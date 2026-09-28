@@ -1,7 +1,7 @@
 // Run with `node --test` (part of `pnpm test`).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { assertStagingUrl } from './db-staging.mjs';
+import { assertStagingUrl, buildArgs, cliInvocation } from './db-staging.mjs';
 
 const STAGING = 'stagingref1234';
 const PROD = 'prodref5678';
@@ -56,4 +56,23 @@ test('a password containing the prod ref does not trip the guard', () => {
     assertStagingUrl(`postgresql://postgres:${PROD}@db.${STAGING}.supabase.co:5432/postgres`, STAGING, PROD),
     true,
   );
+});
+
+test('passes --dry-run through for push only, refuses other flags', () => {
+  assert.deepEqual(buildArgs('push', ['--dry-run'], 'URL'), ['db', 'push', '--db-url', 'URL', '--dry-run']);
+  assert.deepEqual(buildArgs('reset', [], 'URL'), ['db', 'reset', '--db-url', 'URL']);
+  assert.throws(() => buildArgs('reset', ['--dry-run'], 'URL'), /Unsupported/);
+  assert.throws(() => buildArgs('push', ['--linked'], 'URL'), /Unsupported/);
+});
+
+test('starts a JavaScript launcher with node and a native binary directly', () => {
+  assert.deepEqual(cliInvocation('/x/dist/supabase.js', ['db']), {
+    file: process.execPath,
+    args: ['/x/dist/supabase.js', 'db'],
+  });
+  assert.deepEqual(cliInvocation('C:\\x\\bin\\supabase.exe', ['db']), {
+    file: 'C:\\x\\bin\\supabase.exe',
+    args: ['db'],
+  });
+  assert.deepEqual(cliInvocation('/x/bin/supabase', ['db']), { file: '/x/bin/supabase', args: ['db'] });
 });

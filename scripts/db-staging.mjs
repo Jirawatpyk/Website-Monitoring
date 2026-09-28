@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Apply migrations to (or rebuild) the STAGING Supabase database without `supabase link`.
 //
-//   pnpm db:push:staging    → supabase db push  --db-url <staging>
+//   pnpm db:push:staging [-- --dry-run] → supabase db push  --db-url <staging>
 //   pnpm db:reset:staging   → supabase db reset --db-url <staging>   (drops everything, reapplies, seeds)
 //
 // The connection string comes from `.env.staging.local` (never committed; template:
@@ -34,10 +34,37 @@ export function assertStagingUrl(dbUrl, stagingRef, prodRef) {
   return true;
 }
 
+/** Extra flags a caller may pass through; anything else is refused. */
+const ALLOWED_FLAGS = { push: new Set(['--dry-run']), reset: new Set() };
+
+export function buildArgs(command, extra, dbUrl) {
+  const bad = extra.filter((flag) => !ALLOWED_FLAGS[command]?.has(flag));
+  if (bad.length) throw new Error(`Unsupported option(s) for ${command}: ${bad.join(' ')}`);
+  return ['db', command, '--db-url', dbUrl, ...extra];
+}
+
+/**
+ * How to start the CLI without a shell. The npm package's `bin` is a JavaScript launcher today
+ * (`dist/supabase.js`, run with this Node); if a later version ships the native binary directly
+ * (Go, `.exe` on Windows), run that file itself.
+ */
+export function cliInvocation(binPath, args) {
+  return /\.(c|m)?js$/i.test(binPath)
+    ? { file: process.execPath, args: [binPath, ...args] }
+    : { file: binPath, args };
+}
+
+function resolveCliBin() {
+  const require = createRequire(import.meta.url);
+  const pkgPath = require.resolve('supabase/package.json');
+  const { bin } = JSON.parse(readFileSync(pkgPath, 'utf8'));
+  return path.join(path.dirname(pkgPath), typeof bin === 'string' ? bin : bin.supabase);
+}
+
 function main() {
   const command = process.argv[2];
   if (command !== 'push' && command !== 'reset') {
-    console.error('Usage: node scripts/db-staging.mjs <push|reset>');
+    console.error('Usage: node scripts/db-staging.mjs <push [--dry-run] | reset>');
     process.exit(2);
   }
 
@@ -52,14 +79,22 @@ function main() {
     process.exit(1);
   }
 
-  console.info(`db:${command}:staging → project ${SUPABASE_STAGING_PROJECT_REF}`);
-  // Run the CLI's Node entry with this Node — no shell, so characters in the URL are never interpreted.
-  const require = createRequire(import.meta.url);
-  const pkgPath = require.resolve('supabase/package.json');
-  const cli = path.join(path.dirname(pkgPath), JSON.parse(readFileSync(pkgPath, 'utf8')).bin.supabase);
-  const result = spawnSync(process.execPath, [cli, 'db', command, '--db-url', SUPABASE_STAGING_DB_URL], {
-    stdio: 'inherit',
-  });
+  let args;
+  try {
+    args = buildArgs(command, process.argv.slice(3), SUPABASE_STAGING_DB_URL);
+  } catch (err) {
+    console.error(`db:${command}:staging — ${err.message}`);
+    process.exit(2);
+  }
+
+  console.info(
+    `db:${command}:staging → project ${SUPABASE_STAGING_PROJECT_REF}${args.includes('--dry-run') ? ' (dry run)' : ''}`,
+  );
+  // No shell: characters in the connection string are never interpreted.
+  const { file, args: argv } = cliInvocation(resolveCliBin(), args);
+  const result = spawnSync(file, argv, { stdio: 'inherit' });
+  if (result.error)
+    console.error(`db:${command}:staging — could not start the Supabase CLI: ${result.error.message}`);
   process.exit(result.status ?? 1);
 }
 
