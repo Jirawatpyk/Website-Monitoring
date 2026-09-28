@@ -1,0 +1,11 @@
+#!/bin/sh
+# Refuse pushes to main (D-008): the repository is private on GitHub Free, so GitHub doesn't
+# enforce the ruleset — changes reach main only by PR, merged with `pnpm pr:merge <number>`.
+# Installed by `pnpm install` (scripts/install-git-hooks.mjs sets core.hooksPath to .githooks).
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "pre-push: pushing to main is not allowed — open a PR and merge it with 'pnpm pr:merge <number>' (docs/decisions.md D-008)." >&2
+    exit 1
+  fi
+done
+exit 0

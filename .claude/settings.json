@@ -101,7 +101,9 @@
       "Bash(pnpm db:push:staging *)",
       "Bash(pnpm db:reset:staging *)",
       "PowerShell(pnpm db:push:staging *)",
-      "PowerShell(pnpm db:reset:staging *)"
+      "PowerShell(pnpm db:reset:staging *)",
+      "Bash(pnpm pr:merge *)",
+      "PowerShell(pnpm pr:merge *)"
     ],
     "deny": [
       "Bash(git push --force *)",
@@ -126,7 +128,15 @@
       "PowerShell(*supabase db reset --linked*)",
       "Bash(*supabase db reset --db-url*)",
       "PowerShell(*supabase db reset --db-url*)",
-      "Read(**/.env.staging.local)"
+      "Read(**/.env.staging.local)",
+      "Bash(git push * main)",
+      "Bash(git push *:main)",
+      "Bash(git push *:refs/heads/main)",
+      "PowerShell(git push * main)",
+      "PowerShell(git push *:main)",
+      "PowerShell(git push *:refs/heads/main)",
+      "Bash(gh pr merge *)",
+      "PowerShell(gh pr merge *)"
     ]
   },
   "hooks": {
