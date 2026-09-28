@@ -62,6 +62,15 @@ test('passes --dry-run through for push only, refuses other flags', () => {
   assert.deepEqual(buildArgs('push', ['--dry-run'], 'URL'), ['db', 'push', '--db-url', 'URL', '--dry-run']);
   assert.deepEqual(buildArgs('reset', [], 'URL'), ['db', 'reset', '--db-url', 'URL']);
   assert.throws(() => buildArgs('reset', ['--dry-run'], 'URL'), /Unsupported/);
+  // pnpm forwards the `--` separator; only a leading one is dropped.
+  assert.deepEqual(buildArgs('push', ['--', '--dry-run'], 'URL'), [
+    'db',
+    'push',
+    '--db-url',
+    'URL',
+    '--dry-run',
+  ]);
+  assert.throws(() => buildArgs('push', ['--dry-run', '--'], 'URL'), /Unsupported/);
   assert.throws(() => buildArgs('push', ['--linked'], 'URL'), /Unsupported/);
 });
 

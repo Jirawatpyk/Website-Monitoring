@@ -97,7 +97,11 @@
       "Bash(pnpm db:push:staging)",
       "Bash(pnpm db:reset:staging)",
       "PowerShell(pnpm db:push:staging)",
-      "PowerShell(pnpm db:reset:staging)"
+      "PowerShell(pnpm db:reset:staging)",
+      "Bash(pnpm db:push:staging *)",
+      "Bash(pnpm db:reset:staging *)",
+      "PowerShell(pnpm db:push:staging *)",
+      "PowerShell(pnpm db:reset:staging *)"
     ],
     "deny": [
       "Bash(git push --force *)",
