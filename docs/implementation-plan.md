@@ -29,7 +29,7 @@
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04 | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Todo |
-| S16 | Users, access & 2-step | 2 · P1 | L | — | S10 | 5 | Todo |
+| S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Todo |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Todo |
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Todo |
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | Todo |
@@ -60,7 +60,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 ### S00 · Prep, decisions, accounts & staging
 
-- **Scope:** PRD §12 Phase 0. Close CEO decisions (PRD §13): tiers, owners / backups, on-call members, CEO at L2, Twilio, budget ceiling ($60 / month — no PITR add-on, D-005) — collected in a decisions memo as a Claude Doc the CEO answers in place. Site Registration Checklist for 17 sites (URL + key pages, owner, backup, client, AM, hosting, WAF, credential reference) — a Claude Doc that owners and AMs fill in. Link both docs here when they exist. Accounts: Supabase Pro project (production) and a staging project in a separate free organisation (D-005). Two Vercel projects on the same repo, both with root `apps/web` (D-006): `dxt-monitor` (production branch `main`) and `dxt-monitor-staging` (production branch `staging`, env pointing at the staging Supabase project, the staging Chat space and its own `CRON_SECRET` / `INGEST_TOKEN`; Healthchecks URLs left empty or separate checks). Ignored Build Step so each project builds only its own branches — staging: `[ "$VERCEL_GIT_COMMIT_REF" != "staging" ]`, production: `[ "$VERCEL_GIT_COMMIT_REF" = "staging" ]` (exit 0 skips the build). Thai VPS (2 GB), Healthchecks.io checks, Resend sending domain, company domain. Database access per environment: `.env.staging.local` from `scripts/db-staging.env.example` (staging connection string + both project refs), and the GitHub environment `production` with the secret `SUPABASE_PROD_DB_URL` for the `migrate-production` CI job. Sign-in per environment (Supabase Auth handles Google): one Google OAuth client (Web) whose authorised redirect URIs are the Supabase callbacks of **both** projects (`https://<prod-ref>.supabase.co/auth/v1/callback`, `https://<staging-ref>.supabase.co/auth/v1/callback`) — app URLs don't go there. Each Supabase project's Auth URL configuration holds the app URLs: production — Site URL = production domain, redirect `https://<prod-domain>/auth/callback`; staging — Site URL `https://dxt-monitor-staging.vercel.app`, redirects `https://dxt-monitor-staging.vercel.app/auth/callback` and the PR-preview pattern `https://*-<vercel-team>.vercel.app/**` (PR previews use the staging database). Google Chat spaces "DxT Website Alerts", "DxT Website Reports" and a "DxT Monitor — staging" space for tests, each with an incoming webhook. HTTP vs Playwright capture of Tubtong / Cando Asia block pages; ask WAF owners to allowlist the probe UA + secret header and the VPS IP.
+- **Scope:** PRD §12 Phase 0. Close CEO decisions (PRD §13): tiers, owners / backups, on-call members, CEO at L2, Twilio, budget ceiling ($60 / month — no PITR add-on, D-005) — collected in a decisions memo as a Claude Doc the CEO answers in place. Site Registration Checklist for 17 sites (URL + key pages, owner, backup, client, AM, hosting, WAF, credential reference) — a Claude Doc that owners and AMs fill in. Link both docs here when they exist. Accounts: Supabase Pro project (production) and a staging project in a separate free organisation (D-005). Two Vercel projects on the same repo, both with root `apps/web` (D-006): `dxt-monitor` (production branch `main`) and `dxt-monitor-staging` (production branch `staging`, env pointing at the staging Supabase project, the staging Chat space and its own `CRON_SECRET` / `INGEST_TOKEN`; Healthchecks URLs left empty or separate checks). Ignored Build Step so each project builds only its own branches — staging: `[ "$VERCEL_GIT_COMMIT_REF" != "staging" ]`, production: `[ "$VERCEL_GIT_COMMIT_REF" = "staging" ]` (exit 0 skips the build). Thai VPS (2 GB), Healthchecks.io checks, Resend sending domain, company domain (the primary address domain people sign in with, D-007). Access list (D-007): every person who will get a role, with that role — kept outside the repo (public), loaded as SQL in S01. Database access per environment: `.env.staging.local` from `scripts/db-staging.env.example` (staging connection string + both project refs), and the GitHub environment `production` with the secret `SUPABASE_PROD_DB_URL` for the `migrate-production` CI job. Sign-in per environment (Supabase Auth handles Google): one Google OAuth client (Web) in a Google Cloud project of the company's Workspace organisation, consent screen **Internal** (D-007), whose authorised redirect URIs are the Supabase callbacks of **both** projects (`https://<prod-ref>.supabase.co/auth/v1/callback`, `https://<staging-ref>.supabase.co/auth/v1/callback`) — app URLs don't go there. Each Supabase project's Auth URL configuration holds the app URLs: production — Site URL = production domain, redirect `https://<prod-domain>/auth/callback`; staging — Site URL `https://dxt-monitor-staging.vercel.app`, redirects `https://dxt-monitor-staging.vercel.app/auth/callback` and the PR-preview pattern `https://*-<vercel-team>.vercel.app/**` (PR previews use the staging database). Google Chat spaces "DxT Website Alerts", "DxT Website Reports" and a "DxT Monitor — staging" space for tests, each with an incoming webhook. HTTP vs Playwright capture of Tubtong / Cando Asia block pages; ask WAF owners to allowlist the probe UA + secret header and the VPS IP.
 - **Depends on:** —
 - **Done when:**
   1. CEO has approved tiers and the escalation ladder (PRD §12 exit), answered in the decisions memo and copied to the PRD's decisions list.
@@ -71,18 +71,19 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   6. Pushing to `staging` deploys `dxt-monitor-staging` to its production URL, and its Vercel cron logs show `/api/cron/engine` called every minute (401 / 501 responses are expected until S02a); pushing a slice branch builds nothing on the staging project.
   7. The Google OAuth client lists both Supabase callbacks, and each Supabase project's Redirect URLs list matches the URLs above (checked by Tao).
   8. `pnpm db:push:staging --dry-run` against the empty staging database lists migrations 0001–0002 and exits 0; then `pnpm db:push:staging` applies them (output in the S00 notes) — the guarded scripts are proven before S02a needs them.
+  9. The OAuth consent screen is Internal, and everyone on the access list has confirmed that their Google Account → 2-Step Verification page says it is required and can't be turned off (D-007); anyone for whom it can be turned off is raised with IT and left off the list.
 - **Review:** Tao sign-off; no code review.
 
 ## Phase 1 — MVP, P0
 
 ### S01 · Foundation: schema, auth, app shell
 
-- **Scope:** Tables `profiles` (auto-created on first sign-in, email as the default notification channel), `clients`, `sites`, `monitors`, `audit_log` with RLS per role (PRD §3) and explicit grants; role helpers (`current_app_role()`, `owns_site(site_id)`); `audit_log` append-only with a write helper. Google SSO sign-in (Login, MLogin) with `?next=`; company domain in `private.allowed_email_domains`; roles assigned by a reviewed SQL script until the Users screen (S16). App shell (SideNav with `live` flags, account footer), shared empty / loading / no-access states using the `@dxt/shared` formats. Dev seed from the spec sample data. SQL tests with pgTAP (`supabase/tests/`), run in a CI `db` job (Supabase CLI starts the local stack in Docker, then `supabase test db`), required on `main` alongside `check`.
+- **Scope:** Tables `profiles` (auto-created on first sign-in, email as the default notification channel), `clients`, `sites`, `monitors`, `audit_log` with RLS per role (PRD §3) and explicit grants; role helpers (`current_app_role()`, `owns_site(site_id)`); `audit_log` append-only with a write helper. Google SSO sign-in (Login, MLogin) with `?next=`; company domain in `private.allowed_email_domains`; email allowlist `private.allowed_emails (email, role)` checked by the `before_user_created` hook, and the profile created on first sign-in with the allowlisted role (D-007). Until the Users screen (S16) an Admin edits the allowlist with SQL per environment, from a committed template with placeholders — real addresses never enter the repo. Users without an active profile read nothing (RLS). The proxy keeps the domain check only (no database query per request). App shell (SideNav with `live` flags, account footer), shared empty / loading / no-access states using the `@dxt/shared` formats. Dev seed from the spec sample data. SQL tests with pgTAP (`supabase/tests/`), run in a CI `db` job (Supabase CLI starts the local stack in Docker, then `supabase test db`), required on `main` alongside `check`.
 - **Already in place from the setup:** enums (migration 0001), sign-up domain hook (0002), auth proxy with segment-wise public paths, `/auth/callback`, `safeNextPath` / `isAllowedEmail`, app shell and nav `live` flags, placeholder Login / Overview pages; web test tooling — Vitest + Testing Library (`pnpm --filter @dxt/web test`) and Playwright e2e at 1440 / 390 (`pnpm test:e2e`), both in CI.
-- **Boards:** Login, MLogin, EmptyStates · **Tables:** profiles, clients, sites, monitors, audit_log
-- **Depends on:** S00 (Supabase projects, OAuth client, company domain)
+- **Boards:** Login, MLogin, EmptyStates · **Tables:** profiles, clients, sites, monitors, audit_log · **Test plan:** T12
+- **Depends on:** S00 (Supabase projects, OAuth client, company domain, access list)
 - **Done when:**
-  1. A company Google account signs in at `/login` and lands on `/` — locally, on `dxt-monitor-staging` and on one PR preview; a non-company account is refused by the `before_user_created` hook (pgTAP test) and by the proxy (`?error=domain`).
+  1. **T12:** an allowlisted company account signs in at `/login` and lands on `/` with its allowlisted role — locally, on `dxt-monitor-staging` and on one PR preview. A company account that isn't on the allowlist and a non-company account are both refused by the `before_user_created` hook (pgTAP tests); a non-company session is also refused by the proxy (`?error=domain`); a user whose profile is inactive reads nothing (pgTAP).
   2. Opening `/incidents/x` signed out → sign-in → back on `/incidents/x`.
   3. `pnpm exec supabase test db` passes locally and in the CI `db` job: anon reads nothing; viewer can't write `sites`; responder updates only own sites; `authenticated` can't UPDATE / DELETE `audit_log`.
   4. `pnpm db:reset` builds from zero with seed; `pnpm db:types` output committed; `pnpm check` green.
@@ -209,7 +210,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 - ข้อมูล 17 เว็บครบ 100% ก่อน go-live (S05 Done-when 1).
 - DOWN จำลองแล้ว alert ถึงภายใน 3 นาที — on production, against the test target, for a Tier 1 monitor.
-- A second Admin is active with 2-step (PRD §9: "ต้องมี admin คนที่ 2 ก่อน Phase 2"), and Healthchecks alerts go to both Admins. They are added to `.github/CODEOWNERS`, and the GitHub ruleset "main" now requires 1 approving review from a code owner.
+- A second Admin is active, with their 2-Step Verification page confirmed per D-007 (PRD §9: "ต้องมี admin คนที่ 2 ก่อน Phase 2"), and Healthchecks alerts go to both Admins. They are added to `.github/CODEOWNERS`, and the GitHub ruleset "main" now requires 1 approving review from a code owner.
 - `docs/runbook.md` v1 exists and the second Admin has walked through it once: what each heartbeat / Healthchecks alert means, restarting the VPS agent, checking Vercel Cron and function logs, pausing alerts with maintenance, rotating `CRON_SECRET` / `INGEST_TOKEN` / webhook URLs, and who to call (PRD §13 bus-factor mitigation).
 - From here every production deploy happens inside a maintenance window, and the parallel run with the CEO's hourly monitor starts; S19 keeps its log.
 
@@ -287,13 +288,13 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   3. spec-checker passes AuditLog; nav "Audit log" live.
 - **Review:** security-reviewer, spec-checker.
 
-### S16 · Users, access & 2-step
+### S16 · Users & access
 
-- **Scope:** Users & roles (invite, change role, deactivate with the "Used in" check and reassignment, §14.9), Security (2-step required date, sessions, confirm dialogs), Profile (notification channels, on-call checklist). Google Workspace 2-Step status through the Admin SDK (Directory API `isEnrolledIn2Sv`, question Q6); people without it can view + acknowledge only (§15.2, §16.7).
-- **Boards:** Users, Security, Profile · **Test plan:** T12
+- **Scope:** Users & roles (invite = add to the allowlist with a role, change role, deactivate with the "Used in" check and reassignment, §14.9), Security (sessions, sign out everywhere, confirm dialogs), Profile (notification channels, on-call checklist). No 2-step status, required date or lock — Google Workspace enforces 2-step (D-007); the invite dialog reminds the Admin to have the person confirm their 2-Step Verification page.
+- **Boards:** Users, Security, Profile
 - **Depends on:** S10
 - **Done when:**
-  1. **T12:** a user without 2-step after the required date can acknowledge, and mute / maintenance / resolve / mark client update are locked with the spec text.
+  1. Inviting an address adds it to the allowlist with the chosen role and that person can then sign in; deactivating removes the entry, bans the auth user and ends their sessions (test). Every change writes `audit_log`.
   2. Changing Nok's role lists every place Nok is used (escalation levels, AM, owner / backup, shifts) and won't save until each is reassigned.
   3. After "Sign out everywhere", the person's refresh tokens are rejected and their sessions stop working within the JWT lifetime (`jwt_expiry` = 3600 s) (test).
   4. spec-checker passes Users, Security, Profile; nav "Settings" live.
@@ -412,12 +413,12 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 | # | Question | Blocks |
 |---|---|---|
-| Q1 | The spec's "2-step required from Mon 5 Oct" is before MVP go-live. Is it a Google Workspace policy date independent of the app, or should the app's lock start at team go-live? | S16 date only |
+| Q1 | ~~The spec's "2-step required from Mon 5 Oct": Workspace policy date or the app's lock?~~ **Closed 28 Sep 2026 (D-007):** Workspace already enforces 2-step; the app has no lock or date. | — |
 | Q2 | PDF renderer for monthly reports (server-side React PDF vs headless Chromium on the VPS). | S20 |
 | Q3 | Voice call at L2: CEO (current design) or owner / on-call (original intent)? PRD §13. | S10 (off by default either way) |
 | Q4 | Healthchecks grace time and recipients for the verifier, VPS watchdog and daily digest (design: 3 min / 30 min, email Tao). PRD §13. | S12, S14 |
 | Q5 | Confirm synthetic checks cap at PROBLEM. PRD §13. | S23 |
-| Q6 | Google Workspace admin access for the Directory API (2-Step status) — a service account with domain-wide delegation. | S16 |
+| Q6 | ~~Google Workspace admin access for the Directory API (2-Step status).~~ **Closed 28 Sep 2026 (D-007):** not needed — no Directory API. | — |
 | Q7 | ~~Timeline: re-baseline, add a developer, or cut scope?~~ **Answered 28 Sep 2026:** measure S02a first, then decide with real numbers. | — |
 
 ## Appendix — coverage matrix
@@ -525,7 +526,7 @@ ChatAlert starts in S02a and EmailAlert in S02b; both gain rows in every slice t
 | maintenance_windows | S09 |
 | oncall_shifts | S10 |
 
-Tables the plan adds beyond PRD §11: organisation settings and company holidays (S08), API keys and webhooks (S24), `private.allowed_email_domains` (done, migration 0002).
+Tables the plan adds beyond PRD §11: organisation settings and company holidays (S08), API keys and webhooks (S24), `private.allowed_email_domains` (done, migration 0002), `private.allowed_emails` (S01, D-007).
 
 ### Go-live test plan (PRD §12)
 
@@ -542,4 +543,4 @@ Tables the plan adds beyond PRD §11: organisation settings and company holidays
 | T09 | Mute with open incident → escalation, L3 FYI, client update continue | S09 |
 | T10 | Resolve blocked until 3 conditions | S07 |
 | T11 | Engine heartbeat off → Tao email + on-call mention; probe off → email only | S12 |
-| T12 | No 2-step after the required date → ack only | S16 |
+| T12 | Only allowlisted company accounts get in; 2-step enforced by Workspace (D-007) | S01 |

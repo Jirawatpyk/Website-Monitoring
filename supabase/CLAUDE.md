@@ -10,6 +10,6 @@ Local stack: `pnpm db:start` (Docker). Migrations in `migrations/`, applied in f
 - After a schema change run `pnpm db:types` and commit `packages/db/src/database.types.ts`.
 - `seed.sql` is dev sample data from the design spec; never production data.
 - `auto_expose_new_tables = false`: every new table needs explicit `grant … to authenticated` (and RLS) or the API can't see it.
-- Sign-up is limited by the `before_user_created` hook (migration 0002). Each environment needs its company domain in `private.allowed_email_domains`; with no row, nobody can sign up.
-- "2-step" is Google Workspace 2-Step Verification, not Supabase MFA — reading a user's enrolment needs the Google Admin SDK (Directory API `isEnrolledIn2Sv`). Open implementation question for the Login/Security boards.
+- Sign-up is limited by the `before_user_created` hook (migration 0002; S01 adds the email allowlist, D-007). Each environment needs its company domain in `private.allowed_email_domains` and every invited address in `private.allowed_emails`; with no row, nobody can sign up. Real addresses are inserted per environment and never committed — the repo is public.
+- "2-step" is Google Workspace 2-Step Verification, enforced by Workspace (D-007) — not Supabase MFA, and the app never reads or enforces it.
 - Hosted projects (`docs/workflow.md` → Environments): **staging** only through `pnpm db:push:staging` / `pnpm db:reset:staging` (connection string from `.env.staging.local`, template `scripts/db-staging.env.example`; they refuse the production project). **Production** only through the CI job `migrate-production` on `main`. Never run `supabase link`, and never run `supabase db push` / `db reset` against a hosted project by hand — `.claude/settings.json` denies both.

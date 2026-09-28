@@ -11,7 +11,7 @@ The index `/implement-screen` reads. One row per canvas board (44). The board fi
 
 | Board | Canvas title | Route | Phase | Slice | Spec | PRD |
 |---|---|---|---|---|---|---|
-| Login | Sign in — Google SSO + Admin 2-step | `/login` | P0 | S01 | §14.12, §15.2, §16.7 | §3, FR-07 |
+| Login | Sign in — Google SSO (2-step enforced by Workspace, D-007) | `/login` | P0 | S01 | §14.12, §15.2, §16.7 | §3, FR-07 |
 | MLogin | Mobile — session expired from alert link | `/login?next=…` (390) | P0 | S01 | §15.2, §16.7 | §3 |
 | Main | Overview dashboard | `/` | P0 | S06 | §1, §5, §11, §14.13, §15.1 | FR-05 |
 | MOverview | Mobile — Overview | `/` (390) | P0 | S06 | §17 | FR-05 |
@@ -36,8 +36,8 @@ The index `/implement-screen` reads. One row per canvas board (44). The board fi
 | Expiry | SSL & domain expiry | `/expiry` | P1 | S13 | §14.12, §15.8 | FR-11 |
 | Probes | Probes & heartbeat | `/probes` | P1 | S12 | §14.4, §15.3 | §9 |
 | AuditLog | Audit log | `/audit` | P1 | S15 | §16.11 | FR-13 |
-| Users | Settings — users & roles | `/settings/users` | P1 — until then roles are set by a reviewed SQL script (S01) | S16 | §14.9, §15.2, §16.6 | §3 |
-| Security | Settings — sign-in & security | `/settings/security` | P1 | S16 | §15.2, §16.7 | §3, §9 |
+| Users | Settings — users & roles | `/settings/users` | P1 — until then the allowlist and roles are set by SQL (S01, D-007) | S16 | §14.9, §15.2, §16.6 | §3 |
+| Security | Settings — sessions & security (no 2-step lock, D-007) | `/settings/security` | P1 | S16 | §15.2, §16.7 | §3, §9 |
 | AlertChannels | Settings — alert channels & routing | `/settings/alert-channels` | P1 | S17 | §14.8, §15.5, §15.8 | §7 |
 | Organisation | Settings — organisation: tiers, clients, data, cost | `/settings/organisation` | P1 | S17 | §7, §14.14 | §4, §10 |
 | Profile | My profile & notifications | `/profile` | P1 | S16 | §10 (on-call checklist) | §3 |
