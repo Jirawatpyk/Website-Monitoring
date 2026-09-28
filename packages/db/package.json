@@ -1,0 +1,21 @@
+{
+  "name": "@dxt/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./service": "./src/service.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Client status page — Bangkok Airways</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+/* Day-bar tokens — defined once; bars, legend and popover swatches all use the .day classes below. */
+:root{--day-ok:#84cc16;--day-deg:#f59e0b;--day-out:var(--aura-status-blocked-bg);--day-mnt:var(--aura-fg-secondary);--day-nodata:var(--aura-border-control);--day-hatch:rgba(0,0,0,.3);--day-cap:5px}
+.day{display:block;box-sizing:border-box;border-radius:2px;background:var(--day-ok);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.day[data-k="deg"]{background:repeating-linear-gradient(135deg,var(--day-hatch) 0 1.5px,transparent 1.5px 4px),var(--day-deg)}
+.day[data-k="out"]{background:var(--day-out)}
+.day[data-k="no"]{background:repeating-linear-gradient(135deg,var(--day-nodata) 0 1.5px,transparent 1.5px 4px);box-shadow:inset 0 0 0 1px var(--aura-border-default)}
+.day[data-m="1"]{box-shadow:inset 0 var(--day-cap) 0 0 var(--day-mnt)}
+.daybtn{all:unset;box-sizing:border-box;height:100%;display:flex;align-items:flex-end;cursor:pointer;border-radius:3px}
+.daybtn:focus-visible{outline:2px solid var(--aura-fg-accent);outline-offset:2px}
+.daybtn[aria-expanded="true"] .day{outline:2px solid var(--aura-fg-primary);outline-offset:1px}
+.sw{width:8px;flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1380px; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<div style="flex-shrink: 0; margin: 12px 16px; padding: 10px 16px; display: flex; align-items: center; gap: 14px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary)">
+<span style="font-family: var(--font-mono)">STATE</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{states}}" value="{{st}}" on-change="{{pickState}}" size="sm"></x-import>
+<span style="font-family: var(--font-mono)">DAY DETAIL</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Day detail" options="{{popOpts}}" value="{{popVal}}" on-change="{{pickPop}}" size="sm"></x-import>
+<span style="margin-left: auto; line-height: 1.4; text-align: right">Spec control — not part of the client page. Stale = no fresh results for more than 5 min.</span>
+</div>
+
+<header style="height: 72px; flex-shrink: 0; box-sizing: border-box; padding: 0 max(40px, calc((100% - 880px) / 2)); display: flex; align-items: center; justify-content: space-between; background: var(--aura-bg-surface); border-top: 1px solid var(--aura-border-default); border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; gap: 14px">
+<div style="height: 36px; width: 120px; box-sizing: border-box; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-sm); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--aura-fg-secondary)">[Client logo]</div>
+<div style="display: flex; flex-direction: column; line-height: 1.3">
+<span style="font-size: 16px; font-weight: 600">{{t.client}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.title}}</span>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Language" options="{{langs}}" value="{{lang}}" on-change="{{setLang}}" size="sm"></x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="bell" on-click="{{openSub}}">{{t.subscribe}}</x-import>
+</div>
+</header>
+
+<main style="width: 880px; align-self: center; box-sizing: border-box; padding: 36px 0 32px; display: flex; flex-direction: column; gap: 28px">
+
+<div style="display: flex; align-items: flex-start; gap: 16px; padding: 22px 24px; background: {{b.bg}}; border: 1px solid {{b.border}}; border-radius: var(--aura-radius-lg)">
+<span style="width: 40px; height: 40px; flex-shrink: 0; border-radius: 9999px; background: {{b.iconBg}}; color: {{b.iconFg}}; display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="{{b.icon}}" size="md"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; line-height: 1.45">
+<span style="font-size: 20px; font-weight: 600">{{b.title}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{b.sub}}</span>
+<sc-if value="{{b.hasUpdate}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 8px; padding: 12px 14px; background: var(--aura-bg-surface); border: 1px solid {{b.border}}; border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.55">
+<span style="font-weight: 600">{{b.updTitle}}</span>
+<span>{{b.update}}</span>
+</div>
+</sc-if>
+</div>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600">{{t.websites}}</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{t.availability}}</span>
+</div>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Time window" options="{{wins}}" value="{{winLabel}}" on-change="{{pickWin}}" size="sm"></x-import>
+</div>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius)">
+<sc-for list="{{sites}}" as="s" hint-placeholder-count="2">
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<div style="display: flex; flex-direction: column; line-height: 1.35">
+<span style="font-size: 15px; font-weight: 600">{{s.name}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{s.url}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import>
+</div>
+<div style="position: relative">
+<div role="group" aria-label="{{s.groupLabel}}" aria-describedby="daykeys" style="height: 40px; display: grid; grid-template-columns: {{cols}}; gap: {{gap}}">
+<sc-for list="{{s.days}}" as="d" hint-placeholder-count="90">
+<button type="button" class="daybtn" id="{{d.id}}" tabindex="{{d.ti}}" aria-label="{{d.aria}}" aria-haspopup="dialog" aria-expanded="{{d.exp}}" aria-controls="{{s.popId}}" onClick="{{d.open}}" onKeyDown="{{d.key}}" onFocus="{{d.focus}}"><span class="day" data-k="{{d.k}}" data-m="{{d.m}}" style="width: 100%; height: {{d.h}}px"></span></button>
+</sc-for>
+</div>
+<sc-if value="{{s.hasPop}}" hint-placeholder-val="{{false}}">
+<div role="dialog" id="{{s.popId}}" aria-label="{{s.pop.aria}}" onKeyDown="{{popKey}}" style="position: absolute; z-index: 5; bottom: calc(100% + 10px); left: {{s.pop.left}}; transform: translateX({{s.pop.shift}}); width: 288px; box-sizing: border-box; padding: 12px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-control); border-radius: var(--aura-radius-md); box-shadow: 0 8px 24px rgba(0,0,0,.12); display: flex; flex-direction: column; gap: 6px; line-height: 1.45">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-size: 13px; font-weight: 600">{{s.pop.date}}</span>
+<x-import component-from-global-scope="Aura.IconButton" icon="x" label="{{t.close}}" size="sm" on-click="{{closePop}}"></x-import>
+</div>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500"><span class="day sw" data-k="{{s.pop.k}}" data-m="{{s.pop.m}}" style="height: 14px"></span>{{s.pop.state}}</span>
+<sc-if value="{{s.pop.hasBody}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; color: var(--aura-fg-primary)">{{s.pop.body}}</span></sc-if>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{s.pop.note}}</span>
+<span style="position: absolute; top: 100%; left: {{s.pop.arrow}}; width: 10px; height: 10px; margin-top: -5px; margin-left: -5px; transform: rotate(45deg); background: var(--aura-bg-surface); border-right: 1px solid var(--aura-border-control); border-bottom: 1px solid var(--aura-border-control)"></span>
+</div>
+</sc-if>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--aura-fg-secondary)">
+<span>{{t.ago}}</span><span style="font-weight: 600; color: var(--aura-fg-primary)">{{s.uptimeText}}</span><span>{{t.today}}</span>
+</div>
+</div>
+</sc-for>
+<div style="padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas); border-radius: 0 0 var(--aura-card-radius) var(--aura-card-radius)">
+<span style="display: flex; align-items: flex-end; gap: 6px"><span class="day sw" data-k="ok" style="height: 12px"></span>{{t.lOk}}</span>
+<span style="display: flex; align-items: flex-end; gap: 6px"><span class="day sw" data-k="deg" style="height: 16px"></span>{{t.lDeg}}</span>
+<span style="display: flex; align-items: flex-end; gap: 6px"><span class="day sw" data-k="out" style="height: 20px"></span>{{t.lOut}}</span>
+<span style="display: flex; align-items: flex-end; gap: 6px"><span class="day sw" data-k="ok" data-m="1" style="height: 12px"></span>{{t.lMnt}}</span>
+<span style="display: flex; align-items: flex-end; gap: 6px"><span class="day sw" data-k="no" style="height: 12px"></span>{{t.lNo}}</span>
+<span id="daykeys" style="margin-left: auto">{{t.legendNote}}</span>
+</div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600">{{t.past}}</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{t.pastWin}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<sc-for list="{{past}}" as="p" hint-placeholder-count="3">
+<div style="padding: 16px 24px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 10px">
+<x-import component-from-global-scope="Aura.Badge" tone="{{p.tone}}" variant="{{p.variant}}" icon="{{p.icon}}">{{p.kind}}</x-import>
+<span style="font-size: 15px; font-weight: 600">{{p.title}}</span>
+<span style="margin-left: auto; font-size: 12px; color: var(--aura-fg-secondary)">{{p.when}}</span>
+</div>
+<span style="font-size: 13px; line-height: 1.6"><span style="font-weight: 600">{{p.status}}</span> — {{p.body}}</span>
+</div>
+</sc-for>
+</div>
+</section>
+
+<footer style="display: flex; justify-content: space-between; padding-top: 4px; font-size: 12px; color: var(--aura-fg-secondary)">
+<span>{{t.footer}}</span>
+<span style="display: flex; align-items: center; gap: 6px">{{t.powered}} <span style="height: 20px; padding: 0 6px; display: inline-flex; align-items: center; gap: 4px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: 4px; font-family: var(--font-display); font-size: 11px; font-weight: 600">DxT<span style="width: 4px; height: 4px; border-radius: 9999px; background: var(--aura-accent-dot)"></span></span></span>
+</footer>
+</main>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{subOpen}}" on-close="{{closeSub}}" title="{{sub.title}}" description="{{sub.desc}}" size="sm" auto-focus="{{no}}">
+<sc-if value="{{subForm}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<x-import component-from-global-scope="Aura.TextField" label="{{sub.email}}" type="email" placeholder="name@company.com" value="{{email}}" error="{{emailErr}}" on-change="{{setEmail}}" on-blur="{{blurEmail}}"></x-import>
+<div role="group" aria-label="{{sub.sites}}" style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 500">{{sub.sites}}</span>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{subT}}" on-change="{{setSubT}}">{{sub.tw}}</x-import>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{subC}}" on-change="{{setSubC}}">{{sub.cn}}</x-import>
+</div>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{subM}}" on-change="{{setSubM}}">{{sub.mnt}}</x-import>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{sub.note}}</span>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span role="alert" style="flex-grow: 1; font-size: 12px; line-height: 1.4; color: var(--aura-alert-danger-fg)">{{subReason}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeSub}}">{{sub.cancel}}</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="mail" on-click="{{doSub}}">{{sub.go}}</x-import>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{subSent}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 12px; padding: 12px 14px; background: var(--aura-alert-success-bg); border: 1px solid var(--aura-alert-success-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: var(--aura-alert-success-fg)"><x-import component-from-global-scope="Aura.Icon" name="mail" size="sm"></x-import></span>
+<span>{{sub.sentBody}}</span>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{sub.unsub}}</span>
+<div style="display: flex; justify-content: flex-end"><x-import component-from-global-scope="Aura.Button" variant="primary" on-click="{{closeSub}}">{{sub.done}}</x-import></div>
+</div>
+</sc-if>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1380}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { lang: 'EN', st: 'Operational', win: '90 days', pop: null, foc: {}, sub: 'closed', email: '', emailBlur: false, subTried: false, subT: true, subC: true, subM: true };
+  }
+  renderVals() {
+    var self = this;
+    var S = this.state;
+    var th = S.lang === 'TH';
+    var st = S.st;
+    var N = S.win === '30 days' ? 30 : 90;
+    var WD = th ? ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var MO = th ? ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function dm(d) { return d.getDate() + ' ' + MO[d.getMonth()]; }
+    function wdm(d) { return WD[d.getDay()] + ' ' + dm(d); }
+    function mins(m) { if (m < 60) return m + (th ? ' นาที' : ' min'); var h = Math.floor(m / 60), r = m % 60; return h + (th ? ' ชม.' : ' h') + (r ? ' ' + r + (th ? ' นาที' : ' min') : ''); }
+    function key(d) { return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate(); }
+    var TW = th ? 'บางกอกแอร์เวย์ส – ไต้หวัน' : 'Bangkok Airways – Taiwan';
+    var CN = th ? 'บางกอกแอร์เวย์ส – จีน' : 'Bangkok Airways – China';
+    var NOWS = {
+      'Operational': { d: new Date(2026, 8, 25), time: '10:07' },
+      'Stale data': { d: new Date(2026, 8, 26), time: '02:31' },
+      'Maintenance': { d: new Date(2026, 8, 26), time: '22:40' },
+      'Outage': { d: new Date(2026, 8, 2), time: '03:47' }
+    };
+    var now = NOWS[st].d;
+    var u7 = ' (UTC+7)';
+    var at = th ? ' น.' : '';
+    // Client-visible events only (SPEC §12). 11 Aug SSL early warning is internal: not listed, not coloured.
+    var EV = [
+      { id: 'i131', sites: 't', d: new Date(2026, 8, 14), time: '21:12', k: 'deg', min: 6,
+        short: th ? 'โหลดช้าในบางภูมิภาค' : 'Slower loading in one region',
+        body: th ? 'ผู้เข้าชมในบางภูมิภาคโหลดหน้าเว็บช้าลง เว็บไซต์ยังเข้าใช้งานได้ตลอดเวลา' : 'Slower loading for visitors in one region. The site stayed available throughout.' },
+      { id: 'i118', sites: 't', d: new Date(2026, 8, 2), time: '03:40', k: 'out', min: 11,
+        short: th ? 'เซิร์ฟเวอร์ขัดข้อง แก้ไขแล้ว' : 'Server fault, restored',
+        body: th ? 'เว็บไซต์เข้าไม่ได้ชั่วคราวจากปัญหาเซิร์ฟเวอร์ ทีมงานแก้ไขแล้วและใช้งานได้ตามปกติตั้งแต่นั้น' : 'The site was briefly unreachable due to a server fault. Our team restored it and it has been stable since.' },
+      { id: 'c0821', sites: 'c', d: new Date(2026, 7, 21), time: '14:06', k: 'out', min: 26,
+        short: th ? 'เครือข่ายของผู้ให้บริการโฮสติ้งขัดข้อง' : 'Hosting provider network fault',
+        body: th ? 'ผู้ให้บริการโฮสติ้งมีปัญหาเครือข่าย เว็บไซต์กลับมาใช้งานได้หลังผู้ให้บริการแก้ไข' : 'A network fault at the hosting provider. Service returned once the provider fixed it.' },
+      { id: 't0818', sites: 't', d: new Date(2026, 7, 18), time: '10:05', k: 'deg', min: 14,
+        short: th ? 'หน้าจองตั๋วโหลดช้า' : 'Booking page slow',
+        body: th ? 'หน้าจองตั๋วโหลดช้า เว็บไซต์ยังเข้าใช้งานได้ตลอดเวลา' : 'The booking page was slow to load. The site stayed available throughout.' },
+      { id: 'm0812', sites: 'tc', d: new Date(2026, 7, 12), time: '22:00', end: '00:00', k: 'mnt', min: 120,
+        short: th ? 'ปิดปรับปรุงเซิร์ฟเวอร์ตามแผน' : 'Scheduled server work',
+        body: th ? 'ปิดปรับปรุงเซิร์ฟเวอร์ตามกำหนดที่แจ้งไว้ล่วงหน้า ไม่นำมานับในความพร้อมใช้งาน' : 'Scheduled server work, announced in advance. Not counted in uptime.' }
+    ];
+    if (st === 'Outage') EV = EV.filter(function (e) { return e.id !== 'i118' && e.id !== 'i131'; });
+    var first = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (N - 1));
+    function inWin(e) { return key(e.d) >= key(first) && key(e.d) <= key(now); }
+    var LBL = th
+      ? { ok: 'ใช้งานได้ปกติ', deg: 'ประสิทธิภาพลดลง', out: 'ใช้งานไม่ได้', mnt: 'ปิดปรับปรุงตามแผน', no: 'ไม่มีข้อมูล' }
+      : { ok: 'Operational', deg: 'Degraded', out: 'Outage', mnt: 'Planned maintenance', no: 'No data' };
+    var NOTE = th
+      ? { out: 'นับรวมในความพร้อมใช้งาน', deg: 'เว็บไซต์ยังเข้าได้ · ไม่นับรวมในความพร้อมใช้งาน', ok: 'ไม่มีช่วงที่ใช้งานไม่ได้', no: 'ระบบตรวจสอบยังไม่ได้รับผลล่าสุดตั้งแต่ 02:17 น.' }
+      : { out: 'Counted in uptime', deg: 'Site stayed up · not counted in uptime', ok: 'No downtime', no: 'No fresh results since 02:17' };
+    function live(site) {
+      if (st === 'Stale data') return { k: 'no' };
+      if (st === 'Maintenance' && site === 't') return { k: 'mnt', span: '22:00–02:00', short: th ? 'กำลังปิดปรับปรุงตามแผน' : 'Planned maintenance in progress' };
+      if (st === 'Outage' && site === 't') return { k: 'out', min: 7, live: true, short: th ? 'ทีมงานกำลังตรวจสอบ' : 'Our team is investigating' };
+      return null;
+    }
+    var pop = S.pop;
+    function days(site) {
+      var out = [];
+      var focIdx = S.foc[site] != null && S.foc[site] < N ? S.foc[site] : N - 1;
+      if (pop && pop.site === site) {
+        for (var q = 0; q < N; q++) { var qd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (N - 1 - q)); if (key(qd) === pop.key) focIdx = q; }
+      }
+      for (var i = N - 1; i >= 0; i--) {
+        var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        var evs = EV.filter(function (e) { return e.sites.indexOf(site) >= 0 && key(e.d) === key(d); });
+        if (i === 0 && live(site)) evs = evs.concat([live(site)]);
+        var k = 'ok', min = 0, mnt = null, isLive = false, short = '';
+        evs.forEach(function (e) {
+          if (e.k === 'out') { k = 'out'; min += e.min; isLive = !!e.live; short = e.short; }
+          else if (e.k === 'deg' && k !== 'out') { k = 'deg'; min += e.min; short = e.short; }
+          else if (e.k === 'no' && k === 'ok') { k = 'no'; }
+          else if (e.k === 'mnt') { mnt = e.span || (e.time + '–' + e.end); if (!short) short = e.short; }
+        });
+        var h = k === 'out' ? 40 : (k === 'deg' ? 32 : 24);
+        var stateTxt = LBL[k] + (min ? ' · ' + mins(min) + (isLive ? (th ? ' (ยังดำเนินอยู่)' : ' so far') : '') : '');
+        var aria = dm(d) + ' · ' + LBL[k] + (min ? ' ' + mins(min) + (isLive ? (th ? ' (ยังดำเนินอยู่)' : ' so far') : '') : '') + (mnt ? ' · ' + LBL.mnt + ' ' + mnt + at : '');
+        var note = NOTE[k];
+        if (mnt) note = LBL.mnt + ' ' + mnt + at + (th ? ' · ไม่นับรวมในความพร้อมใช้งาน' : ' · not counted in uptime');
+        var dk = key(d);
+        var idx = N - 1 - i;
+        var isOpen = !!(pop && pop.site === site && pop.key === dk);
+        out.push({ k: k, m: mnt ? '1' : '0', h: h, aria: aria, exp: isOpen ? 'true' : 'false', id: 'day-' + site + '-' + idx, dk: dk,
+          ti: idx === focIdx ? '0' : '-1',
+          open: (function (dk2, j, wasOpen) { return function () { var f = Object.assign({}, S.foc); f[site] = j; self.setState({ pop: wasOpen ? null : { site: site, key: dk2 }, foc: f }); }; })(dk, idx, isOpen),
+          focus: (function (j) { return function () { if (S.foc[site] !== j) { var f = Object.assign({}, S.foc); f[site] = j; self.setState({ foc: f }); } }; })(idx),
+          _i: idx, _open: isOpen, _date: wdm(d), _state: stateTxt, _short: short, _note: note });
+      }
+      // Keyboard: one Tab stop per site (roving tabindex). Arrows / Home / End move between days;
+      // Enter or Space opens the day detail (native button click); Esc closes it and keeps focus on the day.
+      out.forEach(function (o, j) {
+        o.key = function (e) {
+          var t = null;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') t = Math.min(N - 1, j + 1);
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') t = Math.max(0, j - 1);
+          else if (e.key === 'Home') t = 0;
+          else if (e.key === 'End') t = N - 1;
+          else if (e.key === 'Escape') { if (pop && pop.site === site) { e.preventDefault(); self.setState({ pop: null }); } return; }
+          if (t === null) return;
+          e.preventDefault();
+          var f = Object.assign({}, S.foc); f[site] = t;
+          // If this site's detail is open it follows the focused day.
+          var np = pop && pop.site === site ? { site: site, key: out[t].dk } : pop;
+          self.setState({ foc: f, pop: np });
+          setTimeout(function () { var el = document.getElementById('day-' + site + '-' + t); if (el) el.focus(); }, 0);
+        };
+      });
+      return out;
+    }
+    function uptime(site) {
+      var down = 0, maint = 0;
+      EV.forEach(function (e) { if (e.sites.indexOf(site) >= 0 && inWin(e)) { if (e.k === 'out') down += e.min; if (e.k === 'mnt') maint += e.min; } });
+      var l = live(site); if (l && l.k === 'out') down += l.min;
+      var total = N * 1440 - maint;
+      return (100 * (1 - down / total)).toFixed(2) + '%';
+    }
+    var OKB = { tone: 'success', variant: 'soft', icon: 'circle-check', label: LBL.ok };
+    function badge(site) {
+      if (st === 'Stale data') return { tone: 'neutral', variant: 'outline', icon: 'circle-dot-dashed', label: th ? 'ไม่มีข้อมูลล่าสุด' : 'No live data' };
+      if (st === 'Maintenance' && site === 't') return { tone: 'neutral', variant: 'soft', icon: 'calendar', label: LBL.mnt };
+      if (st === 'Outage' && site === 't') return { tone: 'danger', variant: 'solid', icon: 'ban', label: LBL.out };
+      return OKB;
+    }
+    function site(id, name, url) {
+      var bd = badge(id), up = uptime(id), dd = days(id);
+      var o = dd.filter(function (x) { return x._open; })[0];
+      var P = { aria: '', left: '50%', shift: '-50%', arrow: '50%', date: '', k: 'ok', m: '0', state: '', hasBody: false, body: '', note: '' };
+      if (o) {
+        var pct = (o._i + 0.5) / N * 100;
+        var edge = pct < 18 ? 'l' : (pct > 82 ? 'r' : 'c');
+        P = { aria: o._date + (th ? ' · รายละเอียด' : ' · details'), left: pct.toFixed(2) + '%', shift: edge === 'l' ? '-24px' : (edge === 'r' ? 'calc(-100% + 24px)' : '-50%'),
+          arrow: edge === 'l' ? '24px' : (edge === 'r' ? 'calc(100% - 24px)' : '50%'),
+          date: o._date, k: o.k, m: o.m, state: o._state, hasBody: !!o._short, body: o._short, note: o._note };
+      }
+      return { popId: 'daypop-' + id, name: name, url: url, tone: bd.tone, variant: bd.variant, icon: bd.icon, label: bd.label, days: dd, hasPop: !!o, pop: P,
+        groupLabel: name + ' · ' + (th ? 'ความพร้อมใช้งานรายวัน ' + N + ' วัน' : 'daily availability, last ' + N + ' days'),
+        uptimeText: th ? ('ความพร้อมใช้งาน ' + up) : (up + ' uptime') };
+    }
+    var lastChecked = (th ? 'ตรวจสอบล่าสุด ' : 'Last checked ') + wdm(now) + ' ' + NOWS[st].time + at + u7;
+    var B = {
+      'Operational': { bg: 'var(--aura-alert-success-bg)', border: 'var(--aura-alert-success-border)', icon: 'check', iconBg: 'var(--aura-status-ready-bg)', iconFg: 'var(--aura-status-ready-fg)',
+        title: th ? 'เว็บไซต์ทั้งหมดใช้งานได้ปกติ' : 'All websites are operational',
+        sub: lastChecked + (th ? ' · ตรวจทุก 1 นาทีจากกรุงเทพฯ สิงคโปร์ และโตเกียว' : ' · every minute from Bangkok, Singapore and Tokyo') },
+      'Stale data': { bg: 'var(--aura-status-neutral-bg)', border: 'var(--aura-border-default)', icon: 'circle-dot-dashed', iconBg: 'var(--aura-bg-surface)', iconFg: 'var(--aura-fg-secondary)',
+        title: th ? 'ไม่สามารถแสดงสถานะล่าสุดได้ชั่วคราว' : 'Live status temporarily unavailable',
+        sub: th ? 'ยืนยันสถานะล่าสุด ส. 26 ก.ย. 02:17 น. (UTC+7) · ระบบตรวจสอบยังไม่ได้รับผลล่าสุด หน้านี้แสดงสถานะที่ยืนยันล่าสุดจนกว่าการตรวจจะกลับมา' : 'Last confirmed Sat 26 Sep 02:17 (UTC+7) · Our monitoring isn’t receiving fresh results. This page shows the last confirmed status until checks resume.' },
+      'Maintenance': { bg: 'var(--aura-status-neutral-bg)', border: 'var(--aura-border-default)', icon: 'calendar', iconBg: 'var(--aura-bg-surface)', iconFg: 'var(--aura-fg-secondary)',
+        title: th ? 'กำลังปิดปรับปรุงตามแผน' : 'Planned maintenance in progress',
+        sub: (th ? TW + ' · ส. 26 ก.ย. 22:00 – อา. 27 ก.ย. 02:00 น. (UTC+7) · เว็บไซต์อาจใช้งานไม่ได้ในช่วงนี้ ' + CN + ' ไม่ได้รับผลกระทบ · ' : TW + ' · Sat 26 Sep 22:00 – Sun 27 Sep 02:00 (UTC+7) · The site may be unavailable during this work. ' + CN + ' is not affected. ') + lastChecked },
+      'Outage': { bg: 'var(--aura-alert-danger-bg)', border: 'var(--aura-alert-danger-border)', icon: 'ban', iconBg: 'var(--aura-status-blocked-bg)', iconFg: 'var(--aura-status-blocked-fg)',
+        title: th ? 'ใช้งานไม่ได้ · ' + TW : 'Outage · ' + TW,
+        sub: (th ? 'เริ่ม พ. 2 ก.ย. 03:40 น. · ผ่านมา 7 นาที · ' : 'Started Wed 2 Sep 03:40 · 7 min so far · ') + lastChecked,
+        hasUpdate: true,
+        updTitle: th ? 'อัปเดต 03:47 น.' : 'Update 03:47',
+        update: th ? 'ผู้เข้าชมเปิดเว็บไซต์ไต้หวันไม่ได้ ทีมงานกำลังตรวจสอบ และจะแจ้งความคืบหน้าครั้งถัดไปภายใน 04:15 น.' : 'The Taiwan website is not loading for visitors. Our team is investigating and will post the next update by 04:15.' }
+    }[st];
+    var KIND = {
+      out: { tone: 'danger', variant: 'outline', icon: 'ban', kind: LBL.out },
+      deg: { tone: 'warning', variant: 'soft', icon: 'triangle-alert', kind: LBL.deg },
+      mnt: { tone: 'neutral', variant: 'soft', icon: 'calendar', kind: LBL.mnt }
+    };
+    var past = EV.filter(inWin).map(function (e) {
+      var K = KIND[e.k];
+      var title = e.sites === 'tc' ? (th ? 'บางกอกแอร์เวย์ส – ไต้หวัน และ จีน' : 'Bangkok Airways – Taiwan and China') : (e.sites === 't' ? TW : CN);
+      return { tone: K.tone, variant: K.variant, icon: K.icon, kind: K.kind, title: title,
+        when: dm(e.d) + ' ' + e.time + at + ' · ' + mins(e.min),
+        status: e.k === 'mnt' ? (th ? 'เสร็จสิ้น' : 'Completed') : (th ? 'แก้ไขแล้ว' : 'Resolved'), body: e.body };
+    });
+    var T = th ? {
+      client: 'บางกอกแอร์เวย์ส', title: 'สถานะเว็บไซต์', subscribe: 'รับการแจ้งเตือน', close: 'ปิด',
+      websites: 'เว็บไซต์', availability: 'ความพร้อมใช้งาน ' + N + ' วันล่าสุด', ago: N + ' วันก่อน', today: 'วันนี้',
+      lOk: LBL.ok, lDeg: LBL.deg, lOut: LBL.out, lMnt: LBL.mnt, lNo: LBL.no, legendNote: 'เลือกวัน · ← → เลื่อน · Enter เปิด · Esc ปิด',
+      past: 'เหตุการณ์ที่ผ่านมา', pastWin: N + ' วันล่าสุด', footer: 'เวลาทั้งหมดเป็นเวลาประเทศไทย (UTC+7)', powered: 'ตรวจสอบโดย'
+    } : {
+      client: 'Bangkok Airways', title: 'Website status', subscribe: 'Get updates', close: 'Close',
+      websites: 'Websites', availability: 'Availability, last ' + N + ' days', ago: N + ' days ago', today: 'Today',
+      lOk: LBL.ok, lDeg: LBL.deg, lOut: LBL.out, lMnt: LBL.mnt, lNo: LBL.no, legendNote: 'Select a day · ← → move · Enter opens · Esc closes',
+      past: 'Past incidents', pastWin: 'Last ' + N + ' days', footer: 'All times are Thailand time (UTC+7)', powered: 'Monitored by'
+    };
+    var em = (S.email || '').trim();
+    var emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em);
+    var anySite = S.subT || S.subC;
+    var SUB = th ? {
+      title: S.sub === 'sent' ? 'โปรดตรวจสอบอีเมลของคุณ' : 'รับการแจ้งเตือนสถานะทางอีเมล',
+      desc: S.sub === 'sent' ? 'ยังไม่ได้เริ่มส่งการแจ้งเตือนจนกว่าคุณจะยืนยัน' : 'เราจะส่งอีเมลเมื่อเว็บไซต์ใช้งานไม่ได้เริ่มขึ้นและเมื่อแก้ไขแล้ว เฉพาะกรณีใช้งานไม่ได้ — ไม่รวมกรณีโหลดช้า ไม่มีอีเมลโฆษณา',
+      email: 'อีเมล', sites: 'เว็บไซต์ที่ต้องการติดตาม', tw: TW, cn: CN, mnt: 'รวมประกาศการปิดปรับปรุงตามแผน',
+      note: 'เราจะส่งลิงก์ยืนยันไปก่อน และทุกอีเมลมีลิงก์ยกเลิกการรับได้ในคลิกเดียว ใช้อีเมลนี้เพื่อแจ้งสถานะเท่านั้น',
+      cancel: 'ยกเลิก', go: 'สมัครรับการแจ้งเตือน', done: 'เสร็จสิ้น',
+      sentBody: 'เราส่งลิงก์ยืนยันไปที่ ' + (em || 'name@company.com') + ' แล้ว การแจ้งเตือนจะเริ่มหลังจากคุณกดยืนยัน',
+      unsub: 'หากต้องการหยุดรับ กด “ยกเลิกการรับ” ท้ายอีเมลฉบับใดก็ได้ ระบบจะหยุดส่งทันที',
+      emailErr: 'กรอกอีเมลให้ถูกต้อง เช่น name@company.com', siteErr: 'เลือกอย่างน้อย 1 เว็บไซต์'
+    } : {
+      title: S.sub === 'sent' ? 'Check your inbox' : 'Get status updates by email',
+      desc: S.sub === 'sent' ? 'Nothing is sent until you confirm.' : 'We email you when an outage starts and when it’s resolved. Outages only — not slowdowns. No marketing.',
+      email: 'Email', sites: 'Websites to follow', tw: TW, cn: CN, mnt: 'Include planned maintenance notices',
+      note: 'We send a confirmation link first. Every email has a one-click unsubscribe link. We use this address only for status updates.',
+      cancel: 'Cancel', go: 'Subscribe', done: 'Done',
+      sentBody: 'We sent a confirmation link to ' + (em || 'name@company.com') + '. Updates start once you click it.',
+      unsub: 'To stop, use “Unsubscribe” at the bottom of any update email — it takes effect straight away.',
+      emailErr: 'Enter a valid email, like name@company.com', siteErr: 'Pick at least one website'
+    };
+    function bool(v) { return v && v.target ? !!v.target.checked : !!v; }
+    return {
+      no: false,
+      lang: S.lang,
+      langs: ['EN', 'TH'],
+      setLang: function (v) { self.setState({ lang: v }); },
+      st: st,
+      states: ['Operational', 'Stale data', 'Maintenance', 'Outage'],
+      pickState: function (v) { self.setState({ st: v, pop: null, foc: {} }); },
+      popKey: function (e) { if (e.key === 'Escape' && pop) { e.preventDefault(); var id = 'day-' + pop.site + '-'; self.setState({ pop: null }); setTimeout(function () { var el = document.querySelector('[id^="' + id + '"][tabindex="0"]'); if (el) el.focus(); }, 0); } },
+      popOpts: ['Closed', 'Open · 18 Aug'],
+      popVal: !pop ? 'Closed' : (pop.site === 't' && pop.key === 20260718 ? 'Open · 18 Aug' : ''),
+      pickPop: function (v) { self.setState(v === 'Closed' ? { pop: null } : { pop: { site: 't', key: 20260718 }, win: '90 days', foc: {} }); },
+      closePop: function () { var ps = pop && pop.site; self.setState({ pop: null }); if (ps) setTimeout(function () { var el = document.querySelector('[id^="day-' + ps + '-"][tabindex="0"]'); if (el) el.focus(); }, 0); },
+      winLabel: th ? (N === 30 ? '30 วัน' : '90 วัน') : S.win,
+      wins: th ? ['30 วัน', '90 วัน'] : ['30 days', '90 days'],
+      pickWin: function (v) { self.setState({ win: v.indexOf('30') === 0 ? '30 days' : '90 days', pop: null, foc: {} }); },
+      cols: 'repeat(' + N + ', minmax(0, 1fr))',
+      gap: N === 30 ? '4px' : '2px',
+      t: T,
+      b: { bg: B.bg, border: B.border, icon: B.icon, iconBg: B.iconBg, iconFg: B.iconFg, title: B.title, sub: B.sub, hasUpdate: !!B.hasUpdate, updTitle: B.updTitle || '', update: B.update || '' },
+      sites: [site('t', TW, '[Taiwan site URL]'), site('c', CN, '[China site URL]')],
+      past: past,
+      openSub: function () { self.setState({ sub: 'form', emailBlur: false, subTried: false }); },
+      closeSub: function () { self.setState({ sub: 'closed' }); },
+      subOpen: S.sub !== 'closed',
+      subForm: S.sub === 'form',
+      subSent: S.sub === 'sent',
+      sub: SUB,
+      email: S.email,
+      setEmail: function (e) { self.setState({ email: e && e.target ? e.target.value : e }); },
+      // Validation shows only after the person leaves the field or presses Subscribe — never on an untouched form.
+      blurEmail: function () { if ((S.email || '').trim()) self.setState({ emailBlur: true }); },
+      emailErr: (S.emailBlur || S.subTried) && !emailOk ? SUB.emailErr : '',
+      subT: S.subT, subC: S.subC, subM: S.subM,
+      setSubT: function (v) { self.setState({ subT: bool(v) }); },
+      setSubC: function (v) { self.setState({ subC: bool(v) }); },
+      setSubM: function (v) { self.setState({ subM: bool(v) }); },
+      subReason: !anySite ? SUB.siteErr : '',
+      doSub: function () { if (emailOk && anySite) self.setState({ sub: 'sent' }); else self.setState({ subTried: true }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

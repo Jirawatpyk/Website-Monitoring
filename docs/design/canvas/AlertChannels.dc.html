@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Alert channels</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+.rt > .aura-table__td{height:auto;align-self:stretch;line-height:1.35}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1960px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="settings" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px; position: relative">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; min-height: 48px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SETTINGS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Settings</h1>
+</div>
+
+</div>
+
+<x-import component-from-global-scope="Aura.Tabs" label="Settings sections" tabs="{{tabs}}" value="channels"></x-import>
+
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+<sc-for list="{{channels}}" as="c" hint-placeholder-count="4">
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">
+<span style="width: 36px; height: 36px; border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); display: flex; align-items: center; justify-content: center; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="md"></x-import></span>
+<sc-if value="{{c.phase}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Phase 3</x-import></sc-if>
+<sc-if value="{{c.pill}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.StatusPill" tone="{{c.tone}}">{{c.status}}</x-import></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-size: 15px; font-weight: 600">{{c.name}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.role}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; line-height: 1.5">
+<sc-for list="{{c.facts}}" as="f" hint-placeholder-count="3">
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="color: var(--aura-fg-secondary)">{{f.k}}</span><span style="font-weight: 500; text-align: right">{{f.v}}</span></div>
+</sc-for>
+</div>
+<div style="margin-top: auto; padding-top: 4px; display: flex; flex-direction: column; gap: 6px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="{{c.actionIcon}}" disabled="{{c.actionOff}}" full-width="{{yes}}" on-click="{{c.run}}">{{c.action}}</x-import>
+<sc-if value="{{c.hasResult}}" hint-placeholder-val="{{false}}"><span style="display: flex; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-positive)"><span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span><span>{{c.result}}</span></span></sc-if>
+<sc-if value="{{c.hasReason}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">{{c.reason}}</span></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Who gets what</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">One incident = one Chat thread. DOWN and PROBLEM channels are set per step in Escalation; every other event keeps at least one channel.</span>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Event</div>
+<div class="aura-table__th" style="width: 150px; justify-content: center">Owner @mention</div>
+<div class="aura-table__th" style="width: 130px; justify-content: center">Alerts Space</div>
+<div class="aura-table__th" style="width: 110px; justify-content: center">Email</div>
+<div class="aura-table__th" style="width: 250px; margin-left: 16px; padding-left: 16px; border-left: 1px solid var(--aura-border-default); gap: 6px"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import>CEO · read-only</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{routing}}" as="r" hint-placeholder-count="5">
+<div class="aura-table__row rt" style="height: auto; min-height: 48px">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 10px; line-height: 1.3; white-space: normal; padding-top: 10px; padding-bottom: 10px">
+<x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.event}}</x-import>
+<sc-if value="{{r.ok}}" hint-placeholder-val="{{true}}"><span style="display: flex; flex-direction: column; font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.4"><span>{{r.note}}</span><sc-if value="{{r.adminNote}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 4px; color: var(--aura-fg-warning)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import>Only Tao · Second Admin not joined · <a href="Users.dc.html">Users</a></span></sc-if></span></sc-if>
+<sc-if value="{{r.err}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import>Keep at least one channel</span></sc-if>
+</div>
+<sc-if value="{{r.ro}}" hint-placeholder-val="{{false}}"><div class="aura-table__td" style="width: 390px; display: flex; align-items: center; gap: 8px; line-height: 1.35; font-size: 13px; color: var(--aura-fg-secondary); white-space: normal; padding-left: 24px"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import><span style="display: flex; flex-direction: column"><span>Read-only · <a href="Escalation.dc.html">Set per step in Escalation</a></span><span style="font-size: 12px">{{r.roSub}}</span></span></div></sc-if>
+<sc-if value="{{r.rw}}" hint-placeholder-val="{{true}}"><div class="aura-table__td" style="width: 150px; display: flex; align-items: center; justify-content: center; line-height: 1">
+<sc-if value="{{r.owner.locked}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="lock">{{r.owner.lockLabel}}</x-import></sc-if>
+<sc-if value="{{r.owner.free}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Checkbox" checked="{{r.owner.on}}" on-change="{{r.owner.set}}" label="{{r.owner.aria}}"></x-import></sc-if>
+</div></sc-if>
+<sc-if value="{{r.rw}}" hint-placeholder-val="{{true}}"><div class="aura-table__td" style="width: 130px; display: flex; align-items: center; justify-content: center; line-height: 1">
+<sc-if value="{{r.space.locked}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="lock">{{r.space.lockLabel}}</x-import></sc-if>
+<sc-if value="{{r.space.free}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Checkbox" checked="{{r.space.on}}" on-change="{{r.space.set}}" label="{{r.space.aria}}"></x-import></sc-if>
+</div></sc-if>
+<sc-if value="{{r.rw}}" hint-placeholder-val="{{true}}"><div class="aura-table__td" style="width: 110px; display: flex; align-items: center; justify-content: center; line-height: 1">
+<sc-if value="{{r.email.locked}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="lock">{{r.email.lockLabel}}</x-import></sc-if>
+<sc-if value="{{r.email.free}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Checkbox" checked="{{r.email.on}}" on-change="{{r.email.set}}" label="{{r.email.aria}}"></x-import></sc-if>
+</div></sc-if>
+<div class="aura-table__td" style="width: 250px; margin-left: 16px; padding-left: 16px; border-left: 1px solid var(--aura-border-default); align-self: stretch; display: flex; align-items: center; font-size: 13px; color: var(--aura-fg-secondary)">
+<sc-if value="{{r.ceoLink}}" hint-placeholder-val="{{false}}"><span>Tier 1: L2 page · L3 FYI</span></sc-if>
+<sc-if value="{{r.ceoText}}" hint-placeholder-val="{{true}}"><span>{{r.ceo}}</span></sc-if>
+</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">OK with a note (blocked, then verified by the browser) isn’t alerted — it’s listed in the daily digest in the “DxT Website Reports” Space.</span>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch">
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Reminders until ack</h3><a href="Escalation.dc.html" style="font-size: 13px">Edit in Escalation</a></div>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between"><span style="color: var(--aura-fg-secondary)">DOWN</span><span style="font-weight: 600">every 15 min</span></div>
+<div style="display: flex; justify-content: space-between"><span style="color: var(--aura-fg-secondary)">PROBLEM</span><span style="font-weight: 600">every 60 min</span></div>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Read-only here. Reminders reply in the incident’s thread and stop at acknowledge.</span>
+</div>
+<div class="aura-card" style="gap: 16px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Flapping</h3>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<x-import component-from-global-scope="Aura.TextField" label="Status changes" value="{{flap}}" on-change="{{setFlap}}" hint="{{flapHint}}" error="{{flapErr}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Stable before summary" value="{{stable}}" on-change="{{setStable}}" suffix="min" error="{{stableErr}}"></x-import>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">3 or more status changes within 30 min → one flapping summary instead of single alerts, until the site is stable for the set time.</span>
+</div>
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Response hours</h3><a href="Organisation.dc.html" style="font-size: 13px">Edit in Organisation</a></div>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Tier 1</span><span style="font-weight: 600">24/7</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Tier 2–3</span><span style="font-weight: 600">Mon–Fri 09:00–18:00</span></div>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Tier 1: owners Mon–Fri 09:00–18:00, on-call outside that. Tier 2–3 outside hours: DOWN still posts, timers wait until 09:00; PROBLEM is held until 09:00.</span>
+</div>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Delivery log</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Filtered: today’s open incidents, digest and retried sends · retry 30 s → 2 min → 8 min, then email · target ≤ 30 s after confirm</span>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="width: 104px">Time</div>
+<div class="aura-table__th" style="width: 96px">Incident</div>
+<div class="aura-table__th" style="width: 120px">Channel</div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">To</div>
+<div class="aura-table__th" style="width: 80px; justify-content: flex-end; padding-right: 16px">Tries</div>
+<div class="aura-table__th" style="width: 96px; justify-content: flex-end; padding-right: 16px">Latency</div>
+<div class="aura-table__th" style="width: 130px">Status</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{log}}" as="l" hint-placeholder-count="8">
+<div class="aura-table__row">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="width: 104px; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">{{l.at}}</div>
+<div class="aura-table__td" style="width: 96px; font-family: var(--font-mono); font-size: 12px">{{l.inc}}</div>
+<div class="aura-table__td" style="width: 120px">{{l.ch}}</div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; color: var(--aura-fg-secondary)">{{l.to}}</div>
+<div class="aura-table__td" style="width: 80px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{l.tries}}</div>
+<div class="aura-table__td" style="width: 96px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{l.lat}}</div>
+<div class="aura-table__td" style="width: 130px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{l.tone}}" icon="{{l.icon}}">{{l.status}}</x-import></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<sc-if value="{{dirty}}" hint-placeholder-val="{{false}}">
+<div role="region" aria-label="Unsaved changes" style="position: relative; margin-top: auto; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 20px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-strong); border-radius: 9999px; box-shadow: var(--aura-shadow-overlay)">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="sm"></x-import></span>
+<span style="font-weight: 600; white-space: nowrap">{{dirtyLabel}}</span>
+<span style="flex-grow: 1; min-width: 0; font-size: 13px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{dirtyHint}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{discard}}">Discard</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="check" on-click="{{save}}">Save</x-import>
+</div>
+</sc-if>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{saveOpen}}" on-close="{{closeSave}}" title="Save alert routing?" description="New alerts use this from the moment you save. Open incidents keep their thread; the next post follows the new routing." size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<sc-if value="{{hasErrors}}" hint-placeholder-val="{{false}}">
+<div role="alert" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--aura-fg-danger); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import>Fix before saving</span>
+<sc-for list="{{errors}}" as="e" hint-placeholder-count="1"><span style="padding-left: 24px">{{e}}</span></sc-for>
+</div>
+</sc-if>
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{diff}}" as="d" hint-placeholder-count="2">
+<div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 10px 14px; border-top: {{d.border}}; font-size: 13px; line-height: 1.45">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">{{d.where}}</span>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span><span style="color: var(--aura-fg-danger); text-decoration: line-through">{{d.before}}</span> → <span style="color: var(--aura-fg-positive)">{{d.after}}</span></span>
+<span style="color: var(--aura-fg-secondary)">{{d.who}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">PEOPLE AFFECTED</span>
+<sc-for list="{{people}}" as="q" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px"><span style="font-weight: 600">{{q.name}}</span><span style="color: var(--aura-fg-secondary)">{{q.what}}</span></div>
+</sc-for>
+</div>
+<x-import component-from-global-scope="Aura.Textarea" label="Change note" required="{{yes}}" rows="{{two}}" placeholder="Why are you changing this?" value="{{note}}" on-change="{{setNote}}" error="{{noteErr}}" hint="Saved with the change in the audit log."></x-import>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1"></span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeSave}}">Back to editing</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" disabled="{{hasErrors}}" on-click="{{confirmSave}}">Save and log</x-import>
+</div>
+</div>
+</x-import>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1960}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { ch: this.base(), saved: this.base(), err: null, saveOpen: false, note: '', tried: false, tested: {}, flap: '3', stable: '15', sFlap: '3', sStable: '15' };
+  }
+  base() {
+    return {
+      down: { owner: true, space: true, email: true },
+      problem: { owner: true, space: true, email: true },
+      recovery: { owner: true, space: true, email: true },
+      ssl: { owner: true, space: false, email: true },
+      fault: { owner: true, space: true, email: true }
+    };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    function copy(o) { return JSON.parse(JSON.stringify(o)); }
+    var ROWS = [
+      ['down', 'Down', 'danger', 'solid', 'ban', 'Posted at once, any hour · who and how per level', { link: true }],
+      ['problem', 'Problem', 'warning', 'soft', 'triangle-alert', 'Tier 2–3 held until 09:00 · Tier 1 at night → on-call · reminder every 60 min', 'Daily digest'],
+      ['recovery', 'Recovery', 'success', 'soft', 'circle-check', 'Reply in the same thread', 'Only if paged in that incident'],
+      ['ssl', 'SSL / domain', 'neutral', 'outline', 'lock', 'SSL < 14 d · domain < 30 d', 'Daily digest'],
+      ['fault', 'Monitor fault', 'neutral', 'outline', 'monitor', 'Engine heartbeat missed > 3 min → email Tao + Alerts Space post @mentioning on-call. One probe (BKK, SIN or TYO) missing > 3 min → email Tao only, no page.', '—']
+    ];
+    var CHN = { owner: 'Owner @mention', space: 'Alerts Space', email: 'Email' };
+    var WHO = {
+      owner: 'Arm, Ploy, Nok, Tao as site owners (Ploy as on-call at night for Tier 1)',
+      space: 'everyone in the Alerts Space — Tao, Arm, Ploy, Nok, Thee (AM), Bua (AM), CEO',
+      email: 'Arm, Ploy, Nok, Tao as site owners'
+    };
+    var PEOPLE = ['Tao', 'Arm', 'Ploy', 'Nok', 'Thee (AM)', 'Bua (AM)', 'CEO'];
+    var hits = {}; PEOPLE.forEach(function (n) { hits[n] = []; });
+    var diff = [];
+    ROWS.forEach(function (r) { ['owner', 'space', 'email'].forEach(function (k) {
+      var a = st.saved[r[0]][k], b2 = st.ch[r[0]][k];
+      if (a === b2) return;
+      diff.push({ where: r[1] + ' · ' + CHN[k], before: a ? 'On' : 'Off', after: b2 ? 'On' : 'Off', who: (b2 ? 'Starts reaching ' : 'Stops reaching ') + WHO[k] + '.' });
+      var ppl = k === 'space' ? PEOPLE : ['Tao', 'Arm', 'Ploy', 'Nok'];
+      ppl.forEach(function (n) { hits[n].push(r[1] + ' ' + ({ owner: '@mention', space: 'Alerts Space post', email: 'email' })[k] + (b2 ? ' on' : ' off')); });
+    }); });
+    if (st.flap !== st.sFlap || st.stable !== st.sStable) {
+      diff.push({ where: 'Flapping', before: st.sFlap + ' changes / 30 min · ' + st.sStable + ' min stable', after: st.flap + ' changes / 30 min · ' + st.stable + ' min stable', who: 'All 17 sites — changes when a flapping summary replaces single alerts for everyone who gets them.' });
+      PEOPLE.forEach(function (n) { if (n !== 'CEO') hits[n].push('flapping summary rule'); });
+    }
+    diff.forEach(function (d, i) { d.border = i ? '1px solid var(--aura-border-subtle)' : 'none'; });
+    var NOCH = { 'Thee (AM)': 'No change — client-update pings come from the client-update track', 'Bua (AM)': 'No change — client-update pings come from the client-update track', 'CEO': 'No change — DOWN pages come from Escalation; PROBLEM and SSL stay in the daily digest' };
+    var people = PEOPLE.map(function (n) { return { name: n, what: hits[n].length ? hits[n].join(' · ') : (NOCH[n] || 'No change') }; });
+    var changes = diff.length;
+    var routing = ROWS.map(function (r) {
+      var id = r[0];
+      function cellFor(k, label) {
+        var locked = id === 'fault';
+        var LL = { owner: '@ on-call · engine', space: 'Engine only', email: 'Tao · both' };
+        return {
+          locked: locked, free: !locked, lockLabel: LL[k], on: st.ch[id][k], aria: r[1] + ' — ' + label,
+          set: function (v) {
+            var on = typeof v === 'boolean' ? v : !st.ch[id][k];
+            var row = st.ch[id];
+            var count = (row.owner ? 1 : 0) + (row.space ? 1 : 0) + (row.email ? 1 : 0);
+            if (!on && count <= 1) { self.setState({ err: id }); return; }
+            var ch = copy(st.ch); ch[id][k] = on; self.setState({ ch: ch, err: null });
+          }
+        };
+      }
+      var err = st.err === id;
+      return {
+        event: r[1], tone: r[2], variant: r[3], icon: r[4], note: r[5], ok: !err, err: err,
+        roSub: id === 'down' ? 'L0 Chat + Space + email · L1 +15 · L2 +30 · L3 +60' : 'L0 Chat + Space · L1 +60 min backup: Chat + email',
+        ro: id === 'down' || id === 'problem', rw: id !== 'down' && id !== 'problem', adminNote: id === 'fault',
+        owner: cellFor('owner', 'owner @mention'), space: cellFor('space', 'Alerts Space'), email: cellFor('email', 'email'),
+        ceoLink: typeof r[6] === 'object', ceoText: typeof r[6] !== 'object', ceo: typeof r[6] === 'object' ? '' : r[6]
+      };
+    });
+    function posInt(v, min) { return /^\s*\d+\s*$/.test(String(v)) && parseInt(v, 10) >= min; }
+    var flapErr = posInt(st.flap, 2) ? '' : 'Whole number, 2 or more';
+    var stableErr = posInt(st.stable, 1) ? '' : 'Whole minutes above 0, e.g. 15';
+    var errors = [];
+    if (flapErr) errors.push('Flapping · status changes: “' + st.flap + '” — enter a whole number, 2 or more.');
+    if (stableErr) errors.push('Flapping · stable before summary: “' + st.stable + '” — enter whole minutes above 0.');
+    var T = st.tested;
+    var LOG = [
+        { at: '10:03:44', inc: 'INC-0142', ch: 'Google Chat', to: '@Ploy · Tao FYI · thread reply (L1)', tries: '1', lat: '1.2 s', status: 'Delivered', tone: 'success', icon: 'circle-check' },
+        { at: '10:03:44', inc: 'INC-0142', ch: 'Email', to: 'Ploy, Tao · L1', tries: '1', lat: '2.4 s', status: 'Delivered', tone: 'success', icon: 'circle-check' },
+        { at: '10:03:13', inc: 'INC-0142', ch: 'Email', to: 'Bua · client update due 10:03', tries: '1', lat: '2.2 s', status: 'Delivered', tone: 'success', icon: 'circle-check' },
+        { at: '10:03:12', inc: 'INC-0142', ch: 'Google Chat', to: '@Bua · client update due (thread reply)', tries: '1', lat: '1.1 s', status: 'Delivered', tone: 'success', icon: 'circle-check' },
+        { at: '09:58:10', inc: 'INC-0141', ch: 'Google Chat', to: 'Acknowledged by Ploy (thread reply, no mention)', tries: '1', lat: '1.0 s', status: 'Delivered', tone: 'success', icon: 'circle-check' },
+        { at: '09:52:31', inc: 'INC-0141', ch: 'Google Chat', to: '@Ploy · new thread (L0, Chat + Space)', tries: '1', lat: '1.1 s', status: 'Delivered', tone: 'success', icon: 'circle-check' },
+        { at: '09:48:44', inc: 'INC-0142', ch: 'Email', to: 'Arm · L0', tries: '1', lat: '2.3 s', status: 'Delivered', tone: 'success', icon: 'circle-check' },
+        { at: '09:48:43', inc: 'INC-0142', ch: 'Google Chat', to: '@Arm · new thread (L0) · Ploy as backup, no mention', tries: '1', lat: '1.8 s', status: 'Delivered', tone: 'success', icon: 'circle-check' },
+        { at: '09:00:02', inc: 'Digest', ch: 'Google Chat', to: 'DxT Website Reports Space', tries: '1', lat: '0.9 s', status: 'Delivered', tone: 'success', icon: 'circle-check' },
+        { at: 'Mon 03:12:41', inc: 'INC-0133', ch: 'Google Chat', to: '@Ploy · new thread (outside hours, timers paused)', tries: '2', lat: '32 s', status: 'Late · retried', tone: 'warning', icon: 'triangle-alert' },
+        { at: 'Mon 03:12:41', inc: 'INC-0133', ch: 'Email', to: 'Ploy', tries: '1', lat: '2.0 s', status: 'Delivered', tone: 'success', icon: 'circle-check' }
+    ];
+    if (T.chat) LOG.unshift({ at: '10:08:12', inc: 'Test', ch: 'Google Chat', to: '@Tao · “TEST — no action” thread', tries: '1', lat: '1.0 s', status: 'Delivered', tone: 'success', icon: 'circle-check' });
+    if (T.email) LOG.unshift({ at: '10:08:31', inc: 'Test', ch: 'Email', to: 'Tao · “TEST — no action”', tries: '1', lat: '2.1 s', status: 'Delivered', tone: 'success', icon: 'circle-check' });
+    function tester(key) { return function () { var t = copy(T); t[key] = true; self.setState({ tested: t }); }; }
+    return {
+      yes: true, no: false,
+      tabs: [
+        { id: 'users', label: 'Users & roles', href: 'Users.dc.html' },
+        { id: 'channels', label: 'Alert channels', href: 'AlertChannels.dc.html' },
+        { id: 'sso', label: 'Sign-in & security', href: 'Security.dc.html' },
+        { id: 'org', label: 'Organisation', href: 'Organisation.dc.html' },
+        { id: 'api', label: 'API & webhooks', href: 'ApiWebhooks.dc.html', count: 'Phase 3' }
+      ],
+      channels: [
+        { icon: 'bell', name: 'Google Chat', role: 'Primary · Space "DxT Website Alerts"', status: 'Connected', tone: 'ready', pill: true, phase: false,
+          facts: [{ k: 'Webhook', v: '•••• set 18 Sep' }, { k: 'Thread key', v: 'incident id' }, { k: 'Last sent', v: '10:03:44 · 1.2 s' }], action: T.chat ? 'Send another test card' : 'Send test card', actionIcon: 'arrow-up-right', actionOff: false, run: tester('chat'), hasResult: !!T.chat, result: 'Posted 10:08 in “TEST — no action” · mentions only you', hasReason: false },
+        { icon: 'mail', name: 'Email · Resend', role: 'Record + fallback when Chat fails', status: 'Connected', tone: 'ready', pill: true, phase: false,
+          facts: [{ k: 'From', v: 'alerts@[domain]' }, { k: 'SPF / DKIM', v: 'Verified' }, { k: '24 h', v: '9 sent · 0 bounced' }], action: T.email ? 'Send another test email' : 'Send test email', actionIcon: 'mail', actionOff: false, run: tester('email'), hasResult: !!T.email, result: 'Sent to you 10:08 · delivered in 2.1 s · “TEST — no action”', hasReason: false },
+        { icon: 'triangle-alert', name: 'Voice call · Twilio', role: 'Tier 1 DOWN with no ack at L2', status: 'Waiting approval', tone: 'neutral', pill: true, phase: false,
+          facts: [{ k: 'Cost', v: '~$23–26 / month' }, { k: 'Decision', v: 'CEO' }, { k: 'Until then', v: 'Chat + email only' }], action: 'Not enabled', actionIcon: 'lock', actionOff: true, hasResult: false, hasReason: true, reason: 'Can’t test yet — waiting for the CEO’s OK on the L2 proposal.' },
+        { icon: 'users', name: 'Google Chat app', role: 'DM owners · ack inside Chat', status: '', tone: 'neutral', pill: false, phase: true,
+          facts: [{ k: 'Needs', v: 'Chat app + service account' }, { k: 'Until then', v: 'Ack via link' }, { k: 'Owner', v: 'Tao' }], action: 'Not started', actionIcon: 'clock', actionOff: true, hasResult: false, hasReason: true, reason: 'Phase 3 — nothing to test until the Chat app exists.' }
+      ],
+      routing: routing,
+      two: 2, diff: diff, people: people,
+      saveOpen: st.saveOpen,
+      closeSave: function () { self.setState({ saveOpen: false }); },
+      note: st.note,
+      setNote: function (e) { self.setState({ note: e && e.target ? e.target.value : e }); },
+      noteErr: st.tried && !st.note.trim() ? 'Add a short note — it goes in the audit log with the change' : '',
+      flapErr: flapErr, stableErr: stableErr, flapHint: 'within 30 min', hasErrors: errors.length > 0, errors: errors,
+      confirmSave: function () { if (errors.length) return; if (!st.note.trim()) { self.setState({ tried: true }); return; } self.setState({ saveOpen: false, saved: copy(st.ch), sFlap: st.flap, sStable: st.stable, err: null, note: '', tried: false }); },
+      flap: st.flap, stable: st.stable,
+      setFlap: function (e) { self.setState({ flap: e && e.target ? e.target.value : e }); },
+      setStable: function (e) { self.setState({ stable: e && e.target ? e.target.value : e }); },
+      dirty: changes > 0,
+      dirtyLabel: changes + (changes === 1 ? ' unsaved change' : ' unsaved changes'),
+      dirtyHint: 'Routing applies to new alerts after you save · the next step lists everyone affected',
+      discard: function () { self.setState({ ch: copy(st.saved), flap: st.sFlap, stable: st.sStable, err: null }); },
+      save: function () { self.setState({ saveOpen: true, tried: false }); },
+      log: LOG,
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

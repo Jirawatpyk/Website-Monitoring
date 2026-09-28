@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Incidents</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<span style="font-size: 17px; font-weight: 600">Incidents</span>
+<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 16px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+<x-import component-from-global-scope="Aura.SegmentedControl" label="State" options="{{views}}" value="{{view}}" on-change="{{setView}}" full-width="{{yes}}" size="sm"></x-import>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{countLabel}}</span>
+
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="4">
+<sc-if value="{{r.link}}" hint-placeholder-val="{{true}}">
+<div style="flex-shrink: 0; display: flex; flex-direction: column; background: {{r.bg}}; border: 1px solid {{r.border}}; border-radius: var(--aura-radius-lg); overflow: hidden">
+<a href="{{r.href}}" style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; color: inherit; text-decoration: none">
+<div style="display: flex; align-items: center; gap: 8px">
+<x-import component-from-global-scope="Aura.Badge" tone="{{r.sevTone}}" variant="{{r.sevVariant}}" icon="{{r.sevIcon}}">{{r.sev}}</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="{{r.wfTone}}" variant="{{r.wfVariant}}" icon="{{r.wfIcon}}">{{r.state}}</x-import>
+<span style="margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">{{r.id}}</span>
+</div>
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-size: 16px; font-weight: 600">{{r.site}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{r.started}} · {{r.dur}} · {{r.owner}}</span>
+</div>
+<span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; color: {{r.nextColor}}">{{r.next}}<span style="display: flex; align-items: center; gap: 2px; flex-shrink: 0; color: var(--aura-fg-secondary); font-weight: 500">Details<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span></span>
+</a>
+<sc-if value="{{r.ack}}" hint-placeholder-val="{{false}}">
+<a href="MobileAck.dc.html" style="min-height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid {{r.border}}; font-size: 13px; font-weight: 600; color: var(--aura-alert-danger-fg); text-decoration: none"><span style="display: flex; align-items: center; gap: 6px"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import>Acknowledge</span><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a>
+</sc-if>
+</div>
+</sc-if>
+</sc-for>
+<sc-if value="{{showMore}}" hint-placeholder-val="{{false}}">
+<div style="flex-shrink: 0; display: flex; flex-direction: column">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="{{moreIcon}}" full-width="{{yes}}" on-click="{{toggleAll}}">{{moreLabel}}</x-import>
+</div>
+</sc-if>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · every card opens Incident detail for that incident — the sample screen shows INC-0142</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="incidents" label="Sections"></x-import>
+</div>
+<div style="margin: 0; width: 240px; font-size: 14px; white-space: pre-wrap; position: absolute; left: -22px; top: 553px; right: auto; bottom: auto; margin: 0px; box-sizing: border-box; width: 240px;"></div></x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: 'Open 3', all: false };
+  }
+  renderVals() {
+    var self = this;
+    var SEV = {
+      down: { sev: 'Down', sevTone: 'danger', sevVariant: 'solid', sevIcon: 'ban' },
+      problem: { sev: 'Problem', sevTone: 'warning', sevVariant: 'soft', sevIcon: 'triangle-alert' },
+      wasdown: { sev: 'Was down', sevTone: 'danger', sevVariant: 'outline', sevIcon: 'ban' },
+      wasproblem: { sev: 'Was problem', sevTone: 'warning', sevVariant: 'outline', sevIcon: 'triangle-alert' }
+    };
+    var WF = {
+      'Escalated · L1': { t: 'warning', i: 'arrow-up-right' },
+      'Acknowledged': { t: 'neutral', i: 'check' },
+      'Needs root cause': { t: 'warning', i: 'pencil' },
+      'In review': { t: 'neutral', i: 'file-text' },
+      'Resolved': { t: 'success', i: 'circle-check' },
+      'Closed': { t: 'neutral', i: 'check', v: 'soft' }
+    };
+    var C = { danger: 'var(--aura-fg-danger)', warning: 'var(--aura-alert-warning-fg)', muted: 'var(--aura-fg-secondary)' };
+    // id, site, sev, state, started, dur, owner, next, color, open?, unacked?
+    var data = [
+      ['INC-0142', 'MuvMi', 'down', 'Escalated · L1', 'Today 09:48', '19 min', 'Arm', '18 min unacked · L2 (CEO) at 10:18', 'danger', true, true],
+      ['INC-0141', 'Fuji Links', 'problem', 'Acknowledged', 'Today 09:52', '15 min', 'Ploy', 'Acknowledged by Ploy 09:58', 'muted', true, false],
+      ['INC-0139', 'ORCA Thailand', 'wasdown', 'Needs root cause', 'Yesterday 22:14', '8 min', 'Tao', 'Recovered — add a root cause to resolve', 'warning', true, false],
+      ['INC-0138', 'Tubtong', 'wasproblem', 'Resolved', 'Thu 24 Sep 14:02', '12 min', 'Ploy', 'Blocked, not verified · verifier restarted', 'muted', false, false],
+      ['INC-0136', 'DxT AI', 'wasproblem', 'Resolved', 'Wed 23 Sep 09:00', '1 d 2 h', 'Tao', 'SSL expiring · cert renewed', 'muted', false, false],
+      ['INC-0133', 'VOCA', 'wasdown', 'In review', 'Mon 21 Sep 03:12', '41 min', 'Ploy', 'Review waiting for Tao’s sign-off', 'muted', false, false],
+      ['INC-0131', 'Bangkok Airways – Taiwan', 'wasproblem', 'Resolved', 'Mon 14 Sep 21:12', '6 min', 'Arm', 'Regional · SIN CDN edge', 'muted', false, false],
+      ['INC-0129', 'WeCare Asia', 'wasproblem', 'Resolved', 'Sat 12 Sep 16:40', '22 min', 'Nok', 'Keyword · broken deploy, rolled back', 'muted', false, false],
+      ['INC-0126', 'MuvMi', 'wasdown', 'Closed', 'Fri 11 Sep 14:05', '35 min', 'Arm', 'Hard fail · review signed off', 'muted', false, false],
+      ['INC-0124', 'Cando Asia', 'wasdown', 'Closed', 'Thu 10 Sep 11:20', '12 min', 'Nok', 'Hard fail · review signed off', 'muted', false, false],
+      ['INC-0120', 'MuvMi', 'wasdown', 'Closed', 'Tue 8 Sep 19:30', '47 min', 'Arm', 'Hard fail · review signed off', 'muted', false, false],
+      ['INC-0118', 'Bangkok Airways – Taiwan', 'wasdown', 'Closed', 'Wed 2 Sep 03:40', '11 min', 'Arm', 'Hard fail · server fault · review signed off', 'muted', false, false]
+    ];
+    var all = this.state.all;
+    var view = this.state.view;
+    var rows = data.filter(function (d) {
+      if (view === 'Open 3') return d[9];
+      if (view === 'Unacked 1') return d[10];
+      return !d[9];
+    }).filter(function (d, i) { return view !== 'Past' || all || i < 4; }).map(function (d) {
+      var s = SEV[d[2]], w = WF[d[3]];
+      var hot = d[10];
+      var href = 'MIncident.dc.html';
+      return { id: d[0], href: href, link: !!href, ack: hot && !!href, site: d[1], sev: s.sev, sevTone: s.sevTone, sevVariant: s.sevVariant, sevIcon: s.sevIcon,
+        state: d[3], wfTone: w.t, wfIcon: w.i, wfVariant: w.v || 'outline', started: d[4], dur: d[5], owner: d[6], next: d[7], nextColor: C[d[8]],
+        bg: hot ? 'var(--aura-alert-danger-bg)' : 'var(--aura-bg-surface)', border: hot ? 'var(--aura-alert-danger-border)' : 'var(--aura-border-default)' };
+    });
+    var LABEL = { 'Open 3': '3 open · unacknowledged first', 'Unacked 1': '1 not acknowledged', 'Past': all ? 'Last 30 days · all 9 resolved, in review or closed · 13 short PROBLEMs auto-resolved (hidden)' : 'Last 30 days · latest 4 of 9 resolved, in review or closed' };
+    return {
+      yes: true,
+      view: view,
+      views: ['Open 3', 'Unacked 1', 'Past'],
+      setView: function (v) { self.setState({ view: v }); },
+      showMore: view === 'Past',
+      moreLabel: all ? 'Show latest 4 only' : 'Show all 9',
+      moreIcon: all ? 'chevron-up' : 'chevron-down',
+      toggleAll: function () { self.setState({ all: !self.state.all }); },
+      rows: rows,
+      countLabel: LABEL[view],
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSite.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

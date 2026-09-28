@@ -1,0 +1,514 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "AddSite.dc.html": {
+      "h": 1680,
+      "is_interactive": true,
+      "title": "Add site + registration checklist",
+      "w": 1440,
+      "x": 3040,
+      "y": 7520
+    },
+    "AlertChannels.dc.html": {
+      "h": 1960,
+      "is_interactive": true,
+      "title": "Settings — alert channels & routing",
+      "w": 1440,
+      "x": 1520,
+      "y": 15425
+    },
+    "AuditLog.dc.html": {
+      "h": 1913,
+      "is_interactive": true,
+      "title": "Audit log",
+      "w": 1440,
+      "x": 4560,
+      "y": 9700
+    },
+    "ChatAlert.dc.html": {
+      "h": 3369,
+      "title": "Google Chat alert thread (content spec)",
+      "w": 600,
+      "x": 1990,
+      "y": 2340
+    },
+    "Escalation.dc.html": {
+      "h": 1528,
+      "is_interactive": true,
+      "title": "Escalation policies",
+      "w": 1440,
+      "x": 0,
+      "y": 9700
+    },
+    "Incident.dc.html": {
+      "h": 1660,
+      "is_interactive": true,
+      "title": "Incident — INC-0142 MuvMi DOWN",
+      "w": 1440,
+      "x": 3040,
+      "y": 0
+    },
+    "Incidents.dc.html": {
+      "h": 1100,
+      "is_interactive": true,
+      "title": "Incidents list",
+      "w": 1440,
+      "x": 0,
+      "y": 7520
+    },
+    "MIncidents.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Incidents",
+      "w": 390,
+      "x": 0,
+      "y": 12113
+    },
+    "MMaintenance.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Mute / maintenance sheet",
+      "w": 390,
+      "x": 940,
+      "y": 12113
+    },
+    "MOnCall.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — On-call",
+      "w": 390,
+      "x": 470,
+      "y": 12113
+    },
+    "MOverview.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Overview",
+      "w": 390,
+      "x": 4560,
+      "y": 0
+    },
+    "MSite.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Site detail",
+      "w": 390,
+      "x": 5030,
+      "y": 0
+    },
+    "MStatusPage.dc.html": {
+      "h": 844,
+      "title": "Client status page — mobile",
+      "w": 390,
+      "x": 3754,
+      "y": 13457
+    },
+    "Main.dc.html": {
+      "h": 1840,
+      "is_interactive": true,
+      "title": "Overview dashboard",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "MainDark.dc.html": {
+      "h": 1840,
+      "is_interactive": true,
+      "title": "Overview dashboard — dark (NOC wall)",
+      "w": 1440,
+      "x": 3040,
+      "y": 15425
+    },
+    "Maintenance.dc.html": {
+      "h": 1240,
+      "is_interactive": true,
+      "title": "Maintenance / mute dialog",
+      "w": 1440,
+      "x": 1520,
+      "y": 7520
+    },
+    "MobileAck.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — acknowledge from alert",
+      "w": 390,
+      "x": 1520,
+      "y": 2340
+    },
+    "MobileAckDark.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile ack — dark (night on-call)",
+      "w": 390,
+      "x": 4560,
+      "y": 15425
+    },
+    "OnCall.dc.html": {
+      "h": 1464,
+      "is_interactive": true,
+      "title": "On-call rotation",
+      "w": 1440,
+      "x": 1520,
+      "y": 9700
+    },
+    "PostIncident.dc.html": {
+      "h": 1700,
+      "is_interactive": true,
+      "title": "Post-incident review — INC-0133 VOCA",
+      "w": 1440,
+      "x": 0,
+      "y": 15425
+    },
+    "Probes.dc.html": {
+      "h": 1496,
+      "is_interactive": true,
+      "title": "Probes & heartbeat",
+      "w": 1440,
+      "x": 3040,
+      "y": 9700
+    },
+    "ReportPDF.dc.html": {
+      "h": 1123,
+      "title": "Monthly client report PDF (A4)",
+      "w": 794,
+      "x": 1520,
+      "y": 13457
+    },
+    "Reports.dc.html": {
+      "h": 1220,
+      "is_interactive": true,
+      "title": "Uptime reports",
+      "w": 1440,
+      "x": 0,
+      "y": 13457
+    },
+    "SiteDetail.dc.html": {
+      "h": 1680,
+      "is_interactive": true,
+      "title": "Site detail — Bangkok Airways – Taiwan",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "StatusModel.dc.html": {
+      "h": 4680,
+      "title": "Status model & verification logic",
+      "w": 1440,
+      "x": 0,
+      "y": 2340
+    },
+    "StatusPage.dc.html": {
+      "h": 1380,
+      "is_interactive": true,
+      "title": "Client status page",
+      "w": 1280,
+      "x": 2394,
+      "y": 13457
+    },
+    "Users.dc.html": {
+      "h": 1468,
+      "is_interactive": true,
+      "title": "Settings — users & roles",
+      "w": 1440,
+      "x": 4224,
+      "y": 13457
+    },
+    "Login.dc.html": {
+      "x": 0,
+      "y": 17885,
+      "w": 1440,
+      "h": 900,
+      "title": "Sign in — Google SSO + Admin 2-step",
+      "is_interactive": true
+    },
+    "MLogin.dc.html": {
+      "x": 1520,
+      "y": 17885,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile — session expired from alert link",
+      "is_interactive": true
+    },
+    "EditMonitors.dc.html": {
+      "x": 1990,
+      "y": 17885,
+      "w": 1440,
+      "h": 1560,
+      "title": "Edit monitors",
+      "is_interactive": true
+    },
+    "Resolve.dc.html": {
+      "x": 3510,
+      "y": 17885,
+      "w": 1440,
+      "h": 1100,
+      "title": "Resolve incident + root cause",
+      "is_interactive": true
+    },
+    "MainFault.dc.html": {
+      "x": 5030,
+      "y": 17885,
+      "w": 1440,
+      "h": 1228,
+      "title": "Overview — monitoring degraded (heartbeat missed)",
+      "is_interactive": true
+    },
+    "Expiry.dc.html": {
+      "x": 0,
+      "y": 19945,
+      "w": 1440,
+      "h": 1340,
+      "title": "SSL & domain expiry",
+      "is_interactive": true
+    },
+    "WeeklySummary.dc.html": {
+      "x": 1520,
+      "y": 19945,
+      "w": 600,
+      "h": 2397,
+      "title": "Weekly summary — Chat card spec"
+    },
+    "EmailAlert.dc.html": {
+      "x": 2200,
+      "y": 19945,
+      "w": 720,
+      "h": 1408,
+      "title": "Alert email template",
+      "is_interactive": true
+    },
+    "Profile.dc.html": {
+      "x": 3000,
+      "y": 19945,
+      "w": 1440,
+      "h": 1136,
+      "title": "My profile & notifications",
+      "is_interactive": true
+    },
+    "Security.dc.html": {
+      "x": 4520,
+      "y": 19945,
+      "w": 1440,
+      "h": 1540,
+      "title": "Settings — sign-in & security",
+      "is_interactive": true
+    },
+    "EmptyStates.dc.html": {
+      "x": 6040,
+      "y": 19945,
+      "w": 1440,
+      "h": 1562,
+      "title": "Empty, loading & no-access states"
+    },
+    "Organisation.dc.html": {
+      "x": 0,
+      "y": 22842,
+      "w": 1440,
+      "h": 1762,
+      "title": "Settings — organisation: tiers, clients, data, cost",
+      "is_interactive": true
+    },
+    "Synthetic.dc.html": {
+      "x": 1520,
+      "y": 22842,
+      "w": 1440,
+      "h": 1184,
+      "title": "Synthetic check — search → booking (Phase 3)",
+      "is_interactive": true
+    },
+    "ApiWebhooks.dc.html": {
+      "x": 3040,
+      "y": 22842,
+      "w": 1440,
+      "h": 1300,
+      "title": "Settings — API & webhooks (Phase 3)",
+      "is_interactive": true
+    },
+    "MIncident.dc.html": {
+      "x": 5500,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile — Incident detail",
+      "is_interactive": true
+    },
+    "Guide.dc.html": {
+      "x": 0,
+      "y": 25104,
+      "w": 1440,
+      "h": 1784,
+      "title": "User guide",
+      "is_interactive": true
+    },
+    "MGuide.dc.html": {
+      "x": 1520,
+      "y": 25104,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile — User guide",
+      "is_interactive": true
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-25T09:31:32Z",
+    "v": 1
+  },
+  "designSystems": [
+    {
+      "artifact": "https://claude.ai/code/artifact/f3ef1020-1006-461f-85fc-0346d4501d90",
+      "copiedAt": "2026-09-25T09:31:32Z",
+      "namespace": "aura",
+      "title": "AURA",
+      "version": "1790327319-76ab"
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "aura-fixes": {
+      "fill": "orange",
+      "maxH": 1400,
+      "text": "AURA — ต้องแก้ (เจอจากงาน DxT Monitor)\n\n1. StatusPill ไม่มี tone warning → PROBLEM ต้องใช้ Badge แทน. เพิ่ม tone \"warning\" (amber + triangle-alert)\n2. Checkbox: prop label ไม่แสดงบนจอ (เป็นแค่ aria-label) ต่างจาก Switch / TextField → render label หรือเปลี่ยนชื่อ prop\n3. Design System artifact ไม่มี tokens.css → bundle.css หา CSS variables ไม่เจอ ต้องสร้างเองจาก tokens.json. Publish tokens.css (aura.css) ด้วย\n4. README ไม่มีส่วน \"Consuming this system\" (namespace, ลำดับโหลด) และ index การ์ด project/api/… → ใช้งานผ่านเครื่องมือแล้วหา component ไม่เจอ\n5. bundle.css @import Google Fonts บรรทัดแรก — ขัดกฎใน README เอง, พังเมื่อมี CSP / offline → ย้ายไป aura-fonts.css\n6. .aura-table__td ตั้ง flex: none → คอลัมน์ที่ยืด (flex-grow) ไม่หด ข้อความยาวดันคอลัมน์อื่นล้นขวา → ให้หดได้ + min-width: 0\n7. DataTable คอลัมน์ width คงที่ รวมแล้วเกิน container แคบ (~550px) → scrollbar แนวนอน; ควรมีคอลัมน์ flex\n8. SideNav ไม่มีระยะด้านบนเมื่อไม่ใช้ header และมี border-right ของตัวเอง → ปุ่มแรกติดขอบ / เส้นซ้อนกับ layout\n9. Dialog เปิดแล้วโฟกัสปุ่มปิด โชว์ focus ring ทันที → โฟกัส field แรกหรือหัวข้อแทน\n10. Icon set ขาด: server, globe, activity, shield-alert, phone, wrench (ตอนนี้ใช้ monitor / lock แทน)\n11. ไม่มี dark theme แบบไฟล์ CSS (มีแค่ค่า dark ใน tokens.json) → ต้อง resolve เองเป็น aura-tokens-dark.css. Publish [data-theme=dark] / prefers-color-scheme ด้วย\n12. SideNav item badge ไม่มี tone (danger / warning) → แจ้ง Fault ใน nav เป็นตัวหนังสือเทาธรรมดา ไม่เด่น\n13. Tag ที่ children ไม่ใช่ string ปกติ → ปุ่มลบได้ aria-label ว่า \"Remove \" (ชื่อหาย) ต้องส่ง removeLabel เองทุกครั้ง\n14. Switch ที่ disabled + checked เป็นสีเทาเหมือนตอนปิด → แยกไม่ออกว่า \"ล็อกเปิด\" หรือ \"ปิด\" (หน้า Security ต้องเปลี่ยนไปใช้ Badge \"Always on\" แทน)",
+      "w": 560,
+      "x": 6050,
+      "y": 0
+    },
+    "row1": {
+      "kind": "title1",
+      "maxW": 5970,
+      "text": "Web app — desktop 1440 + mobile 390",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "row2": {
+      "kind": "title1",
+      "maxW": 2590,
+      "text": "Status logic · Mobile ack · Alert channel",
+      "w": 240,
+      "x": 0,
+      "y": 2040
+    },
+    "row3": {
+      "kind": "title1",
+      "maxW": 4480,
+      "text": "Core flows · incidents · maintenance · onboarding",
+      "w": 240,
+      "x": 0,
+      "y": 7220
+    },
+    "row4": {
+      "kind": "title1",
+      "maxW": 6000,
+      "text": "Operations & governance · web",
+      "w": 240,
+      "x": 0,
+      "y": 9400
+    },
+    "row5": {
+      "kind": "title1",
+      "maxW": 1330,
+      "text": "Mobile app · 390",
+      "w": 240,
+      "x": 0,
+      "y": 11813
+    },
+    "row6": {
+      "kind": "title1",
+      "maxW": 5664,
+      "text": "Reports · client-facing · admin",
+      "w": 240,
+      "x": 0,
+      "y": 13157
+    },
+    "row7": {
+      "kind": "title1",
+      "maxW": 4950,
+      "text": "Review loop · alert routing · dark mode",
+      "w": 240,
+      "x": 0,
+      "y": 15125
+    },
+    "row8": {
+      "kind": "title1",
+      "maxW": 6470,
+      "text": "Access · monitor config · resolve · when the monitor itself fails",
+      "w": 240,
+      "x": 0,
+      "y": 17585
+    },
+    "row9": {
+      "kind": "title1",
+      "maxW": 7480,
+      "text": "Expiry · summaries · email · account & security · empty states",
+      "w": 240,
+      "x": 0,
+      "y": 19645
+    },
+    "row10": {
+      "kind": "title1",
+      "maxW": 4480,
+      "text": "Organisation · Phase 3: synthetic checks · API & webhooks",
+      "w": 240,
+      "x": 0,
+      "y": 22542
+    },
+    "row11": {
+      "kind": "title1",
+      "maxW": 1910,
+      "text": "Help · user guide (desktop + mobile)",
+      "w": 240,
+      "x": 0,
+      "y": 24804
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "SiteDetail.dc.html",
+    "Incident.dc.html",
+    "MIncident.dc.html",
+    "StatusModel.dc.html",
+    "MobileAck.dc.html",
+    "ChatAlert.dc.html",
+    "Incidents.dc.html",
+    "Maintenance.dc.html",
+    "AddSite.dc.html",
+    "Escalation.dc.html",
+    "OnCall.dc.html",
+    "Probes.dc.html",
+    "AuditLog.dc.html",
+    "MOverview.dc.html",
+    "MIncidents.dc.html",
+    "MSite.dc.html",
+    "MOnCall.dc.html",
+    "MMaintenance.dc.html",
+    "Reports.dc.html",
+    "ReportPDF.dc.html",
+    "StatusPage.dc.html",
+    "MStatusPage.dc.html",
+    "Users.dc.html",
+    "PostIncident.dc.html",
+    "AlertChannels.dc.html",
+    "MainDark.dc.html",
+    "MobileAckDark.dc.html",
+    "Login.dc.html",
+    "MLogin.dc.html",
+    "EditMonitors.dc.html",
+    "Resolve.dc.html",
+    "MainFault.dc.html",
+    "Expiry.dc.html",
+    "WeeklySummary.dc.html",
+    "EmailAlert.dc.html",
+    "Profile.dc.html",
+    "Security.dc.html",
+    "EmptyStates.dc.html",
+    "Organisation.dc.html",
+    "Synthetic.dc.html",
+    "ApiWebhooks.dc.html",
+    "Guide.dc.html",
+    "MGuide.dc.html"
+  ],
+  "pages": [],
+  "title": "DxT Website Monitoring"
+}

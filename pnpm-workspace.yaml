@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Only these dependencies may run install scripts.
+allowBuilds:
+  esbuild: true
+
+# AURA is our own package and is released often; skip the new-release waiting period for it.
+minimumReleaseAgeExclude:
+  - '@jirawatpyk/*'

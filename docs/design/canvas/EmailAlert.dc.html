@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Alert email — template spec</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.r3-col > *{flex-shrink:0}
+.aura-segmented--sm .aura-segmented__option{padding:0 9px}
+</style>
+</helmet>
+<div class="r3-col" style="width: 720px; height: 1408px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">EMAIL · RESEND · RECORD COPY + FALLBACK WHEN CHAT FAILS</span>
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Alert email</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Same facts as the Chat thread. One email per event, all under one subject per incident, so a mail client stacks them the way Chat stacks the thread. Pick an event and a recipient — the footer says why that person got it.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Event</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Event" options="{{events}}" value="{{ev}}" on-change="{{pick}}" size="sm"></x-import></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Recipient</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Recipient" options="{{whoOptions}}" value="{{who}}" on-change="{{pickWho}}" size="sm"></x-import></div>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5; margin-top: -6px">{{e.sentTo}}</span>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); overflow: hidden">
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px; line-height: 1.5">
+<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">From</span><span>DxT Monitor &lt;alerts@[domain]&gt;</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">To</span><span>{{r.to}}</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">Subject</span><span style="font-weight: 600">MuvMi · Tier 1 · INC-0142</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">Preheader</span><span><b style="font-weight: 600; color: {{e.labelColor}}">{{e.preStatus}}</b> <span style="color: var(--aura-fg-secondary)">{{e.pre}}</span></span></div>
+</div>
+
+<div style="padding: 24px 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas); font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); overflow: hidden">
+<div style="height: 6px; background: {{e.bar}}"></div>
+<div style="padding: 22px 28px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: {{e.labelColor}}">{{e.label}}</span>
+<span style="font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 26px; line-height: 1.25; font-weight: 700">{{e.headline}}</span>
+<span style="font-size: 14px; color: var(--aura-fg-secondary); line-height: 1.5">{{r.lede}}</span>
+</div>
+<div style="display: flex; flex-direction: column; border-top: 1px solid var(--aura-border-default)">
+<sc-for list="{{e.facts}}" as="f" hint-placeholder-count="4">
+<div style="display: flex; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.5"><span style="width: 120px; flex-shrink: 0; color: var(--aura-fg-secondary)">{{f.k}}</span><span>{{f.v}}</span></div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 10px">
+<sc-for list="{{r.btns}}" as="b" hint-placeholder-count="2">
+<a href="{{b.href}}" style="height: 44px; padding: 0 24px; box-sizing: border-box; display: inline-flex; align-items: center; border-radius: 9999px; background: {{b.bg}}; border: 1px solid {{b.border}}; color: {{b.fg}}; font-size: 14px; font-weight: {{b.weight}}; text-decoration: none">{{b.label}}</a>
+</sc-for>
+<div style="height: 26px; margin-left: auto; padding: 0 8px; display: flex; align-items: center; gap: 5px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)"><span style="font-size: 13px; font-weight: 700">DxT</span><span style="width: 5px; height: 5px; border-radius: 9999px; background: var(--aura-accent-dot)"></span></div>
+</div>
+</div>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5; text-align: center"><b style="font-weight: 600; color: var(--aura-fg-primary)">{{r.why}}</b><br>Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.</span>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — threading (FR-07)</span>
+<span>One subject per incident: <span style="font-family: var(--font-mono); font-size: 11px">site · Tier · incident id</span>, the same for every event, so replies never fork the thread.</span>
+<span>The first email’s Message-ID is stored; every later email sets <span style="font-family: var(--font-mono); font-size: 11px">In-Reply-To</span> and <span style="font-family: var(--font-mono); font-size: 11px">References</span> to it.</span>
+<span>The status word goes first in the preheader and the body, so it still shows in a phone notification.</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Resolved email:</b> when someone resolves the incident (always by hand), one RESOLVED email goes in this same thread to everyone emailed about this DOWN incident — for INC-0142 Arm, Ploy, Tao and Bua. Held 10 s for Undo, like the ack.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — recipients &amp; build</span>
+<span>Recipients follow the escalation step: L0 owner by day / on-call at night · L1 backup + Tao · L2 CEO (proposal · pending CEO) · L3 FYI to CEO + AM (Tier 1, even after an ack). The client-update track emails the AM. Each email is sent per person with its own footer.</span>
+<span>Tier 2–3 L2 (+30 min, no ack) is a reminder email to Tao only — no CEO. Ack and resolve emails are held until the 10 s Undo window closes.</span>
+<span>Table layout, inline styles, 600 px max, system fonts. Status in words and colour. Plain-text part with the same facts and links. No tracking pixels.</span>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":1408}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { ev: 'Down', who: 'Arm' };
+  }
+  renderVals() {
+    var self = this;
+    var CAUSE = 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)';
+    var RED = 'var(--aura-fg-danger)', AMBER = 'var(--aura-alert-warning-fg)', GREY = 'var(--aura-fg-secondary)', GREEN = 'var(--aura-alert-success-fg)';
+    var PRIM = { bg: 'var(--aura-button-primary-bg)', fg: 'var(--aura-button-primary-fg)', border: 'var(--aura-button-primary-bg)', weight: '600' };
+    var SEC = { bg: 'transparent', fg: 'var(--aura-fg-primary)', border: 'var(--aura-button-secondary-border)', weight: '500' };
+    function P(label, href) { return Object.assign({ label: label, href: href }, PRIM); }
+    function Sd(label, href) { return Object.assign({ label: label, href: href }, SEC); }
+    var OPEN = Sd('Open incident', 'Incident.dc.html');
+    var ACKS = 'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).';
+    var E = {
+      'Down': {
+        sentTo: 'Sent 09:48 to Arm only — by day the owner is asked first. Ploy (backup) is first emailed at L1, 10:03.',
+        bar: RED, labelColor: RED, label: 'DOWN', preStatus: 'DOWN —', pre: 'MuvMi confirmed down 09:48:41 · ' + CAUSE + ' · acknowledge by 10:03',
+        headline: 'MuvMi is down',
+        facts: [{ k: 'Confirmed down', v: 'Fri 25 Sep 09:48:41' }, { k: 'Cause', v: CAUSE }, { k: 'Confirmed by', v: '3 locations, 2 checks' }, { k: 'Next step', v: 'L1 at 10:03 if not acknowledged — Ploy, Tao' }],
+        people: {
+          'Arm': { to: 'Arm <arm@[domain]>', lede: 'Nobody has acknowledged yet. You own MuvMi — please acknowledge or hand it over in the Chat thread.', btns: [P('Acknowledge', 'MLogin.dc.html'), OPEN], why: 'You got this because you own MuvMi.' }
+        }
+      },
+      'L1': {
+        sentTo: 'Sent 10:03 to Ploy and Tao, one email each. Arm already has the Down email in this thread.',
+        bar: AMBER, labelColor: AMBER, label: 'ESCALATED · L1', preStatus: 'ESCALATED · L1 —', pre: 'MuvMi down 15 min, not acknowledged · Next: CEO at 10:18',
+        headline: 'MuvMi still down — 15 min, no ack',
+        facts: [{ k: 'Down for', v: '15 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Already told', v: 'Arm — Chat + email 09:48' }, { k: 'Next step', v: 'CEO at 10:18 if still not acknowledged' }],
+        people: {
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Arm hasn’t acknowledged. Please acknowledge — you’re the next person for this incident.', btns: [P('Acknowledge', 'MLogin.dc.html'), OPEN], why: 'You got this because you’re backup for MuvMi and it wasn’t acknowledged in 15 min.' },
+          'Tao': { to: 'Tao <tao@[domain]>', lede: 'For your information — Ploy has been asked to acknowledge. Nothing needed from you unless it reaches the CEO.', btns: [OPEN], why: 'You got this because you’re the Admin — L1 keeps you informed.' }
+        }
+      },
+      'Client update': {
+        sentTo: 'Sent 10:03 to Bua only — the client-update track runs separately from escalation, whatever the ack state.',
+        bar: AMBER, labelColor: AMBER, label: 'CLIENT UPDATE DUE', preStatus: 'CLIENT UPDATE DUE —', pre: 'MuvMi down 15 min · draft ready',
+        headline: 'Tell MuvMi what’s happening',
+        facts: [{ k: 'Down for', v: '15 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Draft', v: 'Ready on the incident page — edit, send it to the client, then mark it' }, { k: 'Acknowledged', v: 'Not yet — Ploy (backup) asked at 10:03' }],
+        people: {
+          'Bua': { to: 'Bua <bua@[domain]>', lede: 'MuvMi (Tier 1) has been down 15 min. Please update the client and mark it on the incident page — the incident can’t be resolved until you do.', btns: [P('Open draft', 'Incident.dc.html'), OPEN], why: 'You got this because you’re the AM for MuvMi and a Tier 1 site was down 15 min.' }
+        }
+      },
+      'Acknowledged': {
+        sentTo: 'Sent 10:07:50 (held 10 s for Undo) to everyone already emailed about this incident: Arm, Ploy, Tao, Bua.',
+        bar: GREY, labelColor: GREY, label: 'ACKNOWLEDGED', preStatus: 'ACKNOWLEDGED —', pre: 'by Arm 10:07 · MuvMi still down · L1–L2 stopped',
+        headline: 'Arm has MuvMi',
+        facts: [{ k: 'Acknowledged', v: 'Arm at 10:07' }, { k: 'Down for', v: '19 min so far (confirmed down 09:48:41)' }, { k: 'Escalation', v: 'L2 cancelled · acked · L3 FYI at 10:48 if still down' }, { k: 'Client update', v: 'Due 10:03 · Bua (AM) notified — she sends it' }],
+        people: {
+          'Arm': { to: 'Arm <arm@[domain]>', lede: ACKS, btns: [OPEN], why: 'You got this because you acknowledged this incident.' },
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: ACKS, btns: [OPEN], why: 'You got this because you were asked to acknowledge at L1.' },
+          'Tao': { to: 'Tao <tao@[domain]>', lede: ACKS, btns: [OPEN], why: 'You got this because you were informed at L1.' },
+          'Bua': { to: 'Bua <bua@[domain]>', lede: ACKS + ' The client update is still yours to send.', btns: [P('Open draft', 'Incident.dc.html'), OPEN], why: 'You got this because you were emailed about the client update at 10:03.' }
+        }
+      },
+      'L2 (CEO) — Proposal': {
+        sentTo: 'Proposal · pending CEO — not live until the CEO approves it. If approved, it goes to the CEO at +30 min when nobody has acknowledged (for INC-0142: 10:18). Arm acknowledged at 10:07, so this was never sent.',
+        bar: AMBER, labelColor: AMBER, label: 'ESCALATED · L2', preStatus: 'ESCALATED · L2 —', pre: 'MuvMi down 30 min, not acknowledged · Arm, Ploy, Tao informed',
+        headline: 'MuvMi down 30 min — nobody has acknowledged',
+        facts: [{ k: 'Down for', v: '30 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Already told', v: 'Arm 09:48 · Ploy + Tao 10:03 · Bua (client update) 10:03' }, { k: 'Voice call', v: 'Configured · off until approved' }, { k: 'Next step', v: 'L3 (CEO + Bua, no call) at 10:48' }],
+        people: {
+          'CEO': { to: 'CEO <ceo@[domain]>', lede: 'MuvMi (Tier 1) has been down 30 min and nobody on the team has acknowledged. Arm (owner), Ploy (backup) and Tao were asked. Open it to see the latest, or call Tao.', btns: [P('Open incident', 'Incident.dc.html')], why: 'You got this because a Tier 1 site was down 30 min without an acknowledgement (L2, the step you approved).' }
+        }
+      },
+      'L3 FYI (CEO + Bua)': {
+        sentTo: 'Tier 1 only: sent at +60 min if the site is still DOWN, even after an ack — email + Chat mention, never a call. For INC-0142 it would have gone at 10:48; MuvMi recovered at 10:31, so it wasn’t sent.',
+        bar: GREY, labelColor: GREY, label: 'FYI · L3', preStatus: 'FYI —', pre: 'MuvMi still down 60 min · acknowledged by Arm 10:07 · no action needed',
+        headline: 'MuvMi still down after 60 min — Arm is on it',
+        facts: [{ k: 'Down for', v: '60 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Acknowledged', v: 'Arm at 10:07 · L1–L2 stopped' }, { k: 'Client update', v: 'Marked by Bua 10:12 — “Called MuvMi ops, ETA shared”' }, { k: 'Next step', v: 'Recovery email when it’s back · no more escalation' }],
+        people: {
+          'CEO': { to: 'CEO <ceo@[domain]>', lede: 'For your information — no action needed. Arm acknowledged at 10:07 and is working on it. This goes out because a Tier 1 site is still down after an hour.', btns: [P('Open incident', 'Incident.dc.html')], why: 'You got this because MuvMi (Tier 1) is still down after 60 min — the FYI step that runs even after an acknowledgement. No call.' },
+          'Bua': { to: 'Bua <bua@[domain]>', lede: 'For your information — MuvMi is still down after an hour and Arm is on it. If the client needs a second update, the draft on the incident page is current.', btns: [P('Open incident', 'Incident.dc.html')], why: 'You got this because you’re the AM for MuvMi and a Tier 1 site is still down after 60 min.' }
+        }
+      },
+      'Recovered': {
+        sentTo: 'Sent 10:31, on the first OK round, to Arm, Ploy, Tao and Bua (AM — so she can tell the client it’s back).',
+        bar: 'var(--aura-fg-positive)', labelColor: GREEN, label: 'RECOVERED', preStatus: 'RECOVERED —', pre: 'MuvMi back at 10:31 · down 43 min · root cause needed',
+        headline: 'MuvMi is back',
+        facts: [{ k: 'Down for', v: '43 min (09:48–10:31)' }, { k: 'Confirmed by', v: 'First OK round from 3 locations → Monitoring' }, { k: 'Acknowledged', v: 'Arm at 10:07' }, { k: 'Client update', v: 'Marked by Bua 10:12 — “Called MuvMi ops, ETA shared”' }, { k: 'Still to do', v: 'Root cause (Arm) · tell the client it’s back (Bua)' }],
+        people: {
+          'Arm': { to: 'Arm <arm@[domain]>', lede: 'Needs a root cause before it can be resolved.', btns: [P('Add root cause', 'Incident.dc.html'), OPEN], why: 'You got this because you own MuvMi.' },
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Nothing needed from you. Arm adds the root cause.', btns: [OPEN], why: 'You got this because you were asked to acknowledge at L1.' },
+          'Tao': { to: 'Tao <tao@[domain]>', lede: 'Nothing needed from you. Arm adds the root cause; the review draft follows.', btns: [OPEN], why: 'You got this because you were informed at L1.' },
+          'Bua': { to: 'Bua <bua@[domain]>', lede: 'MuvMi is back after 43 min. Let the client know it’s back — no need to mark it again; your 10:12 update is already on record.', btns: [P('Open incident', 'Incident.dc.html')], why: 'You got this because you’re the AM for MuvMi and handled its client update.' }
+        }
+      }
+    };
+    var ev = this.state.ev;
+    var e = E[ev];
+    var names = Object.keys(e.people);
+    var who = names.indexOf(this.state.who) >= 0 ? this.state.who : names[0];
+    return {
+      events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (CEO) — Proposal', 'L3 FYI (CEO + Bua)', 'Recovered'],
+      ev: ev,
+      pick: function (v) { self.setState({ ev: v }); },
+      whoOptions: names,
+      who: who,
+      pickWho: function (v) { self.setState({ who: v }); },
+      e: e,
+      r: e.people[who]
+    };
+  }
+}
+</script>
+</body>
+</html>

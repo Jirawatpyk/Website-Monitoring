@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Site detail</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px 0 8px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<a href="MOverview.dc.html" aria-label="Back to overview" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<span style="flex-grow: 1; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Bangkok Airways – Taiwan</span>
+<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 10px">
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 8px"><x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">OK</x-import><span style="font-size: 14px; font-weight: 500">since Mon 14 Sep 21:18</span></div>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Tier 1 · every 1 min · 24/7 · owner Arm · backup Ploy</span>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<a href="MMaintenance.dc.html" style="height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--aura-button-secondary-border); border-radius: 9999px; color: var(--aura-fg-primary); font-size: 13px; font-weight: 500; text-decoration: none"><x-import component-from-global-scope="Aura.Icon" name="eye-off" size="sm"></x-import>Mute</a>
+<a href="MMaintenance.dc.html#maintenance" style="height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--aura-button-secondary-border); border-radius: 9999px; color: var(--aura-fg-primary); font-size: 13px; font-weight: 500; text-decoration: none"><x-import component-from-global-scope="Aura.Icon" name="calendar" size="sm"></x-import>Maintenance</a>
+</div>
+
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Range" options="{{ranges}}" value="{{range}}" on-change="{{setRange}}" full-width="{{yes}}" size="sm"></x-import>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<div style="padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; line-height: 1.3"><span style="font-size: 20px; font-weight: 600">{{stat.uptime}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Uptime</span></div>
+<div style="padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; line-height: 1.3"><span style="font-size: 20px; font-weight: 600">{{stat.p50}} ms</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">p50</span></div>
+<div style="padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; line-height: 1.3"><span style="font-size: 20px; font-weight: 600">{{stat.incidents}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Incidents</span></div>
+</div>
+
+<div style="padding: 12px 14px 8px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="font-size: 13px; font-weight: 600">Response time</span>
+<div style="display: flex; gap: 10px; font-size: 11px; color: var(--aura-fg-secondary)">
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 2px; background: var(--aura-chart-1)"></span>BKK</span>
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 2px; background: var(--aura-chart-2)"></span>SIN</span>
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 2px; background: var(--aura-chart-4)"></span>TYO</span>
+</div>
+</div>
+<div style="display: flex; gap: 6px">
+<div style="width: 26px; height: 72px; flex-shrink: 0; position: relative; font-family: var(--font-mono); font-size: 10px; line-height: 1; color: var(--aura-chart-axis); text-align: right">
+<span style="position: absolute; right: 0; top: 2px">1 s</span><span style="position: absolute; right: 0; top: 31px">500</span><span style="position: absolute; right: 0; top: 61px">0</span>
+</div>
+<svg width="298" height="72" viewBox="0 0 330 110" preserveAspectRatio="none" role="img" aria-label="Response time, all locations under one second" style="display: block; flex-grow: 1; min-width: 0">
+<g style="stroke: var(--aura-chart-grid); stroke-width: 1" vector-effect="non-scaling-stroke"><line x1="0" y1="10" x2="330" y2="10"></line><line x1="0" y1="55" x2="330" y2="55"></line><line x1="0" y1="100" x2="330" y2="100"></line></g>
+<path d="{{chart.bkk}}" style="fill: none; stroke: var(--aura-chart-1); stroke-width: 1.5; vector-effect: non-scaling-stroke"></path>
+<path d="{{chart.sin}}" style="fill: none; stroke: var(--aura-chart-2); stroke-width: 1.5; vector-effect: non-scaling-stroke"></path>
+<path d="{{chart.tyo}}" style="fill: none; stroke: var(--aura-chart-4); stroke-width: 1.5; vector-effect: non-scaling-stroke"></path>
+</svg>
+</div>
+</div>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden; flex-shrink: 0">
+<div style="padding: 8px 14px; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary); border-bottom: 1px solid var(--aura-border-subtle)">INCIDENTS IN RANGE</div>
+<sc-if value="{{hasList}}" hint-placeholder-val="{{true}}">
+<sc-for list="{{stat.list}}" as="i" hint-placeholder-count="2">
+<a href="MIncident.dc.html" style="min-height: 44px; box-sizing: border-box; padding: 4px 8px 4px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; color: inherit; text-decoration: none">
+<span style="width: 108px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="{{i.tone}}" variant="outline" icon="{{i.icon}}">{{i.sev}}</x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{i.what}}</span><span style="font-size: 11px; color: var(--aura-fg-secondary)">{{i.when}}</span></span>
+<span style="font-variant-numeric: tabular-nums; white-space: nowrap">{{i.dur}}</span>
+<span style="display: flex; color: var(--aura-fg-tertiary); margin-left: -4px"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span>
+</a>
+</sc-for>
+</sc-if>
+<sc-if value="{{hasMore}}" hint-placeholder-val="{{false}}">
+<div style="padding: 6px 14px; font-size: 12px; color: var(--aura-fg-secondary); border-bottom: 1px solid var(--aura-border-subtle)">{{stat.more}}</div>
+</sc-if>
+<sc-if value="{{noList}}" hint-placeholder-val="{{false}}">
+<div style="padding: 10px 14px; font-size: 13px; color: var(--aura-fg-secondary)">No incidents in this range.</div>
+</sc-if>
+</div>
+<sc-if value="{{hasList}}" hint-placeholder-val="{{true}}">
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · each row opens Incident detail for that incident — the sample screen shows INC-0142</div>
+</sc-if>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden; flex-shrink: 0">
+<div style="padding: 10px 14px; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary); border-bottom: 1px solid var(--aura-border-subtle)">LATEST ROUND · 3/3 PASS → OK</div>
+<sc-for list="{{round}}" as="r" hint-placeholder-count="3">
+<div style="min-height: 36px; box-sizing: border-box; padding: 3px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px">
+<span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm" label="Pass"></x-import></span>
+<span style="font-weight: 600; width: 36px">{{r.code}}</span>
+<span style="flex-grow: 1; color: var(--aura-fg-secondary)">HTTP 200 · {{r.at}}</span>
+<span style="font-variant-numeric: tabular-nums">{{r.ms}}</span>
+</div>
+</sc-for>
+<div style="min-height: 44px; box-sizing: border-box; padding: 6px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px">
+<span style="flex-grow: 1; color: var(--aura-fg-secondary)">6 monitors pass · SSL 73 d · domain 211 d</span>
+<x-import component-from-global-scope="Aura.Badge" tone="success">6/6</x-import>
+</div>
+</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="sites" label="Sections"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { range: '30 d' };
+  }
+  line(seed, base, spread) {
+    var v = seed, d = [];
+    for (var i = 0; i < 40; i++) {
+      v = (v * 9301 + 49297) % 233280;
+      var ms = base + (v / 233280 - 0.5) * spread;
+      d.push((i === 0 ? 'M' : 'L') + (i * 330 / 39).toFixed(1) + ' ' + (100 - ms / 1000 * 90).toFixed(1));
+    }
+    return d.join(' ');
+  }
+  renderVals() {
+    var self = this;
+    var I118 = { id: 'INC-0118', sev: 'Was down', tone: 'danger', icon: 'ban', what: 'Hard fail · server fault', when: 'Wed 2 Sep 03:40', dur: '11 min' };
+    var I131 = { id: 'INC-0131', sev: 'Was problem', tone: 'warning', icon: 'triangle-alert', what: 'Regional · SIN CDN edge', when: 'Mon 14 Sep 21:12', dur: '6 min' };
+    var R = {
+      '24 h': { uptime: '100.00%', p50: '412', incidents: '0', list: [], more: '' },
+      '7 d': { uptime: '100.00%', p50: '405', incidents: '0', list: [], more: '' },
+      '30 d': { uptime: '99.97%', p50: '398', incidents: '2', list: [I131, I118], more: '' },
+      '90 d': { uptime: '99.99%', p50: '410', incidents: '4', list: [I131, I118], more: '+ 2 in August: booking page slow 18 Aug (14 min), SSL early warning 11 Aug' }
+    };
+    var st = R[this.state.range];
+    return {
+      yes: true,
+      range: this.state.range,
+      ranges: ['24 h', '7 d', '30 d', '90 d'],
+      setRange: function (v) { self.setState({ range: v }); },
+      stat: st,
+      hasList: st.list.length > 0,
+      noList: st.list.length === 0,
+      hasMore: !!st.more,
+      chart: { bkk: this.line(11, 230, 120), sin: this.line(29, 400, 180), tyo: this.line(47, 310, 150) },
+      round: [
+        { code: 'BKK', at: '10:07:10', ms: '212 ms' },
+        { code: 'SIN', at: '10:07:04', ms: '388 ms' },
+        { code: 'TYO', at: '10:07:02', ms: '301 ms' }
+      ],
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSite.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

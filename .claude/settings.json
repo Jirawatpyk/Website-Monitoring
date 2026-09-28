@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install)",
+      "Bash(pnpm check)",
+      "Bash(pnpm check *)",
+      "Bash(pnpm test)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm build)",
+      "Bash(pnpm build *)",
+      "Bash(pnpm format)",
+      "Bash(pnpm format *)",
+      "Bash(pnpm --filter * test)",
+      "Bash(pnpm --filter * test *)",
+      "Bash(pnpm --filter * test:watch)",
+      "Bash(pnpm --filter * typecheck)",
+      "Bash(pnpm --filter * typecheck *)",
+      "Bash(pnpm --filter * build)",
+      "Bash(pnpm --filter * build *)",
+      "Bash(pnpm --filter * dev)",
+      "Bash(pnpm exec vitest *)",
+      "Bash(pnpm exec eslint *)",
+      "Bash(pnpm exec prettier *)",
+      "Bash(pnpm exec tsc *)",
+      "Bash(pnpm db:types)",
+      "Bash(pnpm exec supabase status *)",
+      "Bash(pnpm exec supabase migration new *)",
+      "Bash(pnpm exec supabase migration list *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "PowerShell(pnpm install)",
+      "PowerShell(pnpm check)",
+      "PowerShell(pnpm check *)",
+      "PowerShell(pnpm test)",
+      "PowerShell(pnpm test *)",
+      "PowerShell(pnpm lint)",
+      "PowerShell(pnpm lint *)",
+      "PowerShell(pnpm typecheck)",
+      "PowerShell(pnpm typecheck *)",
+      "PowerShell(pnpm build)",
+      "PowerShell(pnpm build *)",
+      "PowerShell(pnpm format)",
+      "PowerShell(pnpm format *)",
+      "PowerShell(pnpm --filter * test)",
+      "PowerShell(pnpm --filter * test *)",
+      "PowerShell(pnpm --filter * typecheck)",
+      "PowerShell(pnpm --filter * build)",
+      "PowerShell(pnpm --filter * build *)",
+      "PowerShell(pnpm --filter * dev)",
+      "PowerShell(pnpm db:types)",
+      "PowerShell(git status *)",
+      "PowerShell(git diff *)",
+      "PowerShell(git log *)",
+      "PowerShell(git branch *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm --filter * add *)",
+      "Bash(pnpm --filter * exec *)",
+      "Bash(pnpm db:reset)",
+      "Bash(pnpm exec supabase db *)",
+      "Bash(pnpm exec supabase link *)",
+      "Bash(*supabase db push*)",
+      "Bash(vercel *)",
+      "PowerShell(git push *)",
+      "PowerShell(pnpm add *)",
+      "PowerShell(pnpm --filter * add *)",
+      "PowerShell(pnpm --filter * exec *)",
+      "PowerShell(pnpm db:reset)",
+      "PowerShell(pnpm exec supabase db *)",
+      "PowerShell(*supabase db push*)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)",
+      "PowerShell(git push --force *)",
+      "PowerShell(git push -f *)",
+      "PowerShell(git reset --hard *)",
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.development)",
+      "Read(**/.env.test)",
+      "Read(**/.env.production)",
+      "Read(**/.env.keys)",
+      "Read(supabase/.env)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/format.mjs\"",
+            "timeout": 30,
+            "statusMessage": "Formatting with Prettier"
+          }
+        ]
+      }
+    ]
+  }
+}

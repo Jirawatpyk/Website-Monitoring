@@ -1,0 +1,17 @@
+/*
+ * Tailwind v4 + AURA. AURA components sit in @layer aura so Tailwind utilities win over them.
+ * Colours come from AURA semantic tokens only — no raw hex, no Tailwind palette classes.
+ */
+@layer theme, base, aura, components, utilities;
+
+@import 'tailwindcss';
+@import '@jirawatpyk/aura-tokens/tailwind.css';
+@import '@jirawatpyk/aura-react/styles.layer.css';
+
+html,
+body {
+  margin: 0;
+  background: var(--aura-bg-canvas);
+  color: var(--aura-fg-primary);
+  font-family: var(--font-sans);
+}

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — On-call</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.aura-check--labelled{box-sizing:border-box;min-height:44px;padding-block:12px}.aura-check--labelled .aura-check__input{top:15px}
+.aura-dialog__close.aura-icon-btn{width:44px;height:44px;margin:-12px -14px 0 0}
+.aura-input{min-height:44px;box-sizing:border-box}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 8px 0 16px; display: flex; align-items: center; justify-content: space-between; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<span style="font-size: 17px; font-weight: 600">On-call</span>
+<x-import component-from-global-scope="Aura.Avatar" name="Ploy" size="sm"></x-import>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="flex-shrink: 0; padding: 14px 18px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-card-radius); display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; opacity: 0.7">YOUR ON-CALL HOURS START IN 7 H 53 MIN</span>
+<span style="font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.2; white-space: nowrap">Tonight 18:00 → Mon 09:00</span>
+<span style="font-size: 13px; opacity: 0.8">Owners handle alerts until 18:00. Then all Tier 1 alerts (5 sites) come to you instead of the owners.</span>
+</div>
+
+<div style="flex-shrink: 0; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); padding: 12px 16px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="font-size: 15px; font-weight: 600">Before your shift</span>
+<span style="font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums">{{doneCount}}/3</span>
+</div>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 1.4; color: {{readyColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{readyIcon}}" size="sm"></x-import><span>{{readyLine}}</span></span>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{c1}}" on-change="{{set1}}">Alerts Space: notify for @mentions only</x-import>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{c2}}" on-change="{{set2}}">Space allowed through Do Not Disturb</x-import>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{c3}}" disabled="{{yes}}" description="{{c3Note}}">Test alert received on this phone</x-import>
+<sc-if value="{{notSent}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="bell" full-width="{{yes}}" on-click="{{sendTest}}">Send test alert to me</x-import>
+</sc-if>
+<sc-if value="{{waiting}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span><b style="font-weight: 600">Sent 10:07</b> to the “TEST — no action” thread, mentioning only you.</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="external-link" full-width="{{yes}}" on-click="{{openLink}}">Open test link on this phone</x-import>
+</div>
+</sc-if>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.45">Digests post to a separate Space, DxT Website Reports.</span>
+</div>
+
+<div style="flex-shrink: 0; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<div style="padding: 0 4px 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--aura-border-subtle)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ROTATION</span><x-import component-from-global-scope="Aura.Button" variant="ghost" icon="arrow-up-down" on-click="{{openSwap}}">Request swap</x-import></div>
+<sc-for list="{{rotation}}" as="r" hint-placeholder-count="4">
+<div style="min-height: 44px; box-sizing: border-box; padding: 5px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--aura-border-subtle)">
+<x-import component-from-global-scope="Aura.Avatar" name="{{r.who}}" size="sm"></x-import>
+<div style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.3">
+<span style="font-size: 14px; font-weight: 500">{{r.who}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{r.shift}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="{{r.variant}}" icon="{{r.icon}}">{{r.status}}</x-import>
+</div>
+</sc-for>
+</div>
+
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="oncall" label="Sections"></x-import>
+<x-import component-from-global-scope="Aura.Dialog" open="{{swapOpen}}" on-close="{{closeSwap}}" title="Request a swap" description="Your shift: Mon 12 Oct → Mon 19 Oct (Tier 1 nights and weekends)" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<x-import component-from-global-scope="Aura.Select" label="Swap with" options="{{swapPeople}}" value="{{swapWith}}" on-change="{{setSwapWith}}"></x-import>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{swapEffect}}</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{closeSwap}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" full-width="{{yes}}" on-click="{{sendSwap}}">Send request</x-import>
+</div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { c1: true, c2: true, c3: false, sent: false, swapOpen: false, swapWith: 'Nok', swapSent: '' };
+  }
+  renderVals() {
+    var self = this;
+    var s = this.state;
+    return {
+      yes: true,
+      c1: s.c1, c2: s.c2, c3: s.c3,
+      set1: function (v) { self.setState({ c1: v }); },
+      set2: function (v) { self.setState({ c2: v }); },
+      c3Note: s.c3 ? 'Received on this phone at 10:08' : 'Ticks itself when you open the test link on this phone',
+      doneCount: [s.c1, s.c2, s.c3].filter(Boolean).length,
+      readyLine: s.c3 ? 'Ploy’s phone 3 of 3 ready · test alert received 10:08' : 'Ploy’s phone 2 of 3 ready · test alert not received on current phone',
+      readyIcon: s.c3 ? 'circle-check' : 'triangle-alert',
+      readyColor: s.c3 ? 'var(--aura-fg-positive)' : 'var(--aura-alert-warning-fg)',
+      notSent: !s.sent,
+      waiting: s.sent && !s.c3,
+      sendTest: function () { self.setState({ sent: true }); },
+      openLink: function () { self.setState({ c3: true }); },
+      no: false,
+      swapOpen: s.swapOpen,
+      swapWith: s.swapWith,
+      swapPeople: ['Nok', 'Arm'],
+      setSwapWith: function (e) { self.setState({ swapWith: e && e.target ? e.target.value : e }); },
+      swapEffect: s.swapWith + ' gets a Chat message and an email. Nothing changes in the rotation until ' + s.swapWith + ' accepts; you stay on call for Mon 12 Oct → Mon 19 Oct until then.',
+      openSwap: function () { self.setState({ swapOpen: true }); },
+      closeSwap: function () { self.setState({ swapOpen: false }); },
+      sendSwap: function () { self.setState({ swapOpen: false, swapSent: self.state.swapWith }); },
+      rotation: [
+        { who: 'Ploy', shift: 'Mon 21 Sep → Mon 28 Sep · you', status: 'On call now', variant: 'solid', icon: 'user' },
+        { who: 'Nok', shift: 'Mon 28 Sep → Mon 5 Oct', status: 'Scheduled', variant: 'outline', icon: 'clock' },
+        { who: 'Arm', shift: 'Mon 5 Oct → Mon 12 Oct · with Nok, not accepted yet', status: 'Swap requested', variant: 'outline', icon: 'arrow-up-down' },
+        { who: 'Ploy', shift: s.swapSent ? 'Mon 12 Oct → Mon 19 Oct · with ' + s.swapSent + ', not accepted yet' : 'Mon 12 Oct → Mon 19 Oct · you', status: s.swapSent ? 'Swap requested' : 'Scheduled', variant: 'outline', icon: s.swapSent ? 'arrow-up-down' : 'clock' }
+      ],
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSite.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

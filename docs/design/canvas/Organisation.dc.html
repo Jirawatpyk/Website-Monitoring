@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Settings, organisation</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1762px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="settings" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px; position: relative">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; min-height: 48px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SETTINGS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Settings</h1>
+</div>
+
+</div>
+
+<x-import component-from-global-scope="Aura.Tabs" label="Settings sections" tabs="{{tabs}}" value="org"></x-import>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Tiers</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Response hours are set here only — alert channels, escalation and profiles read them. Changes are logged.</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="font-size: 18px; font-weight: 600">Tier 1</span>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">5 sites</x-import>
+</div>
+<div style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Checked every</span><span style="font-weight: 500; text-align: right">1 min</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Detect DOWN within</span><span style="font-weight: 500; text-align: right">3 min</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Covered</span><span style="font-weight: 500; text-align: right">24/7</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Client update after</span><span style="font-weight: 500; text-align: right">15 min down</span></div>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Bangkok Airways – Taiwan / China, ENEOS Industrial, MuvMi, realme.link</span>
+</div>
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="font-size: 18px; font-weight: 600">Tier 2</span>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">9 sites</x-import>
+</div>
+<div style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Checked every</span><span style="font-weight: 500; text-align: right">3 min</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Detect DOWN within</span><span style="font-weight: 500; text-align: right">10 min</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Covered</span><span style="font-weight: 500; text-align: right">Response hours only</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Client update after</span><span style="font-weight: 500; text-align: right">60 min down, in hours</span></div>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Fuji Links, WeCare Studio, Tubtong, Cando Asia, ORCA Thailand, WeCare Asia, VOCA, EQHO, DxT</span>
+</div>
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="font-size: 18px; font-weight: 600">Tier 3</span>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">3 sites</x-import>
+</div>
+<div style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Checked every</span><span style="font-weight: 500; text-align: right">5 min</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Detect DOWN within</span><span style="font-weight: 500; text-align: right">10 min</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Covered</span><span style="font-weight: 500; text-align: right">Response hours only</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Client update</span><span style="font-weight: 500; text-align: right">Report only</span></div>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">DxT Solutions, DxT AI, DxT Games</span>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: var(--aura-radius-md); background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><span style="font-size: 14px; font-weight: 600">Tier 1 · owner hours</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">5 sites</span></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px">
+<x-import component-from-global-scope="Aura.Select" label="Days" options="{{dayOpts}}" value="{{t1Days}}" on-change="{{sett1Days}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="From" options="{{timeOpts}}" value="{{t1From}}" on-change="{{sett1From}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="To" options="{{timeOpts}}" value="{{t1To}}" on-change="{{sett1To}}" error="{{t1Err}}"></x-import>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Covered 24/7: the owner inside these hours, the person on call outside them.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: var(--aura-radius-md); background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><span style="font-size: 14px; font-weight: 600">Tier 2–3 · response hours</span><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">One setting for both tiers · 12 sites</x-import></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px">
+<x-import component-from-global-scope="Aura.Select" label="Days" options="{{dayOpts}}" value="{{t23Days}}" on-change="{{sett23Days}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="From" options="{{timeOpts}}" value="{{t23From}}" on-change="{{sett23From}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="To" options="{{timeOpts}}" value="{{t23To}}" on-change="{{sett23To}}" error="{{t23Err}}"></x-import>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Outside these hours DOWN still posts, but escalation timers wait until the start time. PROBLEM is held until then. Tier 2–3 have no on-call.</span>
+</div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Clients</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Who gets a report and a status page. Client logins arrive in Phase 3.</span>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">New clients are created with their first site</span><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="plus" href="AddSite.dc.html">Add client</x-import></div>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Client</div>
+<div class="aura-table__th" style="width: 70px; justify-content: flex-end; padding-right: 16px">Sites</div>
+<div class="aura-table__th" style="width: 100px">AM</div>
+<div class="aura-table__th" style="width: 170px">Monthly report</div>
+<div class="aura-table__th" style="width: 210px">Status page</div>
+<div class="aura-table__th" style="width: 90px">Language</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{clients}}" as="c" hint-placeholder-count="10">
+<div class="aura-table__row">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: center; line-height: 1.3"><span style="font-weight: 500">{{c.name}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.sites}}</span></div>
+<div class="aura-table__td" style="width: 70px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{c.n}}</div>
+<div class="aura-table__td" style="width: 100px">{{c.am}}</div>
+<div class="aura-table__td" style="width: 170px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{c.rTone}}" icon="{{c.rIcon}}">{{c.report}}</x-import></div>
+<div class="aura-table__td" style="width: 210px; font-family: var(--font-mono); font-size: 12px; color: {{c.pColor}}">{{c.page}}</div>
+<div class="aura-table__td" style="width: 90px; color: var(--aura-fg-secondary)">{{c.lang}}</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Data kept</h3><span style="font-size: 12px; color: var(--aura-fg-secondary)">Database 1.4 GB of 8 GB</span></div>
+<x-import component-from-global-scope="Aura.Progress" value="{{dbUsed}}" max="{{dbMax}}" aria-label="Database storage used" size="sm"></x-import>
+<div style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.5">
+<sc-for list="{{retention}}" as="r" hint-placeholder-count="4">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">{{r.k}}</span><span style="font-weight: 500">{{r.v}}</span></div>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Times are stored in UTC and shown in Thailand time (UTC+7). Raw results older than 90 days are deleted.</span>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Monthly cost</h3><span style="font-size: 12px; color: var(--aura-fg-secondary)">Cap requested: $60 · CEO to approve</span></div>
+<div style="display: flex; align-items: baseline; gap: 8px"><span style="font-size: 32px; font-weight: 600; line-height: 1.1">$28</span><span style="font-size: 13px; color: var(--aura-fg-secondary)">this month · $32 under the cap</span></div>
+<x-import component-from-global-scope="Aura.Progress" value="{{costUsed}}" max="{{costMax}}" aria-label="Monthly cost against the cap" size="sm"></x-import>
+<div style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.5">
+<sc-for list="{{costs}}" as="r" hint-placeholder-count="5">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">{{r.k}}</span><span style="font-weight: 500; font-variant-numeric: tabular-nums">{{r.v}}</span></div>
+</sc-for>
+</div>
+</div>
+
+</div>
+
+<sc-if value="{{dirty}}" hint-placeholder-val="{{false}}">
+<div role="region" aria-label="Unsaved changes" style="position: relative; margin-top: auto; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 20px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-strong); border-radius: 9999px; box-shadow: var(--aura-shadow-overlay)">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="sm"></x-import></span>
+<span style="font-weight: 600; white-space: nowrap">{{dirtyLabel}}</span>
+<span style="flex-grow: 1; min-width: 0; font-size: 13px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{dirtyHint}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{discard}}">Discard</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="check" disabled="{{saveOff}}" on-click="{{save}}">Save</x-import>
+</div>
+</sc-if>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{saveOpen}}" on-close="{{closeSave}}" title="Change response hours?" description="New incidents use the new hours from the moment you save. Open incidents keep the timers they started with." size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{diff}}" as="d" hint-placeholder-count="1">
+<div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 12px 14px; border-top: {{d.border}}; font-size: 13px; line-height: 1.45">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">{{d.where}}</span>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="color: var(--aura-fg-danger); text-decoration: line-through">{{d.before}}</span>
+<span style="color: var(--aura-fg-positive)">{{d.after}}</span>
+<span style="font-weight: 500">{{d.affects}}</span>
+<span style="color: var(--aura-fg-secondary)">{{d.covers}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<x-import component-from-global-scope="Aura.Textarea" label="Change note" required="{{yes}}" rows="{{two}}" placeholder="Why are you changing the hours?" value="{{note}}" on-change="{{setNote}}" error="{{noteErr}}" hint="Saved with the change in the audit log."></x-import>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1"></span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeSave}}">Back to editing</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{confirmSave}}">Save and log</x-import>
+</div>
+</div>
+</x-import>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1762}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var h = { t1Days: 'Mon–Fri', t1From: '09:00', t1To: '18:00', t23Days: 'Mon–Fri', t23From: '09:00', t23To: '18:00' };
+    this.state = { h: h, saved: Object.assign({}, h), saveOpen: false, note: '', tried: false, done: '' };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var keys = Object.keys(st.h);
+    var changes = keys.filter(function (k) { return st.h[k] !== st.saved[k]; }).length;
+    function setter(k) { return function (e) { var v = e && e.target ? e.target.value : e; var h = Object.assign({}, st.h); h[k] = v; self.setState({ h: h }); }; }
+    var hv = {};
+    keys.forEach(function (k) { hv[k] = st.h[k]; hv['set' + k] = setter(k); });
+    function mins(t) { var m = /^(\d\d):(\d\d)$/.exec(t); return m ? +m[1] * 60 + +m[2] : 0; }
+    hv.t1Err = mins(st.h.t1From) >= mins(st.h.t1To) ? 'Must be after From' : '';
+    hv.t23Err = mins(st.h.t23From) >= mins(st.h.t23To) ? 'Must be after From' : '';
+    var invalid = !!(hv.t1Err || hv.t23Err);
+    var times = []; for (var m = 6 * 60; m <= 22 * 60; m += 30) { times.push((m < 600 ? '0' : '') + Math.floor(m / 60) + ':' + (m % 60 ? '30' : '00')); }
+    function span(p, H) { return H[p + 'Days'] + ' ' + H[p + 'From'] + '–' + H[p + 'To']; }
+    function dayPhrase(d) { return d === 'Every day' ? 'every day' : (d === 'Mon–Sat' ? 'Mon–Sat nights, plus all of Sunday' : 'Mon–Fri nights, plus all weekend'); }
+    function offDays(d) { return d === 'Mon–Fri' ? ' + all weekend' : (d === 'Mon–Sat' ? ' + Sundays' : ''); }
+    var diff = [];
+    if (['t1Days', 't1From', 't1To'].some(function (k) { return st.h[k] !== st.saved[k]; })) diff.push({ where: 'Tier 1 · owner hours', before: span('t1', st.saved), after: span('t1', st.h), affects: 'Affects 5 sites · Bangkok Airways – Taiwan / China, ENEOS Industrial, MuvMi, realme.link', covers: 'On-call now covers ' + st.h.t1To + '–' + st.h.t1From + ' ' + dayPhrase(st.h.t1Days) + ' (this week: Ploy, from Mon 28 Sep: Nok). Owners cover ' + span('t1', st.h).replace('Every day', 'every day') + '.' });
+    if (['t23Days', 't23From', 't23To'].some(function (k) { return st.h[k] !== st.saved[k]; })) diff.push({ where: 'Tier 2–3 · response hours', before: span('t23', st.saved), after: span('t23', st.h), affects: 'Affects 12 sites · 9 in Tier 2, 3 in Tier 3', covers: 'On-call covers nothing new — Tier 2–3 have no on-call. Outside ' + span('t23', st.h) + ' DOWN still posts and timers wait until ' + st.h.t23From + '; PROBLEM is held until ' + st.h.t23From + '.' });
+    diff.forEach(function (d, i) { d.border = i ? '1px solid var(--aura-border-subtle)' : 'none'; });
+    hv.timeOpts = times;
+    var SENT = { report: 'Sent monthly', rTone: 'success', rIcon: 'circle-check' };
+    var DRAFT = { report: 'Draft, AM sends', rTone: 'neutral', rIcon: 'pencil' };
+    var NONE = { report: 'Internal — none', rTone: 'neutral', rIcon: 'minus' };
+    function c(name, sites, n, am, rep, page, lang) {
+      return Object.assign({ name: name, sites: sites === name ? '1 site' : sites, n: n, am: am, page: page, lang: lang, pColor: page === 'Not set up' ? 'var(--aura-fg-tertiary)' : 'var(--aura-fg-primary)' }, rep);
+    }
+    return Object.assign(hv, {
+      dbUsed: 1.4, dbMax: 8, costUsed: 28, costMax: 60,
+      dayOpts: ['Mon–Fri', 'Mon–Sat', 'Every day'],
+      dirty: changes > 0,
+      dirtyLabel: changes + (changes === 1 ? ' unsaved change' : ' unsaved changes'),
+      dirtyHint: invalid ? 'Fix the hours first — “To” must be after “From”' : 'Response hours apply to new incidents after you save · the next step shows who is affected',
+      discard: function () { self.setState({ h: Object.assign({}, st.saved) }); },
+      save: function () { if (invalid) return; self.setState({ saveOpen: true, tried: false }); },
+      saveOff: invalid,
+      two: 2, yes: true, diff: diff, saveOpen: st.saveOpen,
+      closeSave: function () { self.setState({ saveOpen: false }); },
+      note: st.note,
+      setNote: function (e) { self.setState({ note: e && e.target ? e.target.value : e }); },
+      noteErr: st.tried && !st.note.trim() ? 'Add a short note — it goes in the audit log with the change' : '',
+      confirmSave: function () { if (!st.note.trim()) { self.setState({ tried: true }); return; } self.setState({ saved: Object.assign({}, st.h), saveOpen: false, note: '', tried: false }); },
+      tabs: [
+        { id: 'users', label: 'Users & roles', href: 'Users.dc.html' },
+        { id: 'channels', label: 'Alert channels', href: 'AlertChannels.dc.html' },
+        { id: 'sso', label: 'Sign-in & security', href: 'Security.dc.html' },
+        { id: 'org', label: 'Organisation', href: 'Organisation.dc.html' },
+        { id: 'api', label: 'API & webhooks', href: 'ApiWebhooks.dc.html', count: 'Phase 3' }
+      ],
+      clients: [
+        c('Bangkok Airways', 'Taiwan, China', '2', 'Bua', SENT, 'status.[client domain]', 'EN'),
+        c('ENEOS', 'ENEOS Industrial', '1', 'Thee', SENT, 'Not set up', 'EN'),
+        c('MuvMi', 'MuvMi', '1', 'Bua', SENT, 'Not set up', 'TH'),
+        c('realme', 'realme.link', '1', 'Thee', DRAFT, 'Not set up', 'EN'),
+        c('Fuji Links', 'Fuji Links', '1', 'Thee', DRAFT, 'Not set up', 'TH'),
+        c('Tubtong', 'Tubtong', '1', 'Bua', DRAFT, 'Not set up', 'TH'),
+        c('Cando Asia', 'Cando Asia', '1', 'Bua', DRAFT, 'Not set up', 'EN'),
+        c('ORCA Thailand', 'ORCA Thailand', '1', 'Thee', DRAFT, 'Not set up', 'TH'),
+        c('WeCare', 'WeCare Studio, WeCare Asia', '2', 'Bua', DRAFT, 'Not set up', 'TH'),
+        c('Internal', 'DxT, DxT Solutions, DxT AI, DxT Games, EQHO, VOCA', '6', '—', NONE, 'Not set up', '—')
+      ],
+      retention: [
+        { k: 'Raw check results', v: '90 days' },
+        { k: 'Hourly and daily roll-ups', v: '2 years' },
+        { k: 'Incidents, reviews, audit log', v: 'Kept forever' },
+        { k: 'Verifier screenshots', v: '30 days' }
+      ],
+      costs: [
+        { k: 'Supabase · Micro compute', v: '$10' },
+        { k: 'Thai VPS · 2 GB (probe + verifier)', v: '$18' },
+        { k: 'Twilio voice · waiting approval', v: '$0 (~$23–26 if yes)' },
+        { k: 'Vercel Pro, Resend, Healthchecks.io', v: 'Already paid / free' },
+        { k: 'Vercel functions this month', v: '312k of ~430k est.' }
+      ],
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    });
+  }
+}
+</script>
+</body>
+</html>

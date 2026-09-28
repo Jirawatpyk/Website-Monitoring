@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Incident detail</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}a.aura-btn--secondary:hover,a.aura-btn--ghost:hover{color:var(--aura-fg-primary)}
+.aura-icon-btn{width:44px;height:44px}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.aura-dialog__close.aura-icon-btn{width:44px;height:44px;margin:-12px -14px 0 0}
+.aura-input{min-height:44px;box-sizing:border-box}
+.aura-input__control{min-height:44px;box-sizing:border-box}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 6px 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<a href="MIncidents.dc.html" aria-label="Back to incidents" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<span style="flex-grow: 1; font-family: var(--font-mono); font-size: 15px; font-weight: 600">INC-0142</span>
+<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+<x-import component-from-global-scope="Aura.IconButton" icon="ellipsis" label="More actions" on-click="{{openMore}}"></x-import>
+</header>
+
+<div id="mi-scroll" class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 12px 16px 32px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" full-width="{{yes}}" size="sm"></x-import></div>
+</div>
+
+<sc-if value="{{showResolved}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-left: 3px solid var(--aura-fg-positive); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
+<span style="font-weight: 600; flex-grow: 1">Resolved 10:33 · review due Mon 28 Sep</span>
+</div>
+<span style="font-size: 13px">Resolved by Arm · MuvMi was down 43 min · root cause: {{rcLabel}}.</span>
+<div role="status" aria-live="polite" style="display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Icon" name="{{postIcon}}" size="sm"></x-import></span><span>{{postLine}}</span></div>
+<sc-if value="{{holding}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="rotate-ccw" full-width="{{yes}}" on-click="{{undo}}">{{undoLabel}}</x-import>
+</sc-if>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap">
+<x-import component-from-global-scope="Aura.Badge" tone="success" variant="outline" icon="circle-check">Resolved</x-import>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="file-text">In review</x-import>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" icon="check">Closed</x-import>
+</div>
+<span>DOWN lifecycle: becomes <b style="font-weight: 500; color: var(--aura-fg-primary)">In review</b> when the review draft is submitted for sign-off, and <b style="font-weight: 500; color: var(--aura-fg-primary)">Closed</b> once Tao signs it off. Write the review draft on desktop.</span>
+</div>
+</div>
+</sc-if>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+<x-import component-from-global-scope="Aura.Badge" tone="danger" variant="{{sev.variant}}" icon="ban">{{sev.label}}</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="{{wf.tone}}" variant="outline" icon="{{wf.icon}}">{{wf.label}}</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Tier 1</x-import>
+</div>
+<h1 style="margin: 2px 0 0; font-family: var(--font-display); font-size: 30px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">{{h.title}}</h1>
+<span style="font-size: 14px; font-weight: 500; color: {{h.subColor}}">{{h.sub}}</span>
+<span style="font-size: 13px; line-height: 1.45; color: var(--aura-fg-secondary)">{{h.cause}}</span>
+<span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Owner Arm (you) · backup Ploy · AM Bua</span>
+</div>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<div style="padding: 8px 14px; display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary); border-bottom: 1px solid var(--aura-border-subtle)"><span>{{round.label}}</span><span>{{round.verdict}}</span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))">
+<sc-for list="{{round.locs}}" as="g" hint-placeholder-count="3">
+<div style="padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; line-height: 1.3; border-right: 1px solid var(--aura-border-subtle)">
+<span style="display: flex; align-items: center; gap: 6px"><span style="display: flex; color: {{g.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{g.icon}}" size="sm" label="{{g.word}}"></x-import></span><span style="font-size: 13px; font-weight: 600">{{g.code}}</span></span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{g.result}}</span>
+</div>
+</sc-for>
+</div>
+<div style="padding: 7px 14px; display: flex; flex-wrap: wrap; gap: 2px 10px; border-top: 1px solid var(--aura-border-subtle); font-size: 11px; line-height: 1.4; color: var(--aura-fg-secondary)">
+<sc-for list="{{legend}}" as="k" hint-placeholder-count="5">
+<span style="display: flex; align-items: center; gap: 4px"><span style="display: flex; color: {{k.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{k.icon}}" size="sm"></x-import></span>{{k.label}}</span>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-size: 15px; font-weight: 600">Escalation · Tier 1 DOWN</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{escHead}}</span>
+</div>
+<sc-for list="{{ladder}}" as="l" hint-placeholder-count="4">
+<div style="display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle)">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; background: {{l.dotBg}}; color: {{l.dotFg}}">{{l.level}}</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.45">
+<span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 13px; font-weight: 600; white-space: nowrap">{{l.when}}</span><span style="font-size: 12px; text-align: right; color: {{l.statusColor}}">{{l.status}}</span></span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{l.who}}</span>
+<sc-if value="{{l.proposal}}" hint-placeholder-val="{{false}}"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="clock">Proposal · pending CEO</x-import></span></sc-if>
+</div>
+</div>
+</sc-for>
+<span style="padding-top: 6px; font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{escFoot}}</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-size: 15px; font-weight: 600">Client update</span>
+<x-import component-from-global-scope="Aura.Badge" tone="success" variant="outline" icon="circle-check">Updated</x-import>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 1.4"><x-import component-from-global-scope="Aura.Avatar" name="Bua" size="sm"></x-import><span style="flex-grow: 1"><b style="font-weight: 500">Bua</b> · Account manager</span><span style="color: var(--aura-fg-secondary)">Due 10:03</span></div>
+<div style="display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: var(--aura-alert-success-bg); border: 1px solid var(--aura-alert-success-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45; color: var(--aura-alert-success-fg)">
+<span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
+<span><b style="font-weight: 600">Marked by Bua 10:12</b> — Called MuvMi ops, ETA shared</span>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{cuNote}}</span>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 2px">
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Draft Bua was sent at 10:03</span>
+<div style="width: 120px; flex-shrink: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Draft language" options="{{langs}}" value="{{lang}}" on-change="{{setLang}}" full-width="{{yes}}" size="sm"></x-import></div>
+</div>
+<div style="padding: 10px 12px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-sm); font-size: 13px; line-height: 1.65; white-space: pre-line">{{draft}}</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="{{copyIcon}}" full-width="{{yes}}" on-click="{{copy}}">{{copyLabel}}</x-import>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-size: 15px; font-weight: 600">Resolve</span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: {{gate.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{gate.icon}}" size="sm"></x-import>{{gate.count}} of 3 met</span>
+</div>
+<sc-for list="{{conds}}" as="c" hint-placeholder-count="3">
+<div style="display: flex; align-items: flex-start; gap: 10px; line-height: 1.45">
+<span style="display: flex; padding-top: 2px; color: {{c.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm" label="{{c.state}}"></x-import></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 500">{{c.label}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.detail}}</span></span>
+<span style="font-size: 12px; font-weight: 500; white-space: nowrap; color: {{c.color}}">{{c.state}}</span>
+</div>
+</sc-for>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{gate.why}}</span>
+<sc-if value="{{canEditRc}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="pencil" full-width="{{yes}}" on-click="{{openRc}}">{{rcCta}}</x-import>
+</sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; padding: 12px 16px 4px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 4px">
+<span style="font-size: 15px; font-weight: 600">Timeline</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Newest first · UTC+7</span>
+</div>
+<sc-for list="{{timeline}}" as="t" hint-placeholder-count="5">
+<div style="display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--aura-border-subtle)">
+<span style="width: 60px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; line-height: 20px; color: var(--aura-fg-secondary)">{{t.at}}</span>
+<span style="display: flex; padding-top: 2px; color: {{t.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.45"><span style="font-size: 13px; font-weight: 500">{{t.title}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.detail}}</span></span>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary); text-align: center">Every event is also in the audit log. Evidence screenshots open on desktop.</span>
+</div>
+
+<div style="flex-shrink: 0; box-sizing: border-box; padding: 10px 16px 24px; display: flex; flex-direction: column; gap: 8px; background: var(--aura-bg-surface); border-top: 1px solid var(--aura-border-default)">
+<span style="display: flex; align-items: flex-start; justify-content: center; gap: 6px; font-size: 12px; line-height: 1.45; text-align: center; color: {{bar.color}}"><span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Icon" name="{{bar.icon}}" size="sm"></x-import></span><span>{{bar.line}}</span></span>
+<sc-if value="{{bar.two}}" hint-placeholder-val="{{true}}">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="pencil" full-width="{{yes}}" on-click="{{openNote}}">Add note</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="circle-check" full-width="{{yes}}" disabled="{{bar.locked}}" on-click="{{resolve}}">Resolve</x-import>
+</div>
+</sc-if>
+<sc-if value="{{bar.one}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="pencil" full-width="{{yes}}" on-click="{{openNote}}">Add note</x-import>
+</sc-if>
+</div>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{noteOpen}}" on-close="{{closeNote}}" title="Add a note" description="INC-0142 · added to the timeline and posted in the Chat thread as “NOTE · MuvMi · Arm: …” — no @mention, no email." size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<x-import component-from-global-scope="Aura.Textarea" label="Your note" required="{{yes}}" rows="3" value="{{noteText}}" placeholder="e.g. Host says the app server is restarting" on-change="{{typeNote}}"></x-import>
+<span style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="user" size="sm"></x-import><span>Signed in as <b style="font-weight: 500; color: var(--aura-fg-primary)">arm@[domain]</b></span></span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{closeNote}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" full-width="{{yes}}" disabled="{{noteEmpty}}" on-click="{{saveNote}}">Post note</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{rcOpen}}" on-close="{{closeRc}}" title="Root cause" description="{{rcDesc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<x-import component-from-global-scope="Aura.Select" label="Root cause category" options="{{causes}}" placeholder="Choose one" required="{{yes}}" value="{{rcCat}}" on-change="{{setRcCat}}" error="{{rcCatErr}}" hint="{{rcCatHint}}"></x-import>
+<x-import component-from-global-scope="Aura.Textarea" label="What happened" required="{{yes}}" rows="3" value="{{rcText}}" on-change="{{setRcText}}" error="{{rcTextErr}}" placeholder="e.g. Host rebooted the app server without notice" hint="Plain language — goes into the weekly summary and the client report."></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Next step" optional="{{yes}}" value="{{rcNext}}" on-change="{{setRcNext}}" placeholder="{{rcNextHint}}"></x-import>
+<span style="font-size: 12px; line-height: 1.5; color: {{rcFootColor}}">{{rcFoot}}</span>
+<span style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="user" size="sm"></x-import><span>Signed in as <b style="font-weight: 500; color: var(--aura-fg-primary)">arm@[domain]</b></span></span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{closeRc}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" full-width="{{yes}}" on-click="{{saveRc}}">{{rcSave}}</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{moreOpen}}" on-close="{{closeMore}}" title="INC-0142 · MuvMi" description="More actions" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="external-link" full-width="{{yes}}" href="https://www.muvmi.co">Visit muvmi.co</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="eye-off" full-width="{{yes}}" href="MMaintenance.dc.html">Mute or maintenance…</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="monitor" full-width="{{yes}}" href="Incident.dc.html">Open on desktop</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="{{linkIcon}}" full-width="{{yes}}" on-click="{{copyLink}}">{{linkLabel}}</x-import>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = this.fresh('Now · 10:14');
+  }
+  fresh(view) {
+    return { view: view, lang: 'TH', copied: false, moreOpen: false, linked: false,
+      noteOpen: false, noteText: '', notes: [],
+      rcOpen: false, rcCat: '', rcText: '', rcNext: '', rcTried: false, rcLog: [], seq: 0,
+      resolved: false, left: 0 };
+  }
+  componentWillUnmount() { if (this._iv) clearInterval(this._iv); }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var later = st.view !== 'Now · 10:14';
+    var at = later ? '10:33' : '10:14';
+    var POS = 'var(--aura-fg-positive)', DANGER = 'var(--aura-fg-danger)', WARN = 'var(--aura-alert-warning-fg)', MUTED = 'var(--aura-fg-secondary)', PEND = 'var(--aura-fg-tertiary)';
+    var CAUSES = [
+      { value: 'hosting', label: 'Hosting / server' },
+      { value: 'deploy', label: 'Deploy / code change' },
+      { value: 'dns', label: 'DNS / domain' },
+      { value: 'ssl', label: 'SSL certificate' },
+      { value: 'third', label: 'Third-party / CDN' },
+      { value: 'traffic', label: 'Traffic / capacity' },
+      { value: 'client', label: 'Client-side change' },
+      { value: 'false', label: 'False alarm (monitor)' },
+      { value: 'unknown', label: 'Unknown — keep investigating' }
+    ];
+    function catLabel(v) { var f = CAUSES.filter(function (c) { return c.value === v; })[0]; return f ? f.label : ''; }
+    var rc = st.rcLog.length ? st.rcLog[st.rcLog.length - 1] : null;
+    var rcMet = !!rc && rc.cat !== 'unknown';
+    var resolved = later && st.resolved;
+    var holding = resolved && st.left > 0;
+
+    // Header
+    var sev = later ? { label: 'Was down', variant: 'outline' } : { label: 'Down', variant: 'solid' };
+    var wf = resolved ? { tone: 'success', icon: 'circle-check', label: 'Resolved' }
+      : (later ? { tone: 'warning', icon: 'pencil', label: 'Needs root cause' } : { tone: 'neutral', icon: 'check', label: 'Acknowledged' });
+    var h = later
+      ? { title: 'MuvMi recovered', sub: 'Was down 43 min · 09:48–10:31 · confirmed 09:48:41', subColor: 'var(--aura-fg-primary)', cause: 'Cause: Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN) · OK since 10:31' }
+      : { title: 'MuvMi is down', sub: 'Down 26 min · confirmed 09:48:41', subColor: DANGER, cause: 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN) · first failed check 09:48:12' };
+    var round = later
+      ? { label: 'LATEST ROUND · 10:33:10', verdict: '3/3 PASS → OK', locs: [
+          { code: 'BKK', icon: 'circle-check', color: POS, word: 'Pass', result: '200 · 236 ms' },
+          { code: 'SIN', icon: 'circle-check', color: POS, word: 'Pass', result: '200 · 412 ms' },
+          { code: 'TYO', icon: 'circle-check', color: POS, word: 'Pass', result: '200 · 318 ms' }] }
+      : { label: 'LATEST ROUND · 10:14:10', verdict: '3/3 HARD FAIL → DOWN', locs: [
+          { code: 'BKK', icon: 'ban', color: DANGER, word: 'Hard fail', result: 'Timeout > 30 s' },
+          { code: 'SIN', icon: 'ban', color: DANGER, word: 'Hard fail', result: 'HTTP 504' },
+          { code: 'TYO', icon: 'ban', color: DANGER, word: 'Hard fail', result: 'Timeout > 30 s' }] };
+
+    // Escalation ladder after ack (Arm 10:07:40)
+    var done = { dotBg: 'var(--aura-bg-surface-strong)', dotFg: 'var(--aura-fg-inverted)', statusColor: MUTED };
+    var off = { dotBg: 'var(--aura-status-neutral-bg)', dotFg: 'var(--aura-status-neutral-fg)', statusColor: MUTED };
+    var ladder = [
+      Object.assign({ level: 'L0', when: '0 min · 09:48', status: 'Sent 09:48', who: 'Arm (owner, business hours) @mention + Alerts Space', proposal: false }, done),
+      Object.assign({ level: 'L1', when: '+15 min · 10:03', status: 'Sent 10:03', who: 'Ploy (backup) + Tao · “@Ploy please acknowledge · Tao FYI”', proposal: false }, done),
+      Object.assign({ level: 'L2', when: '+30 min · 10:18', status: 'Cancelled · acked', who: 'CEO @mention + email (+ voice call if Twilio approved)', proposal: true }, off),
+      Object.assign({ level: 'L3', when: '+60 min · 10:48', status: later ? 'Not sent · recovered 10:31' : 'If still down', who: 'FYI to CEO + Bua at 10:48 if still down (no call)', proposal: false }, off)
+    ];
+    var escFoot = later
+      ? 'Acknowledged by Arm 10:07 → L1–L2 stopped. MuvMi recovered at 10:31, so the L3 FYI to CEO + Bua was not needed.'
+      : 'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).';
+
+    // Resolve gate — 3 conditions (§15.4, §16.2, §16.3)
+    var conds = [];
+    conds.push(later
+      ? { label: 'OK for 2 rounds', detail: 'OK since 10:31 · 2 rounds done 10:32 · 3/3 locations', icon: 'circle-check', color: POS, state: 'Met' }
+      : { label: 'OK for 2 rounds', detail: 'Still down at 10:14 · earliest ≈ 10:16 if it recovers now', icon: 'circle', color: PEND, state: 'Not met' });
+    conds.push({ label: 'Client update marked', detail: 'Required — Tier 1 down over 15 min · marked by Bua 10:12', icon: 'circle-check', color: POS, state: 'Met' });
+    if (rcMet) conds.push({ label: 'Root cause written', detail: 'Arm · ' + rc.at + ' · ' + rc.catLabel, icon: 'circle-check', color: POS, state: 'Met' });
+    else if (rc) conds.push({ label: 'Root cause written', detail: 'Unknown keeps the incident open', icon: 'circle', color: PEND, state: 'Not met' });
+    else conds.push({ label: 'Root cause written', detail: later ? 'Not written yet · needed before Resolve' : 'Not written yet · can be drafted now', icon: 'circle', color: PEND, state: 'Not met' });
+    var count = (later ? 1 : 0) + 1 + (rcMet ? 1 : 0);
+    var ready = count === 3;
+    var why;
+    if (resolved) why = 'Resolved by Arm at 10:33 — Resolve is always a manual step, DOWN never auto-resolves.';
+    else if (!later) why = 'Resolve stays locked until all 3 are met — MuvMi is still down, so “OK for 2 rounds” can’t be met yet.';
+    else if (ready) why = 'All 3 conditions met. Resolve is manual — tap Resolve below when you’re sure.';
+    else if (rc) why = 'Unknown keeps the incident open. Pick a category once you know what happened.';
+    else why = 'Needs a root cause before it can be resolved.';
+    var gate = { count: count, why: why, icon: ready ? 'circle-check' : 'lock', color: ready ? POS : MUTED };
+
+    // Timeline — newest first, only grows
+    var rows = [
+      { at: '09:48:12', k: 0, icon: 'circle-alert', color: DANGER, title: 'First failed check', detail: 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN) → immediate recheck about 30 s later' },
+      { at: '09:48:41', k: 1, icon: 'ban', color: DANGER, title: 'Confirmed down 09:48:41', detail: 'Hard fail at 3 of 3 locations on 2 checks in a row · L0: Arm @mentioned + Alerts Space, Chat + email' },
+      { at: '10:03', k: 2, icon: 'arrow-up-right', color: WARN, title: 'L1 sent · client update due', detail: '@Ploy asked to acknowledge · Tao FYI · Bua (AM) @mentioned with a draft client message' },
+      { at: '10:07', k: 3, icon: 'check', color: POS, title: 'Acknowledged by Arm (posted 10:07:50)', detail: 'L1–L2 stopped · L3 FYI to CEO + Bua at 10:48 if still down (no call)' },
+      { at: '10:12', k: 4, icon: 'circle-check', color: POS, title: 'Client update marked by Bua', detail: '“Called MuvMi ops, ETA shared” · client-update track closed' }
+    ];
+    if (later) {
+      rows.push({ at: '10:31', k: 5, icon: 'eye', color: POS, title: 'Recovered → Monitoring', detail: 'First OK round · RECOVERED reply + email to Arm, Ploy, Tao and Bua · down 43 min (09:48–10:31)' });
+      rows.push({ at: '10:32', k: 6, icon: 'pencil', color: WARN, title: 'OK for 2 rounds → Needs root cause', detail: '3/3 locations pass · needs a root cause before it can be resolved' });
+    }
+    st.notes.forEach(function (n) { rows.push({ at: n.at, k: 10 + n.seq, icon: 'pencil', color: MUTED, title: 'Note by Arm', detail: n.text }); });
+    st.rcLog.forEach(function (r, i) {
+      var met = r.cat !== 'unknown';
+      var d = r.catLabel + ' · “' + r.text + '”' + (r.next ? ' · Next: ' + r.next : '');
+      var verb = i === 0 ? (met && later ? 'Root cause written by Arm' : (met ? 'Root cause draft by Arm' : 'Root cause note by Arm')) : 'Root cause edited by Arm';
+      rows.push({ at: r.at, k: 10 + r.seq, icon: 'pencil', color: met ? POS : MUTED, title: verb,
+        detail: met ? d + (later ? '' : ' · incident kept open (still down)') : d + ' · doesn’t count — incident stays open' });
+    });
+    if (resolved) rows.push({ at: '10:33', k: 999, icon: 'circle-check', color: POS, title: holding ? 'Resolved by Arm (posts 10:33:20 unless undone)' : 'Resolved by Arm (posted 10:33:20)', detail: 'RESOLVED · MuvMi · by Arm 10:33 — Chat reply (no @mention), email to everyone who got the DOWN email, incident.resolved webhook' });
+    rows.sort(function (a, b) { if (a.at !== b.at) return a.at < b.at ? 1 : -1; return b.k - a.k; });
+
+    // Sticky bar
+    var bar;
+    if (resolved) bar = holding
+      ? { line: 'Resolved — posting to Chat, email and webhooks in ' + st.left + ' s. Undo is at the top.', icon: 'clock', color: MUTED, two: false, one: true, locked: true }
+      : { line: 'Resolved 10:33 · review due Mon 28 Sep', icon: 'circle-check', color: POS, two: false, one: true, locked: true };
+    else if (ready) bar = { line: 'All 3 conditions met · Resolve is a manual step', icon: 'circle-check', color: POS, two: true, one: false, locked: false };
+    else if (!later) bar = { line: 'Resolve locked · ' + count + ' of 3 met — MuvMi is still down', icon: 'lock', color: MUTED, two: true, one: false, locked: true };
+    else bar = { line: 'Resolve locked · 2 of 3 met — ' + (rc ? 'Unknown keeps it open' : 'write the root cause first'), icon: 'lock', color: MUTED, two: true, one: false, locked: true };
+
+    var rcCatErr = st.rcTried && !st.rcCat ? 'Choose a category.' : '';
+    var rcTextErr = st.rcTried && !st.rcText.trim() ? 'Required — say what happened in a sentence or two.' : '';
+    var unknownSel = st.rcCat === 'unknown';
+    var rcFoot, rcFootColor = MUTED;
+    if (st.rcTried && (!st.rcCat || !st.rcText.trim())) { rcFoot = 'Fix the highlighted fields to save.'; rcFootColor = 'var(--aura-fg-danger)'; }
+    else if (unknownSel) rcFoot = 'Saves your notes · Unknown keeps the incident open — it doesn’t meet the root-cause condition.';
+    else if (later) rcFoot = 'Saving meets the root-cause condition. Resolve stays a separate, manual step.';
+    else rcFoot = 'Saving records a draft on the timeline. Resolve unlocks when all 3 conditions are met.';
+
+    var TH = 'เรียนทีม MuvMi\nขณะนี้เว็บไซต์ของท่านไม่สามารถเข้าใช้งานได้ ตั้งแต่เวลา 09:48 น. ทีม DxT ตรวจพบแล้วและกำลังแก้ไข จะแจ้งความคืบหน้าภายใน [ETA] น.\nขออภัยในความไม่สะดวก — Bua, DxT Solutions';
+    var EN = 'Hi MuvMi team,\nYour website has been unavailable since 09:48 (UTC+7). DxT detected it and is working on a fix. Next update by [ETA].\nSorry for the disruption — Bua, DxT Solutions';
+
+    return {
+      yes: true,
+      no: false,
+      views: ['Now · 10:14', 'Later · 10:33'],
+      view: st.view,
+      setView: function (v) { if (self._iv) clearInterval(self._iv); self.setState(self.fresh(v)); },
+      sev: sev, wf: wf, h: h, round: round,
+      legend: [
+        { icon: 'circle-check', color: POS, label: 'Pass' },
+        { icon: 'ban', color: DANGER, label: 'Hard fail' },
+        { icon: 'lock', color: MUTED, label: 'Blocked, verified OK' },
+        { icon: 'clock', color: WARN, label: 'Slow' },
+        { icon: 'circle-dot-dashed', color: PEND, label: 'No data' }
+      ],
+      ladder: ladder,
+      escHead: later ? 'Stopped · acked 10:07' : 'L1–L2 stopped',
+      escFoot: escFoot,
+      cuNote: later
+        ? 'Separate from escalation. The RECOVERED email also went to Bua at 10:31 so she can tell MuvMi it’s back. Recorded for the review (Client notified).'
+        : 'Separate from escalation — the ack didn’t stop it. Recorded in the audit log and the post-incident review (Client notified).',
+      langs: ['TH', 'EN'],
+      lang: st.lang,
+      setLang: function (v) { self.setState({ lang: v, copied: false }); },
+      draft: st.lang === 'TH' ? TH : EN,
+      copy: function () { self.setState({ copied: true }); },
+      copyLabel: st.copied ? 'Draft copied' : 'Copy draft',
+      copyIcon: st.copied ? 'check' : 'copy',
+      conds: conds,
+      gate: gate,
+      canEditRc: !resolved,
+      rcCta: rc ? 'Edit root cause' : 'Write root cause',
+      rcLabel: rc ? rc.catLabel : '',
+      timeline: rows,
+      bar: bar,
+      showResolved: resolved,
+      holding: holding,
+      undoLabel: 'Undo · ' + st.left + ' s',
+      postIcon: holding ? 'clock' : 'check',
+      postLine: holding ? 'Posting to Chat, email and webhooks in ' + st.left + ' s — nothing is sent until then' : 'Posted to the Chat thread, email and webhooks at 10:33:20',
+      resolve: function () {
+        if (!ready) return;
+        if (self._iv) clearInterval(self._iv);
+        self.setState({ resolved: true, left: 10 });
+        var sc = typeof document !== 'undefined' && document.getElementById('mi-scroll');
+        if (sc) sc.scrollTop = 0;
+        self._iv = setInterval(function () {
+          var l = self.state.left - 1;
+          self.setState({ left: Math.max(l, 0) });
+          if (l <= 0) clearInterval(self._iv);
+        }, 1000);
+      },
+      undo: function () { if (self._iv) clearInterval(self._iv); self.setState({ resolved: false, left: 0 }); },
+      // note sheet
+      noteOpen: st.noteOpen,
+      noteText: st.noteText,
+      noteEmpty: !st.noteText.trim(),
+      openNote: function () { self.setState({ noteOpen: true, noteText: '' }); },
+      closeNote: function () { self.setState({ noteOpen: false }); },
+      typeNote: function (e) { self.setState({ noteText: e && e.target ? e.target.value : e }); },
+      saveNote: function () {
+        var n = self.state.noteText.trim(); if (!n) return;
+        var s = self.state.seq + 1;
+        self.setState({ notes: self.state.notes.concat([{ text: n, at: at, seq: s }]), seq: s, noteText: '', noteOpen: false });
+      },
+      // root cause sheet
+      rcOpen: st.rcOpen,
+      rcDesc: later ? 'INC-0142 · MuvMi · Tier 1 · recovered 10:31 · owner Arm' : 'INC-0142 · MuvMi · Tier 1 · still down · owner Arm',
+      causes: CAUSES,
+      rcCat: st.rcCat, rcText: st.rcText, rcNext: st.rcNext,
+      rcCatErr: rcCatErr, rcTextErr: rcTextErr,
+      rcCatHint: unknownSel ? 'Unknown keeps the incident open — it does not meet the root-cause condition.' : '',
+      rcNextHint: later ? 'e.g. Ask the host for the reboot log' : 'e.g. Host restarting the app server',
+      rcFoot: rcFoot, rcFootColor: rcFootColor,
+      rcSave: unknownSel || !later ? 'Save, keep open' : 'Save root cause',
+      openRc: function () {
+        var lg = self.state.rcLog; var r = lg.length ? lg[lg.length - 1] : null;
+        self.setState({ rcOpen: true, rcTried: false, rcCat: r ? r.cat : '', rcText: r ? r.text : '', rcNext: r ? r.next : '' });
+      },
+      closeRc: function () { self.setState({ rcOpen: false, rcTried: false }); },
+      setRcCat: function (e) { self.setState({ rcCat: e && e.target ? e.target.value : e }); },
+      setRcText: function (e) { self.setState({ rcText: e && e.target ? e.target.value : e }); },
+      setRcNext: function (e) { self.setState({ rcNext: e && e.target ? e.target.value : e }); },
+      saveRc: function () {
+        var s2 = self.state;
+        if (!s2.rcCat || !s2.rcText.trim()) { self.setState({ rcTried: true }); return; }
+        var sq = s2.seq + 1;
+        self.setState({ rcLog: s2.rcLog.concat([{ cat: s2.rcCat, catLabel: catLabel(s2.rcCat), text: s2.rcText.trim(), next: s2.rcNext.trim(), at: at, seq: sq }]), seq: sq, rcOpen: false, rcTried: false });
+      },
+      // overflow
+      moreOpen: st.moreOpen,
+      openMore: function () { self.setState({ moreOpen: true, linked: false }); },
+      closeMore: function () { self.setState({ moreOpen: false }); },
+      copyLink: function () { self.setState({ linked: true }); },
+      linkLabel: st.linked ? 'Link copied' : 'Copy incident link',
+      linkIcon: st.linked ? 'check' : 'copy'
+    };
+  }
+}
+</script>
+</body>
+</html>

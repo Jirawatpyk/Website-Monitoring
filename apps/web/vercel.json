@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["sin1"],
+  "functions": {
+    "src/app/api/cron/probe-sin/route.ts": { "regions": ["sin1"], "maxDuration": 60 },
+    "src/app/api/cron/probe-tyo/route.ts": { "regions": ["hnd1"], "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/cron/probe-sin", "schedule": "* * * * *" },
+    { "path": "/api/cron/probe-tyo", "schedule": "* * * * *" },
+    { "path": "/api/cron/engine", "schedule": "* * * * *" },
+    { "path": "/api/cron/notifier", "schedule": "* * * * *" }
+  ]
+}

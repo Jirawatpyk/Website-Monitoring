@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Probes and heartbeat</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1496px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="probes" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SYSTEM</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Probes &amp; heartbeat</h1>
+<span style="font-size: 14px; color: var(--aura-fg-secondary)">The biggest risk of building it ourselves: the monitor dies quietly and everyone thinks the sites are fine.</span>
+</div>
+<a href="https://healthchecks.io/" target="_blank" rel="noopener" style="height: 40px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 8px; border-radius: 9999px; border: 1px solid var(--aura-button-secondary-border); color: var(--aura-fg-primary); font-size: 14px; font-weight: 500; text-decoration: none; white-space: nowrap"><x-import component-from-global-scope="Aura.Icon" name="external-link" size="sm"></x-import>Open Healthchecks.io</a>
+</div>
+
+<div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: var(--aura-alert-success-bg); border: 1px solid var(--aura-alert-success-border); border-radius: var(--aura-radius-lg)">
+<span style="display: flex; color: var(--aura-alert-success-fg)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="md"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.5">
+<span style="font-size: 16px; font-weight: 600; color: var(--aura-alert-success-fg)">Monitor healthy · 8/8 heartbeats on time</span>
+<span>Monitor uptime 30 days 99.97% (target ≥ 99.9%). One gap today: the SIN probe missed 03:12–03:16 → one email to Tao at 03:15, no page. BKK + TYO kept deciding status.</span>
+</div>
+</div>
+
+<div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-lg); font-size: 13px; line-height: 1.5">
+<span style="display: flex; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="md"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column">
+<span style="font-weight: 600; color: var(--aura-alert-warning-fg)">1 active Admin — monitor-fault alerts reach only Tao</span>
+<span>Second Admin was invited Thu 24 Sep 09:12 and hasn’t signed in yet. The invite expires Thu 1 Oct.</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="mail" on-click="{{resend}}">{{resendLabel}}</x-import>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<sc-for list="{{probes}}" as="p" hint-placeholder-count="3">
+<div class="aura-card" style="gap: 14px">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-size: 16px; font-weight: 600">{{p.code}} · {{p.city}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{p.host}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">Healthy</x-import>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; font-size: 13px; line-height: 1.45">
+<div style="display: flex; flex-direction: column"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">LAST RUN</span><span style="font-weight: 600">{{p.last}}</span></div>
+<div style="display: flex; flex-direction: column"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">CHECKS / MIN</span><span style="font-weight: 600">{{p.rate}}</span></div>
+<div style="display: flex; flex-direction: column"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">GAPS · 24H</span><span style="font-weight: 600">{{p.gaps}}</span></div>
+<div style="display: flex; flex-direction: column"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">EGRESS IP</span><span style="font-weight: 600">{{p.ip}}</span></div>
+</div>
+<svg width="100%" height="32" viewBox="0 0 300 32" preserveAspectRatio="none" aria-hidden="true"><path d="{{p.bars}}" style="fill: var(--aura-chart-seq-1)"></path><path d="{{p.gapBar}}" style="fill: var(--aura-fg-danger)"></path></svg>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); margin-top: -8px">Results written per hour · last 24 h</span>
+</div>
+</sc-for>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px; min-width: 0">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 24px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Heartbeats</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); text-align: right">Pinged to Healthchecks.io, outside our system · grace and who is alerted per check</span>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Check</div>
+<div class="aura-table__th" style="width: 120px">Runs on</div>
+<div class="aura-table__th" style="width: 110px">Expected</div>
+<div class="aura-table__th" style="width: 80px">Grace</div>
+<div class="aura-table__th" style="width: 300px">Missed → who is alerted</div>
+<div class="aura-table__th" style="width: 104px; justify-content: flex-end; padding-right: 16px">Last ping</div>
+<div class="aura-table__th" style="width: 90px">Status</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{beats}}" as="b" hint-placeholder-count="8">
+<div class="aura-table__row">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; font-family: var(--font-mono); font-size: 12px">{{b.name}}</div>
+<div class="aura-table__td" style="width: 120px; color: var(--aura-fg-secondary)">{{b.on}}</div>
+<div class="aura-table__td" style="width: 110px; color: var(--aura-fg-secondary)">{{b.every}}</div>
+<div class="aura-table__td" style="width: 80px; color: var(--aura-fg-secondary)">{{b.grace}}</div>
+<div class="aura-table__td" style="width: 300px; display: flex; align-items: center; gap: 6px; color: {{b.whoColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{b.whoIcon}}" size="sm"></x-import><span style="overflow: hidden; text-overflow: ellipsis">{{b.who}}</span></div>
+<div class="aura-table__td" style="width: 104px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{b.last}}</div>
+<div class="aura-table__td" style="width: 90px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.StatusPill" tone="ready">Up</x-import></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); background: var(--aura-bg-surface); font-size: 13px; line-height: 1.5">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="mail" size="sm"></x-import></span>
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap">Today 03:15</span>
+<span style="flex-grow: 1">probe-sin missed 03:12–03:16 (grace 3 min) → <b style="font-weight: 600">one email to Tao</b>, no page. BKK + TYO kept deciding status.</span>
+<a href="AuditLog.dc.html" style="white-space: nowrap">In the audit log</a>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch">
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Who hears about monitor faults</h3>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.55">
+<span><b style="font-weight: 600">Engine heartbeat</b> (status engine / Vercel Cron) missed &gt; 3 min → email to Tao + an Alerts Space post that @mentions the on-call person (Ploy this week).</span>
+<span><b style="font-weight: 600">A single probe</b> (BKK, SIN or TYO) missing &gt; 3 min → email to Tao only, no page. The other two locations still decide status.</span>
+</div>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-alert-warning-fg); line-height: 1.5; margin-top: auto"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import>Only Tao · Second Admin not joined · <a href="Users.dc.html">Users</a></span>
+</div>
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Pipeline</h3>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Status engine sweep</span><span style="font-weight: 600">10:07:00 · lag 1.2 s</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Notifier queue</span><span style="font-weight: 600">0 waiting</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Delivery · 24 h</span><span style="font-weight: 600">14 sent · 0 failed</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Email fallback used</span><span style="font-weight: 600">0 times</span></div>
+</div>
+</div>
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Browser verifier · BKK VPS</h3>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Sessions</span><span style="font-weight: 600">0 / 3</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Queue</span><span style="font-weight: 600">0 (alert at &gt; 5)</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Last job</span><span style="font-weight: 600">09:41 · Tubtong · passed</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Memory</span><span style="font-weight: 600">1.1 / 2 GB</span></div>
+</div>
+<x-import component-from-global-scope="Aura.Progress" value="{{mem}}" max="{{memMax}}" aria-label="Verifier memory" size="sm"></x-import>
+</div>
+</div>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1496}}'>
+class Component extends DCLogic {
+  bars(seed, gapAt) {
+    var v = seed, d = [], g = [];
+    for (var i = 0; i < 24; i++) {
+      v = (v * 9301 + 49297) % 233280;
+      var h = 20 + (v / 233280) * 8;
+      if (i === gapAt) { h = 12; g.push('M' + (i * 12.5 + 1) + ' ' + (32 - h) + ' h10.5 v' + h + ' h-10.5 z'); continue; }
+      d.push('M' + (i * 12.5 + 1) + ' ' + (32 - h).toFixed(1) + ' h10.5 v' + h.toFixed(1) + ' h-10.5 z');
+    }
+    return { bars: d.join(' '), gapBar: g.join(' ') };
+  }
+  constructor(props) {
+    super(props);
+    this.state = { resent: false };
+  }
+  renderVals() {
+    var self = this;
+    var bkk = this.bars(7, -1), sin = this.bars(19, 17), tyo = this.bars(31, -1);
+    return {
+      resend: function () { self.setState({ resent: true }); },
+      resendLabel: this.state.resent ? 'Sent again · expires 2 Oct' : 'Resend invite',
+      mem: 55,
+      memMax: 100,
+      probes: [
+        Object.assign({ code: 'BKK', city: 'Bangkok', host: 'Thai VPS · systemd worker', last: '10:07:10', rate: '8.7', gaps: '0', ip: 'Fixed · allowlist' }, bkk),
+        Object.assign({ code: 'SIN', city: 'Singapore', host: 'Vercel function · sin1', last: '10:07:04', rate: '8.7', gaps: '1 · 4 min', ip: 'Dynamic · UA + header' }, sin),
+        Object.assign({ code: 'TYO', city: 'Tokyo', host: 'Vercel function · hnd1', last: '10:07:02', rate: '8.7', gaps: '0', ip: 'Dynamic · UA + header' }, tyo)
+      ],
+      beats: [
+        { name: 'status-engine-sweep', on: 'Vercel Cron', every: '1 min', grace: '3 min', last: '12 s ago', eng: true },
+        { name: 'notifier', on: 'Vercel Cron', every: '1 min', grace: '3 min', last: '12 s ago', eng: true },
+        { name: 'probe-bkk', on: 'Thai VPS', every: '1 min', grace: '3 min', last: '12 s ago' },
+        { name: 'probe-sin', on: 'Vercel · sin1', every: '1 min', grace: '3 min', last: '18 s ago' },
+        { name: 'probe-tyo', on: 'Vercel · hnd1', every: '1 min', grace: '3 min', last: '20 s ago' },
+        { name: 'browser-verifier', on: 'Thai VPS', every: '1 min', grace: '3 min', last: '31 s ago' },
+        { name: 'vps-watchdog', on: 'Thai VPS', every: '1 min', grace: '3 min', last: '9 s ago' },
+        { name: 'daily-digest', on: 'Vercel Cron', every: '09:00 daily', grace: '30 min', last: '09:00:02' }
+      ].map(function (b) { b.who = b.eng ? 'Email Tao + Alerts Space @on-call' : 'Email Tao only · no page'; b.whoIcon = b.eng ? 'bell' : 'mail'; b.whoColor = b.eng ? 'var(--aura-fg-primary)' : 'var(--aura-fg-secondary)'; return b; }),
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

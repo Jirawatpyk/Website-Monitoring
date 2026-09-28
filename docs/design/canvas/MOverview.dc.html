@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Overview</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px 0 16px; display: flex; align-items: center; justify-content: space-between; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; gap: 8px">
+<div style="height: 28px; padding: 0 8px; display: flex; align-items: center; gap: 5px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 14px; font-weight: 600">DxT</span>
+<span style="width: 5px; height: 5px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="display: flex; align-items: center; gap: 4px">
+<a href="MGuide.dc.html" aria-label="User guide" title="User guide" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="md"></x-import></a>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--aura-fg-secondary)">Arm<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import></span>
+</div>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between">
+<div style="display: flex; flex-direction: column; line-height: 1.2; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">FRI 25 SEP 10:07 · UTC+7</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: -0.01em">{{okCount}}/17 OK</h1>
+</div>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><span style="width: 8px; height: 8px; border-radius: 9999px; background: var(--aura-fg-positive)"></span>Probes 3/3</span>
+</div>
+
+<a href="MobileAck.dc.html" style="display: flex; gap: 12px; padding: 14px 16px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-lg); color: inherit; text-decoration: none">
+<span style="display: flex; padding-top: 2px; color: var(--aura-alert-danger-fg)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="md"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.45">
+<span style="font-weight: 600; color: var(--aura-alert-danger-fg)">MuvMi DOWN · 19 min</span>
+<span style="font-size: 13px">Escalated · L1 · 18 min unacked · CEO at 10:18</span>
+</div>
+<span style="display: flex; align-self: center; color: var(--aura-alert-danger-fg)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="md"></x-import></span>
+</a>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<a href="MIncidents.dc.html" style="padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; line-height: 1.3; color: inherit; text-decoration: none"><span style="font-size: 20px; font-weight: 600">3</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Open</span></a>
+<a href="MIncidents.dc.html" style="padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; line-height: 1.3; color: inherit; text-decoration: none"><span style="font-size: 20px; font-weight: 600; color: var(--aura-fg-danger)">1</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Unacked</span></a>
+<div style="padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; line-height: 1.3"><span style="font-size: 20px; font-weight: 600">99.98%</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Uptime 30 d</span></div>
+</div>
+
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Tier" options="{{tierOptions}}" value="{{tier}}" on-change="{{setTier}}" full-width="{{yes}}" size="sm"></x-import>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{rows}}" as="s" hint-placeholder-count="8">
+<sc-if value="{{s.link}}" hint-placeholder-val="{{true}}">
+<a href="{{s.href}}" style="min-height: 52px; box-sizing: border-box; padding: 8px 8px 8px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--aura-border-subtle); color: inherit; text-decoration: none">
+<span style="width: 106px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3; gap: 2px">
+<span style="max-width: 100%; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{s.name}}</span>
+<sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted · until 18:00</x-import></sc-if>
+<sc-if value="{{s.plain}}" hint-placeholder-val="{{true}}"><span style="max-width: 100%; font-size: 12px; color: {{s.noteColor}}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{s.note}}</span></sc-if>
+</div>
+<span style="width: 52px; flex-shrink: 0; text-align: right; font-size: 12px; color: var(--aura-fg-secondary); font-variant-numeric: tabular-nums; white-space: nowrap">{{s.p50}}</span>
+<span style="display: flex; color: var(--aura-fg-tertiary); margin-left: -4px"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span>
+</a>
+</sc-if>
+</sc-for>
+<sc-if value="{{hasMore}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{toggleAll}}" style="width: 100%; height: 48px; box-sizing: border-box; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; background: transparent; border: 0; font: inherit; color: inherit; font-size: 13px; cursor: pointer">
+<span style="color: var(--aura-fg-secondary)">{{moreText}}</span>
+<span style="display: flex; align-items: center; gap: 4px; font-weight: 500">{{moreLabel}} <x-import component-from-global-scope="Aura.Icon" name="{{moreIcon}}" size="sm"></x-import></span>
+</button>
+</sc-if>
+</div>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · every site opens Site detail for that site — the sample screen shows Bangkok Airways – Taiwan</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="overview" label="Sections"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tier: 'All', all: false };
+  }
+  renderVals() {
+    var self = this;
+    var ST = {
+      down: { label: 'Down', tone: 'danger', variant: 'solid', icon: 'ban' },
+      problem: { label: 'Problem', tone: 'warning', variant: 'soft', icon: 'triangle-alert' },
+      maint: { label: 'Maintenance', tone: 'accent', variant: 'soft', icon: 'calendar' },
+      ok: { label: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check' }
+    };
+    var sites = [
+      ['MuvMi', 1, 'down', 'Timeout ×2 · 504 ×1', '—'],
+      ['Fuji Links', 2, 'problem', 'Slow · p50 5.8 s', '5.8 s'],
+      ['WeCare Studio', 2, 'maint', 'Planned 09:30–14:00', '—'],
+      ['Bangkok Airways – Taiwan', 1, 'ok', 'Tier 1', '412 ms'],
+      ['Bangkok Airways – China', 1, 'ok', 'Tier 1', '688 ms'],
+      ['ENEOS Industrial', 1, 'ok', 'Tier 1', '356 ms'],
+      ['realme.link', 1, 'ok', 'Tier 1', '241 ms'],
+      ['Tubtong', 2, 'ok', 'OK · checked by browser', '1.1 s'],
+      ['Cando Asia', 2, 'ok', 'OK · checked by browser', '940 ms'],
+      ['ORCA Thailand', 2, 'ok', 'Tier 2', '520 ms'],
+      ['WeCare Asia', 2, 'ok', 'Tier 2', '610 ms'],
+      ['VOCA', 2, 'ok', 'Tier 2', '298 ms'],
+      ['EQHO', 2, 'ok', 'Tier 2', '334 ms'],
+      ['DxT', 2, 'ok', 'Tier 2', '280 ms'],
+      ['DxT Solutions', 3, 'ok', 'Tier 3', '305 ms'],
+      ['DxT AI', 3, 'ok', 'Tier 3', '450 ms'],
+      ['DxT Games', 3, 'ok', '', '390 ms', true]
+    ];
+    var tier = this.state.tier;
+    var rows = sites.filter(function (s) { return tier === 'All' || ('Tier ' + s[1]) === tier; }).map(function (s) {
+      var st = ST[s[2]];
+      var href = 'MSite.dc.html';
+      return { name: s[0], href: href, link: !!href, muted: !!s[5], plain: !s[5], label: st.label, tone: st.tone, variant: st.variant, icon: st.icon, note: s[3], p50: s[4],
+        noteColor: s[2] === 'down' ? 'var(--aura-fg-danger)' : (s[2] === 'problem' ? 'var(--aura-alert-warning-fg)' : 'var(--aura-fg-secondary)') };
+    });
+    var all = this.state.all;
+    var rest = rows.slice(6);
+    var muted = sites.filter(function (x) { return x[5]; }).map(function (x) { return x[0]; });
+    var restMuted = rest.filter(function (r) { return muted.indexOf(r.name) >= 0; }).length;
+    var restOk = rest.filter(function (r) { return r.label === 'OK' && muted.indexOf(r.name) < 0; }).length;
+    var moreText = all ? 'All ' + rows.length + ' sites' : rest.length + ' more · ' + restOk + ' OK' + (restMuted ? ' · ' + restMuted + ' muted' : '');
+    return {
+      yes: true,
+      okCount: 14,
+      tier: tier,
+      tierOptions: ['All', 'Tier 1', 'Tier 2', 'Tier 3'],
+      setTier: function (v) { self.setState({ tier: v, all: false }); },
+      rows: all ? rows : rows.slice(0, 6),
+      moreLabel: all ? 'Show fewer' : 'Show all',
+      moreIcon: all ? 'chevron-up' : 'chevron-down',
+      toggleAll: function () { self.setState({ all: !self.state.all }); },
+      hasMore: rows.length > 6,
+      moreText: moreText,
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSite.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

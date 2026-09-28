@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — User guide</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+.gtopic{width:100%;box-sizing:border-box;display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border:1px solid transparent;border-radius:var(--aura-radius-md);color:var(--aura-fg-primary);font:inherit;text-align:left;cursor:pointer;min-height:44px}
+.gtopic:hover{border-color:var(--aura-border-default)}
+.gtopic:focus-visible{outline:2px solid var(--aura-focus-ring);outline-offset:1px}
+.grel{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px 0 12px;border:1px solid var(--aura-border-default);border-radius:9999px;background:var(--aura-bg-surface);color:var(--aura-fg-primary);font-size:13px;font-weight:500;text-decoration:none;white-space:nowrap}
+.grel:hover{border-color:var(--aura-border-control);color:var(--aura-fg-primary)}
+.grel:focus-visible{outline:2px solid var(--aura-focus-ring);outline-offset:1px}
+.gsug{height:32px;padding:0 12px;border:1px solid var(--aura-border-default);border-radius:9999px;background:var(--aura-bg-surface);color:var(--aura-fg-primary);font:inherit;font-size:12px;font-weight:500;cursor:pointer}
+.gsug:hover{border-color:var(--aura-border-control)}
+.gall{padding:0;border:0;background:none;font:inherit;font-size:12px;font-weight:500;color:var(--aura-fg-accent);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.gall:focus-visible{outline:2px solid var(--aura-focus-ring);outline-offset:2px;border-radius:2px}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1784px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="guide" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">HELP</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">User guide</h1>
+<span style="font-size: 14px; color: var(--aura-fg-secondary)">How DxT Monitor alerts, escalates and resolves — the rules exactly as the app applies them, by role.</span>
+</div>
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="width: 380px; display: flex; flex-direction: column"><x-import component-from-global-scope="Aura.TextField" label="Search the guide" icon="search" placeholder="e.g. mute, 2-step, root cause" value="{{q}}" on-change="{{setQ}}"></x-import></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><sc-if value="{{isMine}}" hint-placeholder-val="{{true}}"><span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--aura-fg-secondary)"><span>Showing topics for you · <span style="font-weight: 500; color: var(--aura-fg-primary)">{{me}}</span></span><button type="button" class="gall" onClick="{{showAll}}">Show all</button></span></sc-if><sc-if value="{{notMine}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Show topics for</span></sc-if><x-import component-from-global-scope="Aura.SegmentedControl" label="Show topics for" options="{{roles}}" value="{{role}}" on-change="{{setRole}}" size="sm"></x-import></div>
+</div>
+
+<div style="display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; margin-top: -4px">
+
+<nav aria-label="Guide topics" style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; font-size: 13px; color: var(--aura-fg-secondary)">
+<span>{{countLabel}}</span>
+<sc-if value="{{showClear}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="x" on-click="{{clear}}">Clear</x-import></sc-if>
+</div>
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="padding: 0 12px 4px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--aura-fg-tertiary)">{{g.title}}</span>
+<sc-for list="{{g.topics}}" as="t" hint-placeholder-count="3">
+<button type="button" class="gtopic" onClick="{{t.pick}}" aria-current="{{t.cur}}" style="background: {{t.bg}}">
+<span style="display: flex; padding-top: 3px; color: {{t.ic}}"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span>
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0; line-height: 1.4"><span style="font-size: 14px; font-weight: {{t.fw}}">{{t.title}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.summary}}</span></span>
+</button>
+</sc-for>
+</div>
+</sc-for>
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px dashed var(--aura-border-default); border-radius: var(--aura-radius-md); line-height: 1.5">
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="search" size="md"></x-import></span>
+<span style="font-size: 14px; font-weight: 600">{{emptyTitle}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Try one of these, or ask in DxT Website Alerts.</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{sugs}}" as="s" hint-placeholder-count="3"><button type="button" class="gsug" onClick="{{s.pick}}">{{s.label}}</button></sc-for></div>
+<span style="display: flex"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="x" on-click="{{clear}}">Clear search and filters</x-import></span>
+</div>
+</sc-if>
+</nav>
+
+<article class="aura-card" style="padding: 28px 32px; gap: 24px">
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">{{a.group}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">For <span style="font-weight: 500; color: var(--aura-fg-primary)">{{a.forText}}</span></span></div>
+<h2 style="margin: 0; font-family: var(--font-display); font-size: 28px; line-height: 1.2; font-weight: 600; letter-spacing: -0.01em">{{a.title}}</h2>
+<span style="font-size: 15px; line-height: 1.6; color: var(--aura-fg-secondary)">{{a.lede}}</span>
+</div>
+
+<!-- ============ When an alert arrives ============ -->
+<sc-if value="{{a.isAlert}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="For Stakeholders (AMs, CEO)">Got an FYI (L3) or a client-update mention? You don’t need to acknowledge — AMs act on the client update; the CEO needs no action on an FYI.</x-import>
+
+<div style="display: flex; gap: 14px">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px">1</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; line-height: 1.55">
+<span style="font-weight: 600">Open the card</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">The text line above the Chat card @mentions the person expected to act — the owner by day, on-call at night for Tier 1. Tap <strong style="color: var(--aura-fg-primary); font-weight: 600">Open / acknowledge</strong>, or open the email.</span>
+<div style="padding: 8px 12px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-sm); background: var(--aura-bg-canvas); font-family: var(--font-mono); font-size: 12px; line-height: 1.5">&lt;users/ARM&gt; DOWN · MuvMi (Tier 1) · acknowledge by 10:03 or it escalates</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 14px">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px">2</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; line-height: 1.55">
+<span style="font-weight: 600">Acknowledge in one tap</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Anyone can open it; the ack is recorded under their own Google account, so nobody can acknowledge as someone else. The state badge changes from <span style="white-space: nowrap">Unacked</span> (or Escalated) to Acknowledged:</span>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; line-height: 1">
+<x-import component-from-global-scope="Aura.Badge" tone="danger" variant="outline" icon="clock">Unacked</x-import>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span>
+<x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="arrow-up-right">Escalated · L1</x-import>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="check">Acknowledged</x-import>
+</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 14px">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px">3</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; line-height: 1.55">
+<span style="font-weight: 600">Tapped by mistake? Undo within 10 s</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Nothing leaves the app until the undo window closes. For 10 s you see:</span>
+<div aria-hidden="true" style="width: 520px; max-width: 100%; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 12px 12px 12px 18px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<span style="display: flex"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; font-size: 13px"><span><span style="font-weight: 600">Acknowledged INC-0142</span> · L1–L2 stopped</span><span style="font-size: 12px; opacity: 0.75">Posting to Chat, email and webhooks in 8 s — nothing is sent until then</span></span>
+<span style="height: 36px; padding: 0 16px; flex-shrink: 0; display: flex; align-items: center; border-radius: 9999px; border: 1px solid currentColor; font-size: 13px; font-weight: 500">Undo · 8 s</span>
+</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 14px">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px">4</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; line-height: 1.55">
+<span style="font-weight: 600">Work the incident</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">The cause line shows where it failed — “Timeout &gt; 30 s (BKK, TYO) · HTTP 504 (SIN)”. A NOTE reply keeps the thread current without @mentioning anyone.</span>
+</div>
+</div>
+
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="Acknowledge stops L1 and L2 — nothing else">The client-update track keeps running, and Tier 1 DOWN keeps the L3 FYI: “Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).”</x-import>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Who gets it if nobody acknowledges</h3>
+<div style="display: flex; flex-direction: column; padding: 4px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="font-size: 13px; font-weight: 600">Tier 1 DOWN · 24/7</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Timers start at “Confirmed down”</span></div>
+<sc-for list="{{ladder}}" as="l" hint-placeholder-count="4">
+<div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: {{l.line}}; font-size: 12px; line-height: 1.45">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; background: var(--aura-status-neutral-bg); color: var(--aura-status-neutral-fg)">{{l.level}}</span>
+<span style="width: 56px; flex-shrink: 0; font-size: 13px; font-weight: 600">{{l.when}}</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--aura-fg-secondary)"><span>{{l.who}}</span><sc-if value="{{l.proposal}}" hint-placeholder-val="{{false}}"><span style="display: flex; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="clock">Proposal · pending CEO</x-import></span></sc-if></span>
+<span style="width: 140px; flex-shrink: 0; text-align: right; color: {{l.ackColor}}">{{l.ack}}</span>
+</div>
+</sc-for>
+</div>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-size: 13px; font-weight: 600; color: var(--aura-fg-primary)">Tier 2–3 DOWN</span>
+<span>L0 owner + Space · L1 +15 min backup + Tao · L2 +30 min reminder to Tao. No CEO page. Outside Mon–Fri 09:00–18:00: posted at once, timers pause until 09:00.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-size: 13px; font-weight: 600; color: var(--aura-fg-primary)">PROBLEM · all tiers</span>
+<span>L0 owner + Space · reminder every 60 min · L1 +60 min backup. Tier 1 at night goes to on-call; Tier 2–3 outside response hours is held until 09:00.</span>
+</div>
+</div>
+</div>
+
+</div>
+</sc-if>
+
+<!-- ============ Recover, root cause & resolve ============ -->
+<sc-if value="{{a.isResolve}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px dashed var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">THE LIFECYCLE</span>
+<div style="display: flex; gap: 12px; align-items: flex-start"><span style="width: 72px; flex-shrink: 0; padding-top: 2px; font-size: 12px; font-weight: 600">DOWN</span><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 10px; line-height: 1"><sc-for list="{{lifeDown}}" as="w" hint-placeholder-count="8"><span style="display: flex; align-items: center; gap: 8px"><sc-if value="{{w.arrow}}" hint-placeholder-val="{{true}}"><span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span></sc-if><x-import component-from-global-scope="Aura.Badge" tone="{{w.tone}}" variant="{{w.variant}}" icon="{{w.icon}}">{{w.label}}</x-import></span></sc-for></div></div>
+<div style="display: flex; gap: 12px; align-items: flex-start"><span style="width: 72px; flex-shrink: 0; padding-top: 2px; font-size: 12px; font-weight: 600">PROBLEM</span><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; line-height: 1"><sc-for list="{{lifeProblem}}" as="w" hint-placeholder-count="4"><span style="display: flex; align-items: center; gap: 8px"><sc-if value="{{w.arrow}}" hint-placeholder-val="{{true}}"><span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span></sc-if><x-import component-from-global-scope="Aura.Badge" tone="{{w.tone}}" variant="{{w.variant}}" icon="{{w.icon}}">{{w.label}}</x-import></span></sc-for><span style="font-size: 12px; color: var(--aura-fg-secondary)">ends here — no review</span></div></div>
+</div>
+
+<sc-for list="{{resolveSteps}}" as="s" hint-placeholder-count="5">
+<div style="display: flex; gap: 14px">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px">{{s.n}}</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; line-height: 1.55">
+<span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 600">{{s.title}}</span><sc-if value="{{s.hasBadge}}" hint-placeholder-val="{{false}}"><span style="display: flex; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="outline" icon="{{s.icon}}">{{s.badge}}</x-import></span></sc-if></span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{s.text}}</span>
+<sc-if value="{{s.gate}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; padding: 4px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{gates}}" as="c" hint-placeholder-count="3">
+<div style="display: flex; gap: 10px; padding: 9px 0; border-bottom: {{c.line}}; font-size: 13px; line-height: 1.45">
+<span style="display: flex; padding-top: 1px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
+<span style="display: flex; flex-direction: column"><span style="font-weight: 500">{{c.t}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.d}}</span></span>
+</div>
+</sc-for>
+</div>
+<div style="padding: 8px 12px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-sm); background: var(--aura-bg-canvas); font-family: var(--font-mono); font-size: 12px; line-height: 1.5">RESOLVED · ORCA Thailand · by Tao 10:08</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">No @mention. The email goes in the same thread to everyone who got a DOWN email for that incident.</span>
+</sc-if>
+</div>
+</div>
+</sc-for>
+
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="DOWN never resolves itself">Resolve is always a manual action once the 3 conditions are met. The only exception: a PROBLEM that recovers within 5 min and was never acknowledged auto-resolves — no root cause needed — and is hidden from Incidents by default.</x-import>
+
+</div>
+</sc-if>
+
+<!-- ============ Mute vs maintenance ============ -->
+<sc-if value="{{a.isMute}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); overflow: hidden">
+<div style="display: grid; grid-template-columns: 132px 1fr 1fr; gap: 16px; padding: 10px 16px; background: var(--aura-bg-canvas); border-bottom: 1px solid var(--aura-border-default); align-items: center">
+<span></span>
+<span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><x-import component-from-global-scope="Aura.Icon" name="eye-off" size="sm"></x-import>Mute</span>
+<span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><x-import component-from-global-scope="Aura.Icon" name="calendar" size="sm"></x-import>Maintenance</span>
+</div>
+<div style="display: grid; grid-template-columns: 132px 1fr 1fr; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--aura-border-subtle); align-items: center; font-size: 13px; line-height: 1.45">
+<span style="color: var(--aura-fg-secondary)">What you see</span>
+<span style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">OK</x-import><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted · until 18:00</x-import></span>
+<span style="display: flex; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="accent" icon="calendar">Maintenance</x-import></span>
+</div>
+<sc-for list="{{muteRows}}" as="m" hint-placeholder-count="6">
+<div style="display: grid; grid-template-columns: 132px 1fr 1fr; gap: 16px; padding: 10px 16px; border-bottom: {{m.line}}; font-size: 13px; line-height: 1.45">
+<span style="color: var(--aura-fg-secondary)">{{m.k}}</span>
+<span>{{m.mute}}</span>
+<span>{{m.maint}}</span>
+</div>
+</sc-for>
+</div>
+
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="Mute stops new alerts only">An open incident keeps its escalation ladder, the L3 FYI and the client-update track. Mute never counts as an acknowledgement — the mute sheet says so: “Mute stops new alerts only — INC-0142 keeps escalating until someone acknowledges.”</x-import>
+
+<div style="display: flex; gap: 14px">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px">1</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; line-height: 1.55">
+<span style="font-weight: 600">Site is DOWN right now? Mute, don’t schedule</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">A maintenance window can’t start now (or overlap now) on a site that is DOWN or has an open incident. The sheet blocks it and offers Mute instead:</span>
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px dashed var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">EXAMPLE · MAINTENANCE SHEET, START NOW</span>
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="MuvMi is DOWN now (INC-0142)">A window started now won’t hide this incident — it stays open and keeps counting.</x-import>
+<span style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="eye-off" href="Maintenance.dc.html#mute">Mute instead</x-import><span style="font-size: 12px; color: var(--aura-fg-secondary)">Opens the mute sheet for MuvMi</span></span>
+</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 14px">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px">2</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; line-height: 1.55">
+<span style="font-weight: 600">Write the reason</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Every mute and maintenance sheet needs a reason before you can submit. It’s kept in the Audit log with the change.</span>
+</div>
+</div>
+
+<div style="display: flex; gap: 14px">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px">3</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; line-height: 1.55">
+<span style="font-weight: 600">End early, edit or cancel from Overview</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">The “Maintenance &amp; mutes” card on Overview lists what’s active and scheduled, with <strong style="color: var(--aura-fg-primary); font-weight: 600">End now</strong> and <strong style="color: var(--aura-fg-primary); font-weight: 600">Edit / cancel</strong>. Each asks you to confirm and is logged.</span>
+</div>
+</div>
+
+</div>
+</sc-if>
+
+<!-- ============ Statuses & badges ============ -->
+<sc-if value="{{a.isStatus}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Site status — how the site is right now</h3>
+<div style="display: flex; flex-direction: column; padding: 2px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{siteStates}}" as="s" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: center; padding: 10px 0; border-bottom: {{s.line}}">
+<span style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import><sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted · until 18:00</x-import></sc-if></span>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{s.text}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Incident state — where the response is</h3>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; padding: 2px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{incStates}}" as="s" hint-placeholder-count="8">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-bottom: {{s.line}}">
+<span style="display: flex; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import></span>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{s.text}}</span>
+</div>
+</sc-for>
+</div>
+<span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">In lists of past or needs-action items the severity is shown outlined: <x-import component-from-global-scope="Aura.Badge" tone="danger" variant="outline" icon="ban">Was down</x-import></span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Location results — BKK · SIN · TYO</h3>
+<div style="display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 12px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px">
+<sc-for list="{{glyphs}}" as="g" hint-placeholder-count="6"><span style="display: flex; align-items: center; gap: 6px"><span style="display: flex; color: {{g.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{g.icon}}" size="sm"></x-import></span>{{g.label}}</span></sc-for>
+</div>
+</div>
+
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="Read the icon and the word, not just the colour">Solid red with the ban icon always means the site is DOWN right now. Incident states are always outlined and never use it. Among badges, purple means Maintenance only — look for the calendar icon.</x-import>
+
+</div>
+</sc-if>
+
+<!-- ============ Short articles ============ -->
+<sc-if value="{{a.isShort}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<sc-if value="{{a.hasChecklist}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px dashed var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{a.checkTitle}}</span>
+<sc-for list="{{a.checklist}}" as="c" hint-placeholder-count="3"><span style="display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500"><span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>{{c}}</span></sc-for>
+</div>
+</sc-if>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<sc-for list="{{a.bullets}}" as="b" hint-placeholder-count="5">
+<div style="display: flex; gap: 12px; font-size: 14px; line-height: 1.6">
+<span style="width: 6px; height: 6px; flex-shrink: 0; margin-top: 9px; border-radius: 9999px; background: var(--aura-fg-tertiary)"></span>
+<span><span style="font-weight: 600">{{b.lead}}</span> <span style="color: var(--aura-fg-secondary)">{{b.text}}</span></span>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{a.hasMatrix}}" hint-placeholder-val="{{false}}">
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Can…</div>
+<sc-for list="{{matrixHead}}" as="h" hint-placeholder-count="4"><div class="aura-table__th" style="width: {{h.w}}px">{{h.t}}</div></sc-for>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{matrix}}" as="m" hint-placeholder-count="5">
+<div class="aura-table__row" style="height: 44px">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; font-size: 13px; display: flex; align-items: center">{{m.label}}</div>
+<sc-for list="{{m.cells}}" as="c" hint-placeholder-count="4"><div class="aura-table__td" style="width: {{c.w}}px; display: flex; align-items: center; gap: 4px; font-size: 12px; line-height: 1.2; color: {{c.color}}"><span style="display: flex; flex-shrink: 0" aria-label="{{c.aria}}"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm"></x-import></span><span>{{c.note}}</span></div></sc-for>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{a.hasCallout}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Alert" tone="{{a.cTone}}" title="{{a.cTitle}}">{{a.cText}}</x-import></sc-if>
+</div>
+</sc-if>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">RELATED SCREENS</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{a.related}}" as="r" hint-placeholder-count="4"><a class="grel" href="{{r.href}}"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{r.icon}}" size="sm"></x-import></span>{{r.label}}</a></sc-for></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px; padding-top: 20px; border-top: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 36px">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="font-size: 14px; font-weight: 500">Was this helpful?</span>
+<sc-if value="{{a.askFb}}" hint-placeholder-val="{{true}}"><span style="display: flex; gap: 8px"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" on-click="{{a.yes}}">Yes</x-import><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" on-click="{{a.no}}">No</x-import></span></sc-if>
+<sc-if value="{{a.fbDone}}" hint-placeholder-val="{{false}}"><span role="status" style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import>Thanks — sent to Tao</span></sc-if>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Last updated 25 Sep 2026</span>
+</div>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Still stuck? Ask in DxT Website Alerts or message Tao.</span>
+</div>
+
+</article>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1784}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 'alert', q: '', role: 'Admin', fb: {} };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var ME = 'Admin';
+    var ROLES = ['Responder', 'On-call', 'Stakeholder', 'Viewer', 'Admin'];
+    var EVERY = ROLES;
+    var GROUPS = ['Getting started', 'Everyday', 'When things go wrong', 'Admin'];
+    var R = {
+      incident: { label: 'INC-0142 · MuvMi', href: 'Incident.dc.html', icon: 'bell' },
+      incidents: { label: 'Incidents', href: 'Incidents.dc.html', icon: 'bell' },
+      mack: { label: 'Acknowledge on mobile', href: 'MobileAck.dc.html', icon: 'check' },
+      esc: { label: 'Escalation policies', href: 'Escalation.dc.html', icon: 'arrow-up-right' },
+      chat: { label: 'Chat alerts', href: 'ChatAlert.dc.html', icon: 'inbox' },
+      email: { label: 'Alert emails', href: 'EmailAlert.dc.html', icon: 'mail' },
+      resolve: { label: 'Resolve · INC-0139', href: 'Resolve.dc.html', icon: 'circle-check' },
+      review: { label: 'Incident review', href: 'PostIncident.dc.html', icon: 'file-text' },
+      maint: { label: 'Schedule maintenance', href: 'Maintenance.dc.html', icon: 'calendar' },
+      mute: { label: 'Mute a site', href: 'Maintenance.dc.html#mute', icon: 'eye-off' },
+      overview: { label: 'Overview · Maintenance & mutes', href: 'Main.dc.html', icon: 'layout-dashboard' },
+      audit: { label: 'Audit log', href: 'AuditLog.dc.html', icon: 'file-text' },
+      model: { label: 'How status is decided', href: 'StatusModel.dc.html', icon: 'info' },
+      site: { label: 'Site detail', href: 'SiteDetail.dc.html', icon: 'monitor' },
+      login: { label: 'Sign in', href: 'Login.dc.html', icon: 'lock' },
+      profile: { label: 'My profile', href: 'Profile.dc.html', icon: 'user' },
+      security: { label: 'Sign-in & security', href: 'Security.dc.html', icon: 'lock' },
+      oncall: { label: 'On-call rotation', href: 'OnCall.dc.html', icon: 'users' },
+      moncall: { label: 'On-call on your phone', href: 'MOnCall.dc.html', icon: 'bell' },
+      users: { label: 'Users & roles', href: 'Users.dc.html', icon: 'users' },
+      fault: { label: 'Overview during a monitor fault', href: 'MainFault.dc.html', icon: 'triangle-alert' },
+      probes: { label: 'Probes & heartbeat', href: 'Probes.dc.html', icon: 'monitor' },
+      status: { label: 'Client status page', href: 'StatusPage.dc.html', icon: 'external-link' },
+      reports: { label: 'Uptime reports', href: 'Reports.dc.html', icon: 'chart-column' },
+      pdf: { label: 'Client report (PDF)', href: 'ReportPDF.dc.html', icon: 'file' },
+      weekly: { label: 'Weekly summary', href: 'WeeklySummary.dc.html', icon: 'mail' },
+      channels: { label: 'Alert channels', href: 'AlertChannels.dc.html', icon: 'bell' }
+    };
+    function B(lead, text) { return { lead: lead, text: text }; }
+    var T = [
+      { id: 'signin', g: 0, icon: 'lock', title: 'Sign in & 2-step', summary: '2-step required for everyone from Mon 5 Oct', roles: EVERY, kw: 'login google account 2sv two-step verification password acknowledge only locked session device',
+        lede: 'Sign in with your DxT Google account. From Mon 5 Oct everyone needs 2-step verification — without it you can view and acknowledge only.',
+        bullets: [
+          B('DxT Google Workspace accounts only.', 'Personal Gmail accounts are blocked at sign-in.'),
+          B('2-step is required for everyone from Mon 5 Oct.', 'Admins included — the same rule applies to every role.'),
+          B('Without 2-step: acknowledge only.', 'From Mon 5 Oct you can still sign in to view and acknowledge; everything else is locked until 2-step is on. The sign-in page says “2-step required — you can acknowledge only”.'),
+          B('Locked in that state:', 'resolve, mute, maintenance, Mark client update and Not needed.'),
+          B('Sessions last 30 days', 'so the link in an alert opens straight to the incident. Sign out other devices from My profile — takes effect now.')
+        ],
+        callout: { tone: 'warning', title: 'Not on 2-step yet? Nok, Thee and Mint', text: 'Users shows “Off · needed from 5 Oct” for them. Turn it on in your Google account before Mon 5 Oct.' },
+        related: [R.login, R.profile, R.security] },
+      { id: 'phone', g: 0, icon: 'bell', title: 'Set up your phone for on-call', summary: '3 checks so a night alert actually wakes you', roles: ['Responder', 'On-call', 'Admin'], kw: 'phone mobile do not disturb dnd notify mentions test alert checklist night',
+        lede: 'Tier 1 alerts at night go to the on-call person’s phone through Google Chat. Three settings decide whether it rings.',
+        checkTitle: 'ON-CALL CHECKLIST · ALL 3 NEEDED',
+        checklist: ['Alerts Space: notify for @mentions only', 'Space allowed through Do Not Disturb', 'Test alert received on this phone'],
+        bullets: [
+          B('Send yourself a test', 'from My profile. It posts in its own “TEST — no action” thread and mentions only you.'),
+          B('New phone? Test again.', 'The checklist is per phone — a test on your old phone doesn’t count.'),
+          B('@mentions are what ring.', 'The text line above each card @mentions the person expected to act; mentions inside the card body don’t notify.'),
+          B('No personal do-not-disturb in the app.', 'DOWN always reaches whoever is expected to act.')
+        ],
+        related: [R.profile, R.moncall, R.oncall] },
+      { id: 'statuses', g: 0, icon: 'circle-check', title: 'Statuses & badges', summary: 'OK, Problem, Down, Maintenance, Muted and the incident states', roles: EVERY, kw: 'status badge colour color ok problem down maintenance muted unacked escalated acknowledged monitoring review closed legend bkk sin tyo',
+        lede: 'Two kinds of badge: site status says how the site is right now; incident state says where the response is. Every badge has an icon and a word.',
+        full: 'status', related: [R.model, R.incidents, R.site] },
+      { id: 'alert', g: 2, icon: 'circle-alert', title: 'When an alert arrives', summary: 'Acknowledge in one tap · who gets it if nobody acks', roles: ['Responder', 'On-call', 'Stakeholder', 'Admin'], kw: 'ack acknowledge alert escalation ladder l0 l1 l2 l3 undo chat email ceo fyi timers response hours',
+        lede: 'Open the card, acknowledge in one tap, then work the incident. Nothing is posted until the 10 s undo window closes.',
+        full: 'alert', related: [R.incident, R.mack, R.esc, R.chat] },
+      { id: 'client', g: 2, icon: 'mail', title: 'Client updates', summary: 'For AMs: draft, then Mark client updated or Not needed', roles: ['Responder', 'Stakeholder', 'Admin'], kw: 'client update am account manager draft mark updated not needed reason customer',
+        lede: 'When a client-facing outage runs long, the site’s AM is @mentioned with a draft message. The update is a separate track from escalation.',
+        bullets: [
+          B('Tier 1 DOWN reaching 15 min:', 'the site’s AM is @mentioned in the incident thread with a draft client message and gets a “Client update due” email — whatever the ack state.'),
+          B('Tier 2 DOWN reaching 60 min', 'inside response hours: the AM is @mentioned too. Tier 3 goes in the report only.'),
+          B('On the incident’s Client update card:', 'Copy draft, contact the client, then Mark client updated — it records who and when (e.g. Bua, Fri 10:12, “Called MuvMi ops, ETA shared”).'),
+          B('Client doesn’t need one?', 'Choose Not needed… and give a reason — the reason is required.'),
+          B('Required only when the track fired.', 'Otherwise the incident shows “Not required”. A Tier 1 DOWN longer than 15 min can’t be resolved until the update is marked or Not needed.'),
+          B('Who can mark:', 'Admin · Responders on their own sites · AMs for their own clients. Not Viewers, and not anyone in the 2-step “acknowledge only” state.')
+        ],
+        callout: { tone: 'info', title: 'Acknowledge doesn’t stop the client-update track', text: 'The AM is still @mentioned at 15 min even if a responder acked at 5 min.' },
+        related: [R.incident, R.email, R.review] },
+      { id: 'resolve', g: 2, icon: 'pencil', title: 'Recover, root cause & resolve', summary: 'Monitoring → Needs root cause → Resolved → Closed', roles: ['Responder', 'On-call', 'Admin'], kw: 'recover recovered root cause resolve resolved review sign-off closed monitoring unknown auto-resolve conditions',
+        lede: 'A recovered site isn’t a finished incident. Resolve is manual and needs 3 conditions; a DOWN also needs a review signed off by Tao.',
+        full: 'resolve', related: [R.resolve, R.incident, R.review, R.incidents] },
+      { id: 'monitor', g: 2, icon: 'monitor', title: 'When the monitor itself fails', summary: 'Heartbeat alerts, hand checks and manual incidents', roles: ['On-call', 'Admin'], kw: 'monitor fault heartbeat engine probe healthchecks fallback manual incident hand check escalate now',
+        lede: 'If the monitor stops checking, you get told by a separate heartbeat — and you check the important sites by hand until it’s back.',
+        bullets: [
+          B('Engine heartbeat missed > 3 min:', 'email to Tao + a post in the Alerts Space that @mentions the on-call person.'),
+          B('One probe (BKK, SIN or TYO) missing > 3 min:', 'email to Tao only, no page — the other two locations still decide status. Not sent while an engine fault is open.'),
+          B('Hand check:', 'on Overview each site offers “Loads OK” or “Down — open incident”.'),
+          B('“Down — open incident”', 'opens an incident with Trigger “Manual (hand check)”, posts L0 in the Alerts Space through the fallback sender and starts the client-update track.'),
+          B('Timers don’t run while the engine is down.', 'Send L1+ and client-update reminders by hand with Escalate now; automatic timers resume when the engine is back.'),
+          B('Clients see', '“Live status temporarily unavailable” with the last confirmed time — never a green banner.')
+        ],
+        callout: { tone: 'warning', title: 'Only one active Admin today', text: 'Monitor-fault emails reach Tao only — the Second Admin is invited but hasn’t joined yet.' },
+        related: [R.fault, R.probes, R.status] },
+      { id: 'mute', g: 1, icon: 'eye-off', title: 'Mute vs maintenance', summary: 'Mute stops new alerts only · maintenance can’t start on a DOWN site', roles: ['Responder', 'On-call', 'Admin'], kw: 'mute maintenance window planned silence suppress reason end early cancel edit guard uptime',
+        lede: 'Both quieten alerts, but they mean different things — for uptime, for clients and for an incident that’s already open.',
+        full: 'mute', related: [R.maint, R.mute, R.overview, R.audit] },
+      { id: 'rotation', g: 1, icon: 'users', title: 'On-call rotation', summary: 'Weekly shifts, swap requests, Hand over shift', roles: ['Responder', 'On-call', 'Admin'], kw: 'on-call rotation shift week swap hand over handover night weekend ploy nok arm',
+        lede: 'One person covers Tier 1 nights and weekends for a week at a time. Swaps are requested ahead; the live shift is handed over.',
+        bullets: [
+          B('Weekly, changing Monday 09:00.', 'The on-call person answers Tier 1 outside Mon–Fri 09:00–18:00; by day the site owner does.'),
+          B('Now:', 'Ploy (Mon 21 → Mon 28 Sep). Next: Nok (28 Sep → 5 Oct), Arm (5 → 12 Oct), Ploy (12 → 19 Oct).'),
+          B('Swap:', 'request it from the rotation. Both people accept in Chat, then an Admin approves — nothing changes until then. Arm’s swap with Nok is still waiting for Nok.'),
+          B('The live shift can’t be swapped.', 'Use Hand over shift… in Settings › Users: new person, effective time and their phone checklist.'),
+          B('Tao isn’t in the rotation.', 'As Admin backstop, Tao is at L1 for every DOWN.')
+        ],
+        related: [R.oncall, R.moncall, R.users] },
+      { id: 'reports', g: 1, icon: 'chart-column', title: 'Reports & client status page', summary: 'What clients see: Outage, Degraded, Planned maintenance', roles: ['Stakeholder', 'Admin'], kw: 'report status page client outage degraded planned maintenance uptime internal pdf weekly digest',
+        lede: 'Clients see a simpler picture than the team. Some things are internal only and never appear on their page or report.',
+        bullets: [
+          B('Outage (red):', 'a DOWN. Listed and counted in uptime.'),
+          B('Degraded (amber):', 'a PROBLEM that’s slow, a key page or regional. Listed, not counted.'),
+          B('Planned maintenance (grey):', 'listed, not counted.'),
+          B('Internal only:', 'SSL/domain, keyword, redirect, blocked-not-verified and OK with a note — never listed, never coloured.'),
+          B('Uptime = 1 − DOWN minutes ÷ minutes in the window,', 'with maintenance removed from both. PROBLEM counts as up; muted time is counted.'),
+          B('“Note from your account manager”', 'appears only on manually sent reports when the AM wrote one. Digests and the weekly summary go to DxT Website Reports.')
+        ],
+        related: [R.status, R.reports, R.pdf, R.weekly] },
+      { id: 'admin', g: 3, icon: 'settings', title: 'Escalation rules, users & roles', summary: 'Guardrails, the role matrix and the Used-in check', roles: ['Admin'], kw: 'admin escalation policy editor rules users roles permissions matrix used in deactivate change role ceo proposal voice',
+        lede: 'What the escalation editor won’t let you break, who can do what, and why a role change asks you to reassign first.',
+        bullets: [
+          B('L0 is pinned', 'on every DOWN policy — owner/on-call with Chat @mention and Alerts Space, both locked on.'),
+          B('Later steps:', 'at least +15 min and later than the one before; every step needs a channel; each DOWN policy needs at least one step after L0.'),
+          B('CEO only on Tier 1 DOWN, from L2 on,', 'auto-tagged “Proposal · pending CEO”. Voice shows “Configured · off until approved”. The Tier 1 CEO + AM step (the FYI after ack) can’t be removed or carry voice.'),
+          B('Used-in check:', 'before changing a role or deactivating, the dialog lists where the person is used — escalation levels, Site AM, owner/backup, on-call shifts — and you reassign each first.')
+        ],
+        hasMatrix: true,
+        callout: { tone: 'warning', title: 'Only one active Admin today', text: 'The Second Admin is invited but hasn’t joined. Until they do, Tao is the only Admin for sign-offs and monitor faults.' },
+        related: [R.esc, R.users, R.channels, R.security] }
+    ];
+    var q = (st.q || '').trim().toLowerCase();
+    var role = st.role;
+    function match(t) {
+      var okRole = role === 'All' || t.roles.indexOf(role) >= 0;
+      var hay = (t.title + ' ' + t.summary + ' ' + t.kw + ' ' + t.lede).toLowerCase();
+      return okRole && (!q || hay.indexOf(q) >= 0);
+    }
+    var vis = T.filter(match);
+    var sel = st.sel;
+    var cur = T.filter(function (t) { return t.id === sel; })[0] || T[3];
+    function pick(id) { return function () { self.setState({ sel: id }); }; }
+    var groups = GROUPS.map(function (name, gi) {
+      var ts = vis.filter(function (t) { return t.g === gi; }).map(function (t) {
+        var on = t.id === cur.id;
+        return { title: t.title, summary: t.summary, icon: t.icon, pick: pick(t.id), cur: on ? 'page' : 'false', bg: on ? 'var(--aura-bg-selected)' : 'transparent', ic: on ? 'var(--aura-fg-primary)' : 'var(--aura-fg-tertiary)', fw: on ? 600 : 500 };
+      });
+      return { title: name.toUpperCase(), topics: ts, n: ts.length };
+    }).filter(function (g) { return g.n > 0; });
+    function refilter(next) {
+      var s2 = Object.assign({}, st, next);
+      var q2 = (s2.q || '').trim().toLowerCase();
+      var v2 = T.filter(function (t) {
+        var okRole = s2.role === 'All' || t.roles.indexOf(s2.role) >= 0;
+        var hay = (t.title + ' ' + t.summary + ' ' + t.kw + ' ' + t.lede).toLowerCase();
+        return okRole && (!q2 || hay.indexOf(q2) >= 0);
+      });
+      var byTitle = q2 ? v2.filter(function (t) { return t.title.toLowerCase().indexOf(q2) >= 0; }) : [];
+      if (byTitle.length && !byTitle.some(function (t) { return t.id === s2.sel; })) next.sel = byTitle[0].id;
+      else if (v2.length && !v2.some(function (t) { return t.id === s2.sel; })) next.sel = v2[0].id;
+      self.setState(next);
+    }
+    var filtered = !!q || (role !== 'All' && role !== ME);
+    var fbv = st.fb[cur.id];
+    var ladder = [
+      { level: 'L0', when: '0 min', who: 'Owner by day, on-call at night · @mention + Alerts Space', ack: 'Sent at once', ackColor: 'var(--aura-fg-secondary)', proposal: false },
+      { level: 'L1', when: '+15 min', who: 'Backup + Tao, minus anyone already paged', ack: 'Stopped by ack', ackColor: 'var(--aura-fg-secondary)', proposal: false },
+      { level: 'L2', when: '+30 min', who: 'CEO @mention + email (+ call if approved)', ack: 'Stopped by ack', ackColor: 'var(--aura-fg-secondary)', proposal: true },
+      { level: 'L3', when: '+60 min', who: 'CEO + Site AM @mention + email, if still down', ack: 'After ack: FYI, no call', ackColor: 'var(--aura-alert-warning-fg)', proposal: false }
+    ].map(function (l, i, arr) { return Object.assign({ line: i === arr.length - 1 ? 'none' : '1px solid var(--aura-border-subtle)' }, l); });
+    var S = {
+      un: { label: 'Unacked', tone: 'danger', variant: 'outline', icon: 'clock' },
+      esc: { label: 'Escalated · L1', tone: 'warning', variant: 'outline', icon: 'arrow-up-right' },
+      ack: { label: 'Acknowledged', tone: 'neutral', variant: 'outline', icon: 'check' },
+      mon: { label: 'Monitoring', tone: 'neutral', variant: 'outline', icon: 'eye' },
+      nrc: { label: 'Needs root cause', tone: 'warning', variant: 'outline', icon: 'pencil' },
+      res: { label: 'Resolved', tone: 'success', variant: 'outline', icon: 'circle-check' },
+      rev: { label: 'In review', tone: 'neutral', variant: 'outline', icon: 'file-text' },
+      clo: { label: 'Closed', tone: 'neutral', variant: 'soft', icon: 'check' }
+    };
+    function flow(keys) { return keys.map(function (k, i) { return Object.assign({ arrow: i > 0 }, S[k]); }); }
+    function lines(arr) { return arr.map(function (x, i) { return Object.assign({ line: i === arr.length - 1 ? 'none' : '1px solid var(--aura-border-subtle)' }, x); }); }
+    var inc = [
+      ['un', 'Not acknowledged yet, before L1 fires.'],
+      ['esc', 'L1 or L2 fired and nobody acked. Replaces Unacked; the wait shows as text (“18 min unacked”).'],
+      ['ack', 'Someone acknowledged; the site is still failing.'],
+      ['mon', 'First OK round after recovery — RECOVERED sent.'],
+      ['nrc', '2 OK rounds done; root cause (or a required client update) is missing.'],
+      ['res', 'All 3 conditions met and someone pressed Resolve. A PROBLEM ends here.'],
+      ['rev', 'DOWN only: review draft submitted for sign-off.'],
+      ['clo', 'DOWN only: review signed off by Tao.']
+    ].map(function (r, i) { return Object.assign({ text: r[1], line: i >= 6 ? 'none' : '1px solid var(--aura-border-subtle)' }, S[r[0]]); });
+    return {
+      q: st.q,
+      setQ: function (e) { refilter({ q: e && e.target ? e.target.value : e }); },
+      roles: ['All'].concat(ROLES),
+      me: ME, isMine: role === ME && !q, notMine: !(role === ME && !q),
+      showAll: function () { refilter({ role: 'All' }); },
+      role: role,
+      setRole: function (v) { refilter({ role: v && v.target ? v.target.value : v }); },
+      clear: function () { self.setState({ q: '', role: 'All' }); },
+      filtered: filtered,
+      showClear: filtered && vis.length > 0,
+      countLabel: filtered || vis.length < T.length ? (vis.length === 1 ? '1 of ' : vis.length + ' of ') + T.length + ' topics' + (role !== 'All' ? ' · ' + role : '') : T.length + ' topics',
+      groups: groups,
+      empty: vis.length === 0,
+      emptyTitle: 'No topics match “' + (st.q || '').trim() + '”' + (role !== 'All' ? ' for ' + role : ''),
+      sugs: ['acknowledge', 'mute', 'root cause', '2-step'].map(function (w) { return { label: w, pick: function () { refilter({ q: w, role: 'All' }); } }; }),
+      a: {
+        group: GROUPS[cur.g].toUpperCase(), title: cur.title, lede: cur.lede,
+        forText: cur.roles.length === ROLES.length ? 'Everyone' : ROLES.filter(function (r) { return cur.roles.indexOf(r) >= 0; }).join(' · '),
+        isAlert: cur.full === 'alert', isResolve: cur.full === 'resolve', isMute: cur.full === 'mute', isStatus: cur.full === 'status', isShort: !cur.full,
+        bullets: cur.bullets || [],
+        hasChecklist: !!cur.checklist, checklist: cur.checklist || [], checkTitle: cur.checkTitle || '',
+        hasMatrix: !!cur.hasMatrix,
+        hasCallout: !!cur.callout, cTone: cur.callout ? cur.callout.tone : 'info', cTitle: cur.callout ? cur.callout.title : '', cText: cur.callout ? cur.callout.text : '',
+        related: cur.related,
+        askFb: !fbv, fbDone: !!fbv,
+        yes: function () { var f = Object.assign({}, st.fb); f[cur.id] = 'yes'; self.setState({ fb: f }); },
+        no: function () { var f = Object.assign({}, st.fb); f[cur.id] = 'no'; self.setState({ fb: f }); }
+      },
+      ladder: ladder,
+      lifeDown: flow(['un', 'esc', 'ack', 'mon', 'nrc', 'res', 'rev', 'clo']),
+      lifeProblem: flow(['un', 'esc', 'ack', 'res']),
+      resolveSteps: [
+        { n: '1', title: 'The site recovers', hasBadge: true, badge: 'Monitoring', tone: 'neutral', icon: 'eye', gate: false, text: 'On the first OK round the state becomes Monitoring and the RECOVERED reply + email go out: “Needs a root cause before it can be resolved.”' },
+        { n: '2', title: 'Two OK rounds', hasBadge: true, badge: 'Needs root cause', tone: 'warning', icon: 'pencil', gate: false, text: 'After 2 OK rounds it moves to Needs root cause — unless a root cause is already written.' },
+        { n: '3', title: 'Write the root cause', hasBadge: false, gate: false, text: 'Pick a category and say what happened and what fixed it. “Unknown — keep investigating” doesn’t count: Unknown keeps the incident open.' },
+        { n: '4', title: 'Press Resolve', hasBadge: true, badge: 'Resolved', tone: 'success', icon: 'circle-check', gate: true, text: 'Resolve unlocks when all 3 conditions are met. Like an ack, it’s held 10 s with Undo — “Posting to Chat, email and webhooks in N s — nothing is sent until then”.' },
+        { n: '5', title: 'DOWN only: review and sign-off', hasBadge: true, badge: 'In review', tone: 'neutral', icon: 'file-text', gate: false, text: 'Resolving a DOWN creates a review draft. Submit it → In review; when Tao signs it off → Closed. A PROBLEM ends at Resolved.' }
+      ],
+      gates: lines([
+        { t: 'OK for 2 rounds', d: 'The site has passed two check rounds in a row.' },
+        { t: 'Client update marked — or not required', d: 'Required only if the track fired (Tier 1 DOWN > 15 min, Tier 2 DOWN ≥ 60 min in response hours). Met by Mark client updated or Not needed + reason.' },
+        { t: 'Root cause written', d: 'Any category except “Unknown — keep investigating”.' }
+      ]),
+      muteRows: lines([
+        { k: 'Use it for', mute: 'A known issue or noisy site, right now', maint: 'Planned work, scheduled ahead' },
+        { k: 'Alerts', mute: 'New alerts stop; an open incident keeps escalating', maint: 'Suppressed during the window; checks still run' },
+        { k: 'Uptime', mute: 'Still counted', maint: 'Window not counted' },
+        { k: 'Clients see', mute: 'The real status', maint: 'Planned maintenance' },
+        { k: 'How long', mute: 'Up to 24 h', maint: 'Over 24 h needs Admin approval (Admins approve their own)' },
+        { k: 'Who', mute: 'Admin · Responders on their own sites', maint: 'Admin · Responders on their own sites' }
+      ]),
+      siteStates: lines([
+        { label: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check', muted: false, text: 'Reachable. Most locations pass — or blocked, and the browser verifier loaded the page (with a note).' },
+        { label: 'Problem', tone: 'warning', variant: 'soft', icon: 'triangle-alert', muted: false, text: 'Reachable, with an issue: Slow, Keyword, SSL expiring, Regional, Blocked, not verified… Counts as up in uptime.' },
+        { label: 'Down', tone: 'danger', variant: 'solid', icon: 'ban', muted: false, text: 'At least 2 of 3 locations get a hard fail (timeout, 5xx, DNS/TLS error, connection refused) on two checks in a row — the second is an immediate recheck about 30 s later.' },
+        { label: 'Maintenance', tone: 'accent', variant: 'soft', icon: 'calendar', muted: false, text: 'Inside a planned window. Alerts suppressed, window not counted in uptime.' },
+        { label: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check', muted: true, text: 'Mute is an overlay, not a status — the real status stays next to it.' }
+      ]),
+      incStates: inc,
+      glyphs: [
+        { icon: 'circle-check', color: 'var(--aura-fg-positive)', label: 'Pass' },
+        { icon: 'ban', color: 'var(--aura-fg-danger)', label: 'Hard fail' },
+        { icon: 'lock', color: 'var(--aura-fg-secondary)', label: 'Blocked, verified OK' },
+        { icon: 'clock', color: 'var(--aura-alert-warning-fg)', label: 'Slow' },
+        { icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)', label: 'No data' },
+        { icon: 'circle', color: 'var(--aura-fg-tertiary)', label: 'Paused / maintenance' }
+      ],
+      matrixHead: [{ t: 'Admin', w: 72 }, { t: 'Responder', w: 150 }, { t: 'AM', w: 104 }, { t: 'Viewer', w: 72 }],
+      matrix: [
+        ['Acknowledge and resolve', ['Y', 'own + on-call T1', 'N', 'N']],
+        ['Mark client update / Not needed', ['Y', 'own sites', 'own clients', 'N']],
+        ['Maintenance and mute', ['Y', 'own sites', 'N', 'N']],
+        ['Approve incident review', ['Y', 'N', 'N', 'N']],
+        ['Edit sites, monitors, escalation', ['Y', 'N', 'N', 'N']]
+      ].map(function (r) {
+        var MW = [72, 150, 104, 72];
+        return { label: r[0], cells: r[1].map(function (v, i) { return Object.assign({ w: MW[i] }, (function () {
+          if (v === 'Y') return { icon: 'check', color: 'var(--aura-fg-positive)', aria: 'Allowed', note: '' };
+          if (v === 'N') return { icon: 'minus', color: 'var(--aura-fg-tertiary)', aria: 'Not allowed', note: '' };
+          return { icon: 'check', color: 'var(--aura-fg-secondary)', aria: 'Allowed with limits', note: v };
+        })()); }) };
+      }),
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

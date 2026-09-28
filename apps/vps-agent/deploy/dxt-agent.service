@@ -1,0 +1,43 @@
+# systemd unit for the Bangkok probe + browser verifier.
+#
+# Layout (the agent can't rewrite its own code or secrets):
+#   /opt/dxt-agent         code, owned by root, read-only to the service
+#   /etc/dxt-agent/env     secrets, root:dxt 0640
+#   /var/lib/dxt-agent     writable state (StateDirectory), e.g. Chromium profile, screenshots before upload
+# Install: copy to /etc/systemd/system/, then `systemctl daemon-reload && systemctl enable --now dxt-agent`.
+[Unit]
+Description=DxT Monitor VPS agent (Bangkok probe + browser verifier)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dxt
+Group=dxt
+WorkingDirectory=/opt/dxt-agent
+EnvironmentFile=/etc/dxt-agent/env
+Environment=HOME=/var/lib/dxt-agent
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=5
+MemoryMax=1800M
+
+StateDirectory=dxt-agent
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Keep the probe and the browser off the VPS's own network and cloud metadata (SSRF).
+IPAddressDeny=localhost link-local multicast 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10 169.254.169.254
+
+[Install]
+WantedBy=multi-user.target

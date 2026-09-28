@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Alert thread content</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.r3-col > *{flex-shrink:0}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}a.aura-btn--secondary:hover{color:var(--aura-fg-primary)}
+</style>
+</helmet>
+
+<div class="r3-col" style="width: 600px; height: 3369px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SPACE · DxT WEBSITE ALERTS · one thread per incident (INC-0142)</span>
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">One incident, one thread</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Every message is a plain text line that starts with STATE · site, followed by a card. Escalation, the client update and recovery reply in the same thread. Daily digests and the weekly summary post to DxT Website Reports (see the Weekly summary board).</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — why @mentions sit in the text line</span>
+<span>• Google Chat only notifies for <span style="font-family: var(--font-mono)">&lt;users/{id}&gt;</span> in the message <b>text</b>. A name inside a card body doesn’t notify anyone. The lock-screen preview shows the text line, so it carries the state in words.</span>
+<span>• L0 mentions only the person expected to act: the owner by day, the on-call person at night. Backup and FYI people are plain text.</span>
+<span>• An incoming webhook can’t edit a card it already posted. The first card stays as it was; each reply opens with the current state.</span>
+<span>• An ack is posted only after its 10 s Undo window closes (Arm acked 10:07:40 → posted 10:07:50).</span>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">09:48 · FIRST MESSAGE · DAY (Mon–Fri 09–18) → OWNER ACTS</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/ARM&gt;</span> DOWN · MuvMi (Tier 1) · acknowledge by 10:03 or it escalates</span></div>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); overflow: hidden">
+<div style="padding: 14px 20px; display: flex; gap: 12px; border-bottom: 1px solid var(--aura-border-default)">
+<span style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-status-blocked-bg); color: var(--aura-status-blocked-fg); display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-size: 16px; font-weight: 600">DOWN · MuvMi</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Tier 1 · INC-0142 · Confirmed down 09:48:41 (UTC+7)</span>
+</div>
+</div>
+<div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Cause</span><span>Timeout &gt; 30 s (BKK, TYO) · HTTP 504 (SIN)</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Confirmed by</span><span>3 locations, 2 checks</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Owner</span><span>Arm · backup Ploy (not notified yet)</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Next</span><span>L1 at 10:03 if not acknowledged — Ploy, Tao</span></div>
+</div>
+<div style="padding: 0 20px 14px; display: flex; gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="external-link" href="MobileAck.dc.html">Open / acknowledge</x-import>
+</div>
+<div style="padding: 10px 20px; background: var(--aura-bg-canvas); border-top: 1px solid var(--aura-border-default); font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5"><b style="font-weight: 600; color: var(--aura-fg-primary)">Current status is in the latest reply.</b> Anyone can open it; the ack is recorded under their own Google account, so nobody can acknowledge as someone else.</div>
+</div>
+
+<div style="margin-left: 24px; padding-left: 20px; border-left: 2px solid var(--aura-border-default); display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="arrow-up-right" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">10:03 · reply</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> ESCALATED · L1 · MuvMi DOWN 15 min, not acknowledged · please acknowledge · Tao FYI · CEO at 10:18</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">ESCALATED · L1 · MuvMi still down · 15 min, not acknowledged</span>
+<span>Arm hasn’t acknowledged. Ploy (backup) please take it; Tao is informed. Next: CEO at 10:18.</span>
+<div style="display: flex; padding-top: 4px"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="external-link" href="MobileAck.dc.html">Open / acknowledge</x-import></div>
+</div>
+</div>
+</div>
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="mail" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">10:03 · reply</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/BUA&gt;</span> CLIENT UPDATE DUE · MuvMi DOWN 15 min · draft ready</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">CLIENT UPDATE DUE · MuvMi still down · 15 min</span>
+<span>Bua (AM) sends the client message from the draft on the incident page, then marks it. Runs whether or not the incident is acknowledged.</span>
+<div style="display: flex; padding-top: 4px"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="external-link" href="Incident.dc.html">Open draft</x-import></div>
+</div>
+</div>
+</div>
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">10:07:50 · reply (held 10 s for Undo)</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span>ACKNOWLEDGED · MuvMi · by Arm 10:07 · L1–L2 stopped</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">ACKNOWLEDGED · MuvMi still down · by Arm 10:07</span>
+<span>Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).</span>
+</div>
+</div>
+</div>
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">10:31 · reply</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/ARM&gt;</span> RECOVERED · MuvMi · down 43 min · add a root cause</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">RECOVERED · MuvMi is back · down 43 min (09:48–10:31)</span>
+<span>OK from 3 locations. Needs a root cause before it can be resolved. Client update marked by Bua 10:12.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Posted on the first OK round (state → Monitoring); after 2 OK rounds it moves to Needs root cause.</span>
+</div>
+</div>
+</div>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">NIGHT VERSION OF THE FIRST MESSAGE · same template · only the routing rows differ</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> DOWN · Bangkok Airways – Taiwan (Tier 1) · acknowledge by 03:55 or it escalates</span></div>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); overflow: hidden">
+<div style="padding: 14px 20px; display: flex; gap: 12px; border-bottom: 1px solid var(--aura-border-default)">
+<span style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-status-blocked-bg); color: var(--aura-status-blocked-fg); display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-size: 16px; font-weight: 600">DOWN · Bangkok Airways – Taiwan</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Tier 1 · INC-0118 · Wed 2 Sep · Confirmed down 03:40:36 (UTC+7)</span>
+</div>
+</div>
+<div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Cause</span><span>HTTP 503 (BKK, SIN, TYO)</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Confirmed by</span><span>3 locations, 2 checks</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">On call</span><span>Ploy (Tier 1 night) — the person who acts</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Owner</span><span>Arm · not paged at night</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Next</span><span>L1 at 03:55 if not acknowledged — Tao</span></div>
+</div>
+<div style="padding: 0 20px 14px; display: flex; gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="external-link" href="MobileAckDark.dc.html">Open / acknowledge</x-import>
+</div>
+<div style="padding: 10px 20px; background: var(--aura-bg-canvas); border-top: 1px solid var(--aura-border-default); font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5"><b style="font-weight: 600; color: var(--aura-fg-primary)">Current status is in the latest reply.</b> Anyone can open it; the ack is recorded under their own Google account, so nobody can acknowledge as someone else.</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">COVERAGE · EVENT → TEXT LINE → WHO IS @MENTIONED</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Every event the Alerts Space posts. The text line is what the phone shows; only the people after @ are notified.</span>
+<span style="font-size: 12px; color: var(--aura-fg-primary)"><b style="font-weight: 600">Rule:</b> L1 = backup + Tao, minus anyone already paged. By day the backup is @mentioned and Tao is FYI in plain text; at night the backup is often the on-call person paged at L0, so Tao is @mentioned instead.</span>
+</div>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--aura-border-default); font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)"><span>EVENT · @MENTIONED</span><span>TEXT LINE</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Tier 1 DOWN · day</span><span style="color: var(--aura-fg-secondary)">@ Owner (Arm)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/ARM&gt;</span> DOWN · MuvMi (Tier 1) · acknowledge by 10:03 or it escalates</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Tier 1 DOWN · night</span><span style="color: var(--aura-fg-secondary)">@ On-call (Ploy); owner not paged</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> DOWN · Bangkok Airways – Taiwan (Tier 1) · acknowledge by 03:55 or it escalates</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Tier 2 DOWN · outside hours</span><span style="color: var(--aura-fg-secondary)">@ Owner (Tao)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/TAO&gt;</span> DOWN · ORCA Thailand (Tier 2) · outside response hours · timers paused until 09:00</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">L1 · +15 min · day</span><span style="color: var(--aura-fg-secondary)">@ Backup (Ploy); Tao plain text</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> ESCALATED · L1 · MuvMi DOWN 15 min, not acknowledged · please acknowledge · Tao FYI · CEO at 10:18</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">L1 · night</span><span style="color: var(--aura-fg-secondary)">@ Tao; backup Ploy already paged at L0 as on-call</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/TAO&gt;</span> ESCALATED · L1 · Bangkok Airways – Taiwan DOWN 15 min, not acknowledged · please acknowledge · Ploy (on call) already paged · CEO at 04:10</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px"><span style="font-weight: 600">L2 · +30 min (CEO)</span><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="clock">Proposal · pending CEO</x-import><span style="color: var(--aura-fg-secondary)">@ CEO (+ email)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/CEO&gt;</span> ESCALATED · L2 · MuvMi DOWN 30 min, not acknowledged · Arm, Ploy, Tao informed</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">L3 FYI · +60 min</span><span style="color: var(--aura-fg-secondary)">@ CEO + Site AM (Bua); email, no call</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/CEO&gt;</span> <span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/BUA&gt;</span> FYI · L3 · MuvMi still DOWN 60 min · acknowledged by Arm 10:07 · no action needed</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Tier 2–3 L2 · +30 min</span><span style="color: var(--aura-fg-secondary)">@ Tao (reminder); email to Tao · no CEO</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/TAO&gt;</span> REMINDER · L2 · WeCare Studio DOWN 30 min, not acknowledged</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Client update due</span><span style="color: var(--aura-fg-secondary)">@ Site AM (Bua)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/BUA&gt;</span> CLIENT UPDATE DUE · MuvMi DOWN 15 min · draft ready</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Acknowledged</span><span style="color: var(--aura-fg-secondary)">@ Nobody</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">ACKNOWLEDGED · MuvMi · by Arm 10:07 · L1–L2 stopped</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Note (thread reply)</span><span style="color: var(--aura-fg-secondary)">@ Nobody · no email</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">NOTE · MuvMi · Arm: origin timing out behind the CDN, restarting the app server</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Recovered</span><span style="color: var(--aura-fg-secondary)">@ Owner (Arm) · first OK round</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/ARM&gt;</span> RECOVERED · MuvMi · down 43 min · add a root cause</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Resolved</span><span style="color: var(--aura-fg-secondary)">@ Nobody · email in the same thread to everyone who got a DOWN email</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">RESOLVED · ORCA Thailand · by Tao 10:08</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM</span><span style="color: var(--aura-fg-secondary)">@ Owner (Ploy)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> PROBLEM · Fuji Links (Tier 2) · slow, p50 5.8 s · please take a look</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM · 60-min reminder</span><span style="color: var(--aura-fg-secondary)">@ Owner (Ploy) + backup (Nok)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> <span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/NOK&gt;</span> STILL PROBLEM · Fuji Links · 60 min, not acknowledged · Nok (backup) please take it</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Test alert · own thread</span><span style="color: var(--aura-fg-secondary)">@ Tester only (Ploy)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> TEST — no action · alert test for Ploy’s phone</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Monitor fault</span><span style="color: var(--aura-fg-secondary)">@ On-call (Ploy); email to Tao</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> MONITOR FAULT · all sites · heartbeat missed since 02:17 · status unknown, hand-check Tier 1</span></div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":3369}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

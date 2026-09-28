@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Escalation policies</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1528px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="escalation" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px 24px; display: flex; flex-direction: column; gap: 24px; position: relative">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">OPERATIONS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Escalation policies</h1>
+<span style="font-size: 14px; color: var(--aura-fg-secondary)">One person must acknowledge. No ack in time → the next level is notified. Acknowledge stops this chain — not the client-update track.</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" icon="file-text" href="AuditLog.dc.html">Change history</x-import>
+</div>
+
+<div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Policy" options="{{policies}}" value="{{pol}}" on-change="{{setPol}}"></x-import>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary); white-space: nowrap"><x-import component-from-global-scope="Aura.Icon" name="clock" size="sm"></x-import>{{timerBasis}}</span>
+<a href="Organisation.dc.html" style="font-size: 13px; white-space: nowrap">Edit in Organisation</a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start">
+
+<div style="grid-column: span 2; display: flex; flex-direction: column; gap: 0; min-width: 0">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+<div style="display: flex; gap: 16px">
+<div style="width: 40px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center">
+<span style="width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted)">{{s.level}}</span>
+<span style="flex-grow: 1; width: 2px; min-height: 16px; background: var(--aura-border-default)"></span>
+</div>
+<div class="aura-card" style="flex-grow: 1; min-width: 0; gap: 12px; margin-bottom: 12px">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600">{{s.when}}<sc-if value="{{s.pinned}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="pin">Pinned</x-import></sc-if><sc-if value="{{s.hasTag}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="clock">{{s.tag}}</x-import></sc-if><sc-if value="{{s.hasFyi}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="info">FYI after ack · no call</x-import></sc-if></span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{s.cond}}</span>
+<sc-for list="{{s.errs}}" as="er" hint-placeholder-count="0"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import>{{er}}</span></sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 2px">
+<x-import component-from-global-scope="Aura.IconButton" icon="arrow-up" label="{{s.upLabel}}" disabled="{{s.noUp}}" on-click="{{s.up}}"></x-import>
+<x-import component-from-global-scope="Aura.IconButton" icon="arrow-down" label="{{s.downLabel}}" disabled="{{s.noDown}}" on-click="{{s.down}}"></x-import>
+<x-import component-from-global-scope="Aura.IconButton" icon="pencil" label="{{s.editLabel}}" on-click="{{s.edit}}"></x-import>
+<x-import component-from-global-scope="Aura.IconButton" icon="trash-2" tone="danger" label="{{s.delLabel}}" disabled="{{s.noDel}}" on-click="{{s.del}}"></x-import>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px 16px; align-items: center">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">NOTIFY</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{s.who}}" as="t" hint-placeholder-count="2">
+<x-import component-from-global-scope="Aura.Tag" icon="user">{{t}}</x-import>
+</sc-for>
+<sc-if value="{{s.hasAdmin}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-warning); line-height: 1.4"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import>Tao is the only active Admin · Second Admin hasn’t joined · <a href="Users.dc.html">Users</a></span></sc-if>
+</div>
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">CHANNELS</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{s.ch}}" as="c" hint-placeholder-count="2">
+<x-import component-from-global-scope="Aura.Badge" tone="{{c.tone}}" variant="outline" icon="{{c.icon}}">{{c.label}}</x-import>
+</sc-for>
+<sc-if value="{{s.noCh}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="danger" variant="outline" icon="circle-alert">No channel · notifies nobody</x-import></sc-if>
+</div>
+</div>
+<sc-if value="{{s.hasNote}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5; padding-top: 10px; border-top: 1px solid var(--aura-border-subtle)">{{s.note}}</span>
+</sc-if>
+<sc-if value="{{s.hasFyi}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; gap: 10px; padding: 10px 12px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; gap: 2px"><b style="font-weight: 600">After ack: FYI only if still down, no call</b><span style="color: var(--aura-fg-secondary)">{{s.fyi}}</span></div>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-for>
+<div style="padding-left: 56px; display: flex; align-items: center; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="plus" on-click="{{addStep}}">Add step</x-import>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{stepHint}}</span>
+</div>
+<sc-if value="{{hasPolMsg}}" hint-placeholder-val="{{false}}"><div style="padding-left: 56px; margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: {{polMsgColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{polMsgIcon}}" size="sm"></x-import>{{polMsg}}</div></sc-if>
+
+<div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px; padding: 20px 24px; border: 1px dashed var(--aura-border-strong); border-radius: var(--aura-card-radius); background: var(--aura-bg-surface)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Client-update track</h3>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="rotate-ccw">Runs even after acknowledge</x-import>
+</div>
+<sc-for list="{{track}}" as="t" hint-placeholder-count="2">
+<div style="display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; font-size: 13px; line-height: 1.5">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">{{t.at}}</span>
+<span>{{t.what}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Preview</h3>
+<x-import component-from-global-scope="Aura.Select" label="Resolve for site" options="{{siteOpts}}" value="{{site}}" on-change="{{setSite}}"></x-import>
+<div style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.45; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); padding: 4px 12px">
+<sc-for list="{{tokens}}" as="k" hint-placeholder-count="5">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: {{k.border}}"><span style="color: var(--aura-fg-secondary); white-space: nowrap">{{k.token}}</span><span style="font-weight: 500; text-align: right">{{k.name}}</span></div>
+</sc-for>
+</div>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">{{previewCase}}</span>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{preview}}" as="p" hint-placeholder-count="5">
+<div style="display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.5">
+<span style="width: 72px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">{{p.at}}</span>
+<span style="color: {{p.color}}">{{p.what}}</span>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{hasAckCase}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{ackCaseLabel}}</span>
+<span>{{ackCase}}</span>
+</div>
+</sc-if>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Applies to every step</h3>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<x-import component-from-global-scope="Aura.TextField" label="DOWN reminder" value="{{remDown}}" on-change="{{setRemDown}}" suffix="min" error="{{remDownErr}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="PROBLEM reminder" value="{{remProb}}" on-change="{{setRemProb}}" suffix="min" error="{{remProbErr}}"></x-import>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Thread</span><span style="font-weight: 600">1 per incident</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Chat fails</span><span style="font-weight: 600">Email fallback</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Tier 1 hours</span><span style="font-weight: 600">24/7</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Tier 2–3 hours</span><span style="font-weight: 600; white-space: nowrap">Mon–Fri 09:00–18:00</span></div>
+</div>
+</div>
+
+<sc-if value="{{showVoice}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="{{propTitle}}">{{propBody}}</x-import>
+</sc-if>
+</div>
+
+</div>
+
+<sc-if value="{{dirty}}" hint-placeholder-val="{{false}}">
+<div role="region" aria-label="Unsaved changes" style="position: relative; margin-top: auto; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 20px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-strong); border-radius: 9999px; box-shadow: var(--aura-shadow-overlay)">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="sm"></x-import></span>
+<span style="font-weight: 600; white-space: nowrap">{{dirtyLabel}}</span>
+<span style="flex-grow: 1; min-width: 0; font-size: 13px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{dirtyHint}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{discard}}">Discard</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="check" on-click="{{save}}">Save</x-import>
+</div>
+</sc-if>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{saveOpen}}" on-close="{{closeSave}}" title="Save escalation changes?" description="{{saveDesc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<sc-if value="{{hasErrors}}" hint-placeholder-val="{{false}}">
+<div role="alert" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--aura-fg-danger); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import>{{errTitle}}</span>
+<sc-for list="{{errors}}" as="e" hint-placeholder-count="1">
+<span style="padding-left: 24px">{{e}}</span>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{hasWarns}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--aura-border-strong); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--aura-fg-warning)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import>Allowed, but check</span>
+<sc-for list="{{warns}}" as="w" hint-placeholder-count="1">
+<span style="padding-left: 24px">{{w}}</span>
+</sc-for>
+</div>
+</sc-if>
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{diff}}" as="d" hint-placeholder-count="2">
+<div style="display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 12px; padding: 10px 14px; border-top: {{d.border}}; font-size: 13px; line-height: 1.45">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); white-space: nowrap">{{d.where}}</span>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<sc-if value="{{d.hasBefore}}" hint-placeholder-val="{{true}}"><span style="color: var(--aura-fg-danger); text-decoration: line-through">{{d.before}}</span></sc-if>
+<sc-if value="{{d.hasAfter}}" hint-placeholder-val="{{true}}"><span style="color: var(--aura-fg-positive)">{{d.after}}</span></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span>
+<span>{{affects}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Textarea" label="Change note" required="{{yes}}" rows="{{two}}" placeholder="Why are you changing this?" value="{{note}}" on-change="{{setNote}}" error="{{noteErr}}" hint="Saved with the change in the audit log."></x-import>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1"></span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeSave}}">Back to editing</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" disabled="{{hasErrors}}" on-click="{{confirmSave}}">Save and log</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{editOpen}}" on-close="{{closeEdit}}" title="{{editTitle}}" description="{{editDesc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<sc-if value="{{ePinned}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; gap: 10px; padding: 10px 14px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="pin" size="sm"></x-import></span><span>L0 is pinned: it fires the moment the incident is confirmed and always @mentions the Owner / on-call in Chat and posts in the Alerts Space — both locked on. You can add people or email.</span></div>
+</sc-if>
+<x-import component-from-global-scope="Aura.TextField" label="Notify after" suffix="min after Confirmed down" value="{{eDelay}}" on-change="{{setEDelay}}" disabled="{{ePinned}}" error="{{eDelayErr}}" hint="{{eDelayHint}}"></x-import>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 500">Who · role tokens</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{eRoles}}" as="r" hint-placeholder-count="5">
+<x-import component-from-global-scope="Aura.Tag" icon="user" selected="{{r.on}}" disabled="{{r.locked}}" on-click="{{r.toggle}}">{{r.label}}</x-import>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: {{eWhoColor}}; line-height: 1.5">{{eWhoHint}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">{{eCeoNote}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 500">Channels</span>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{eChat}}" disabled="{{ePinned}}" description="{{eLockDesc}}" on-change="{{setEChat}}">Chat @mention</x-import>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{eSpace}}" disabled="{{ePinned}}" description="{{eLockDesc}}" on-change="{{setESpace}}">Alerts Space</x-import>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{eEmail}}" on-change="{{setEEmail}}">Email</x-import>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{eVoice}}" disabled="{{yes}}" description="{{eVoiceDesc}}">{{eVoiceLabel}}</x-import>
+<sc-if value="{{eNoCh}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-danger); line-height: 1.5"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import>No channel ticked — this step notifies nobody. You can apply it, but Save stays blocked.</span></sc-if>
+</div>
+<sc-if value="{{eIsProp}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Tagged “Proposal · pending CEO” automatically because it pages the CEO — this step can’t move above L2.</span>
+</sc-if>
+<div style="display: flex; gap: 10px; padding: 10px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap">{{ePrevAt}}</span><span style="color: {{ePrevColor}}">{{ePrev}}</span></div>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1"></span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeEdit}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{applyEdit}}">{{eApply}}</x-import>
+</div>
+</div>
+</x-import>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1528}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var p = this.base();
+    this.state = { pol: 'Tier 1 DOWN', p: p, saved: JSON.parse(JSON.stringify(p)), remDown: '15', remProb: '60', sRemDown: '15', sRemProb: '60', site: 'MuvMi', saveOpen: false, note: '', tried: false, n: 0, edit: null, eTried: false };
+  }
+  base() {
+    function S(delay, cond, who, ch, tag, note, fyi) { return { delay: delay, cond: cond, who: who, ch: ch, tag: tag || '', note: note || '', fyi: !!fyi }; }
+    var t23 = function () {
+      return [
+        S(0, 'DOWN confirmed · posted at any hour', ['Owner / on-call'], ['chat', 'space', 'email'], '', 'Tier 2–3 have no on-call, so this is the owner. Outside response hours it still posts, but the timers below wait until 09:00.'),
+        S(15, 'No acknowledgement', ['Backup', 'Admin (Tao)'], ['chat', 'email']),
+        S(30, 'Still no acknowledgement', ['Admin (Tao)'], ['chat'], '', 'Reminder to Tao. No CEO page — the CEO sees it in the daily digest.')
+      ];
+    };
+    return {
+      t1: [
+        S(0, 'DOWN confirmed', ['Owner / on-call'], ['chat', 'space', 'email'], '', 'Chat @mention and Alerts Space are locked on. Owner by day (Mon–Fri 09:00–18:00), the person on call otherwise. Only they are @mentioned; the backup is named in plain text.'),
+        S(15, 'No acknowledgement', ['Backup', 'Admin (Tao)'], ['chat', 'email'], '', 'Posts “@Ploy please acknowledge · Tao FYI” in the same thread.'),
+        S(30, 'No acknowledgement', ['CEO'], ['chat', 'email', 'voice'], 'Proposal · pending CEO'),
+        S(60, 'Still DOWN — sent even after acknowledge', ['CEO', 'Site AM'], ['chat', 'email'], '', '', true)
+      ],
+      t2: t23(),
+      t3: t23(),
+      pr: [
+        S(0, 'PROBLEM confirmed', ['Owner / on-call'], ['chat', 'space'], '', 'Tier 1 at night goes to the person on call. Tier 2–3 outside response hours are held until 09:00.'),
+        S(60, 'No acknowledgement', ['Backup'], ['chat', 'email'])
+      ]
+    };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    function copy(o) { return JSON.parse(JSON.stringify(o)); }
+    var KEY = { 'Tier 1 DOWN': 't1', 'Tier 2 DOWN': 't2', 'Tier 3 DOWN': 't3', 'PROBLEM · all tiers': 'pr' };
+    var k = KEY[st.pol];
+    var CH = {
+      chat: { label: 'Chat @mention', icon: 'bell', tone: 'neutral' },
+      space: { label: 'Alerts Space', icon: 'users', tone: 'neutral' },
+      email: { label: 'Email', icon: 'mail', tone: 'neutral' },
+      voice: { label: 'Voice call · configured, off until approved', icon: 'lock', tone: 'warning' }
+    };
+    var steps = st.p[k];
+    function setSteps(ns) { var p = copy(st.p); p[k] = ns; self.setState({ p: p }); }
+    function fmtDelay(d) { return d === 0 ? '+0 · immediately' : '+' + d + ' min'; }
+    function stepErrs(pk, list, i) {
+      var sN = list[i], e = [];
+      if (!sN.ch.filter(function (c) { return c !== 'voice'; }).length) e.push('No channel ticked — this step notifies nobody.');
+      if (!sN.who.length) e.push('Pick at least one person.');
+      if (i > 0) {
+        if (!(sN.delay >= 15)) e.push('Must be at least +15 min.');
+        else if (sN.delay <= list[i - 1].delay) e.push('Must be later than L' + (i - 1) + ' (+' + list[i - 1].delay + ' min).');
+      }
+      if (sN.tag && i < 2) e.push('A proposal step can’t sit above L2.');
+      if (sN.who.indexOf('CEO') >= 0) {
+        if (pk !== 't1') e.push('The CEO is paged only on Tier 1 DOWN — remove CEO from this step.');
+        else if (i < 2) e.push('The CEO can be paged only from L2 onward.');
+      }
+      return e;
+    }
+    function stepErr(list, i) { return stepErrs(k, list, i).join(' '); }
+    function polErr(pk, list) { return pk !== 'pr' && list.length < 2 ? NAME[pk] + ' needs at least one step after L0 — otherwise nobody else is ever told.' : ''; }
+    function polWarn(pk, list) { return pk === 'pr' && list.length < 2 ? 'PROBLEM has no step after L0 — only the owner / on-call hears about it. Allowed, but the backup is never told.' : ''; }
+    function canSwap(list, a, b) { // a<b, swapping contents of a and b
+      if (a === 0) return false;
+      if (list[a].fyi || list[b].fyi) return false;
+      if (list[b].tag && a < 2) return false;
+      if (list[a].tag && b < 2) return false;
+      return true;
+    }
+    var NAME = { t1: 'Tier 1 DOWN', t2: 'Tier 2 DOWN', t3: 'Tier 3 DOWN', pr: 'PROBLEM' };
+    var view = steps.map(function (s, i) {
+      var L = 'L' + i;
+      var upOk = i > 0 && canSwap(steps, i - 1, i);
+      var downOk = i < steps.length - 1 && canSwap(steps, i, i + 1);
+      var fyiNear = s.fyi || (steps[i - 1] && steps[i - 1].fyi) || (steps[i + 1] && steps[i + 1].fyi);
+      var upWhy = i === 0 ? 'L0 is pinned' : (i === 1 ? 'L0 is pinned — nothing can move above it' : (!upOk ? (s.fyi || steps[i - 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'A proposal step can’t move above L2') : 'Move ' + L + ' earlier'));
+      var downWhy = i === 0 ? 'L0 is pinned' : (i === steps.length - 1 ? 'Already the last step' : (!downOk ? (s.fyi || steps[i + 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'L' + (i + 1) + ' is a proposal — it can’t move up to L' + i) : 'Move ' + L + ' later'));
+      var fyi = !!s.fyi;
+      var errs = stepErrs(k, steps, i);
+      var err = errs.join(' ');
+      return {
+        level: L, when: fmtDelay(s.delay), cond: s.cond, who: s.who,
+        ch: s.ch.map(function (c) { return CH[c]; }), noCh: !s.ch.filter(function (c) { return c !== 'voice'; }).length, errs: errs,
+        pinned: i === 0,
+        hasTag: !!s.tag, tag: s.tag, hasNote: !!s.note, note: s.note,
+        hasErr: !!err, err: err,
+        hasAdmin: s.who.indexOf('Admin (Tao)') >= 0,
+        hasFyi: fyi,
+        fyi: 'Acknowledge stops L1–L2 only. If the site is still DOWN at +' + s.delay + ' min, ' + s.who.join(' + ') + (s.who.length > 1 ? ' get' : ' gets') + ' an FYI — Chat @mention + email, never a voice call. Recovered by then → nothing is sent.',
+        noUp: !upOk, noDown: !downOk, noDel: i === 0 || fyi,
+        upLabel: upWhy, downLabel: downWhy, editLabel: 'Edit ' + L, delLabel: i === 0 ? 'L0 is pinned on every policy and can’t be deleted' : (fyi ? 'The CEO + AM FYI step can’t be removed from Tier 1 DOWN' : 'Delete ' + L),
+        edit: function () { self.setState({ edit: { idx: i, isNew: false, delay: String(s.delay), who: s.who.slice(), ch: s.ch.slice(), tag: s.tag, fyi: !!s.fyi }, eTried: false }); },
+        up: function () { if (!upOk) return; var ns = copy(steps); var a = ns[i - 1], b = ns[i]; var da = a.delay, ca = a.cond, db = b.delay, cb = b.cond; ns[i - 1] = b; ns[i] = a; ns[i - 1].delay = da; ns[i - 1].cond = ca; ns[i].delay = db; ns[i].cond = cb; setSteps(ns); },
+        down: function () { if (!downOk) return; var ns = copy(steps); var a = ns[i], b = ns[i + 1]; var da = a.delay, ca = a.cond, db = b.delay, cb = b.cond; ns[i] = b; ns[i + 1] = a; ns[i].delay = da; ns[i].cond = ca; ns[i + 1].delay = db; ns[i + 1].cond = cb; setSteps(ns); },
+        del: function () { if (i === 0 || fyi) return; var ns = copy(steps); ns.splice(i, 1); setSteps(ns); }
+      };
+    });
+    // sites
+    var SITES = {
+      t1: [['MuvMi', 'Arm', 'Ploy', 'Bua'], ['Bangkok Airways – Taiwan', 'Arm', 'Ploy', 'Bua'], ['Bangkok Airways – China', 'Arm', 'Ploy', 'Bua'], ['ENEOS Industrial', 'Ploy', 'Arm', 'Thee'], ['realme.link', 'Nok', 'Arm', 'Thee']],
+      t2: [['Fuji Links', 'Ploy', 'Nok', 'Thee'], ['WeCare Studio', 'Nok', 'Ploy', 'Bua'], ['Tubtong', 'Ploy', 'Nok', 'Bua'], ['Cando Asia', 'Nok', 'Ploy', 'Bua'], ['ORCA Thailand', 'Tao', 'Nok', 'Thee'], ['WeCare Asia', 'Nok', 'Ploy', 'Bua'], ['VOCA', 'Ploy', 'Tao', '— (internal)'], ['EQHO', 'Tao', 'Nok', '— (internal)'], ['DxT', 'Tao', 'Nok', '— (internal)']],
+      t3: [['DxT AI', 'Tao', 'Nok', '— (internal)'], ['DxT Solutions', 'Tao', 'Nok', '— (internal)'], ['DxT Games', 'Tao', 'Nok', '— (internal)']]
+    };
+    SITES.pr = SITES.t1.concat(SITES.t2).concat(SITES.t3);
+    var list = SITES[k];
+    var cur = list.filter(function (x) { return x[0] === st.site; })[0] || list[0];
+    var t1like = k === 't1' || (k === 'pr' && SITES.t1.some(function (x) { return x[0] === cur[0]; }));
+    var R = {
+      'Owner / on-call': t1like ? cur[1] + ' (day) · Ploy (night)' : cur[1] + ' · no on-call',
+      'Backup': cur[2], 'Admin (Tao)': 'Tao · only active Admin', 'CEO': 'CEO', 'Site AM': cur[3]
+    };
+    var used = [];
+    steps.forEach(function (s) { s.who.forEach(function (w) { if (used.indexOf(w) < 0) used.push(w); }); });
+    if (k !== 'pr' && k !== 't3' && used.indexOf('Site AM') < 0) used.push('Site AM');
+    var tokens = used.map(function (t, i) { return { token: t, name: R[t], border: i ? '1px solid var(--aura-border-subtle)' : 'none' }; });
+    function first(who) { return who === 'Owner / on-call' ? (t1like ? cur[1] : cur[1]) : R[who]; }
+    function nobody(s) { return !s.ch.filter(function (c) { return c !== 'voice'; }).length || !s.who.length; }
+    function tgt(s) { return nobody(s) ? 'notifies nobody (' + (s.who.length ? 'no channel ticked' : 'no one picked') + ')' : names(s); }
+    function col(s) { return nobody(s) ? 'var(--aura-fg-danger)' : 'var(--aura-fg-primary)'; }
+    function names(s) { return s.who.map(function (w) { return w === 'Owner / on-call' ? cur[1] : (w === 'Site AM' ? cur[3] : (w === 'Admin (Tao)' ? 'Tao' : R[w])); }).join(' + ') + (s.ch.indexOf('space') >= 0 ? ' + Alerts Space' : ''); }
+    function hm(h, m) { h = h + Math.floor(m / 60); m = m % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
+    var preview = [], previewCase;
+    if (k === 't1') {
+      previewCase = cur[0] + ' DOWN confirmed 09:48 today, nobody acknowledges:';
+      steps.forEach(function (s, i) { preview.push({ at: hm(9, 48 + s.delay), what: 'L' + i + ' → ' + tgt(s) + (s.tag && !nobody(s) ? ' (proposal)' : '') + (s.fyi && !nobody(s) ? ' · FYI even if acked' : ''), color: col(s) }); });
+      preview.push({ at: hm(9, 63), what: 'Client update → ' + cur[3] + ' gets a draft message (even if acked)', color: 'var(--aura-fg-secondary)' });
+      preview.sort(function (a, b) { return a.at < b.at ? -1 : a.at > b.at ? 1 : 0; });
+    } else if (k === 't2') {
+      previewCase = cur[0] + ' DOWN at Thu 22:14 (outside response hours), nobody acknowledges:';
+      steps.forEach(function (s, i) { preview.push({ at: s.delay === 0 ? 'Thu 22:14' : 'Fri ' + hm(9, s.delay), what: 'L' + i + ' → ' + tgt(s) + (s.delay === 0 ? ' · timers paused' : ''), color: col(s) }); });
+      preview.splice(1, 0, { at: 'Fri 09:00', what: 'Response hours start · timers run', color: 'var(--aura-fg-secondary)' });
+      preview.push({ at: 'Fri 10:00', what: 'Client update → ' + cur[3] + ' (60 min down in hours)', color: 'var(--aura-fg-secondary)' });
+    } else if (k === 't3') {
+      previewCase = cur[0] + ' DOWN at Wed 10:00 (inside response hours), nobody acknowledges:';
+      steps.forEach(function (s, i) { preview.push({ at: 'Wed ' + hm(10, s.delay), what: 'L' + i + ' → ' + tgt(s), color: col(s) }); });
+      preview.push({ at: 'Month end', what: 'Listed in the report only — no AM ping', color: 'var(--aura-fg-secondary)' });
+    } else {
+      previewCase = cur[0] + ' PROBLEM (Slow) at Fri 16:00, nobody acknowledges:';
+      steps.forEach(function (s, i) { preview.push({ at: 'Fri ' + hm(16, s.delay), what: 'L' + i + ' → ' + tgt(s), color: col(s) }); });
+      preview.push({ at: 'Fri 17:00', what: 'Reminder in the thread (every ' + st.remProb + ' min)', color: 'var(--aura-fg-secondary)' });
+      preview.push({ at: 'Fri 18:00', what: t1like ? 'Tier 1 → on-call (Ploy) takes over' : 'Outside hours → held until Mon 09:00', color: 'var(--aura-fg-secondary)' });
+      preview.sort(function (a, b) { return a.at < b.at ? -1 : a.at > b.at ? 1 : 0; });
+    }
+    var TRACK = {
+      t1: [{ at: '+15 min down', what: 'Site AM is @mentioned in the thread with a draft client message — acked or not.' }, { at: 'Resolve', what: 'A Tier 1 DOWN longer than 15 min can’t be resolved until the client update is marked done, or “Not needed” with a reason.' }],
+      t2: [{ at: '+60 min down', what: 'Inside response hours, the Site AM is @mentioned with a draft client message — acked or not.' }],
+      t3: [{ at: 'Report only', what: 'Tier 3 sites are internal: the incident is listed in the monthly report, no AM ping.' }],
+      pr: [{ at: 'Not started', what: 'PROBLEM doesn’t start the client-update track. Slow and regional show as “Degraded” on the status page.' }]
+    };
+    // diff
+    function desc(s) { return fmtDelay(s.delay) + ' · ' + (s.who.length ? s.who.join(' + ') : 'no one') + ' · ' + (s.ch.length ? s.ch.map(function (c) { return CH[c].label; }).join(', ') : 'no channel (notifies nobody)'); }
+    var diff = [];
+    ['t1', 't2', 't3', 'pr'].forEach(function (pk) {
+      var a = st.saved[pk], b = st.p[pk];
+      var n = Math.max(a.length, b.length);
+      for (var i = 0; i < n; i++) {
+        var da = a[i] ? desc(a[i]) : '', db = b[i] ? desc(b[i]) : '';
+        if (da !== db) diff.push({ where: NAME[pk] + ' · L' + i, before: da, after: db ? db : (i >= b.length ? 'Removed' : ''), hasBefore: !!da, hasAfter: true });
+      }
+    });
+    if (st.remDown !== st.sRemDown) diff.push({ where: 'DOWN reminder', before: 'every ' + st.sRemDown + ' min', after: 'every ' + st.remDown + ' min', hasBefore: true, hasAfter: true });
+    if (st.remProb !== st.sRemProb) diff.push({ where: 'PROBLEM reminder', before: 'every ' + st.sRemProb + ' min', after: 'every ' + st.remProb + ' min', hasBefore: true, hasAfter: true });
+    diff.forEach(function (d, i) { d.border = i ? '1px solid var(--aura-border-subtle)' : 'none'; });
+    var touched = ['t1', 't2', 't3', 'pr'].filter(function (pk) { return JSON.stringify(st.saved[pk]) !== JSON.stringify(st.p[pk]); });
+    var SC = { t1: 5, t2: 9, t3: 3, pr: 17 };
+    var sites = 0; touched.forEach(function (pk) { sites += SC[pk]; });
+    if ((st.remDown !== st.sRemDown || st.remProb !== st.sRemProb) || touched.indexOf('pr') >= 0) sites = 17;
+    var open = [];
+    if (touched.indexOf('t1') >= 0 || st.remDown !== st.sRemDown) open.push('INC-0142');
+    if (touched.indexOf('pr') >= 0 || st.remProb !== st.sRemProb) open.push('INC-0141');
+    var errors = [], warns = [];
+    ['t1', 't2', 't3', 'pr'].forEach(function (pk) {
+      var list = st.p[pk];
+      list.forEach(function (x, i) { stepErrs(pk, list, i).forEach(function (e) { errors.push(NAME[pk] + ' · L' + i + ' (' + fmtDelay(x.delay) + '): ' + e); }); });
+      var pe = polErr(pk, list); if (pe) errors.push(pe);
+      var pw = polWarn(pk, list); if (pw) warns.push(pw);
+    });
+    function remErr(v) { return /^\s*\d+\s*$/.test(String(v)) && parseInt(v, 10) > 0 ? '' : 'Whole minutes above 0, e.g. 15'; }
+    var rdErr = remErr(st.remDown), rpErr = remErr(st.remProb);
+    if (rdErr) errors.push('DOWN reminder: “' + st.remDown + '” isn’t valid — enter whole minutes above 0.');
+    if (rpErr) errors.push('PROBLEM reminder: “' + st.remProb + '” isn’t valid — enter whole minutes above 0.');
+    // edit dialog
+    var ed = st.edit;
+    var ROLES = ['Owner / on-call', 'Backup', 'Admin (Tao)', 'CEO', 'Site AM'];
+    var eVals = { editOpen: !!ed };
+    if (ed) {
+      var idx = ed.isNew ? steps.length : ed.idx;
+      var pinned = idx === 0;
+      var dN = parseInt(ed.delay, 10);
+      var dErr = '', dHint = '';
+      if (!pinned) {
+        if (!/^\d+$/.test(String(ed.delay).trim())) dErr = 'Enter whole minutes, e.g. 45';
+        else if (dN < 15) dErr = 'At least +15 min — L0 covers the first 15 minutes';
+        else {
+          var prev = steps[idx - 1], next = ed.isNew ? null : steps[idx + 1];
+          if (prev && dN <= prev.delay) dHint = 'Earlier than L' + (idx - 1) + ' (+' + prev.delay + ' min). You can apply it, but Save stays blocked until each step is later than the one before.';
+          else if (next && dN >= next.delay) dHint = 'Later than L' + (idx + 1) + ' (+' + next.delay + ' min). You can apply it, but Save stays blocked until each step is later than the one before.';
+          else dHint = prev ? 'Must be later than L' + (idx - 1) + ' (+' + prev.delay + ' min)' + (next ? ' and earlier than L' + (idx + 1) + ' (+' + next.delay + ' min).' : '.') : '';
+        }
+      }
+      var whoErr = !ed.who.length;
+      var setEd = function (patch) { var ne = copy(ed); for (var kk in patch) ne[kk] = patch[kk]; self.setState({ edit: ne }); };
+      var tmp = { who: ed.who, ch: ed.ch, delay: pinned ? 0 : (dN || 0), tag: ed.tag };
+      var at = k === 't1' ? hm(9, 48 + (pinned ? 0 : (dN || 0))) : '+' + (pinned ? 0 : (dN || 0)) + ' min';
+      eVals = {
+        editOpen: true,
+        editTitle: (ed.isNew ? 'Add L' : 'Edit L') + idx + ' · ' + NAME[k],
+        editDesc: ed.isNew ? 'New steps go at the end of the ladder. Nothing changes until you save the page.' : 'Changes stay on this page until you save — the save step lists everything and asks for a note.',
+        ePinned: pinned,
+        eDelay: pinned ? '0' : ed.delay,
+        setEDelay: function (e) { setEd({ delay: e && e.target ? e.target.value : e }); },
+        eDelayErr: dErr, eDelayHint: pinned ? 'Pinned — fires immediately.' : dHint,
+        eRoles: ROLES.map(function (r) {
+          var on = ed.who.indexOf(r) >= 0;
+          var locked = (pinned && r === 'Owner / on-call') || (ed.fyi && (r === 'CEO' || r === 'Site AM')) || (r === 'CEO' && !on && (k !== 't1' || idx < 2));
+          return { label: r + (r === 'Admin (Tao)' ? ' · only Admin' : ''), on: on, locked: locked, toggle: function () {
+            if (locked) return;
+            var w = ed.who.slice(); if (on) w.splice(w.indexOf(r), 1); else w.push(r);
+            w.sort(function (a, b) { return ROLES.indexOf(a) - ROLES.indexOf(b); });
+            var patch = { who: w };
+            if (r === 'CEO' && !ed.fyi) {
+              if (w.indexOf('CEO') >= 0) patch.tag = 'Proposal · pending CEO';
+              else { patch.tag = ''; patch.ch = ed.ch.filter(function (c) { return c !== 'voice'; }); }
+            }
+            setEd(patch);
+          } };
+        }),
+        eCeoNote: ed.fyi ? 'CEO + Site AM are fixed on this step: it’s the Tier 1 step that still sends an FYI after acknowledge (never a call). It can’t be removed.' : (k !== 't1' ? 'CEO isn’t available here — the CEO is paged only on Tier 1 DOWN, from L2 onward. On this policy the CEO sees incidents in the daily digest.' : (idx < 2 ? 'CEO is available from L2 onward.' : 'Adding CEO tags this step “Proposal · pending CEO” automatically.')),
+        eLockDesc: pinned ? 'Locked on for L0' : '',
+        eVoice: ed.ch.indexOf('voice') >= 0,
+        eVoiceLabel: ed.ch.indexOf('voice') >= 0 ? 'Voice call · Configured · off until approved' : 'Voice call',
+        eVoiceDesc: ed.ch.indexOf('voice') >= 0 ? 'Set up on this step but stays off until the CEO approves the proposal and Twilio is set up (~$23–26 / month).' : (ed.fyi ? 'Never on this step — the FYI goes by Chat @mention + email only.' : 'Only the L2 CEO proposal step carries a voice call, and it stays off until approved.'),
+        eNoCh: !ed.ch.filter(function (c) { return c !== 'voice'; }).length,
+        eWhoHint: whoErr ? (st.eTried ? 'Pick at least one person.' : 'Pick who this step notifies. Tokens resolve per site — see the preview.') : 'Tokens resolve per site. Admin (Tao) is the only active Admin until Second Admin joins.',
+        eWhoColor: whoErr && st.eTried ? 'var(--aura-fg-danger)' : 'var(--aura-fg-secondary)',
+        eChat: ed.ch.indexOf('chat') >= 0, eSpace: ed.ch.indexOf('space') >= 0, eEmail: ed.ch.indexOf('email') >= 0,
+        setEChat: function (v) { if (pinned) return; var c = ed.ch.filter(function (x) { return x !== 'chat'; }); if (v) c.unshift('chat'); setEd({ ch: c }); },
+        setESpace: function (v) { if (pinned) return; var c = ed.ch.filter(function (x) { return x !== 'space'; }); if (v) c.push('space'); setEd({ ch: c }); },
+        setEEmail: function (v) { var c = ed.ch.filter(function (x) { return x !== 'email'; }); if (v) c.push('email'); setEd({ ch: c }); },
+        eIsProp: !!ed.tag,
+        ePrevAt: at,
+        ePrev: 'L' + idx + ' → ' + tgt(tmp) + (nobody(tmp) ? '' : ' (' + cur[0] + ')'),
+        ePrevColor: col(tmp),
+        eApply: ed.isNew ? 'Add L' + idx : 'Apply to L' + idx,
+        closeEdit: function () { self.setState({ edit: null, eTried: false }); },
+        applyEdit: function () {
+          if (dErr || whoErr) { self.setState({ eTried: true }); return; }
+          var ns = copy(steps);
+          var chs = ed.ch.slice(); if (pinned) { if (chs.indexOf('chat') < 0) chs.unshift('chat'); if (chs.indexOf('space') < 0) chs.push('space'); }
+          if (ed.isNew) ns.push({ delay: dN, cond: 'No acknowledgement', who: ed.who.slice(), ch: chs, tag: ed.tag || '', note: '', fyi: false });
+          else { ns[idx].who = ed.who.slice(); ns[idx].ch = chs; ns[idx].tag = ed.fyi ? '' : (ed.tag || ''); if (!pinned) ns[idx].delay = dN; }
+          var p2 = copy(st.p); p2[k] = ns; self.setState({ p: p2, edit: null, eTried: false });
+        }
+      };
+      if (eVals.eDelayErr && !st.eTried && ed.delay === '') eVals.eDelayErr = '';
+    }
+    var propIdx = -1; steps.forEach(function (x, i) { if (x.tag && propIdx < 0) propIdx = i; });
+    var ackCase = '', ackLabel = '';
+    if (k === 't1') {
+      var l3 = steps.filter(function (x) { return x.fyi; })[0];
+      ackLabel = 'If ' + cur[1] + ' acknowledges at 10:07';
+      var fyiIdx = -1; steps.forEach(function (x, i) { if (x.fyi) fyiIdx = i; });
+      var lastStop = (fyiIdx > 0 ? fyiIdx : steps.length) - 1;
+      ackCase = 'Acknowledged by ' + cur[1] + ' → ' + (lastStop <= 1 ? 'L1' : 'L1–L' + lastStop) + ' stopped.' + (l3 ? ' If ' + cur[0] + ' is still down at ' + hm(9, 48 + l3.delay) + ', ' + names({ who: l3.who, ch: [] }) + ' get an FYI (no call).' : '');
+    }
+    var changes = diff.length;
+    var out = {
+      yes: true, no: false, two: 2,
+      policies: ['Tier 1 DOWN', 'Tier 2 DOWN', 'Tier 3 DOWN', 'PROBLEM · all tiers'],
+      pol: st.pol,
+      setPol: function (v) { var kk = KEY[v]; self.setState({ pol: v, site: SITES[kk === 'pr' ? 't1' : kk][0][0] === 'MuvMi' && kk === 'pr' ? 'ENEOS Industrial' : SITES[kk][0][0] }); },
+      timerBasis: k === 't1' ? 'Tier 1 · timers run 24/7 from “Confirmed down”' : (k === 'pr' ? 'Tier 1 runs 24/7 · Tier 2–3 wait for Mon–Fri 09:00–18:00' : 'Tier 2 and 3 share hours: Mon–Fri 09:00–18:00'),
+      steps: view,
+      stepHint: 'L0 is pinned. Every step needs at least one channel. Each later step is at least +15 min and later than the one before; delays stay with the level when you reorder.',
+      addStep: function () { var last = steps[steps.length - 1]; self.setState({ edit: { idx: steps.length, isNew: true, delay: String(last.delay + 30), who: [], ch: ['chat', 'email'], tag: '', fyi: false }, eTried: false }); },
+      hasAckCase: k === 't1', ackCase: ackCase, ackCaseLabel: ackLabel,
+      propTitle: 'L' + propIdx + ' is a proposal, pending the CEO',
+      propBody: 'The CEO page at L' + propIdx + ' waits for the CEO’s OK. Its voice call is configured but off until approved (Twilio, ~$23–26 / month) — until then L' + propIdx + ' sends a Chat @mention and email only. It can’t move above L2.',
+      hasErrors: errors.length > 0, errors: errors, hasWarns: warns.length > 0, warns: warns,
+      remDownErr: rdErr, remProbErr: rpErr,
+      hasPolMsg: !!(polErr(k, steps) || polWarn(k, steps)), polMsg: polErr(k, steps) || polWarn(k, steps),
+      polMsgColor: polErr(k, steps) ? 'var(--aura-fg-danger)' : 'var(--aura-fg-warning)', polMsgIcon: polErr(k, steps) ? 'circle-alert' : 'triangle-alert', errTitle: errors.length === 1 ? 'Fix 1 problem before saving' : 'Fix ' + errors.length + ' problems before saving',
+      track: TRACK[k],
+      siteOpts: list.map(function (x) { return x[0]; }),
+      site: cur[0],
+      setSite: function (e) { self.setState({ site: e && e.target ? e.target.value : e }); },
+      tokens: tokens,
+      previewCase: previewCase,
+      preview: preview,
+      remDown: st.remDown, remProb: st.remProb,
+      setRemDown: function (e) { self.setState({ remDown: e && e.target ? e.target.value : e }); },
+      setRemProb: function (e) { self.setState({ remProb: e && e.target ? e.target.value : e }); },
+      showVoice: k === 't1' && steps.some(function (s) { return s.tag; }),
+      dirty: changes > 0,
+      dirtyLabel: changes + (changes === 1 ? ' unsaved change' : ' unsaved changes'),
+      dirtyHint: touched.length ? 'In ' + touched.map(function (pk) { return NAME[pk]; }).join(', ') : 'Reminder interval',
+      discard: function () { self.setState({ p: copy(st.saved), remDown: st.sRemDown, remProb: st.sRemProb }); },
+      save: function () { self.setState({ saveOpen: true, tried: false }); },
+      saveOpen: st.saveOpen,
+      closeSave: function () { self.setState({ saveOpen: false }); },
+      saveDesc: 'Check each step before it goes live. New incidents use the new policy straight away.',
+      diff: diff,
+      affects: 'Affects ' + sites + ' sites · ' + (open.length === 1 ? '1 open incident (' + open[0] + ') keeps its current timers' : (open.length ? open.length + ' open incidents (' + open.join(', ') + ') keep their current timers' : 'no open incidents')),
+      note: st.note,
+      setNote: function (e) { self.setState({ note: e && e.target ? e.target.value : e }); },
+      noteErr: st.tried && !st.note.trim() ? 'Add a short note — it goes in the audit log with the change' : '',
+      confirmSave: function () { if (errors.length) return; if (!st.note.trim()) { self.setState({ tried: true }); return; } self.setState({ saveOpen: false, saved: copy(st.p), sRemDown: st.remDown, sRemProb: st.remProb, note: '', tried: false }); },
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+    for (var ek in eVals) out[ek] = eVals[ek];
+    return out;
+  }
+}
+</script>
+</body>
+</html>

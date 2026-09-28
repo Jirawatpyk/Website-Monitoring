@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Synthetic check</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1184px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="sites" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="position: relative; flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px 88px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
+<a href="Main.dc.html" style="text-decoration: none">Sites</a>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<a href="SiteDetail.dc.html" style="text-decoration: none">Bangkok Airways – Taiwan</a>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<span>Synthetic checks</span>
+</div>
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 12px">
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Search → booking page</h1>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Phase 3</x-import>
+</div>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">A real browser walks the booking path every 15 min from Bangkok. Catches a broken search that a plain HTTP 200 would miss.</span>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="{{runIcon}}" disabled="{{running}}" on-click="{{runNow}}">{{runLabel}}</x-import>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Test run · never opens an incident</span>
+</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start">
+
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Steps</h2>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Show run" options="{{runs}}" value="{{run}}" on-change="{{pickRun}}" size="sm"></x-import>
+</div>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius); overflow: hidden">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="7">
+<div style="display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--aura-border-default); background: {{s.bg}}; opacity: {{s.op}}">
+<span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; background: {{s.dotBg}}; color: {{s.dotFg}}">{{s.n}}</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; line-height: 1.4">
+<span style="font-weight: 600">{{s.title}}</span>
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{s.detail}}</span>
+<sc-if value="{{s.hasErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--aura-fg-danger)">{{s.err}}</span></sc-if>
+</div>
+<span style="width: 72px; flex-shrink: 0; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--aura-fg-secondary)">{{s.ms}}</span>
+<span style="width: 22px; flex-shrink: 0; display: flex; justify-content: flex-end; padding-top: 2px; color: {{s.iconColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{s.icon}}" size="sm"></x-import></span>
+</div>
+</sc-for>
+<sc-if value="{{noForm}}" hint-placeholder-val="{{true}}">
+<div style="padding: 12px 18px; display: flex; align-items: center; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="plus" disabled="{{addOff}}" on-click="{{openAdd}}">Add step</x-import>
+<sc-if value="{{addOff}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{addWhy}}</span></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{adding}}" hint-placeholder-val="{{false}}">
+<div role="group" aria-label="New step" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; background: var(--aura-bg-canvas)">
+<span style="font-weight: 600">Step {{nextN}}</span>
+<div style="display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 12px">
+<x-import component-from-global-scope="Aura.Select" label="Action" options="{{actions}}" value="{{fAct}}" on-change="{{setAct}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="{{targetLabel}}" placeholder="{{targetPh}}" value="{{fTarget}}" on-change="{{setTarget}}"></x-import>
+</div>
+<x-import component-from-global-scope="Aura.TextField" label="Step name" placeholder="e.g. Open the fare details" value="{{fName}}" on-change="{{setName}}"></x-import>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">Steps can’t submit booking, payment or login forms. The step is tried on the next test run before it goes live.</span>
+<div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">{{addReason}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{cancelAdd}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="plus" disabled="{{addLocked}}" on-click="{{doAdd}}">Add step</x-import>
+</div>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{showShot}}" hint-placeholder-val="{{false}}">
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Screenshot at step 6</h3><span style="font-size: 12px; color: var(--aura-fg-secondary)">Kept 30 days · on the 09:30 run</span></div>
+<div style="height: 140px; border-radius: var(--aura-radius-md); border: 1px dashed var(--aura-border-control); background: var(--aura-bg-canvas); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--aura-fg-secondary); font-size: 13px">
+<x-import component-from-global-scope="Aura.Icon" name="image" size="md"></x-import>
+<span>[Screenshot — results page with spinner still loading]</span>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px">
+
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Last 24 runs</h3>
+<div style="display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--aura-fg-secondary)">
+<span style="display: flex; align-items: center; gap: 5px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--aura-fg-tertiary)"></span>Passed</span>
+<span style="display: flex; align-items: center; gap: 5px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--aura-fg-danger)"></span>Failed</span>
+<span style="display: flex; align-items: center; gap: 5px"><span style="width: 14px; border-top: 2px dashed var(--aura-fg-danger)"></span>Run timeout</span>
+</div>
+</div>
+<div style="display: flex; gap: 8px">
+<div style="width: 30px; flex-shrink: 0; position: relative; height: 140px; font-size: 11px; line-height: 1; color: var(--aura-fg-secondary); text-align: right; font-variant-numeric: tabular-nums">
+<span style="position: absolute; right: 0; top: 0; transform: translateY(-50%)">60 s</span>
+<span style="position: absolute; right: 0; top: 33.33%; transform: translateY(-50%)">40 s</span>
+<span style="position: absolute; right: 0; top: 66.67%; transform: translateY(-50%)">20 s</span>
+<span style="position: absolute; right: 0; bottom: 0; transform: translateY(50%)">0</span>
+</div>
+<div style="flex-grow: 1; min-width: 0; position: relative; height: 140px; border-bottom: 1px solid var(--aura-chart-axis)">
+<span style="position: absolute; left: 0; right: 0; top: 33.33%; border-top: 1px solid var(--aura-chart-grid)"></span>
+<span style="position: absolute; left: 0; right: 0; top: 66.67%; border-top: 1px solid var(--aura-chart-grid)"></span>
+<span style="position: absolute; left: 0; right: 0; top: 0; border-top: 2px dashed var(--aura-fg-danger)"></span>
+<span style="position: absolute; right: 0; top: 4px; font-size: 11px; line-height: 1.2; color: var(--aura-fg-danger)">Run timeout 60 s — the run fails here</span>
+<div style="position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 4px">
+<sc-for list="{{history}}" as="h" hint-placeholder-count="24">
+<span title="{{h.t}}" style="flex: 1 1 0; height: {{h.h}}px; border-radius: 2px 2px 0 0; background: {{h.c}}"></span>
+</sc-for>
+</div>
+</div>
+</div>
+<div style="display: flex; justify-content: space-between; padding-left: 38px; font-size: 11px; color: var(--aura-fg-secondary)"><span>04:15</span><span>Bar height = run duration</span><span>10:00</span></div>
+<div style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Passed</span><span style="font-weight: 500">23 of 24</span></div>
+<div style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Typical run</span><span style="font-weight: 500">9.8 s</span></div>
+<div style="display: flex; justify-content: space-between; padding: 7px 0"><span style="color: var(--aura-fg-secondary)">Failed</span><span style="font-weight: 500">09:30 · step 6 · no incident</span></div>
+</div>
+</div>
+
+<div class="aura-card" style="gap: 14px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Settings</h3><sc-if value="{{savedNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-positive)">Saved · applies from the next run</span></sc-if></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<x-import component-from-global-scope="Aura.Select" label="Every" options="{{every}}" value="{{cfg.every}}" on-change="{{setEvery}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Whole run timeout" value="{{cfg.timeout}}" on-change="{{setTimeout}}" suffix="s" error="{{toErr}}"></x-import>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; line-height: 1.4; font-weight: 500">Worst it can make the site</span>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px"><x-import component-from-global-scope="Aura.Badge" tone="warning" icon="triangle-alert">Problem</x-import><span style="color: var(--aura-fg-secondary)">Fixed, can’t be changed</span></div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">Only the primary monitor can make a site Down. Synthetic checks can only raise a PROBLEM — they never make a site DOWN.</span>
+</div>
+<x-import component-from-global-scope="Aura.Select" label="Fail when" options="{{failWhen}}" value="{{cfg.fail}}" on-change="{{setFail}}"></x-import>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600; color: var(--aura-alert-warning-fg)">Guard rails</span>
+<span>• Stops before any booking, payment or login — no step may submit those forms.</span>
+<span>• Uses the verifier’s browser (max 3 at once). This run takes one for ~10 s every {{everyLabel}}.</span>
+<span>• Client signs off the path before it goes live; it hits their search backend {{runsPerDay}} times a day.</span>
+</div>
+
+</div>
+</div>
+<sc-if value="{{dirty}}" hint-placeholder-val="{{false}}">
+<div role="region" aria-label="Unsaved changes" style="position: absolute; left: 40px; right: 40px; bottom: 20px; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 20px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-strong); border-radius: 9999px; box-shadow: var(--aura-shadow-overlay)">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="sm"></x-import></span>
+<span style="font-weight: 600; white-space: nowrap">{{dirtyLabel}}</span>
+<span style="flex-grow: 1; min-width: 0; font-size: 13px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{dirtyHint}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{discard}}">Discard</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="check" disabled="{{saveOff}}" on-click="{{save}}">Save</x-import>
+</div>
+</sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1184}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var cfg = { every: '15', timeout: '60', fail: 'two' };
+    this.state = { run: '10:00 · passed', running: false, adding: false, fAct: 'expect', fTarget: '', fName: '', extra: [], cfg: cfg, saved: cfg, savedNote: false };
+  }
+  renderVals() {
+    var self = this;
+    var S = this.state;
+    var running = S.running && S.run === '10:07 · running';
+    var failed = S.run === '09:30 · failed';
+    function val(e) { return e && e.target ? e.target.value : e; }
+    var base = [
+      ['Open the home page', 'goto  https://[site URL]/', '1.2 s', '1.4 s'],
+      ['Choose From', 'fill  #origin  →  "Taipei (TPE)"', '0.6 s', '0.6 s'],
+      ['Choose To', 'fill  #destination  →  "Bangkok (BKK)"', '0.5 s', '0.7 s'],
+      ['Pick a date 14 days out', 'click  [data-date="+14d"]', '0.4 s', '0.4 s'],
+      ['Search flights', 'click  button:has-text("Search")', '0.3 s', '0.3 s'],
+      ['Wait for results', 'expect text "Select your flight"  ≤ 15 s', '6.1 s', '15.0 s'],
+      ['At least one fare shown', 'expect  .fare-card  count ≥ 1', '0.7 s', '—']
+    ];
+    base = base.concat(S.extra.map(function (x) { return [x.name, x.detail, 'not run yet', 'not run yet', true]; }));
+    var steps = base.map(function (b, i) {
+      var isFail = failed && i === 5, skipped = (failed && i === 6) || (failed && b[4]);
+      var isNew = !!b[4] && !running;
+      var runDone = running && i < 3, runNow = running && i === 3, runWait = running && i > 3;
+      var icon = isFail ? 'ban' : (skipped || isNew ? 'minus' : (runNow ? 'loader-circle' : (runWait ? 'circle-dot-dashed' : 'circle-check')));
+      return {
+        n: String(i + 1), title: b[0], detail: b[1], ms: running ? (runDone ? b[2] : (runNow ? 'running…' : '')) : (failed ? b[3] : b[2]),
+        hasErr: isFail, err: 'Timed out after 15 s — spinner still showing. Next run passed, so no incident (needs 2 in a row).',
+        icon: icon,
+        iconColor: isFail ? 'var(--aura-fg-danger)' : (skipped || isNew || runWait ? 'var(--aura-fg-tertiary)' : (runNow ? 'var(--aura-fg-secondary)' : 'var(--aura-fg-positive)')),
+        dotBg: isFail ? 'var(--aura-status-blocked-bg)' : 'var(--aura-bg-canvas)',
+        dotFg: isFail ? 'var(--aura-status-blocked-fg)' : 'var(--aura-fg-secondary)',
+        bg: isFail ? 'var(--aura-alert-danger-bg)' : 'var(--aura-bg-surface)',
+        op: skipped || runWait ? 0.5 : 1
+      };
+    });
+    // Run durations in seconds, 04:15 → 10:00 every 15 min. Chart is 140 px = 60 s run timeout.
+    var DUR = [9.4, 10.1, 9.8, 9.2, 10.6, 9.9, 9.5, 11.2, 9.7, 9.8, 10.3, 9.1, 9.6, 10.0, 9.8, 12.4, 9.3, 9.9, 10.2, 9.7, 9.8, 18.4, 10.4, 9.8];
+    var history = DUR.map(function (d, i) {
+      var fail = i === 21;
+      var m = 4 * 60 + 15 + i * 15;
+      var hhmm = (m < 600 ? '0' : '') + Math.floor(m / 60) + ':' + (m % 60 < 10 ? '0' : '') + (m % 60);
+      return { h: Math.round(d / 60 * 140), c: fail ? 'var(--aura-fg-danger)' : 'var(--aura-fg-tertiary)', t: hhmm + (fail ? ' · failed at step 6 · ' : ' · passed · ') + d.toFixed(1) + ' s' };
+    });
+    var ACT = { goto: ['URL', 'https://[site URL]/…', 'goto  '], fill: ['Field (CSS selector)', '#promo-code', 'fill  '], click: ['Button or link', 'button:has-text("Details")', 'click  '], expect: ['Text to find', 'Fare details', 'expect text  '] };
+    var a = ACT[S.fAct] || ACT.expect;
+    var addOk = S.fTarget.trim().length > 0 && S.fName.trim().length > 0;
+    var keys = ['every', 'timeout', 'fail'];
+    var changes = keys.filter(function (k) { return S.cfg[k] !== S.saved[k]; }).length;
+    var to = parseInt(S.cfg.timeout, 10);
+    var toErr = (isNaN(to) || to < 15 || to > 120) ? 'Between 15 and 120 s' : '';
+    function setCfg(k) { return function (e) { var c = Object.assign({}, self.state.cfg); c[k] = String(val(e)); self.setState({ cfg: c, savedNote: false }); }; }
+    return {
+      yes: true,
+      failed: failed,
+      // The failure screenshot makes way for the add-step form (the new step is tried on the next test run anyway).
+      showShot: failed && !S.adding,
+      addOff: S.extra.length > 0,
+      addWhy: running ? 'One new step at a time — it’s being tried in the 10:07 test run now.' : 'One new step at a time — it waits for its first test run (Run now) before you add another.',
+      running: running,
+      runLabel: running ? 'Running…' : 'Run now',
+      runIcon: running ? 'loader-circle' : 'arrow-right',
+      runNow: function () { self.setState({ running: true, run: '10:07 · running' }); },
+      runs: S.running ? ['10:07 · running', '10:00 · passed', '09:30 · failed'] : ['10:00 · passed', '09:30 · failed'],
+      run: S.run,
+      pickRun: function (v) { self.setState({ run: v }); },
+      noForm: !S.adding,
+      adding: S.adding,
+      nextN: String(base.length + 1),
+      openAdd: function () { self.setState({ adding: true }); },
+      cancelAdd: function () { self.setState({ adding: false, fTarget: '', fName: '' }); },
+      actions: [{ value: 'goto', label: 'Go to page' }, { value: 'fill', label: 'Fill a field' }, { value: 'click', label: 'Click' }, { value: 'expect', label: 'Expect text' }],
+      fAct: S.fAct, fTarget: S.fTarget, fName: S.fName,
+      setAct: function (e) { self.setState({ fAct: String(val(e)) }); },
+      setTarget: function (e) { self.setState({ fTarget: val(e) }); },
+      setName: function (e) { self.setState({ fName: val(e) }); },
+      targetLabel: a[0], targetPh: a[1],
+      addLocked: !addOk,
+      addReason: addOk ? '' : 'Name the step and fill in the ' + a[0].toLowerCase(),
+      doAdd: function () { if (!addOk) return; self.setState({ adding: false, fTarget: '', fName: '', extra: S.extra.concat([{ name: S.fName.trim(), detail: a[2] + S.fTarget.trim() }]) }); },
+      cfg: S.cfg,
+      everyLabel: ({ '5': '5 min', '15': '15 min', '60': 'hour' })[S.cfg.every] || (S.cfg.every + ' min'),
+      runsPerDay: String(Math.round(1440 / (parseInt(S.cfg.every, 10) || 15))),
+      setEvery: setCfg('every'), setTimeout: setCfg('timeout'), setFail: setCfg('fail'),
+      toErr: toErr,
+      dirty: changes > 0,
+      dirtyLabel: changes + (changes === 1 ? ' unsaved change' : ' unsaved changes'),
+      dirtyHint: 'Applies from the next scheduled run · logged in the audit log',
+      saveOff: !!toErr,
+      discard: function () { self.setState({ cfg: Object.assign({}, self.state.saved) }); },
+      save: function () { if (!toErr) self.setState({ saved: Object.assign({}, self.state.cfg), savedNote: true }); },
+      savedNote: S.savedNote && changes === 0,
+      steps: steps,
+      history: history,
+      every: [{ value: '5', label: '5 min' }, { value: '15', label: '15 min' }, { value: '60', label: '1 hour' }],
+      failWhen: [{ value: 'one', label: '1 failed run' }, { value: 'two', label: '2 failed runs in a row' }],
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

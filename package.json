@@ -1,0 +1,39 @@
+{
+  "name": "dxt-monitor",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DxT Website Monitoring & Incident Automation platform",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @dxt/web dev",
+    "dev:agent": "pnpm --filter @dxt/vps-agent dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@jirawatpyk/aura-tokens": "^5.10.0",
+    "@next/eslint-plugin-next": "^16.3.6",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.9",
+    "supabase": "^2.118.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.70.1"
+  }
+}

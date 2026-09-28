@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Status model and verification logic</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+</style>
+</helmet>
+<div style="width: 1440px; height: 4680px; box-sizing: border-box; padding: 56px 64px; display: flex; flex-direction: column; gap: 28px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 8px; max-width: 860px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">STATUS ENGINE</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 48px; line-height: 1.1; font-weight: 600; letter-spacing: -0.02em">Status model &amp; verification logic</h1>
+<p style="margin: 0; font-size: 16px; color: var(--aura-fg-secondary)">One rule decides DOWN, everywhere in the product. A monitor that is blocked is not a site that is down.</p>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
+<span style="font-family: var(--font-mono); font-size: 12px">LOCATIONS</span>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">BKK · Thai VPS</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">SIN · sin1</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">TYO · hnd1</x-import>
+</div>
+</div>
+
+<div style="display: flex; gap: 20px; padding: 24px 28px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-card-radius)">
+<span style="display: flex; padding-top: 4px"><x-import component-from-global-scope="Aura.Icon" name="ban" size="md"></x-import></span>
+<div style="display: flex; flex-direction: column; gap: 6px; line-height: 1.6">
+<span style="font-family: var(--font-mono); font-size: 11px; opacity: 0.7">THE DOWN RULE · USE THIS WORDING EVERYWHERE</span>
+<span style="font-size: 17px; font-weight: 500">DOWN when at least 2 of 3 locations get a hard fail (timeout, 5xx, DNS/TLS error, connection refused) on two checks in a row. The second check is an immediate recheck about 30 s after the first failure.</span>
+<span style="font-size: 14px; opacity: 0.85">Hard fails don’t wait for the browser verifier — it only takes a screenshot afterwards as evidence. If locations are blocked (403, 429, bot challenge), the browser verifier decides: page loads and keyword found → OK with a note; page fails → DOWN; verifier unavailable → PROBLEM (unverified). Only the primary monitor can make a site DOWN; every other monitor caps at PROBLEM.</span>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+<sc-for list="{{statuses}}" as="s" hint-placeholder-count="4">
+<div class="aura-card" style="gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import>
+<span style="font-size: 13px; font-weight: 600">{{s.meaning}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.5">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">CONDITION</span>
+<span style="font-size: 13px">{{s.condition}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.5">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ALERT</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{s.alert}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Decision table · one check, per site</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Read left to right. Counts are out of the locations that reported in the window.</span>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="width: 300px">Location outcomes · first check</div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">What happens next</div>
+<div class="aura-table__th" style="width: 200px">Result</div>
+<div class="aura-table__th" style="width: 250px">Alert</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{rules}}" as="r" hint-placeholder-count="12">
+<div class="aura-table__row" style="height: auto; min-height: 56px; align-items: stretch">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="width: 300px; height: auto; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding-top: 10px; padding-bottom: 10px; white-space: normal; line-height: 1.45">
+<span style="display: flex; align-items: center; gap: 8px"><sc-for list="{{r.glyphs}}" as="g" hint-placeholder-count="3"><span style="display: flex; color: {{g.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{g.icon}}" size="sm" label="{{g.label}}"></x-import></span></sc-for></span>
+<span style="font-size: 13px; font-weight: 500">{{r.when}}</span>
+</div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; height: auto; display: flex; align-items: center; padding-top: 10px; padding-bottom: 10px; white-space: normal; line-height: 1.5; font-size: 13px; color: var(--aura-fg-secondary)">{{r.next}}</div>
+<div class="aura-table__td" style="width: 200px; height: auto; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.result}}</x-import></div>
+<div class="aura-table__td" style="width: 250px; height: auto; display: flex; align-items: center; padding-top: 10px; padding-bottom: 10px; white-space: normal; line-height: 1.5; font-size: 13px; color: var(--aura-fg-secondary)">{{r.alert}}</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--aura-fg-secondary); line-height: 1">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">GLYPHS</span>
+<sc-for list="{{legend}}" as="g" hint-placeholder-count="6">
+<span style="display: flex; align-items: center; gap: 6px"><span style="display: flex; color: {{g.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{g.icon}}" size="sm"></x-import></span>{{g.label}}</span>
+</sc-for>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start">
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Timing definitions</h3>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5">
+<sc-for list="{{timing}}" as="t" hint-placeholder-count="7">
+<div style="display: flex; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">{{t.k}}</span><span style="font-weight: 600; text-align: right">{{t.v}}</span></div>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">After recovery a DOWN shows Monitoring for 2 OK rounds, then Needs root cause until all 3 resolve conditions are met.</span>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">PROBLEM triggers</h3>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{triggers}}" as="t" hint-placeholder-count="7">
+<div style="display: flex; gap: 12px; font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column">
+<span style="font-weight: 600">{{t.title}}</span>
+<span style="color: var(--aura-fg-secondary)">{{t.detail}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Mute is an overlay, not a status</h3>
+<div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<x-import component-from-global-scope="Aura.Badge" tone="success" variant="soft" icon="circle-check">OK</x-import>
+<span style="font-size: 13px; font-weight: 500">DxT Games</span>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted · until 18:00</x-import>
+</div>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<li>The real status badge stays; the mute sits next to it.</li>
+<li>Alerts suppressed. Still counted in uptime.</li>
+<li>Max 24 h, then it ends itself.</li>
+<li>Responders can mute their own sites; Admins any site. A reason is required.</li>
+<li>Ended early, edited or cancelled from Overview › Maintenance &amp; mutes (confirm, logged).</li>
+</ul>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="font-weight: 600; color: var(--aura-alert-warning-fg)">Site with an open incident</span><span>Mute stops new alerts only. The open incident keeps its escalation ladder, the L3 FYI and the client-update track. Mute never counts as an acknowledgement — the sheet says: “Mute stops new alerts only — INC-0142 keeps escalating until someone acknowledges.”</span></div>
+</div>
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Maintenance vs mute</h3>
+<span style="font-size: 13px; line-height: 1.55; color: var(--aura-fg-secondary)">Maintenance is a status: alerts suppressed and the window is removed from uptime. It is identified by the calendar icon and the word “Maintenance”; among status badges only Maintenance uses the violet accent. Mute keeps the real status and still counts.</span>
+</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start">
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Uptime formula</h3>
+<div style="padding: 14px 16px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-family: var(--font-mono); font-size: 13px; line-height: 1.8">site uptime = 1 − DOWN minutes ÷ minutes in window<br>all sites = time-weighted across sites</div>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<li>Only DOWN minutes count. PROBLEM counts as up.</li>
+<li>Maintenance is removed from both sides. Mute is counted.</li>
+<li>Monitor faults are stored as no data, not downtime.</li>
+</ul>
+<div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">MuvMi · 30 d at Fri 25 Sep 10:07</span><span style="font-weight: 600; font-variant-numeric: tabular-nums">1 − 101 ÷ 43,200 = 99.77%</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">All 17 sites · 30 d</span><span style="font-weight: 600; font-variant-numeric: tabular-nums">1 − 173 ÷ 734,400 = 99.98%</span></div>
+</div>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">What clients see · status page and client report</h3>
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); overflow: hidden">
+<div style="display: grid; grid-template-columns: 220px 180px minmax(0, 1fr); gap: 12px; padding: 8px 14px; background: var(--aura-bg-canvas); font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)"><span>INTERNAL</span><span>CLIENT SEES</span><span>UPTIME · LISTED</span></div>
+<sc-for list="{{mapping}}" as="m" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 220px 180px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.45">
+<span>{{m.internal}}</span>
+<span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; flex-shrink: 0; border-radius: 9999px; background: {{m.dot}}"></span>{{m.client}}</span>
+<span style="color: var(--aura-fg-secondary)">{{m.effect}}</span>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">“Last checked” on anything a client sees always includes the date.</span>
+</div>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Incident lifecycle · DOWN and PROBLEM</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">One workflow badge per incident, next to the severity badge. Each incident moves forward along its own lifecycle.</span>
+</div>
+<div class="aura-card" style="gap: 14px">
+<sc-for list="{{lanes}}" as="l" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 16px">
+<span style="width: 150px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.4"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{l.eyebrow}}</span><span style="font-size: 13px; font-weight: 600">{{l.title}}</span></span>
+<span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; line-height: 1">
+<sc-for list="{{l.steps}}" as="w" hint-placeholder-count="8"><span style="display: flex; align-items: center; gap: 8px"><sc-if value="{{w.arrow}}" hint-placeholder-val="{{true}}"><span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span></sc-if><x-import component-from-global-scope="Aura.Badge" tone="{{w.tone}}" variant="{{w.variant}}" icon="{{w.icon}}">{{w.label}}</x-import></span></sc-for>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); padding-left: 4px">{{l.end}}</span>
+</span>
+</div>
+</sc-for>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5; padding-top: 10px; border-top: 1px solid var(--aura-border-subtle)">A step that doesn’t happen is skipped (acknowledged before L1 → no “Escalated”; recovered before anyone acked → straight to Monitoring). Closed exists only for DOWN, after the review is signed off.</span>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 16px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="width: 180px">Workflow badge</div>
+<div class="aura-table__th" style="width: 124px">Applies to</div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Shown while</div>
+<div class="aura-table__th" style="width: 150px">Extra text</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{workflow}}" as="w" hint-placeholder-count="8">
+<div class="aura-table__row" style="height: auto; min-height: 48px; align-items: stretch">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="width: 180px; height: auto; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{w.tone}}" variant="{{w.variant}}" icon="{{w.icon}}">{{w.label}}</x-import></div>
+<div class="aura-table__td" style="width: 124px; height: auto; display: flex; align-items: center; white-space: normal; line-height: 1.4; font-size: 12px; color: var(--aura-fg-secondary)">{{w.applies}}</div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; height: auto; display: flex; align-items: center; padding-top: 10px; padding-bottom: 10px; white-space: normal; line-height: 1.5; font-size: 13px">{{w.when}}</div>
+<div class="aura-table__td" style="width: 150px; height: auto; display: flex; align-items: center; padding-top: 10px; padding-bottom: 10px; white-space: normal; line-height: 1.5; font-size: 13px; color: var(--aura-fg-secondary)">{{w.extra}}</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Lifecycle rules · recovery and resolve</h3>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">Resolve is always manual</span> once the 3 conditions are met. A DOWN never auto-resolves.</li>
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">Only exception:</span> a PROBLEM never acknowledged that recovers within 5 min auto-resolves (no root cause) and is hidden: “N short PROBLEMs auto-resolved in &lt; 5 min — never acknowledged — are hidden”.</li>
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">RECOVERED</span> reply + email go out on the first OK round (→ Monitoring); after 2 OK rounds → Needs root cause unless written. Copy: “Needs a root cause before it can be resolved.”</li>
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">Root cause “Unknown — keep investigating”</span> does not meet the gate — “Unknown keeps the incident open”.</li>
+</ul>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Resolve gate · the same 3 conditions everywhere</h3>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Checked on the Incident page, the Resolve dialog and here. Resolve stays disabled and names what is missing until all three are met.</span>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+<sc-for list="{{gate}}" as="g" hint-placeholder-count="3">
+<div style="display: flex; align-items: flex-start; gap: 10px"><span style="display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); font-size: 11px; font-weight: 600">{{g.n}}</span><span><span style="font-weight: 500">{{g.title}}</span> <span style="color: var(--aura-fg-secondary)">· {{g.detail}}</span></span></div>
+</sc-for>
+</div>
+</div>
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Two clocks, never mixed</h3>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Wait / time to ack</span><span style="font-weight: 600; text-align: right">from Confirmed down</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Incident duration</span><span style="font-weight: 600; text-align: right">from the first failed check</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">INC-0142 at 10:07:12</span><span style="font-weight: 600; text-align: right">18 min unacked · down 19 min</span></div>
+</div>
+</div>
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Acknowledge, resolve, undo and L3</h3>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">Acknowledge stops L1 and L2.</span> It does not stop the client-update track.</li>
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">Tier 1 DOWN only:</span> if the site is still DOWN at +60 min, L3 sends an FYI to CEO + Site AM — @mention + email, never a voice call. Tier 2–3 have no L3.</li>
+<li>Ladder after ack: L2 “Cancelled · acked” · L3 “FYI at 10:48 if still down”.</li>
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">Undo:</span> a 10 s toast on every surface. Chat, email and webhook posts for an ack or a resolve are held until the window closes (“Posting to Chat, email and webhooks in N s — nothing is sent until then” · button “Undo · N s”). Arm’s ack at 10:07:40 → posted and incident.acknowledged webhook sent 10:07:50.</li>
+</ul>
+<div style="padding: 10px 12px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">“Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).”</div>
+</div>
+</div>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start">
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Heartbeats · when DxT Monitor itself stops</h3>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="circle-dot-dashed">No data</x-import>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr); gap: 0; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); overflow: hidden; font-size: 13px; line-height: 1.5">
+<span style="padding: 8px 12px; background: var(--aura-bg-canvas); font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">HEARTBEAT</span><span style="padding: 8px 12px; background: var(--aura-bg-canvas); font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ENGINE (STATUS ENGINE, CRON)</span><span style="padding: 8px 12px; background: var(--aura-bg-canvas); font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ONE PROBE (BKK, SIN OR TYO)</span>
+<sc-for list="{{hb}}" as="h" hint-placeholder-count="4"><span style="padding: 8px 12px; border-top: 1px solid var(--aura-border-subtle); color: var(--aura-fg-secondary)">{{h.k}}</span><span style="padding: 8px 12px; border-top: 1px solid var(--aura-border-subtle)">{{h.engine}}</span><span style="padding: 8px 12px; border-top: 1px solid var(--aura-border-subtle)">{{h.probe}}</span></sc-for>
+</div>
+<sc-for list="{{fault}}" as="f" hint-placeholder-count="3">
+<div style="display: flex; gap: 12px; font-size: 13px; line-height: 1.5"><span style="width: 120px; flex-shrink: 0; color: var(--aura-fg-secondary)">{{f.k}}</span><span>{{f.v}}</span></div>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Maintenance guard</h3>
+<x-import component-from-global-scope="Aura.Badge" tone="accent" variant="soft" icon="calendar">Maintenance</x-import>
+</div>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">A window can’t start now, or overlap now, on a site that is DOWN or has an open incident.</span> The form shows a blocking alert and offers Mute instead.</li>
+<li>A window never hides an open incident — it stays open and keeps counting.</li>
+<li>Windows over 24 h need an Admin’s approval; an Admin creating one approves it themselves (“You’re an Admin — no approval needed”). Same rule on mobile.</li>
+<li>If the site is still DOWN when a window ends, an incident opens immediately.</li>
+<li>“Mute instead” opens the mute sheet with the open-incident rule: “Mute stops new alerts only — INC-0142 keeps escalating until someone acknowledges.” A reason is required before Mute, Schedule or Start now.</li>
+</ul>
+<div style="padding: 10px 12px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="font-weight: 600; color: var(--aura-alert-danger-fg)">MuvMi is DOWN now (INC-0142).</span> A window started now won’t hide this incident — it stays open and keeps counting.</div>
+</div>
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Hand check during a fault · Tier 1 sites</h3>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; align-items: flex-start; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span><span><span style="font-weight: 500">Loads OK</span> <span style="color: var(--aura-fg-secondary)">· recorded with name and time; status stays “Last: OK”.</span></span></div>
+<div style="display: flex; align-items: flex-start; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import></span><span><span style="font-weight: 500">Down — open incident</span> <span style="color: var(--aura-fg-secondary)">· opens an incident with Trigger “Manual (hand check)”, posts L0 through the fallback sender and starts the client-update track. Timers don’t run: L1+ and client-update reminders go by hand (“Escalate now”) until the engine is back.</span></span></div>
+</div>
+</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 16px 20px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.6; color: var(--aura-fg-secondary)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE</span>
+<span>Source: PRD §5 (status engine), §6 (escalation), §8 (uptime). Engine is a stateless TypeScript module; state lives in site_status and incidents. Only the monitor with is_primary = true may produce DOWN. The browser verifier is plain Chromium (no stealth plugin), max 3 sessions on the 2 GB VPS, 20 s timeout; Admin is alerted when its queue holds more than 5 jobs. Screenshots kept 30 days. Rules shown above: SPEC §14.1 (L3 FYI after ack), §14.3 (two clocks, undo), §14.5 (maintenance guard), §14.6 (manual incident), §15.1 (mute with an open incident), §15.3 (engine vs probe heartbeats; one-location-fails-most-sites rule), §15.4 (DOWN / PROBLEM lifecycles, 3-condition resolve gate, held posts and webhooks), §16.1–16.4, 16.8, 16.10.</span>
+</div>
+
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":4680}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var P = { icon: 'circle-check', color: 'var(--aura-fg-positive)', label: 'Pass' };
+    var F = { icon: 'ban', color: 'var(--aura-fg-danger)', label: 'Hard fail' };
+    var B = { icon: 'lock', color: 'var(--aura-fg-secondary)', label: 'Blocked' };
+    var N = { icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)', label: 'No data' };
+    var M = { icon: 'circle', color: 'var(--aura-fg-tertiary)', label: 'Paused' };
+    var OK = { result: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check' };
+    var OKN = { result: 'OK + note', tone: 'success', variant: 'soft', icon: 'circle-check' };
+    var DOWN = { result: 'Down', tone: 'danger', variant: 'solid', icon: 'ban' };
+    var PROB = { result: 'Problem', tone: 'warning', variant: 'soft', icon: 'triangle-alert' };
+    var KEEP = { result: 'No change', tone: 'neutral', variant: 'outline', icon: 'minus' };
+    var MAINT = { result: 'Maintenance', tone: 'accent', variant: 'soft', icon: 'calendar' };
+    var W = {
+      un: { label: 'Unacked', tone: 'danger', variant: 'outline', icon: 'clock', applies: 'DOWN · PROBLEM', when: 'Not acknowledged, before L1 fires.', extra: '“Unacked · 12 min”' },
+      esc: { label: 'Escalated · L1', tone: 'warning', variant: 'outline', icon: 'arrow-up-right', applies: 'DOWN · PROBLEM', when: 'L1 (or L2) has fired and nobody has acknowledged. Replaces Unacked — never both.', extra: 'Wait as text: “18 min unacked”' },
+      ack: { label: 'Acknowledged', tone: 'neutral', variant: 'outline', icon: 'check', applies: 'DOWN · PROBLEM', when: 'Someone acked; the site is still failing. Stops L1–L2 (Tier 1 DOWN keeps the L3 FYI).', extra: '“by Arm 10:07”' },
+      mon: { label: 'Monitoring', tone: 'neutral', variant: 'outline', icon: 'eye', applies: 'DOWN', when: 'First OK round after recovery — RECOVERED reply + email sent. Lasts until the 2nd OK round.', extra: '“OK since 10:31”' },
+      nrc: { label: 'Needs root cause', tone: 'warning', variant: 'outline', icon: 'pencil', applies: 'DOWN', when: '2 OK rounds done; root cause not written (or Unknown), or client update still required.', extra: 'Stays in “Needs action”' },
+      res: { label: 'Resolved', tone: 'success', variant: 'outline', icon: 'circle-check', applies: 'DOWN · PROBLEM', when: 'All 3 conditions met and someone pressed Resolve (always manual). A PROBLEM ends here. For DOWN a review draft is created.', extra: 'PROBLEM: final state' },
+      rev: { label: 'In review', tone: 'neutral', variant: 'outline', icon: 'file-text', applies: 'DOWN', when: 'Review draft submitted for sign-off.', extra: '“Waiting for Tao”' },
+      clo: { label: 'Closed', tone: 'neutral', variant: 'soft', icon: 'check', applies: 'DOWN', when: 'Review signed off. Never used for a PROBLEM.', extra: '“Signed off by Tao”' }
+    };
+    function r(glyphs, when, next, res, alert) { return Object.assign({ glyphs: glyphs, when: when, next: next, alert: alert }, res); }
+    return {
+      statuses: [
+        { label: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check', meaning: 'Reachable', condition: 'Majority of locations pass, or blocked and the browser verifier loaded the page (with a note).', alert: 'None. Recovery reply in the thread if it was down.' },
+        { label: 'Problem', tone: 'warning', variant: 'soft', icon: 'triangle-alert', meaning: 'Reachable, with an issue', condition: 'Any PROBLEM trigger below, or blocked and the verifier is unavailable.', alert: 'Owner + Alerts Space. Tier 2–3 outside response hours: held until 09:00.' },
+        { label: 'Down', tone: 'danger', variant: 'solid', icon: 'ban', meaning: 'Confirmed unreachable', condition: 'At least 2 of 3 locations hard fail on two checks in a row (the second is the immediate recheck), or blocked and the page fails in the browser.', alert: 'Posted immediately at any hour. Escalation per tier.' },
+        { label: 'Maintenance', tone: 'accent', variant: 'soft', icon: 'calendar', meaning: 'Planned', condition: 'Inside a window set ahead by the owner. Can’t start on a site that is DOWN or has an open incident. Over 24 h needs Admin approval (Admins approve their own).', alert: 'Suppressed. Results stored, window not counted in uptime.' }
+      ],
+      rules: [
+        r([P, P, P], '3 of 3 pass (or 2 pass, 1 anything else)', 'Majority passes. A single failing location is only noted.', OK, 'None'),
+        r([F, F, P], '2 or 3 hard fail', 'Immediate recheck about 30 s later from all locations. Status stays as it was while it runs (Pending).', KEEP, 'None yet — Pending'),
+        r([F, F, F], 'Recheck: still 2 or 3 hard fail', 'Two checks in a row → DOWN. Incident duration starts at the first failed check. The browser verifier takes a screenshot afterwards, as evidence only.', DOWN, 'Posted immediately · escalation per tier'),
+        r([P, P, F], 'Recheck: majority passes', 'Pending ends after one recheck — no second recheck. Logged as a blip; the next scheduled check decides again.', OK, 'None'),
+        r([F, P, P], '1 hard fail, others pass', 'Majority passes, so OK. If the same location keeps failing for 5 min or more while the others pass → PROBLEM (Regional).', OK, 'None · after ≥ 5 min: Regional PROBLEM to owner + Alerts Space'),
+        r([B, B, P], '2 or 3 blocked (403, 429, bot challenge) — or blocked + hard fail make 2', 'The browser verifier opens the page from Bangkok. Page loads and keyword found → OK with a note.', OKN, 'None · note on the site'),
+        r([B, B, B], 'Blocked · browser: page fails', 'Same verifier run, but the page does not load or the keyword is missing.', DOWN, 'Posted immediately · escalation per tier'),
+        r([B, B, N], 'Blocked · verifier unavailable', 'No proof either way. Shown as PROBLEM (unverified); retried every check.', PROB, 'Owner + Alerts Space · Admin told about the verifier'),
+        r([P, N, N], 'Fewer than 2 locations reported', 'Not enough votes for this round. The last status is kept (shown with “as of” time); missing locations are stored as no data, not downtime. Next round votes again.', KEEP, 'None for the site · heartbeat rules below decide who hears about a stopped probe or engine'),
+        r([F, P, P], 'One location fails > 50% of all sites in a round', 'The location itself is suspect, not the sites. It is treated as no data for that round; the other two decide status.', KEEP, 'None for the sites · repeats count toward the probe heartbeat (email Tao)'),
+        r([N, N, N], 'Monitor fault · hand check: “Down — open incident”', 'A person confirms the site is down while the engine is stopped. Opens an incident with Trigger “Manual (hand check)”.', DOWN, 'L0 via the fallback sender · L1+ and client-update reminders by hand (“Escalate now”)'),
+        r([M, M, M], 'Inside a maintenance window', 'Checks still run and are stored. If still DOWN when the window ends, an incident opens immediately.', MAINT, 'Suppressed')
+      ],
+      legend: [
+        { icon: 'circle-check', color: 'var(--aura-fg-positive)', label: 'Pass' },
+        { icon: 'ban', color: 'var(--aura-fg-danger)', label: 'Hard fail' },
+        { icon: 'lock', color: 'var(--aura-fg-secondary)', label: 'Blocked, verified OK' },
+        { icon: 'clock', color: 'var(--aura-alert-warning-fg)', label: 'Slow' },
+        { icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)', label: 'No data' },
+        { icon: 'circle', color: 'var(--aura-fg-tertiary)', label: 'Paused / maintenance' }
+      ],
+      timing: [
+        { k: 'Second check (“round 2”)', v: 'Immediate recheck ~30 s after the first failure' },
+        { k: 'Pending loop limit', v: '1 recheck, then decide' },
+        { k: 'Typical time to confirm DOWN', v: 'check interval + ~30 s' },
+        { k: 'Detection target', v: 'Tier 1 ≤ 3 min · Tier 2–3 ≤ 10 min' },
+        { k: 'Incident duration starts', v: 'at the first failed check' },
+        { k: 'Regional', v: '1 location failing ≥ 5 min' },
+        { k: 'Back to OK', v: '2 passing checks, majority' },
+        { k: 'Flapping', v: '≥ 3 changes in 30 min → 1 incident' }
+      ],
+      triggers: [
+        { icon: 'clock', title: 'Slow', detail: 'p50 over threshold 3 checks in a row — Tier 1 > 3 s, Tier 2–3 > 5 s.' },
+        { icon: 'file-text', title: 'Keyword', detail: 'Brand keyword missing, or forbidden text found (defacement, spam).' },
+        { icon: 'external-link', title: 'Key page', detail: 'Home is OK but a key page returns 4xx/5xx or is slow.' },
+        { icon: 'monitor', title: 'Regional', detail: 'One location failing ≥ 5 min while the others pass.' },
+        { icon: 'lock', title: 'SSL expiring · Domain', detail: 'SSL expires within 14 days, domain within 30 days.' },
+        { icon: 'arrow-up-right', title: 'Redirect', detail: 'Final host outside the site allowlist (hijack signal).' },
+        { icon: 'circle-dot-dashed', title: 'Blocked, not verified', detail: 'Blocked and the browser verifier is unavailable.' }
+      ],
+      workflow: [
+        W.un, W.esc, W.ack, W.mon, W.nrc, W.res, W.rev, W.clo
+      ],
+      lanes: [
+        { eyebrow: 'DOWN', title: 'Outage lifecycle', end: '', steps: [W.un, W.esc, W.ack, W.mon, W.nrc, W.res, W.rev, W.clo].map(function (w, i) { return Object.assign({}, w, { arrow: i > 0 }); }) },
+        { eyebrow: 'PROBLEM', title: 'Issue lifecycle', end: 'Ends at Resolved — no review, no Closed.', steps: [W.un, W.esc, W.ack, W.res].map(function (w, i) { return Object.assign({}, w, { arrow: i > 0 }); }) }
+      ],
+      gate: [
+        { n: '1', title: 'OK for 2 rounds', detail: 'the site passed two scheduled checks in a row after recovery.' },
+        { n: '2', title: 'Client update marked', detail: 'required only if the client-update track fired — Tier 1 DOWN > 15 min, or Tier 2 DOWN ≥ 60 min inside response hours. Otherwise “Not required” (met). When required, met by “Mark client updated” or “Not needed” + reason.' },
+        { n: '3', title: 'Root cause written', detail: 'saved on the incident with its required fields. “Unknown — keep investigating” doesn’t count — Unknown keeps the incident open.' }
+      ],
+      hb: [
+        { k: 'Grace', engine: 'Missed > 3 min', probe: 'Missing > 3 min' },
+        { k: 'Who is alerted', engine: 'Email Tao + Alerts Space post @mentioning on-call', probe: 'Email Tao only — no page. The other two locations still decide status.' },
+        { k: 'Automatic alerts', engine: 'Paused until the engine is back — escalation and client-update timers don’t run', probe: 'Keep working · single-probe emails are suppressed while an engine fault is open' },
+        { k: 'Example', engine: 'Sat 26 Sep: last round 02:17 → alert 02:20 (email Tao, Chat @Ploy)', probe: 'Fri 25 Sep: SIN gap 03:12–03:16 → one email to Tao at 03:15' }
+      ],
+      fault: [
+        { k: 'Detected by', v: 'Healthchecks.io watches both heartbeats. Tao is the only active Admin — the second Admin hasn’t joined.' },
+        { k: 'Still works', v: 'Healthchecks.io → Chat + email (its own sender). It also carries manual incidents opened by a hand check while automatic alerts are paused.' },
+        { k: 'Data', v: 'Statuses frozen at the last round; the gap is stored as no data, not downtime. Cards say “as of 02:17”.' }
+      ],
+      mapping: [
+        { internal: 'DOWN', client: 'Outage', dot: 'var(--aura-fg-danger)', effect: 'Counted in uptime · listed' },
+        { internal: 'PROBLEM · slow, key page, regional', client: 'Degraded', dot: 'var(--aura-alert-warning-fg)', effect: 'Not counted · listed' },
+        { internal: 'PROBLEM · SSL/domain, keyword, redirect, blocked; OK + note', client: 'Not shown', dot: 'var(--aura-border-default)', effect: 'Internal only · not listed, not coloured' },
+        { internal: 'Maintenance', client: 'Planned maintenance', dot: 'var(--aura-fg-tertiary)', effect: 'Not counted · listed (grey)' },
+        { internal: 'Monitor fault / data > 5 min old', client: 'Live status temporarily unavailable', dot: 'var(--aura-fg-tertiary)', effect: 'Neutral note with “last confirmed Sat 26 Sep 02:17” · no green banner' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

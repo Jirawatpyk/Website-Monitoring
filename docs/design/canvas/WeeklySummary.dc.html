@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Weekly summary — Chat card spec</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.r3-col > *{flex-shrink:0}
+a.aura-btn--secondary:hover{color:var(--aura-fg-primary)}
+</style>
+</helmet>
+<div class="r3-col" style="width: 600px; height: 2397px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SPACE · DxT WEBSITE REPORTS · + EMAIL TO CEO</span>
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Daily digest &amp; weekly summary</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Both post to DxT Website Reports, a separate Space so reports never bury an alert. Same OK / PROBLEM / DOWN shape, so the CEO reads both the same way. No @mentions except named follow-ups.</span>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); margin-top: 4px">DAILY DIGEST · FRI 25 SEP 09:00</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span>Website status Fri 25 Sep 09:00 · 17/17 OK · 1 muted · follow-up: <span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/TAO&gt;</span></span></div>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-size: 16px; font-weight: 600">Website status · Fri 25 Sep 09:00</span>
+<span style="font-size: 14px; font-weight: 500">Now: 17/17 OK · 1 muted (DxT Games)</span>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">OK · checked by browser</x-import><span>Tubtong, Cando Asia — bots blocked, page verified</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted · until 18:00</x-import><span>DxT Games — redeploying build, still counted</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="accent" variant="soft" icon="calendar">Maintenance</x-import><span>WeCare Studio — Planned today 09:30–14:00 · CMS upgrade · not counted</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px; padding-top: 8px; border-top: 1px solid var(--aura-border-subtle)">
+<span style="font-weight: 600">Yesterday · Thu 24 Sep</span>
+<span>ORCA Thailand DOWN 8 min (22:14, outside response hours) — needs a root cause, Tao</span>
+<span>Tubtong PROBLEM 12 min (14:02, blocked, not verified) — resolved</span>
+<span>DxT AI PROBLEM (SSL expiring, since Wed 09:00) — cert renewed, resolved</span>
+<span style="color: var(--aura-fg-secondary)">Monitor ran 100% of rounds. A missing digest means the monitor itself needs checking.</span>
+</div>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); margin-top: 12px">WEEKLY SUMMARY · MON 28 SEP 09:00 · Mon 21 – Sun 27 Sep</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span>Website week 21–27 Sep · 14/17 sites had no downtime · follow-ups: <span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/ARM&gt; &lt;users/TAO&gt; &lt;users/NOK&gt; &lt;users/CEO&gt;</span></span></div>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); overflow: hidden">
+
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--aura-border-default)">
+<span style="font-size: 16px; font-weight: 600">Website week · Mon 21 – Sun 27 Sep</span>
+<span style="font-size: 14px; font-weight: 500">Week: 14/17 sites had no downtime</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Uptime all sites 99.95% · 3 DOWN · 3 PROBLEM · maintenance excluded</span>
+</div>
+
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px; line-height: 1.5">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">NEEDS SOMEONE</span>
+<sc-for list="{{todo}}" as="t" hint-placeholder-count="4">
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span><span style="flex-grow: 1">{{t.text}}</span><span style="font-weight: 600; white-space: nowrap">{{t.who}}</span></div>
+</sc-for>
+</div>
+
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px; line-height: 1.5">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">INCIDENTS · ALL RECOVERED</span>
+<sc-for list="{{incidents}}" as="i" hint-placeholder-count="6">
+<div style="display: flex; align-items: flex-start; gap: 10px">
+<span style="width: 104px; flex-shrink: 0; display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Badge" tone="{{i.tone}}" variant="outline" icon="{{i.icon}}">{{i.sev}}</x-import></span>
+<span style="flex-grow: 1; min-width: 0"><b>{{i.site}}</b> <span style="color: var(--aura-fg-secondary)">· {{i.what}}</span></span>
+<span style="font-variant-numeric: tabular-nums; white-space: nowrap">{{i.dur}}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="padding: 14px 20px; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; border-bottom: 1px solid var(--aura-border-default)">
+<sc-for list="{{numbers}}" as="n" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; line-height: 1.35"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{n.k}}</span><span style="font-size: 18px; font-weight: 600">{{n.v}}</span><span style="font-size: 12px; color: {{n.c}}">{{n.note}}</span></div>
+</sc-for>
+</div>
+
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px; line-height: 1.5">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">PLANNED &amp; QUIET</span>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="accent" icon="calendar">Maintenance</x-import><span>WeCare Studio · Fri 25 Sep 09:30–14:00 · CMS upgrade · not counted</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted</x-import><span>DxT Games · Fri 25 Sep until 18:00 · redeploying build · still counted</span></div>
+</div>
+
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px; line-height: 1.5">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">COMING UP</span>
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="users" size="sm"></x-import></span><span>On call this week (Tier 1 nights and weekends): Nok, Mon 28 Sep → Mon 5 Oct. Next: Arm, 5 → 12 Oct — swap with Nok asked, not accepted yet.</span></div>
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="clock" size="sm"></x-import></span><span>Cando Asia domain in 38 days · SSL in 52 — client renews, AM to remind</span></div>
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="clock" size="sm"></x-import></span><span>WeCare Studio domain in 47 days — Nok renews</span></div>
+</div>
+
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">THE MONITOR ITSELF</span>
+<span>Monitor ran 99.7% of rounds on time · 1 gap Sat 26 Sep 02:17–02:43 (26 min, Vercel Cron) — stored as no data, not downtime.</span>
+<span>1 probe gap Fri 25 Sep 03:12–03:16 (SIN) — BKK and TYO still decided status · one email to Tao at 03:15, no page.</span>
+<div style="display: flex; gap: 10px; color: var(--aura-alert-warning-fg)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span>Only 1 active Admin (Tao). The second Admin is invited but hasn’t joined, so monitor-fault alerts reach one person.</span></div>
+</div>
+
+<div style="padding: 0 20px 16px; display: flex; gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="external-link" href="Incidents.dc.html">Open incidents</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="chart-column" href="Reports.dc.html">Uptime report</x-import>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — rules for both cards (FR-12)</span>
+<span>• Weekly email to the CEO: subject <span style="font-family: var(--font-mono)">DxT Monitor · Weekly summary · 21–27 Sep</span>; the email body is this card (same sections, plain-text part too).</span>
+<span>• Posts to the DxT Website Reports Space, not the alerts Space. The only @mentions are named follow-ups, in the text line as <span style="font-family: var(--font-mono)">&lt;users/{id}&gt;</span> — names inside the card don’t notify. The CEO is mentioned as their own account, never a role alias.</span>
+<span>• “Needs someone” lists DOWN without a root cause, reviews waiting sign-off, pending CEO decisions and unanswered on-call swaps. Empty → the section is left out, not shown as “none”.</span>
+<span>• A DOWN counts once however many times it flapped. Durations are down time, not incident length. Past incidents show severity in outline.</span>
+<span>• The daily digest shows what is true at 09:00: a maintenance window later that day is “Planned today”, not current.</span>
+<span>• If the digest or summary hasn’t posted by 09:05, Healthchecks.io alerts Tao — a missing report means the monitor needs checking.</span>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":2397}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var DOWN = { tone: 'danger', icon: 'ban', sev: 'Was down' };
+    var PROB = { tone: 'warning', icon: 'triangle-alert', sev: 'Was problem' };
+    function inc(s, site, what, dur) { return Object.assign({ site: site, what: what, dur: dur }, s); }
+    return {
+      todo: [
+        { icon: 'pencil', text: 'MuvMi DOWN Fri 25 Sep (43 min) — no root cause yet', who: 'Arm' },
+        { icon: 'file-text', text: 'VOCA review (Mon 21 Sep) — waiting for sign-off', who: 'Tao' },
+        { icon: 'arrow-up-right', text: 'Tier 1 escalation to the CEO at +30 min (email, voice call if Twilio is approved) — proposal waiting for your decision', who: 'CEO' },
+        { icon: 'arrow-up-down', text: 'On-call swap 5–12 Oct — Arm asked, not accepted yet', who: 'Nok' }
+      ],
+      incidents: [
+        inc(DOWN, 'MuvMi', 'Fri 25 Sep 09:48 · Timeout ×2 · 504 ×1 · reached L1, acked by Arm 10:07 · client updated by Bua 10:12', '43 min'),
+        inc(DOWN, 'VOCA', 'Mon 21 Sep 03:12 · Hard fail, flapped ×4 · outside response hours', '41 min'),
+        inc(DOWN, 'ORCA Thailand', 'Thu 24 Sep 22:14 · Hard fail · provider reboot · root cause added', '8 min'),
+        inc(PROB, 'DxT AI', 'Wed 23 Sep 09:00 · SSL expiring · renewed', '1 d 2 h'),
+        inc(PROB, 'Fuji Links', 'Fri 25 Sep 09:52 · Slow, p50 5.8 s · acked by Ploy 09:58', '22 min'),
+        inc(PROB, 'Tubtong', 'Thu 24 Sep 14:02 · Blocked, not verified · verifier restarted', '12 min')
+      ],
+      numbers: [
+        { k: 'MTTA DOWN (response hours)', v: 'Tier 1 19 min · Tier 2 —', note: 'Tier 1 over the 15 min target · Tier 2 — (no DOWN inside response hours)', c: 'var(--aura-alert-warning-fg)' },
+        { k: 'Client first to report', v: '0', note: 'Goal met this week', c: 'var(--aura-fg-positive)' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

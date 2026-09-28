@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Empty, loading & no-access states</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1562px; box-sizing: border-box; padding: 40px; display: flex; flex-direction: column; gap: 24px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">STATE SPEC · APPLIES TO EVERY LIST AND DASHBOARD</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Empty, loading &amp; no-access</h1>
+</div>
+<span style="max-width: 520px; font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5; text-align: right">Rule: never show a blank table or a green dashboard you can’t trust. Every state says what’s true, how old it is, and the one next step.</span>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
+
+<!-- 1 first run -->
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">1 · FIRST RUN — OVERVIEW, NO SITES</span>
+<div style="height: 440px; box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius)">
+<div class="aura-empty is-sm" style="padding-bottom: 8px">
+<span class="aura-empty__icon"><x-import component-from-global-scope="Aura.Icon" name="monitor" size="md"></x-import></span>
+<h3 class="aura-empty__title">Nothing is being monitored yet</h3>
+<p class="aura-empty__text">Three steps and the first check runs within a minute.</p>
+</div>
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{setup}}" as="s" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px">
+<span style="display: flex; color: {{s.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{s.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1">{{s.text}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{s.note}}</span>
+</div>
+</sc-for>
+</div>
+<a href="AddSite.dc.html" style="align-self: center; height: 40px; padding: 0 20px; display: inline-flex; align-items: center; gap: 8px; border-radius: 9999px; background: var(--aura-button-primary-bg); color: var(--aura-button-primary-fg); font-size: 13px; font-weight: 500; text-decoration: none"><x-import component-from-global-scope="Aura.Icon" name="plus" size="sm"></x-import>Add first site</a>
+</div>
+</div>
+
+<!-- 2 no incidents -->
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">2 · INCIDENTS — NOTHING OPEN (AFTER 10:31)</span>
+<div style="height: 440px; box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; justify-content: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius)">
+<div class="aura-empty">
+<span class="aura-empty__icon" style="background: var(--aura-status-ready-bg); color: var(--aura-status-ready-fg)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="md"></x-import></span>
+<h3 class="aura-empty__title">No open incidents</h3>
+<p class="aura-empty__text">Last one: MuvMi, Down 43 min, recovered today 10:31. 6 incidents in the last 7 days.</p>
+</div>
+<a href="Incidents.dc.html" style="margin-top: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); color: inherit; text-decoration: none">
+<span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; color: var(--aura-fg-accent)">2 waiting for root cause or sign-off<x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="pencil">Needs root cause</x-import><span style="font-family: var(--font-mono); color: var(--aura-fg-secondary)">INC-0142</span><span>MuvMi</span></span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="file-text">In review</x-import><span style="font-family: var(--font-mono); color: var(--aura-fg-secondary)">INC-0133</span><span>VOCA · waiting Tao’s sign-off</span></span>
+</a>
+<span style="margin-top: 12px; font-size: 12px; color: var(--aura-fg-tertiary); text-align: center">Say what was last true — “none” alone reads like the monitor is broken. Link to what’s recovered but not finished.</span>
+</div>
+</div>
+
+<!-- 3 filter no results -->
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">3 · FILTER MATCHES NOTHING</span>
+<div style="height: 440px; box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius)">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 32px">
+<sc-if value="{{f.tier}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Tag" on-remove="{{dropTier}}" remove-label="Remove Tier 1 filter">Tier 1</x-import></sc-if>
+<sc-if value="{{f.owner}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Tag" on-remove="{{dropOwner}}" remove-label="Remove owner filter">Owner: Tao</x-import></sc-if>
+<sc-if value="{{f.none}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--aura-fg-secondary)">No filters</span></sc-if>
+<sc-if value="{{f.changed}}" hint-placeholder-val="{{false}}"><span style="margin-left: auto"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="rotate-ccw" on-click="{{resetF}}">Reset example</x-import></span></sc-if>
+</div>
+<sc-if value="{{f.both}}" hint-placeholder-val="{{true}}">
+<div class="aura-empty is-sm is-bordered" style="flex-grow: 1; justify-content: center">
+<span class="aura-empty__icon"><x-import component-from-global-scope="Aura.Icon" name="filter" size="md"></x-import></span>
+<h3 class="aura-empty__title">No Tier 1 sites owned by Tao</h3>
+<p class="aura-empty__text">Tao owns 6 sites, all Tier 2 or 3.</p>
+<div class="aura-empty__action">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" on-click="{{clearF}}">Clear filters</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{dropTier}}">Show Tao’s 6 sites</x-import>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{f.list}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; font-size: 13px">
+<span style="padding-bottom: 6px; font-size: 12px; color: var(--aura-fg-secondary)">{{f.caption}}</span>
+<sc-for list="{{f.rows}}" as="r" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 10px; height: 36px; border-top: 1px solid var(--aura-border-subtle)"><span style="flex-grow: 1; font-weight: 500">{{r.name}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{r.tier}}</span></div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</div>
+
+<!-- 4 loading -->
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">4 · LOADING — SHAPE FIRST, NEVER GREEN</span>
+<div style="height: 440px; box-sizing: border-box; padding: 20px 24px; display: flex; flex-direction: column; gap: 4px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius)">
+<div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px">
+<x-import component-from-global-scope="Aura.Skeleton" variant="text" width="120px"></x-import>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="loader-circle" size="sm"></x-import>Loading 17 sites</span>
+</div>
+<sc-for list="{{skel}}" as="k" hint-placeholder-count="7">
+<div style="display: flex; align-items: center; gap: 14px; height: 44px; border-top: 1px solid var(--aura-border-subtle)">
+<x-import component-from-global-scope="Aura.Skeleton" variant="pill"></x-import>
+<div style="flex-grow: 1"><x-import component-from-global-scope="Aura.Skeleton" variant="text" width="{{k.w}}"></x-import></div>
+<x-import component-from-global-scope="Aura.Skeleton" variant="text" width="56px"></x-import>
+</div>
+</sc-for>
+<span style="margin-top: auto; font-size: 12px; color: var(--aura-fg-tertiary)">Status badges stay grey until real data arrives. After 10 s: “Still loading — last data 10:06” with Retry.</span>
+</div>
+</div>
+
+<!-- 5 no access -->
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">5 · NO ACCESS — VIEWER OPENS AN ACK LINK</span>
+<div style="height: 440px; box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius)">
+<div style="display: flex; align-items: center; gap: 8px">
+<x-import component-from-global-scope="Aura.Badge" tone="danger" variant="solid" icon="ban">Down</x-import>
+<span style="font-weight: 600">MuvMi is down · 19 min</span>
+<span style="margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">INC-0142</span>
+</div>
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="You can see this, not acknowledge it">You’re signed in as Mint (Viewer). Only Responders and Admins can ack, so the owner is still being chased.</x-import>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px">
+<span style="color: var(--aura-fg-secondary)">Who can act now</span>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import><span style="flex-grow: 1">Arm — owner</span><span style="color: var(--aura-fg-danger)">Not acked</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Ploy" size="sm"></x-import><span style="flex-grow: 1">Ploy — backup (L1)</span><span style="color: var(--aura-fg-secondary)">Notified 10:03</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Tao" size="sm"></x-import><span style="flex-grow: 1">Tao — Admin (L1)</span><span style="color: var(--aura-fg-secondary)">Notified 10:03</span></div>
+</div>
+<span style="margin-top: auto; font-size: 12px; color: var(--aura-fg-tertiary)">Never a bare 403. Show the incident read-only and name who can act. Not the same as “2-step required — you can acknowledge only” (anyone without 2-step from Mon 5 Oct): that person CAN ack; everything else stays locked until they turn 2-step on.</span>
+</div>
+</div>
+
+<!-- 6 offline -->
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">6 · YOUR CONNECTION DROPPED</span>
+<div style="height: 440px; box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius)">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.4">
+<span style="display: flex; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span>
+<span style="flex-grow: 1"><b>Offline</b> — showing what you had at 10:06. {{retryText}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="rotate-ccw" disabled="{{retrying}}" on-click="{{retry}}">{{retryLabel}}</x-import>
+</div>
+<sc-for list="{{stale}}" as="s" hint-placeholder-count="5">
+<div style="display: flex; align-items: center; gap: 12px; height: 40px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; opacity: 0.72">
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="clock">{{s.st}}</x-import>
+<span style="flex-grow: 1; font-weight: 500">{{s.name}}</span>
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">10:06</span>
+</div>
+</sc-for>
+<span style="margin-top: auto; font-size: 12px; color: var(--aura-fg-tertiary)">This is the viewer’s network, not the monitor. When the monitor itself stops, see “Overview — monitoring degraded”.</span>
+</div>
+</div>
+
+<!-- 7 client status page states -->
+<div style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">7 · CLIENT STATUS PAGE — STALE DATA, MAINTENANCE, OUTAGE</span>
+<div style="box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 18px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius)">
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
+<sc-for list="{{client}}" as="c" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: {{c.bg}}; border: 1px solid {{c.border}}; border-radius: var(--aura-radius-lg)">
+<span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 9999px; background: {{c.iconBg}}; color: {{c.iconFg}}; display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm"></x-import></span>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.4">
+<span style="font-size: 15px; font-weight: 600">{{c.title}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.sub}}</span>
+<sc-if value="{{c.hasUpd}}" hint-placeholder-val="{{false}}"><span style="margin-top: 6px; padding: 8px 10px; background: var(--aura-bg-surface); border: 1px solid {{c.border}}; border-radius: var(--aura-radius-sm); font-size: 12px; line-height: 1.45"><b>Update 03:47</b> — The Taiwan website is not loading for visitors. Next update by 04:15.</span></sc-if>
+</div>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px">
+<span style="font-weight: 600">Bangkok Airways – Taiwan</span>
+<x-import component-from-global-scope="Aura.Badge" tone="{{c.tone}}" variant="{{c.variant}}" icon="{{c.bIcon}}">{{c.badge}}</x-import>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-tertiary); line-height: 1.5">{{c.rule}}</span>
+</div>
+</sc-for>
+</div>
+<div style="padding: 10px 14px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="font-family: var(--font-mono)">SPEC NOTE · SPEC §12</span> — Client-facing mapping: DOWN → Outage (red, counted) · slow / key page / regional PROBLEM → Degraded (amber, not counted) · SSL, domain, keyword, redirect, blocked-not-verified → internal only (not listed, not coloured) · maintenance → Planned maintenance (grey, not counted) · monitor fault or no fresh results for more than 5 min → neutral “Live status temporarily unavailable”, never a green banner. “Last checked” always includes the date. Full board: Client status page (state switch).</div>
+</div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1562}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tier: true, owner: true, retrying: false };
+  }
+  renderVals() {
+    var self = this;
+    var S = this.state;
+    var TAO = [['ORCA Thailand', 'Tier 2'], ['EQHO', 'Tier 2'], ['DxT', 'Tier 2'], ['DxT Solutions', 'Tier 3'], ['DxT AI', 'Tier 3'], ['DxT Games', 'Tier 3']];
+    var T1 = [['Bangkok Airways – Taiwan', 'Tier 1'], ['Bangkok Airways – China', 'Tier 1'], ['ENEOS Industrial', 'Tier 1'], ['MuvMi', 'Tier 1'], ['realme.link', 'Tier 1']];
+    var ALL6 = [['MuvMi', 'Tier 1'], ['Fuji Links', 'Tier 2'], ['Bangkok Airways – Taiwan', 'Tier 1'], ['Bangkok Airways – China', 'Tier 1'], ['ENEOS Industrial', 'Tier 1'], ['realme.link', 'Tier 1']];
+    var both = S.tier && S.owner;
+    var rows = S.owner ? TAO : (S.tier ? T1 : ALL6);
+    var caption = S.owner ? 'Tao owns 6 sites' : (S.tier ? '5 Tier 1 sites' : 'All 17 sites · first 6 shown');
+    return {
+      f: { tier: S.tier, owner: S.owner, none: !S.tier && !S.owner, both: both, list: !both, changed: !both, caption: caption,
+        rows: rows.map(function (r) { return { name: r[0], tier: r[1] }; }) },
+      dropTier: function () { self.setState({ tier: false }); },
+      dropOwner: function () { self.setState({ owner: false }); },
+      clearF: function () { self.setState({ tier: false, owner: false }); },
+      resetF: function () { self.setState({ tier: true, owner: true }); },
+      retrying: S.retrying,
+      retry: function () { self.setState({ retrying: true }); },
+      retryLabel: S.retrying ? 'Retrying…' : 'Retry',
+      retryText: S.retrying ? 'Retrying now…' : 'Retrying every 10 s.',
+      noop: function () {},
+      setup: [
+        { icon: 'circle-check', color: 'var(--aura-fg-positive)', text: 'Connect the Google Chat Space', note: 'Done · test card sent' },
+        { icon: 'circle-dot-dashed', color: 'var(--aura-fg-secondary)', text: 'Add sites and pick a tier', note: '0 of 17' },
+        { icon: 'circle', color: 'var(--aura-fg-tertiary)', text: 'Give every site an owner and backup', note: 'Needed before alerts' }
+      ],
+      client: [
+        { bg: 'var(--aura-status-neutral-bg)', border: 'var(--aura-border-default)', icon: 'circle-dot-dashed', iconBg: 'var(--aura-bg-surface)', iconFg: 'var(--aura-fg-secondary)',
+          title: 'Live status temporarily unavailable', sub: 'Last confirmed Sat 26 Sep 02:17 (UTC+7). This page shows the last confirmed status until checks resume.', hasUpd: false,
+          tone: 'neutral', variant: 'outline', bIcon: 'circle-dot-dashed', badge: 'No live data',
+          rule: 'Stale data: no green banner, no green badges. Today’s bar is hatched “No data”; uptime stays at the last confirmed value.' },
+        { bg: 'var(--aura-status-neutral-bg)', border: 'var(--aura-border-default)', icon: 'calendar', iconBg: 'var(--aura-bg-surface)', iconFg: 'var(--aura-fg-secondary)',
+          title: 'Planned maintenance in progress', sub: 'Sat 26 Sep 22:00 – Sun 27 Sep 02:00 (UTC+7). Last checked Sat 26 Sep 22:40 (UTC+7).', hasUpd: false,
+          tone: 'neutral', variant: 'soft', bIcon: 'calendar', badge: 'Planned maintenance',
+          rule: 'Grey, not counted in uptime. The day keeps its real colour with a dark cap on top — the same mark on the status page and the PDF report; listed afterwards as “Completed”.' },
+        { bg: 'var(--aura-alert-danger-bg)', border: 'var(--aura-alert-danger-border)', icon: 'ban', iconBg: 'var(--aura-status-blocked-bg)', iconFg: 'var(--aura-status-blocked-fg)',
+          title: 'Outage · Bangkok Airways – Taiwan', sub: 'Started Wed 2 Sep 03:40 · 7 min so far · Last checked Wed 2 Sep 03:47 (UTC+7)', hasUpd: true,
+          tone: 'danger', variant: 'solid', bIcon: 'ban', badge: 'Outage',
+          rule: 'Only a confirmed DOWN shows as Outage. The update text is the client update the AM approved; each update states the next update time.' }
+      ],
+      skel: [{ w: '70%' }, { w: '55%' }, { w: '80%' }, { w: '60%' }, { w: '75%' }, { w: '50%' }, { w: '65%' }],
+      stale: [
+        { st: 'Last: Down', name: 'MuvMi' },
+        { st: 'Last: Problem', name: 'Fuji Links' },
+        { st: 'Last: Maintenance', name: 'WeCare Studio' },
+        { st: 'Last: OK', name: 'Bangkok Airways – Taiwan' },
+        { st: 'Last: OK', name: 'Bangkok Airways – China' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Audit log</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1913px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="audit" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">REPORTS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Audit log</h1>
+<span style="font-size: 14px; color: var(--aura-fg-secondary)">Who did what, when, with the value before and after. Nobody can edit or delete an entry, Admin included.</span>
+</div>
+<div style="display: flex; align-items: center; gap: 12px"><sc-if value="{{exported}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-positive)">{{exportNote}}</span></sc-if><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="download" on-click="{{doExport}}">{{exportLabel}}</x-import></div>
+</div>
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px">
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Category" options="{{cats}}" value="{{cat}}" on-change="{{setCat}}" size="sm"></x-import>
+<div style="display: flex; align-items: flex-end; gap: 12px">
+<div style="width: 150px; display: flex; flex-direction: column"><x-import component-from-global-scope="Aura.Select" label="Actor" icon="user" options="{{actors}}" value="{{actor}}" on-change="{{setActor}}"></x-import></div>
+<div style="width: 170px; display: flex; flex-direction: column"><x-import component-from-global-scope="Aura.Select" label="When" icon="calendar" options="{{ranges}}" value="{{range}}" on-change="{{setRange}}"></x-import></div>
+</div>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: -12px; font-size: 13px; color: var(--aura-fg-secondary)">
+<span>{{countLabel}}</span>
+<sc-if value="{{filtered}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="x" on-click="{{clear}}">Clear filters</x-import></sc-if>
+</div>
+
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="width: 104px">Time</div>
+<div class="aura-table__th" style="width: 120px">Actor</div>
+<div class="aura-table__th" style="width: 200px">Action</div>
+<div class="aura-table__th" style="width: 176px">Entity</div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Before → After</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="14">
+<div class="aura-table__row" style="height: 56px">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="width: 104px; display: flex; align-items: center; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">{{r.at}}</div>
+<div class="aura-table__td" style="width: 120px; display: flex; align-items: center; gap: 8px; line-height: 1"><x-import component-from-global-scope="Aura.Avatar" name="{{r.actor}}" size="sm"></x-import><span>{{r.actor}}</span></div>
+<div class="aura-table__td" style="width: 200px; display: flex; flex-direction: column; justify-content: center; line-height: 1.3"><span style="font-weight: 500">{{r.words}}</span><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{r.action}}</span></div>
+<div class="aura-table__td" style="width: 176px; line-height: 1.3; display: flex; align-items: center">{{r.entity}}</div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; line-height: 1.2">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); text-decoration: {{r.strike}}">{{r.before}}</span>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span>
+<span style="font-family: var(--font-mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.after}}</span>
+</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}"><div style="padding: 24px; text-align: center; font-size: 13px; color: var(--aura-fg-secondary)">No entries match these filters.</div></sc-if>
+</div>
+<div style="display: flex; gap: 12px; align-items: flex-start; font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">
+<span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import></span>
+<span>Entries are kept forever and can’t be edited or deleted. “System” rows are written by the status engine and the notifier.</span>
+</div>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1913}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cat: 'All', actor: 'Everyone', range: 'Last 7 days', exported: false };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var data = [
+      ['10:03:41', 'System', 'incident.escalate', 'INC-0142 · MuvMi', 'L0 · Arm', 'L1 · Ploy + Tao', 'Incidents', 0],
+      ['10:03:12', 'System', 'incident.client_update_due', 'INC-0142 · MuvMi', '—', 'Bua @mentioned · draft client message', 'Incidents', 0],
+      ['09:58:02', 'Ploy', 'incident.ack', 'INC-0141 · Fuji Links', 'Unacked', 'Acknowledged', 'Incidents', 0],
+      ['09:52:29', 'System', 'incident.open', 'INC-0141 · Fuji Links', '—', 'PROBLEM · Slow (p50 5.8 s)', 'Incidents', 0],
+      ['09:48:41', 'System', 'incident.open', 'INC-0142 · MuvMi', '—', 'DOWN · Hard fail', 'Incidents', 0],
+      ['09:31:10', 'Tao', 'site.mute', 'DxT Games', 'not muted', 'until 18:00 · "redeploying build"', 'Maintenance & mute', 0],
+      ['09:30:00', 'System', 'maintenance.start', 'WeCare Studio', 'scheduled', 'active until 14:00', 'Maintenance & mute', 0],
+      ['03:16:08', 'System', 'monitor.heartbeat_ok', 'probe-sin · Singapore', 'missed', 'pinging again · gap 4 min', 'Monitor', 0],
+      ['03:15:04', 'System', 'monitor.heartbeat_missed', 'probe-sin · Singapore', 'last ping 03:12', 'missed > 3 min · email to Tao, no page', 'Monitor', 0],
+      ['Thu 22:22', 'System', 'incident.recover', 'INC-0139 · ORCA Thailand', 'DOWN · 8 min', 'Recovered · needs root cause', 'Incidents', 1],
+      ['Thu 22:14', 'System', 'incident.open', 'INC-0139 · ORCA Thailand', '—', 'DOWN · Hard fail · outside hours, timers paused', 'Incidents', 1],
+      ['Thu 18:22', 'Tao', 'monitor.update', 'Fuji Links · /', 'slow threshold 3 s', '5 s (Tier 2 default)', 'Config', 1],
+      ['Thu 16:40', 'System', 'signin.blocked', 'Personal Gmail account', '—', 'blocked · not a DxT account', 'Access', 1],
+      ['Thu 16:05', 'Nok', 'maintenance.create', 'WeCare Studio', '—', '25 Sep 09:30–14:00 · CMS upgrade', 'Maintenance & mute', 1],
+      ['Thu 14:14', 'System', 'incident.recover', 'INC-0138 · Tubtong', 'PROBLEM · 12 min', 'Recovered · verifier restarted', 'Incidents', 1],
+      ['Thu 14:02', 'System', 'incident.open', 'INC-0138 · Tubtong', '—', 'PROBLEM · Blocked, not verified', 'Incidents', 1],
+      ['Thu 11:40', 'Tao', 'escalation.update', 'DOWN · Tier 1 · L1', 'after 10 min', '15 min · "match client-update timer"', 'Config', 1],
+      ['Thu 11:00', 'System', 'incident.recover', 'INC-0136 · DxT AI', 'PROBLEM · 1 d 2 h', 'Recovered · cert renewed', 'Incidents', 1],
+      ['Thu 09:20', 'Tao', 'security.2sv_required', 'Everyone', 'Admins only', 'Everyone from Mon 5 Oct · Nok, Thee, Mint emailed', 'Access', 1],
+      ['Thu 09:12', 'Tao', 'user.invite', 'Second Admin', '—', 'invited as Admin · 2-step required', 'Access', 1],
+      ['Wed 18:30', 'Tao', 'session.revoke', 'Nok · old laptop', 'signed in', 'signed out', 'Access', 2],
+      ['Wed 09:15', 'Tao', 'site.update', 'Tubtong', 'backup Tao', 'backup Nok', 'Config', 2],
+      ['Wed 09:00', 'System', 'incident.open', 'INC-0136 · DxT AI', '—', 'PROBLEM · SSL expiring (< 14 days)', 'Incidents', 2],
+      ['Tue 10:12', 'Arm', 'oncall.swap.request', 'Week of 5 Oct', 'Arm', 'Nok (waiting for Nok)', 'On-call', 3],
+      ['Mon 08:04', 'Ploy', 'incident.ack', 'INC-0133 · VOCA', 'Unacked · timers paused', 'Acknowledged (before hours)', 'Incidents', 4],
+      ['Mon 04:04', 'System', 'incident.recover', 'INC-0133 · VOCA', 'DOWN · flapped ×4', 'Recovered · 41 min down', 'Incidents', 4],
+      ['Mon 03:12', 'System', 'incident.open', 'INC-0133 · VOCA', '—', 'DOWN · Hard fail · outside hours, timers paused', 'Incidents', 4]
+    ];
+    var WORDS = {
+      'incident.client_update_due': 'Client update due', 'incident.escalate': 'Escalated', 'incident.ack': 'Acknowledged', 'incident.open': 'Incident opened',
+      'incident.recover': 'Recovered', 'site.mute': 'Muted site', 'maintenance.start': 'Maintenance started', 'monitor.update': 'Changed monitor',
+      'signin.blocked': 'Sign-in blocked', 'maintenance.create': 'Scheduled maintenance', 'escalation.update': 'Changed escalation',
+      'security.2sv_required': 'Required 2-step', 'user.invite': 'Invited user', 'session.revoke': 'Signed out devices', 'site.update': 'Changed site',
+      'oncall.swap.request': 'Requested swap', 'monitor.heartbeat_missed': 'Heartbeat missed', 'monitor.heartbeat_ok': 'Heartbeat back'
+    };
+    var cat = st.cat, actor = st.actor, range = st.range;
+    var rows = data.filter(function (d) {
+      return (cat === 'All' || d[6] === cat) && (actor === 'Everyone' || d[1] === actor) && (range === 'Last 7 days' || d[7] === 0);
+    }).map(function (d) {
+      return { at: d[0], actor: d[1], action: d[2], words: WORDS[d[2]] || d[2], entity: d[3], before: d[4], after: d[5], strike: d[4] === '—' ? 'none' : 'line-through' };
+    });
+    var filtered = cat !== 'All' || actor !== 'Everyone' || range !== 'Last 7 days';
+    var span = range === 'Today' ? 'today' : 'Fri 18 Sep → Fri 25 Sep 10:07';
+    return {
+      cat: cat,
+      cats: ['All', 'Incidents', 'Monitor', 'Config', 'Maintenance & mute', 'On-call', 'Access'],
+      setCat: function (v) { self.setState({ cat: v, exported: false }); },
+      actors: ['Everyone', 'System', 'Tao', 'Arm', 'Ploy', 'Nok'],
+      actor: actor, setActor: function (e) { self.setState({ actor: e && e.target ? e.target.value : e, exported: false }); },
+      ranges: ['Last 7 days', 'Today'],
+      range: range, setRange: function (e) { self.setState({ range: e && e.target ? e.target.value : e, exported: false }); },
+      filtered: filtered,
+      clear: function () { self.setState({ cat: 'All', actor: 'Everyone', range: 'Last 7 days', exported: false }); },
+      rows: rows, empty: rows.length === 0,
+      countLabel: (rows.length === 1 ? '1 entry' : rows.length + ' entries') + ' · ' + span + (filtered ? ' · filtered from ' + data.length : ''),
+      exported: !!st.exported,
+      exportNote: 'audit-log.csv · ' + rows.length + ' rows downloaded',
+      exportLabel: filtered ? 'Export ' + rows.length + ' rows' : 'Export CSV',
+      doExport: function () { self.setState({ exported: true }); },
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

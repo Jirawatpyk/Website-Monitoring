@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Settings, API & webhooks</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1300px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="settings" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px; position: relative">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; min-height: 48px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SETTINGS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Settings</h1>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Docs publish with Phase 3</span><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="external-link" disabled="{{yes}}">API docs</x-import></div>
+</div>
+
+<x-import component-from-global-scope="Aura.Tabs" label="Settings sections" tabs="{{tabs}}" value="api"></x-import>
+
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--aura-fg-secondary)">
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Phase 3</x-import>
+<span>The read-only API and outgoing webhooks come after the v1 launch. What’s here is for early testing with our own tools.</span>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">API keys</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Read-only: sites, status, incidents, uptime. 60 requests / min per key. Keys expire after 6 months.</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="plus" on-click="{{create}}">Create key</x-import>
+</div>
+<sc-if value="{{created}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 18px; background: var(--aura-alert-success-bg); border: 1px solid var(--aura-alert-success-border); border-radius: var(--aura-radius-lg)">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px; line-height: 1.4">
+<span style="font-weight: 600; color: var(--aura-alert-success-fg)">“{{newName}}” created — copy the key now, it won’t be shown again</span>
+<span style="font-family: var(--font-mono); font-size: 13px">dxtm_live_[shown once, 40 characters]</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="{{copyIcon}}" on-click="{{copy}}">{{copyLabel}}</x-import>
+</div>
+</sc-if>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Name</div>
+<div class="aura-table__th" style="width: 180px">Key</div>
+<div class="aura-table__th" style="width: 130px">Scope</div>
+<div class="aura-table__th" style="width: 90px">Created by</div>
+<div class="aura-table__th" style="width: 130px">Last used</div>
+<div class="aura-table__th" style="width: 120px">Expires</div>
+<div class="aura-table__th" style="width: 100px"></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{keys}}" as="k" hint-placeholder-count="3">
+<div class="aura-table__row">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; line-height: 1"><span style="font-weight: 500">{{k.name}}</span><sc-if value="{{k.isNew}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">New</x-import></sc-if><sc-if value="{{k.stale}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" icon="clock">Unused 30+ days</x-import></sc-if></div>
+<div class="aura-table__td" style="width: 180px; font-family: var(--font-mono); font-size: 12px">{{k.key}}</div>
+<div class="aura-table__td" style="width: 130px; color: var(--aura-fg-secondary)">{{k.scope}}</div>
+<div class="aura-table__td" style="width: 90px">{{k.by}}</div>
+<div class="aura-table__td" style="width: 130px; color: var(--aura-fg-secondary)">{{k.last}}</div>
+<div class="aura-table__td" style="width: 120px; color: var(--aura-fg-secondary)">{{k.exp}}</div>
+<div class="aura-table__td" style="width: 100px; display: flex; align-items: center; justify-content: flex-end; line-height: 1"><x-import component-from-global-scope="Aura.Button" variant="danger-secondary" size="sm" on-click="{{k.revoke}}">Revoke</x-import></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Outgoing webhooks</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">HMAC-SHA256 signed. Retries 30 s → 2 min → 8 min, paused after 5 failures. New endpoints open with Phase 3.</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="plus" disabled="{{yes}}">Add endpoint</x-import>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<sc-for list="{{hooks}}" as="h" hint-placeholder-count="2">
+<div class="aura-card" style="gap: 12px; position: relative">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; line-height: 1.4; min-width: 0">
+<span style="font-size: 16px; font-weight: 600">{{h.name}}</span>
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">{{h.url}}</span>
+</div>
+<div style="display: flex; align-items: center; gap: 4px">
+<x-import component-from-global-scope="Aura.Badge" tone="{{h.tone}}" icon="{{h.icon}}">{{h.status}}</x-import>
+<x-import component-from-global-scope="Aura.IconButton" icon="ellipsis" label="{{h.menuLabel}}" on-click="{{h.toggle}}"></x-import>
+</div>
+</div>
+<sc-if value="{{h.menuOpen}}" hint-placeholder-val="{{false}}">
+<div class="aura-menu" role="menu" aria-label="{{h.menuLabel}}" style="position: absolute; top: 64px; right: 16px; z-index: 20; min-width: 200px; line-height: 1.4">
+<button type="button" role="menuitem" class="aura-menu__item" disabled="{{yes}}"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="sm"></x-import><span class="aura-menu__label">Edit endpoint</span></button>
+<span style="display: block; padding: 0 8px 6px 32px; font-size: 12px; color: var(--aura-fg-secondary); white-space: normal; max-width: 200px">Editing opens with Phase 3.</span>
+<button type="button" role="menuitem" class="aura-menu__item" onClick="{{h.rotate}}"><x-import component-from-global-scope="Aura.Icon" name="rotate-ccw" size="sm"></x-import><span class="aura-menu__label">Rotate secret…</span></button>
+<div role="separator" class="aura-menu__sep"></div>
+<button type="button" role="menuitem" class="aura-menu__item aura-menu__item--danger" onClick="{{h.del}}"><x-import component-from-global-scope="Aura.Icon" name="trash-2" size="sm"></x-import><span class="aura-menu__label">Delete endpoint…</span></button>
+</div>
+</sc-if>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{h.events}}" as="e" hint-placeholder-count="3"><x-import component-from-global-scope="Aura.Tag">{{e}}</x-import></sc-for>
+</div>
+<div style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Last delivery</span><span style="font-weight: 500; color: {{h.lastColor}}">{{h.last}}</span></div>
+<div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">Signing secret</span><span style="font-family: var(--font-mono); font-size: 12px">whsec_••••{{h.tail}}</span></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="arrow-right" on-click="{{h.test}}">Send test event</x-import>
+<sc-if value="{{h.paused}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="rotate-ccw" on-click="{{h.replay}}">Resume + replay 5</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="arrow-right" on-click="{{h.skip}}">Resume from now</x-import>
+</sc-if>
+</div>
+<sc-if value="{{h.hasTest}}" hint-placeholder-val="{{false}}"><span style="display: flex; gap: 6px; font-size: 12px; line-height: 1.5; color: {{h.testColor}}"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="{{h.testIcon}}" size="sm"></x-import></span>{{h.testText}}</span></sc-if>
+<sc-if value="{{h.paused}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5; margin-top: -4px">Replay re-sends the 5 failed report.sent events in order. From now skips them.</span></sc-if>
+</div>
+</sc-for>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 16px; align-items: start">
+<div class="aura-card" style="gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Recent deliveries</h3><span style="font-size: 12px; color: var(--aura-fg-secondary)">Kept 30 days</span></div>
+<sc-for list="{{log}}" as="l" hint-placeholder-count="5">
+<div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--aura-border-subtle); font-size: 13px">
+<span style="width: 80px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap">{{l.at}}</span>
+<span style="width: 200px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; white-space: nowrap">{{l.ev}}</span>
+<span style="flex-grow: 1; min-width: 0; color: var(--aura-fg-secondary); line-height: 1.4">{{l.to}}</span>
+<span style="width: 60px; flex-shrink: 0; text-align: right; font-variant-numeric: tabular-nums">{{l.ms}}</span>
+<span style="width: 72px; flex-shrink: 0; display: flex; justify-content: flex-end"><x-import component-from-global-scope="Aura.Badge" tone="{{l.tone}}" icon="{{l.icon}}">{{l.code}}</x-import></span>
+</div>
+</sc-for>
+</div>
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Payload · incident.opened</h3>
+<pre style="margin: 0; padding: 14px 16px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-family: var(--font-mono); font-size: 12px; line-height: 1.6; white-space: pre; overflow: hidden">{{payload}}</pre>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Header <span style="font-family: var(--font-mono)">X-DxT-Signature</span> = HMAC of the raw body. Times are ISO 8601 in UTC; the UI shows UTC+7.</span>
+</div>
+</div>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{revOpen}}" on-close="{{closeRev}}" title="{{revTitle}}" description="Apps using this key get “401 Unauthorized” straight away. This can’t be undone — you’d create a new key instead." size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; padding: 4px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<sc-for list="{{revFacts}}" as="f" hint-placeholder-count="4">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: {{f.border}}"><span style="color: var(--aura-fg-secondary)">{{f.k}}</span><span style="font-weight: 500; font-family: {{f.font}}">{{f.v}}</span></div>
+</sc-for>
+</div>
+<x-import component-from-global-scope="Aura.TextField" label="{{revLabel}}" placeholder="{{revName}}" value="{{typed}}" on-change="{{setTyped}}" hint="Type the key name exactly to confirm."></x-import>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Takes effect now · logged</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeRev}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="danger" icon="trash-2" disabled="{{revLocked}}" on-click="{{doRevoke}}">Revoke key</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{keyOpen}}" on-close="{{closeKey}}" title="Create an API key" description="Read-only. The key is shown once after you create it — store it in the tool that uses it." size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<x-import component-from-global-scope="Aura.TextField" label="Name" required="{{yes}}" placeholder="e.g. Status board in the meeting room" value="{{kName}}" on-change="{{setKName}}" error="{{kNameErr}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Scope" options="{{scopeOpts}}" value="{{kScope}}" on-change="{{setKScope}}" hint="{{scopeHint}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Expires" options="{{expOpts}}" value="{{kExp}}" on-change="{{setKExp}}" hint="Keys expire after 6 months at most. We email Tao 14 days before."></x-import>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Logged in the audit log</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeKey}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="plus" on-click="{{makeKey}}">Create key</x-import>
+</div>
+</div>
+</x-import>
+<x-import component-from-global-scope="Aura.Dialog" open="{{hkOpen}}" on-close="{{closeHk}}" title="{{hkTitle}}" description="{{hkDesc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{hkRows}}" as="r" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 76px 150px minmax(0, 1fr); gap: 10px; padding: 8px 14px; border-top: {{r.border}}; font-size: 13px; line-height: 1.45"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">{{r.at}}</span><span style="font-family: var(--font-mono); font-size: 12px">{{r.ev}}</span><span>{{r.what}}</span></div>
+</sc-for>
+</div>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{hkNote}}</span>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Takes effect now · logged</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeHk}}">Cancel</x-import>
+<sc-if value="{{hkDanger}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="danger" icon="{{hkIcon}}" on-click="{{doHk}}">{{hkCta}}</x-import></sc-if>
+<sc-if value="{{hkSafe}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="{{hkIcon}}" on-click="{{doHk}}">{{hkCta}}</x-import></sc-if>
+</div>
+</div>
+</x-import>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { created: false, rev: null, typed: '', menu: null, revoked: [], keyOpen: false, kName: '', kScope: 'status:read', kExp: '6', kTried: false, newKeys: [], copied: false, hk: null, hkMode: '', hState: {}, tests: {} };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var OK = { tone: 'success', icon: 'circle-check' };
+    var BAD = { tone: 'danger', icon: 'circle-alert' };
+    var KEYS = [
+      { name: 'Ticketing sync', key: 'dxtm_live_••••4f2a', scope: 'incidents:read', by: 'Tao', last: 'Today 10:07', lastLong: 'Today 10:07 · 1,204 calls in 24 h', exp: '20 Jan 2027', created: 'Mon 20 Jul' },
+      { name: 'Office TV dashboard', key: 'dxtm_live_••••91c0', scope: 'status:read', by: 'Tao', last: 'Today 10:08', lastLong: 'Today 10:08 · every 30 s', exp: '14 Jan 2027', created: 'Tue 14 Jul' },
+      { name: 'Old test key', key: 'dxtm_live_••••0b7e', scope: 'status:read', by: 'Tao', last: 'Sat 15 Aug', lastLong: 'Sat 15 Aug · 41 days ago', exp: '30 Oct', created: 'Thu 30 Apr', stale: true }
+    ];
+    KEYS = st.newKeys.concat(KEYS);
+    var keys = KEYS.filter(function (k) { return st.revoked.indexOf(k.name) < 0; }).map(function (k) {
+      return Object.assign({}, k, { stale: !!k.stale, isNew: !!k.isNew, revoke: function () { self.setState({ rev: k.name, typed: '' }); } });
+    });
+    var rk = KEYS.filter(function (k) { return k.name === st.rev; })[0];
+    var HS = st.hState;
+    var HOOKS = [
+      Object.assign({ name: 'Ticketing', url: 'https://[ticketing endpoint]', status: 'Healthy', events: ['incident.opened', 'incident.acknowledged', 'incident.resolved'], last: '10:07:50 · 200 in 180 ms', lastColor: 'var(--aura-fg-primary)', tail: '7d1e', paused: false }, OK),
+      Object.assign({ name: 'CRM', url: 'https://[CRM endpoint]', status: 'Paused', events: ['report.sent', 'incident.resolved'], last: 'Wed 18:02 · 500 × 5 in a row', lastColor: 'var(--aura-fg-danger)', tail: 'a44c', paused: true }, { tone: 'warning', icon: 'circle-alert' })
+    ];
+    HOOKS = HOOKS.filter(function (h) { return !(HS[h.name] && HS[h.name].deleted); }).map(function (h) {
+      var x = HS[h.name] || {};
+      if (x.resumed) return Object.assign({}, h, { status: 'Healthy', paused: false, last: x.resumed === 'replay' ? '10:08:30 · 5 replayed · 200' : '10:08:30 · resumed · 5 skipped', lastColor: 'var(--aura-fg-primary)' }, OK);
+      if (x.rotated) return Object.assign({}, h, { tail: '3b90' });
+      return h;
+    });
+    var FAILED = [
+      { at: 'Wed 17:40', ev: 'report.sent', what: 'realme · August report' },
+      { at: 'Wed 17:44', ev: 'report.sent', what: 'Fuji Links · August report' },
+      { at: 'Wed 17:48', ev: 'report.sent', what: 'Tubtong · August report' },
+      { at: 'Wed 17:55', ev: 'report.sent', what: 'Cando Asia · August report' },
+      { at: 'Wed 18:02', ev: 'report.sent', what: 'ORCA Thailand · August report' }
+    ];
+    var hooks = HOOKS.map(function (h) {
+      var open = st.menu === h.name;
+      var t = st.tests[h.name];
+      function modal(m) { return function () { self.setState({ menu: null, hk: h.name, hkMode: m }); }; }
+      return Object.assign({}, h, { menuOpen: open, menuLabel: 'Actions for ' + h.name + ' endpoint', toggle: function () { self.setState({ menu: open ? null : h.name }); },
+        rotate: modal('rotate'), del: modal('delete'), replay: modal('replay'), skip: modal('skip'),
+        test: function () { var tt = JSON.parse(JSON.stringify(st.tests)); tt[h.name] = true; self.setState({ tests: tt }); },
+        hasTest: !!t, testIcon: h.paused ? 'circle-alert' : 'circle-check', testColor: h.paused ? 'var(--aura-fg-danger)' : 'var(--aura-fg-positive)',
+        testText: h.paused ? 'Test sent 10:08 · 500 in 2.0 s — CRM is still failing. Fix it before resuming.' : 'Test sent 10:08 · ping event · 200 in 190 ms' });
+    });
+    var hk = st.hk, mode = st.hkMode;
+    var hkRows = [], hkTitle = '', hkDesc = '', hkNote = '', hkCta = '', hkIcon = 'check', hkDanger = false;
+    var hkH = HOOKS.filter(function (h) { return h.name === hk; })[0];
+    if (hkH) {
+      if (mode === 'replay') { hkTitle = 'Resume CRM and re-send 5 events?'; hkDesc = 'These failed while the endpoint returned 500. They’re re-sent in this order, then new events follow.'; hkRows = FAILED; hkNote = 'Each event keeps its original id, so CRM can ignore any it already stored. If CRM still fails, it pauses again after 5 failures.'; hkCta = 'Resume + replay 5'; hkIcon = 'rotate-ccw'; }
+      if (mode === 'skip') { hkTitle = 'Resume CRM from now?'; hkDesc = 'New events go to CRM again. These 5 failed events are skipped for good:'; hkRows = FAILED; hkNote = 'CRM won’t show these 5 August reports as sent — the AMs log them by hand if needed.'; hkCta = 'Resume, skip 5'; hkIcon = 'arrow-right'; hkDanger = true; }
+      if (mode === 'rotate') { hkTitle = 'Rotate the ' + hk + ' signing secret?'; hkDesc = 'A new secret is made now. The old one (whsec_••••' + hkH.tail + ') keeps signing too for 24 h, so you can update ' + hk + ' without dropping events.'; hkRows = [{ at: 'Now', ev: 'new secret', what: 'Shown once after you confirm' }, { at: 'Sat 10:08', ev: 'old secret', what: 'Stops working — ' + hk + ' must use the new one by then' }]; hkNote = 'Events in the next 24 h carry both signatures.'; hkCta = 'Rotate secret'; hkIcon = 'rotate-ccw'; hkDanger = true; }
+      if (mode === 'delete') { hkTitle = 'Delete the ' + hk + ' endpoint?'; hkDesc = 'Nothing is sent to ' + hkH.url + ' any more. This can’t be undone — you’d add it again with a new secret.'; hkRows = hkH.events.map(function (e) { return { at: 'Stops', ev: e, what: 'no longer sent to ' + hk }; }); hkNote = hkH.paused ? 'The 5 failed report.sent events are dropped with it.' : 'Recent delivery history stays for 30 days.'; hkCta = 'Delete endpoint'; hkIcon = 'trash-2'; hkDanger = true; }
+      hkRows = hkRows.map(function (r, i) { return Object.assign({}, r, { border: i ? '1px solid var(--aura-border-subtle)' : 'none' }); });
+    }
+    var EXP = { '6': '25 Mar 2027', '3': '25 Dec', '1': '25 Oct' };
+    var kOk = !!st.kName.trim();
+    return {
+      yes: true, no: false,
+      created: st.created,
+      create: function () { self.setState({ keyOpen: true, kName: '', kScope: 'status:read', kExp: '6', kTried: false }); },
+      newName: st.newKeys.length ? st.newKeys[0].name : '',
+      copy: function () { self.setState({ copied: true }); },
+      copyLabel: st.copied ? 'Copied' : 'Copy', copyIcon: st.copied ? 'check' : 'copy',
+      keyOpen: st.keyOpen,
+      closeKey: function () { self.setState({ keyOpen: false }); },
+      kName: st.kName, setKName: function (e) { self.setState({ kName: e && e.target ? e.target.value : e }); },
+      kNameErr: st.kTried && !kOk ? 'Name it after the tool that uses it' : '',
+      scopeOpts: ['status:read', 'incidents:read', 'uptime:read', 'sites:read'],
+      kScope: st.kScope, setKScope: function (e) { self.setState({ kScope: e && e.target ? e.target.value : e }); },
+      scopeHint: ({ 'status:read': 'Current status of every site — for dashboards', 'incidents:read': 'Incidents and their timelines', 'uptime:read': 'Uptime numbers and roll-ups', 'sites:read': 'Site list, tiers and owners' })[st.kScope],
+      expOpts: [{ value: '6', label: '6 months · 25 Mar 2027' }, { value: '3', label: '3 months · 25 Dec' }, { value: '1', label: '1 month · 25 Oct' }],
+      kExp: st.kExp, setKExp: function (e) { self.setState({ kExp: e && e.target ? e.target.value : e }); },
+      makeKey: function () { if (!kOk) { self.setState({ kTried: true }); return; } var nk = { name: st.kName.trim(), key: 'dxtm_live_••••e81d', scope: st.kScope, by: 'Tao', last: 'Never', lastLong: 'Never used', exp: EXP[st.kExp], created: 'Fri 25 Sep', isNew: true }; self.setState({ keyOpen: false, created: true, copied: false, newKeys: [nk].concat(st.newKeys.map(function (k) { return Object.assign({}, k, { isNew: false }); })) }); },
+      hkOpen: !!hkH, closeHk: function () { self.setState({ hk: null }); },
+      hkTitle: hkTitle, hkDesc: hkDesc, hkRows: hkRows, hkNote: hkNote, hkCta: hkCta, hkIcon: hkIcon, hkDanger: hkDanger, hkSafe: !hkDanger,
+      doHk: function () { var x = JSON.parse(JSON.stringify(st.hState)); var cur = x[hk] || {}; if (mode === 'replay' || mode === 'skip') cur.resumed = mode; if (mode === 'rotate') cur.rotated = true; if (mode === 'delete') cur.deleted = true; x[hk] = cur; self.setState({ hState: x, hk: null }); },
+      tabs: [
+        { id: 'users', label: 'Users & roles', href: 'Users.dc.html' },
+        { id: 'channels', label: 'Alert channels', href: 'AlertChannels.dc.html' },
+        { id: 'sso', label: 'Sign-in & security', href: 'Security.dc.html' },
+        { id: 'org', label: 'Organisation', href: 'Organisation.dc.html' },
+        { id: 'api', label: 'API & webhooks', href: 'ApiWebhooks.dc.html', count: 'Phase 3' }
+      ],
+      keys: keys,
+      hooks: hooks,
+      revOpen: !!rk,
+      closeRev: function () { self.setState({ rev: null, typed: '' }); },
+      revTitle: rk ? 'Revoke “' + rk.name + '”?' : '',
+      revFacts: rk ? [
+        { k: 'Key', v: rk.key, font: 'var(--font-mono)', border: 'none' },
+        { k: 'Scope', v: rk.scope, font: 'inherit', border: '1px solid var(--aura-border-subtle)' },
+        { k: 'Last used', v: rk.lastLong, font: 'inherit', border: '1px solid var(--aura-border-subtle)' },
+        { k: 'Created', v: rk.created + ' by ' + rk.by, font: 'inherit', border: '1px solid var(--aura-border-subtle)' }
+      ] : [],
+      revLabel: rk ? 'Key name' : '',
+      revName: rk ? rk.name : '',
+      typed: st.typed,
+      setTyped: function (e) { self.setState({ typed: e && e.target ? e.target.value : e }); },
+      revLocked: !rk || st.typed.trim() !== rk.name,
+      doRevoke: function () { self.setState({ revoked: st.revoked.concat([st.rev]), rev: null, typed: '' }); },
+      log: [
+        Object.assign({ at: '10:07:50', ev: 'incident.acknowledged', to: 'Ticketing · INC-0142 · Arm · held 10 s (undo)', ms: '180 ms', code: '200' }, OK),
+        Object.assign({ at: '09:52:32', ev: 'incident.opened', to: 'Ticketing · INC-0141', ms: '164 ms', code: '200' }, OK),
+        Object.assign({ at: '09:48:43', ev: 'incident.opened', to: 'Ticketing · INC-0142', ms: '201 ms', code: '200' }, OK),
+        Object.assign({ at: 'Wed 18:02', ev: 'report.sent', to: 'CRM · 5th failure → paused', ms: '2.1 s', code: '500' }, BAD),
+        Object.assign({ at: 'Wed 17:48', ev: 'report.sent', to: 'CRM · retrying', ms: '2.0 s', code: '500' }, BAD)
+      ],
+      payload: '{\n  "event": "incident.opened",\n  "id": "INC-0142",\n  "site": "MuvMi",\n  "tier": 1,\n  "status": "DOWN",\n  "trigger": "hard_fail",\n  "locations_failed": 3,\n  "owner": "Arm",\n  "opened_at": "2026-09-25T02:48:41Z",\n  "url": "https://[app]/incidents/INC-0142"\n}',
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

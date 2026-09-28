@@ -1,0 +1,45 @@
+import type { CheckOutcome } from '@dxt/shared';
+
+/**
+ * Turn one HTTP response into pass / fail / blocked (PRD §5).
+ * - fail    = DNS error, connect/response timeout > 30 s, HTTP 5xx, TLS failure or expired cert.
+ * - blocked = 403 / 429 / 503 carrying a WAF or challenge signature. Inconclusive, never a failure:
+ *             the browser verifier decides.
+ * Keyword and slow checks raise PROBLEM elsewhere; they never make a check fail here.
+ */
+export interface ResponseSnapshot {
+  status: number;
+  headers: Headers;
+  /** First few KB of the body, enough to spot a challenge page. */
+  bodySample: string;
+}
+
+const CHALLENGE_STATUSES = new Set([403, 429, 503]);
+
+/**
+ * Headers only a challenge / block response carries. Never match on `server: cloudflare` alone: every
+ * response through the proxy has it, including a real 503 from the origin — that must stay a hard fail.
+ */
+const CHALLENGE_HEADERS: readonly [header: string, match?: RegExp][] = [
+  ['cf-mitigated'],
+  ['cf-chl-bypass'],
+  ['x-sucuri-block'],
+];
+
+/** Signatures to refine in Phase 0 against Tubtong and Cando Asia (PRD §5). */
+const CHALLENGE_BODY =
+  /(cf-challenge|challenge-platform|captcha|attention required|just a moment|access denied)/i;
+
+export function hasChallengeSignature(res: ResponseSnapshot): boolean {
+  for (const [name, match] of CHALLENGE_HEADERS) {
+    const value = res.headers.get(name);
+    if (value !== null && (!match || match.test(value))) return true;
+  }
+  return CHALLENGE_BODY.test(res.bodySample);
+}
+
+export function classifyResponse(res: ResponseSnapshot): CheckOutcome {
+  if (CHALLENGE_STATUSES.has(res.status) && hasChallengeSignature(res)) return 'blocked';
+  if (res.status >= 500) return 'fail';
+  return 'pass';
+}

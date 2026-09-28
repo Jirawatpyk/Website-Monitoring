@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — User guide</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}a.aura-btn--secondary:hover,a.aura-btn--ghost:hover{color:var(--aura-fg-primary)}
+.aura-input{min-height:44px;box-sizing:border-box}
+.aura-input__control{min-height:44px;box-sizing:border-box}
+.aura-tag.is-selectable{min-height:44px;padding-inline:14px;flex-shrink:0;white-space:nowrap}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.mg-chips{scrollbar-width:none}.mg-chips::-webkit-scrollbar{display:none}
+.mg-all{min-width:44px;min-height:44px;padding:0 8px;border:0;background:none;font:inherit;font-size:12px;font-weight:500;color:var(--aura-fg-accent);text-decoration:underline;text-underline-offset:2px;cursor:pointer}.mg-all:focus-visible{outline:2px solid var(--aura-focus-ring);outline-offset:-2px;border-radius:var(--aura-radius-sm)}
+.mg-row{-webkit-tap-highlight-color:transparent}.mg-row:last-child{border-bottom:0 !important}.mg-row:hover{background:var(--aura-bg-surface-hover)}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<sc-if value="{{isList}}" hint-placeholder-val="{{true}}">
+<a href="MOverview.dc.html" aria-label="Back to overview" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+</sc-if>
+<sc-if value="{{isArticle}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{backToList}}" aria-label="Back to all topics" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; background: transparent; border: 0; color: var(--aura-fg-primary); cursor: pointer"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></button>
+</sc-if>
+<span style="flex-grow: 1; font-size: 17px; font-weight: 600">User guide</span>
+<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+</header>
+
+<div id="mg-scroll" class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 14px 16px 32px; display: flex; flex-direction: column; gap: 12px">
+
+<sc-if value="{{isList}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.TextField" label="Search the guide" icon="search" placeholder="e.g. acknowledge, mute, root cause" value="{{q}}" on-change="{{setQ}}"></x-import>
+<div class="mg-chips" role="group" aria-label="Filter by role" style="margin: 0 -16px; padding: 0 16px; display: flex; gap: 8px; overflow-x: auto">
+<sc-for list="{{chips}}" as="c" hint-placeholder-count="5">
+<x-import component-from-global-scope="Aura.Tag" selected="{{c.on}}" on-click="{{c.pick}}">{{c.label}}</x-import>
+</sc-for>
+<span style="width: 8px; flex-shrink: 0"></span>
+</div>
+<sc-if value="{{isMine}}" hint-placeholder-val="{{true}}"><div style="margin: -12px 0; display: flex; align-items: center; gap: 2px; font-size: 12px; color: var(--aura-fg-secondary)"><span>Showing topics for you · <span style="font-weight: 500; color: var(--aura-fg-primary)">{{me}}</span></span><button type="button" class="mg-all" onClick="{{showAll}}">Show all</button></div></sc-if>
+<sc-if value="{{notMine}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{countLine}}</span></sc-if>
+
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{g.caps}}</span>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{g.items}}" as="t" hint-placeholder-count="3">
+<button type="button" class="mg-row" onClick="{{t.open}}" style="width: 100%; min-height: 60px; box-sizing: border-box; padding: 10px 10px 10px 14px; display: flex; align-items: center; gap: 12px; background: transparent; border: 0; border-bottom: 1px solid var(--aura-border-subtle); font: inherit; color: inherit; text-align: left; cursor: pointer">
+<span style="width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; gap: 2px"><span style="font-size: 14px; font-weight: 500">{{t.title}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.summary}}</span></span>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-for>
+
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 24px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: var(--aura-bg-surface); border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-lg)">
+<span style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-canvas); color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="search" size="md"></x-import></span>
+<span style="font-size: 15px; font-weight: 600">{{emptyTitle}}</span>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">Try “acknowledge”, “mute” or “root cause”, or show all roles.</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="x" full-width="{{yes}}" on-click="{{clearAll}}">Clear search and filters</x-import>
+</div>
+</sc-if>
+<span style="display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Icon" name="monitor" size="sm"></x-import></span><span>Same topics as the desktop User guide. Screens for Admin settings open on desktop.</span></span>
+</sc-if>
+
+<sc-if value="{{isArticle}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{a.caps}}</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 26px; line-height: 1.2; font-weight: 600; letter-spacing: -0.01em">{{a.title}}</h1>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="users" size="sm"></x-import><span>For {{a.forLine}}</span></span>
+</div>
+<sc-if value="{{a.hasIntro}}" hint-placeholder-val="{{true}}">
+<p style="margin: 0; font-size: 14px; line-height: 1.6">{{a.intro}}</p>
+</sc-if>
+<sc-if value="{{a.hasStake}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="For Stakeholders (AMs, CEO)">{{a.stake}}</x-import>
+</sc-if>
+<sc-if value="{{a.hasYou}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+<span>{{a.you}}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{a.hasBadges}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{a.badgeCaps}}</span>
+<sc-for list="{{a.badges}}" as="b" hint-placeholder-count="4">
+<div style="display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.45">
+<span style="width: 138px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="{{b.tone}}" variant="{{b.variant}}" icon="{{b.icon}}">{{b.label}}</x-import></span>
+<span style="color: var(--aura-fg-secondary); padding-top: 1px">{{b.means}}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{a.hasSteps}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; padding: 4px 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<sc-for list="{{a.steps}}" as="s" hint-placeholder-count="4">
+<div style="display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--aura-border-subtle)">
+<span style="width: 24px; height: 24px; flex-shrink: 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted)">{{s.n}}</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; line-height: 1.5">
+<span style="font-size: 14px; font-weight: 600">{{s.title}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{s.text}}</span>
+<sc-if value="{{s.hasLink}}" hint-placeholder-val="{{false}}">
+<a href="{{s.href}}" style="align-self: flex-start; min-height: 44px; box-sizing: border-box; margin: -4px 0 -8px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; text-decoration: none"><span>Open the {{s.linkLabel}}</span><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></a>
+</sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{a.hasLadder}}" hint-placeholder-val="{{false}}">
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<div style="padding: 8px 14px; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary); border-bottom: 1px solid var(--aura-border-subtle)">TIER 1 DOWN · WHO GETS ASKED</div>
+<sc-for list="{{a.ladder}}" as="l" hint-placeholder-count="4">
+<div style="padding: 8px 14px; display: flex; gap: 10px; border-bottom: 1px solid var(--aura-border-subtle); line-height: 1.45">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; background: var(--aura-status-neutral-bg); color: var(--aura-status-neutral-fg)">{{l.level}}</span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 600">{{l.when}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{l.who}}</span>
+<sc-if value="{{l.proposal}}" hint-placeholder-val="{{false}}"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="clock">Proposal · pending CEO</x-import></span></sc-if>
+</span>
+</div>
+</sc-for>
+<div style="padding: 8px 14px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Tier 2–3 DOWN: no CEO step and no L3. DOWN still posts at any hour, but timers pause outside Mon–Fri 09:00–18:00 and resume at 09:00.</div>
+</div>
+</sc-if>
+
+<sc-if value="{{a.hasRule}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="{{a.ruleTitle}}">{{a.ruleText}}</x-import>
+</sc-if>
+
+<sc-if value="{{a.hasBullets}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<sc-for list="{{a.bullets}}" as="x" hint-placeholder-count="4">
+<div style="display: flex; gap: 10px; font-size: 13px; line-height: 1.55"><span style="width: 5px; height: 5px; flex-shrink: 0; margin-top: 8px; border-radius: 9999px; background: var(--aura-fg-tertiary)"></span><span>{{x.text}}</span></div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{a.hasOpen}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="arrow-up-right" full-width="{{yes}}" href="{{a.openHref}}">{{a.openLabel}}</x-import>
+</sc-if>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">RELATED</span>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{a.related}}" as="r" hint-placeholder-count="2">
+<button type="button" class="mg-row" onClick="{{r.open}}" style="width: 100%; min-height: 48px; box-sizing: border-box; padding: 6px 10px 6px 14px; display: flex; align-items: center; gap: 10px; background: transparent; border: 0; border-bottom: 1px solid var(--aura-border-subtle); font: inherit; font-size: 14px; color: inherit; text-align: left; cursor: pointer">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{r.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1">{{r.title}}</span>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span>
+</button>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<sc-if value="{{askFb}}" hint-placeholder-val="{{true}}">
+<span style="font-size: 14px; font-weight: 600">Was this helpful?</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="check" full-width="{{yes}}" on-click="{{fbYes}}">Yes</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="x" full-width="{{yes}}" on-click="{{fbNo}}">No</x-import>
+</div>
+</sc-if>
+<sc-if value="{{gotFb}}" hint-placeholder-val="{{false}}">
+<span role="status" aria-live="polite" style="min-height: 44px; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import>Thanks — sent to Tao</span>
+<span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">{{fbNote}}</span>
+</sc-if>
+</div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { q: '', role: 'Responder', open: '', fb: {} };
+  }
+  topics() {
+    var R = 'Responder', O = 'On-call', S = 'Stakeholder', V = 'Viewer', A = 'Admin';
+    var ALL = [R, O, S, V, A];
+    return [
+      { id: 'signin', group: 'Getting started', icon: 'lock', title: 'Sign in & 2-step', roles: ALL,
+        summary: 'Google sign-in, staying signed in, 2-step from Mon 5 Oct',
+        bullets: [
+          'Sign in with your company Google account. The link in Chat is the same for everyone — signing in is how DxT Monitor knows who acknowledged.',
+          'You stay signed in on this phone for 30 days.',
+          'Turn on Google 2-step verification. From Mon 5 Oct you can still sign in to acknowledge without it; everything else is locked until 2-step is on.',
+          'Viewers can see an incident but can’t acknowledge it — ask the owner or backup in the Chat thread.'
+        ], related: ['users', 'alert'] },
+      { id: 'phone', group: 'Getting started', icon: 'bell', title: 'Set up your phone for on-call', roles: [R, O, A], full: true,
+        summary: '3 checks before your shift: @mentions, Do Not Disturb, test alert',
+        intro: 'Outside Mon–Fri 09:00–18:00, all Tier 1 alerts (5 sites) go to the on-call person instead of the owners. Do these before your shift — your phone counts as ready only when all three checks are ticked.',
+        you: 'Your next shift: Mon 5 Oct → Mon 12 Oct. You asked Nok to swap — not accepted yet, so it’s still yours.',
+        badgeCaps: 'ROTATION BADGES',
+        badges: [
+          { tone: 'neutral', variant: 'solid', icon: 'user', label: 'On call now', means: 'Tier 1 nights and weekends come to this person.' },
+          { tone: 'neutral', variant: 'outline', icon: 'clock', label: 'Scheduled', means: 'An upcoming shift.' },
+          { tone: 'neutral', variant: 'outline', icon: 'arrow-up-down', label: 'Swap requested', means: 'Waiting for the other person to accept — nothing changes until then.' }
+        ],
+        steps: [
+          { title: 'Alerts Space: notify for @mentions only', text: 'In Google Chat, open the Alerts Space › Notifications › @mentions only. You’re @mentioned only when you’re expected to act, so every buzz matters.' },
+          { title: 'Allow the Space through Do Not Disturb', text: 'In your phone’s Do Not Disturb (Focus) settings, let Google Chat notifications from the Alerts Space through, so night alerts ring.' },
+          { title: 'Send a test alert and open it on this phone', text: 'On-call › “Send test alert to me” posts in its own “TEST — no action” thread and mentions only you. Open the test link on the phone you’ll carry — the third check ticks itself.', href: 'MOnCall.dc.html', link: 'On-call checklist' },
+          { title: 'Turn on 2-step', text: 'From Mon 5 Oct you can still sign in to acknowledge without 2-step; everything else is locked until it’s on.' }
+        ],
+        ruleTitle: 'Ready = 3 of 3, on the phone you carry',
+        ruleText: 'A test received on an old phone doesn’t count — send a new one after changing phones. Digests and the weekly summary post to a separate Space, DxT Website Reports; you don’t need alerts from it.',
+        related: ['rotation', 'alert'] },
+      { id: 'badges', group: 'Getting started', icon: 'circle-check', title: 'Statuses & badges', roles: ALL,
+        summary: 'Site status vs incident state, Muted, location glyphs',
+        badgeCaps: 'SITE STATUS · INCIDENT STATE',
+        badges: [
+          { tone: 'danger', variant: 'solid', icon: 'ban', label: 'Down', means: '2 of 3 locations hard-fail on two checks in a row.' },
+          { tone: 'warning', variant: 'soft', icon: 'triangle-alert', label: 'Problem', means: 'Slow, regional, SSL, keyword… Counts as up.' },
+          { tone: 'success', variant: 'soft', icon: 'circle-check', label: 'OK', means: 'All checks pass.' },
+          { tone: 'accent', variant: 'soft', icon: 'calendar', label: 'Maintenance', means: 'Planned window — the only purple status.' },
+          { tone: 'neutral', variant: 'outline', icon: 'eye-off', label: 'Muted · until 18:00', means: 'Overlay — the real status badge stays.' },
+          { tone: 'danger', variant: 'outline', icon: 'clock', label: 'Unacked', means: 'Nobody has acknowledged yet.' },
+          { tone: 'warning', variant: 'outline', icon: 'arrow-up-right', label: 'Escalated · L1', means: 'Still unacked; the next level was asked.' },
+          { tone: 'neutral', variant: 'outline', icon: 'check', label: 'Acknowledged', means: 'Someone is on it; L1–L2 stopped.' },
+          { tone: 'neutral', variant: 'outline', icon: 'eye', label: 'Monitoring', means: 'Recovered, waiting for 2 OK rounds.' },
+          { tone: 'warning', variant: 'outline', icon: 'pencil', label: 'Needs root cause', means: 'Recovered; write what happened to resolve.' },
+          { tone: 'success', variant: 'outline', icon: 'circle-check', label: 'Resolved', means: 'Closed out by a person — never automatic for DOWN.' },
+          { tone: 'neutral', variant: 'outline', icon: 'file-text', label: 'In review', means: 'Review draft waiting for sign-off.' },
+          { tone: 'neutral', variant: 'soft', icon: 'check', label: 'Closed', means: 'Review signed off.' }
+        ],
+        bullets: [
+          'Solid red means the site is down now. Incident states use outline badges; past incidents show “Was down” in outline.',
+          'Location glyphs for BKK, SIN and TYO: pass, hard fail, blocked but verified OK (grey lock), slow, no data.',
+          'Muting never changes the status — it only stops new alerts.'
+        ], related: ['alert', 'resolve'] },
+      { id: 'mute', group: 'Everyday', icon: 'eye-off', title: 'Mute vs maintenance', roles: [R, O, A],
+        summary: 'Stop alerts for a while, or plan a window that doesn’t count',
+        bullets: [
+          'Mute stops new alerts for up to 24 h. The site keeps its real status with a “Muted” tag and still counts toward uptime.',
+          'Maintenance holds alerts and isn’t counted in uptime; the client status page shows “Planned maintenance”. Windows over 24 h need an Admin.',
+          'Mute stops new alerts only — an open incident keeps escalating until someone acknowledges. Muting is not an acknowledgement.',
+          'You can’t start maintenance now on a site that is DOWN or has an open incident — mute instead.',
+          'A reason is required every time. Responders can do this on their own sites.'
+        ], openHref: 'MMaintenance.dc.html', openLabel: 'Open mute or maintenance', related: ['badges', 'alert'] },
+      { id: 'rotation', group: 'Everyday', icon: 'users', title: 'On-call rotation', roles: [R, O, A],
+        summary: 'Who covers Tier 1 nights and weekends, and how swaps work',
+        bullets: [
+          'Tier 1 is 24/7: owners respond Mon–Fri 09:00–18:00, the on-call person the rest of the time.',
+          'Weekly shifts, handover Monday 09:00: Ploy until Mon 28 Sep, then Nok, then Arm (5 Oct), then Ploy (12 Oct).',
+          'Swaps: request one from On-call. Nothing changes until the other person accepts.',
+          'Tao isn’t in the rotation — he’s the Admin backstop and gets L1 at +15 min.',
+          'Tier 2–3 have no on-call: DOWN still posts at any hour, but timers pause until 09:00.'
+        ], openHref: 'MOnCall.dc.html', openLabel: 'Open On-call', related: ['phone', 'alert'] },
+      { id: 'reports', group: 'Everyday', icon: 'chart-column', title: 'Reports & client status page', roles: [S, A],
+        summary: 'What counts in uptime and what clients see',
+        bullets: [
+          'Uptime counts DOWN minutes only. PROBLEM counts as up, maintenance is left out, muted time is counted.',
+          'Client status page: DOWN → Outage, slow / key page / regional → Degraded, maintenance → Planned maintenance. SSL, keyword and other internal problems aren’t shown.',
+          'Digests and the weekly summary post to DxT Website Reports, not the Alerts Space.',
+          'Account managers send client reports for their own clients. “Note from your account manager” appears only on reports sent by hand when you wrote one.'
+        ], openHref: 'MStatusPage.dc.html', openLabel: 'Open client status page', related: ['clientupd', 'badges'] },
+      { id: 'alert', group: 'When things go wrong', icon: 'circle-alert', title: 'When an alert arrives', roles: [R, O, S, A], full: true,
+        stake: 'Got an FYI (L3) or a client-update mention? You don’t need to acknowledge — AMs act on the client update; the CEO needs no action on an FYI.',
+        summary: 'Open, check, acknowledge, undo, add notes',
+        intro: 'A DOWN alert reaches you in the Alerts Space (Google Chat) and by email. By day (Mon–Fri 09:00–18:00) the site owner is @mentioned; nights and weekends, Tier 1 alerts go to the on-call person instead.',
+        badgeCaps: 'WHAT YOU’LL SEE',
+        badges: [
+          { tone: 'danger', variant: 'solid', icon: 'ban', label: 'Down', means: 'The site is down now.' },
+          { tone: 'danger', variant: 'outline', icon: 'clock', label: 'Unacked', means: 'Nobody has acknowledged yet.' },
+          { tone: 'warning', variant: 'outline', icon: 'arrow-up-right', label: 'Escalated · L1', means: 'Backup + Tao were asked at +15 min.' },
+          { tone: 'neutral', variant: 'outline', icon: 'check', label: 'Acknowledged', means: 'Someone is on it; L1–L2 stopped.' }
+        ],
+        steps: [
+          { title: 'Open the alert', text: 'Tap “Open / acknowledge” on the Chat card or in the email. Anyone can open it; the ack is recorded under their own Google account, so nobody can acknowledge as someone else.', href: 'MobileAck.dc.html', link: 'acknowledge screen' },
+          { title: 'Check what failed', text: 'The alert says why, e.g. “Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)”. DOWN means at least 2 of 3 locations hard-failed on two checks in a row — the second is an immediate recheck about 30 s later.' },
+          { title: 'Tap Acknowledge', text: 'This stops L1 and L2. For 10 s nothing is sent — “Posting to Chat, email and webhooks in N s — nothing is sent until then”. Tap “Undo · N s” if it was a mistake.' },
+          { title: 'Work it and add notes', text: 'Notes go on the timeline and into the Chat thread as “NOTE · site · your name” (no @mention). The client update runs on its own — for Tier 1 DOWN over 15 min the account manager is @mentioned with a draft.', href: 'MIncident.dc.html', link: 'full incident' },
+          { title: 'When it recovers', text: 'You get a RECOVERED reply. Write the root cause, then Resolve — see “Recover, root cause & resolve”.' }
+        ],
+        ladder: true,
+        ruleTitle: 'Acknowledge stops the escalation — not the client update',
+        ruleText: 'After an ack, L1–L2 stop. For Tier 1 DOWN only, if the site is still down at +60 min, CEO + the site’s account manager get an FYI (no call).',
+        related: ['clientupd', 'resolve'] },
+      { id: 'clientupd', group: 'When things go wrong', icon: 'mail', title: 'Client updates', roles: [R, S, A],
+        summary: 'When the account manager is asked to tell the client',
+        bullets: [
+          'Tier 1 DOWN reaching 15 min: the site’s account manager is @mentioned in the thread with a draft client message — acknowledged or not. Tier 2 DOWN reaching 60 min inside response hours: same. Tier 3: report only.',
+          'Tell the client, then tap “Mark client updated” (records who and when) — or “Not needed…” with a reason.',
+          'A Tier 1 DOWN over 15 min can’t be resolved until this is marked. If the track never fired, the condition shows “Not required”.',
+          'Who can mark it: Admin, Responders on their own sites, account managers on their own clients. Viewers can’t.'
+        ], openHref: 'MIncident.dc.html', openLabel: 'Open INC-0142 client update', related: ['alert', 'resolve'] },
+      { id: 'resolve', group: 'When things go wrong', icon: 'pencil', title: 'Recover, root cause & resolve', roles: [R, O, A],
+        summary: 'Monitoring, the 3 conditions, undo, review',
+        bullets: [
+          'On the first OK round the RECOVERED reply and email go out and the incident moves to Monitoring. After 2 OK rounds it needs a root cause.',
+          'Resolve is always a manual step and needs 3 conditions: OK for 2 rounds, client update marked (or not required / not needed), root cause written.',
+          '“Unknown — keep investigating” saves your notes but keeps the incident open.',
+          'After Resolve nothing is sent for 10 s — “Posting to Chat, email and webhooks in N s — nothing is sent until then” — tap “Undo · N s” if needed.',
+          'DOWN then goes Resolved → In review → Closed once the review is signed off. A PROBLEM ends at Resolved; one that recovers in under 5 min without an ack resolves itself.'
+        ], openHref: 'MIncident.dc.html', openLabel: 'Open INC-0142', related: ['clientupd', 'badges'] },
+      { id: 'fault', group: 'When things go wrong', icon: 'circle-dot-dashed', title: 'When the monitor itself fails', roles: [O, A],
+        summary: 'Heartbeat missed — what still works and what to do by hand',
+        bullets: [
+          'If the monitor’s heartbeat is missed for more than 3 min, Tao (the only active Admin) gets an email and the Alerts Space @mentions the on-call person.',
+          'While it’s out, automatic alerts and timers pause. Check Tier 1 sites by hand: “Loads OK” or “Down — open incident”, which posts L0 and starts the client-update track.',
+          'Escalate by hand with “Escalate now”; automatic timers resume when the monitor is back.',
+          'One location (BKK, SIN or TYO) missing for more than 3 min only emails Tao — the other two still decide the status.',
+          'The client status page shows “Live status temporarily unavailable” instead of green.'
+        ], related: ['phone', 'alert'] },
+      { id: 'escalation', group: 'Admin', icon: 'arrow-up-right', title: 'Escalation rules', roles: [A],
+        summary: 'Levels, timing and the guardrails when you edit them',
+        bullets: [
+          'Tier 1 DOWN: L0 owner or on-call + Alerts Space · L1 +15 min backup + Tao · L2 +30 min CEO (Proposal · pending CEO) · L3 +60 min CEO + account manager.',
+          'Tier 2–3 DOWN: L0, L1 +15 min, L2 +30 min reminder to Tao. No CEO page — the CEO sees it in the digest.',
+          'L0 is pinned. Later steps are at least +15 min apart and each needs at least one channel.',
+          'Saving asks you to confirm who is affected. Edit policies on desktop.'
+        ], related: ['alert', 'users'] },
+      { id: 'users', group: 'Admin', icon: 'user', title: 'Users & roles', roles: [A],
+        summary: 'Admin, Responder, Stakeholder, Viewer — and reassigning',
+        bullets: [
+          'Roles: Admin, Responder, Stakeholder (account manager) and Viewer.',
+          'Responders acknowledge and resolve on sites they own or back up, plus Tier 1 while on call. Account managers mark client updates for their own clients.',
+          'Before you change a role or deactivate someone, DxT Monitor lists where they’re used — escalation, account manager of clients, owner or backup, on-call shifts — and asks you to reassign.',
+          'Only 1 active Admin today (Tao) — the second Admin is invited but hasn’t joined.',
+          'From Mon 5 Oct people without 2-step can still sign in to acknowledge; everything else is locked until 2-step is on.'
+        ], related: ['signin', 'escalation'] }
+    ];
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var T = this.topics();
+    var byId = {}; T.forEach(function (t) { byId[t.id] = t; });
+    var GROUPS = ['Getting started', 'Everyday', 'When things go wrong', 'Admin'];
+    var ME = 'Responder';
+    var ROLES = ['Responder', 'On-call', 'Stakeholder', 'Viewer', 'Admin'];
+    function go(id) {
+      return function () {
+        self.setState({ open: id });
+        var sc = typeof document !== 'undefined' && document.getElementById('mg-scroll');
+        if (sc) sc.scrollTop = 0;
+      };
+    }
+    function text(t) {
+      var parts = [t.title, t.summary, t.intro || ''].concat(t.bullets || []);
+      (t.steps || []).forEach(function (s) { parts.push(s.title, s.text); });
+      (t.badges || []).forEach(function (b) { parts.push(b.label, b.means); });
+      if (t.ladder) parts.push('L0 L1 L2 L3 escalation CEO backup');
+      return parts.join(' ').toLowerCase();
+    }
+    var q = st.q.trim().toLowerCase();
+    var role = st.role;
+    var shown = T.filter(function (t) {
+      if (role !== 'All' && t.roles.indexOf(role) < 0) return false;
+      return !q || text(t).indexOf(q) >= 0;
+    });
+    var groups = GROUPS.map(function (g) {
+      return { caps: g.toUpperCase(), items: shown.filter(function (t) { return t.group === g; }).map(function (t) { return { title: t.title, summary: t.summary, icon: t.icon, open: go(t.id) }; }) };
+    }).filter(function (g) { return g.items.length > 0; });
+    var countLine;
+    if (q) countLine = shown.length + (shown.length === 1 ? ' result' : ' results') + ' for “' + st.q.trim() + '”' + (role !== 'All' ? ' · ' + role : '');
+    else countLine = role === 'All' ? T.length + ' topics · you’re a Responder' : shown.length + ' topics for ' + role;
+    var chips = ['All'].concat(ROLES).map(function (r) {
+      return { label: r, on: r === role, pick: function () { self.setState({ role: r }); } };
+    });
+
+    var cur = st.open ? byId[st.open] : null;
+    var a = { caps: '', title: '', forLine: '', related: [] };
+    if (cur) {
+      var ROLE_ALL = cur.roles.length === ROLES.length;
+      a = {
+        caps: cur.group.toUpperCase(),
+        title: cur.title,
+        forLine: ROLE_ALL ? 'everyone' : ROLES.filter(function (r) { return cur.roles.indexOf(r) >= 0; }).join(' · '),
+        hasStake: !!cur.stake, stake: cur.stake || '',
+        hasIntro: !!cur.intro, intro: cur.intro || '',
+        hasYou: !!cur.you, you: cur.you || '',
+        hasBadges: !!cur.badges, badgeCaps: cur.badgeCaps || '', badges: cur.badges || [],
+        hasSteps: !!cur.steps,
+        steps: (cur.steps || []).map(function (s, i) { return { n: i + 1, title: s.title, text: s.text, hasLink: !!s.href, href: s.href || '', linkLabel: s.link || '' }; }),
+        hasLadder: !!cur.ladder,
+        ladder: [
+          { level: 'L0', when: '0 min', who: 'Owner (day) or on-call (night) @mention + Alerts Space', proposal: false },
+          { level: 'L1', when: '+15 min', who: 'Backup + Tao — “@backup please acknowledge · Tao FYI”', proposal: false },
+          { level: 'L2', when: '+30 min', who: 'CEO @mention + email (+ voice call if approved)', proposal: true },
+          { level: 'L3', when: '+60 min', who: 'CEO + account manager · after an ack: FYI if still down (no call)', proposal: false }
+        ],
+        hasRule: !!cur.ruleTitle, ruleTitle: cur.ruleTitle || '', ruleText: cur.ruleText || '',
+        hasBullets: !!cur.bullets, bullets: (cur.bullets || []).map(function (b) { return { text: b }; }),
+        hasOpen: !!cur.openHref, openHref: cur.openHref || '', openLabel: cur.openLabel || '',
+        related: (cur.related || []).map(function (id) { var r = byId[id]; return { title: r.title, icon: r.icon, open: go(id) }; })
+      };
+    }
+    var fbv = cur ? st.fb[cur.id] : '';
+    function setFb(v) { return function () { var f = Object.assign({}, self.state.fb); f[self.state.open] = v; self.setState({ fb: f }); }; }
+    return {
+      yes: true,
+      isList: !cur,
+      isArticle: !!cur,
+      q: st.q,
+      setQ: function (e) { self.setState({ q: e && e.target ? e.target.value : e }); },
+      chips: chips,
+      countLine: countLine,
+      me: ME, isMine: role === ME && !q, notMine: !(role === ME && !q),
+      showAll: function () { self.setState({ role: 'All' }); },
+      groups: groups,
+      empty: shown.length === 0,
+      emptyTitle: q ? 'No topics match “' + st.q.trim() + '”' + (role !== 'All' ? ' for ' + role : '') : 'No topics for this role',
+      clearAll: function () { self.setState({ q: '', role: 'All' }); },
+      backToList: function () {
+        self.setState({ open: '' });
+        var sc = typeof document !== 'undefined' && document.getElementById('mg-scroll');
+        if (sc) sc.scrollTop = 0;
+      },
+      a: a,
+      askFb: !fbv,
+      gotFb: !!fbv,
+      fbNote: fbv === 'no' ? 'Tao gets “Not helpful” for this topic from Arm. Reply in Chat if you want to say what was missing.' : 'Tao gets “Helpful” for this topic from Arm.',
+      fbYes: setFb('yes'),
+      fbNo: setFb('no')
+    };
+  }
+}
+</script>
+</body>
+</html>

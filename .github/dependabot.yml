@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      aura:
+        patterns: ['@jirawatpyk/aura-*']
+      next-react:
+        patterns: ['next', 'react', 'react-dom', '@types/react*', '@next/*']
+      dev-tooling:
+        dependency-type: development
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

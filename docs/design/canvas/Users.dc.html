@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Users and roles</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1468px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="settings" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px; position: relative">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; min-height: 48px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SETTINGS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Settings</h1>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="plus" on-click="{{openInvite}}">Invite user</x-import>
+</div>
+
+<x-import component-from-global-scope="Aura.Tabs" label="Settings sections" tabs="{{tabs}}" value="users"></x-import>
+
+<div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-lg); font-size: 13px; line-height: 1.5">
+<span style="display: flex; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="md"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column">
+<span style="font-weight: 600; color: var(--aura-alert-warning-fg)">1 active Admin — monitor-fault alerts reach only Tao</span>
+<span>{{bannerText}}</span>
+</div>
+<sc-if value="{{hasInvite}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="mail" on-click="{{resend}}">{{resendLabel}}</x-import></sc-if>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Users</h2>
+<span style="font-size: 13px; color: {{countColor}}">{{countLine}}</span>
+</div>
+<div style="position: relative">
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Name</div>
+<div class="aura-table__th" style="width: 124px">Role</div>
+<div class="aura-table__th" style="width: 140px">Alert channels</div>
+<div class="aura-table__th" style="width: 184px">2-step</div>
+<div class="aura-table__th" style="width: 108px">Owner · backup</div>
+<div class="aura-table__th" style="width: 124px">On-call</div>
+<div class="aura-table__th" style="width: 116px">Last active</div>
+<div class="aura-table__th" style="width: 48px"></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{people}}" as="m2" hint-placeholder-count="9">
+<div class="aura-table__row" style="height: 56px">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 10px; line-height: 1.3">
+<x-import component-from-global-scope="Aura.Avatar" name="{{m2.name}}" size="sm"></x-import>
+<div style="display: flex; flex-direction: column; min-width: 0">
+<span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{m2.name}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{m2.email}}</span>
+</div>
+</div>
+<div class="aura-table__td" style="width: 124px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="{{m2.roleVariant}}">{{m2.role}}</x-import></div>
+<div class="aura-table__td" style="width: 140px; display: flex; align-items: center; gap: 10px; line-height: 1.3; font-size: 12px; color: var(--aura-fg-secondary)">
+<sc-if value="{{m2.chat}}" hint-placeholder-val="{{true}}"><span style="display: flex; align-items: center; gap: 4px; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="bell" size="sm" label="Google Chat linked"></x-import>Chat</span></sc-if>
+<sc-if value="{{m2.email2}}" hint-placeholder-val="{{true}}"><span style="display: flex; align-items: center; gap: 4px; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="mail" size="sm" label="Email linked"></x-import>Email</span></sc-if>
+<sc-if value="{{m2.noCh}}" hint-placeholder-val="{{false}}"><span>{{m2.chNote}}</span></sc-if>
+</div>
+<div class="aura-table__td" style="width: 184px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{m2.svTone}}" variant="{{m2.svVariant}}" icon="{{m2.svIcon}}">{{m2.sv}}</x-import></div>
+<div class="aura-table__td" style="width: 108px; line-height: 55px; font-variant-numeric: tabular-nums">{{m2.owns}}</div>
+<div class="aura-table__td" style="width: 124px; line-height: 55px; color: {{m2.ocColor}}; font-weight: {{m2.ocWeight}}">{{m2.oncall}}</div>
+<div class="aura-table__td" style="width: 116px; line-height: 55px; color: var(--aura-fg-secondary); white-space: nowrap">{{m2.last}}</div>
+<div class="aura-table__td" style="width: 48px; display: flex; align-items: center; justify-content: flex-end; padding-right: 0; line-height: 1">
+<x-import component-from-global-scope="Aura.IconButton" icon="ellipsis" label="{{m2.menuLabel}}" on-click="{{m2.toggle}}"></x-import>
+</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}">
+<div class="aura-menu" role="menu" aria-label="{{menuLabel}}" style="position: absolute; top: {{menuTop}}px; right: 16px; z-index: 20; min-width: 220px; line-height: 1.4">
+<button type="button" role="menuitem" class="aura-menu__item" onClick="{{openRole}}" disabled="{{roleOff}}"><x-import component-from-global-scope="Aura.Icon" name="users" size="sm"></x-import><span class="aura-menu__label">Change role…</span></button>
+<sc-if value="{{roleOff}}" hint-placeholder-val="{{false}}"><span style="display: block; padding: 0 8px 6px 32px; font-size: 12px; color: var(--aura-fg-secondary); white-space: normal; max-width: 200px">{{roleOffWhy}}</span></sc-if>
+<sc-if value="{{menuLive}}" hint-placeholder-val="{{false}}"><button type="button" role="menuitem" class="aura-menu__item" onClick="{{openHand}}"><x-import component-from-global-scope="Aura.Icon" name="arrow-up-down" size="sm"></x-import><span class="aura-menu__label">Hand over shift…</span></button></sc-if>
+<sc-if value="{{menuInvite}}" hint-placeholder-val="{{false}}"><button type="button" role="menuitem" class="aura-menu__item" onClick="{{resendMenu}}"><x-import component-from-global-scope="Aura.Icon" name="mail" size="sm"></x-import><span class="aura-menu__label">{{resendLabel}}</span></button></sc-if>
+<sc-if value="{{menuMember}}" hint-placeholder-val="{{true}}"><a role="menuitem" class="aura-menu__item" href="Security.dc.html"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import><span class="aura-menu__label">Sign-in &amp; devices</span></a></sc-if>
+<div role="separator" class="aura-menu__sep"></div>
+<sc-if value="{{menuInvite}}" hint-placeholder-val="{{false}}"><button type="button" role="menuitem" class="aura-menu__item aura-menu__item--danger" onClick="{{openRevoke}}"><x-import component-from-global-scope="Aura.Icon" name="x" size="sm"></x-import><span class="aura-menu__label">Revoke invite…</span></button></sc-if>
+<sc-if value="{{menuMember}}" hint-placeholder-val="{{true}}"><button type="button" role="menuitem" class="aura-menu__item aura-menu__item--danger" onClick="{{openDeact}}" disabled="{{deactOff}}"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import><span class="aura-menu__label">Deactivate…</span></button></sc-if>
+<sc-if value="{{deactOff}}" hint-placeholder-val="{{false}}"><span style="display: block; padding: 0 8px 6px 32px; font-size: 12px; color: var(--aura-fg-secondary); white-space: normal; max-width: 200px">You can’t deactivate the only active Admin.</span></sc-if>
+</div>
+</sc-if>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">What each role can do</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">“Own” = sites where the person is primary or backup owner</span>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Permission</div>
+<sc-for list="{{roles}}" as="r" hint-placeholder-count="5"><div class="aura-table__th" style="width: {{r.w}}px; justify-content: center; gap: 6px">{{r.label}}<sc-if value="{{r.phase}}" hint-placeholder-val="{{false}}"><span style="text-transform: none"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Phase 3</x-import></span></sc-if></div></sc-for>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{matrix}}" as="m" hint-placeholder-count="9">
+<div class="aura-table__row" style="height: 44px">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; line-height: 43px">{{m.label}}</div>
+<sc-for list="{{m.cells}}" as="c" hint-placeholder-count="5">
+<div class="aura-table__td" style="width: {{c.w}}px; display: flex; align-items: center; justify-content: center; gap: 4px; line-height: 1.25; font-size: 11px; text-align: left; color: {{c.color}}"><span style="display: flex; flex-shrink: 0"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm" label="{{c.aria}}"></x-import></span><sc-if value="{{c.hasNote}}" hint-placeholder-val="{{false}}"><span style="white-space: normal">{{c.note}}</span></sc-if></div>
+</sc-for>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{roleOpen}}" on-close="{{closeRole}}" title="{{roleTitle}}" description="{{roleDesc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<sc-if value="{{isRole}}" hint-placeholder-val="{{true}}">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr); gap: 12px; align-items: end">
+<div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 500">Current role</span><div style="height: 44px; box-sizing: border-box; display: flex; align-items: center; padding: 0 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">{{curRole}}</div></div>
+<span style="height: 44px; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span>
+<x-import component-from-global-scope="Aura.Select" label="New role" options="{{roleOpts}}" value="{{newRole}}" on-change="{{setNewRole}}"></x-import>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">GAINS</span>
+<sc-for list="{{gains}}" as="g" hint-placeholder-count="1"><span style="display: flex; gap: 6px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="plus" size="sm"></x-import></span>{{g}}</span></sc-for>
+<sc-if value="{{noGains}}" hint-placeholder-val="{{false}}"><span style="color: var(--aura-fg-secondary)">Nothing new</span></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">LOSES</span>
+<sc-for list="{{losses}}" as="g" hint-placeholder-count="3"><span style="display: flex; gap: 6px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="minus" size="sm"></x-import></span>{{g}}</span></sc-for>
+<sc-if value="{{noLosses}}" hint-placeholder-val="{{false}}"><span style="color: var(--aura-fg-secondary)">Nothing</span></sc-if>
+</div>
+</div>
+<sc-if value="{{hasAdminNote}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; gap: 10px; padding: 12px 14px; border: 1px solid {{adminNoteBorder}}; background: {{adminNoteBg}}; border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: {{adminNoteColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{adminNoteIcon}}" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-weight: 600">{{adminNoteTitle}}</span><sc-for list="{{adminNotes}}" as="an" hint-placeholder-count="2"><span>{{an}}</span></sc-for></div>
+</div>
+</sc-if>
+</sc-if>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">USED IN</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{usedSummary}}</span></div>
+<sc-if value="{{noUse}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--aura-fg-secondary); padding: 10px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">Not used in any escalation step, site, client or on-call shift — nothing to reassign.</span></sc-if>
+<sc-for list="{{usedIn}}" as="u" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid {{u.border}}; background: {{u.bg}}; border-radius: var(--aura-radius-md)">
+<div style="display: flex; gap: 10px; font-size: 13px; line-height: 1.45">
+<span style="display: flex; padding-top: 2px; color: {{u.iconColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{u.icon}}" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-weight: 600">{{u.label}}</span><span style="color: var(--aura-fg-secondary)">{{u.detail}}</span><span style="font-size: 12px; color: {{u.iconColor}}">{{u.verdict}}</span></div>
+</div>
+<sc-if value="{{u.single}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Select" label="{{u.selLabel}}" required="{{yes}}" placeholder="Choose a person" options="{{u.opts}}" value="{{u.val}}" on-change="{{u.set}}" error="{{u.err}}"></x-import>
+</sc-if>
+<sc-if value="{{u.perSite}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.45">{{u.perSiteHint}}</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px">
+<sc-for list="{{u.sites}}" as="ps" hint-placeholder-count="2">
+<x-import component-from-global-scope="Aura.Select" label="{{ps.label}}" required="{{yes}}" placeholder="Choose a person" options="{{ps.opts}}" value="{{ps.val}}" on-change="{{ps.set}}" error="{{ps.err}}" hint="{{ps.hint}}"></x-import>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.4">{{roleFoot}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeRole}}">Cancel</x-import>
+<sc-if value="{{isRole}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{confirmRole}}">{{roleCta}}</x-import></sc-if>
+<sc-if value="{{isDeact}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="danger" icon="ban" on-click="{{confirmRole}}">{{roleCta}}</x-import></sc-if>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{invOpen}}" on-close="{{closeInvite}}" title="Invite someone to Monitor" description="They sign in with their DxT Google account. The invite link works for 7 days." size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<x-import component-from-global-scope="Aura.TextField" label="DxT Google account" placeholder="name@[company domain]" value="{{invEmail}}" on-change="{{setInvEmail}}" error="{{invErr}}" required="{{yes}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Role" options="{{invRoles}}" value="{{invRole}}" on-change="{{setInvRole}}" hint="{{invHint}}"></x-import>
+<div style="display: flex; gap: 10px; padding: 10px 14px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import></span><span>2-step verification is required for everyone from Mon 5 Oct. They turn on Google 2-step at first sign-in; from Mon 5 Oct anyone without it can still sign in to acknowledge; everything else is locked until 2-step is on.</span></div>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Logged in the audit log</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeInvite}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="mail" on-click="{{sendInvite}}">Send invite</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{revOpen}}" on-close="{{closeRevoke}}" title="Revoke Second Admin’s invite?" description="The invite link stops working now. Nothing else changes." size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 10px; padding: 12px 14px; border: 1px solid var(--aura-alert-warning-border); background: var(--aura-alert-warning-bg); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span>Tao stays the only active Admin, so monitor-fault alerts keep reaching only Tao until another Admin joins. Invite someone new afterwards.</span></div>
+<x-import component-from-global-scope="Aura.Textarea" label="Reason" required="{{yes}}" rows="{{two}}" placeholder="e.g. Wrong address — re-inviting the right person" value="{{revNote}}" on-change="{{setRevNote}}" error="{{revErr}}"></x-import>
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Logged in the audit log</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeRevoke}}">Keep invite</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="danger" icon="x" on-click="{{confirmRevoke}}">Revoke invite</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{handOpen}}" on-close="{{closeHand}}" title="Hand over Ploy’s live shift" description="Ploy is on call now, until Mon 28 Sep 09:00. The new person gets Tier 1 alerts at night and on the weekend from the time you pick. Ploy’s sites, backups and later weeks don’t change." size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px">
+<x-import component-from-global-scope="Aura.Select" label="New on-call person" options="{{handOpts}}" value="{{handTo}}" on-change="{{setHandTo}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Takes effect" options="{{handWhenOpts}}" value="{{handWhen}}" on-change="{{setHandWhen}}"></x-import>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid {{handBorder}}; border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px"><span style="font-weight: 600">{{handTo}}’s phone · {{handReady}}</span><x-import component-from-global-scope="Aura.Badge" tone="{{handTone}}" icon="{{handIcon}}">{{handBadge}}</x-import></div>
+<sc-for list="{{handChecks}}" as="hc" hint-placeholder-count="3">
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: {{hc.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{hc.icon}}" size="sm"></x-import></span><span>{{hc.label}}</span></div>
+</sc-for>
+<sc-if value="{{hasHandWarn}}" hint-placeholder-val="{{false}}"><span style="display: flex; gap: 6px; color: var(--aura-alert-warning-fg)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span>{{handWarn}}</span></span></sc-if>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="bell" disabled="{{handTested}}" on-click="{{handTest}}">{{handTestLabel}}</x-import></div>
+</div>
+<div style="display: flex; gap: 10px; padding: 10px 14px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span>{{handSummary}}</span></div>
+<x-import component-from-global-scope="Aura.Textarea" label="Reason" required="{{yes}}" rows="{{two}}" placeholder="e.g. Ploy is ill tonight" value="{{handNote}}" on-change="{{setHandNote}}" error="{{handErr}}"></x-import>
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Logged in the audit log</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeHand}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="arrow-up-down" on-click="{{confirmHand}}">{{handCta}}</x-import>
+</div>
+</div>
+</x-import>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1468}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { menu: null, role: null, mode: 'role', newRole: 'Viewer', re: {}, tried: false, resent: false, inv: false, invEmail: '', invRole: 'Responder', invTried: false, invited: '', done: '', rev: false, revNote: '', revTried: false, revoked: false, hand: false, handTo: 'Arm', handWhen: 'tonight', handNote: '', handTried: false, handTested: {}, handedTo: '' };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var VAR = { Admin: 'solid', Responder: 'soft', Stakeholder: 'outline', Viewer: 'soft' };
+    var SV = { On: ['success', 'circle-check', 'soft', 'On'], Off5: ['warning', 'clock', 'outline', 'Off · needed from 5 Oct'], Needed: ['warning', 'triangle-alert', 'soft', 'Needed at first sign-in'] };
+    var SITEMAP = {
+      'Bangkok Airways – Taiwan': ['Arm', 'Ploy'], 'Bangkok Airways – China': ['Arm', 'Ploy'], 'ENEOS Industrial': ['Ploy', 'Arm'], 'MuvMi': ['Arm', 'Ploy'], 'realme.link': ['Nok', 'Arm'],
+      'Fuji Links': ['Ploy', 'Nok'], 'WeCare Studio': ['Nok', 'Ploy'], 'Tubtong': ['Ploy', 'Nok'], 'Cando Asia': ['Nok', 'Ploy'], 'ORCA Thailand': ['Tao', 'Nok'], 'WeCare Asia': ['Nok', 'Ploy'],
+      'VOCA': ['Ploy', 'Tao'], 'EQHO': ['Tao', 'Nok'], 'DxT': ['Tao', 'Nok'], 'DxT Solutions': ['Tao', 'Nok'], 'DxT AI': ['Tao', 'Nok'], 'DxT Games': ['Tao', 'Nok']
+    };
+    function art(w) { return /^[AEIOU]/.test(w) ? 'an ' : 'a '; }
+    function Art(w) { return /^[AEIOU]/.test(w) ? 'An ' : 'A '; }
+    var P = {
+      Tao: { sub: 'Jirawat Piyakit · [email]', role: 'Admin', ch: 'both', sv: 'On', owns: '6 · 1', oc: 'Admin backstop', last: 'Now', sites: [] },
+      'Second Admin': { sub: 'Invited Thu 24 Sep · expires 1 Oct', role: 'Admin', ch: 'invite', sv: 'Needed', owns: '—', oc: '—', last: 'Not joined', sites: [] },
+      Arm: { sub: '[email]', role: 'Responder', ch: 'both', sv: 'On', owns: '3 · 2', oc: 'Next: 5 Oct', last: 'Today 10:05',
+        sites: ['Bangkok Airways – Taiwan', 'Bangkok Airways – China', 'MuvMi'], backups: ['ENEOS Industrial', 'realme.link'],
+        shifts: 'Mon 5 Oct → Mon 12 Oct (swap with Nok requested, not accepted yet)' },
+      Ploy: { sub: '[email]', role: 'Responder', ch: 'both', sv: 'On', owns: '4 · 6', oc: 'On call now', last: 'Today 09:58',
+        sites: ['ENEOS Industrial', 'Fuji Links', 'Tubtong', 'VOCA'], backups: ['Bangkok Airways – Taiwan', 'Bangkok Airways – China', 'MuvMi', 'WeCare Studio', 'Cando Asia', 'WeCare Asia'],
+        shifts: 'On call now until Mon 28 Sep 09:00 · again Mon 12 Oct → Mon 19 Oct', liveShift: true,
+        incs: 'INC-0141 · Fuji Links · PROBLEM · acknowledged by Ploy 09:58 — still open' },
+      Nok: { sub: '[email]', role: 'Responder', ch: 'both', sv: 'Off5', owns: '4 · 8', oc: 'Next: 28 Sep', last: 'Yesterday 18:10',
+        sites: ['realme.link', 'WeCare Studio', 'Cando Asia', 'WeCare Asia'], backups: ['Fuji Links', 'Tubtong', 'ORCA Thailand', 'EQHO', 'DxT', 'DxT Solutions', 'DxT AI', 'DxT Games'],
+        shifts: 'Mon 28 Sep → Mon 5 Oct' },
+      Thee: { sub: '[email] · AM', role: 'Stakeholder', ch: 'both', sv: 'Off5', owns: '—', oc: '—', last: 'Today 09:02', sites: [],
+        am: ['ENEOS', 'realme', 'Fuji Links', 'ORCA'], amEsc: 'Tier 1 DOWN L3 FYI + client-update pings for ENEOS and realme' },
+      Bua: { sub: '[email] · AM', role: 'Stakeholder', ch: 'both', sv: 'On', owns: '—', oc: '—', last: 'Today 09:30', sites: [],
+        am: ['Bangkok Airways', 'MuvMi', 'Tubtong', 'Cando Asia', 'WeCare'], amEsc: 'Tier 1 DOWN L3 FYI + client-update pings for Bangkok Airways and MuvMi (incl. INC-0142 now)' },
+      CEO: { sub: '[email]', role: 'Stakeholder', ch: 'both', sv: 'On', owns: '—', oc: '—', last: 'Mon 21 Sep', sites: [],
+        esc: 'Tier 1 DOWN · L2 (+30 min, proposal) and L3 (+60 min, FYI after ack)' },
+      Mint: { sub: '[email]', role: 'Viewer', ch: 'viewer', sv: 'Off5', owns: '—', oc: '—', last: 'Wed 23 Sep', sites: [] }
+    };
+    if (st.handedTo) { P.Ploy.oc = 'Handed to ' + st.handedTo; P[st.handedTo].oc = 'Covering Ploy'; }
+    var names = ['Tao', 'Second Admin', 'Arm', 'Ploy', 'Nok', 'Thee', 'Bua', 'CEO', 'Mint'].filter(function (n) { return !(st.revoked && n === 'Second Admin'); });
+    var people = names.map(function (n) {
+      var d = P[n];
+      var open = st.menu === n;
+      return {
+        name: n, email: d.sub, role: d.role, roleVariant: VAR[d.role],
+        chat: d.ch === 'both', email2: d.ch === 'both', noCh: d.ch !== 'both', chNote: d.ch === 'invite' ? 'After joining' : 'Not needed · Viewer',
+        sv: SV[d.sv][3], svTone: SV[d.sv][0], svIcon: SV[d.sv][1], svVariant: SV[d.sv][2],
+        owns: d.owns, oncall: d.oc,
+        ocColor: d.oc === 'On call now' || d.oc === 'Covering Ploy' ? 'var(--aura-fg-primary)' : 'var(--aura-fg-secondary)', ocWeight: d.oc === 'On call now' || d.oc === 'Covering Ploy' ? '600' : '400',
+        last: d.last, menuLabel: 'Actions for ' + n, menuOpen: open, z: open ? 20 : 'auto',
+        roleOff: n === 'Tao' || n === 'Second Admin',
+        toggle: function () { self.setState({ menu: open ? null : n }); },
+        openRole: function () { self.setState({ menu: null, role: n, mode: 'role', newRole: d.role === 'Responder' ? 'Viewer' : (d.role === 'Viewer' ? 'Responder' : 'Viewer'), re: {}, tried: false }); }
+      };
+    });
+    // permissions matrix: value per role Admin, Responder, Stakeholder, Viewer, Client
+    var ROLES = ['Admin', 'Responder', 'Stakeholder', 'Viewer', 'Client'];
+    var M = [
+      ['See dashboard and history', ['Y', 'Y', 'Y', 'Y', 'own sites']],
+      ['Receive alerts and digests', ['Y', 'Y', 'Y', 'N', 'N']],
+      ['Acknowledge and resolve incidents', ['Y', 'own (primary or backup) + on-call Tier 1', 'N', 'N', 'N']],
+      ['Mark client update / Not needed', ['Y', 'own sites', 'own clients', 'N', 'N']],
+      ['Maintenance windows and mute', ['Y', 'own sites', 'N', 'N', 'N']],
+      ['Download uptime reports', ['Y', 'Y', 'Y', 'N', 'own sites']],
+      ['Send client reports / edit AM note', ['Y', 'N', 'own clients', 'N', 'N']],
+      ['Approve incident review', ['Y', 'N', 'N', 'N', 'N']],
+      ['Edit sites, monitors and escalation', ['Y', 'N', 'N', 'N', 'N']],
+      ['Manage users and roles', ['Y', 'N', 'N', 'N', 'N']]
+    ];
+    var W = [104, 176, 128, 96, 150];
+    function cell(v, i) {
+      if (v === 'Y') return { icon: 'check', color: 'var(--aura-fg-positive)', aria: 'Allowed', note: '', hasNote: false, w: W[i] };
+      if (v === 'N') return { icon: 'minus', color: 'var(--aura-fg-tertiary)', aria: 'Not allowed', note: '', hasNote: false, w: W[i] };
+      return { icon: 'check', color: 'var(--aura-fg-secondary)', aria: 'Allowed with limits', note: v, hasNote: true, w: W[i] };
+    }
+    var who = st.role;
+    var d = who ? P[who] : null;
+    var cur = d ? d.role : 'Responder';
+    var nr = st.newRole;
+    var ci = ROLES.indexOf(cur), ni = ROLES.indexOf(nr);
+    var gains = [], losses = [];
+    if (d && nr !== cur) {
+      M.forEach(function (r) {
+        var a = r[1][ci], b = r[1][ni];
+        if (a === 'N' && b !== 'N') gains.push(r[0] + (b === 'Y' ? '' : ' (' + b + ')'));
+        else if (a !== 'N' && b === 'N') losses.push(r[0]);
+        else if (a !== 'Y' && b === 'Y') gains.push(r[0] + ' (all sites)');
+        else if (a === 'Y' && b !== 'Y' && b !== 'N') losses.push(r[0] + ' outside ' + b);
+      });
+    }
+    var deact = st.mode === 'deact';
+    var target = deact ? 'Deactivated' : nr;
+    var used = [];
+    function others(list) { return list.filter(function (x) { return x !== who; }).map(function (x) { return { value: x, label: x }; }); }
+    if (d) {
+      var canOwn = !deact && (nr === 'Admin' || nr === 'Responder');
+      var canAck = !deact && (nr === 'Admin' || nr === 'Responder');
+      if (d.sites.length) used.push({ key: 'own', label: 'Owner of ' + d.sites.length + ' sites', detail: d.sites.join(' · '), need: !canOwn, perSite: d.sites, slot: 0 });
+      if (d.backups) used.push({ key: 'backup', label: 'Backup on ' + d.backups.length + ' sites', detail: d.backups.join(' · '), need: !canOwn, perSite: d.backups, slot: 1 });
+      if (d.incs) used.push({ key: 'inc', label: 'Holds 1 open incident', detail: d.incs, need: !canAck, opts: others(['Arm', 'Nok', 'Tao']), selLabel: 'Hand INC-0141 to' });
+      if (d.shifts) used.push({ key: 'shift', label: 'On-call shifts', detail: d.shifts, need: deact || !(nr === 'Responder' || nr === 'Admin'), opts: others(['Arm', 'Ploy', 'Nok']), selLabel: d.liveShift ? 'Hand tonight’s shift to' : 'Take over these shifts' });
+      if (d.esc) used.push({ key: 'esc', label: 'Escalation · CEO token', detail: d.esc, need: deact || nr === 'Viewer', opts: [{ value: 'Tao', label: 'Tao (Admin)' }, { value: 'remove', label: 'Remove L2–L3 from Tier 1 DOWN' }], selLabel: 'CEO steps go to' });
+      if (d.am) used.push({ key: 'am', label: 'Site AM of ' + d.am.length + ' clients', detail: d.am.join(', ') + ' · ' + d.amEsc, need: deact || !(nr === 'Stakeholder' || nr === 'Admin'), opts: others(['Thee', 'Bua', 'Tao']).map(function (o) { return { value: o.value, label: o.value + (o.value === 'Tao' ? ' (Admin)' : ' (AM)') }; }), selLabel: 'New AM for these clients' });
+    }
+    var missing = false;
+    var usedIn = used.map(function (u) {
+      var val = st.re[u.key] || '';
+      var sites = [];
+      if (u.perSite && u.need) {
+        sites = u.perSite.map(function (site) {
+          var pair = SITEMAP[site] || ['', ''];
+          var other = pair[1 - u.slot];
+          var k2 = u.key + ':' + site, v2 = st.re[k2] || '';
+          if (!v2) missing = true;
+          return { label: site, val: v2,
+            opts: ['Arm', 'Ploy', 'Nok', 'Tao'].filter(function (x) { return x !== who && x !== other; }).map(function (x) { return { value: x, label: x }; }),
+            hint: (u.slot === 0 ? 'Backup here: ' : 'Owner here: ') + other,
+            err: st.tried && !v2 ? 'Pick a person' : '',
+            set: function (e) { var r = JSON.parse(JSON.stringify(st.re)); r[k2] = e && e.target ? e.target.value : e; self.setState({ re: r }); } };
+        });
+      } else if (u.need && !val) missing = true;
+      return {
+        label: u.label, detail: u.detail, need: u.need, opts: u.opts, selLabel: u.selLabel, val: val,
+        single: u.need && !u.perSite, perSite: u.need && !!u.perSite, sites: sites,
+        perSiteHint: 'Pick per site. Owner and backup must be different people, so each list leaves out the person already on that site.',
+        verdict: u.need ? (deact ? 'Reassign before deactivating' : Art(nr) + nr + ' can’t do this — reassign first') : 'Stays with ' + who + ' — ' + art(nr) + nr + ' can still do this',
+        icon: u.need ? 'triangle-alert' : 'circle-check',
+        iconColor: u.need ? 'var(--aura-alert-warning-fg)' : 'var(--aura-fg-secondary)',
+        border: u.need ? 'var(--aura-alert-warning-border)' : 'var(--aura-border-default)',
+        bg: u.need ? 'var(--aura-alert-warning-bg)' : 'transparent',
+        err: st.tried && u.need && !val ? 'Pick who takes this over' : '',
+        set: function (e) { var r = JSON.parse(JSON.stringify(st.re)); r[u.key] = e && e.target ? e.target.value : e; self.setState({ re: r }); }
+      };
+    });
+    var needN = used.filter(function (u) { return u.need; }).length;
+    var adminNote = null;
+    if (d && !deact && nr === 'Admin') {
+      if (d.sv !== 'On') adminNote = { t: who + ' has 2-step off', warn: true, lines: [
+        who + ' becomes an Admin now but can view + acknowledge only until 2-step is on — Admin actions (users, sites, escalation, reviews) stay locked.',
+        'Once 2-step is on, ' + who + ' is a second active Admin and also gets monitor-fault emails. ' + who + ' gets an email with the steps.'] };
+      else adminNote = { t: 'Adds a second active Admin', warn: false, lines: [
+        who + ' has 2-step on, so Admin actions work straight away.',
+        'Monitor-fault emails go to Tao and ' + who + ' from now on — no longer only Tao.'] };
+    }
+    var READY = {
+      Arm: { n: '3 of 3', ok: true, checks: [['Alerts Space: notify for @mentions only', true], ['Space allowed through Do Not Disturb', true], ['Test alert received on this phone · Mon 14 Sep', true]], warn: '' },
+      Nok: { n: '3 of 3', ok: true, checks: [['Alerts Space: notify for @mentions only', true], ['Space allowed through Do Not Disturb', true], ['Test alert received on this phone · Tue 1 Sep', true]], warn: 'Nok is on call next (Mon 28 Sep → 5 Oct) — this makes it back-to-back. Nok has 2-step off: fine until Mon 5 Oct.' }
+    };
+    var hr = READY[st.handTo] || READY.Arm;
+    var tested = !!st.handTested[st.handTo];
+    var WHEN = { now: 'now (Fri 10:08)', tonight: 'tonight 18:00', sat: 'Sat 26 Sep 09:00' };
+    var emailOk = /^[^@\s]+@[^@\s]+$/.test(st.invEmail.trim());
+    return {
+      yes: true, no: false,
+      tabs: [
+        { id: 'users', label: 'Users & roles', href: 'Users.dc.html' },
+        { id: 'channels', label: 'Alert channels', href: 'AlertChannels.dc.html' },
+        { id: 'sso', label: 'Sign-in & security', href: 'Security.dc.html' },
+        { id: 'org', label: 'Organisation', href: 'Organisation.dc.html' },
+        { id: 'api', label: 'API & webhooks', href: 'ApiWebhooks.dc.html', count: 'Phase 3' }
+      ],
+      resend: function () { self.setState({ resent: true }); },
+      resendLabel: st.resent ? 'Sent again · expires 2 Oct' : 'Resend invite',
+      countLine: st.done ? st.done : (st.invited ? 'Invite sent to ' + st.invited + ' · expires Fri 2 Oct · shows here once they sign in' : names.length + ' people · Google Workspace accounts only · 2-step required for everyone from Mon 5 Oct · role changes are logged'),
+      bannerText: st.revoked ? 'Second Admin’s invite was revoked Fri 10:08. Invite another Admin so monitor-fault alerts don’t depend on one person.' : 'Second Admin was invited Thu 24 Sep 09:12 and hasn’t signed in yet. The invite expires Thu 1 Oct.',
+      hasInvite: !st.revoked,
+      menuLive: st.menu === 'Ploy' && !st.handedTo, menuInvite: st.menu === 'Second Admin', menuMember: st.menu !== 'Second Admin',
+      deactOff: st.menu === 'Tao',
+      roleOffWhy: st.menu === 'Second Admin' ? 'Not joined yet — the role can change after they sign in. To use a different role now, revoke and invite again.' : (st.revoked ? 'You’re the only active Admin — invite another Admin first.' : 'You’re the only active Admin until Second Admin joins.'),
+      resendMenu: function () { self.setState({ resent: true, menu: null, done: 'Invite sent again to Second Admin · expires Fri 2 Oct · logged' }); },
+      openRevoke: function () { self.setState({ menu: null, rev: true, revNote: '', revTried: false }); },
+      revOpen: st.rev, closeRevoke: function () { self.setState({ rev: false }); },
+      revNote: st.revNote, setRevNote: function (e) { self.setState({ revNote: e && e.target ? e.target.value : e }); },
+      revErr: st.revTried && !st.revNote.trim() ? 'Add a short reason — it goes in the audit log' : '',
+      confirmRevoke: function () { if (!st.revNote.trim()) { self.setState({ revTried: true }); return; } self.setState({ rev: false, revoked: true, done: 'Second Admin’s invite revoked · link no longer works · logged' }); },
+      hasAdminNote: !!adminNote, adminNoteTitle: adminNote ? adminNote.t : '', adminNotes: adminNote ? adminNote.lines : [],
+      adminNoteIcon: adminNote && adminNote.warn ? 'lock' : 'info',
+      adminNoteColor: adminNote && adminNote.warn ? 'var(--aura-alert-warning-fg)' : 'var(--aura-fg-secondary)',
+      adminNoteBorder: adminNote && adminNote.warn ? 'var(--aura-alert-warning-border)' : 'var(--aura-border-default)',
+      adminNoteBg: adminNote && adminNote.warn ? 'var(--aura-alert-warning-bg)' : 'var(--aura-bg-canvas)',
+      openHand: function () { self.setState({ menu: null, hand: true, handTo: 'Arm', handWhen: 'tonight', handNote: '', handTried: false }); },
+      handOpen: st.hand, closeHand: function () { self.setState({ hand: false }); },
+      handOpts: [{ value: 'Arm', label: 'Arm · phone 3 of 3 ready' }, { value: 'Nok', label: 'Nok · phone 3 of 3 ready · on call next' }],
+      handTo: st.handTo, setHandTo: function (e) { self.setState({ handTo: e && e.target ? e.target.value : e }); },
+      handWhenOpts: [{ value: 'now', label: 'Now · Fri 10:08' }, { value: 'tonight', label: 'Tonight 18:00' }, { value: 'sat', label: 'Sat 26 Sep 09:00' }],
+      handWhen: st.handWhen, setHandWhen: function (e) { self.setState({ handWhen: e && e.target ? e.target.value : e }); },
+      handReady: hr.n + ' ready', handBadge: tested ? 'Test sent 10:08' : 'Phone ready', handTone: tested ? 'neutral' : 'success', handIcon: tested ? 'clock' : 'circle-check',
+      handBorder: hr.warn ? 'var(--aura-alert-warning-border)' : 'var(--aura-border-default)',
+      handChecks: hr.checks.map(function (c) { return { label: c[0], icon: c[1] ? 'circle-check' : 'circle', color: c[1] ? 'var(--aura-fg-positive)' : 'var(--aura-fg-tertiary)' }; }),
+      hasHandWarn: !!hr.warn, handWarn: hr.warn,
+      handTested: tested, handTestLabel: tested ? 'Test alert sent to ' + st.handTo + ' · 10:08' : 'Send test alert to ' + st.handTo,
+      handTest: function () { var t = JSON.parse(JSON.stringify(st.handTested)); t[st.handTo] = true; self.setState({ handTested: t }); },
+      handSummary: 'From ' + WHEN[st.handWhen] + ' until Mon 28 Sep 09:00, Tier 1 DOWN at night and on the weekend @mentions ' + st.handTo + ' instead of Ploy.' + (st.handWhen === 'now' ? ' Right now owners respond until 18:00, so nothing changes before tonight.' : '') + ' Ploy and ' + st.handTo + ' get a Chat message; the On-call page updates.',
+      handNote: st.handNote, setHandNote: function (e) { self.setState({ handNote: e && e.target ? e.target.value : e }); },
+      handErr: st.handTried && !st.handNote.trim() ? 'Add a short reason — Ploy and ' + st.handTo + ' see it' : '',
+      handCta: 'Hand over to ' + st.handTo,
+      confirmHand: function () { if (!st.handNote.trim()) { self.setState({ handTried: true }); return; } self.setState({ hand: false, handedTo: st.handTo, done: 'Ploy’s shift handed to ' + st.handTo + ' from ' + WHEN[st.handWhen] + ' · both told in Chat · logged' }); },
+      countColor: st.done || st.invited ? 'var(--aura-fg-positive)' : 'var(--aura-fg-secondary)',
+      openInvite: function () { self.setState({ inv: true, invTried: false, invEmail: '', invRole: 'Responder' }); },
+      invOpen: st.inv,
+      closeInvite: function () { self.setState({ inv: false }); },
+      invEmail: st.invEmail,
+      setInvEmail: function (e) { self.setState({ invEmail: e && e.target ? e.target.value : e }); },
+      invErr: st.invTried && !emailOk ? 'Enter a DxT Google account, e.g. name@[company domain]' : '',
+      invRoles: ['Admin', 'Responder', 'Stakeholder', 'Viewer'],
+      invRole: st.invRole,
+      setInvRole: function (e) { self.setState({ invRole: e && e.target ? e.target.value : e }); },
+      invHint: st.invRole === 'Admin' ? 'Admin actions unlock once they turn on Google 2-step.' : (st.invRole === 'Responder' ? 'Can own sites and join the on-call rotation once they join.' : 'Can be picked as Site AM or in escalation once they join.'),
+      sendInvite: function () { if (!emailOk) { self.setState({ invTried: true }); return; } self.setState({ inv: false, invited: st.invEmail.trim(), done: '' }); },
+      userCount: names.length,
+      people: people,
+      menuOpen: !!st.menu,
+      menuLabel: st.menu ? 'Actions for ' + st.menu : '',
+      menuTop: 49 + (names.indexOf(st.menu) + 1) * 56 - 10,
+      roleOff: st.menu === 'Tao' || st.menu === 'Second Admin',
+      openRole: function () { var n = st.menu; var d0 = P[n]; self.setState({ menu: null, role: n, mode: 'role', newRole: d0.role === 'Responder' ? 'Viewer' : (d0.role === 'Viewer' ? 'Responder' : 'Viewer'), re: {}, tried: false }); },
+      openDeact: function () { var n = st.menu; self.setState({ menu: null, role: n, mode: 'deact', re: {}, tried: false }); },
+      isRole: !deact, isDeact: deact,
+      usedIn: usedIn, noUse: !!d && used.length === 0,
+      usedSummary: used.length ? (needN ? needN + ' of ' + used.length + ' need a new person' : 'Nothing needs reassigning') : '',
+      roles: ROLES.map(function (r, i) { return { label: r, phase: r === 'Client', w: W[i] }; }),
+      matrix: M.map(function (r) { return { label: r[0], cells: r[1].map(cell) }; }),
+      roleOpen: !!who,
+      closeRole: function () { self.setState({ role: null }); },
+      roleTitle: who ? (deact ? 'Deactivate ' + who + '?' : 'Change ' + who + '’s role') : '',
+      roleDesc: deact ? (who || '') + ' loses access at once and stops getting alerts and digests. Past acknowledgements and notes stay in the audit log; Tao can reactivate later.' : 'Takes effect as soon as you confirm. ' + (who || '') + ' gets an email saying what changed.',
+      curRole: cur,
+      roleOpts: ROLES.slice(0, 4).filter(function (r) { return r !== cur; }),
+      newRole: nr,
+      setNewRole: function (e) { self.setState({ newRole: e && e.target ? e.target.value : e, tried: false, re: {} }); },
+      gains: gains, noGains: gains.length === 0,
+      losses: losses, noLosses: losses.length === 0,
+      roleFoot: 'Logged in the audit log',
+      roleCta: who ? (deact ? 'Deactivate ' + who : 'Change to ' + nr) : 'Change role',
+      confirmRole: function () { if (missing) { self.setState({ tried: true }); return; } self.setState({ role: null, invited: '', done: deact ? who + ' deactivated · reassignments applied · logged' : who + ' is now ' + nr + ' · reassignments applied · logged' }); },
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

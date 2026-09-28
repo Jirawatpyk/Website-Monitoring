@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Sign in</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<section style="width: 600px; flex-shrink: 0; box-sizing: border-box; padding: 48px 56px; display: flex; flex-direction: column; justify-content: space-between; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted)">
+<div style="display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface); color: var(--aura-fg-primary); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 16px">
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 44px; line-height: 1.1; font-weight: 600; letter-spacing: -0.015em">Know a client site is down before the client does.</h1>
+<span style="font-size: 16px; line-height: 1.5; opacity: 0.75">DxT Website Monitoring · for the DxT team</span>
+</div>
+<span style="font-size: 12px; opacity: 0.6">Times shown in Thailand time (UTC+7)</span>
+</section>
+
+<main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; position: relative">
+<div class="aura-card" style="width: 440px; box-sizing: border-box; padding: 40px; gap: 24px">
+
+<sc-if value="{{isStart}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-family: var(--font-display); font-size: 30px; line-height: 1.2; font-weight: 600">Sign in</h2>
+<span style="font-size: 14px; color: var(--aura-fg-secondary); line-height: 1.5">Use your DxT Google account.</span>
+</div>
+<a href="Main.dc.html" style="height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; background: var(--aura-button-primary-bg); color: var(--aura-button-primary-fg); font-size: 14px; font-weight: 500; text-decoration: none">Sign in with Google</a>
+<div style="display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--aura-border-default); font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="bell" size="sm"></x-import></span><span>Came from an alert? You’ll go straight back to that incident.</span></div>
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="clock" size="sm"></x-import></span><span>You stay signed in on this device for 30 days.</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{isDomain}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-family: var(--font-display); font-size: 26px; line-height: 1.2; font-weight: 600">This account can’t sign in</h2>
+<span style="font-size: 14px; color: var(--aura-fg-secondary); line-height: 1.5">You used <b style="color: var(--aura-fg-primary)">someone@gmail.com</b>. Only DxT Google accounts can sign in.</span>
+</div>
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="Client or partner?">Uptime for your own sites is on your status page and in the monthly report. Ask your DxT account manager for the link.</x-import>
+<div style="display: flex; flex-direction: column"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="arrow-left" on-click="{{back}}">Use a different account</x-import></div>
+</sc-if>
+
+<sc-if value="{{isNoAccess}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-family: var(--font-display); font-size: 26px; line-height: 1.2; font-weight: 600">No access yet</h2>
+<span style="font-size: 14px; color: var(--aura-fg-secondary); line-height: 1.5"><b style="color: var(--aura-fg-primary)">[name]@[company domain]</b> is a DxT account, but it hasn’t been invited to Monitor yet.</span>
+</div>
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="Ask Tao to invite you">Tao (Admin) adds people and picks their role. You’ll get an email; the invite link works for 7 days.</x-import>
+<div style="display: flex; flex-direction: column"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="arrow-left" on-click="{{back}}">Use a different account</x-import></div>
+</sc-if>
+
+<sc-if value="{{isOff}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-family: var(--font-display); font-size: 26px; line-height: 1.2; font-weight: 600">Account deactivated</h2>
+<span style="font-size: 14px; color: var(--aura-fg-secondary); line-height: 1.5"><b style="color: var(--aura-fg-primary)">[name]@[company domain]</b> was deactivated by an Admin. It can’t see sites, incidents or reports any more.</span>
+</div>
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="Think this is a mistake?">Ask Tao to reactivate it. Your past acknowledgements and notes stay in the audit log either way.</x-import>
+<div style="display: flex; flex-direction: column"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="arrow-left" on-click="{{back}}">Use a different account</x-import></div>
+</sc-if>
+
+<sc-if value="{{isMfa}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-family: var(--font-display); font-size: 26px; line-height: 1.2; font-weight: 600">Turn on 2-step verification</h2>
+<span style="font-size: 14px; color: var(--aura-fg-secondary); line-height: 1.5">Signed in as <b style="color: var(--aura-fg-primary)">Second Admin</b> (first sign-in from Tao’s invite). Your role is Admin, and Admins can change alerts, escalation and uptime — so the system needs Google 2-step verification on.</span>
+</div>
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Admin actions are locked">Until it’s on, you can view + acknowledge only. Editing settings, excluding downtime and approving long maintenance stay locked.</x-import>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener" style="height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; background: var(--aura-button-primary-bg); color: var(--aura-button-primary-fg); font-size: 14px; font-weight: 500; text-decoration: none">Open Google security settings <x-import component-from-global-scope="Aura.Icon" name="external-link" size="sm"></x-import></a>
+<span style="font-size: 12px; color: var(--aura-fg-tertiary); line-height: 1.5; text-align: center">Opens in a new tab. Come back and sign in again once it’s on.</span>
+<a href="Main.dc.html" style="height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 9999px; border: 1px solid var(--aura-button-secondary-border); color: var(--aura-fg-primary); font-size: 13px; font-weight: 500; text-decoration: none">Continue with limited access</a>
+</div>
+</sc-if>
+
+<sc-if value="{{isReq}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-family: var(--font-display); font-size: 26px; line-height: 1.2; font-weight: 600">2-step required — you can acknowledge only</h2>
+<span style="font-size: 14px; color: var(--aura-fg-secondary); line-height: 1.5">Signed in as <b style="color: var(--aura-fg-primary)">Nok</b>. Since Mon 5 Oct, Monitor needs Google 2-step verification for everyone, and yours is still off.</span>
+</div>
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Until it’s on">You can view sites and incidents and acknowledge alerts from the Ack link. Mute, maintenance, resolve, client-update marking and everything else stay locked.</x-import>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener" style="height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; background: var(--aura-button-primary-bg); color: var(--aura-button-primary-fg); font-size: 14px; font-weight: 500; text-decoration: none">Turn on 2-step in Google <x-import component-from-global-scope="Aura.Icon" name="external-link" size="sm"></x-import></a>
+<span style="font-size: 12px; color: var(--aura-fg-tertiary); line-height: 1.5; text-align: center">Opens in a new tab. Sign in again once it’s on — everything unlocks.</span>
+<a href="Main.dc.html" style="height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 9999px; border: 1px solid var(--aura-button-secondary-border); color: var(--aura-fg-primary); font-size: 13px; font-weight: 500; text-decoration: none">Continue — acknowledge only</a>
+</div>
+</sc-if>
+
+<sc-if value="{{isOk}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 12px 0">
+<span style="width: 48px; height: 48px; border-radius: 9999px; background: var(--aura-bg-canvas); color: var(--aura-fg-secondary); display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="loader-circle" size="md"></x-import></span>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 18px; font-weight: 600">Welcome back, Tao</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Taking you back to the page you opened — INC-0142 · MuvMi</span>
+</div>
+<a href="Incident.dc.html" style="height: 44px; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-button-primary-bg); color: var(--aura-button-primary-fg); font-size: 13px; font-weight: 500; text-decoration: none">Go now</a>
+</div>
+</sc-if>
+
+</div>
+
+<div style="position: absolute; left: 50%; bottom: 32px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--aura-fg-tertiary)">
+<span style="font-family: var(--font-mono)">STATE</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{states}}" value="{{stateLabel}}" on-change="{{pickState}}" size="sm"></x-import>
+</div>
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 'Sign in' };
+  }
+  renderVals() {
+    var self = this;
+    var s = this.state.step;
+    return {
+      isStart: s === 'Sign in',
+      isDomain: s === 'Wrong domain',
+      isNoAccess: s === 'No access yet',
+      isOff: s === 'Deactivated',
+      isMfa: s === 'Admin, no 2-step',
+      isReq: s === '2-step required',
+      isOk: s === 'Redirecting',
+      states: ['Sign in', 'Wrong domain', 'No access yet', 'Deactivated', 'Admin, no 2-step', '2-step required', 'Redirecting'],
+      stateLabel: s,
+      pickState: function (v) { self.setState({ step: v }); },
+      back: function () { self.setState({ step: 'Sign in' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

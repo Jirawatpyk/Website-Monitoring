@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — My profile</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1136px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="profile" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 24px">
+<div style="display: flex; align-items: center; gap: 16px">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="lg"></x-import>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">ACCOUNT</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 32px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Tao</h1>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="solid">Admin</x-import>
+<span>Jirawat Piyakit · Admin · Google Workspace account · 2-step verification on</span>
+</div>
+</div>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="log-out" href="Login.dc.html">Sign out</x-import>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start">
+
+<div style="display: flex; flex-direction: column; gap: 24px">
+
+<div class="aura-card" style="gap: 16px">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; line-height: 1.5">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">How alerts reach me</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">At least one must work before you can own a site or be on call.</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="bell" on-click="{{test}}">{{testLabel}}</x-import>
+</div>
+<sc-for list="{{channels}}" as="c" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<span style="width: 36px; height: 36px; flex-shrink: 0; border-radius: var(--aura-radius-sm); background: var(--aura-bg-canvas); display: flex; align-items: center; justify-content: center; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-weight: 600">{{c.name}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{c.detail}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Badge" tone="{{c.tone}}" icon="{{c.bicon}}">{{c.status}}</x-import>
+</div>
+</sc-for>
+<sc-if value="{{tested}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="success" title="Test sent at 10:08">Posted in its own “TEST — no action” thread, mentioning only you. Chat arrived in 1.3 s, email in 2.2 s. If your phone didn’t buzz, allow the Alerts Space through Do Not Disturb.</x-import>
+</sc-if>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Sites I’m responsible for</h3>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Site</div>
+<div class="aura-table__th" style="width: 72px">Tier</div>
+<div class="aura-table__th" style="width: 120px">My role</div>
+<div class="aura-table__th" style="width: 190px">Status</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{sites}}" as="s" hint-placeholder-count="8">
+<a href="SiteDetail.dc.html" class="aura-table__row" style="color: inherit; text-decoration: none">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; font-weight: 500">{{s.name}}</div>
+<div class="aura-table__td" style="width: 72px; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">T{{s.tier}}</div>
+<div class="aura-table__td" style="width: 120px">{{s.role}}</div>
+<div class="aura-table__td" style="width: 190px; display: flex; align-items: center; gap: 6px; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" icon="{{s.icon}}">{{s.st}}</x-import><sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted · until 18:00</x-import></sc-if></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</a>
+</sc-for>
+</div>
+</div>
+
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 24px">
+
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Where I sit in escalation</h3>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Every DOWN, all tiers</span><span style="font-weight: 500; text-align: right">L1 at +15 min, with the backup</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Tier 2–3 DOWN</span><span style="font-weight: 500; text-align: right">L2 reminder at +30 min</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">My 6 sites</span><span style="font-weight: 500; text-align: right">L0 — I’m the owner</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary); white-space: nowrap">Monitor faults</span><span style="font-weight: 500; text-align: right; display: flex; flex-direction: column; gap: 4px"><span>Engine heartbeat missed &gt; 3 min → email to me + Alerts Space post @mentioning on-call</span><span>One probe (BKK, SIN or TYO) missing &gt; 3 min → email to me only, no page</span></span></div>
+<div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: -6px; font-size: 12px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import>Only Tao · Second Admin not joined · <a href="Users.dc.html">Users</a></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Tier 1 night rotation</span><span style="font-weight: 500; text-align: right">Not in it — Admin backstop</span></div>
+</div>
+<div style="display: flex; gap: 16px"><a href="Escalation.dc.html" style="font-size: 13px">Escalation policies</a><a href="OnCall.dc.html" style="font-size: 13px">See the rotation</a></div>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; flex-direction: column; line-height: 1.5">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Signed-in devices</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Sessions last 30 days so the Ack link opens straight to the incident. Signing out a device takes effect now.</span>
+</div>
+<sc-for list="{{devices}}" as="d" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.4">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{d.icon}}" size="sm"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column"><span style="font-weight: 500">{{d.name}}</span><span style="color: var(--aura-fg-secondary)">{{d.when}}</span></div>
+<sc-if value="{{d.current}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral">This device</x-import></sc-if>
+<sc-if value="{{d.other}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{d.out}}">Sign out</x-import></sc-if><sc-if value="{{d.gone}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Signed out · now</span></sc-if>
+</div>
+</sc-for>
+</div>
+
+<div class="aura-card" style="gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Same for everyone</h3><a href="Organisation.dc.html" style="font-size: 13px">Edit in Organisation</a></div>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Response hours · Tier 1</span><span style="font-weight: 500">24/7</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Response hours · Tier 2–3</span><span style="font-weight: 500">Mon–Fri 09:00–18:00</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Time zone</span><span style="font-weight: 500">Thailand (UTC+7)</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary)">Language</span><span style="font-weight: 500">English in v1</span></div>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">There’s no personal do-not-disturb here — DOWN always reaches whoever is expected to act.</span>
+</div>
+
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1136}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tested: false, out: [] };
+  }
+  renderVals() {
+    var self = this;
+    var OK = { tone: 'success', st: 'OK', icon: 'circle-check' };
+    function site(name, tier, role) { return Object.assign({ name: name, tier: tier, role: role, muted: false }, OK); }
+    return {
+      tested: this.state.tested,
+      testLabel: this.state.tested ? 'Send again' : 'Send me a test alert',
+      test: function () { self.setState({ tested: true }); },
+      channels: [
+        { icon: 'bell', name: 'Google Chat @mention', detail: 'Matched to your Chat user in DxT Website Alerts · primary', tone: 'success', bicon: 'circle-check', status: 'Working' },
+        { icon: 'mail', name: 'Email', detail: 'Your Workspace address · record + fallback', tone: 'success', bicon: 'circle-check', status: 'Working' },
+        { icon: 'lock', name: 'Phone call (Twilio)', detail: 'Only if the CEO approves voice calls for Tier 1 at L2', tone: 'neutral', bicon: 'clock', status: 'Not available' }
+      ],
+      sites: [
+        site('EQHO', 2, 'Owner'),
+        site('ORCA Thailand', 2, 'Owner'),
+        site('DxT', 2, 'Owner'),
+        site('DxT Solutions', 3, 'Owner'),
+        site('DxT AI', 3, 'Owner'),
+        Object.assign(site('DxT Games', 3, 'Owner'), { muted: true }),
+        site('VOCA', 2, 'Backup')
+      ],
+      devices: [
+        { icon: 'monitor', name: 'Chrome · macOS', when: 'Bangkok · active now', current: true, other: false },
+        { icon: 'monitor', name: 'Safari · iPhone', when: 'Bangkok · last used today 07:52', current: false },
+        { icon: 'monitor', name: 'Chrome · Windows', when: 'Bangkok · last used 18 Sep', current: false }
+      ].map(function (d) { if (d.current) return Object.assign({ gone: false }, d); var gone = self.state.out.indexOf(d.name) >= 0; return Object.assign({}, d, { other: !gone, gone: gone, out: function () { self.setState({ out: self.state.out.concat([d.name]) }); } }); }),
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

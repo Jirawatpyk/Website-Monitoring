@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Client status page — mobile</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+/* Day-bar tokens — same definitions as the desktop status page; defined once here. */
+:root{--day-ok:#84cc16;--day-deg:#f59e0b;--day-out:var(--aura-status-blocked-bg);--day-mnt:var(--aura-fg-secondary);--day-nodata:var(--aura-border-control);--day-hatch:rgba(0,0,0,.3);--day-cap:4px}
+.day{display:block;box-sizing:border-box;border-radius:2px;background:var(--day-ok);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.day[data-k="deg"]{background:repeating-linear-gradient(135deg,var(--day-hatch) 0 1.5px,transparent 1.5px 4px),var(--day-deg)}
+.day[data-k="out"]{background:var(--day-out)}
+.day[data-k="no"]{background:repeating-linear-gradient(135deg,var(--day-nodata) 0 1.5px,transparent 1.5px 4px);box-shadow:inset 0 0 0 1px var(--aura-border-default)}
+.day[data-m="1"]{box-shadow:inset 0 var(--day-cap) 0 0 var(--day-mnt)}
+.strip{all:unset;box-sizing:border-box;width:100%;min-height:44px;padding:6px 0 2px;display:flex;flex-direction:column;gap:4px;cursor:pointer;border-radius:6px}
+.strip:focus-visible{outline:2px solid var(--aura-fg-accent);outline-offset:3px}
+.strip:active .stripgrid{opacity:.8}
+.stripgrid{height:32px;display:grid;gap:2px;align-items:end}
+.stripcta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;line-height:1.3}
+.stripcta b{display:inline-flex;align-items:center;gap:2px;font-weight:500;color:var(--aura-fg-accent)}
+.dayrow{min-height:44px;box-sizing:border-box;padding:10px 0;display:flex;gap:10px;border-top:1px solid var(--aura-border-subtle)}
+.sw{width:6px;flex-shrink:0}
+.seg{display:inline-flex;box-sizing:border-box;height:46px;padding:0 1px;border:1px solid var(--aura-border-default);border-radius:9999px;background:var(--aura-bg-surface)}
+/* Segments are 44 px tall hit areas; the visible pill is drawn 4 px inside with inset shadows (visual 36 px). */
+.seg button{all:unset;box-sizing:border-box;min-width:44px;height:44px;padding:0 13px;display:flex;align-items:center;justify-content:center;border-radius:9999px;font-size:12px;font-weight:500;color:var(--aura-fg-secondary);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--aura-bg-canvas);color:var(--aura-fg-primary);box-shadow:inset 0 0 0 3px var(--aura-bg-surface),inset 0 0 0 4px var(--aura-border-default)}
+.seg button:focus-visible,.pill:focus-visible{outline:2px solid var(--aura-fg-accent);outline-offset:2px}
+.pill{all:unset;box-sizing:border-box;height:44px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:9999px;border:1px solid var(--aura-button-secondary-border);color:var(--aura-fg-primary);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.pill.primary{background:var(--aura-button-primary-bg);border-color:var(--aura-button-primary-bg);color:var(--aura-button-primary-fg)}
+.pill[disabled]{opacity:.45;cursor:not-allowed}
+.aura-input{min-height:44px}
+.x44{all:unset;box-sizing:border-box;flex-shrink:0;width:44px;height:44px;margin:-10px -10px -10px 0;display:flex;align-items:center;justify-content:center;border-radius:9999px;cursor:pointer;color:var(--aura-fg-secondary)}
+.x44:focus-visible{outline:2px solid var(--aura-fg-accent)}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 60px; flex-shrink: 0; box-sizing: border-box; padding: 0 12px 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<div style="height: 32px; width: 84px; flex-shrink: 0; box-sizing: border-box; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-sm); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--aura-fg-secondary)">[Client logo]</div>
+<div style="display: flex; align-items: center; gap: 6px">
+<div class="seg" role="group" aria-label="Language">
+<sc-for list="{{langBtns}}" as="l" hint-placeholder-count="2"><button type="button" aria-pressed="{{l.on}}" onClick="{{l.pick}}">{{l.label}}</button></sc-for>
+</div>
+<button type="button" class="pill" onClick="{{openSub}}"><x-import component-from-global-scope="Aura.Icon" name="bell" size="sm"></x-import>{{t.subscribe}}</button>
+</div>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; box-sizing: border-box; padding: 18px 16px 16px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">{{t.eyebrow}}</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 26px; line-height: 1.2; font-weight: 600">{{t.client}}</h1>
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: var(--aura-alert-success-bg); border: 1px solid var(--aura-alert-success-border); border-radius: var(--aura-radius-lg)">
+<span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-status-ready-bg); color: var(--aura-status-ready-fg); display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.4">
+<span style="font-size: 16px; font-weight: 600">{{t.allOk}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.checked}}</span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<div style="display: flex; flex-direction: column; line-height: 1.3">
+<span style="font-size: 15px; font-weight: 600">{{t.websites}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.availability}}</span>
+</div>
+<div class="seg" role="group" aria-label="Time window">
+<sc-for list="{{winBtns}}" as="w" hint-placeholder-count="2"><button type="button" aria-pressed="{{w.on}}" onClick="{{w.pick}}">{{w.label}}</button></sc-for>
+</div>
+</div>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<sc-for list="{{sites}}" as="s" hint-placeholder-count="2">
+<div style="padding: 12px 16px 8px; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-size: 14px; font-weight: 600">{{s.name}}</span>
+<x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">{{t.operational}}</x-import>
+</div>
+<button type="button" class="strip" id="{{s.btnId}}" aria-haspopup="dialog" aria-expanded="{{s.exp}}" aria-controls="daysheet" aria-label="{{s.aria}}" onClick="{{s.open}}">
+<sc-for list="{{s.rows}}" as="r" hint-placeholder-count="1">
+<sc-if value="{{r.hasLabel}}" hint-placeholder-val="{{false}}"><span style="display: block; font-size: 11px; line-height: 1.2; color: var(--aura-fg-secondary)">{{r.label}}</span></sc-if>
+<span class="stripgrid" style="grid-template-columns: repeat(30, minmax(0, 1fr))">
+<sc-for list="{{r.days}}" as="d" hint-placeholder-count="30"><span class="day" data-k="{{d.k}}" data-m="{{d.m}}" style="width: 100%; height: {{d.h}}px"></span></sc-for>
+</span>
+</sc-for>
+<span style="display: flex; justify-content: space-between; font-size: 11px; color: var(--aura-fg-secondary)"><span>{{t.ago}}</span><span style="font-weight: 600; color: var(--aura-fg-primary)">{{s.uptimeText}}</span><span>{{t.today}}</span></span>
+<span class="stripcta"><span style="color: var(--aura-fg-secondary)">{{s.evText}}</span><b>{{t.viewDays}}<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></b></span>
+</button>
+</div>
+</sc-for>
+<div style="padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; line-height: 1.4; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas); border-radius: 0 0 var(--aura-radius-lg) var(--aura-radius-lg)">
+<span style="display: flex; align-items: flex-end; gap: 5px"><span class="day sw" data-k="ok" style="height: 10px"></span>{{t.lOk}}</span>
+<span style="display: flex; align-items: flex-end; gap: 5px"><span class="day sw" data-k="deg" style="height: 13px"></span>{{t.lDeg}}</span>
+<span style="display: flex; align-items: flex-end; gap: 5px"><span class="day sw" data-k="out" style="height: 16px"></span>{{t.lOut}}</span>
+<span style="display: flex; align-items: flex-end; gap: 5px"><span class="day sw" data-k="ok" data-m="1" style="height: 10px"></span>{{t.lMnt}}</span>
+<span style="display: flex; align-items: flex-end; gap: 5px"><span class="day sw" data-k="no" style="height: 10px"></span>{{t.lNo}}</span>
+<span style="width: 100%">{{t.legendNote}}</span>
+</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: baseline; justify-content: space-between">
+<span style="font-size: 15px; font-weight: 600">{{t.past}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.pastWin}}</span>
+</div>
+<sc-for list="{{past}}" as="p" hint-placeholder-count="2">
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 8px"><x-import component-from-global-scope="Aura.Badge" tone="{{p.tone}}" variant="{{p.variant}}" icon="{{p.icon}}">{{p.kind}}</x-import><span style="margin-left: auto; font-size: 11px; color: var(--aura-fg-secondary)">{{p.when}}</span></div>
+<span style="font-size: 13px; font-weight: 600; line-height: 1.4">{{p.title}}</span>
+<span style="font-size: 12px; line-height: 1.5"><span style="font-weight: 600">{{p.status}}</span> — <span style="color: var(--aura-fg-secondary)">{{p.body}}</span></span>
+</div>
+</sc-for>
+</div>
+
+<span style="font-size: 11px; color: var(--aura-fg-secondary); text-align: center">{{t.footer}}</span>
+</div>
+
+<sc-if value="{{subOpen}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; z-index: 20; background: rgba(9,9,11,.45); display: flex; flex-direction: column; justify-content: flex-end">
+<div role="dialog" aria-modal="true" aria-label="{{sub.title}}" style="box-sizing: border-box; padding: 8px 16px 24px; background: var(--aura-bg-surface); border-radius: 16px 16px 0 0; display: flex; flex-direction: column; gap: 12px">
+<span style="align-self: center; width: 36px; height: 4px; border-radius: 9999px; background: var(--aura-border-control)"></span>
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">
+<div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.4">
+<span style="font-size: 17px; font-weight: 600">{{sub.title}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{sub.desc}}</span>
+</div>
+<button type="button" class="x44" aria-label="{{t.close}}" onClick="{{closeSub}}" style="margin: -6px -10px 0 0"><x-import component-from-global-scope="Aura.Icon" name="x" size="sm"></x-import></button>
+</div>
+<sc-if value="{{subForm}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<x-import component-from-global-scope="Aura.TextField" label="{{sub.email}}" type="email" placeholder="name@company.com" value="{{email}}" error="{{emailErr}}" on-change="{{setEmail}}" on-blur="{{blurEmail}}"></x-import>
+<div role="group" aria-label="{{sub.sites}}" style="display: flex; flex-direction: column">
+<span style="font-size: 13px; font-weight: 500">{{sub.sites}}</span>
+<div style="min-height: 44px; display: flex; align-items: center"><x-import component-from-global-scope="Aura.Checkbox" checked="{{subT}}" on-change="{{setSubT}}">{{sub.tw}}</x-import></div>
+<div style="min-height: 44px; display: flex; align-items: center; border-top: 1px solid var(--aura-border-subtle)"><x-import component-from-global-scope="Aura.Checkbox" checked="{{subC}}" on-change="{{setSubC}}">{{sub.cn}}</x-import></div>
+<div style="min-height: 44px; display: flex; align-items: center; border-top: 1px solid var(--aura-border-subtle)"><x-import component-from-global-scope="Aura.Checkbox" checked="{{subM}}" on-change="{{setSubM}}">{{sub.mnt}}</x-import></div>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{sub.note}}</span>
+<sc-if value="{{hasSubReason}}" hint-placeholder-val="{{false}}"><span role="alert" style="font-size: 12px; line-height: 1.4; color: var(--aura-alert-danger-fg); text-align: right">{{subReason}}</span></sc-if>
+<div style="display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px">
+<button type="button" class="pill" onClick="{{closeSub}}">{{sub.cancel}}</button>
+<button type="button" class="pill primary" onClick="{{doSub}}"><x-import component-from-global-scope="Aura.Icon" name="mail" size="sm"></x-import>{{sub.go}}</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{subSent}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; gap: 10px; padding: 12px 14px; background: var(--aura-alert-success-bg); border: 1px solid var(--aura-alert-success-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: var(--aura-alert-success-fg)"><x-import component-from-global-scope="Aura.Icon" name="mail" size="sm"></x-import></span>
+<span>{{sub.sentBody}}</span>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{sub.unsub}}</span>
+<button type="button" class="pill primary" onClick="{{closeSub}}">{{sub.done}}</button>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{sheetOpen}}" hint-placeholder-val="{{false}}">
+<div onClick="{{closeSheet}}" style="position: absolute; inset: 0; z-index: 20; background: rgba(9,9,11,.45); display: flex; flex-direction: column; justify-content: flex-end">
+<div role="dialog" id="daysheet" aria-modal="true" aria-labelledby="daysheet-title" onClick="{{stop}}" onKeyDown="{{sheetKey}}" style="max-height: 80%; box-sizing: border-box; padding: 8px 16px 20px; background: var(--aura-bg-surface); border-radius: 16px 16px 0 0; display: flex; flex-direction: column; gap: 12px">
+<span style="align-self: center; width: 36px; height: 4px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-border-control)"></span>
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">
+<div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.4">
+<span id="daysheet-title" style="font-size: 17px; font-weight: 600">{{sh.title}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{sh.sub}}</span>
+</div>
+<button type="button" class="x44" id="daysheet-close" aria-label="{{t.close}}" onClick="{{closeSheet}}" style="margin: -6px -10px 0 0"><x-import component-from-global-scope="Aura.Icon" name="x" size="sm"></x-import></button>
+</div>
+<div class="seg" role="group" aria-label="{{sh.filterLabel}}" style="align-self: flex-start">
+<sc-for list="{{sh.filters}}" as="f" hint-placeholder-count="2"><button type="button" aria-pressed="{{f.on}}" onClick="{{f.pick}}">{{f.label}}</button></sc-for>
+</div>
+<div role="list" aria-label="{{sh.listLabel}}" style="min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 0 16px">
+<sc-for list="{{sh.items}}" as="it" hint-placeholder-count="2">
+<div role="listitem" class="dayrow">
+<span class="day sw" data-k="{{it.k}}" data-m="{{it.m}}" style="height: 16px; margin-top: 3px"></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.4">
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 13px"><span style="font-weight: 600">{{it.date}}</span><span style="font-weight: 500">{{it.state}}</span></div>
+<sc-if value="{{it.hasBody}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px">{{it.body}}</span></sc-if>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{it.note}}</span>
+</div>
+</div>
+</sc-for>
+<sc-if value="{{sh.empty}}" hint-placeholder-val="{{false}}">
+<div class="dayrow" style="flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.45"><span style="font-weight: 600">{{sh.emptyTitle}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{sh.emptyBody}}</span></div>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { lang: 'EN', win: 30, sheet: null, sub: 'closed', email: '', emailBlur: false, subTried: false, subT: true, subC: true, subM: true };
+  }
+  renderVals() {
+    var self = this;
+    var S = this.state;
+    var th = S.lang === 'TH';
+    var N = S.win;
+    // Mirrors the desktop status page, Operational state (Fri 25 Sep 10:07). Same ledger, labels and copy.
+    var now = new Date(2026, 8, 25);
+    var WD = th ? ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var MO = th ? ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function dm(d) { return d.getDate() + ' ' + MO[d.getMonth()]; }
+    function wdm(d) { return WD[d.getDay()] + ' ' + dm(d); }
+    function mins(m) { if (m < 60) return m + (th ? ' นาที' : ' min'); var h = Math.floor(m / 60), r = m % 60; return h + (th ? ' ชม.' : ' h') + (r ? ' ' + r + (th ? ' นาที' : ' min') : ''); }
+    function key(d) { return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate(); }
+    var at = th ? ' น.' : '';
+    var TW = th ? 'บางกอกแอร์เวย์ส – ไต้หวัน' : 'Bangkok Airways – Taiwan';
+    var CN = th ? 'บางกอกแอร์เวย์ส – จีน' : 'Bangkok Airways – China';
+    var LBL = th
+      ? { ok: 'ใช้งานได้ปกติ', deg: 'ประสิทธิภาพลดลง', out: 'ใช้งานไม่ได้', mnt: 'ปิดปรับปรุงตามแผน', no: 'ไม่มีข้อมูล' }
+      : { ok: 'Operational', deg: 'Degraded', out: 'Outage', mnt: 'Planned maintenance', no: 'No data' };
+    var NOTE = th
+      ? { out: 'นับรวมในความพร้อมใช้งาน', deg: 'เว็บไซต์ยังเข้าได้ · ไม่นับรวมในความพร้อมใช้งาน', ok: 'ไม่มีช่วงที่ใช้งานไม่ได้' }
+      : { out: 'Counted in uptime', deg: 'Site stayed up · not counted in uptime', ok: 'No downtime' };
+    var EV = [
+      { sites: 't', d: new Date(2026, 8, 14), time: '21:12', k: 'deg', min: 6,
+        short: th ? 'โหลดช้าในบางภูมิภาค' : 'Slower loading in one region',
+        body: th ? 'ผู้เข้าชมในบางภูมิภาคโหลดหน้าเว็บช้าลง เว็บไซต์ยังเข้าใช้งานได้ตลอดเวลา' : 'Slower loading for visitors in one region. The site stayed available throughout.' },
+      { sites: 't', d: new Date(2026, 8, 2), time: '03:40', k: 'out', min: 11,
+        short: th ? 'เซิร์ฟเวอร์ขัดข้อง แก้ไขแล้ว' : 'Server fault, restored',
+        body: th ? 'เว็บไซต์เข้าไม่ได้ชั่วคราวจากปัญหาเซิร์ฟเวอร์ ทีมงานแก้ไขแล้วและใช้งานได้ตามปกติตั้งแต่นั้น' : 'The site was briefly unreachable due to a server fault. Our team restored it and it has been stable since.' },
+      { sites: 'c', d: new Date(2026, 7, 21), time: '14:06', k: 'out', min: 26,
+        short: th ? 'เครือข่ายของผู้ให้บริการโฮสติ้งขัดข้อง' : 'Hosting provider network fault',
+        body: th ? 'ผู้ให้บริการโฮสติ้งมีปัญหาเครือข่าย เว็บไซต์กลับมาใช้งานได้หลังผู้ให้บริการแก้ไข' : 'A network fault at the hosting provider. Service returned once the provider fixed it.' },
+      { sites: 't', d: new Date(2026, 7, 18), time: '10:05', k: 'deg', min: 14,
+        short: th ? 'หน้าจองตั๋วโหลดช้า' : 'Booking page slow',
+        body: th ? 'หน้าจองตั๋วโหลดช้า เว็บไซต์ยังเข้าใช้งานได้ตลอดเวลา' : 'The booking page was slow to load. The site stayed available throughout.' },
+      { sites: 'tc', d: new Date(2026, 7, 12), time: '22:00', end: '00:00', k: 'mnt', min: 120,
+        short: th ? 'ปิดปรับปรุงเซิร์ฟเวอร์ตามแผน' : 'Scheduled server work',
+        body: th ? 'ปิดปรับปรุงเซิร์ฟเวอร์ตามกำหนดที่แจ้งไว้ล่วงหน้า ไม่นำมานับในความพร้อมใช้งาน' : 'Scheduled server work, announced in advance. Not counted in uptime.' }
+    ];
+    var first = new Date(2026, 8, 25 - (N - 1));
+    function inWin(e) { return key(e.d) >= key(first) && key(e.d) <= key(now); }
+    function dayList(site) {
+      var out = [];
+      for (var i = N - 1; i >= 0; i--) {
+        var d = new Date(2026, 8, 25 - i);
+        var evs = EV.filter(function (e) { return e.sites.indexOf(site) >= 0 && key(e.d) === key(d); });
+        var k = 'ok', min = 0, mnt = null, short = '';
+        evs.forEach(function (e) {
+          if (e.k === 'out') { k = 'out'; min += e.min; short = e.short; }
+          else if (e.k === 'deg' && k !== 'out') { k = 'deg'; min += e.min; short = e.short; }
+          else if (e.k === 'mnt') { mnt = e.time + '–' + e.end; if (!short) short = e.short; }
+        });
+        var note = mnt ? LBL.mnt + ' ' + mnt + at + (th ? ' · ไม่นับรวมในความพร้อมใช้งาน' : ' · not counted in uptime') : NOTE[k];
+        out.push({ k: k, m: mnt ? '1' : '0', h: k === 'out' ? 32 : (k === 'deg' ? 26 : 20), ev: k !== 'ok' || !!mnt,
+          _d: d, _date: wdm(d), _state: LBL[k] + (min ? ' · ' + mins(min) : ''), _short: short, _note: note });
+      }
+      return out;
+    }
+    // Each site's strip is ONE control (the bars are ~9 px wide — too small to tap one by one). It opens a bottom sheet
+    // listing the days with events (or all days), with the same per-day detail the desktop popover shows.
+    function rows(all) {
+      var out = [];
+      for (var r = 0; r < N / 30; r++) {
+        var ds = all.slice(r * 30, r * 30 + 30);
+        var label = dm(ds[0]._d) + ' – ' + dm(ds[29]._d);
+        out.push({ days: ds, hasLabel: N > 30, label: label });
+      }
+      return out;
+    }
+    function uptime(site) {
+      var down = 0, maint = 0;
+      EV.forEach(function (e) { if (e.sites.indexOf(site) >= 0 && inWin(e)) { if (e.k === 'out') down += e.min; if (e.k === 'mnt') maint += e.min; } });
+      var up = (100 * (1 - down / (N * 1440 - maint))).toFixed(2) + '%';
+      return th ? ('ความพร้อมใช้งาน ' + up) : (up + ' uptime');
+    }
+    var KIND = {
+      out: { tone: 'danger', variant: 'outline', icon: 'ban', kind: LBL.out },
+      deg: { tone: 'warning', variant: 'soft', icon: 'triangle-alert', kind: LBL.deg },
+      mnt: { tone: 'neutral', variant: 'soft', icon: 'calendar', kind: LBL.mnt }
+    };
+    var T = th ? {
+      subscribe: 'รับการแจ้งเตือน', close: 'ปิด', eyebrow: 'สถานะเว็บไซต์', client: 'บางกอกแอร์เวย์ส', allOk: 'เว็บไซต์ทั้งหมดใช้งานได้ปกติ',
+      checked: 'ตรวจสอบล่าสุด ศ. 25 ก.ย. 10:07 น. (UTC+7) · ตรวจทุก 1 นาทีจากกรุงเทพฯ สิงคโปร์ และโตเกียว', websites: 'เว็บไซต์', availability: 'ความพร้อมใช้งาน ' + N + ' วันล่าสุด',
+      operational: LBL.ok, ago: N + ' วันก่อน', today: 'วันนี้', lOk: LBL.ok, lDeg: LBL.deg, lOut: LBL.out, lMnt: LBL.mnt, lNo: LBL.no,
+      legendNote: 'แตะแถบของเว็บไซต์เพื่อดูรายละเอียดรายวัน', viewDays: 'ดูรายวัน',
+      past: 'เหตุการณ์ที่ผ่านมา', pastWin: N + ' วันล่าสุด', footer: 'เวลาทั้งหมดเป็นเวลาประเทศไทย (UTC+7) · ตรวจสอบโดย DxT'
+    } : {
+      subscribe: 'Get updates', close: 'Close', eyebrow: 'WEBSITE STATUS', client: 'Bangkok Airways', allOk: 'All websites are operational',
+      checked: 'Last checked Fri 25 Sep 10:07 (UTC+7) · every minute from Bangkok, Singapore and Tokyo', websites: 'Websites', availability: 'Availability, last ' + N + ' days',
+      operational: LBL.ok, ago: N + ' days ago', today: 'Today', lOk: LBL.ok, lDeg: LBL.deg, lOut: LBL.out, lMnt: LBL.mnt, lNo: LBL.no,
+      legendNote: 'Tap a site’s bar to see each day', viewDays: 'View days',
+      past: 'Past incidents', pastWin: 'Last ' + N + ' days', footer: 'All times are Thailand time (UTC+7) · Monitored by DxT'
+    };
+    var em = (S.email || '').trim();
+    var emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em);
+    var anySite = S.subT || S.subC;
+    var SUB = th ? {
+      title: S.sub === 'sent' ? 'โปรดตรวจสอบอีเมลของคุณ' : 'รับการแจ้งเตือนสถานะทางอีเมล',
+      desc: S.sub === 'sent' ? 'ยังไม่ได้เริ่มส่งการแจ้งเตือนจนกว่าคุณจะยืนยัน' : 'เราจะส่งอีเมลเมื่อเว็บไซต์ใช้งานไม่ได้เริ่มขึ้นและเมื่อแก้ไขแล้ว เฉพาะกรณีใช้งานไม่ได้ — ไม่รวมกรณีโหลดช้า ไม่มีอีเมลโฆษณา',
+      email: 'อีเมล', sites: 'เว็บไซต์ที่ต้องการติดตาม', tw: TW, cn: CN, mnt: 'รวมประกาศการปิดปรับปรุงตามแผน',
+      note: 'เราจะส่งลิงก์ยืนยันไปก่อน และทุกอีเมลมีลิงก์ยกเลิกการรับได้ในคลิกเดียว ใช้อีเมลนี้เพื่อแจ้งสถานะเท่านั้น',
+      cancel: 'ยกเลิก', go: 'สมัครรับการแจ้งเตือน', done: 'เสร็จสิ้น',
+      sentBody: 'เราส่งลิงก์ยืนยันไปที่ ' + (em || 'name@company.com') + ' แล้ว การแจ้งเตือนจะเริ่มหลังจากคุณกดยืนยัน',
+      unsub: 'หากต้องการหยุดรับ กด “ยกเลิกการรับ” ท้ายอีเมลฉบับใดก็ได้ ระบบจะหยุดส่งทันที',
+      emailErr: 'กรอกอีเมลให้ถูกต้อง เช่น name@company.com', siteErr: 'เลือกอย่างน้อย 1 เว็บไซต์'
+    } : {
+      title: S.sub === 'sent' ? 'Check your inbox' : 'Get status updates by email',
+      desc: S.sub === 'sent' ? 'Nothing is sent until you confirm.' : 'We email you when an outage starts and when it’s resolved. Outages only — not slowdowns. No marketing.',
+      email: 'Email', sites: 'Websites to follow', tw: TW, cn: CN, mnt: 'Include planned maintenance notices',
+      note: 'We send a confirmation link first. Every email has a one-click unsubscribe link. We use this address only for status updates.',
+      cancel: 'Cancel', go: 'Subscribe', done: 'Done',
+      sentBody: 'We sent a confirmation link to ' + (em || 'name@company.com') + '. Updates start once you click it.',
+      unsub: 'To stop, use “Unsubscribe” at the bottom of any update email — it takes effect straight away.',
+      emailErr: 'Enter a valid email, like name@company.com', siteErr: 'Pick at least one website'
+    };
+    function bool(v) { return v && v.target ? !!v.target.checked : !!v; }
+    var SH = S.sheet;
+    function closeSheet(ev) {
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+      var id = SH ? 'strip-' + SH.site : null;
+      self.setState({ sheet: null });
+      if (id) setTimeout(function () { var el = document.getElementById(id); if (el) el.focus(); }, 0);
+    }
+    function evCount(n) { return th ? (n ? 'มีเหตุการณ์ ' + n + ' วัน' : 'ไม่มีเหตุการณ์') : (n ? n + (n === 1 ? ' day' : ' days') + ' with events' : 'No events'); }
+    var siteList = [['t', TW], ['c', CN]].map(function (x) {
+      var all = dayList(x[0]);
+      var n = all.filter(function (d) { return d.ev; }).length;
+      return { name: x[1], uptimeText: uptime(x[0]), rows: rows(all), btnId: 'strip-' + x[0], evText: evCount(n),
+        exp: SH && SH.site === x[0] ? 'true' : 'false', _all: all, _n: n, _up: uptime(x[0]),
+        aria: x[1] + ' · ' + (th ? 'ความพร้อมใช้งาน ' + N + ' วัน' : N + '-day availability') + ' · ' + uptime(x[0]) + ' · ' + evCount(n) + ' · ' + (th ? 'เปิดรายการรายวัน' : 'open the day list'),
+        open: function () {
+          self.setState({ sheet: { site: x[0], f: n ? 'ev' : 'all' } });
+          setTimeout(function () { var el = document.getElementById('daysheet-close'); if (el) el.focus(); }, 0);
+        } };
+    });
+    var SHV = { title: '', sub: '', filters: [], items: [], empty: false, emptyTitle: '', emptyBody: '', filterLabel: '', listLabel: '' };
+    if (SH) {
+      var cur = siteList.filter(function (x) { return x.btnId === 'strip-' + SH.site; })[0];
+      var list = cur._all.slice().reverse().filter(function (d) { return SH.f === 'all' || d.ev; });
+      SHV = {
+        title: cur.name,
+        sub: (th ? N + ' วันล่าสุด · ' : 'Last ' + N + ' days · ') + cur._up,
+        filterLabel: th ? 'แสดง' : 'Show',
+        listLabel: th ? 'รายวัน' : 'Days',
+        filters: [
+          { k: 'ev', label: th ? 'มีเหตุการณ์ (' + cur._n + ')' : 'With events (' + cur._n + ')' },
+          { k: 'all', label: th ? 'ทั้งหมด ' + N + ' วัน' : 'All ' + N + ' days' }
+        ].map(function (f) { return { label: f.label, on: SH.f === f.k ? 'true' : 'false', pick: function () { self.setState({ sheet: { site: SH.site, f: f.k } }); } }; }),
+        items: list.map(function (d) { return { k: d.k, m: d.m, date: d._date, state: d._state, hasBody: !!d._short, body: d._short, note: d._note }; }),
+        empty: list.length === 0,
+        emptyTitle: th ? 'ไม่มีเหตุการณ์ใน ' + N + ' วันล่าสุด' : 'No events in the last ' + N + ' days',
+        emptyBody: th ? 'ไม่มีช่วงที่ใช้งานไม่ได้ โหลดช้า หรือปิดปรับปรุง' : 'No outages, slowdowns or planned maintenance.'
+      };
+    }
+    return {
+      t: T,
+      langBtns: ['EN', 'TH'].map(function (l) { return { label: l, on: S.lang === l ? 'true' : 'false', pick: function () { self.setState({ lang: l }); } }; }),
+      winBtns: [30, 90].map(function (w) { return { label: th ? w + ' วัน' : w + ' days', on: N === w ? 'true' : 'false', pick: function () { self.setState({ win: w, sheet: null }); } }; }),
+      stop: function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); },
+      sites: siteList,
+      sheetOpen: !!SH,
+      sh: SHV,
+      closeSheet: closeSheet,
+      sheetKey: function (e) { if (e.key === 'Escape') { e.preventDefault(); closeSheet(); } },
+      past: EV.filter(inWin).map(function (e) {
+        var K = KIND[e.k];
+        return { tone: K.tone, variant: K.variant, icon: K.icon, kind: K.kind,
+          title: e.sites === 'tc' ? (th ? 'บางกอกแอร์เวย์ส – ไต้หวัน และ จีน' : 'Bangkok Airways – Taiwan and China') : (e.sites === 't' ? TW : CN),
+          when: dm(e.d) + ' ' + e.time + at + ' · ' + mins(e.min),
+          status: e.k === 'mnt' ? (th ? 'เสร็จสิ้น' : 'Completed') : (th ? 'แก้ไขแล้ว' : 'Resolved'), body: e.body };
+      }),
+      openSub: function () { self.setState({ sub: 'form', emailBlur: false, subTried: false }); },
+      closeSub: function () { self.setState({ sub: 'closed' }); },
+      subOpen: S.sub !== 'closed',
+      subForm: S.sub === 'form',
+      subSent: S.sub === 'sent',
+      sub: SUB,
+      email: S.email,
+      setEmail: function (e) { self.setState({ email: e && e.target ? e.target.value : e }); },
+      // Validation shows only after leaving the field or pressing Subscribe — never on an untouched form.
+      blurEmail: function () { if ((S.email || '').trim()) self.setState({ emailBlur: true }); },
+      emailErr: (S.emailBlur || S.subTried) && !emailOk ? SUB.emailErr : '',
+      subT: S.subT, subC: S.subC, subM: S.subM,
+      setSubT: function (v) { self.setState({ subT: bool(v) }); },
+      setSubC: function (v) { self.setState({ subC: bool(v) }); },
+      setSubM: function (v) { self.setState({ subM: bool(v) }); },
+      hasSubReason: !anySite,
+      subReason: !anySite ? SUB.siteErr : '',
+      doSub: function () { if (emailOk && anySite) self.setState({ sub: 'sent' }); else self.setState({ subTried: true }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

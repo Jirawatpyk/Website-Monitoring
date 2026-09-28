@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile incident — acknowledge</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}a.aura-btn--secondary:hover,a.aura-btn--ghost:hover{color:var(--aura-fg-primary)}
+.aura-icon-btn{width:44px;height:44px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px 0 4px; display: flex; align-items: center; justify-content: space-between; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; gap: 4px">
+<a href="MIncidents.dc.html" aria-label="Back to incidents" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<div style="height: 28px; padding: 0 8px; box-sizing: border-box; display: flex; align-items: center; gap: 5px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 14px; font-weight: 600">DxT</span>
+<span style="width: 5px; height: 5px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600; margin-left: 4px">Monitor</span>
+</div>
+<x-import component-from-global-scope="Aura.Avatar" name="{{c.viewer}}" size="sm"></x-import>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 14px 16px 32px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 8px">
+<x-import component-from-global-scope="Aura.Badge" tone="danger" variant="solid" icon="ban">Down</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="{{wf.tone}}" variant="outline" icon="{{wf.icon}}">{{wf.label}}</x-import>
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); margin-left: auto">{{c.id}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h1 style="margin: 0; font-family: var(--font-display); font-size: {{c.h1size}}; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">{{c.title}}</h1>
+<span style="font-size: 14px; color: var(--aura-fg-secondary)">{{c.sub}}</span>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.4">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{c.roleIcon}}" size="sm"></x-import></span>
+<span><b style="font-weight: 600">{{c.role}}</b> <span style="color: var(--aura-fg-secondary)">{{c.roleNote}}</span></span>
+</div>
+</div>
+
+<div class="aura-card" style="padding: 4px 16px; gap: 0">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary); font-size: 13px">Confirmed down</span><span style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1.35"><span style="font-weight: 500; font-variant-numeric: tabular-nums">{{c.confirmed}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Confirmed by 3 locations, 2 checks</span></span></div>
+<div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle); line-height: 1.4"><span style="color: var(--aura-fg-secondary); font-size: 13px">Cause</span><span style="font-weight: 500">{{c.cause}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle); line-height: 1.4"><span style="color: var(--aura-fg-secondary); font-size: 13px">Escalation</span><span style="font-weight: 500">{{escText}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 0; line-height: 1.4">
+<div style="display: flex; justify-content: space-between; align-items: center; height: 22px"><span style="color: var(--aura-fg-secondary); font-size: 13px">Client update</span><a href="Incident.dc.html" style="min-height: 44px; min-width: 64px; box-sizing: border-box; margin: -11px -12px -11px 0; padding: 0 12px; display: inline-flex; align-items: center; justify-content: flex-end; font-size: 13px; font-weight: 500; text-decoration: none">Draft →</a></div>
+<span style="font-weight: 500; color: {{c.clientColor}}">{{c.client}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.clientNote}}</span>
+</div>
+</div>
+
+<sc-if value="{{acked}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-left: 3px solid var(--aura-fg-positive); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
+<span style="font-weight: 600; flex-grow: 1">Acknowledged as {{c.viewer}}</span>
+</div>
+<span style="font-size: 13px">{{c.ackSentence}}</span>
+<div role="status" aria-live="polite" style="display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Icon" name="{{postIcon}}" size="sm"></x-import></span><span>{{postLine}}</span></div>
+<sc-if value="{{canUndo}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="rotate-ccw" full-width="{{yes}}" on-click="{{undo}}">{{undoLabel}}</x-import>
+</sc-if>
+<sc-if value="{{posted}}" hint-placeholder-val="{{false}}">
+<a href="MIncident.dc.html" style="align-self: flex-start; min-height: 44px; box-sizing: border-box; margin: -6px 0 -10px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; text-decoration: none"><span>Open full incident</span><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></a>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{hasLog}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 0">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary); padding-bottom: 2px">LATEST</span>
+<sc-for list="{{log}}" as="l" hint-placeholder-count="3">
+<div style="display: flex; gap: 12px; padding: 4px 0; line-height: 1.45"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); width: 40px; flex-shrink: 0; padding-top: 1px">{{l.t}}</span><span style="font-size: 13px">{{l.text}}</span></div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+<div style="flex-shrink: 0; box-sizing: border-box; padding: 10px 16px 24px; display: flex; flex-direction: column; gap: 8px; background: var(--aura-bg-surface); border-top: 1px solid var(--aura-border-default)">
+<sc-if value="{{notAcked}}" hint-placeholder-val="{{true}}">
+<span style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="user" size="sm"></x-import><span>Signed in as <b style="font-weight: 500; color: var(--aura-fg-primary)">{{c.email}}</b></span></span>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" full-width="{{yes}}" on-click="{{ack}}">Acknowledge</x-import>
+</sc-if>
+<sc-if value="{{acked}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="pencil" full-width="{{yes}}" on-click="{{openNote}}">Add note</x-import>
+</sc-if>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" href="{{c.siteUrl}}">Visit site ↗</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="{{det.icon}}" full-width="{{yes}}" href="{{det.href}}">{{det.label}}</x-import>
+</div>
+</div>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{noteOpen}}" on-close="{{closeNote}}" title="Add a note" description="{{noteDesc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<x-import component-from-global-scope="Aura.Textarea" label="Your note" rows="3" placeholder="e.g. Hosting provider restarting the app server" on-change="{{setNote}}"></x-import>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{closeNote}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" full-width="{{yes}}" disabled="{{noteEmpty}}" on-click="{{saveNote}}">Post note</x-import>
+</div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { acked: false, undo: 0, noteOpen: false, note: '', notes: [] };
+  }
+  componentWillUnmount() { if (this.timer) clearInterval(this.timer); }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var acked = st.acked;
+    var C = {
+      id: 'INC-0142', viewer: 'Arm', email: 'arm@[domain]', ackPosted: '10:07:50', noteAt: '10:08', ackAt: '10:07',
+      h1size: '30px', title: 'MuvMi is down', sub: '19 min · Tier 1 · Fri 25 Sep',
+      roleIcon: 'user', role: 'You’re the owner.', roleNote: 'By day (Mon–Fri 09–18) alerts come to you.',
+      wf: { tone: 'warning', icon: 'arrow-up-right', label: 'Escalated · L1' },
+      confirmed: '09:48:41', cause: 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)',
+      esc: '18 min unacked · L1 sent 10:03 (Ploy, Tao) · L2 (CEO) at 10:18', escAcked: 'L2 cancelled · acked · L3 FYI at 10:48 if still down',
+      client: 'Due 10:03 · Bua (AM) notified — she sends it', clientColor: 'var(--aura-alert-warning-fg)',
+      clientNote: 'Separate from escalation — your ack doesn’t stop it.',
+      ackSentence: 'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).',
+      detailHref: 'Incident.dc.html', detailLabel: 'Full incident', detailIcon: 'external-link',
+      siteUrl: 'https://www.muvmi.co',
+      log: [
+        { t: '10:03', text: 'Client update due — Bua (AM) notified' },
+        { t: '10:03', text: 'L1: Ploy asked to acknowledge · Tao FYI' },
+        { t: '09:48', text: 'Confirmed down — you got Chat + email' }
+      ]
+    };
+    var WF = acked ? { tone: 'neutral', icon: 'check', label: 'Acknowledged' } : C.wf;
+    var holding = acked && st.undo > 0;
+    var noteRows = st.notes.map(function (n) { return { t: C.noteAt, text: 'Note by ' + C.viewer + ': ' + n }; }).reverse();
+    var ackRow = { t: C.ackAt, text: holding ? 'Acknowledged by ' + C.viewer + ' (posts ' + C.ackPosted + ' unless undone)' : 'Acknowledged by ' + C.viewer + ' (posted ' + C.ackPosted + ')' };
+    return {
+      yes: true,
+      no: false,
+      c: C,
+      wf: WF,
+      acked: acked,
+      notAcked: !acked,
+      canUndo: holding,
+      posted: acked && !holding,
+      undoLabel: 'Undo · ' + st.undo + ' s',
+      postIcon: holding ? 'clock' : 'check',
+      postLine: holding ? 'Posting to Chat, email and webhooks in ' + st.undo + ' s — nothing is sent until then' : 'Posted to the Chat thread + email at ' + C.ackPosted,
+      ack: function () {
+        if (self.timer) clearInterval(self.timer);
+        self.setState({ acked: true, undo: 10 });
+        self.timer = setInterval(function () {
+          var u = self.state.undo - 1;
+          self.setState({ undo: u });
+          if (u <= 0) clearInterval(self.timer);
+        }, 1000);
+      },
+      undo: function () { if (self.timer) clearInterval(self.timer); self.setState({ acked: false, undo: 0 }); },
+      det: acked && !holding ? { href: 'MIncident.dc.html', label: 'Full incident', icon: 'arrow-right' } : { href: C.detailHref, label: C.detailLabel, icon: C.detailIcon },
+      escText: acked ? C.escAcked : C.esc,
+      log: (acked ? noteRows.concat([ackRow]) : noteRows).concat(C.log),
+      hasLog: true,
+      noteOpen: st.noteOpen,
+      noteDesc: C.id + ' · shows on the incident page and in the Chat thread as ' + C.viewer + '.',
+      noteEmpty: !st.note.trim(),
+      openNote: function () { self.setState({ noteOpen: true, note: '' }); },
+      closeNote: function () { self.setState({ noteOpen: false }); },
+      setNote: function (e) { self.setState({ note: e && e.target ? e.target.value : e }); },
+      saveNote: function () { self.setState({ noteOpen: false, notes: st.notes.concat([st.note.trim()]), note: '' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

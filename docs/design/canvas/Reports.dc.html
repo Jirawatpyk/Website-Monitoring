@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Uptime reports</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1220px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="uptime" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">REPORTS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Uptime reports</h1>
+<span style="font-size: 13px; color: var(--aura-fg-tertiary)">Figures as of Fri 25 Sep 10:07 (UTC+7)</span>
+<span style="max-width: 860px; margin-top: 4px; font-size: 14px; line-height: 1.55; color: var(--aura-fg-secondary)">Monthly PDF per client in DxT branding, drafted on the 1st at 06:00. <b style="font-weight: 600; color: var(--aura-fg-primary)">Bangkok Airways, ENEOS and MuvMi</b> go out automatically; the other 6 clients wait for their AM to review and send (set per client in Settings › Organisation).</span>
+</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Month" options="{{months}}" value="{{month}}" on-change="{{setMonth}}" size="sm"></x-import>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+<x-import component-from-global-scope="Aura.Stat" label="{{stat.upLabel}}" value="{{stat.uptime}}" icon="chart-column" caption="{{stat.upCaption}}"></x-import>
+<x-import component-from-global-scope="Aura.Stat" label="Downtime" value="{{stat.down}}" icon="clock" caption="{{stat.downCaption}}"></x-import>
+<x-import component-from-global-scope="Aura.Stat" label="Incidents clients see" value="{{stat.inc}}" icon="bell" caption="{{stat.incCaption}}"></x-import>
+<x-import component-from-global-scope="Aura.Stat" label="Reports sent" value="{{stat.sent}}" icon="mail" caption="{{stat.sentCaption}}"></x-import>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Client reports · {{monthLabel}}<sc-if value="{{hasRunNote}}" hint-placeholder-val="{{false}}"><span style="margin-left: 12px; font-size: 13px; font-weight: 500; color: var(--aura-fg-secondary)">Preview draft · generated on demand</span></sc-if></h2>
+<span style="font-size: 13px; line-height: 1.55; color: var(--aura-fg-secondary)">Tier 1 clients first. Incidents = what the client sees: Outage (a DOWN) and Degraded (a slow, key-page or regional PROBLEM). SSL, domain, keyword and blocked-check PROBLEMs stay internal and aren’t counted. A report can’t go out — automatically or by hand — while one of its incidents has no root cause.</span>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Client</div>
+<div class="aura-table__th" style="width: 56px">Sites</div>
+<div class="aura-table__th" style="width: 96px; justify-content: flex-end; padding-right: 16px">Uptime</div>
+<div class="aura-table__th" style="width: 96px; justify-content: flex-end; padding-right: 16px">Downtime</div>
+<div class="aura-table__th" style="width: 192px; padding-left: 16px">Incidents</div>
+<div class="aura-table__th" style="width: 56px">AM</div>
+<div class="aura-table__th" style="width: 184px">Report</div>
+<div class="aura-table__th" style="width: {{actW}}; justify-content: flex-end">Actions</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="9">
+<div class="aura-table__row">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; line-height: 1">
+<span style="font-weight: 500; white-space: nowrap">{{r.client}}</span>
+<sc-if value="{{r.t1}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Tier 1</x-import></sc-if>
+</div>
+<div class="aura-table__td" style="width: 56px; font-variant-numeric: tabular-nums">{{r.sites}}</div>
+<div class="aura-table__td" style="width: 96px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums; font-weight: 600">{{r.uptime}}</div>
+<div class="aura-table__td" style="width: 96px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums; color: var(--aura-fg-secondary)">{{r.down}}</div>
+<div class="aura-table__td" style="width: 192px; padding-left: 16px; font-variant-numeric: tabular-nums; white-space: nowrap"><span style="font-weight: 600">{{r.inc}}</span><sc-if value="{{r.hasIncNote}}" hint-placeholder-val="{{true}}"><span style="color: var(--aura-fg-secondary)"> · {{r.incNote}}</span></sc-if></div>
+<div class="aura-table__td" style="width: 56px">{{r.am}}</div>
+<div class="aura-table__td" style="width: 184px; display: flex; align-items: center; line-height: 1"><sc-if value="{{r.pill}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.StatusPill" tone="{{r.tone}}">{{r.status}}</x-import></sc-if><sc-if value="{{r.rc}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="pencil">Needs root cause</x-import></sc-if></div>
+<div class="aura-table__td" style="width: {{actW}}; display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding-right: 0; line-height: 1">
+<div style="width: {{prevW}}; display: flex; justify-content: flex-end"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="eye" href="ReportPDF.dc.html" title="{{r.prevTitle}}">{{prevLabel}}</x-import></div>
+<div style="width: 92px; display: flex; justify-content: flex-end"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="mail" disabled="{{r.blocked}}" title="{{r.sendWhy}}" on-click="{{r.ask}}">{{r.sendLabel}}</x-import></div>
+</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: flex-start; gap: 16px; padding: 10px 14px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="flex-shrink: 0; font-family: var(--font-mono)">SPEC NOTE</span>
+<span>Prototype: every row’s “{{prevLabel}}” links to the one sample, the Bangkok Airways August report. In the product each row opens that client’s own PDF. {{prevNote}}</span>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Daily digest</h3><x-import component-from-global-scope="Aura.Switch" checked="{{sw.dg}}" on-change="{{sw.dgSet}}" aria-label="Daily digest"></x-import></div>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.55">Every day 09:00 in the “DxT Website Reports” Space. Same OK / PROBLEM / DOWN + “Overall X/17” format the CEO uses. A missing digest means the monitor needs checking.</span>
+<span style="font-size: 12px; color: var(--aura-fg-tertiary)">{{sw.dgNote}}</span>
+</div>
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Weekly summary</h3><x-import component-from-global-scope="Aura.Switch" checked="{{sw.ws}}" on-change="{{sw.wsSet}}" aria-label="Weekly summary"></x-import></div>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.55">Mondays 09:00 in the “DxT Website Reports” Space for the CEO, Thee &amp; Bua. Uptime per site, MTTA / MTTR, downtime still without a root cause, false alerts reviewed.</span>
+<span style="font-size: 12px; color: var(--aura-fg-tertiary)">{{sw.wsNote}}</span>
+</div>
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Monthly client report</h3><x-import component-from-global-scope="Aura.Switch" checked="{{sw.mr}}" on-change="{{sw.mrSet}}" aria-label="Monthly client report"></x-import></div>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.55">Drafts on the 1st at 06:00. BA, ENEOS and MuvMi are emailed from reports@ automatically; for the others the AM adds a note in TH or EN, then sends.</span>
+<span style="display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--aura-fg-tertiary)"><span>{{sw.mrNote}}</span><a href="ReportPDF.dc.html" style="font-size: 13px">See a sample report</a></span>
+</div>
+</div>
+
+</main>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{dlgOpen}}" on-close="{{closeDlg}}" title="{{dlg.title}}" description="{{dlg.desc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; padding: 4px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<sc-for list="{{dlg.facts}}" as="f" hint-placeholder-count="5">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: {{f.border}}"><span style="color: var(--aura-fg-secondary)">{{f.k}}</span><span style="font-weight: 500; text-align: right">{{f.v}}</span></div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Emails can’t be recalled · logged in the audit log</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeDlg}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="mail" on-click="{{doSend}}">{{dlg.go}}</x-import>
+</div>
+</div>
+</x-import>
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+<div role="status" style="position: absolute; right: 40px; bottom: 32px; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-md); box-shadow: 0 8px 24px rgba(0,0,0,.18); font-size: 13px">
+<x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import>
+<span>{{toast}}</span>
+<button type="button" onClick="{{hideToast}}" aria-label="Dismiss" style="all: unset; cursor: pointer; display: flex; padding: 4px; border-radius: 9999px"><x-import component-from-global-scope="Aura.Icon" name="x" size="sm"></x-import></button>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1220}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { month: 'Aug 2026', ask: null, toast: '', dg: true, ws: true, mr: true };
+  }
+  renderVals() {
+    var self = this;
+    var aug = this.state.month === 'Aug 2026';
+    // Delivery per client matches Settings › Organisation: BA, ENEOS, MuvMi "Sent monthly" (automatic); others "Draft, AM sends".
+    var DRAFT = { status: 'Draft, AM sends', tone: 'neutral', blocked: false };
+    var SENT = { status: 'Sent automatically 1 Sep', tone: 'ready', blocked: false, sent: true };
+    var LIVE_AUTO = { status: 'Sends automatically 1 Oct', tone: 'neutral', blocked: true };
+    var LIVE = { status: 'Month running', tone: 'neutral', blocked: true };
+    var RC = { status: 'Needs root cause', rc: true, blocked: true };
+    // Aug: client-visible incidents (DOWN + Degraded); internal-only PROBLEMs (e.g. BA 11 Aug SSL warning) not counted.
+    // Sep so far (1 Sep – Fri 25 Sep 10:07, 35,167 min per site): from the incident ledger.
+    // Incidents column = client-visible only, in client terms: [count, breakdown]. Sums match the headline card.
+    var rows = [
+      ['Bangkok Airways', true, '2', ['99.97%', '26 min', '2', '1 outage, 1 degraded'], ['99.98%', '11 min', '2', '1 outage, 1 degraded'], 'Bua', aug ? SENT : LIVE_AUTO],
+      ['ENEOS', true, '1', ['100.00%', '0 min', '0', ''], ['100.00%', '0 min', '0', ''], 'Thee', aug ? SENT : LIVE_AUTO],
+      ['MuvMi', true, '1', ['99.95%', '22 min', '1', '1 outage'], ['99.71%', '1 h 41 min', '3', '3 outages, 1 open'], 'Bua', aug ? SENT : LIVE_AUTO],
+      ['realme', true, '1', ['99.98%', '9 min', '1', '1 outage'], ['100.00%', '0 min', '0', ''], 'Thee', aug ? DRAFT : LIVE],
+      ['Fuji Links', false, '1', ['99.99%', '4 min', '1', '1 outage'], ['100.00%', '0 min', '1', '1 degraded, open'], 'Thee', aug ? DRAFT : LIVE],
+      ['Tubtong', false, '1', ['99.93%', '30 min', '2', '2 outages'], ['100.00%', '0 min', '0', ''], 'Bua', aug ? DRAFT : LIVE],
+      ['Cando Asia', false, '1', ['99.96%', '17 min', '1', '1 outage'], ['99.97%', '12 min', '1', '1 outage'], 'Bua', aug ? DRAFT : LIVE],
+      ['ORCA Thailand', false, '1', ['100.00%', '0 min', '1', '1 degraded'], ['99.98%', '8 min', '1', '1 outage'], 'Thee', aug ? DRAFT : RC],
+      ['WeCare', false, '2', ['99.99%', '10 min', '1', '1 outage'], ['100.00%', '0 min', '0', ''], 'Bua', aug ? DRAFT : LIVE]
+    ].map(function (r) {
+      var m = aug ? r[3] : r[4];
+      var resend = !!r[6].sent;
+      var why = !r[6].blocked ? '' : (r[6].rc ? 'Can’t send: an incident still needs a root cause' : (aug ? '' : 'Month still running — the report drafts on 1 Oct'));
+      return { sendWhy: why, prevTitle: aug ? 'Open the ' + r[0] + ' report (prototype: opens the BA sample)' : 'Preview draft · generated on demand from live data (prototype: opens the BA sample)', client: r[0], t1: r[1], sites: r[2], uptime: m[0], down: m[1], inc: m[2], incNote: m[3], hasIncNote: !!m[3], am: r[5], status: r[6].status, tone: r[6].tone || 'neutral', pill: !r[6].rc, rc: !!r[6].rc, blocked: r[6].blocked, sendLabel: resend ? 'Resend' : 'Send',
+        ask: function () { self.setState({ ask: { client: r[0], am: r[5], resend: resend, inc: m[2] + (m[3] ? ' (' + m[3] + ')' : ''), up: m[0] } }); } };
+    });
+    var S = aug
+      ? { upLabel: 'Uptime · Aug 2026', uptime: '99.98%', upCaption: '11 client sites · maintenance excluded', down: '1 h 58 min', downCaption: 'Outages only, across all clients', inc: '10', incCaption: '8 outages · 2 degraded', sent: '3 / 9', sentCaption: '3 automatic · 6 drafts waiting for the AM' }
+      : { upLabel: 'Uptime · Sep so far', uptime: '99.97%', upCaption: '11 client sites · to Fri 25 Sep 10:07', down: '2 h 12 min', downCaption: 'MuvMi 1 h 41 min · 3 others 31 min', inc: '8', incCaption: '6 outages · 2 degraded · 2 still open', sent: '—', sentCaption: '1 Oct: 3 automatic, 6 to their AM' };
+    var A = this.state.ask;
+    var mon = aug ? 'August 2026' : 'September 2026';
+    var facts = A ? [
+      ['Client', A.client], ['Report', mon + ' · PDF, DxT branding'], ['Uptime · incidents', A.up + ' · ' + A.inc],
+      ['To', '[Client report contacts] · cc ' + A.am + ' (AM)'], ['From', 'reports@ · sent as Tao']
+    ].map(function (f, i) { return { k: f[0], v: f[1], border: i ? '1px solid var(--aura-border-subtle)' : 'none' }; }) : [];
+    var st = this.state;
+    function sw(k) { return function (v) { var o = {}; o[k] = v && v.target ? !!v.target.checked : !!v; self.setState(o); }; }
+    return {
+      yes: true,
+      month: this.state.month,
+      months: ['Aug 2026', 'Sep 2026'],
+      setMonth: function (v) { self.setState({ month: v, toast: '' }); },
+      monthLabel: aug ? 'August 2026' : 'September 2026 (running)',
+      hasRunNote: !aug,
+      stat: S,
+      no: false,
+      dlgOpen: !!A,
+      closeDlg: function () { self.setState({ ask: null }); },
+      doSend: function () { var a = self.state.ask; self.setState({ ask: null, toast: mon + ' report ' + (a.resend ? 'resent' : 'sent') + ' to ' + a.client + ' · cc ' + a.am + ' · logged in the audit log' }); },
+      hasToast: !!this.state.toast,
+      toast: this.state.toast,
+      hideToast: function () { self.setState({ toast: '' }); },
+      prevLabel: aug ? 'Preview' : 'Preview draft',
+      prevW: '112px',
+      actW: '208px',
+      prevNote: aug ? '' : 'Running month: “Preview draft” is generated on demand from live figures (to Fri 25 Sep 10:07) — nothing is stored or sent until the 1 Oct draft.',
+      dlg: A ? { title: (A.resend ? 'Resend the ' : 'Send the ') + mon + ' report to ' + A.client + '?', desc: A.resend ? 'It already went out automatically on 1 Sep. The client gets a second copy.' : 'The client gets the PDF by email now. Check the AM note first.', go: A.resend ? 'Resend report' : 'Send report', facts: facts } : { title: '', desc: '', go: '', facts: [] },
+      sw: {
+        dg: st.dg, ws: st.ws, mr: st.mr, dgSet: sw('dg'), wsSet: sw('ws'), mrSet: sw('mr'),
+        dgNote: st.dg ? 'Last sent today 09:00 · switching off takes effect now' : 'Off — takes effect now · no digest tomorrow 09:00',
+        wsNote: st.ws ? 'Next Mon 28 Sep 09:00 · switching off takes effect now' : 'Off — takes effect now · Mon 28 Sep is skipped',
+        mrNote: st.mr ? 'Next drafts Thu 1 Oct 06:00' : 'Off — no drafts or automatic sends on 1 Oct'
+      },
+      rows: rows,
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

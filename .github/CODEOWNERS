@@ -1,0 +1,9 @@
+# Every change needs a review from the project owner until a second maintainer joins (PRD §13 bus factor).
+* @Jirawatpyk
+
+# Security-sensitive paths
+/supabase/ @Jirawatpyk
+/apps/web/src/lib/ @Jirawatpyk
+/apps/web/src/app/api/ @Jirawatpyk
+/.github/ @Jirawatpyk
+/.claude/ @Jirawatpyk

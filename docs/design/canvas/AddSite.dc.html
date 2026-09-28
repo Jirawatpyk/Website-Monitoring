@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Add site</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1680px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="sites" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
+<a href="Main.dc.html" style="text-decoration: none">Sites</a>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<span>Add site</span>
+</div>
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Add site</h1>
+<span style="font-size: 14px; color: var(--aura-fg-secondary)">Monitoring starts only when the registration checklist is complete.</span>
+</div>
+</div>
+</div>
+
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start">
+
+<div style="grid-column: span 2; display: flex; flex-direction: column; gap: 16px; min-width: 0">
+
+<div class="aura-card" style="gap: 20px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Site</h3>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<x-import component-from-global-scope="Aura.TextField" label="Site name" default-value="EQHO Academy" required="{{yes}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Client" options="{{clients}}" value="{{client}}" on-change="{{setClient}}" required="{{yes}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Primary URL" value="{{url}}" on-change="{{setUrl}}" placeholder="https://[site URL]" required="{{yes}}" icon="external-link" error="{{urlError}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Hosting provider" value="{{hosting}}" on-change="{{setHosting}}" placeholder="[Hosting provider]" required="{{yes}}"></x-import>
+</div>
+<x-import component-from-global-scope="Aura.TextField" label="Credential reference" value="{{cred}}" on-change="{{setCred}}" required="{{yes}}" placeholder="e.g. 1Password › Internal › EQHO Academy" hint="Where the team finds access. Never paste the password itself — the system does not store credentials."></x-import>
+</div>
+
+<div class="aura-card" style="gap: 20px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Tier</h3>
+<x-import component-from-global-scope="Aura.RadioGroup" label="Tier sets check interval, response hours and escalation timers" options="{{tiers}}" value="{{tier}}" on-change="{{setTier}}"></x-import>
+</div>
+
+<div class="aura-card" style="gap: 20px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Ownership</h3>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<x-import component-from-global-scope="Aura.Select" label="Primary owner" options="{{people}}" value="{{primary}}" on-change="{{setPrimary}}" required="{{yes}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Backup owner" options="{{backupPeople}}" value="{{backup}}" on-change="{{setBackup}}" required="{{yes}}" error="{{backupError}}" hint="{{backupHint}}"></x-import>
+<sc-if value="{{isClient}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Select" label="Account manager" options="{{ams}}" value="{{am}}" on-change="{{setAm}}" placeholder="Choose the AM" required="{{yes}}" hint="Gets client-update drafts"></x-import>
+</sc-if>
+<sc-if value="{{isInternal}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Select" label="Account manager" options="{{amNone}}" value="none" disabled="{{yes}}" hint="Internal site — not needed"></x-import>
+</sc-if>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Owners need Google Chat or email linked before they can be assigned.</span>
+</div>
+
+<div class="aura-card" style="gap: 20px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Primary monitor</h3>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Primary</x-import>
+</div>
+<span style="font-size: 13px; line-height: 1.55; color: var(--aura-fg-secondary)">Only this monitor can make the site DOWN: at least 2 of 3 locations get a hard fail (timeout, 5xx, DNS/TLS error, connection refused) on two checks in a row — the second is an immediate recheck about 30 s later. Key pages and every other monitor stop at PROBLEM.</span>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<x-import component-from-global-scope="Aura.Select" label="Method" options="{{methods}}" default-value="GET"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Expected status" default-value="200"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Timeout" default-value="30" suffix="s"></x-import>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<x-import component-from-global-scope="Aura.TextField" label="Must contain (brand keyword)" value="{{keyword}}" on-change="{{setKeyword}}" required="{{yes}}" placeholder="Brand name or page title" hint="Missing → PROBLEM (Keyword)"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Must not contain" default-value="Index of /, Database error" hint="Shared gambling / spam list is always on"></x-import>
+</div>
+<x-import component-from-global-scope="Aura.TextField" label="Allowed redirect domains" placeholder="[site domain], [CDN domain]" hint="A redirect anywhere else → PROBLEM (possible hijack)"></x-import>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 500">Key pages <span style="font-weight: 400; color: var(--aura-fg-secondary)">— top out at PROBLEM</span></span>
+<sc-for list="{{keyPages}}" as="k" hint-placeholder-count="1">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px"><span style="font-family: var(--font-mono); font-size: 12px; flex-grow: 1">{{k.path}}</span><span style="color: var(--aura-fg-secondary)">Expect 2xx</span><x-import component-from-global-scope="Aura.IconButton" icon="trash-2" label="{{k.label}}" on-click="{{k.rm}}"></x-import></div>
+</sc-for>
+<sc-if value="{{noKeyPages}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">No key pages — optional. The home page is always checked.</span></sc-if>
+<div><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="plus" on-click="{{addKey}}" disabled="{{keyFull}}">{{addKeyLabel}}</x-import></div>
+</div>
+</div>
+
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<div class="aura-card">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Registration checklist</h3>
+<span style="font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums">{{doneCount}}/{{total}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Progress" value="{{doneCount}}" max="{{total}}" aria-label="Checklist progress" size="sm"></x-import>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{checklist}}" as="c" hint-placeholder-count="7">
+<div style="display: flex; gap: 10px; font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: {{c.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm" label="{{c.state}}"></x-import></span>
+<div style="display: flex; flex-direction: column">
+<span style="font-weight: 500">{{c.label}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.detail}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="circle-check" full-width="{{yes}}" disabled="{{startDisabled}}" on-click="{{start}}">{{startLabel}}</x-import>
+<sc-if value="{{notReady}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; line-height: 1.5; color: var(--aura-alert-warning-fg); text-align: center">{{leftText}}</span></sc-if>
+<sc-if value="{{started}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-positive); text-align: center">{{startedText}}</span></sc-if>
+<sc-if value="{{notStarted}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" icon="{{draftIcon}}" on-click="{{saveDraft}}">{{draftLabel}}</x-import></sc-if>
+<sc-if value="{{started}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" icon="arrow-right" href="SiteDetail.dc.html">Open site</x-import></sc-if>
+</div>
+</div>
+
+<div class="aura-card">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Test check</h3>
+<span style="display: flex; align-items: center; gap: 8px"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{testAt}}</span><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="rotate-ccw" on-click="{{rerun}}">Run again</x-import></span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{test}}" as="t" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><span style="display: flex; color: {{t.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm" label="{{t.state}}"></x-import></span><span style="font-weight: 600; width: 36px">{{t.loc}}</span><span style="flex-grow: 1">{{t.r}}</span><span style="color: var(--aura-fg-secondary); font-variant-numeric: tabular-nums; white-space: nowrap">{{t.ms}}</span></div>
+</sc-for>
+</div>
+<div style="padding: 12px 14px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-sm); font-size: 13px; line-height: 1.55">
+<span style="font-weight: 600">{{testVerdict}}</span> {{testNote}}
+</div>
+</div>
+<div class="aura-card" style="gap: 16px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Bot protection</h3>
+<x-import component-from-global-scope="Aura.Switch" label="Behind WAF / Cloudflare" checked="{{waf}}" on-change="{{setWaf}}"></x-import>
+<sc-if value="{{waf}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.6">Ask the site admin to allowlist the probes. Until they confirm, blocked results go to browser verification (slower, uses VPS capacity).</span>
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); overflow: hidden">
+<div style="padding: 12px 14px; display: flex; flex-direction: column; line-height: 1.5; border-bottom: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">BKK IP (FIXED)</span><span style="font-family: var(--font-mono); font-size: 12px">[VPS IP]</span></div>
+<div style="padding: 12px 14px; display: flex; flex-direction: column; line-height: 1.5; border-bottom: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">USER-AGENT</span><span style="font-family: var(--font-mono); font-size: 12px">DxT-Monitor/1.0</span></div>
+<div style="padding: 12px 14px; display: flex; flex-direction: column; line-height: 1.5"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SECRET HEADER (SIN, TYO)</span><span style="font-family: var(--font-mono); font-size: 12px">X-DxT-Monitor: ••••••</span></div>
+</div>
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{allow}}" on-change="{{setAllow}}">Site admin confirmed the allowlist</x-import>
+</div>
+</sc-if>
+</div>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1680}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { client: 'internal', primary: 'nok', am: '', keys: ['/contact'], runs: 0, draft: false, started: false, tier: 't2', backup: 'ploy', waf: false, allow: false, url: 'https://[EQHO Academy URL]', hosting: '[Hosting provider]', cred: '', keyword: 'EQHO Academy' };
+  }
+  renderVals() {
+    var self = this;
+    var s = this.state;
+    var NAME2 = { thee: 'Thee', bua: 'Bua' };
+    var TIER = { t1: 'Tier 1 · every 1 min · 24/7', t2: 'Tier 2 · every 3 min · Mon–Fri 09:00–18:00', t3: 'Tier 3 · every 5 min · Mon–Fri 09:00–18:00' };
+    var filled = function (v) { return !!(v && v.trim()); };
+    var EXISTING = ['https://[muvmi site url]', 'https://[cando asia site url]'];
+    var dup = EXISTING.indexOf((s.url || '').trim().toLowerCase()) >= 0;
+    var urlOk = filled(s.url) && !dup;
+    var NAME = { arm: 'Arm', ploy: 'Ploy', nok: 'Nok', tao: 'Tao' };
+    var CLIENT = { internal: 'Internal (DxT group)', cando: 'Cando Asia', tubtong: 'Tubtong', bangkokair: 'Bangkok Airways', muvmi: 'MuvMi' };
+    var isClient = s.client !== 'internal';
+    var backupOk = s.backup !== s.primary && s.backup !== '';
+    var amOk = !isClient || !!s.am;
+    var ok = { icon: 'circle-check', color: 'var(--aura-fg-positive)', state: 'Done' };
+    var todo = { icon: 'circle', color: 'var(--aura-fg-tertiary)', state: 'To do' };
+    var bad = { icon: 'circle-alert', color: 'var(--aura-fg-danger)', state: 'Blocked' };
+    var hostOk = filled(s.hosting) && filled(s.cred);
+    var hostDetail = hostOk ? 'Hosting and vault location filled in' : (!filled(s.hosting) && !filled(s.cred) ? 'Add hosting provider and credential reference' : (!filled(s.cred) ? 'Add the credential reference' : 'Add the hosting provider'));
+    var items = [
+      Object.assign({ label: 'URL + key pages', detail: urlOk ? ['/'].concat(s.keys).join(' and ') : (dup ? 'This URL is already monitored' : 'Add the primary URL'), short: 'URL' }, urlOk ? ok : (dup ? bad : todo)),
+      Object.assign({ label: 'Brand keyword set', detail: filled(s.keyword) ? '“' + s.keyword.trim() + '” must appear on the page' : 'Add the brand name the page must contain', short: 'Brand keyword' }, filled(s.keyword) ? ok : todo),
+      Object.assign({ label: 'Tier', detail: TIER[s.tier], short: 'Tier' }, ok),
+      Object.assign({ label: 'Primary owner', detail: NAME[s.primary] + ' · Google Chat linked', short: 'Primary owner' }, ok),
+      Object.assign({ label: 'Backup owner', detail: backupOk ? NAME[s.backup] + ' · linked channel ready' : 'Same as primary (' + NAME[s.primary] + ') — pick someone else', short: 'Backup owner' }, backupOk ? ok : bad),
+      Object.assign({ label: 'Client', detail: isClient ? CLIENT[s.client] + ' · client-update track on' : 'Internal site · no client updates', short: 'Client' }, ok),
+      isClient ? Object.assign({ label: 'Account manager', detail: s.am ? NAME2[s.am] + ' gets client-update drafts' : 'Required for client sites — choose the AM', short: 'Account manager' }, s.am ? ok : todo) : null,
+      Object.assign({ label: 'Hosting + credential reference', detail: hostDetail, short: 'Credential reference' }, hostOk ? ok : todo),
+      Object.assign({ label: 'WAF status', detail: !s.waf ? 'Not behind a WAF' : (s.allow ? 'Allowlist confirmed' : 'Allowlist pending — can go live, verifier covers it'), optional: true, short: 'WAF' }, (!s.waf || s.allow) ? ok : todo)
+    ];
+    items = items.filter(function (i) { return !!i; });
+    var required = items.filter(function (i) { return !i.optional; });
+    var left = required.filter(function (i) { return i.icon !== 'circle-check'; });
+    var doneCount = items.filter(function (i) { return i.icon === 'circle-check'; }).length;
+    var kw = filled(s.keyword) ? 'keyword found' : 'no keyword set';
+    var P = { icon: 'circle-check', color: 'var(--aura-fg-positive)', state: 'Pass' };
+    var L = { icon: 'lock', color: 'var(--aura-fg-secondary)', state: 'Blocked' };
+    return {
+      yes: true,
+      tier: s.tier,
+      client: s.client, setClient: function (e) { self.setState({ client: e && e.target ? e.target.value : e, am: '' }); },
+      isClient: isClient,
+      isInternal: !isClient,
+      amNone: [{ value: 'none', label: 'None' }],
+      primary: s.primary, setPrimary: function (e) { self.setState({ primary: e && e.target ? e.target.value : e }); },
+      backupPeople: [{ value: 'arm', label: 'Arm' }, { value: 'ploy', label: 'Ploy' }, { value: 'nok', label: 'Nok' }, { value: 'tao', label: 'Tao' }].map(function (p) { return p.value === s.primary ? { value: p.value, label: p.label + ' (primary)', disabled: true } : p; }),
+      backupHint: backupOk ? 'Not the primary owner' : undefined,
+      am: s.am, setAm: function (e) { self.setState({ am: e && e.target ? e.target.value : e }); },
+      ams: [{ value: 'thee', label: 'Thee' }, { value: 'bua', label: 'Bua' }],
+      keyPages: s.keys.map(function (k, i) { return { path: k, label: 'Remove ' + k, rm: function () { self.setState({ keys: self.state.keys.filter(function (x, j) { return j !== i; }) }); } }; }),
+      noKeyPages: s.keys.length === 0,
+      keyFull: s.keys.length >= 3,
+      addKeyLabel: s.keys.length >= 3 ? 'Add key page · max 3 per site' : 'Add key page',
+      addKey: function () { var opts = ['/contact', '/courses', '/register']; var n = opts.filter(function (o) { return self.state.keys.indexOf(o) < 0; })[0]; if (n) self.setState({ keys: self.state.keys.concat([n]) }); },
+      testAt: s.runs ? 'Ran 10:07:' + (20 + s.runs * 5) : 'Ran 10:06:52',
+      rerun: function () { self.setState({ runs: self.state.runs + 1 }); },
+      draftIcon: s.draft ? 'check' : 'file',
+      draftLabel: s.draft ? 'Draft saved · 10:07' : 'Save draft',
+      saveDraft: function () { self.setState({ draft: true }); },
+      started: s.started,
+      notStarted: !s.started,
+      startedText: 'Started 10:08 · first round within ' + (s.tier === 't1' ? '1 min' : (s.tier === 't2' ? '3 min' : '5 min')) + ' from BKK, SIN and TYO. ' + NAME[s.primary] + ' and ' + NAME[s.backup] + ' notified · in the audit log.',
+      startDisabled: left.length > 0 || s.started,
+      startLabel: s.started ? 'Monitoring' : 'Start monitoring',
+      start: function () { if (!left.length) self.setState({ started: true }); },
+      setTier: function (v) { self.setState({ tier: v }); },
+      backup: s.backup,
+      setBackup: function (e) { self.setState({ backup: e && e.target ? e.target.value : e }); },
+      backupError: backupOk ? undefined : 'Same as primary — pick another',
+      waf: s.waf,
+      setWaf: function (v) { self.setState({ waf: v }); },
+      allow: s.allow,
+      setAllow: function (v) { self.setState({ allow: v }); },
+      checklist: items,
+      url: s.url, setUrl: function (e) { self.setState({ url: e && e.target ? e.target.value : e }); },
+      urlError: dup ? 'Already monitored as another site — open that site instead of adding a duplicate.' : undefined,
+      hosting: s.hosting, setHosting: function (e) { self.setState({ hosting: e && e.target ? e.target.value : e }); },
+      cred: s.cred, setCred: function (e) { self.setState({ cred: e && e.target ? e.target.value : e }); },
+      keyword: s.keyword, setKeyword: function (e) { self.setState({ keyword: e && e.target ? e.target.value : e }); },
+      leftText: left.length + (left.length === 1 ? ' item left: ' : ' items left: ') + left.map(function (i) { return i.short; }).join(', '),
+      test: s.waf ? [
+        Object.assign({ loc: 'BKK', r: 'HTTP 200 · ' + kw, ms: '1.2 s' }, P),
+        Object.assign({ loc: 'SIN', r: '403 · bot challenge', ms: '0.3 s' }, L),
+        Object.assign({ loc: 'TYO', r: '403 · bot challenge', ms: '0.3 s' }, L)
+      ] : [
+        Object.assign({ loc: 'BKK', r: 'HTTP 200 · ' + kw, ms: '1.2 s' }, P),
+        Object.assign({ loc: 'SIN', r: 'HTTP 200 · ' + kw, ms: '0.9 s' }, P),
+        Object.assign({ loc: 'TYO', r: 'HTTP 200 · ' + kw, ms: '1.0 s' }, P)
+      ],
+      testVerdict: s.waf ? 'Would be: OK + note.' : 'Would be: OK.',
+      testNote: s.waf ? '2 of 3 blocked → the browser verifier loaded the page and found “' + (s.keyword || '').trim() + '”. Allowlist SIN and TYO to stop relying on the verifier.' : '3 of 3 locations pass and “' + (s.keyword || '').trim() + '” is on the page. Nothing is stored or alerted until monitoring starts.',
+      doneCount: doneCount,
+      total: items.length,
+      notReady: left.length > 0 && !s.started,
+      clients: [{ value: 'internal', label: 'Internal (DxT group)' }, { value: 'bangkokair', label: 'Bangkok Airways' }, { value: 'cando', label: 'Cando Asia' }, { value: 'muvmi', label: 'MuvMi' }, { value: 'tubtong', label: 'Tubtong' }],
+      people: [{ value: 'arm', label: 'Arm' }, { value: 'ploy', label: 'Ploy' }, { value: 'nok', label: 'Nok' }, { value: 'tao', label: 'Tao' }],
+      methods: ['GET', 'HEAD'],
+      tiers: [
+        { value: 't1', label: 'Tier 1 — 24/7 · every 1 min', description: 'Enterprise / transactions · owner responds by day, on-call at night · CEO step at +30 min (Proposal · pending CEO)' },
+        { value: 't2', label: 'Tier 2 — business hours · every 3 min', description: 'Client sites · Mon–Fri 09:00–18:00 · DOWN still posts at night, escalation waits until 09:00' },
+        { value: 't3', label: 'Tier 3 — business hours · every 5 min', description: 'Internal / DxT group · Mon–Fri 09:00–18:00 · no client updates' }
+      ],
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

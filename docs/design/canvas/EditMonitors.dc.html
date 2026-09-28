@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Edit monitors</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1560px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="sites" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
+<a href="Main.dc.html" style="text-decoration: none">Sites</a>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<a href="SiteDetail.dc.html" style="text-decoration: none">Bangkok Airways – Taiwan</a>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<span>Monitors</span>
+</div>
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Edit monitors</h1>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Tier 1 · every 1 min from BKK, SIN, TYO · owner Arm · site status is the worst of these monitors</span>
+</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<sc-if value="{{dirty}}" hint-placeholder-val="{{true}}"><span style="font-size: 13px; color: var(--aura-alert-warning-fg)">{{changeText}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{askDiscard}}">Cancel</x-import></sc-if>
+<sc-if value="{{clean}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" href="SiteDetail.dc.html">Cancel</x-import></sc-if>
+<sc-if value="{{dirty}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{save}}">Save changes</x-import></sc-if>
+<sc-if value="{{clean}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" disabled="{{yes}}">{{cleanLabel}}</x-import></sc-if>
+</div>
+</div>
+</div>
+
+<sc-if value="{{saved}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="success" title="Saved — takes effect on the next round">Change logged in the audit log as “Tao edited monitors on Bangkok Airways – Taiwan”.</x-import>
+</sc-if>
+
+<div style="display: flex; gap: 24px; align-items: flex-start">
+
+<div style="width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px">
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius); overflow: hidden">
+<sc-for list="{{monitors}}" as="m" hint-placeholder-count="6">
+<sc-if value="{{m.pending}}" hint-placeholder-val="{{false}}">
+<div style="box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--aura-border-default); background: var(--aura-bg-canvas)">
+<span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--aura-radius-sm); border: 1px dashed var(--aura-border-control); display: flex; align-items: center; justify-content: center; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="{{m.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35">
+<span style="font-size: 14px; font-weight: 600; color: var(--aura-fg-tertiary); text-decoration: line-through">{{m.type}} <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 400">{{m.target}}</span></span>
+<span style="font-size: 12px; color: var(--aura-alert-warning-fg)">Removed on save</span>
+</span>
+<button type="button" onClick="{{m.undoRm}}" style="height: 32px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--aura-button-secondary-border); background: transparent; color: var(--aura-fg-primary); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer">Undo</button>
+</div>
+</sc-if>
+<sc-if value="{{m.live}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{m.pick}}" aria-pressed="{{m.selected}}" style="all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--aura-border-default); background: {{m.bg}}; box-shadow: {{m.bar}}">
+<span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--aura-radius-sm); background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); display: flex; align-items: center; justify-content: center; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{m.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35">
+<span style="display: flex; align-items: center; gap: 6px"><span style="font-size: 14px; font-weight: 600">{{m.type}}</span><sc-if value="{{m.primary}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Primary</x-import></sc-if><sc-if value="{{m.edited}}" hint-placeholder-val="{{false}}"><span title="Edited, not saved" aria-label="Edited, not saved" style="width: 8px; height: 8px; border-radius: 9999px; background: var(--aura-alert-warning-fg)"></span></sc-if></span>
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{m.target}}</span>
+</span>
+<span style="font-family: var(--font-mono); font-size: 11px; color: {{m.capColor}}">{{m.cap}}</span>
+</button>
+</sc-if>
+</sc-for>
+<div style="padding: 12px 16px">
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="plus" on-click="{{addMonitor}}" disabled="{{hasNew}}">{{addLabel}}</x-import>
+</div>
+</div>
+<div style="display: flex; gap: 10px; padding: 12px 14px; font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary); background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span>
+<span>Only the primary monitor can make the site DOWN. Every other monitor stops at PROBLEM, so a slow key page never pages anyone at night.</span>
+</div>
+</div>
+
+<div style="flex-grow: 1; min-width: 0">
+<sc-for list="{{monitors}}" as="m" hint-placeholder-count="1">
+<sc-if value="{{m.selected}}" hint-placeholder-val="{{true}}">
+<div class="aura-card" style="gap: 0; padding: 0">
+
+<div style="padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-size: 18px; font-weight: 600">{{m.title}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{m.summary}}</span>
+</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<x-import component-from-global-scope="Aura.Switch" label="Enabled" default-checked="{{yes}}" disabled="{{m.primary}}" on-change="{{touch}}"></x-import>
+<sc-if value="{{m.removable}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.IconButton" icon="trash-2" label="Remove this monitor" on-click="{{m.askRemove}}"></x-import></sc-if>
+</div>
+</div>
+
+<sc-if value="{{m.showRequest}}" hint-placeholder-val="{{true}}">
+<section style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid var(--aura-border-default)">
+<h3 style="margin: 0; font-size: 14px; line-height: 1.5; font-weight: 600">Request</h3>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 16px">
+<x-import component-from-global-scope="Aura.TextField" label="URL" default-value="{{m.url}}" required="{{yes}}" icon="external-link" on-input="{{touch}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Method" options="{{methods}}" default-value="{{m.method}}"></x-import>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<x-import component-from-global-scope="Aura.TextField" label="Expected status" default-value="{{m.expect}}" hint="Comma list or 2xx" on-input="{{touch}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Timeout" default-value="{{m.timeout}}" suffix="s" hint="Longer than this = hard fail" on-input="{{touch}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Redirects" options="{{redirectOpts}}" default-value="follow"></x-import>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{m.showContain}}" hint-placeholder-val="{{true}}">
+<section style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid var(--aura-border-default)">
+<h3 style="margin: 0; font-size: 14px; line-height: 1.5; font-weight: 600">Content checks</h3>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 500">Must contain</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{m.must}}" as="k" hint-placeholder-count="2"><x-import component-from-global-scope="Aura.Tag" on-remove="{{k.rm}}" remove-label="Remove {{k.t}}">{{k.t}}</x-import></sc-for>
+</div>
+<x-import component-from-global-scope="Aura.TextField" label="Add phrase" placeholder="Brand name or page title"></x-import>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Missing → PROBLEM (keyword). Checked on the final page after redirects.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 500">Must not contain</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{m.mustNot}}" as="k" hint-placeholder-count="2"><x-import component-from-global-scope="Aura.Tag" on-remove="{{k.rm}}" remove-label="Remove {{k.t}}">{{k.t}}</x-import></sc-for>
+<x-import component-from-global-scope="Aura.Tag" icon="lock">Shared spam / gambling list</x-import>
+</div>
+<x-import component-from-global-scope="Aura.TextField" label="Add phrase" placeholder="e.g. Index of /"></x-import>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Found → PROBLEM. The shared list is on for every site and edited by Admins only.</span>
+</div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{m.showHeaders}}" hint-placeholder-val="{{true}}">
+<section style="padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: baseline; justify-content: space-between">
+<h3 style="margin: 0; font-size: 14px; line-height: 1.5; font-weight: 600">Custom headers</h3>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Sent from all 3 locations and the browser verifier</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{m.headers}}" as="h" hint-placeholder-count="2">
+<div style="display: grid; grid-template-columns: 220px minmax(0, 1fr) 40px; gap: 12px; align-items: center">
+<div style="height: 40px; box-sizing: border-box; padding: 0 12px; display: flex; align-items: center; font-family: var(--font-mono); font-size: 12px; background: var(--aura-bg-input); border: 1px solid var(--aura-border-control); border-radius: var(--aura-radius-md)">{{h.k}}</div>
+<div style="height: 40px; box-sizing: border-box; padding: 0 12px; display: flex; align-items: center; font-family: var(--font-mono); font-size: 12px; background: var(--aura-bg-input); border: 1px solid var(--aura-border-control); border-radius: var(--aura-radius-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{h.v}}</div>
+<x-import component-from-global-scope="Aura.IconButton" icon="trash-2" label="{{h.rm}}" on-click="{{h.del}}"></x-import>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="plus" on-click="{{m.addHeader}}">Add header</x-import>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Never put passwords or tokens here — anyone with Responder access can read them.</span>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{m.showRedirect}}" hint-placeholder-val="{{false}}">
+<section style="padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--aura-border-default)">
+<h3 style="margin: 0; font-size: 14px; line-height: 1.5; font-weight: 600">Allowed final hosts</h3>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{m.hosts}}" as="k" hint-placeholder-count="2"><x-import component-from-global-scope="Aura.Tag" on-remove="{{k.rm}}" remove-label="Remove {{k.t}}">{{k.t}}</x-import></sc-for>
+</div>
+<x-import component-from-global-scope="Aura.TextField" label="Add host" placeholder="[CDN domain]" hint="A redirect anywhere else → PROBLEM (possible hijack). Checked on every round."></x-import>
+</section>
+</sc-if>
+
+<sc-if value="{{m.showExpiry}}" hint-placeholder-val="{{false}}">
+<section style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid var(--aura-border-default)">
+<h3 style="margin: 0; font-size: 14px; line-height: 1.5; font-weight: 600">Expiry</h3>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<x-import component-from-global-scope="Aura.TextField" label="Warn when less than" default-value="{{m.warnDays}}" suffix="days" on-input="{{touch}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Check daily at" default-value="06:00" suffix="UTC+7"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Source" default-value="{{m.source}}" disabled="{{yes}}"></x-import>
+</div>
+<div style="display: flex; gap: 32px; padding: 14px 16px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px">
+<sc-for list="{{m.facts}}" as="f" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; line-height: 1.4"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{f.k}}</span><span style="font-weight: 600">{{f.v}}</span></div>
+</sc-for>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{m.showSlow}}" hint-placeholder-val="{{true}}">
+<section style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid var(--aura-border-default)">
+<h3 style="margin: 0; font-size: 14px; line-height: 1.5; font-weight: 600">Thresholds</h3>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<x-import component-from-global-scope="Aura.TextField" label="Slow when p50 is over" default-value="{{m.slow}}" suffix="ms" on-input="{{touch}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="For" default-value="3" suffix="rounds in a row" on-input="{{touch}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Result" options="{{slowResult}}" default-value="problem" disabled="{{yes}}"></x-import>
+</div>
+<sc-if value="{{m.primary}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px">
+<x-import component-from-global-scope="Aura.Badge" tone="danger" variant="solid" icon="ban">Down</x-import>
+<span>When at least <b>2 of 3</b> locations get a hard fail (timeout, 5xx, DNS/TLS error, connection refused) on <b>two checks in a row</b> — the second is an immediate recheck about 30 s later. Hard fails don’t wait for the browser verifier. Not editable — <a href="StatusModel.dc.html">how status is decided</a>.</span>
+</div>
+</sc-if>
+</section>
+</sc-if>
+
+<section style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<h3 style="margin: 0; font-size: 14px; line-height: 1.5; font-weight: 600">Test before saving</h3>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{testNote}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="{{testIcon}}" on-click="{{runTest}}">{{testLabel}}</x-import>
+</div>
+<sc-if value="{{tested}}" hint-placeholder-val="{{false}}">
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="width: 150px">Location</div>
+<div class="aura-table__th" style="width: 90px">Result</div>
+<div class="aura-table__th" style="width: 100px; justify-content: flex-end; padding-right: 16px">Time</div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Detail</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{m.test}}" as="t" hint-placeholder-count="3">
+<div class="aura-table__row">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="width: 150px">{{t.loc}}</div>
+<div class="aura-table__td" style="width: 90px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{t.tone}}" icon="{{t.icon}}">{{t.r}}</x-import></div>
+<div class="aura-table__td" style="width: 100px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{t.ms}}</div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; font-size: 13px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{t.d}}</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{notTested}}" hint-placeholder-val="{{true}}">
+<div style="padding: 16px; text-align: center; font-size: 13px; color: var(--aura-fg-tertiary); border: 1px dashed var(--aura-border-default); border-radius: var(--aura-radius-md)">No test run yet for this monitor.</div>
+</sc-if>
+</section>
+
+</div>
+</sc-if>
+</sc-for>
+</div>
+
+</div>
+</main>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{rmOpen}}" on-close="{{closeRm}}" title="{{rmTitle}}" description="Bangkok Airways – Taiwan · owner Arm · backup Ploy" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px; font-size: 14px; line-height: 1.6">
+<span>{{rmBody}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Nothing changes until you press Save changes. Past results stay in the check log for 90 days.</span>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeRm}}">Keep monitor</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="trash-2" on-click="{{confirmRm}}">Remove monitor</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{discardOpen}}" on-close="{{closeDiscard}}" title="{{discardTitle}}" description="Bangkok Airways – Taiwan · monitors" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px; font-size: 14px; line-height: 1.6">
+<span>{{discardBody}}</span>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeDiscard}}">Keep editing</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" href="SiteDetail.dc.html">Discard changes</x-import>
+</div>
+</div>
+</x-import>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1560}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 0, tested: {}, dirty: false, saved: false, removed: {}, edited: {}, gone: {}, rmAsk: -1, discard: false, added: false, hdrGone: {}, hdrNew: {} };
+  }
+  renderVals() {
+    var self = this;
+    var sel = this.state.sel;
+    var PASS = { tone: 'success', icon: 'circle-check' };
+    var WARN = { tone: 'warning', icon: 'triangle-alert' };
+    var base = [
+      { type: 'HTTP', icon: 'monitor', primary: true, target: 'GET /', cap: 'DOWN', title: 'HTTP · home page', summary: 'Primary · the only monitor that can make this site DOWN · always on',
+        url: 'https://[site URL]/', method: 'GET', expect: '200', timeout: '30', slow: '3000',
+        must: ['Bangkok Airways', 'Book a flight'], mustNot: ['Index of /', 'Database error'],
+        headers: [{ k: 'User-Agent', v: 'DxT-Monitor/1.0 (+ops contact)' }, { k: 'Accept-Language', v: 'zh-TW,en;q=0.8' }],
+        test: [
+          Object.assign({ loc: 'BKK · Thai VPS', r: 'Pass', ms: '412 ms', d: '200 · 2 phrases found · final host allowed' }, PASS),
+          Object.assign({ loc: 'SIN · Vercel sin1', r: 'Pass', ms: '388 ms', d: '200 · 2 phrases found · final host allowed' }, PASS),
+          Object.assign({ loc: 'TYO · Vercel hnd1', r: 'Pass', ms: '455 ms', d: '200 · 2 phrases found · final host allowed' }, PASS)
+        ] },
+      { type: 'Key page', icon: 'file-text', target: 'GET /booking', cap: 'PROBLEM', title: 'Key page · booking', summary: 'Stops at PROBLEM — a slow booking page is worth a look, not a page at 3 a.m.',
+        url: 'https://[site URL]/booking', method: 'GET', expect: '2xx', timeout: '30', slow: '3000',
+        must: ['Select your flight'], mustNot: [],
+        headers: [{ k: 'User-Agent', v: 'DxT-Monitor/1.0 (+ops contact)' }],
+        test: [
+          Object.assign({ loc: 'BKK · Thai VPS', r: 'Pass', ms: '530 ms', d: '200 · phrase found' }, PASS),
+          Object.assign({ loc: 'SIN · Vercel sin1', r: 'Pass', ms: '612 ms', d: '200 · phrase found' }, PASS),
+          Object.assign({ loc: 'TYO · Vercel hnd1', r: 'Slow', ms: '3.4 s', d: '200 · over 3000 ms once — needs 3 rounds to count' }, WARN)
+        ] },
+      { type: 'Keyword', icon: 'search', target: 'GET /', cap: 'PROBLEM', title: 'Keyword · defacement watch', summary: 'Looks for phrases that should never appear on the page',
+        url: 'https://[site URL]/', method: 'GET', expect: '200', timeout: '30', slow: '3000',
+        must: [], mustNot: ['casino', 'hacked by'],
+        test: [
+          Object.assign({ loc: 'BKK · Thai VPS', r: 'Pass', ms: '420 ms', d: 'Clean · 0 of 2 phrases + shared list' }, PASS),
+          Object.assign({ loc: 'SIN · Vercel sin1', r: 'Pass', ms: '391 ms', d: 'Clean' }, PASS),
+          Object.assign({ loc: 'TYO · Vercel hnd1', r: 'Pass', ms: '447 ms', d: 'Clean' }, PASS)
+        ] },
+      { type: 'Redirect', icon: 'arrow-up-right', target: 'final host', cap: 'PROBLEM', title: 'Redirect · final host', summary: 'Catches a hijacked DNS record or a malicious redirect',
+        url: 'https://[site URL]/', method: 'HEAD', expect: '200, 301, 302', timeout: '30',
+        hosts: ['[site domain]', '[CDN domain]'],
+        test: [
+          Object.assign({ loc: 'BKK · Thai VPS', r: 'Pass', ms: '120 ms', d: '301 → [site domain] · allowed' }, PASS),
+          Object.assign({ loc: 'SIN · Vercel sin1', r: 'Pass', ms: '98 ms', d: '301 → [site domain] · allowed' }, PASS),
+          Object.assign({ loc: 'TYO · Vercel hnd1', r: 'Pass', ms: '133 ms', d: '301 → [site domain] · allowed' }, PASS)
+        ] },
+      { type: 'SSL', icon: 'lock', target: 'certificate', cap: 'PROBLEM', title: 'SSL certificate', summary: 'Checked once a day from BKK', locs: ['BKK'],
+        warnDays: '14', source: 'TLS handshake', facts: [{ k: 'Expires', v: '7 Dec 2026' }, { k: 'Days left', v: '73' }, { k: 'Issuer', v: '[Certificate issuer]' }],
+        test: [Object.assign({ loc: 'BKK · Thai VPS', r: 'Pass', ms: '210 ms', d: 'Valid · 73 days left · chain complete' }, PASS)] },
+      { type: 'Domain', icon: 'calendar', target: 'RDAP', cap: 'PROBLEM', title: 'Domain registration', summary: 'Checked once a day from BKK through RDAP, WHOIS as fallback', locs: ['BKK'],
+        warnDays: '30', source: 'RDAP', facts: [{ k: 'Expires', v: '24 Apr 2027' }, { k: 'Days left', v: '211' }, { k: 'Registrar', v: '[Registrar]' }],
+        test: [Object.assign({ loc: 'BKK · Thai VPS', r: 'Pass', ms: '640 ms', d: 'Registered · 211 days left' }, PASS)] }
+    ];
+    function newMon(saved, k) { return { type: 'Key page', icon: 'file-text', target: 'GET /[new page' + (k ? ' ' + (k + 1) : '') + ']', cap: 'PROBLEM', title: saved ? 'Key page · /[new page' + (k ? ' ' + (k + 1) : '') + ']' : 'Key page · new', summary: saved ? 'Added by Tao · live from the next round · stops at PROBLEM' : 'New monitor · added on save · stops at PROBLEM',
+      url: 'https://[site URL]/[new page' + (k ? ' ' + (k + 1) : '') + ']', method: 'GET', expect: '2xx', timeout: '30', slow: '3000', must: [], mustNot: [], headers: [{ k: 'User-Agent', v: 'DxT-Monitor/1.0 (+ops contact)' }], test: [
+        Object.assign({ loc: 'BKK · Thai VPS', r: 'Pass', ms: '480 ms', d: '200' }, PASS), Object.assign({ loc: 'SIN · Vercel sin1', r: 'Pass', ms: '520 ms', d: '200' }, PASS), Object.assign({ loc: 'TYO · Vercel hnd1', r: 'Pass', ms: '560 ms', d: '200' }, PASS)] }; }
+    var nSaved = this.state.addedN || 0;
+    for (var k = 0; k < nSaved; k++) base.push(newMon(true, k));
+    if (this.state.added) base.push(newMon(false, nSaved));
+    var hdrGone = this.state.hdrGone, hdrNew = this.state.hdrNew;
+    var touch = function () { var e = Object.assign({}, self.state.edited); e[self.state.sel] = true; self.setState({ dirty: true, saved: false, edited: e }); };
+    var edited = this.state.edited, gone = this.state.gone;
+    var removed = this.state.removed;
+    function tags(i, key, list) {
+      return (list || []).filter(function (x) { return !removed[i + key + x]; }).map(function (x) {
+        return { t: x, rm: function () { var r = Object.assign({}, self.state.removed); r[i + key + x] = true; var e = Object.assign({}, self.state.edited); e[i] = true; self.setState({ removed: r, edited: e, dirty: true, saved: false }); } };
+      });
+    }
+    var monitors = base.map(function (m, i) {
+      var t = m.type;
+      return Object.assign({
+        i: i, primary: false, pick: function () { self.setState({ sel: i, saved: false }); }, must: [], mustNot: [], headers: [], hosts: [], facts: [],
+        selected: i === sel,
+        removable: !m.primary,
+        edited: !!edited[i],
+        askRemove: function () { self.setState({ rmAsk: i }); },
+        pending: !!gone[i],
+        live: !gone[i],
+        undoRm: function () { var g = Object.assign({}, self.state.gone); delete g[i]; var any = Object.keys(g).length || Object.keys(self.state.edited).length || self.state.added; self.setState({ gone: g, dirty: !!any }); },
+        addHeader: function () { var n = Object.assign({}, self.state.hdrNew); n[i] = (n[i] || 0) + 1; var e = Object.assign({}, self.state.edited); e[i] = true; self.setState({ hdrNew: n, edited: e, dirty: true, saved: false }); },
+        bg: i === sel ? 'var(--aura-bg-selected)' : 'var(--aura-bg-surface)',
+        bar: i === sel ? 'inset 3px 0 0 var(--aura-accent-violet)' : 'none',
+        capColor: m.cap === 'DOWN' ? 'var(--aura-fg-danger)' : 'var(--aura-fg-secondary)',
+        showRequest: ['HTTP', 'Key page', 'Keyword', 'Redirect'].indexOf(t) >= 0,
+        showContain: t === 'HTTP' || t === 'Key page' || t === 'Keyword',
+        showHeaders: t === 'HTTP' || t === 'Key page',
+        showRedirect: t === 'Redirect',
+        showExpiry: t === 'SSL' || t === 'Domain',
+        showSlow: t === 'HTTP' || t === 'Key page'
+      }, m, { locs: m.locs || ['BKK', 'SIN', 'TYO'], must: tags(i, 'm', m.must), mustNot: tags(i, 'n', m.mustNot), hosts: tags(i, 'h', m.hosts), headers: (m.headers || []).concat(Array.apply(null, Array(hdrNew[i] || 0)).map(function () { return { k: '[Header name]', v: '[value]' }; })).map(function (h, j) { return { k: h.k, v: h.v, j: j, rm: 'Remove header ' + h.k, del: function () { var g = Object.assign({}, self.state.hdrGone); g[i + ':' + j] = true; var e = Object.assign({}, self.state.edited); e[i] = true; self.setState({ hdrGone: g, edited: e, dirty: true, saved: false }); } }; }).filter(function (h) { return !hdrGone[i + ':' + h.j]; }) });
+    });
+    var savedGone = this.state.savedGone || {};
+    monitors = monitors.filter(function (m) { return !savedGone[m.i]; });
+    var cur = monitors.filter(function (m) { return m.i === sel && !gone[m.i]; })[0] || monitors[0];
+    var changed = monitors.filter(function (m) { return m.edited && !gone[m.i]; }).map(function (m) { return m.title === 'Key page · new' ? 'adding Key page · new' : m.title; });
+    var goneNames = base.filter(function (m, i) { return gone[i]; }).map(function (m) { return m.title; });
+    var nChanges = changed.length + goneNames.length;
+    var rmM = base[this.state.rmAsk];
+    var tested = !!this.state.tested[sel];
+    return {
+      yes: true,
+      monitors: monitors,
+      methods: ['GET', 'HEAD', 'POST'],
+      redirectOpts: [{ value: 'follow', label: 'Follow (max 5)' }, { value: 'none', label: 'Don’t follow' }],
+      slowResult: [{ value: 'problem', label: 'PROBLEM (slow)' }],
+      no: false,
+      clean: !this.state.dirty,
+      cleanLabel: this.state.saved ? 'Saved' : 'No changes',
+      hasNew: !!this.state.added,
+      addLabel: this.state.added ? 'Add monitor · save first to add another' : 'Add monitor',
+      addMonitor: function () { var idx = 6 + (self.state.addedN || 0); var e = Object.assign({}, self.state.edited); e[idx] = true; self.setState({ added: true, sel: idx, edited: e, dirty: true, saved: false }); },
+      changeText: nChanges + (nChanges === 1 ? ' unsaved change' : ' unsaved changes'),
+      testNote: cur.locs.length === 1 ? 'Runs once from ' + cur.locs[0] + ' with the settings above. Nothing is stored or alerted.' : 'Runs once from each location (' + cur.locs.join(', ') + ') with the settings above. Nothing is stored or alerted.',
+      rmOpen: this.state.rmAsk >= 0,
+      rmTitle: rmM ? 'Remove ' + rmM.title + '?' : '',
+      rmBody: rmM ? 'Checks for ' + rmM.title + ' (' + rmM.target + ') stop after you save. Arm and Ploy will no longer get ' + rmM.cap + ' alerts from it, and it drops out of the site status.' : '',
+      closeRm: function () { self.setState({ rmAsk: -1 }); },
+      confirmRm: function () { var g = Object.assign({}, self.state.gone); g[self.state.rmAsk] = true; self.setState({ gone: g, rmAsk: -1, sel: 0, dirty: true, saved: false }); },
+      askDiscard: function () { self.setState({ discard: true }); },
+      discardOpen: this.state.discard,
+      closeDiscard: function () { self.setState({ discard: false }); },
+      discardTitle: 'Discard ' + nChanges + (nChanges === 1 ? ' change?' : ' changes?'),
+      discardBody: 'You will lose: ' + changed.map(function (t) { return 'edits to ' + t; }).concat(goneNames.map(function (t) { return 'removing ' + t; })).join(' · ') + '. Nothing has been saved yet.',
+      tested: tested,
+      notTested: !tested,
+      testLabel: tested ? 'Run again' : 'Run test now',
+      testIcon: tested ? 'rotate-ccw' : 'arrow-right',
+      runTest: function () { var t = Object.assign({}, self.state.tested); t[sel] = true; self.setState({ tested: t }); },
+      touch: touch,
+      dirty: this.state.dirty,
+      saved: this.state.saved,
+      save: function () { self.setState({ dirty: false, saved: true, edited: {}, added: false, addedN: (self.state.addedN || 0) + (self.state.added ? 1 : 0), savedGone: Object.assign({}, self.state.savedGone || {}, self.state.gone), gone: {}, sel: self.state.gone[self.state.sel] ? 0 : self.state.sel }); },
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Post-incident review INC-0133</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1700px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="incidents" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
+<a href="Incidents.dc.html" style="text-decoration: none">Incidents</a>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<span style="font-family: var(--font-mono); font-size: 12px">INC-0133</span>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<span>Post-incident review</span>
+</div>
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">VOCA outage at night — Mon 21 Sep</h1>
+<div style="display: flex; align-items: center; gap: 8px">
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="{{reviewVariant}}" icon="{{reviewIcon}}">{{reviewLabel}}</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="danger" variant="outline" icon="ban">Was down</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="rotate-ccw">Flapping ×4</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Tier 2</x-import>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); margin-left: 8px">Required for every DOWN incident · drafted by Ploy</span>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="{{expIcon}}" on-click="{{doExport}}">{{expLabel}}</x-import>
+<sc-if value="{{open}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{approve}}">Approve &amp; close</x-import></sc-if>
+<sc-if value="{{closed}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--aura-fg-secondary)">Signed off by Tao · 10:08 · Closed</span></sc-if>
+</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start">
+
+<div style="grid-column: span 2; display: flex; flex-direction: column; gap: 16px; min-width: 0">
+
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Summary</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.7">VOCA went down four times between 03:12 and 04:04 on Monday — 41 minutes of downtime in total. The hosting provider restarted PHP-FPM each time an aggressive crawler pushed memory over the limit. The alert posted at once, but Tier 2 is not covered at night: escalation timers were paused until 09:00, and Ploy saw it at 08:04. The site recovered on its own; no client report came in.</p>
+</div>
+
+<div class="aura-card" style="gap: 14px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">What happened</h3>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Built from incident events · UTC+7</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; height: 28px; border-radius: 6px; overflow: hidden">
+<sc-for list="{{strip}}" as="g" hint-placeholder-count="9">
+<div title="{{g.title}}" style="flex-grow: {{g.min}}; flex-basis: 0; background: {{g.bg}}; border-right: 1px solid var(--aura-bg-surface)"></div>
+</sc-for>
+</div>
+<div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)"><span>03:00</span><span>03:18</span><span>03:36</span><span>03:54</span><span>04:12</span></div>
+<div style="display: flex; gap: 16px; font-size: 12px; color: var(--aura-fg-secondary)">
+<span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 2px; background: var(--aura-status-blocked-bg)"></span>DOWN · 4 drops, 41 min</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 2px; background: var(--aura-status-ready-bg)"></span>OK between drops</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 2px; background: var(--aura-bg-skeleton)"></span>Before the incident</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{timeline}}" as="t" hint-placeholder-count="7">
+<div style="display: flex; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle)">
+<span style="width: 112px; flex-shrink: 0; white-space: nowrap; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); line-height: 22px">{{t.at}}</span>
+<span style="display: flex; padding-top: 3px; color: {{t.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span>
+<span style="font-size: 13px; line-height: 1.6">{{t.text}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Root cause · 5 whys</h3>
+<ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.6">
+<li>The site returned HTTP 502 from all three locations — PHP-FPM was restarting.</li>
+<li>The host restarts PHP-FPM when it passes its 512 MB memory limit.</li>
+<li>Memory spiked because one crawler requested ~40 search pages per second.</li>
+<li>Nothing limits request rate on the search page, and it is not cached.</li>
+<li>The site was set up before we had a rate-limit standard for client sites.</li>
+</ol>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; display: flex; align-items: center; gap: 8px"><span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>Went well</h3>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.6">
+<li>DOWN confirmed on the immediate recheck, 31 s after the first failure.</li>
+<li>Flapping merged 8 status changes into one incident and one thread.</li>
+<li>RECOVERED posted on the first OK round.</li>
+</ul>
+</div>
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; display: flex; align-items: center; gap: 8px"><span style="display: flex; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import></span>Didn't go well</h3>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.6">
+<li>Nobody saw it for almost 5 hours — Tier 2 is not covered at night.</li>
+<li>We learned the cause from host logs, not from our own monitoring.</li>
+<li>Root cause was only logged 3 days later.</li>
+</ul>
+</div>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Action items</h2>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="plus" on-click="{{openAdd}}">Add action</x-import>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Action</div>
+<div class="aura-table__th" style="width: 88px">Owner</div>
+<div class="aura-table__th" style="width: 96px">Due</div>
+<div class="aura-table__th" style="width: 128px">Status</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{actions}}" as="a" hint-placeholder-count="4">
+<div class="aura-table__row" style="height: auto; min-height: 48px; align-items: center">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; white-space: normal; overflow: visible; text-overflow: clip; height: auto; align-items: center; line-height: 1.45; padding-top: 13px; padding-bottom: 13px">{{a.text}}</div>
+<div class="aura-table__td" style="width: 88px">{{a.owner}}</div>
+<div class="aura-table__td" style="width: 96px; font-variant-numeric: tabular-nums; color: var(--aura-fg-secondary)">{{a.due}}</div>
+<div class="aura-table__td" style="width: 128px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{a.tone}}" variant="{{a.variant}}" icon="{{a.icon}}">{{a.status}}</x-import></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+</section>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<div class="aura-card" style="gap: 0">
+<h3 style="margin: 0 0 8px; font-size: 16px; line-height: 1.5; font-weight: 600">Impact</h3>
+<sc-for list="{{impact}}" as="i" hint-placeholder-count="7">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.5">
+<span style="color: var(--aura-fg-secondary)">{{i.k}}</span><span style="font-weight: 600; text-align: right">{{i.v}}</span>
+</div>
+</sc-for>
+<span style="margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">* Counted from confirmed down (03:12:39). Tier 2 is not covered at night; acked before response hours started, so it counts as 0 min against the target.<br>† From the client-update record: VOCA is an internal site, so no client update was needed.</span>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Sign-off</h3>
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><x-import component-from-global-scope="Aura.Avatar" name="Ploy" size="sm"></x-import><span style="flex-grow: 1">Ploy · owner</span><x-import component-from-global-scope="Aura.StatusPill" tone="ready">Drafted</x-import></div>
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><x-import component-from-global-scope="Aura.Avatar" name="Tao" size="sm"></x-import><span style="flex-grow: 1">Tao · accountable</span><x-import component-from-global-scope="Aura.StatusPill" tone="{{taoTone}}">{{taoLabel}}</x-import></div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Closing needs a root cause and an owner and due date on every action. Open actions carry into the weekly summary.</span>
+</div>
+
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Template</h3>
+<sc-for list="{{sections}}" as="s" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>{{s}}</div>
+</sc-for>
+</div>
+
+<div class="aura-card" style="gap: 8px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Linked</h3>
+<a href="Incidents.dc.html" style="font-size: 13px">INC-0133 · incident record</a>
+<a href="AuditLog.dc.html" style="font-size: 13px">Audit trail for this incident</a>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Client update · not needed (internal site)</span>
+</div>
+</div>
+
+</div>
+</main>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{addOpen}}" on-close="{{closeAdd}}" title="Add action item" description="INC-0133 · every action needs an owner and a due date before the review can close" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<x-import component-from-global-scope="Aura.TextField" label="What needs doing" required="{{yes}}" value="{{newText}}" on-change="{{typeNew}}" placeholder="e.g. Alert on PHP-FPM restarts from the host panel"></x-import>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<x-import component-from-global-scope="Aura.Select" label="Owner" options="{{owners}}" value="{{newOwner}}" on-change="{{pickOwner}}" required="{{yes}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Due" options="{{dues}}" value="{{newDue}}" on-change="{{pickDue}}" required="{{yes}}"></x-import>
+</div>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeAdd}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="plus" disabled="{{newEmpty}}" on-click="{{saveAdd}}">Add action</x-import>
+</div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { closed: false, exported: false, addOpen: false, newText: '', newOwner: 'Ploy', newDue: '2 Oct', added: [] };
+  }
+  renderVals() {
+    var self = this;
+    var closed = this.state.closed;
+    var OK = 'var(--aura-status-ready-bg)', DOWN = 'var(--aura-status-blocked-bg)', PRE = 'var(--aura-bg-skeleton)';
+    function seg(min, bg, title) { return { min: min, bg: bg, title: title }; }
+    var st = this.state;
+    function val(e) { return e && e.target ? e.target.value : e; }
+    return {
+      yes: true,
+      no: false,
+      exported: st.exported,
+      expIcon: st.exported ? 'check' : 'download',
+      expLabel: st.exported ? 'PDF downloaded' : 'Export PDF',
+      doExport: function () { self.setState({ exported: true }); },
+      addOpen: st.addOpen,
+      openAdd: function () { self.setState({ addOpen: true }); },
+      closeAdd: function () { self.setState({ addOpen: false }); },
+      newText: st.newText, newOwner: st.newOwner, newDue: st.newDue,
+      typeNew: function (e) { self.setState({ newText: val(e) }); },
+      pickOwner: function (e) { self.setState({ newOwner: val(e) }); },
+      pickDue: function (e) { self.setState({ newDue: val(e) }); },
+      newEmpty: !st.newText.trim(),
+      owners: ['Ploy', 'Arm', 'Nok', 'Tao'],
+      dues: ['28 Sep', '30 Sep', '2 Oct', '5 Oct', '9 Oct'],
+      saveAdd: function () { var t = self.state.newText.trim(); if (!t) return; self.setState({ added: self.state.added.concat([{ text: t, owner: self.state.newOwner, due: self.state.newDue, status: 'Open', tone: 'neutral', variant: 'soft', icon: 'circle' }]), newText: '', addOpen: false }); },
+      open: !closed,
+      closed: closed,
+      approve: function () { self.setState({ closed: true }); },
+      reviewLabel: closed ? 'Closed' : 'In review',
+      reviewVariant: closed ? 'soft' : 'outline',
+      reviewIcon: closed ? 'check' : 'file-text',
+      taoLabel: closed ? 'Approved' : 'Waiting',
+      taoTone: closed ? 'ready' : 'neutral',
+      strip: [
+        seg(12, PRE, 'Before 03:12 · OK'), seg(7, DOWN, '03:12–03:19 · DOWN'), seg(5, OK, '03:19–03:24 · OK'), seg(11, DOWN, '03:24–03:35 · DOWN'),
+        seg(3, OK, '03:35–03:38 · OK'), seg(14, DOWN, '03:38–03:52 · DOWN'), seg(3, OK, '03:52–03:55 · OK'), seg(9, DOWN, '03:55–04:04 · DOWN'), seg(8, OK, 'Stable from 04:04')
+      ],
+      timeline: [
+        { at: '03:12:39', icon: 'ban', color: 'var(--aura-fg-danger)', text: 'Confirmed down 03:12:39 — HTTP 502 (BKK, SIN, TYO). Posted to the Alerts Space at once. Outside Tier 2 response hours: escalation timer paused until 09:00.' },
+        { at: '03:19–04:04', icon: 'rotate-ccw', color: 'var(--aura-alert-warning-fg)', text: 'Site recovered and dropped again three more times — flapping, merged into the same incident and thread.' },
+        { at: '04:04:10', icon: 'circle-check', color: 'var(--aura-fg-positive)', text: 'First OK round — RECOVERED reply + email posted → State: Monitoring.' },
+        { at: '04:10:10', icon: 'pencil', color: 'var(--aura-alert-warning-fg)', text: 'OK for 2 rounds (≈ 6 min on Tier 2) → State: Needs root cause.' },
+        { at: '08:04:31', icon: 'check', color: 'var(--aura-fg-primary)', text: 'Acknowledged by Ploy from mobile, before response hours started (09:00).' },
+        { at: '10:40:00', icon: 'file-text', color: 'var(--aura-fg-secondary)', text: 'Ploy checks host logs: PHP-FPM restarted 4× on memory limit.' },
+        { at: 'Thu 24 Sep 16:20', icon: 'pencil', color: 'var(--aura-fg-secondary)', text: 'Root cause logged, resolved; review submitted for Tao’s sign-off.' }
+      ],
+      impact: [
+        { k: 'Downtime', v: '41 min (4 drops)' },
+        { k: 'Window', v: 'Mon 21 Sep 03:12–04:04' },
+        { k: 'Time to detect', v: '31 s' },
+        { k: 'Time to acknowledge', v: '4 h 52 min*' },
+        { k: 'Time to recover', v: '52 min · self-recovered' },
+        { k: 'Client notified', v: 'Not needed · internal site†' },
+        { k: 'Uptime 30 d (VOCA)', v: '99.91%' }
+      ],
+      actions: [
+        { text: 'Rate-limit and cache the search page; block the crawler at the WAF', owner: 'Ploy', due: '30 Sep', status: 'Done', tone: 'success', variant: 'outline', icon: 'circle-check' },
+        { text: 'Ask the host to raise the PHP-FPM memory limit or move to a bigger plan', owner: 'Ploy', due: '2 Oct', status: 'In progress', tone: 'neutral', variant: 'outline', icon: 'loader-circle' },
+        { text: 'Add a key-page monitor for /search', owner: 'Ploy', due: '2 Oct', status: 'Open', tone: 'neutral', variant: 'soft', icon: 'circle' },
+        { text: 'CEO decision: Tier 2 night coverage, or move VOCA to Tier 1', owner: 'Tao', due: '28 Sep', status: 'Open', tone: 'neutral', variant: 'soft', icon: 'circle' }
+      ].concat(st.added),
+      sections: ['Summary', 'Timeline', 'Root cause', 'What went well / didn’t', 'Action items with owners', 'Impact numbers'],
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

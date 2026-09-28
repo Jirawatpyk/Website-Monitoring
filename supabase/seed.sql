@@ -1,0 +1,4 @@
+-- Local development seed only (runs on `pnpm db:reset`). Never run against production.
+-- Use the spec's sample data (docs/dxt-monitor-design-spec.md §1–§5: 17 sites, owners, INC-0118…0142)
+-- so screens can be compared with the canvas boards. Real owners and tiers come from the
+-- Site Registration Checklist (PRD Phase 0), not from here.

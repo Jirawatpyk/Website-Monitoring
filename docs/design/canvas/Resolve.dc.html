@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Resolve incident</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1100px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="incidents" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
+<a href="Incidents.dc.html" style="text-decoration: none">Incidents</a>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<span style="font-family: var(--font-mono); font-size: 12px">INC-0139</span>
+</div>
+<div style="display: flex; align-items: center; gap: 16px">
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">ORCA Thailand recovered</h1>
+<x-import component-from-global-scope="Aura.Badge" tone="{{pageTone}}" variant="outline" icon="{{pageIcon}}">{{pageState}}</x-import>
+<span style="margin-left: auto"><sc-if value="{{canReopen}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="circle-check" on-click="{{reopen}}">Resolve…</x-import></sc-if></span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: -12px">
+<x-import component-from-global-scope="Aura.Badge" tone="danger" variant="outline" icon="ban">Was down</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Tier 2</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Trigger: Hard fail</x-import>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); margin-left: 4px">Fri 25 Sep 2026 · 10:08 (UTC+7)</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: var(--aura-border-default); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius); overflow: hidden; box-shadow: var(--aura-shadow-enterprise)">
+<sc-for list="{{facts}}" as="f" hint-placeholder-count="6">
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; background: var(--aura-bg-surface)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{f.k}}</span><span style="font-size: 14px; font-weight: 600">{{f.v}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{f.sub}}</span></div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 28px 24px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-card-radius); font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="layout-dashboard" size="md"></x-import></span>
+<span><span style="font-weight: 500; color: var(--aura-fg-primary)">Page content — see Incident.</span> Evidence by location, timeline, escalation and the Resolve card use the same layout as INC-0142; the Resolve dialog opens on top of this page. <a href="Incident.dc.html">Open the Incident board</a></span>
+</div>
+</main>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{open}}" on-close="{{close}}" title="{{dlgTitle}}" description="INC-0139 · ORCA Thailand · Tier 2 · owner Tao" size="md" auto-focus="{{no}}">
+<sc-if value="{{editing}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 18px; padding-top: 4px">
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--aura-border-default); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); overflow: hidden">
+<div style="padding: 10px 14px; background: var(--aura-bg-canvas); display: flex; flex-direction: column; line-height: 1.4"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Down</span><span style="font-weight: 600">8 min</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-canvas); display: flex; flex-direction: column; line-height: 1.4"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Window</span><span style="font-weight: 600">Thu 22:14–22:22</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-canvas); display: flex; flex-direction: column; line-height: 1.4"><span style="font-size: 12px; color: var(--aura-fg-secondary)">OK since</span><span style="font-weight: 600">22:22 · 3/3</span></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 500">Before you can resolve</span>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<sc-for list="{{conds}}" as="c" hint-placeholder-count="3">
+<div style="display: flex; align-items: flex-start; gap: 10px"><span style="display: flex; padding-top: 2px; color: {{c.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm" label="{{c.state}}"></x-import></span><span style="flex-grow: 1"><span style="font-weight: 500">{{c.label}}</span> <span style="color: var(--aura-fg-secondary)">· {{c.detail}}</span></span></div>
+</sc-for>
+</div>
+</div>
+<x-import component-from-global-scope="Aura.Select" label="Root cause category" options="{{causes}}" value="{{cause}}" on-change="{{setCause}}" required="{{yes}}" placeholder="Choose one"></x-import>
+<x-import component-from-global-scope="Aura.Textarea" label="What happened" required="{{yes}}" rows="{{three}}" value="{{what}}" on-change="{{setWhat}}" error="{{whatError}}" hint="Plain language — this text goes into the weekly summary and the client report."></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="What fixed it" default-value="Nothing from our side — provider reboot finished" optional="{{yes}}"></x-import>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 500">Uptime</span>
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<span style="font-size: 13px">8 min counts as downtime → ORCA Thailand September uptime 99.98%</span>
+<x-import component-from-global-scope="Aura.Checkbox" disabled="{{yes}}">Inside a maintenance window</x-import>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Only an Admin can exclude downtime, and only when a window was active. None was.</span>
+</div>
+
+<sc-if value="{{notUnknown}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="file-text" size="sm"></x-import></span><span><span style="font-weight: 600">A post-incident review is created.</span> DOWN incidents always get one. The draft is prefilled from this form and the timeline, assigned to Tao, due Mon 28 Sep.</span></div>
+</sc-if>
+<sc-if value="{{isUnknown}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Unknown keeps the incident open">It stays in “Needs root cause” and in the weekly summary until someone picks a real category. Your notes are saved.</x-import>
+</sc-if>
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px">
+<span style="font-size: 12px; line-height: 1.5; color: {{footColor}}">{{footText}}</span>
+<div style="display: flex; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{close}}">Cancel</x-import>
+<sc-if value="{{notUnknown}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="circle-check" disabled="{{cannotResolve}}" on-click="{{resolve}}">Resolve incident</x-import></sc-if>
+<sc-if value="{{isUnknown}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="pencil" disabled="{{cannotResolve}}" on-click="{{keep}}">Save, keep open</x-import></sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{kept}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 18px; padding-top: 4px">
+<div style="display: flex; align-items: center; gap: 14px">
+<span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-alert-warning-bg); color: var(--aura-alert-warning-fg); display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="md"></x-import></span>
+<div style="display: flex; flex-direction: column; line-height: 1.45">
+<span style="font-size: 16px; font-weight: 600">Saved at 10:08 by Tao — still open</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">INC-0139 stays in “Needs root cause”. Notes are saved; pick a category when you know more.</span>
+</div>
+</div>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{undo}}">Edit again</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" href="Incidents.dc.html">Back to incidents</x-import>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 18px; padding-top: 4px">
+<div style="display: flex; align-items: center; gap: 14px">
+<span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-status-ready-bg); color: var(--aura-status-ready-fg); display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="check" size="md"></x-import></span>
+<div style="display: flex; flex-direction: column; line-height: 1.45">
+<span style="font-size: 16px; font-weight: 600">Resolved at 10:08 by Tao</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Root cause: {{causeLabel}}. Down 8 min. {{holdLine}}</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px"><span style="display: flex; color: {{postColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{postIcon}}" size="sm"></x-import></span><span style="flex-grow: 1">{{postText}}</span><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap">{{postAt}}</span></div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px"><span style="display: flex; color: {{postColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{postIcon}}" size="sm"></x-import></span><span style="flex-grow: 1">{{mailText}}</span><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap">{{postAt}}</span></div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px"><span style="display: flex; color: {{postColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{postIcon}}" size="sm"></x-import></span><span style="flex-grow: 1">{{hookText}}</span><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap">{{postAt}}</span></div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px"><span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span><span style="flex-grow: 1">Review draft created for Tao — due Mon 28 Sep</span><a href="PostIncident.dc.html" style="font-size: 13px">Open review</a></div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; font-size: 13px"><span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span><span style="flex-grow: 1">Removed from “Needs root cause” in the weekly summary</span></div>
+</div>
+<div style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Badge" tone="success" variant="outline" icon="circle-check">Resolved</x-import></span><span>DOWN lifecycle: becomes <span style="font-weight: 500; color: var(--aura-fg-primary)">In review</span> when the review draft is submitted for sign-off, and <span style="font-weight: 500; color: var(--aura-fg-primary)">Closed</span> once it is signed off.</span></div>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<sc-if value="{{holding}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="rotate-ccw" on-click="{{undo}}">{{undoLabel}}</x-import></sc-if>
+<x-import component-from-global-scope="Aura.Button" variant="primary" href="Incidents.dc.html">Back to incidents</x-import>
+</div>
+</div>
+</sc-if>
+</x-import>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: true, cause: '', done: false, left: 10, what: 'The hosting provider rebooted the server for a kernel update without notice. The site came back on its own after 8 minutes.' };
+  }
+  renderVals() {
+    var self = this;
+    var done = this.state.done;
+    var cause = this.state.cause;
+    var what = this.state.what;
+    var unknown = cause === 'unknown';
+    var causes = [
+      { value: 'hosting', label: 'Hosting / server' },
+      { value: 'deploy', label: 'Deploy / code change' },
+      { value: 'dns', label: 'DNS / domain' },
+      { value: 'ssl', label: 'SSL certificate' },
+      { value: 'third', label: 'Third-party / CDN' },
+      { value: 'traffic', label: 'Traffic / capacity' },
+      { value: 'client', label: 'Client-side change' },
+      { value: 'false', label: 'False alarm (monitor)' },
+      { value: 'unknown', label: 'Unknown — keep investigating' }
+    ];
+    var causeLabel = (causes.filter(function (c) { return c.value === cause; })[0] || {}).label || '';
+    var whatEmpty = !what || !what.trim();
+    var foot, footColor = 'var(--aura-fg-secondary)';
+    if (!cause) { foot = 'Choose a root cause category'; footColor = 'var(--aura-alert-warning-fg)'; }
+    else if (whatEmpty) { foot = 'Write what happened to continue'; footColor = 'var(--aura-alert-warning-fg)'; }
+    else if (unknown) { foot = 'Saves your notes · the incident stays open'; }
+    else { foot = 'All 3 conditions met'; }
+    var OKC = 'var(--aura-fg-positive)', PEND = 'var(--aura-fg-tertiary)';
+    var rcDone = !!cause && !unknown && !whatEmpty;
+    return {
+      yes: true,
+      no: false,
+      three: 3,
+      open: this.state.open,
+      close: function () { self.setState({ open: false }); },
+      reopen: function () { self.setState({ open: true }); },
+      canReopen: !this.state.open && done !== 'resolved',
+      conds: [
+        { label: 'OK for 2 rounds', detail: 'since 22:22 · 3/3 locations', icon: 'circle-check', color: OKC, state: 'Met' },
+        { label: 'Client update marked', detail: 'Not required — the client-update track didn’t fire (only Tier 1 DOWN > 15 min, or Tier 2 DOWN ≥ 60 min inside response hours)', icon: 'circle-check', color: OKC, state: 'Met' },
+        { label: 'Root cause written', detail: rcDone ? 'filled in below' : (unknown ? 'Unknown keeps the incident open' : 'fill in below · “Unknown — keep investigating” doesn’t count'), icon: rcDone ? 'circle-check' : 'circle', color: rcDone ? OKC : PEND, state: rcDone ? 'Met' : 'Not met' }
+      ],
+      editing: !done,
+      done: done === 'resolved',
+      kept: done === 'kept',
+      isUnknown: unknown,
+      notUnknown: !unknown,
+      dlgTitle: done === 'resolved' ? 'Incident resolved' : (done === 'kept' ? 'Saved — incident still open' : 'Resolve incident'),
+      pageState: done === 'resolved' ? 'Resolved' : 'Needs root cause',
+      pageTone: done === 'resolved' ? 'success' : 'warning',
+      pageIcon: done === 'resolved' ? 'circle-check' : 'pencil',
+      cause: cause,
+      causeLabel: causeLabel,
+      setCause: function (v) { self.setState({ cause: v && v.target ? v.target.value : v }); },
+      what: what,
+      setWhat: function (v) { self.setState({ what: v && v.target ? v.target.value : v }); },
+      whatError: whatEmpty ? 'Required — say what happened, even if the site recovered on its own.' : '',
+      cannotResolve: !cause || whatEmpty,
+      footText: foot,
+      footColor: footColor,
+      resolve: function () {
+        clearInterval(self._iv);
+        self.setState({ done: 'resolved', left: 10 });
+        self._iv = setInterval(function () {
+          var l = self.state.left - 1;
+          if (l <= 0) { clearInterval(self._iv); self.setState({ left: 0 }); } else self.setState({ left: l });
+        }, 1000);
+      },
+      keep: function () { self.setState({ done: 'kept' }); },
+      undo: function () { clearInterval(self._iv); self.setState({ done: false, left: 10 }); },
+      holding: done === 'resolved' && this.state.left > 0,
+      undoLabel: 'Undo · ' + this.state.left + ' s',
+      holdLine: this.state.left > 0 ? 'Posting to Chat, email and webhooks in ' + this.state.left + ' s — nothing is sent until then.' : 'Posted to Chat, email and webhooks 10:08:10.',
+      postIcon: this.state.left > 0 ? 'clock' : 'circle-check',
+      postColor: this.state.left > 0 ? 'var(--aura-fg-secondary)' : 'var(--aura-fg-positive)',
+      postText: this.state.left > 0 ? 'Resolved reply to the Chat thread · held for undo' : 'Resolved reply posted in the Chat thread',
+      mailText: this.state.left > 0 ? 'Resolved email to the DOWN recipients · held for undo' : 'Resolved email sent in the incident thread',
+      hookText: this.state.left > 0 ? 'incident.resolved webhook · held for undo' : 'incident.resolved webhook sent',
+      postAt: this.state.left > 0 ? 'in ' + this.state.left + ' s' : '10:08:10',
+      facts: [
+        { k: 'STARTED', v: 'Thu 22:14', sub: 'First failed check' },
+        { k: 'DURATION', v: '8 min', sub: 'Recovered on its own 22:22' },
+        { k: 'ALERTS', v: 'Posted 22:14', sub: 'Outside response hours · timers paused' },
+        { k: 'OWNER', v: 'Tao', sub: 'Backup Nok · AM Thee' },
+        { k: 'CLIENT UPDATE', v: 'Not required', sub: 'Tier 2 · under 60 min' },
+        { k: 'STATE', v: done === 'resolved' ? 'Resolved' : 'Needs root cause', sub: done === 'resolved' ? 'Review draft due Mon 28 Sep' : 'Stays in “Needs action”' }
+      ],
+      causes: causes,
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: done === 'resolved' ? 2 : 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

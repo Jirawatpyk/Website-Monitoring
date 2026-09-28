@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Monthly uptime report — Bangkok Airways, August 2026</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#ffffff}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+:root{--day-ok:#84cc16;--day-deg:#f59e0b;--day-out:var(--aura-status-blocked-bg);--day-mnt:var(--aura-fg-secondary);--day-hatch:rgba(0,0,0,.35);--day-cap:5px}
+/* Day cells — same tokens and maintenance cap as the client status page. Each state has a non-colour cue so greyscale print works:
+   outage = white ×, degraded = diagonal stripes, maintenance = dark cap on top. */
+.day{position:relative;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border-radius:3px;background:var(--day-ok);color:#fff;font-size:11px;font-weight:600;line-height:1;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.day[data-k="deg"]{background:repeating-linear-gradient(135deg,var(--day-hatch) 0 1.5px,transparent 1.5px 4px),var(--day-deg)}
+.day[data-k="out"]{background:var(--day-out)}
+.day[data-k="out"]::after{content:"×";font-size:13px}
+.day[data-m="1"]{box-shadow:inset 0 var(--day-cap) 0 0 var(--day-mnt)}
+.day.sw{width:10px;height:10px;border-radius:2px;--day-cap:3px}
+.day.sw[data-k="out"]::after{font-size:9px}
+@media print{.spec-note{display:none}}
+</style>
+</helmet>
+<div style="width: 794px; height: 1123px; box-sizing: border-box; padding: 48px 56px 36px; display: flex; flex-direction: column; gap: 22px; background: var(--aura-bg-surface); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 12px; line-height: 1.55">
+
+<header style="display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 18px; border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 10px; color: var(--aura-fg-secondary); letter-spacing: 0.04em">MONTHLY UPTIME REPORT · 1–31 AUG 2026 · THAILAND TIME (UTC+7)</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 32px; line-height: 1.1; font-weight: 600; letter-spacing: -0.01em">Bangkok Airways</h1>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">2 websites · Prepared by DxT Solutions · Account manager: Bua</span>
+</div>
+<div style="height: 30px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 15px; font-weight: 600">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+</header>
+
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+<div style="padding: 14px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; line-height: 1.3"><span style="font-size: 11px; color: var(--aura-fg-secondary)">Overall uptime</span><span style="font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums">99.97%</span><span style="font-size: 11px; color: var(--aura-fg-positive); font-weight: 500">Target 99.9% met</span></div>
+<div style="padding: 14px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; line-height: 1.3"><span style="font-size: 11px; color: var(--aura-fg-secondary)">Downtime</span><span style="font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums">26 min</span><span style="font-size: 11px; color: var(--aura-fg-secondary)">1 outage, China site</span></div>
+<div style="padding: 14px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; line-height: 1.3"><span style="font-size: 11px; color: var(--aura-fg-secondary)">Incidents</span><span style="font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums">2</span><span style="font-size: 11px; color: var(--aura-fg-secondary)">1 outage · 1 degraded</span></div>
+<div style="padding: 14px 16px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; line-height: 1.3"><span style="font-size: 11px; color: var(--aura-fg-secondary)">Typical response</span><span style="font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums">540 ms</span><span style="font-size: 11px; color: var(--aura-fg-secondary)">Both sites, 3 locations</span></div>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">Daily availability</h2>
+<sc-for list="{{sites}}" as="s" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="width: 110px; flex-shrink: 0; font-size: 12px; font-weight: 500">{{s.name}}</span>
+<div style="flex-grow: 1; display: grid; grid-template-columns: repeat(31, minmax(0, 1fr)); gap: 2px">
+<sc-for list="{{s.days}}" as="d" hint-placeholder-count="31">
+<span class="day" data-k="{{d.k}}" data-m="{{d.m}}" title="{{d.title}}" aria-label="{{d.title}}" style="height: 22px"></span>
+</sc-for>
+</div>
+<span style="width: 56px; text-align: right; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums">{{s.uptime}}</span>
+</div>
+</sc-for>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding-left: 122px; font-size: 10px; color: var(--aura-fg-secondary)">
+<span style="display: flex; align-items: center; gap: 5px; white-space: nowrap"><span class="day sw" data-k="ok"></span>Fully available</span>
+<span style="display: flex; align-items: center; gap: 5px; white-space: nowrap"><span class="day sw" data-k="deg"></span>Degraded (site reachable)</span>
+<span style="display: flex; align-items: center; gap: 5px; white-space: nowrap"><span class="day sw" data-k="out"></span>Outage</span>
+<span style="display: flex; align-items: center; gap: 5px; white-space: nowrap"><span class="day sw" data-k="ok" data-m="1"></span>Planned maintenance (not counted)</span>
+<span style="margin-left: auto">Each day shows its worst event</span>
+</div>
+
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">By website</h2>
+<table style="width: 100%; border-collapse: collapse; font-size: 12px">
+<thead><tr style="text-align: left; font-family: var(--font-mono); font-size: 10px; color: var(--aura-fg-secondary); text-transform: uppercase"><th style="padding: 8px 0; border-bottom: 1px solid var(--aura-border-default); font-weight: 400">Website</th><th style="padding: 8px 0; border-bottom: 1px solid var(--aura-border-default); font-weight: 400; text-align: right">Uptime</th><th style="padding: 8px 0; border-bottom: 1px solid var(--aura-border-default); font-weight: 400; text-align: right">Downtime</th><th style="padding: 8px 0; border-bottom: 1px solid var(--aura-border-default); font-weight: 400; text-align: right">Typical response</th><th style="padding: 8px 0; border-bottom: 1px solid var(--aura-border-default); font-weight: 400; text-align: right">Slowest 5%</th><th style="padding: 8px 0; border-bottom: 1px solid var(--aura-border-default); font-weight: 400; text-align: right">Incidents</th></tr></thead>
+<tbody>
+<tr><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); font-weight: 500">Bangkok Airways – Taiwan</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right; font-variant-numeric: tabular-nums">100.00%</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right">0 min</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right">405 ms</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right">702 ms</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right">1 degraded</td></tr>
+<tr><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); font-weight: 500">Bangkok Airways – China</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right; font-variant-numeric: tabular-nums">99.94%</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right">26 min</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right">676 ms</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right">1.2 s</td><td style="padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right">1 outage</td></tr>
+</tbody>
+</table>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">Incidents</h2>
+<sc-for list="{{incidents}}" as="i" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 76px 96px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--aura-border-subtle)">
+<div style="display: flex; flex-direction: column; line-height: 1.4"><span style="font-weight: 600">{{i.date}}</span><span style="font-size: 11px; color: var(--aura-fg-secondary)">{{i.time}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px; line-height: 1.4"><span style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: {{i.color}}"><span class="day sw" data-k="{{i.k}}"></span>{{i.kind}}</span><span style="font-size: 11px; color: var(--aura-fg-secondary)">{{i.dur}}</span></div>
+<div style="display: flex; flex-direction: column; line-height: 1.45"><span style="font-weight: 500">{{i.site}} — {{i.what}}</span><span style="color: var(--aura-fg-secondary)">{{i.cause}}</span></div>
+</div>
+</sc-for>
+</section>
+
+<div class="spec-note" style="padding: 6px 10px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-sm); font-size: 10px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="font-family: var(--font-mono)">SPEC NOTE · NOT PRINTED</span> — AM note block — appears only on manually-sent reports when the AM writes one; omitted on automatic reports like this one.</div>
+
+<footer style="margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--aura-border-default); font-size: 10px; line-height: 1.55; color: var(--aura-fg-secondary)">
+<span><span style="font-weight: 600; color: var(--aura-fg-primary)">How we measure.</span> Each website is checked every minute from Bangkok, Singapore and Tokyo. We count an outage only when at least 2 of 3 locations fail two checks in a row. "Degraded" means the site stayed reachable but was slow, or showed an error on a key page — it does not reduce uptime. Planned maintenance (1 window, 12 Aug 22:00–00:00) is excluded. The China site is checked from outside mainland China.</span>
+<div style="display: flex; justify-content: space-between; font-family: var(--font-mono)"><span>DxT SOLUTIONS · REPORT RPT-2608-BA · GENERATED 1 SEP 2026 06:00</span><span>PAGE 1 OF 1</span></div>
+<div class="spec-note" style="padding: 6px 10px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-sm); font-size: 10px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="font-family: var(--font-mono)">SPEC NOTE · NOT PRINTED</span> — When the incident list runs past one page: repeat the header strip (client · month · DxT mark) on every page, add “Incidents (continued)” at the top of the next page, never split one incident across pages, and number pages “Page 2 of 3” in this footer.</div>
+</footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":794,"height":1123}}'>
+class Component extends DCLogic {
+  renderVals() {
+    // Each cell = the day's worst client-visible event. Maintenance is a dark cap on top of the cell (same mark as the status page), not a full grey cell.
+    // Internal-only events (e.g. 11 Aug SSL early warning) are not shown.
+    var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    function days(special, mnt) {
+      var d = [];
+      for (var i = 1; i <= 31; i++) {
+        var k = special[i] ? special[i][0] : 'ok';
+        var t = WD[new Date(2026, 7, i).getDay()] + ' ' + i + ' Aug · ' + ({ ok: 'Fully available', deg: 'Degraded', out: 'Outage' }[k]) + (special[i] ? ' · ' + special[i][1] : '');
+        if (mnt[i]) t += ' · Planned maintenance ' + mnt[i] + ' (not counted)';
+        d.push({ k: k, m: mnt[i] ? '1' : '0', title: t });
+      }
+      return d;
+    }
+    return {
+      sites: [
+        { name: 'Taiwan website', uptime: '100.00%', days: days({ 18: ['deg', '14 min'] }, { 12: '22:00–00:00' }) },
+        { name: 'China website', uptime: '99.94%', days: days({ 21: ['out', '26 min'] }, { 12: '22:00–00:00' }) }
+      ],
+      incidents: [
+        { date: '21 Aug', time: '14:06 (UTC+7)', k: 'out', kind: 'Outage', color: 'var(--aura-fg-danger)', dur: '26 min', site: 'Bangkok Airways – China', what: 'site unreachable from all locations', cause: 'Hosting provider network fault. Restored by the provider; we followed up for their incident report.' },
+        { date: '18 Aug', time: '10:05 (UTC+7)', k: 'deg', kind: 'Degraded', color: 'var(--aura-alert-warning-fg)', dur: '14 min', site: 'Bangkok Airways – Taiwan', what: 'booking page slow', cause: 'The booking page took longer than usual to load. The site stayed available throughout, so this does not reduce uptime.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

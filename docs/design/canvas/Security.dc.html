@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Settings, sign-in & security</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+main > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1540px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="settings" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px; position: relative">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; min-height: 48px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SETTINGS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Settings</h1>
+</div>
+
+</div>
+
+<x-import component-from-global-scope="Aura.Tabs" label="Settings sections" tabs="{{tabs}}" value="sso"></x-import>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch">
+
+<div class="aura-card" style="gap: 14px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Who can sign in</h3>
+<x-import component-from-global-scope="Aura.TextField" label="Google Workspace domain" default-value="[company domain]" disabled="{{yes}}" hint="Set at deploy time. Changing it signs everyone out."></x-import>
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; line-height: 1.45"><span style="font-size: 14px; font-weight: 500">Block personal accounts</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Clients get a status page, not an account.</span></div>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="lock">Always on</x-import>
+</div>
+</div>
+
+<div class="aura-card" style="gap: 14px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">2-step verification</h3>
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; line-height: 1.45"><span style="font-size: 14px; font-weight: 500">Required for Admins</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Without it an Admin can view + acknowledge only.</span></div>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="lock">Always on</x-import>
+</div>
+<x-import component-from-global-scope="Aura.Switch" label="Required for everyone" on-change="{{toggleAll}}" checked="{{all2sv}}" description="{{allDesc}}"></x-import>
+<sc-if value="{{hasReq}}" hint-placeholder-val="{{true}}"><div><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="calendar" on-click="{{openChange}}">Change start date</x-import></div></sc-if>
+</div>
+
+<div class="aura-card" style="gap: 14px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Sessions</h3>
+<x-import component-from-global-scope="Aura.Select" label="Stay signed in for" options="{{lengths}}" value="{{len}}" on-change="{{setLen}}" hint="Long enough that the Ack link from Chat opens without a sign-in."></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Admin actions ask Google again after" options="{{reauth}}" value="{{re}}" on-change="{{setRe}}"></x-import>
+</div>
+</div>
+
+<sc-if value="{{pageWarn}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-lg); font-size: 13px; line-height: 1.5">
+<span style="display: flex; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="md"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 600; color: var(--aura-alert-warning-fg)">{{pageWarnTitle}}</span><span>{{pageWarnText}}</span><span>{{pageWarnText2}}</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="mail" disabled="{{nudged}}" on-click="{{nudge}}">{{nudgeLabel}}</x-import>
+<div style="display: flex; align-items: center; gap: 12px"><a href="OnCall.dc.html" style="font-size: 13px; white-space: nowrap">Open on-call</a><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="calendar" on-click="{{openChange}}">Change start date</x-import></div>
+</div>
+</div>
+</sc-if>
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">People and their sign-in</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">2-step status comes from Google at each sign-in · signing out takes effect now</span>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Person</div>
+<div class="aura-table__th" style="width: 120px">Role</div>
+<div class="aura-table__th" style="width: 230px">2-step</div>
+<div class="aura-table__th" style="width: 90px; justify-content: flex-end; padding-right: 16px">Devices</div>
+<div class="aura-table__th" style="width: 150px">Last sign-in</div>
+<div class="aura-table__th" style="width: 200px"></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{people}}" as="p" hint-placeholder-count="9">
+<div class="aura-table__row">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 10px; line-height: 1"><x-import component-from-global-scope="Aura.Avatar" name="{{p.name}}" size="sm"></x-import><span style="font-weight: 500">{{p.name}}</span><sc-if value="{{p.onCall}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{p.onCallShort}}</span></sc-if></div>
+<div class="aura-table__td" style="width: 120px">{{p.role}}</div>
+<div class="aura-table__td" style="width: 230px; display: flex; align-items: center; gap: 6px; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{p.tone}}" variant="{{p.variant}}" icon="{{p.icon}}">{{p.sv}}</x-import><sc-if value="{{p.pending}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="clock">{{p.pendingLabel}}</x-import></sc-if></div>
+<div class="aura-table__td" style="width: 90px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{p.dev}}</div>
+<div class="aura-table__td" style="width: 150px; color: var(--aura-fg-secondary)">{{p.last}}</div>
+<div class="aura-table__td" style="width: 200px; display: flex; align-items: center; justify-content: flex-end; line-height: 1"><sc-if value="{{p.canOut}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="log-out" on-click="{{p.open}}">{{p.outLabel}}</x-import></sc-if></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px">
+<div class="aura-card" style="gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Recent sign-in events</h3><a href="AuditLog.dc.html" style="font-size: 13px">Audit log</a></div>
+<sc-for list="{{events}}" as="e" hint-placeholder-count="3">
+<div style="display: flex; gap: 12px; font-size: 13px; line-height: 1.5"><span style="width: 76px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">{{e.at}}</span><span style="display: flex; padding-top: 2px; color: {{e.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{e.icon}}" size="sm"></x-import></span><span>{{e.text}}</span></div>
+</sc-for>
+</div>
+<div class="aura-card" style="gap: 10px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">If Google sign-in is down</h3>
+<span style="font-size: 13px; line-height: 1.6; color: var(--aura-fg-secondary)">There are no local passwords, on purpose. Checks, the Chat thread, emails and escalation keep running without anyone signed in — only Ack and editing wait. Escalation doesn’t stop without an ack, so the next level still gets called.</span>
+</div>
+</div>
+
+<sc-if value="{{dirty}}" hint-placeholder-val="{{false}}">
+<div role="region" aria-label="Unsaved changes" style="position: relative; margin-top: auto; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 20px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-strong); border-radius: 9999px; box-shadow: var(--aura-shadow-overlay)">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="sm"></x-import></span>
+<span style="font-weight: 600; white-space: nowrap">{{dirtyLabel}}</span>
+<span style="flex-grow: 1; min-width: 0; font-size: 13px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{dirtyHint}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{discard}}">Discard</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="check" on-click="{{save}}">Save</x-import>
+</div>
+</sc-if>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{outOpen}}" on-close="{{closeOut}}" title="{{outTitle}}" description="{{outDesc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{outDevices}}" as="d" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: {{d.border}}; font-size: 13px; line-height: 1.4">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="monitor" size="sm"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column"><span style="font-weight: 500">{{d.name}}</span><span style="color: var(--aura-fg-secondary)">{{d.when}}</span></div>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">{{d.tag}}</x-import>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{outWarn}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="{{outWarnTitle}}">{{outWarnText}}</x-import>
+</sc-if>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Takes effect now · logged</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeOut}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="danger" icon="log-out" on-click="{{doOut}}">{{outCta}}</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{svOpen}}" on-close="{{closeSv}}" title="{{svTitle}}" description="Nok, Thee and Mint have it off. From the date below they can still sign in to acknowledge; everything else is locked until 2-step is on." size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<x-import component-from-global-scope="Aura.Select" label="Required from" options="{{fromOpts}}" value="{{from}}" on-change="{{setFrom}}" hint="Checked against the on-call rotation, including Arm’s pending swap with Nok. Each of the 3 people gets an email with the date and a how-to link."></x-import>
+<sc-if value="{{dlgWarn}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Alert" tone="warning" title="{{dlgWarnTitle}}">{{dlgWarnText}}</x-import></sc-if>
+<sc-if value="{{dlgClear}}" hint-placeholder-val="{{false}}"><span style="display: flex; gap: 8px; font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 3px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>{{dlgClearText}}</span></sc-if>
+<sc-if value="{{hasOther}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">{{otherNote}}</span>
+</sc-if>
+<div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Written to the audit log</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeSv}}">Back</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{confirmSv}}">{{svCta}}</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{offOpen}}" on-close="{{closeOff}}" title="Stop requiring 2-step for everyone?" description="Takes effect now. Admins still need 2-step — that rule is always on." size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--aura-alert-warning-border); background: var(--aura-alert-warning-bg); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import>What changes</span>
+<span>Nok, Thee and Mint are no longer asked for 2-step on Mon 5 Oct and keep full access for their role without it. They get an email saying the requirement was withdrawn.</span>
+<span>Everyone who already has 2-step on keeps it — Google settings don’t change.</span>
+</div>
+<x-import component-from-global-scope="Aura.Textarea" label="Note" required="{{yes}}" rows="{{two}}" placeholder="Why are you turning this off?" value="{{offNote}}" on-change="{{setOffNote}}" error="{{offErr}}" hint="Saved in the audit log and quoted in the email."></x-import>
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Takes effect now · logged</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeOff}}">Keep it required</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="danger" icon="x" on-click="{{confirmOff}}">Stop requiring 2-step</x-import>
+</div>
+</div>
+</x-import>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1540}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { offOpen: false, offNote: '', offTried: false, nudged: false, all2sv: true, saved2sv: 'Mon 5 Oct', len: '30', re: '12', sLen: '30', sRe: '12', out: null, svOpen: false, from: 'Mon 5 Oct', changing: false, outDone: [] };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var ON = { sv: 'On', tone: 'success', icon: 'circle-check' };
+    var OFF = { sv: 'Off', tone: 'neutral', icon: 'circle' };
+    var NEED = { sv: 'Needed at first sign-in', tone: 'warning', icon: 'triangle-alert' };
+    var pending2sv = st.all2sv && !st.saved2sv;
+    var pendingOff = !st.all2sv && !!st.saved2sv;
+    var changes = (pending2sv || pendingOff ? 1 : 0) + (st.len !== st.sLen ? 1 : 0) + (st.re !== st.sRe ? 1 : 0);
+    // rotation incl. Arm's pending swap: Nok (2-step off) is on call 28 Sep → 5 Oct, and 5 → 12 Oct if Nok accepts
+    var DAY = { 'Mon 28 Sep': 28, 'Thu 1 Oct': 31, 'Mon 5 Oct': 35, 'Mon 12 Oct': 42 };
+    function clash(d) {
+      var n = DAY[d];
+      if (n === undefined) return null;
+      if (n >= 28 && n < 35) return { title: 'Starts in the middle of Nok’s on-call shift (Mon 28 Sep → Mon 5 Oct)', text: 'Nok has 2-step off. From ' + d + ' Nok could still acknowledge from the Ack link, but mute, maintenance and resolve would be locked mid-shift. Ask Nok to turn it on first, or keep Mon 5 Oct.' };
+      if (n >= 35 && n < 42) return { title: 'Nok has 2-step off — his shift ends the morning it starts', text: 'Nok’s shift ends Mon 5 Oct 09:00. From Mon 5 Oct Nok can still sign in to acknowledge; everything else is locked until 2-step is on — and he owns 4 sites and backs up 8. If Arm’s swap is accepted, Nok is also on call Mon 5 → 12 Oct like that.' };
+      return null;
+    }
+    var dlgC = clash(st.from);
+    var pageC = st.saved2sv && st.all2sv ? { title: 'Nok still has 2-step off · required from ' + st.saved2sv, text: 'Nok’s own on-call shift ends Mon 5 Oct 09:00. From ' + st.saved2sv + ' Nok can still sign in to acknowledge, but everything else is locked until 2-step is on — and Nok owns 4 sites and backs up 8, so mute, maintenance, resolve and client-update marking on those sites wait for someone else.', text2: 'If Arm’s swap is accepted, Nok is also on call Mon 5 → Mon 12 Oct in that state. Thee and Mint have it off too (Stakeholder, Viewer — lower risk).' } : null;
+    var DEV = {
+      Tao: [['Chrome · macOS', 'Bangkok · active now', 'This device'], ['Safari · iPhone', 'Last used today 07:52', 'Phone'], ['Chrome · Windows', 'Last used 18 Sep', 'Laptop']],
+      Arm: [['Chrome · macOS', 'Last used today 10:05', 'Laptop'], ['Chrome · Android', 'Last used today 09:49 · Ack link', 'Phone']],
+      Ploy: [['Safari · macOS', 'Last used today 09:58', 'Laptop'], ['Safari · iPhone', 'Last used Mon 21 Sep 08:04 · Ack link', 'Phone']],
+      Nok: [['Chrome · Windows', 'Last used yesterday 18:10', 'Laptop']],
+      Thee: [['Chrome · macOS', 'Last used today 09:02', 'Laptop']],
+      Bua: [['Chrome · macOS', 'Last used today 09:30', 'Laptop']],
+      CEO: [['Safari · iPhone', 'Last used Mon 21 Sep', 'Phone'], ['Safari · macOS', 'Last used Mon 21 Sep', 'Laptop']],
+      Mint: [['Chrome · Windows', 'Last used Wed 23 Sep', 'Laptop']]
+    };
+    var ONCALL = {
+      Ploy: { short: 'On call now', title: 'Ploy is on call until Mon 28 Sep 09:00', text: 'Their Ack link will need a fresh sign-in. If an alert comes tonight, Ploy has to sign in with Google before acknowledging — tell Ploy first, or wait until the shift ends.' },
+      Nok: { short: 'On call from 28 Sep', title: 'Nok is on call from Mon 28 Sep 09:00', text: 'Their Ack link will need a fresh sign-in. Make sure Nok signs in again before the shift starts.' }
+    };
+    function p(name, role, sv, last) {
+      var devs = DEV[name] || [];
+      var wasOut = (st.outDone || []).indexOf(name) >= 0;
+      if (wasOut) devs = name === 'Tao' ? devs.slice(0, 1) : [];
+      var s = sv;
+      var pend = false, pendLabel = '';
+      if (sv === OFF && pending2sv) { pend = true; pendLabel = 'Pending save'; }
+      if (sv === OFF && st.saved2sv) { s = { sv: 'Off · needed from ' + st.saved2sv.replace(/^[A-Za-z]{3} /, ''), tone: 'warning', icon: 'clock', variant: 'outline' }; }
+      if (!s.variant) s = Object.assign({ variant: 'soft' }, s);
+      var oc = ONCALL[name];
+      var own = name === 'Tao';
+      return Object.assign({ name: name, role: role, dev: String(devs.length), last: wasOut ? 'Signed out · 10:08' : last, canOut: devs.length > (own ? 1 : 0),
+        onCall: !!oc, onCallShort: oc ? '· ' + oc.short : '',
+        pending: pend, pendingLabel: pendLabel,
+        outLabel: own ? 'Sign out other devices' : 'Sign out all',
+        open: function () { self.setState({ out: name }); } }, s);
+    }
+    var who = st.out;
+    var devs = who ? (DEV[who] || []) : [];
+    var own = who === 'Tao';
+    var shown = own ? devs.slice(1) : devs;
+    var oc = who ? ONCALL[who] : null;
+    var n = shown.length;
+    return {
+      yes: true, no: false,
+      tabs: [
+        { id: 'users', label: 'Users & roles', href: 'Users.dc.html' },
+        { id: 'channels', label: 'Alert channels', href: 'AlertChannels.dc.html' },
+        { id: 'sso', label: 'Sign-in & security', href: 'Security.dc.html' },
+        { id: 'org', label: 'Organisation', href: 'Organisation.dc.html' },
+        { id: 'api', label: 'API & webhooks', href: 'ApiWebhooks.dc.html', count: 'Phase 3' }
+      ],
+      all2sv: st.all2sv,
+      toggleAll: function (v) { var on = typeof v === 'boolean' ? v : !st.all2sv; if (!on && st.saved2sv) { self.setState({ offOpen: true, offNote: '', offTried: false }); return; } self.setState({ all2sv: on }); },
+      offOpen: st.offOpen, closeOff: function () { self.setState({ offOpen: false }); },
+      offNote: st.offNote, setOffNote: function (e) { self.setState({ offNote: e && e.target ? e.target.value : e }); },
+      offErr: st.offTried && !st.offNote.trim() ? 'Add a short note — it goes in the audit log' : '',
+      confirmOff: function () { if (!st.offNote.trim()) { self.setState({ offTried: true }); return; } self.setState({ offOpen: false, all2sv: false, saved2sv: null, offDone: true }); },
+      nudged: st.nudged, nudgeLabel: st.nudged ? 'Reminder sent to Nok · 10:08' : 'Remind Nok to turn it on',
+      nudge: function () { self.setState({ nudged: true }); },
+      allDesc: st.offDone && !st.all2sv ? 'Turned off Fri 10:08 · Nok, Thee and Mint were emailed · logged.' : pendingOff ? 'Not saved yet · Nok, Thee and Mint won’t be asked any more.' : (st.saved2sv ? ('Required from ' + st.saved2sv + '. Nok, Thee and Mint ' + (st.saved2sv === 'Mon 5 Oct' ? 'were emailed Thu 24 Sep.' : 'get the new date by email today.')) : (pending2sv ? 'Not saved yet · Nok, Thee and Mint will be affected.' : 'Recommended. 3 people have it off today.')),
+      hasReq: !!st.saved2sv && st.all2sv,
+      openChange: function () { self.setState({ svOpen: true, changing: true, from: st.saved2sv || 'Mon 12 Oct' }); },
+      pageWarn: !!pageC, pageWarnTitle: pageC ? '2-step rollout · ' + pageC.title : '', pageWarnText: pageC ? pageC.text : '', pageWarnText2: pageC ? pageC.text2 : '',
+      svTitle: st.changing ? 'Change when 2-step becomes required?' : 'Require 2-step verification for everyone?',
+      dlgWarn: !!dlgC, dlgWarnTitle: dlgC ? dlgC.title : '', dlgWarnText: dlgC ? dlgC.text : '',
+      dlgClear: !dlgC, dlgClearText: 'No one with 2-step off is on call from ' + st.from + ' — Ploy (2-step on) has that week, and Nok’s next shift is later even if the swap goes through.',
+      lengths: [{ value: '7', label: '7 days' }, { value: '30', label: '30 days' }, { value: '90', label: '90 days' }],
+      reauth: [{ value: '1', label: '1 hour' }, { value: '12', label: '12 hours' }, { value: '24', label: '24 hours' }],
+      len: st.len, re: st.re,
+      setLen: function (e) { self.setState({ len: e && e.target ? e.target.value : e }); },
+      setRe: function (e) { self.setState({ re: e && e.target ? e.target.value : e }); },
+      dirty: changes > 0,
+      dirtyLabel: changes + (changes === 1 ? ' unsaved change' : ' unsaved changes'),
+      dirtyHint: pending2sv ? '2-step for everyone asks for a start date when you save' : (pendingOff ? 'Nok, Thee and Mint stop being asked for 2-step after you save' : 'Session length applies from each person’s next sign-in'),
+      discard: function () { self.setState({ all2sv: !!st.saved2sv, len: st.sLen, re: st.sRe }); },
+      save: function () { if (pending2sv) { self.setState({ svOpen: true, changing: false, from: 'Mon 12 Oct' }); } else { self.setState({ sLen: st.len, sRe: st.re, saved2sv: st.all2sv ? st.saved2sv : null }); } },
+      people: [
+        p('Tao', 'Admin', ON, 'Today 07:52'),
+        p('Second Admin', 'Admin', NEED, 'Invite sent Thu 09:12'),
+        p('Arm', 'Responder', ON, 'Today 10:05'),
+        p('Ploy', 'Responder', ON, 'Today 09:58'),
+        p('Nok', 'Responder', OFF, 'Yesterday 18:10'),
+        p('Thee', 'Stakeholder', OFF, 'Today 09:02'),
+        p('Bua', 'Stakeholder', ON, 'Today 09:30'),
+        p('CEO', 'Stakeholder', ON, 'Mon 21 Sep'),
+        p('Mint', 'Viewer', OFF, 'Wed 23 Sep')
+      ],
+      outOpen: !!who,
+      closeOut: function () { self.setState({ out: null }); },
+      doOut: function () { self.setState({ out: null, outDone: (st.outDone || []).concat([who]) }); },
+      outTitle: own ? 'Sign out your other devices?' : ('Sign out ' + who + ' everywhere?'),
+      outDesc: own ? 'This browser (Chrome · macOS) stays signed in. The devices below go back to the Google sign-in.' : (who + ' goes back to the Google sign-in on ' + (n === 1 ? 'this device' : 'these ' + n + ' devices') + '. Their role and alerts don’t change.'),
+      outDevices: shown.map(function (d, i) { return { name: d[0], when: d[1], tag: d[2], border: i ? '1px solid var(--aura-border-subtle)' : 'none' }; }),
+      outWarn: !!oc,
+      outWarnTitle: oc ? oc.title : '',
+      outWarnText: oc ? oc.text : '',
+      outCta: own ? ('Sign out ' + n + ' other devices') : ('Sign out ' + (n === 1 ? '1 device' : n + ' devices')),
+      svOpen: st.svOpen,
+      closeSv: function () { self.setState({ svOpen: false }); },
+      fromOpts: [{ value: 'Mon 28 Sep', label: 'Mon 28 Sep' }, { value: 'Thu 1 Oct', label: 'Thu 1 Oct' }, { value: 'Mon 5 Oct', label: 'Mon 5 Oct' }, { value: 'Mon 12 Oct', label: 'Mon 12 Oct' }],
+      from: st.from,
+      setFrom: function (e) { self.setState({ from: e && e.target ? e.target.value : e }); },
+      hasOther: st.len !== st.sLen || st.re !== st.sRe,
+      otherNote: 'Your session change is saved at the same time.',
+      svCta: 'Save · required from ' + st.from.replace(/^[A-Za-z]{3} /, ''),
+      confirmSv: function () { self.setState({ svOpen: false, all2sv: true, saved2sv: st.from, sLen: st.len, sRe: st.re, changing: false }); },
+      events: [
+        { at: 'Thu 16:40', icon: 'ban', color: 'var(--aura-fg-danger)', text: 'Blocked: a personal Gmail account tried to sign in' },
+        { at: 'Thu 09:20', icon: 'lock', color: 'var(--aura-fg-secondary)', text: 'Tao required 2-step for everyone from Mon 5 Oct · Nok, Thee, Mint emailed' },
+        { at: 'Thu 09:12', icon: 'mail', color: 'var(--aura-fg-secondary)', text: 'Tao invited Second Admin — 2-step needed first' },
+        { at: 'Wed 18:30', icon: 'log-out', color: 'var(--aura-fg-secondary)', text: 'Tao signed out Nok’s old laptop session' }
+      ],
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Sign in (mobile)</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}a.aura-btn--secondary:hover,a.aura-btn--ghost:hover{color:var(--aura-fg-primary)}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; gap: 8px">
+<div style="height: 28px; padding: 0 8px; display: flex; align-items: center; gap: 5px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 14px; font-weight: 600">DxT</span>
+<span style="width: 5px; height: 5px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 16px">
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">{{eyebrow}}</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">{{title}}</h1>
+<span style="font-size: 14px; color: var(--aura-fg-secondary); line-height: 1.5">{{lede}}</span>
+</div>
+
+<sc-if value="{{showInc}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-left: 3px solid var(--aura-fg-danger); border-radius: var(--aura-radius-lg)">
+<div style="display: flex; align-items: center; gap: 8px">
+<x-import component-from-global-scope="Aura.Badge" tone="danger" variant="solid" icon="ban">Down</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="{{wf.tone}}" variant="outline" icon="{{wf.icon}}">{{wf.label}}</x-import>
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); margin-left: auto">INC-0142</span>
+</div>
+<span style="font-size: 18px; font-weight: 600; line-height: 1.3">MuvMi is down · 19 min</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Tier 1 · Owner: Arm · Ploy (backup) asked at 10:03</span>
+<sc-if value="{{notDone}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--aura-alert-warning-fg)">
+<x-import component-from-global-scope="Aura.Icon" name="clock" size="sm"></x-import><span>18 min unacked · L2 (CEO) at 10:18</span>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{choose}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<sc-if value="{{twoStep}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="From Mon 5 Oct · 2-step required — you can acknowledge only">nok@[domain] has Google 2-step verification off. From Mon 5 Oct Nok can still sign in to acknowledge; everything else is locked until 2-step is on. Turn it on before then to keep full access.</x-import>
+</sc-if>
+<sc-if value="{{canAck}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" full-width="{{yes}}" on-click="{{signAck}}">{{ackLabel}}</x-import>
+<span style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; line-height: 1.4"><x-import component-from-global-scope="Aura.Icon" name="user" size="sm"></x-import><span>{{asLine}}</span></span>
+</sc-if>
+<sc-if value="{{twoStep}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="external-link" full-width="{{yes}}" href="https://myaccount.google.com/signinoptions/two-step-verification">Turn on 2-step in Google</x-import>
+</sc-if>
+<sc-if value="{{cantUse}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="{{cant.alertTitle}}">{{cant.alertText}}</x-import>
+</sc-if>
+<sc-if value="{{viewer}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Your role can’t acknowledge (Viewer)">mint@[domain] can see this incident but not acknowledge it. Arm (owner) or Ploy (backup) can — ask in the Chat thread.</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="eye" full-width="{{yes}}" href="MIncidents.dc.html">Continue as mint@[domain] · view only</x-import>
+</sc-if>
+<x-import component-from-global-scope="Aura.Button" variant="{{otherVariant}}" icon="users" full-width="{{yes}}" on-click="{{openPicker}}">Use another account</x-import>
+</div>
+</sc-if>
+
+<sc-if value="{{picking}}" hint-placeholder-val="{{false}}">
+<div style="flex-shrink: 0; display: flex; flex-direction: column; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<span style="padding: 10px 16px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--aura-border-subtle)">Choose a Google account</span>
+<sc-for list="{{accounts}}" as="a" hint-placeholder-count="3">
+<button type="button" onClick="{{a.pick}}" style="flex-shrink: 0; min-height: 52px; box-sizing: border-box; padding: 6px 16px; display: flex; align-items: center; gap: 12px; background: transparent; border: 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: left; font: inherit; color: inherit; cursor: pointer">
+<x-import component-from-global-scope="Aura.Avatar" name="{{a.name}}" size="sm"></x-import>
+<span style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.3"><span style="font-size: 14px; font-weight: 500">{{a.name}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{a.email}}</span></span>
+</button>
+</sc-for>
+<button type="button" onClick="{{closePicker}}" style="flex-shrink: 0; min-height: 48px; background: transparent; border: 0; font: inherit; font-size: 13px; font-weight: 500; color: var(--aura-fg-secondary); cursor: pointer">Cancel</button>
+</div>
+</sc-if>
+
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-left: 3px solid var(--aura-fg-positive); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
+<span style="font-weight: 600; flex-grow: 1">Acknowledged as {{who}}</span>
+</div>
+<span style="font-size: 13px">{{ackSentence}}</span>
+<div role="status" aria-live="polite" style="display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Icon" name="{{postIcon}}" size="sm"></x-import></span><span>{{postLine}}</span></div>
+<sc-if value="{{canUndo}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="rotate-ccw" full-width="{{yes}}" on-click="{{undo}}">{{undoLabel}}</x-import>
+</sc-if>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="arrow-right" full-width="{{yes}}" href="MobileAck.dc.html">Open incident</x-import>
+</sc-if>
+
+<sc-if value="{{notDone}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="users" size="sm"></x-import></span><span>The link in Chat is the same for everyone in the Space. Signing in is how the system knows who acknowledged.</span></div>
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import></span><span>You’ll stay signed in on this phone for 30 days.</span></div>
+</div>
+
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<span style="font-size: 13px; font-weight: 600">Can’t sign in right now?</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Escalation keeps running until someone acknowledges. Ploy (backup) was asked at 10:03 — reply in the Chat thread so she can acknowledge from her phone.</span>
+</div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { acct: 'arm', picking: false, done: false, undo: 0 };
+  }
+  componentWillUnmount() { if (this.timer) clearInterval(this.timer); }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var A = {
+      arm: { name: 'Arm', email: 'arm@[domain]', as: 'You\u2019ll acknowledge as Arm (owner)' },
+      ploy: { name: 'Ploy', email: 'ploy@[domain]', as: 'You\u2019ll acknowledge as Ploy (backup)' },
+      nok: { name: 'Nok', email: 'nok@[domain]', as: 'You\u2019ll acknowledge as Nok (Responder)' },
+      mint: { name: 'Mint', email: 'mint@[domain]', as: '' },
+      invite: { name: 'New starter', email: '[name]@[domain]', as: '' },
+      off: { name: 'Former staff', email: '[former]@[domain]', as: '' }
+    };
+    var CANT = {
+      invite: { lede: '[name]@[domain] is a DxT account, but it hasn\u2019t been invited to Monitor yet.', alertTitle: 'Ask Tao to invite you', alertText: 'Tao (Admin) adds people and picks their role. You\u2019ll get an email; the invite link works for 7 days. Meanwhile Arm (owner) or Ploy (backup) can acknowledge.' },
+      off: { lede: '[former]@[domain] was deactivated by Tao on 18 Sep. It can\u2019t see sites, incidents or reports any more.', alertTitle: 'Think this is a mistake?', alertText: 'Ask Tao to reactivate it. Your past acknowledgements and notes stay in the audit log either way.' }
+    };
+    var cant = CANT[st.acct] || null;
+    var a = A[st.acct];
+    var done = st.done;
+    var holding = done && st.undo > 0;
+    return {
+      yes: true,
+      done: done,
+      notDone: !done,
+      choose: !done && !st.picking,
+      picking: !done && st.picking,
+      canAck: ['arm', 'ploy', 'nok'].indexOf(st.acct) >= 0,
+      twoStep: st.acct === 'nok',
+      cantUse: !!cant,
+      showInc: !cant,
+      cant: cant || CANT.invite,
+      otherVariant: cant ? 'secondary' : 'ghost',
+      viewer: st.acct === 'mint',
+      ackLabel: 'Continue as ' + a.email + ' & acknowledge',
+      asLine: a.as,
+      who: a.name,
+      eyebrow: done ? 'SIGNED IN' : (cant ? 'CAN\u2019T SIGN IN' : 'SESSION EXPIRED'),
+      title: done ? 'Done \u2014 you\u2019ve got it' : (cant ? 'This account can\u2019t use DxT Monitor' : 'Sign in to acknowledge'),
+      lede: done ? 'The client update is still Bua\u2019s to send.' : (cant ? cant.lede : 'Your session on this phone ran out. One tap signs you in and acknowledges.'),
+      wf: done ? { tone: 'neutral', icon: 'check', label: 'Acknowledged' } : { tone: 'warning', icon: 'arrow-up-right', label: 'Escalated \u00b7 L1' },
+      ackSentence: 'Acknowledged by ' + a.name + ' \u2192 L1\u2013L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).',
+      canUndo: holding,
+      postIcon: holding ? 'clock' : 'check',
+      postLine: holding ? 'Posting to Chat, email and webhooks in ' + st.undo + ' s \u2014 nothing is sent until then' : 'Signed in as ' + a.email + ' \u00b7 posted to Chat + email',
+      undoLabel: 'Undo \u00b7 ' + st.undo + ' s',
+      accounts: ['arm', 'ploy', 'nok', 'mint', 'invite', 'off'].map(function (k) {
+        return { name: A[k].name, email: A[k].email, pick: function () { self.setState({ acct: k, picking: false }); } };
+      }),
+      openPicker: function () { self.setState({ picking: true }); },
+      closePicker: function () { self.setState({ picking: false }); },
+      signAck: function () {
+        if (self.timer) clearInterval(self.timer);
+        self.setState({ done: true, undo: 10 });
+        self.timer = setInterval(function () {
+          var u = self.state.undo - 1;
+          self.setState({ undo: u });
+          if (u <= 0) clearInterval(self.timer);
+        }, 1000);
+      },
+      undo: function () { if (self.timer) clearInterval(self.timer); self.setState({ done: false, undo: 0 }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

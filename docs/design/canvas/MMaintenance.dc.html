@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Mute or maintenance</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.aura-dialog__close.aura-icon-btn{width:44px;height:44px;margin:-12px -14px 0 0}
+.aura-input{min-height:44px;box-sizing:border-box}
+.aura-input__control{min-height:44px;box-sizing:border-box}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 8px 0 16px; display: flex; align-items: center; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<span style="font-size: 16px; font-weight: 600">{{site}}</span>
+</header>
+<div style="padding: 16px; display: flex; flex-direction: column; gap: 12px">
+<div style="height: 44px; border-radius: 9999px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default)"></div>
+<div style="height: 64px; border-radius: var(--aura-radius-md); background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default)"></div>
+<div style="height: 160px; border-radius: var(--aura-radius-lg); background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default)"></div>
+</div>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{yes}}" on-close="{{close}}" title="{{title}}" description="Tier 1 · you’re the owner" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<x-import component-from-global-scope="Aura.Select" label="Site" options="{{sites}}" value="{{site}}" on-change="{{setSite}}"></x-import>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Type" options="{{types}}" value="{{kind}}" on-change="{{setKind}}" full-width="{{yes}}"></x-import>
+<sc-if value="{{blocked}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="danger" title="Can’t start maintenance now">MuvMi is DOWN now (INC-0142). A window started now won’t hide this incident — it stays open and keeps counting.</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="eye-off" full-width="{{yes}}" on-click="{{muteInstead}}">Mute instead</x-import>
+</sc-if>
+<sc-if value="{{open}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; font-weight: 500">{{durLabel}}</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Duration" options="{{durations}}" value="{{dur}}" on-change="{{setDur}}" full-width="{{yes}}" size="sm"></x-import>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{ends}}</span>
+</div>
+<sc-if value="{{muteOnIncident}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Mute stops new alerts only — INC-0142 keeps escalating until someone acknowledges">The open incident keeps its escalation ladder, the L3 FYI to CEO + Bua and the client update. Muting is not an acknowledgement.</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="check" full-width="{{yes}}" href="MobileAck.dc.html">Acknowledge INC-0142 instead</x-import>
+</sc-if>
+<x-import component-from-global-scope="Aura.TextField" label="Reason" required="{{yes}}" placeholder="{{reasonHint}}" value="{{reason}}" on-change="{{setReason}}" hint="{{reasonNote}}"></x-import>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{effect}}</span>
+<span style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="user" size="sm"></x-import><span>Signed in as <b style="font-weight: 500; color: var(--aura-fg-primary)">arm@[domain]</b></span></span>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="{{submitIcon}}" full-width="{{yes}}" disabled="{{noReason}}" on-click="{{submitIt}}">{{submit}}</x-import>
+</sc-if>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="success" title="{{doneTitle}}">{{doneText}}</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="arrow-left" full-width="{{yes}}" href="{{back.href}}">{{back.label}}</x-import>
+</sc-if>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var h = (typeof location !== 'undefined' && location.hash) || '';
+    this.state = { kind: h.indexOf('maintenance') >= 0 ? 'Maintenance' : 'Mute', dur: '1 h', site: 'Bangkok Airways – Taiwan', reason: '', done: false };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var mute = st.kind === 'Mute';
+    var down = st.site === 'MuvMi';
+    var blocked = !mute && down;
+    var dur = st.dur;
+    var ENDT = { '1 h': '11:07', '4 h': '14:07', '8 h': '18:07', '24 h': 'Sat 26 Sep 10:07' };
+    var END = mute
+      ? { '1 h': 'Unmutes itself at 11:07 today', '4 h': 'Unmutes itself at 14:07 today', '8 h': 'Unmutes itself at 18:07 today', '24 h': 'Unmutes itself Sat 26 Sep 10:07 (max 24 h)' }
+      : { '1 h': 'Starts now · ends 11:07', '4 h': 'Starts now · ends 14:07', '8 h': 'Starts now · ends 18:07', '24 h': 'Starts now · ends Sat 26 Sep 10:07 · longer needs Admin' };
+    var noReason = !st.reason.trim();
+    var BACK = { 'MuvMi': { href: 'MobileAck.dc.html', label: 'Back to incident' }, 'Bangkok Airways \u2013 Taiwan': { href: 'MSite.dc.html', label: 'Back to site' }, 'Bangkok Airways \u2013 China': { href: 'MOverview.dc.html', label: 'Back to overview' } };
+    var back = BACK[st.site];
+    return {
+      yes: true,
+      no: false,
+      close: function () { if (typeof location !== 'undefined') location.href = back.href; },
+      site: st.site,
+      sites: ['Bangkok Airways – Taiwan', 'Bangkok Airways – China', 'MuvMi'],
+      setSite: function (e) { self.setState({ site: e && e.target ? e.target.value : e, done: false }); },
+      kind: st.kind,
+      types: ['Mute', 'Maintenance'],
+      setKind: function (v) { self.setState({ kind: v, done: false }); },
+      blocked: blocked,
+      muteOnIncident: mute && down && !st.done,
+      open: !blocked && !st.done,
+      done: !blocked && st.done,
+      muteInstead: function () { self.setState({ kind: 'Mute' }); },
+      title: mute ? 'Mute alerts' : 'Start maintenance',
+      durLabel: mute ? 'Mute for' : 'Window length',
+      durations: ['1 h', '4 h', '8 h', '24 h'],
+      dur: dur,
+      setDur: function (v) { self.setState({ dur: v }); },
+      ends: END[dur],
+      reason: st.reason,
+      setReason: function (e) { self.setState({ reason: e && e.target ? e.target.value : e }); },
+      reasonHint: mute ? (down ? 'e.g. Known outage, host restarting' : 'e.g. Investigating slow booking page') : 'e.g. Emergency hotfix deploy',
+      reasonNote: noReason ? 'Type a reason to continue — it shows in the digest and the audit log.' : 'Shows in the digest and the audit log.',
+      noReason: noReason,
+      effect: mute
+        ? (down
+          ? 'New alerts for MuvMi stop until ' + ENDT[dur] + '. INC-0142 stays open and keeps escalating. The site keeps its real status with a “Muted” tag and still counts toward uptime.'
+          : 'New alerts stop until ' + ENDT[dur] + ', including DOWN alerts to on-call. The site keeps its real status with a “Muted” tag and still counts toward uptime.')
+        : 'Alerts are held and this window is not counted in uptime. Checks keep running. The status page shows “Planned maintenance”. Plan longer windows from the web app.',
+      submit: mute ? 'Mute for ' + dur : 'Start maintenance',
+      submitIcon: mute ? 'eye-off' : 'calendar',
+      submitIt: function () { self.setState({ done: true }); },
+      doneTitle: mute ? st.site + ' muted until ' + ENDT[dur] : 'Maintenance started · ends ' + ENDT[dur],
+      doneText: 'Takes effect now. Recorded as Arm: “' + st.reason.trim() + '”.' + (mute && down ? ' INC-0142 is still escalating — acknowledge it to stop L1–L2.' : '') + ' End or edit it early from Maintenance & mutes in the web app.',
+      back: back
+    };
+  }
+}
+</script>
+</body>
+</html>
