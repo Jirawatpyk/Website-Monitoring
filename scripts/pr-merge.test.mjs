@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { mergeBlockers } from './pr-merge.mjs';
+import { mergeBlockers, WORKFLOW_FLAG } from './pr-merge.mjs';
 
 const green = {
   state: 'OPEN',
@@ -47,4 +47,13 @@ test('refuses drafts, closed PRs, other bases, conflicts and requested changes',
   assert.equal(mergeBlockers({ ...green, baseRefName: 'staging' }).length, 1);
   assert.equal(mergeBlockers({ ...green, mergeable: 'CONFLICTING' }).length, 1);
   assert.equal(mergeBlockers({ ...green, reviewDecision: 'CHANGES_REQUESTED' }).length, 1);
+});
+
+test('refuses CI file changes until they are marked as reviewed', () => {
+  const pr = { ...green, files: [{ path: '.github/workflows/ci.yml' }, { path: 'docs/workflow.md' }] };
+  const problems = mergeBlockers(pr);
+  assert.equal(problems.length, 1);
+  assert.ok(problems[0].includes('.github/workflows/ci.yml') && problems[0].includes(WORKFLOW_FLAG));
+  assert.deepEqual(mergeBlockers(pr, { workflowChangesReviewed: true }), []);
+  assert.deepEqual(mergeBlockers({ ...green, files: [{ path: 'docs/workflow.md' }] }), []);
 });

@@ -1,11 +1,12 @@
 // Squash-merge a pull request only when it is safe to (D-008).
 //
-//   pnpm pr:merge <number>
+//   pnpm pr:merge <number> [--workflow-changes-reviewed]
 //
 // The repository is private on GitHub Free, so the ruleset "main" is not enforced and GitHub would
 // merge a PR with a red or unfinished CI. This script refuses unless the PR is open, not a draft,
 // targets main, has no requested changes, and the CI job `check` succeeded on its current head
-// commit; it then merges that exact commit (`--match-head-commit`), so a push after the check
+// commit, and — when the PR changes CI files that can read repository secrets — the caller passed
+// --workflow-changes-reviewed; it then merges that exact commit (`--match-head-commit`), so a push after the check
 // can't slip in. No shell: arguments go straight to `gh`.
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -13,9 +14,22 @@ import path from 'node:path';
 export const REQUIRED_CHECK = 'check';
 const FAILED = new Set(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE']);
 
+export const WORKFLOW_FLAG = '--workflow-changes-reviewed';
+
+/** Changed files that run in CI and can read repository secrets (`.github/workflows/`, `.github/actions/`). */
+export function ciFiles(pr) {
+  return (pr.files ?? []).map((f) => f.path).filter((p) => /^\.github\/(workflows|actions)\//.test(p));
+}
+
 /** Reasons the PR must not be merged yet; empty when it may be merged. */
-export function mergeBlockers(pr) {
+export function mergeBlockers(pr, { workflowChangesReviewed = false } = {}) {
   const problems = [];
+  const ci = ciFiles(pr);
+  if (ci.length && !workflowChangesReviewed) {
+    problems.push(
+      `it changes CI files that can read repository secrets (${ci.join(', ')}) — review them, then re-run with ${WORKFLOW_FLAG}`,
+    );
+  }
   if (pr.state !== 'OPEN') problems.push(`the PR is ${pr.state.toLowerCase()}`);
   if (pr.isDraft) problems.push('the PR is a draft');
   if (pr.baseRefName !== 'main') problems.push(`it targets ${pr.baseRefName}, not main`);
@@ -44,16 +58,18 @@ function gh(args, options = {}) {
 }
 
 function main() {
-  const number = process.argv[2];
-  if (!/^\d+$/.test(number ?? '')) {
-    console.error('Usage: pnpm pr:merge <pull request number>');
+  // pnpm forwards a `--` separator (`pnpm pr:merge 9 -- --flag`); ignore it.
+  const [number, ...flags] = process.argv.slice(2).filter((a) => a !== '--');
+  const unknown = flags.filter((f) => f !== WORKFLOW_FLAG);
+  if (!/^\d+$/.test(number ?? '') || unknown.length) {
+    console.error(`Usage: pnpm pr:merge <pull request number> [${WORKFLOW_FLAG}]`);
     process.exit(2);
   }
 
   const fields =
-    'number,title,state,isDraft,baseRefName,mergeable,reviewDecision,headRefOid,statusCheckRollup';
+    'number,title,state,isDraft,baseRefName,mergeable,reviewDecision,headRefOid,statusCheckRollup,files';
   const pr = JSON.parse(gh(['pr', 'view', number, '--json', fields]));
-  const problems = mergeBlockers(pr);
+  const problems = mergeBlockers(pr, { workflowChangesReviewed: flags.includes(WORKFLOW_FLAG) });
   if (problems.length) {
     console.error(`pr:merge — not merging #${pr.number} "${pr.title}":`);
     for (const p of problems) console.error(`  - ${p}`);
