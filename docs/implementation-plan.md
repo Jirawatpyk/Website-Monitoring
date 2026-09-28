@@ -5,7 +5,7 @@
 - **Status** is updated by `/slice-review <ID>` when every Done-when line has evidence. Values: `Todo` · `In progress` · `In review` · `Done` · `Blocked`.
 - How a slice is worked: [`workflow.md`](workflow.md). Settled conflicts: [`decisions.md`](decisions.md). Board → route map: [`design/screens.md`](design/screens.md). Coverage is checked by `pnpm plan:check`.
 - **Size** (one developer): **S** ≤ 2 days · **M** 3–4 days · **L** 5 days. Nothing is larger than a week; split a slice that grows past L and run `pnpm plan:check`.
-- **PRD week** is the PRD §12 target (week 1 = Mon 28 Sep 2026). The sizes add up to more than that — see [Timeline](#timeline) and question Q7.
+- **PRD week** is the PRD §12 target (week 1 = Mon 28 Sep 2026). The sizes add up to more than that — see [Timeline](#timeline); Q7 is settled: measure S02a, then re-baseline.
 
 ## Slices
 
@@ -52,7 +52,7 @@ Every slice also meets the [Definition of Done](workflow.md#definition-of-done) 
 | 2 Team go-live (S10–S19) | weeks 4–5 + buffer, then 2-week parallel run | ≈ 36 days ≈ 7 weeks (parallel run overlaps) |
 | 3 Client-facing (S20–S24) | weeks 6–10 | ≈ 23 days ≈ 5 weeks |
 
-The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose between re-baselining the dates, adding a developer, or cutting P1 / P2 scope. Slices are sized without assuming AI-assisted speed-ups; S02a is deliberately small (≤ 2 days) so the first real measurement arrives early: if it takes longer than its size, re-baseline the plan before starting S02b.
+The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2026): keep the PRD order, build S02a, and decide on dates / capacity / scope with its real duration. Slices are sized without assuming AI-assisted speed-ups; S02a is deliberately small (≤ 2 days) so the first real measurement arrives early: if it takes longer than its size, re-baseline the plan before starting S02b.
 
 ---
 
@@ -60,14 +60,15 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 
 ### S00 · Prep, decisions, accounts & staging
 
-- **Scope:** PRD §12 Phase 0. Close CEO decisions (PRD §13): tiers, owners / backups, on-call members, CEO at L2, Twilio, budget ceiling ($60 / month — no PITR add-on, D-005). Site Registration Checklist for 17 sites (URL + key pages, owner, backup, client, AM, hosting, WAF, credential reference). Accounts: Supabase Pro project (production) and a staging project in a separate free organisation (D-005; free projects pause after a week without activity — resume it before staging checks), Vercel project + env for Production and Preview, Thai VPS (2 GB), Healthchecks.io checks, Google OAuth client, Resend sending domain, company domain. Google Chat spaces "DxT Website Alerts", "DxT Website Reports" and a "DxT Monitor — staging" space for tests, each with an incoming webhook. HTTP vs Playwright capture of Tubtong / Cando Asia block pages; ask WAF owners to allowlist the probe UA + secret header and the VPS IP.
+- **Scope:** PRD §12 Phase 0. Close CEO decisions (PRD §13): tiers, owners / backups, on-call members, CEO at L2, Twilio, budget ceiling ($60 / month — no PITR add-on, D-005) — collected in a decisions memo as a Claude Doc the CEO answers in place. Site Registration Checklist for 17 sites (URL + key pages, owner, backup, client, AM, hosting, WAF, credential reference) — a Claude Doc that owners and AMs fill in. Link both docs here when they exist. Accounts: Supabase Pro project (production) and a staging project in a separate free organisation (D-005). Two Vercel projects on the same repo, both with root `apps/web` (D-006): `dxt-monitor` (production branch `main`) and `dxt-monitor-staging` (production branch `staging`, env pointing at the staging Supabase project, the staging Chat space and its own `CRON_SECRET` / `INGEST_TOKEN`; Healthchecks URLs left empty or separate checks). Ignored Build Step so each project builds only its own branches — staging: `[ "$VERCEL_GIT_COMMIT_REF" != "staging" ]`, production: `[ "$VERCEL_GIT_COMMIT_REF" = "staging" ]` (exit 0 skips the build). Thai VPS (2 GB), Healthchecks.io checks, Google OAuth client, Resend sending domain, company domain. Google Chat spaces "DxT Website Alerts", "DxT Website Reports" and a "DxT Monitor — staging" space for tests, each with an incoming webhook. HTTP vs Playwright capture of Tubtong / Cando Asia block pages; ask WAF owners to allowlist the probe UA + secret header and the VPS IP.
 - **Depends on:** —
 - **Done when:**
-  1. CEO has approved tiers and the escalation ladder (PRD §12 exit), recorded in the PRD's decisions list.
+  1. CEO has approved tiers and the escalation ladder (PRD §12 exit), answered in the decisions memo and copied to the PRD's decisions list.
   2. The checklist is complete for every Tier 1 site (PRD §12 exit) and has owner, backup, client and AM for all 17.
-  3. Vercel (Production + Preview), both Supabase projects and the VPS have every variable name from `apps/web/.env.example` / `apps/vps-agent/.env.example` set (`vercel env ls` lists the names; values never shared in chat).
+  3. Both Vercel projects, both Supabase projects and the VPS have every variable name from `apps/web/.env.example` / `apps/vps-agent/.env.example` set (`vercel env ls` lists the names; values never shared in chat).
   4. A webhook test message appears in each of the three Chat spaces.
   5. Captured Tubtong / Cando block responses (status, headers, body sample) are saved under `docs/phase0/` for `packages/probe` challenge signatures.
+  6. Pushing to `staging` deploys `dxt-monitor-staging` to its production URL, and its Vercel cron logs show `/api/cron/engine` called every minute (401 / 501 responses are expected until S02a); pushing a slice branch builds nothing on the staging project.
 - **Review:** Tao sign-off; no code review.
 
 ## Phase 1 — MVP, P0
@@ -94,7 +95,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 - **Boards:** ChatAlert (DOWN and RECOVERED rows) · **Tables:** probe_locations, check_results, site_status, incidents, incident_events, notifications
 - **Depends on:** S01
 - **Done when:**
-  1. On staging, switching the test target to 500 posts `DOWN · <site>` in the staging Chat space within **3 min** of the switch (timestamps in the PR).
+  1. On staging (`dxt-monitor-staging`, slice branch pushed to `staging` — cron runs only there, D-006), switching the test target to 500 posts `DOWN · <site>` in the staging Chat space within **3 min** of the switch (timestamps in the PR).
   2. Switching back to 200 posts `RECOVERED · <site>` as a reply in the same thread.
   3. An integration test drives the engine with stored results: both locations fail on the first check and the recheck → one incident opened; only one location fails → no incident; a location that didn't recheck doesn't vote twice.
   4. Healthchecks shows pings from probe-sin, probe-tyo and the engine; the probe functions log `sin1` / `hnd1`.
@@ -108,7 +109,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 - **Boards:** MobileAck, MobileAckDark, ChatAlert (ACKNOWLEDGED row), EmailAlert (Down, Acknowledged, Recovered) · **Test plan:** T08
 - **Depends on:** S02a
 - **Done when:**
-  1. On staging, the DOWN email arrives within **3 min** of the switch, and RECOVERED lands in the same email thread.
+  1. On staging (`dxt-monitor-staging`), the DOWN email arrives within **3 min** of the switch, and RECOVERED lands in the same email thread.
   2. `notifications.sent_at − incidents.detected_at` ≤ **30 s** for the DOWN alert (query output in the PR).
   3. With the Chat webhook pointed at a failing URL, attempts are recorded at +30 s, +2 min, +8 min and the email fallback is sent (test + `notifications` rows).
   4. From a phone, the card link opens the incident signed in; one tap acknowledges; ACKNOWLEDGED appears after 10 s under that person's name.
@@ -400,7 +401,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 
 | # | Risk | Mitigation in this plan |
 |---|---|---|
-| R1 | One developer; the sizes add up to about twice the PRD timeline (bus factor 1, PRD §13) | Q7 decides dates vs capacity vs scope. Gates are scope gates: when a phase slips, its gate moves, never its Done-when lines. Second Admin at G1. |
+| R1 | One developer; the sizes add up to about twice the PRD timeline (bus factor 1, PRD §13) | Re-baseline after S02a with its measured duration (Q7), then tell the CEO. Gates are scope gates: when a phase slips, its gate moves, never its Done-when lines. Second Admin at G1. |
 | R2 | Vercel Cron is the single point of failure for probes, engine and notifier | Healthchecks pings from S02a; watchdog and fault mode in S12 before go-live. |
 | R3 | WAF blocks grow and the verifier gets busy | S00 allowlist requests; S03 caps the verifier at 3 sessions and alerts at > 5 queued jobs. |
 | R4 | Alert fatigue during the parallel run | Majority vote, dedupe and flapping (S04, D-004); false-alert review in the S19 log. |
@@ -415,7 +416,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 | Q4 | Healthchecks grace time and recipients for the verifier, VPS watchdog and daily digest (design: 3 min / 30 min, email Tao). PRD §13. | S12, S14 |
 | Q5 | Confirm synthetic checks cap at PROBLEM. PRD §13. | S23 |
 | Q6 | Google Workspace admin access for the Directory API (2-Step status) — a service account with domain-wide delegation. | S16 |
-| Q7 | Timeline: re-baseline the dates to the sized plan, add a developer, or cut P1 / P2 scope? | Dates only |
+| Q7 | ~~Timeline: re-baseline, add a developer, or cut scope?~~ **Answered 28 Sep 2026:** measure S02a first, then decide with real numbers. | — |
 
 ## Appendix — coverage matrix
 

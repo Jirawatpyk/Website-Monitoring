@@ -12,11 +12,13 @@ How work moves from [`implementation-plan.md`](implementation-plan.md) to produc
 | 4. Build | Small commits. Engine rules test-first (`/engine-case`), schema through `/new-migration`, screens through `/implement-screen`. Stop and ask on any source conflict (see [Decisions](#decisions)) | skills |
 | 5. Check | `pnpm check` green locally (format, plan coverage, lint, types, tests) | — |
 | 6. Review | Run the reviewers named in the slice's **Review** line (table below); fix every High / Medium or record why not | agents |
-| 7. Verify | Collect evidence for each "Done when" line; `slice-verifier` checks it. Status → `In review` | `/slice-review <ID>` |
+| 7. Verify | Deploy the slice to staging — `git push --force-with-lease origin HEAD:staging` (asks first) — and collect evidence for each "Done when" line there and locally; `slice-verifier` checks it. Status → `In review` | `/slice-review <ID>` |
 | 8. PR | PR template with the Done-when checklist and its evidence; CI `check` green; review conversations resolved; CODEOWNERS are requested automatically | GitHub |
-| 9. Merge | Squash-merge to `main` → Vercel production deploy. Status → `Done` in the plan (same PR or a follow-up) | `/slice-review` |
+| 9. Merge | Squash-merge to `main` → Vercel production deploy. Status → `Done` in the plan (same PR or a follow-up). Reset `staging` to `main` (`git push --force-with-lease origin origin/main:staging`) | `/slice-review` |
 
 `main` is protected by the GitHub ruleset "main": no direct pushes, no force pushes or deletion; every change arrives by pull request with the CI `check` job passing on an up-to-date branch, all review threads resolved, squash merge only (head branches are deleted after merge). Required approvals are **0** while Tao is the only maintainer (GitHub doesn't let authors approve their own PRs); raise it to 1 with code-owner review when the second Admin joins (G1).
+
+`staging` is a throwaway branch that always holds exactly the code under test: one slice at a time is pushed onto it (not merged into it, so unfinished slices never pile up), and it is reset to `main` after each merge. It is not protected and never merged anywhere.
 
 Commits use Conventional Commits with the slice as scope: `feat(S02a): post DOWN to Google Chat`, `fix(S03): …`, `docs(S05): …`.
 
@@ -60,7 +62,8 @@ The precedence is in the root `CLAUDE.md`: `decisions.md` → design spec (behav
 | Env | Web | Database | Used for |
 |---|---|---|---|
 | Local | `pnpm dev` on http://localhost:3500 | `pnpm db:start` (Docker) | Building and unit / SQL tests |
-| Staging | Vercel preview deployment of the slice branch | Staging Supabase project in a separate free organisation (D-005; resume it if paused) | Done-when checks against the test target |
+| PR preview | Vercel preview deployment of `dxt-monitor` for each PR | Staging Supabase project | Looking at UI changes only — Vercel Cron never runs on preview deployments, so no probes, engine or notifier |
+| Staging | Vercel project `dxt-monitor-staging`, production branch `staging` (D-006) — its crons run every minute | Staging Supabase project in a separate free organisation (D-005; the every-minute crons keep it from pausing) | Done-when checks against the test target |
 | Production | Vercel production from `main` | Production Supabase project (Pro, daily backups kept 7 days, no PITR — D-005) | Real sites after G1 |
 
 Migrations reach staging and production only through the reviewed PR (`supabase db push` asks first). During the PRD §12 parallel run, every production deploy happens inside a maintenance window.
