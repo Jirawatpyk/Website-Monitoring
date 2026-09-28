@@ -25,15 +25,16 @@ pnpm dev                                        # http://localhost:3500
 
 `pnpm dev` needs `apps/web/.env.local` with at least the two `NEXT_PUBLIC_SUPABASE_*` values — without them the auth proxy fails on every page. Set `ALLOWED_EMAIL_DOMAIN` and add the same domain to `private.allowed_email_domains` (see `supabase/CLAUDE.md`), or every sign-in is rejected — both checks fail closed. Port 3500 is used because 3000 is in a Windows reserved port range on some machines.
 
-| Command           | What it does                                                            |
-| ----------------- | ----------------------------------------------------------------------- |
-| `pnpm check`      | format + plan coverage + lint + typecheck + tests (run before every PR) |
-| `pnpm plan:check` | checks every FR, board, table and go-live test maps to one slice        |
-| `pnpm test`       | Vitest in every package that has tests                                  |
-| `pnpm test:e2e`   | Playwright e2e for the web app (desktop 1440 + mobile 390)              |
-| `pnpm build`      | builds the web app and the VPS agent                                    |
-| `pnpm db:reset`   | rebuilds the local database from migrations + seed                      |
-| `pnpm db:types`   | regenerates `packages/db/src/database.types.ts`                         |
+| Command              | What it does                                                            |
+| -------------------- | ----------------------------------------------------------------------- |
+| `pnpm check`         | format + plan coverage + lint + typecheck + tests (run before every PR) |
+| `pnpm plan:check`    | checks every FR, board, table and go-live test maps to one slice        |
+| `pnpm test`          | Vitest in every package that has tests                                  |
+| `pnpm test:coverage` | unit + integration tests with coverage thresholds (CI)                  |
+| `pnpm test:e2e`      | Playwright e2e for the web app (desktop 1440 + mobile 390)              |
+| `pnpm build`         | builds the web app and the VPS agent                                    |
+| `pnpm db:reset`      | rebuilds the local database from migrations + seed                      |
+| `pnpm db:types`      | regenerates `packages/db/src/database.types.ts`                         |
 
 ## Repository layout
 

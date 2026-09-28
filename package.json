@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "pnpm -r test && node --test \"scripts/**/*.test.mjs\"",
+    "test:coverage": "pnpm -r test:coverage && node --test \"scripts/**/*.test.mjs\"",
     "test:e2e": "pnpm --filter @dxt/web test:e2e",
     "check": "pnpm format:check && pnpm plan:check && pnpm lint && pnpm typecheck && pnpm test",
     "plan:check": "node scripts/check-plan-coverage.mjs",

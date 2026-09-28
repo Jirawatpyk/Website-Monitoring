@@ -9,13 +9,15 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@dxt/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
+    "@vitest/coverage-v8": "^5.0.2",
     "typescript": "~5.9.3",
     "vitest": "^5.0.2"
   }
