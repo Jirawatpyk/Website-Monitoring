@@ -24,6 +24,8 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
+    "db:push:staging": "node scripts/db-staging.mjs push",
+    "db:reset:staging": "node scripts/db-staging.mjs reset",
     "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts"
   },
   "devDependencies": {
