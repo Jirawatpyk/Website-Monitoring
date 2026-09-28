@@ -7,7 +7,7 @@ How work moves from [`implementation-plan.md`](implementation-plan.md) to produc
 | Step | What happens | Tool |
 |---|---|---|
 | 1. Pick | Next `Todo` slice whose "Depends on" are all `Done` | `/slice <ID>` checks this |
-| 2. Branch | `slice/<ID>-<short-name>` from an up-to-date `main`, e.g. `slice/S02-thin-slice` | `/slice` |
+| 2. Branch | `slice/<ID>-<short-name>` from an up-to-date `main`, e.g. `slice/S02a-thin-slice` | `/slice` |
 | 3. Plan | Read the slice, its boards (`screens.md`), spec sections, FRs and decisions. For an **L** slice, write the plan in Plan mode and agree it before coding. Status → `In progress` | `/slice` |
 | 4. Build | Small commits. Engine rules test-first (`/engine-case`), schema through `/new-migration`, screens through `/implement-screen`. Stop and ask on any source conflict (see [Decisions](#decisions)) | skills |
 | 5. Check | `pnpm check` green locally (format, plan coverage, lint, types, tests) | — |
@@ -18,7 +18,7 @@ How work moves from [`implementation-plan.md`](implementation-plan.md) to produc
 
 `main` is protected by the GitHub ruleset "main": no direct pushes, no force pushes or deletion; every change arrives by pull request with the CI `check` job passing on an up-to-date branch, all review threads resolved, squash merge only (head branches are deleted after merge). Required approvals are **0** while Tao is the only maintainer (GitHub doesn't let authors approve their own PRs); raise it to 1 with code-owner review when the second Admin joins (G1).
 
-Commits use Conventional Commits with the slice as scope: `feat(S02): post DOWN to Google Chat`, `fix(S03): …`, `docs(S05): …`.
+Commits use Conventional Commits with the slice as scope: `feat(S02a): post DOWN to Google Chat`, `fix(S03): …`, `docs(S05): …`.
 
 ## Who reviews what
 
@@ -60,8 +60,8 @@ The precedence is in the root `CLAUDE.md`: `decisions.md` → design spec (behav
 | Env | Web | Database | Used for |
 |---|---|---|---|
 | Local | `pnpm dev` on http://localhost:3500 | `pnpm db:start` (Docker) | Building and unit / SQL tests |
-| Staging | Vercel preview deployment of the slice branch | Staging Supabase project | Done-when checks against the test target |
-| Production | Vercel production from `main` | Production Supabase project | Real sites after G1 |
+| Staging | Vercel preview deployment of the slice branch | Staging Supabase project in a separate free organisation (D-005; resume it if paused) | Done-when checks against the test target |
+| Production | Vercel production from `main` | Production Supabase project (Pro, daily backups kept 7 days, no PITR — D-005) | Real sites after G1 |
 
 Migrations reach staging and production only through the reviewed PR (`supabase db push` asks first). During the PRD §12 parallel run, every production deploy happens inside a maintenance window.
 

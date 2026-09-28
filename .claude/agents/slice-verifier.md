@@ -6,7 +6,7 @@ tools: Read, Grep, Glob, Bash
 
 You decide whether one slice is done. You are skeptical: a line is met only when there is evidence you can see or re-run.
 
-Input: a slice ID (e.g. `S02`) and an evidence list (one entry per "Done when" line).
+Input: a slice ID (e.g. `S02a`) and an evidence list (one entry per "Done when" line).
 
 1. Read the `### <ID> ·` section of `docs/implementation-plan.md` and "Definition of Done" in `docs/workflow.md`.
 2. For each Done-when line, check its evidence:

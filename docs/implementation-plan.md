@@ -1,6 +1,6 @@
 # Implementation plan
 
-25 vertical slices in 4 phases, following PRD §12: Phase 0 prep → a thin end-to-end slice for one site → the rest of the MVP (P0) → team go-live (P1) → client-facing (P2). Each slice ships something that runs end to end and has observable **Done when** checks; phase gates repeat the PRD §12 exit criteria.
+26 vertical slices in 4 phases, following PRD §12: Phase 0 prep → a thin end-to-end slice for one site → the rest of the MVP (P0) → team go-live (P1) → client-facing (P2). Each slice ships something that runs end to end and has observable **Done when** checks; phase gates repeat the PRD §12 exit criteria.
 
 - **Status** is updated by `/slice-review <ID>` when every Done-when line has evidence. Values: `Todo` · `In progress` · `In review` · `Done` · `Blocked`.
 - How a slice is worked: [`workflow.md`](workflow.md). Settled conflicts: [`decisions.md`](decisions.md). Board → route map: [`design/screens.md`](design/screens.md). Coverage is checked by `pnpm plan:check`.
@@ -13,11 +13,12 @@
 |---|---|---|---|---|---|---|---|
 | S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Todo |
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Todo |
-| S02 | Thin slice: one site from probe to Ack | 1 · P0 | L | FR-02, FR-07 | S01 | 2 | Todo |
-| S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02 | 2–3 | Todo |
+| S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Todo |
+| S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Todo |
+| S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
-| S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02, S05 | 3 | Todo |
+| S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04 | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
 | S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06, S08 | 3 | Todo |
@@ -47,11 +48,11 @@ Every slice also meets the [Definition of Done](workflow.md#definition-of-done) 
 | Phase | PRD target | Sum of sizes (1 developer) |
 |---|---|---|
 | 0 Prep | week 1 | week 1 |
-| 1 MVP (S01–S09) | weeks 2–3 (10 working days) | ≈ 40 days ≈ 8 weeks |
+| 1 MVP (S01–S09) | weeks 2–3 (10 working days) | ≈ 41 days ≈ 8 weeks |
 | 2 Team go-live (S10–S19) | weeks 4–5 + buffer, then 2-week parallel run | ≈ 36 days ≈ 7 weeks (parallel run overlaps) |
 | 3 Client-facing (S20–S24) | weeks 6–10 | ≈ 23 days ≈ 5 weeks |
 
-The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose between re-baselining the dates, adding a developer, or cutting P1 / P2 scope. Slices are sized without assuming AI-assisted speed-ups; re-estimate after S02 with real numbers.
+The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose between re-baselining the dates, adding a developer, or cutting P1 / P2 scope. Slices are sized without assuming AI-assisted speed-ups; S02a is deliberately small (≤ 2 days) so the first real measurement arrives early: if it takes longer than its size, re-baseline the plan before starting S02b.
 
 ---
 
@@ -59,7 +60,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 
 ### S00 · Prep, decisions, accounts & staging
 
-- **Scope:** PRD §12 Phase 0. Close CEO decisions (PRD §13): tiers, owners / backups, on-call members, CEO at L2, Twilio, budget ceiling (check Supabase PITR cost against the $60 / month cap). Site Registration Checklist for 17 sites (URL + key pages, owner, backup, client, AM, hosting, WAF, credential reference). Accounts: Supabase Pro project (production) and a staging project, Vercel project + env for Production and Preview, Thai VPS (2 GB), Healthchecks.io checks, Google OAuth client, Resend sending domain, company domain. Google Chat spaces "DxT Website Alerts", "DxT Website Reports" and a "DxT Monitor — staging" space for tests, each with an incoming webhook. HTTP vs Playwright capture of Tubtong / Cando Asia block pages; ask WAF owners to allowlist the probe UA + secret header and the VPS IP.
+- **Scope:** PRD §12 Phase 0. Close CEO decisions (PRD §13): tiers, owners / backups, on-call members, CEO at L2, Twilio, budget ceiling ($60 / month — no PITR add-on, D-005). Site Registration Checklist for 17 sites (URL + key pages, owner, backup, client, AM, hosting, WAF, credential reference). Accounts: Supabase Pro project (production) and a staging project in a separate free organisation (D-005; free projects pause after a week without activity — resume it before staging checks), Vercel project + env for Production and Preview, Thai VPS (2 GB), Healthchecks.io checks, Google OAuth client, Resend sending domain, company domain. Google Chat spaces "DxT Website Alerts", "DxT Website Reports" and a "DxT Monitor — staging" space for tests, each with an incoming webhook. HTTP vs Playwright capture of Tubtong / Cando Asia block pages; ask WAF owners to allowlist the probe UA + secret header and the VPS IP.
 - **Depends on:** —
 - **Done when:**
   1. CEO has approved tiers and the escalation ladder (PRD §12 exit), recorded in the PRD's decisions list.
@@ -85,27 +86,41 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
   5. spec-checker passes Login, MLogin, EmptyStates at 390 and 1440 px, light and dark.
 - **Review:** security-reviewer, db-reviewer, spec-checker.
 
-### S02 · Thin slice: one site from probe to Ack
+### S02a · Thin slice: probe → engine → DOWN / RECOVERED in Chat
 
-- **Scope:** PRD §12 "days 1–3" slice, one monitor, two Vercel locations (a DOWN needs both to fail until Bangkok joins in S03). Tables `probe_locations`, `check_results` (monthly partitions), `site_status`, `incidents`, `incident_events`, `notifications`. Probes `probe-sin` / `probe-tyo` (region check via `VERCEL_REGION`, `DxT-Monitor/1.0` UA + WAF secret header). Engine cron: hard-fail DOWN via `evaluateRound` + recheck (`after`) + `confirmsDown`, recovery to OK, incident open / recover with events. Notifier: Google Chat L0 card + text line (`threadKey` = incident id), Resend email threaded per incident, `hold_until` 10 s undo, retry 30 s / 2 min / 8 min then email fallback, delivery status per attempt; the engine calls the notifier as soon as it enqueues (the cron is only the sweep) so alerts leave within 30 s (PRD §9). MobileAck (+ dark): ack in one tap on a signed-in phone, Undo toast, ACKNOWLEDGED reply. Healthchecks ping from each cron. A test target (`apps/test-target`, deployed separately) answering 200 / 500 / timeout on demand.
+- **Scope:** PRD §12 "days 1–3" slice cut to the smallest end-to-end path: one monitor, two Vercel locations (a DOWN needs both to fail until Bangkok joins in S03), Google Chat only. Tables `probe_locations`, `check_results` (monthly partitions), `site_status`, `incidents`, `incident_events`, `notifications` (one row per message: channel, thread key, status). Probes `probe-sin` / `probe-tyo` (region check via `VERCEL_REGION`, `DxT-Monitor/1.0` UA + WAF secret header). Engine cron: hard-fail DOWN via `evaluateRound` + recheck (`after`) + `confirmsDown`, recovery to OK, incident open / recover with events. Notifier: Google Chat card + text line for DOWN and RECOVERED in one thread per incident (`threadKey` = incident id). Healthchecks ping from each cron. A test target (`apps/test-target`, deployed separately) answering 200 / 500 / timeout on demand.
 - **Already in place from the setup:** `evaluateRound` / `confirmsDown` / `faultyLocations` / `isRegionalProblem` / `decideVerification`, the lifecycle incl. D-003, `canResolve`, `autoResolves`, `clientUpdateRequired` and uptime in `@dxt/engine` (unit-tested, not yet wired), `runHttpCheck` + `classifyResponse` in `@dxt/probe`, `buildChatTextLine` in `@dxt/notifier`, authenticated cron / ingest / jobs route stubs (501), `vercel.json` crons and region pinning.
-- **Boards:** MobileAck, MobileAckDark, ChatAlert (DOWN, ACKNOWLEDGED, RECOVERED rows), EmailAlert (Down, Acknowledged, Recovered) · **Tables:** probe_locations, check_results, site_status, incidents, incident_events, notifications · **Test plan:** T08
+- **Out of scope (S02b):** email, retries and fallback, the 30 s delivery target, acknowledge, undo.
+- **Boards:** ChatAlert (DOWN and RECOVERED rows) · **Tables:** probe_locations, check_results, site_status, incidents, incident_events, notifications
 - **Depends on:** S01
 - **Done when:**
-  1. On staging, switching the test target to 500 posts `DOWN · <site>` in the staging Chat space and sends the email within **3 min** of the switch (timestamps in the PR).
-  2. `notifications.sent_at − incidents.detected_at` ≤ **30 s** for that alert (query output in the PR).
+  1. On staging, switching the test target to 500 posts `DOWN · <site>` in the staging Chat space within **3 min** of the switch (timestamps in the PR).
+  2. Switching back to 200 posts `RECOVERED · <site>` as a reply in the same thread.
+  3. An integration test drives the engine with stored results: both locations fail on the first check and the recheck → one incident opened; only one location fails → no incident; a location that didn't recheck doesn't vote twice.
+  4. Healthchecks shows pings from probe-sin, probe-tyo and the engine; the probe functions log `sin1` / `hnd1`.
+  5. message-checker passes the DOWN and RECOVERED text lines and cards against ChatAlert.
+  6. Actual time spent is recorded in the PR, for the re-baseline check in [Timeline](#timeline).
+- **Review:** engine-reviewer, message-checker, security-reviewer (cron, RLS), db-reviewer (partitions).
+
+### S02b · Email, delivery guarantees, Ack + Undo
+
+- **Scope:** FR-07 complete on the S02a path. Resend email threaded per incident (one subject, `In-Reply-To` / `References`, per-recipient footer). Delivery: the engine calls the notifier as soon as it enqueues (the cron is only the sweep) so alerts leave within 30 s (PRD §9); retry 30 s / 2 min / 8 min, then email fallback; delivery status per attempt. MobileAck (+ dark): the card link opens the incident on a signed-in phone, ack in one tap, Undo toast, `hold_until` 10 s before ACKNOWLEDGED goes to Chat and email. If this passes 4 days, split email + delivery from Ack + Undo.
+- **Boards:** MobileAck, MobileAckDark, ChatAlert (ACKNOWLEDGED row), EmailAlert (Down, Acknowledged, Recovered) · **Test plan:** T08
+- **Depends on:** S02a
+- **Done when:**
+  1. On staging, the DOWN email arrives within **3 min** of the switch, and RECOVERED lands in the same email thread.
+  2. `notifications.sent_at − incidents.detected_at` ≤ **30 s** for the DOWN alert (query output in the PR).
   3. With the Chat webhook pointed at a failing URL, attempts are recorded at +30 s, +2 min, +8 min and the email fallback is sent (test + `notifications` rows).
   4. From a phone, the card link opens the incident signed in; one tap acknowledges; ACKNOWLEDGED appears after 10 s under that person's name.
   5. **T08:** Ack → Undo within 10 s → no Chat post and no email (the rows end `cancelled`).
-  6. Switching back to 200 posts RECOVERED in the same Chat thread and email thread.
-  7. message-checker passes the rows above against ChatAlert / EmailAlert.
-- **Review:** engine-reviewer, message-checker, security-reviewer (cron, RLS), db-reviewer (partitions, notifications), spec-checker (MobileAck, MobileAckDark).
+  6. message-checker passes the email events and the ACKNOWLEDGED row; spec-checker passes MobileAck and MobileAckDark.
+- **Review:** message-checker, engine-reviewer, security-reviewer (ack action, RLS), db-reviewer (notifications), spec-checker (MobileAck, MobileAckDark).
 
 ### S03 · Bangkok probe & browser verifier
 
 - **Scope:** FR-04 and the third location. VPS agent: Bangkok probe loop → `/api/ingest` (location fixed server-side), Healthchecks ping per loop. Blocked rounds → browser verifier: Playwright on the VPS, Job API with leases over pgmq, at most 3 sessions, Admin alert when > 5 jobs queue, screenshots to Supabase Storage deleted after 30 days, async evidence screenshot for hard-fail DOWN. D-001: verifier unavailable → PROBLEM (unverified) at once + Admin email. Test target gains a 403-challenge mode.
 - **Test plan:** T03
-- **Depends on:** S02
+- **Depends on:** S02b (the Admin email for D-001)
 - **Done when:**
   1. The staging site shows three locations voting; stopping the VPS agent leaves two voting and no false DOWN.
   2. 403-challenge mode with the page loading → OK with the note "Automated check blocked by bot protection; verified via browser".
@@ -130,7 +145,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 
 - **Scope:** FR-01. `/sites` list, Add site with the registration checklist, Edit monitors (URL, method, expected status, timeout, keywords, headers, thresholds, primary, key pages, redirect allowlist). An owner must have signed in once and have a notification channel (PRD §3). Monitor URLs rejected when they resolve to private, link-local or metadata addresses. Every change writes `audit_log` with before / after. Production clients and AMs load from a reviewed SQL script (UI in S17).
 - **Boards:** AddSite, EditMonitors · route `/sites`
-- **Depends on:** S01 (S02 for probes to pick the monitors up)
+- **Depends on:** S01 (S02a for probes to pick the monitors up)
 - **Done when:**
   1. All 17 sites and their primary monitors are entered through the UI on production with owner, backup, client and hosting (PRD §12 MVP exit: "ข้อมูล 17 เว็บครบ 100%").
   2. `http://169.254.169.254/`, `http://10.0.0.5/` and a hostname resolving to `127.0.0.1` are rejected (tests).
@@ -142,7 +157,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 
 - **Scope:** FR-05, FR-08. Overview (desktop, mobile, dark NOC): X/17 OK, status per site with Realtime, filters (tier, owner, client), 24 h sparkline, open incidents; the "Maintenance & mutes" card lands in S09. Site detail: uptime 24 h / 7 d / 30 d / 90 d, response time per location, incident history, check log. `check_rollups` hourly and daily via pg_cron (daily kept 2 years); partition create / drop jobs (90-day raw retention).
 - **Boards:** Main, MOverview, MainDark, SiteDetail, MSite · **Tables:** check_rollups
-- **Depends on:** S02, S05
+- **Depends on:** S02a, S05
 - **Done when:**
   1. With 17 sites and 90 days of generated check data on staging, `/` renders in < 2 s (server timing in the PR) and a status change shows in < 5 s via Realtime (PRD §9).
   2. Site detail uptime for the seeded sample equals `siteUptime` (MuvMi 30 d = 99.77%).
@@ -304,7 +319,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 
 ### S19 · Go-live readiness
 
-- **Scope:** PRD §12 buffer + Phase 2 exit: runbook extended to everything built in Phase 2 (fault mode, hand check, on-call swaps), backups + point-in-time recovery checked and one restore drill, UAT with owners twice, game day, and the parallel-run log comparing every incident from the CEO's hourly monitor with DxT Monitor.
+- **Scope:** PRD §12 buffer + Phase 2 exit: runbook extended to everything built in Phase 2 (fault mode, hand check, on-call swaps), Supabase Pro daily backups checked (7-day retention, no PITR — D-005) and one restore drill from the latest daily backup, UAT with owners twice, game day, and the parallel-run log comparing every incident from the CEO's hourly monitor with DxT Monitor.
 - **Test plan:** T06, T07
 - **Depends on:** S10–S18
 - **Done when:**
@@ -386,7 +401,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 | # | Risk | Mitigation in this plan |
 |---|---|---|
 | R1 | One developer; the sizes add up to about twice the PRD timeline (bus factor 1, PRD §13) | Q7 decides dates vs capacity vs scope. Gates are scope gates: when a phase slips, its gate moves, never its Done-when lines. Second Admin at G1. |
-| R2 | Vercel Cron is the single point of failure for probes, engine and notifier | Healthchecks pings from S02; watchdog and fault mode in S12 before go-live. |
+| R2 | Vercel Cron is the single point of failure for probes, engine and notifier | Healthchecks pings from S02a; watchdog and fault mode in S12 before go-live. |
 | R3 | WAF blocks grow and the verifier gets busy | S00 allowlist requests; S03 caps the verifier at 3 sessions and alerts at > 5 queued jobs. |
 | R4 | Alert fatigue during the parallel run | Majority vote, dedupe and flapping (S04, D-004); false-alert review in the S19 log. |
 
@@ -411,12 +426,12 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | FR | Slice |
 |---|---|
 | FR-01 | S05 |
-| FR-02 | S02 |
+| FR-02 | S02a |
 | FR-03 | S04 |
 | FR-04 | S03 |
 | FR-05 | S06 |
 | FR-06 | S07 |
-| FR-07 | S02 |
+| FR-07 | S02b |
 | FR-08 | S06 |
 | FR-09a | S08 |
 | FR-09b | S10 |
@@ -442,10 +457,10 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | Login | S01 |
 | MLogin | S01 |
 | EmptyStates | S01 |
-| MobileAck | S02 |
-| MobileAckDark | S02 |
-| ChatAlert | S02 |
-| EmailAlert | S02 |
+| MobileAck | S02b |
+| MobileAckDark | S02b |
+| ChatAlert | S02a |
+| EmailAlert | S02b |
 | StatusModel | S04 |
 | AddSite | S05 |
 | EditMonitors | S05 |
@@ -484,7 +499,7 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | Synthetic | S23 |
 | ApiWebhooks | S24 |
 
-ChatAlert and EmailAlert start in S02 and gain rows in every slice that adds an event; Escalation is extended in S10; Incident gains the client-update card in S11.
+ChatAlert starts in S02a and EmailAlert in S02b; both gain rows in every slice that adds an event; Escalation is extended in S10; Incident gains the client-update card in S11.
 
 ### Tables (PRD §11)
 
@@ -495,12 +510,12 @@ ChatAlert and EmailAlert start in S02 and gain rows in every slice that adds an 
 | sites | S01 |
 | monitors | S01 |
 | audit_log | S01 |
-| probe_locations | S02 |
-| check_results | S02 |
-| site_status | S02 |
-| incidents | S02 |
-| incident_events | S02 |
-| notifications | S02 |
+| probe_locations | S02a |
+| check_results | S02a |
+| site_status | S02a |
+| incidents | S02a |
+| incident_events | S02a |
+| notifications | S02a |
 | check_rollups | S06 |
 | escalation_policies | S08 |
 | escalation_steps | S08 |
@@ -520,7 +535,7 @@ Tables the plan adds beyond PRD §11: organisation settings and company holidays
 | T05 | No ack → L0–L3 on time | S10 |
 | T06 | UAT with owners twice on mobile | S19 |
 | T07 | Game day, MTTD / MTTA measured | S19 |
-| T08 | Ack → Undo within 10 s → nothing sent | S02 |
+| T08 | Ack → Undo within 10 s → nothing sent | S02b |
 | T09 | Mute with open incident → escalation, L3 FYI, client update continue | S09 |
 | T10 | Resolve blocked until 3 conditions | S07 |
 | T11 | Engine heartbeat off → Tao email + on-call mention; probe off → email only | S12 |

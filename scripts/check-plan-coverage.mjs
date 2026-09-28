@@ -13,7 +13,7 @@ const prd = read('docs/prd.md');
 const errors = [];
 
 // Slices declared in the main table: | S01 | …
-const slices = new Set([...plan.matchAll(/^\| (S\d{2}|G\d) \|/gm)].map((m) => m[1]));
+const slices = new Set([...plan.matchAll(/^\| (S\d{2}[a-z]?|G\d) \|/gm)].map((m) => m[1]));
 
 // Appendix rows: | <key> | … | <Sxx> |  (slice is the last cell)
 function appendixSection(title) {
@@ -30,7 +30,7 @@ function appendixSection(title) {
       .split('|')
       .map((c) => c.trim())
       .filter(Boolean);
-    if (cells.length < 2 || /^-+$/.test(cells[0]) || !/^S\d{2}$/.test(cells.at(-1))) continue;
+    if (cells.length < 2 || /^-+$/.test(cells[0]) || !/^S\d{2}[a-z]?$/.test(cells.at(-1))) continue;
     const key = cells[0];
     if (rows.has(key)) errors.push(`${title}: "${key}" is mapped more than once`);
     rows.set(key, cells.at(-1));

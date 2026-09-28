@@ -1,5 +1,5 @@
 <!--
-Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 142)
+Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 143)
 Converted to Markdown: 2026-09-28. The Claude Doc is the source of truth — re-export this file when it changes.
 Settled conflicts: docs/decisions.md wins over this file and the design spec.
 Precedence: on scope, priority, architecture and budget this PRD wins; on screen behaviour, status logic, UI copy and formats docs/dxt-monitor-design-spec.md wins.
@@ -329,7 +329,7 @@ Ack หยุด L1–L2 แต่ไม่หยุด client-update track แ�
 | Time | เก็บ UTC, แสดง Asia/Bangkok (UTC+7) ทุกหน้าจอและข้อความ |
 | Language | UI อังกฤษ (v1), alert/digest อังกฤษ ตาม format ที่ CEO ใช้; client template TH/EN |
 | Accessibility & UX | Status ไม่พึ่งสีอย่างเดียว (มี label + icon), ใช้บนมือถือได้เต็มรูปเพราะ ack ส่วนใหญ่ทำจากมือถือ |
-| Backup & DR | Daily DB backup + Point-in-time recovery; restore drill ทุกไตรมาส |
+| Backup & DR | Daily DB backup ที่มากับ Supabase Pro (เก็บ 7 วัน); restore drill ทุกไตรมาส — ไม่ใช้ Point-in-time recovery เพราะ add-on ราว $100/เดือน เกินเพดานงบ $60 (ข้อมูล monitor หายสูงสุดราว 1 วันไม่กระทบเว็บลูกค้า); staging ใช้ Supabase org ฟรีแยก |
 
 ## 10. Architecture & Tech Stack
 
