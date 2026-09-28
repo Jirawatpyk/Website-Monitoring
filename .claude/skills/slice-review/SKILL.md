@@ -1,7 +1,7 @@
 ---
 name: slice-review
-description: Close a slice of docs/implementation-plan.md — run its reviewers, collect evidence for every "Done when" line, have slice-verifier check it, and update the slice Status. Use when a slice looks finished ("/slice-review S02", "is S05 done?").
-argument-hint: <SliceID, e.g. S02>
+description: Close a slice of docs/implementation-plan.md — run its reviewers, collect evidence for every "Done when" line, have slice-verifier check it, and update the slice Status. Use when a slice looks finished ("/slice-review S02a", "is S05 done?").
+argument-hint: <SliceID, e.g. S02a>
 ---
 
 # Review slice $ARGUMENTS

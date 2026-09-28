@@ -25,8 +25,8 @@ The index `/implement-screen` reads. One row per canvas board (44). The board fi
 | MIncidents | Mobile — Incidents | `/incidents` (390) | P0 | S07 | §17 | FR-06 |
 | Incident | Incident — INC-0142 MuvMi DOWN | `/incidents/[incidentId]` | P0 | S07 | §8, §9, §14.1, §14.3, §15.4, §16.2–3 | FR-06, FR-20 |
 | MIncident | Mobile — Incident detail | `/incidents/[incidentId]` (390) | P0 | S07 | §15.6, §17 | FR-06 |
-| MobileAck | Mobile — acknowledge from alert | `/incidents/[incidentId]?ack=1` (390) | P0 | S02 | §14.3, §16.8, §17 | FR-07 |
-| MobileAckDark | Mobile ack — dark (night on-call) | same, dark theme | P0 | S02 | §15.7 | FR-07 |
+| MobileAck | Mobile — acknowledge from alert | `/incidents/[incidentId]?ack=1` (390) | P0 | S02b | §14.3, §16.8, §17 | FR-07 |
+| MobileAckDark | Mobile ack — dark (night on-call) | same, dark theme | P0 | S02b | §15.7 | FR-07 |
 | Resolve | Resolve incident + root cause | dialog on `/incidents/[incidentId]` | P0 | S07 | §15.4, §16.1–4 | FR-06 |
 | Maintenance | Maintenance / mute dialog | `/maintenance` + dialog | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1 | FR-10a, FR-14 |
 | MMaintenance | Mobile — Mute / maintenance sheet | sheet (390) | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1 | FR-10a, FR-14 |
@@ -66,6 +66,6 @@ Each nav item carries its slice and a `live` flag (`apps/web/src/components/app-
 | Board | Canvas title | Implemented in | Phase | Slice | Spec | PRD |
 |---|---|---|---|---|---|---|
 | StatusModel | Status model & verification logic | `packages/engine` (status, rounds, uptime) | P0 | S04 | §5, §6, §15.3 | §5, FR-03 |
-| ChatAlert | Google Chat alert thread (content spec) | `packages/notifier` (Chat templates) | P0 | S02 | §10, §14.10, §15.7, §16.5 | §7 |
-| EmailAlert | Alert email template | `packages/notifier` (email templates) | P0 | S02 | §10, §14.11, §15.7 | §7 |
+| ChatAlert | Google Chat alert thread (content spec) | `packages/notifier` (Chat templates) | P0 | S02a | §10, §14.10, §15.7, §16.5 | §7 |
+| EmailAlert | Alert email template | `packages/notifier` (email templates) | P0 | S02b | §10, §14.11, §15.7 | §7 |
 | WeeklySummary | Weekly summary — Chat card spec | `packages/notifier` (digest + weekly) | P1 | S14 | §10, §15.7 | FR-12 |

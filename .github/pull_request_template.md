@@ -1,6 +1,6 @@
 ## Slice
 
-<!-- e.g. S02 · Thin slice — link its section in docs/implementation-plan.md -->
+<!-- e.g. S02a · Thin slice — link its section in docs/implementation-plan.md -->
 
 ## What and why
 

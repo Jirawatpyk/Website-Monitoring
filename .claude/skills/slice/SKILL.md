@@ -1,7 +1,7 @@
 ---
 name: slice
-description: Start or continue one slice of docs/implementation-plan.md — check its dependencies, create the branch, load the right sources, plan, and build it through the project workflow. Use when asked to work on a slice ("/slice S02", "start the thin slice", "continue S05").
-argument-hint: <SliceID, e.g. S02>
+description: Start or continue one slice of docs/implementation-plan.md — check its dependencies, create the branch, load the right sources, plan, and build it through the project workflow. Use when asked to work on a slice ("/slice S02a", "start the thin slice", "continue S05").
+argument-hint: <SliceID, e.g. S02a>
 ---
 
 # Slice $ARGUMENTS
