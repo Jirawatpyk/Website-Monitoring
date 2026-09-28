@@ -54,6 +54,7 @@ Rules — enforced by `dxt/feature-boundaries` in ESLint (`scripts/eslint/featur
 
 - Unit / component tests: `src/**/*.test.ts(x)` with Vitest + Testing Library in jsdom (`vitest.config.ts`, `test/setup.ts` stubs `matchMedia`, `ResizeObserver` and `server-only`). Run `pnpm --filter @dxt/web test`.
 - E2E: `e2e/*.spec.ts` with Playwright, projects `desktop` (1440) and `mobile` (390). `pnpm test:e2e` starts `pnpm dev` on :3500 (or reuses it) with placeholder Supabase values — enough for signed-out flows; signed-in flows need `pnpm db:start` and a seeded user.
+- Coverage (`pnpm --filter @dxt/web test:coverage`) measures the logic layers — `lib/`, `features/`, `server/`, `components/` — with thresholds 80 lines / 75 branches / 70 functions. Tests that need Node APIs such as `NextRequest` start with `// @vitest-environment node`; server env comes from `test/env.ts` (`stubServerEnv`).
 - `src/components/app-shell/nav.test.ts` fails if a nav item links to a page that doesn't exist — flip `live` only with the page.
 
 <!-- BEGIN:nextjs-agent-rules -->

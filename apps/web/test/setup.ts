@@ -4,8 +4,11 @@ import { afterEach } from 'vitest';
 
 afterEach(() => cleanup());
 
-// jsdom lacks these browser APIs; AURA's responsive components read them.
-if (!window.matchMedia) {
+// jsdom lacks these browser APIs; AURA's responsive components read them. Files that opt into the
+// node environment (`// @vitest-environment node`) have no window at all.
+const hasWindow = typeof window !== 'undefined';
+
+if (hasWindow && !window.matchMedia) {
   window.matchMedia = (query: string) =>
     ({
       matches: false,
@@ -19,7 +22,7 @@ if (!window.matchMedia) {
     }) as MediaQueryList;
 }
 
-if (!('ResizeObserver' in window)) {
+if (hasWindow && !('ResizeObserver' in window)) {
   class ResizeObserverStub {
     observe() {}
     unobserve() {}

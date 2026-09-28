@@ -47,6 +47,7 @@ pnpm dev:agent           # VPS agent (needs apps/vps-agent/.env)
 pnpm check               # format + plan coverage + lint + typecheck + test — run before saying work is done
 pnpm plan:check          # every FR, board, table and go-live test maps to one slice
 pnpm test                # Vitest in every package that has tests (web: jsdom + Testing Library)
+pnpm test:coverage       # the same tests with coverage thresholds (what CI runs)
 pnpm test:e2e            # Playwright against the web app, desktop 1440 + mobile 390 (starts `pnpm dev` if needed)
 pnpm --filter @dxt/engine test:watch
 pnpm build
@@ -63,7 +64,7 @@ pnpm db:start | db:stop | db:reset | db:types   # local Supabase (Docker); db:ty
 - **Security**: RLS on every table; the service-role key only in server code (`createServiceClient` from `@dxt/db/service`, which is `server-only`; cron and Ingest/Job routes) — never in a Client Component, never on the VPS. Cron routes check `CRON_SECRET`, VPS routes check `INGEST_TOKEN` (constant-time). Secrets live in env only; `.env.example` lists names, never values. `?next=` redirects go through `safeNextPath`, company-domain checks through `isAllowedEmail` (both `@dxt/shared`). New `/api/*` routes need a session unless added to `PUBLIC_PATHS` in `apps/web/src/lib/supabase/proxy.ts` with their own token check. Monitor and webhook URLs must be checked against private/link-local ranges (SSRF) before any probe fetches them.
 - **Audit**: every change to config or incident state writes `audit_log` (append-only, before/after).
 - **Undo**: ack and resolve hold Chat, email and webhooks for 10 s (`notifications.hold_until`).
-- **Tests**: engine rules get table-driven Vitest cases taken from the spec's examples (INC-0142 etc.). A behaviour change without a test is not done.
+- **Tests**: engine rules get table-driven Vitest cases taken from the spec's examples (INC-0142 etc.). A behaviour change without a test is not done. Coverage thresholds live in each package's `vitest.config.ts` (engine 95 / 90 branches; shared, probe, notifier 90 / 85; vps-agent 70 / 60; web logic layers 80 / 75) and only ever go up — never lower one to make a PR pass.
 - **Mobile**: every screen works at 390 px; touch targets ≥ 44 px. Check 390 / 820 / 1440, light and dark.
 - **Work slice by slice** (`docs/implementation-plan.md`, `docs/workflow.md`): one slice per branch and PR; don't start a slice whose dependencies aren't Done; a slice is Done only when every "Done when" line has evidence. Nav items stay hidden (`live: false`) until their slice ships the page.
 - **Git**: branch `slice/<ID>-<name>` from `main` (`fix/…` for hotfixes), Conventional Commits with the slice as scope (`feat(S02): …`), never commit `.env*` files except `.env.example`. `main` is protected (ruleset "main"): changes land only by PR with CI green and squash merge — never try to push to `main`. Push branches and open PRs only when asked.

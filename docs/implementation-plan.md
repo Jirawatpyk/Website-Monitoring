@@ -73,14 +73,14 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 
 ### S01 · Foundation: schema, auth, app shell
 
-- **Scope:** Tables `profiles` (auto-created on first sign-in, email as the default notification channel), `clients`, `sites`, `monitors`, `audit_log` with RLS per role (PRD §3) and explicit grants; role helpers (`current_app_role()`, `owns_site(site_id)`); `audit_log` append-only with a write helper. Google SSO sign-in (Login, MLogin) with `?next=`; company domain in `private.allowed_email_domains`; roles assigned by a reviewed SQL script until the Users screen (S16). App shell (SideNav with `live` flags, account footer), shared empty / loading / no-access states using the `@dxt/shared` formats. Dev seed from the spec sample data. SQL tests with pgTAP (`supabase/tests/`).
+- **Scope:** Tables `profiles` (auto-created on first sign-in, email as the default notification channel), `clients`, `sites`, `monitors`, `audit_log` with RLS per role (PRD §3) and explicit grants; role helpers (`current_app_role()`, `owns_site(site_id)`); `audit_log` append-only with a write helper. Google SSO sign-in (Login, MLogin) with `?next=`; company domain in `private.allowed_email_domains`; roles assigned by a reviewed SQL script until the Users screen (S16). App shell (SideNav with `live` flags, account footer), shared empty / loading / no-access states using the `@dxt/shared` formats. Dev seed from the spec sample data. SQL tests with pgTAP (`supabase/tests/`), run in a CI `db` job (Supabase CLI starts the local stack in Docker, then `supabase test db`), required on `main` alongside `check`.
 - **Already in place from the setup:** enums (migration 0001), sign-up domain hook (0002), auth proxy with segment-wise public paths, `/auth/callback`, `safeNextPath` / `isAllowedEmail`, app shell and nav `live` flags, placeholder Login / Overview pages; web test tooling — Vitest + Testing Library (`pnpm --filter @dxt/web test`) and Playwright e2e at 1440 / 390 (`pnpm test:e2e`), both in CI.
 - **Boards:** Login, MLogin, EmptyStates · **Tables:** profiles, clients, sites, monitors, audit_log
 - **Depends on:** S00 (Supabase projects, OAuth client, company domain)
 - **Done when:**
   1. A company Google account signs in at `/login` and lands on `/`; a non-company account is refused by the `before_user_created` hook (pgTAP test) and by the proxy (`?error=domain`).
   2. Opening `/incidents/x` signed out → sign-in → back on `/incidents/x`.
-  3. `pnpm exec supabase test db` passes: anon reads nothing; viewer can't write `sites`; responder updates only own sites; `authenticated` can't UPDATE / DELETE `audit_log`.
+  3. `pnpm exec supabase test db` passes locally and in the CI `db` job: anon reads nothing; viewer can't write `sites`; responder updates only own sites; `authenticated` can't UPDATE / DELETE `audit_log`.
   4. `pnpm db:reset` builds from zero with seed; `pnpm db:types` output committed; `pnpm check` green.
   5. spec-checker passes Login, MLogin, EmptyStates at 390 and 1440 px, light and dark.
 - **Review:** security-reviewer, db-reviewer, spec-checker.
