@@ -13,8 +13,10 @@ How work moves from [`implementation-plan.md`](implementation-plan.md) to produc
 | 5. Check | `pnpm check` green locally (format, plan coverage, lint, types, tests) | — |
 | 6. Review | Run the reviewers named in the slice's **Review** line (table below); fix every High / Medium or record why not | agents |
 | 7. Verify | Collect evidence for each "Done when" line; `slice-verifier` checks it. Status → `In review` | `/slice-review <ID>` |
-| 8. PR | PR template with the Done-when checklist and its evidence; CI green; review by CODEOWNERS | GitHub |
+| 8. PR | PR template with the Done-when checklist and its evidence; CI `check` green; review conversations resolved; CODEOWNERS are requested automatically | GitHub |
 | 9. Merge | Squash-merge to `main` → Vercel production deploy. Status → `Done` in the plan (same PR or a follow-up) | `/slice-review` |
+
+`main` is protected by the GitHub ruleset "main": no direct pushes, no force pushes or deletion; every change arrives by pull request with the CI `check` job passing on an up-to-date branch, all review threads resolved, squash merge only (head branches are deleted after merge). Required approvals are **0** while Tao is the only maintainer (GitHub doesn't let authors approve their own PRs); raise it to 1 with code-owner review when the second Admin joins (G1).
 
 Commits use Conventional Commits with the slice as scope: `feat(S02): post DOWN to Google Chat`, `fix(S03): …`, `docs(S05): …`.
 

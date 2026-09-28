@@ -66,7 +66,7 @@ pnpm db:start | db:stop | db:reset | db:types   # local Supabase (Docker); db:ty
 - **Tests**: engine rules get table-driven Vitest cases taken from the spec's examples (INC-0142 etc.). A behaviour change without a test is not done.
 - **Mobile**: every screen works at 390 px; touch targets ≥ 44 px. Check 390 / 820 / 1440, light and dark.
 - **Work slice by slice** (`docs/implementation-plan.md`, `docs/workflow.md`): one slice per branch and PR; don't start a slice whose dependencies aren't Done; a slice is Done only when every "Done when" line has evidence. Nav items stay hidden (`live: false`) until their slice ships the page.
-- **Git**: branch `slice/<ID>-<name>` from `main` (`fix/…` for hotfixes), Conventional Commits with the slice as scope (`feat(S02): …`), never commit `.env*` files except `.env.example`. Push and PRs only when asked.
+- **Git**: branch `slice/<ID>-<name>` from `main` (`fix/…` for hotfixes), Conventional Commits with the slice as scope (`feat(S02): …`), never commit `.env*` files except `.env.example`. `main` is protected (ruleset "main"): changes land only by PR with CI green and squash merge — never try to push to `main`. Push branches and open PRs only when asked.
 
 ## Project skills and agents
 

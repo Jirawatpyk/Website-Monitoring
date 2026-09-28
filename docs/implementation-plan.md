@@ -191,7 +191,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 asks Tao to choose
 
 - ข้อมูล 17 เว็บครบ 100% ก่อน go-live (S05 Done-when 1).
 - DOWN จำลองแล้ว alert ถึงภายใน 3 นาที — on production, against the test target, for a Tier 1 monitor.
-- A second Admin is active with 2-step (PRD §9: "ต้องมี admin คนที่ 2 ก่อน Phase 2"), and Healthchecks alerts go to both Admins.
+- A second Admin is active with 2-step (PRD §9: "ต้องมี admin คนที่ 2 ก่อน Phase 2"), and Healthchecks alerts go to both Admins. They are added to `.github/CODEOWNERS`, and the GitHub ruleset "main" now requires 1 approving review from a code owner.
 - `docs/runbook.md` v1 exists and the second Admin has walked through it once: what each heartbeat / Healthchecks alert means, restarting the VPS agent, checking Vercel Cron and function logs, pausing alerts with maintenance, rotating `CRON_SECRET` / `INGEST_TOKEN` / webhook URLs, and who to call (PRD §13 bus-factor mitigation).
 - From here every production deploy happens inside a maintenance window, and the parallel run with the CEO's hourly monitor starts; S19 keeps its log.
 
