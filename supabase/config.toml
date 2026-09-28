@@ -277,7 +277,7 @@ max_frequency = "5s"
 # inactivity_timeout = "8h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
-# DxT Monitor: only company-domain accounts may sign up (migration 0002, private.allowed_email_domains).
+# DxT Monitor: only company-domain accounts on the allowlist may sign up (migration 0002, D-007).
 [auth.hook.before_user_created]
 enabled = true
 uri = "pg-functions://postgres/public/hook_before_user_created"
@@ -301,8 +301,8 @@ auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
-# DxT Monitor: "2-step" means Google Workspace 2-Step Verification (Login/Security boards), read from
-# Google, not Supabase TOTP — keep these off.
+# DxT Monitor: "2-step" means Google Workspace 2-Step Verification, enforced by Workspace (D-007),
+# not Supabase TOTP — keep these off.
 [auth.mfa.totp]
 enroll_enabled = false
 verify_enabled = false

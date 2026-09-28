@@ -1,5 +1,5 @@
 <!--
-Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 143)
+Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 148)
 Converted to Markdown: 2026-09-28. The Claude Doc is the source of truth — re-export this file when it changes.
 Settled conflicts: docs/decisions.md wins over this file and the design spec.
 Precedence: on scope, priority, architecture and budget this PRD wins; on screen behaviour, status logic, UI copy and formats docs/dxt-monitor-design-spec.md wins.
@@ -65,7 +65,7 @@ Precedence: on scope, priority, architecture and budget this PRD wins; on screen
 | Viewer | ทีมทั่วไป | ดู dashboard และ history อย่างเดียว |
 | Client (Phase 3) | ลูกค้า | ดู status page / uptime report เฉพาะเว็บของตัวเอง |
 
-- Login ผ่าน Google Workspace SSO (จำกัด domain บริษัท) + บังคับ 2-step ทุกคนตั้งแต่ จ. 5 ต.ค. 2026 (เดิมบังคับเฉพาะ Admin) — คนที่ยังไม่เปิด 2-step ยัง login ได้ แต่ทำได้แค่ดูและ acknowledge; action อื่นล็อกจนกว่าจะเปิด (Admin ที่ยังไม่เปิดก็เหมือนกัน)
+- Login ผ่าน Google Workspace SSO (OAuth client แบบ Internal + domain บริษัท) และต้องมีอีเมลอยู่ใน allowlist ที่ Admin เพิ่มไว้พร้อม role เท่านั้นจึงสร้างบัญชีได้ — 2-step บังคับโดย Google Workspace ทุกบัญชี (ปิดเองไม่ได้) ระบบจึงไม่เช็คหรือล็อกซ้ำ; ทุกคนที่ได้ role ต้องยืนยันว่าหน้า 2-Step Verification ของตัวเองปิดไม่ได้ (D-007)
 - ทุก user ต้องผูก notification channel อย่างน้อย 1 ช่องทาง (Google Chat หรือ email) ก่อนจะถูกตั้งเป็น owner ได้
   เปลี่ยน role หรือ deactivate user ต้องผ่าน **Used in check** ก่อน: แสดงว่าคนนั้นอยู่ใน escalation level ไหน, เป็น AM ของลูกค้ากี่ราย, เป็น owner/backup กี่เว็บ และมีเวร on-call เมื่อไร แล้วบังคับ reassign ให้ครบก่อนยืนยัน
 
@@ -207,7 +207,7 @@ Google Chat เป็นช่องทางหลัก ส่วน Email เ
 | Voice call (Twilio) — **ข้อเสนอ, รออนุมัติ** | โทรเมื่อ Tier 1 DOWN ยังไม่มี ack ถึง L2 (T+30 นาที) — เสียงอ่านชื่อเว็บ + กด 1 เพื่อ Ack; design ปัจจุบันผูกสายนี้กับ step L2 (CEO) ต้องยืนยันผู้รับสาย (Section 13); ตั้งค่าได้แต่ปิดไว้จนกว่าจะอนุมัติ | เบอร์ไทย ~$22–25/เดือน + $0.10/นาที ถึงมือถือไทย; ใช้จริงไม่กี่สาย/เดือน → รวมราว $23–26/เดือน; ปิดช่องว่างเรื่อง DND ที่ Google Chat ปิดไม่ได้ |
 | Google Chat app (Chat API) | DM ถึง owner โดยตรง, กด Acknowledge ในแชทได้เลย | P2 — ต้องตั้ง Chat app + service account |
 
-**Acknowledge ใน v1:** ปุ่มบน card เปิด link ไปหน้า incident (ลิงก์เดียวกันสำหรับทุกคน) หน้า incident ใช้ session Google SSO ที่ login ค้างไว้บนมือถือ ระบบจึงบันทึกได้ว่าใคร Ack จริง แล้วกด Ack ได้ใน 1 tap — ไม่ใช้ signed link ผูก user เพราะ card ถูกโพสต์ใน Space ที่ทุกคนเห็น คนอื่นจะ Ack แทน owner ได้ — webhook รับการกดปุ่มกลับมาไม่ได้ จึงใช้ link แทนจนกว่าจะมี Chat app — หลังกด Ack มี undo 10 วินาที: ข้อความ Chat, email และ webhook ถูก hold ไว้จนหมดเวลา ("Posting to Chat, email and webhooks in N s — nothing is sent until then"); คนที่ยังไม่เปิด 2-step ยัง Ack ได้เสมอ
+**Acknowledge ใน v1:** ปุ่มบน card เปิด link ไปหน้า incident (ลิงก์เดียวกันสำหรับทุกคน) หน้า incident ใช้ session Google SSO ที่ login ค้างไว้บนมือถือ ระบบจึงบันทึกได้ว่าใคร Ack จริง แล้วกด Ack ได้ใน 1 tap — ไม่ใช้ signed link ผูก user เพราะ card ถูกโพสต์ใน Space ที่ทุกคนเห็น คนอื่นจะ Ack แทน owner ได้ — webhook รับการกดปุ่มกลับมาไม่ได้ จึงใช้ link แทนจนกว่าจะมี Chat app — หลังกด Ack มี undo 10 วินาที: ข้อความ Chat, email และ webhook ถูก hold ไว้จนหมดเวลา ("Posting to Chat, email and webhooks in N s — nothing is sent until then")
 
 **Routing matrix**
 
@@ -323,7 +323,7 @@ Ack หยุด L1–L2 แต่ไม่หยุด client-update track แ�
 | Dead man's switch | ทุก probe ส่ง heartbeat ไปบริการภายนอก (เช่น Healthchecks.io) ทุก 1 นาที แยก 2 ระดับ: engine (status engine / Vercel Cron) หาย > 3 นาที → email Admin + โพสต์ Alerts Space @mention on-call ผ่านช่องทางที่ไม่พึ่งระบบเรา; probe location เดียวหาย > 3 นาที → email Admin เท่านั้น ไม่ page — ตอนนี้มี Admin active คนเดียว (Tao) ต้องมี admin คนที่ 2 ก่อน Phase 2 |
 | Alert delivery | ส่ง alert ภายใน 30 วินาทีหลัง confirm; retry 3 ครั้งแบบ backoff; Google Chat ส่งไม่สำเร็จ → fallback Email อัตโนมัติ; บันทึก delivery status ทุกข้อความ |
 | Performance | Dashboard โหลด < 2 วินาที, realtime update < 5 วินาทีหลังสถานะเปลี่ยน; รองรับ 200 monitor โดยไม่ต้องแก้ architecture |
-| Security | Google SSO + 2-step ทุกคน (ไม่เปิด = ดู + ack เท่านั้น), RBAC บน Row Level Security, secrets ใน env/vault เท่านั้น, ไม่เก็บ credential ของเว็บลูกค้า, probe ส่ง User-Agent ที่ระบุตัวตน (`DxT-Monitor/1.0`) |
+| Security | Google SSO (Internal + allowlist รายอีเมล) + 2-step บังคับโดย Google Workspace ทุกบัญชี, RBAC บน Row Level Security, secrets ใน env/vault เท่านั้น, ไม่เก็บ credential ของเว็บลูกค้า, probe ส่ง User-Agent ที่ระบุตัวตน (`DxT-Monitor/1.0`) |
 | Audit | Audit log แบบ append-only: ใคร ทำอะไร เมื่อไหร่ ค่าเดิม/ค่าใหม่ |
 | Data retention | Raw check result 90 วัน, hourly/daily aggregate 2 ปี, incident + audit log ตลอดไป |
 | Time | เก็บ UTC, แสดง Asia/Bangkok (UTC+7) ทุกหน้าจอและข้อความ |
@@ -426,7 +426,7 @@ incidents.state = unacked / escalated / acknowledged / monitoring / needs_root_c
 - [ ] Mute เว็บที่มี incident เปิดอยู่ → escalation, L3 FYI และ client update ยังทำงานตามเวลา
 - [ ] Resolve ไม่ได้จนกว่าจะครบ 3 เงื่อนไข (root cause "Unknown" ไม่ผ่าน)
 - [ ] ปิด engine heartbeat → Tao ได้ email + on-call ถูก @mention; ปิด probe เดียว → Tao ได้ email เท่านั้น
-- [ ] User ที่ไม่เปิด 2-step หลัง 5 ต.ค. → ack ได้ แต่ mute / maintenance / resolve ถูกล็อก
+- [ ] บัญชีบริษัทที่ไม่อยู่ใน allowlist และบัญชีนอกบริษัท → สร้างบัญชี / login ไม่ได้; ทุกคนที่ได้ role ยืนยันแล้วว่า 2-step ของตัวเองปิดไม่ได้
 
 ## 13. Risks, Open Questions & Decisions Needed
 

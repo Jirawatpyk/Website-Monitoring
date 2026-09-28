@@ -23,7 +23,7 @@ pnpm db:start                                   # local Supabase; prints URL + k
 pnpm dev                                        # http://localhost:3500
 ```
 
-`pnpm dev` needs `apps/web/.env.local` with at least the two `NEXT_PUBLIC_SUPABASE_*` values — without them the auth proxy fails on every page. Set `ALLOWED_EMAIL_DOMAIN` and add the same domain to `private.allowed_email_domains` (see `supabase/CLAUDE.md`), or every sign-in is rejected — both checks fail closed. Port 3500 is used because 3000 is in a Windows reserved port range on some machines.
+`pnpm dev` needs `apps/web/.env.local` with at least the two `NEXT_PUBLIC_SUPABASE_*` values — without them the auth proxy fails on every page. Set `ALLOWED_EMAIL_DOMAIN` and add the same domain to `private.allowed_email_domains` (see `supabase/CLAUDE.md`), or every sign-in is rejected — both checks fail closed. From S01 your address must also be on the allowlist (D-007). Port 3500 is used because 3000 is in a Windows reserved port range on some machines.
 
 | Command              | What it does                                                            |
 | -------------------- | ----------------------------------------------------------------------- |

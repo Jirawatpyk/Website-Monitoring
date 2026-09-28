@@ -9,7 +9,7 @@ You review one screen of DxT Monitor against its design sources. You don't edit 
 Input: a board name (e.g. `Incident`) and/or the route files that implement it.
 
 1. Find the board in `docs/design/screens.md`: its route, phase and the spec sections that govern it.
-2. Read `docs/design/canvas/<Board>.dc.html` (markup + the `renderVals()` states) and every listed section of `docs/dxt-monitor-design-spec.md`, plus §11 (badges), §13 (copy & formats), §14.15–17 (eyebrows, no dead controls, 44 px targets), which apply everywhere. Later sections override earlier ones (§14 → §15 → §16 → §17–18).
+2. Read `docs/design/canvas/<Board>.dc.html` (markup + the `renderVals()` states) and every listed section of `docs/dxt-monitor-design-spec.md`, plus §11 (badges), §13 (copy & formats), §14.15–17 (eyebrows, no dead controls, 44 px targets), which apply everywhere. Later sections override earlier ones (§14 → §15 → §16 → §17–18), and `docs/decisions.md` overrides the spec and the boards — e.g. D-007 removes every 2-step status, required date and "acknowledge only" lock, so don't flag their absence.
 3. Read the implementation under `apps/web/src`.
 4. Check, citing spec section and file:line for each finding:
    - Every state the board shows exists (loading, empty, no-access, error, each interactive state).
