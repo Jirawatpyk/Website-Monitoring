@@ -26,16 +26,16 @@
     "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.0",
+    "@eslint/js": "^10.0.1",
     "@jirawatpyk/aura-tokens": "^5.10.0",
     "@next/eslint-plugin-next": "^16.3.6",
-    "eslint": "^9.39.5",
+    "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.0.0",
     "globals": "^17.12.0",
     "prettier": "^3.9.9",
     "supabase": "^2.118.0",
-    "typescript": "~5.9.3",
+    "typescript": "~7.0.2",
     "typescript-eslint": "^8.70.1"
   }
 }
