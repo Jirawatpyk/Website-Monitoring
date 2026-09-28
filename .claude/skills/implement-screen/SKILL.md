@@ -14,7 +14,7 @@ argument-hint: <BoardName>
    - AURA component cards you'll use (AURA artifact `project/api/components/<Name>.md`) or the types in `node_modules/@jirawatpyk/aura-react`.
 3. **Plan briefly** (in your reply, not a file): data needed and where it comes from (table/view, RLS as the user), components, client vs server split, states. If data or a table doesn't exist yet, note it — add a migration via `/new-migration` or use a typed loader returning placeholder-free empty data; never hard-code spec sample data.
 4. **Build.**
-   - Page in `apps/web/src/app/(app)/<route>/page.tsx` as a Server Component; interactive parts in small `'use client'` files beside it; reusable pieces in `apps/web/src/components/<area>/`.
+   - Follow the folder structure in `apps/web/CLAUDE.md`: a thin `apps/web/src/app/(app)/<route>/page.tsx` (Server Component) that calls `features/<area>/server.ts` and renders components exported from `features/<area>/index.ts`; the UI in `features/<area>/components/` (small `'use client'` parts where needed); queries / actions / schemas in the feature; UI shared by several features in `src/components/`. ESLint `dxt/feature-boundaries` fails deep imports into another feature.
    - Domain rules come from `@dxt/engine`; formatting from `@dxt/shared` (`formatDay`, `formatTime`, `formatDuration`, `formatPercent`, `TRIGGER_LABELS`). Add a helper there (with a test) rather than formatting inline.
    - Server Actions for mutations: validate with zod, check role, write `audit_log`, hold notifications 10 s for ack/resolve.
    - Eyebrow, title, meta line per §14.15; one primary button; confirms for destructive actions; loading/empty/no-access states.

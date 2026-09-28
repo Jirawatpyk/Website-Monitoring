@@ -4,6 +4,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Major upgrades of the toolchain are done by hand: typescript-eslint doesn't support TS 7 yet,
+    # and eslint-plugin-aura / eslint-config-next are tested on ESLint 9.
+    ignore:
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      - dependency-name: eslint
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@eslint/js'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       aura:
         patterns: ['@jirawatpyk/aura-*']

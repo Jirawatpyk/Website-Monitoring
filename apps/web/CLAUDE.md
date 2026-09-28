@@ -9,10 +9,41 @@ Next.js 16 App Router (Turbopack) on Vercel Pro. UI + every Vercel function.
 - Supabase: `src/lib/supabase/server.ts` (Server Components / actions / routes, RLS as the user), `client.ts` (browser, Realtime), service role only via `createServiceClient` from `@dxt/db/service` (server-only) in cron/ingest code.
 - Env: server values through `serverEnv()` (`src/lib/env.ts`, validated on first use); add every new variable to `.env.example` too.
 
+## Folder structure
+
+```
+src/
+  app/                      routes only, kept thin: page, layout, route, loading, error
+    (app)/<route>/page.tsx  loads data through a feature and renders its components
+    (auth)/  api/  auth/callback/
+  features/<area>/          one folder per domain: overview, sites, incidents, escalation, maintenance,
+                            oncall, expiry, audit, settings, reports, guide …
+    index.ts                public entry, client-safe: components and types other code may use
+    server.ts               public entry, server-only (`import 'server-only'`): queries and actions
+    components/             the feature's UI — one component tree serves desktop and mobile
+    queries.ts              server data loaders (RLS as the signed-in user)
+    actions.ts              Server Actions: zod → role check → audit_log → hold messages 10 s
+    schemas.ts              zod input schemas
+    *.test.ts(x)            tests next to the code
+  components/               UI shared by several features (app-shell, status badges, empty states, time)
+  lib/                      infrastructure: supabase clients, auth, env, audit helper
+  server/                   background work the cron / API routes call: engine runner, notifier dispatch,
+                            probe runner (service-role, never imported by UI)
+  proxy.ts
+```
+
+Rules — enforced by `dxt/feature-boundaries` in ESLint (`scripts/eslint/feature-boundaries.mjs`):
+
+- Another feature is reached only through `@/features/<name>` or `@/features/<name>/server`; never a deep path into its folders.
+- Layers point one way: `app` → `features` → `components` / `lib`. `components/` and `lib/` never import `features/` or `app/`; `features/` and `server/` never import `app/`.
+- Inside a feature, import its own files relatively or by alias — anything goes.
+- Something two features both need moves down to `components/` (UI), `lib/` (infrastructure) or a workspace package (domain rules → `@dxt/engine`, formats → `@dxt/shared`), never sideways.
+- Create a feature folder when its first slice needs it; no empty folders or `.gitkeep`.
+
 ## Building a screen
 
 1. Find the board in `docs/design/screens.md`; read its `.dc.html` and every spec section listed.
-2. Server Component page loads data; interactive parts (anything passing functions: `onClick`, DataTable `render`) go in a small `'use client'` component next to it.
+2. The route's `page.tsx` (Server Component) calls the feature's `server.ts` for data and renders components from its `index.ts`; interactive parts (anything passing functions: `onClick`, DataTable `render`) are small `'use client'` components in `features/<area>/components/`.
 3. AURA components only. Display components and `formatDate` can come from `@jirawatpyk/aura-react/server`.
 4. Styling: AURA props first, then Tailwind utilities that map to AURA tokens (`text-fg-secondary`, `bg-bg-surface`). No inline hex.
 5. Empty, loading (Skeleton) and no-access states per the EmptyStates board. No dead controls: a button works or is disabled with its reason (spec §14.16).

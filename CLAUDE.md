@@ -29,10 +29,12 @@ packages/engine   Pure status engine: DOWN rule, rounds, verification, lifecycle
 packages/probe    One HTTP check + pass/fail/blocked classification, shared by every probe location
 packages/notifier Google Chat / email message builders
 packages/db       Supabase generated types; `@dxt/db/service` = server-only service-role client
-supabase/         config.toml, migrations/, seed.sql (dev sample data only)
-docs/             plan, workflow, decisions, PRD, design spec, canvas snapshot, AURA notes
-scripts/          repo checks (check-plan-coverage.mjs)
+supabase/         config.toml, migrations/, tests/ (pgTAP), seed.sql (dev sample data only)
+docs/             plan, workflow, decisions, runbook, PRD, design spec, canvas snapshot, AURA notes
+scripts/          repo checks (check-plan-coverage.mjs) and the project ESLint rule (eslint/feature-boundaries.mjs)
 ```
+
+Inside `apps/web/src`: `app/` holds thin routes, `features/<area>/` holds each domain's UI, queries, actions and schemas behind two public entries (`index.ts`, `server.ts`), `components/` and `lib/` are shared layers, `server/` runs background work. Full tree and rules: `apps/web/CLAUDE.md` → Folder structure; ESLint `dxt/feature-boundaries` enforces them.
 
 Workspace packages export TypeScript source (`exports: ./src/index.ts`); Next transpiles them, tsup bundles them into the agent. Put logic where it can be reused and tested: pure rules in `packages/engine`, formatting in `packages/shared`, never inside a React component or route handler.
 

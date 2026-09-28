@@ -6,6 +6,7 @@ import prettier from 'eslint-config-prettier';
 import nextPlugin from '@next/eslint-plugin-next';
 import reactHooks from 'eslint-plugin-react-hooks';
 import aura from '@jirawatpyk/aura-tokens/eslint-plugin';
+import dxt from './scripts/eslint/feature-boundaries.mjs';
 
 export default tseslint.config(
   {
@@ -42,6 +43,12 @@ export default tseslint.config(
     },
   },
   { files: ['apps/web/**/*.{ts,tsx}'], ...aura.configs.recommended },
+  // Folder structure: features reached only through their public entry; layers point one way.
+  {
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    plugins: { dxt },
+    rules: { 'dxt/feature-boundaries': 'error' },
+  },
   // Tests may use non-null assertions and loose fixtures.
   {
     files: ['**/*.test.ts'],
