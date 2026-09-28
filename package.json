@@ -21,12 +21,14 @@
     "test:e2e": "pnpm --filter @dxt/web test:e2e",
     "check": "pnpm format:check && pnpm plan:check && pnpm lint && pnpm typecheck && pnpm test",
     "plan:check": "node scripts/check-plan-coverage.mjs",
+    "pr:merge": "node scripts/pr-merge.mjs",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:push:staging": "node scripts/db-staging.mjs push",
     "db:reset:staging": "node scripts/db-staging.mjs reset",
-    "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts"
+    "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts",
+    "prepare": "node scripts/install-git-hooks.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

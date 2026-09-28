@@ -56,12 +56,13 @@ jobs:
 
   # Production migrations are applied here and only here, after a PR is merged to main
   # (docs/workflow.md → Environments). Skips until the production project and its secret exist.
+  # SUPABASE_PROD_DB_URL is a repository secret: environment secrets are ignored on a private repo
+  # on GitHub Free (D-008). Only this job reads it, and only on pushes to main.
   migrate-production:
     needs: check
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: production
     concurrency:
       group: migrate-production
       cancel-in-progress: false
