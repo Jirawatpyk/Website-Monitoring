@@ -13,7 +13,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
-  reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  // Fail the run instead of hanging a CI runner.
+  globalTimeout: isCI ? 5 * 60_000 : 0,
+  reporter: isCI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: 'on-first-retry',
@@ -31,10 +33,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: isCI ? 'pnpm start' : 'pnpm dev',
+    // In CI run Next directly: behind `pnpm start` the Next process didn't exit when Playwright stopped
+    // the server on Linux, and the job hung after the tests.
+    command: isCI ? `node node_modules/next/dist/bin/next start --port ${PORT}` : 'pnpm dev',
     url: `http://localhost:${PORT}/login`,
     reuseExistingServer: !isCI,
     timeout: 180_000,
+    gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
     env: {
       NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321',
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
