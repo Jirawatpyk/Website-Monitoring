@@ -1,7 +1,8 @@
 <!--
-Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 139)
+Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 142)
 Converted to Markdown: 2026-09-28. The Claude Doc is the source of truth — re-export this file when it changes.
-Precedence: on scope, priority, architecture and budget this PRD wins; on screen behaviour, UI copy and formats docs/dxt-monitor-design-spec.md wins.
+Settled conflicts: docs/decisions.md wins over this file and the design spec.
+Precedence: on scope, priority, architecture and budget this PRD wins; on screen behaviour, status logic, UI copy and formats docs/dxt-monitor-design-spec.md wins.
 -->
 
 # PRD — DxT Website Monitoring Platform
@@ -126,7 +127,7 @@ flowchart TD
   B -->|Blocked<br/>403/429/challenge| V[Browser verification<br/>Playwright]
   V -->|Page loads + keyword| OKN[OK + note]
   V -->|Fails| DOWN
-  V -->|Verifier unavailable| K[Keep status + alert Admin<br/>over 10 min: PROBLEM]
+  V -->|Verifier unavailable| K["PROBLEM (unverified)<br/>+ alert Admin · retry every round"]
 ```
 
 **รอบ (round)** = ผลล่าสุดของแต่ละ location ที่เข้ามาภายใน time window — Tier 1: 90 วินาที, Tier 2–3: interval + 30 วินาที เพราะ probe บน Vercel Cron กับ probe Bangkok รันไม่ sync กัน location ที่ไม่มีผลใน window ถูกตัดออกจากการโหวต; เหลือ < 2 location → ไม่เปลี่ยนสถานะ + alert Admin
@@ -142,7 +143,7 @@ flowchart TD
 - Timeout 20 วินาทีต่อหน้า, ใช้ Chromium ปกติ (ไม่ใช้ stealth plugin — ถ้า browser ปกติโดนบล็อก ผู้ใช้จริงก็อาจโดนด้วย ควรเป็น PROBLEM ไม่ใช่ถูกซ่อน)
 - สูงสุด 3 sessions พร้อมกัน (พอสำหรับ 17 เว็บบน VPS 2 GB)
 - Screenshot เก็บใน Supabase Storage 30 วัน แนบกับ incident
-- ใช้เฉพาะกรณี blocked — ไม่อยู่ใน critical path ของ hard fail (สำหรับ DOWN จาก hard fail verifier แค่ถ่าย screenshot เป็นหลักฐานแบบ async); verifier ล่มขณะเว็บ blocked → คงสถานะเดิม + alert Admin, blocked ต่อเนื่อง > 10 นาทีโดยยืนยันไม่ได้ → PROBLEM (unverified)
+- ใช้เฉพาะกรณี blocked — ไม่อยู่ใน critical path ของ hard fail (สำหรับ DOWN จาก hard fail verifier แค่ถ่าย screenshot เป็นหลักฐานแบบ async); verifier ล่มขณะเว็บ blocked → PROBLEM (unverified) ทันที + alert Admin เรื่อง verifier และตรวจซ้ำทุกรอบ — ไม่มีช่วงรอ 10 นาที เพราะเมื่อยืนยันไม่ได้ ระบบต้องไม่แสดงว่าเว็บ OK (ตาม design spec §6 และ board StatusModel)
 - Phase 0: ยิง Tubtong และ Cando Asia ด้วย HTTP ปกติเทียบ Playwright เพื่อเก็บ signature ของ challenge page จริง
 
 **PROBLEM triggers**
@@ -416,7 +417,7 @@ incidents.state = unacked / escalated / acknowledged / monitoring / needs_root_c
 
 - [ ] Staging site ที่บังคับให้คืน 200 / 500 / timeout / 403-challenge / keyword หาย / cert ใกล้หมด ได้ตามสั่ง — ทดสอบทุก status path
 - [ ] ปิด probe 1 location → ต้องไม่เกิด false DOWN และ Admin ได้ heartbeat alert
-- [ ] ปิด browser verifier → เว็บทดสอบที่ hard fail ต้องยังขึ้น DOWN ตามเวลา; เว็บที่ blocked คงสถานะ + Admin ได้ alert และเกิน 10 นาทีเป็น PROBLEM (unverified)
+- [ ] ปิด browser verifier → เว็บทดสอบที่ hard fail ต้องยังขึ้น DOWN ตามเวลา; เว็บที่ blocked ขึ้น PROBLEM (unverified) ทันที + Admin ได้ alert เรื่อง verifier
 - [ ] Disable Vercel Cron → Healthchecks.io แจ้ง 2 คน และ VPS watchdog ส่ง alert เอง
 - [ ] ไม่ ack → escalation ไล่ครบ L0–L3 ตามเวลา
 - [ ] UAT กับ owner 2 รอบ: ack, mute, maintenance บนมือถือ

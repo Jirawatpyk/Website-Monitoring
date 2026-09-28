@@ -6,7 +6,7 @@ argument-hint: <BoardName>
 
 # Implement screen: $ARGUMENTS
 
-1. **Locate.** Find `$ARGUMENTS` in `docs/design/screens.md` → route, phase, spec sections, PRD FRs. If its phase is later than the current work (P1/P2 while P0 is open), say so and confirm before building. If it's a "Not a route" board, implement it in the package named there instead.
+1. **Locate.** Find `$ARGUMENTS` in `docs/design/screens.md` → route, phase, slice, spec sections, PRD FRs. Screens are built inside their slice: if no `/slice` is in progress for that slice, or its dependencies aren't Done in `docs/implementation-plan.md`, say so and confirm before building. If it's a "Not a route" board, implement it in the package named there instead.
 2. **Read the sources.**
    - `docs/design/canvas/$ARGUMENTS.dc.html` — layout, exact copy, every state in `renderVals()`, which `Aura.<Component>` sits where. The matching mobile board too (M-prefix), since the route is responsive.
    - Every spec section listed, plus §11, §13, §14.15–17. Later sections win.
@@ -18,5 +18,5 @@ argument-hint: <BoardName>
    - Domain rules come from `@dxt/engine`; formatting from `@dxt/shared` (`formatDay`, `formatTime`, `formatDuration`, `formatPercent`, `TRIGGER_LABELS`). Add a helper there (with a test) rather than formatting inline.
    - Server Actions for mutations: validate with zod, check role, write `audit_log`, hold notifications 10 s for ack/resolve.
    - Eyebrow, title, meta line per §14.15; one primary button; confirms for destructive actions; loading/empty/no-access states.
-5. **Verify.** `pnpm check`. Run `pnpm dev` and look at the route in the preview browser at 390, 820 and 1440 px, light and dark. Then run the `spec-checker` agent on the board and fix what it finds.
+5. **Verify.** `pnpm check`. Run `pnpm dev` and look at the route in the preview browser at 390, 820 and 1440 px, light and dark. Then run the `spec-checker` agent on the board and fix what it finds. When the slice is complete, flip the page's nav item to `live: true` in `apps/web/src/components/app-shell/nav.tsx`.
 6. **Report** what was built, what's stubbed or waiting on data, and anything in the spec that was ambiguous.

@@ -6,6 +6,7 @@ Local stack: `pnpm db:start` (Docker). Migrations in `migrations/`, applied in f
 - Every table: `id uuid primary key default gen_random_uuid()`, `created_at`, `updated_at` (trigger), **RLS enabled in the same migration** with policies per role (PRD §3): admin all; responder own sites (+ Tier 1 while on call); stakeholder read + client updates for own clients; viewer read-only.
 - Enums mirror `packages/shared/src/domain.ts` — change both together.
 - `check_results`: monthly partitions, 90-day retention via pg_cron; `check_rollups` kept 2 years; `audit_log` append-only (no UPDATE/DELETE policies, revoke from `authenticated`).
+- Every table's policies get pgTAP tests in `supabase/tests/` (`pnpm exec supabase test db`): allowed and refused access per role.
 - After a schema change run `pnpm db:types` and commit `packages/db/src/database.types.ts`.
 - `seed.sql` is dev sample data from the design spec; never production data.
 - `auto_expose_new_tables = false`: every new table needs explicit `grant … to authenticated` (and RLS) or the API can't see it.

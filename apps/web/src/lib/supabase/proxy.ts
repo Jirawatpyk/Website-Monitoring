@@ -2,17 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@dxt/db';
 import { isAllowedEmail } from '@dxt/shared';
-
-/**
- * Paths reachable without a session, matched per path segment (`/login` matches `/login` and
- * `/login/…`, never `/login-x`). Each API route listed here checks its own bearer token; any new
- * `/api/*` route needs a session unless it is added here on purpose.
- */
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/status', '/api/cron', '/api/ingest', '/api/jobs'];
-
-function isPublic(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
+import { isPublic } from '@/lib/auth/public-paths';
 
 /**
  * Refreshes the Supabase session cookie on every request, sends signed-out people to /login, and

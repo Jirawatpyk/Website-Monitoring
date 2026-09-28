@@ -17,6 +17,13 @@ Next.js 16 App Router (Turbopack) on Vercel Pro. UI + every Vercel function.
 4. Styling: AURA props first, then Tailwind utilities that map to AURA tokens (`text-fg-secondary`, `bg-bg-surface`). No inline hex.
 5. Empty, loading (Skeleton) and no-access states per the EmptyStates board. No dead controls: a button works or is disabled with its reason (spec §14.16).
 6. Check 390 / 820 / 1440 px, light and dark (`pnpm dev`, then the preview browser).
+7. When the slice that owns the page is done, flip its item to `live: true` in `src/components/app-shell/nav.tsx` (each item names its slice). Screens are built inside a slice — start with `/slice <ID>`, not on their own.
+
+## Testing
+
+- Unit / component tests: `src/**/*.test.ts(x)` with Vitest + Testing Library in jsdom (`vitest.config.ts`, `test/setup.ts` stubs `matchMedia`, `ResizeObserver` and `server-only`). Run `pnpm --filter @dxt/web test`.
+- E2E: `e2e/*.spec.ts` with Playwright, projects `desktop` (1440) and `mobile` (390). `pnpm test:e2e` starts `pnpm dev` on :3500 (or reuses it) with placeholder Supabase values — enough for signed-out flows; signed-in flows need `pnpm db:start` and a seeded user.
+- `src/components/app-shell/nav.test.ts` fails if a nav item links to a page that doesn't exist — flip `live` only with the page.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

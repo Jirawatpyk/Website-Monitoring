@@ -4,16 +4,18 @@ Website monitoring and incident automation for the 17 sites DxT runs: checks eve
 
 ## Sources of truth — read before building anything
 
-| Doc                                  | Governs                                                      |
-| ------------------------------------ | ------------------------------------------------------------ |
-| `docs/decisions.md`                  | Settled PRD-vs-spec conflicts (D-001…) — wins over both      |
-| `docs/prd.md`                        | Scope, priority (P0/P1/P2), architecture, data model, budget |
-| `docs/dxt-monitor-design-spec.md`    | Screen behaviour, statuses, escalation, UI copy, formats     |
-| `docs/design/screens.md`             | Canvas board → route → phase → governing spec sections       |
-| `docs/design/canvas/<Board>.dc.html` | Exact layout, copy and states of each of the 44 boards       |
-| `docs/design/aura.md`                | How this project uses the AURA design system                 |
+| Doc                                  | Governs                                                       |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `docs/implementation-plan.md`        | What to build next: slices, dependencies, "Done when", status |
+| `docs/workflow.md`                   | How a slice moves from branch to Done; Definition of Done     |
+| `docs/decisions.md`                  | Settled PRD-vs-spec conflicts (D-001…) — wins over both       |
+| `docs/prd.md`                        | Scope, priority (P0/P1/P2), architecture, data model, budget  |
+| `docs/dxt-monitor-design-spec.md`    | Screen behaviour, statuses, escalation, UI copy, formats      |
+| `docs/design/screens.md`             | Canvas board → route → phase → governing spec sections        |
+| `docs/design/canvas/<Board>.dc.html` | Exact layout, copy and states of each of the 44 boards        |
+| `docs/design/aura.md`                | How this project uses the AURA design system                  |
 
-**Precedence:** `docs/decisions.md` (settled conflicts, D-xxx) wins over both. Then: on screen behaviour, status logic, UI copy and formats the design spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. Inside the spec, later sections override earlier ones: §14 → §15 → §16 → §17–18. If two sources still conflict, stop and ask — don't pick one silently; record the answer as a new decision.
+**Precedence:** `docs/decisions.md` (settled conflicts, D-xxx) wins over everything. Then: on screen behaviour, status logic, UI copy and formats the design spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. The canvas boards give layout, exact copy and states; where a board and the spec text disagree on behaviour, the spec wins (spec §0: the canvas shows how it looks, the spec says how it behaves). Inside the spec, later sections override earlier ones: §14 → §15 → §16 → §17–18. If two sources still conflict, stop and ask — don't pick one silently; record the answer as a new decision.
 
 Sample data in the spec and on the canvas (owners, INC-0142, uptime figures, "Tao") is for mockups and tests only; never hard-code it into product code. Items tagged "Proposal · pending CEO" (L2 CEO page, Twilio voice) are built behind config, off by default.
 
@@ -28,7 +30,8 @@ packages/probe    One HTTP check + pass/fail/blocked classification, shared by e
 packages/notifier Google Chat / email message builders
 packages/db       Supabase generated types; `@dxt/db/service` = server-only service-role client
 supabase/         config.toml, migrations/, seed.sql (dev sample data only)
-docs/             PRD, design spec, canvas snapshot, AURA notes
+docs/             plan, workflow, decisions, PRD, design spec, canvas snapshot, AURA notes
+scripts/          repo checks (check-plan-coverage.mjs)
 ```
 
 Workspace packages export TypeScript source (`exports: ./src/index.ts`); Next transpiles them, tsup bundles them into the agent. Put logic where it can be reused and tested: pure rules in `packages/engine`, formatting in `packages/shared`, never inside a React component or route handler.
@@ -39,8 +42,10 @@ Workspace packages export TypeScript source (`exports: ./src/index.ts`); Next tr
 pnpm install
 pnpm dev                 # web on http://localhost:3500
 pnpm dev:agent           # VPS agent (needs apps/vps-agent/.env)
-pnpm check               # lint + typecheck + test — run before saying work is done
-pnpm test                # Vitest in every package that has tests
+pnpm check               # format + plan coverage + lint + typecheck + test — run before saying work is done
+pnpm plan:check          # every FR, board, table and go-live test maps to one slice
+pnpm test                # Vitest in every package that has tests (web: jsdom + Testing Library)
+pnpm test:e2e            # Playwright against the web app, desktop 1440 + mobile 390 (starts `pnpm dev` if needed)
 pnpm --filter @dxt/engine test:watch
 pnpm build
 pnpm db:start | db:stop | db:reset | db:types   # local Supabase (Docker); db:types regenerates packages/db types
@@ -58,12 +63,24 @@ pnpm db:start | db:stop | db:reset | db:types   # local Supabase (Docker); db:ty
 - **Undo**: ack and resolve hold Chat, email and webhooks for 10 s (`notifications.hold_until`).
 - **Tests**: engine rules get table-driven Vitest cases taken from the spec's examples (INC-0142 etc.). A behaviour change without a test is not done.
 - **Mobile**: every screen works at 390 px; touch targets ≥ 44 px. Check 390 / 820 / 1440, light and dark.
-- **Phase gating**: build P0 (MVP) first; don't start P1/P2 screens unless asked.
-- **Git**: branch from `main` (`feat/…`, `fix/…`), Conventional Commits, never commit `.env*` files except `.env.example`.
+- **Work slice by slice** (`docs/implementation-plan.md`, `docs/workflow.md`): one slice per branch and PR; don't start a slice whose dependencies aren't Done; a slice is Done only when every "Done when" line has evidence. Nav items stay hidden (`live: false`) until their slice ships the page.
+- **Git**: branch `slice/<ID>-<name>` from `main` (`fix/…` for hotfixes), Conventional Commits with the slice as scope (`feat(S02): …`), never commit `.env*` files except `.env.example`. Push and PRs only when asked.
 
 ## Project skills and agents
 
+Skills:
+
+- `/slice <ID>` — start or continue a slice: check dependencies, branch, load its sources, plan, build.
+- `/slice-review <ID>` — run the slice's reviewers, collect evidence per "Done when" line, update its status.
 - `/implement-screen <Board>` — build one canvas board as a route, following screens.md, the spec and AURA.
 - `/new-migration <name>` — add a Supabase migration with RLS and regenerate types.
 - `/engine-case <rule>` — add a table-driven engine test from a spec example.
-- Agents: `spec-checker` (screen vs spec + board), `engine-reviewer` (status/lifecycle logic), `security-reviewer` (RLS, auth, secrets).
+
+Agents (read-only reviewers; which one runs when is in `docs/workflow.md`):
+
+- `spec-checker` — a screen vs its board and the spec.
+- `engine-reviewer` — status, lifecycle, escalation and notification timing.
+- `message-checker` — Chat / email / digest / webhook content vs ChatAlert, EmailAlert, WeeklySummary.
+- `security-reviewer` — RLS, auth, secrets, API surface, the VPS.
+- `db-reviewer` — tables, indexes, partitions, retention, rollups, query plans.
+- `slice-verifier` — whether a slice's "Done when" lines are really met.

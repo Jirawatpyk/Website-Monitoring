@@ -13,8 +13,11 @@ Check:
 - DOWN rule (spec §6): ≥ 2 of 3 locations hard-fail on two checks in a row; the second is the immediate ~30 s recheck; hard fails never wait for the verifier; only the primary monitor can make a site DOWN, others cap at PROBLEM.
 - Blocked → browser verifier: loads + keyword → OK with note; fails → DOWN; unavailable → PROBLEM (unverified) at once + Admin told (D-001 in `docs/decisions.md`).
 - Client-update track: Tier 1 DOWN reaching 15 min (`>=`) from the first failed check (D-002).
+- PROBLEM passes Monitoring / Needs root cause and ends at Resolved (D-003); relapse inside an open incident rejoins it, escalation keeps its original clock, 3rd change in 30 min → flapping (D-004).
 - `docs/decisions.md` records settled PRD-vs-spec conflicts; it wins over both.
-- Round window (Tier 1: 90 s; Tier 2–3: interval + 30 s), < 2 locations → no status change + alert Admin; faulty-location exclusion (> 50% of sites failing in a round).
+- The immediate recheck is evaluated with `after` = first failing check time; a location that fails > 50% of sites is excluded only when it is the sole such location.
+- Response hours also skip company holidays (PRD §4).
+- Round window (Tier 1: 90 s; Tier 2–3: interval + 30 s), < 2 locations → no status change + alert Admin.
 - Lifecycle (spec §15.4) and the resolve gate: OK 2 rounds + client update (required only when the track fired, §16.2) + root cause ("Unknown" doesn't count). DOWN never auto-resolves; only < 5 min unacked PROBLEM does.
 - Escalation (spec §8, §14.1, §15.5): ack stops L1–L2 but not the client-update track nor the Tier 1 L3 FYI; Tier 2–3 timers pause outside response hours and resume 09:00; L1 = backup + Tao minus anyone already paged.
 - Mute stops new alerts only and is never an ack (§15.1). Undo holds Chat/email/webhooks 10 s.
