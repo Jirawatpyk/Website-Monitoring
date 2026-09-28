@@ -70,7 +70,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   5. Captured Tubtong / Cando block responses (status, headers, body sample) are saved under `docs/phase0/` for `packages/probe` challenge signatures.
   6. Pushing to `staging` deploys `dxt-monitor-staging` to its production URL, and its Vercel cron logs show `/api/cron/engine` called every minute (401 / 501 responses are expected until S02a); pushing a slice branch builds nothing on the staging project.
   7. The Google OAuth client lists both Supabase callbacks, and each Supabase project's Redirect URLs list matches the URLs above (checked by Tao).
-  8. `pnpm db:push:staging -- --dry-run` against the empty staging database lists migrations 0001–0002 and exits 0; then `pnpm db:push:staging` applies them (output in the S00 notes) — the guarded scripts are proven before S02a needs them.
+  8. `pnpm db:push:staging --dry-run` against the empty staging database lists migrations 0001–0002 and exits 0; then `pnpm db:push:staging` applies them (output in the S00 notes) — the guarded scripts are proven before S02a needs them.
 - **Review:** Tao sign-off; no code review.
 
 ## Phase 1 — MVP, P0

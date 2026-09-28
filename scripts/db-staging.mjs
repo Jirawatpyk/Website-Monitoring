@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Apply migrations to (or rebuild) the STAGING Supabase database without `supabase link`.
 //
-//   pnpm db:push:staging [-- --dry-run] → supabase db push  --db-url <staging>
+//   pnpm db:push:staging [--dry-run] → supabase db push  --db-url <staging>
 //   pnpm db:reset:staging   → supabase db reset --db-url <staging>   (drops everything, reapplies, seeds)
 //
 // The connection string comes from `.env.staging.local` (never committed; template:
@@ -37,7 +37,9 @@ export function assertStagingUrl(dbUrl, stagingRef, prodRef) {
 /** Extra flags a caller may pass through; anything else is refused. */
 const ALLOWED_FLAGS = { push: new Set(['--dry-run']), reset: new Set() };
 
-export function buildArgs(command, extra, dbUrl) {
+export function buildArgs(command, rawExtra, dbUrl) {
+  // pnpm (v7+) forwards a `--` separator to the script: `pnpm db:push:staging -- --dry-run` → ['--', '--dry-run'].
+  const extra = rawExtra[0] === '--' ? rawExtra.slice(1) : rawExtra;
   const bad = extra.filter((flag) => !ALLOWED_FLAGS[command]?.has(flag));
   if (bad.length) throw new Error(`Unsupported option(s) for ${command}: ${bad.join(' ')}`);
   return ['db', command, '--db-url', dbUrl, ...extra];
