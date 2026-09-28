@@ -11,7 +11,7 @@
 
 | ID | Slice | Phase | Size | FRs | Depends on | PRD week | Status |
 |---|---|---|---|---|---|---|---|
-| S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Todo |
+| S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | In progress |
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Todo |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Todo |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Todo |
@@ -72,6 +72,11 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   7. The Google OAuth client lists both Supabase callbacks, and each Supabase project's Redirect URLs list matches the URLs above (checked by Tao).
   8. `pnpm db:push:staging --dry-run` against the empty staging database lists migrations 0001–0002 and exits 0; then `pnpm db:push:staging` applies them (output in the S00 notes) — the guarded scripts are proven before S02a needs them.
   9. The OAuth consent screen is Internal, and everyone on the access list has confirmed that their Google Account → 2-Step Verification page says it is required and can't be turned off (D-007); anyone for whom it can be turned off is raised with IT and left off the list.
+- **Notes (evidence as it lands):**
+  - 28 Sep 2026 — CEO decisions memo and Site Registration Checklist created (links in Scope); names are drafts until confirmed. Awaiting the CEO's answers (Done-when 1) and owners' entries (Done-when 2).
+  - 29 Sep 2026 — Supabase: production `dxt-monitor` (ref `lirbdsexmabumgdeaetk`) in the existing Pro organisation, staging `dxt-monitor-staging` (ref `ctxmmrhvrjbkpodpgkqd`) in a separate free organisation, both Singapore. `.env.staging.local` set; repository secret `SUPABASE_PROD_DB_URL` set (D-008).
+  - 29 Sep 2026 — **Done-when 8 ✓**: `pnpm db:push:staging --dry-run` listed `20260928000001_extensions_and_enums.sql` and `20260928000002_signup_domain_hook.sql`; `pnpm db:push:staging` applied both; a second dry run reported "Remote database is up to date."
+  - Production migrations: first `migrate-production` run is expected on the merge of this note (see its CI log).
 - **Review:** Tao sign-off; no code review.
 
 ## Phase 1 — MVP, P0
