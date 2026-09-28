@@ -10,7 +10,8 @@ AURA is the only UI kit. Its full docs live in the [AURA design system](https://
   - `apps/web/src/app/globals.css` declares `@layer theme, base, aura, components, utilities;`, then imports `tailwindcss`, `@jirawatpyk/aura-tokens/tailwind.css` (Tailwind v4 theme **and** `aura.css` tokens) and `@jirawatpyk/aura-react/styles.layer.css` (components inside `@layer aura`). The layer order lets Tailwind utilities override AURA component styles. Never also import `aura.css` or `styles.css` — that duplicates tokens and components outside the layers.
 - `<AuraProvider locale="en" linkComponent={Link}>` in `apps/web/src/app/providers.tsx`. The product UI is English (PRD §9); no Thai locale pack.
 - Tailwind class names map to AURA tokens (`bg-bg-surface`, `text-fg-secondary`, `border-border-default`, `font-display`, `font-mono`).
-- ESLint: `@jirawatpyk/aura-tokens/eslint-plugin` (`aura.configs.recommended`) fails the lint on any hard-coded colour.
+- ESLint: `@jirawatpyk/aura-tokens/eslint-plugin` (`aura.configs.recommended`) fails the lint on any hard-coded colour, and the project rule `dxt/no-hardcoded-design-values` (`scripts/eslint/design-tokens.mjs`) on Tailwind arbitrary values with a literal length or colour (`p-[13px]`, `bg-[#fff]`, `z-[99]`) and on literal lengths or colours in `style={{…}}`.
+- Tokens to use instead: spacing `*-aura-0…16` (4 px grid; the Tailwind scale `p-1…p-16` is the same grid), radius `rounded-aura-xs…2xl|full`, shadow `shadow-aura-enterprise|overlay`, z-index `var(--aura-z-menu|dialog|bar|toast|tooltip)`, sizes `var(--aura-button-height)` etc. (`@jirawatpyk/aura-tokens/tokens.json`).
 - Server Components: display components (Card, Badge, StatusPill, Alert, EmptyState, Icon) and helpers (`formatDate`, `statusTone`) come from `@jirawatpyk/aura-react/server`.
 
 ## Rules

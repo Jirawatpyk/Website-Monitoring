@@ -35,3 +35,8 @@ Thumbs.db
 # claude code — personal settings stay local
 .claude/settings.local.json
 CLAUDE.local.md
+
+# Downloaded credentials (Google OAuth client JSON, service-account keys) — never commit
+client_secret*.json
+*service-account*.json
+*credentials*.json

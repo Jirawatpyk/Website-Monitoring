@@ -79,5 +79,3 @@ export const featureBoundaries = {
     };
   },
 };
-
-export default { rules: { 'feature-boundaries': featureBoundaries } };
