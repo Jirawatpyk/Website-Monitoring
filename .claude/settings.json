@@ -87,8 +87,6 @@
       "Bash(pnpm --filter * exec *)",
       "Bash(pnpm db:reset)",
       "Bash(pnpm exec supabase db *)",
-      "Bash(pnpm exec supabase link *)",
-      "Bash(*supabase db push*)",
       "Bash(vercel *)",
       "PowerShell(git push *)",
       "PowerShell(pnpm add *)",
@@ -96,7 +94,10 @@
       "PowerShell(pnpm --filter * exec *)",
       "PowerShell(pnpm db:reset)",
       "PowerShell(pnpm exec supabase db *)",
-      "PowerShell(*supabase db push*)"
+      "Bash(pnpm db:push:staging)",
+      "Bash(pnpm db:reset:staging)",
+      "PowerShell(pnpm db:push:staging)",
+      "PowerShell(pnpm db:reset:staging)"
     ],
     "deny": [
       "Bash(git push --force *)",
@@ -112,7 +113,16 @@
       "Read(**/.env.test)",
       "Read(**/.env.production)",
       "Read(**/.env.keys)",
-      "Read(supabase/.env)"
+      "Read(supabase/.env)",
+      "Bash(*supabase link*)",
+      "PowerShell(*supabase link*)",
+      "Bash(*supabase db push*)",
+      "PowerShell(*supabase db push*)",
+      "Bash(*supabase db reset --linked*)",
+      "PowerShell(*supabase db reset --linked*)",
+      "Bash(*supabase db reset --db-url*)",
+      "PowerShell(*supabase db reset --db-url*)",
+      "Read(**/.env.staging.local)"
     ]
   },
   "hooks": {

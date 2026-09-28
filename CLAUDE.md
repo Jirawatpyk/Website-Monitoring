@@ -52,6 +52,7 @@ pnpm test:e2e            # Playwright against the web app, desktop 1440 + mobile
 pnpm --filter @dxt/engine test:watch
 pnpm build
 pnpm db:start | db:stop | db:reset | db:types   # local Supabase (Docker); db:types regenerates packages/db types
+pnpm db:push:staging | db:reset:staging          # staging database only (refuses production); asks first
 ```
 
 ## Rules
@@ -67,7 +68,7 @@ pnpm db:start | db:stop | db:reset | db:types   # local Supabase (Docker); db:ty
 - **Tests**: engine rules get table-driven Vitest cases taken from the spec's examples (INC-0142 etc.). A behaviour change without a test is not done. Coverage thresholds live in each package's `vitest.config.ts` (engine 95 / 90 branches; shared, probe, notifier 90 / 85; vps-agent 70 / 60; web logic layers 80 / 75) and only ever go up — never lower one to make a PR pass.
 - **Mobile**: every screen works at 390 px; touch targets ≥ 44 px. Check 390 / 820 / 1440, light and dark.
 - **Work slice by slice** (`docs/implementation-plan.md`, `docs/workflow.md`): one slice per branch and PR; don't start a slice whose dependencies aren't Done; a slice is Done only when every "Done when" line has evidence. Nav items stay hidden (`live: false`) until their slice ships the page.
-- **Git**: branch `slice/<ID>-<name>` from `main` (`fix/…` for hotfixes), Conventional Commits with the slice as scope (`feat(S02a): …`), never commit `.env*` files except `.env.example`. `main` is protected (ruleset "main"): changes land only by PR with CI green and squash merge — never try to push to `main`. `staging` is a throwaway branch deployed by the `dxt-monitor-staging` Vercel project (D-006): push a slice onto it to verify, reset it to `main` after the merge. Push branches and open PRs only when asked.
+- **Git**: branch `slice/<ID>-<name>` from `main` (`fix/…` for hotfixes), Conventional Commits with the slice as scope (`feat(S02a): …`), never commit `.env*` files except `.env.example`. `main` is protected (ruleset "main"): changes land only by PR with CI green and squash merge — never try to push to `main`. `staging` is a throwaway branch deployed by the `dxt-monitor-staging` Vercel project (D-006): push a slice onto it to verify, reset it to `main` after the merge. Staging database: `pnpm db:push:staging` / `pnpm db:reset:staging` only; production migrations only via the CI job `migrate-production`. Never run `supabase link`. Push branches and open PRs only when asked.
 
 ## Project skills and agents
 
