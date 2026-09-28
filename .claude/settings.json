@@ -103,7 +103,9 @@
       "PowerShell(pnpm db:push:staging *)",
       "PowerShell(pnpm db:reset:staging *)",
       "Bash(pnpm pr:merge *)",
-      "PowerShell(pnpm pr:merge *)"
+      "PowerShell(pnpm pr:merge *)",
+      "Edit(.github/workflows/**)",
+      "Edit(.github/actions/**)"
     ],
     "deny": [
       "Bash(git push --force *)",
