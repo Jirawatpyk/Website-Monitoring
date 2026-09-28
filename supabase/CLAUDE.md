@@ -12,4 +12,4 @@ Local stack: `pnpm db:start` (Docker). Migrations in `migrations/`, applied in f
 - `auto_expose_new_tables = false`: every new table needs explicit `grant … to authenticated` (and RLS) or the API can't see it.
 - Sign-up is limited by the `before_user_created` hook (migration 0002). Each environment needs its company domain in `private.allowed_email_domains`; with no row, nobody can sign up.
 - "2-step" is Google Workspace 2-Step Verification, not Supabase MFA — reading a user's enrolment needs the Google Admin SDK (Directory API `isEnrolledIn2Sv`). Open implementation question for the Login/Security boards.
-- Never run `supabase db push` or `db reset --linked` against the hosted project without asking.
+- Hosted projects (`docs/workflow.md` → Environments): the **staging** project takes migrations from the slice branch (`supabase db push`) and may be rebuilt with `db reset --linked` — always ask first and check which project is linked; the **production** project only takes migrations from `main` after merge. Never run `db reset` against production.

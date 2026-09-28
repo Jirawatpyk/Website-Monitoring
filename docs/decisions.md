@@ -19,7 +19,9 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 **Why.** Cron, region pinning and function limits behave exactly as in production, at no extra cost on the Pro team. The every-minute crons also keep the free staging database from pausing.
 
-**Impact.** Plan S00 (second project, build filters, Done-when 6) and S02a / S02b Done-when; `docs/workflow.md` lifecycle and Environments. `vercel.json` needs no change — both projects read the same crons and function regions.
+**Also.** Migrations reach the staging database from the slice branch (`supabase db push`, rebuilt with `db reset --linked` when it drifts); production only from merged `main`. Google sign-in works per environment because the OAuth client lists both Supabase callbacks and each Supabase project allowlists its own app URLs (staging also the PR-preview pattern).
+
+**Impact.** Plan S00 (second project, build filters, OAuth / redirect URLs, Done-when 6–7), S01 Done-when 1 and S02a / S02b Done-when; `docs/workflow.md` lifecycle and Environments. `vercel.json` needs no change — both projects read the same crons and function regions.
 
 ## D-005 — Backups without PITR; staging in a free organisation
 

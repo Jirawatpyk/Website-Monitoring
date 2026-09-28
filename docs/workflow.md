@@ -12,7 +12,7 @@ How work moves from [`implementation-plan.md`](implementation-plan.md) to produc
 | 4. Build | Small commits. Engine rules test-first (`/engine-case`), schema through `/new-migration`, screens through `/implement-screen`. Stop and ask on any source conflict (see [Decisions](#decisions)) | skills |
 | 5. Check | `pnpm check` green locally (format, plan coverage, lint, types, tests) | — |
 | 6. Review | Run the reviewers named in the slice's **Review** line (table below); fix every High / Medium or record why not | agents |
-| 7. Verify | Deploy the slice to staging — `git push --force-with-lease origin HEAD:staging` (asks first) — and collect evidence for each "Done when" line there and locally; `slice-verifier` checks it. Status → `In review` | `/slice-review <ID>` |
+| 7. Verify | Deploy the slice to staging — `git push --force-with-lease origin HEAD:staging` and, if it has migrations, `supabase db push` to the staging project (both ask first) — and collect evidence for each "Done when" line there and locally; `slice-verifier` checks it. Status → `In review` | `/slice-review <ID>` |
 | 8. PR | PR template with the Done-when checklist and its evidence; CI `check` green; review conversations resolved; CODEOWNERS are requested automatically | GitHub |
 | 9. Merge | Squash-merge to `main` → Vercel production deploy. Status → `Done` in the plan (same PR or a follow-up). Reset `staging` to `main` (`git push --force-with-lease origin origin/main:staging`) | `/slice-review` |
 
@@ -66,7 +66,7 @@ The precedence is in the root `CLAUDE.md`: `decisions.md` → design spec (behav
 | Staging | Vercel project `dxt-monitor-staging`, production branch `staging` (D-006) — its crons run every minute | Staging Supabase project in a separate free organisation (D-005; the every-minute crons keep it from pausing) | Done-when checks against the test target |
 | Production | Vercel production from `main` | Production Supabase project (Pro, daily backups kept 7 days, no PITR — D-005) | Real sites after G1 |
 
-Migrations reach staging and production only through the reviewed PR (`supabase db push` asks first). During the PRD §12 parallel run, every production deploy happens inside a maintenance window.
+Migrations: **staging** gets them straight from the slice branch while it is being verified — `pnpm exec supabase link --project-ref <staging-ref>` then `pnpm exec supabase db push` (both ask first). **Production** gets them only from `main` after the PR is merged. The staging database is disposable: when a slice changes a migration that is already on staging, or after `staging` is reset to `main`, rebuild it with `pnpm exec supabase db reset --linked` on the staging project so its schema matches the code again. Never edit a migration that production already has; add a new one. During the PRD §12 parallel run, every production deploy happens inside a maintenance window.
 
 ## Working with Claude Code
 
