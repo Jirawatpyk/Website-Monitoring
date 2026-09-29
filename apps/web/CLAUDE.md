@@ -45,7 +45,7 @@ Rules — enforced by `dxt/feature-boundaries` in ESLint (`scripts/eslint/featur
 1. Find the board in `docs/design/screens.md`; read its `.dc.html` and every spec section listed.
 2. The route's `page.tsx` (Server Component) calls the feature's `server.ts` for data and renders components from its `index.ts`; interactive parts (anything passing functions: `onClick`, DataTable `render`) are small `'use client'` components in `features/<area>/components/`.
 3. AURA components only. Display components and `formatDate` can come from `@jirawatpyk/aura-react/server`.
-4. Styling: AURA props first, then Tailwind utilities that map to AURA tokens (`text-fg-secondary`, `bg-bg-surface`). No inline hex.
+4. Styling: AURA props first, then Tailwind utilities that map to AURA tokens (`text-fg-secondary`, `bg-bg-surface`, `p-aura-4`). No hard-coded colours, spacing, sizes, radii, shadows or z-index — enforced by `dxt/no-hardcoded-design-values` (`scripts/eslint/design-tokens.mjs`).
 5. Empty, loading (Skeleton) and no-access states per the EmptyStates board. No dead controls: a button works or is disabled with its reason (spec §14.16).
 6. Check 390 / 820 / 1440 px, light and dark (`pnpm dev`, then the preview browser).
 7. When the slice that owns the page is done, flip its item to `live: true` in `src/components/app-shell/nav.tsx` (each item names its slice). Screens are built inside a slice — start with `/slice <ID>`, not on their own.

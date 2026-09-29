@@ -31,7 +31,7 @@ packages/notifier Google Chat / email message builders
 packages/db       Supabase generated types; `@dxt/db/service` = server-only service-role client
 supabase/         config.toml, migrations/, tests/ (pgTAP), seed.sql (dev sample data only)
 docs/             plan, workflow, decisions, runbook, PRD, design spec, canvas snapshot, AURA notes
-scripts/          repo checks (check-plan-coverage.mjs) and the project ESLint rule (eslint/feature-boundaries.mjs)
+scripts/          repo checks (check-plan-coverage.mjs, pr-merge.mjs, db-staging.mjs) and the project ESLint plugin `dxt` (eslint/index.mjs: feature-boundaries, design-tokens)
 ```
 
 Inside `apps/web/src`: `app/` holds thin routes, `features/<area>/` holds each domain's UI, queries, actions and schemas behind two public entries (`index.ts`, `server.ts`), `components/` and `lib/` are shared layers, `server/` runs background work. Full tree and rules: `apps/web/CLAUDE.md` → Folder structure; ESLint `dxt/feature-boundaries` enforces them.
