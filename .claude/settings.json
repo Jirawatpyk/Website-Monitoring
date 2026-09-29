@@ -138,7 +138,9 @@
       "PowerShell(git push *:main)",
       "PowerShell(git push *:refs/heads/main)",
       "Bash(gh pr merge *)",
-      "PowerShell(gh pr merge *)"
+      "PowerShell(gh pr merge *)",
+      "Read(**/client_secret*.json)",
+      "Read(**/*service-account*.json)"
     ]
   },
   "hooks": {
