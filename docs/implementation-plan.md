@@ -236,7 +236,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 ### S11 · Client-update track
 
-- **Scope:** FR-20. At Tier 1 DOWN 15 min from the first failed check (D-002) or Tier 2 DOWN 60 min inside response hours: AM mentioned in the thread with a TH / EN draft and a "Client update due" email. Incident card: AM, due time, draft, Mark client updated (who + when), Not needed + reason, Copy draft. Permissions §16.6; locked in the "acknowledge only" state. Feeds the resolve condition and "Client notified".
+- **Scope:** FR-20. At Tier 1 DOWN 15 min from the first failed check (D-002) or Tier 2 DOWN 60 min inside response hours: AM mentioned in the thread with a TH / EN draft and a "Client update due" email. Incident card: AM, due time, draft, Mark client updated (who + when), Not needed + reason, Copy draft. Permissions §16.6 (no "acknowledge only" lock — D-007). Feeds the resolve condition and "Client notified".
 - **Boards:** Incident (client-update card), EmailAlert (Client update) · **Tables:** — (columns on `incidents`)
 - **Depends on:** S08
 - **Done when:**
