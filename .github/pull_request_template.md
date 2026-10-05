@@ -8,7 +8,7 @@
 
 ## Done when — evidence
 
-<!-- One line per "Done when" item of the slice: test name / command, timestamps, screenshot, or "needs manual check" + steps. -->
+<!-- One line per "Done when" item of the slice: test name / command, timestamps, screenshot, `/verify` capture, or "needs manual check" + steps. -->
 
 | #   | Done when | Evidence |
 | --- | --------- | -------- |
