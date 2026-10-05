@@ -11,11 +11,11 @@ How work moves from [`implementation-plan.md`](implementation-plan.md) to produc
 | 3. Plan | Read the slice, its boards (`screens.md`), spec sections, FRs and decisions. For an **L** slice, write the plan in Plan mode and agree it before coding. Status → `In progress` | `/slice` |
 | 4. Build | Small commits. Engine rules test-first (`/engine-case`), schema through `/new-migration`, screens through `/implement-screen`. Stop and ask on any source conflict (see [Decisions](#decisions)) | skills |
 | 5. Check | `pnpm check` green locally (format, plan coverage, lint, types, tests) | — |
-| 6. Review | Run the reviewers named in the slice's **Review** line (table below); fix every High / Medium or record why not | agents |
+| 6. Review | Run the reviewers named in the slice's **Review** line (table below); fix every High (no waivers); fix every Medium or give the reason in the PR | agents |
 | 7. Verify | Deploy the slice to staging — `git push --force-with-lease origin HEAD:staging` and, if it has migrations, `pnpm db:push:staging` (both ask first) — and collect evidence for each "Done when" line there and locally; `slice-verifier` checks it. Status → `In review` | `/slice-review <ID>` |
 | 8. PR | PR template with the Done-when checklist and its evidence; CI `check` green; review conversations resolved; CODEOWNERS are requested automatically | GitHub |
 | 9. Merge | `pnpm pr:merge <number>` (squash, only when CI `check` is green on the head commit — D-008) → Vercel production deploy. Status → `Done` in the plan (same PR or a follow-up). Reset `staging` to `main` (`git push --force-with-lease origin origin/main:staging`) | `/slice-review` |
-| 10. Improve | Five-minute retro (below): what went wrong or slow, and the change that stops it happening again. One line in [`retro.md`](retro.md) | `/slice-review` |
+| 10. Improve | Five-minute retro (below): what went wrong or slow, and the change that stops it happening again. One line in [`retro.md`](retro.md); skip when nothing went wrong | `/slice-review` |
 
 `main` is protected by rules we enforce ourselves (D-008 — the repository is private on GitHub Free, so GitHub doesn't enforce its ruleset "main"): every change arrives by pull request and is squash-merged with `pnpm pr:merge <number>`, which refuses unless the CI `check` job succeeded on the PR's current head commit, the PR targets `main`, isn't a draft, has no conflicts and no requested changes. A PR that changes `.github/workflows/` or `.github/actions/` (files that can read repository secrets) also needs `--workflow-changes-reviewed`, passed only after a human has read those changes. Nobody pushes to `main`: the `pre-push` hook in `.githooks` (installed by `pnpm install`) and `.claude/settings.json` both refuse it, and `gh pr merge` is denied to Claude Code so every merge goes through the script. Resolve review conversations before merging; head branches are deleted after merge. When the second Admin joins (G1) they review every PR before it is merged. If the repository moves to GitHub Pro, the ruleset "main" applies again and becomes the enforcement.
 
@@ -36,6 +36,8 @@ The workflow, the rules and the tooling improve every time something goes wrong,
 1. Enforce it with a tool — ESLint rule, test, type, CI check, Git hook, a deny rule in `.claude/settings.json`, a guard in a script.
 2. Otherwise write it down where it is read at the right moment — `CLAUDE.md` (root or the folder's), a skill, an agent's checklist, the Definition of Done, or a decision in `decisions.md`.
 3. Fix the stale source itself (plan, PRD, spec mirror) rather than adding a note that contradicts it.
+
+**At each gate**, read `retro.md` from top to bottom: a lesson that shows up more than once becomes a rule or a guard (step 1 or 2 above) and its rows are marked as promoted.
 
 **Record it** as one line in [`retro.md`](retro.md): date · what happened · what changed · PR. The change ships in the slice's PR or a small follow-up PR. Nothing is recorded when nothing went wrong.
 
@@ -91,4 +93,4 @@ Migrations: **staging** gets them straight from the slice branch while it is bei
 - Use Plan mode for L slices and for anything touching the engine's state machine.
 - Run independent reviewers as parallel subagents; paste their findings into the PR only as a short summary.
 - Keep the plan the single tracker: don't open GitHub issues for slice tasks unless the team asks for them.
-- If a slice grows past L, split it in the plan (new ID, dependencies, Done-when) before continuing, and run `pnpm plan:check`.
+- If a slice grows past L, split it in the plan (new ID, dependencies, Done-when) before continuing, run `pnpm plan:check`, then start each part with a fresh `/slice <ID>` so its sources and Done-when are loaded again.

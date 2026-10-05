@@ -10,7 +10,7 @@ Sources, highest first: `docs/decisions.md`, then the spec (§16 > §15 > §14 >
 
 Check each event the change touches:
 
-- **Text line**: present before every card and reply; starts with `STATE · site`; @mentions only here as `<users/{id}>`; only the person expected to act (owner by day / on-call at night at L0; L1 = backup + Tao minus anyone already paged); CEO only on Tier 1 L2 (Proposal · pending CEO) and the L3 FYI; no mention on RESOLVED / NOTE.
+- **Text line**: present before every card and reply; starts with `STATE · site`; @mentions only here as `<users/{id}>`; only the person expected to act (owner by day / on-call at night at L0; L1 = backup + Tao minus anyone already paged); CEO only on Tier 1 L2 (approved, D-009 — no pending tag) and the L3 FYI; no mention on RESOLVED / NOTE.
 - **Thread**: one Chat thread per incident (`threadKey` = incident id); replies start with the current state because the first card can't be edited; test alerts in their own "TEST — no action" thread.
 - **Email**: one subject per incident (`site · Tier N · INC-id`), status first in preheader and body, `In-Reply-To` / `References` to the first message, a per-recipient footer saying why they got it, plain-text part, no tracking pixels.
 - **Timing**: ack / resolve / webhook messages held 10 s (`hold_until`) and cancelled on Undo; RECOVERED on the first OK round; client update at 15 min from the first failed check (D-002); outside response hours Tier 2–3 DOWN posts with "timers paused until 09:00", PROBLEM held until 09:00.

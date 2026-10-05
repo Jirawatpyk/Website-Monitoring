@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-009 | 5 Oct 2026 | CEO answers to the decisions memo: **Tier 1 L2 CEO page on by default** (no "Proposal · pending CEO" tag); Twilio voice off for now; interim Admin = Tao only, on-call = Tle | Spec §8 / Escalation board "Proposal · pending CEO"; CLAUDE.md "off by default" |
 | D-008 | 28 Sep 2026 | The repository is **private on GitHub Free**: `main` is guarded by `pnpm pr:merge`, a pre-push hook and Claude Code deny rules; the production DB secret is a repository secret | `docs/workflow.md` ruleset "main" and GitHub environment `production` |
 | D-007 | 28 Sep 2026 | Sign-in: **2-Step Verification is enforced by Google Workspace**, not by the app; accounts are created only for addresses on an **email allowlist** (Internal OAuth client + domain + allowlist) | PRD §3, §9, §12 test 12 and spec §15.2, §16.6–7 "2-step required from 5 Oct, otherwise view + acknowledge only"; plan Q1, Q6 |
 | D-006 | 28 Sep 2026 | Staging is a **second Vercel project** `dxt-monitor-staging` with production branch `staging`; PR previews are for UI only | `docs/workflow.md` "staging = preview deployment" |
@@ -12,6 +13,19 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-009 — CEO answers to the decisions memo (5 Oct 2026)
+
+**Gap.** The spec and the Escalation board tag the Tier 1 L2 CEO page and Twilio voice "Proposal · pending CEO", and `CLAUDE.md` said both are built behind config, off by default, until the CEO decides. The CEO answered the decisions memo on 5 Oct 2026 (recorded in PRD §13).
+
+**Decision.**
+- Tier 1 DOWN with no acknowledgement pages the CEO at L2 (+30 min, @mention + email) and sends the L3 FYI (+60 min). The L2 step is **on by default**; the UI drops the "Proposal · pending CEO" tag and shows it as a normal level.
+- Twilio voice is **not used for now**: built behind config, off ("Configured · off"); Tier 1 after hours is best effort over Chat and email. Who a call would reach (Q3) is decided only if voice is enabled.
+- Interim staffing: Admin = Tao only until a second Admin joins (required before G1); on-call = Tle every week until a rotation of at least three exists (required before G2). Both are changed in the product (Users, On-call) without a new decision.
+
+**Why.** The memo is the CEO's decision record; the spec's tag existed only because the decision was pending.
+
+**Impact.** `CLAUDE.md`, plan S10 scope, `message-checker`; spec-checker must not flag the missing "pending CEO" tag on the Escalation board or in the Tier 1 ladder.
 
 ## D-008 — Private repository on GitHub Free: guard `main` ourselves
 

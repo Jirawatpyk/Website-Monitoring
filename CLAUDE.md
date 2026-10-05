@@ -17,7 +17,7 @@ Website monitoring and incident automation for the 17 sites DxT runs: checks eve
 
 **Precedence:** `docs/decisions.md` (settled conflicts, D-xxx) wins over everything. Then: on screen behaviour, status logic, UI copy and formats the design spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. The canvas boards give layout, exact copy and states; where a board and the spec text disagree on behaviour, the spec wins (spec §0: the canvas shows how it looks, the spec says how it behaves). Inside the spec, later sections override earlier ones: §14 → §15 → §16 → §17–18. If two sources still conflict, stop and ask — don't pick one silently; record the answer as a new decision.
 
-Sample data in the spec and on the canvas (owners, INC-0142, uptime figures, "Tao") is for mockups and tests only; never hard-code it into product code. Items tagged "Proposal · pending CEO" (L2 CEO page, Twilio voice) are built behind config, off by default.
+Sample data in the spec and on the canvas (owners, INC-0142, uptime figures, "Tao") is for mockups and tests only; never hard-code it into product code. The CEO answered the spec's "Proposal · pending CEO" items on 5 Oct 2026 (D-009): the Tier 1 L2 CEO page is approved and on by default, and the pending tag is not shown; Twilio voice stays built behind config, off.
 
 ## Layout
 
@@ -30,7 +30,7 @@ packages/probe    One HTTP check + pass/fail/blocked classification, shared by e
 packages/notifier Google Chat / email message builders
 packages/db       Supabase generated types; `@dxt/db/service` = server-only service-role client
 supabase/         config.toml, migrations/, tests/ (pgTAP), seed.sql (dev sample data only)
-docs/             plan, workflow, decisions, runbook, PRD, design spec, canvas snapshot, AURA notes
+docs/             plan, workflow, decisions, retro log, runbook, PRD, design spec, canvas snapshot, AURA notes, phase0/ captures
 scripts/          repo checks (check-plan-coverage.mjs, pr-merge.mjs, db-staging.mjs) and the project ESLint plugin `dxt` (eslint/index.mjs: feature-boundaries, design-tokens)
 ```
 
@@ -68,6 +68,7 @@ pnpm db:push:staging | db:reset:staging          # staging database only (refuse
 - **Undo**: ack and resolve hold Chat, email and webhooks for 10 s (`notifications.hold_until`).
 - **Tests**: engine rules get table-driven Vitest cases taken from the spec's examples (INC-0142 etc.). A behaviour change without a test is not done. Coverage thresholds live in each package's `vitest.config.ts` (engine 95 / 90 branches; shared, probe, notifier 90 / 85; vps-agent 70 / 60; web logic layers 80 / 75) and only ever go up — never lower one to make a PR pass.
 - **Mobile**: every screen works at 390 px; touch targets ≥ 44 px. Check 390 / 820 / 1440, light and dark.
+- **Improve when something goes wrong** (`docs/workflow.md` → Continuous improvement): when you get something wrong or against a rule, a reviewer repeats a finding, CI fails for a preventable reason, or a source is stale, propose the strongest fix — a tool guard (lint, test, CI, hook, deny rule) before a written rule — and add one line to `docs/retro.md`. Reviewer findings: High always fixed; Medium fixed or justified in the PR.
 - **Work slice by slice** (`docs/implementation-plan.md`, `docs/workflow.md`): one slice per branch and PR; don't start a slice whose dependencies aren't Done; a slice is Done only when every "Done when" line has evidence. Nav items stay hidden (`live: false`) until their slice ships the page.
 - **Git**: branch `slice/<ID>-<name>` from `main` (`fix/…` for hotfixes), Conventional Commits with the slice as scope (`feat(S02a): …`), never commit `.env*` files except `.env.example`. `main` is protected by our own guards (D-008 — private repo on GitHub Free, so GitHub doesn't enforce the ruleset): changes land only by PR, merged with `pnpm pr:merge <number>` once CI `check` is green — never push to `main`, never `gh pr merge` directly. `staging` is a throwaway branch deployed by the `dxt-monitor-staging` Vercel project (D-006): push a slice onto it to verify, reset it to `main` after the merge. Staging database: `pnpm db:push:staging` / `pnpm db:reset:staging` only; production migrations only via the CI job `migrate-production`. Never run `supabase link`. Push branches and open PRs only when asked.
 
@@ -76,7 +77,7 @@ pnpm db:push:staging | db:reset:staging          # staging database only (refuse
 Skills:
 
 - `/slice <ID>` — start or continue a slice: check dependencies, branch, load its sources, plan, build.
-- `/slice-review <ID>` — run the slice's reviewers, collect evidence per "Done when" line, update its status.
+- `/slice-review <ID>` — run the slice's reviewers, collect evidence per "Done when" line, update its status, then a short retro.
 - `/implement-screen <Board>` — build one canvas board as a route, following screens.md, the spec and AURA.
 - `/new-migration <name>` — add a Supabase migration with RLS and regenerate types.
 - `/engine-case <rule>` — add a table-driven engine test from a spec example.
