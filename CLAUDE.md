@@ -77,10 +77,12 @@ pnpm db:push:staging | db:reset:staging          # staging database only (refuse
 Skills:
 
 - `/slice <ID>` — start or continue a slice: check dependencies, branch, load its sources, plan, build.
-- `/slice-review <ID>` — run the slice's reviewers, collect evidence per "Done when" line, update its status, then a short retro.
+- `/slice-review <ID>` — run `/code-review`, the slice's reviewers and `/verify`, collect evidence per "Done when" line, update its status, then a short retro.
 - `/implement-screen <Board>` — build one canvas board as a route, following screens.md, the spec and AURA.
 - `/new-migration <name>` — add a Supabase migration with RLS and regenerate types.
 - `/engine-case <rule>` — add a table-driven engine test from a spec example.
+
+Built-in: `/code-review high` on every slice's diff (general bugs; the agents below check the domain). `/verify` runs the app at the change's surface and captures runtime evidence; `slice-verifier` checks the evidence covers every Done-when line. Both run inside `/slice-review`.
 
 Agents (read-only reviewers; which one runs when is in `docs/workflow.md`):
 
