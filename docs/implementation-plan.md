@@ -76,7 +76,9 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - 28 Sep 2026 — CEO decisions memo and Site Registration Checklist created (links in Scope); names are drafts until confirmed. Awaiting the CEO's answers (Done-when 1) and owners' entries (Done-when 2).
   - 29 Sep 2026 — Supabase: production `dxt-monitor` (ref `lirbdsexmabumgdeaetk`) in the existing Pro organisation, staging `dxt-monitor-staging` (ref `ctxmmrhvrjbkpodpgkqd`) in a separate free organisation, both Singapore. `.env.staging.local` set; repository secret `SUPABASE_PROD_DB_URL` set (D-008).
   - 29 Sep 2026 — **Done-when 8 ✓**: `pnpm db:push:staging --dry-run` listed `20260928000001_extensions_and_enums.sql` and `20260928000002_signup_domain_hook.sql`; `pnpm db:push:staging` applied both; a second dry run reported "Remote database is up to date."
-  - Production migrations: first `migrate-production` run is expected on the merge of this note (see its CI log).
+  - 29 Sep 2026 — Production migrations: the first `migrate-production` run applied 0001–0002 on merge of PR #12. Google OAuth client (Internal) created; Vercel `dxt-monitor` (monitor.dxtspace.com) and `dxt-monitor-staging` (monitor-staging.dxtspace.com) deployed; Chat spaces + webhooks, Resend (`notify.dxtspace.com`) and Healthchecks set up — **Done-when 4 ✓** (webhook tests).
+  - 5 Oct 2026 — **Done-when 2 ✓**: Site Registration Checklist filled from the OMG Group Asia Systems Audit Tracker and checked against the live sites; all 17 marked checked (DxT follows the live site: Wix, active). Credential storage locations still to be added by owners.
+  - 5 Oct 2026 — **Done-when 5 ✓**: block captures in `docs/phase0/` (`waf-captures.md`): Bangkok Airways 403 from Akamai (allowlist request deferred), Cando Asia filters some UAs but passes `DxT-Monitor/1.0`, Tubtong not blocked from a Thai IP. Re-check from Vercel IPs in S02a.
 - **Review:** Tao sign-off; no code review.
 
 ## Phase 1 — MVP, P0
