@@ -1,5 +1,5 @@
 <!--
-Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 148)
+Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 168)
 Converted to Markdown: 2026-09-28. The Claude Doc is the source of truth — re-export this file when it changes.
 Settled conflicts: docs/decisions.md wins over this file and the design spec.
 Precedence: on scope, priority, architecture and budget this PRD wins; on screen behaviour, status logic, UI copy and formats docs/dxt-monitor-design-spec.md wins.
@@ -444,22 +444,22 @@ incidents.state = unacked / escalated / acknowledged / monitoring / needs_root_c
 
 **Decisions needed (จาก CEO)**
 
-- [ ] Approve Tier ของ 17 เว็บ (Section 4) — โดยเฉพาะเว็บที่ต้อง response 24/7
-- [ ] Primary / Backup owner ของแต่ละเว็บ และใครอยู่ใน on-call rotation
-- [ ] CEO ต้องการรับ DOWN alert ทันที หรือเมื่อ escalate ถึง L2 เท่านั้น — ข้อเสนอปัจจุบัน: เฉพาะ Tier 1 ที่ L2 (+30 นาที) และ FYI ที่ L3 หลัง ack (ไม่โทร); Tier 2–3 เห็นแค่ใน digest
-- [ ] อนุมัติ Twilio voice call สำหรับ Tier 1 DOWN ที่ไม่มี ack ถึง L2 (~$23–26/เดือน) — ทางเลือก: เก็บสถิติ 30 วันแรกก่อนตัดสิน; ถ้าไม่อนุมัติ Tier 1 นอกเวลาทำการเป็น best effort
-- [ ] อนุมัติเพดานงบ infra $60/เดือน: Supabase project ใหม่ ~$10 (Micro compute), VPS ไทย 2 GB ~$10–25, Twilio ~$23–26 ถ้าอนุมัติ — Vercel Pro, Google Chat, Healthchecks.io (free) และ Resend (free) ไม่มีค่าใช้จ่ายเพิ่ม
-- [ ] จะให้ลูกค้าเห็น status page / uptime report ไหม และจะขายเป็นบริการ managed monitoring หรือไม่
+- [x] Approve Tier ของ 17 เว็บ (Section 4) — โดยเฉพาะเว็บที่ต้อง response 24/7 → ตัดสินแล้ว 5 ต.ค. 2026: อนุมัติตามเสนอ (Tier 1 = 5 เว็บ, Tier 2 = 9, Tier 3 = 3)
+- [x] Primary / Backup owner ของแต่ละเว็บ และใครอยู่ใน on-call rotation → ตัดสินแล้ว 5 ต.ค. 2026: owner / backup ตาม Site Registration Checklist; ระยะแรก on-call = Tle และ Admin = Tao คนเดียว — ต้องมี Admin คนที่ 2 ก่อนจบ Phase 1 และเวรหมุน ≥ 3 คนก่อนจบ Phase 2
+- [x] CEO ต้องการรับ DOWN alert ทันที หรือเมื่อ escalate ถึง L2 เท่านั้น — ข้อเสนอปัจจุบัน: เฉพาะ Tier 1 ที่ L2 (+30 นาที) และ FYI ที่ L3 หลัง ack (ไม่โทร); Tier 2–3 เห็นแค่ใน digest → ตัดสินแล้ว 5 ต.ค. 2026: อนุมัติตามข้อเสนอ
+- [x] อนุมัติ Twilio voice call สำหรับ Tier 1 DOWN ที่ไม่มี ack ถึง L2 (~$23–26/เดือน) — ทางเลือก: เก็บสถิติ 30 วันแรกก่อนตัดสิน; ถ้าไม่อนุมัติ Tier 1 นอกเวลาทำการเป็น best effort → ตัดสินแล้ว 5 ต.ค. 2026: ยังไม่ใช้ Twilio (เก็บไว้อนาคต) — Tier 1 นอกเวลาทำการเป็น best effort
+- [x] อนุมัติเพดานงบ infra $60/เดือน: Supabase project ใหม่ ~$10 (Micro compute), VPS ไทย 2 GB ~$10–25, Twilio ~$23–26 ถ้าอนุมัติ — Vercel Pro, Google Chat, Healthchecks.io (free) และ Resend (free) ไม่มีค่าใช้จ่ายเพิ่ม → ตัดสินแล้ว 5 ต.ค. 2026: อนุมัติเพดาน $60/เดือน (ประมาณการจริง ~$20–35 โดยไม่มี Twilio)
+- [x] จะให้ลูกค้าเห็น status page / uptime report ไหม และจะขายเป็นบริการ managed monitoring หรือไม่ → ตัดสินแล้ว 5 ต.ค. 2026: ทำ status page / uptime report ใน Phase 3; เรื่องขายเป็นบริการตัดสินภายหลัง
 
 **Open questions (ทีม)**
 
 - [ ] ใครอยู่ใน Alerts Space บ้าง และ CEO อยู่ใน Space เดียวกันหรือรับเฉพาะ @mention + Email
-- [ ] Key pages ของแต่ละเว็บ (เช่น booking flow ของ Bangkok Airways, หน้า contact form) คืออะไร
-- [ ] เว็บไหนอยู่หลัง WAF/Cloudflare ที่เรามีสิทธิ์ตั้ง allowlist ได้เอง
-- [ ] Tubtong และ Cando Asia โดนบล็อกด้วยสาเหตุอะไร (ต้องเช็ค response จริงใน Phase 0)
-- [ ] Voice call ที่ L2 โทรหาใคร — CEO (ตาม design ปัจจุบัน) หรือ owner / on-call (ตามเจตนาเดิมที่จะปลุกคนที่แก้ได้)
-- [ ] Grace time และคนที่ได้ alert ของ heartbeat อื่น (browser verifier, VPS watchdog, daily digest) — design ใส่ไว้ 3 นาที / 30 นาที และ email Tao เท่านั้น
-- [ ] Synthetic check (FR-17) ยกได้สูงสุดแค่ PROBLEM ไม่ทำให้เว็บ DOWN — ยืนยัน
+- [x] Key pages ของแต่ละเว็บ (เช่น booking flow ของ Bangkok Airways, หน้า contact form) คืออะไร → ตอบแล้ว 5 ต.ค. 2026: อยู่ใน Site Registration Checklist ครบ 17 เว็บ
+- [x] เว็บไหนอยู่หลัง WAF/Cloudflare ที่เรามีสิทธิ์ตั้ง allowlist ได้เอง → ตอบแล้ว 5 ต.ค. 2026: คอลัมน์ WAF / CDN ใน checklist — ต้องขอลูกค้าจริงเฉพาะ Bangkok Airways (Akamai) เลื่อนไปทำก่อนจบ Phase 1
+- [x] Tubtong และ Cando Asia โดนบล็อกด้วยสาเหตุอะไร (ต้องเช็ค response จริงใน Phase 0) → ตอบแล้ว 5 ต.ค. 2026: Tubtong ไม่บล็อก; Cando Asia บล็อกบาง User-Agent แต่ DxT-Monitor/1.0 ผ่าน — ตรวจซ้ำจาก IP ของ Vercel ในงานชิ้นแรก
+- [ ] Voice call ที่ L2 โทรหาใคร — CEO (ตาม design ปัจจุบัน) หรือ owner / on-call (ตามเจตนาเดิมที่จะปลุกคนที่แก้ได้) → เลื่อน 5 ต.ค. 2026: ยังไม่ใช้ Twilio ตัดสินเมื่อจะเปิดใช้
+- [x] Grace time และคนที่ได้ alert ของ heartbeat อื่น (browser verifier, VPS watchdog, daily digest) — design ใส่ไว้ 3 นาที / 30 นาที และ email Tao เท่านั้น → ตอบแล้ว 28 ก.ย. 2026: ตาม design (3 นาที / 30 นาที, email Tao; Admin คนที่ 2 เพิ่มทีหลัง)
+- [x] Synthetic check (FR-17) ยกได้สูงสุดแค่ PROBLEM ไม่ทำให้เว็บ DOWN — ยืนยัน → ยืนยันแล้ว 5 ต.ค. 2026 (CEO อนุมัติตามเสนอ)
 
 ## 14. Design & Handoff
 
