@@ -1,0 +1,22 @@
+# Captured 2026-10-05T05:33:17Z from a Thai residential IP
+# curl -s -D - -A 'DxT-Monitor/1.0' https://www.bangkokair.com/twn
+HTTP/1.1 403 Forbidden
+Server: AkamaiGHost
+Mime-Version: 1.0
+Content-Type: text/html
+Content-Length: 375
+Expires: Mon, 05 Oct 2026 05:33:17 GMT
+Date: Mon, 05 Oct 2026 05:33:17 GMT
+Connection: close
+Akamai-GRN: 0.4c0c133d.1791178397.4e22cfbd
+
+<HTML><HEAD>
+<TITLE>Access Denied</TITLE>
+</HEAD><BODY>
+<H1>Access Denied</H1>
+ 
+You don't have permission to access "http&#58;&#47;&#47;www&#46;bangkokair&#46;com&#47;twn" on this server.<P>
+Reference&#32;&#35;18&#46;4c0c133d&#46;1791178397&#46;4e22cfbd
+<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;net&#47;18&#46;4c0c133d&#46;1791178397&#46;4e22cfbd</P>
+</BODY>
+</HTML>
