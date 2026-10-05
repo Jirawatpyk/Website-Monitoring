@@ -16,4 +16,5 @@ argument-hint: <SliceID, e.g. S02a>
    - otherwise keep `In progress` and list the missing lines.
      Also flip the slice's nav items to `live` if its screens are complete, and record any new decision.
 7. Write the PR description from `.github/pull_request_template.md` with the Done-when checklist and the evidence. Don't push or open the PR without asking.
-8. Report: verdict, evidence table, anything left for manual check.
+8. Retro (docs/workflow.md → Continuous improvement): ask what went wrong or slow in this slice — Claude Code mistakes, repeated review findings, preventable CI failures, stale sources. For each, propose the strongest fix (tool → rule → source fix), make it in this PR or a follow-up, and add one line to `docs/retro.md`. Skip if nothing went wrong.
+9. Report: verdict, evidence table, anything left for manual check, and the retro lines.

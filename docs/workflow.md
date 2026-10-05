@@ -15,12 +15,29 @@ How work moves from [`implementation-plan.md`](implementation-plan.md) to produc
 | 7. Verify | Deploy the slice to staging — `git push --force-with-lease origin HEAD:staging` and, if it has migrations, `pnpm db:push:staging` (both ask first) — and collect evidence for each "Done when" line there and locally; `slice-verifier` checks it. Status → `In review` | `/slice-review <ID>` |
 | 8. PR | PR template with the Done-when checklist and its evidence; CI `check` green; review conversations resolved; CODEOWNERS are requested automatically | GitHub |
 | 9. Merge | `pnpm pr:merge <number>` (squash, only when CI `check` is green on the head commit — D-008) → Vercel production deploy. Status → `Done` in the plan (same PR or a follow-up). Reset `staging` to `main` (`git push --force-with-lease origin origin/main:staging`) | `/slice-review` |
+| 10. Improve | Five-minute retro (below): what went wrong or slow, and the change that stops it happening again. One line in [`retro.md`](retro.md) | `/slice-review` |
 
 `main` is protected by rules we enforce ourselves (D-008 — the repository is private on GitHub Free, so GitHub doesn't enforce its ruleset "main"): every change arrives by pull request and is squash-merged with `pnpm pr:merge <number>`, which refuses unless the CI `check` job succeeded on the PR's current head commit, the PR targets `main`, isn't a draft, has no conflicts and no requested changes. A PR that changes `.github/workflows/` or `.github/actions/` (files that can read repository secrets) also needs `--workflow-changes-reviewed`, passed only after a human has read those changes. Nobody pushes to `main`: the `pre-push` hook in `.githooks` (installed by `pnpm install`) and `.claude/settings.json` both refuse it, and `gh pr merge` is denied to Claude Code so every merge goes through the script. Resolve review conversations before merging; head branches are deleted after merge. When the second Admin joins (G1) they review every PR before it is merged. If the repository moves to GitHub Pro, the ruleset "main" applies again and becomes the enforcement.
 
 `staging` is a throwaway branch that always holds exactly the code under test: one slice at a time is pushed onto it (not merged into it, so unfinished slices never pile up), and it is reset to `main` after each merge. It is not protected and never merged anywhere.
 
 Commits use Conventional Commits with the slice as scope: `feat(S02a): post DOWN to Google Chat`, `fix(S03): …`, `docs(S05): …`.
+
+## Continuous improvement
+
+The workflow, the rules and the tooling improve every time something goes wrong, not on a schedule.
+
+**When.** At the end of every slice (step 10), at every gate (G1–G3), and as soon as one of these happens: Claude Code does something wrong or against a rule, a reviewer raises the same finding twice, CI fails for a preventable reason, a source turns out stale or contradictory, or an incident shows a gap.
+
+**Ask three questions.** What went wrong or slow? Why — unclear rule, missing guard, or a stale document? What change stops it recurring?
+
+**Fix at the strongest level that works**, in this order:
+
+1. Enforce it with a tool — ESLint rule, test, type, CI check, Git hook, a deny rule in `.claude/settings.json`, a guard in a script.
+2. Otherwise write it down where it is read at the right moment — `CLAUDE.md` (root or the folder's), a skill, an agent's checklist, the Definition of Done, or a decision in `decisions.md`.
+3. Fix the stale source itself (plan, PRD, spec mirror) rather than adding a note that contradicts it.
+
+**Record it** as one line in [`retro.md`](retro.md): date · what happened · what changed · PR. The change ships in the slice's PR or a small follow-up PR. Nothing is recorded when nothing went wrong.
 
 ## Who reviews what
 
