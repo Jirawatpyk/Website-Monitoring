@@ -83,7 +83,8 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - 5 Oct 2026 — **Done-when 7 ✓**: Supabase URL configuration set by Tao (prod: `monitor.dxtspace.com`; staging: `monitor-staging.dxtspace.com` + PR-preview pattern). Google provider stays off until S01 adds the allowlist.
   - 5 Oct 2026 — **Done-when 1 ✓**: the CEO answered all 8 memo items (tiers and the escalation ladder as proposed; synthetic checks capped at PROBLEM; budget $60 / month; CEO at L2 / L3 as proposed; Tier 1 after hours best effort, no Twilio; status page and reports in Phase 3). Item 3 approved with changes: owners / backups per the checklist; for now Admin = Tao only (second Admin needed before G1) and on-call = Tle (rotation of ≥ 3 before G2). Copied to the PRD decisions list (Claude Doc rev 168, `docs/prd.md`).
   - 5 Oct 2026 — **Done-when 9 ✓**: OAuth consent screen is Internal; Tao confirms Google Workspace enforces 2-Step Verification for everyone who will get a role (his own page says required and can't be turned off). Per D-007 the self-check stays a step of every allowlist invite, so a person in an OU without enforcement is still caught.
-  - Still open: Done-when 3 (VPS env — VPS not rented yet).
+  - 5 Oct 2026 — VPS rented: LightNode Bangkok, 2 vCPU / 4 GB, Ubuntu 24.04, `dxt-monitor-bkk`, public IP `38.60.233.62` (geolocates to Bangkok, AS154177), ~$13.70 / month. Hardened: SSH key only (password and keyboard-interactive login off, root by key only), ufw deny-incoming except 22/tcp, unattended security upgrades on (provider image had the apt timers masked), upgraded and rebooted, timezone UTC. SSH key `~/.ssh/dxt_vps` on Tao's machine (RSA — LightNode accepts RSA only).
+  - Still open: Done-when 3 — the agent's env file on the VPS (`/etc/dxt-agent/env`) is written when the agent is installed in S03; every Vercel variable is set.
 - **Review:** Tao sign-off; no code review.
 
 ## Phase 1 — MVP, P0
