@@ -17,7 +17,7 @@ Website monitoring and incident automation for the 17 sites DxT runs: checks eve
 
 **Precedence:** `docs/decisions.md` (settled conflicts, D-xxx) wins over everything. Then: on screen behaviour, status logic, UI copy and formats the design spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. The canvas boards give layout, exact copy and states; where a board and the spec text disagree on behaviour, the spec wins (spec §0: the canvas shows how it looks, the spec says how it behaves). Inside the spec, later sections override earlier ones: §14 → §15 → §16 → §17–18. If two sources still conflict, stop and ask — don't pick one silently; record the answer as a new decision.
 
-Sample data in the spec and on the canvas (owners, INC-0142, uptime figures, "Tao") is for mockups and tests only; never hard-code it into product code. Items tagged "Proposal · pending CEO" (L2 CEO page, Twilio voice) are built behind config, off by default.
+Sample data in the spec and on the canvas (owners, INC-0142, uptime figures, "Tao") is for mockups and tests only; never hard-code it into product code. The CEO answered the spec's "Proposal · pending CEO" items on 5 Oct 2026 (D-009): the Tier 1 L2 CEO page is approved and on by default, and the pending tag is not shown; Twilio voice stays built behind config, off.
 
 ## Layout
 
