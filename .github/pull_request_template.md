@@ -19,7 +19,7 @@
 - [ ] `pnpm check` and `pnpm plan:check` pass; slice Status updated in the plan
 - [ ] Behaviour follows the design spec (later sections win) and any decision in `docs/decisions.md`
 - [ ] Engine / rule changes have table-driven tests from the spec's examples
-- [ ] Reviewers from the slice's Review line: no open High / Medium findings
+- [ ] `/code-review high` + reviewers from the slice's Review line: no open High; every Medium fixed or justified here
 - [ ] New tables: RLS + explicit grants in the same migration, pgTAP tests in `supabase/tests/`, `pnpm db:types` committed
 - [ ] Config / incident state changes write `audit_log`; ack / resolve messages held 10 s
 - [ ] New env names in `.env.example`; new decisions in `docs/decisions.md`

@@ -41,7 +41,7 @@
 | S24 | Public API & webhooks | 3 · P2 | M | FR-19 | G2 | 9–10 | Todo |
 | G3 | **Client-facing gate** | 3 | — | — | S20–S24 | end 10 | Todo |
 
-Every slice also meets the [Definition of Done](workflow.md#definition-of-done) (checks, reviews, no dead controls, docs updated).
+Every slice also meets the [Definition of Done](workflow.md#definition-of-done) (checks, reviews, no dead controls, docs updated). Each slice's **Review** line names the domain agents; `/code-review high` runs on every slice in addition (workflow step 6).
 
 ## Timeline
 
