@@ -139,11 +139,22 @@ describe('runProbe', () => {
     ]);
   });
 
-  it('shortens the wait so a long timeout still fits the 55 s budget', async () => {
-    const s = setup([monitor('slow', 1, 30_000)], [[fail], [fail]]);
+  it('caps a monitor timeout at 30 s and rechecks 30 s after the run started (PRD §5)', async () => {
+    const s = setup([monitor('slow', 1, 60_000)], [[fail], [fail]]);
     await runProbe({ db: s.db, location: 'SIN', check: s.check, clock: s.clock, sleep: s.sleep });
-    expect(s.sleep).toHaveBeenCalledWith(25_000);
+    expect(s.check).toHaveBeenNthCalledWith(1, expect.objectContaining({ timeoutMs: 30_000 }));
+    expect(s.sleep).toHaveBeenCalledWith(30_000);
     expect(s.check).toHaveBeenLastCalledWith(expect.objectContaining({ timeoutMs: 30_000 }));
+  });
+
+  it('stamps scheduled checks with the run start, so a late start keeps its round', async () => {
+    const s = setup([monitor('a', 1)], [[pass]]);
+    const clock = vi
+      .fn()
+      .mockReturnValueOnce(start)
+      .mockReturnValue(start + 2_500);
+    await runProbe({ db: s.db, location: 'SIN', check: s.check, clock, sleep: s.sleep });
+    expect(inserts(s.calls)[0]?.[0]).toMatchObject({ checked_at: new Date(start).toISOString() });
   });
 
   it('skips the recheck when no time is left', async () => {
@@ -151,7 +162,7 @@ describe('runProbe', () => {
     const clock = vi
       .fn()
       .mockReturnValueOnce(start)
-      .mockReturnValue(start + 54_500);
+      .mockReturnValue(start + 84_500);
     const result = await runProbe({ db: s.db, location: 'SIN', check: s.check, clock, sleep: s.sleep });
     expect(result).toMatchObject({ failed: 1, rechecked: 0 });
   });

@@ -231,3 +231,108 @@ describe('decideMonitor — recovery (spec §16.4)', () => {
     expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0 });
   });
 });
+
+describe('decideMonitor — engine-reviewer round 2 (spec §6, PRD §5)', () => {
+  it('staging 6 Oct: the incident starts at SIN 19:07:46 in the split round before (M3)', () => {
+    // 12:07 Bangkok-minute M: TYO passed at :02 (before the switch), SIN failed at :46 and its recheck.
+    const checks = [
+      check('TYO', 'pass', 2),
+      check('SIN', 'fail', 46),
+      check('SIN', 'fail', 76, 2),
+      check('TYO', 'fail', 62),
+      check('TYO', 'fail', 92, 2),
+      check('SIN', 'fail', 106),
+      check('SIN', 'fail', 136, 2),
+    ];
+    // Round M is split (judged first, nothing opens); round M+60 confirms DOWN from SIN's first failure.
+    expect(decideMonitor(snapshot(checks, { now: at(159) }))).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 0,
+    });
+    expect(decideMonitor(snapshot(checks, { now: at(159), lastRoundAt: at(0) }))).toMatchObject({
+      kind: 'open',
+      roundAt: at(60),
+      startedAt: at(46),
+    });
+  });
+
+  it('a confirmed DOWN round is judged even when a later round is already OK (M1a)', () => {
+    const checks = [...downRound(), ...okRound(60)];
+    expect(decideMonitor(snapshot(checks, { now: at(160) }))).toMatchObject({ kind: 'open', roundAt: at(0) });
+  });
+
+  it('two unjudged DOWN rounds open from the first one (M1b)', () => {
+    const checks = [...downRound(), ...downRound(60)];
+    expect(decideMonitor(snapshot(checks, { now: at(160) }))).toMatchObject({
+      kind: 'open',
+      roundAt: at(0),
+      startedAt: at(1),
+    });
+  });
+
+  it('skips rounds older than the lookback', () => {
+    expect(decideMonitor(snapshot(downRound(), { now: at(400) }))).toEqual({ kind: 'wait' });
+  });
+
+  it('Tier 2: a check late in its 3-minute round rechecks across the boundary', () => {
+    const checks = [
+      check('TYO', 'fail', -118),
+      check('TYO', 'fail', -88, 2),
+      check('SIN', 'fail', 50),
+      check('SIN', 'fail', 80, 2),
+    ];
+    expect(decideMonitor(snapshot(checks, { intervalSec: 180, now: at(81) }))).toMatchObject({
+      kind: 'open',
+      roundAt: at(-120),
+      startedAt: at(-118),
+    });
+  });
+
+  it('Tier 3: an incomplete round waits until 75 s after its 5-minute end', () => {
+    const checks = [check('SIN', 'pass', -100)]; // round 02:45:00–02:50:00, TYO never reported
+    expect(decideMonitor(snapshot(checks, { intervalSec: 300, now: at(254) }))).toEqual({ kind: 'wait' });
+    expect(decideMonitor(snapshot(checks, { intervalSec: 300, now: at(256) }))).toMatchObject({
+      kind: 'none',
+    });
+  });
+
+  it('three locations: 2 pass + 1 regional failure recovers; 1 pass + 1 fail + 1 missing does not (M2)', () => {
+    const three = ['BKK', 'SIN', 'TYO'] as const;
+    const regional = [check('BKK', 'fail', 1), check('BKK', 'fail', 31, 2), ...okRound()];
+    expect(decideMonitor(snapshot(regional, { locations: three, open: incident('unacked') }))).toMatchObject({
+      kind: 'recover',
+      okLocations: 2,
+    });
+    const split = [check('SIN', 'pass', 1), check('TYO', 'fail', 2), check('TYO', 'fail', 32, 2)];
+    expect(
+      decideMonitor(snapshot(split, { locations: three, open: incident('unacked'), now: at(140) })),
+    ).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 0,
+    });
+  });
+
+  it('with no active locations known, rounds wait for the deadline (L3)', () => {
+    expect(
+      decideMonitor(snapshot([check('SIN', 'fail', 1), check('TYO', 'fail', 2)], { locations: [] })),
+    ).toEqual({
+      kind: 'wait',
+    });
+  });
+
+  it('a failure the recheck clears is not a relapse (L1)', () => {
+    const checks = [
+      check('SIN', 'fail', 1),
+      check('TYO', 'fail', 2),
+      check('SIN', 'pass', 31, 2),
+      check('TYO', 'pass', 32, 2),
+    ];
+    expect(decideMonitor(snapshot(checks, { open: incident('needs_root_cause') }))).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 0,
+    });
+  });
+});

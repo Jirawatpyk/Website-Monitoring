@@ -5,6 +5,6 @@ import { probeJob } from '@/server/probe/probe-job';
 // Next's `preferredRegion` is deprecated and doesn't pin Node functions on Vercel. runProbe refuses
 // to record results if a failover ever runs it elsewhere.
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 export const GET = cronHandler(() => probeJob('SIN'));

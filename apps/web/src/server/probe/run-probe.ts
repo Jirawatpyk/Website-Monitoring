@@ -10,10 +10,12 @@ export const PROBE_REGIONS = { SIN: 'sin1', TYO: 'hnd1' } as const satisfies Par
 >;
 export type CloudLocation = keyof typeof PROBE_REGIONS;
 
-/** Work must finish inside the function's maxDuration (60 s) with room to write results. */
-export const PROBE_BUDGET_MS = 55_000;
-/** The immediate recheck comes about 30 s after the first failure (PRD §5, spec §6). */
+/** Work must finish inside the function's maxDuration (90 s, vercel.json) with room to write results. */
+export const PROBE_BUDGET_MS = 85_000;
+/** The immediate recheck starts about 30 s after the scheduled check (PRD §5, spec §6). */
 export const RECHECK_DELAY_MS = 30_000;
+/** A response slower than 30 s is a failure (PRD §5); longer monitor timeouts are capped here. */
+export const MAX_CHECK_TIMEOUT_MS = 30_000;
 
 export interface ProbeDeps {
   db: DbClient;
@@ -68,8 +70,10 @@ export async function runProbe({
   const monitors = await loadDueMonitors(db, new Date(started));
   const headers = secretHeader ? { [secretHeader.name]: secretHeader.value } : undefined;
 
-  const runOnce = (m: DueMonitor, timeoutMs: number) => {
-    const checkedAt = new Date(clock());
+  // Scheduled checks carry the run's start time, so a run that starts at :59.9 still lands in the
+  // round it was due for; rechecks carry their own start time.
+  const runOnce = (m: DueMonitor, timeoutMs: number, at?: number) => {
+    const checkedAt = new Date(at ?? clock());
     return check({ url: m.url, method: m.method, timeoutMs, headers, allowPrivateTargets }).then(
       (result) => ({
         m,
@@ -79,15 +83,14 @@ export async function runProbe({
     );
   };
 
-  const first = await Promise.all(monitors.map((m) => runOnce(m, m.timeoutMs)));
+  const first = await Promise.all(monitors.map((m) => runOnce(m, m.timeoutMs, started)));
   await insertResults(db, location, 1, first);
 
   const failed = first.filter((r) => r.result.outcome === 'fail').map((r) => r.m);
   let rechecked = 0;
   if (failed.length) {
     const deadline = started + PROBE_BUDGET_MS;
-    const longest = Math.max(...failed.map((m) => m.timeoutMs));
-    await sleep(Math.max(0, Math.min(RECHECK_DELAY_MS, deadline - clock() - longest)));
+    await sleep(Math.max(0, started + RECHECK_DELAY_MS - clock()));
     const remaining = deadline - clock();
     if (remaining >= 1_000) {
       const second = await Promise.all(failed.map((m) => runOnce(m, Math.min(m.timeoutMs, remaining))));
@@ -118,7 +121,7 @@ async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonitor[]> {
       id: m.id,
       url: m.url,
       method: m.method === 'HEAD' ? 'HEAD' : 'GET',
-      timeoutMs: m.timeout_ms,
+      timeoutMs: Math.min(m.timeout_ms, MAX_CHECK_TIMEOUT_MS),
     }));
 }
 

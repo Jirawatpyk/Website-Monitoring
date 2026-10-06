@@ -2,10 +2,10 @@ import 'server-only';
 import type { DbClient } from '@dxt/db';
 import {
   decideMonitor,
-  RECHECK_WITHIN_MS,
-  ROUND_DEADLINE_MS,
+  lookbackMs,
   UNKNOWN_ROOT_CAUSE,
   type MonitorDecision,
+  type MonitorSnapshot,
   type OpenIncident,
   type StoredCheck,
 } from '@dxt/engine';
@@ -13,8 +13,8 @@ import { formatCause } from '@dxt/notifier';
 import { TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 
-/** History loaded beyond one interval: the round still waiting for its deadline, its rechecks, slack. */
-const LOOKBACK_EXTRA_MS = ROUND_DEADLINE_MS + RECHECK_WITHIN_MS + 30_000;
+/** Rounds judged per monitor per run: catches up after a missed run without running unbounded. */
+const MAX_ROUNDS_PER_RUN = 5;
 const OPEN_STATES_EXCLUDED = '("resolved","in_review","closed")';
 
 interface MonitorRow {
@@ -46,8 +46,9 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   if (!monitors.length) return summary;
   summary.monitors = monitors.length;
 
-  const longestInterval = Math.max(...monitors.map((m) => TIER_CONFIG[m.tier].intervalSec));
-  const since = new Date(now.getTime() - longestInterval * 1000 - LOOKBACK_EXTRA_MS);
+  const since = new Date(
+    now.getTime() - Math.max(...monitors.map((m) => lookbackMs(TIER_CONFIG[m.tier].intervalSec))),
+  );
   const siteIds = monitors.map((m) => m.siteId);
 
   const [checks, statuses, incidents, locations] = await Promise.all([
@@ -59,7 +60,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     db.from('site_status').select('site_id, last_round_at, ok_rounds').in('site_id', siteIds),
     db
       .from('incidents')
-      .select('id, site_id, state, severity, root_cause_category')
+      .select('id, site_id, state, severity, root_cause_category, notifications(template)')
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
     db.from('probe_locations').select('code').eq('is_active', true),
@@ -68,9 +69,9 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   const active = (locations.data ?? []).map((l) => l.code as ProbeLocation);
 
   for (const m of monitors) {
-    const status = statuses.data?.find((s) => s.site_id === m.siteId);
-    const open = incidents.data?.find((i) => i.site_id === m.siteId);
-    const decision = decideMonitor({
+    const status = statuses.data?.find((st) => st.site_id === m.siteId);
+    const open = incidents.data?.find((inc) => inc.site_id === m.siteId);
+    const snapshot: MonitorSnapshot = {
       checks: checks
         .filter((c) => c.monitor_id === m.id)
         .map((c): StoredCheck => ({
@@ -95,13 +96,24 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
             hasRootCause: !!open.root_cause_category && open.root_cause_category !== UNKNOWN_ROOT_CAUSE,
           } satisfies OpenIncident)
         : null,
-    });
-    if (decision.kind === 'none' && decision.relapse) {
-      summary.relapses += 1;
-      console.warn(JSON.stringify({ event: 'relapse_not_alerted', site: m.siteId, incident: open?.id }));
+    };
+    // RECOVERED only replies to a DOWN that was queued (not one held back by a mute, spec §15.1).
+    const downQueued = !!open?.notifications.some((n) => n.template === 'down');
+
+    // Judge rounds oldest first until one changes the incident or nothing is ready.
+    for (let i = 0; i < MAX_ROUNDS_PER_RUN; i += 1) {
+      const decision = decideMonitor(snapshot);
+      if (decision.kind === 'wait') break;
+      if (decision.kind === 'none' && decision.relapse) {
+        summary.relapses += 1;
+        console.warn(JSON.stringify({ event: 'relapse_not_alerted', site: m.siteId, incident: open?.id }));
+      }
+      const applied = await apply(db, m, decision, open?.id ?? null, now, downQueued);
+      if (applied) summary[applied] += 1;
+      if (decision.kind !== 'none') break;
+      snapshot.lastRoundAt = decision.roundAt;
+      snapshot.okRounds = decision.okRounds;
     }
-    const applied = await apply(db, m, decision, open?.id ?? null, now);
-    if (applied) summary[applied] += 1;
   }
   return summary;
 }
@@ -148,6 +160,7 @@ async function apply(
   d: MonitorDecision,
   incidentId: string | null,
   now: Date,
+  downQueued: boolean,
 ): Promise<'opened' | 'recovered' | 'settled' | null> {
   const at = now.toISOString();
   switch (d.kind) {
@@ -198,7 +211,7 @@ async function apply(
         p_recovered_at: d.recoveredAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
         p_context: { okLocations: d.okLocations },
-        p_notify: !m.muted,
+        p_notify: !m.muted && downQueued,
       });
       if (error) throw new Error(`engine_recover_incident: ${error.message}`);
       return data ? 'recovered' : null;

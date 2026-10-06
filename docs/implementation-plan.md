@@ -137,7 +137,8 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - **Done-when 4 ✓** Healthchecks project "DxT Monitor — staging" (separate from production): engine, probe-sin, probe-tyo, notifier all Up, last pings 11–54 s ago (checked by Claude in the browser, 12:17Z). Vercel logs: `probe-sin … region:"sin1"`, `probe-tyo … region:"hnd1"` every minute.
   - **Done-when 5 ✓** message-checker: no open High; Mediums fixed (sub-minute duration floor, owner-without-Chat-id → D-015) — the live cards match ChatAlert minus the D-013 omissions.
   - **Done-when 6 ✓** ≈ 1 h 45 min of build to a verified staging run, against an S estimate — record for the Q7 re-baseline.
-  - Known limits (by design, in later slices): a relapse while the incident is open is logged, not alerted (D-004, S04); on staging run `supabase/staging/reset-test-incident.sql` before repeating a DOWN test. The downtime counts from the first fully failing round's first check, not a failure in a preceding split round (≈ 16 s on staging) — S04 with D-004.
+  - Known limits (by design, in later slices): a confirmed relapse while the incident is open is logged, not alerted, and after the second OK round the site shows OK — so no real site may be probed on production before S04 (D-004) is Done (see S05). On staging run `supabase/staging/reset-test-incident.sql` before repeating a DOWN test.
+  - Engine-reviewer round 2 (fixed before the PR): rounds judged oldest first; OK = majority of reporting locations; the incident starts at the first failed check, even in a split round before (the staging run would now read 19:07:46); checks stamped with the probe run's start; monitor timeouts capped at 30 s (PRD §5) with probe `maxDuration` 90 s; RECOVERED only after a queued DOWN.
 
 ### S02b · Email, delivery guarantees, Ack + Undo
 
@@ -181,7 +182,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 ### S05 · Sites & monitors
 
-- **Scope:** FR-01. `/sites` list, Add site with the registration checklist, Edit monitors (URL, method, expected status, timeout, keywords, headers, thresholds, primary, key pages, redirect allowlist). An owner must have signed in once and have a notification channel (PRD §3). Monitor URLs rejected when they resolve to private, link-local or metadata addresses. Every change writes `audit_log` with before / after. Production clients and AMs load from a reviewed SQL script (UI in S17).
+- **Scope:** FR-01. `/sites` list, Add site with the registration checklist, Edit monitors (URL, method, expected status, timeout, keywords, headers, thresholds, primary, key pages, redirect allowlist). An owner must have signed in once and have a notification channel (PRD §3). Monitor URLs rejected when they resolve to private, link-local or metadata addresses (the probe enforces the same on every hop since S02a). Real sites are entered on production only once S04 is Done — before that a relapse during an open incident isn't alerted (D-004, S02a engine review). Every change writes `audit_log` with before / after. Production clients and AMs load from a reviewed SQL script (UI in S17).
 - **Boards:** AddSite, EditMonitors · route `/sites`
 - **Depends on:** S01 (S02a for probes to pick the monitors up)
 - **Done when:**

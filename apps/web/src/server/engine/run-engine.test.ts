@@ -1,6 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import { fakeDb } from '../../../test/fake-db';
+import { fakeDb as baseFakeDb } from '../../../test/fake-db';
+
+// Both Vercel locations are active, as on staging.
+const fakeDb = (results: Parameters<typeof baseFakeDb>[0] = {}) =>
+  baseFakeDb({ 'probe_locations.select': { data: [{ code: 'SIN' }, { code: 'TYO' }] }, ...results });
 import { runEngine } from './run-engine';
 
 const now = new Date('2026-10-06T10:01:05Z');
@@ -34,12 +38,13 @@ const down = [
   row('TYO', 'fail', 32, 2),
 ];
 const ok = [row('SIN', 'pass', 0, 1, 200), row('TYO', 'pass', 1, 1, 200)];
-const incident = (state: string) => ({
+const incident = (state: string, downQueued = true) => ({
   id: 'i1',
   site_id: 's1',
   state,
   severity: 'down',
   root_cause_category: null,
+  notifications: downQueued ? [{ template: 'down' }] : [],
 });
 
 describe('runEngine', () => {
@@ -134,6 +139,38 @@ describe('runEngine', () => {
         p_notify: true,
       },
     });
+  });
+
+  it('sends no RECOVERED when the DOWN was held back by a mute (spec §15.1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: ok },
+      'incidents.select': { data: [incident('unacked', false)] },
+      'rpc.engine_recover_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]?.args).toMatchObject({ p_notify: false });
+  });
+
+  it('judges a missed round and the next in one run', async () => {
+    const { db, calls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': {
+        data: [
+          ...ok.map((r) => ({
+            ...r,
+            checked_at: at(Date.parse(r.checked_at) / 1000 - Date.parse(at(0)) / 1000 - 60),
+          })),
+          ...ok,
+        ],
+      },
+    });
+    await runEngine(db, new Date(Date.parse(at(0)) + 140_000));
+    expect(
+      calls
+        .filter((c) => c.table === 'site_status' && c.op === 'upsert')
+        .map((c) => (c.values as { ok_rounds: number }).ok_rounds),
+    ).toEqual([1, 2]);
   });
 
   it('settles on the second OK round', async () => {
