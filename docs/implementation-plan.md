@@ -14,7 +14,7 @@
 | S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Done |
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
-| S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | In progress |
+| S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | In review |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
@@ -162,6 +162,9 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - Staging run 2 (deploy `48a3256`): → `error` 16:12:15Z; DOWN INC-0004 to Chat + email at 16:14:17Z (**2 min 2 s**). **Done-when 4 (phone, Tao):** the card's "Open / acknowledge" on an iPhone opened sign-in, then straight back to INC-0004 signed in as the owner; one tap acknowledged ("Undo · 7 s").
   - **Done-when 5 / T08 on staging:** ack 16:15:11Z → Undo inside the window → both ACKNOWLEDGED rows `cancelled`, `attempts 0`, nothing sent; the page went back to Acknowledge and logged "Acknowledgement undone". Re-ack 16:15:24Z → ACKNOWLEDGED sent 16:15:37.9Z (Chat) / 16:15:38.3Z (email). RECOVERED 16:18:40Z (staging SQL, Claude).
   - Email threading: Resend/SES replace the Message-ID we set (Gmail "Show original" of INC-0003: `…@ap-northeast-1.amazonses.com`), and the send-only API key can't read it back — so emails now carry a stable incident id in `References` (+ `In-Reply-To` after a person's first), deploy `2170815`. The test inbox has Gmail "Conversation view off", which shows every email as its own row regardless.
+  - **Done-when 4 ✓** The phone ack's ACKNOWLEDGED (INC-0004, re-ack after the Undo) went out 16:15:37.9Z (Chat) / 16:15:38.3Z (email) with `ackedBy` = the acker's own profile name (staging SQL, Claude) — 13 s after the ack.
+  - **Done-when 6 ✓** message-checker and spec-checker, two rounds each: no High; every Medium fixed (round 2: copy after the retries end, D-017 for threading); Lows fixed or justified in the PR. Also `/code-review high` (8 fixed), engine-reviewer ×2, security-reviewer, db-reviewer.
+  - Time spent: started 14:03Z, staging verified 16:46Z — ≈ 2 h 45 min with three review rounds (planned M, 3–4 days).
   - **Done-when 1 ✓** Staging run 3 (deploy `2170815`): → `error` 16:40:01Z; DOWN INC-0005 email 16:41Z; ack (Claude, browser) 16:43:14Z; → `ok` 16:43:47Z; RECOVERED 16:45:40Z. Gmail "Show original": DOWN `References: <inc-c5226de9…@notify.dxtspace.com>`, ACKNOWLEDGED / RECOVERED `In-Reply-To` + `References` the same id. With Conversation view on (Tao's screenshot) INC-0005 is **one conversation of 3** (DOWN → ACKNOWLEDGED → RECOVERED); INC-0003 (old design, references to an id SES replaced) split 2 + 1 — the bug the fix closed. Google's rule for notification threading: same subject and references that consistently refer to the same message id (Workspace Updates, Mar 2019).
 
 ### S03 · Bangkok probe & browser verifier
