@@ -1,6 +1,5 @@
 import {
   formatDay,
-  formatDuration,
   formatIncidentId,
   formatTier,
   formatTime,
@@ -8,10 +7,11 @@ import {
   isSameBangkokDay,
 } from '@dxt/shared';
 import { buildChatTextLine } from './chat-text';
+import { downtime } from './downtime';
 
 /**
- * Google Chat DOWN and RECOVERED messages — ChatAlert board, spec §10 / §14.10 / §16.4, with D-013:
- * no escalation promise (S10) and an "Open incident" button until ack ships (S02b).
+ * Google Chat DOWN, ACKNOWLEDGED and RECOVERED messages — ChatAlert board, spec §10 / §14.10 /
+ * §16.4, with D-013 / D-016: no escalation promise until S08 / S10.
  * A message is a plain text line (the only place @mentions notify) followed by one Cards v2 card.
  */
 
@@ -52,7 +52,15 @@ export interface DownAlertInput {
   confirmingLocations: number;
   owner: ChatPerson | null;
   backup: ChatPerson | null;
+  /** The incident page, where the ack happens (`?ack=1`, MobileAck). */
   incidentUrl: string;
+}
+
+export interface AcknowledgedAlertInput {
+  incidentId: string;
+  site: string;
+  ackedBy: string;
+  ackedAt: Date;
 }
 
 export interface RecoveredAlertInput {
@@ -110,10 +118,12 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
                 row('Owner', ownerText),
                 {
                   buttonList: {
-                    buttons: [{ text: 'Open incident', onClick: { openLink: { url: input.incidentUrl } } }],
+                    buttons: [
+                      { text: 'Open / acknowledge', onClick: { openLink: { url: input.incidentUrl } } },
+                    ],
                   },
                 },
-                { textParagraph: { text: '<b>Current status is in the latest reply.</b>' } },
+                { textParagraph: { text: FIRST_CARD_FOOTER } },
               ],
             },
           ],
@@ -123,19 +133,36 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
   };
 }
 
-export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
-  const { startedAt, recoveredAt } = input;
+/** Spec §14.10: the first card says where the status is and that an ack is personal. */
+export const FIRST_CARD_FOOTER =
+  '<b>Current status is in the latest reply.</b><br>Anyone can open it; the ack is recorded under ' +
+  'their own Google account, so nobody can acknowledge as someone else.';
+
+/**
+ * ACKNOWLEDGED reply (ChatAlert board): posted only after the 10 s Undo window, mentions nobody,
+ * no button. Until escalation exists the body says only who acknowledged (D-016).
+ */
+export function buildAcknowledgedAlert(input: AcknowledgedAlertInput): ChatMessage {
   const site = plainName(input.site);
-  // At least "1 min": a confirmed DOWN always lasted some time, and "down 0 min" reads as no outage.
-  // Count whole clock minutes, so the number matches the range shown (19:37–19:42 = 5 min); at least
-  // "1 min" — a confirmed DOWN always lasted some time, and "down 0 min" reads as no outage.
-  const minute = (d: Date) => Math.floor(d.getTime() / 60_000);
-  const down = formatDuration(Math.max(1, minute(recoveredAt) - minute(startedAt)));
-  // Past midnight in Bangkok the range names both days.
-  const at = (d: Date) =>
-    isSameBangkokDay(startedAt, recoveredAt)
-      ? formatTime(d)
-      : `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
+  const by = plainName(input.ackedBy);
+  const at = formatTime(input.ackedAt);
+  return {
+    text: buildChatTextLine({ state: 'ACKNOWLEDGED', site, detail: [`by ${by} ${at}`] }),
+    cardsV2: [
+      {
+        cardId: `acknowledged-${input.incidentId}`,
+        card: {
+          header: { title: `ACKNOWLEDGED · ${site} still down · by ${by} ${at}` },
+          sections: [{ widgets: [{ textParagraph: { text: `Acknowledged by ${by}.` } }] }],
+        },
+      },
+    ],
+  };
+}
+
+export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
+  const site = plainName(input.site);
+  const { duration: down, range } = downtime(input.startedAt, input.recoveredAt);
 
   return {
     text: buildChatTextLine({
@@ -149,7 +176,7 @@ export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
         cardId: `recovered-${input.incidentId}`,
         card: {
           header: {
-            title: `RECOVERED · ${site} is back · down ${down} (${at(startedAt)}–${at(recoveredAt)})`,
+            title: `RECOVERED · ${site} is back · down ${down} (${range})`,
           },
           sections: [
             {

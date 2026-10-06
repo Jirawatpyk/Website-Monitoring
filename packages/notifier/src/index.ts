@@ -2,3 +2,6 @@ export * from './cause';
 export * from './chat-alerts';
 export * from './chat-text';
 export * from './chat-webhook';
+export * from './downtime';
+export * from './email-alerts';
+export * from './email-send';
