@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { NAV_SECTIONS } from './nav';
+import { activeNavId, NAV_SECTIONS } from './nav';
 
 const appDir = path.resolve(import.meta.dirname, '../../app');
 
@@ -22,5 +22,16 @@ describe('NAV_SECTIONS', () => {
   it('has no empty section and no duplicate ids', () => {
     expect(NAV_SECTIONS.every((section) => section.items.length > 0)).toBe(true);
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
+  });
+});
+
+describe('activeNavId', () => {
+  it.each([
+    ['/', 'overview'],
+    ['/login', null],
+    ['/incidents/x', null], // Incidents isn't shown until S07
+    ['/overview-x', null],
+  ])('%s → %s', (pathname, expected) => {
+    expect(activeNavId(pathname)).toBe(expected);
   });
 });

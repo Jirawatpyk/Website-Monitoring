@@ -9,7 +9,11 @@ const mocks = vi.hoisted(() => ({
   }),
 }));
 vi.mock('@/lib/auth/session', () => ({ getAccess: mocks.getAccess }));
-vi.mock('next/navigation', () => ({ redirect: mocks.redirect, useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock('next/navigation', () => ({
+  redirect: mocks.redirect,
+  useRouter: () => ({ refresh: vi.fn() }),
+  usePathname: () => '/',
+}));
 vi.mock('@/features/auth/actions', () => ({ signOut: vi.fn() }));
 
 const page = <p>page content</p>;

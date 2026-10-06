@@ -18,10 +18,13 @@ export function BrandMark({ inverted = false }: { inverted?: boolean }) {
   );
 }
 
-/** Sidebar header, as on the canvas. */
+/**
+ * Sidebar header, as on the canvas (logo 20 px from the left and top, 72 px tall). AURA SideNav's
+ * header slot already pads 20 / 16 px, so this only adds the last 4 px on each side.
+ */
 export function Brand() {
   return (
-    <div className="flex h-18 items-center px-5">
+    <div className="mb-1 flex h-8 items-center px-1">
       <BrandMark />
     </div>
   );
