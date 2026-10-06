@@ -14,7 +14,7 @@
 | S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Done |
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
-| S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | In review |
+| S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
@@ -154,7 +154,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   5. **T08:** Ack → Undo within 10 s → no Chat post and no email (the rows end `cancelled`).
   6. message-checker passes the email events and the ACKNOWLEDGED row; spec-checker passes MobileAck and MobileAckDark.
 - **Review:** message-checker, engine-reviewer, security-reviewer (ack action, RLS), db-reviewer (notifications), spec-checker (MobileAck, MobileAckDark).
-- **Notes (evidence):** started 6 Oct 2026 14:03Z. Ack rights, fallback audience, copy cuts and the incident route per D-016.
+- **Notes (evidence):** merged 6 Oct 2026 as PR #29 (`246ca6c`); production migration by `migrate-production` 17:22:45Z, and Vercel promoted the production deployment only after it (Deployment Checks — "Running Checks" until then; production logs: 0 errors). Started 14:03Z. Ack rights, fallback audience, copy cuts and the incident route per D-016; email threading per D-017.
   - Staging run 1 (deploy `3ab200c`, 6 Oct): test target → `error` 15:44:11Z; the probe-sin run whose recheck failed ran the engine itself and sent INC-0003 at once — DOWN email 15:46:17.26Z, Chat 15:46:17.81Z (**2 min 6 s** after the switch; Tao's inbox and Chat screenshots: subject `Test target · Tier 1 · INC-0003`, button "Open / acknowledge", footer ack sentence). Resend accepted the custom `Message-ID`.
   - **Done-when 2:** `sent_at − detected_at` for the DOWN = **0.9 s** (email) / **1.4 s** (Chat); `detected_at` = the confirming recheck 15:46:16Z (staging SQL, Tao).
   - Ack (desktop, Tao) 15:50:58Z → "Undo · N s" countdown → ACKNOWLEDGED posted to Chat + email 15:51:10–11Z (window 10 s + 2 s margin); the page then read "Posted to the Chat thread + email at 22:51:10" and the log "(posted 22:51:10)". ACKNOWLEDGED email: "Jirawat (Tao) Piyakit has Test target", footer "you acknowledged this incident".
