@@ -32,7 +32,7 @@ export interface Facts {
   incidents: Map<string, IncidentFacts>;
   /** Active people only: a deactivated account gets no email. */
   recipients: Map<string, Recipient>;
-  /** `incident:user` → the template of that person's first email of the incident (the thread root). */
+  /** `incident:user` → the template of the first email that person was really sent (the thread root). */
   firstEmail: Map<string, string>;
 }
 
@@ -61,7 +61,7 @@ export async function loadFacts(db: DbClient, rows: readonly Notification[]): Pr
           .from('notifications')
           .select('incident_id, user_id, template')
           .eq('channel', 'email')
-          .neq('status', 'cancelled')
+          .eq('status', 'sent')
           .in('incident_id', incidentIds)
           .in('user_id', userIds)
           .order('created_at')

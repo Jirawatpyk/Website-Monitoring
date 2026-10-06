@@ -185,6 +185,27 @@ describe('MobileAck view', () => {
     ]);
   });
 
+  it('never marks an undone ack as posted, even when a later ack posted', () => {
+    const events: EventRow[] = [
+      detected,
+      ackEvent('2026-09-25T03:07:00Z'),
+      { type: 'ack_undone', at: '2026-09-25T03:07:05Z', actor_id: 'u-arm', payload: {} },
+      ackEvent('2026-09-25T03:07:40Z'),
+      {
+        type: 'alerted',
+        at: '2026-09-25T03:07:51Z',
+        actor_id: null,
+        payload: { channel: 'google_chat', template: 'acknowledged' },
+      },
+    ];
+    const v = view(acked, events, viewer(), new Date('2026-09-25T03:08:00Z'));
+    expect(v.log.map((l) => l.text)).toContain('Acknowledged by Arm (posted 10:07:51)');
+    expect(v.log.filter((l) => l.text.startsWith('Acknowledged by Arm'))).toEqual([
+      { at: '10:07', text: 'Acknowledged by Arm (posted 10:07:51)' },
+      { at: '10:07', text: 'Acknowledged by Arm' },
+    ]);
+  });
+
   it('falls back to the window when the ack event is missing, and knows a muted ack posts nothing', () => {
     expect(view(acked, [detected]).ack).toMatchObject({
       postsAt: '2026-09-25T03:07:50.000Z',

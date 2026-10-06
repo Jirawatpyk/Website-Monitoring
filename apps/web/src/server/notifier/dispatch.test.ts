@@ -173,15 +173,16 @@ describe('dispatchNotifications', () => {
       },
     });
     const send = okSend();
-    // The DOWN email is superseded (the incident is acknowledged); the other two go.
+    // Even with the incident acknowledged the DOWN email goes: it is the owner's record (PRD §7).
     expect(
       await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send }),
-    ).toMatchObject({ email: { sent: 2, superseded: 1 } });
+    ).toMatchObject({ email: { sent: 3, superseded: 0 } });
 
     const sent = send.mock.calls as unknown as [
       { subject: string; text: string; headers: Record<string, string> },
       { to: string; idempotencyKey: string },
     ][];
+    sent.shift(); // the DOWN record
     expect(sent.map(([m, o]) => [m.subject, o.to, o.idempotencyKey])).toEqual([
       ['Test target · Tier 1 · INC-0007', 'arm@example.test', 'notification-e-ack'],
       ['Test target · Tier 1 · INC-0007', 'tao@example.test', 'notification-e-rec-tao'],
@@ -336,7 +337,7 @@ describe('dispatchNotifications', () => {
     expect(calls.find((c) => c.table === 'profiles')?.filters).toContainEqual(['eq', 'is_active', true]);
     expect(calls.find((c) => c.table === 'notifications' && c.op === 'select')?.filters).toEqual([
       ['eq', 'channel', 'email'],
-      ['neq', 'status', 'cancelled'],
+      ['eq', 'status', 'sent'],
       ['in', 'incident_id', ['i1']],
       ['in', 'user_id', ['u-arm']],
     ]);

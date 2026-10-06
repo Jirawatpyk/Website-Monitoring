@@ -2,7 +2,7 @@
 -- re-ack after Undo, the fallback email audience, and the attempts log's RLS.
 begin;
 \ir _helpers.psql
-select plan(39);
+select plan(40);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -123,6 +123,11 @@ select results_eq(
            ('incident.ack_undone', (select id from ids where name = 'arm'))$$,
   'both are audited under the person'
 );
+
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select throws_ok(format('select public.undo_ack(%L)', (select id from inc where name = 'a')),
+  '55000', null, 'a second Undo (double tap) is "nothing to undo", not "not yours"');
+reset role;
 
 -- Re-ack after Undo queues fresh messages (the cancelled ones don't block them).
 select tests.authenticate_as((select id from ids where name = 'arm'));

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Button, EmptyState } from '@jirawatpyk/aura-react';
+import { IconInbox } from '@jirawatpyk/aura-react/icons';
 import { IncidentAckView } from '@/features/incidents';
 import { getIncidentForAck } from '@/features/incidents/server';
 import { getAccess } from '@/lib/auth/session';
@@ -18,7 +19,7 @@ export default async function IncidentPage({ params }: { params: Promise<{ incid
   if (!view || access.status !== 'active') {
     return (
       <EmptyState
-        icon="inbox"
+        icon={<IconInbox />}
         title="Incident not found"
         description="The link may be wrong, or the incident was removed."
         action={<Button href="/">Go to Overview</Button>}

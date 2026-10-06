@@ -154,7 +154,9 @@ $$;
 -- run that dies, and a run that stops early releases what it didn't send. After an attempt the
 -- notifier sets `next_retry_at` itself: the backoff (30 s, 2 min, 8 min) or nothing when sent.
 -- Messages of one thread leave in order: a row waits while an older one for the same incident,
--- channel and person is still queued, so the latest reply is always the current status.
+-- channel and person is still queued, so the latest reply is always the current status. The cost:
+-- while an older message is in backoff (up to 8 min), later replies in that thread wait behind it,
+-- so the "ACKNOWLEDGED after 10 s" target holds on a healthy Chat; email is still the record.
 drop function public.claim_notifications(public.notification_channel, integer);
 create function public.claim_notifications(
   p_channel public.notification_channel,
@@ -342,6 +344,9 @@ begin
   select * into v_inc from public.incidents where id = p_incident_id for update;
   if not found then
     raise exception 'incident not found' using errcode = 'P0002';
+  end if;
+  if v_inc.acked_by is null then
+    raise exception 'Nothing to undo' using errcode = '55000';
   end if;
   if v_inc.acked_by is distinct from auth.uid() then
     raise exception 'Only the person who acknowledged can undo it' using errcode = '42501';

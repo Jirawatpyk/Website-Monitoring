@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Button, Icon } from '@jirawatpyk/aura-react';
+import { Alert, Button } from '@jirawatpyk/aura-react';
+import { IconCheck, IconClock, IconRotateCcw, IconUser } from '@jirawatpyk/aura-react/icons';
 import { formatTimeWithSeconds, UNDO_WINDOW_SEC } from '@dxt/shared';
 import { acknowledgeIncident, undoAcknowledge } from '../actions';
 import type { AckState } from '../view';
@@ -136,7 +137,7 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
         >
           <div className="flex items-center gap-2">
             <span className="flex text-fg-positive">
-              <Icon name="check" size="sm" />
+              <IconCheck aria-hidden className="size-4" />
             </span>
             <h2
               id="ack-card-title"
@@ -150,7 +151,11 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
           {ack.byViewer && <span className="text-sm">Acknowledged by {ack.byName}.</span>}
           <div className="flex items-start gap-1.5 text-xs text-fg-secondary">
             <span className="flex pt-px">
-              <Icon name={holding || waitingForPost ? 'clock' : 'check'} size="sm" />
+              {holding || waitingForPost ? (
+                <IconClock aria-hidden className="size-4" />
+              ) : (
+                <IconCheck aria-hidden className="size-4" />
+              )}
             </span>
             <span>
               {holding ? `Posting to Chat and email in ${seconds} s — nothing is sent until then` : phase}
@@ -160,7 +165,7 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
             <Button
               ref={undoButton}
               variant="secondary"
-              icon="rotate-ccw"
+              icon={<IconRotateCcw />}
               fullWidth
               loading={pending}
               onClick={() => run(() => undoAcknowledge(incidentId))}
@@ -182,7 +187,7 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
         {ack.kind === 'can-ack' && (
           <>
             <span className="flex items-center justify-center gap-1.5 text-xs text-fg-secondary">
-              <Icon name="user" size="sm" />
+              <IconUser aria-hidden className="size-4" />
               <span>
                 Signed in as <b className="font-medium text-fg-primary">{viewerEmail}</b>
               </span>
@@ -190,7 +195,7 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
             <Button
               ref={ackButton}
               variant="primary"
-              icon="check"
+              icon={<IconCheck />}
               fullWidth
               loading={pending}
               onClick={() => run(() => acknowledgeIncident(incidentId))}

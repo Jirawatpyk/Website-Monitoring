@@ -1,17 +1,29 @@
-import { Badge, type IconName, type Tone } from '@jirawatpyk/aura-react';
+import type { ReactElement } from 'react';
+import { Badge, type Tone } from '@jirawatpyk/aura-react';
+import {
+  IconArrowUpRight,
+  IconBan,
+  IconCheck,
+  IconCircleCheck,
+  IconClock,
+  IconEye,
+  IconFileText,
+  IconPencil,
+  IconTriangleAlert,
+} from '@jirawatpyk/aura-react/icons';
 import type { IncidentState, Severity } from '@dxt/shared';
 
-type BadgeSpec = { tone: Tone; variant: 'outline' | 'soft'; icon: IconName | undefined; label: string };
+type BadgeSpec = { tone: Tone; variant: 'outline' | 'soft'; icon: ReactElement | undefined; label: string };
 
 /** Incident workflow state (spec §11): never solid red, never the ban icon. */
 const WORKFLOW: Record<IncidentState, BadgeSpec> = {
-  unacked: { tone: 'danger', variant: 'outline', icon: 'clock', label: 'Unacked' },
-  escalated: { tone: 'warning', variant: 'outline', icon: 'arrow-up-right', label: 'Escalated' },
-  acknowledged: { tone: 'neutral', variant: 'outline', icon: 'check', label: 'Acknowledged' },
-  monitoring: { tone: 'neutral', variant: 'outline', icon: 'eye', label: 'Monitoring' },
-  needs_root_cause: { tone: 'warning', variant: 'outline', icon: 'pencil', label: 'Needs root cause' },
-  resolved: { tone: 'success', variant: 'outline', icon: 'circle-check', label: 'Resolved' },
-  in_review: { tone: 'neutral', variant: 'outline', icon: 'file-text', label: 'In review' },
+  unacked: { tone: 'danger', variant: 'outline', icon: <IconClock />, label: 'Unacked' },
+  escalated: { tone: 'warning', variant: 'outline', icon: <IconArrowUpRight />, label: 'Escalated' },
+  acknowledged: { tone: 'neutral', variant: 'outline', icon: <IconCheck />, label: 'Acknowledged' },
+  monitoring: { tone: 'neutral', variant: 'outline', icon: <IconEye />, label: 'Monitoring' },
+  needs_root_cause: { tone: 'warning', variant: 'outline', icon: <IconPencil />, label: 'Needs root cause' },
+  resolved: { tone: 'success', variant: 'outline', icon: <IconCircleCheck />, label: 'Resolved' },
+  in_review: { tone: 'neutral', variant: 'outline', icon: <IconFileText />, label: 'In review' },
   closed: { tone: 'neutral', variant: 'soft', icon: undefined, label: 'Closed' },
 };
 
@@ -31,17 +43,17 @@ export function WorkflowBadge({ state, level }: { state: IncidentState; level?: 
 export function SeverityBadge({ severity, recovered }: { severity: Severity; recovered: boolean }) {
   if (severity === 'problem') {
     return (
-      <Badge tone="warning" variant={recovered ? 'outline' : 'soft'} icon="triangle-alert">
+      <Badge tone="warning" variant={recovered ? 'outline' : 'soft'} icon={<IconTriangleAlert />}>
         {recovered ? 'Was a problem' : 'Problem'}
       </Badge>
     );
   }
   return recovered ? (
-    <Badge tone="danger" variant="outline" icon="ban">
+    <Badge tone="danger" variant="outline" icon={<IconBan />}>
       Was down
     </Badge>
   ) : (
-    <Badge tone="danger" variant="solid" icon="ban">
+    <Badge tone="danger" variant="solid" icon={<IconBan />}>
       Down
     </Badge>
   );

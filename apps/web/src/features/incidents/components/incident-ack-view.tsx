@@ -1,4 +1,4 @@
-import { Icon } from '@jirawatpyk/aura-react';
+import { IconUser } from '@jirawatpyk/aura-react/icons';
 import { SeverityBadge, WorkflowBadge } from '@/components/status-badges';
 import { NoAccess } from '@/components/states';
 import type { IncidentView } from '../view';
@@ -30,7 +30,7 @@ export function IncidentAckView({ view, viewerName, viewerEmail }: IncidentAckVi
         {view.role && (
           <span className="flex items-center gap-2 text-sm">
             <span className="flex text-fg-secondary">
-              <Icon name="user" size="sm" />
+              <IconUser aria-hidden className="size-4" />
             </span>
             <b className="font-semibold">{view.role}</b>
           </span>

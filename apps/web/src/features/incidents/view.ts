@@ -264,10 +264,13 @@ export function logOf(
         // Newer events come first: an undo after this ack means it never posts.
         const later = sorted.slice(0, n);
         const undone = later.some((l) => l.type === 'ack_undone');
-        const posted = later
-          .filter((l) => l.type === 'alerted' && l.payload.template === 'acknowledged')
-          .map((l) => l.at)
-          .sort()[0];
+        // An undone ack never posted: a later ack's post belongs to that one.
+        const posted = undone
+          ? undefined
+          : later
+              .filter((l) => l.type === 'alerted' && l.payload.template === 'acknowledged')
+              .map((l) => l.at)
+              .sort()[0];
         const holding = postsAt && !undone && new Date(postsAt) > now && e.payload.notifies !== false;
         const by = `Acknowledged by ${nameOf(e.actor_id)}`;
         return [

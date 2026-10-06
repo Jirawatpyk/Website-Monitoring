@@ -94,41 +94,58 @@ export async function dispatchNotifications(
   deps: DispatchDeps,
   options: DispatchOptions = {},
 ): Promise<CronJobResult> {
+  const claim = async (channel: 'google_chat' | 'email') => {
+    const claimed = await deps.db.rpc('claim_notifications', {
+      p_channel: channel,
+      p_limit: CLAIM_LIMIT,
+      ...(options.incidentId ? { p_incident_id: options.incidentId } : {}),
+    });
+    if (claimed.error) throw new Error(`claim_notifications: ${claimed.error.message}`);
+    return claimed.data;
+  };
+  const [chatRows, emailRows] = await Promise.all([
+    deps.webhookUrl ? claim('google_chat') : null,
+    deps.email ? claim('email') : null,
+  ]);
+  // One load of incidents, owners and recipients for both channels.
+  const all = [...(chatRows ?? []), ...(emailRows ?? [])];
+  const facts = all.length ? await loadFacts(deps.db, all) : null;
   const [chat, email] = await Promise.all([
-    deps.webhookUrl ? dispatchChannel(deps, 'google_chat', options) : null,
-    deps.email ? dispatchChannel(deps, 'email', options) : null,
+    chatRows && facts
+      ? dispatchChannel(deps, 'google_chat', chatRows, facts, options)
+      : chatRows && emptySummary(),
+    emailRows && facts
+      ? dispatchChannel(deps, 'email', emailRows, facts, options)
+      : emailRows && emptySummary(),
   ]);
   return { ok: true, chat: chat ?? 'no_webhook', email: email ?? 'not_configured' };
 }
 
+const emptySummary = (): ChannelSummary => ({ sent: 0, retrying: 0, failed: 0, superseded: 0, released: 0 });
+
 async function dispatchChannel(
   deps: DispatchDeps,
   channel: 'google_chat' | 'email',
-  { deadline, incidentId }: DispatchOptions,
+  rows: readonly Notification[],
+  facts: Facts,
+  { deadline }: DispatchOptions,
 ): Promise<ChannelSummary> {
   const { db } = deps;
   const now = deps.now ?? (() => new Date());
-  const summary: ChannelSummary = { sent: 0, retrying: 0, failed: 0, superseded: 0, released: 0 };
+  const summary = emptySummary();
 
-  const claimed = await db.rpc('claim_notifications', {
-    p_channel: channel,
-    p_limit: CLAIM_LIMIT,
-    ...(incidentId ? { p_incident_id: incidentId } : {}),
-  });
-  if (claimed.error) throw new Error(`claim_notifications: ${claimed.error.message}`);
-  if (!claimed.data.length) return summary;
-  const facts = await loadFacts(db, claimed.data);
-
-  for (const [index, n] of claimed.data.entries()) {
+  for (const [index, n] of rows.entries()) {
     if (deadline !== undefined && now().getTime() + ROW_BUDGET_MS > deadline) {
-      summary.released = await release(db, claimed.data.slice(index));
+      summary.released = await release(db, rows.slice(index));
       break;
     }
 
-    // A DOWN that hasn't left yet is old news once the incident moved on (acked, recovered): the
-    // thread's latest reply must be the current status (ChatAlert), so it is dropped, not sent late.
+    // A Chat DOWN that hasn't left yet is old news once the incident moved on (acked, recovered):
+    // the thread's latest reply must be the current status (ChatAlert), so it is dropped, not sent
+    // late. The email still goes: it is each person's record of the incident (PRD §7).
     const incident = facts.incidents.get(n.incident_id);
     if (
+      channel === 'google_chat' &&
       (n.template === 'down' || n.template === 'problem') &&
       incident &&
       !WAITING_FOR_ACK.includes(incident.state)
@@ -208,15 +225,18 @@ async function dispatchChannel(
 
 /** Hands claimed rows back untouched: the claim counted an attempt this run never made. */
 async function release(db: DbClient, rows: readonly Notification[]): Promise<number> {
-  for (const r of rows) {
-    const back = await db
-      .from('notifications')
-      .update({ attempts: r.attempts - 1, next_retry_at: null })
-      .eq('id', r.id)
-      .eq('status', 'queued')
-      .eq('attempts', r.attempts);
-    if (back.error) throw new Error(`notifications: ${back.error.message}`);
-  }
+  const results = await Promise.all(
+    rows.map((r) =>
+      db
+        .from('notifications')
+        .update({ attempts: r.attempts - 1, next_retry_at: null })
+        .eq('id', r.id)
+        .eq('status', 'queued')
+        .eq('attempts', r.attempts),
+    ),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(`notifications: ${failed.error.message}`);
   return rows.length;
 }
 
@@ -242,7 +262,8 @@ async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: D
   const to = n.user_id ? facts.recipients.get(n.user_id) : undefined;
   if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
   const { apiKey, from } = deps.email!;
-  const first = facts.firstEmail.get(`${n.incident_id}:${to.id}`);
+  // The thread root is the first email this person really got; without one, this email is it.
+  const first = facts.firstEmail.get(`${n.incident_id}:${to.id}`) ?? n.template;
   const message = renderEmail(n, incident, to, deps.appUrl, domainOf(from), first);
   if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
   const send = deps.send ?? sendEmail;
