@@ -7,3 +7,5 @@ A switchable site for staging checks (S02a), deployed as its own Vercel project 
 (`supabase/staging/test-target.sql`) and flip `mode` to trigger a DOWN / RECOVERED.
 
 No secrets, no data, no auth: it only says which mode it is in.
+
+Vercel runs `api/index.ts` as native ESM: relative imports there must end in `.js` (`../src/handler.js`), or the function fails with `ERR_MODULE_NOT_FOUND` though tests pass.

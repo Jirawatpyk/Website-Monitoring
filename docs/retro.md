@@ -4,6 +4,7 @@ One line per lesson: what went wrong or slow, and the change that stops it happe
 
 | Date | What happened | What changed | Where |
 | --- | --- | --- | --- |
+| 6 Oct 2026 | The test target crashed on Vercel (`ERR_MODULE_NOT_FOUND`): a plain Vercel function runs as native ESM, so relative imports need `.js`; tests and typecheck passed because Vitest resolves them | `.js` on relative imports in `apps/test-target/api` (rule in its CLAUDE.md); check every new Vercel project's first deploy with a real request before handing it over | S02a |
 | 6 Oct 2026 | Engine tests used one round at an off-minute time, so they missed overlapping rounds: the engine could judge a round before its rechecks landed, and count 1 pass + 1 fail as OK (engine-reviewer H1/H2) | Rounds are probe-tick buckets judged only when complete; table tests use minute-aligned timelines with a newer incomplete round; rule in `packages/engine/CLAUDE.md` | S02a |
 | 6 Oct 2026 | The probe followed redirects with the WAF secret header and had no SSRF guard in the slice that started fetching (security-reviewer) | `runHttpCheck` follows redirects by hand, sends extra headers only to the monitor's origin, and refuses private / reserved targets on every hop (`assertPublicTarget`), with tests | S02a |
 | 6 Oct 2026 | A helper change broke the integration tests unnoticed: `*.int.test.ts` aren't part of `pnpm check` | The CI `db` job runs `test:int`; run `pnpm --filter @dxt/web test:int` locally after touching `src/server/` (apps/web CLAUDE.md) | S02a |
