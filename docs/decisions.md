@@ -38,11 +38,12 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   The on-call rule (any Tier 1 site while on shift) comes with on-call in S10. The check lives in the `ack_incident` SQL function, so no client can skip it.
 - **Fallback:**
   - when a Chat message is still failing after its last retry (+30 s, +2 min, +8 min), the same alert is emailed to the site's backup and every active Admin who didn't already get that email
-  - footer: "You got this because the Google Chat alert couldn't be delivered."
+  - footer: "You got this because a Google Chat alert for this incident couldn’t be delivered." (the same line on every later email to that person)
 - **D-013 covers email and the ack page.** Until their slices, these are left out:
   - escalation copy: "Next step", "acknowledge by …", "L1–L2 stopped", "L3 FYI"
   - client-update rows
   - buttons to pages that don't exist yet ("Add root cause", "Open draft", "Add note", "Full incident", "Site details")
+  - on the Down email, [Open incident] next to [Acknowledge]: both open the same page until S07
 
   Resulting copy:
   - The Undo line reads "Posting to Chat and email in N s — nothing is sent until then" (§16.8 without "webhooks" until S24).
