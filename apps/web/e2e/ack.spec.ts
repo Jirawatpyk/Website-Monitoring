@@ -43,6 +43,17 @@ test.describe('acknowledge from the alert link (local Supabase)', () => {
     ]);
   });
 
+  test('the action bar sits on the bottom edge of the screen, even with little content', async ({ page }) => {
+    const id = await openTestIncident('arm@example.test');
+    await page.goto(`/incidents/${id}`);
+    const bar = page
+      .getByRole('button', { name: 'Acknowledge' })
+      .locator('xpath=ancestor::div[contains(@class,"sticky")][1]');
+    const box = await bar.boundingBox();
+    const height = page.viewportSize()!.height;
+    expect(Math.abs(box!.y + box!.height - height)).toBeLessThanOrEqual(1);
+  });
+
   test('one tap acknowledges under the person’s name; Undo goes once the window closes', async ({ page }) => {
     const id = await openTestIncident('arm@example.test');
     await page.goto(`/incidents/${id}?ack=1`);
