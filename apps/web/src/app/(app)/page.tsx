@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import { Container } from '@jirawatpyk/aura-react';
-import { PageHeader } from '@/components/app-shell/page-header';
+import { Container, PageHeader } from '@jirawatpyk/aura-react';
 
 export const metadata: Metadata = { title: 'Overview' };
 

@@ -46,11 +46,11 @@ The canvas's orange note listed 14 issues. As of AURA 5.10 these are fixed (and 
 
 Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build project-specific components in `apps/web/src/components`, not in AURA.
 
-## Requests to AURA (workarounds in DxT until they ship)
+## Requests to AURA
 
-Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac) (6 Oct 2026). Remove each workaround when its request ships:
+Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac) (6 Oct 2026). All four shipped in **AURA 5.32** and DxT's workarounds are gone:
 
-- SideNav header divider: `components/app-shell/brand.tsx` stretches to the nav edges with `-ml-4 -mr-2` and draws `border-b`.
-- IconButton AURA Tooltip: icon buttons keep the native `title` (AURA sets it); don't wrap them in `<Tooltip>` (two tooltips).
-- PageHeader: `components/app-shell/page-header.tsx`; AppShell's content padding is the page margin, so pages add no top padding.
-- Skeleton pill: `components/states/loading-list.tsx` uses `rect` + `rounded-aura-full`.
+- SideNav header divider → `SideNav headerDivider` (`components/app-shell/app-nav.tsx`).
+- IconButton tooltip → AURA's own tip (hover and keyboard focus); don't wrap IconButtons in `<Tooltip>`, and find them in tests by accessible name, not `title`.
+- PageHeader → AURA `PageHeader` (no outer padding: AppShell's content padding is the page margin).
+- Skeleton pill → `Skeleton variant="pill"` (StatusPill size) or `variant="badge"` (Badge size).

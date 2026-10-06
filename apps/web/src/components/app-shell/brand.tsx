@@ -18,15 +18,7 @@ export function BrandMark({ inverted = false }: { inverted?: boolean }) {
   );
 }
 
-/**
- * Sidebar header, as on the canvas: logo 20 px from the left and top, a full-width divider at 72 px,
- * menu from 88 px. AURA SideNav's header slot pads 20 / 8 / 16 / 16 px, so this stretches back to the
- * nav's edges (-ml-4, -mr-2) to draw the divider across the whole sidebar.
- */
+/** Sidebar header: the brand mark. SideNav's `headerDivider` (AURA 5.32) gives the canvas metrics. */
 export function Brand() {
-  return (
-    <div className="-mr-2 -ml-4 flex h-13 items-start border-b border-border-default px-5">
-      <BrandMark />
-    </div>
-  );
+  return <BrandMark />;
 }

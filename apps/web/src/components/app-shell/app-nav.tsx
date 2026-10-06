@@ -9,6 +9,13 @@ import { activeNavId, NAV_SECTIONS } from './nav';
 export function AppNav({ header, footer }: { header: ReactNode; footer: ReactNode }) {
   const value = activeNavId(usePathname()) ?? undefined;
   return (
-    <SideNav sections={NAV_SECTIONS} value={value} header={header} footer={footer} label="Main navigation" />
+    <SideNav
+      sections={NAV_SECTIONS}
+      value={value}
+      header={header}
+      headerDivider
+      footer={footer}
+      label="Main navigation"
+    />
   );
 }
