@@ -339,7 +339,7 @@ $$;
 
 -- Acknowledges an open, unacknowledged incident as the signed-in person, in one transaction:
 -- state, timeline, audit, and the ACKNOWLEDGED messages held for the 10 s Undo window — the Chat
--- reply (only when the DOWN was posted) and an email to everyone already emailed. Returns the time
+-- reply (when the incident had a Chat DOWN, posted or due — it reads on its own if the DOWN was set aside) and an email to everyone already emailed. Returns the time
 -- the messages go out. Errors: 42501 not allowed · P0002 not found · 55000 not unacknowledged.
 create function public.ack_incident(p_incident_id uuid)
 returns timestamptz

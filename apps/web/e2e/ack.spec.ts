@@ -30,7 +30,7 @@ test.describe('acknowledge from the alert link (local Supabase)', () => {
     await expect(page.getByText(/^Posting to Chat and email in \d+ s/)).toBeVisible();
     const undo = page.getByRole('button', { name: /^Undo · \d+ s$/ });
     // Touch targets ≥ 44 px (spec §14.17).
-    for (const control of [undo, page.getByRole('link', { name: 'Visit site ↗' })]) {
+    for (const control of [undo, page.getByRole('link', { name: 'Visit site (opens in a new tab)' })]) {
       if (await control.count()) expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     }
     await undo.click();

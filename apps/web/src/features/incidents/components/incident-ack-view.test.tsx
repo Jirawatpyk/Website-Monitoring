@@ -50,7 +50,7 @@ describe('IncidentAckView (MobileAck)', () => {
     expect(screen.getByText('Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)')).toBeInTheDocument();
     expect(screen.getByText('arm@example.test')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Visit site ↗' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Visit site (opens in a new tab)' })).toHaveAttribute(
       'href',
       'https://www.muvmi.example.test',
     );
@@ -190,6 +190,13 @@ describe('IncidentAckView (MobileAck)', () => {
     await act(async () => vi.advanceTimersByTime(30_000));
     expect(refresh.mock.calls.length).toBeGreaterThanOrEqual(3);
     expect(screen.getByRole('status')).toHaveTextContent('Still sending — retried automatically');
+  });
+
+  it('says plainly when a page opened after the retries finds it still unposted', async () => {
+    renderView(acked({ windowOpen: false, postsAt: '2026-09-25T02:50:00Z' }));
+    await act(async () => vi.advanceTimersByTime(0));
+    expect(screen.getByRole('status')).toHaveTextContent('Not confirmed as posted');
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it('shows a PROBLEM incident as Problem, and the escalation level', () => {

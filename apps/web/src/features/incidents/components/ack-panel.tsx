@@ -56,7 +56,8 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [late, setLate] = useState(false);
+  /** How long it has been unposted: `late` after 30 s, `stale` once the retries (~11 min) are over. */
+  const [overdue, setOverdue] = useState<'no' | 'late' | 'stale'>('no');
   const ackButton = useRef<HTMLButtonElement>(null);
   const undoButton = useRef<HTMLButtonElement>(null);
   const cardTitle = useRef<HTMLHeadingElement>(null);
@@ -75,11 +76,18 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
   useEffect(() => {
     if (!waitingForPost || !postsAt) return;
     const since = Date.now() - new Date(postsAt).getTime();
-    if (since > POLL_FOR_MS) return;
+    // A page opened after the retries are over says so at once, rather than "now" for ever.
+    if (since > POLL_FOR_MS) {
+      const staleTimer = setTimeout(() => setOverdue('stale'), 0);
+      return () => clearTimeout(staleTimer);
+    }
     const timers = REFRESH_AFTER_MS.map((ms) => setTimeout(() => router.refresh(), ms));
     const poll = setInterval(() => router.refresh(), POLL_MS);
-    const lateTimer = setTimeout(() => setLate(true), Math.max(0, LATE_AFTER_MS - since));
-    const stop = setTimeout(() => clearInterval(poll), POLL_FOR_MS - since);
+    const lateTimer = setTimeout(() => setOverdue('late'), Math.max(0, LATE_AFTER_MS - since));
+    const stop = setTimeout(() => {
+      clearInterval(poll);
+      setOverdue('stale');
+    }, POLL_FOR_MS - since);
     return () => {
       timers.forEach(clearTimeout);
       clearInterval(poll);
@@ -118,9 +126,11 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
           ? 'Nothing to post — no alert went out for this incident.'
           : ack.posted
             ? `Posted to ${ack.posted.to} at ${formatTimeWithSeconds(new Date(ack.posted.at))}`
-            : late
-              ? 'Still sending — retried automatically until it goes through'
-              : 'Posting to the Chat thread and email now';
+            : overdue === 'stale'
+              ? 'Not confirmed as posted — Chat and email didn’t answer. Tell the team in the Chat thread.'
+              : overdue === 'late'
+                ? 'Still sending — retried automatically until it goes through'
+                : 'Posting to the Chat thread and email now';
 
   return (
     <>
@@ -143,7 +153,7 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
               id="ack-card-title"
               ref={cardTitle}
               tabIndex={-1}
-              className="m-0 grow text-base font-semibold outline-none"
+              className="m-0 grow rounded-aura-sm text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
             >
               {ack.byViewer ? `Acknowledged as ${viewerName}` : `Acknowledged by ${ack.byName}`}
             </h2>
@@ -206,7 +216,8 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
         )}
         {siteUrl && (
           <Button variant="secondary" fullWidth href={siteUrl} target="_blank" rel="noopener noreferrer">
-            Visit site ↗
+            Visit site <span aria-hidden>↗</span>
+            <span className="sr-only">(opens in a new tab)</span>
           </Button>
         )}
       </div>

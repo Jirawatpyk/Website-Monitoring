@@ -285,7 +285,6 @@ async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: D
   const to = n.user_id ? facts.recipients.get(n.user_id) : undefined;
   if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
   const { apiKey, from } = deps.email!;
-  // The thread root is the first email this person really got; without one, this email is it.
   // One thread per incident; this person's first email starts theirs (Resend/SES set Message-IDs).
   const first = facts.firstEmail.get(`${n.incident_id}:${to.id}`);
   const message = renderEmail(n, incident, to, deps.appUrl, {
