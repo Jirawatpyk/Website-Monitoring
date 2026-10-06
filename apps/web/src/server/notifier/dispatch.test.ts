@@ -11,7 +11,6 @@ import {
   runNotifierSweep,
 } from './dispatch';
 import { notifierDeps } from './deps';
-import { domainOf } from './render';
 
 const webhookUrl = 'https://chat.googleapis.com/v1/spaces/S/messages?key=K&token=T';
 const appUrl = 'https://monitor.dxt.example';
@@ -171,16 +170,18 @@ describe('dispatchNotifications', () => {
       // Tao's first email of the incident was the ACKNOWLEDGED fallback, not a DOWN.
       'notifications.select': {
         data: [
-          { incident_id: 'i1', user_id: 'u-arm', template: 'down' },
-          { incident_id: 'i1', user_id: 'u-tao', template: 'acknowledged' },
-          { incident_id: 'i1', user_id: 'u-tao', template: 'recovered' },
+          { id: 'e-down', incident_id: 'i1', user_id: 'u-arm', provider_message_id: 'em_down' },
+          { id: 'e-ack-tao', incident_id: 'i1', user_id: 'u-tao', provider_message_id: 'em_ack_tao' },
+          { id: 'e-rec-tao', incident_id: 'i1', user_id: 'u-tao', provider_message_id: null },
         ],
       },
     });
     const send = okSend();
+    // The provider's Message-ID of each person's first email (Resend/SES set their own).
+    const messageIdOf = vi.fn(async (_key: string, id: string) => `<${id}@ses.example>`);
     // Even with the incident acknowledged the DOWN email goes: it is the owner's record (PRD §7).
     expect(
-      await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send }),
+      await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send, messageIdOf }),
     ).toMatchObject({ email: { sent: 3, superseded: 0 } });
 
     const sent = send.mock.calls as unknown as [
@@ -193,20 +194,23 @@ describe('dispatchNotifications', () => {
       ['Test target · Tier 1 · INC-0007', 'tao@example.test', 'notification-e-rec-tao'],
     ]);
     expect(sent[0]?.[0].text).toContain('You got this because you acknowledged this incident.');
-    expect(sent[0]?.[0].headers['In-Reply-To']).toBe('<inc-i1.down.u-arm@notify.dxt.example>');
-    expect(sent[1]?.[0].headers['In-Reply-To']).toBe('<inc-i1.acknowledged.u-tao@notify.dxt.example>');
+    expect(sent[0]?.[0].headers['In-Reply-To']).toBe('<em_down@ses.example>');
+    expect(sent[1]?.[0].headers['In-Reply-To']).toBe('<em_ack_tao@ses.example>');
+    expect(messageIdOf).toHaveBeenCalledWith('re_test', 'em_down');
     expect(sent[1]?.[0].text).toContain('couldn’t be delivered');
   });
 
   it('starts a person’s thread with their first email: no reply headers on it', async () => {
     const { db } = fakeDb({
       ...queue([], [mail('down')]),
-      'notifications.select': { data: [{ incident_id: 'i1', user_id: 'u-arm', template: 'down' }] },
+      'notifications.select': {
+        data: [{ id: 'e-down', incident_id: 'i1', user_id: 'u-arm', provider_message_id: null }],
+      },
     });
     const send = okSend();
     await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send });
     const [m] = send.mock.calls[0] as unknown as [{ headers: Record<string, string> }];
-    expect(m.headers).toEqual({ 'Message-ID': '<inc-i1.down.u-arm@notify.dxt.example>' });
+    expect(m.headers).toEqual({});
   });
 
   it('drops a DOWN that hasn’t left once the incident has moved on (ChatAlert: latest reply = status)', async () => {
@@ -493,11 +497,5 @@ describe('notifierDeps', () => {
     expect(
       notifierDeps('db' as never, { ...TEST_ENV, RESEND_API_KEY: 're_x' } as never).email,
     ).toBeUndefined();
-  });
-
-  it('reads the domain of the sending address', () => {
-    expect(domainOf(email.from)).toBe('notify.dxt.example');
-    expect(domainOf('alerts@plain.example')).toBe('plain.example');
-    expect(domainOf('nobody')).toBe('localhost');
   });
 });

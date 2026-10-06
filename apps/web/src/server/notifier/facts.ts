@@ -32,8 +32,8 @@ export interface Facts {
   incidents: Map<string, IncidentFacts>;
   /** Active people only: a deactivated account gets no email. */
   recipients: Map<string, Recipient>;
-  /** `incident:user` → the template of the first email that person was really sent (the thread root). */
-  firstEmail: Map<string, string>;
+  /** `incident:user` → the first email that person was really sent (the thread root). */
+  firstEmail: Map<string, { id: string; providerId: string | null }>;
 }
 
 /** Loads the incidents and email recipients of a batch of claimed messages, three queries in all. */
@@ -59,7 +59,7 @@ export async function loadFacts(db: DbClient, rows: readonly Notification[]): Pr
     userIds.length
       ? db
           .from('notifications')
-          .select('incident_id, user_id, template')
+          .select('id, incident_id, user_id, provider_message_id')
           .eq('channel', 'email')
           .eq('status', 'sent')
           .in('incident_id', incidentIds)
@@ -71,14 +71,11 @@ export async function loadFacts(db: DbClient, rows: readonly Notification[]): Pr
   if (people.error) throw new Error(`profiles: ${people.error.message}`);
   if (emails.error) throw new Error(`notifications: ${emails.error.message}`);
 
-  const firstEmail = new Map<string, string>();
-  for (const e of (emails.data ?? []) as {
-    incident_id: string;
-    user_id: string | null;
-    template: string;
-  }[]) {
+  type Sent = { id: string; incident_id: string; user_id: string | null; provider_message_id: string | null };
+  const firstEmail = new Map<string, { id: string; providerId: string | null }>();
+  for (const e of (emails.data ?? []) as Sent[]) {
     const key = `${e.incident_id}:${e.user_id}`;
-    if (!firstEmail.has(key)) firstEmail.set(key, e.template);
+    if (!firstEmail.has(key)) firstEmail.set(key, { id: e.id, providerId: e.provider_message_id });
   }
   return {
     incidents: new Map(incidents.data.map((i) => [i.id, i])),

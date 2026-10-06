@@ -4,7 +4,6 @@ import {
   buildDownEmail,
   buildRecoveredEmail,
   EMAIL_FOOTER,
-  emailMessageId,
   type EmailBaseInput,
 } from './email-alerts';
 
@@ -18,7 +17,6 @@ const base: EmailBaseInput = {
   recipientId: 'u-arm',
   reason: 'owner',
   incidentUrl: 'https://monitor.example.test/incidents/inc-1',
-  messageDomain: 'notify.example.test',
 };
 const startedAt = new Date('2026-09-25T02:48:10Z');
 const confirmedAt = new Date('2026-09-25T02:48:41Z');
@@ -40,14 +38,11 @@ describe('one thread per incident (spec §10)', () => {
     for (const m of [down(), acked(), recovered()]) expect(m.subject).toBe('MuvMi · Tier 1 · INC-0142');
   });
 
-  it('gives DOWN a Message-ID and makes every later email a reply to it', () => {
-    const first = emailMessageId('inc-1', 'down', 'u-arm', 'notify.example.test');
-    expect(first).toBe('<inc-inc-1.down.u-arm@notify.example.test>');
-    expect(down().headers).toEqual({ 'Message-ID': first });
-    for (const m of [acked(), recovered()]) {
-      expect(m.headers['In-Reply-To']).toBe(first);
-      expect(m.headers.References).toBe(first);
-      expect(m.headers['Message-ID']).not.toBe(first);
+  it('replies to the Message-ID the provider gave the first email; the first starts the thread', () => {
+    const root = '<0106abc@ap-northeast-1.amazonses.com>';
+    expect(down().headers).toEqual({});
+    for (const m of [acked({ replyTo: root }), recovered({ replyTo: root })]) {
+      expect(m.headers).toEqual({ 'In-Reply-To': root, References: root });
     }
   });
 });
@@ -142,12 +137,6 @@ describe('Recovered email (EmailAlert, spec §16.4, D-016)', () => {
 });
 
 describe('thread root and buttons per person', () => {
-  it('replies to the first email the person really got, and starts the thread with it', () => {
-    const root = emailMessageId('inc-1', 'acknowledged', 'u-arm', 'notify.example.test');
-    expect(recovered({ firstTemplate: 'acknowledged' }).headers['In-Reply-To']).toBe(root);
-    expect(acked({ firstTemplate: 'acknowledged' }).headers).toEqual({ 'Message-ID': root });
-  });
-
   it('gives the owner the leading button, everyone else a secondary one (board)', () => {
     expect(recovered().html).toMatch(
       /background:#18181b;border:1px solid #18181b;color:#ffffff;font-weight:600/,

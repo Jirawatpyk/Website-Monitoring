@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sendEmail } from './email-send';
+import { getEmailMessageId, sendEmail } from './email-send';
 
 const message = {
   subject: 'S · Tier 1 · INC-0001',
@@ -94,5 +94,26 @@ describe('sendEmail (Resend)', () => {
       error: 'Network error',
       retryable: true,
     });
+  });
+});
+
+describe('getEmailMessageId (Resend)', () => {
+  it('reads the Message-ID header Resend gave a sent email', async () => {
+    const fetchImpl = vi.fn(async () => Response.json({ id: 'em_1', message_id: '<0106abc@ses.example>' }));
+    expect(await getEmailMessageId('re_secret', 'em_1', { fetchImpl })).toBe('<0106abc@ses.example>');
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.resend.com/emails/em_1');
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer re_secret');
+  });
+
+  it('is null when it can’t be read or isn’t a Message-ID', async () => {
+    const notFound = vi.fn(async () => new Response('', { status: 404 }));
+    expect(await getEmailMessageId('k', 'x', { fetchImpl: notFound })).toBeNull();
+    const odd = vi.fn(async () => Response.json({ message_id: 'evil\r\nBcc: x' }));
+    expect(await getEmailMessageId('k', 'x', { fetchImpl: odd })).toBeNull();
+    const down = vi.fn(async () => {
+      throw new Error('net');
+    });
+    expect(await getEmailMessageId('k', 'x', { fetchImpl: down })).toBeNull();
   });
 });

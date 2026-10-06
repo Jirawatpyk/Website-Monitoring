@@ -75,17 +75,13 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   return 'fallback';
 }
 
-/** "DxT Monitor <alerts@notify.example>" → "notify.example". */
-export const domainOf = (from: string) => /@([^>\s]+)>?\s*$/.exec(from)?.[1] ?? 'localhost';
-
 /** The email for a claimed row and its recipient, or null when its template has nothing to say. */
 export function renderEmail(
   n: Notification,
   i: IncidentFacts,
   to: Recipient,
   appUrl: string,
-  messageDomain: string,
-  firstTemplate?: string,
+  replyTo: string | null,
 ): EmailMessage | null {
   const ctx = contextOf(n.context);
   const base: EmailBaseInput = {
@@ -96,8 +92,7 @@ export function renderEmail(
     recipientId: to.id,
     reason: emailReason(n, i),
     incidentUrl: incidentUrl(appUrl, i.id),
-    messageDomain,
-    ...(firstTemplate ? { firstTemplate } : {}),
+    replyTo,
   };
   switch (n.template) {
     case 'down':

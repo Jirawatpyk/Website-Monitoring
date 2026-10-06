@@ -7,7 +7,8 @@ import { downtime } from './downtime';
  *
  * One email per event and per person, all under one subject per incident ("MuvMi · Tier 1 ·
  * INC-0142"), so a mail client stacks them like the Chat thread: every later email sets
- * `In-Reply-To` / `References` to the recipient's DOWN email. The status word leads the preheader
+ * `In-Reply-To` / `References` to the Message-ID of the recipient's first email (the provider
+ * assigns Message-IDs — Resend/SES replaces any we set — so the caller looks it up). The status word leads the preheader
  * and the body (it shows in a phone notification); the footer says why this person got it.
  * Table layout, inline styles, 600 px, system fonts, plain-text part, no tracking.
  */
@@ -31,13 +32,8 @@ export interface EmailBaseInput {
   reason: EmailReason;
   /** The incident page (`/incidents/<id>`). */
   incidentUrl: string;
-  /** Domain of the sending address: Message-IDs are made on it. */
-  messageDomain: string;
-  /**
-   * Template of the recipient's first email of this incident — the thread root later emails reply
-   * to (`down`, or what a fallback first sent them). Default `down`.
-   */
-  firstTemplate?: string;
+  /** Message-ID of the recipient's first email of this incident, which this one replies to. */
+  replyTo?: string | null;
 }
 
 export interface DownEmailInput extends EmailBaseInput {
@@ -87,16 +83,6 @@ export const EMAIL_FOOTER =
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-
-/** `<inc-…@domain>`: deterministic, so later emails can reply to the recipient's DOWN email. */
-export function emailMessageId(
-  incidentId: string,
-  template: string,
-  recipientId: string,
-  domain: string,
-): string {
-  return `<inc-${incidentId}.${template}.${recipientId}@${domain}>`;
-}
 
 const subjectOf = (i: EmailBaseInput) =>
   `${i.site} · ${formatTier(i.tier)} · ${formatIncidentId(i.incidentNumber)}`;
@@ -186,14 +172,10 @@ function render(input: EmailBaseInput, b: Body): EmailMessage {
     EMAIL_FOOTER,
   ].join('\n');
 
-  const own = emailMessageId(input.incidentId, b.template, input.recipientId, input.messageDomain);
-  const rootTemplate = input.firstTemplate ?? 'down';
-  const root = emailMessageId(input.incidentId, rootTemplate, input.recipientId, input.messageDomain);
-  // Reply only to an email this person really got; their first one starts the thread.
-  const headers: Record<string, string> =
-    rootTemplate === b.template
-      ? { 'Message-ID': own }
-      : { 'Message-ID': own, 'In-Reply-To': root, References: root };
+  // Their first email starts the thread; every later one replies to it.
+  const headers: Record<string, string> = input.replyTo
+    ? { 'In-Reply-To': input.replyTo, References: input.replyTo }
+    : {};
 
   return { subject: subjectOf(input), html, text, headers };
 }

@@ -155,6 +155,10 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   6. message-checker passes the email events and the ACKNOWLEDGED row; spec-checker passes MobileAck and MobileAckDark.
 - **Review:** message-checker, engine-reviewer, security-reviewer (ack action, RLS), db-reviewer (notifications), spec-checker (MobileAck, MobileAckDark).
 - **Notes (evidence):** started 6 Oct 2026 14:03Z. Ack rights, fallback audience, copy cuts and the incident route per D-016.
+  - Staging run 1 (deploy `3ab200c`, 6 Oct): test target → `error` 15:44:11Z; the probe-sin run whose recheck failed ran the engine itself and sent INC-0003 at once — DOWN email 15:46:17.26Z, Chat 15:46:17.81Z (**2 min 6 s** after the switch; Tao's inbox and Chat screenshots: subject `Test target · Tier 1 · INC-0003`, button "Open / acknowledge", footer ack sentence). Resend accepted the custom `Message-ID`.
+  - **Done-when 2:** `sent_at − detected_at` for the DOWN = **0.9 s** (email) / **1.4 s** (Chat); `detected_at` = the confirming recheck 15:46:16Z (staging SQL, Tao).
+  - Ack (desktop, Tao) 15:50:58Z → "Undo · N s" countdown → ACKNOWLEDGED posted to Chat + email 15:51:10–11Z (window 10 s + 2 s margin); the page then read "Posted to the Chat thread + email at 22:51:10" and the log "(posted 22:51:10)". ACKNOWLEDGED email: "Jirawat (Tao) Piyakit has Test target", footer "you acknowledged this incident".
+  - Test target → `ok` 15:52:44Z; RECOVERED by the engine cron 15:54:39Z to Chat and email.
 
 ### S03 · Bangkok probe & browser verifier
 
