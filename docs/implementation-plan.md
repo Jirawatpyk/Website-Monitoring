@@ -14,7 +14,7 @@
 | S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Done |
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
-| S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Todo |
+| S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | In progress |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
@@ -97,7 +97,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 - **Depends on:** S00 (Supabase projects, OAuth client, company domain, access list)
 - **Done when:**
   1. **T12:** an allowlisted company account signs in at `/login` and lands on `/` with its allowlisted role — locally, on `dxt-monitor-staging` and on one PR preview. Signing in with different capitals still matches the allowlist. A company account that isn't on the allowlist and a non-company account are both refused by the `before_user_created` hook with a message to ask an Admin (pgTAP tests); inserting an allowlist row on a domain that isn't allowed fails (pgTAP); a non-company session is also refused by the proxy (`?error=domain`); a user whose profile is inactive reads nothing (pgTAP).
-  2. Opening `/incidents/x` signed out → sign-in → back on `/incidents/x` (evidence: the URL after sign-in; the page itself 404s until S07).
+  2. Opening `/incidents/x` signed out → sign-in → back on `/incidents/x` (evidence: the URL after sign-in; the page itself 404'd until S02b built it, D-016).
   3. `pnpm exec supabase test db` passes locally and in the CI `db` job: anon reads nothing; viewer can't write `sites`; responder updates only the mute fields of own sites (D-012); `authenticated` can't UPDATE / DELETE `audit_log`.
   4. `pnpm db:reset` builds from zero with seed; `pnpm db:types` output committed; `pnpm check` green.
   5. spec-checker passes Login, MLogin, EmptyStates at 390 and 1440 px, light and dark.
@@ -154,6 +154,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   5. **T08:** Ack → Undo within 10 s → no Chat post and no email (the rows end `cancelled`).
   6. message-checker passes the email events and the ACKNOWLEDGED row; spec-checker passes MobileAck and MobileAckDark.
 - **Review:** message-checker, engine-reviewer, security-reviewer (ack action, RLS), db-reviewer (notifications), spec-checker (MobileAck, MobileAckDark).
+- **Notes (evidence):** started 6 Oct 2026 14:03Z. Ack rights, fallback audience, copy cuts and the incident route per D-016.
 
 ### S03 · Bangkok probe & browser verifier
 
