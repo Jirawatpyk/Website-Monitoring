@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@dxt/db';
 import { isAllowedEmail } from '@dxt/shared';
+import { refusedEmailCookie } from '@/lib/auth/login-errors';
 import { isPublic } from '@/lib/auth/public-paths';
 
 /**
@@ -53,6 +54,8 @@ export async function updateSession(request: NextRequest) {
     url.search = '?error=domain';
     const redirect = NextResponse.redirect(url);
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    // The login page names the account that was refused (D-011) — via a cookie, never the URL.
+    if (email) redirect.cookies.set(refusedEmailCookie(email.toLowerCase()));
     return redirect;
   }
 

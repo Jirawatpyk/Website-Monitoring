@@ -26,9 +26,16 @@ begin
   loop
     insert into private.allowed_emails (email, role)
     values (person.handle || '@example.test', person.role);
-    insert into auth.users (id, email, aud, role, raw_user_meta_data, email_confirmed_at)
-    values (gen_random_uuid(), person.handle || '@example.test', 'authenticated', 'authenticated',
-            jsonb_build_object('full_name', person.display_name), now());
+    -- instance_id, timestamps and the empty-string tokens let GoTrue load these users (admin API, e2e sign-in).
+    insert into auth.users (
+      instance_id, id, email, aud, role, raw_app_meta_data, raw_user_meta_data, email_confirmed_at,
+      confirmation_token, recovery_token, email_change_token_new, email_change, created_at, updated_at
+    )
+    values (
+      '00000000-0000-0000-0000-000000000000', gen_random_uuid(), person.handle || '@example.test',
+      'authenticated', 'authenticated', '{"provider":"email","providers":["email"]}',
+      jsonb_build_object('full_name', person.display_name), now(), '', '', '', '', now(), now()
+    );
   end loop;
 end;
 $$;

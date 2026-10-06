@@ -6,6 +6,17 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dxt/web", "dev"],
       "port": 3500
+    },
+    {
+      "name": "web-local-db",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dxt/web", "dev"],
+      "port": 3500,
+      "env": {
+        "NEXT_PUBLIC_SUPABASE_URL": "http://127.0.0.1:54321",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
+        "ALLOWED_EMAIL_DOMAIN": "example.test"
+      }
     }
   ]
 }

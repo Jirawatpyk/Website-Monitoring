@@ -2,7 +2,7 @@
 
 Next.js 16 App Router (Turbopack) on Vercel Pro. UI + every Vercel function.
 
-- `src/app/(app)/` — signed-in pages inside `AppShell` + `SideNav` (`src/components/app-shell/`). `src/app/(auth)/` — sign-in. `/status/[clientSlug]` (Phase 3) is public.
+- `src/app/(app)/` — signed-in pages inside `AppShell` + `SideNav` (`src/components/app-shell/`); the layout reads `getAccess()` (`src/lib/auth/session.ts`) and sends a session without an active profile to `/auth/refused`. `src/app/(auth)/` — sign-in (`features/auth`); `/auth/sign-in` starts Google OAuth, `/auth/callback` finishes it (D-007, D-011). `/status/[clientSlug]` (Phase 3) is public.
 - `src/proxy.ts` (Next 16's renamed middleware) refreshes the Supabase session and redirects signed-out people to `/login?next=…`. It doesn't protect `/api/*` — each route checks its own token.
 - `src/app/api/cron/*` — Vercel Cron, every minute (`vercel.json`). Wrap handlers with `cronHandler`. Probe regions are pinned in `vercel.json` `functions` (sin1, hnd1), **not** with `preferredRegion` (deprecated, and it doesn't pin Node functions).
 - `src/app/api/ingest`, `src/app/api/jobs` — for the VPS agent, bearer `INGEST_TOKEN`.
@@ -53,7 +53,7 @@ Rules — enforced by `dxt/feature-boundaries` in ESLint (`scripts/eslint/featur
 ## Testing
 
 - Unit / component tests: `src/**/*.test.ts(x)` with Vitest + Testing Library in jsdom (`vitest.config.ts`, `test/setup.ts` stubs `matchMedia`, `ResizeObserver` and `server-only`). Run `pnpm --filter @dxt/web test`.
-- E2E: `e2e/*.spec.ts` with Playwright, projects `desktop` (1440) and `mobile` (390). `pnpm test:e2e` starts `pnpm dev` on :3500 (or reuses it) with placeholder Supabase values — enough for signed-out flows; signed-in flows need `pnpm db:start` and a seeded user.
+- E2E: `e2e/*.spec.ts` with Playwright, projects `desktop` (1440) and `mobile` (390). `pnpm test:e2e` starts `pnpm dev` on :3500 (or reuses it) with placeholder Supabase values — enough for signed-out flows. Signed-in flows (`e2e/auth.spec.ts`) run against the local stack: `pnpm db:start`, `pnpm db:reset`, then `E2E_LOCAL_SUPABASE=1 pnpm test:e2e` with the dev server pointed at it (launch config `web-local-db`); they're skipped otherwise, including in CI.
 - Coverage (`pnpm --filter @dxt/web test:coverage`) measures the logic layers — `lib/`, `features/`, `server/`, `components/` — with thresholds 80 lines / 75 branches / 70 functions. Tests that need Node APIs such as `NextRequest` start with `// @vitest-environment node`; server env comes from `test/env.ts` (`stubServerEnv`).
 - `src/components/app-shell/nav.test.ts` fails if a nav item links to a page that doesn't exist — flip `live` only with the page.
 

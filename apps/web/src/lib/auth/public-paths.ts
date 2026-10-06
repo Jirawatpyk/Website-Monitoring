@@ -5,6 +5,7 @@
  */
 export const PUBLIC_PATHS = [
   '/login',
+  '/auth/sign-in',
   '/auth/callback',
   '/status',
   '/api/cron',
