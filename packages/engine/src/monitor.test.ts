@@ -65,7 +65,7 @@ describe('decideMonitor — DOWN on the check and its recheck (spec §6, S02a Do
     // Past the round deadline; TYO's scheduled failure (M+2) is later than SIN's (M+1) but isn't a recheck.
     const d = decideMonitor(
       snapshot([check('SIN', 'fail', 1), check('TYO', 'fail', 2), check('SIN', 'fail', 31, 2)], {
-        now: at(80),
+        now: at(140),
       }),
     );
     expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0 });
@@ -93,6 +93,21 @@ describe('decideMonitor — DOWN on the check and its recheck (spec §6, S02a Do
     expect(decideMonitor(snapshot(checks, { lastRoundAt: at(0) }))).toEqual({ kind: 'wait' });
   });
 
+  it('real staging cron offsets: SIN checks at :46 and rechecks in the next minute', () => {
+    const checks = [
+      check('TYO', 'fail', 2),
+      check('TYO', 'fail', 32, 2),
+      check('SIN', 'fail', 46),
+      check('SIN', 'fail', 76, 2),
+    ];
+    // Before SIN's recheck lands the round isn't complete — even past 75 s from its start.
+    expect(decideMonitor(snapshot(checks.slice(0, 3), { now: at(75) }))).toEqual({ kind: 'wait' });
+    expect(decideMonitor(snapshot(checks, { now: at(99) }))).toMatchObject({
+      kind: 'open',
+      startedAt: at(2),
+    });
+  });
+
   it('waits for a late recheck until the round deadline', () => {
     const checks = [check('SIN', 'fail', 1), check('TYO', 'fail', 2), check('SIN', 'fail', 31, 2)];
     expect(decideMonitor(snapshot(checks, { now: at(61) }))).toEqual({ kind: 'wait' });
@@ -104,7 +119,7 @@ describe('decideMonitor — DOWN on the check and its recheck (spec §6, S02a Do
   it('waits while a location hasn’t reported, then judges with what arrived', () => {
     expect(decideMonitor(snapshot([check('SIN', 'pass', 1)], { now: at(30) }))).toEqual({ kind: 'wait' });
     // Fewer than 2 locations: keep the status (PRD §5).
-    expect(decideMonitor(snapshot([check('SIN', 'pass', 1)], { now: at(80), okRounds: 1 }))).toEqual({
+    expect(decideMonitor(snapshot([check('SIN', 'pass', 1)], { now: at(140), okRounds: 1 }))).toEqual({
       kind: 'none',
       roundAt: at(0),
       okRounds: 1,

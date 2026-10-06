@@ -75,8 +75,10 @@ export type MonitorDecision =
   | { kind: 'settle'; roundAt: Date; from: IncidentState; to: IncidentState };
 
 /**
- * A round still incomplete this long after it started is judged with what arrived: the probe's
- * budget (55 s) plus room for cron start jitter.
+ * A round still incomplete this long after it ENDS is judged with what arrived. Vercel starts each
+ * cron at its own second within the minute (seen on staging: probe-tyo :02, probe-sin :46), so a
+ * check late in the round gets its recheck ~30 s into the next one: the probe's budget (55 s) plus
+ * room for jitter.
  */
 export const ROUND_DEADLINE_MS = 75_000;
 /** A recheck belongs to the scheduled check it follows within this time (one probe invocation). */
@@ -156,7 +158,8 @@ function newestReadyRound(s: MonitorSnapshot): Round | null {
   for (const start of newestFirst) {
     if (s.lastRoundAt && start <= s.lastRoundAt.getTime()) return null;
     const round = buildRound(s.checks, start, intervalMs);
-    if (isComplete(round, s.locations) || s.now.getTime() - start >= ROUND_DEADLINE_MS) return round;
+    if (isComplete(round, s.locations) || s.now.getTime() - (start + intervalMs) >= ROUND_DEADLINE_MS)
+      return round;
   }
   return null;
 }

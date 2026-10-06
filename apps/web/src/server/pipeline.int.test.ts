@@ -155,7 +155,7 @@ describe('engine on stored results (S02a Done-when 3)', () => {
       ['TYO', 'fail', t(2)], // later than SIN's first failure, but a scheduled check, not a recheck
       ['SIN', 'fail', t(31), 2],
     ]);
-    await runEngine(db, t(80)); // past the round deadline
+    await runEngine(db, t(140)); // past the round deadline
     expect(await incidentsOf(siteId)).toEqual([]);
     expect(await statusOf(siteId)).toMatchObject({ status: 'ok', ok_rounds: 0 });
   });
