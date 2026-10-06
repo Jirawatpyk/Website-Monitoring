@@ -5,9 +5,7 @@ begin;
 select plan(35);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
-delete from public.monitors;
-delete from public.sites;
-delete from public.clients;
+select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
 grant select on ids to anon, authenticated;
 insert into ids values

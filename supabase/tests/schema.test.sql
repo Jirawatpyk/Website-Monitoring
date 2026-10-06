@@ -3,9 +3,7 @@ begin;
 \ir _helpers.psql
 select plan(9);
 
-delete from public.monitors;
-delete from public.sites;
-delete from public.clients;
+select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
 insert into ids values
   ('arm', tests.create_user('arm@pgtap.test', 'responder')),
