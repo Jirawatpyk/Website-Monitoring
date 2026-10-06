@@ -12,7 +12,8 @@ export interface FakeCall {
 
 /**
  * A tiny stand-in for the Supabase client in unit tests: every `from(table)` chain resolves to the
- * result registered for `table.op` (default `{ data: [] }`), `rpc(name)` to `rpc.name`. Calls are
+ * result registered for `table.op` (default `{ data: [] }`), `rpc(name)` to `rpc.name` (a function
+ * result gets the arguments as `values`). Calls are
  * recorded so tests can assert what was written. Integration tests use the real local stack instead.
  */
 export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Result)> = {}) {
@@ -41,7 +42,18 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
           return builder;
         };
       }
-      for (const method of ['select', 'eq', 'in', 'not', 'gte', 'order', 'range', 'overrideTypes']) {
+      for (const method of [
+        'select',
+        'eq',
+        'in',
+        'is',
+        'not',
+        'gte',
+        'lte',
+        'order',
+        'range',
+        'overrideTypes',
+      ]) {
         builder[method] = (...args: unknown[]) => {
           if (!['select', 'order', 'overrideTypes'].includes(method)) call.filters.push([method, ...args]);
           return builder;
@@ -51,7 +63,9 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
     },
     rpc(name: string, args: unknown) {
       rpcCalls.push({ name, args });
-      return Promise.resolve(resolve(`rpc.${name}`));
+      return Promise.resolve(
+        resolve(`rpc.${name}`, { table: name, op: 'select', values: args, filters: [] }),
+      );
     },
   };
 
