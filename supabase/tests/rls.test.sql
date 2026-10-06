@@ -4,17 +4,20 @@ begin;
 select plan(32);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
+-- Start from no sites or clients, whatever the dev seed loaded (rolled back at the end).
+delete from public.sites;
+delete from public.clients;
 create temp table ids (name text primary key, id uuid) on commit drop;
 grant select on ids to anon, authenticated;
 insert into ids values
-  ('admin',       tests.create_user('admin@example.test', 'admin')),
-  ('arm',         tests.create_user('arm@example.test', 'responder')),
-  ('ploy',        tests.create_user('ploy@example.test', 'responder')),
-  ('bua',         tests.create_user('bua@example.test', 'stakeholder')),
-  ('mint',        tests.create_user('mint@example.test', 'viewer')),
-  ('former',      tests.create_user('former@example.test', 'responder')),
-  ('no_profile',  tests.create_user('noprofile@example.test')),
-  ('client_user', tests.create_user('client@example.test', 'client'));
+  ('admin',       tests.create_user('admin@pgtap.test', 'admin')),
+  ('arm',         tests.create_user('arm@pgtap.test', 'responder')),
+  ('ploy',        tests.create_user('ploy@pgtap.test', 'responder')),
+  ('bua',         tests.create_user('bua@pgtap.test', 'stakeholder')),
+  ('mint',        tests.create_user('mint@pgtap.test', 'viewer')),
+  ('former',      tests.create_user('former@pgtap.test', 'responder')),
+  ('no_profile',  tests.create_user('noprofile@pgtap.test')),
+  ('client_user', tests.create_user('client@pgtap.test', 'client'));
 update public.profiles set is_active = false where id = (select id from ids where name = 'former');
 
 insert into public.clients (id, name, am_user_id)
@@ -25,7 +28,7 @@ insert into public.sites (id, client_id, name, tier, primary_owner_id, backup_ow
   ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000c1', 'Site B', 2,
    (select id from ids where name = 'ploy'), null);
 insert into public.monitors (site_id, type, is_primary, url)
-values ('00000000-0000-0000-0000-0000000000a1', 'http', true, 'https://a.example.test');
+values ('00000000-0000-0000-0000-0000000000a1', 'http', true, 'https://a.pgtap.test');
 insert into public.audit_log (action, entity) values ('fixture', 'test');
 
 -- ── anon reads nothing ───────────────────────────────────────────────────

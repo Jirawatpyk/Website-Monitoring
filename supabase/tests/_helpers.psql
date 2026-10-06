@@ -52,5 +52,5 @@ $$;
 
 grant execute on all functions in schema tests to anon, authenticated;
 
-insert into private.allowed_email_domains (domain) values ('example.test')
+insert into private.allowed_email_domains (domain) values ('pgtap.test')
   on conflict do nothing;
