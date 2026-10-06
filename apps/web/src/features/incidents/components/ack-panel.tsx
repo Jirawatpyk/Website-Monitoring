@@ -188,7 +188,8 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
 
       {children}
 
-      <div className="sticky bottom-0 -mx-4 mt-auto flex flex-col gap-2 border-t border-border-default bg-bg-surface px-4 pt-2.5 pb-6">
+      {/* Flush with the screen's bottom edge: the negative margin cancels AppShell's own padding. */}
+      <div className="sticky bottom-0 -mx-4 -mb-aura-6 mt-auto flex flex-col gap-2 border-t border-border-default bg-bg-surface px-4 pt-2.5 pb-6 lg:-mb-aura-8">
         {error && (
           <Alert tone="danger" role="alert">
             {error}
