@@ -2,7 +2,7 @@ import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PROBE_USER_AGENT } from '@dxt/shared';
-import { runHttpCheck } from './http-check';
+import { runHttpCheck, sameSite } from './http-check';
 
 // A local server that answers per path, so every outcome is tested over real HTTP.
 let server: Server;
@@ -156,5 +156,36 @@ describe('runHttpCheck', () => {
       lookup: async () => [{ address: '10.0.0.5' }],
     });
     expect(rebound.error).toBe('Target not allowed: private or reserved address');
+  });
+
+  it('reads no body for a HEAD check', async () => {
+    const result = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok`, method: 'HEAD' });
+    expect(result).toMatchObject({ outcome: 'pass', statusCode: 200, bodySample: '' });
+  });
+
+  it('counts DNS resolution against the timeout', async () => {
+    const result = await runHttpCheck({
+      url: 'https://slow-dns.example.test/',
+      timeoutMs: 100,
+      lookup: () => new Promise(() => {}),
+    });
+    expect(result).toMatchObject({ outcome: 'fail', error: 'Timeout' });
+  });
+});
+
+describe('sameSite (where the WAF secret header may go)', () => {
+  const first = new URL('http://site.example.test/');
+  it.each([
+    ['http://site.example.test/next', true],
+    ['https://site.example.test/', true], // upgrade on default ports
+    ['https://www.site.example.test/', false],
+    ['http://other.example.test/', false],
+    ['https://site.example.test:8443/', false],
+  ])('%s → %s', (to, expected) => {
+    expect(sameSite(new URL(to), first)).toBe(expected);
+  });
+
+  it('never follows a downgrade to plain http', () => {
+    expect(sameSite(new URL('http://site.example.test/'), new URL('https://site.example.test/'))).toBe(false);
   });
 });

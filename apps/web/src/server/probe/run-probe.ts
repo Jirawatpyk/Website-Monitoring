@@ -20,6 +20,11 @@ export interface ProbeDeps {
   location: CloudLocation;
   /** `{ name, value }` of the WAF allowlist header (PRD §13), when configured. */
   secretHeader?: { name: string; value: string };
+  /**
+   * Local development only (PROBE_ALLOW_PRIVATE_TARGETS=1 off Vercel): allow a loopback test target.
+   * Off by default — a probe anywhere else keeps the SSRF guard.
+   */
+  allowPrivateTargets?: boolean;
   /** process.env.VERCEL / VERCEL_REGION; when not on Vercel (local) the region isn't checked. */
   vercel?: { region: string | undefined } | null;
   check?: (req: HttpCheckRequest) => Promise<HttpCheckResult>;
@@ -48,6 +53,7 @@ export async function runProbe({
   db,
   location,
   secretHeader,
+  allowPrivateTargets = false,
   vercel = null,
   check = runHttpCheck,
   clock = Date.now,
@@ -64,8 +70,7 @@ export async function runProbe({
 
   const runOnce = (m: DueMonitor, timeoutMs: number) => {
     const checkedAt = new Date(clock());
-    // Off Vercel (local dev only) a loopback test target is allowed; a deployed probe never fetches one.
-    return check({ url: m.url, method: m.method, timeoutMs, headers, allowPrivateTargets: !vercel }).then(
+    return check({ url: m.url, method: m.method, timeoutMs, headers, allowPrivateTargets }).then(
       (result) => ({
         m,
         checkedAt,

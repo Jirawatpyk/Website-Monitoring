@@ -34,7 +34,8 @@
         "CRON_SECRET": "local-dev-cron-secret-not-a-real-secret-000",
         "INGEST_TOKEN": "local-dev-ingest-token-not-a-real-secret-00",
         "GOOGLE_CHAT_ALERTS_WEBHOOK_URL": "http://127.0.0.1:3999/chat",
-        "NEXT_PUBLIC_APP_URL": "http://localhost:3500"
+        "NEXT_PUBLIC_APP_URL": "http://localhost:3500",
+        "PROBE_ALLOW_PRIVATE_TARGETS": "1"
       }
     }
   ]

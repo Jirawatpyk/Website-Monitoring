@@ -45,5 +45,24 @@ describe('assertPublicTarget', () => {
       'private',
     );
     await expect(assertPublicTarget(new URL('http://[::1]/'))).rejects.toThrow('private');
+    // The real resolver: localhost is loopback.
+    await expect(assertPublicTarget(new URL('http://localhost/'))).rejects.toThrow('private');
+  });
+
+  it('passes DNS errors through and stops at the deadline', async () => {
+    const signal = new AbortController().signal;
+    const failing = async () => {
+      throw Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' });
+    };
+    await expect(assertPublicTarget(new URL('https://example.test/'), failing, signal)).rejects.toThrow(
+      'ENOTFOUND',
+    );
+    const aborted = AbortSignal.abort(new Error('deadline'));
+    await expect(assertPublicTarget(new URL('https://example.test/'), publicDns, aborted)).rejects.toThrow(
+      'deadline',
+    );
+    await expect(
+      assertPublicTarget(new URL('https://example.test/'), publicDns, signal),
+    ).resolves.toBeUndefined();
   });
 });

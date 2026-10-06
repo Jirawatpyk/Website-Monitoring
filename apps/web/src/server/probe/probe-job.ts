@@ -19,6 +19,8 @@ export function probeJob(location: CloudLocation): Promise<Response> {
       location,
       secretHeader: value ? { name: env.PROBE_SECRET_HEADER_NAME, value } : undefined,
       vercel: process.env.VERCEL ? { region: process.env.VERCEL_REGION } : null,
+      // Explicit opt-in, and never on Vercel: a local dev server probing a loopback test target.
+      allowPrivateTargets: !process.env.VERCEL && process.env.PROBE_ALLOW_PRIVATE_TARGETS === '1',
     }),
   );
 }

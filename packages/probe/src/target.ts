@@ -62,12 +62,36 @@ export type Lookup = (hostname: string) => Promise<{ address: string }[]>;
 const defaultLookup: Lookup = (hostname) => dnsLookup(hostname, { all: true, verbatim: true });
 
 /** Throws TargetNotAllowedError unless `url` is http(s) on port 80/443 and resolves only to public addresses. */
-export async function assertPublicTarget(url: URL, lookup: Lookup = defaultLookup): Promise<void> {
+export async function assertPublicTarget(
+  url: URL,
+  lookup: Lookup = defaultLookup,
+  signal?: AbortSignal,
+): Promise<void> {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new TargetNotAllowedError('scheme');
   if (url.port && url.port !== '80' && url.port !== '443') throw new TargetNotAllowedError('port');
   const host = url.hostname.replace(/^\[(.*)\]$/, '$1');
-  const addresses = isIP(host) ? [{ address: host }] : await lookup(host);
+  // The DNS lookup counts against the check's timeout like the request itself.
+  const addresses = isIP(host) ? [{ address: host }] : await withSignal(lookup(host), signal);
   if (!addresses.length || addresses.some((a) => isBlockedAddress(a.address))) {
     throw new TargetNotAllowedError('private or reserved address');
   }
+}
+
+function withSignal<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return work;
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    work.then(
+      (v) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(v);
+      },
+      (e: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(e);
+      },
+    );
+  });
 }

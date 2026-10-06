@@ -8,7 +8,8 @@ export interface HttpCheckRequest {
   timeoutMs?: number;
   /**
    * Extra headers, e.g. the secret header a site's WAF allowlists (PRD §13). Sent only to the
-   * monitor's own origin — never to a host a redirect points at.
+   * monitor's own host (and an http → https upgrade of it) — never to a host a redirect points at,
+   * and never downgraded to plain http.
    */
   headers?: Record<string, string>;
   /** Local development and tests only: allow loopback / private targets. Never in a deployed probe. */
@@ -39,7 +40,7 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
   try {
     const res = await fetchFollowing(req);
     const ttfbMs = Math.round(performance.now() - started);
-    const bodySample = (await res.text()).slice(0, BODY_SAMPLE_BYTES);
+    const bodySample = await readSample(res, BODY_SAMPLE_BYTES);
     return {
       outcome: classifyResponse({ status: res.status, headers: res.headers, bodySample }),
       statusCode: res.status,
@@ -66,16 +67,16 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
  * headers go only to the monitor's own origin.
  */
 async function fetchFollowing(req: HttpCheckRequest): Promise<Response> {
-  const origin = new URL(req.url).origin;
+  const first = new URL(req.url);
   const signal = AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  let url = new URL(req.url);
+  let url = first;
   let method = req.method ?? 'GET';
   for (let hop = 0; ; hop += 1) {
-    if (!req.allowPrivateTargets) await assertPublicTarget(url, req.lookup);
+    if (!req.allowPrivateTargets) await assertPublicTarget(url, req.lookup, signal);
     const res = await fetch(url, {
       method,
       redirect: 'manual',
-      headers: { 'user-agent': PROBE_USER_AGENT, ...(url.origin === origin ? req.headers : {}) },
+      headers: { 'user-agent': PROBE_USER_AGENT, ...(sameSite(url, first) ? req.headers : {}) },
       signal,
     });
     const location = res.headers.get('location');
@@ -85,6 +86,44 @@ async function fetchFollowing(req: HttpCheckRequest): Promise<Response> {
     url = new URL(location, url);
     if (res.status === 303) method = 'GET';
   }
+}
+
+/** The monitor's own origin, or its http → https upgrade on the default ports; never a downgrade. */
+export function sameSite(url: URL, first: URL): boolean {
+  if (url.origin === first.origin) return true;
+  return (
+    url.hostname === first.hostname &&
+    first.protocol === 'http:' &&
+    url.protocol === 'https:' &&
+    !first.port &&
+    !url.port
+  );
+}
+
+/** Reads at most `limit` bytes of the body as text, then stops the download. */
+async function readSample(res: Response, limit: number): Promise<string> {
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (size < limit) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.byteLength;
+  }
+  try {
+    await reader.cancel();
+  } catch {
+    // The sample is already read; a failed cancel only leaves the rest undownloaded.
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const c of chunks) {
+    bytes.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder().decode(bytes).slice(0, limit);
 }
 
 function describeError(err: unknown): string {

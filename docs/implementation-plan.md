@@ -130,7 +130,14 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   5. message-checker passes the DOWN and RECOVERED text lines and cards against ChatAlert.
   6. Actual time spent is recorded in the PR, for the re-baseline check in [Timeline](#timeline).
 - **Review:** engine-reviewer, message-checker, security-reviewer (cron, RLS), db-reviewer (partitions).
-- **Notes:** started 6 Oct 2026 10:32Z (re-baseline clock, Q7). Chat copy follows D-013 (no escalation promise or ack button until their slices).
+- **Notes (evidence):** started 6 Oct 2026 10:32Z; staging verified 12:15Z — time spent ≈ 1 h 45 min (planned S, ≤ 2 days). Chat copy per D-013; owners' Chat ids per D-015; schema choices D-014.
+  - **Done-when 1 ✓** Staging, 6 Oct: test target switched to `error` at 12:07:12Z (first 500 seen); the engine opened INC-0001 and sent DOWN at 12:09:39Z (Vercel log `engine … opened:1, delivery.sent:1`) — **2 min 27 s**. Round 12:07 was split (TYO passed before the switch); round 12:08 failed on both checks and both rechecks.
+  - **Done-when 2 ✓** Switched to `ok` at 12:11:21Z; RECOVERED sent 12:13:39Z (`recovered:1, delivery.sent:1`), shown by Tao's Chat screenshot as a reply in the DOWN thread ("RECOVERED · Test target · down 3 min · add a root cause"); the next round settled the incident to Needs root cause (12:14:39Z, `settled:1`).
+  - **Done-when 3 ✓** `pnpm --filter @dxt/web test:int` (`src/server/pipeline.int.test.ts`, 5 cases on the local stack, also in the CI `db` job): both fail on check + recheck → 1 incident, 1 DOWN, a second run adds nothing; one location fails → none; no recheck → no double vote; a newer incomplete round doesn't hide the complete one; recovery → Monitoring + RECOVERED in the same thread → Needs root cause. Engine rules: `packages/engine/src/monitor.test.ts` (incl. real staging cron offsets). pgTAP `probes.test.sql` (35).
+  - **Done-when 4 ✓** Healthchecks project "DxT Monitor — staging" (separate from production): engine, probe-sin, probe-tyo, notifier all Up, last pings 11–54 s ago (checked by Claude in the browser, 12:17Z). Vercel logs: `probe-sin … region:"sin1"`, `probe-tyo … region:"hnd1"` every minute.
+  - **Done-when 5 ✓** message-checker: no open High; Mediums fixed (sub-minute duration floor, owner-without-Chat-id → D-015) — the live cards match ChatAlert minus the D-013 omissions.
+  - **Done-when 6 ✓** ≈ 1 h 45 min of build to a verified staging run, against an S estimate — record for the Q7 re-baseline.
+  - Known limits (by design, in later slices): a relapse while the incident is open is logged, not alerted (D-004, S04); on staging run `supabase/staging/reset-test-incident.sql` before repeating a DOWN test. The downtime counts from the first fully failing round's first check, not a failure in a preceding split round (≈ 16 s on staging) — S04 with D-004.
 
 ### S02b · Email, delivery guarantees, Ack + Undo
 
