@@ -20,12 +20,11 @@ export function AccountFooter({ displayName, role }: AccountFooterProps) {
         <Avatar name={displayName} size="md" />
       </span>
       <div className="flex min-w-0 grow flex-col">
-        <span className="line-clamp-2 text-sm font-medium break-words" title={displayName}>
-          {displayName}
-        </span>
+        <span className="line-clamp-2 text-sm font-medium break-words">{displayName}</span>
         <span className="truncate text-xs text-fg-secondary">{ROLE_LABELS[role]}</span>
       </div>
       <form action={signOut}>
+        {/* AURA IconButton: `label` is its accessible name and its tooltip (AURA sets `title`). */}
         <IconButton type="submit" icon={<IconLogOut />} label="Sign out" touchHeight />
       </form>
     </div>
