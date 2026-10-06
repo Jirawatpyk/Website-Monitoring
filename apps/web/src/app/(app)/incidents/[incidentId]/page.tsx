@@ -5,6 +5,8 @@ import { getIncidentForAck } from '@/features/incidents/server';
 import { getAccess } from '@/lib/auth/session';
 
 export const metadata: Metadata = { title: 'Incident' };
+// The ack action sends its held messages after the 10 s Undo window (`after()`): room for that.
+export const maxDuration = 60;
 
 /**
  * Incident page — MobileAck / MobileAckDark (S02b, D-016); the Chat card and the email link here

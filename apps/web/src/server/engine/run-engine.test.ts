@@ -77,7 +77,7 @@ describe('runEngine', () => {
           p_trigger: 'hard_fail',
           p_severity: 'down',
           p_started_at: at(0),
-          p_detected_at: now.toISOString(),
+          p_detected_at: '2026-10-06T10:00:32.000Z', // the last confirming recheck, not the run
           p_round_at: at(0),
           p_context: { cause: 'HTTP 500 (SIN, TYO)', confirmingLocations: 2 },
           p_notify: true,

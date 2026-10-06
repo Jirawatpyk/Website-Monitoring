@@ -1,5 +1,5 @@
 import { Badge, type IconName, type Tone } from '@jirawatpyk/aura-react';
-import type { IncidentState } from '@dxt/shared';
+import type { IncidentState, Severity } from '@dxt/shared';
 
 type BadgeSpec = { tone: Tone; variant: 'outline' | 'soft'; icon: IconName | undefined; label: string };
 
@@ -24,8 +24,18 @@ export function WorkflowBadge({ state, level }: { state: IncidentState; level?: 
   );
 }
 
-/** A DOWN incident's severity (spec §11): solid while down, outline ("Was down") once recovered. */
-export function DownBadge({ recovered }: { recovered: boolean }) {
+/**
+ * An incident's severity (spec §11): Down = danger solid ban, Problem = warning soft triangle-alert;
+ * once recovered it shows as outline ("Was down"), as in lists of past items.
+ */
+export function SeverityBadge({ severity, recovered }: { severity: Severity; recovered: boolean }) {
+  if (severity === 'problem') {
+    return (
+      <Badge tone="warning" variant={recovered ? 'outline' : 'soft'} icon="triangle-alert">
+        {recovered ? 'Was a problem' : 'Problem'}
+      </Badge>
+    );
+  }
   return recovered ? (
     <Badge tone="danger" variant="outline" icon="ban">
       Was down

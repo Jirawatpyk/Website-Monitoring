@@ -6,9 +6,12 @@ import {
   formatTime,
   formatTimeWithSeconds,
   ROLE_LABELS,
+  TRIGGER_LABELS,
   UNDO_WINDOW_SEC,
   type IncidentState,
   type Role,
+  type Severity,
+  type Trigger,
 } from '@dxt/shared';
 import type { PersonWhoCanAct } from '@/components/states';
 
@@ -17,6 +20,9 @@ export interface IncidentRow {
   id: string;
   number: number;
   state: IncidentState;
+  severity: Severity;
+  trigger: Trigger;
+  escalation_level: number;
   started_at: string;
   detected_at: string;
   acked_at: string | null;
@@ -72,6 +78,8 @@ export interface IncidentView {
   title: string;
   sub: string;
   state: IncidentState;
+  severity: Severity;
+  escalationLevel: number;
   recovered: boolean;
   /** "You’re the owner." — only for someone who can act. */
   role: string | null;
@@ -207,18 +215,24 @@ export function buildIncidentView(
     id: formatIncidentId(i.number),
     incidentId: i.id,
     site,
-    title: recovered ? `${site} is back` : `${site} is down`,
+    title: recovered
+      ? `${site} is back`
+      : i.severity === 'problem'
+        ? `${site} has a problem`
+        : `${site} is down`,
     sub: [
       recovered ? `down ${formatDuration(minutes)}` : formatDuration(minutes),
       formatTier(i.sites.tier),
       formatDay(started, { weekday: true }),
     ].join(' · '),
     state: i.state,
+    severity: i.severity,
+    escalationLevel: i.escalation_level,
     recovered,
     role,
     confirmedAt: formatTimeWithSeconds(new Date(i.detected_at)),
     confirmedBy: `Confirmed by ${num(detected?.payload.confirmingLocations) ?? 2} locations, 2 checks`,
-    cause: str(detected?.payload.cause) ?? 'Hard fail',
+    cause: str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
     siteUrl: i.sites.monitors.find((m) => m.is_primary)?.url ?? null,
     ack,
     log: logOf(events, nameOf, now),
@@ -248,14 +262,22 @@ export function logOf(
       case 'acknowledged': {
         const postsAt = str(e.payload.posts_at);
         // Newer events come first: an undo after this ack means it never posts.
-        const undone = sorted.slice(0, n).some((later) => later.type === 'ack_undone');
+        const later = sorted.slice(0, n);
+        const undone = later.some((l) => l.type === 'ack_undone');
+        const posted = later
+          .filter((l) => l.type === 'alerted' && l.payload.template === 'acknowledged')
+          .map((l) => l.at)
+          .sort()[0];
         const holding = postsAt && !undone && new Date(postsAt) > now && e.payload.notifies !== false;
+        const by = `Acknowledged by ${nameOf(e.actor_id)}`;
         return [
           {
             at,
-            text: holding
-              ? `Acknowledged by ${nameOf(e.actor_id)} (posts ${formatTimeWithSeconds(new Date(postsAt))} unless undone)`
-              : `Acknowledged by ${nameOf(e.actor_id)}`,
+            text: posted
+              ? `${by} (posted ${formatTimeWithSeconds(new Date(posted))})`
+              : holding
+                ? `${by} (posts ${formatTimeWithSeconds(new Date(postsAt))} unless undone)`
+                : by,
           },
         ];
       }

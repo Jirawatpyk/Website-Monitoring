@@ -88,6 +88,7 @@ export async function runProbe({
 
   const failed = first.filter((r) => r.result.outcome === 'fail').map((r) => r.m);
   let rechecked = 0;
+  let recheckFailed = 0;
   if (failed.length) {
     const deadline = started + PROBE_BUDGET_MS;
     await sleep(Math.max(0, started + RECHECK_DELAY_MS - clock()));
@@ -96,6 +97,7 @@ export async function runProbe({
       const second = await Promise.all(failed.map((m) => runOnce(m, Math.min(m.timeoutMs, remaining))));
       await insertResults(db, location, 2, second);
       rechecked = second.length;
+      recheckFailed = second.filter((r) => r.result.outcome === 'fail').length;
     }
   }
 
@@ -105,7 +107,7 @@ export async function runProbe({
     .eq('code', location);
   if (beat.error) throw new Error(`heartbeat: ${beat.error.message}`);
 
-  return { ok: true, location, checked: first.length, failed: failed.length, rechecked };
+  return { ok: true, location, checked: first.length, failed: failed.length, rechecked, recheckFailed };
 }
 
 async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonitor[]> {

@@ -33,7 +33,7 @@ grant all on public.notification_attempts to service_role;
 
 -- ── Engine writes: email next to Chat ─────────────────────────────────────
 -- Same as S02a, plus the DOWN email to the primary owner (L0; locked, so `notify_email` doesn't
--- turn it off — PRD §8, D-016).
+-- turn it off — PRD §8, D-016) while their profile is active (a deactivated person gets nothing).
 create or replace function public.engine_open_incident(
   p_site_id uuid,
   p_monitor_id uuid,
@@ -84,7 +84,8 @@ begin
     insert into public.notifications (incident_id, user_id, channel, template, thread_key, context)
     select v_id, s.primary_owner_id, 'email', p_severity::text, v_id::text, p_context
     from public.sites s
-    where s.id = p_site_id and s.primary_owner_id is not null;
+    join public.profiles p on p.id = s.primary_owner_id and p.is_active
+    where s.id = p_site_id;
   end if;
 
   return v_id;
@@ -148,12 +149,17 @@ end;
 $$;
 
 -- ── Notifier ──────────────────────────────────────────────────────────────
--- Claims due messages of one channel. SKIP LOCKED keeps two runs apart; the 90 s lease (longer
--- than a run's 60 s maxDuration) covers a run that dies. After an attempt the notifier sets
--- `next_retry_at` itself: the backoff (30 s, 2 min, 8 min) or nothing when sent.
-create or replace function public.claim_notifications(
+-- Claims due messages of one channel — of one incident with `p_incident_id` (the ack's own flush).
+-- SKIP LOCKED keeps two runs apart; the 90 s lease (longer than a run's 60 s maxDuration) covers a
+-- run that dies, and a run that stops early releases what it didn't send. After an attempt the
+-- notifier sets `next_retry_at` itself: the backoff (30 s, 2 min, 8 min) or nothing when sent.
+-- Messages of one thread leave in order: a row waits while an older one for the same incident,
+-- channel and person is still queued, so the latest reply is always the current status.
+drop function public.claim_notifications(public.notification_channel, integer);
+create function public.claim_notifications(
   p_channel public.notification_channel,
-  p_limit integer default 20
+  p_limit integer default 20,
+  p_incident_id uuid default null
 )
 returns setof public.notifications
 language sql
@@ -163,8 +169,15 @@ as $$
     select id from public.notifications
     where status = 'queued'
       and channel = p_channel
+      and (p_incident_id is null or incident_id = p_incident_id)
       and (hold_until is null or hold_until <= now())
       and (next_retry_at is null or next_retry_at <= now())
+      and not exists (
+        select 1 from public.notifications older
+        where older.incident_id = notifications.incident_id and older.channel = notifications.channel
+          and older.user_id is not distinct from notifications.user_id
+          and older.status = 'queued' and older.created_at < notifications.created_at
+      )
     order by created_at
     limit p_limit
     for update skip locked
@@ -176,8 +189,9 @@ as $$
   returning n.*;
 $$;
 
--- Chat failed after its last retry: email the same alert to the site's backup and every active
--- Admin who doesn't already have it (D-016). Returns how many emails were queued.
+-- Chat failed after its last retry: email the same alert to the site's backup and every Admin
+-- (active profiles only) who doesn't already have it (D-016). A DOWN whose incident has moved on
+-- (acknowledged, recovered) is old news: no fallback. Returns how many emails were queued.
 create function public.queue_fallback_emails(p_notification_id uuid)
 returns integer
 language plpgsql
@@ -193,11 +207,12 @@ begin
   join public.incidents i on i.id = n.incident_id
   join public.sites s on s.id = i.site_id
   cross join lateral (
-    select s.backup_owner_id as user_id
+    select b.id as user_id from public.profiles b where b.id = s.backup_owner_id and b.is_active
     union
     select p.id from public.profiles p where p.role = 'admin' and p.is_active
   ) r
-  where n.id = p_notification_id and n.channel = 'google_chat' and r.user_id is not null
+  where n.id = p_notification_id and n.channel = 'google_chat'
+    and not (n.template in ('down', 'problem') and i.state not in ('unacked', 'escalated'))
     and not exists (
       select 1 from public.notifications e
       where e.incident_id = n.incident_id and e.channel = 'email' and e.template = n.template
@@ -212,13 +227,13 @@ $$;
 revoke execute on function
   public.engine_open_incident(uuid, uuid, public.incident_trigger, public.severity, timestamptz, timestamptz, timestamptz, jsonb, boolean),
   public.engine_recover_incident(uuid, public.incident_state, public.incident_state, timestamptz, timestamptz, jsonb, boolean),
-  public.claim_notifications(public.notification_channel, integer),
+  public.claim_notifications(public.notification_channel, integer, uuid),
   public.queue_fallback_emails(uuid)
   from public, anon, authenticated;
 grant execute on function
   public.engine_open_incident(uuid, uuid, public.incident_trigger, public.severity, timestamptz, timestamptz, timestamptz, jsonb, boolean),
   public.engine_recover_incident(uuid, public.incident_state, public.incident_state, timestamptz, timestamptz, jsonb, boolean),
-  public.claim_notifications(public.notification_channel, integer),
+  public.claim_notifications(public.notification_channel, integer, uuid),
   public.queue_fallback_emails(uuid)
   to service_role;
 
@@ -273,7 +288,6 @@ begin
     set state = 'acknowledged', acked_at = v_now, acked_by = auth.uid()
     where id = p_incident_id;
 
-
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), 'incident.ack', 'incident', p_incident_id,
           jsonb_build_object('state', v_inc.state),
@@ -283,8 +297,10 @@ begin
   select p_incident_id, 'google_chat', 'acknowledged', p_incident_id::text, v_context, v_hold
   where exists (
     select 1 from public.notifications
-    where incident_id = p_incident_id and channel = 'google_chat' and template = 'down'
-  );
+    where incident_id = p_incident_id and channel = 'google_chat'
+      and template in ('down', 'problem') and status <> 'cancelled'
+  )
+  on conflict do nothing;
 
   insert into public.notifications
     (incident_id, user_id, channel, template, thread_key, context, hold_until)
@@ -292,7 +308,8 @@ begin
          p_incident_id::text, v_context, v_hold
   from public.notifications n
   where n.incident_id = p_incident_id and n.channel = 'email' and n.status <> 'cancelled'
-    and n.user_id is not null;
+    and n.user_id is not null
+  on conflict do nothing;
 
   -- The timeline says when the ack posts, and whether it posts at all (a muted incident has no
   -- thread and no emails to follow up).
@@ -326,10 +343,11 @@ begin
   if not found then
     raise exception 'incident not found' using errcode = 'P0002';
   end if;
-  if v_inc.state <> 'acknowledged' or v_inc.acked_by is distinct from auth.uid() then
+  if v_inc.acked_by is distinct from auth.uid() then
     raise exception 'Only the person who acknowledged can undo it' using errcode = '42501';
   end if;
-  if now() >= v_inc.acked_at + interval '10 seconds' then
+  -- Their own ack, but the incident moved on (recovered) or the window passed: too late.
+  if v_inc.state <> 'acknowledged' or now() >= v_inc.acked_at + interval '10 seconds' then
     raise exception 'The undo window has closed' using errcode = '55000';
   end if;
 

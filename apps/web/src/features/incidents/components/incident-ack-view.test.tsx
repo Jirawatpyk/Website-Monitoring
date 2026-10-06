@@ -16,6 +16,8 @@ const base: IncidentView = {
   title: 'MuvMi is down',
   sub: '19 min · Tier 1 · Fri 25 Sep',
   state: 'unacked',
+  severity: 'down',
+  escalationLevel: 0,
   recovered: false,
   role: 'You’re the owner.',
   confirmedAt: '09:48:41',
@@ -56,12 +58,28 @@ describe('IncidentAckView (MobileAck)', () => {
     expect(screen.queryByText(/Escalation|Client update|Add note|Full incident/)).toBeNull();
   });
 
-  it('acknowledges in one tap and refreshes', async () => {
+  it('acknowledges in one tap (the action re-renders the page itself)', async () => {
     actions.acknowledgeIncident.mockResolvedValue({ ok: true, postsAt: '2026-09-25T03:07:51Z' });
     renderView();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' })));
     expect(actions.acknowledgeIncident).toHaveBeenCalledWith('i1');
-    expect(refresh).toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('moves focus to Undo after the ack, and back to Acknowledge after the undo (WCAG 2.4.3)', async () => {
+    const { rerender } = renderView();
+    rerender(
+      <IncidentAckView view={{ ...base, ...acked() }} viewerName="Arm" viewerEmail="arm@example.test" />,
+    );
+    await act(async () => vi.advanceTimersByTime(0));
+    expect(screen.getByRole('button', { name: /Undo/ })).toHaveFocus();
+    rerender(<IncidentAckView view={base} viewerName="Arm" viewerEmail="arm@example.test" />);
+    expect(screen.getByRole('button', { name: 'Acknowledge' })).toHaveFocus();
+  });
+
+  it('keeps the live region mounted, empty until there is something to say', () => {
+    renderView();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('says why an ack was refused', async () => {
@@ -72,6 +90,7 @@ describe('IncidentAckView (MobileAck)', () => {
     renderView();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' })));
     expect(screen.getByRole('alert')).toHaveTextContent('no longer waiting');
+    expect(refresh).toHaveBeenCalled(); // show what the incident is now
   });
 
   const acked = (
@@ -161,6 +180,22 @@ describe('IncidentAckView (MobileAck)', () => {
     expect(screen.getByText('Arm — owner')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
     expect(screen.queryByRole('link', { name: /Visit site/ })).toBeNull();
+  });
+
+  it('keeps refreshing until the ack is posted, and says so when it takes longer', async () => {
+    renderView(acked({ windowOpen: false, postsAt: '2026-09-25T03:07:40Z' }));
+    await act(async () => vi.advanceTimersByTime(2_000));
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveTextContent('Posting to the Chat thread and email now');
+    await act(async () => vi.advanceTimersByTime(30_000));
+    expect(refresh.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByRole('status')).toHaveTextContent('Still sending — retried automatically');
+  });
+
+  it('shows a PROBLEM incident as Problem, and the escalation level', () => {
+    renderView({ severity: 'problem', state: 'escalated', escalationLevel: 1, title: 'MuvMi has a problem' });
+    expect(screen.getByText('Problem')).toBeInTheDocument();
+    expect(screen.getByText('Escalated · L1')).toBeInTheDocument();
   });
 
   it('shows "Was down" once recovered', () => {

@@ -68,7 +68,10 @@ describe('getIncidentForAck', () => {
   it('skips the names query when nobody is named', async () => {
     const { db, calls } = fakeDb({
       'incidents.select': { data: { ...incident, sites: { ...incident.sites, primary_owner_id: null } } },
-      'incident_events.select': { data: [] },
+      // The timeline is empty and there is no separate confirm event either.
+      'incident_events.select': (c) => ({
+        data: c.filters.some((f) => f[1] === 'type') ? null : [],
+      }),
     });
     m.db = db;
     expect(await getIncidentForAck(ID)).not.toBeNull();
@@ -87,5 +90,23 @@ describe('getIncidentForAck', () => {
     });
     m.db = db;
     await expect(getIncidentForAck(ID)).rejects.toThrow(message);
+  });
+
+  it('reads the confirm on its own when the latest 20 events no longer include it', async () => {
+    const recent = Array.from({ length: 20 }, (_, n) => ({
+      type: 'alerted',
+      at: `2026-10-06T03:${String(10 + n).padStart(2, '0')}:00Z`,
+      actor_id: null,
+      payload: { channel: 'google_chat', template: 'down' },
+    }));
+    const { db } = fakeDb({
+      'incidents.select': { data: incident },
+      'incident_events.select': (c) => ({
+        data: c.filters.some((f) => f[1] === 'type') ? events[0] : recent,
+      }),
+      'profiles.select': { data: [] },
+    });
+    m.db = db;
+    expect(await getIncidentForAck(ID)).toMatchObject({ cause: 'HTTP 500 (SIN, TYO)' });
   });
 });

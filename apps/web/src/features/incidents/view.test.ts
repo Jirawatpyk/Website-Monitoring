@@ -6,6 +6,9 @@ const incident: IncidentRow = {
   id: 'i1',
   number: 142,
   state: 'unacked',
+  severity: 'down',
+  trigger: 'hard_fail',
+  escalation_level: 0,
   started_at: '2026-09-25T02:48:10Z',
   detected_at: '2026-09-25T02:48:41Z',
   acked_at: null,
@@ -155,7 +158,7 @@ describe('MobileAck view', () => {
     expect(posted.log.slice(0, 3).map((l) => l.text)).toEqual([
       'ACKNOWLEDGED emailed to Arm',
       'ACKNOWLEDGED posted in Chat',
-      'Acknowledged by Arm',
+      'Acknowledged by Arm (posted 10:07:51)',
     ]);
     expect(view(acked, events.slice(0, 3), viewer(), now).ack).toMatchObject({
       posted: { to: 'the Chat thread' },

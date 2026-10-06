@@ -1,5 +1,5 @@
 import { Icon } from '@jirawatpyk/aura-react';
-import { DownBadge, WorkflowBadge } from '@/components/status-badges';
+import { SeverityBadge, WorkflowBadge } from '@/components/status-badges';
 import { NoAccess } from '@/components/states';
 import type { IncidentView } from '../view';
 import { AckPanel } from './ack-panel';
@@ -19,8 +19,8 @@ export function IncidentAckView({ view, viewerName, viewerEmail }: IncidentAckVi
   return (
     <div className="mx-auto flex min-h-full w-full max-w-xl flex-col gap-2.5">
       <div className="flex items-center gap-2">
-        <DownBadge recovered={view.recovered} />
-        <WorkflowBadge state={view.state} />
+        <SeverityBadge severity={view.severity} recovered={view.recovered} />
+        <WorkflowBadge state={view.state} level={view.escalationLevel} />
         <span className="ml-auto font-mono text-xs text-fg-secondary">{view.id}</span>
       </div>
 

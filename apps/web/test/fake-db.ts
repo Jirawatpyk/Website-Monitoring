@@ -45,6 +45,7 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
       for (const method of [
         'select',
         'eq',
+        'neq',
         'in',
         'is',
         'not',

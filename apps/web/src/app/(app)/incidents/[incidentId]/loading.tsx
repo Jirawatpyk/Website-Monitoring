@@ -12,6 +12,8 @@ export default function Loading() {
       <Skeleton variant="rect" height={40} />
       <Skeleton variant="rect" height={120} />
       <Skeleton variant="text" lines={3} />
+      {/* The action bar's place, so nothing jumps when the page arrives. */}
+      <Skeleton variant="rect" height={96} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 -- re-ack after Undo, the fallback email audience, and the attempts log's RLS.
 begin;
 \ir _helpers.psql
-select plan(32);
+select plan(39);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -164,6 +164,8 @@ select is(
 );
 
 -- ── Fallback email audience (D-016) ──────────────────────────────────────
+-- (While the incident still waits for an ack — a moved-on DOWN gets none, tested below.)
+update public.incidents set state = 'escalated' where id = (select id from inc where name = 'a');
 select is(
   public.queue_fallback_emails((select id from public.notifications
     where incident_id = (select id from inc where name = 'a') and channel = 'google_chat' and template = 'down')),
@@ -197,6 +199,69 @@ select is(
      and user_id = (select id from ids where name = 'arm')),
   1,
   'so each person still has one DOWN email'
+);
+
+-- Undo after the incident moved on (recovered) is "too late", not "not yours".
+update public.incidents set state = 'monitoring', acked_at = now() where id = (select id from inc where name = 'a');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select throws_ok(format('select public.undo_ack(%L)', (select id from inc where name = 'a')),
+  '55000', null, 'Undo after the incident recovered is refused as too late');
+reset role;
+
+-- ── Deactivated people get nothing (security review M1) ──────────────────
+insert into ids values ('gone', tests.create_user('gone@pgtap.test', 'responder'));
+update public.profiles set is_active = false where id = (select id from ids where name = 'gone');
+insert into public.sites (id, client_id, name, tier, primary_owner_id) values
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000c1', 'Site D', 1,
+   (select id from ids where name = 'gone'));
+insert into inc values ('d', public.engine_open_incident('00000000-0000-0000-0000-0000000000a4', null,
+  'hard_fail', 'down', now() - interval '90 seconds', now(), now(), '{}', true));
+select is(
+  (select count(*)::int from public.notifications
+   where incident_id = (select id from inc where name = 'd') and channel = 'email'),
+  0,
+  'a deactivated owner gets no DOWN email'
+);
+
+-- ── One thread, in order; one incident's flush ───────────────────────────
+insert into public.sites (id, client_id, name, tier, primary_owner_id) values
+  ('00000000-0000-0000-0000-0000000000a5', '00000000-0000-0000-0000-0000000000c1', 'Site E', 1,
+   (select id from ids where name = 'arm'));
+insert into inc values ('e', public.engine_open_incident('00000000-0000-0000-0000-0000000000a5', null,
+  'hard_fail', 'down', now() - interval '90 seconds', now(), now(), '{}', true));
+insert into public.notifications (incident_id, channel, template, thread_key, created_at)
+values ((select id from inc where name = 'e'), 'google_chat', 'recovered',
+        (select id from inc where name = 'e')::text, now() + interval '1 second');
+select results_eq(
+  format($$select incident_id, template from public.claim_notifications('google_chat', 10, %L)$$,
+    (select id from inc where name = 'e')),
+  format($$values (%L::uuid, 'down'::text)$$, (select id from inc where name = 'e')),
+  'the flush of one incident claims only its rows, and a reply waits for the DOWN before it'
+);
+select is(
+  (select count(*)::int from public.claim_notifications('google_chat', 10,
+    (select id from inc where name = 'e'))),
+  0,
+  'while the DOWN is still queued (retrying), the later reply stays behind it'
+);
+select is(
+  (select count(*)::int from public.claim_notifications('email', 10,
+    (select id from inc where name = 'e'))),
+  1,
+  'the email thread has its own order: the DOWN email goes'
+);
+
+-- A DOWN whose incident has moved on gets no fallback.
+update public.incidents set state = 'acknowledged' where id = (select id from inc where name = 'e');
+select is(
+  public.queue_fallback_emails((select id from public.notifications
+    where incident_id = (select id from inc where name = 'e') and channel = 'google_chat' and template = 'down')),
+  0,
+  'no fallback for a DOWN that is no longer the news'
+);
+select ok(
+  not exists (select 1 from pg_proc where proname = 'claim_notifications' and pronargs = 2),
+  'the old two-argument claim is gone'
 );
 
 -- ── Delivery log RLS ─────────────────────────────────────────────────────

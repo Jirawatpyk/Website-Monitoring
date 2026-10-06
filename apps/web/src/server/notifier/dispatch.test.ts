@@ -1,15 +1,23 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { fakeDb, type FakeCall } from '../../../test/fake-db';
-import { afterAttempt, BACKOFF_MS, dispatchNotifications, MAX_ATTEMPTS, runNotifierSweep } from './dispatch';
+import { TEST_ENV } from '../../../test/env';
+import {
+  afterAttempt,
+  BACKOFF_MS,
+  dispatchNotifications,
+  MAX_ATTEMPTS,
+  ROW_BUDGET_MS,
+  runNotifierSweep,
+} from './dispatch';
 import { notifierDeps } from './deps';
 import { domainOf } from './render';
-import { TEST_ENV } from '../../../test/env';
 
 const webhookUrl = 'https://chat.googleapis.com/v1/spaces/S/messages?key=K&token=T';
 const appUrl = 'https://monitor.dxt.example';
 const email = { apiKey: 're_test', from: 'DxT Monitor <alerts@notify.dxt.example>' };
-const now = () => new Date('2026-10-06T03:00:00Z');
+const NOW = new Date('2026-10-06T03:00:00Z');
+const now = () => NOW;
 const created = '2026-10-06T02:48:45Z';
 
 const notification = (template: string, over: Record<string, unknown> = {}) => ({
@@ -31,6 +39,7 @@ const mail = (template: string, over: Record<string, unknown> = {}) =>
 const incident = {
   id: 'i1',
   number: 7,
+  state: 'unacked',
   started_at: '2026-10-06T02:47:30Z',
   detected_at: '2026-10-06T02:48:41Z',
   acked_at: '2026-10-06T02:55:10Z',
@@ -48,13 +57,14 @@ const people = [
   { id: 'u-tao', email: 'tao@example.test', display_name: 'Tao' },
 ];
 
-/** Claims by channel: what each `claim_notifications(channel)` returns. */
-const queue = (chat: unknown[], emails: unknown[] = []) => ({
+/** Claims by channel; every row update succeeds unless a test says otherwise. */
+const queue = (chat: unknown[], emails: unknown[] = [], over: Partial<typeof incident> = {}) => ({
   'rpc.claim_notifications': (c: FakeCall) => ({
     data: (c.values as { p_channel: string }).p_channel === 'email' ? emails : chat,
   }),
-  'incidents.select': { data: [incident] },
+  'incidents.select': { data: [{ ...incident, ...over }] },
   'profiles.select': { data: people },
+  'notifications.update': { data: [{ id: 'x' }] },
 });
 
 const okPost = () => vi.fn(async () => ({ ok: true as const, messageName: 'spaces/S/messages/M' }));
@@ -75,30 +85,28 @@ describe('dispatchNotifications', () => {
 
   it('does nothing when no message is due', async () => {
     const { db } = fakeDb(queue([]));
+    const empty = { sent: 0, retrying: 0, failed: 0, superseded: 0, released: 0 };
     expect(await dispatchNotifications({ db, webhookUrl, email, appUrl })).toEqual({
       ok: true,
-      chat: { sent: 0, retrying: 0, failed: 0 },
-      email: { sent: 0, retrying: 0, failed: 0 },
+      chat: empty,
+      email: empty,
     });
   });
 
   it('posts DOWN, ACKNOWLEDGED and RECOVERED in the incident thread and records each delivery', async () => {
-    const { db, calls } = fakeDb(
-      queue([
-        notification('down', { context: { cause: 'HTTP 500 (SIN, TYO)', confirmingLocations: 2 } }),
-        notification('acknowledged', {
-          hold_until: '2026-10-06T02:55:20Z',
-          context: { ackedBy: 'Arm', ackedById: 'u-arm', ackedAt: '2026-10-06T02:55:10Z' },
-        }),
-        notification('recovered', { context: { okLocations: 2 } }),
-      ]),
-    );
+    const rows = [
+      notification('down', { context: { cause: 'HTTP 500 (SIN, TYO)', confirmingLocations: 2 } }),
+      notification('acknowledged', {
+        hold_until: '2026-10-06T02:55:20Z',
+        context: { ackedBy: 'Arm', ackedById: 'u-arm', ackedAt: '2026-10-06T02:55:10Z' },
+      }),
+      notification('recovered', { context: { okLocations: 2 } }),
+    ];
+    const { db, calls } = fakeDb(queue(rows));
     const post = okPost();
     expect(
       await dispatchNotifications({ db, webhookUrl, email: undefined, appUrl, now, post }),
-    ).toMatchObject({
-      chat: { sent: 3, retrying: 0, failed: 0 },
-    });
+    ).toMatchObject({ chat: { sent: 3, retrying: 0, failed: 0 } });
 
     const posted = post.mock.calls as unknown as [string, { text: string; cardsV2: unknown[] }, unknown][];
     expect(posted.map((c) => c[1].text)).toEqual([
@@ -112,13 +120,20 @@ describe('dispatchNotifications', () => {
     // messageId makes a retry after an unrecorded success a no-op.
     expect(posted[0]?.[2]).toEqual({ threadKey: 'i1', messageId: 'client-n-down' });
 
-    expect(updates(calls)[0]).toEqual({
+    const first = calls.find((c) => c.table === 'notifications' && c.op === 'update');
+    expect(first?.values).toEqual({
       status: 'sent',
       sent_at: '2026-10-06T03:00:00.000Z',
       provider_message_id: 'spaces/S/messages/M',
       error: null,
       next_retry_at: null,
     });
+    // Written only while the claim is still ours.
+    expect(first?.filters).toEqual([
+      ['eq', 'id', 'n-down'],
+      ['eq', 'status', 'queued'],
+      ['eq', 'attempts', 1],
+    ]);
     expect(calls.filter((c) => c.table === 'notification_attempts').map((c) => c.values)).toContainEqual({
       notification_id: 'n-down',
       attempt: 1,
@@ -134,9 +149,9 @@ describe('dispatchNotifications', () => {
     });
   });
 
-  it('emails each person with their own footer, threaded by the DOWN email', async () => {
-    const { db, calls } = fakeDb(
-      queue(
+  it('emails each person with their own footer, replying to the first email they really got', async () => {
+    const { db } = fakeDb({
+      ...queue(
         [],
         [
           mail('down', { context: { cause: 'HTTP 500 (SIN, TYO)', confirmingLocations: 2 } }),
@@ -146,35 +161,58 @@ describe('dispatchNotifications', () => {
           }),
           mail('recovered', { id: 'e-rec-tao', user_id: 'u-tao', context: { okLocations: 2 } }),
         ],
+        { state: 'acknowledged' },
       ),
-    );
+      // Tao's first email of the incident was the ACKNOWLEDGED fallback, not a DOWN.
+      'notifications.select': {
+        data: [
+          { incident_id: 'i1', user_id: 'u-arm', template: 'down' },
+          { incident_id: 'i1', user_id: 'u-tao', template: 'acknowledged' },
+          { incident_id: 'i1', user_id: 'u-tao', template: 'recovered' },
+        ],
+      },
+    });
     const send = okSend();
+    // The DOWN email is superseded (the incident is acknowledged); the other two go.
     expect(
       await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send }),
-    ).toMatchObject({
-      email: { sent: 3 },
-    });
+    ).toMatchObject({ email: { sent: 2, superseded: 1 } });
 
     const sent = send.mock.calls as unknown as [
       { subject: string; text: string; headers: Record<string, string> },
-      { to: string; idempotencyKey: string; from: string },
+      { to: string; idempotencyKey: string },
     ][];
     expect(sent.map(([m, o]) => [m.subject, o.to, o.idempotencyKey])).toEqual([
-      ['Test target · Tier 1 · INC-0007', 'arm@example.test', 'notification-e-down'],
       ['Test target · Tier 1 · INC-0007', 'arm@example.test', 'notification-e-ack'],
       ['Test target · Tier 1 · INC-0007', 'tao@example.test', 'notification-e-rec-tao'],
     ]);
-    expect(sent[0]?.[0].text).toContain('You got this because you own Test target.');
-    expect(sent[0]?.[0].headers['Message-ID']).toBe('<inc-i1.down.u-arm@notify.dxt.example>');
-    expect(sent[1]?.[0].text).toContain('You got this because you acknowledged this incident.');
-    expect(sent[1]?.[0].headers['In-Reply-To']).toBe('<inc-i1.down.u-arm@notify.dxt.example>');
-    expect(sent[2]?.[0].text).toContain('Acknowledged: Arm at 09:55');
-    expect(sent[2]?.[0].text).toContain('couldn’t be delivered');
-    expect(calls.filter((c) => c.table === 'incident_events').map((c) => c.values)).toContainEqual({
-      incident_id: 'i1',
-      type: 'alerted',
-      payload: { channel: 'email', template: 'down', user_id: 'u-arm' },
+    expect(sent[0]?.[0].text).toContain('You got this because you acknowledged this incident.');
+    expect(sent[0]?.[0].headers['In-Reply-To']).toBe('<inc-i1.down.u-arm@notify.dxt.example>');
+    expect(sent[1]?.[0].headers['In-Reply-To']).toBe('<inc-i1.acknowledged.u-tao@notify.dxt.example>');
+    expect(sent[1]?.[0].text).toContain('couldn’t be delivered');
+  });
+
+  it('starts a person’s thread with their first email: no reply headers on it', async () => {
+    const { db } = fakeDb({
+      ...queue([], [mail('down')]),
+      'notifications.select': { data: [{ incident_id: 'i1', user_id: 'u-arm', template: 'down' }] },
     });
+    const send = okSend();
+    await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send });
+    const [m] = send.mock.calls[0] as unknown as [{ headers: Record<string, string> }];
+    expect(m.headers).toEqual({ 'Message-ID': '<inc-i1.down.u-arm@notify.dxt.example>' });
+  });
+
+  it('drops a DOWN that hasn’t left once the incident has moved on (ChatAlert: latest reply = status)', async () => {
+    const { db, calls } = fakeDb(queue([notification('down')], [], { state: 'monitoring' }));
+    const post = okPost();
+    expect(
+      await dispatchNotifications({ db, webhookUrl, email: undefined, appUrl, now, post }),
+    ).toMatchObject({ chat: { superseded: 1, sent: 0 } });
+    expect(post).not.toHaveBeenCalled();
+    expect(updates(calls)).toEqual([
+      { status: 'cancelled', error: 'Superseded: the incident moved on first', next_retry_at: null },
+    ]);
   });
 
   it('retries a failed Chat post at +30 s, +2 min, +8 min, then falls back to email', async () => {
@@ -212,6 +250,62 @@ describe('dispatchNotifications', () => {
     expect(last.calls.some((c) => c.table === 'incident_events')).toBe(false);
   });
 
+  it('does nothing more when another run took the message over (lease lost)', async () => {
+    const { db, calls, rpcCalls } = fakeDb({
+      ...queue([notification('down', { attempts: MAX_ATTEMPTS })]),
+      'notifications.update': { data: [] },
+    });
+    const post = vi.fn(async () => ({ ok: false as const, error: 'HTTP 500' }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(
+      await dispatchNotifications({ db, webhookUrl, email: undefined, appUrl, now, post }),
+    ).toMatchObject({ chat: { sent: 0, failed: 0 } });
+    expect(rpcCalls.some((c) => c.name === 'queue_fallback_emails')).toBe(false);
+    expect(calls.some((c) => c.table === 'incident_events')).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('delivery_lease_lost'));
+    warn.mockRestore();
+  });
+
+  it('starts no send that could end after the deadline, and hands the rest back', async () => {
+    const rows = [notification('down', { attempts: 2 }), notification('recovered', { id: 'n-rec' })];
+    const { db, calls } = fakeDb(queue(rows));
+    const post = okPost();
+    const result = await dispatchNotifications(
+      { db, webhookUrl, email: undefined, appUrl, now, post },
+      { deadline: NOW.getTime() + ROW_BUDGET_MS - 1 },
+    );
+    expect(result).toMatchObject({ chat: { sent: 0, released: 2 } });
+    expect(post).not.toHaveBeenCalled();
+    const back = calls.filter((c) => c.table === 'notifications' && c.op === 'update');
+    expect(back.map((c) => [c.values, c.filters])).toEqual([
+      [
+        { attempts: 1, next_retry_at: null },
+        [
+          ['eq', 'id', 'n-down'],
+          ['eq', 'status', 'queued'],
+          ['eq', 'attempts', 2],
+        ],
+      ],
+      [
+        { attempts: 0, next_retry_at: null },
+        [
+          ['eq', 'id', 'n-rec'],
+          ['eq', 'status', 'queued'],
+          ['eq', 'attempts', 1],
+        ],
+      ],
+    ]);
+  });
+
+  it('claims only one incident’s messages for an ack’s own flush', async () => {
+    const { db, rpcCalls } = fakeDb(queue([]));
+    await dispatchNotifications({ db, webhookUrl, email, appUrl }, { incidentId: 'i9' });
+    expect(rpcCalls.map((c) => c.args)).toEqual([
+      { p_channel: 'google_chat', p_limit: 20, p_incident_id: 'i9' },
+      { p_channel: 'email', p_limit: 20, p_incident_id: 'i9' },
+    ]);
+  });
+
   it('gives up on an email the provider refuses for good, without a fallback', async () => {
     const send = vi.fn(async () => ({ ok: false as const, error: 'HTTP 422: invalid', retryable: false }));
     const { db, calls, rpcCalls } = fakeDb(queue([], [mail('down')]));
@@ -224,17 +318,28 @@ describe('dispatchNotifications', () => {
     [notification('escalated'), "Can't render template escalated"],
     [notification('recovered', { incident_id: 'gone' }), 'Incident not found'],
     [mail('escalated'), "Can't render template escalated"],
-    [mail('down', { user_id: 'u-nobody' }), 'Recipient not found'],
+    [mail('recovered', { user_id: 'u-nobody' }), 'Recipient not found or inactive'],
   ])('fails a message it can’t send without sending (%#)', async (row, error) => {
-    const { db, calls } = fakeDb({
-      ...queue(row.channel === 'email' ? [] : [row], row.channel === 'email' ? [row] : []),
-    });
+    const isEmail = row.channel === 'email';
+    const { db, calls } = fakeDb(queue(isEmail ? [] : [row], isEmail ? [row] : []));
     const post = okPost();
     const send = okSend();
     await dispatchNotifications({ db, webhookUrl, email, appUrl, now, post, send });
     expect(post).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
     expect(updates(calls)[0]).toMatchObject({ status: 'failed', error });
+  });
+
+  it('asks only for active recipients and their first emails', async () => {
+    const { db, calls } = fakeDb(queue([], [mail('down')]));
+    await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send: okSend() });
+    expect(calls.find((c) => c.table === 'profiles')?.filters).toContainEqual(['eq', 'is_active', true]);
+    expect(calls.find((c) => c.table === 'notifications' && c.op === 'select')?.filters).toEqual([
+      ['eq', 'channel', 'email'],
+      ['neq', 'status', 'cancelled'],
+      ['in', 'incident_id', ['i1']],
+      ['in', 'user_id', ['u-arm']],
+    ]);
   });
 
   it('uses safe defaults when the stored context is missing', async () => {
@@ -256,6 +361,7 @@ describe('dispatchNotifications', () => {
     ['rpc.claim_notifications', 'claim_notifications: boom'],
     ['incidents.select', 'incidents: boom'],
     ['profiles.select', 'profiles: boom'],
+    ['notifications.select', 'notifications: boom'],
     ['notifications.update', 'notifications: boom'],
     ['notification_attempts.insert', 'notification_attempts: boom'],
     ['incident_events.insert', 'incident_events: boom'],
@@ -264,6 +370,20 @@ describe('dispatchNotifications', () => {
     await expect(
       dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send: okSend() }),
     ).rejects.toThrow(message);
+  });
+
+  it.each([
+    ['superseded', { state: 'monitoring' }, okPost()],
+    ['released', {}, okPost()],
+  ] as const)('throws when the %s update fails', async (kind, over, post) => {
+    const { db } = fakeDb({
+      ...queue([notification('down')], [], over),
+      'notifications.update': { error: { message: 'boom' } },
+    });
+    const deadline = kind === 'released' ? NOW.getTime() : undefined;
+    await expect(
+      dispatchNotifications({ db, webhookUrl, email: undefined, appUrl, now, post }, { deadline }),
+    ).rejects.toThrow('notifications: boom');
   });
 
   it('throws when the fallback can’t be queued', async () => {
@@ -288,24 +408,29 @@ describe('afterAttempt', () => {
 });
 
 describe('runNotifierSweep', () => {
-  it('runs two passes 30 s apart', async () => {
+  it('runs a second pass 30 s after the start, each pass under its own deadline', async () => {
     const { db, rpcCalls } = fakeDb(queue([]));
-    const sleep = vi.fn(async () => {});
-    const result = await runNotifierSweep({ db, webhookUrl, email, appUrl }, { sleep });
+    let t = 1_000_000;
+    const clock = () => t;
+    const sleep = vi.fn(async (ms: number) => {
+      t += ms;
+    });
+    t += 0; // pass 1 starts at the run's start
+    const result = await runNotifierSweep({ db, webhookUrl, email, appUrl }, { sleep, clock });
     expect(sleep).toHaveBeenCalledWith(30_000);
     expect(rpcCalls.filter((c) => c.name === 'claim_notifications')).toHaveLength(4);
     expect(result).toMatchObject({ ok: true, passes: [{ ok: true }, { ok: true }] });
   });
 
-  it('skips the second pass when the first left too little of the function’s time', async () => {
-    const { db, rpcCalls } = fakeDb(queue([]));
-    const times = [0, 10_000];
-    const clock = () => times.shift() ?? 10_000;
+  it('sleeps only what is left of the 30 s after a slow first pass', async () => {
+    const { db } = fakeDb(queue([]));
+    const times = [0, 12_000, 30_000];
     const sleep = vi.fn(async () => {});
-    const result = await runNotifierSweep({ db, webhookUrl, email, appUrl }, { sleep, clock });
-    expect(sleep).not.toHaveBeenCalled();
-    expect(rpcCalls.filter((c) => c.name === 'claim_notifications')).toHaveLength(2);
-    expect(result).toMatchObject({ passes: [{ ok: true }], skipped: 'no_time_for_second_pass' });
+    await runNotifierSweep(
+      { db, webhookUrl, email, appUrl },
+      { sleep, clock: () => times.shift() ?? 30_000 },
+    );
+    expect(sleep).toHaveBeenCalledWith(18_000);
   });
 });
 

@@ -27,8 +27,13 @@ test.describe('acknowledge from the alert link (local Supabase)', () => {
     await ack.click();
 
     await expect(page.getByText('Acknowledged as Arm')).toBeVisible();
-    await expect(page.getByRole('status').filter({ hasText: 'Posting to Chat and email in' })).toBeVisible();
-    await page.getByRole('button', { name: /^Undo · \d+ s$/ }).click();
+    await expect(page.getByText(/^Posting to Chat and email in \d+ s/)).toBeVisible();
+    const undo = page.getByRole('button', { name: /^Undo · \d+ s$/ });
+    // Touch targets ≥ 44 px (spec §14.17).
+    for (const control of [undo, page.getByRole('link', { name: 'Visit site ↗' })]) {
+      if (await control.count()) expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
+    await undo.click();
 
     await expect(page.getByRole('button', { name: 'Acknowledge' })).toBeVisible();
     await expect(page.getByText('Acknowledgement undone by Arm')).toBeVisible();

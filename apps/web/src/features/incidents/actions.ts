@@ -46,7 +46,11 @@ export async function acknowledgeIncident(incidentId: string): Promise<AckResult
       setTimeout(r, Math.max(0, new Date(postsAt).getTime() - Date.now()) + FLUSH_MARGIN_MS),
     );
     try {
-      await dispatchNotifications(notifierDeps(serviceDb(), serverEnv()));
+      // Only this incident's messages, and well inside the page's maxDuration.
+      await dispatchNotifications(notifierDeps(serviceDb(), serverEnv()), {
+        incidentId: id.data,
+        deadline: Date.now() + 30_000,
+      });
     } catch (err) {
       console.error(JSON.stringify({ event: 'ack_flush_failed', error: String(err) }));
     }

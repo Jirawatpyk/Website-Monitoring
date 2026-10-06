@@ -85,6 +85,7 @@ export function renderEmail(
   to: Recipient,
   appUrl: string,
   messageDomain: string,
+  firstTemplate?: string,
 ): EmailMessage | null {
   const ctx = contextOf(n.context);
   const base: EmailBaseInput = {
@@ -96,6 +97,7 @@ export function renderEmail(
     reason: emailReason(n, i),
     incidentUrl: incidentUrl(appUrl, i.id),
     messageDomain,
+    ...(firstTemplate ? { firstTemplate } : {}),
   };
   switch (n.template) {
     case 'down':

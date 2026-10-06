@@ -140,3 +140,18 @@ describe('Recovered email (EmailAlert, spec §16.4, D-016)', () => {
     expect(noOwner.text).not.toContain('Still to do');
   });
 });
+
+describe('thread root and buttons per person', () => {
+  it('replies to the first email the person really got, and starts the thread with it', () => {
+    const root = emailMessageId('inc-1', 'acknowledged', 'u-arm', 'notify.example.test');
+    expect(recovered({ firstTemplate: 'acknowledged' }).headers['In-Reply-To']).toBe(root);
+    expect(acked({ firstTemplate: 'acknowledged' }).headers).toEqual({ 'Message-ID': root });
+  });
+
+  it('gives the owner the leading button, everyone else a secondary one (board)', () => {
+    expect(recovered().html).toMatch(
+      /background:#18181b;border:1px solid #18181b;color:#ffffff;font-weight:600/,
+    );
+    expect(recovered({ reason: 'fallback' }).html).toMatch(/background:transparent;border:1px solid #8e8e97/);
+  });
+});

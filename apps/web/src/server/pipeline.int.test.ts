@@ -142,6 +142,20 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     expect(await statusOf(siteId)).toMatchObject({ status: 'down' });
   });
 
+  it('two engine runs judging the same round at once (probe trigger + cron) open one incident, confirmed at the last recheck', async () => {
+    const { siteId, monitorId } = await newSite('Concurrent');
+    await results(monitorId, downRound());
+    await Promise.all([runEngine(db, t(65)), runEngine(db, t(65)), runEngine(db, t(66))]);
+
+    const incidents = await must(
+      db.from('incidents').select('id, started_at, detected_at').eq('site_id', siteId),
+    );
+    expect(incidents).toHaveLength(1);
+    // PRD §9's 30 s clock starts when the last recheck confirmed it (board: "Confirmed down 09:48:41").
+    expect(new Date(incidents[0]!.detected_at).getTime()).toBe(t(32).getTime());
+    expect(await notificationsOf(incidents[0]!.id)).toHaveLength(1);
+  });
+
   it('only one location fails → no incident', async () => {
     const { siteId, monitorId } = await newSite('One fails');
     await results(monitorId, [
@@ -179,6 +193,20 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     const { siteId, monitorId } = await newSite('Recovers');
     await results(monitorId, downRound());
     await runEngine(db, t(65));
+    // As the engine route / probe trigger do: send the DOWN as soon as it is queued.
+    const post = vi.fn(async () => ({ ok: true as const, messageName: 'spaces/S/messages/M' }));
+    const deliver = (incidentId: string) =>
+      dispatchNotifications(
+        {
+          db,
+          webhookUrl: 'https://chat.example.test/webhook',
+          email: undefined,
+          appUrl: 'https://monitor.example.test',
+          post,
+        },
+        { incidentId },
+      );
+    await deliver((await incidentsOf(siteId))[0]!.id);
 
     await results(monitorId, [
       ['SIN', 'pass', t(61)],
@@ -202,19 +230,53 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     expect(await statusOf(siteId)).toMatchObject({ status: 'ok', ok_rounds: 2 });
 
     // The notifier renders both from the stored rows and records the deliveries.
-    const post = vi.fn(async () => ({ ok: true as const, messageName: 'spaces/S/messages/M' }));
-    const summary = await dispatchNotifications({
-      db,
-      webhookUrl: 'https://chat.example.test/webhook',
-      email: undefined,
-      appUrl: 'https://monitor.example.test',
-      post,
-    });
-    expect((summary.chat as { sent: number }).sent).toBeGreaterThanOrEqual(2);
+    expect((await deliver(incident!.id)).chat).toMatchObject({ sent: 1 });
     const texts = (post.mock.calls as unknown as [string, { text: string }][]).map((c) => c[1].text);
     expect(texts).toContain(`DOWN · Recovers ${run} (Tier 1)`);
     expect(texts).toContain(`RECOVERED · Recovers ${run} · down 1 min · add a root cause`);
     expect((await notificationsOf(incident!.id)).map((n) => n.status)).toEqual(['sent', 'sent']);
+  });
+
+  it('a DOWN still queued when the site recovers is dropped, so the thread never ends on old news', async () => {
+    const { siteId, monitorId } = await newSite('Late down');
+    await results(monitorId, downRound());
+    await runEngine(db, t(65));
+    await results(monitorId, [
+      ['SIN', 'pass', t(61)],
+      ['TYO', 'pass', t(62)],
+    ]);
+    await runEngine(db, t(125));
+    const [incident] = await incidentsOf(siteId);
+    const post = vi.fn(async () => ({ ok: true as const, messageName: 'spaces/S/messages/M' }));
+    const summary = await dispatchNotifications(
+      {
+        db,
+        webhookUrl: 'https://chat.example.test/webhook',
+        email: undefined,
+        appUrl: 'https://monitor.example.test',
+        post,
+      },
+      { incidentId: incident!.id },
+    );
+    expect(summary.chat).toMatchObject({ superseded: 1 });
+    // RECOVERED waited behind the DOWN (one thread, in order) and leaves on the next pass.
+    await dispatchNotifications(
+      {
+        db,
+        webhookUrl: 'https://chat.example.test/webhook',
+        email: undefined,
+        appUrl: 'https://monitor.example.test',
+        post,
+      },
+      { incidentId: incident!.id },
+    );
+    expect((post.mock.calls as unknown as [string, { text: string }][]).map((c) => c[1].text)).toEqual([
+      `RECOVERED · Late down ${run} · down 1 min · add a root cause`,
+    ]);
+    expect((await notificationsOf(incident!.id)).map((n) => [n.template, n.status])).toEqual([
+      ['down', 'cancelled'],
+      ['recovered', 'sent'],
+    ]);
   });
 });
 describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
@@ -346,7 +408,9 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
       })),
     );
 
-    // The fallback went out in the same run, after Chat: the backup and every Admin, marked.
+    // The fallback goes out on the next pass (Chat and email run side by side): the backup and
+    // every Admin, marked.
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     const emails = (await rowsOf(incidentId)).filter((n) => n.channel === 'email');
     expect(emails.find((n) => n.user_id === arm)?.context).not.toHaveProperty('fallback');
     expect(emails.find((n) => n.user_id === ploy)).toMatchObject({

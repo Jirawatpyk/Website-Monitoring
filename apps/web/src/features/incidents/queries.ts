@@ -14,11 +14,12 @@ export async function getIncidentForAck(incidentId: string, now = new Date()): P
   if (access.status !== 'active') return null;
   const supabase = await createClient();
 
-  const [incident, events] = await Promise.all([
+  const [incident, events, detected] = await Promise.all([
     supabase
       .from('incidents')
       .select(
-        `id, number, state, started_at, detected_at, acked_at, acked_by, recovered_at,
+        `id, number, state, severity, trigger, escalation_level, started_at, detected_at, acked_at,
+         acked_by, recovered_at,
          sites!inner(name, tier, primary_owner_id, backup_owner_id, monitors(url, is_primary))`,
       )
       .eq('id', incidentId)
@@ -31,15 +32,30 @@ export async function getIncidentForAck(incidentId: string, now = new Date()): P
       .order('at', { ascending: false })
       .limit(20)
       .overrideTypes<EventRow[], { merge: false }>(),
+    // The confirm (cause, locations) is the oldest event: read it on its own, so a long timeline
+    // never pushes it out of the latest 20.
+    supabase
+      .from('incident_events')
+      .select('type, at, actor_id, payload')
+      .eq('incident_id', incidentId)
+      .eq('type', 'detected')
+      .limit(1)
+      .maybeSingle()
+      .overrideTypes<EventRow, { merge: false }>(),
   ]);
   if (incident.error) throw new Error(`incident: ${incident.error.message}`);
   if (events.error) throw new Error(`incident_events: ${events.error.message}`);
+  if (detected.error) throw new Error(`incident_events: ${detected.error.message}`);
   if (!incident.data) return null;
+  const timeline =
+    events.data.some((e) => e.type === 'detected') || !detected.data
+      ? events.data
+      : [...events.data, detected.data];
 
   const i = incident.data;
   const ids = new Set<string>();
   for (const id of [i.acked_by, i.sites.primary_owner_id, i.sites.backup_owner_id]) if (id) ids.add(id);
-  for (const e of events.data) {
+  for (const e of timeline) {
     if (e.actor_id) ids.add(e.actor_id);
     if (typeof e.payload.user_id === 'string') ids.add(e.payload.user_id);
   }
@@ -53,7 +69,7 @@ export async function getIncidentForAck(incidentId: string, now = new Date()): P
 
   return buildIncidentView(
     i,
-    events.data,
+    timeline,
     access.profile,
     new Map(people.data.map((p) => [p.id, p.display_name])),
     now,

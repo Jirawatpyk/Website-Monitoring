@@ -37,7 +37,10 @@ describe('acknowledgeIncident', () => {
     expect(m.dispatch).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(500);
     await flush;
-    expect(m.dispatch).toHaveBeenCalledWith(expect.objectContaining({ db: 'db' }));
+    expect(m.dispatch).toHaveBeenCalledWith(expect.objectContaining({ db: 'db' }), {
+      incidentId: ID,
+      deadline: expect.any(Number),
+    });
   });
 
   it('logs a failed flush instead of throwing (the cron sweep sends it)', async () => {

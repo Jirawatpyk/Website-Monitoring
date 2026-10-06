@@ -189,7 +189,8 @@ async function apply(
         p_trigger: 'hard_fail',
         p_severity: 'down',
         p_started_at: d.startedAt.toISOString(),
-        p_detected_at: at,
+        // When the last recheck confirmed it, not when this run noticed (PRD §9: alert within 30 s).
+        p_detected_at: d.confirmedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
         p_context: {
           cause: formatCause(d.failing, m.timeoutMs),

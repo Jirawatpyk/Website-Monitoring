@@ -58,6 +58,8 @@ export type MonitorDecision =
       roundAt: Date;
       /** First failed check: the incident's duration starts here (spec §6). */
       startedAt: Date;
+      /** The last confirming recheck: "Confirmed down" — the 30 s alert clock starts here (PRD §9). */
+      confirmedAt: Date;
       /** The recheck results that confirmed it, for the cause line. */
       failing: readonly StoredCheck[];
     }
@@ -123,7 +125,13 @@ export function decideMonitor(s: MonitorSnapshot): MonitorDecision {
     // A confirmed relapse while an incident is open joins it (D-004) — S04. Nothing new to open.
     if (s.open) return { kind: 'none', roundAt, okRounds: 0, relapse: true };
     const failing = round.rechecks.filter((c) => second.failing.includes(c.location));
-    return { kind: 'open', roundAt, startedAt: firstFailedCheck(s.checks, failing), failing };
+    return {
+      kind: 'open',
+      roundAt,
+      startedAt: firstFailedCheck(s.checks, failing),
+      confirmedAt: latest(failing),
+      failing,
+    };
   }
 
   // An OK round needs a majority of the reporting locations to pass (PRD §5): one pass and one fail
@@ -229,6 +237,10 @@ function firstFailedCheck(checks: readonly StoredCheck[], confirming: readonly S
     }
   }
   return new Date(start);
+}
+
+function latest(checks: readonly StoredCheck[]): Date {
+  return new Date(Math.max(...checks.map((c) => c.checkedAt.getTime())));
 }
 
 function earliest(checks: readonly StoredCheck[]): Date {

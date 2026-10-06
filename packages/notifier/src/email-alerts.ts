@@ -33,6 +33,11 @@ export interface EmailBaseInput {
   incidentUrl: string;
   /** Domain of the sending address: Message-IDs are made on it. */
   messageDomain: string;
+  /**
+   * Template of the recipient's first email of this incident — the thread root later emails reply
+   * to (`down`, or what a fallback first sent them). Default `down`.
+   */
+  firstTemplate?: string;
 }
 
 export interface DownEmailInput extends EmailBaseInput {
@@ -182,11 +187,13 @@ function render(input: EmailBaseInput, b: Body): EmailMessage {
   ].join('\n');
 
   const own = emailMessageId(input.incidentId, b.template, input.recipientId, input.messageDomain);
-  const first = emailMessageId(input.incidentId, 'down', input.recipientId, input.messageDomain);
+  const rootTemplate = input.firstTemplate ?? 'down';
+  const root = emailMessageId(input.incidentId, rootTemplate, input.recipientId, input.messageDomain);
+  // Reply only to an email this person really got; their first one starts the thread.
   const headers: Record<string, string> =
-    b.template === 'down'
+    rootTemplate === b.template
       ? { 'Message-ID': own }
-      : { 'Message-ID': own, 'In-Reply-To': first, References: first };
+      : { 'Message-ID': own, 'In-Reply-To': root, References: root };
 
   return { subject: subjectOf(input), html, text, headers };
 }
@@ -258,6 +265,7 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
       ...(ack ? [['Acknowledged', `${ack.by} at ${formatTime(ack.at)}`] as [string, string]] : []),
       ...(owner ? [['Still to do', `Root cause (${owner})`] as [string, string]] : []),
     ],
-    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
+    // Board: the owner's only button leads; for everyone else it's secondary (nothing to do).
+    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: isOwner }],
   });
 }
