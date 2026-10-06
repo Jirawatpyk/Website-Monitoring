@@ -4,6 +4,7 @@ One line per lesson: what went wrong or slow, and the change that stops it happe
 
 | Date | What happened | What changed | Where |
 | --- | --- | --- | --- |
+| 6 Oct 2026 | Overview's header sat 64 px down vs 32 px on the board: the page padded itself on top of AURA AppShell's padding; spec-checker read code, not rendered pixels (Tao spotted it) | Shared `PageHeader` with no outer padding; apps/web CLAUDE.md says AppShell pads the page; measure rendered spacing against the board in the browser, not only the source | S01 close-out |
 | 6 Oct 2026 | Committed DB types went stale after a late migration edit; typecheck passed because no code used the dropped column (slice-verifier) | The CI `db` job regenerates the types and fails on any diff | S01 close-out |
 | 6 Oct 2026 | Signed-in e2e flows were skipped in CI (no database in `check`), against "no skipped tests" | The CI `db` job builds the web app and runs `e2e/auth.spec.ts` against its local stack | S01 close-out |
 | 6 Oct 2026 | Claude asked Tao to check the PR preview instead of checking it itself | Claude verifies staging / previews in the browser pane; asks only for sign-in or secrets | S01 |
