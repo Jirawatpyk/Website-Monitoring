@@ -42,7 +42,7 @@ create trigger audit_log_no_truncate before truncate on public.audit_log
 create function public.write_audit(
   p_action text,
   p_entity text,
-  p_entity_id uuid,
+  p_entity_id uuid default null,
   p_before jsonb default null,
   p_after jsonb default null
 )

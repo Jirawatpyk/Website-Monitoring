@@ -146,7 +146,7 @@ isOneToOne: false
 { Args: { "p_site_id": string }; Returns: boolean
                            },
 "write_audit":
-{ Args: { "p_action": string,"p_after"?: Json,"p_before"?: Json,"p_entity": string,"p_entity_id": string }; Returns: string
+{ Args: { "p_action": string,"p_after"?: Json,"p_before"?: Json,"p_entity": string,"p_entity_id"?: string }; Returns: string
                            }
           }
           Enums: {
