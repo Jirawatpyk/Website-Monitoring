@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { AppShell, SideNav } from '@jirawatpyk/aura-react';
 import { Brand } from '@/components/app-shell/brand';
 import { NAV_SECTIONS } from '@/components/app-shell/nav';
+import { OfflineStrip } from '@/components/states';
 import { AccountFooter } from '@/features/auth';
 import { getAccess } from '@/lib/auth/session';
 
@@ -29,6 +30,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         />
       }
     >
+      <OfflineStrip />
       {children}
     </AppShell>
   );
