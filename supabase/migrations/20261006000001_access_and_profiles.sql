@@ -87,6 +87,8 @@ $$;
 
 revoke execute on function public.hook_before_user_created(jsonb) from public, anon, authenticated;
 grant execute on function public.hook_before_user_created(jsonb) to supabase_auth_admin;
+-- Supabase's Auth Hooks guide grants this too; hosted Auth needs it to resolve the function.
+grant usage on schema public to supabase_auth_admin;
 
 -- ── Profiles ──────────────────────────────────────────────────────────────
 -- PRD §11 plus display_name and is_active (deactivated users read nothing).

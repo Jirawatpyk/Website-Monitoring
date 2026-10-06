@@ -330,7 +330,7 @@ max_frequency = "5s"
 # DxT Monitor sign-in (PRD §3). Set the two env vars in supabase/.env, then flip `enabled` to true.
 # The company domain is enforced by the before_user_created hook above and again in the web proxy.
 [auth.external.google]
-enabled = false
+enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 redirect_uri = ""
