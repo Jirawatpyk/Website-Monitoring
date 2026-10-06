@@ -5,7 +5,9 @@ describe('isPublic — paths reachable without a session', () => {
   it.each([
     ['/login', true],
     ['/login/anything', true],
+    ['/auth/sign-in', true],
     ['/auth/callback', true],
+    ['/auth/refused', false],
     ['/status/muvmi', true],
     ['/api/cron/engine', true],
     ['/api/ingest', true],

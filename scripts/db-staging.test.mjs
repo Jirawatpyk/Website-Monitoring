@@ -60,7 +60,7 @@ test('a password containing the prod ref does not trip the guard', () => {
 
 test('passes --dry-run through for push only, refuses other flags', () => {
   assert.deepEqual(buildArgs('push', ['--dry-run'], 'URL'), ['db', 'push', '--db-url', 'URL', '--dry-run']);
-  assert.deepEqual(buildArgs('reset', [], 'URL'), ['db', 'reset', '--db-url', 'URL']);
+  assert.deepEqual(buildArgs('reset', [], 'URL'), ['db', 'reset', '--db-url', 'URL', '--no-seed']);
   assert.throws(() => buildArgs('reset', ['--dry-run'], 'URL'), /Unsupported/);
   // pnpm forwards the `--` separator; only a leading one is dropped.
   assert.deepEqual(buildArgs('push', ['--', '--dry-run'], 'URL'), [

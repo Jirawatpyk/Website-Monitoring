@@ -4,6 +4,9 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-012 | 6 Oct 2026 | A Responder may update only `muted_until` / `mute_reason` on sites they own (primary or backup); every other site, monitor and client field is Admin-only | Plan S01 Done-when 3 "responder updates only own sites" (read literally) |
+| D-011 | 6 Oct 2026 | Sign-in copy under D-007: "No access yet" asks for an Admin to add you (no invite email, no 7-day link, no names); "Wrong domain" shows the address from a 60 s httpOnly cookie; no "30 days" promise | Login / MLogin boards: invite email + "link works for 7 days", "Ask Tao", "signed in for 30 days" |
+| D-010 | 6 Oct 2026 | S00 is closed; the VPS agent env file (S00 Done-when 3, VPS part) moves to S03, which installs the agent | Plan S00 Done-when 3 (VPS part) |
 | D-009 | 5 Oct 2026 | CEO answers to the decisions memo: **Tier 1 L2 CEO page on by default** (no "Proposal · pending CEO" tag); Twilio voice off for now; interim Admin = Tao only, on-call = Tle | Spec §8 / Escalation board "Proposal · pending CEO"; CLAUDE.md "off by default" |
 | D-008 | 28 Sep 2026 | The repository is **private on GitHub Free**: `main` is guarded by `pnpm pr:merge`, a pre-push hook and Claude Code deny rules; the production DB secret is a repository secret | `docs/workflow.md` ruleset "main" and GitHub environment `production` |
 | D-007 | 28 Sep 2026 | Sign-in: **2-Step Verification is enforced by Google Workspace**, not by the app; accounts are created only for addresses on an **email allowlist** (Internal OAuth client + domain + allowlist) | PRD §3, §9, §12 test 12 and spec §15.2, §16.6–7 "2-step required from 5 Oct, otherwise view + acknowledge only"; plan Q1, Q6 |
@@ -13,6 +16,39 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-012 — Responder writes on sites: mute fields only
+
+**Conflict.** Plan S01 Done-when 3 says "responder updates only own sites". The Users board's role matrix gives "Edit sites, monitors and escalation" to Admin only, and Responders "Maintenance windows and mute" on their own sites (PRD §3).
+
+**Decision.** A Responder may update a site only when they are its primary or backup owner, and only the mute fields (`muted_until`, `mute_reason`). Every other `sites` column, and all of `monitors` and `clients`, are Admin-only. RLS limits the rows (`owns_site()`); a `BEFORE UPDATE` trigger on `sites` refuses a change to any other column unless `current_app_role() = 'admin'` — column grants can't do it, because they bind to the Postgres role `authenticated`, which Admins share.
+
+**Why.** Matches the role matrix and PRD §3; Done-when 3 meant "only on own sites", not "any field".
+
+**Impact.** S01 migration and pgTAP tests; S09 (mute) builds on it.
+
+## D-011 — Sign-in copy under D-007
+
+**Conflict.** The Login and MLogin boards' "No access yet" state says "Ask Tao to invite you … You'll get an email; the invite link works for 7 days". Under D-007 the allowlist row is the invite — no email or link exists — and product code must not hard-code sample names. "Wrong domain" echoes the address used, but the proxy has already signed that session out. The hint "You stay signed in on this device for 30 days" promises a session timebox nobody configured (the staging project is on the free plan, which can't set one).
+
+**Decision.**
+- "No access yet": the address is a company account that isn't on the access list; ask an Admin to add you, then sign in again. No email, no link, no person's name.
+- "Wrong domain": the proxy puts the refused address in a 60-second httpOnly cookie before redirecting to `/login?error=domain`; the page reads and shows it, never via the URL. Without the cookie the copy reads "That account isn't a DxT Google account."
+- The hint reads "You stay signed in on this device." with no number of days.
+
+**Why.** The copy must describe what the system does; personal data stays out of URLs and logs.
+
+**Impact.** S01 Login / MLogin; spec-checker must not flag these copy differences.
+
+## D-010 — S00 closed; VPS agent env moves to S03
+
+**Gap.** S01 depends on S00 being Done. S00 Done-when 3 still lacks the VPS agent's env file (`/etc/dxt-agent/env`), which can only be written when the agent is installed — S03's job. Every Vercel and Supabase variable is set.
+
+**Decision.** Mark S00 Done. The VPS env file becomes an S03 Done-when line.
+
+**Why.** Everything S01 needs from S00 (Supabase projects, OAuth client, company domain, access list) is in place; keeping S00 open would block the plan on work that belongs to S03.
+
+**Impact.** Plan S00 Status and Notes, S03 Done-when.
 
 ## D-009 — CEO answers to the decisions memo (5 Oct 2026)
 
@@ -32,7 +68,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 **Gap.** The repository was made private (28 Sep 2026) because `docs/prd.md` and the design spec name staff, clients and all 17 sites. On GitHub Free a private repository gets no rulesets, no auto-merge and no environments: the ruleset "main" is kept but not enforced, and "any configured protection rules or environment secrets will be ignored" (GitHub docs). So GitHub would accept a direct push to `main`, merge a PR whose CI failed, and hide the `production` environment's secret from `migrate-production`, which would then skip silently.
 
 **Decision.** Stay on GitHub Free and enforce the same rules locally:
-- Merge only with `pnpm pr:merge <number>` (`scripts/pr-merge.mjs`): it refuses unless CI `check` succeeded on the PR's current head, the PR targets `main`, isn't a draft, has no conflicts and no requested changes, and it merges that exact commit (`--match-head-commit`). `gh pr merge` is denied to Claude Code, so every merge goes through it.
+- Merge only with `pnpm pr:merge <number>` (`scripts/pr-merge.mjs`): it refuses unless CI `check` (and, since S01, `db`) succeeded on the PR's current head, the PR targets `main`, isn't a draft, has no conflicts and no requested changes, and it merges that exact commit (`--match-head-commit`). `gh pr merge` is denied to Claude Code, so every merge goes through it.
 - No pushes to `main`: a `pre-push` hook in `.githooks` (installed by `pnpm install` through `prepare`) and deny rules in `.claude/settings.json`.
 - `SUPABASE_PROD_DB_URL` becomes a **repository** secret; `migrate-production` drops `environment: production` and still runs only on pushes to `main`.
 

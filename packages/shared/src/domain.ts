@@ -64,6 +64,15 @@ export type ProbeLocation = (typeof PROBE_LOCATIONS)[number];
 export const ROLES = ['admin', 'responder', 'stakeholder', 'viewer', 'client'] as const;
 export type Role = (typeof ROLES)[number];
 
+/** Roles as people read them (PRD §3). */
+export const ROLE_LABELS: Record<Role, string> = {
+  admin: 'Admin',
+  responder: 'Responder',
+  stakeholder: 'Stakeholder',
+  viewer: 'Viewer',
+  client: 'Client',
+};
+
 export interface TierConfig {
   /** Check interval per location. */
   intervalSec: number;

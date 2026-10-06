@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// Signed-out smoke checks that need no database. Signed-in flows arrive with S01 (local Supabase).
+// Signed-out smoke checks that need no database. Signed-in flows: e2e/auth.spec.ts (local Supabase).
 
 test('signed-out visitors are sent to sign-in, keeping where they were going', async ({ page }) => {
   await page.goto('/incidents');

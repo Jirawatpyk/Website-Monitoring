@@ -8,6 +8,8 @@ export function safeNextPath(next: string | null | undefined, fallback = '/'): s
   // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f\u007f\\]/.test(next)) return fallback;
   if (next.startsWith('//')) return fallback;
+  // Sign-in pages are never a destination: returning there after signing in would loop.
+  if (/^\/(login|auth)(?=[/?#]|$)/.test(next)) return fallback;
   return next;
 }
 

@@ -32,6 +32,14 @@ describe('updateSession (auth proxy)', () => {
     );
   });
 
+  it('turns an OAuth refusal sent to the Site URL into the refusal card', async () => {
+    signedInAs(null);
+    const response = await visit(
+      "/?error=access_denied&error_description=You're+not+on+the+DxT+Monitor+access+list+yet.",
+    );
+    expect(response.headers.get('location')).toBe('http://localhost:3500/login?error=access');
+  });
+
   it('lets public paths through without a session', async () => {
     signedInAs(null);
     const response = await visit('/api/cron/engine');
@@ -50,6 +58,9 @@ describe('updateSession (auth proxy)', () => {
     const response = await visit('/incidents');
     expect(response.headers.get('location')).toBe('http://localhost:3500/login?error=domain');
     expect(auth.signOut).toHaveBeenCalledOnce();
+    const cookie = response.cookies.get('dxt_refused_email');
+    expect(cookie?.value).toBe('someone@gmail.com');
+    expect(cookie).toMatchObject({ httpOnly: true, path: '/login', maxAge: 60 });
   });
 
   it('rejects everyone when ALLOWED_EMAIL_DOMAIN is not set (fail closed)', async () => {

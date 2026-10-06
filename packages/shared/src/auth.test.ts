@@ -13,6 +13,11 @@ describe('safeNextPath', () => {
     ['/\t/evil.example', '/'],
     ['/\n/evil.example', '/'],
     ['javascript:alert(1)', '/'],
+    ['/login', '/'],
+    ['/login?next=%2Fx', '/'],
+    ['/auth/callback?code=x', '/'],
+    ['/login-history', '/login-history'],
+    ['/authors', '/authors'],
   ])('%j → %s', (input, expected) => {
     expect(safeNextPath(input)).toBe(expected);
   });

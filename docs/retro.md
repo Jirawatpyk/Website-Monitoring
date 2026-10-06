@@ -4,6 +4,10 @@ One line per lesson: what went wrong or slow, and the change that stops it happe
 
 | Date | What happened | What changed | Where |
 | --- | --- | --- | --- |
+| 6 Oct 2026 | `pnpm db:reset:staging` would have loaded the dev seed (fake users, `example.test` allowlist, 17 fake monitors) onto staging; found by `/code-review` | The script always passes `--no-seed`; test added | S01 |
+| 6 Oct 2026 | Sign-up trusted any provider: with a project's Email provider left on, an allowlisted address could be claimed with a password (security-reviewer) | The hook and `handle_new_user` accept Google only (`.test` excepted for local); pgTAP covers it | S01 |
+| 6 Oct 2026 | RLS helpers ran once per row (359 ms vs 7.7 ms on 50k rows, db-reviewer) | Policies wrap them as `(select …)`; rule in `supabase/CLAUDE.md` | S01 |
+| 6 Oct 2026 | Bash heredocs with `$$` or curly quotes failed on Windows Git Bash several times | Write files with the Write tool (or a script file), not multi-line heredocs | S01 |
 | 1 Oct 2026 | Plan S11 still described the "acknowledge only" lock that D-007 removed; the D-007 sweep had searched for "2-step" only | Line fixed to point at D-007; when a decision removes a concept, search for every name of it, not one keyword | PR #15 |
 | 29 Sep 2026 | Hard-coded spacing and colours were a written rule only | ESLint `dxt/no-hardcoded-design-values` fails the build | PR #13 |
 | 29 Sep 2026 | A downloaded Google OAuth client secret (JSON) landed in the project folder; only luck kept it out of a commit | `.gitignore` covers `client_secret*.json` and service-account keys; Claude Code is denied reading them | PR #13 |

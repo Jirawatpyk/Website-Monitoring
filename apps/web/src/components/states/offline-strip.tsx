@@ -1,0 +1,80 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Alert, Button } from '@jirawatpyk/aura-react';
+import { IconRotateCcw } from '@jirawatpyk/aura-react/icons';
+import { formatTime } from '@dxt/shared';
+
+export const OFFLINE_RETRY_MS = 10_000;
+
+/**
+ * "Your connection dropped" (EmptyStates board, panel 6): the viewer's network, not the monitor.
+ * Says what time the page's data is from, retries every 10 s, and refreshes when back online.
+ */
+export function OfflineStrip() {
+  const router = useRouter();
+  const [offlineSince, setOfflineSince] = useState<Date | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const retryingTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const retry = useCallback(() => {
+    setRetrying(true);
+    if (navigator.onLine) {
+      setOfflineSince(null);
+      router.refresh();
+    }
+    clearTimeout(retryingTimer.current);
+    retryingTimer.current = setTimeout(() => setRetrying(false), 1_000);
+  }, [router]);
+
+  useEffect(() => {
+    const goOffline = () => setOfflineSince((since) => since ?? new Date());
+    const goOnline = () => {
+      setOfflineSince(null);
+      router.refresh();
+    };
+    if (!navigator.onLine) goOffline();
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  }, [router]);
+
+  useEffect(() => () => clearTimeout(retryingTimer.current), []);
+
+  useEffect(() => {
+    if (!offlineSince) return;
+    const timer = setInterval(retry, OFFLINE_RETRY_MS);
+    return () => clearInterval(timer);
+  }, [offlineSince, retry]);
+
+  if (!offlineSince) return null;
+  return (
+    <Alert
+      tone="warning"
+      role="none"
+      action={
+        <Button
+          size="sm"
+          variant="ghost"
+          touchHeight
+          icon={<IconRotateCcw />}
+          onClick={retry}
+          disabled={retrying}
+        >
+          {retrying ? 'Retrying…' : 'Retry'}
+        </Button>
+      }
+    >
+      {/* Only the summary is a live region; the retry ticker would re-announce every 10 s.
+          The time is when the connection dropped — what's on screen was loaded before it. */}
+      <span role="status">
+        <b>Offline</b> — showing what you had at {formatTime(offlineSince)}.
+      </span>{' '}
+      <span>{retrying ? 'Retrying now…' : 'Retrying every 10 s.'}</span>
+    </Alert>
+  );
+}

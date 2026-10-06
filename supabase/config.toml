@@ -218,8 +218,11 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-# DxT Monitor: Google Workspace SSO only (PRD §3) — no email sign-ups.
-enable_signup = false
+# DxT Monitor: people sign in with Google Workspace SSO only (PRD §3). On the LOCAL stack email +
+# password is on so e2e tests can sign seeded users in (the CLI ties email sign-in to this flag);
+# the before_user_created hook still refuses any address that isn't allowlisted (D-007).
+# Hosted projects don't read this file: keep the Email provider off in their dashboards.
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
@@ -327,7 +330,7 @@ max_frequency = "5s"
 # DxT Monitor sign-in (PRD §3). Set the two env vars in supabase/.env, then flip `enabled` to true.
 # The company domain is enforced by the before_user_created hook above and again in the web proxy.
 [auth.external.google]
-enabled = false
+enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 redirect_uri = ""
