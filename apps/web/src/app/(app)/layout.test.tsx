@@ -33,7 +33,8 @@ describe('AppLayout', () => {
     expect(screen.queryByRole('link', { name: 'Incidents' })).toBeNull(); // not live until S07
     expect(screen.getAllByText('Arm').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Responder').length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: 'Sign out' })[0]).toHaveAttribute('title', 'Sign out');
+    // AURA 5.32: the name shows in AURA's own tip (hover + keyboard focus), not a native title.
+    expect(screen.getAllByRole('button', { name: 'Sign out' })[0]).toHaveAttribute('data-aura-tip');
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
 

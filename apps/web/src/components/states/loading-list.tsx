@@ -59,7 +59,7 @@ export function LoadingList({ label, rows = 7, lastDataAt = null, onRetry }: Loa
       <ul className="m-0 flex list-none flex-col gap-3 p-0" aria-hidden>
         {Array.from({ length: rows }, (_, i) => (
           <li key={i} className="flex items-center gap-3">
-            <Skeleton variant="rect" className="h-5 w-18 rounded-aura-full" />
+            <Skeleton variant="pill" />
             <div className={ROW_WIDTHS[i % ROW_WIDTHS.length]}>
               <Skeleton variant="text" />
             </div>
