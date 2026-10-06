@@ -35,6 +35,8 @@ interface IncidentFacts {
 }
 
 const CLAIM_LIMIT = 20;
+/** A failed post stays queued and is retried when its 2-min lease ends, up to this many attempts. */
+export const MAX_ATTEMPTS = 3;
 
 /**
  * One notifier run: claim due Google Chat messages, render each from its incident and the context
@@ -73,7 +75,11 @@ export async function dispatchNotifications({
     const incident = incidents.data.find((i) => i.id === n.incident_id);
     const message = incident ? render(n.template, incident, n.context, appUrl, now) : null;
     const result: ChatPostResult = message
-      ? await post(webhookUrl, message, { threadKey: n.thread_key ?? n.incident_id })
+      ? // messageId makes a re-send of an already posted message a no-op (Chat answers 409).
+        await post(webhookUrl, message, {
+          threadKey: n.thread_key ?? n.incident_id,
+          messageId: `client-${n.id}`,
+        })
       : { ok: false, error: `Can't render template ${n.template}` };
 
     const update = result.ok
@@ -83,7 +89,10 @@ export async function dispatchNotifications({
           provider_message_id: result.messageName,
           error: null,
         }
-      : { status: 'failed' as const, error: result.error };
+      : {
+          status: n.attempts < MAX_ATTEMPTS && message ? ('queued' as const) : ('failed' as const),
+          error: result.error,
+        };
     const saved = await db.from('notifications').update(update).eq('id', n.id);
     if (saved.error) throw new Error(`notifications: ${saved.error.message}`);
 

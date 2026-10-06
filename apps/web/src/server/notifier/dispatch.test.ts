@@ -13,6 +13,7 @@ const notification = (template: string, context: Record<string, unknown> = {}) =
   channel: 'google_chat',
   template,
   thread_key: 'i1',
+  attempts: 1,
   context,
 });
 const incident = {
@@ -70,7 +71,7 @@ describe('dispatchNotifications', () => {
     expect(downCall?.[1].text).toBe('<users/ARM> DOWN · Test target (Tier 1)');
     expect(JSON.stringify(downCall?.[1].cardsV2)).toContain('INC-0007');
     expect(JSON.stringify(downCall?.[1].cardsV2)).toContain('https://monitor.dxt.example/incidents/i1');
-    expect(downCall?.[2]).toEqual({ threadKey: 'i1' });
+    expect(downCall?.[2]).toEqual({ threadKey: 'i1', messageId: 'client-n-down' });
     expect(recoveredCall?.[1].text).toBe(
       '<users/ARM> RECOVERED · Test target · down 43 min · add a root cause',
     );
@@ -87,22 +88,45 @@ describe('dispatchNotifications', () => {
     ]);
   });
 
-  it('records a failed post with its error', async () => {
-    const { db, calls } = fakeDb({
+  it('keeps a failed post queued for a retry, then gives up after 3 attempts', async () => {
+    const post = vi.fn(async () => ({ ok: false as const, error: 'HTTP 503' }));
+    const first = fakeDb({
       'rpc.claim_notifications': { data: [notification('down')] },
       'incidents.select': { data: [incident] },
     });
-    const post = vi.fn(async () => ({ ok: false as const, error: 'HTTP 400: bad card' }));
-    expect(await dispatchNotifications({ db, webhookUrl, appUrl, post })).toEqual({
+    expect(await dispatchNotifications({ db: first.db, webhookUrl, appUrl, post })).toEqual({
       ok: true,
       sent: 0,
       failed: 1,
     });
-    expect(calls.find((c) => c.table === 'notifications')?.values).toEqual({
-      status: 'failed',
-      error: 'HTTP 400: bad card',
+    expect(first.calls.find((c) => c.table === 'notifications')?.values).toEqual({
+      status: 'queued',
+      error: 'HTTP 503',
     });
-    expect(calls.some((c) => c.table === 'incident_events')).toBe(false);
+    expect(first.calls.some((c) => c.table === 'incident_events')).toBe(false);
+
+    const last = fakeDb({
+      'rpc.claim_notifications': { data: [{ ...notification('down'), attempts: 3 }] },
+      'incidents.select': { data: [incident] },
+    });
+    await dispatchNotifications({ db: last.db, webhookUrl, appUrl, post });
+    expect(last.calls.find((c) => c.table === 'notifications')?.values).toEqual({
+      status: 'failed',
+      error: 'HTTP 503',
+    });
+  });
+
+  it('posts with a client message id so a retry can never duplicate a message', async () => {
+    const { db } = fakeDb({
+      'rpc.claim_notifications': { data: [notification('down')] },
+      'incidents.select': { data: [incident] },
+    });
+    const post = vi.fn(async () => ({ ok: true as const, messageName: null }));
+    await dispatchNotifications({ db, webhookUrl, appUrl, post });
+    expect((post.mock.calls[0] as unknown as [string, unknown, unknown])[2]).toEqual({
+      threadKey: 'i1',
+      messageId: 'client-n-down',
+    });
   });
 
   it('marks a message it can’t render as failed without posting', async () => {

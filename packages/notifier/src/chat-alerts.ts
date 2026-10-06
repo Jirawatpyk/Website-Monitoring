@@ -117,7 +117,8 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
 
 export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
   const { site, startedAt, recoveredAt } = input;
-  const down = formatDuration((recoveredAt.getTime() - startedAt.getTime()) / 60_000);
+  // At least "1 min": a confirmed DOWN always lasted some time, and "down 0 min" reads as no outage.
+  const down = formatDuration(Math.max(1, (recoveredAt.getTime() - startedAt.getTime()) / 60_000));
 
   return {
     text: buildChatTextLine({

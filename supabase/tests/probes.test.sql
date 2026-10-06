@@ -2,7 +2,7 @@
 -- write functions, one open incident per site, one message per incident, and read-only RLS.
 begin;
 \ir _helpers.psql
-select plan(30);
+select plan(31);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 delete from public.monitors;
@@ -135,6 +135,14 @@ select is(
   (select state::text from public.incidents) || '/' || (select status::text from public.site_status),
   'needs_root_cause/ok',
   'Needs root cause, and the site is OK again'
+);
+
+select results_eq(
+  format($$select action, before->>'state', after->>'state' from public.audit_log
+           where entity = 'incident' and entity_id = '%s' order by at, action$$, (select id from inc)),
+  $$values ('incident.opened', null, 'unacked'), ('incident.recovered', 'unacked', 'monitoring'),
+           ('incident.state', 'monitoring', 'needs_root_cause')$$,
+  'every incident state change is audited, with before / after'
 );
 
 -- claim_notifications leases due rows once.

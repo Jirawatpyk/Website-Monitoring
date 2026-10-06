@@ -19,6 +19,20 @@ describe('postChatMessage', () => {
     expect(JSON.parse(init.body as string)).toEqual(message);
   });
 
+  it('treats 409 for a message id it already posted as sent', async () => {
+    const fetchImpl = vi.fn(async () => new Response('ALREADY_EXISTS', { status: 409 }));
+    const result = await postChatMessage(webhook, message, {
+      threadKey: 'k',
+      messageId: 'client-n1',
+      fetchImpl,
+    });
+    expect(result).toEqual({ ok: true, messageName: null });
+    const [url] = fetchImpl.mock.calls[0] as unknown as [URL];
+    expect(url.searchParams.get('messageId')).toBe('client-n1');
+    const plain = await postChatMessage(webhook, message, { threadKey: 'k', fetchImpl });
+    expect(plain).toEqual({ ok: false, error: 'HTTP 409: ALREADY_EXISTS' });
+  });
+
   it('reports an HTTP error without the webhook URL', async () => {
     const fetchImpl = vi.fn(async () => new Response('bad card', { status: 400 }));
     const result = await postChatMessage(webhook, message, { threadKey: 'inc-1', fetchImpl });

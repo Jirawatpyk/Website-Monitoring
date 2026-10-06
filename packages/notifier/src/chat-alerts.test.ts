@@ -107,6 +107,20 @@ describe('RECOVERED reply (ChatAlert, spec §16.4)', () => {
   });
 });
 
+describe('RECOVERED duration floor', () => {
+  it('never says "down 0 min"', () => {
+    const quick = buildRecoveredAlert({
+      incidentId: 'inc-1',
+      site: 'MuvMi',
+      startedAt: confirmedAt,
+      recoveredAt: new Date(confirmedAt.getTime() + 40_000),
+      okLocations: 2,
+      owner: null,
+    });
+    expect(quick.text).toBe('RECOVERED · MuvMi · down 1 min · add a root cause');
+  });
+});
+
 describe('formatCause (spec §10)', () => {
   it('groups by kind with locations in BKK / SIN / TYO order', () => {
     expect(

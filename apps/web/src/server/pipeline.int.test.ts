@@ -55,18 +55,17 @@ async function results(
   monitorId: string,
   rows: [location: 'SIN' | 'TYO', Outcome, at: Date, attempt?: 1 | 2][],
 ) {
-  await must(
-    db.from('check_results').insert(
-      rows.map(([location, outcome, at, attempt = 1]) => ({
-        monitor_id: monitorId,
-        location,
-        outcome,
-        checked_at: at.toISOString(),
-        attempt,
-        status_code: outcome === 'fail' ? 500 : 200,
-      })),
-    ),
+  const { error } = await db.from('check_results').insert(
+    rows.map(([location, outcome, at, attempt = 1]) => ({
+      monitor_id: monitorId,
+      location,
+      outcome,
+      checked_at: at.toISOString(),
+      attempt,
+      status_code: outcome === 'fail' ? 500 : 200,
+    })),
   );
+  if (error) throw new Error(error.message);
 }
 
 const incidentsOf = (siteId: string) =>

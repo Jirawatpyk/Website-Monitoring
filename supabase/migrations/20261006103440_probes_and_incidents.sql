@@ -250,6 +250,12 @@ begin
   insert into public.incident_events (incident_id, type, payload, at)
   values (v_id, 'detected', p_context, p_detected_at);
 
+  -- Every incident state change is audited (CLAUDE.md → Audit); actor null = the engine.
+  insert into public.audit_log (action, entity, entity_id, after)
+  values ('incident.opened', 'incident', v_id,
+          jsonb_build_object('state', 'unacked', 'severity', p_severity, 'trigger', p_trigger,
+                             'site_id', p_site_id, 'started_at', p_started_at));
+
   insert into public.site_status as s
     (site_id, status, since, last_evaluated_at, last_round_at, ok_rounds)
   values (p_site_id, p_severity::text::public.site_state, p_started_at, p_detected_at, p_round_at, 0)
@@ -298,6 +304,11 @@ begin
   insert into public.incident_events (incident_id, type, payload, at)
   values (p_incident_id, 'recovered', p_context, p_recovered_at);
 
+  insert into public.audit_log (action, entity, entity_id, before, after)
+  values ('incident.recovered', 'incident', p_incident_id,
+          jsonb_build_object('state', p_from),
+          jsonb_build_object('state', p_to, 'recovered_at', p_recovered_at));
+
   update public.site_status
     set ok_rounds = 1, last_evaluated_at = p_recovered_at, last_round_at = p_round_at
     where site_id = v_site_id;
@@ -340,6 +351,10 @@ begin
   if p_to is distinct from p_from then
     insert into public.incident_events (incident_id, type, payload, at)
     values (p_incident_id, 'ok_two_rounds', jsonb_build_object('state', p_to), p_at);
+
+    insert into public.audit_log (action, entity, entity_id, before, after)
+    values ('incident.state', 'incident', p_incident_id,
+            jsonb_build_object('state', p_from), jsonb_build_object('state', p_to));
   end if;
 
   update public.site_status
