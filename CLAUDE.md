@@ -46,13 +46,13 @@ pnpm dev                 # web on http://localhost:3500
 pnpm dev:agent           # VPS agent (needs apps/vps-agent/.env)
 pnpm check               # format + plan coverage + lint + typecheck + test — run before saying work is done
 pnpm plan:check          # every FR, board, table and go-live test maps to one slice
-pnpm pr:merge <number>   # squash-merge a PR only if CI `check` is green on its head (D-008)
+pnpm pr:merge <number>   # squash-merge a PR only if CI `check` + `db` are green on its head (D-008)
 pnpm test                # Vitest in every package that has tests (web: jsdom + Testing Library)
 pnpm test:coverage       # the same tests with coverage thresholds (what CI runs)
 pnpm test:e2e            # Playwright against the web app, desktop 1440 + mobile 390 (starts `pnpm dev` if needed)
 pnpm --filter @dxt/engine test:watch
 pnpm build
-pnpm db:start | db:stop | db:reset | db:types   # local Supabase (Docker); db:types regenerates packages/db types
+pnpm db:start | db:stop | db:reset | db:types | db:test   # local Supabase (Docker); db:types regenerates packages/db types; db:test runs pgTAP
 pnpm db:push:staging | db:reset:staging          # staging database only (refuses production); asks first
 ```
 
@@ -70,7 +70,7 @@ pnpm db:push:staging | db:reset:staging          # staging database only (refuse
 - **Mobile**: every screen works at 390 px; touch targets ≥ 44 px. Check 390 / 820 / 1440, light and dark.
 - **Improve when something goes wrong** (`docs/workflow.md` → Continuous improvement): when you get something wrong or against a rule, a reviewer repeats a finding, CI fails for a preventable reason, or a source is stale, propose the strongest fix — a tool guard (lint, test, CI, hook, deny rule) before a written rule — and add one line to `docs/retro.md`. Reviewer findings: High always fixed; Medium fixed or justified in the PR.
 - **Work slice by slice** (`docs/implementation-plan.md`, `docs/workflow.md`): one slice per branch and PR; don't start a slice whose dependencies aren't Done; a slice is Done only when every "Done when" line has evidence. Nav items stay hidden (`live: false`) until their slice ships the page.
-- **Git**: branch `slice/<ID>-<name>` from `main` (`fix/…` for hotfixes), Conventional Commits with the slice as scope (`feat(S02a): …`), never commit `.env*` files except `.env.example`. `main` is protected by our own guards (D-008 — private repo on GitHub Free, so GitHub doesn't enforce the ruleset): changes land only by PR, merged with `pnpm pr:merge <number>` once CI `check` is green — never push to `main`, never `gh pr merge` directly. `staging` is a throwaway branch deployed by the `dxt-monitor-staging` Vercel project (D-006): push a slice onto it to verify, reset it to `main` after the merge. Staging database: `pnpm db:push:staging` / `pnpm db:reset:staging` only; production migrations only via the CI job `migrate-production`. Never run `supabase link`. Push branches and open PRs only when asked.
+- **Git**: branch `slice/<ID>-<name>` from `main` (`fix/…` for hotfixes), Conventional Commits with the slice as scope (`feat(S02a): …`), never commit `.env*` files except `.env.example`. `main` is protected by our own guards (D-008 — private repo on GitHub Free, so GitHub doesn't enforce the ruleset): changes land only by PR, merged with `pnpm pr:merge <number>` once CI `check` and `db` are green — never push to `main`, never `gh pr merge` directly. `staging` is a throwaway branch deployed by the `dxt-monitor-staging` Vercel project (D-006): push a slice onto it to verify, reset it to `main` after the merge. Staging database: `pnpm db:push:staging` / `pnpm db:reset:staging` only; production migrations only via the CI job `migrate-production`. Never run `supabase link`. Push branches and open PRs only when asked.
 
 ## Project skills and agents
 

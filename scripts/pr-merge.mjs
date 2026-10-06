@@ -4,14 +4,14 @@
 //
 // The repository is private on GitHub Free, so the ruleset "main" is not enforced and GitHub would
 // merge a PR with a red or unfinished CI. This script refuses unless the PR is open, not a draft,
-// targets main, has no requested changes, and the CI job `check` succeeded on its current head
-// commit, and — when the PR changes CI files that can read repository secrets — the caller passed
+// targets main, has no requested changes, and the CI jobs `check` and `db` succeeded on its current
+// head commit, and — when the PR changes CI files that can read repository secrets — the caller passed
 // --workflow-changes-reviewed; it then merges that exact commit (`--match-head-commit`), so a push after the check
 // can't slip in. No shell: arguments go straight to `gh`.
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
-export const REQUIRED_CHECK = 'check';
+export const REQUIRED_CHECKS = ['check', 'db'];
 const FAILED = new Set(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE']);
 
 export const WORKFLOW_FLAG = '--workflow-changes-reviewed';
@@ -39,14 +39,16 @@ export function mergeBlockers(pr, { workflowChangesReviewed = false } = {}) {
   if (pr.reviewDecision === 'CHANGES_REQUESTED') problems.push('a reviewer requested changes');
 
   const checks = pr.statusCheckRollup ?? [];
-  const required = checks.filter((c) => c.name === REQUIRED_CHECK);
-  if (required.length === 0) problems.push(`CI "${REQUIRED_CHECK}" has not run on the head commit`);
-  for (const c of required) {
-    if (c.status !== 'COMPLETED') problems.push(`CI "${REQUIRED_CHECK}" is still ${c.status.toLowerCase()}`);
-    else if (c.conclusion !== 'SUCCESS') problems.push(`CI "${REQUIRED_CHECK}" ended ${c.conclusion}`);
+  for (const name of REQUIRED_CHECKS) {
+    const runs = checks.filter((c) => c.name === name);
+    if (runs.length === 0) problems.push(`CI "${name}" has not run on the head commit`);
+    for (const c of runs) {
+      if (c.status !== 'COMPLETED') problems.push(`CI "${name}" is still ${c.status.toLowerCase()}`);
+      else if (c.conclusion !== 'SUCCESS') problems.push(`CI "${name}" ended ${c.conclusion}`);
+    }
   }
   for (const c of checks) {
-    if (c.name !== REQUIRED_CHECK && c.status === 'COMPLETED' && FAILED.has(c.conclusion)) {
+    if (!REQUIRED_CHECKS.includes(c.name) && c.status === 'COMPLETED' && FAILED.has(c.conclusion)) {
       problems.push(`check "${c.name}" ended ${c.conclusion}`);
     }
   }
