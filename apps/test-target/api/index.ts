@@ -1,11 +1,11 @@
 import { readEdgeConfigItem } from '../src/edge-config';
 import { handle } from '../src/handler';
 
-// Every path is rewritten here (vercel.json). The mode lives in the Edge Config store connected to
-// this project (env EDGE_CONFIG), item `mode`.
+// Every path is rewritten here (vercel.json). The mode lives in the Global Config (formerly Edge
+// Config) store connected to this project — env GLOBAL_CONFIG (EDGE_CONFIG on older stores) — item `mode`.
 const respond = (request: Request) =>
   handle({
-    readMode: () => readEdgeConfigItem(process.env.EDGE_CONFIG, 'mode'),
+    readMode: () => readEdgeConfigItem(process.env.GLOBAL_CONFIG ?? process.env.EDGE_CONFIG, 'mode'),
     userAgent: request.headers.get('user-agent'),
   });
 
