@@ -2,7 +2,7 @@
 -- write functions, one open incident per site, one message per incident, and read-only RLS.
 begin;
 \ir _helpers.psql
-select plan(35);
+select plan(36);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -94,9 +94,14 @@ select results_eq(
   'the timeline starts with "detected"'
 );
 select results_eq(
-  'select template, thread_key, status::text from public.notifications',
+  $$select template, thread_key, status::text from public.notifications where channel = 'google_chat'$$,
   format($$values ('down', '%s', 'queued')$$, (select id from inc)),
   'the DOWN Chat message is queued, threaded by incident id'
+);
+select results_eq(
+  $$select template, user_id from public.notifications where channel = 'email'$$,
+  $$select 'down'::text, id from ids where name = 'arm'$$,
+  'the DOWN email goes to the primary owner (S02b)'
 );
 select is(
   public.engine_open_incident(
@@ -105,7 +110,7 @@ select is(
   null,
   'a second open incident for the same site is not created'
 );
-select is((select count(*)::int from public.notifications), 1, 'and no second DOWN is queued');
+select is((select count(*)::int from public.notifications), 2, 'and no second DOWN is queued (Chat + email)');
 select throws_ok(
   format($$insert into public.notifications (incident_id, channel, template) values ('%s', 'google_chat', 'down')$$,
     (select id from inc)),
@@ -118,9 +123,9 @@ select ok(
   'engine_recover_incident moves Unacked → Monitoring'
 );
 select results_eq(
-  'select template from public.notifications order by created_at, template',
-  $$values ('down'), ('recovered')$$,
-  'RECOVERED is queued in the same incident'
+  'select channel::text, template from public.notifications order by template, channel',
+  $$values ('email', 'down'), ('google_chat', 'down'), ('email', 'recovered'), ('google_chat', 'recovered')$$,
+  'RECOVERED is queued in the same incident, in Chat and to everyone emailed'
 );
 select ok(
   not public.engine_recover_incident((select id from inc), 'unacked', 'monitoring', now(), now(), '{}', true),
@@ -184,9 +189,9 @@ select throws_ok(
   '42501', null, 'or settle one'
 );
 select is(
-  (select count(*)::int from public.notifications where channel = 'email'),
-  0,
-  'claims are per channel (no email rows exist in S02a)'
+  (select count(*)::int from public.notifications where channel = 'email' and attempts = 0),
+  2,
+  'claims are per channel: the email rows were not claimed with Chat'
 );
 select throws_ok(
   $$select public.claim_notifications('google_chat', 1)$$,
