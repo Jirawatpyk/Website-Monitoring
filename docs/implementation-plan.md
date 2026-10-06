@@ -210,7 +210,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 ### S06 · Overview dashboard & site detail
 
-- **Scope:** FR-05, FR-08. Overview (desktop, mobile, dark NOC): X/17 OK, status per site with Realtime, filters (tier, owner, client), 24 h sparkline, open incidents; the "Maintenance & mutes" card lands in S09. Site detail: uptime 24 h / 7 d / 30 d / 90 d, response time per location, incident history, check log. `check_rollups` hourly and daily via pg_cron (daily kept 2 years); partition create / drop jobs (90-day raw retention).
+- **Scope:** FR-05, FR-08. Overview (desktop, mobile, dark NOC): X/17 OK, status per site with Realtime, filters (tier, owner, client), 24 h sparkline, open incidents; the "Maintenance & mutes" card lands in S09. Phone shell (D-018): AURA `BottomNav` with the live sections replaces the menu button and drawer below lg (MOverview). Site detail: uptime 24 h / 7 d / 30 d / 90 d, response time per location, incident history, check log. `check_rollups` hourly and daily via pg_cron (daily kept 2 years); partition create / drop jobs (90-day raw retention).
 - **Boards:** Main, MOverview, MainDark, SiteDetail, MSite · **Tables:** check_rollups
 - **Depends on:** S02a, S05
 - **Done when:**
@@ -222,7 +222,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 ### S07 · Incidents, timeline & resolve
 
-- **Scope:** FR-06. Incidents list (filters, "N short PROBLEMs auto-resolved (hidden)"), Incident detail (state badges §11 / §14.3, timeline that only grows, notes, root cause, MTTA / MTTR), mobile list and detail, Resolve dialog with the three conditions, resolve held 10 s, NOTE and RESOLVED Chat replies, RESOLVED email. Until S11 builds the client-update track it never fires, so that condition shows "Not required" (D-002, spec §16.2).
+- **Scope:** FR-06. Incidents list (filters, "N short PROBLEMs auto-resolved (hidden)"), Incident detail (state badges §11 / §14.3, timeline that only grows, notes, root cause, MTTA / MTTR), mobile list and detail, Resolve dialog with the three conditions, resolve held 10 s, NOTE and RESOLVED Chat replies, RESOLVED email. Until S11 builds the client-update track it never fires, so that condition shows "Not required" (D-002, spec §16.2). Phone detail pages get the top bar's back arrow (MobileAck, MIncident → Incidents; D-018).
 - **Boards:** Incidents, MIncidents, Incident, MIncident, Resolve · **Test plan:** T10
 - **Depends on:** S04
 - **Done when:**

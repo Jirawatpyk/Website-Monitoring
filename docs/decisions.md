@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-018 | 7 Oct 2026 | One page-header rhythm and one phone shell: every page header is AURA `PageHeader` with 4 px between its parts, a breadcrumb sitting in the eyebrow slot; phones get the boards' top bar (brand + avatar) now, the back arrow with S07 and BottomNav with S06 | Board drift: breadcrumb gaps of 12 / 24 px and title → meta gaps of 6 / 10 px; AppShell's menu-only phone bar |
 | D-017 | 6 Oct 2026 | Alert emails thread on a stable incident id (`<inc-<id>@<sending domain>>` in `References`, plus `In-Reply-To` after a person's first email) instead of the first email's Message-ID | Spec §10 / EmailAlert "In-Reply-To / References set to the first message" |
 | D-016 | 6 Oct 2026 | S02b ack, email and fallback: an Admin acks any site and a Responder only sites they own (on-call rule in S10); when Chat fails after its last retry the fallback email goes to the backup and every Admin not already emailed; D-013's no-promise rule covers email and the ack page too (no escalation / client-update rows, no "webhooks" in the Undo line until their slices); `/incidents/[id]` is built in S02b with the MobileAck layout | EmailAlert / MobileAck boards' escalation and client-update copy, §16.8 "webhooks" (until their slices); MLogin "any Responder acks"; PRD §9 fallback audience (gap) |
 | D-015 | 6 Oct 2026 | A site's owner and backup must have a Google Chat user id before the site is saved (S05); until the Profile screen (S16) an Admin sets it with a reviewed SQL script. Alerts mention only people with an id | Gap — ChatAlert board assumes every owner can be @mentioned |
@@ -21,6 +22,18 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-018 — Page header spacing and the phone shell
+
+**Conflict.** (1) The boards space the page header differently: a section eyebrow sits 4 px above the title (Main, Incidents, Expiry, Settings …), a breadcrumb 12 px (Synthetic, EditMonitors, AddSite, SiteDetail, Incident) or 24 px (Resolve); the title → meta line gap is 4 px on most boards, 6 px on Synthetic / EditMonitors and 10 px where the second row holds badges (SiteDetail, Incident, Maintenance, PostIncident). The spec gives no numbers, and §13 says "Eyebrow = breadcrumb (chevron style) OR section name in caps … never both". (2) Every phone board (MOverview, MobileAck, MIncidents …) draws a 56 px top bar — brand on the left, avatar on the right, a back arrow on detail pages — and a BottomNav, with no menu drawer. The app shell (S01) used AURA AppShell's default phone bar: the menu button alone. No slice owned the phone shell.
+
+**Decision (7 Oct 2026, with Tao).**
+- Every page header is AURA `PageHeader`: 4 px between eyebrow, title and meta line, as on Overview today. A breadcrumb is the eyebrow — it goes in the `eyebrow` slot, so a page with a breadcrumb and one with a section name line up. The other gaps on the boards are drawing drift, not intent.
+- Phones get the boards' top bar now: brand (compact tile) + the signed-in person's avatar (`components/app-shell/mobile-bar.tsx`), hidden from lg where the sidebar shows. The menu button stays until BottomNav replaces it in S06; the back arrow comes with S07, when the Incidents list it returns to exists (no dead controls, §14.16).
+
+**Why.** One rhythm means the title doesn't jump between pages, and the breadcrumb row (13 px text, 16 px icons) is the same height as the mono eyebrow, so nothing else changes. Using `PageHeader` as AURA ships it avoids a second wrapper with its own spacing. The phone bar is what every phone board shows, and a person opening an alert link on a phone should see where they are and who is signed in.
+
+**Impact.** `apps/web/src/app/(app)/layout.tsx`, `components/app-shell/{brand,mobile-bar}.tsx`, `app/globals.css` (the from-lg hide is a workaround until AURA request 6, `docs/design/aura.md`); plan S06 and S07 Scope; `apps/web/CLAUDE.md` → Building a screen. spec-checker should treat a header's 4 px gaps as correct where a board draws 6 / 10 / 12 / 24 px.
 
 ## D-017 — Email threads hang on an incident id, not the first Message-ID
 

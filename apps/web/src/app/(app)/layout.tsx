@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { AppShell } from '@jirawatpyk/aura-react';
 import { AppNav } from '@/components/app-shell/app-nav';
 import { Brand } from '@/components/app-shell/brand';
+import { MobileBar } from '@/components/app-shell/mobile-bar';
 import { OfflineStrip } from '@/components/states';
 import { AccountFooter } from '@/features/auth';
 import { getAccess } from '@/lib/auth/session';
@@ -19,6 +20,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <AppShell
+      // Top bar on phones only — globals.css hides it from lg (AURA request 6).
+      className="dxt-shell-phone-bar"
+      header={<MobileBar displayName={profile.displayName} />}
       nav={
         <AppNav
           header={<Brand />}

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AppLayout from './layout';
 
@@ -36,6 +36,21 @@ describe('AppLayout', () => {
     // AURA 5.32: the name shows in AURA's own tip (hover + keyboard focus), not a native title.
     expect(screen.getAllByRole('button', { name: 'Sign out' })[0]).toHaveAttribute('data-aura-tip');
     expect(screen.getByText('page content')).toBeInTheDocument();
+  });
+
+  it('puts the brand and the avatar in the phone top bar', async () => {
+    mocks.getAccess.mockResolvedValue({
+      status: 'active',
+      profile: { id: 'u1', email: 'arm@example.test', displayName: 'Arm', role: 'responder' },
+    });
+    const { container } = render(await AppLayout({ children: page }));
+
+    const bar = container.querySelector('.aura-shell__bar');
+    expect(bar).not.toBeNull();
+    expect(within(bar as HTMLElement).getByText('DxT')).toBeInTheDocument();
+    expect(within(bar as HTMLElement).getByLabelText('Arm')).toBeInTheDocument();
+    // Hidden from lg by globals.css (AURA request 6).
+    expect(container.querySelector('.aura-shell')).toHaveClass('dxt-shell-phone-bar');
   });
 
   it.each([
