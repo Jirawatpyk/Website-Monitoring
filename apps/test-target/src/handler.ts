@@ -19,9 +19,16 @@ export interface HandlerDeps {
   sleep?: (ms: number) => Promise<void>;
 }
 
-export async function handle({ readMode, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }: HandlerDeps) {
+export async function handle({
+  readMode,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+}: HandlerDeps) {
   const mode = parseMode(await readMode());
-  const headers = { 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8', 'x-target-mode': mode };
+  const headers = {
+    'cache-control': 'no-store',
+    'content-type': 'text/plain; charset=utf-8',
+    'x-target-mode': mode,
+  };
   if (mode === 'error') return new Response('Test target: error mode\n', { status: 500, headers });
   if (mode === 'timeout') await sleep(TIMEOUT_HOLD_MS);
   return new Response(`Test target: ${mode}\n`, { status: 200, headers });

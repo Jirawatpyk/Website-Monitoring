@@ -44,7 +44,9 @@ describe('readEdgeConfigItem', () => {
 
   it('returns undefined when the store is missing, the item is absent or the call fails', async () => {
     expect(await readEdgeConfigItem(undefined, 'mode')).toBeUndefined();
-    expect(await readEdgeConfigItem(connection, 'mode', async () => new Response('', { status: 404 }))).toBeUndefined();
+    expect(
+      await readEdgeConfigItem(connection, 'mode', async () => new Response('', { status: 404 })),
+    ).toBeUndefined();
     expect(
       await readEdgeConfigItem(connection, 'mode', async () => {
         throw new Error('offline');

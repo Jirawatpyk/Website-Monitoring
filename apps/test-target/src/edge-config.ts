@@ -11,7 +11,10 @@ export async function readEdgeConfigItem(
   if (!connection) return undefined;
   try {
     const store = new URL(connection);
-    const item = new URL(`${store.pathname.replace(/\/$/, '')}/item/${encodeURIComponent(key)}`, store.origin);
+    const item = new URL(
+      `${store.pathname.replace(/\/$/, '')}/item/${encodeURIComponent(key)}`,
+      store.origin,
+    );
     item.search = store.search;
     const res = await fetchImpl(item, { signal: AbortSignal.timeout(3_000) });
     return res.ok ? await res.json() : undefined;
