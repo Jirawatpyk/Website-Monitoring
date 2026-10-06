@@ -44,3 +44,12 @@ The canvas's orange note listed 14 issues. As of AURA 5.10 these are fixed (and 
 4. Switch disabled + checked looks like off — for "always on" settings show Badge "Always on" instead (Security board does this).
 
 Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build project-specific components in `apps/web/src/components`, not in AURA.
+
+## Requests to AURA (workarounds in DxT until they ship)
+
+Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac) (6 Oct 2026). Remove each workaround when its request ships:
+
+- SideNav header divider: `components/app-shell/brand.tsx` stretches to the nav edges with `-ml-4 -mr-2` and draws `border-b`.
+- IconButton AURA Tooltip: icon buttons keep the native `title` (AURA sets it); don't wrap them in `<Tooltip>` (two tooltips).
+- PageHeader: `components/app-shell/page-header.tsx`; AppShell's content padding is the page margin, so pages add no top padding.
+- Skeleton pill: `components/states/loading-list.tsx` uses `rect` + `rounded-aura-full`.
