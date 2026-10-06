@@ -52,9 +52,9 @@ export async function dispatchNotifications({
 }: DispatchDeps): Promise<CronJobResult> {
   if (!webhookUrl) return { ok: false, skipped: 'no_webhook' };
 
-  const claimed = await db.rpc('claim_notifications', { p_limit: CLAIM_LIMIT });
+  const claimed = await db.rpc('claim_notifications', { p_channel: 'google_chat', p_limit: CLAIM_LIMIT });
   if (claimed.error) throw new Error(`claim_notifications: ${claimed.error.message}`);
-  const rows = claimed.data.filter((n) => n.channel === 'google_chat');
+  const rows = claimed.data;
   if (!rows.length) return { ok: true, sent: 0, failed: 0 };
 
   const incidents = await db

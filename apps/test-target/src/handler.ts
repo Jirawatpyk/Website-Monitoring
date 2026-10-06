@@ -16,11 +16,14 @@ export function parseMode(value: unknown): TargetMode {
 
 export interface HandlerDeps {
   readMode: () => Promise<unknown>;
+  /** The request's User-Agent: only a probe is held in timeout mode, so nobody else can tie up the function. */
+  userAgent?: string | null;
   sleep?: (ms: number) => Promise<void>;
 }
 
 export async function handle({
   readMode,
+  userAgent = null,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
 }: HandlerDeps) {
   const mode = parseMode(await readMode());
@@ -30,6 +33,6 @@ export async function handle({
     'x-target-mode': mode,
   };
   if (mode === 'error') return new Response('Test target: error mode\n', { status: 500, headers });
-  if (mode === 'timeout') await sleep(TIMEOUT_HOLD_MS);
+  if (mode === 'timeout' && userAgent?.startsWith('DxT-Monitor/')) await sleep(TIMEOUT_HOLD_MS);
   return new Response(`Test target: ${mode}\n`, { status: 200, headers });
 }

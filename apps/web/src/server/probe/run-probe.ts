@@ -64,11 +64,14 @@ export async function runProbe({
 
   const runOnce = (m: DueMonitor, timeoutMs: number) => {
     const checkedAt = new Date(clock());
-    return check({ url: m.url, method: m.method, timeoutMs, headers }).then((result) => ({
-      m,
-      checkedAt,
-      result,
-    }));
+    // Off Vercel (local dev only) a loopback test target is allowed; a deployed probe never fetches one.
+    return check({ url: m.url, method: m.method, timeoutMs, headers, allowPrivateTargets: !vercel }).then(
+      (result) => ({
+        m,
+        checkedAt,
+        result,
+      }),
+    );
   };
 
   const first = await Promise.all(monitors.map((m) => runOnce(m, m.timeoutMs)));

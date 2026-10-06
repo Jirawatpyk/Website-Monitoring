@@ -79,6 +79,12 @@ describe('DOWN alert (ChatAlert, D-013)', () => {
     expect(rows(down({ owner: null }))).toContainEqual(['Owner', 'No owner set · backup Ploy']);
   });
 
+  it('strips angle brackets from names so nobody can inject a mention or a link', () => {
+    const m = down({ site: 'Evil <users/all>', owner: { name: '<a href="x">Arm</a>', chatUserId: null } });
+    expect(m.text).toBe('DOWN · Evil users/all (Tier 1)');
+    expect(JSON.stringify(m)).not.toMatch(/<users|<a /);
+  });
+
   it('never puts a mention inside the card', () => {
     expect(JSON.stringify(down().cardsV2)).not.toContain('<users/');
   });

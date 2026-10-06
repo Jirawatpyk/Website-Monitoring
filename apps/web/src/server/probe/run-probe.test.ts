@@ -89,6 +89,7 @@ describe('runProbe', () => {
       method: 'GET',
       timeoutMs: 5_000,
       headers: { 'X-DxT-Monitor': 'v' },
+      allowPrivateTargets: false,
     });
     expect(inserts(s.calls)).toEqual([
       [

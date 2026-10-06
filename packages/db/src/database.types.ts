@@ -275,7 +275,7 @@ isOneToOne: false
           }
           Functions: {
             "claim_notifications":
-{ Args: { "p_limit"?: number }; Returns: {
+{ Args: { "p_channel": Database["public"]['Enums']["notification_channel"],"p_limit"?: number }; Returns: {
               "attempts": number,
 "channel": Database["public"]['Enums']["notification_channel"],
 "context": NonNullable<Json>,

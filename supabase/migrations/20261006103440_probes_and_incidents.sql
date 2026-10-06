@@ -366,9 +366,13 @@ begin
 end;
 $$;
 
--- Claims due Chat / email messages for one notifier run. Rows are locked with SKIP LOCKED so two
--- runs never send the same message, and leased for 2 minutes (next_retry_at) in case a run dies.
-create function public.claim_notifications(p_limit integer default 20)
+-- Claims due messages of one channel for one notifier run. Rows are locked with SKIP LOCKED so two
+-- runs never send the same message, and leased for 2 minutes (next_retry_at, longer than a run's
+-- 60 s maxDuration) in case a run dies; the notifier caps attempts and then marks a row failed.
+create function public.claim_notifications(
+  p_channel public.notification_channel,
+  p_limit integer default 20
+)
 returns setof public.notifications
 language sql
 set search_path = ''
@@ -376,6 +380,7 @@ as $$
   with due as (
     select id from public.notifications
     where status = 'queued'
+      and channel = p_channel
       and (hold_until is null or hold_until <= now())
       and (next_retry_at is null or next_retry_at <= now())
     order by created_at
@@ -393,13 +398,13 @@ revoke execute on function
   public.engine_open_incident(uuid, uuid, public.incident_trigger, public.severity, timestamptz, timestamptz, timestamptz, jsonb, boolean),
   public.engine_recover_incident(uuid, public.incident_state, public.incident_state, timestamptz, timestamptz, jsonb, boolean),
   public.engine_settle_incident(uuid, public.incident_state, public.incident_state, timestamptz, timestamptz),
-  public.claim_notifications(integer)
+  public.claim_notifications(public.notification_channel, integer)
   from public, anon, authenticated;
 grant execute on function
   public.engine_open_incident(uuid, uuid, public.incident_trigger, public.severity, timestamptz, timestamptz, timestamptz, jsonb, boolean),
   public.engine_recover_incident(uuid, public.incident_state, public.incident_state, timestamptz, timestamptz, jsonb, boolean),
   public.engine_settle_incident(uuid, public.incident_state, public.incident_state, timestamptz, timestamptz),
-  public.claim_notifications(integer)
+  public.claim_notifications(public.notification_channel, integer)
   to service_role;
 
 -- ── RLS ───────────────────────────────────────────────────────────────────

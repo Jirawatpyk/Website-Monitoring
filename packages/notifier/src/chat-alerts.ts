@@ -65,6 +65,12 @@ export interface RecoveredAlertInput {
   owner: ChatPerson | null;
 }
 
+/**
+ * Names come from Admins and Google profiles. Angle brackets would let one inject a mention
+ * (`<users/all>`) or a link into the text line, or markup into the card: names never need them.
+ */
+export const plainName = (name: string) => name.replace(/[<>]/g, '');
+
 const mentionOf = (owner: ChatPerson | null) => (owner?.chatUserId ? [owner.chatUserId] : []);
 
 const row = (topLabel: string, text: string): ChatWidget => ({
@@ -72,14 +78,18 @@ const row = (topLabel: string, text: string): ChatWidget => ({
 });
 
 export function buildDownAlert(input: DownAlertInput): ChatMessage {
-  const { site, tier, confirmedAt, now, owner, backup } = input;
+  const { tier, confirmedAt, now, owner, backup } = input;
+  const site = plainName(input.site);
   const subtitle = [
     formatTier(tier),
     formatIncidentId(input.incidentNumber),
     ...(isSameBangkokDay(confirmedAt, now) ? [] : [formatDay(confirmedAt, { weekday: true })]),
     `Confirmed down ${formatTimeWithSeconds(confirmedAt)} (UTC+7)`,
   ].join(' · ');
-  const ownerText = [owner?.name ?? 'No owner set', ...(backup ? [`backup ${backup.name}`] : [])].join(' · ');
+  const ownerText = [
+    owner ? plainName(owner.name) : 'No owner set',
+    ...(backup ? [`backup ${plainName(backup.name)}`] : []),
+  ].join(' · ');
 
   return {
     text: buildChatTextLine({
@@ -114,7 +124,8 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
 }
 
 export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
-  const { site, startedAt, recoveredAt } = input;
+  const { startedAt, recoveredAt } = input;
+  const site = plainName(input.site);
   // At least "1 min": a confirmed DOWN always lasted some time, and "down 0 min" reads as no outage.
   const down = formatDuration(Math.max(1, (recoveredAt.getTime() - startedAt.getTime()) / 60_000));
 

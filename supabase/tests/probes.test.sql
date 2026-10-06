@@ -2,7 +2,7 @@
 -- write functions, one open incident per site, one message per incident, and read-only RLS.
 begin;
 \ir _helpers.psql
-select plan(31);
+select plan(35);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 delete from public.monitors;
@@ -78,6 +78,7 @@ select ok(
 
 -- ── Engine writes ────────────────────────────────────────────────────────
 create temp table inc (id uuid) on commit drop;
+grant select on inc to authenticated;
 insert into inc select public.engine_open_incident(
   '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1',
   'hard_fail', 'down', now() - interval '90 seconds', now(), now() - interval '60 seconds',
@@ -146,8 +147,8 @@ select results_eq(
 );
 
 -- claim_notifications leases due rows once.
-select is((select count(*)::int from public.claim_notifications(10)), 2, 'claim takes both due messages');
-select is((select count(*)::int from public.claim_notifications(10)), 0, 'a second run gets none while leased');
+select is((select count(*)::int from public.claim_notifications('google_chat', 10)), 2, 'claim takes both due messages');
+select is((select count(*)::int from public.claim_notifications('google_chat', 10)), 0, 'a second run gets none while leased');
 
 -- ── RLS and grants ───────────────────────────────────────────────────────
 select tests.as_anon();
@@ -170,7 +171,27 @@ select throws_ok(
   '42501', null, 'not even an Admin writes check results through the API'
 );
 select throws_ok(
-  'select public.claim_notifications(1)',
+  $$select public.engine_open_incident('00000000-0000-0000-0000-0000000000a1', null, 'hard_fail', 'down',
+      now(), now(), now(), '{}', false)$$,
+  '42501', null, 'not even an Admin can open an incident through the engine function'
+);
+select throws_ok(
+  format($$select public.engine_recover_incident('%s', 'needs_root_cause', 'monitoring', now(), now(), '{}', false)$$,
+    (select id from inc)),
+  '42501', null, 'or recover one'
+);
+select throws_ok(
+  format($$select public.engine_settle_incident('%s', 'monitoring', 'needs_root_cause', now(), now())$$,
+    (select id from inc)),
+  '42501', null, 'or settle one'
+);
+select is(
+  (select count(*)::int from public.notifications where channel = 'email'),
+  0,
+  'claims are per channel (no email rows exist in S02a)'
+);
+select throws_ok(
+  $$select public.claim_notifications('google_chat', 1)$$,
   '42501', null, 'only the service role can claim notifications'
 );
 reset role;

@@ -17,15 +17,22 @@ describe('handle', () => {
 
   it('holds the request past any monitor timeout in timeout mode', async () => {
     const sleep = vi.fn(async () => {});
-    const res = await handle({ readMode: async () => 'timeout', sleep });
+    const res = await handle({ readMode: async () => 'timeout', userAgent: 'DxT-Monitor/1.0', sleep });
     expect(sleep).toHaveBeenCalledWith(TIMEOUT_HOLD_MS);
     expect(TIMEOUT_HOLD_MS).toBeGreaterThan(30_000);
     expect(res.status).toBe(200);
   });
 
+  it('answers anyone but a probe at once in timeout mode', async () => {
+    const sleep = vi.fn(async () => {});
+    const res = await handle({ readMode: async () => 'timeout', userAgent: 'curl/8', sleep });
+    expect(sleep).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+  });
+
   it('really waits with the default sleep', async () => {
     vi.useFakeTimers();
-    const pending = handle({ readMode: async () => 'timeout' });
+    const pending = handle({ readMode: async () => 'timeout', userAgent: 'DxT-Monitor/1.0' });
     await vi.advanceTimersByTimeAsync(TIMEOUT_HOLD_MS);
     expect((await pending).status).toBe(200);
     vi.useRealTimers();
