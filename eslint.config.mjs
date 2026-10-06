@@ -48,7 +48,25 @@ export default tseslint.config(
   {
     files: ['apps/web/src/**/*.{ts,tsx}'],
     plugins: { dxt },
-    rules: { 'dxt/feature-boundaries': 'error', 'dxt/no-hardcoded-design-values': 'error' },
+    rules: {
+      'dxt/feature-boundaries': 'error',
+      'dxt/no-hardcoded-design-values': 'error',
+      // Icons as components from @jirawatpyk/aura-react/icons (AURA 6.0 drops the string map;
+      // docs/design/aura.md). S02b slipped string names past review.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXAttribute[name.name='icon'][value.type='Literal']",
+          message:
+            'Pass an icon component (`icon={<IconCheck />}` from @jirawatpyk/aura-react/icons), not a name.',
+        },
+        {
+          selector: "JSXOpeningElement[name.name='Icon']",
+          message:
+            'Use the icon component itself (`<IconCheck />` from @jirawatpyk/aura-react/icons), not <Icon name>.',
+        },
+      ],
+    },
   },
   {
     files: ['apps/web/src/**/*.test.{ts,tsx}'],

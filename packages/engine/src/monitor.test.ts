@@ -47,7 +47,9 @@ const okRound = (base = 0) => [check('SIN', 'pass', base + 1), check('TYO', 'pas
 describe('decideMonitor — DOWN on the check and its recheck (spec §6, S02a Done-when 3)', () => {
   it('both locations fail the scheduled check and the recheck → open, from the first failed check', () => {
     const d = decideMonitor(snapshot(downRound()));
-    expect(d).toMatchObject({ kind: 'open', startedAt: at(1), roundAt: at(0) });
+    // Confirmed when the last recheck that agreed came in (board: "Confirmed down 09:48:41") — the
+    // clock for "alert within 30 s of the confirm" (PRD §9) and the ack wait.
+    expect(d).toMatchObject({ kind: 'open', startedAt: at(1), roundAt: at(0), confirmedAt: at(32) });
     expect(d.kind === 'open' && d.failing.map((c) => [c.location, c.attempt])).toEqual([
       ['SIN', 2],
       ['TYO', 2],
@@ -295,6 +297,19 @@ describe('decideMonitor — engine-reviewer round 2 (spec §6, PRD §5)', () => 
     expect(decideMonitor(snapshot(checks, { intervalSec: 300, now: at(256) }))).toMatchObject({
       kind: 'none',
     });
+  });
+
+  it('three locations all fail: confirmed by the second agreeing recheck, not a later third (spec §6)', () => {
+    const checks = [
+      check('BKK', 'fail', 1),
+      check('SIN', 'fail', 2),
+      check('TYO', 'fail', 3),
+      check('SIN', 'fail', 31, 2),
+      check('TYO', 'fail', 33, 2),
+      check('BKK', 'fail', 50, 2),
+    ];
+    const d = decideMonitor(snapshot(checks, { locations: ['BKK', 'SIN', 'TYO'] }));
+    expect(d).toMatchObject({ kind: 'open', startedAt: at(1), confirmedAt: at(33) });
   });
 
   it('three locations: 2 pass + 1 regional failure recovers; 1 pass + 1 fail + 1 missing does not (M2)', () => {

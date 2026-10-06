@@ -17,6 +17,7 @@ AURA is the only UI kit. Its full docs live in the [AURA design system](https://
 ## Rules
 
 - Use AURA components and semantic tokens as drawn. Never a raw hex, a Tailwind palette class (`bg-red-500`) or a hand-built control AURA already has.
+  - Exception: alert emails (`packages/notifier/src/email-alerts.ts`). Email clients don't read CSS variables, so the AURA light tokens are resolved to hex in one constant there (aura-tokens 5.31); update it when the tokens change.
 - Icons: import components from `@jirawatpyk/aura-react/icons` (`<IconBell />`), never icon names as strings — 6.0 drops the string map. Only the 70 AURA icons; a missing one comes from Lucide unchanged.
 - Enterprise register everywhere in the app. Creative (mesh, grain, offset shadows) is not used in this product.
 - Status badges follow spec §11 and §14.2: Down = Badge danger solid `ban`; Problem = Badge warning soft `triangle-alert`; OK = Badge success soft `circle-check`; Maintenance = Badge accent soft `calendar` — accent is reserved for Maintenance among status badges.

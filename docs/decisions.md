@@ -4,6 +4,8 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-017 | 6 Oct 2026 | Alert emails thread on a stable incident id (`<inc-<id>@<sending domain>>` in `References`, plus `In-Reply-To` after a person's first email) instead of the first email's Message-ID | Spec §10 / EmailAlert "In-Reply-To / References set to the first message" |
+| D-016 | 6 Oct 2026 | S02b ack, email and fallback: an Admin acks any site and a Responder only sites they own (on-call rule in S10); when Chat fails after its last retry the fallback email goes to the backup and every Admin not already emailed; D-013's no-promise rule covers email and the ack page too (no escalation / client-update rows, no "webhooks" in the Undo line until their slices); `/incidents/[id]` is built in S02b with the MobileAck layout | EmailAlert / MobileAck boards' escalation and client-update copy, §16.8 "webhooks" (until their slices); MLogin "any Responder acks"; PRD §9 fallback audience (gap) |
 | D-015 | 6 Oct 2026 | A site's owner and backup must have a Google Chat user id before the site is saved (S05); until the Profile screen (S16) an Admin sets it with a reviewed SQL script. Alerts mention only people with an id | Gap — ChatAlert board assumes every owner can be @mentioned |
 | D-014 | 6 Oct 2026 | S02a monitoring schema: `check_results.location` keys to `probe_locations.code`; `probe_locations` / `site_status` keyed by their natural key (no `id`); the `notifications` table with `claim_notifications` (SKIP LOCKED + lease) is the delivery queue instead of pgmq; engine round bookkeeping in `site_status`; enum `site_status` renamed `site_state` | PRD §10 "pgmq queues", §11 `location_id` and "every table has id" |
 | D-013 | 6 Oct 2026 | Chat alerts grow with their slices: no escalation promise ("acknowledge by … or it escalates", "Next: L1 at …") until S10; the first card's button reads "Open incident" until ack ships (S02b); incident numbers display as `INC-` + at least 4 digits | ChatAlert board DOWN text line, "Next" row and "Open / acknowledge" button (until their slices) |
@@ -19,6 +21,59 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-017 — Email threads hang on an incident id, not the first Message-ID
+
+**Conflict.** Spec §10 and the EmailAlert board: "The first email’s Message-ID is stored; every later email sets `In-Reply-To` and `References` to it." Resend sends through Amazon SES, which replaces any Message-ID we set (Gmail "Show original" on staging: `…@ap-northeast-1.amazonses.com`). Reading the real one back (`GET /emails/:id`) needs a Full-access API key; the app's keys are send-only, as they should be.
+
+**Decision (6 Oct 2026, with Tao: keep the send-only key).** Every email of an incident carries `References: <inc-<incident id>@<sending domain>>`; every email after a person's first also sets `In-Reply-To` to it. The subject stays the same for every event.
+
+**Why.** Google's rule for notification threading is "same subject, and references headers that consistently refer to the same message ID" (Workspace Updates, March 2019); GitHub threads its notifications the same way. It needs no read access to the provider. Verified on staging: INC-0005 shows as one Gmail conversation of 3 (DOWN, ACKNOWLEDGED, RECOVERED).
+
+**Impact.** `packages/notifier` (`incidentThreadId`), `apps/web/src/server/notifier/dispatch.ts`. The board's intent — one thread per incident — is unchanged.
+
+## D-016 — Ack, email and fallback in S02b
+
+**Gap / conflict.**
+- PRD §3 lets a Responder acknowledge only sites they own, or any Tier 1 site while on call. The MLogin board lets a Responder who owns neither site acknowledge.
+- PRD §9 says "fall back to email when Chat fails" but not who receives it; the owner already gets the record email of every alert.
+- The EmailAlert and MobileAck boards carry escalation, client-update and webhook copy whose features arrive in S08, S10, S11 and S24.
+- The ack link needs an incident page, which S07 owns.
+
+**Decision (Tao, 6 Oct 2026).**
+- **Who can acknowledge:**
+  - an Admin, on any site
+  - a Responder, on sites they own as primary or backup (D-012)
+  - Stakeholders and Viewers see the incident read-only
+
+  The on-call rule (any Tier 1 site while on shift) comes with on-call in S10. The check lives in the `ack_incident` SQL function, so no client can skip it.
+- **Fallback:**
+  - when a Chat message is still failing after its last retry (+30 s, +2 min, +8 min), the same alert is emailed to the site's backup and every active Admin who didn't already get that email
+  - footer: "You got this because a Google Chat alert for this incident couldn’t be delivered." (the same line on every later email to that person)
+  - the fallback DOWN email's lede: "Nobody has acknowledged yet. The Google Chat alert couldn’t be delivered, so this email is the alert."
+  - on the owner's RECOVERED email "Open incident" is the primary button, since its board primary "Add root cause" waits for S07
+- **D-013 covers email and the ack page.** Until their slices, these are left out:
+  - escalation copy: "Next step", "acknowledge by …", "L1–L2 stopped", "L3 FYI"
+  - client-update rows
+  - buttons to pages that don't exist yet ("Add root cause", "Open draft", "Add note", "Full incident", "Site details")
+  - on the Down email, [Open incident] next to [Acknowledge]: both open the same page until S07
+
+  Resulting copy:
+  - The Undo line reads "Posting to Chat and email in N s — nothing is sent until then" (§16.8 without "webhooks" until S24).
+  - The ack sentence reads "Acknowledged by <name>."
+- **Recipients in S02b:**
+  - the DOWN email goes to the primary owner only; day/night routing comes in S08
+  - the L0 email is locked (PRD §8), so `notify_email` doesn't turn it off
+  - ACKNOWLEDGED and RECOVERED emails go to everyone already emailed about the incident
+  - ACKNOWLEDGED in Chat is a reply without a mention
+- **`/incidents/[incidentId]` is built in S02b** with the MobileAck layout, one column at every width. S07 grows it into the Incident board. `?ack=1` is accepted and changes nothing.
+
+**Why.**
+- Who can acknowledge follows the PRD's role table.
+- The fallback reaches the people who would have seen the Space, without duplicating the owner's email.
+- A Chat or email link sent today must still work after S07, so the page lives at its final URL from the start.
+
+**Impact.** S02b (SQL ack/undo, notifier, the incident page). S08, S10, S11 and S24 add their copy back. S07 extends the page.
 
 ## D-015 — Owners need a Google Chat id before go-live
 
@@ -39,7 +94,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 **Decision.**
 - `probe_locations` is keyed by its code (BKK / SIN / TYO) and `check_results.location` references it; `site_status` is keyed by `site_id` (one row per site). Both are lookups where a surrogate id adds a join and nothing else.
-- The `notifications` table is the queue: the engine inserts rows in the same transaction as the incident change, the notifier claims them with `claim_notifications(channel)` (`for update skip locked`, a 2-minute lease longer than a run), caps attempts at 3 and posts with a client message id so a retry can't duplicate a Chat message. pgmq stays available (extension in 0001) if volume ever needs it.
+- The `notifications` table is the queue: the engine inserts rows in the same transaction as the incident change, the notifier claims them with `claim_notifications(channel)` (`for update skip locked`, a lease longer than a run: 2 min in S02a, 90 s from S02b, which also keeps each thread in order), caps attempts (3 in S02a; from S02b 4 = the first send + retries at 30 s / 2 min / 8 min, PRD §11) and posts with a client message id (Chat) or an idempotency key (Resend) so a retry can't duplicate a message. pgmq stays available (extension in 0001) if volume ever needs it.
 - The engine keeps `last_round_at` / `ok_rounds` in `site_status`. When S06 adds `site_status` to the Realtime publication, move them to a private table if the per-minute updates make noise.
 - The enum becomes `site_state` (values unchanged) so the table can use the PRD name.
 - One message per incident / channel / template / person (`notifications_once_per_incident`): S04 (relapse, D-004) and S10 (repeated escalations) add a dedupe key when a template can repeat.

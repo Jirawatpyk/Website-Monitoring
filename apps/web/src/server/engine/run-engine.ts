@@ -168,16 +168,14 @@ async function apply(
       return null;
 
     case 'none': {
-      const { error } = await db.from('site_status').upsert(
-        {
-          site_id: m.siteId,
-          last_round_at: d.roundAt.toISOString(),
-          last_evaluated_at: at,
-          ok_rounds: d.okRounds,
-        },
-        { onConflict: 'site_id' },
-      );
-      if (error) throw new Error(`site_status: ${error.message}`);
+      // Never moves the round back when another engine run (probe trigger, cron) got further.
+      const { error } = await db.rpc('engine_record_round', {
+        p_site_id: m.siteId,
+        p_round_at: d.roundAt.toISOString(),
+        p_evaluated_at: at,
+        p_ok_rounds: d.okRounds,
+      });
+      if (error) throw new Error(`engine_record_round: ${error.message}`);
       return null;
     }
 
@@ -189,7 +187,8 @@ async function apply(
         p_trigger: 'hard_fail',
         p_severity: 'down',
         p_started_at: d.startedAt.toISOString(),
-        p_detected_at: at,
+        // When the last recheck confirmed it, not when this run noticed (PRD §9: alert within 30 s).
+        p_detected_at: d.confirmedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
         p_context: {
           cause: formatCause(d.failing, m.timeoutMs),

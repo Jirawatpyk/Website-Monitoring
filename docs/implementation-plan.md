@@ -14,7 +14,7 @@
 | S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Done |
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
-| S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Todo |
+| S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | In review |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
@@ -97,7 +97,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 - **Depends on:** S00 (Supabase projects, OAuth client, company domain, access list)
 - **Done when:**
   1. **T12:** an allowlisted company account signs in at `/login` and lands on `/` with its allowlisted role — locally, on `dxt-monitor-staging` and on one PR preview. Signing in with different capitals still matches the allowlist. A company account that isn't on the allowlist and a non-company account are both refused by the `before_user_created` hook with a message to ask an Admin (pgTAP tests); inserting an allowlist row on a domain that isn't allowed fails (pgTAP); a non-company session is also refused by the proxy (`?error=domain`); a user whose profile is inactive reads nothing (pgTAP).
-  2. Opening `/incidents/x` signed out → sign-in → back on `/incidents/x` (evidence: the URL after sign-in; the page itself 404s until S07).
+  2. Opening `/incidents/x` signed out → sign-in → back on `/incidents/x` (evidence: the URL after sign-in; the page itself 404'd until S02b built it, D-016).
   3. `pnpm exec supabase test db` passes locally and in the CI `db` job: anon reads nothing; viewer can't write `sites`; responder updates only the mute fields of own sites (D-012); `authenticated` can't UPDATE / DELETE `audit_log`.
   4. `pnpm db:reset` builds from zero with seed; `pnpm db:types` output committed; `pnpm check` green.
   5. spec-checker passes Login, MLogin, EmptyStates at 390 and 1440 px, light and dark.
@@ -154,6 +154,18 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   5. **T08:** Ack → Undo within 10 s → no Chat post and no email (the rows end `cancelled`).
   6. message-checker passes the email events and the ACKNOWLEDGED row; spec-checker passes MobileAck and MobileAckDark.
 - **Review:** message-checker, engine-reviewer, security-reviewer (ack action, RLS), db-reviewer (notifications), spec-checker (MobileAck, MobileAckDark).
+- **Notes (evidence):** started 6 Oct 2026 14:03Z. Ack rights, fallback audience, copy cuts and the incident route per D-016.
+  - Staging run 1 (deploy `3ab200c`, 6 Oct): test target → `error` 15:44:11Z; the probe-sin run whose recheck failed ran the engine itself and sent INC-0003 at once — DOWN email 15:46:17.26Z, Chat 15:46:17.81Z (**2 min 6 s** after the switch; Tao's inbox and Chat screenshots: subject `Test target · Tier 1 · INC-0003`, button "Open / acknowledge", footer ack sentence). Resend accepted the custom `Message-ID`.
+  - **Done-when 2:** `sent_at − detected_at` for the DOWN = **0.9 s** (email) / **1.4 s** (Chat); `detected_at` = the confirming recheck 15:46:16Z (staging SQL, Tao).
+  - Ack (desktop, Tao) 15:50:58Z → "Undo · N s" countdown → ACKNOWLEDGED posted to Chat + email 15:51:10–11Z (window 10 s + 2 s margin); the page then read "Posted to the Chat thread + email at 22:51:10" and the log "(posted 22:51:10)". ACKNOWLEDGED email: "Jirawat (Tao) Piyakit has Test target", footer "you acknowledged this incident".
+  - Test target → `ok` 15:52:44Z; RECOVERED by the engine cron 15:54:39Z to Chat and email.
+  - Staging run 2 (deploy `48a3256`): → `error` 16:12:15Z; DOWN INC-0004 to Chat + email at 16:14:17Z (**2 min 2 s**). **Done-when 4 (phone, Tao):** the card's "Open / acknowledge" on an iPhone opened sign-in, then straight back to INC-0004 signed in as the owner; one tap acknowledged ("Undo · 7 s").
+  - **Done-when 5 / T08 on staging:** ack 16:15:11Z → Undo inside the window → both ACKNOWLEDGED rows `cancelled`, `attempts 0`, nothing sent; the page went back to Acknowledge and logged "Acknowledgement undone". Re-ack 16:15:24Z → ACKNOWLEDGED sent 16:15:37.9Z (Chat) / 16:15:38.3Z (email). RECOVERED 16:18:40Z (staging SQL, Claude).
+  - Email threading: Resend/SES replace the Message-ID we set (Gmail "Show original" of INC-0003: `…@ap-northeast-1.amazonses.com`), and the send-only API key can't read it back — so emails now carry a stable incident id in `References` (+ `In-Reply-To` after a person's first), deploy `2170815`. The test inbox has Gmail "Conversation view off", which shows every email as its own row regardless.
+  - **Done-when 4 ✓** The phone ack's ACKNOWLEDGED (INC-0004, re-ack after the Undo) went out 16:15:37.9Z (Chat) / 16:15:38.3Z (email) with `ackedBy` = the acker's own profile name (staging SQL, Claude) — 13 s after the ack.
+  - **Done-when 6 ✓** message-checker and spec-checker, two rounds each: no High; every Medium fixed (round 2: copy after the retries end, D-017 for threading); Lows fixed or justified in the PR. Also `/code-review high` (8 fixed), engine-reviewer ×2, security-reviewer, db-reviewer.
+  - Time spent: started 14:03Z, staging verified 16:46Z — ≈ 2 h 45 min with three review rounds (planned M, 3–4 days).
+  - **Done-when 1 ✓** Staging run 3 (deploy `2170815`): → `error` 16:40:01Z; DOWN INC-0005 email 16:41Z; ack (Claude, browser) 16:43:14Z; → `ok` 16:43:47Z; RECOVERED 16:45:40Z. Gmail "Show original": DOWN `References: <inc-c5226de9…@notify.dxtspace.com>`, ACKNOWLEDGED / RECOVERED `In-Reply-To` + `References` the same id. With Conversation view on (Tao's screenshot) INC-0005 is **one conversation of 3** (DOWN → ACKNOWLEDGED → RECOVERED); INC-0003 (old design, references to an id SES replaced) split 2 + 1 — the bug the fix closed. Google's rule for notification threading: same subject and references that consistently refer to the same message id (Workspace Updates, Mar 2019).
 
 ### S03 · Bangkok probe & browser verifier
 
@@ -168,11 +180,13 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   5. A Storage lifecycle job removes screenshots older than 30 days (test or SQL check).
   6. The VPS has every variable name from `apps/vps-agent/.env.example` set in `/etc/dxt-agent/env` (moved from S00 Done-when 3, D-010; names listed, values never shared).
 - **Review:** security-reviewer (Job API, Storage, VPS unit), db-reviewer (pgmq queues, leases), engine-reviewer.
+- **Carried from S02b review:** a round can be completed by Bangkok's result arriving through Ingest; Ingest must run the engine (`engineAndDeliver`) like a failing probe recheck does, or DOWN waits up to a minute for the engine cron (PRD §9: 30 s).
 
 ### S04 · PROBLEM triggers, flapping & status rules
 
 - **Scope:** FR-03 complete. PROBLEM triggers: slow (p50 over the tier threshold 3 rounds), keyword must / must-not, key page 4xx / 5xx, regional (one location ≥ 5 min), redirect outside the allowlist. Only the primary monitor can make a site DOWN; `< 2` locations → Admin alert. Relapse + flapping (D-004). Wire the rules that already exist in `@dxt/engine` into the engine cron — `faultyLocations`, `isRegionalProblem`, `autoResolves`, the D-003 lifecycle — with integration tests. ChatAlert PROBLEM rows (the 60-min PROBLEM reminder belongs to S08). Test target gains keyword-missing and slow modes.
 - **Boards:** StatusModel · **Test plan:** T01 (the expiring-cert path finishes in S13)
+- **Carried from S02b review:** engine runs overlap (probe trigger + cron); relapse handling must be one state-guarded SQL function, or a relapse alerts once per run.
 - **Depends on:** S03
 - **Done when:**
   1. **T01:** each test-target mode gives the StatusModel outcome on staging — 200 → OK, 500 / timeout → DOWN, 403-challenge + loads → OK with note, keyword missing → PROBLEM (Keyword), slow 3 rounds → PROBLEM (Slow).

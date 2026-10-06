@@ -82,3 +82,46 @@ export async function signIn(context: BrowserContext, baseURL: string, email: st
   if (error) throw new Error(`sign-in failed for ${email}: ${error.message}`);
   await context.addCookies([...jar].map(([name, value]) => ({ name, value, url: baseURL })));
 }
+
+/**
+ * Opens a DOWN incident (Chat + owner email queued, as the engine would) on a new site whose
+ * primary owner is `ownerEmail`, so tests never compete for seeded sites. Returns the incident id.
+ */
+export async function openTestIncident(ownerEmail: string): Promise<string> {
+  const [owner] = (await admin(`/rest/v1/profiles?select=id&email=eq.${encodeURIComponent(ownerEmail)}`)) as {
+    id: string;
+  }[];
+  const [client] = (await admin('/rest/v1/clients?select=id&limit=1')) as { id: string }[];
+  const [site] = (await admin('/rest/v1/sites?select=id', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      client_id: client!.id,
+      name: `E2E ${crypto.randomUUID().slice(0, 8)}`,
+      tier: 1,
+      primary_owner_id: owner!.id,
+    }),
+  })) as { id: string }[];
+  const now = Date.now();
+  return (await admin('/rest/v1/rpc/engine_open_incident', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_site_id: site!.id,
+      p_monitor_id: null,
+      p_trigger: 'hard_fail',
+      p_severity: 'down',
+      p_started_at: new Date(now - 120_000).toISOString(),
+      p_detected_at: new Date(now - 60_000).toISOString(),
+      p_round_at: new Date(now - 120_000).toISOString(),
+      p_context: { cause: 'HTTP 500 (SIN, TYO)', confirmingLocations: 2 },
+      p_notify: true,
+    }),
+  })) as string;
+}
+
+/** The incident's ACKNOWLEDGED messages: channel and status. */
+export async function ackMessages(incidentId: string): Promise<{ channel: string; status: string }[]> {
+  return (await admin(
+    `/rest/v1/notifications?select=channel,status&incident_id=eq.${incidentId}&template=eq.acknowledged&order=channel`,
+  )) as { channel: string; status: string }[];
+}

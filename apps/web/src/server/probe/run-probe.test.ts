@@ -83,7 +83,14 @@ describe('runProbe', () => {
       clock: s.clock,
       sleep: s.sleep,
     });
-    expect(result).toEqual({ ok: true, location: 'TYO', checked: 2, failed: 0, rechecked: 0 });
+    expect(result).toEqual({
+      ok: true,
+      location: 'TYO',
+      checked: 2,
+      failed: 0,
+      rechecked: 0,
+      recheckFailed: 0,
+    });
     expect(s.check).toHaveBeenCalledWith({
       url: 'https://b.example.test',
       method: 'GET',
@@ -132,7 +139,14 @@ describe('runProbe', () => {
       clock: s.clock,
       sleep: s.sleep,
     });
-    expect(result).toEqual({ ok: true, location: 'SIN', checked: 2, failed: 1, rechecked: 1 });
+    expect(result).toEqual({
+      ok: true,
+      location: 'SIN',
+      checked: 2,
+      failed: 1,
+      rechecked: 1,
+      recheckFailed: 1,
+    });
     expect(s.sleep).toHaveBeenCalledWith(30_000);
     expect(inserts(s.calls)[1]).toEqual([
       expect.objectContaining({ monitor_id: 'a', attempt: 2, outcome: 'fail' }),

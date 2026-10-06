@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildDownAlert, buildRecoveredAlert, type ChatMessage, type DownAlertInput } from './chat-alerts';
+import {
+  buildAcknowledgedAlert,
+  buildDownAlert,
+  buildRecoveredAlert,
+  type ChatMessage,
+  type DownAlertInput,
+} from './chat-alerts';
 import { formatCause } from './cause';
 
 // ChatAlert board sample (test data only): MuvMi, INC-0142, confirmed down 09:48:41, back 10:31.
@@ -54,19 +60,17 @@ describe('DOWN alert (ChatAlert, D-013)', () => {
     ]);
   });
 
-  it('links "Open incident" and keeps the footer', () => {
-    expect(widgets(down())).toContainEqual({
-      buttonList: {
-        buttons: [
-          {
-            text: 'Open incident',
-            onClick: { openLink: { url: 'https://monitor.example.test/incidents/inc-1' } },
-          },
-        ],
-      },
+  it('links "Open / acknowledge" (S02b) and says the ack is personal (spec §14.10)', () => {
+    const url = 'https://monitor.example.test/incidents/inc-1?ack=1';
+    expect(widgets(down({ incidentUrl: url }))).toContainEqual({
+      buttonList: { buttons: [{ text: 'Open / acknowledge', onClick: { openLink: { url } } }] },
     });
     expect(widgets(down())).toContainEqual({
-      textParagraph: { text: '<b>Current status is in the latest reply.</b>' },
+      textParagraph: {
+        text:
+          '<b>Current status is in the latest reply.</b><br>Anyone can open it; the ack is recorded ' +
+          'under their own Google account, so nobody can acknowledge as someone else.',
+      },
     });
   });
 
@@ -87,6 +91,34 @@ describe('DOWN alert (ChatAlert, D-013)', () => {
 
   it('never puts a mention inside the card', () => {
     expect(JSON.stringify(down().cardsV2)).not.toContain('<users/');
+  });
+});
+
+describe('ACKNOWLEDGED reply (ChatAlert, D-016)', () => {
+  const ack = buildAcknowledgedAlert({
+    incidentId: 'inc-1',
+    site: 'MuvMi',
+    ackedBy: 'Arm',
+    ackedAt: new Date('2026-09-25T03:07:40Z'),
+  });
+
+  it('has the board text line, with no mention', () => {
+    expect(ack.text).toBe('ACKNOWLEDGED · MuvMi · by Arm 10:07');
+  });
+
+  it('has the board title, says only who acknowledged until escalation exists, and no button', () => {
+    expect(ack.cardsV2[0]!.card.header.title).toBe('ACKNOWLEDGED · MuvMi still down · by Arm 10:07');
+    expect(widgets(ack)).toEqual([{ textParagraph: { text: 'Acknowledged by Arm.' } }]);
+  });
+
+  it('strips angle brackets from the name', () => {
+    const m = buildAcknowledgedAlert({
+      incidentId: 'i',
+      site: 'S',
+      ackedBy: '<users/all>',
+      ackedAt: new Date(),
+    });
+    expect(JSON.stringify(m)).not.toContain('<users');
   });
 });
 

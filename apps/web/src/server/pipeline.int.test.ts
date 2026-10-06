@@ -1,6 +1,7 @@
 // @vitest-environment node
 /**
- * S02a Done-when 3: the engine driven by stored check results on the LOCAL Supabase stack
+ * S02a Done-when 3 and S02b Done-when 3 / 5: the engine and the notifier driven by stored rows on
+ * the LOCAL Supabase stack
  * (`pnpm db:start`), through the real tables, SQL functions and constraints. Run with
  * `pnpm --filter @dxt/web test:int` (CI: the `db` job). Refuses any non-local URL.
  */
@@ -13,6 +14,8 @@ import { dispatchNotifications } from './notifier/dispatch';
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
 // The Supabase CLI's well-known local demo key — not a secret, and never sent to a non-local URL.
 const SECRET_KEY = process.env.E2E_SUPABASE_SECRET_KEY ?? 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
+const PUBLISHABLE_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH';
 if (!/^http:\/\/(127\.0\.0\.1|localhost):/.test(URL_))
   throw new Error('integration tests run on the local stack only');
 
@@ -30,11 +33,14 @@ async function must<T>(
 }
 
 let clientId: string;
-async function newSite(name: string): Promise<{ siteId: string; monitorId: string }> {
+async function newSite(
+  name: string,
+  owners: { primary_owner_id?: string; backup_owner_id?: string } = {},
+): Promise<{ siteId: string; monitorId: string }> {
   const site = await must(
     db
       .from('sites')
-      .insert({ client_id: clientId, name: `${name} ${run}`, tier: 1 })
+      .insert({ client_id: clientId, name: `${name} ${run}`, tier: 1, ...owners })
       .select('id')
       .single(),
   );
@@ -136,6 +142,20 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     expect(await statusOf(siteId)).toMatchObject({ status: 'down' });
   });
 
+  it('two engine runs judging the same round at once (probe trigger + cron) open one incident, confirmed at the last recheck', async () => {
+    const { siteId, monitorId } = await newSite('Concurrent');
+    await results(monitorId, downRound());
+    await Promise.all([runEngine(db, t(65)), runEngine(db, t(65)), runEngine(db, t(66))]);
+
+    const incidents = await must(
+      db.from('incidents').select('id, started_at, detected_at').eq('site_id', siteId),
+    );
+    expect(incidents).toHaveLength(1);
+    // PRD §9's 30 s clock starts when the last recheck confirmed it (board: "Confirmed down 09:48:41").
+    expect(new Date(incidents[0]!.detected_at).getTime()).toBe(t(32).getTime());
+    expect(await notificationsOf(incidents[0]!.id)).toHaveLength(1);
+  });
+
   it('only one location fails → no incident', async () => {
     const { siteId, monitorId } = await newSite('One fails');
     await results(monitorId, [
@@ -173,6 +193,20 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     const { siteId, monitorId } = await newSite('Recovers');
     await results(monitorId, downRound());
     await runEngine(db, t(65));
+    // As the engine route / probe trigger do: send the DOWN as soon as it is queued.
+    const post = vi.fn(async () => ({ ok: true as const, messageName: 'spaces/S/messages/M' }));
+    const deliver = (incidentId: string) =>
+      dispatchNotifications(
+        {
+          db,
+          webhookUrl: 'https://chat.example.test/webhook',
+          email: undefined,
+          appUrl: 'https://monitor.example.test',
+          post,
+        },
+        { incidentId },
+      );
+    await deliver((await incidentsOf(siteId))[0]!.id);
 
     await results(monitorId, [
       ['SIN', 'pass', t(61)],
@@ -196,17 +230,254 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     expect(await statusOf(siteId)).toMatchObject({ status: 'ok', ok_rounds: 2 });
 
     // The notifier renders both from the stored rows and records the deliveries.
-    const post = vi.fn(async () => ({ ok: true as const, messageName: 'spaces/S/messages/M' }));
-    const summary = await dispatchNotifications({
-      db,
-      webhookUrl: 'https://chat.example.test/webhook',
-      appUrl: 'https://monitor.example.test',
-      post,
-    });
-    expect(summary.sent).toBeGreaterThanOrEqual(2);
+    expect((await deliver(incident!.id)).chat).toMatchObject({ sent: 1 });
     const texts = (post.mock.calls as unknown as [string, { text: string }][]).map((c) => c[1].text);
     expect(texts).toContain(`DOWN · Recovers ${run} (Tier 1)`);
     expect(texts).toContain(`RECOVERED · Recovers ${run} · down 1 min · add a root cause`);
     expect((await notificationsOf(incident!.id)).map((n) => n.status)).toEqual(['sent', 'sent']);
+  });
+
+  it('a DOWN still queued when the site recovers is dropped, so the thread never ends on old news', async () => {
+    const { siteId, monitorId } = await newSite('Late down');
+    await results(monitorId, downRound());
+    await runEngine(db, t(65));
+    await results(monitorId, [
+      ['SIN', 'pass', t(61)],
+      ['TYO', 'pass', t(62)],
+    ]);
+    await runEngine(db, t(125));
+    const [incident] = await incidentsOf(siteId);
+    const post = vi.fn(async () => ({ ok: true as const, messageName: 'spaces/S/messages/M' }));
+    const summary = await dispatchNotifications(
+      {
+        db,
+        webhookUrl: 'https://chat.example.test/webhook',
+        email: undefined,
+        appUrl: 'https://monitor.example.test',
+        post,
+      },
+      { incidentId: incident!.id },
+    );
+    expect(summary.chat).toMatchObject({ superseded: 1 });
+    // RECOVERED waited behind the DOWN (one thread, in order) and leaves on the next pass.
+    await dispatchNotifications(
+      {
+        db,
+        webhookUrl: 'https://chat.example.test/webhook',
+        email: undefined,
+        appUrl: 'https://monitor.example.test',
+        post,
+      },
+      { incidentId: incident!.id },
+    );
+    expect((post.mock.calls as unknown as [string, { text: string }][]).map((c) => c[1].text)).toEqual([
+      `RECOVERED · Late down ${run} · down 1 min · add a root cause`,
+    ]);
+    expect((await notificationsOf(incident!.id)).map((n) => [n.template, n.status])).toEqual([
+      ['down', 'cancelled'],
+      ['recovered', 'sent'],
+    ]);
+  });
+});
+describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
+  const webhookUrl = 'https://chat.example.test/webhook';
+  const appUrl = 'https://monitor.example.test';
+  const email = {
+    apiKey: 're_local_test',
+    from: 'DxT Monitor <alerts@notify.example.test>',
+  };
+  const PASSWORD = 'int-local-only-Password-1';
+  let arm: string;
+  let ploy: string;
+
+  // Seed people (supabase/seed.sql): Arm owns the test sites, Ploy is the backup, Tao an Admin.
+  const profileId = async (address: string) =>
+    (await must(db.from('profiles').select('id').eq('email', address).single())).id;
+  beforeAll(async () => {
+    arm = await profileId('arm@example.test');
+    ploy = await profileId('ploy@example.test');
+  });
+
+  async function openDown(name: string): Promise<string> {
+    const { siteId, monitorId } = await newSite(name, {
+      primary_owner_id: arm,
+      backup_owner_id: ploy,
+    });
+    await results(monitorId, downRound());
+    await runEngine(db, t(65));
+    return (await incidentsOf(siteId))[0]!.id;
+  }
+  const rowsOf = (incidentId: string) =>
+    must(
+      db
+        .from('notifications')
+        .select(
+          'id, channel, template, user_id, status, attempts, created_at, hold_until, next_retry_at, context',
+        )
+        .eq('incident_id', incidentId)
+        .order('created_at')
+        .order('channel'),
+    );
+  // Messages of other incidents already in the queue would be claimed too: keep each test to its own.
+  const onlyMine = async (incidentId: string) => {
+    const { error } = await db
+      .from('notifications')
+      .update({ status: 'cancelled' })
+      .eq('status', 'queued')
+      .neq('incident_id', incidentId);
+    if (error) throw new Error(error.message);
+  };
+  const due = async (incidentId: string, template: string) => {
+    const { error } = await db
+      .from('notifications')
+      .update({ hold_until: new Date(Date.now() - 1000).toISOString() })
+      .eq('incident_id', incidentId)
+      .eq('template', template);
+    if (error) throw new Error(error.message);
+  };
+  async function signedIn(address: string) {
+    const { error } = await db.auth.admin.updateUserById(await profileId(address), { password: PASSWORD });
+    if (error) throw new Error(error.message);
+    const user = createClient<Database>(URL_, PUBLISHABLE_KEY, {
+      auth: { persistSession: false },
+    });
+    const signIn = await user.auth.signInWithPassword({
+      email: address,
+      password: PASSWORD,
+    });
+    if (signIn.error) throw new Error(signIn.error.message);
+    return user;
+  }
+  const okPost = () =>
+    vi.fn(async () => ({
+      ok: true as const,
+      messageName: 'spaces/S/messages/M',
+    }));
+  const okSend = () => vi.fn(async () => ({ ok: true as const, id: 'em_local' }));
+  const sentEmails = (send: ReturnType<typeof okSend>) =>
+    (send.mock.calls as unknown as [{ text: string }, { to: string }][]).map(([m, o]) => ({
+      to: o.to,
+      text: m.text,
+    }));
+
+  it('queues DOWN for Chat and the owner; a failing Chat is retried at +30 s, +2 min, +8 min, then emailed to the backup and the Admins', async () => {
+    const incidentId = await openDown('Chat fails');
+    await onlyMine(incidentId);
+    expect((await rowsOf(incidentId)).map((n) => [n.channel, n.template, n.user_id])).toEqual([
+      ['google_chat', 'down', null],
+      ['email', 'down', arm],
+    ]);
+
+    const post = vi.fn(async () => ({ ok: false as const, error: 'HTTP 500' }));
+    const send = okSend();
+    const chatRow = async () => (await rowsOf(incidentId)).find((n) => n.channel === 'google_chat')!;
+    const retriesAt: number[] = [];
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      await dispatchNotifications({
+        db,
+        webhookUrl,
+        email,
+        appUrl,
+        post,
+        send,
+      });
+      const row = await chatRow();
+      expect(row.attempts).toBe(attempt);
+      if (attempt < 4) {
+        expect(row.status).toBe('queued');
+        retriesAt.push(new Date(row.next_retry_at!).getTime() - new Date(row.created_at).getTime());
+        // Skip the wait: make the retry due now.
+        await db.from('notifications').update({ next_retry_at: null }).eq('id', row.id);
+      } else {
+        expect(row).toMatchObject({ status: 'failed', next_retry_at: null });
+      }
+    }
+    expect(retriesAt).toEqual([30_000, 120_000, 480_000]);
+    const attempts = await must(
+      db
+        .from('notification_attempts')
+        .select('attempt, ok, error')
+        .eq('notification_id', (await chatRow()).id)
+        .order('attempt'),
+    );
+    expect(attempts).toEqual(
+      [1, 2, 3, 4].map((attempt) => ({
+        attempt,
+        ok: false,
+        error: 'HTTP 500',
+      })),
+    );
+
+    // The fallback goes out on the next pass (Chat and email run side by side): the backup and
+    // every Admin, marked.
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
+    const emails = (await rowsOf(incidentId)).filter((n) => n.channel === 'email');
+    expect(emails.find((n) => n.user_id === arm)?.context).not.toHaveProperty('fallback');
+    expect(emails.find((n) => n.user_id === ploy)).toMatchObject({
+      status: 'sent',
+      context: expect.objectContaining({ fallback: true }),
+    });
+    const sent = sentEmails(send);
+    expect(sent.map((e) => e.to)).toEqual(
+      expect.arrayContaining(['arm@example.test', 'ploy@example.test', 'tao@example.test']),
+    );
+    expect(sent.find((e) => e.to === 'ploy@example.test')?.text).toContain('couldn’t be delivered');
+  });
+
+  it('holds ACKNOWLEDGED for the 10 s Undo window, then posts it under the person’s name in Chat and email', async () => {
+    const incidentId = await openDown('Ack');
+    await onlyMine(incidentId);
+    const post = okPost();
+    const send = okSend();
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
+    post.mockClear();
+    send.mockClear();
+
+    const user = await signedIn('arm@example.test');
+    expect((await user.rpc('ack_incident', { p_incident_id: incidentId })).error).toBeNull();
+    const state = await must(db.from('incidents').select('state, acked_by').eq('id', incidentId).single());
+    expect(state).toEqual({ state: 'acknowledged', acked_by: arm });
+
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
+    expect(post).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+
+    await due(incidentId, 'acknowledged');
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
+    const text = (post.mock.calls[0] as unknown as [string, { text: string }])[1].text;
+    expect(text).toMatch(new RegExp(`^ACKNOWLEDGED · Ack ${run} · by Arm \\d\\d:\\d\\d$`));
+    expect(sentEmails(send)).toEqual([
+      {
+        to: 'arm@example.test',
+        text: expect.stringContaining('You got this because you acknowledged this incident.'),
+      },
+    ]);
+  });
+
+  it('T08: Ack → Undo within 10 s → no Chat post and no email, the rows end cancelled', async () => {
+    const incidentId = await openDown('Undo');
+    await onlyMine(incidentId);
+    const post = okPost();
+    const send = okSend();
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
+    post.mockClear();
+    send.mockClear();
+
+    const user = await signedIn('arm@example.test');
+    expect((await user.rpc('ack_incident', { p_incident_id: incidentId })).error).toBeNull();
+    expect((await user.rpc('undo_ack', { p_incident_id: incidentId })).error).toBeNull();
+
+    const acks = (await rowsOf(incidentId)).filter((n) => n.template === 'acknowledged');
+    expect(acks.map((n) => [n.channel, n.status])).toEqual([
+      ['google_chat', 'cancelled'],
+      ['email', 'cancelled'],
+    ]);
+    expect((await must(db.from('incidents').select('state').eq('id', incidentId).single())).state).toBe(
+      'unacked',
+    );
+    await due(incidentId, 'acknowledged');
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
+    expect(post).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
   });
 });
