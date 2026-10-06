@@ -10,21 +10,19 @@ import { IconCircleAlert, IconRotateCcw } from '@jirawatpyk/aura-react/icons';
 export default function AppError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <Container>
-      <div className="py-12">
-        <EmptyState
-          tone="danger"
-          bordered
-          icon={<IconCircleAlert />}
-          title="This page didn’t load"
-          description="Nothing on it is shown, so nothing here can be trusted yet. Try again; if it keeps failing, tell an Admin."
-          action={
-            <Button variant="secondary" icon={<IconRotateCcw />} onClick={reset}>
-              Try again
-            </Button>
-          }
-          role="alert"
-        />
-      </div>
+      <EmptyState
+        tone="danger"
+        bordered
+        icon={<IconCircleAlert />}
+        title="This page didn’t load"
+        description="Nothing on it is shown, so nothing here can be trusted yet. Try again; if it keeps failing, tell an Admin."
+        action={
+          <Button variant="secondary" icon={<IconRotateCcw />} onClick={reset}>
+            Try again
+          </Button>
+        }
+        role="alert"
+      />
     </Container>
   );
 }

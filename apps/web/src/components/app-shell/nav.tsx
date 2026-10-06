@@ -127,3 +127,16 @@ export const NAV_SECTIONS: NavSections = SECTIONS.map(({ title, items }) => ({
   title,
   items: items.filter((item) => item.live).map(({ id, label, icon, href }) => ({ id, label, icon, href })),
 })).filter((section) => section.items.length > 0);
+
+/**
+ * The nav item for the current path (SideNav `value`): exact match or a sub-page, longest href wins;
+ * `/` only matches itself. Null when no shown item owns the page.
+ */
+export function activeNavId(pathname: string): string | null {
+  const items = NAV_SECTIONS.flatMap((section) => section.items);
+  const matches = items.filter(({ href }) =>
+    href === '/' ? pathname === '/' : !!href && (pathname === href || pathname.startsWith(`${href}/`)),
+  );
+  matches.sort((a, b) => (b.href?.length ?? 0) - (a.href?.length ?? 0));
+  return matches[0]?.id ?? null;
+}

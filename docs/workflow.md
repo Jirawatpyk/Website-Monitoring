@@ -62,7 +62,7 @@ Every slice, on top of its own "Done when" lines:
 
 - [ ] `pnpm check`, `pnpm plan:check` and CI green; no skipped tests.
 - [ ] `/code-review high` and the reviewers from the slice's Review line: no open High findings; every Medium fixed or justified in the PR.
-- [ ] Tests: rules and helpers in Vitest; screen behaviour (states, disabled reasons, confirms) in Vitest + Testing Library next to the component; flows that cross pages or depend on auth / redirects in Playwright (`apps/web/e2e/`, desktop 1440 + mobile 390). `pnpm test:e2e` green; `pnpm test:coverage` meets every package's threshold (raise a threshold when coverage rises, never lower it).
+- [ ] Tests: rules and helpers in Vitest; screen behaviour (states, disabled reasons, confirms) in Vitest + Testing Library next to the component; flows that cross pages or depend on auth / redirects in Playwright (`apps/web/e2e/`, desktop 1440 + mobile 390; signed-in flows run in the CI `db` job against its local Supabase). `pnpm test:e2e` green; `pnpm test:coverage` meets every package's threshold (raise a threshold when coverage rises, never lower it).
 - [ ] Screens: spec-checker passed at 390 / 820 / 1440 px, light and dark; touch targets ≥ 44 px; no dead controls — the slice's nav item is flipped `live` in `apps/web/src/components/app-shell/nav.tsx` only now.
 - [ ] Data: new tables have RLS + explicit grants in the same migration, pgTAP tests in `supabase/tests/`, and `pnpm db:types` committed.
 - [ ] Every config or incident state change writes `audit_log`; ack / resolve messages are held 10 s.

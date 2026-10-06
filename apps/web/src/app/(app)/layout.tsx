@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
-import { AppShell, SideNav } from '@jirawatpyk/aura-react';
+import { AppShell } from '@jirawatpyk/aura-react';
+import { AppNav } from '@/components/app-shell/app-nav';
 import { Brand } from '@/components/app-shell/brand';
-import { NAV_SECTIONS } from '@/components/app-shell/nav';
 import { OfflineStrip } from '@/components/states';
 import { AccountFooter } from '@/features/auth';
 import { getAccess } from '@/lib/auth/session';
@@ -20,11 +20,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <AppShell
       nav={
-        <SideNav
-          sections={NAV_SECTIONS}
+        <AppNav
           header={<Brand />}
           footer={<AccountFooter displayName={profile.displayName} role={profile.role} />}
-          label="Main navigation"
         />
       }
     >
