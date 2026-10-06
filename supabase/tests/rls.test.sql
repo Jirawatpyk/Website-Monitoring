@@ -1,10 +1,11 @@
 -- RLS per role (PRD §3, D-007, D-012) and the append-only audit_log.
 begin;
 \ir _helpers.psql
-select plan(32);
+select plan(40);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 -- Start from no sites or clients, whatever the dev seed loaded (rolled back at the end).
+delete from public.monitors;
 delete from public.sites;
 delete from public.clients;
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -65,6 +66,8 @@ select throws_ok(
 select is_empty($$ delete from public.sites returning id $$, 'viewer cannot delete sites');
 select is_empty($$ update public.monitors set timeout_ms = 5000 returning id $$,
   'viewer cannot update monitors');
+select throws_ok($$ select public.write_audit('x', 'y', null) $$, '42501', null,
+  'a viewer cannot write the audit log (read-only role)');
 reset role;
 
 -- ── stakeholder: read-only in S01 ────────────────────────────────────────
@@ -89,6 +92,19 @@ select is_empty(
   'responder cannot mute a site they do not own');
 select is_empty($$ update public.monitors set timeout_ms = 5000 returning id $$,
   'responder cannot update monitors');
+select throws_ok(
+  $$ update public.sites set backup_owner_id = null where id = '00000000-0000-0000-0000-0000000000a1' $$,
+  '42501', null, 'responder cannot change the owners of their own site');
+select throws_ok(
+  $$ insert into public.monitors (site_id, type, url)
+     values ('00000000-0000-0000-0000-0000000000a1', 'http', 'https://x.pgtap.test') $$,
+  '42501', null, 'responder cannot add monitors');
+select throws_ok(
+  $$ insert into public.clients (name) values ('New client') $$,
+  '42501', null, 'responder cannot add clients');
+select is_empty(
+  $$ update public.profiles set role = 'admin' where id = auth.uid() returning id $$,
+  'responder cannot promote themselves');
 select ok(public.write_audit('site.mute', 'site', '00000000-0000-0000-0000-0000000000a1') is not null,
   'a signed-in user can write the audit log through write_audit');
 select is_empty('select * from public.audit_log', 'only Admins read the audit log');
@@ -120,6 +136,16 @@ select throws_ok($$ delete from public.audit_log $$, '42501', 'audit_log is appe
 select tests.authenticate_as((select id from ids where name = 'former'));
 select throws_ok($$ select public.write_audit('x', 'y', null) $$, '42501', null,
   'a user without an active profile cannot write the audit log');
+select is_empty(
+  $$ update public.profiles set is_active = true where id = auth.uid() returning id $$,
+  'a deactivated user cannot reactivate themselves');
+reset role;
+
+set local role service_role;
+select throws_ok($$ update public.audit_log set action = 'x' $$, '42501', null,
+  'the service role cannot UPDATE audit_log');
+select throws_ok($$ delete from public.audit_log $$, '42501', null,
+  'the service role cannot DELETE from audit_log');
 reset role;
 
 select * from finish();

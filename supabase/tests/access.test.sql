@@ -1,7 +1,7 @@
 -- D-007 sign-up filters: domain + exact allowlist address, lower-case, profile from the allowlist.
 begin;
 \ir _helpers.psql
-select plan(17);
+select plan(23);
 
 -- Allowlist rows
 select lives_ok(
@@ -50,6 +50,33 @@ select is((select email from public.my_access()), null, 'my_access hides the pro
 reset role;
 select tests.authenticate_as(gen_random_uuid());
 select is((select status from public.my_access()), 'missing', 'a session without a profile reports missing');
+reset role;
+
+-- Google only (D-007): a password account is refused even for an allowlisted company address
+insert into private.allowed_email_domains (domain) values ('corp.example');
+insert into private.allowed_emails (email, role) values ('boss@corp.example', 'admin');
+select is(
+  public.hook_before_user_created('{"user":{"email":"boss@corp.example","app_metadata":{"provider":"google"}}}'),
+  '{}'::jsonb, 'an allowlisted address signing in with Google may sign up');
+select matches(
+  public.hook_before_user_created('{"user":{"email":"boss@corp.example","app_metadata":{"provider":"email"}}}') -> 'error' ->> 'message',
+  'Google account', 'an email/password sign-up is refused even when allowlisted');
+select is(
+  public.hook_before_user_created('{"user":{"email":"boss@corp.example"}}') -> 'error' ->> 'http_code',
+  '403', 'a sign-up with no provider is refused');
+insert into auth.users (id, email, aud, role, raw_app_meta_data)
+values (gen_random_uuid(), 'boss@corp.example', 'authenticated', 'authenticated', '{"provider":"email"}');
+select is((select count(*)::int from public.profiles where email = 'boss@corp.example'), 0,
+  'a non-Google auth user gets no profile, even when allowlisted');
+
+-- The hook and the allowlist are out of reach of API roles
+select tests.as_anon();
+select throws_ok($$ select public.hook_before_user_created('{}') $$, '42501', null,
+  'anon cannot call the sign-up hook');
+reset role;
+select tests.authenticate_as((select id from public.profiles where email = 'arm@pgtap.test'));
+select throws_ok($$ select * from private.allowed_emails $$, '42501', null,
+  'a signed-in user cannot read the allowlist');
 reset role;
 
 select * from finish();

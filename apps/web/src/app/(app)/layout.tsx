@@ -23,9 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <SideNav
           sections={NAV_SECTIONS}
           header={<Brand />}
-          footer={
-            <AccountFooter displayName={profile.displayName} email={profile.email} role={profile.role} />
-          }
+          footer={<AccountFooter displayName={profile.displayName} role={profile.role} />}
           label="Main navigation"
         />
       }

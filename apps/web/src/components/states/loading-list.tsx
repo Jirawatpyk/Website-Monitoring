@@ -28,27 +28,28 @@ interface LoadingListProps {
 export function LoadingList({ label, rows = 7, lastDataAt = null, onRetry }: LoadingListProps) {
   const router = useRouter();
   const [slow, setSlow] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
+  // Each attempt gets its own 10 s; Retry starts a new one.
   useEffect(() => {
     const timer = setTimeout(() => setSlow(true), STILL_LOADING_AFTER_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [attempt]);
 
   const retry = () => {
     setSlow(false);
+    setAttempt((a) => a + 1);
     if (onRetry) onRetry();
     else router.refresh();
   };
 
   return (
-    <div className="flex flex-col gap-3" aria-busy="true">
-      <div role="status" className="flex items-center gap-2 text-sm text-fg-secondary">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 text-sm text-fg-secondary">
         <IconLoaderCircle aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
-        {slow ? (
-          <span>Still loading{lastDataAt ? ` — last data ${formatTime(lastDataAt)}` : ''}</span>
-        ) : (
-          <span>{label}</span>
-        )}
+        <span role="status">
+          {slow ? `Still loading${lastDataAt ? ` — last data ${formatTime(lastDataAt)}` : ''}` : label}
+        </span>
         {slow && (
           <Button size="sm" variant="secondary" touchHeight onClick={retry}>
             Retry

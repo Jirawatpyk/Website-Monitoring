@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Alert, Avatar } from '@jirawatpyk/aura-react';
 
 export interface PersonWhoCanAct {
@@ -24,20 +25,23 @@ interface NoAccessProps {
  * notice names who can act. Used wherever a role can see something but not change it.
  */
 export function NoAccess({ title, description, people = [] }: NoAccessProps) {
+  const headingId = useId();
   return (
     <div className="flex flex-col gap-4">
       <Alert tone="info" title={title}>
         {description}
       </Alert>
       {people.length > 0 && (
-        <section aria-labelledby="who-can-act" className="flex flex-col gap-2">
-          <h2 id="who-can-act" className="m-0 text-sm font-semibold">
+        <section aria-labelledby={headingId} className="flex flex-col gap-2">
+          <p id={headingId} className="m-0 text-sm text-fg-secondary">
             Who can act now
-          </h2>
+          </p>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {people.map((person) => (
               <li key={`${person.name}-${person.duty}`} className="flex min-h-11 items-center gap-3">
-                <Avatar name={person.name} size="sm" />
+                <span aria-hidden>
+                  <Avatar name={person.name} size="sm" />
+                </span>
                 <span className="grow text-sm">
                   {person.name} — {person.duty}
                 </span>

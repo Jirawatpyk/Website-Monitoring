@@ -23,7 +23,7 @@ export default async function LoginPage({
   const next = safeNextPath(typeof params.next === 'string' ? params.next : null);
   const error = parseLoginError(params.error);
 
-  if (!error && (await getAccess()).status === 'active') redirect(next);
+  if ((await getAccess()).status === 'active') redirect(next);
 
   const email =
     error && error !== 'auth' ? parseRefusedEmail((await cookies()).get(REFUSED_EMAIL_COOKIE)?.value) : null;
@@ -33,7 +33,7 @@ export default async function LoginPage({
       <FragmentError />
       <BrandPanel />
       <div className="flex min-w-0 grow flex-col">
-        <header className="flex h-14 items-center px-4 lg:hidden">
+        <header className="flex h-14 items-center border-b border-border-default bg-bg-surface px-4 lg:hidden">
           <BrandMark />
         </header>
         <main className="flex grow items-start justify-center px-4 py-6 sm:items-center sm:py-12">

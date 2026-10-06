@@ -1,4 +1,4 @@
--- DxT Monitor · 0004 — clients, sites and monitors (PRD §11) with RLS per role (PRD §3, D-012).
+-- DxT Monitor · clients, sites and monitors (PRD §11) with RLS per role (PRD §3, D-012).
 -- Staff read everything; Admins write; a Responder may change only the mute fields of a site
 -- they own (primary or backup). Server jobs use the service role and bypass RLS.
 
@@ -34,7 +34,8 @@ create table public.sites (
 
 create table public.monitors (
   id uuid primary key default gen_random_uuid(),
-  site_id uuid not null references public.sites (id) on delete cascade,
+  -- restrict, not cascade: check results will hang off monitors (S02a); delete monitors on purpose.
+  site_id uuid not null references public.sites (id) on delete restrict,
   type public.monitor_type not null,
   is_primary boolean not null default false,
   url text not null check (url ~ '^https?://'),

@@ -65,9 +65,10 @@ const COPY: Record<
 export function RefusalCard({ reason, email, next }: RefusalCardProps) {
   const copy = COPY[reason];
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md" flushBelow="sm">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-1.5">
+          <p className="m-0 font-mono text-xs tracking-wide text-fg-secondary uppercase">Can’t sign in</p>
           <h1 className="m-0 font-display text-2xl leading-tight font-semibold">{copy.title}</h1>
           <p className="m-0 text-sm text-fg-secondary">{copy.lede(email)}</p>
         </div>

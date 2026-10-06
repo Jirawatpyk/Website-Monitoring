@@ -1,4 +1,4 @@
--- DxT Monitor · 0005 — audit_log (PRD §11): append-only record of every config and incident
+-- DxT Monitor · audit_log (PRD §11): append-only record of every config and incident
 -- state change, with before / after. Written only through public.write_audit() (signed-in
 -- users) or by the service role; never updated or deleted — not even by the service role.
 
@@ -11,9 +11,9 @@ create table public.audit_log (
   entity_id uuid,
   before jsonb,
   after jsonb,
-  at timestamptz not null default now(),
-  -- Append-only: there is no updated_at because a row never changes.
-  created_at timestamptz not null default now()
+  -- When it happened. Append-only: `at` is the row's creation time and there is no updated_at,
+  -- because a row never changes.
+  at timestamptz not null default now()
 );
 
 create index audit_log_at_idx on public.audit_log (at desc);
@@ -37,8 +37,9 @@ create trigger audit_log_no_truncate before truncate on public.audit_log
   for each statement execute function private.audit_log_immutable();
 
 -- ── Write helper ──────────────────────────────────────────────────────────
--- Records a change by the signed-in user. Refuses anyone without an active profile,
--- so the actor is always a real, current person.
+-- Records a change by the signed-in user. Only roles that can change something write it (a Viewer
+-- is read-only, PRD §3), so the actor is always a real, current person with write access.
+-- From S09 on, a change and its audit row should share one RPC / transaction.
 create function public.write_audit(
   p_action text,
   p_entity text,
@@ -54,8 +55,10 @@ as $$
 declare
   v_id uuid;
 begin
-  if public.current_app_role() is null then
-    raise exception 'No active profile' using errcode = '42501';
+  if public.current_app_role() is distinct from 'admin'
+     and public.current_app_role() is distinct from 'responder'
+     and public.current_app_role() is distinct from 'stakeholder' then
+    raise exception 'This role can''t change anything' using errcode = '42501';
   end if;
 
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)

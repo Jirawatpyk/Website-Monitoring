@@ -17,7 +17,14 @@ const PASSWORD = 'e2e-local-only-Password-1';
 export const localSupabaseEnabled =
   process.env.E2E_LOCAL_SUPABASE === '1' && /^http:\/\/(127\.0\.0\.1|localhost):/.test(SUPABASE_URL);
 
+/** Every helper refuses to run unless the target is the local stack — never send these keys elsewhere. */
+function assertLocal(): void {
+  if (!localSupabaseEnabled)
+    throw new Error('local Supabase only: set E2E_LOCAL_SUPABASE=1 and a localhost URL');
+}
+
 async function admin(path: string, init: RequestInit = {}): Promise<unknown> {
+  assertLocal();
   const res = await fetch(`${SUPABASE_URL}${path}`, {
     ...init,
     headers: {
@@ -63,6 +70,7 @@ export async function setActive(userId: string, isActive: boolean): Promise<void
 
 /** Sign `email` in and copy the session cookies into the browser context. */
 export async function signIn(context: BrowserContext, baseURL: string, email: string): Promise<void> {
+  assertLocal();
   const jar = new Map<string, string>();
   const supabase = createServerClient(SUPABASE_URL, PUBLISHABLE_KEY, {
     cookies: {

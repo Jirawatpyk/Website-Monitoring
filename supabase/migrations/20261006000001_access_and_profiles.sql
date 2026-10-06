@@ -1,4 +1,4 @@
--- DxT Monitor · 0003 — access list and profiles (D-007).
+-- DxT Monitor · access list and profiles (D-007).
 -- Sign-up needs the company domain (0002) AND the exact address on private.allowed_emails.
 -- The allowlist row is the invite: on first sign-in the profile is created with its role.
 -- Rows are added per environment from supabase/access/allowlist.template.sql — real addresses
@@ -29,7 +29,24 @@ create table private.allowed_emails (
 );
 revoke all on private.allowed_emails from public, anon, authenticated;
 
--- ── Sign-up hook: domain AND allowlist ────────────────────────────────────
+-- ── Accounts come from Google only (D-007) ───────────────────────────────
+-- Google (Internal OAuth client, Workspace-enforced 2-step) is the only way in. An email/password
+-- or other provider account is refused even for an allowlisted address — otherwise anyone who knows
+-- an invited address could sign up with a password if a project's Email provider were left on.
+-- The one exception is the reserved `.test` domain (RFC 2606: no real mailbox can exist), used only
+-- by the local dev seed and the tests.
+create function private.is_trusted_sign_up(p_provider text, p_email text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_provider, '') = 'google' or p_email like '%.test';
+$$;
+
+revoke execute on function private.is_trusted_sign_up(text, text) from public, anon, authenticated;
+
+-- ── Sign-up hook: Google, domain AND allowlist ────────────────────────────
 create or replace function public.hook_before_user_created(event jsonb)
 returns jsonb
 language plpgsql
@@ -39,6 +56,7 @@ as $$
 declare
   v_email text := lower(trim(coalesce(event -> 'user' ->> 'email', '')));
   v_domain text := split_part(v_email, '@', 2);
+  v_provider text := event -> 'user' -> 'app_metadata' ->> 'provider';
 begin
   if v_domain = '' or not exists (
     select 1 from private.allowed_email_domains d where d.domain = v_domain
@@ -46,6 +64,13 @@ begin
     return jsonb_build_object('error', jsonb_build_object(
       'http_code', 403,
       'message', 'Only DxT Google accounts can sign in. Ask an Admin if you need access.'
+    ));
+  end if;
+
+  if not private.is_trusted_sign_up(v_provider, v_email) then
+    return jsonb_build_object('error', jsonb_build_object(
+      'http_code', 403,
+      'message', 'Sign in with your DxT Google account.'
     ));
   end if;
 
@@ -84,8 +109,9 @@ create trigger profiles_set_updated_at
   before update on public.profiles
   for each row execute function private.set_updated_at();
 
--- First sign-in: create the profile with the allowlisted role. An auth user created
--- without an allowlist row (only possible outside the hook) gets no profile and reads nothing.
+-- First sign-in: create the profile with the allowlisted role. An auth user created without an
+-- allowlist row, or not through Google (only possible outside the hook), gets no profile and
+-- reads nothing.
 create function private.handle_new_user()
 returns trigger
 language plpgsql
@@ -96,6 +122,9 @@ declare
   v_email text := lower(new.email);
   v_role public.app_role;
 begin
+  if not private.is_trusted_sign_up(new.raw_app_meta_data ->> 'provider', v_email) then
+    return new;
+  end if;
   select a.role into v_role from private.allowed_emails a where a.email = v_email;
   if v_role is null then
     return new;

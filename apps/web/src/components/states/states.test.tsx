@@ -38,6 +38,16 @@ describe('LoadingList', () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
+  it('a Retry that is still slow offers Retry again after another 10 s', () => {
+    const onRetry = vi.fn();
+    render(<LoadingList label="Loading" onRetry={onRetry} />);
+    act(() => vi.advanceTimersByTime(STILL_LOADING_AFTER_MS));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    act(() => vi.advanceTimersByTime(STILL_LOADING_AFTER_MS));
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
   it('retries by refreshing the route by default', () => {
     render(<LoadingList label="Loading" />);
     act(() => vi.advanceTimersByTime(STILL_LOADING_AFTER_MS));
@@ -60,12 +70,11 @@ describe('OfflineStrip', () => {
     act(() => {
       window.dispatchEvent(new Event('offline'));
     });
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Offline — showing what you had at 10:06. Retrying every 10 s.',
-    );
+    expect(screen.getByRole('status')).toHaveTextContent('Offline — showing what you had at 10:06.');
+    expect(screen.getByText('Retrying every 10 s.')).toBeInTheDocument(); // not in the live region
 
     act(() => vi.advanceTimersByTime(OFFLINE_RETRY_MS));
-    expect(screen.getByRole('status')).toHaveTextContent('Retrying now…');
+    expect(screen.getByText('Retrying now…')).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled(); // still offline
 
     setOnline(true);
@@ -90,13 +99,13 @@ describe('NoAccess', () => {
       />,
     );
     expect(screen.getByText('You can see this, not acknowledge it')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Who can act now' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Who can act now' })).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
     expect(screen.getByText('Not acked')).toHaveClass('text-fg-danger');
   });
 
   it('can stand alone without a list', () => {
     render(<NoAccess title="Admins only" description="Ask an Admin to change this." />);
-    expect(screen.queryByRole('heading', { name: 'Who can act now' })).toBeNull();
+    expect(screen.queryByText('Who can act now')).toBeNull();
   });
 });

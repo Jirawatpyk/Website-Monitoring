@@ -1,5 +1,5 @@
 import { Alert, Button, Card } from '@jirawatpyk/aura-react';
-import { IconBell, IconClock } from '@jirawatpyk/aura-react/icons';
+import { IconBell, IconClock, IconUsers } from '@jirawatpyk/aura-react/icons';
 import { signInHref } from '../sign-in-href';
 
 interface SignInCardProps {
@@ -12,7 +12,7 @@ interface SignInCardProps {
 /** "Sign in" state of the Login / MLogin boards. */
 export function SignInCard({ next, failed = false }: SignInCardProps) {
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md" flushBelow="sm">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-1.5">
           <h1 className="m-0 font-display text-3xl leading-tight font-semibold">Sign in</h1>
@@ -36,6 +36,15 @@ export function SignInCard({ next, failed = false }: SignInCardProps) {
             <IconBell aria-hidden className="mt-0.5 size-4 shrink-0" />
             <span>Came from an alert? You’ll go straight back to that incident.</span>
           </li>
+          {next !== '/' && (
+            <li className="flex gap-2.5">
+              <IconUsers aria-hidden className="mt-0.5 size-4 shrink-0" />
+              <span>
+                The link in Chat is the same for everyone in the Space. Signing in is how the system knows who
+                acted.
+              </span>
+            </li>
+          )}
           <li className="flex gap-2.5">
             <IconClock aria-hidden className="mt-0.5 size-4 shrink-0" />
             <span>You stay signed in on this device.</span>

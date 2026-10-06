@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, Button } from '@jirawatpyk/aura-react';
+import { IconRotateCcw } from '@jirawatpyk/aura-react/icons';
 import { formatTime } from '@dxt/shared';
 
 export const OFFLINE_RETRY_MS = 10_000;
@@ -54,15 +55,26 @@ export function OfflineStrip() {
   return (
     <Alert
       tone="warning"
-      role="status"
+      role="none"
       action={
-        <Button size="sm" variant="secondary" touchHeight onClick={retry} loading={retrying}>
+        <Button
+          size="sm"
+          variant="ghost"
+          touchHeight
+          icon={<IconRotateCcw />}
+          onClick={retry}
+          disabled={retrying}
+        >
           {retrying ? 'Retrying…' : 'Retry'}
         </Button>
       }
     >
-      <b>Offline</b> — showing what you had at {formatTime(offlineSince)}.{' '}
-      {retrying ? 'Retrying now…' : 'Retrying every 10 s.'}
+      {/* Only the summary is a live region; the retry ticker would re-announce every 10 s.
+          The time is when the connection dropped — what's on screen was loaded before it. */}
+      <span role="status">
+        <b>Offline</b> — showing what you had at {formatTime(offlineSince)}.
+      </span>{' '}
+      <span>{retrying ? 'Retrying now…' : 'Retrying every 10 s.'}</span>
     </Alert>
   );
 }
