@@ -296,6 +296,17 @@ describe('runNotifierSweep', () => {
     expect(rpcCalls.filter((c) => c.name === 'claim_notifications')).toHaveLength(4);
     expect(result).toMatchObject({ ok: true, passes: [{ ok: true }, { ok: true }] });
   });
+
+  it('skips the second pass when the first left too little of the function’s time', async () => {
+    const { db, rpcCalls } = fakeDb(queue([]));
+    const times = [0, 10_000];
+    const clock = () => times.shift() ?? 10_000;
+    const sleep = vi.fn(async () => {});
+    const result = await runNotifierSweep({ db, webhookUrl, email, appUrl }, { sleep, clock });
+    expect(sleep).not.toHaveBeenCalled();
+    expect(rpcCalls.filter((c) => c.name === 'claim_notifications')).toHaveLength(2);
+    expect(result).toMatchObject({ passes: [{ ok: true }], skipped: 'no_time_for_second_pass' });
+  });
 });
 
 describe('notifierDeps', () => {

@@ -2,7 +2,7 @@ import type { EmailMessage } from './email-alerts';
 
 export type EmailSendResult =
   | { ok: true; id: string | null }
-  /** `retryable`: a timeout, a network error, 409 / 429 or 5xx — worth another attempt. */
+  /** `retryable`: a timeout, a network error, 429, 5xx or a concurrent request — worth another attempt. */
   | { ok: false; error: string; retryable: boolean };
 
 export interface EmailSendOptions {
@@ -57,7 +57,11 @@ export async function sendEmail(
         error: `HTTP ${res.status}${detail ? `: ${detail}` : ''}`
           .replace(EMAIL_ADDRESS, '<address>')
           .slice(0, 200),
-        retryable: res.status === 409 || res.status === 429 || res.status >= 500,
+        // 409 is worth a retry only while the same key is still in flight; a changed payload never is.
+        retryable:
+          res.status === 429 ||
+          res.status >= 500 ||
+          (res.status === 409 && body.name === 'concurrent_idempotent_requests'),
       };
     }
     const body = (await res.json().catch(() => ({}))) as { id?: unknown };

@@ -56,6 +56,8 @@ export type AckState =
       byName: string;
       byViewer: boolean;
       postsAt: string;
+      /** The Undo window was still open when the page was rendered. */
+      windowOpen: boolean;
       notifies: boolean;
       /** When the ACKNOWLEDGED messages went out, and where ("the Chat thread + email"). */
       posted: { at: string; to: string } | null;
@@ -86,7 +88,10 @@ const ACKABLE: readonly IncidentState[] = ['unacked', 'escalated'];
 const str = (v: unknown) => (typeof v === 'string' ? v : null);
 const num = (v: unknown) => (typeof v === 'number' ? v : null);
 
-/** Who may acknowledge (D-016): an Admin, or a Responder on a site they own (primary or backup). */
+/**
+ * Who may acknowledge (D-016): an Admin, or a Responder on a site they own (primary or backup).
+ * Display only — the `ack_incident` SQL function (`private.can_ack`) is the rule that counts.
+ */
 export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
   if (viewer.role === 'admin') return true;
   return (
@@ -145,13 +150,15 @@ export function buildIncidentView(
     );
     const viaChat = posted.some((e) => e.payload.channel === 'google_chat');
     const viaEmail = posted.some((e) => e.payload.channel === 'email');
+    const postsAt =
+      str(ackEvent?.payload.posts_at) ??
+      new Date(new Date(i.acked_at).getTime() + UNDO_WINDOW_SEC * 1000).toISOString();
     ack = {
       kind: 'acked',
       byName: nameOf(i.acked_by),
       byViewer: i.acked_by === viewer.id,
-      postsAt:
-        str(ackEvent?.payload.posts_at) ??
-        new Date(new Date(i.acked_at).getTime() + UNDO_WINDOW_SEC * 1000).toISOString(),
+      postsAt,
+      windowOpen: new Date(postsAt) > now,
       notifies: ackEvent?.payload.notifies !== false,
       posted: posted.length
         ? {

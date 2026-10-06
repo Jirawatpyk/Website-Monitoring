@@ -127,6 +127,7 @@ describe('MobileAck view', () => {
       byName: 'Arm',
       byViewer: true,
       postsAt: '2026-09-25T03:07:50.000Z',
+      windowOpen: true,
       notifies: true,
       posted: null,
     });

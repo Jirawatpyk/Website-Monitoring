@@ -24,6 +24,7 @@ const UNDO_REFUSALS: Record<string, string> = {
   '55000': 'Too late to undo — the acknowledgement has been posted.',
 };
 const FAILED = 'Couldn’t reach the server. Check your connection and try again.';
+const FLUSH_MARGIN_MS = 2_000;
 
 /**
  * Acknowledge as the signed-in person (FR-07, D-016). The SQL function checks who may, records the
@@ -39,8 +40,11 @@ export async function acknowledgeIncident(incidentId: string): Promise<AckResult
 
   const postsAt = data;
   after(async () => {
-    // Just after the window closes, so the claim (hold_until <= now) takes the held messages.
-    await new Promise((r) => setTimeout(r, Math.max(0, new Date(postsAt).getTime() - Date.now()) + 500));
+    // Just after the window closes, so the claim (hold_until <= the database's now) takes the held
+    // messages; 2 s of margin covers clock skew between this function and Postgres.
+    await new Promise((r) =>
+      setTimeout(r, Math.max(0, new Date(postsAt).getTime() - Date.now()) + FLUSH_MARGIN_MS),
+    );
     try {
       await dispatchNotifications(notifierDeps(serviceDb(), serverEnv()));
     } catch (err) {

@@ -224,7 +224,8 @@ grant execute on function
 
 -- ── Acknowledge + Undo (signed-in people) ─────────────────────────────────
 -- Who may acknowledge (PRD §3, D-012, D-016): an Admin on any site; a Responder on sites they own
--- (primary or backup). On-call Tier 1 access comes with on-call shifts (S10).
+-- (primary or backup). On-call Tier 1 access comes with on-call shifts (S10). The incident page mirrors
+-- this rule only to decide what to show (`canAcknowledge` in apps/web features/incidents/view.ts).
 create function private.can_ack(p_site_id uuid)
 returns boolean
 language sql

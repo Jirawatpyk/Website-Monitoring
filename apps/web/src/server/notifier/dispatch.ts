@@ -178,13 +178,24 @@ async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: D
 
 /**
  * The notifier cron: two passes 30 s apart, so a retry due 30 s after a failure leaves on time
- * (Vercel Cron fires once a minute). The second pass ends well inside the 60 s maxDuration.
+ * (Vercel Cron fires once a minute). The second pass runs only when enough of the 60 s maxDuration
+ * is left after the first (`budgetMs`, with room for a slow pass); otherwise the next run picks it up.
  */
 export async function runNotifierSweep(
   deps: DispatchDeps,
-  { gapMs = 30_000, sleep = (ms: number) => new Promise((r) => setTimeout(r, ms)) } = {},
+  {
+    gapMs = 30_000,
+    budgetMs = 55_000,
+    reserveMs = 20_000,
+    clock = Date.now,
+    sleep = (ms: number) => new Promise((r) => setTimeout(r, ms)),
+  } = {},
 ): Promise<CronJobResult> {
+  const started = clock();
   const first = await dispatchNotifications(deps);
+  if (budgetMs - (clock() - started) < gapMs + reserveMs) {
+    return { ok: true, passes: [first], skipped: 'no_time_for_second_pass' };
+  }
   await sleep(gapMs);
   const second = await dispatchNotifications(deps);
   return { ok: true, passes: [first, second] };

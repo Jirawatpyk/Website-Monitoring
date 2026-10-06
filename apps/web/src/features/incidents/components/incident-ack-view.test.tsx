@@ -83,6 +83,7 @@ describe('IncidentAckView (MobileAck)', () => {
       byName: 'Arm',
       byViewer: true,
       postsAt: '2026-09-25T03:07:51Z',
+      windowOpen: true,
       notifies: true,
       posted: null,
       ...over,
@@ -93,20 +94,34 @@ describe('IncidentAckView (MobileAck)', () => {
     renderView(acked());
     await act(async () => vi.advanceTimersByTime(0));
     expect(screen.getByText('Acknowledged as Arm')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Posting to Chat and email in 10 s — nothing is sent until then',
-    );
+    expect(
+      screen.getByText('Posting to Chat and email in 10 s — nothing is sent until then'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Undo · 10 s' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
+    // Screen readers hear the phase once, not every second.
+    const live = screen.getByRole('status');
+    expect(live).toHaveTextContent('Posting to Chat and email in a few seconds — nothing is sent until then');
 
     await act(async () => vi.advanceTimersByTime(4_000));
     expect(screen.getByRole('button', { name: 'Undo · 6 s' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Posting to Chat and email in 6 s — nothing is sent until then'),
+    ).toBeInTheDocument();
+    expect(live).toHaveTextContent('in a few seconds');
 
     await act(async () => vi.advanceTimersByTime(6_000));
     expect(screen.queryByRole('button', { name: /Undo/ })).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('Posting to the Chat thread and email now');
     await act(async () => vi.advanceTimersByTime(2_000));
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it('never offers Undo for a window that had closed when the page was rendered', async () => {
+    renderView(acked({ windowOpen: false }));
+    await act(async () => vi.advanceTimersByTime(0));
+    expect(screen.queryByRole('button', { name: /Undo/ })).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Posting to the Chat thread and email now');
   });
 
   it('undoes inside the window', async () => {

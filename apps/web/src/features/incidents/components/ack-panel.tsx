@@ -47,7 +47,10 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const holdingUntil = ack.kind === 'acked' && ack.notifies && !ack.posted ? ack.postsAt : null;
+  // Only a window still open when the server rendered counts down: a reload after it closed never
+  // shows an Undo that would be refused.
+  const holdingUntil =
+    ack.kind === 'acked' && ack.windowOpen && ack.notifies && !ack.posted ? ack.postsAt : null;
   const seconds = useSecondsLeft(holdingUntil);
   const holding = holdingUntil !== null && seconds > 0;
 
@@ -66,6 +69,15 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
       router.refresh();
     });
 
+  const phase =
+    ack.kind !== 'acked'
+      ? ''
+      : !ack.notifies
+        ? 'Nothing to post — no alert went out for this incident.'
+        : ack.posted
+          ? `Posted to ${ack.posted.to} at ${formatTimeWithSeconds(new Date(ack.posted.at))}`
+          : 'Posting to the Chat thread and email now';
+
   return (
     <>
       {ack.kind === 'acked' && (
@@ -82,24 +94,18 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
             </span>
           </div>
           <span className="text-sm">Acknowledged by {ack.byName}.</span>
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex items-start gap-1.5 text-xs text-fg-secondary"
-          >
+          {/* The visible line counts down; screen readers hear only its changes of phase. */}
+          <div className="flex items-start gap-1.5 text-xs text-fg-secondary">
             <span className="flex pt-px">
               <Icon name={holding || (ack.notifies && !ack.posted) ? 'clock' : 'check'} size="sm" />
             </span>
             <span>
-              {holding
-                ? `Posting to Chat and email in ${seconds} s — nothing is sent until then`
-                : !ack.notifies
-                  ? 'Nothing to post — no alert went out for this incident.'
-                  : ack.posted
-                    ? `Posted to ${ack.posted.to} at ${formatTimeWithSeconds(new Date(ack.posted.at))}`
-                    : 'Posting to the Chat thread and email now'}
+              {holding ? `Posting to Chat and email in ${seconds} s — nothing is sent until then` : phase}
             </span>
           </div>
+          <p role="status" className="sr-only">
+            {holding ? 'Posting to Chat and email in a few seconds — nothing is sent until then' : phase}
+          </p>
           {holding && ack.byViewer && (
             <Button
               variant="secondary"

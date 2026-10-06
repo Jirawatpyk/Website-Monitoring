@@ -2,7 +2,7 @@
 -- re-ack after Undo, the fallback email audience, and the attempts log's RLS.
 begin;
 \ir _helpers.psql
-select plan(30);
+select plan(32);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -182,6 +182,21 @@ select is(
     where incident_id = (select id from inc where name = 'a') and channel = 'google_chat' and template = 'down')),
   0,
   'running it again queues nothing'
+);
+
+-- The engine's and fallback's `on conflict do nothing` meet the partial unique index.
+select lives_ok(
+  format($$insert into public.notifications (incident_id, user_id, channel, template)
+           values (%L, (select id from ids where name = 'arm'), 'email', 'down') on conflict do nothing$$,
+         (select id from inc where name = 'a')),
+  'a second live copy of a message is skipped by on conflict do nothing'
+);
+select is(
+  (select count(*)::int from public.notifications
+   where incident_id = (select id from inc where name = 'a') and channel = 'email' and template = 'down'
+     and user_id = (select id from ids where name = 'arm')),
+  1,
+  'so each person still has one DOWN email'
 );
 
 -- ── Delivery log RLS ─────────────────────────────────────────────────────

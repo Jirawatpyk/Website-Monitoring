@@ -33,7 +33,7 @@ describe('acknowledgeIncident', () => {
     expect(m.revalidatePath).toHaveBeenCalledWith(`/incidents/${ID}`);
 
     const flush = (m.after.mock.calls[0] as [() => Promise<void>])[0]();
-    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(11_500);
     expect(m.dispatch).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(500);
     await flush;
@@ -46,7 +46,7 @@ describe('acknowledgeIncident', () => {
     m.dispatch.mockRejectedValue(new Error('down'));
     await acknowledgeIncident(ID);
     const flush = (m.after.mock.calls[0] as [() => Promise<void>])[0]();
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(2_000);
     await flush;
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('ack_flush_failed'));
   });

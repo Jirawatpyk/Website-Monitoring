@@ -41,7 +41,7 @@ describe('sendEmail (Resend)', () => {
   it.each([
     [429, true],
     [500, true],
-    [409, true],
+    [409, false],
     [422, false],
     [403, false],
   ])('HTTP %i → retryable %s', async (status, retryable) => {
@@ -51,6 +51,13 @@ describe('sendEmail (Resend)', () => {
       error: `HTTP ${status}: error: nope`,
       retryable,
     });
+  });
+
+  it('retries a 409 only while the same key is still in flight', async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({ name: 'concurrent_idempotent_requests', message: 'busy' }, { status: 409 }),
+    );
+    expect(await sendEmail(message, { ...opts, fetchImpl })).toMatchObject({ ok: false, retryable: true });
   });
 
   it('never stores the address or the key in an error', async () => {
