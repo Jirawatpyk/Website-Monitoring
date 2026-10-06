@@ -182,6 +182,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   2. `http://169.254.169.254/`, `http://10.0.0.5/` and a hostname resolving to `127.0.0.1` are rejected (tests).
   3. Create / update / delete of a site or monitor each leave one `audit_log` row with before / after (test).
   4. spec-checker passes AddSite and EditMonitors; nav "Sites" is live.
+  5. A site can't be saved with an owner or backup who has no Google Chat user id; the form names them (D-015, test).
 - **Review:** spec-checker, security-reviewer (SSRF, RLS).
 
 ### S06 · Overview dashboard & site detail
@@ -317,7 +318,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 ### S16 · Users & access
 
-- **Scope:** Users & roles (invite = add to the allowlist with a role, change role, deactivate with the "Used in" check and reassignment, §14.9), Security (sessions, sign out everywhere, confirm dialogs), Profile (notification channels, on-call checklist). No 2-step status, required date or lock — Google Workspace enforces 2-step (D-007); the invite dialog asks for the person's primary Google address (not a DxT alias) and reminds the Admin to have them confirm their 2-Step Verification page.
+- **Scope:** Users & roles (invite = add to the allowlist with a role, change role, deactivate with the "Used in" check and reassignment, §14.9), Security (sessions, sign out everywhere, confirm dialogs), Profile (notification channels incl. the Google Chat user id that alerts mention, D-015; on-call checklist). No 2-step status, required date or lock — Google Workspace enforces 2-step (D-007); the invite dialog asks for the person's primary Google address (not a DxT alias) and reminds the Admin to have them confirm their 2-Step Verification page.
 - **Boards:** Users, Security, Profile
 - **Depends on:** S10
 - **Done when:**
