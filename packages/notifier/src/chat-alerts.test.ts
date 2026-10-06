@@ -114,6 +114,31 @@ describe('RECOVERED reply (ChatAlert, spec §16.4)', () => {
   });
 });
 
+describe('RECOVERED duration matches the range shown', () => {
+  const recovered = (start: string, end: string) =>
+    buildRecoveredAlert({
+      incidentId: 'inc-1',
+      site: 'MuvMi',
+      startedAt: new Date(start),
+      recoveredAt: new Date(end),
+      okLocations: 2,
+      owner: null,
+    });
+
+  it('counts clock minutes: 19:37:30 → 19:42:00 reads 5 min (19:37–19:42)', () => {
+    const m = recovered('2026-10-06T12:37:30Z', '2026-10-06T12:42:00Z');
+    expect(m.text).toBe('RECOVERED · MuvMi · down 5 min · add a root cause');
+    expect(m.cardsV2[0]!.card.header.title).toBe('RECOVERED · MuvMi is back · down 5 min (19:37–19:42)');
+  });
+
+  it('names both days when the outage crosses midnight in Bangkok', () => {
+    const m = recovered('2026-10-06T16:50:00Z', '2026-10-06T17:20:00Z');
+    expect(m.cardsV2[0]!.card.header.title).toBe(
+      'RECOVERED · MuvMi is back · down 30 min (Tue 6 Oct 23:50–Wed 7 Oct 00:20)',
+    );
+  });
+});
+
 describe('RECOVERED duration floor', () => {
   it('never says "down 0 min"', () => {
     const quick = buildRecoveredAlert({

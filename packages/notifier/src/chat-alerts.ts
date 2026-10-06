@@ -127,7 +127,15 @@ export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
   const { startedAt, recoveredAt } = input;
   const site = plainName(input.site);
   // At least "1 min": a confirmed DOWN always lasted some time, and "down 0 min" reads as no outage.
-  const down = formatDuration(Math.max(1, (recoveredAt.getTime() - startedAt.getTime()) / 60_000));
+  // Count whole clock minutes, so the number matches the range shown (19:37–19:42 = 5 min); at least
+  // "1 min" — a confirmed DOWN always lasted some time, and "down 0 min" reads as no outage.
+  const minute = (d: Date) => Math.floor(d.getTime() / 60_000);
+  const down = formatDuration(Math.max(1, minute(recoveredAt) - minute(startedAt)));
+  // Past midnight in Bangkok the range names both days.
+  const at = (d: Date) =>
+    isSameBangkokDay(startedAt, recoveredAt)
+      ? formatTime(d)
+      : `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
 
   return {
     text: buildChatTextLine({
@@ -141,7 +149,7 @@ export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
         cardId: `recovered-${input.incidentId}`,
         card: {
           header: {
-            title: `RECOVERED · ${site} is back · down ${down} (${formatTime(startedAt)}–${formatTime(recoveredAt)})`,
+            title: `RECOVERED · ${site} is back · down ${down} (${at(startedAt)}–${at(recoveredAt)})`,
           },
           sections: [
             {
