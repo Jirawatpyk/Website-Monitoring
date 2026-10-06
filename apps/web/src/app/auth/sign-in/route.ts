@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { safeNextPath } from '@dxt/shared';
+import { serverEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,8 @@ export async function GET(request: Request): Promise<Response> {
       queryParams: {
         // Always show Google's account chooser so "Use a different account" works.
         prompt: 'select_account',
-        ...(process.env.ALLOWED_EMAIL_DOMAIN ? { hd: process.env.ALLOWED_EMAIL_DOMAIN } : {}),
+        // Google shows company accounts first.
+        hd: serverEnv().ALLOWED_EMAIL_DOMAIN,
       },
     },
   });

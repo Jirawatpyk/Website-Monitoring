@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@dxt/db';
 import { isAllowedEmail } from '@dxt/shared';
-import { refusedEmailCookie } from '@/lib/auth/login-errors';
+import { loginErrorFromCallback, refusedEmailCookie } from '@/lib/auth/login-errors';
 import { isPublic } from '@/lib/auth/public-paths';
 
 /**
@@ -41,6 +41,12 @@ export async function updateSession(request: NextRequest) {
   if (!claims) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    // Supabase Auth may send an OAuth refusal (e.g. the sign-up hook) to the Site URL instead of
+    // /auth/callback: show the refusal rather than a sign-in loop.
+    if (request.nextUrl.searchParams.has('error_description')) {
+      url.search = `?error=${loginErrorFromCallback(request.nextUrl.searchParams)}`;
+      return NextResponse.redirect(url);
+    }
     // Keep the alert link so sign-in returns to the incident (MLogin board).
     url.search = `?next=${encodeURIComponent(pathname + search)}`;
     return NextResponse.redirect(url);

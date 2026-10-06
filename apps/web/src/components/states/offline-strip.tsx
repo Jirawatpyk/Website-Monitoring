@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, Button } from '@jirawatpyk/aura-react';
 import { formatTime } from '@dxt/shared';
@@ -15,6 +15,7 @@ export function OfflineStrip() {
   const router = useRouter();
   const [offlineSince, setOfflineSince] = useState<Date | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const retryingTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const retry = useCallback(() => {
     setRetrying(true);
@@ -22,7 +23,8 @@ export function OfflineStrip() {
       setOfflineSince(null);
       router.refresh();
     }
-    setTimeout(() => setRetrying(false), 1_000);
+    clearTimeout(retryingTimer.current);
+    retryingTimer.current = setTimeout(() => setRetrying(false), 1_000);
   }, [router]);
 
   useEffect(() => {
@@ -39,6 +41,8 @@ export function OfflineStrip() {
       window.removeEventListener('online', goOnline);
     };
   }, [router]);
+
+  useEffect(() => () => clearTimeout(retryingTimer.current), []);
 
   useEffect(() => {
     if (!offlineSince) return;

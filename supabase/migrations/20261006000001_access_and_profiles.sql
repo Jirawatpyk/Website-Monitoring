@@ -146,27 +146,32 @@ as $$
   select coalesce(public.current_app_role() in ('admin', 'responder', 'stakeholder', 'viewer'), false);
 $$;
 
--- What the app shows a signed-in user whose profile RLS hides: 'active', 'inactive' or 'missing'.
-create function public.my_profile_status()
-returns text
+-- The signed-in user's access in one call (the app layout runs it on every page): status
+-- 'active' | 'inactive' | 'missing', plus the profile fields when active. RLS hides an inactive
+-- profile, so the app can't read this itself.
+create function public.my_access()
+returns table (status text, id uuid, email text, display_name text, role public.app_role)
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select coalesce(
-    (select case when p.is_active then 'active' else 'inactive' end
-       from public.profiles p where p.id = auth.uid()),
-    'missing'
-  );
+  select
+    coalesce(case when p.is_active then 'active' when p.id is not null then 'inactive' end, 'missing'),
+    case when p.is_active then p.id end,
+    case when p.is_active then p.email end,
+    case when p.is_active then p.display_name end,
+    case when p.is_active then p.role end
+  from (select 1) as one
+  left join public.profiles p on p.id = auth.uid();
 $$;
 
 revoke execute on function public.current_app_role() from public, anon;
 revoke execute on function public.is_staff() from public, anon;
-revoke execute on function public.my_profile_status() from public, anon;
+revoke execute on function public.my_access() from public, anon;
 grant execute on function public.current_app_role() to authenticated, service_role;
 grant execute on function public.is_staff() to authenticated, service_role;
-grant execute on function public.my_profile_status() to authenticated, service_role;
+grant execute on function public.my_access() to authenticated, service_role;
 
 -- ── RLS ───────────────────────────────────────────────────────────────────
 alter table public.profiles enable row level security;
@@ -174,14 +179,14 @@ alter table public.profiles enable row level security;
 -- Staff see each other (owner names on sites and incidents); inactive or missing profiles see nothing.
 create policy profiles_select_staff on public.profiles
   for select to authenticated
-  using (public.is_staff());
+  using ((select public.is_staff()));
 
 -- Role and activation changes are Admin-only (Users screen, S16). Profiles are inserted
 -- only by the sign-up trigger and never deleted by the app (deactivate instead).
 create policy profiles_update_admin on public.profiles
   for update to authenticated
-  using (public.current_app_role() = 'admin')
-  with check (public.current_app_role() = 'admin');
+  using ((select public.current_app_role()) = 'admin')
+  with check ((select public.current_app_role()) = 'admin');
 
 revoke all on public.profiles from public, anon, authenticated;
 grant select, update on public.profiles to authenticated;

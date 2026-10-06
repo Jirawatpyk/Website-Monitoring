@@ -15,7 +15,10 @@
       "env": {
         "NEXT_PUBLIC_SUPABASE_URL": "http://127.0.0.1:54321",
         "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
-        "ALLOWED_EMAIL_DOMAIN": "example.test"
+        "ALLOWED_EMAIL_DOMAIN": "example.test",
+        "SUPABASE_SERVICE_ROLE_KEY": "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz",
+        "CRON_SECRET": "local-dev-cron-secret-not-a-real-secret-000",
+        "INGEST_TOKEN": "local-dev-ingest-token-not-a-real-secret-00"
       }
     }
   ]

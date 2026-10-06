@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { safeNextPath } from '@dxt/shared';
 import { BrandMark } from '@/components/app-shell/brand';
-import { BrandPanel, RefusalCard, SignInCard } from '@/features/auth';
+import { BrandPanel, FragmentError, RefusalCard, SignInCard } from '@/features/auth';
 import { parseLoginError, parseRefusedEmail, REFUSED_EMAIL_COOKIE } from '@/lib/auth/login-errors';
 import { getAccess } from '@/lib/auth/session';
 
@@ -30,6 +30,7 @@ export default async function LoginPage({
 
   return (
     <div className="flex min-h-dvh bg-bg-canvas text-fg-primary">
+      <FragmentError />
       <BrandPanel />
       <div className="flex min-w-0 grow flex-col">
         <header className="flex h-14 items-center px-4 lg:hidden">

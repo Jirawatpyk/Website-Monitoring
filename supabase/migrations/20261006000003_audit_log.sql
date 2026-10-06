@@ -73,7 +73,7 @@ alter table public.audit_log enable row level security;
 
 -- Who else may read it is decided with the Audit log screen (S15).
 create policy audit_log_select_admin on public.audit_log
-  for select to authenticated using (public.current_app_role() = 'admin');
+  for select to authenticated using ((select public.current_app_role()) = 'admin');
 
 revoke all on public.audit_log from public, anon, authenticated;
 grant select on public.audit_log to authenticated;

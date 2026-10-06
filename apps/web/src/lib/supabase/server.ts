@@ -25,3 +25,6 @@ export async function createClient() {
     },
   );
 }
+
+/** The per-request server client's type, for helpers that take one. */
+export type ServerClient = Awaited<ReturnType<typeof createClient>>;

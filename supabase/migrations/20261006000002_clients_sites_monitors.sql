@@ -116,43 +116,43 @@ alter table public.sites enable row level security;
 alter table public.monitors enable row level security;
 
 create policy clients_select_staff on public.clients
-  for select to authenticated using (public.is_staff());
+  for select to authenticated using ((select public.is_staff()));
 create policy clients_insert_admin on public.clients
-  for insert to authenticated with check (public.current_app_role() = 'admin');
+  for insert to authenticated with check ((select public.current_app_role()) = 'admin');
 create policy clients_update_admin on public.clients
   for update to authenticated
-  using (public.current_app_role() = 'admin')
-  with check (public.current_app_role() = 'admin');
+  using ((select public.current_app_role()) = 'admin')
+  with check ((select public.current_app_role()) = 'admin');
 create policy clients_delete_admin on public.clients
-  for delete to authenticated using (public.current_app_role() = 'admin');
+  for delete to authenticated using ((select public.current_app_role()) = 'admin');
 
 create policy sites_select_staff on public.sites
-  for select to authenticated using (public.is_staff());
+  for select to authenticated using ((select public.is_staff()));
 create policy sites_insert_admin on public.sites
-  for insert to authenticated with check (public.current_app_role() = 'admin');
+  for insert to authenticated with check ((select public.current_app_role()) = 'admin');
 create policy sites_update_admin_or_owner on public.sites
   for update to authenticated
   using (
-    public.current_app_role() = 'admin'
-    or (public.current_app_role() = 'responder' and public.owns_site(id))
+    (select public.current_app_role()) = 'admin'
+    or ((select public.current_app_role()) = 'responder' and public.owns_site(id))
   )
   with check (
-    public.current_app_role() = 'admin'
-    or (public.current_app_role() = 'responder' and public.owns_site(id))
+    (select public.current_app_role()) = 'admin'
+    or ((select public.current_app_role()) = 'responder' and public.owns_site(id))
   );
 create policy sites_delete_admin on public.sites
-  for delete to authenticated using (public.current_app_role() = 'admin');
+  for delete to authenticated using ((select public.current_app_role()) = 'admin');
 
 create policy monitors_select_staff on public.monitors
-  for select to authenticated using (public.is_staff());
+  for select to authenticated using ((select public.is_staff()));
 create policy monitors_insert_admin on public.monitors
-  for insert to authenticated with check (public.current_app_role() = 'admin');
+  for insert to authenticated with check ((select public.current_app_role()) = 'admin');
 create policy monitors_update_admin on public.monitors
   for update to authenticated
-  using (public.current_app_role() = 'admin')
-  with check (public.current_app_role() = 'admin');
+  using ((select public.current_app_role()) = 'admin')
+  with check ((select public.current_app_role()) = 'admin');
 create policy monitors_delete_admin on public.monitors
-  for delete to authenticated using (public.current_app_role() = 'admin');
+  for delete to authenticated using ((select public.current_app_role()) = 'admin');
 
 -- ── Grants (auto_expose_new_tables = false) ───────────────────────────────
 revoke all on public.clients, public.sites, public.monitors from public, anon, authenticated;

@@ -36,7 +36,8 @@ export function LoadingList({ label, rows = 7, lastDataAt = null, onRetry }: Loa
 
   const retry = () => {
     setSlow(false);
-    (onRetry ?? router.refresh)();
+    if (onRetry) onRetry();
+    else router.refresh();
   };
 
   return (

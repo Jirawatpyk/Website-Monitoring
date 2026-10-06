@@ -1,7 +1,7 @@
 -- D-007 sign-up filters: domain + exact allowlist address, lower-case, profile from the allowlist.
 begin;
 \ir _helpers.psql
-select plan(14);
+select plan(17);
 
 -- Allowlist rows
 select lives_ok(
@@ -40,11 +40,16 @@ select is((select count(*)::int from public.profiles where email = 'stranger@pgt
 
 -- Profile status as the app sees it
 select tests.authenticate_as((select id from public.profiles where email = 'arm@pgtap.test'));
-select is(public.my_profile_status(), 'active', 'active profile reports active');
+select is((select status from public.my_access()), 'active', 'active profile reports active');
+select is((select role::text from public.my_access()), 'responder', 'my_access returns the role of an active profile');
 reset role;
 update public.profiles set is_active = false where email = 'arm@pgtap.test';
 select tests.authenticate_as((select id from public.profiles where email = 'arm@pgtap.test'));
-select is(public.my_profile_status(), 'inactive', 'deactivated profile reports inactive');
+select is((select status from public.my_access()), 'inactive', 'deactivated profile reports inactive');
+select is((select email from public.my_access()), null, 'my_access hides the profile of a deactivated user');
+reset role;
+select tests.authenticate_as(gen_random_uuid());
+select is((select status from public.my_access()), 'missing', 'a session without a profile reports missing');
 reset role;
 
 select * from finish();

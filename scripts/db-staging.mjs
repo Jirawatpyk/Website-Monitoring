@@ -2,7 +2,8 @@
 // Apply migrations to (or rebuild) the STAGING Supabase database without `supabase link`.
 //
 //   pnpm db:push:staging [--dry-run] → supabase db push  --db-url <staging>
-//   pnpm db:reset:staging   → supabase db reset --db-url <staging>   (drops everything, reapplies, seeds)
+//   pnpm db:reset:staging   → supabase db reset --db-url <staging> --no-seed   (drops everything, reapplies;
+//                             seed.sql is local dev data only — never on staging)
 //
 // The connection string comes from `.env.staging.local` (never committed; template:
 // scripts/db-staging.env.example). The run is refused unless the URL belongs to the staging project
@@ -42,7 +43,9 @@ export function buildArgs(command, rawExtra, dbUrl) {
   const extra = rawExtra[0] === '--' ? rawExtra.slice(1) : rawExtra;
   const bad = extra.filter((flag) => !ALLOWED_FLAGS[command]?.has(flag));
   if (bad.length) throw new Error(`Unsupported option(s) for ${command}: ${bad.join(' ')}`);
-  return ['db', command, '--db-url', dbUrl, ...extra];
+  // seed.sql is local sample data (example.test users, fake sites) — never load it on staging.
+  const noSeed = command === 'reset' ? ['--no-seed'] : [];
+  return ['db', command, '--db-url', dbUrl, ...noSeed, ...extra];
 }
 
 /**

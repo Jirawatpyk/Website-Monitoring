@@ -139,8 +139,10 @@ isOneToOne: false
 "is_staff":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
-"my_profile_status":
-{ Args: Record<PropertyKey, never>; Returns: string
+"my_access":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "display_name": string,"email": string,"id": string,"role": Database["public"]['Enums']["app_role"],"status": string
+            }[]
                            },
 "owns_site":
 { Args: { "p_site_id": string }; Returns: boolean

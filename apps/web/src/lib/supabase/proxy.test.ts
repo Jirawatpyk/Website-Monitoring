@@ -32,6 +32,14 @@ describe('updateSession (auth proxy)', () => {
     );
   });
 
+  it('turns an OAuth refusal sent to the Site URL into the refusal card', async () => {
+    signedInAs(null);
+    const response = await visit(
+      "/?error=access_denied&error_description=You're+not+on+the+DxT+Monitor+access+list+yet.",
+    );
+    expect(response.headers.get('location')).toBe('http://localhost:3500/login?error=access');
+  });
+
   it('lets public paths through without a session', async () => {
     signedInAs(null);
     const response = await visit('/api/cron/engine');

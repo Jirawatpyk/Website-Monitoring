@@ -1,8 +1,6 @@
 import 'server-only';
 import type { Json } from '@dxt/db';
-import type { createClient } from '@/lib/supabase/server';
-
-type ServerClient = Awaited<ReturnType<typeof createClient>>;
+import type { ServerClient } from '@/lib/supabase/server';
 
 export interface AuditEntry {
   /** What happened, `entity.verb` — e.g. `site.mute`, `incident.ack`. */

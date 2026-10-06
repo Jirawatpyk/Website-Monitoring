@@ -3,9 +3,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { refusedEmailCookie, type LoginError } from './login-errors';
 import type { Access } from './session';
-import type { createClient } from '@/lib/supabase/server';
-
-type ServerClient = Awaited<ReturnType<typeof createClient>>;
+import type { ServerClient } from '@/lib/supabase/server';
 
 /**
  * Sign a session out that may not use the app, and show /login with the reason (D-007, D-011).

@@ -62,7 +62,9 @@ test.describe('signed in (local Supabase)', () => {
     await ensureUser('arm@example.test');
     await signIn(context, baseURL!, 'arm@example.test');
     await page.goto('/login?next=%2Fincidents%2Fx');
-    // The incident page arrives in S07; the evidence is the URL (S01 Done-when 2).
+    // The incident page arrives in S07; the evidence is the URL (S01 Done-when 2). This proves the
+    // login page's return; the real Google → /auth/callback → `next` round trip is checked with
+    // /verify on staging (real cookies), and the callback's mapping by its unit tests.
     await expect(page).toHaveURL(/\/incidents\/x$/);
   });
 
