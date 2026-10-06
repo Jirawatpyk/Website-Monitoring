@@ -52,10 +52,13 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
         'lte',
         'order',
         'range',
+        'limit',
+        'maybeSingle',
         'overrideTypes',
       ]) {
         builder[method] = (...args: unknown[]) => {
-          if (!['select', 'order', 'overrideTypes'].includes(method)) call.filters.push([method, ...args]);
+          if (!['select', 'order', 'limit', 'maybeSingle', 'overrideTypes'].includes(method))
+            call.filters.push([method, ...args]);
           return builder;
         };
       }

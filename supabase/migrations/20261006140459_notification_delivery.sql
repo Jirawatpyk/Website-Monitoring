@@ -272,9 +272,6 @@ begin
     set state = 'acknowledged', acked_at = v_now, acked_by = auth.uid()
     where id = p_incident_id;
 
-  insert into public.incident_events (incident_id, type, actor_id, payload, at)
-  values (p_incident_id, 'acknowledged', auth.uid(),
-          jsonb_build_object('from', v_inc.state, 'posts_at', v_hold), v_now);
 
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), 'incident.ack', 'incident', p_incident_id,
@@ -295,6 +292,16 @@ begin
   from public.notifications n
   where n.incident_id = p_incident_id and n.channel = 'email' and n.status <> 'cancelled'
     and n.user_id is not null;
+
+  -- The timeline says when the ack posts, and whether it posts at all (a muted incident has no
+  -- thread and no emails to follow up).
+  insert into public.incident_events (incident_id, type, actor_id, payload, at)
+  values (p_incident_id, 'acknowledged', auth.uid(),
+          jsonb_build_object('from', v_inc.state, 'posts_at', v_hold,
+            'notifies', exists (select 1 from public.notifications
+                                where incident_id = p_incident_id and template = 'acknowledged'
+                                  and status = 'queued')),
+          v_now);
 
   return v_hold;
 end;
