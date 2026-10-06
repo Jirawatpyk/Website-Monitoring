@@ -1,0 +1,11 @@
+# apps/test-target
+
+A switchable site for staging checks (S02a), deployed as its own Vercel project `dxt-test-target`
+(root `apps/test-target`) so it never depends on the app it helps test. Every path answers by the
+`mode` item in the Global Config (formerly Edge Config) store `dxt-test-target-global-config` connected to the project (env `GLOBAL_CONFIG`): `ok` → 200,
+`error` → 500, `timeout` → held 45 s (probe User-Agent only; anyone else gets 200 at once). Point the staging test monitor at it
+(`supabase/staging/test-target.sql`) and flip `mode` to trigger a DOWN / RECOVERED.
+
+No secrets, no data, no auth: it only says which mode it is in.
+
+Vercel runs `api/index.ts` as native ESM: relative imports there must end in `.js` (`../src/handler.js`), or the function fails with `ERR_MODULE_NOT_FOUND` though tests pass.

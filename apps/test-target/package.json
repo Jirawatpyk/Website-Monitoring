@@ -1,0 +1,18 @@
+{
+  "name": "@dxt/test-target",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Switchable test site for staging checks: 200 / 500 / timeout from Vercel Edge Config",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@vitest/coverage-v8": "^5.0.3",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.3"
+  }
+}

@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|---|
 | S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Done |
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
-| S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Todo |
+| S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | In review |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Todo |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
@@ -130,6 +130,16 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   5. message-checker passes the DOWN and RECOVERED text lines and cards against ChatAlert.
   6. Actual time spent is recorded in the PR, for the re-baseline check in [Timeline](#timeline).
 - **Review:** engine-reviewer, message-checker, security-reviewer (cron, RLS), db-reviewer (partitions).
+- **Notes (evidence):** started 6 Oct 2026 10:32Z; staging verified 12:15Z — time spent ≈ 1 h 45 min (planned S, ≤ 2 days). Chat copy per D-013; owners' Chat ids per D-015; schema choices D-014.
+  - **Done-when 1 ✓** Staging, 6 Oct: test target switched to `error` at 12:07:12Z (first 500 seen); the engine opened INC-0001 and sent DOWN at 12:09:39Z (Vercel log `engine … opened:1, delivery.sent:1`) — **2 min 27 s**. Round 12:07 was split (TYO passed before the switch); round 12:08 failed on both checks and both rechecks.
+  - **Done-when 2 ✓** Switched to `ok` at 12:11:21Z; RECOVERED sent 12:13:39Z (`recovered:1, delivery.sent:1`), shown by Tao's Chat screenshot as a reply in the DOWN thread ("RECOVERED · Test target · down 3 min · add a root cause"); the next round settled the incident to Needs root cause (12:14:39Z, `settled:1`).
+  - **Re-run after engine-reviewer round 2** (deploy `e1ea685`, after `reset-test-incident.sql`): switched to `error` 12:37:00Z → INC-0002 DOWN sent 12:38:39Z (**1 min 39 s**); back to `ok` 12:41:17Z → RECOVERED 12:43:39Z as a reply in the same thread, reading "down 4 min (19:37–19:42)" — now from the first failed check; settled 12:44:39Z (Tao's Chat screenshot, Vercel logs).
+  - **Done-when 3 ✓** `pnpm --filter @dxt/web test:int` (`src/server/pipeline.int.test.ts`, 5 cases on the local stack, also in the CI `db` job): both fail on check + recheck → 1 incident, 1 DOWN, a second run adds nothing; one location fails → none; no recheck → no double vote; a newer incomplete round doesn't hide the complete one; recovery → Monitoring + RECOVERED in the same thread → Needs root cause. Engine rules: `packages/engine/src/monitor.test.ts` (incl. real staging cron offsets). pgTAP `probes.test.sql` (35).
+  - **Done-when 4 ✓** Healthchecks project "DxT Monitor — staging" (separate from production): engine, probe-sin, probe-tyo, notifier all Up, last pings 11–54 s ago (checked by Claude in the browser, 12:17Z); all 4 still Up on the final deploy `e1ea685` (12:51Z). Vercel logs: `probe-sin … region:"sin1"`, `probe-tyo … region:"hnd1"` every minute.
+  - **Done-when 5 ✓** message-checker: no open High; Mediums fixed (sub-minute duration floor, owner-without-Chat-id → D-015) — the live cards match ChatAlert minus the D-013 omissions.
+  - **Done-when 6 ✓** ≈ 1 h 45 min of build to a verified staging run, against an S estimate — record for the Q7 re-baseline.
+  - Known limits (by design, in later slices): a confirmed relapse while the incident is open is logged, not alerted, and after the second OK round the site shows OK — so no real site may be probed on production before S04 (D-004) is Done (see S05). On staging run `supabase/staging/reset-test-incident.sql` before repeating a DOWN test.
+  - Engine-reviewer round 2 (fixed before the PR): rounds judged oldest first; OK = majority of reporting locations; the incident starts at the first failed check, even in a split round before (the staging run would now read 19:07:46); checks stamped with the probe run's start; monitor timeouts capped at 30 s (PRD §5) with probe `maxDuration` 90 s; RECOVERED only after a queued DOWN.
 
 ### S02b · Email, delivery guarantees, Ack + Undo
 
@@ -173,7 +183,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 ### S05 · Sites & monitors
 
-- **Scope:** FR-01. `/sites` list, Add site with the registration checklist, Edit monitors (URL, method, expected status, timeout, keywords, headers, thresholds, primary, key pages, redirect allowlist). An owner must have signed in once and have a notification channel (PRD §3). Monitor URLs rejected when they resolve to private, link-local or metadata addresses. Every change writes `audit_log` with before / after. Production clients and AMs load from a reviewed SQL script (UI in S17).
+- **Scope:** FR-01. `/sites` list, Add site with the registration checklist, Edit monitors (URL, method, expected status, timeout, keywords, headers, thresholds, primary, key pages, redirect allowlist). An owner must have signed in once and have a notification channel (PRD §3). Monitor URLs rejected when they resolve to private, link-local or metadata addresses (the probe enforces the same on every hop since S02a). Real sites are entered on production only once S04 is Done — before that a relapse during an open incident isn't alerted (D-004, S02a engine review). Every change writes `audit_log` with before / after. Production clients and AMs load from a reviewed SQL script (UI in S17).
 - **Boards:** AddSite, EditMonitors · route `/sites`
 - **Depends on:** S01 (S02a for probes to pick the monitors up)
 - **Done when:**
@@ -181,6 +191,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   2. `http://169.254.169.254/`, `http://10.0.0.5/` and a hostname resolving to `127.0.0.1` are rejected (tests).
   3. Create / update / delete of a site or monitor each leave one `audit_log` row with before / after (test).
   4. spec-checker passes AddSite and EditMonitors; nav "Sites" is live.
+  5. A site can't be saved with an owner or backup who has no Google Chat user id; the form names them (D-015, test).
 - **Review:** spec-checker, security-reviewer (SSRF, RLS).
 
 ### S06 · Overview dashboard & site detail
@@ -316,7 +327,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 ### S16 · Users & access
 
-- **Scope:** Users & roles (invite = add to the allowlist with a role, change role, deactivate with the "Used in" check and reassignment, §14.9), Security (sessions, sign out everywhere, confirm dialogs), Profile (notification channels, on-call checklist). No 2-step status, required date or lock — Google Workspace enforces 2-step (D-007); the invite dialog asks for the person's primary Google address (not a DxT alias) and reminds the Admin to have them confirm their 2-Step Verification page.
+- **Scope:** Users & roles (invite = add to the allowlist with a role, change role, deactivate with the "Used in" check and reassignment, §14.9), Security (sessions, sign out everywhere, confirm dialogs), Profile (notification channels incl. the Google Chat user id that alerts mention, D-015; on-call checklist). No 2-step status, required date or lock — Google Workspace enforces 2-step (D-007); the invite dialog asks for the person's primary Google address (not a DxT alias) and reminds the Admin to have them confirm their 2-Step Verification page.
 - **Boards:** Users, Security, Profile
 - **Depends on:** S10
 - **Done when:**

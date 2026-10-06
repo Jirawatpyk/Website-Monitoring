@@ -42,6 +42,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"check_results": {
+                  Row: {
+                    "attempt": number,"checked_at": string,"created_at": string,"error": string | null,"id": string,"location": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"resolved_ip": unknown,"response_ms": number | null,"status_code": number | null,"ttfb_ms": number | null
+                  }
+                  Insert: {
+                    "attempt"?: number,"checked_at": string,"created_at"?: string,"error"?: string | null,"id"?: string,"location": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"resolved_ip"?: unknown,"response_ms"?: number | null,"status_code"?: number | null,"ttfb_ms"?: number | null
+                  }
+                  Update: {
+                    "attempt"?: number,"checked_at"?: string,"created_at"?: string,"error"?: string | null,"id"?: string,"location"?: string,"monitor_id"?: string,"outcome"?: Database["public"]['Enums']["check_outcome"],"resolved_ip"?: unknown,"response_ms"?: number | null,"status_code"?: number | null,"ttfb_ms"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "check_results_location_fkey"
+      columns: ["location"]
+isOneToOne: false
+      referencedRelation: "probe_locations"
+      referencedColumns: ["code"]
+    },{
+      foreignKeyName: "check_results_monitor_id_fkey"
+      columns: ["monitor_id"]
+isOneToOne: false
+      referencedRelation: "monitors"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"clients": {
                   Row: {
                     "am_user_id": string | null,"contact_email": string | null,"created_at": string,"id": string,"language": string,"name": string,"updated_at": string
@@ -58,6 +83,68 @@ isOneToOne: false
       columns: ["am_user_id"]
 isOneToOne: false
       referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"incident_events": {
+                  Row: {
+                    "actor_id": string | null,"at": string,"id": string,"incident_id": string,"payload": NonNullable<Json>,"type": string
+                  }
+                  Insert: {
+                    "actor_id"?: string | null,"at"?: string,"id"?: string,"incident_id": string,"payload"?: NonNullable<Json>,"type": string
+                  }
+                  Update: {
+                    "actor_id"?: string | null,"at"?: string,"id"?: string,"incident_id"?: string,"payload"?: NonNullable<Json>,"type"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "incident_events_actor_id_fkey"
+      columns: ["actor_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "incident_events_incident_id_fkey"
+      columns: ["incident_id"]
+isOneToOne: false
+      referencedRelation: "incidents"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"incidents": {
+                  Row: {
+                    "acked_at": string | null,"acked_by": string | null,"client_update_due_at": string | null,"client_update_note": string | null,"client_update_required": boolean,"client_updated_at": string | null,"client_updated_by": string | null,"created_at": string,"detected_at": string,"escalation_level": number,"id": string,"is_flapping": boolean,"is_manual": boolean,"monitor_id": string | null,"number": number,"recovered_at": string | null,"resolved_at": string | null,"review_state": string | null,"root_cause": string | null,"root_cause_category": string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state": Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at": string
+                  }
+                  Insert: {
+                    "acked_at"?: string | null,"acked_by"?: string | null,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at": string,"escalation_level"?: number,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state"?: Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
+                  }
+                  Update: {
+                    "acked_at"?: string | null,"acked_by"?: string | null,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at"?: string,"escalation_level"?: number,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"severity"?: Database["public"]['Enums']["severity"],"site_id"?: string,"started_at"?: string,"state"?: Database["public"]['Enums']["incident_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "incidents_acked_by_fkey"
+      columns: ["acked_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "incidents_client_updated_by_fkey"
+      columns: ["client_updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "incidents_monitor_id_fkey"
+      columns: ["monitor_id"]
+isOneToOne: false
+      referencedRelation: "monitors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "incidents_site_id_fkey"
+      columns: ["site_id"]
+isOneToOne: false
+      referencedRelation: "sites"
       referencedColumns: ["id"]
     }
                   ]
@@ -80,6 +167,44 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"notifications": {
+                  Row: {
+                    "attempts": number,"channel": Database["public"]['Enums']["notification_channel"],"context": NonNullable<Json>,"created_at": string,"error": string | null,"hold_until": string | null,"id": string,"incident_id": string,"next_retry_at": string | null,"provider_message_id": string | null,"sent_at": string | null,"status": Database["public"]['Enums']["notification_status"],"template": string,"thread_key": string | null,"updated_at": string,"user_id": string | null
+                  }
+                  Insert: {
+                    "attempts"?: number,"channel": Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id": string,"next_retry_at"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"template": string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                  }
+                  Update: {
+                    "attempts"?: number,"channel"?: Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string,"next_retry_at"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"template"?: string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "notifications_incident_id_fkey"
+      columns: ["incident_id"]
+isOneToOne: false
+      referencedRelation: "incidents"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "notifications_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"probe_locations": {
+                  Row: {
+                    "code": string,"created_at": string,"is_active": boolean,"last_heartbeat_at": string | null,"provider": string,"region": string,"updated_at": string
+                  }
+                  Insert: {
+                    "code": string,"created_at"?: string,"is_active"?: boolean,"last_heartbeat_at"?: string | null,"provider": string,"region": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "code"?: string,"created_at"?: string,"is_active"?: boolean,"last_heartbeat_at"?: string | null,"provider"?: string,"region"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"profiles": {
                   Row: {
                     "created_at": string,"display_name": string,"email": string,"google_chat_user_id": string | null,"id": string,"is_active": boolean,"notify_email": boolean,"phone": string | null,"role": Database["public"]['Enums']["app_role"],"timezone": string,"updated_at": string
@@ -92,6 +217,25 @@ isOneToOne: false
                   }
                   Relationships: [
                     
+                  ]
+                },"site_status": {
+                  Row: {
+                    "created_at": string,"last_evaluated_at": string | null,"last_round_at": string | null,"note": string | null,"ok_rounds": number,"since": string,"site_id": string,"status": Database["public"]['Enums']["site_state"],"updated_at": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"last_evaluated_at"?: string | null,"last_round_at"?: string | null,"note"?: string | null,"ok_rounds"?: number,"since"?: string,"site_id": string,"status"?: Database["public"]['Enums']["site_state"],"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"last_evaluated_at"?: string | null,"last_round_at"?: string | null,"note"?: string | null,"ok_rounds"?: number,"since"?: string,"site_id"?: string,"status"?: Database["public"]['Enums']["site_state"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "site_status_site_id_fkey"
+      columns: ["site_id"]
+isOneToOne: true
+      referencedRelation: "sites"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"sites": {
                   Row: {
@@ -130,8 +274,42 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "current_app_role":
+            "claim_notifications":
+{ Args: { "p_channel": Database["public"]['Enums']["notification_channel"],"p_limit"?: number }; Returns: {
+              "attempts": number,
+"channel": Database["public"]['Enums']["notification_channel"],
+"context": NonNullable<Json>,
+"created_at": string,
+"error": string | null,
+"hold_until": string | null,
+"id": string,
+"incident_id": string,
+"next_retry_at": string | null,
+"provider_message_id": string | null,
+"sent_at": string | null,
+"status": Database["public"]['Enums']["notification_status"],
+"template": string,
+"thread_key": string | null,
+"updated_at": string,
+"user_id": string | null
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "notifications"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
+"current_app_role":
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
+                           },
+"engine_open_incident":
+{ Args: { "p_context": Json,"p_detected_at": string,"p_monitor_id": string,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
+                           },
+"engine_recover_incident":
+{ Args: { "p_context": Json,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_notify": boolean,"p_recovered_at": string,"p_round_at": string,"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
+                           },
+"engine_settle_incident":
+{ Args: { "p_at": string,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_round_at": string,"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
                            },
 "hook_before_user_created":
 { Args: { "event": Json }; Returns: Json
@@ -152,7 +330,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "app_role": "admin"|"responder"|"stakeholder"|"viewer"|"client","check_outcome": "pass"|"fail"|"blocked","incident_state": "unacked"|"escalated"|"acknowledged"|"monitoring"|"needs_root_cause"|"resolved"|"in_review"|"closed","incident_trigger": "hard_fail"|"blocked_unverified"|"slow"|"keyword"|"key_page"|"ssl"|"domain"|"redirect"|"regional"|"manual","monitor_type": "http"|"keyword"|"ssl"|"domain"|"browser","notification_channel": "google_chat"|"email"|"voice","notification_status": "queued"|"sent"|"failed"|"cancelled","severity": "problem"|"down","site_status": "ok"|"problem"|"down"|"maintenance"
+            "app_role": "admin"|"responder"|"stakeholder"|"viewer"|"client","check_outcome": "pass"|"fail"|"blocked","incident_state": "unacked"|"escalated"|"acknowledged"|"monitoring"|"needs_root_cause"|"resolved"|"in_review"|"closed","incident_trigger": "hard_fail"|"blocked_unverified"|"slow"|"keyword"|"key_page"|"ssl"|"domain"|"redirect"|"regional"|"manual","monitor_type": "http"|"keyword"|"ssl"|"domain"|"browser","notification_channel": "google_chat"|"email"|"voice","notification_status": "queued"|"sent"|"failed"|"cancelled","severity": "problem"|"down","site_state": "ok"|"problem"|"down"|"maintenance"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -272,7 +450,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "app_role": ["admin", "responder", "stakeholder", "viewer", "client"],"check_outcome": ["pass", "fail", "blocked"],"incident_state": ["unacked", "escalated", "acknowledged", "monitoring", "needs_root_cause", "resolved", "in_review", "closed"],"incident_trigger": ["hard_fail", "blocked_unverified", "slow", "keyword", "key_page", "ssl", "domain", "redirect", "regional", "manual"],"monitor_type": ["http", "keyword", "ssl", "domain", "browser"],"notification_channel": ["google_chat", "email", "voice"],"notification_status": ["queued", "sent", "failed", "cancelled"],"severity": ["problem", "down"],"site_status": ["ok", "problem", "down", "maintenance"]
+            "app_role": ["admin", "responder", "stakeholder", "viewer", "client"],"check_outcome": ["pass", "fail", "blocked"],"incident_state": ["unacked", "escalated", "acknowledged", "monitoring", "needs_root_cause", "resolved", "in_review", "closed"],"incident_trigger": ["hard_fail", "blocked_unverified", "slow", "keyword", "key_page", "ssl", "domain", "redirect", "regional", "manual"],"monitor_type": ["http", "keyword", "ssl", "domain", "browser"],"notification_channel": ["google_chat", "email", "voice"],"notification_status": ["queued", "sent", "failed", "cancelled"],"severity": ["problem", "down"],"site_state": ["ok", "problem", "down", "maintenance"]
           }
         }
 } as const

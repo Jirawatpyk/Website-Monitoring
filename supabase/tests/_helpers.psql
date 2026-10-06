@@ -54,3 +54,23 @@ grant execute on all functions in schema tests to anon, authenticated;
 
 insert into private.allowed_email_domains (domain) values ('pgtap.test')
   on conflict do nothing;
+
+-- Start from no sites, whatever the dev seed or a local dev run left (rolled back with the test).
+-- Monitoring rows go first: monitors and sites are delete-restricted by them.
+create or replace function tests.clear_sites()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.notifications;
+  delete from public.incident_events;
+  delete from public.incidents;
+  delete from public.site_status;
+  delete from public.check_results;
+  delete from public.monitors;
+  delete from public.sites;
+  delete from public.clients;
+end;
+$$;

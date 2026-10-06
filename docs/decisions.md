@@ -4,6 +4,9 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-015 | 6 Oct 2026 | A site's owner and backup must have a Google Chat user id before the site is saved (S05); until the Profile screen (S16) an Admin sets it with a reviewed SQL script. Alerts mention only people with an id | Gap — ChatAlert board assumes every owner can be @mentioned |
+| D-014 | 6 Oct 2026 | S02a monitoring schema: `check_results.location` keys to `probe_locations.code`; `probe_locations` / `site_status` keyed by their natural key (no `id`); the `notifications` table with `claim_notifications` (SKIP LOCKED + lease) is the delivery queue instead of pgmq; engine round bookkeeping in `site_status`; enum `site_status` renamed `site_state` | PRD §10 "pgmq queues", §11 `location_id` and "every table has id" |
+| D-013 | 6 Oct 2026 | Chat alerts grow with their slices: no escalation promise ("acknowledge by … or it escalates", "Next: L1 at …") until S10; the first card's button reads "Open incident" until ack ships (S02b); incident numbers display as `INC-` + at least 4 digits | ChatAlert board DOWN text line, "Next" row and "Open / acknowledge" button (until their slices) |
 | D-012 | 6 Oct 2026 | A Responder may update only `muted_until` / `mute_reason` on sites they own (primary or backup); every other site, monitor and client field is Admin-only | Plan S01 Done-when 3 "responder updates only own sites" (read literally) |
 | D-011 | 6 Oct 2026 | Sign-in copy under D-007: "No access yet" asks for an Admin to add you (no invite email, no 7-day link, no names); "Wrong domain" shows the address from a 60 s httpOnly cookie; no "30 days" promise | Login / MLogin boards: invite email + "link works for 7 days", "Ask Tao", "signed in for 30 days" |
 | D-010 | 6 Oct 2026 | S00 is closed; the VPS agent env file (S00 Done-when 3, VPS part) moves to S03, which installs the agent | Plan S00 Done-when 3 (VPS part) |
@@ -16,6 +19,46 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-015 — Owners need a Google Chat id before go-live
+
+**Gap.** The ChatAlert board @mentions the owner on every DOWN and RECOVERED (L0). A mention needs the person's Google Chat user id (`profiles.google_chat_user_id`); nothing makes anyone fill it in, and a DOWN without a mention wakes nobody (message-checker, S02a).
+
+**Decision (Tao, 6 Oct 2026).** Require it rather than work around it:
+- S05: Add site / Edit site accept only owners and backups whose profile has a Google Chat user id; the form says who is missing one.
+- Until the Profile screen (S16) an Admin sets ids with a reviewed SQL script, as for clients and AMs.
+- The notifier mentions only people with an id (S02a behaviour) — no fallback mention of the Admin.
+
+**Why.** A fallback mention would train the Admin to absorb every alert; a required field fixes it once.
+
+**Impact.** S05 Done-when, S16 Profile; G1 go-live checks that every owner and backup of the 17 sites has an id.
+
+## D-014 — S02a monitoring schema choices
+
+**Conflict.** PRD §11 says every table has `id uuid`, names the check location `location_id`, and PRD §10 puts notifications on pgmq queues. The 0001 enum `site_status` has the name PRD §11 gives the table.
+
+**Decision.**
+- `probe_locations` is keyed by its code (BKK / SIN / TYO) and `check_results.location` references it; `site_status` is keyed by `site_id` (one row per site). Both are lookups where a surrogate id adds a join and nothing else.
+- The `notifications` table is the queue: the engine inserts rows in the same transaction as the incident change, the notifier claims them with `claim_notifications(channel)` (`for update skip locked`, a 2-minute lease longer than a run), caps attempts at 3 and posts with a client message id so a retry can't duplicate a Chat message. pgmq stays available (extension in 0001) if volume ever needs it.
+- The engine keeps `last_round_at` / `ok_rounds` in `site_status`. When S06 adds `site_status` to the Realtime publication, move them to a private table if the per-minute updates make noise.
+- The enum becomes `site_state` (values unchanged) so the table can use the PRD name.
+- One message per incident / channel / template / person (`notifications_once_per_incident`): S04 (relapse, D-004) and S10 (repeated escalations) add a dedupe key when a template can repeat.
+
+**Why.** One transaction for "incident opened + alert queued" (an incident can't open without its alert), fewer moving parts for 17 sites, and the delivery audit the PRD asks for in the same row.
+
+**Impact.** S02a migration; S02b builds retries and email on the same table; S04 / S06 / S10 as noted.
+
+## D-013 — Chat alerts grow with their slices
+
+**Gap.** The ChatAlert board's DOWN message promises escalation ("acknowledge by 10:03 or it escalates", a "Next: L1 at 10:03 … — Ploy, Tao" row) and its button reads "Open / acknowledge" (MobileAck). S02a posts the first real alerts, but escalation arrives in S10, ack in S02b and the incident page in S07. No rule says how incident numbers like INC-0142 are made — they appear only as sample data.
+
+**Decision.**
+- A message never promises something the system can't do yet. Until S10, the DOWN text line has no "acknowledge by … or it escalates" clause and the card has no "Next" row. Until S02b, the button reads "Open incident" and links to `/incidents/<id>`; S02b renames it "Open / acknowledge". The same rule drops the Owner row's "(not notified yet)" and the footer's ack sentence ("Anyone can open it; the ack is recorded …") until their slices; the footer keeps "**Current status is in the latest reply.**". Every other part of the board (STATE · site first, mentions only in the text line, one thread per incident) applies from S02a.
+- Incident numbers come from an identity column `incidents.number` and display as `INC-` followed by at least 4 digits, zero-padded (`formatIncidentId` in `@dxt/shared`); the Chat thread key is the incident id.
+
+**Why.** An alert that promises an escalation nobody will send trains people to ignore the promise; the board stays the target and each slice adds its part.
+
+**Impact.** S02a (notifier templates, message-checker uses this entry for the omissions); S02b and S10 add the parts back.
 
 ## D-012 — Responder writes on sites: mute fields only
 

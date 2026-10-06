@@ -1,0 +1,338 @@
+import { describe, expect, it } from 'vitest';
+import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
+import { decideMonitor, type MonitorSnapshot, type OpenIncident, type StoredCheck } from './monitor';
+
+// INC-0142 timeline (spec §4, §6) with S02a's two Vercel locations. M = 09:47:00 Bangkok
+// (02:47:00Z), a probe tick: scheduled checks at M+1 / M+2 s, rechecks ~30 s later.
+const M = Date.parse('2026-09-25T02:47:00Z');
+const at = (sec: number) => new Date(M + sec * 1000);
+
+function check(location: ProbeLocation, outcome: CheckOutcome, sec: number, attempt: 1 | 2 = 1): StoredCheck {
+  return {
+    location,
+    outcome,
+    checkedAt: at(sec),
+    attempt,
+    statusCode: outcome === 'fail' ? 500 : 200,
+    error: null,
+  };
+}
+
+const snapshot = (checks: StoredCheck[], over: Partial<MonitorSnapshot> = {}): MonitorSnapshot => ({
+  checks,
+  now: at(65),
+  intervalSec: 60, // Tier 1
+  locations: ['SIN', 'TYO'],
+  lastRoundAt: null,
+  okRounds: 0,
+  open: null,
+  ...over,
+});
+
+const incident = (state: OpenIncident['state'], hasRootCause = false): OpenIncident => ({
+  id: 'inc-1',
+  state,
+  severity: 'down',
+  hasRootCause,
+});
+
+const downRound = (base = 0) => [
+  check('SIN', 'fail', base + 1),
+  check('TYO', 'fail', base + 2),
+  check('SIN', 'fail', base + 31, 2),
+  check('TYO', 'fail', base + 32, 2),
+];
+const okRound = (base = 0) => [check('SIN', 'pass', base + 1), check('TYO', 'pass', base + 2)];
+
+describe('decideMonitor — DOWN on the check and its recheck (spec §6, S02a Done-when 3)', () => {
+  it('both locations fail the scheduled check and the recheck → open, from the first failed check', () => {
+    const d = decideMonitor(snapshot(downRound()));
+    expect(d).toMatchObject({ kind: 'open', startedAt: at(1), roundAt: at(0) });
+    expect(d.kind === 'open' && d.failing.map((c) => [c.location, c.attempt])).toEqual([
+      ['SIN', 2],
+      ['TYO', 2],
+    ]);
+  });
+
+  it('only one location fails → no incident, and not an OK round either', () => {
+    const d = decideMonitor(
+      snapshot([check('SIN', 'fail', 1), check('TYO', 'pass', 2), check('SIN', 'fail', 31, 2)]),
+    );
+    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0 });
+  });
+
+  it('a location that didn’t recheck doesn’t vote twice with its scheduled result', () => {
+    // Past the round deadline; TYO's scheduled failure (M+2) is later than SIN's (M+1) but isn't a recheck.
+    const d = decideMonitor(
+      snapshot([check('SIN', 'fail', 1), check('TYO', 'fail', 2), check('SIN', 'fail', 31, 2)], {
+        now: at(140),
+      }),
+    );
+    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0 });
+  });
+
+  it('the recheck passes → no incident', () => {
+    const d = decideMonitor(
+      snapshot([
+        check('SIN', 'fail', 1),
+        check('TYO', 'fail', 2),
+        check('SIN', 'pass', 31, 2),
+        check('TYO', 'pass', 32, 2),
+      ]),
+    );
+    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0 });
+  });
+
+  it('judges the complete round, not the newer one whose rechecks haven’t landed (engine-reviewer H1)', () => {
+    const d = decideMonitor(snapshot([...downRound(), check('SIN', 'fail', 61), check('TYO', 'fail', 62)]));
+    expect(d).toMatchObject({ kind: 'open', roundAt: at(0), startedAt: at(1) });
+  });
+
+  it('waits for the newer round once the complete one is judged', () => {
+    const checks = [...downRound(), check('SIN', 'fail', 61), check('TYO', 'fail', 62)];
+    expect(decideMonitor(snapshot(checks, { lastRoundAt: at(0) }))).toEqual({ kind: 'wait' });
+  });
+
+  it('real staging cron offsets: SIN checks at :46 and rechecks in the next minute', () => {
+    const checks = [
+      check('TYO', 'fail', 2),
+      check('TYO', 'fail', 32, 2),
+      check('SIN', 'fail', 46),
+      check('SIN', 'fail', 76, 2),
+    ];
+    // Before SIN's recheck lands the round isn't complete — even past 75 s from its start.
+    expect(decideMonitor(snapshot(checks.slice(0, 3), { now: at(75) }))).toEqual({ kind: 'wait' });
+    expect(decideMonitor(snapshot(checks, { now: at(99) }))).toMatchObject({
+      kind: 'open',
+      startedAt: at(2),
+    });
+  });
+
+  it('waits for a late recheck until the round deadline', () => {
+    const checks = [check('SIN', 'fail', 1), check('TYO', 'fail', 2), check('SIN', 'fail', 31, 2)];
+    expect(decideMonitor(snapshot(checks, { now: at(61) }))).toEqual({ kind: 'wait' });
+    expect(decideMonitor(snapshot([...checks, check('TYO', 'fail', 62, 2)], { now: at(63) }))).toMatchObject({
+      kind: 'open',
+    });
+  });
+
+  it('waits while a location hasn’t reported, then judges with what arrived', () => {
+    expect(decideMonitor(snapshot([check('SIN', 'pass', 1)], { now: at(30) }))).toEqual({ kind: 'wait' });
+    // Fewer than 2 locations: keep the status (PRD §5).
+    expect(decideMonitor(snapshot([check('SIN', 'pass', 1)], { now: at(140), okRounds: 1 }))).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 1,
+    });
+  });
+
+  it('a timeout check and a timeout recheck confirm DOWN from the first check’s start', () => {
+    const timeout = (location: ProbeLocation, sec: number, attempt: 1 | 2 = 1) => ({
+      ...check(location, 'fail', sec, attempt),
+      statusCode: null,
+      error: 'Timeout',
+    });
+    const d = decideMonitor(
+      snapshot([timeout('SIN', 0), timeout('TYO', 1), timeout('SIN', 30, 2), timeout('TYO', 31, 2)]),
+    );
+    expect(d).toMatchObject({ kind: 'open', startedAt: at(0) });
+  });
+
+  it('judges Tier 2 rounds on their 3-minute ticks', () => {
+    const d = decideMonitor(snapshot(downRound(), { intervalSec: 180 }));
+    expect(d).toMatchObject({ kind: 'open', roundAt: at(-120) }); // 02:45:00Z, a 3-minute tick;
+    expect(
+      decideMonitor(
+        snapshot(downRound(), { intervalSec: 180, lastRoundAt: (d as { roundAt: Date }).roundAt }),
+      ),
+    ).toEqual({
+      kind: 'wait',
+    });
+  });
+
+  it('flags a relapse while an incident is open but opens nothing new (D-004, S04)', () => {
+    expect(decideMonitor(snapshot(downRound(), { open: incident('needs_root_cause') }))).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 0,
+      relapse: true,
+    });
+  });
+
+  it('does nothing without results', () => {
+    expect(decideMonitor(snapshot([]))).toEqual({ kind: 'wait' });
+  });
+});
+
+describe('decideMonitor — recovery (spec §16.4)', () => {
+  it.each(['unacked', 'escalated', 'acknowledged'] as const)(
+    'first OK round from %s → RECOVERED at the first OK check, Monitoring',
+    (state) => {
+      expect(decideMonitor(snapshot(okRound(), { open: incident(state) }))).toEqual({
+        kind: 'recover',
+        roundAt: at(0),
+        recoveredAt: at(1),
+        from: state,
+        to: 'monitoring',
+        okLocations: 2,
+      });
+    },
+  );
+
+  it('one pass and one fail is not an OK round: no RECOVERED (engine-reviewer H2)', () => {
+    const d = decideMonitor(
+      snapshot([check('SIN', 'pass', 1), check('TYO', 'fail', 2), check('TYO', 'fail', 32, 2)], {
+        open: incident('unacked'),
+      }),
+    );
+    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0 });
+  });
+
+  it('never mixes an old failure with a new pass', () => {
+    // TYO failed in the previous round; only SIN has reported in the new one so far.
+    const checks = [check('TYO', 'fail', -58), check('TYO', 'fail', -28, 2), check('SIN', 'pass', 1)];
+    expect(
+      decideMonitor(snapshot(checks, { now: at(2), open: incident('unacked'), lastRoundAt: at(-60) })),
+    ).toEqual({
+      kind: 'wait',
+    });
+  });
+
+  it('second OK round in a row → Needs root cause', () => {
+    expect(decideMonitor(snapshot(okRound(), { open: incident('monitoring'), okRounds: 1 }))).toEqual({
+      kind: 'settle',
+      roundAt: at(0),
+      from: 'monitoring',
+      to: 'needs_root_cause',
+    });
+  });
+
+  it('second OK round with a root cause already written → stays in Monitoring', () => {
+    expect(
+      decideMonitor(snapshot(okRound(), { open: incident('monitoring', true), okRounds: 1 })),
+    ).toMatchObject({
+      kind: 'settle',
+      to: 'monitoring',
+    });
+  });
+
+  it('later OK rounds change nothing', () => {
+    expect(decideMonitor(snapshot(okRound(), { open: incident('needs_root_cause'), okRounds: 2 }))).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 2,
+    });
+  });
+
+  it('a blocked round resets the OK count', () => {
+    const d = decideMonitor(
+      snapshot([check('SIN', 'blocked', 1), check('TYO', 'blocked', 2)], { okRounds: 1 }),
+    );
+    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0 });
+  });
+});
+
+describe('decideMonitor — engine-reviewer round 2 (spec §6, PRD §5)', () => {
+  it('staging 6 Oct: the incident starts at SIN 19:07:46 in the split round before (M3)', () => {
+    // 12:07 Bangkok-minute M: TYO passed at :02 (before the switch), SIN failed at :46 and its recheck.
+    const checks = [
+      check('TYO', 'pass', 2),
+      check('SIN', 'fail', 46),
+      check('SIN', 'fail', 76, 2),
+      check('TYO', 'fail', 62),
+      check('TYO', 'fail', 92, 2),
+      check('SIN', 'fail', 106),
+      check('SIN', 'fail', 136, 2),
+    ];
+    // Round M is split (judged first, nothing opens); round M+60 confirms DOWN from SIN's first failure.
+    expect(decideMonitor(snapshot(checks, { now: at(159) }))).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 0,
+    });
+    expect(decideMonitor(snapshot(checks, { now: at(159), lastRoundAt: at(0) }))).toMatchObject({
+      kind: 'open',
+      roundAt: at(60),
+      startedAt: at(46),
+    });
+  });
+
+  it('a confirmed DOWN round is judged even when a later round is already OK (M1a)', () => {
+    const checks = [...downRound(), ...okRound(60)];
+    expect(decideMonitor(snapshot(checks, { now: at(160) }))).toMatchObject({ kind: 'open', roundAt: at(0) });
+  });
+
+  it('two unjudged DOWN rounds open from the first one (M1b)', () => {
+    const checks = [...downRound(), ...downRound(60)];
+    expect(decideMonitor(snapshot(checks, { now: at(160) }))).toMatchObject({
+      kind: 'open',
+      roundAt: at(0),
+      startedAt: at(1),
+    });
+  });
+
+  it('skips rounds older than the lookback', () => {
+    expect(decideMonitor(snapshot(downRound(), { now: at(400) }))).toEqual({ kind: 'wait' });
+  });
+
+  it('Tier 2: a check late in its 3-minute round rechecks across the boundary', () => {
+    const checks = [
+      check('TYO', 'fail', -118),
+      check('TYO', 'fail', -88, 2),
+      check('SIN', 'fail', 50),
+      check('SIN', 'fail', 80, 2),
+    ];
+    expect(decideMonitor(snapshot(checks, { intervalSec: 180, now: at(81) }))).toMatchObject({
+      kind: 'open',
+      roundAt: at(-120),
+      startedAt: at(-118),
+    });
+  });
+
+  it('Tier 3: an incomplete round waits until 75 s after its 5-minute end', () => {
+    const checks = [check('SIN', 'pass', -100)]; // round 02:45:00–02:50:00, TYO never reported
+    expect(decideMonitor(snapshot(checks, { intervalSec: 300, now: at(254) }))).toEqual({ kind: 'wait' });
+    expect(decideMonitor(snapshot(checks, { intervalSec: 300, now: at(256) }))).toMatchObject({
+      kind: 'none',
+    });
+  });
+
+  it('three locations: 2 pass + 1 regional failure recovers; 1 pass + 1 fail + 1 missing does not (M2)', () => {
+    const three = ['BKK', 'SIN', 'TYO'] as const;
+    const regional = [check('BKK', 'fail', 1), check('BKK', 'fail', 31, 2), ...okRound()];
+    expect(decideMonitor(snapshot(regional, { locations: three, open: incident('unacked') }))).toMatchObject({
+      kind: 'recover',
+      okLocations: 2,
+    });
+    const split = [check('SIN', 'pass', 1), check('TYO', 'fail', 2), check('TYO', 'fail', 32, 2)];
+    expect(
+      decideMonitor(snapshot(split, { locations: three, open: incident('unacked'), now: at(140) })),
+    ).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 0,
+    });
+  });
+
+  it('with no active locations known, rounds wait for the deadline (L3)', () => {
+    expect(
+      decideMonitor(snapshot([check('SIN', 'fail', 1), check('TYO', 'fail', 2)], { locations: [] })),
+    ).toEqual({
+      kind: 'wait',
+    });
+  });
+
+  it('a failure the recheck clears is not a relapse (L1)', () => {
+    const checks = [
+      check('SIN', 'fail', 1),
+      check('TYO', 'fail', 2),
+      check('SIN', 'pass', 31, 2),
+      check('TYO', 'pass', 32, 2),
+    ];
+    expect(decideMonitor(snapshot(checks, { open: incident('needs_root_cause') }))).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 0,
+    });
+  });
+});

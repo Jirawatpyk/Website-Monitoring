@@ -15,6 +15,7 @@ interface BangkokParts {
   weekday: number; // 0 = Sunday
   hour: number;
   minute: number;
+  second: number;
 }
 
 const partsFormatter = new Intl.DateTimeFormat('en-US', {
@@ -24,6 +25,7 @@ const partsFormatter = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
   hour: 'numeric',
   minute: 'numeric',
+  second: 'numeric',
   hourCycle: 'h23',
 });
 
@@ -40,6 +42,7 @@ function bangkokParts(date: Date): BangkokParts {
     weekday: new Date(Date.UTC(year, month, day)).getUTCDay(),
     hour: get('hour'),
     minute: get('minute'),
+    second: get('second'),
   };
 }
 
@@ -49,6 +52,19 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 export function formatTime(date: Date): string {
   const p = bangkokParts(date);
   return `${pad2(p.hour)}:${pad2(p.minute)}`;
+}
+
+/** "09:48:41" — with seconds, for confirmation times in alerts (ChatAlert board). */
+export function formatTimeWithSeconds(date: Date): string {
+  const p = bangkokParts(date);
+  return `${pad2(p.hour)}:${pad2(p.minute)}:${pad2(p.second)}`;
+}
+
+/** True when both instants fall on the same calendar day in Bangkok. */
+export function isSameBangkokDay(a: Date, b: Date): boolean {
+  const pa = bangkokParts(a);
+  const pb = bangkokParts(b);
+  return pa.year === pb.year && pa.month === pb.month && pa.day === pb.day;
 }
 
 /** "25 Sep", or "Fri 25 Sep" with `weekday`. Never zero-padded, never "Sept". */
@@ -77,4 +93,9 @@ export function formatPercent(ratio: number): string {
 /** "Tier 1" in prose and pills; "T1" only inside dense table cells. */
 export function formatTier(tier: number, options: { short?: boolean } = {}): string {
   return options.short ? `T${tier}` : `Tier ${tier}`;
+}
+
+/** Incident number → "INC-0007" (D-013): at least 4 digits, zero-padded, never truncated. */
+export function formatIncidentId(number: number): string {
+  return `INC-${String(number).padStart(4, '0')}`;
 }
