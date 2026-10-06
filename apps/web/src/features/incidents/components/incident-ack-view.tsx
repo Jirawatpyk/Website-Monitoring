@@ -17,7 +17,7 @@ interface IncidentAckViewProps {
  */
 export function IncidentAckView({ view, viewerName, viewerEmail }: IncidentAckViewProps) {
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-xl flex-col gap-2.5">
+    <div className="mx-auto flex min-h-dvh w-full max-w-xl flex-col gap-2.5 lg:min-h-full">
       <div className="flex items-center gap-2">
         <SeverityBadge severity={view.severity} recovered={view.recovered} />
         <WorkflowBadge state={view.state} level={view.escalationLevel} />
