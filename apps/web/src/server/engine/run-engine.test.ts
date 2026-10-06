@@ -106,16 +106,17 @@ describe('runEngine', () => {
   });
 
   it('records a quiet round in site_status', async () => {
-    const { db, calls } = fakeDb({
+    const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
       'check_results.select': { data: ok },
     });
     await runEngine(db, now);
-    expect(calls.find((c) => c.table === 'site_status' && c.op === 'upsert')?.values).toEqual({
-      site_id: 's1',
-      last_round_at: at(0),
-      last_evaluated_at: now.toISOString(),
-      ok_rounds: 1,
+    // Through the guarded function: a run with an older snapshot never moves the round back.
+    expect(rpcCalls.find((c) => c.name === 'engine_record_round')?.args).toEqual({
+      p_site_id: 's1',
+      p_round_at: at(0),
+      p_evaluated_at: now.toISOString(),
+      p_ok_rounds: 1,
     });
   });
 
@@ -153,7 +154,7 @@ describe('runEngine', () => {
   });
 
   it('judges a missed round and the next in one run', async () => {
-    const { db, calls } = fakeDb({
+    const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
       'check_results.select': {
         data: [
@@ -167,9 +168,9 @@ describe('runEngine', () => {
     });
     await runEngine(db, new Date(Date.parse(at(0)) + 140_000));
     expect(
-      calls
-        .filter((c) => c.table === 'site_status' && c.op === 'upsert')
-        .map((c) => (c.values as { ok_rounds: number }).ok_rounds),
+      rpcCalls
+        .filter((c) => c.name === 'engine_record_round')
+        .map((c) => (c.args as { p_ok_rounds: number }).p_ok_rounds),
     ).toEqual([1, 2]);
   });
 
@@ -197,7 +198,8 @@ describe('runEngine', () => {
       'probe_locations.select': { data: [{ code: 'SIN' }, { code: 'TYO' }] },
     });
     expect(await runEngine(db, now)).toMatchObject({ relapses: 1, opened: 0 });
-    expect(rpcCalls).toEqual([]);
+    // Only the round is recorded: nothing opens and nothing alerts (D-004 is S04).
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('relapse_not_alerted'));
     warn.mockRestore();
   });
@@ -216,7 +218,7 @@ describe('runEngine', () => {
   it.each([
     ['monitors.select', 'monitors: boom'],
     ['check_results.select', 'boom'],
-    ['site_status.upsert', 'site_status: boom'],
+    ['rpc.engine_record_round', 'engine_record_round: boom'],
     ['probe_locations.select', 'boom'],
   ])('throws when %s fails', async (key, message) => {
     const { db } = fakeDb({

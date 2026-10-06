@@ -299,6 +299,19 @@ describe('decideMonitor — engine-reviewer round 2 (spec §6, PRD §5)', () => 
     });
   });
 
+  it('three locations all fail: confirmed by the second agreeing recheck, not a later third (spec §6)', () => {
+    const checks = [
+      check('BKK', 'fail', 1),
+      check('SIN', 'fail', 2),
+      check('TYO', 'fail', 3),
+      check('SIN', 'fail', 31, 2),
+      check('TYO', 'fail', 33, 2),
+      check('BKK', 'fail', 50, 2),
+    ];
+    const d = decideMonitor(snapshot(checks, { locations: ['BKK', 'SIN', 'TYO'] }));
+    expect(d).toMatchObject({ kind: 'open', startedAt: at(1), confirmedAt: at(33) });
+  });
+
   it('three locations: 2 pass + 1 regional failure recovers; 1 pass + 1 fail + 1 missing does not (M2)', () => {
     const three = ['BKK', 'SIN', 'TYO'] as const;
     const regional = [check('BKK', 'fail', 1), check('BKK', 'fail', 31, 2), ...okRound()];

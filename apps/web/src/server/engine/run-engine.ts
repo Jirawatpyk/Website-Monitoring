@@ -168,16 +168,14 @@ async function apply(
       return null;
 
     case 'none': {
-      const { error } = await db.from('site_status').upsert(
-        {
-          site_id: m.siteId,
-          last_round_at: d.roundAt.toISOString(),
-          last_evaluated_at: at,
-          ok_rounds: d.okRounds,
-        },
-        { onConflict: 'site_id' },
-      );
-      if (error) throw new Error(`site_status: ${error.message}`);
+      // Never moves the round back when another engine run (probe trigger, cron) got further.
+      const { error } = await db.rpc('engine_record_round', {
+        p_site_id: m.siteId,
+        p_round_at: d.roundAt.toISOString(),
+        p_evaluated_at: at,
+        p_ok_rounds: d.okRounds,
+      });
+      if (error) throw new Error(`engine_record_round: ${error.message}`);
       return null;
     }
 

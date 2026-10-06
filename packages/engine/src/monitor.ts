@@ -129,7 +129,7 @@ export function decideMonitor(s: MonitorSnapshot): MonitorDecision {
       kind: 'open',
       roundAt,
       startedAt: firstFailedCheck(s.checks, failing),
-      confirmedAt: latest(failing),
+      confirmedAt: confirmedAt(failing),
       failing,
     };
   }
@@ -239,8 +239,13 @@ function firstFailedCheck(checks: readonly StoredCheck[], confirming: readonly S
   return new Date(start);
 }
 
-function latest(checks: readonly StoredCheck[]): Date {
-  return new Date(Math.max(...checks.map((c) => c.checkedAt.getTime())));
+/**
+ * DOWN is confirmed by the second failing recheck (spec §6: at least 2 locations agree); with three
+ * locations a later third one doesn't move the confirm. With one location left, its recheck.
+ */
+function confirmedAt(rechecks: readonly StoredCheck[]): Date {
+  const times = rechecks.map((c) => c.checkedAt.getTime()).sort((a, b) => a - b);
+  return new Date(times[Math.min(1, times.length - 1)]!);
 }
 
 function earliest(checks: readonly StoredCheck[]): Date {

@@ -18,6 +18,11 @@ const appUrl = 'https://monitor.dxt.example';
 const email = { apiKey: 're_test', from: 'DxT Monitor <alerts@notify.dxt.example>' };
 const NOW = new Date('2026-10-06T03:00:00Z');
 const now = () => NOW;
+/** NOW for the first reading (before the claim), 5 s later after that. */
+const later = () => {
+  let reads = 0;
+  return () => new Date(NOW.getTime() + (reads++ === 0 ? 0 : 5_000));
+};
 const created = '2026-10-06T02:48:45Z';
 
 const notification = (template: string, over: Record<string, unknown> = {}) => ({
@@ -212,7 +217,13 @@ describe('dispatchNotifications', () => {
     ).toMatchObject({ chat: { superseded: 1, sent: 0 } });
     expect(post).not.toHaveBeenCalled();
     expect(updates(calls)).toEqual([
-      { status: 'cancelled', error: 'Superseded: the incident moved on first', next_retry_at: null },
+      // The claim's attempt never happened: it is given back.
+      {
+        status: 'cancelled',
+        error: 'Superseded: the incident moved on first',
+        next_retry_at: null,
+        attempts: 0,
+      },
     ]);
   });
 
@@ -271,9 +282,10 @@ describe('dispatchNotifications', () => {
     const rows = [notification('down', { attempts: 2 }), notification('recovered', { id: 'n-rec' })];
     const { db, calls } = fakeDb(queue(rows));
     const post = okPost();
+    // Time passes between the claim and the first send (another channel, a slow claim).
     const result = await dispatchNotifications(
-      { db, webhookUrl, email: undefined, appUrl, now, post },
-      { deadline: NOW.getTime() + ROW_BUDGET_MS - 1 },
+      { db, webhookUrl, email: undefined, appUrl, now: later(), post },
+      { deadline: NOW.getTime() + ROW_BUDGET_MS + 1_000 },
     );
     expect(result).toMatchObject({ chat: { sent: 0, released: 2 } });
     expect(post).not.toHaveBeenCalled();
@@ -381,10 +393,46 @@ describe('dispatchNotifications', () => {
       ...queue([notification('down')], [], over),
       'notifications.update': { error: { message: 'boom' } },
     });
-    const deadline = kind === 'released' ? NOW.getTime() : undefined;
+    const deadline = kind === 'released' ? NOW.getTime() + ROW_BUDGET_MS + 1_000 : undefined;
     await expect(
-      dispatchNotifications({ db, webhookUrl, email: undefined, appUrl, now, post }, { deadline }),
+      dispatchNotifications({ db, webhookUrl, email: undefined, appUrl, now: later(), post }, { deadline }),
     ).rejects.toThrow('notifications: boom');
+  });
+
+  it('claims nothing when there is no time left to send anything', async () => {
+    const { db, rpcCalls } = fakeDb(queue([notification('down')]));
+    expect(
+      await dispatchNotifications({ db, webhookUrl, email, appUrl, now }, { deadline: NOW.getTime() }),
+    ).toEqual({ ok: true, chat: 'no_time', email: 'no_time' });
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it('waits for both channels before failing, so nothing keeps running detached', async () => {
+    const send = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+      return { ok: true as const, id: 'em_1' };
+    });
+    const { db } = fakeDb({
+      ...queue([notification('down')], [mail('down')]),
+      'notification_attempts.insert': (c) =>
+        (c.values as { notification_id: string }).notification_id === 'n-down'
+          ? { error: { message: 'boom' } }
+          : { data: [] },
+    });
+    await expect(
+      dispatchNotifications({ db, webhookUrl, email, appUrl, now, post: okPost(), send }),
+    ).rejects.toThrow('notification_attempts: boom');
+    expect(send).toHaveBeenCalled();
+  });
+
+  it('keeps a DOWN that may still be undone (inside the 10 s window), even if acknowledged', async () => {
+    const { db } = fakeDb(
+      queue([notification('down')], [], { state: 'acknowledged', acked_at: '2026-10-06T02:59:55Z' }),
+    );
+    const post = okPost();
+    expect(
+      await dispatchNotifications({ db, webhookUrl, email: undefined, appUrl, now, post }),
+    ).toMatchObject({ chat: { sent: 1, superseded: 0 } });
   });
 
   it('throws when the fallback can’t be queued', async () => {
@@ -417,7 +465,10 @@ describe('runNotifierSweep', () => {
       t += ms;
     });
     t += 0; // pass 1 starts at the run's start
-    const result = await runNotifierSweep({ db, webhookUrl, email, appUrl }, { sleep, clock });
+    const result = await runNotifierSweep(
+      { db, webhookUrl, email, appUrl, now: () => new Date(t) },
+      { sleep, clock },
+    );
     expect(sleep).toHaveBeenCalledWith(30_000);
     expect(rpcCalls.filter((c) => c.name === 'claim_notifications')).toHaveLength(4);
     expect(result).toMatchObject({ ok: true, passes: [{ ok: true }, { ok: true }] });

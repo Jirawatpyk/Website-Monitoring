@@ -169,11 +169,13 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   5. A Storage lifecycle job removes screenshots older than 30 days (test or SQL check).
   6. The VPS has every variable name from `apps/vps-agent/.env.example` set in `/etc/dxt-agent/env` (moved from S00 Done-when 3, D-010; names listed, values never shared).
 - **Review:** security-reviewer (Job API, Storage, VPS unit), db-reviewer (pgmq queues, leases), engine-reviewer.
+- **Carried from S02b review:** a round can be completed by Bangkok's result arriving through Ingest; Ingest must run the engine (`engineAndDeliver`) like a failing probe recheck does, or DOWN waits up to a minute for the engine cron (PRD §9: 30 s).
 
 ### S04 · PROBLEM triggers, flapping & status rules
 
 - **Scope:** FR-03 complete. PROBLEM triggers: slow (p50 over the tier threshold 3 rounds), keyword must / must-not, key page 4xx / 5xx, regional (one location ≥ 5 min), redirect outside the allowlist. Only the primary monitor can make a site DOWN; `< 2` locations → Admin alert. Relapse + flapping (D-004). Wire the rules that already exist in `@dxt/engine` into the engine cron — `faultyLocations`, `isRegionalProblem`, `autoResolves`, the D-003 lifecycle — with integration tests. ChatAlert PROBLEM rows (the 60-min PROBLEM reminder belongs to S08). Test target gains keyword-missing and slow modes.
 - **Boards:** StatusModel · **Test plan:** T01 (the expiring-cert path finishes in S13)
+- **Carried from S02b review:** engine runs overlap (probe trigger + cron); relapse handling must be one state-guarded SQL function, or a relapse alerts once per run.
 - **Depends on:** S03
 - **Done when:**
   1. **T01:** each test-target mode gives the StatusModel outcome on staging — 200 → OK, 500 / timeout → DOWN, 403-challenge + loads → OK with note, keyword missing → PROBLEM (Keyword), slow 3 rounds → PROBLEM (Slow).

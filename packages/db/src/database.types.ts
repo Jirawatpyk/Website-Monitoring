@@ -327,6 +327,9 @@ isOneToOne: false
 "engine_open_incident":
 { Args: { "p_context": Json,"p_detected_at": string,"p_monitor_id": string,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
                            },
+"engine_record_round":
+{ Args: { "p_evaluated_at": string,"p_ok_rounds": number,"p_round_at": string,"p_site_id": string }; Returns: undefined
+                           },
 "engine_recover_incident":
 { Args: { "p_context": Json,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_notify": boolean,"p_recovered_at": string,"p_round_at": string,"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
                            },

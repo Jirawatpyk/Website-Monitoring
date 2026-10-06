@@ -2,7 +2,7 @@
 -- re-ack after Undo, the fallback email audience, and the attempts log's RLS.
 begin;
 \ir _helpers.psql
-select plan(40);
+select plan(45);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -269,13 +269,55 @@ select ok(
   'the old two-argument claim is gone'
 );
 
+-- ── A DOWN in backoff doesn't hold the ack back; Undo puts it back (engine review r2) ──
+insert into public.sites (id, client_id, name, tier, primary_owner_id) values
+  ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000c1', 'Site F', 1,
+   (select id from ids where name = 'arm'));
+insert into inc values ('f', public.engine_open_incident('00000000-0000-0000-0000-0000000000a6', null,
+  'hard_fail', 'down', now() - interval '90 seconds', now(), now(), '{}', true));
+-- The Chat DOWN failed once and waits for its +2 min retry.
+update public.notifications set attempts = 1, next_retry_at = now() + interval '2 minutes'
+  where incident_id = (select id from inc where name = 'f') and channel = 'google_chat';
+insert into public.notification_attempts (notification_id, attempt, ok, error)
+select id, 1, false, 'HTTP 500' from public.notifications
+where incident_id = (select id from inc where name = 'f') and channel = 'google_chat';
+
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok(format('select public.ack_incident(%L)', (select id from inc where name = 'f')),
+  'the owner acks while the Chat DOWN waits for a retry');
+reset role;
+select results_eq(
+  format($$select template, status::text from public.notifications
+           where incident_id = %L and channel = 'google_chat' order by template$$, (select id from inc where name = 'f')),
+  $$values ('acknowledged', 'queued'), ('down', 'cancelled')$$,
+  'the retrying DOWN is set aside, so ACKNOWLEDGED isn''t stuck behind its backoff'
+);
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok(format('select public.undo_ack(%L)', (select id from inc where name = 'f')), 'Undo');
+reset role;
+select is(
+  (select status::text from public.notifications
+   where incident_id = (select id from inc where name = 'f') and channel = 'google_chat' and template = 'down'),
+  'queued',
+  'Undo puts the DOWN back, as if the ack never happened'
+);
+
+-- A judged round never moves back (overlapping engine runs).
+select public.engine_record_round('00000000-0000-0000-0000-0000000000a6', now() + interval '1 minute', now(), 1::smallint);
+select public.engine_record_round('00000000-0000-0000-0000-0000000000a6', now(), now(), 0::smallint);
+select is(
+  (select ok_rounds from public.site_status where site_id = '00000000-0000-0000-0000-0000000000a6'),
+  1::smallint,
+  'a run with an older snapshot doesn''t move site_status back to an older round'
+);
+
 -- ── Delivery log RLS ─────────────────────────────────────────────────────
 insert into public.notification_attempts (notification_id, attempt, ok, error)
 select id, 1, false, 'HTTP 500' from public.notifications
 where incident_id = (select id from inc where name = 'a') and channel = 'google_chat' and template = 'down';
 
 select tests.authenticate_as((select id from ids where name = 'admin'));
-select is((select count(*)::int from public.notification_attempts), 1, 'an Admin reads the attempts log');
+select is((select count(*)::int from public.notification_attempts), 2, 'an Admin reads the attempts log');
 select throws_ok(
   $$select public.queue_fallback_emails(gen_random_uuid())$$,
   '42501', null, 'only the service role queues fallback emails'

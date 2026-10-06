@@ -75,7 +75,8 @@ begin
   on conflict (site_id) do update
     set status = excluded.status, since = excluded.since,
         last_evaluated_at = excluded.last_evaluated_at, last_round_at = excluded.last_round_at,
-        ok_rounds = 0;
+        ok_rounds = 0
+    where s.last_round_at is null or s.last_round_at <= excluded.last_round_at;
 
   if p_notify then
     insert into public.notifications (incident_id, channel, template, thread_key, context)
@@ -92,7 +93,9 @@ begin
 end;
 $$;
 
--- Same as S02a, plus the RECOVERED email to everyone already emailed about the incident.
+-- Same as S02a, plus the RECOVERED email to everyone already emailed about the incident; a Chat
+-- DOWN that hasn't left yet (retrying, not in flight) is dropped so RECOVERED isn't stuck behind it.
+-- site_status never moves back to an older round (engine runs overlap since S02b).
 create or replace function public.engine_recover_incident(
   p_incident_id uuid,
   p_from public.incident_state,
@@ -128,7 +131,14 @@ begin
 
   update public.site_status
     set ok_rounds = 1, last_evaluated_at = p_recovered_at, last_round_at = p_round_at
-    where site_id = v_site_id;
+    where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
+
+  update public.notifications n
+    set status = 'cancelled', error = 'Superseded: recovered first', next_retry_at = null
+    where n.incident_id = p_incident_id and n.channel = 'google_chat'
+      and n.template in ('down', 'problem') and n.status = 'queued' and n.attempts > 0
+      -- waiting for a retry, not in flight: every attempt it was claimed for is logged
+      and n.attempts = (select count(*) from public.notification_attempts a where a.notification_id = n.id);
 
   if p_notify then
     insert into public.notifications (incident_id, channel, template, thread_key, context)
@@ -239,6 +249,78 @@ grant execute on function
   public.queue_fallback_emails(uuid)
   to service_role;
 
+-- ── Rounds and superseded alerts ─────────────────────────────────────────
+-- Records a judged round with no incident change. Engine runs overlap (the probe that completes a
+-- round runs one, the cron another): a run holding an older snapshot never moves the round back.
+create function public.engine_record_round(
+  p_site_id uuid,
+  p_round_at timestamptz,
+  p_evaluated_at timestamptz,
+  p_ok_rounds smallint
+)
+returns void
+language sql
+set search_path = ''
+as $$
+  insert into public.site_status as s (site_id, last_round_at, last_evaluated_at, ok_rounds)
+  values (p_site_id, p_round_at, p_evaluated_at, p_ok_rounds)
+  on conflict (site_id) do update
+    set last_round_at = excluded.last_round_at, last_evaluated_at = excluded.last_evaluated_at,
+        ok_rounds = excluded.ok_rounds
+    where s.last_round_at is null or s.last_round_at < excluded.last_round_at;
+$$;
+
+-- Same as S02a, with the same never-backwards guard on site_status.
+create or replace function public.engine_settle_incident(
+  p_incident_id uuid,
+  p_from public.incident_state,
+  p_to public.incident_state,
+  p_at timestamptz,
+  p_round_at timestamptz
+)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_site_id uuid;
+begin
+  update public.incidents
+    set state = p_to
+    where id = p_incident_id and state = p_from
+    returning site_id into v_site_id;
+
+  if v_site_id is null then
+    return false;
+  end if;
+
+  if p_to is distinct from p_from then
+    insert into public.incident_events (incident_id, type, payload, at)
+    values (p_incident_id, 'ok_two_rounds', jsonb_build_object('state', p_to), p_at);
+
+    insert into public.audit_log (action, entity, entity_id, before, after)
+    values ('incident.state', 'incident', p_incident_id,
+            jsonb_build_object('state', p_from), jsonb_build_object('state', p_to));
+  end if;
+
+  update public.site_status
+    set status = 'ok', since = p_at, ok_rounds = 2, last_evaluated_at = p_at,
+        last_round_at = p_round_at
+    where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
+
+  return true;
+end;
+$$;
+
+revoke execute on function
+  public.engine_record_round(uuid, timestamptz, timestamptz, smallint),
+  public.engine_settle_incident(uuid, public.incident_state, public.incident_state, timestamptz, timestamptz)
+  from public, anon, authenticated;
+grant execute on function
+  public.engine_record_round(uuid, timestamptz, timestamptz, smallint),
+  public.engine_settle_incident(uuid, public.incident_state, public.incident_state, timestamptz, timestamptz)
+  to service_role;
+
 -- ── Acknowledge + Undo (signed-in people) ─────────────────────────────────
 -- Who may acknowledge (PRD §3, D-012, D-016): an Admin on any site; a Responder on sites they own
 -- (primary or backup). On-call Tier 1 access comes with on-call shifts (S10). The incident page mirrors
@@ -303,6 +385,15 @@ begin
       and template in ('down', 'problem') and status <> 'cancelled'
   )
   on conflict do nothing;
+
+  -- A DOWN waiting for a retry would hold ACKNOWLEDGED back for minutes (one thread, in order): it
+  -- is set aside, and Undo puts it back. The owner's DOWN email stays: it is the record.
+  update public.notifications n
+    set status = 'cancelled', error = 'Superseded: acknowledged first', next_retry_at = null
+    where n.incident_id = p_incident_id and n.channel = 'google_chat'
+      and n.template in ('down', 'problem') and n.status = 'queued' and n.attempts > 0
+      -- waiting for a retry, not in flight: every attempt it was claimed for is logged
+      and n.attempts = (select count(*) from public.notification_attempts a where a.notification_id = n.id);
 
   insert into public.notifications
     (incident_id, user_id, channel, template, thread_key, context, hold_until)
@@ -376,6 +467,12 @@ begin
   update public.notifications
     set status = 'cancelled', next_retry_at = null
     where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued';
+
+  -- As if the ack never happened: an alert it set aside is due again.
+  update public.notifications
+    set status = 'queued', error = null, next_retry_at = null
+    where incident_id = p_incident_id and status = 'cancelled'
+      and error = 'Superseded: acknowledged first';
 
   update public.incidents
     set state = coalesce(v_from, 'unacked'), acked_at = null, acked_by = null

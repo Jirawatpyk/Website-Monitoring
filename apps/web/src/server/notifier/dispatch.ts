@@ -1,6 +1,7 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { postChatMessage, sendEmail } from '@dxt/notifier';
+import { UNDO_WINDOW_SEC } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { loadFacts, type Facts, type Notification } from './facts';
 import { domainOf, renderChat, renderEmail } from './render';
@@ -94,6 +95,12 @@ export async function dispatchNotifications(
   deps: DispatchDeps,
   options: DispatchOptions = {},
 ): Promise<CronJobResult> {
+  if (
+    options.deadline !== undefined &&
+    (deps.now ?? (() => new Date()))().getTime() + ROW_BUDGET_MS > options.deadline
+  ) {
+    return { ok: true, chat: 'no_time', email: 'no_time' };
+  }
   const claim = async (channel: 'google_chat' | 'email') => {
     const claimed = await deps.db.rpc('claim_notifications', {
       p_channel: channel,
@@ -103,14 +110,14 @@ export async function dispatchNotifications(
     if (claimed.error) throw new Error(`claim_notifications: ${claimed.error.message}`);
     return claimed.data;
   };
-  const [chatRows, emailRows] = await Promise.all([
+  const [chatRows, emailRows] = await settled([
     deps.webhookUrl ? claim('google_chat') : null,
     deps.email ? claim('email') : null,
   ]);
   // One load of incidents, owners and recipients for both channels.
   const all = [...(chatRows ?? []), ...(emailRows ?? [])];
   const facts = all.length ? await loadFacts(deps.db, all) : null;
-  const [chat, email] = await Promise.all([
+  const [chat, email] = await settled([
     chatRows && facts
       ? dispatchChannel(deps, 'google_chat', chatRows, facts, options)
       : chatRows && emptySummary(),
@@ -119,6 +126,16 @@ export async function dispatchNotifications(
       : emailRows && emptySummary(),
   ]);
   return { ok: true, chat: chat ?? 'no_webhook', email: email ?? 'not_configured' };
+}
+
+/** Like Promise.all, but waits for every branch before rethrowing: nothing keeps running detached. */
+async function settled<T extends readonly unknown[]>(
+  work: T,
+): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }> {
+  const results = await Promise.allSettled(work);
+  const failed = results.find((r) => r.status === 'rejected');
+  if (failed) throw (failed as PromiseRejectedResult).reason;
+  return results.map((r) => (r as PromiseFulfilledResult<unknown>).value) as never;
 }
 
 const emptySummary = (): ChannelSummary => ({ sent: 0, retrying: 0, failed: 0, superseded: 0, released: 0 });
@@ -144,8 +161,13 @@ async function dispatchChannel(
     // the thread's latest reply must be the current status (ChatAlert), so it is dropped, not sent
     // late. The email still goes: it is each person's record of the incident (PRD §7).
     const incident = facts.incidents.get(n.incident_id);
+    const undoable =
+      incident?.state === 'acknowledged' &&
+      !!incident.acked_at &&
+      now().getTime() < new Date(incident.acked_at).getTime() + UNDO_WINDOW_SEC * 1000;
     if (
       channel === 'google_chat' &&
+      !undoable &&
       (n.template === 'down' || n.template === 'problem') &&
       incident &&
       !WAITING_FOR_ACK.includes(incident.state)
@@ -156,6 +178,7 @@ async function dispatchChannel(
           status: 'cancelled',
           error: 'Superseded: the incident moved on first',
           next_retry_at: null,
+          attempts: n.attempts - 1,
         })
         .eq('id', n.id)
         .eq('status', 'queued');
