@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fakeDb } from '../../../test/fake-db';
 import { runEngine } from './run-engine';
 
@@ -34,12 +34,25 @@ const down = [
   row('TYO', 'fail', 32, 2),
 ];
 const ok = [row('SIN', 'pass', 0, 1, 200), row('TYO', 'pass', 1, 1, 200)];
-const incident = (state: string) => ({ id: 'i1', site_id: 's1', state, severity: 'down', root_cause: null });
+const incident = (state: string) => ({
+  id: 'i1',
+  site_id: 's1',
+  state,
+  severity: 'down',
+  root_cause_category: null,
+});
 
 describe('runEngine', () => {
   it('does nothing without monitors', async () => {
     const { db, rpcCalls } = fakeDb();
-    expect(await runEngine(db, now)).toEqual({ ok: true, monitors: 0, opened: 0, recovered: 0, settled: 0 });
+    expect(await runEngine(db, now)).toEqual({
+      ok: true,
+      monitors: 0,
+      opened: 0,
+      recovered: 0,
+      settled: 0,
+      relapses: 0,
+    });
     expect(rpcCalls).toEqual([]);
   });
 
@@ -60,7 +73,7 @@ describe('runEngine', () => {
           p_severity: 'down',
           p_started_at: at(0),
           p_detected_at: now.toISOString(),
-          p_round_at: at(1),
+          p_round_at: at(0),
           p_context: { cause: 'HTTP 500 (SIN, TYO)', confirmingLocations: 2 },
           p_notify: true,
         },
@@ -95,7 +108,7 @@ describe('runEngine', () => {
     await runEngine(db, now);
     expect(calls.find((c) => c.table === 'site_status' && c.op === 'upsert')?.values).toEqual({
       site_id: 's1',
-      last_round_at: at(1),
+      last_round_at: at(0),
       last_evaluated_at: now.toISOString(),
       ok_rounds: 1,
     });
@@ -115,8 +128,8 @@ describe('runEngine', () => {
         p_incident_id: 'i1',
         p_from: 'unacked',
         p_to: 'monitoring',
-        p_recovered_at: at(1),
-        p_round_at: at(1),
+        p_recovered_at: at(0),
+        p_round_at: at(0),
         p_context: { okLocations: 2 },
         p_notify: true,
       },
@@ -138,6 +151,20 @@ describe('runEngine', () => {
     });
   });
 
+  it('counts and logs a relapse while the incident is open, without alerting', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: down },
+      'incidents.select': { data: [incident('needs_root_cause')] },
+      'probe_locations.select': { data: [{ code: 'SIN' }, { code: 'TYO' }] },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ relapses: 1, opened: 0 });
+    expect(rpcCalls).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('relapse_not_alerted'));
+    warn.mockRestore();
+  });
+
   it('waits when the round was already judged', async () => {
     const { db, calls, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
@@ -153,6 +180,7 @@ describe('runEngine', () => {
     ['monitors.select', 'monitors: boom'],
     ['check_results.select', 'boom'],
     ['site_status.upsert', 'site_status: boom'],
+    ['probe_locations.select', 'boom'],
   ])('throws when %s fails', async (key, message) => {
     const { db } = fakeDb({
       'monitors.select': { data: [monitor()] },

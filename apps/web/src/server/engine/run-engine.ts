@@ -1,12 +1,20 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { decideMonitor, type MonitorDecision, type OpenIncident, type StoredCheck } from '@dxt/engine';
+import {
+  decideMonitor,
+  RECHECK_WITHIN_MS,
+  ROUND_DEADLINE_MS,
+  UNKNOWN_ROOT_CAUSE,
+  type MonitorDecision,
+  type OpenIncident,
+  type StoredCheck,
+} from '@dxt/engine';
 import { formatCause } from '@dxt/notifier';
 import { TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 
-/** Extra history loaded beyond the tier window, so the round and its rechecks are both in view. */
-const LOOKBACK_MARGIN_SEC = 90;
+/** History loaded beyond one interval: the round still waiting for its deadline, its rechecks, slack. */
+const LOOKBACK_EXTRA_MS = ROUND_DEADLINE_MS + RECHECK_WITHIN_MS + 30_000;
 const OPEN_STATES_EXCLUDED = '("resolved","in_review","closed")';
 
 interface MonitorRow {
@@ -22,6 +30,8 @@ export interface EngineSummary extends CronJobResult {
   opened: number;
   recovered: number;
   settled: number;
+  /** Confirmed DOWN while the site's incident is still open: no alert until D-004 (S04). */
+  relapses: number;
 }
 
 /**
@@ -31,38 +41,37 @@ export interface EngineSummary extends CronJobResult {
  * harmless (one open incident per site, one message per incident).
  */
 export async function runEngine(db: DbClient, now: Date = new Date()): Promise<EngineSummary> {
-  const summary: EngineSummary = { ok: true, monitors: 0, opened: 0, recovered: 0, settled: 0 };
+  const summary: EngineSummary = { ok: true, monitors: 0, opened: 0, recovered: 0, settled: 0, relapses: 0 };
   const monitors = await loadMonitors(db, now);
   if (!monitors.length) return summary;
   summary.monitors = monitors.length;
 
-  const longestWindow = Math.max(...monitors.map((m) => TIER_CONFIG[m.tier].roundWindowSec));
-  const since = new Date(now.getTime() - (longestWindow + LOOKBACK_MARGIN_SEC) * 1000);
+  const longestInterval = Math.max(...monitors.map((m) => TIER_CONFIG[m.tier].intervalSec));
+  const since = new Date(now.getTime() - longestInterval * 1000 - LOOKBACK_EXTRA_MS);
   const siteIds = monitors.map((m) => m.siteId);
 
-  const [checks, statuses, incidents] = await Promise.all([
-    db
-      .from('check_results')
-      .select('monitor_id, location, outcome, checked_at, attempt, status_code, error')
-      .in(
-        'monitor_id',
-        monitors.map((m) => m.id),
-      )
-      .gte('checked_at', since.toISOString()),
+  const [checks, statuses, incidents, locations] = await Promise.all([
+    loadChecks(
+      db,
+      monitors.map((m) => m.id),
+      since,
+    ),
     db.from('site_status').select('site_id, last_round_at, ok_rounds').in('site_id', siteIds),
     db
       .from('incidents')
-      .select('id, site_id, state, severity, root_cause')
+      .select('id, site_id, state, severity, root_cause_category')
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
+    db.from('probe_locations').select('code').eq('is_active', true),
   ]);
-  for (const r of [checks, statuses, incidents]) if (r.error) throw new Error(r.error.message);
+  for (const r of [statuses, incidents, locations]) if (r.error) throw new Error(r.error.message);
+  const active = (locations.data ?? []).map((l) => l.code as ProbeLocation);
 
   for (const m of monitors) {
     const status = statuses.data?.find((s) => s.site_id === m.siteId);
     const open = incidents.data?.find((i) => i.site_id === m.siteId);
     const decision = decideMonitor({
-      checks: (checks.data ?? [])
+      checks: checks
         .filter((c) => c.monitor_id === m.id)
         .map((c): StoredCheck => ({
           location: c.location as ProbeLocation,
@@ -73,7 +82,8 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
           error: c.error,
         })),
       now,
-      windowSec: TIER_CONFIG[m.tier].roundWindowSec,
+      intervalSec: TIER_CONFIG[m.tier].intervalSec,
+      locations: active,
       lastRoundAt: status?.last_round_at ? new Date(status.last_round_at) : null,
       okRounds: status?.ok_rounds ?? 0,
       open: open
@@ -81,14 +91,39 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
             id: open.id,
             state: open.state,
             severity: open.severity,
-            hasRootCause: !!open.root_cause,
+            // Same rule as the resolve gate (spec §16.3): "Unknown" isn't a root cause.
+            hasRootCause: !!open.root_cause_category && open.root_cause_category !== UNKNOWN_ROOT_CAUSE,
           } satisfies OpenIncident)
         : null,
     });
+    if (decision.kind === 'none' && decision.relapse) {
+      summary.relapses += 1;
+      console.warn(JSON.stringify({ event: 'relapse_not_alerted', site: m.siteId, incident: open?.id }));
+    }
     const applied = await apply(db, m, decision, open?.id ?? null, now);
     if (applied) summary[applied] += 1;
   }
   return summary;
+}
+
+/** PostgREST returns at most max_rows (1000) rows per request: read the window page by page. */
+export const CHECKS_PAGE = 1000;
+
+async function loadChecks(db: DbClient, monitorIds: string[], since: Date) {
+  const rows = [];
+  for (let from = 0; ; from += CHECKS_PAGE) {
+    const { data, error } = await db
+      .from('check_results')
+      .select('id, monitor_id, location, outcome, checked_at, attempt, status_code, error')
+      .in('monitor_id', monitorIds)
+      .gte('checked_at', since.toISOString())
+      .order('checked_at', { ascending: false })
+      .order('id')
+      .range(from, from + CHECKS_PAGE - 1);
+    if (error) throw new Error(`check_results: ${error.message}`);
+    rows.push(...data);
+    if (data.length < CHECKS_PAGE) return rows;
+  }
 }
 
 async function loadMonitors(db: DbClient, now: Date): Promise<MonitorRow[]> {
@@ -160,7 +195,7 @@ async function apply(
         p_from: d.from,
         p_to: d.to,
         // The first OK check, not the engine run: the downtime ends when the site answered again.
-        p_recovered_at: d.roundAt.toISOString(),
+        p_recovered_at: d.recoveredAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
         p_context: { okLocations: d.okLocations },
         p_notify: !m.muted,

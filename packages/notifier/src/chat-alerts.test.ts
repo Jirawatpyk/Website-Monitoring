@@ -76,6 +76,7 @@ describe('DOWN alert (ChatAlert, D-013)', () => {
     expect(m.text).toBe('DOWN · MuvMi (Tier 1)');
     expect(rows(m)).toContainEqual(['Owner', 'No owner set']);
     expect(rows(down({ backup: null }))).toContainEqual(['Owner', 'Arm']);
+    expect(rows(down({ owner: null }))).toContainEqual(['Owner', 'No owner set · backup Ploy']);
   });
 
   it('never puts a mention inside the card', () => {

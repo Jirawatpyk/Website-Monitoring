@@ -41,9 +41,9 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
           return builder;
         };
       }
-      for (const method of ['select', 'eq', 'in', 'not', 'gte', 'overrideTypes']) {
+      for (const method of ['select', 'eq', 'in', 'not', 'gte', 'order', 'range', 'overrideTypes']) {
         builder[method] = (...args: unknown[]) => {
-          if (method !== 'select' && method !== 'overrideTypes') call.filters.push([method, ...args]);
+          if (!['select', 'order', 'overrideTypes'].includes(method)) call.filters.push([method, ...args]);
           return builder;
         };
       }

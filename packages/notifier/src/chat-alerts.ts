@@ -79,9 +79,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
     ...(isSameBangkokDay(confirmedAt, now) ? [] : [formatDay(confirmedAt, { weekday: true })]),
     `Confirmed down ${formatTimeWithSeconds(confirmedAt)} (UTC+7)`,
   ].join(' · ');
-  const ownerText = owner
-    ? [owner.name, ...(backup ? [`backup ${backup.name}`] : [])].join(' · ')
-    : 'No owner set';
+  const ownerText = [owner?.name ?? 'No owner set', ...(backup ? [`backup ${backup.name}`] : [])].join(' · ');
 
   return {
     text: buildChatTextLine({
