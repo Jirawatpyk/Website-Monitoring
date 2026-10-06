@@ -287,8 +287,6 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
     from: 'DxT Monitor <alerts@notify.example.test>',
   };
   const PASSWORD = 'int-local-only-Password-1';
-  // Never ask the real Resend for a Message-ID from a test.
-  const messageIdOf = async (_key: string, id: string) => `<${id}@test.example>`;
   let arm: string;
   let ploy: string;
 
@@ -412,7 +410,7 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
 
     // The fallback goes out on the next pass (Chat and email run side by side): the backup and
     // every Admin, marked.
-    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send, messageIdOf });
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     const emails = (await rowsOf(incidentId)).filter((n) => n.channel === 'email');
     expect(emails.find((n) => n.user_id === arm)?.context).not.toHaveProperty('fallback');
     expect(emails.find((n) => n.user_id === ploy)).toMatchObject({
@@ -431,7 +429,7 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
     await onlyMine(incidentId);
     const post = okPost();
     const send = okSend();
-    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send, messageIdOf });
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     post.mockClear();
     send.mockClear();
 
@@ -440,12 +438,12 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
     const state = await must(db.from('incidents').select('state, acked_by').eq('id', incidentId).single());
     expect(state).toEqual({ state: 'acknowledged', acked_by: arm });
 
-    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send, messageIdOf });
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     expect(post).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
 
     await due(incidentId, 'acknowledged');
-    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send, messageIdOf });
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     const text = (post.mock.calls[0] as unknown as [string, { text: string }])[1].text;
     expect(text).toMatch(new RegExp(`^ACKNOWLEDGED · Ack ${run} · by Arm \\d\\d:\\d\\d$`));
     expect(sentEmails(send)).toEqual([
@@ -461,7 +459,7 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
     await onlyMine(incidentId);
     const post = okPost();
     const send = okSend();
-    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send, messageIdOf });
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     post.mockClear();
     send.mockClear();
 
@@ -478,7 +476,7 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
       'unacked',
     );
     await due(incidentId, 'acknowledged');
-    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send, messageIdOf });
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     expect(post).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
   });

@@ -177,11 +177,9 @@ describe('dispatchNotifications', () => {
       },
     });
     const send = okSend();
-    // The provider's Message-ID of each person's first email (Resend/SES set their own).
-    const messageIdOf = vi.fn(async (_key: string, id: string) => `<${id}@ses.example>`);
     // Even with the incident acknowledged the DOWN email goes: it is the owner's record (PRD §7).
     expect(
-      await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send, messageIdOf }),
+      await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send }),
     ).toMatchObject({ email: { sent: 3, superseded: 0 } });
 
     const sent = send.mock.calls as unknown as [
@@ -194,9 +192,10 @@ describe('dispatchNotifications', () => {
       ['Test target · Tier 1 · INC-0007', 'tao@example.test', 'notification-e-rec-tao'],
     ]);
     expect(sent[0]?.[0].text).toContain('You got this because you acknowledged this incident.');
-    expect(sent[0]?.[0].headers['In-Reply-To']).toBe('<em_down@ses.example>');
-    expect(sent[1]?.[0].headers['In-Reply-To']).toBe('<em_ack_tao@ses.example>');
-    expect(messageIdOf).toHaveBeenCalledWith('re_test', 'em_down');
+    // Everyone's emails hang on the incident's thread id; only a person's first starts it.
+    const thread = '<inc-i1@notify.dxt.example>';
+    expect(sent[0]?.[0].headers).toEqual({ 'In-Reply-To': thread, References: thread });
+    expect(sent[1]?.[0].headers).toEqual({ 'In-Reply-To': thread, References: thread });
     expect(sent[1]?.[0].text).toContain('couldn’t be delivered');
   });
 
@@ -210,7 +209,7 @@ describe('dispatchNotifications', () => {
     const send = okSend();
     await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send });
     const [m] = send.mock.calls[0] as unknown as [{ headers: Record<string, string> }];
-    expect(m.headers).toEqual({});
+    expect(m.headers).toEqual({ References: '<inc-i1@notify.dxt.example>' });
   });
 
   it('drops a DOWN that hasn’t left once the incident has moved on (ChatAlert: latest reply = status)', async () => {

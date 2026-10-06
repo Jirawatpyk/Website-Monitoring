@@ -20,31 +20,6 @@ export interface EmailSendOptions {
 }
 
 const RESEND_URL = 'https://api.resend.com/emails';
-
-/**
- * The Message-ID header Resend gave a sent email (`GET /emails/:id`), so later emails can reply to
- * it. Null when it can't be read; the email then goes without reply headers (the subject still
- * groups it in most clients). Never throws.
- */
-export async function getEmailMessageId(
-  apiKey: string,
-  emailId: string,
-  { timeoutMs = 5_000, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {},
-): Promise<string | null> {
-  try {
-    const res = await fetchImpl(`${RESEND_URL}/${encodeURIComponent(emailId)}`, {
-      headers: { authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json().catch(() => ({}))) as { message_id?: unknown };
-    return typeof body.message_id === 'string' && /^<[^<>\s]+>$/.test(body.message_id)
-      ? body.message_id
-      : null;
-  } catch {
-    return null;
-  }
-}
 // Provider messages can echo an address; an error is stored in the delivery log, so strip them.
 const EMAIL_ADDRESS = /[^\s<>"'@]+@[^\s<>"'@]+/g;
 

@@ -4,6 +4,7 @@ import {
   buildDownEmail,
   buildRecoveredEmail,
   EMAIL_FOOTER,
+  incidentThreadId,
   type EmailBaseInput,
 } from './email-alerts';
 
@@ -17,6 +18,8 @@ const base: EmailBaseInput = {
   recipientId: 'u-arm',
   reason: 'owner',
   incidentUrl: 'https://monitor.example.test/incidents/inc-1',
+  threadId: '<inc-inc-1@notify.example.test>',
+  startsThread: false,
 };
 const startedAt = new Date('2026-09-25T02:48:10Z');
 const confirmedAt = new Date('2026-09-25T02:48:41Z');
@@ -38,10 +41,12 @@ describe('one thread per incident (spec §10)', () => {
     for (const m of [down(), acked(), recovered()]) expect(m.subject).toBe('MuvMi · Tier 1 · INC-0142');
   });
 
-  it('replies to the Message-ID the provider gave the first email; the first starts the thread', () => {
-    const root = '<0106abc@ap-northeast-1.amazonses.com>';
-    expect(down().headers).toEqual({});
-    for (const m of [acked({ replyTo: root }), recovered({ replyTo: root })]) {
+  it('hangs every email on the incident thread id; each after the first replies to it', () => {
+    const root = incidentThreadId('inc-1', 'DxT Monitor <alerts@notify.example.test>');
+    expect(root).toBe('<inc-inc-1@notify.example.test>');
+    expect(incidentThreadId('inc-1', 'nobody')).toBe('<inc-inc-1@localhost>');
+    expect(down({ startsThread: true }).headers).toEqual({ References: root });
+    for (const m of [acked(), recovered()]) {
       expect(m.headers).toEqual({ 'In-Reply-To': root, References: root });
     }
   });

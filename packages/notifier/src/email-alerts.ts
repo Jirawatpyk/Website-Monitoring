@@ -6,9 +6,10 @@ import { downtime } from './downtime';
  * escalation, client-update or root-cause buttons until their slices).
  *
  * One email per event and per person, all under one subject per incident ("MuvMi · Tier 1 ·
- * INC-0142"), so a mail client stacks them like the Chat thread: every later email sets
- * `In-Reply-To` / `References` to the Message-ID of the recipient's first email (the provider
- * assigns Message-IDs — Resend/SES replaces any we set — so the caller looks it up). The status word leads the preheader
+ * INC-0142"), so a mail client stacks them like the Chat thread. The provider assigns each
+ * email's Message-ID (Resend/SES replaces any we set), so the thread hangs on a stable id of the
+ * incident instead: every email carries it in `References`, and every email after a person's first
+ * also in `In-Reply-To` — the way GitHub threads its notifications. The status word leads the preheader
  * and the body (it shows in a phone notification); the footer says why this person got it.
  * Table layout, inline styles, 600 px, system fonts, plain-text part, no tracking.
  */
@@ -32,8 +33,10 @@ export interface EmailBaseInput {
   reason: EmailReason;
   /** The incident page (`/incidents/<id>`). */
   incidentUrl: string;
-  /** Message-ID of the recipient's first email of this incident, which this one replies to. */
-  replyTo?: string | null;
+  /** The incident's thread id (`incidentThreadId`). */
+  threadId: string;
+  /** This is the recipient's first email of the incident: it starts their thread. */
+  startsThread: boolean;
 }
 
 export interface DownEmailInput extends EmailBaseInput {
@@ -83,6 +86,12 @@ export const EMAIL_FOOTER =
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+/** `<inc-<id>@notify.example>`: the id every email of one incident refers to. */
+export function incidentThreadId(incidentId: string, from: string): string {
+  const domain = /@([^>\s]+)>?\s*$/.exec(from)?.[1] ?? 'localhost';
+  return `<inc-${incidentId}@${domain}>`;
+}
 
 const subjectOf = (i: EmailBaseInput) =>
   `${i.site} · ${formatTier(i.tier)} · ${formatIncidentId(i.incidentNumber)}`;
@@ -172,10 +181,9 @@ function render(input: EmailBaseInput, b: Body): EmailMessage {
     EMAIL_FOOTER,
   ].join('\n');
 
-  // Their first email starts the thread; every later one replies to it.
-  const headers: Record<string, string> = input.replyTo
-    ? { 'In-Reply-To': input.replyTo, References: input.replyTo }
-    : {};
+  const headers: Record<string, string> = input.startsThread
+    ? { References: input.threadId }
+    : { 'In-Reply-To': input.threadId, References: input.threadId };
 
   return { subject: subjectOf(input), html, text, headers };
 }

@@ -81,7 +81,7 @@ export function renderEmail(
   i: IncidentFacts,
   to: Recipient,
   appUrl: string,
-  replyTo: string | null,
+  thread: { threadId: string; startsThread: boolean },
 ): EmailMessage | null {
   const ctx = contextOf(n.context);
   const base: EmailBaseInput = {
@@ -92,7 +92,7 @@ export function renderEmail(
     recipientId: to.id,
     reason: emailReason(n, i),
     incidentUrl: incidentUrl(appUrl, i.id),
-    replyTo,
+    ...thread,
   };
   switch (n.template) {
     case 'down':

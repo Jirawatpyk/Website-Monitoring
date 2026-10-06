@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { getEmailMessageId, postChatMessage, sendEmail } from '@dxt/notifier';
+import { incidentThreadId, postChatMessage, sendEmail } from '@dxt/notifier';
 import { UNDO_WINDOW_SEC } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { loadFacts, type Facts, type Notification } from './facts';
@@ -23,7 +23,6 @@ export interface DispatchDeps {
   now?: () => Date;
   post?: typeof postChatMessage;
   send?: typeof sendEmail;
-  messageIdOf?: typeof getEmailMessageId;
 }
 
 export interface DispatchOptions {
@@ -287,13 +286,12 @@ async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: D
   if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
   const { apiKey, from } = deps.email!;
   // The thread root is the first email this person really got; without one, this email is it.
-  // Reply to this person's first email, by the Message-ID the provider gave it (Resend/SES set their
-  // own); their first email itself starts the thread.
+  // One thread per incident; this person's first email starts theirs (Resend/SES set Message-IDs).
   const first = facts.firstEmail.get(`${n.incident_id}:${to.id}`);
-  const lookup = deps.messageIdOf ?? getEmailMessageId;
-  const replyTo =
-    first && first.id !== n.id && first.providerId ? await lookup(apiKey, first.providerId) : null;
-  const message = renderEmail(n, incident, to, deps.appUrl, replyTo);
+  const message = renderEmail(n, incident, to, deps.appUrl, {
+    threadId: incidentThreadId(n.incident_id, from),
+    startsThread: !first || first.id === n.id,
+  });
   if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
   const send = deps.send ?? sendEmail;
   const result = await send(message, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });
