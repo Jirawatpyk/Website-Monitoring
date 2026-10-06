@@ -12,7 +12,7 @@
 | ID | Slice | Phase | Size | FRs | Depends on | PRD week | Status |
 |---|---|---|---|---|---|---|---|
 | S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Done |
-| S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | In progress |
+| S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Todo |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Todo |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
@@ -102,6 +102,18 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   4. `pnpm db:reset` builds from zero with seed; `pnpm db:types` output committed; `pnpm check` green.
   5. spec-checker passes Login, MLogin, EmptyStates at 390 and 1440 px, light and dark.
 - **Review:** security-reviewer, db-reviewer, spec-checker.
+- **Notes (evidence):** merged 6 Oct 2026 as PR #25 (`5d1fcde`); time spent ≈ 1 working day (planned M, 3–4 days).
+  - **Done-when 1 ✓**
+    - Real Google sign-in as the allowlisted Admin works on staging, on PR #25's preview and on production (Tao, 6 Oct). Each lands on `/` with role Admin; Claude re-checked staging in the browser at 09:19Z.
+    - Refusals, lower-case matching, alias-domain rows, Google-only sign-up and "inactive reads nothing" are covered by pgTAP `access.test.sql` / `rls.test.sql`. A real local GoTrue sign-up with mixed case got its profile and role, and both refusals returned the hook's "ask an Admin" messages.
+    - The proxy's `?error=domain` is covered by `proxy.test.ts`.
+    - The signed-in flows are in `e2e/auth.spec.ts`: lands on `/` with its role, no profile → "No access yet", deactivated, sign out. They run in the CI `db` job.
+  - **Done-when 2 ✓** On staging, real Google sign-in returned to `/incidents/x`. On production at 09:19Z, `/incidents/x` → `/login?next=%2Fincidents%2Fx`. Also covered by the e2e "goes back to the page they opened" and the callback unit tests.
+  - **Done-when 3 ✓** pgTAP: 3 files, 72 tests, locally and in the CI `db` job (PR #25 and `main`).
+  - **Done-when 4 ✓** `pnpm db:reset` builds from zero with the seed and `pnpm check` is green. Types were stale after a late migration edit; they're regenerated in the close-out PR, and the `db` job now fails on stale types.
+  - **Done-when 5 ✓** spec-checker found no High, and M1–M6 are fixed. Checked at 390 / 820 / 1440 in light and dark. Not built on purpose: the 2-step states (D-007), invite-email copy (D-011), and the MLogin incident card / ack / Viewer / Done states (S02b, S07).
+  - **Production setup** done by Tao after the merge: Google on, Email off, `before_user_created` hook on, allowlist row.
+  - **Deferred:** a change and its audit row in one transaction → S09 (security-reviewer L1). Skeleton row geometry, a skip link and per-page loading labels → the pages that use them (spec-checker L2, L8, L9).
 
 ### S02a · Thin slice: probe → engine → DOWN / RECOVERED in Chat
 

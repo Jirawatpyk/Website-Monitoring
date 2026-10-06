@@ -25,13 +25,13 @@ export type Database = {
           Tables: {
             "audit_log": {
                   Row: {
-                    "action": string,"actor_id": string | null,"after": Json | null,"at": string,"before": Json | null,"created_at": string,"entity": string,"entity_id": string | null,"id": string
+                    "action": string,"actor_id": string | null,"after": Json | null,"at": string,"before": Json | null,"entity": string,"entity_id": string | null,"id": string
                   }
                   Insert: {
-                    "action": string,"actor_id"?: string | null,"after"?: Json | null,"at"?: string,"before"?: Json | null,"created_at"?: string,"entity": string,"entity_id"?: string | null,"id"?: string
+                    "action": string,"actor_id"?: string | null,"after"?: Json | null,"at"?: string,"before"?: Json | null,"entity": string,"entity_id"?: string | null,"id"?: string
                   }
                   Update: {
-                    "action"?: string,"actor_id"?: string | null,"after"?: Json | null,"at"?: string,"before"?: Json | null,"created_at"?: string,"entity"?: string,"entity_id"?: string | null,"id"?: string
+                    "action"?: string,"actor_id"?: string | null,"after"?: Json | null,"at"?: string,"before"?: Json | null,"entity"?: string,"entity_id"?: string | null,"id"?: string
                   }
                   Relationships: [
                     {

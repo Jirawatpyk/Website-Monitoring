@@ -57,9 +57,15 @@ jobs:
   # Database tests: build the schema from every migration + seed on a local Supabase stack in
   # Docker, then run the pgTAP tests in supabase/tests (RLS, grants, sign-up hook, audit_log).
   # Required on main alongside `check` (pnpm pr:merge, D-008). No secrets: local stack only.
+  # Then: committed DB types must match the migrations, and the signed-in e2e flows (Google can't
+  # be scripted, so test users sign in with a password on this local stack only) run against it.
   db:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      ALLOWED_EMAIL_DOMAIN: example.test
+      E2E_LOCAL_SUPABASE: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -70,9 +76,33 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Only Postgres + Auth: the tests need the auth schema, nothing else.
-      - run: pnpm exec supabase start -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit,postgrest,kong
+      # Postgres, Auth, REST and the API gateway: enough for pgTAP and the signed-in e2e flows.
+      - run: pnpm exec supabase start -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit
       - run: pnpm db:test
+      - name: DB types match the migrations
+        run: |
+          pnpm db:types
+          git diff --exit-code packages/db/src/database.types.ts || {
+            echo "::error::packages/db/src/database.types.ts is stale — run pnpm db:reset && pnpm db:types and commit it"
+            exit 1
+          }
+      # The local stack's own keys (CLI demo values, not secrets) for the app and the e2e helper.
+      - name: Local Supabase keys
+        run: |
+          pnpm exec supabase status -o env | sed -n \
+            -e 's/^PUBLISHABLE_KEY="\(.*\)"$/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=\1/p' \
+            -e 's/^SECRET_KEY="\(.*\)"$/E2E_SUPABASE_SECRET_KEY=\1/p' >> "$GITHUB_ENV"
+      - run: pnpm --filter @dxt/web build
+      - run: pnpm --filter @dxt/web exec playwright install --with-deps chromium
+      - name: Signed-in e2e (local Supabase)
+        run: pnpm --filter @dxt/web exec playwright test e2e/auth.spec.ts
+        timeout-minutes: 6
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: playwright-report-db
+          path: apps/web/playwright-report
+          retention-days: 7
 
   # Production migrations are applied here and only here, after a PR is merged to main
   # (docs/workflow.md → Environments). Skips until the production project and its secret exist.

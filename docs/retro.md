@@ -4,6 +4,9 @@ One line per lesson: what went wrong or slow, and the change that stops it happe
 
 | Date | What happened | What changed | Where |
 | --- | --- | --- | --- |
+| 6 Oct 2026 | Committed DB types went stale after a late migration edit; typecheck passed because no code used the dropped column (slice-verifier) | The CI `db` job regenerates the types and fails on any diff | S01 close-out |
+| 6 Oct 2026 | Signed-in e2e flows were skipped in CI (no database in `check`), against "no skipped tests" | The CI `db` job builds the web app and runs `e2e/auth.spec.ts` against its local stack | S01 close-out |
+| 6 Oct 2026 | Claude asked Tao to check the PR preview instead of checking it itself | Claude verifies staging / previews in the browser pane; asks only for sign-in or secrets | S01 |
 | 6 Oct 2026 | `pnpm db:reset:staging` would have loaded the dev seed (fake users, `example.test` allowlist, 17 fake monitors) onto staging; found by `/code-review` | The script always passes `--no-seed`; test added | S01 |
 | 6 Oct 2026 | Sign-up trusted any provider: with a project's Email provider left on, an allowlisted address could be claimed with a password (security-reviewer) | The hook and `handle_new_user` accept Google only (`.test` excepted for local); pgTAP covers it | S01 |
 | 6 Oct 2026 | RLS helpers ran once per row (359 ms vs 7.7 ms on 50k rows, db-reviewer) | Policies wrap them as `(select …)`; rule in `supabase/CLAUDE.md` | S01 |
