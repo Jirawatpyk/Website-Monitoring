@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|---|
 | S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Done |
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
-| S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | In review |
+| S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Todo |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
@@ -130,7 +130,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   5. message-checker passes the DOWN and RECOVERED text lines and cards against ChatAlert.
   6. Actual time spent is recorded in the PR, for the re-baseline check in [Timeline](#timeline).
 - **Review:** engine-reviewer, message-checker, security-reviewer (cron, RLS), db-reviewer (partitions).
-- **Notes (evidence):** started 6 Oct 2026 10:32Z; staging verified 12:15Z — time spent ≈ 1 h 45 min (planned S, ≤ 2 days). Chat copy per D-013; owners' Chat ids per D-015; schema choices D-014.
+- **Notes (evidence):** merged 6 Oct 2026 as PR #27 (`e812ef2`); production migration applied by `migrate-production` 13:23:54Z. Started 10:32Z; staging verified 12:15Z — time spent ≈ 1 h 45 min to a verified run, ≈ 2 h 15 min with review rounds (planned S, ≤ 2 days). Chat copy per D-013; owners' Chat ids per D-015; schema choices D-014.
   - **Done-when 1 ✓** Staging, 6 Oct: test target switched to `error` at 12:07:12Z (first 500 seen); the engine opened INC-0001 and sent DOWN at 12:09:39Z (Vercel log `engine … opened:1, delivery.sent:1`) — **2 min 27 s**. Round 12:07 was split (TYO passed before the switch); round 12:08 failed on both checks and both rechecks.
   - **Done-when 2 ✓** Switched to `ok` at 12:11:21Z; RECOVERED sent 12:13:39Z (`recovered:1, delivery.sent:1`), shown by Tao's Chat screenshot as a reply in the DOWN thread ("RECOVERED · Test target · down 3 min · add a root cause"); the next round settled the incident to Needs root cause (12:14:39Z, `settled:1`).
   - **Re-run after engine-reviewer round 2** (deploy `e1ea685`, after `reset-test-incident.sql`): switched to `error` 12:37:00Z → INC-0002 DOWN sent 12:38:39Z (**1 min 39 s**); back to `ok` 12:41:17Z → RECOVERED 12:43:39Z as a reply in the same thread, reading "down 4 min (19:37–19:42)" — now from the first failed check; settled 12:44:39Z (Tao's Chat screenshot, Vercel logs).
