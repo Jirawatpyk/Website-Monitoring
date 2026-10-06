@@ -15,3 +15,18 @@ body {
   color: var(--aura-fg-primary);
   font-family: var(--font-sans);
 }
+
+/*
+ * Workaround (docs/design/aura.md → Requests to AURA, request 6): AppShell shows its top bar at every
+ * width once it has a `header`, but only the phone boards draw one (MOverview, MobileAck). From lg,
+ * where the sidebar shows, hide it and zero the sticky offset AURA keeps for it — the same as AURA
+ * does for a menu-only bar. Remove when AURA ships a phone-only header option.
+ */
+@media (min-width: 1024px) {
+  .dxt-shell-phone-bar .aura-shell__bar {
+    display: none;
+  }
+  .dxt-shell-phone-bar {
+    --aura-shell-bar-height: 0px;
+  }
+}
