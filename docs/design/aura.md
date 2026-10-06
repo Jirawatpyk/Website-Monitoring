@@ -54,3 +54,7 @@ Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://c
 - IconButton tooltip → AURA's own tip (hover and keyboard focus); don't wrap IconButtons in `<Tooltip>`, and find them in tests by accessible name, not `title`.
 - PageHeader → AURA `PageHeader` (no outer padding: AppShell's content padding is the page margin).
 - Skeleton pill → `Skeleton variant="pill"` (StatusPill size) or `variant="badge"` (Badge size).
+
+Open (7 Oct 2026):
+
+- **IconButton hover on SideNav.** The hover background is the same colour as the SideNav surface (both `rgb(250, 250, 250)` in light), so hovering an IconButton in the sidebar footer (Sign out) shows no change; only the tip and the pointer cursor do. Ask: an IconButton's hover is always visibly darker than the surface it sits on (or a SideNav variant). Until it ships, leave it — no local override (no hard-coded colours, and the tip already shows the button is live).
