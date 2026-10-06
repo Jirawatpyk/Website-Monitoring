@@ -159,6 +159,9 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - **Done-when 2:** `sent_at − detected_at` for the DOWN = **0.9 s** (email) / **1.4 s** (Chat); `detected_at` = the confirming recheck 15:46:16Z (staging SQL, Tao).
   - Ack (desktop, Tao) 15:50:58Z → "Undo · N s" countdown → ACKNOWLEDGED posted to Chat + email 15:51:10–11Z (window 10 s + 2 s margin); the page then read "Posted to the Chat thread + email at 22:51:10" and the log "(posted 22:51:10)". ACKNOWLEDGED email: "Jirawat (Tao) Piyakit has Test target", footer "you acknowledged this incident".
   - Test target → `ok` 15:52:44Z; RECOVERED by the engine cron 15:54:39Z to Chat and email.
+  - Staging run 2 (deploy `48a3256`): → `error` 16:12:15Z; DOWN INC-0004 to Chat + email at 16:14:17Z (**2 min 2 s**). **Done-when 4 (phone, Tao):** the card's "Open / acknowledge" on an iPhone opened sign-in, then straight back to INC-0004 signed in as the owner; one tap acknowledged ("Undo · 7 s").
+  - **Done-when 5 / T08 on staging:** ack 16:15:11Z → Undo inside the window → both ACKNOWLEDGED rows `cancelled`, `attempts 0`, nothing sent; the page went back to Acknowledge and logged "Acknowledgement undone". Re-ack 16:15:24Z → ACKNOWLEDGED sent 16:15:37.9Z (Chat) / 16:15:38.3Z (email). RECOVERED 16:18:40Z (staging SQL, Claude).
+  - Email threading: Resend/SES replace the Message-ID we set (Gmail "Show original" of INC-0003: `…@ap-northeast-1.amazonses.com`), and the send-only API key can't read it back — so emails now carry a stable incident id in `References` (+ `In-Reply-To` after a person's first), deploy `2170815`. The test inbox has Gmail "Conversation view off", which shows every email as its own row regardless.
 
 ### S03 · Bangkok probe & browser verifier
 
