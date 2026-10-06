@@ -8,6 +8,8 @@ import { z } from 'zod';
 const serverEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
+  /** Public base URL; alert cards link to incidents under it (fallback: VERCEL_PROJECT_PRODUCTION_URL). */
+  NEXT_PUBLIC_APP_URL: z.url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   CRON_SECRET: z.string().min(32, 'CRON_SECRET must be at least 32 characters'),
   INGEST_TOKEN: z.string().min(32, 'INGEST_TOKEN must be at least 32 characters'),
@@ -21,6 +23,7 @@ const serverEnvSchema = z.object({
   HEALTHCHECKS_PING_URL_ENGINE: z.url().optional(),
   HEALTHCHECKS_PING_URL_PROBE_SIN: z.url().optional(),
   HEALTHCHECKS_PING_URL_PROBE_TYO: z.url().optional(),
+  HEALTHCHECKS_PING_URL_NOTIFIER: z.url().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

@@ -57,8 +57,9 @@ jobs:
   # Database tests: build the schema from every migration + seed on a local Supabase stack in
   # Docker, then run the pgTAP tests in supabase/tests (RLS, grants, sign-up hook, audit_log).
   # Required on main alongside `check` (pnpm pr:merge, D-008). No secrets: local stack only.
-  # Then: committed DB types must match the migrations, and the signed-in e2e flows (Google can't
-  # be scripted, so test users sign in with a password on this local stack only) run against it.
+  # Then: committed DB types must match the migrations, the server integration tests run, and the
+  # signed-in e2e flows (Google can't be scripted, so test users sign in with a password on this
+  # local stack only) run against it.
   db:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -92,6 +93,8 @@ jobs:
           pnpm exec supabase status -o env | sed -n \
             -e 's/^PUBLISHABLE_KEY="\(.*\)"$/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=\1/p' \
             -e 's/^SECRET_KEY="\(.*\)"$/E2E_SUPABASE_SECRET_KEY=\1/p' >> "$GITHUB_ENV"
+      # Engine + notifier against the real tables and SQL functions (S02a Done-when 3).
+      - run: pnpm --filter @dxt/web test:int
       - run: pnpm --filter @dxt/web build
       - run: pnpm --filter @dxt/web exec playwright install --with-deps chromium
       - name: Signed-in e2e (local Supabase)

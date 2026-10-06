@@ -131,4 +131,3 @@ function latestPerLocation(
   }
   return [...latest.values()];
 }
-

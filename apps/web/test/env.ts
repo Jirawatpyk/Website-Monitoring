@@ -8,6 +8,7 @@ export const TEST_ENV = {
   CRON_SECRET: 'c'.repeat(32),
   INGEST_TOKEN: 'i'.repeat(32),
   ALLOWED_EMAIL_DOMAIN: 'dxt.example',
+  NEXT_PUBLIC_APP_URL: 'https://monitor.dxt.example',
 } as const;
 
 export function stubServerEnv(overrides: Partial<Record<keyof typeof TEST_ENV, string>> = {}) {
