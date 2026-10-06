@@ -11,8 +11,8 @@
 
 | ID | Slice | Phase | Size | FRs | Depends on | PRD week | Status |
 |---|---|---|---|---|---|---|---|
-| S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | In progress |
-| S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Todo |
+| S00 | Prep, decisions, accounts & staging | 0 | — | — | — | 1 | Done |
+| S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | In progress |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Todo |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Todo |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
@@ -84,7 +84,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - 5 Oct 2026 — **Done-when 1 ✓**: the CEO answered all 8 memo items (tiers and the escalation ladder as proposed; synthetic checks capped at PROBLEM; budget $60 / month; CEO at L2 / L3 as proposed; Tier 1 after hours best effort, no Twilio; status page and reports in Phase 3). Item 3 approved with changes: owners / backups per the checklist; for now Admin = Tao only (second Admin needed before G1) and on-call = Tle (rotation of ≥ 3 before G2). Copied to the PRD decisions list (Claude Doc rev 168, `docs/prd.md`).
   - 5 Oct 2026 — **Done-when 9 ✓**: OAuth consent screen is Internal; Tao confirms Google Workspace enforces 2-Step Verification for everyone who will get a role (his own page says required and can't be turned off). Per D-007 the self-check stays a step of every allowlist invite, so a person in an OU without enforcement is still caught.
   - 5 Oct 2026 — VPS rented: LightNode Bangkok, 2 vCPU / 4 GB, Ubuntu 24.04, `dxt-monitor-bkk`, public IP `38.60.233.62` (geolocates to Bangkok, AS154177), ~$13.70 / month. Hardened: SSH key only (password and keyboard-interactive login off, root by key only), ufw deny-incoming except 22/tcp, unattended security upgrades on (provider image had the apt timers masked), upgraded and rebooted, timezone UTC. SSH key `~/.ssh/dxt_vps` on Tao's machine (RSA — LightNode accepts RSA only).
-  - Still open: Done-when 3 — the agent's env file on the VPS (`/etc/dxt-agent/env`) is written when the agent is installed in S03; every Vercel variable is set.
+  - 6 Oct 2026 — **Done-when 3 ✓ (Vercel / Supabase part)**: every variable is set on both Vercel projects. The VPS agent's env file (`/etc/dxt-agent/env`) moves to S03 Done-when 6, where the agent is installed (D-010). **S00 Done.**
 - **Review:** Tao sign-off; no code review.
 
 ## Phase 1 — MVP, P0
@@ -97,8 +97,8 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 - **Depends on:** S00 (Supabase projects, OAuth client, company domain, access list)
 - **Done when:**
   1. **T12:** an allowlisted company account signs in at `/login` and lands on `/` with its allowlisted role — locally, on `dxt-monitor-staging` and on one PR preview. Signing in with different capitals still matches the allowlist. A company account that isn't on the allowlist and a non-company account are both refused by the `before_user_created` hook with a message to ask an Admin (pgTAP tests); inserting an allowlist row on a domain that isn't allowed fails (pgTAP); a non-company session is also refused by the proxy (`?error=domain`); a user whose profile is inactive reads nothing (pgTAP).
-  2. Opening `/incidents/x` signed out → sign-in → back on `/incidents/x`.
-  3. `pnpm exec supabase test db` passes locally and in the CI `db` job: anon reads nothing; viewer can't write `sites`; responder updates only own sites; `authenticated` can't UPDATE / DELETE `audit_log`.
+  2. Opening `/incidents/x` signed out → sign-in → back on `/incidents/x` (evidence: the URL after sign-in; the page itself 404s until S07).
+  3. `pnpm exec supabase test db` passes locally and in the CI `db` job: anon reads nothing; viewer can't write `sites`; responder updates only the mute fields of own sites (D-012); `authenticated` can't UPDATE / DELETE `audit_log`.
   4. `pnpm db:reset` builds from zero with seed; `pnpm db:types` output committed; `pnpm check` green.
   5. spec-checker passes Login, MLogin, EmptyStates at 390 and 1440 px, light and dark.
 - **Review:** security-reviewer, db-reviewer, spec-checker.
@@ -144,6 +144,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   3. **T03:** verifier stopped → a hard-fail site still goes DOWN on time; a blocked site shows PROBLEM (unverified) at once and the Admin is emailed.
   4. The Job API refuses a wrong token and an expired lease; Ingest refuses results > 5 min old (tests).
   5. A Storage lifecycle job removes screenshots older than 30 days (test or SQL check).
+  6. The VPS has every variable name from `apps/vps-agent/.env.example` set in `/etc/dxt-agent/env` (moved from S00 Done-when 3, D-010; names listed, values never shared).
 - **Review:** security-reviewer (Job API, Storage, VPS unit), db-reviewer (pgmq queues, leases), engine-reviewer.
 
 ### S04 · PROBLEM triggers, flapping & status rules
