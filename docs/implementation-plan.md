@@ -210,7 +210,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 
 ### S06 · Overview dashboard & site detail
 
-- **Scope:** FR-05, FR-08. Overview (desktop, mobile, dark NOC): X/17 OK, status per site with Realtime, filters (tier, owner, client), 24 h sparkline, open incidents; the "Maintenance & mutes" card lands in S09. Phone shell (D-018): AURA `BottomNav` with the live sections replaces the menu button and drawer below lg (MOverview). Site detail: uptime 24 h / 7 d / 30 d / 90 d, response time per location, incident history, check log. `check_rollups` hourly and daily via pg_cron (daily kept 2 years); partition create / drop jobs (90-day raw retention).
+- **Scope:** FR-05, FR-08. Overview (desktop, mobile, dark NOC): X/17 OK, status per site with Realtime, filters (tier, owner, client), 24 h sparkline, open incidents; the "Maintenance & mutes" card lands in S09. Phone shell (D-018): AURA `BottomNav` with the four sections of MOverview (Overview, Incidents, Sites, On-call; the live ones only) below lg, phones and tablets; the menu drawer stays for the other pages. Site detail: uptime 24 h / 7 d / 30 d / 90 d, response time per location, incident history, check log. `check_rollups` hourly and daily via pg_cron (daily kept 2 years); partition create / drop jobs (90-day raw retention).
 - **Boards:** Main, MOverview, MainDark, SiteDetail, MSite · **Tables:** check_rollups
 - **Depends on:** S02a, S05
 - **Done when:**

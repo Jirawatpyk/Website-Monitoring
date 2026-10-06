@@ -6,7 +6,7 @@ import { BrandMark } from './brand';
  * right, 16 px from the edge as on the boards (AppShell pads 8). AppShell puts it after its menu
  * button; the bar shows below lg only (`layout.tsx`, `globals.css`).
  * The back arrow on detail boards comes with the pages it returns to (Incidents, S07), and
- * BottomNav replaces the menu button in S06.
+ * BottomNav joins it in S06 for the four main sections; the menu drawer stays for the rest (D-018).
  */
 export function MobileBar({ displayName }: { displayName: string }) {
   return (
