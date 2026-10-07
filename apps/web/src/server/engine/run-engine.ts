@@ -16,6 +16,11 @@ import type { CronJobResult } from '../cron-job';
 /** Rounds judged per monitor per run: catches up after a missed run without running unbounded. */
 const MAX_ROUNDS_PER_RUN = 5;
 const OPEN_STATES_EXCLUDED = '("resolved","in_review","closed")';
+/**
+ * A round expects only the active locations whose probe beat this recently (D-019): a stopped VPS
+ * agent drops out of the vote at once instead of holding every round until its deadline.
+ */
+export const HEARTBEAT_FRESH_MS = 3 * 60_000;
 
 interface MonitorRow {
   id: string;
@@ -63,10 +68,14 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       .select('id, site_id, state, severity, root_cause_category, notifications(template)')
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
-    db.from('probe_locations').select('code').eq('is_active', true),
+    db.from('probe_locations').select('code, last_heartbeat_at').eq('is_active', true),
   ]);
   for (const r of [statuses, incidents, locations]) if (r.error) throw new Error(r.error.message);
-  const active = (locations.data ?? []).map((l) => l.code as ProbeLocation);
+  const active = (locations.data ?? [])
+    .filter(
+      (l) => !!l.last_heartbeat_at && now.getTime() - Date.parse(l.last_heartbeat_at) <= HEARTBEAT_FRESH_MS,
+    )
+    .map((l) => l.code as ProbeLocation);
 
   for (const m of monitors) {
     const status = statuses.data?.find((st) => st.site_id === m.siteId);

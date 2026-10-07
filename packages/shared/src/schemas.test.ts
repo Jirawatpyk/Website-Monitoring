@@ -15,8 +15,9 @@ const result = {
 };
 
 describe('checkResultSchema', () => {
-  it('accepts a probe result', () => {
-    expect(checkResultSchema.parse(result)).toEqual(result);
+  it('accepts a probe result, a scheduled check unless it says it is the recheck', () => {
+    expect(checkResultSchema.parse(result)).toEqual({ ...result, attempt: 1 });
+    expect(checkResultSchema.parse({ ...result, attempt: 2 }).attempt).toBe(2);
   });
 
   it.each([
@@ -25,6 +26,7 @@ describe('checkResultSchema', () => {
     ['a status code out of range', { statusCode: 700 }],
     ['a monitor id that is not a uuid', { monitorId: 'monitor-1' }],
     ['a local time without zone', { checkedAt: '2026-09-25 09:48:12' }],
+    ['a third attempt', { attempt: 3 }],
   ])('rejects %s', (_name, change) => {
     expect(checkResultSchema.safeParse({ ...result, ...change }).success).toBe(false);
   });

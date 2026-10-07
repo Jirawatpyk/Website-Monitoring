@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Database, DbClient } from '@dxt/db';
 import { runEngine } from './engine/run-engine';
+import { engineAfterIngest, storeBangkokResults } from './ingest/bangkok';
 import { dispatchNotifications } from './notifier/dispatch';
 
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
@@ -59,7 +60,7 @@ async function newSite(
 type Outcome = 'pass' | 'fail';
 async function results(
   monitorId: string,
-  rows: [location: 'SIN' | 'TYO', Outcome, at: Date, attempt?: 1 | 2][],
+  rows: [location: 'BKK' | 'SIN' | 'TYO', Outcome, at: Date, attempt?: 1 | 2][],
 ) {
   const { error } = await db.from('check_results').insert(
     rows.map(([location, outcome, at, attempt = 1]) => ({
@@ -97,8 +98,21 @@ const downRound = (base = 0): ['SIN' | 'TYO', Outcome, Date, (1 | 2)?][] => [
   ['TYO', 'fail', t(base + 32), 2],
 ];
 
+/** The engine expects only locations that beat in the last 3 min (D-019). */
+async function beat(location: 'BKK' | 'SIN' | 'TYO', at: Date | null) {
+  const { error } = await db
+    .from('probe_locations')
+    .update({ last_heartbeat_at: at?.toISOString() ?? null })
+    .eq('code', location);
+  if (error) throw new Error(error.message);
+}
+
 beforeAll(async () => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
+  // SIN and TYO beating, Bangkok's agent not running — as on staging before S03.
+  await beat('SIN', new Date());
+  await beat('TYO', new Date());
+  await beat('BKK', null);
   clientId = (
     await must(
       db
@@ -154,6 +168,54 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     // PRD §9's 30 s clock starts when the last recheck confirmed it (board: "Confirmed down 09:48:41").
     expect(new Date(incidents[0]!.detected_at).getTime()).toBe(t(32).getTime());
     expect(await notificationsOf(incidents[0]!.id)).toHaveLength(1);
+  });
+
+  it('Bangkok completes the round through Ingest: SIN + TYO confirmed, BKK passes last → DOWN in that request (S02b review)', async () => {
+    const { siteId, monitorId } = await newSite('Bangkok last');
+    await beat('BKK', new Date());
+    try {
+      await results(monitorId, downRound());
+      // Bangkok is beating but hasn't reported: the round waits for it (well before its deadline).
+      await runEngine(db, t(65));
+      expect(await incidentsOf(siteId)).toHaveLength(0);
+
+      await storeBangkokResults(
+        db,
+        [
+          {
+            monitorId,
+            checkedAt: t(3).toISOString(),
+            outcome: 'pass',
+            statusCode: 200,
+            responseMs: 150,
+            ttfbMs: 90,
+            resolvedIp: null,
+            error: null,
+            attempt: 1,
+          },
+        ],
+        new Date(),
+      );
+      // The Ingest route runs this after its response; the engine runs at the round's time here.
+      vi.spyOn(console, 'info').mockImplementation(() => {});
+      await engineAfterIngest(db, {} as never, Date.now() + 30_000, (d) => runEngine(d, t(66)));
+
+      const incidents = await incidentsOf(siteId);
+      expect(incidents).toHaveLength(1);
+      expect(await notificationsOf(incidents[0]!.id)).toEqual([
+        expect.objectContaining({ template: 'down', status: 'queued' }),
+      ]);
+      const bkk = await must(
+        db
+          .from('check_results')
+          .select('location, attempt')
+          .eq('monitor_id', monitorId)
+          .eq('location', 'BKK'),
+      );
+      expect(bkk).toEqual([{ location: 'BKK', attempt: 1 }]);
+    } finally {
+      await beat('BKK', null);
+    }
   });
 
   it('only one location fails → no incident', async () => {
