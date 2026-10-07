@@ -3,7 +3,7 @@
 -- one email per active Admin), the site note, read-only RLS and the private screenshot bucket.
 begin;
 \ir _helpers.psql
-select plan(38);
+select plan(43);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -197,6 +197,12 @@ select ok(
   not public.engine_escalate_incident((select id from d_inc), now(), date_trunc('minute', now()), '{}', true),
   'a second engine run raises nothing'
 );
+select results_eq(
+  $$select action, before ->> 'severity', after ->> 'severity' from public.audit_log
+    where entity = 'incident' and entity_id = (select id from d_inc) and action = 'incident.severity'$$,
+  $$values ('incident.severity'::text, 'problem'::text, 'down'::text)$$,
+  'raising it writes one audit row, problem → down'
+);
 
 -- ── Site note ────────────────────────────────────────────────────────────
 select lives_ok(
@@ -228,9 +234,22 @@ select isnt(public.open_system_alert('verifier_unavailable', '{}'), null,
   'the next outage opens a new alert');
 select is((select count(*)::int from public.notifications where system_alert_id is not null), 4,
   'and emails the Admins again, even with the first emails still on record');
+select results_eq(
+  $$select action, count(*)::int from public.audit_log where entity = 'system_alert'
+      and entity_id in (select id from public.system_alerts) group by 1 order by 1$$,
+  $$values ('system_alert.cleared'::text, 1), ('system_alert.opened'::text, 2)$$,
+  'opening and clearing an alert are audited'
+);
 
 -- ── RLS: people read, never write ────────────────────────────────────────
+insert into public.agent_heartbeats (name, last_seen_at) values ('verifier', now());
+select tests.as_anon();
+select throws_ok($$select count(*) from public.agent_heartbeats$$, '42501', null, 'anon can''t read heartbeats');
+reset role;
 select tests.authenticate_as((select id from ids where name = 'mint'));
+select is((select count(*)::int from public.agent_heartbeats), 1, 'a Viewer reads the verifier heartbeat');
+select throws_ok($$update public.agent_heartbeats set last_seen_at = now()$$, '42501', null,
+  'people can''t stamp a heartbeat');
 select results_eq(
   $$select (select count(*) from public.verification_jobs) > 0, (select count(*) from public.system_alerts)$$,
   $$values (true, 0::bigint)$$,
