@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-024 | 7 Oct 2026 | S04b rules: a relapse is one state-guarded SQL function; recovery and the status floor follow the severity of what is failing now (`episode_severity`); a flip is an OK ↔ not-OK change at an incident step and the 3rd in 30 min tags flapping; while flapping RECOVERED (Chat + email) becomes one summary held 15 min, every DOWN AGAIN / PROBLEM AGAIN is still posted (Chat only); a < 5 min unacked PROBLEM auto-resolves on its first OK round and still gets RECOVERED; `notifications.dedupe_key` lets a template repeat | ChatAlert note "Drops after 03:24 aren't re-posted"; PostIncident "RECOVERED 04:04:10"; D-004 reply wording "DOWN · site · down again"; gaps — when a relapse emails, what counts as a status change |
 | D-023 | 7 Oct 2026 | A DOWN incident recovers when the primary monitor is OK again, even if a key page still fails; the key page's problem then rejoins the same incident as a PROBLEM relapse (built in S04b). Until S04b, D-022's "recover when every monitor is OK" stays | D-022 recovery rule ("an incident recovers on the first round every monitor is OK") for DOWN incidents |
 | D-022 | 7 Oct 2026 | S04 is split into S04a / S04b. Engine rules: one verdict per monitor per round; site status = the worst verdict, never below an unrecovered incident's severity; non-primary problems are `key_page`; keyword and redirect = a majority in one round; slow = p50 over the threshold 3 rounds in a row; regional = one location failing ≥ 5 min; the faulty-location rule needs ≥ 3 monitors in the minute; fewer than 2 locations beating → Admin alert. PROBLEM is sent at any hour until S08. While flapping, states move as normal and only RECOVERED is held. Every new problem on a recovered incident is a D-004 relapse (S04b). PROBLEM message copy comes from the ChatAlert / EmailAlert rows design added (spec §19) | Gaps — PRD §5 / StatusModel name the triggers but not how they are counted; ChatAlert / EmailAlert have one PROBLEM text line only |
 | D-021 | 7 Oct 2026 | A DOWN confirmed while the site's open incident is a PROBLEM raises that incident to DOWN (same incident and thread, DOWN alert sent, back to waiting for an ack if it had recovered); a DOWN incident's relapse stays D-004 / S04 | Gap — D-004 covers a site failing again, not a PROBLEM incident turning into an outage |
@@ -27,6 +28,52 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-024 — S04b: relapse, flapping and auto-resolve
+
+**Gap.** D-004, D-022, D-023, spec §16.1 and §19.3–19.4 say what should happen, but not:
+- how overlapping engine runs avoid a double reply;
+- what a "status change" is when the site's shown status lags a round behind a recovery (it shows OK only after the 2nd OK round);
+- how a DOWN incident that carries on as a key-page PROBLEM (D-023) recovers;
+- which channels the relapse and flapping messages use.
+
+The ChatAlert board also has a note, "Drops after 03:24 aren't re-posted", that contradicts §19.4 ("only the RECOVERED replies are held"). PostIncident shows RECOVERED at 04:04:10, where §19.4 and ChatAlert put the summary at 04:19.
+
+**Decision (7 Oct 2026, with Tao).**
+- **Relapse.** A new DOWN or PROBLEM on an incident in Monitoring or Needs root cause joins it. One state-guarded SQL function, `engine_relapse_incident`, does all of it in one transaction:
+  - the state goes back to Acknowledged if acked, Escalated if a level had fired, otherwise Unacked;
+  - `recovered_at` is cleared;
+  - severity only goes up;
+  - the `down_again` / `problem_again` Chat reply is queued in the thread.
+
+  If two runs overlap, the second fails the guard and sends nothing. A DOWN on a recovered PROBLEM incident stays D-021 (DOWN card).
+- **Episode severity.** `incidents.episode_severity` is the severity of what is failing now. The status floor and recovery follow it:
+  - a DOWN episode recovers on the round the primary monitor is OK (D-023);
+  - a PROBLEM episode recovers when every monitor is OK.
+
+  With D-023, round N records RECOVERED and the site shows PROBLEM. Round N+1 rejoins as PROBLEM AGAIN. `severity` keeps `down` for the record.
+- **Flip.** A flip is the site going OK → not-OK (open, relapse, escalate) or not-OK → OK (a recovery where every monitor is OK). It is recorded at that round in `site_status.flips` and `flip_ok`, inside the guarded SQL. A D-023 partial recovery and the PROBLEM relapse after it are not flips. The relapse that makes the 3rd flip in 30 min tags `is_flapping` (VOCA: 03:12, 03:19, 03:24).
+- **While flapping.**
+  - The states move as normal.
+  - The RECOVERED Chat reply and email are not sent. Instead one summary (Chat + an email to the owner) is queued, held until 15 min after the recovery. Any new drop cancels it, so it goes only after 15 min of continuous OK.
+  - Every drop still posts DOWN AGAIN / PROBLEM AGAIN (§19.4 wins over the board note; Tao's 7 Oct answer).
+- **Channels.** DOWN AGAIN and PROBLEM AGAIN are Chat replies only. The flapping summary also goes by email to the owner.
+- **Auto-resolve (§16.1, D-003).** A PROBLEM episode on a PROBLEM incident that was never acked and recovers less than 5 min after `started_at` goes from its first OK round straight to Resolved (`auto_resolved = true`, hidden by S07). It still gets RECOVERED in Chat and by email, whose last line says it was resolved automatically and needs no root cause. A DOWN never auto-resolves.
+- **Dedupe key (D-014).** `notifications.dedupe_key` joins the once-per-incident index. `recovered`, the AGAIN replies and the summary use the round, so they can repeat.
+- **Copy.** It comes from the ChatAlert rows (DOWN AGAIN VOCA, PROBLEM AGAIN INC-0150, flapping summary) and the rows design adds for the auto-resolved RECOVERED, the later drop while flapping, the D-023 PROBLEM AGAIN and the summary email.
+  - "Outside response hours · timers paused until 09:00" is left out until S08 (D-013).
+  - The board text "DOWN AGAIN" replaces D-004's "DOWN · site · down again".
+
+**Why.**
+- The state guard and the dedupe key make a reply impossible to double, whatever the cron overlap.
+- Recording flips at incident steps ties flapping to what people were told, not to a display that lags.
+- The held summary needs no extra engine wake-up: the notifier claim already waits for `hold_until`.
+
+**Impact.**
+- Migration `relapse_and_flapping`.
+- `@dxt/engine` (`site.ts`, `lifecycle.ts`), `run-engine.ts`.
+- `@dxt/notifier` builders (`down_again`, `problem_again`, `flap_summary`, auto-resolved RECOVERED).
+- ChatAlert / EmailAlert / PostIncident updates from design.
 
 ## D-023 — A DOWN ends when the home page is back; a broken key page carries on as a PROBLEM
 
