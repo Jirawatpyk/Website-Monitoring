@@ -2,7 +2,7 @@
 
 26 vertical slices in 4 phases, following PRD §12: Phase 0 prep → a thin end-to-end slice for one site → the rest of the MVP (P0) → team go-live (P1) → client-facing (P2). Each slice ships something that runs end to end and has observable **Done when** checks; phase gates repeat the PRD §12 exit criteria.
 
-- **Status** is updated by `/slice-review <ID>` when every Done-when line has evidence. Values: `Todo` · `In progress` · `In review` · `Done` · `Blocked`.
+- **Status** is updated by `/slice-review <ID>` when every Done-when line has evidence. Values: `Todo` · `In progress` · `In review` · `Done` · `Blocked`. A line that can only be checked on production keeps the slice `In review` after the merge; a close-out PR sets `Done` with its evidence ([`workflow.md`](workflow.md) step 9).
 - How a slice is worked: [`workflow.md`](workflow.md). Settled conflicts: [`decisions.md`](decisions.md). Board → route map: [`design/screens.md`](design/screens.md). Coverage is checked by `pnpm plan:check`.
 - **Size** (one developer): **S** ≤ 2 days · **M** 3–4 days · **L** 5 days. Nothing is larger than a week; split a slice that grows past L and run `pnpm plan:check`.
 - **PRD week** is the PRD §12 target (week 1 = Mon 28 Sep 2026). The sizes add up to more than that — see [Timeline](#timeline); Q7 is settled: measure S02a, then re-baseline.
