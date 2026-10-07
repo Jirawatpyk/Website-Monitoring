@@ -240,14 +240,123 @@ describe('runEngine — blocked rounds (S03)', () => {
     });
   });
 
-  it('clears a no-poll outage once the verifier polls again', async () => {
+  it.each([
+    ['opened 10 min ago, polling, nothing queued', at(-540), 0, true],
+    ['opened 5 min ago (it could flap)', at(-240), 0, false],
+    ['jobs still queued', at(-540), 2, false],
+  ])(
+    'a verifier-unavailable alert clears once it works again — %s (engine review M3)',
+    async (_n, openedAt, queued, cleared) => {
+      const { db, rpcCalls } = fakeDb({
+        ...verifierUp,
+        'check_results.select': { data: [] },
+        'verification_jobs.select': jobs([], queued),
+        'system_alerts.select': {
+          data: [{ kind: 'verifier_unavailable', context: { reason: 'lease_expired' }, opened_at: openedAt }],
+        },
+      });
+      await runEngine(db, now);
+      expect(rpcCalls).toEqual(
+        cleared ? [{ name: 'clear_system_alert', args: { p_kind: 'verifier_unavailable' } }] : [],
+      );
+    },
+  );
+
+  it('a job queued 35 s while every session was busy waits its turn (engine review M4)', async () => {
     const { db, rpcCalls } = fakeDb({
+      'agent_heartbeats.select': { data: { last_seen_at: at(60), info: { sessions: 3, free: 0 } } },
+      'verification_jobs.select': jobs([
+        job({ status: 'queued', result: null, created_at: at(30), completed_at: null }),
+      ]),
+    });
+    expect(await runEngine(db, now)).toMatchObject({ unverified: 0 });
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it('a job nobody picked up is expired with its round, so a late verdict can’t land on it', async () => {
+    const { db, calls } = fakeDb({
       ...verifierUp,
-      'check_results.select': { data: [] },
-      'system_alerts.select': { data: [{ kind: 'verifier_unavailable', context: { reason: 'no_poll' } }] },
+      'verification_jobs.select': jobs([
+        job({ status: 'queued', result: null, created_at: at(30), completed_at: null }),
+      ]),
     });
     await runEngine(db, now);
-    expect(rpcCalls).toEqual([{ name: 'clear_system_alert', args: { p_kind: 'verifier_unavailable' } }]);
+    expect(calls.find((c) => c.table === 'verification_jobs' && c.op === 'update')).toMatchObject({
+      values: { status: 'expired' },
+      filters: [
+        ['eq', 'monitor_id', 'm1'],
+        ['eq', 'round_at', at(0)],
+        ['eq', 'status', 'queued'],
+      ],
+    });
+  });
+
+  it('DOWN while a PROBLEM (unverified) is open → raised to DOWN with its alert (D-021)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'check_results.select': {
+        data: [
+          {
+            monitor_id: 'm1',
+            location: 'SIN',
+            outcome: 'fail',
+            checked_at: at(1),
+            attempt: 1,
+            status_code: 500,
+            error: null,
+          },
+          {
+            monitor_id: 'm1',
+            location: 'TYO',
+            outcome: 'fail',
+            checked_at: at(2),
+            attempt: 1,
+            status_code: 500,
+            error: null,
+          },
+          {
+            monitor_id: 'm1',
+            location: 'SIN',
+            outcome: 'fail',
+            checked_at: at(31),
+            attempt: 2,
+            status_code: 500,
+            error: null,
+          },
+          {
+            monitor_id: 'm1',
+            location: 'TYO',
+            outcome: 'fail',
+            checked_at: at(32),
+            attempt: 2,
+            status_code: 500,
+            error: null,
+          },
+        ],
+      },
+      'incidents.select': {
+        data: [
+          {
+            id: 'i1',
+            site_id: 's1',
+            state: 'unacked',
+            severity: 'problem',
+            root_cause_category: null,
+            notifications: [],
+          },
+        ],
+      },
+      'rpc.engine_escalate_incident': { data: true },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ escalated: 1 });
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_escalate_incident',
+      args: {
+        p_incident_id: 'i1',
+        p_detected_at: at(32),
+        p_notify: true,
+        p_context: { confirmingLocations: 2 },
+      },
+    });
   });
 
   it('alerts when more than 5 jobs wait, and clears when the queue drains', async () => {

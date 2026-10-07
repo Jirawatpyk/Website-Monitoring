@@ -55,7 +55,8 @@ export async function leaseJobs(
 ): Promise<LeasedJob[]> {
   const beat = await db
     .from('agent_heartbeats')
-    .upsert({ name: 'verifier', last_seen_at: now.toISOString(), info: { sessions } });
+    // `free` = sessions it could fill now; 0 = busy, so queued jobs aren't "not picked up" (D-019).
+    .upsert({ name: 'verifier', last_seen_at: now.toISOString(), info: { sessions, free: max } });
   if (beat.error) throw new Error(`agent_heartbeats: ${beat.error.message}`);
   const expired = await db.rpc('expire_verification_jobs');
   if (expired.error) throw new Error(`expire_verification_jobs: ${expired.error.message}`);

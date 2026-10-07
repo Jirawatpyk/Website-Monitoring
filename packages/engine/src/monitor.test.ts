@@ -516,3 +516,113 @@ describe('decideMonitor — blocked rounds and the browser verifier (S03, Status
     expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 1 });
   });
 });
+
+// engine-reviewer S03: hard fails never wait for the verifier; a PROBLEM never swallows a DOWN.
+describe('decideMonitor — engine review S03 (spec §6, PRD §9, D-021)', () => {
+  const three = { locations: ['BKK', 'SIN', 'TYO'] as const };
+  const blockedR1 = [check('BKK', 'blocked', 1), check('SIN', 'blocked', 2), check('TYO', 'pass', 3)];
+  const downR2 = [
+    check('BKK', 'pass', 61),
+    check('SIN', 'fail', 62),
+    check('TYO', 'fail', 63),
+    check('SIN', 'fail', 92, 2),
+    check('TYO', 'fail', 93, 2),
+  ];
+  const pendingR1 = {
+    verifierAvailable: true,
+    verifications: new Map([[at(0).getTime(), { state: 'pending' as const }]]),
+  };
+
+  it('H1: a blocked round waiting for its verifier doesn’t hold back a confirmed DOWN in the next round', () => {
+    expect(
+      decideMonitor(snapshot([...blockedR1, ...downR2], { ...three, ...pendingR1, now: at(100) })),
+    ).toMatchObject({
+      kind: 'open',
+      roundAt: at(60),
+      startedAt: at(62),
+      confirmedAt: at(93),
+    });
+  });
+
+  it('H1: a later OK round still waits behind the pending one', () => {
+    const okR2 = [check('BKK', 'pass', 61), check('SIN', 'pass', 62), check('TYO', 'pass', 63)];
+    expect(
+      decideMonitor(snapshot([...blockedR1, ...okR2], { ...three, ...pendingR1, now: at(100) })),
+    ).toEqual({ kind: 'wait' });
+  });
+
+  it('M2: two locations confirmed DOWN → judged without waiting for Bangkok (staging offsets)', () => {
+    const d = decideMonitor(
+      snapshot(
+        [
+          check('TYO', 'fail', 2),
+          check('TYO', 'fail', 32, 2),
+          check('SIN', 'fail', 46),
+          check('SIN', 'fail', 76, 2),
+        ],
+        { ...three, now: at(80) },
+      ),
+    );
+    expect(d).toMatchObject({ kind: 'open', startedAt: at(2), confirmedAt: at(76) });
+  });
+
+  it('H2 (INC-0138 Tubtong): DOWN confirmed while a PROBLEM (unverified) is open → escalate, not a silent relapse', () => {
+    const problem: OpenIncident = {
+      id: 'inc-138',
+      state: 'unacked',
+      severity: 'problem',
+      hasRootCause: false,
+    };
+    expect(decideMonitor(snapshot(downRound(), { open: problem }))).toMatchObject({
+      kind: 'escalate',
+      roundAt: at(0),
+      confirmedAt: at(32),
+    });
+  });
+
+  it('H2: the browser fails while a PROBLEM is open → escalate with the verify job', () => {
+    const problem: OpenIncident = {
+      id: 'inc-138',
+      state: 'acknowledged',
+      severity: 'problem',
+      hasRootCause: false,
+    };
+    const d = decideMonitor(
+      snapshot(blockedR1, {
+        ...three,
+        open: problem,
+        verifications: new Map([
+          [
+            at(0).getTime(),
+            { state: 'failed' as const, jobId: 'j1', completedAt: at(41), detail: 'HTTP 503' },
+          ],
+        ]),
+      }),
+    );
+    expect(d).toMatchObject({
+      kind: 'escalate',
+      confirmedAt: at(41),
+      verifyJobId: 'j1',
+      browserDetail: 'HTTP 503',
+    });
+  });
+
+  it('L4: a [B, B, F] round the browser loaded counts the two reachable locations', () => {
+    const d = decideMonitor(
+      snapshot(
+        [
+          check('BKK', 'blocked', 1),
+          check('SIN', 'blocked', 2),
+          check('TYO', 'fail', 3),
+          check('TYO', 'fail', 33, 2),
+        ],
+        {
+          ...three,
+          open: incident('unacked'),
+          verifications: new Map([[at(0).getTime(), { state: 'loaded' as const, jobId: 'j1' }]]),
+        },
+      ),
+    );
+    expect(d).toMatchObject({ kind: 'recover', okLocations: 2 });
+  });
+});

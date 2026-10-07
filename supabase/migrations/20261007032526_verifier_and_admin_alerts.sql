@@ -159,7 +159,8 @@ begin
 end;
 $$;
 
--- Jobs that can no longer help: a lease that ran out, a verify job nobody picked up within 30 s
+-- Jobs that can no longer help: a lease that ran out, a verify job still queued after 2 min (the
+-- engine already expired it if the verifier had a free session after 30 s),
 -- (its round is already judged), an evidence job older than 15 min. Returns how many expired.
 create function public.expire_verification_jobs()
 returns integer
@@ -172,7 +173,7 @@ begin
   update public.verification_jobs
     set status = 'expired', lease_until = null
     where (status = 'leased' and lease_until < now())
-       or (status = 'queued' and kind = 'verify' and created_at < now() - interval '30 seconds')
+       or (status = 'queued' and kind = 'verify' and created_at < now() - interval '2 minutes')
        or (status = 'queued' and kind = 'evidence' and created_at < now() - interval '15 minutes');
   get diagnostics v_count = row_count;
   return v_count;

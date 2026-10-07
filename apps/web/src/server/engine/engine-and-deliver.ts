@@ -19,7 +19,8 @@ export async function engineAndDeliver(
 ): Promise<EngineSummary & { delivery?: unknown }> {
   const summary = await engine(db);
   // New incident messages, or an Admin alert about the verifier (D-019): send them now.
-  if (summary.opened + summary.recovered + (summary.alerts ?? 0) === 0) return summary;
+  if (summary.opened + summary.recovered + (summary.alerts ?? 0) + (summary.escalated ?? 0) === 0)
+    return summary;
   try {
     return { ...summary, delivery: await dispatchNotifications(notifierDeps(db, env), { deadline }) };
   } catch (err) {

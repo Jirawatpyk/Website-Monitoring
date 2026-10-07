@@ -66,6 +66,7 @@ describe('runEngine', () => {
       verifying: 0,
       unverified: 0,
       alerts: 0,
+      escalated: 0,
     });
     expect(rpcCalls).toEqual([]);
   });
@@ -96,18 +97,30 @@ describe('runEngine', () => {
   });
 
   it.each([
-    ['beating', '2026-10-06T10:00:40Z', 0],
-    ['stopped 3 min ago', '2026-10-06T09:58:00Z', 1],
-    ['never started', null, 1],
-  ])('expects Bangkok only while its agent beats (D-019) — agent %s', async (_name, beat, opened) => {
+    ['beating', '2026-10-06T10:00:40Z', []],
+    ['stopped 3 min ago', '2026-10-06T09:58:00Z', ['engine_record_round']],
+    ['never started', null, ['engine_record_round']],
+  ])('expects Bangkok only while its agent beats (D-019) — agent %s', async (_name, beat, rpcs) => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: ok },
+      'probe_locations.select': { data: [...beating, { code: 'BKK', last_heartbeat_at: beat }] },
+    });
+    // A beating agent that hasn't reported holds an OK round until its deadline; a stopped one doesn't.
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(rpcs);
+  });
+
+  it('a DOWN two locations confirmed is judged without waiting for a beating Bangkok (engine review M2)', async () => {
     const { db } = fakeDb({
       'monitors.select': { data: [monitor()] },
       'check_results.select': { data: down },
-      'probe_locations.select': { data: [...beating, { code: 'BKK', last_heartbeat_at: beat }] },
+      'probe_locations.select': {
+        data: [...beating, { code: 'BKK', last_heartbeat_at: '2026-10-06T10:00:40Z' }],
+      },
       'rpc.engine_open_incident': { data: 'i1' },
     });
-    // A beating agent that hasn't reported holds the round until its deadline; a stopped one doesn't.
-    expect(await runEngine(db, now)).toMatchObject({ opened });
+    expect(await runEngine(db, now)).toMatchObject({ opened: 1 });
   });
 
   it('counts nothing when the site already had an open incident (the function returns null)', async () => {

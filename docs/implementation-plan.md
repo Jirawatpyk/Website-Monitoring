@@ -188,6 +188,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 - **Scope:** FR-03 complete. PROBLEM triggers: slow (p50 over the tier threshold 3 rounds), keyword must / must-not, key page 4xx / 5xx, regional (one location ≥ 5 min), redirect outside the allowlist. Only the primary monitor can make a site DOWN; `< 2` locations → Admin alert. Relapse + flapping (D-004). Wire the rules that already exist in `@dxt/engine` into the engine cron — `faultyLocations`, `isRegionalProblem`, `autoResolves`, the D-003 lifecycle — with integration tests. ChatAlert PROBLEM rows (the 60-min PROBLEM reminder belongs to S08). Test target gains keyword-missing and slow modes.
 - **Boards:** StatusModel · **Test plan:** T01 (the expiring-cert path finishes in S13)
 - **Carried from S02b review:** engine runs overlap (probe trigger + cron); relapse handling must be one state-guarded SQL function, or a relapse alerts once per run.
+- **Carried from S03 review (engine M1):** a blocked round the verifier can't decide while the site's incident is already open (e.g. in Monitoring / Needs root cause, site OK) records the round and the note "Blocked, not verified" but leaves `site_status` OK; S04's status rules must show it as PROBLEM (D-001) and clear it on the next OK round.
 - **Depends on:** S03
 - **Done when:**
   1. **T01:** each test-target mode gives the StatusModel outcome on staging — 200 → OK, 500 / timeout → DOWN, 403-challenge + loads → OK with note, keyword missing → PROBLEM (Keyword), slow 3 rounds → PROBLEM (Slow).

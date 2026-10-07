@@ -3,7 +3,7 @@
 -- one email per active Admin), the site note, read-only RLS and the private screenshot bucket.
 begin;
 \ir _helpers.psql
-select plan(35);
+select plan(38);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -92,11 +92,11 @@ select is(
   0, 'a job already done can''t be completed again'
 );
 
--- A verify job nobody picked up expires after 30 s (the engine already counts the verifier unavailable).
+-- A verify job still queued after 2 min expires.
 insert into public.verification_jobs (kind, monitor_id, site_id, round_at, url, created_at)
 values ('verify', '00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000a2',
         '2026-10-07 03:00Z', 'https://b.pgtap.test', now() - interval '3 minutes');
-select is(public.expire_verification_jobs(), 1, 'a verify job left queued past 30 s expires');
+select is(public.expire_verification_jobs(), 1, 'a verify job left queued past 2 min expires');
 
 -- ── Evidence after a hard-fail DOWN ──────────────────────────────────────
 select isnt(
@@ -168,6 +168,34 @@ select public.engine_open_incident('00000000-0000-0000-0000-0000000000a3', '0000
 select is(
   (select count(*)::int from public.verification_jobs where site_id = '00000000-0000-0000-0000-0000000000a3' and kind = 'evidence'),
   1, 'a browser DOWN without a screenshot queues an evidence job'
+);
+
+-- PROBLEM (unverified) then a confirmed DOWN: raised to DOWN with its alert, once (D-021).
+insert into public.sites (id, client_id, name, tier, primary_owner_id) values
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000c1', 'Site D', 1,
+   (select id from ids where name = 'arm'));
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000d4', '00000000-0000-0000-0000-0000000000a4', 'http', true, 'https://d.pgtap.test');
+create temp table d_inc on commit drop as
+select public.engine_open_incident('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000d4',
+  'blocked_unverified', 'problem', now() - interval '3 minutes', now() - interval '2 minutes',
+  date_trunc('minute', now()) - interval '2 minutes', '{"cause":"Blocked, not verified"}', false) as id;
+select ok(
+  public.engine_escalate_incident((select id from d_inc), now(), date_trunc('minute', now()),
+    '{"cause":"HTTP 500 (SIN, TYO)","confirmingLocations":2}', true),
+  'a confirmed DOWN raises the open PROBLEM'
+);
+select results_eq(
+  $$select i.severity::text, i.state::text, s.status::text,
+           (select count(*)::int from public.notifications n where n.incident_id = i.id and n.template = 'down')
+    from public.incidents i join public.site_status s on s.site_id = i.site_id
+    where i.site_id = '00000000-0000-0000-0000-0000000000a4'$$,
+  $$values ('down', 'unacked', 'down', 2)$$,
+  'to DOWN, the site DOWN, with the DOWN Chat post and the owner email'
+);
+select ok(
+  not public.engine_escalate_incident((select id from d_inc), now(), date_trunc('minute', now()), '{}', true),
+  'a second engine run raises nothing'
 );
 
 -- ── Site note ────────────────────────────────────────────────────────────

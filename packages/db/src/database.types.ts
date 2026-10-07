@@ -445,6 +445,9 @@ isOneToOne: false
 "current_app_role":
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
                            },
+"engine_escalate_incident":
+{ Args: { "p_context": Json,"p_detected_at": string,"p_incident_id": string,"p_notify": boolean,"p_round_at": string }; Returns: boolean
+                           },
 "engine_note_site":
 { Args: { "p_note"?: string,"p_round_at": string,"p_site_id": string }; Returns: undefined
                            },

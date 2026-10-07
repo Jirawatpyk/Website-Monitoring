@@ -107,6 +107,18 @@ export type MonitorDecision =
       verifyJobId?: string;
       browserDetail?: string | null;
     }
+  /**
+   * DOWN confirmed while the site's open incident is a PROBLEM (e.g. blocked, not verified): the
+   * incident becomes DOWN and the DOWN alert goes out in its thread (D-021) — never swallowed.
+   */
+  | {
+      kind: 'escalate';
+      roundAt: Date;
+      confirmedAt: Date;
+      failing: readonly StoredCheck[];
+      verifyJobId?: string;
+      browserDetail?: string | null;
+    }
   /** First OK round: RECOVERED, incident → Monitoring (spec §16.4). */
   | {
       kind: 'recover';
@@ -149,9 +161,27 @@ interface Round {
   rechecks: StoredCheck[];
 }
 
+/** The round waits for its browser verifier job (internal to `decideMonitor`). */
+const PENDING = 'pending' as const;
+
 export function decideMonitor(s: MonitorSnapshot): MonitorDecision {
-  const round = oldestReadyRound(s);
-  if (!round) return { kind: 'wait' };
+  const rounds = unjudgedRounds(s);
+  const oldest = rounds[0];
+  if (!oldest?.ready) return { kind: 'wait' };
+  const decision = judgeRound(s, oldest.round);
+  if (decision !== PENDING) return decision;
+  // Hard fails never wait for the browser verifier (spec §6): a later round that confirms DOWN is
+  // judged now, and the blocked round it passes over is never judged (its verdict comes too late).
+  for (const later of rounds.slice(1)) {
+    if (!later.ready) continue;
+    const d = judgeRound(s, later.round);
+    if (d !== PENDING && (d.kind === 'open' || d.kind === 'escalate')) return d;
+  }
+  return { kind: 'wait' };
+}
+
+/** One round's decision, or PENDING while its verify job runs. */
+function judgeRound(s: MonitorSnapshot, round: Round): MonitorDecision | typeof PENDING {
   const roundAt = round.start;
   // The rows are already chosen; the window only has to include them all.
   const windowSec =
@@ -167,9 +197,12 @@ export function decideMonitor(s: MonitorSnapshot): MonitorDecision {
     if (!(confirmsDown(first, second) && second.kind === 'hard_fail')) {
       return { kind: 'none', roundAt, okRounds: 0 };
     }
-    // A confirmed relapse while an incident is open joins it (D-004) — S04. Nothing new to open.
-    if (s.open) return { kind: 'none', roundAt, okRounds: 0, relapse: true };
     const failing = round.rechecks.filter((c) => second.failing.includes(c.location));
+    if (s.open?.severity === 'problem') {
+      return { kind: 'escalate', roundAt, confirmedAt: confirmedAt(failing), failing };
+    }
+    // A confirmed relapse while a DOWN incident is open joins it (D-004) — S04. Nothing new to open.
+    if (s.open) return { kind: 'none', roundAt, okRounds: 0, relapse: true };
     return {
       kind: 'open',
       roundAt,
@@ -196,16 +229,28 @@ export function decideMonitor(s: MonitorSnapshot): MonitorDecision {
     }
     switch (v.state) {
       case 'pending':
-        return { kind: 'wait' };
+        return PENDING;
       case 'unavailable':
         return { kind: 'unverified', roundAt, startedAt, reason: v.reason, note: UNVERIFIED_NOTE };
       case 'blocked':
         // PRD §5: a plain browser blocked too is a PROBLEM, never hidden — and never a DOWN (D-020).
         return { kind: 'unverified', roundAt, startedAt, reason: 'browser_blocked', note: UNVERIFIED_NOTE };
       case 'loaded':
-        // The browser saw the page: every location counts as reachable this round.
-        return okRound(s, roundAt, round.scheduled, BLOCKED_NOTE);
-      case 'failed':
+        // The browser saw the page: the blocked locations count as reachable this round.
+        return okRound(
+          s,
+          roundAt,
+          round.scheduled.filter((c) => c.outcome !== 'fail'),
+          BLOCKED_NOTE,
+        );
+      case 'failed': {
+        const browser = {
+          confirmedAt: v.completedAt,
+          failing: notPassing,
+          verifyJobId: v.jobId,
+          browserDetail: v.detail,
+        };
+        if (s.open?.severity === 'problem') return { kind: 'escalate', roundAt, ...browser };
         if (s.open) return { kind: 'none', roundAt, okRounds: 0, relapse: true };
         return {
           kind: 'open',
@@ -216,6 +261,7 @@ export function decideMonitor(s: MonitorSnapshot): MonitorDecision {
           verifyJobId: v.jobId,
           browserDetail: v.detail,
         };
+      }
     }
   }
 
@@ -254,25 +300,38 @@ function okRound(
 }
 
 /**
- * The oldest round after `lastRoundAt` (within the lookback), if it is complete or past its deadline.
- * Rounds are judged in order, so a confirmed DOWN in one round is never skipped for a later one; the
- * runner calls again until it gets `wait`.
+ * The rounds after `lastRoundAt` (within the lookback), oldest first, each ready once complete, past
+ * its deadline, or already decided DOWN. Rounds are judged in order, so a confirmed DOWN in one round
+ * is never skipped for a later one; only a round waiting for its verifier lets a later DOWN through.
+ * The runner calls again until it gets `wait`.
  */
-function oldestReadyRound(s: MonitorSnapshot): Round | null {
+function unjudgedRounds(s: MonitorSnapshot): { round: Round; ready: boolean }[] {
   const intervalMs = s.intervalSec * 1000;
   const oldestAllowed = s.now.getTime() - lookbackMs(s.intervalSec);
   const starts = new Set<number>();
   for (const c of s.checks) {
     if (c.attempt === 1) starts.add(Math.floor(c.checkedAt.getTime() / intervalMs) * intervalMs);
   }
-  const oldestFirst = [...starts]
+  return [...starts]
     .filter((start) => start >= oldestAllowed && (!s.lastRoundAt || start > s.lastRoundAt.getTime()))
-    .sort((a, b) => a - b);
-  const start = oldestFirst[0];
-  if (start === undefined) return null;
-  const round = buildRound(s.checks, start, intervalMs);
-  const pastDeadline = s.now.getTime() - (start + intervalMs) >= ROUND_DEADLINE_MS;
-  return isComplete(round, s.locations) || pastDeadline ? round : null;
+    .sort((a, b) => a - b)
+    .map((start) => {
+      const round = buildRound(s.checks, start, intervalMs);
+      const pastDeadline = s.now.getTime() - (start + intervalMs) >= ROUND_DEADLINE_MS;
+      return { round, ready: isComplete(round, s.locations) || downDecided(round) || pastDeadline };
+    });
+}
+
+/**
+ * Two locations failed the check and their rechecks: a third can't change the verdict, so the round
+ * is judged without waiting for it (PRD §9: DOWN within 30 s of the confirm).
+ */
+function downDecided(round: Round): boolean {
+  const confirmed = round.scheduled.filter(
+    (c) =>
+      c.outcome === 'fail' && round.rechecks.some((r) => r.location === c.location && r.outcome === 'fail'),
+  );
+  return confirmed.length >= 2;
 }
 
 function buildRound(checks: readonly StoredCheck[], start: number, intervalMs: number): Round {

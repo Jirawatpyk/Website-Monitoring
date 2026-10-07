@@ -33,7 +33,7 @@ describe('leaseJobs (GET /api/jobs)', () => {
     expect(calls[0]).toMatchObject({
       table: 'agent_heartbeats',
       op: 'upsert',
-      values: { name: 'verifier', last_seen_at: now.toISOString(), info: { sessions: 1 } },
+      values: { name: 'verifier', last_seen_at: now.toISOString(), info: { sessions: 1, free: 2 } },
     });
     expect(rpcCalls.map((c) => c.name)).toEqual(['expire_verification_jobs', 'claim_verification_jobs']);
     expect(rpcCalls[1]?.args).toEqual({ p_limit: 2 });

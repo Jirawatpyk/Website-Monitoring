@@ -173,12 +173,16 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     expect(await notificationsOf(incidents[0]!.id)).toHaveLength(1);
   });
 
-  it('Bangkok completes the round through Ingest: SIN + TYO confirmed, BKK passes last → DOWN in that request (S02b review)', async () => {
+  it('Bangkok completes the round through Ingest: SIN confirmed, TYO passed, BKK fails twice last → DOWN in that request (S02b review)', async () => {
     const { siteId, monitorId } = await newSite('Bangkok last');
     await beat('BKK', new Date());
     try {
-      await results(monitorId, downRound());
-      // Bangkok is beating but hasn't reported: the round waits for it (well before its deadline).
+      await results(monitorId, [
+        ['SIN', 'fail', t(1)],
+        ['TYO', 'pass', t(2)],
+        ['SIN', 'fail', t(31), 2],
+      ]);
+      // Bangkok is beating but hasn't reported, and one failure isn't DOWN: the round waits for it.
       await runEngine(db, t(65));
       expect(await incidentsOf(siteId)).toHaveLength(0);
 
@@ -188,13 +192,24 @@ describe('engine on stored results (S02a Done-when 3)', () => {
           {
             monitorId,
             checkedAt: t(3).toISOString(),
-            outcome: 'pass',
-            statusCode: 200,
+            outcome: 'fail',
+            statusCode: 500,
             responseMs: 150,
             ttfbMs: 90,
             resolvedIp: null,
             error: null,
             attempt: 1,
+          },
+          {
+            monitorId,
+            checkedAt: t(33).toISOString(),
+            outcome: 'fail',
+            statusCode: 500,
+            responseMs: 150,
+            ttfbMs: 90,
+            resolvedIp: null,
+            error: null,
+            attempt: 2,
           },
         ],
         new Date(),
@@ -213,9 +228,13 @@ describe('engine on stored results (S02a Done-when 3)', () => {
           .from('check_results')
           .select('location, attempt')
           .eq('monitor_id', monitorId)
-          .eq('location', 'BKK'),
+          .eq('location', 'BKK')
+          .order('attempt'),
       );
-      expect(bkk).toEqual([{ location: 'BKK', attempt: 1 }]);
+      expect(bkk).toEqual([
+        { location: 'BKK', attempt: 1 },
+        { location: 'BKK', attempt: 2 },
+      ]);
     } finally {
       await beat('BKK', null);
     }
