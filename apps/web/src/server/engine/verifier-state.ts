@@ -70,7 +70,7 @@ export async function loadVerifierState(
   since: Date,
   now: Date,
 ): Promise<VerifierState> {
-  const [beat, jobs, queued, alerts] = await Promise.all([
+  const [beat, jobs, queued, leased, alerts] = await Promise.all([
     db.from('agent_heartbeats').select('last_seen_at, info').eq('name', 'verifier').maybeSingle(),
     db
       .from('verification_jobs')
@@ -81,18 +81,24 @@ export async function loadVerifierState(
       .in('monitor_id', monitorIds)
       .gte('round_at', since.toISOString()),
     db.from('verification_jobs').select('id', { count: 'exact', head: true }).eq('status', 'queued'),
+    db
+      .from('verification_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'leased')
+      .gte('lease_until', now.toISOString()),
     db.from('system_alerts').select('kind, context, opened_at').is('cleared_at', null),
   ]);
   if (beat.error) throw new Error(`agent_heartbeats: ${beat.error.message}`);
   if (jobs.error) throw new Error(`verification_jobs: ${jobs.error.message}`);
   if (queued.error) throw new Error(`verification_jobs: ${queued.error.message}`);
+  if (leased.error) throw new Error(`verification_jobs: ${leased.error.message}`);
   if (alerts.error) throw new Error(`system_alerts: ${alerts.error.message}`);
 
   const info = (beat.data?.info ?? {}) as { free?: unknown };
   const lastSeen = beat.data?.last_seen_at ? Date.parse(beat.data.last_seen_at) : null;
   const available = lastSeen !== null && now.getTime() - lastSeen <= VERIFIER_FRESH_MS;
-  // Every session was taken at the last poll: queued jobs wait their turn (M4).
-  const busy = available && info.free === 0;
+  // Every session was taken at the last poll and jobs really are leased: queued jobs wait their turn.
+  const busy = available && info.free === 0 && (leased.count ?? 0) > 0;
   const byMonitor = new Map<string, Map<number, Verification>>();
   for (const job of (jobs.data ?? []) as VerifyJobRow[]) {
     if (!job.round_at) continue;

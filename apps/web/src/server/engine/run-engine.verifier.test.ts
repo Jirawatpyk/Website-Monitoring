@@ -262,12 +262,13 @@ describe('runEngine — blocked rounds (S03)', () => {
     },
   );
 
-  it('a job queued 35 s while every session was busy waits its turn (engine review M4)', async () => {
+  it('a job queued 35 s while every session was busy with a live lease waits its turn (engine review M4, N1)', async () => {
     const { db, rpcCalls } = fakeDb({
       'agent_heartbeats.select': { data: { last_seen_at: at(60), info: { sessions: 3, free: 0 } } },
-      'verification_jobs.select': jobs([
-        job({ status: 'queued', result: null, created_at: at(30), completed_at: null }),
-      ]),
+      'verification_jobs.select': jobs(
+        [job({ status: 'queued', result: null, created_at: at(30), completed_at: null })],
+        1,
+      ),
     });
     expect(await runEngine(db, now)).toMatchObject({ unverified: 0 });
     expect(rpcCalls).toEqual([]);

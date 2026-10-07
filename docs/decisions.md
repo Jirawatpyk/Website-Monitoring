@@ -41,7 +41,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 **Why.** An outage must never hide behind a weaker status (spec §11: a site shows its worst status). One incident per site keeps the history and the thread together, and the alert carries the DOWN facts.
 
-**Impact.** Migration `escalate_problem_to_down`, `@dxt/engine` decision `escalate`, `run-engine.ts`. If the PROBLEM was already acknowledged, its DOWN Chat post is dropped as superseded (the incident has an owner) and the email still goes. S08 escalation timing counts from the new "Confirmed down".
+**Impact.** Migration `escalate_problem_to_down`, `@dxt/engine` decision `escalate`, `run-engine.ts`. The DOWN Chat post goes out even when the PROBLEM was already acknowledged: acknowledging "blocked, not verified" isn't acknowledging an outage (the notifier doesn't drop an escalated DOWN as superseded). The DOWN's own start, its first failed check, is kept in the alert context and the `escalated_to_down` event (`downStartedAt`): uptime (spec §5) and the client-update track (D-002, S11) count from there, not from the PROBLEM's `started_at`. S08 escalation timing counts from the new "Confirmed down".
 
 ## D-020 — Blocked in the browser too: PROBLEM, not DOWN
 

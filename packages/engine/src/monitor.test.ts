@@ -275,7 +275,7 @@ describe('decideMonitor — engine-reviewer round 2 (spec §6, PRD §5)', () => 
   });
 
   it('skips rounds older than the lookback', () => {
-    expect(decideMonitor(snapshot(downRound(), { now: at(400) }))).toEqual({ kind: 'wait' });
+    expect(decideMonitor(snapshot(downRound(), { now: at(600) }))).toEqual({ kind: 'wait' });
   });
 
   it('Tier 2: a check late in its 3-minute round rechecks across the boundary', () => {
@@ -551,6 +551,29 @@ describe('decideMonitor — engine review S03 (spec §6, PRD §9, D-021)', () =>
     ).toEqual({ kind: 'wait' });
   });
 
+  it('N3: a decided DOWN isn’t held back by an older round still missing a location', () => {
+    // R1: SIN + TYO pass, Bangkok (beating) never reported — ready only at its deadline (+135).
+    const okR1 = [check('SIN', 'pass', 1), check('TYO', 'pass', 2)];
+    expect(decideMonitor(snapshot([...okR1, ...downR2], { ...three, now: at(100) }))).toMatchObject({
+      kind: 'open',
+      roundAt: at(60),
+    });
+  });
+
+  it('N1: the lookback keeps a blocked round in view for its verify job’s longest wait', () => {
+    // Ready at its deadline (+135), job queued busy for 2 min, then leased 60 s: judged at +330.
+    const d = decideMonitor(
+      snapshot([check('BKK', 'blocked', 1), check('SIN', 'blocked', 2)], {
+        ...three,
+        now: at(330),
+        verifications: new Map([
+          [at(0).getTime(), { state: 'unavailable' as const, reason: 'lease_expired' as const }],
+        ]),
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'unverified', roundAt: at(0), reason: 'lease_expired' });
+  });
+
   it('M2: two locations confirmed DOWN → judged without waiting for Bangkok (staging offsets)', () => {
     const d = decideMonitor(
       snapshot(
@@ -576,6 +599,7 @@ describe('decideMonitor — engine review S03 (spec §6, PRD §9, D-021)', () =>
     expect(decideMonitor(snapshot(downRound(), { open: problem }))).toMatchObject({
       kind: 'escalate',
       roundAt: at(0),
+      downStartedAt: at(1),
       confirmedAt: at(32),
     });
   });

@@ -301,7 +301,12 @@ async function apply(
         p_incident_id: incidentId,
         p_detected_at: d.confirmedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
-        p_context: downContext(d, m.timeoutMs),
+        // When the outage started, apart from the PROBLEM before it (uptime, D-002 count from here).
+        p_context: {
+          ...downContext(d, m.timeoutMs),
+          downStartedAt: d.downStartedAt.toISOString(),
+          escalated: true,
+        },
         p_notify: !m.muted,
       });
       if (error) throw new Error(`engine_escalate_incident: ${error.message}`);

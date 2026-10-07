@@ -160,7 +160,7 @@ end;
 $$;
 
 -- Jobs that can no longer help: a lease that ran out, a verify job still queued after 2 min (the
--- engine already expired it if the verifier had a free session after 30 s),
+-- engine expires one sooner itself, at 30 s, when the verifier had a free session),
 -- (its round is already judged), an evidence job older than 15 min. Returns how many expired.
 create function public.expire_verification_jobs()
 returns integer

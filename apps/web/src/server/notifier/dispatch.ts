@@ -3,7 +3,7 @@ import type { DbClient } from '@dxt/db';
 import { incidentThreadId, postChatMessage, sendEmail } from '@dxt/notifier';
 import { UNDO_WINDOW_SEC } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
-import { loadFacts, type Facts, type Notification } from './facts';
+import { contextOf, loadFacts, type Facts, type Notification } from './facts';
 import { renderChat, renderEmail, renderSystemAlertEmail } from './render';
 
 export interface EmailConfig {
@@ -170,7 +170,10 @@ async function dispatchChannel(
       !undoable &&
       (n.template === 'down' || n.template === 'problem') &&
       incident &&
-      !WAITING_FOR_ACK.includes(incident.state)
+      !WAITING_FOR_ACK.includes(incident.state) &&
+      // A PROBLEM raised to DOWN: acknowledging "blocked, not verified" isn't acknowledging an
+      // outage, so its DOWN is posted even when the PROBLEM was acked (D-021).
+      contextOf(n.context).escalated !== true
     ) {
       const dropped = await db
         .from('notifications')

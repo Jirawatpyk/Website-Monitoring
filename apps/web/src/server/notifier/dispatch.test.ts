@@ -230,6 +230,19 @@ describe('dispatchNotifications', () => {
     ]);
   });
 
+  it('posts a PROBLEM raised to DOWN even when the PROBLEM was acknowledged (D-021)', async () => {
+    const escalated = notification('down', { context: { cause: 'HTTP 500 (SIN, TYO)', escalated: true } });
+    const { db } = fakeDb(
+      queue([escalated], [], { state: 'acknowledged', acked_at: '2026-10-06T02:00:00Z' }),
+    );
+    const post = okPost();
+    expect(
+      await dispatchNotifications({ db, webhookUrl, email: undefined, appUrl, now, post }),
+    ).toMatchObject({
+      chat: { sent: 1, superseded: 0 },
+    });
+  });
+
   it('retries a failed Chat post at +30 s, +2 min, +8 min, then falls back to email', async () => {
     const post = vi.fn(async () => ({ ok: false as const, error: 'HTTP 503' }));
     const at = (attempts: number) => {

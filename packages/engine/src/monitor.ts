@@ -114,6 +114,8 @@ export type MonitorDecision =
   | {
       kind: 'escalate';
       roundAt: Date;
+      /** The DOWN's first failed (or blocked) check — the PROBLEM may have started long before. */
+      downStartedAt: Date;
       confirmedAt: Date;
       failing: readonly StoredCheck[];
       verifyJobId?: string;
@@ -145,10 +147,13 @@ export const RECHECK_WITHIN_MS = 60_000;
 
 /**
  * How far back the runner must load results for a monitor so every round still to be judged is
- * complete in view: one interval, the deadline, a recheck and slack. Older rounds are skipped.
+ * complete in view: one interval, the deadline, a recheck, a blocked round's verify job at its
+ * longest (queued 2 min while the verifier is busy, then a 60 s lease) and slack. Older rounds are
+ * skipped, so none may still be waiting for its verdict.
  */
+export const VERIFY_WAIT_MAX_MS = 120_000 + 60_000;
 export function lookbackMs(intervalSec: number): number {
-  return intervalSec * 1000 + ROUND_DEADLINE_MS + RECHECK_WITHIN_MS + 30_000;
+  return intervalSec * 1000 + ROUND_DEADLINE_MS + RECHECK_WITHIN_MS + VERIFY_WAIT_MAX_MS + 30_000;
 }
 
 const RECOVERABLE: readonly IncidentState[] = ['unacked', 'escalated', 'acknowledged'];
@@ -167,11 +172,14 @@ const PENDING = 'pending' as const;
 export function decideMonitor(s: MonitorSnapshot): MonitorDecision {
   const rounds = unjudgedRounds(s);
   const oldest = rounds[0];
-  if (!oldest?.ready) return { kind: 'wait' };
-  const decision = judgeRound(s, oldest.round);
-  if (decision !== PENDING) return decision;
-  // Hard fails never wait for the browser verifier (spec §6): a later round that confirms DOWN is
-  // judged now, and the blocked round it passes over is never judged (its verdict comes too late).
+  if (!oldest) return { kind: 'wait' };
+  if (oldest.ready) {
+    const decision = judgeRound(s, oldest.round);
+    if (decision !== PENDING) return decision;
+  }
+  // A DOWN never waits (spec §6, PRD §9): not for a blocked round's verifier, nor for an older round
+  // still missing a location. A later round that confirms DOWN is judged now; the older one it passes
+  // over is never judged (its result comes too late to matter).
   for (const later of rounds.slice(1)) {
     if (!later.ready) continue;
     const d = judgeRound(s, later.round);
@@ -199,7 +207,13 @@ function judgeRound(s: MonitorSnapshot, round: Round): MonitorDecision | typeof 
     }
     const failing = round.rechecks.filter((c) => second.failing.includes(c.location));
     if (s.open?.severity === 'problem') {
-      return { kind: 'escalate', roundAt, confirmedAt: confirmedAt(failing), failing };
+      return {
+        kind: 'escalate',
+        roundAt,
+        downStartedAt: firstFailedCheck(s.checks, failing),
+        confirmedAt: confirmedAt(failing),
+        failing,
+      };
     }
     // A confirmed relapse while a DOWN incident is open joins it (D-004) — S04. Nothing new to open.
     if (s.open) return { kind: 'none', roundAt, okRounds: 0, relapse: true };
@@ -250,7 +264,9 @@ function judgeRound(s: MonitorSnapshot, round: Round): MonitorDecision | typeof 
           verifyJobId: v.jobId,
           browserDetail: v.detail,
         };
-        if (s.open?.severity === 'problem') return { kind: 'escalate', roundAt, ...browser };
+        if (s.open?.severity === 'problem') {
+          return { kind: 'escalate', roundAt, downStartedAt: startedAt, ...browser };
+        }
         if (s.open) return { kind: 'none', roundAt, okRounds: 0, relapse: true };
         return {
           kind: 'open',
