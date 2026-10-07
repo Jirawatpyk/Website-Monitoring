@@ -1,5 +1,5 @@
-import type { IncidentState, ProbeLocation, SiteStatus, Trigger } from '@dxt/shared';
-import { transition } from './lifecycle';
+import type { IncidentState, ProbeLocation, Severity, SiteStatus, Trigger } from '@dxt/shared';
+import { autoResolves, isFlapping, RECOVERED_STATES, transition } from './lifecycle';
 import {
   buildRound,
   confirmedAt,
@@ -37,10 +37,14 @@ import {
  * the runner loads the facts, applies the decision and records `roundAt` so a round is judged once.
  *
  * - Only the primary monitor can make the site DOWN; any problem on a key page is a PROBLEM (`key_page`).
- * - Site status = the worst verdict; while an open incident hasn't recovered, never below its severity.
- * - An incident recovers on the first round every monitor is OK, and settles on the second.
+ * - Site status = the worst verdict; while an open incident hasn't recovered, never below the
+ *   severity of its drop in progress (`episodeSeverity`, D-024).
+ * - A DOWN drop recovers on the first round the home page answers again (D-023), a PROBLEM drop on
+ *   the first round every monitor is OK; the incident settles on the second.
+ * - A new DOWN / PROBLEM on a recovered incident is a relapse into it (D-004, spec §19.3); the 3rd
+ *   OK ↔ not-OK change in 30 min tags it flapping, and its recoveries hold one summary instead of
+ *   RECOVERED (§19.4). A < 5 min PROBLEM nobody acknowledged auto-resolves (§16.1).
  * - A DOWN never waits: not for a key page, a blocked round's verifier, nor an older incomplete round.
- * - Not here yet: a relapse on a recovered incident (D-004) is flagged `relapse` and logged — S04b.
  */
 
 /** A monitor's carry state from the last judged round (monitor_status). */
@@ -90,6 +94,9 @@ export interface SiteSnapshot {
   verifierAvailable?: boolean;
   /** Per probe minute, locations treated as no data (spec §15.3, `faultyByMinute`). */
   faulty?: ReadonlyMap<number, ReadonlySet<ProbeLocation>>;
+  /** OK ↔ not-OK changes at incident steps in the last 30 min, and the last one's direction (D-024). */
+  flips?: readonly Date[];
+  flipOk?: boolean | null;
 }
 
 /** A monitor's verdict for the judged round, and its carry state for the next one. */
@@ -133,8 +140,25 @@ export type SiteDecision =
   | { kind: 'wait' }
   /** Blocked rounds with no job yet: queue one per monitor; the round waits for them. */
   | { kind: 'verify'; roundAt: Date; monitorIds: string[] }
-  /** Judged; no incident change. `relapse`: a new problem on a recovered incident (D-004, S04b). */
-  | ({ kind: 'none'; okRounds: number; relapse?: true } & Judged)
+  /** Judged; no incident change. */
+  | ({ kind: 'none'; okRounds: number } & Judged)
+  /**
+   * A new drop on a recovered incident joins it (D-004, spec §19.3): DOWN AGAIN (with the DOWN's
+   * facts) or PROBLEM AGAIN. `flapping`: this drop is the 3rd change in 30 min (D-024).
+   */
+  | ({
+      kind: 'relapse';
+      severity: Severity;
+      monitorId: string;
+      trigger: Trigger;
+      detail?: ProblemDetail;
+      /** The drop's first failed check. */
+      startedAt: Date;
+      /** "Confirmed down" of a DOWN relapse; the judged round for a PROBLEM. */
+      detectedAt: Date;
+      flapping: boolean;
+      down?: DownFacts;
+    } & Judged)
   /** A PROBLEM and no incident open: open one (spec §15.4). */
   | ({
       kind: 'problem';
@@ -147,20 +171,26 @@ export type SiteDecision =
   /** DOWN confirmed on the primary's check and recheck (or in the browser): open an incident. */
   | ({ kind: 'open'; startedAt: Date } & DownFacts & Judged)
   /** DOWN confirmed while the open incident is a PROBLEM: raise it to DOWN (D-021). */
-  | ({ kind: 'escalate'; downStartedAt: Date } & DownFacts & Judged)
-  /** First round every monitor is OK: RECOVERED, incident → Monitoring (spec §16.4). */
+  | ({ kind: 'escalate'; downStartedAt: Date; flapping: boolean } & DownFacts & Judged)
+  /**
+   * The drop is over: RECOVERED, incident → Monitoring (spec §16.4), or Resolved when it
+   * auto-resolves (§16.1). `allOk`: every monitor OK (a flip); false for D-023's partial recovery,
+   * where a key page still fails. `holdSummary`: flapping, so one summary after 15 min instead.
+   */
   | ({
       kind: 'recover';
       recoveredAt: Date;
       from: IncidentState;
       to: IncidentState;
       okLocations: number;
+      allOk: boolean;
+      autoResolve: boolean;
+      holdSummary: boolean;
     } & Judged)
   /** Second OK round in a row: the site is OK; incident → Needs root cause (or stays in Monitoring). */
   | ({ kind: 'settle'; from: IncidentState; to: IncidentState } & Judged);
 
 const RECOVERABLE: readonly IncidentState[] = ['unacked', 'escalated', 'acknowledged'];
-const RECOVERED: readonly IncidentState[] = ['monitoring', 'needs_root_cause'];
 /** The round waits for a browser verifier job. */
 const PENDING = 'pending' as const;
 
@@ -170,7 +200,15 @@ type Verdict =
   | { kind: 'blip' }
   | { kind: 'verify' }
   | { kind: 'ok'; reachable: StoredCheck[]; note?: string }
-  | { kind: 'problem'; trigger: Trigger; detail: ProblemDetail; startedAt: Date; note?: string }
+  | {
+      kind: 'problem';
+      trigger: Trigger;
+      detail: ProblemDetail;
+      startedAt: Date;
+      note?: string;
+      /** A passing round with a problem (slow, keyword, …): the page answered from these. */
+      reachable?: StoredCheck[];
+    }
   | ({ kind: 'down'; startedAt: Date } & Omit<DownFacts, 'monitorId'>);
 
 interface Judgement {
@@ -266,8 +304,10 @@ function judgeSiteRound(
   }
   const base = { roundAt, monitors: states, unverified, ...(note ? { note } : {}) };
   const open = s.open;
-  const recovered = !!open && RECOVERED.includes(open.state);
-  const relapse = recovered ? { relapse: true as const } : {};
+  const recovered = !!open && RECOVERED_STATES.includes(open.state);
+  const episode = open ? (open.episodeSeverity ?? open.severity) : null;
+  // A new drop on a recovered incident: is it the 3rd change in 30 min (D-024)?
+  const flapping = recovered && isFlapping(s.flips ?? [], s.flipOk, roundAt);
 
   // ── DOWN (primary only) ──
   if (primaryDown && primary) {
@@ -280,10 +320,23 @@ function judgeSiteRound(
     };
     const judgedDown = { ...base, status: 'down' as const };
     if (open?.severity === 'problem') {
-      return { kind: 'escalate', downStartedAt: primaryDown.startedAt, ...facts, ...judgedDown };
+      return { kind: 'escalate', downStartedAt: primaryDown.startedAt, flapping, ...facts, ...judgedDown };
     }
-    // A confirmed relapse while a DOWN incident is open joins it (D-004) — S04b. Nothing new to open.
-    if (open) return { kind: 'none', okRounds: 0, ...relapse, ...judgedDown };
+    // DOWN AGAIN: the recovered DOWN incident takes the drop (D-004, spec §19.3).
+    if (open && recovered) {
+      return {
+        kind: 'relapse',
+        severity: 'down',
+        monitorId: primary.id,
+        trigger: 'hard_fail',
+        startedAt: primaryDown.startedAt,
+        detectedAt: primaryDown.confirmedAt,
+        flapping,
+        down: facts,
+        ...judgedDown,
+      };
+    }
+    if (open) return { kind: 'none', okRounds: 0, ...judgedDown };
     return { kind: 'open', startedAt: primaryDown.startedAt, ...facts, ...judgedDown };
   }
 
@@ -298,9 +351,35 @@ function judgeSiteRound(
     .sort((a, b) => Number(b.m.isPrimary) - Number(a.m.isPrimary))
     .find((x) => x.v.kind === 'problem');
   if (problem && problem.v.kind === 'problem') {
-    const stillDown = !!open && !recovered && open.severity === 'down';
-    const status = stillDown ? ('down' as const) : ('problem' as const);
-    if (open) return { kind: 'none', okRounds: 0, ...relapse, ...base, status };
+    // D-023: a DOWN drop is over once the home page answers again, whatever a key page says.
+    // RECOVERED now (the site shows PROBLEM); what still fails joins as PROBLEM AGAIN next round.
+    const homeBack =
+      primaryVerdict.kind === 'ok' || (primaryVerdict.kind === 'problem' && !!primaryVerdict.reachable);
+    if (open && !recovered && episode === 'down' && homeBack && RECOVERABLE.includes(open.state)) {
+      const reachable =
+        primaryVerdict.kind === 'ok' || primaryVerdict.kind === 'problem'
+          ? (primaryVerdict.reachable ?? [])
+          : [];
+      const d = recoverDecision(s, open, base, reachable, 'problem', false);
+      if (d) return d;
+    }
+    // PROBLEM AGAIN: the recovered incident takes the new problem (D-004, D-022 — M1 included).
+    if (open && recovered) {
+      return {
+        kind: 'relapse',
+        severity: 'problem',
+        monitorId: problem.m.id,
+        trigger: problem.v.trigger,
+        detail: problem.v.detail,
+        startedAt: problem.v.startedAt,
+        detectedAt: roundAt,
+        flapping,
+        ...base,
+        status: 'problem',
+      };
+    }
+    const status = open && episode === 'down' ? ('down' as const) : ('problem' as const);
+    if (open) return { kind: 'none', okRounds: 0, ...base, status };
     return {
       kind: 'problem',
       monitorId: problem.m.id,
@@ -339,25 +418,55 @@ function okRound(
 ): SiteDecision {
   const open = s.open;
   if (open && RECOVERABLE.includes(open.state)) {
-    const next = transition(open.state, 'recover', open);
-    if (next.ok) {
-      return {
-        kind: 'recover',
-        recoveredAt: earliest(reachable),
-        from: open.state,
-        to: next.state,
-        okLocations: reachable.length,
-        ...base,
-        // PRD §5: the site shows OK only after the second OK round.
-        status: open.severity,
-      };
-    }
+    // PRD §5: the site shows OK only after the second OK round; until then, the drop's severity.
+    const d = recoverDecision(s, open, base, reachable, open.episodeSeverity ?? open.severity, true);
+    if (d) return d;
   }
   if (open && open.state === 'monitoring' && s.okRounds === 1) {
     const next = transition(open.state, 'ok_two_rounds', open);
     if (next.ok) return { kind: 'settle', from: open.state, to: next.state, ...base, status: 'ok' };
   }
   return { kind: 'none', okRounds: Math.min(s.okRounds + 1, 2), ...base, status: 'ok' };
+}
+
+/**
+ * The drop is over. A PROBLEM incident nobody acknowledged that recovers < 5 min after its first
+ * failed check goes straight to Resolved (spec §16.1, D-003); a flapping one holds its RECOVERED for
+ * one summary after 15 min of continuous OK (spec §19.4).
+ */
+function recoverDecision(
+  s: SiteSnapshot,
+  open: OpenIncident,
+  base: Omit<Judged, 'status'>,
+  reachable: readonly StoredCheck[],
+  status: Exclude<SiteStatus, 'maintenance'>,
+  allOk: boolean,
+): SiteDecision | null {
+  const recoveredAt = earliest(reachable);
+  const autoResolve =
+    allOk &&
+    !!open.startedAt &&
+    (open.episodeSeverity ?? open.severity) === 'problem' &&
+    autoResolves({
+      severity: open.severity,
+      recovered: true,
+      acknowledged: !!open.acked,
+      minutesToRecover: (recoveredAt.getTime() - open.startedAt.getTime()) / 60_000,
+    });
+  const next = transition(open.state, autoResolve ? 'auto_resolve' : 'recover', open);
+  if (!next.ok) return null;
+  return {
+    kind: 'recover',
+    recoveredAt,
+    from: open.state,
+    to: next.state,
+    okLocations: reachable.length,
+    allOk,
+    autoResolve,
+    holdSummary: !!open.isFlapping && !autoResolve,
+    ...base,
+    status,
+  };
 }
 
 /** One monitor's verdict for one round, and its carry state after it. */
@@ -430,6 +539,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
           kind: 'problem',
           ...issue,
           startedAt: issueStart(issue.detail, counted, roundAt, s, slowRounds),
+          reachable: passing,
         },
         next,
       };

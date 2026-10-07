@@ -23,8 +23,17 @@ export interface StoredCheck extends LocationResult, CheckFacts {
 export interface OpenIncident {
   id: string;
   state: IncidentState;
+  /** The incident's worst severity (only goes up). */
   severity: Severity;
   hasRootCause: boolean;
+  /** The severity of the drop in progress (D-024): the status floor and the recovery rule follow it. */
+  episodeSeverity?: Severity;
+  /** Someone acknowledged it: a PROBLEM never auto-resolves then (spec §16.1). */
+  acked?: boolean;
+  /** Its first failed check (incident duration, auto-resolve). */
+  startedAt?: Date;
+  /** Tagged flapping (D-004): RECOVERED becomes one summary after 15 min of continuous OK. */
+  isFlapping?: boolean;
 }
 
 /** The site note while a blocked site can't be verified (D-019; trigger label, spec §11). */
