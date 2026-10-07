@@ -35,3 +35,23 @@ describe('deploy/package.json', () => {
     expect(runtime.dependencies).toEqual({ playwright: agent.dependencies.playwright });
   });
 });
+
+describe('the bundle (tsup.config.ts)', () => {
+  it('keeps external only what deploy/package.json installs on the VPS', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { default: tsup } = await import('../tsup.config');
+    const read = async (path: string) =>
+      JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8')) as {
+        dependencies: Record<string, string>;
+      };
+    const [agent, runtime] = await Promise.all([read('../package.json'), read('../deploy/package.json')]);
+    const bundled = (tsup as { noExternal: (string | RegExp)[] }).noExternal;
+    const isBundled = (name: string) =>
+      bundled.some((p) => (typeof p === 'string' ? p === name : p.test(name)));
+    // Seen on the VPS (S03): zod stayed external and the agent couldn't start.
+    const missing = Object.keys(agent.dependencies).filter(
+      (d) => !isBundled(d) && !(d in runtime.dependencies),
+    );
+    expect(missing).toEqual([]);
+  });
+});

@@ -8,7 +8,7 @@ argument-hint: <SliceID, e.g. S02a>
 
 1. Read the `### $ARGUMENTS ·` section of `docs/implementation-plan.md` and the Definition of Done in `docs/workflow.md`.
 2. Run `pnpm check` and `pnpm plan:check`. Stop on failure and fix first.
-3. Run `/code-review high` on the slice's diff against `main`, then the agents named in the slice's **Review** line, in parallel where independent (spec-checker once per board). Fix every High finding — no waivers. Fix every Medium finding, or give the reason in the PR.
+3. Run `/code-review high` on the slice's diff against `main` — invoke the skill itself in this session (Skill tool), not a general-purpose agent given its instructions (retro 7 Oct 2026) — then the agents named in the slice's **Review** line, in parallel where independent (spec-checker once per board). Fix every High finding — no waivers. Fix every Medium finding, or give the reason in the PR.
 4. Run `/verify` on the slice's change (runtime observation: the app running, the changed screen / route / cron driven, output captured; SKIP when there is no runtime surface). For a screen, include the UI checks in `docs/workflow.md` → Definition of Done (hover on every surface, keyboard focus, drawers and dialogs, 390 / 820 / 1440 light and dark) and run `E2E_LOCAL_SUPABASE=1 pnpm --filter @dxt/web exec playwright test e2e/layout-consistency.spec.ts`. Then build an evidence list, one entry per Done-when line: the test name and command, the timestamp / message text / screenshot path, or the SQL test. Evidence that needs staging or a phone and can't be produced here is marked **Needs manual check** with exact steps for Tao.
 5. Run the `slice-verifier` agent with the slice ID and the evidence list.
 6. Update the plan table:
