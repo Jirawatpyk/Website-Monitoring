@@ -4,8 +4,8 @@
 
 - **Status** is updated by `/slice-review <ID>` when every Done-when line has evidence. Values: `Todo` · `In progress` · `In review` · `Done` · `Blocked`. A line that can only be checked on production keeps the slice `In review` after the merge; a close-out PR sets `Done` with its evidence ([`workflow.md`](workflow.md) step 9).
 - How a slice is worked: [`workflow.md`](workflow.md). Settled conflicts: [`decisions.md`](decisions.md). Board → route map: [`design/screens.md`](design/screens.md). Coverage is checked by `pnpm plan:check`.
-- **Size** (one developer): **S** ≤ 2 days · **M** 3–4 days · **L** 5 days. Nothing is larger than a week; split a slice that grows past L and run `pnpm plan:check`.
-- **PRD week** is the PRD §12 target (week 1 = Mon 28 Sep 2026). The sizes add up to more than that — see [Timeline](#timeline); Q7 is settled: measure S02a, then re-baseline.
+- **Size** (one developer): **S** ≤ 2 days · **M** 3–4 days · **L** 5 days. Nothing is larger than a week; split a slice that grows past L and run `pnpm plan:check`. Sizes stay as relative effort; the calendar comes from the measured pace in [Timeline](#timeline) (re-baselined 7 Oct 2026).
+- **PRD week** is the PRD §12 target (week 1 = Mon 28 Sep 2026). Q7 is settled: measure, then re-baseline — done 7 Oct 2026 from six measured slices ([Timeline](#timeline)); the gates land back on the PRD weeks.
 
 ## Slices
 
@@ -23,7 +23,7 @@
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
 | S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06, S08 | 3 | Todo |
-| G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 | Todo |
+| G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
 | S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06, S10, S11 | 4 | Todo |
@@ -34,26 +34,37 @@
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Todo |
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Todo |
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | Todo |
-| G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run | Todo |
+| G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov) | Todo |
 | S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 | 6 | Todo |
 | S21 | Client status page | 3 · P2 | L | FR-16 | S20 | 7 | Todo |
 | S22 | Post-incident review | 3 · P2 | M | FR-18 | G2 | 8 | Todo |
 | S23 | Synthetic transactions | 3 · P2 | L | FR-17 | G2 | 8–9 | Todo |
 | S24 | Public API & webhooks | 3 · P2 | M | FR-19 | G2 | 9–10 | Todo |
-| G3 | **Client-facing gate** | 3 | — | — | S20–S24 | end 10 | Todo |
+| G3 | **Client-facing gate** | 3 | — | — | S20–S24 | end 10 (≈ 27 Nov – 4 Dec) | Todo |
 
 Every slice also meets the [Definition of Done](workflow.md#definition-of-done) (checks, reviews, no dead controls, docs updated). Each slice's **Review** line names the domain agents; `/code-review high` (step 6, Claude) and `/verify` (step 7, typed by Tao, when the slice has a runtime surface) run on every slice in addition.
 
 ## Timeline
 
-| Phase | PRD target | Sum of sizes (1 developer) |
-|---|---|---|
-| 0 Prep | week 1 | week 1 |
-| 1 MVP (S01–S09) | weeks 2–3 (10 working days) | ≈ 45 days ≈ 9 weeks (S04 split into S04a L + S04b L, 7 Oct) |
-| 2 Team go-live (S10–S19) | weeks 4–5 + buffer, then 2-week parallel run | ≈ 36 days ≈ 7 weeks (parallel run overlaps) |
-| 3 Client-facing (S20–S24) | weeks 6–10 | ≈ 23 days ≈ 5 weeks |
+| Phase | PRD target | Sum of sizes (1 developer, 28 Sep) | Re-baselined 7 Oct 2026 (measured pace) |
+|---|---|---|---|
+| 0 Prep | week 1 | week 1 | Done 6 Oct |
+| 1 MVP (S01–S09) | weeks 2–3 (10 working days), gate end of week 3 = Fri 16 Oct | ≈ 45 days ≈ 9 weeks | S01–S04b done 7 Oct; S05–S09 ≈ 6 working days → **G1 ≈ Fri 16 – Wed 21 Oct** |
+| 2 Team go-live (S10–S19) | weeks 4–5 + buffer, then 2-week parallel run (≈ Fri 13 Nov) | ≈ 36 days ≈ 7 weeks | S10–S18 ≈ 8–10 working days, S19 UAT + game day ≈ 2–3, then the 2-week run (10 working days, fixed) → **G2 ≈ Wed 18 – Fri 20 Nov** |
+| 3 Client-facing (S20–S24) | weeks 6–10, gate end of week 10 = Fri 4 Dec | ≈ 23 days ≈ 5 weeks | ≈ 7–9 working days after G2 → **G3 ≈ Fri 27 Nov – Fri 4 Dec** |
 
-The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2026): keep the PRD order, build S02a, and decide on dates / capacity / scope with its real duration. Slices are sized without assuming AI-assisted speed-ups; S02a is deliberately small (≤ 2 days) so the first real measurement arrives early: if it takes longer than its size, re-baseline the plan before starting S02b.
+**Re-baseline (7 Oct 2026, Q7).** Six slices are measured: S01 (M) about 1 working day, S02a (S) 2 h, S02b (M) 2 h 45 min, S03 (L) 4 h, S04a (L) 3 h, S04b (L) 2.5 h. Each includes `/code-review`, the domain reviewers (often two rounds), staging, Tao's `/verify` and the merge. The calendar per slice is set well above those hours, because the build is no longer the slow part. What sets the pace now is review rounds, waiting for Tao (`/verify`, merges, approvals) and screens (several boards checked at 390 / 820 / 1440 in light and dark):
+- a logic slice ≈ 0.5 working day;
+- an M with screens ≈ 1 day;
+- an L with screens ≈ 1.5 days;
+- plus about 20 % buffer.
+
+The dates skip the Thai public holidays on Tue 13 Oct and Fri 23 Oct. The order, dependencies and gates don't change. Fixed waits that the pace doesn't shorten:
+- **G1:** all 17 sites entered on production through the UI (S05 Done-when 1). This needs the Site Registration Checklist completed by owners and AMs, and is G1's long pole. G1 also needs a second Admin and the runbook.
+- **G2:** UAT with owners on phones, the game day and the restore drill (S19), then the 2-week parallel run against the CEO's checks, which can't be compressed.
+- **G3:** P2 scope is confirmed with the CEO at G2. A smaller P2 lands earlier.
+
+Re-measure after S06 (the first slice heavy on screens) and adjust if screen slices run longer than 1.5 days.
 
 ---
 
