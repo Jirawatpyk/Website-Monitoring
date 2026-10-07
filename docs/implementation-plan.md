@@ -251,7 +251,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - **D-003 lifecycle:** checked end to end.
   - **D-023:** a DOWN incident recovers when the primary monitor is OK; a key page still failing rejoins the same incident as a PROBLEM relapse.
   - **Carried from S04a review:**
-    - **VPS agent release per instance:** `dxt-agent@staging` and `dxt-agent@production` run from one build in `/opt/dxt-agent`, so a staging release changes what production runs after its next restart. Give each instance its own release folder (`/opt/dxt-agent/<instance>/`, shared browsers), update the systemd template, `apps/vps-agent/deploy/install.md`, the runbook and the `verifier-staging` skill; move the VPS with Tao's OK.
+    - **VPS agent release per instance:** `dxt-agent@staging` and `dxt-agent@production` run from one build in `/opt/dxt-agent`, so a staging release changes what production runs after its next restart. Give each instance its own release folder (`/opt/dxt-agent/<instance>/`, shared browsers), update the systemd template, `apps/vps-agent/deploy/install.md`, the runbook and the `verifier-staging` skill; moving the VPS to the new layout is OK'd by Tao (7 Oct 2026).
     - **Engine loads by RPC (db-reviewer M2):** `run-engine.ts` / `verifier-state.ts` pass every monitor id in a GET query string (`in (…)`), near the gateway's 8 KB limit at the PRD's 200 monitors. Load checks, `monitor_status` and verify jobs through service-role RPCs with keyset paging, before S05 adds real sites.
   - **Messages:** the "down again", "PROBLEM again" and flapping summary rows.
 - **Boards:** ChatAlert (relapse, flapping rows) · **Test plan:** —
