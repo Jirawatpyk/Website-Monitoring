@@ -3,7 +3,9 @@
   "regions": ["sin1"],
   "functions": {
     "src/app/api/cron/probe-sin/route.ts": { "regions": ["sin1"], "maxDuration": 90 },
-    "src/app/api/cron/probe-tyo/route.ts": { "regions": ["hnd1"], "maxDuration": 90 }
+    "src/app/api/cron/probe-tyo/route.ts": { "regions": ["hnd1"], "maxDuration": 90 },
+    "src/app/api/monitor-test/sin/route.ts": { "regions": ["sin1"], "maxDuration": 60 },
+    "src/app/api/monitor-test/tyo/route.ts": { "regions": ["hnd1"], "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/cron/probe-sin", "schedule": "* * * * *" },
