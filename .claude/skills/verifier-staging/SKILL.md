@@ -35,6 +35,15 @@ Modes (`apps/test-target/CLAUDE.md`) and the outcome to expect (StatusModel, D-0
 | `keyword-missing`   | PROBLEM `keyword` (the staging monitor has `must_contain = {Test target}`)                               | the next round             |
 | `slow`              | PROBLEM `slow` on the **3rd** slow round (Tier 1: ~3–4 min)                                              |                            |
 
+Relapse, flapping and auto-resolve (S04b, D-024), on one incident without a reset in between:
+
+| Sequence                                              | Expect                                                                                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `error` → `ok` (2 rounds) → `error`                   | DOWN, RECOVERED, then DOWN AGAIN in the same thread (`down_again`), incident back to Unacked                 |
+| `error` / `ok` once more after that                   | the 3rd change in 30 min: `is_flapping`; the next recovery queues `flap_summary` (held 15 min), no RECOVERED |
+| leave it `ok` 15 min                                  | one RECOVERED summary in Chat + one owner email ("flapped ×n, down … in total")                              |
+| fresh incident: `keyword-missing` → `ok` within 5 min | PROBLEM, then RECOVERED without a mention, "resolved automatically"; `incidents.auto_resolved`               |
+
 A round that straddles the switch can mix outcomes (e.g. part challenged, part 500 → the browser decides).
 
 ## 3. Observe
@@ -60,4 +69,4 @@ A round that straddles the switch can mix outcomes (e.g. part challenged, part 5
 
 ## 4. Reset between runs
 
-Until S04b builds relapse, a new problem on an incident that is still open (Monitoring / Needs root cause) opens nothing new. Before the next mode run `supabase/staging/reset-test-incident.sql` in the SQL editor, and leave the target on `ok` at the end.
+A new problem on an incident that is still open (Monitoring / Needs root cause) is a relapse into it (S04b), not a new incident. For a clean start — a fresh DOWN or PROBLEM card — run `supabase/staging/reset-test-incident.sql` in the SQL editor first, and leave the target on `ok` at the end.

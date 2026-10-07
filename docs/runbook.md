@@ -54,3 +54,17 @@ The cause line says which trigger and where (spec §19 cause table, D-022): slow
 select m.url, m.is_primary, ms.status, ms.trigger, ms.cause, ms.slow_rounds, ms.failing_since, ms.last_round_at
 from monitor_status ms join monitors m on m.id = ms.monitor_id where ms.site_id = '<site id>';
 ```
+
+## A site keeps failing and recovering (relapse, flapping)
+
+A site that fails again while its incident is open (Monitoring / Needs root cause) joins the same incident and thread: DOWN AGAIN / PROBLEM AGAIN in Chat, mentioning whoever acknowledged, else the owner (D-004, D-024). The incident goes back to Acknowledged (if acked) or Unacked. The 3rd OK ↔ not-OK change in 30 min tags it flapping: RECOVERED replies and emails stop, and one summary (Chat + an email to the owner) is held until 15 min after the last recovery; any new drop cancels it. Read the flips and the held summary:
+
+```sql
+select st.status, st.flips, st.flip_ok, i.state, i.severity, i.episode_severity, i.is_flapping
+from site_status st join incidents i on i.site_id = st.site_id and i.state not in ('resolved','in_review','closed')
+where st.site_id = '<site id>';
+select template, channel, status, hold_until, dedupe_key, error from notifications
+where incident_id = '<incident id>' order by created_at;
+```
+
+A summary row `queued` with `hold_until` in the future is waiting for 15 min of OK; `cancelled` with "Superseded: down again" means the site dropped again first. A PROBLEM nobody acknowledged that clears within 5 min of being flagged resolves itself (`auto_resolved`) and still posts one RECOVERED without a mention (spec §19.6).
