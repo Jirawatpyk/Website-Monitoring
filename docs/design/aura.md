@@ -4,7 +4,7 @@ AURA is the only UI kit. Its full docs live in the [AURA design system](https://
 
 ## Packages
 
-- `@jirawatpyk/aura-react` and `@jirawatpyk/aura-tokens`, pinned `^5.31.0` in `apps/web` (tokens also at the root for the ESLint plugin). Both always share one version.
+- `@jirawatpyk/aura-react` and `@jirawatpyk/aura-tokens`, pinned `^5.33.0` in `apps/web` (tokens also at the root for the ESLint plugin). Both always share one version.
 - CSS is wired in two places — don't add more imports:
   - `apps/web/src/app/layout.tsx` imports `@jirawatpyk/aura-tokens/aura-fonts.local.css` (self-hosted fonts) and `./globals.css`, and renders `<ColorSchemeScript />` in `<head>`.
   - `apps/web/src/app/globals.css` declares `@layer theme, base, aura, components, utilities;`, then imports `tailwindcss`, `@jirawatpyk/aura-tokens/tailwind.css` (Tailwind v4 theme **and** `aura.css` tokens) and `@jirawatpyk/aura-react/styles.layer.css` (components inside `@layer aura`). The layer order lets Tailwind utilities override AURA component styles. Never also import `aura.css` or `styles.css` — that duplicates tokens and components outside the layers.
@@ -48,16 +48,18 @@ Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build proj
 
 ## Requests to AURA
 
-Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac) (6 Oct 2026). All four shipped in **AURA 5.32** and DxT's workarounds are gone:
+Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). All eight requests have shipped and DxT's workarounds are gone. None is open; a new request goes in the doc (template at its foot) and here.
+
+AURA 5.32 (requests 1–4, 6 Oct 2026):
 
 - SideNav header divider → `SideNav headerDivider` (`components/app-shell/app-nav.tsx`).
 - IconButton tooltip → AURA's own tip (hover and keyboard focus); don't wrap IconButtons in `<Tooltip>`, and find them in tests by accessible name, not `title`.
 - PageHeader → AURA `PageHeader` (no outer padding: AppShell's content padding is the page margin).
 - Skeleton pill → `Skeleton variant="pill"` (StatusPill size) or `variant="badge"` (Badge size).
 
-Open (7 Oct 2026):
+AURA 5.33 (requests 5–8, 7 Oct 2026):
 
-- **IconButton hover on SideNav.** The hover background is the same colour as the SideNav surface (both `rgb(250, 250, 250)` in light), so hovering an IconButton in the sidebar footer (Sign out) shows no change; only the tip and the pointer cursor do. Ask: an IconButton's hover is always visibly darker than the surface it sits on (or a SideNav variant). Until it ships, leave it — no local override (no hard-coded colours, and the tip already shows the button is live).
-- **AppShell header on phones only.** With a `header`, AppShell shows its top bar at every width; only the phone boards draw one (D-018). DxT hides it from lg in `apps/web/src/app/globals.css` (`.dxt-shell-phone-bar`, also zeroing `--aura-shell-bar-height`), which reaches into AURA's class names. Ask: an AppShell option for a header shown only where the menu button shows (e.g. `headerHideFrom="lg"`), keeping the sticky offset right. Then drop the class and the CSS block.
-- **PageHeader breadcrumb slot.** `eyebrow` renders a `<p>`, so AURA `Breadcrumb` (`<nav><ol>`) can't go in it without invalid HTML. DxT puts the Breadcrumb 4 px above a PageHeader with no eyebrow (D-018). Ask: a `breadcrumb` slot (or `eyebrow` as a `<div>`), spaced like the eyebrow. Then move the Breadcrumb into it.
-- **SideNav header in the phone drawer = bar height.** Below lg, with `headerDivider`, the drawer's header is 72 px (the desktop board's), so its line sits 16 px below the AppShell bar's line (56 px) beside it — measured at 390 px, light and dark. No board draws the drawer. Ask: inside AppShell's phone drawer, the SideNav header takes `--aura-shell-bar-height` so the two lines meet; the desktop sidebar keeps 72 px. No DxT workaround.
+- Hover on the canvas → `--aura-bg-canvas-hover`: SideNav rows and buttons, PageHeader actions, Pagination and DataTable's header band now show hover. Hover fills read `--aura-hover`; outside AppShell, set `--aura-hover: var(--aura-bg-canvas-hover)` on your own canvas-coloured area. Nothing to change in DxT.
+- Phone-only top bar → `AppShell headerHideFrom="lg"` (`app/(app)/layout.tsx`): the bar, header and all, shows only below 1024 px, and `--aura-shell-bar-height` is 0 from lg (D-018).
+- Breadcrumb → `PageHeader breadcrumb={<Breadcrumb … />}`: its own `div` 4 px above the title, Breadcrumb keeps its 13 px sans; with an eyebrow too, the breadcrumb comes first (D-018). Never put a Breadcrumb in `eyebrow` (a `<p>`).
+- Phone drawer header → takes the bar's measured height so the two lines meet; the drawer's close button is a 44 px target on touch. Nothing to change in DxT.
