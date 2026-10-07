@@ -16,7 +16,7 @@
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Done |
-| S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | In review |
+| S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | M | — | S04a | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
@@ -225,7 +225,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   4. M1: a blocked round the verifier can't decide while the incident is open shows the site as PROBLEM, and the next OK round clears it (engine + integration tests).
   5. Fewer than 2 locations beating → one Admin email; it clears when they come back (test).
 - **Review:** engine-reviewer, message-checker, security-reviewer (migration, probe / ingest fields), db-reviewer (`monitor_status`, `check_results` columns).
-- **Notes (evidence):** started 7 Oct 2026 ~09:00Z; staging verified 11:43Z. Split from S04 and engine rules per D-022; PROBLEM copy from the ChatAlert / EmailAlert rows and spec §19 design added the same day. Staging: migration `problem_triggers` by `pnpm db:push:staging` (before the code, as its header says); `dxt-agent@staging` redeployed (keyword result + final URL from Bangkok too); test-target modes `keyword-missing` / `slow`; the staging monitor's `must_contain = {Test target}`; `reset-test-incident.sql` between modes (relapse is S04b).
+- **Notes (evidence):** merged 7 Oct 2026 as PR #39 (`77f2547`); `migrate-production` applied `problem_triggers`, the production deploy is Ready (`/login` 200) and `dxt-agent@production` runs the new build (keyword result + final URL from Bangkok). `/verify` (Tao) PASS; its two copy findings fixed before the merge. **S04a Done.** Started 7 Oct 2026 ~09:00Z; staging verified 11:43Z — ≈ 3 h with three review rounds (planned L). Split from S04 and engine rules per D-022; PROBLEM copy from the ChatAlert / EmailAlert rows and spec §19 design added the same day. Staging: migration `problem_triggers` by `pnpm db:push:staging` (before the code, as its header says); `dxt-agent@staging` redeployed (keyword result + final URL from Bangkok too); test-target modes `keyword-missing` / `slow`; the staging monitor's `must_contain = {Test target}`; `reset-test-incident.sql` between modes (relapse is S04b).
   - **Done-when 1 (T01) ✓** staging, 7 Oct (UTC):
     - `keyword-missing` 11:19:01 → INC-0011 PROBLEM `keyword` detected 11:20:01.5; email 11:20:02.2, Chat 11:20:02.9; cause "Missing “Test target” on / (BKK, SIN, TYO)" (all three locations, Bangkok included). → `ok` 11:23:35 → RECOVERED email 11:25:02.8 / Chat 11:25:03.2, incident Monitoring.
     - `slow` 11:26:39 → rounds 11:27 / 11:28 / 11:29 p50 ≈ 6.1 s → INC-0012 PROBLEM `slow` detected 11:30:07.5 (`monitor_status.slow_rounds` 3); email 11:30:08.2, Chat 11:30:08.8; cause "p50 6.1 s (BKK, SIN, TYO) · over the Tier 1 limit of 3 s for 3 checks in a row". → `ok` → RECOVERED 11:32:02.
