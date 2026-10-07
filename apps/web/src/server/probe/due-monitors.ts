@@ -15,6 +15,9 @@ export interface DueMonitor {
   mustNotContain: string[];
 }
 
+/** Monitor types the HTTP probes check (`keyword` is an HTTP check with keywords). */
+export const HTTP_MONITOR_TYPES = ['http', 'keyword'] as const;
+
 /** Tier 1 every minute, Tier 2 every 3, Tier 3 every 5 (PRD §2), on the UTC minute. */
 export function isDue(tier: Tier, at: Date): boolean {
   const everyMin = TIER_CONFIG[tier].intervalSec / 60;
@@ -29,7 +32,9 @@ export async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonito
   const { data, error } = await db
     .from('monitors')
     .select('id, url, method, timeout_ms, must_contain, must_not_contain, sites!inner(tier, is_active)')
-    .eq('sites.is_active', true);
+    .eq('sites.is_active', true)
+    // HTTP page monitors only: SSL / domain (S13) and browser (S23) monitors are checked their own way.
+    .in('type', HTTP_MONITOR_TYPES);
   if (error) throw new Error(`monitors: ${error.message}`);
   return data
     .filter((m) => isDue(m.sites.tier as Tier, at))

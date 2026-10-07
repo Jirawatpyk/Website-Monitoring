@@ -228,6 +228,20 @@ describe('decideSite — only the primary monitor can make a site DOWN (spec §6
     });
   });
 
+  it('a key page still showing a problem but with no data holds the recovery: nobody saw it recover', () => {
+    const kept = carry({
+      status: 'problem',
+      trigger: 'key_page',
+      cause: 'Home OK · /booking → HTTP 500 (BKK)',
+    });
+    const d = decideSite(
+      site([monitor('home', all('pass')), monitor('booking', [], { carry: kept })], {
+        open: incident('unacked', 'problem'),
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'none', status: null });
+  });
+
   it('a key page with no data doesn’t hold back an OK round', () => {
     const d = decideSite(site([monitor('home', all('pass')), monitor('booking', [])]));
     expect(d).toMatchObject({ kind: 'none', okRounds: 1, status: 'ok' });

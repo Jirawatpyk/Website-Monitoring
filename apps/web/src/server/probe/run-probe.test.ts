@@ -127,7 +127,11 @@ describe('runProbe', () => {
     ]);
     expect(s.sleep).not.toHaveBeenCalled();
     // Every monitor of an active site, key pages included — not only the primary (S04a).
-    expect(s.calls.find((c) => c.table === 'monitors')?.filters).toEqual([['eq', 'sites.is_active', true]]);
+    expect(s.calls.find((c) => c.table === 'monitors')?.filters).toEqual([
+      ['eq', 'sites.is_active', true],
+      // HTTP page monitors only: SSL / domain (S13) and browser (S23) are checked their own way.
+      ['in', 'type', ['http', 'keyword']],
+    ]);
     expect(s.calls.find((c) => c.table === 'probe_locations')).toMatchObject({
       op: 'update',
       filters: [['eq', 'code', 'TYO']],

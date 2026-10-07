@@ -126,6 +126,13 @@ describe('runHttpCheck', () => {
     });
   });
 
+  it('cuts a long keyword list and long keywords to what the stores take, never failing the batch', async () => {
+    const many = Array.from({ length: 25 }, (_, i) => `missing-${i}-${'x'.repeat(250)}`);
+    const result = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok`, mustContain: many });
+    expect(result.keywordMissing).toHaveLength(20);
+    expect(result.keywordMissing![0]).toHaveLength(200);
+  });
+
   it('matches keywords case-sensitively, like the browser verifier', async () => {
     const result = await runHttpCheck({
       allowPrivateTargets: true,

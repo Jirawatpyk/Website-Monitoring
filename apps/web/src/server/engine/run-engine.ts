@@ -22,6 +22,7 @@ import {
 } from '@dxt/notifier';
 import { TIER_CONFIG, type ProbeLocation, type Tier, type Trigger } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
+import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
@@ -141,6 +142,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
 
   /** Sites the verifier couldn't decide this run, with the reason it saw (D-019). */
   const unverifiedSites = new Map<string, string>();
+  const unverifiedMonitors = new Set<string>();
   for (const site of sites) {
     const status = statuses.data?.find((st) => st.site_id === site.id);
     const open = incidents.data?.find((inc) => inc.site_id === site.id);
@@ -189,7 +191,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         console.warn(JSON.stringify({ event: 'relapse_not_alerted', site: site.id, incident: open?.id }));
       }
       for (const u of decision.unverified) {
-        summary.unverified += 1;
+        unverifiedMonitors.add(u.monitorId);
         // Judged without it: a late verdict mustn't land on this round or clear the alert.
         if (u.reason === 'not_picked_up') await expireUnpicked(db, u.monitorId, decision.roundAt);
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
@@ -231,6 +233,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     }
   }
 
+  summary.unverified = unverifiedMonitors.size;
   summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations);
   return summary;
 }
@@ -440,7 +443,8 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
     .select(
       'id, url, is_primary, must_contain, timeout_ms, thresholds, allowed_redirect_domains, site_id, sites!inner(name, tier, is_active, muted_until)',
     )
-    .eq('sites.is_active', true);
+    .eq('sites.is_active', true)
+    .in('type', HTTP_MONITOR_TYPES);
   if (error) throw new Error(`monitors: ${error.message}`);
   const sites = new Map<string, SiteRow>();
   for (const m of data) {

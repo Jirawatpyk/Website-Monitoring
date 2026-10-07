@@ -315,7 +315,12 @@ function judgeSiteRound(
     return { kind: 'none', okRounds: 0, ...base, status: null };
   }
 
-  // ── Every monitor OK (key pages with no data don't hold it back) ──
+  // A key page still showing a problem but with no data this round: nobody saw it recover.
+  if (verdicts.some((x) => x.v.kind === 'insufficient' && x.m.carry.status !== 'ok')) {
+    return { kind: 'none', okRounds: s.okRounds, ...base, status: null };
+  }
+
+  // ── Every monitor OK (a key page with no data that was OK doesn't hold it back) ──
   const reachable = primaryVerdict.kind === 'ok' ? primaryVerdict.reachable : [];
   return okRound(s, base, reachable);
 }

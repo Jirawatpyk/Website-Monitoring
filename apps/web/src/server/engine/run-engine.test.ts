@@ -398,7 +398,7 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
     expect(rpcCalls.filter((c) => c.name.startsWith('engine_'))).toEqual([]);
   });
 
-  it('keeps a key page’s worded cause while it has no data, and recovers RECOVERED for a PROBLEM', async () => {
+  it('keeps a key page’s worded cause while it has no data, and doesn’t recover what nobody saw recover', async () => {
     const booking = page({ id: 'm2', url: 'https://tubtong.example.test/booking', is_primary: false });
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor(), booking] },
@@ -420,11 +420,11 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
       },
       'rpc.engine_recover_incident': { data: true },
     });
-    // Past the round's deadline: a key page with no data doesn't hold it back any longer.
-    expect(await runEngine(db, new Date(at(140)))).toMatchObject({ recovered: 1 });
+    // Past the round's deadline, home passes, but /booking has no data: its problem holds.
+    expect(await runEngine(db, new Date(at(140)))).toMatchObject({ recovered: 0 });
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_record_round' });
+    expect(rpcCalls[0]?.args).not.toHaveProperty('p_status');
     expect(rpcCalls[0]?.args).toMatchObject({
-      p_notify: true,
-      p_status: 'problem',
       p_monitors: [
         { monitorId: 'm1', status: 'ok' },
         {

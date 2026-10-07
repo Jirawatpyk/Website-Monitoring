@@ -42,6 +42,11 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const BODY_SAMPLE_BYTES = 16_384;
 /** Enough of a real home page to find its keywords (D-022); read only when the monitor has some. */
 export const KEYWORD_BODY_BYTES = 262_144;
+/** What `check_results` and the Ingest schema take: a longer URL or list is cut, never refused. */
+export const MAX_FINAL_URL = 2048;
+export const MAX_KEYWORDS = 20;
+export const MAX_KEYWORD_LENGTH = 200;
+const capped = (words: string[]) => words.slice(0, MAX_KEYWORDS).map((w) => w.slice(0, MAX_KEYWORD_LENGTH));
 export const MAX_REDIRECTS = 5;
 
 /**
@@ -66,9 +71,9 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       ttfbMs,
       error: null,
       bodySample,
-      finalUrl: url.href,
-      keywordMissing: checked ? mustContain.filter((k) => !bodySample.includes(k)) : null,
-      keywordForbidden: checked ? mustNotContain.filter((k) => bodySample.includes(k)) : null,
+      finalUrl: url.href.slice(0, MAX_FINAL_URL),
+      keywordMissing: checked ? capped(mustContain.filter((k) => !bodySample.includes(k))) : null,
+      keywordForbidden: checked ? capped(mustNotContain.filter((k) => bodySample.includes(k))) : null,
     };
   } catch (err) {
     // DNS, TLS, refused connection and timeout all land here: a hard fail.
