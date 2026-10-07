@@ -20,6 +20,23 @@ export function formatProblemCause(detail: ProblemDetail, ctx: ProblemCauseConte
   return capped(ctx.isPrimary ? inner : `Home OK · ${pathOf(ctx.monitorUrl)} → ${inner}`);
 }
 
+/**
+ * A key page's PROBLEM in parts, for the replies that name the page (ChatAlert INC-0151, INC-0152):
+ * "/booking", "HTTP 404", "/booking → HTTP 404 (BKK, SIN, TYO)". Null for the home page.
+ */
+export function formatKeyPage(
+  detail: ProblemDetail,
+  ctx: ProblemCauseContext,
+): { path: string; failure: string; cause: string } | null {
+  if (ctx.isPrimary) return null;
+  const path = pathOf(ctx.monitorUrl);
+  return {
+    path,
+    failure: capped(innerSummary(detail, ctx)),
+    cause: capped(`${path} → ${innerCause(detail, ctx)}`),
+  };
+}
+
 /** What `monitor_status.cause` holds: a long keyword list or path is cut, never refused. */
 export const MAX_CAUSE_LENGTH = 500;
 const capped = (text: string) =>

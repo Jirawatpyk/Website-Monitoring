@@ -6,3 +6,4 @@ export * from './downtime';
 export * from './email-alerts';
 export * from './email-send';
 export * from './problem-cause';
+export * from './relapse-alerts';
