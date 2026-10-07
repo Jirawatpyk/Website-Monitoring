@@ -104,7 +104,6 @@ describe('completeJob (POST /api/jobs)', () => {
           p_screenshot_path: `2026-09/${input.jobId}.jpg`,
         },
       },
-      { name: 'clear_system_alert', args: { p_kind: 'verifier_unavailable' } },
     ]);
   });
 
@@ -142,7 +141,6 @@ describe('completeJob (POST /api/jobs)', () => {
   it.each([
     ['verification_jobs.select', 'verification_jobs: boom'],
     ['rpc.complete_verification_job', 'complete_verification_job: boom'],
-    ['rpc.clear_system_alert', 'clear_system_alert: boom'],
   ])('throws when %s fails', async (key, message) => {
     const { db } = fakeDb({
       'verification_jobs.select': { data: { id: input.jobId, created_at: '2026-10-07T03:00:00Z' } },

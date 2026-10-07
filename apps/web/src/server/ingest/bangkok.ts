@@ -16,12 +16,15 @@ export async function beatBangkok(db: DbClient, now: Date): Promise<void> {
 }
 
 /**
- * The monitors the Bangkok probe should check this minute — the same rule as SIN and TYO. Asking
- * isn't a heartbeat: Bangkok beats only when its results are stored, so an agent whose posts fail
- * never holds rounds open waiting for it.
+ * The monitors the Bangkok probe should check this minute — the same rule as SIN and TYO. Bangkok
+ * beats when its results are stored, so an agent whose posts fail never holds rounds open; in a
+ * minute with nothing due no batch follows, so asking is the beat then (else a Tier 2–3-only
+ * minute would let it drop out of the vote).
  */
-export function dueForBangkok(db: DbClient, now: Date): Promise<DueMonitor[]> {
-  return loadDueMonitors(db, now);
+export async function dueForBangkok(db: DbClient, now: Date): Promise<DueMonitor[]> {
+  const monitors = await loadDueMonitors(db, now);
+  if (!monitors.length) await beatBangkok(db, now);
+  return monitors;
 }
 
 /** Store a batch from the VPS as BKK check results (attempt 1 or the recheck) and beat. */

@@ -1,4 +1,4 @@
-import { assertPublicTarget, hasChallengeSignature, TargetNotAllowedError, type Lookup } from '@dxt/probe';
+import { assertPublicTarget, classifyResponse, TargetNotAllowedError, type Lookup } from '@dxt/probe';
 import type { Api, LeasedJob, Verdict } from './api';
 
 /** PRD §5: 20 s per page. */
@@ -32,14 +32,13 @@ export function judgeVisit(
   mustContain: readonly string[],
 ): Pick<Verdict, 'result' | 'detail'> {
   if (visit.status === null) return { result: 'failed', detail: 'No response' };
-  if (
-    hasChallengeSignature({
-      status: visit.status,
-      headers: new Headers(visit.headers),
-      bodySample: visit.html.slice(0, 16_384),
-    }) &&
-    [403, 429, 503].includes(visit.status)
-  ) {
+  // The same rule as the HTTP probes (D-020): what they call blocked, the browser calls blocked.
+  const seen = {
+    status: visit.status,
+    headers: new Headers(visit.headers),
+    bodySample: visit.html.slice(0, 16_384),
+  };
+  if (classifyResponse(seen) === 'blocked') {
     return { result: 'blocked', detail: `Bot protection in the browser too (HTTP ${visit.status})` };
   }
   if (visit.status >= 400) return { result: 'failed', detail: `HTTP ${visit.status}` };
@@ -118,7 +117,7 @@ export interface VerifierPool {
   drain(): Promise<void>;
 }
 
-/** At most `maxSessions` pages at once (3 on the 2 GB VPS, PRD §5). */
+/** At most `maxSessions` pages at once (PRD §5: 3 sessions; staging runs 1, D-019). */
 export function createVerifierPool(deps: VerifyDeps, maxSessions: number): VerifierPool {
   const running = new Set<Promise<void>>();
   return {

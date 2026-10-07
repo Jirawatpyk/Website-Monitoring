@@ -18,10 +18,18 @@ async function main() {
   const controller = new AbortController();
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => controller.abort());
   const { signal } = controller;
+  // Ends early on shutdown; the abort listener goes when the timer fires (no pile-up on the signal).
   const sleep = (ms: number) =>
     new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, ms);
-      signal.addEventListener('abort', () => (clearTimeout(timer), resolve()), { once: true });
+      const onAbort = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      signal.addEventListener('abort', onAbort, { once: true });
     });
 
   const api = createApi(config.API_BASE_URL, config.INGEST_TOKEN);
@@ -51,17 +59,19 @@ async function main() {
 
   const verifierLoop = async () => {
     let lastPing = 0;
+    // One ping a minute: ok when any poll in that minute got through, /fail only when none did.
+    let okSincePing = false;
     while (!signal.aborted) {
-      let ok = true;
       try {
         await pool.poll();
+        okSincePing = true;
       } catch (err) {
-        ok = false;
         console.error(JSON.stringify({ event: 'verifier_poll_failed', error: String(err) }));
       }
       if (Date.now() - lastPing >= VERIFIER_PING_EVERY_MS) {
         lastPing = Date.now();
-        await ping(config.HEALTHCHECKS_PING_URL_VERIFIER, ok ? 'ok' : 'fail');
+        await ping(config.HEALTHCHECKS_PING_URL_VERIFIER, okSincePing ? 'ok' : 'fail');
+        okSincePing = false;
       }
       await sleep(config.VERIFIER_POLL_MS);
     }

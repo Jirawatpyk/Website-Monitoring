@@ -65,9 +65,9 @@ describe('runProbeRound (Bangkok)', () => {
     expect(posted[1]).toEqual([
       expect.objectContaining({ monitorId: 'm-down', attempt: 2, checkedAt: '2026-10-07T03:01:31.000Z' }),
     ]);
-    // The recheck's timeout fits what's left of the round (55 s budget).
+    // The recheck's timeout fits what's left of the round (48 s budget).
     expect(check).toHaveBeenLastCalledWith(
-      expect.objectContaining({ url: 'https://down.example.test', timeoutMs: 25_000 }),
+      expect.objectContaining({ url: 'https://down.example.test', timeoutMs: 18_000 }),
     );
   });
 

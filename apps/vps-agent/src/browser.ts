@@ -1,8 +1,10 @@
+import { CHALLENGE_STATUSES } from '@dxt/probe';
 import { chromium, type Browser, type Response } from 'playwright';
 import type { PageBrowser, PageVisit } from './verifier';
 
-/** Statuses a challenge page answers with; a JS challenge then redirects to the real page. */
-const CHALLENGE_STATUSES = new Set([403, 429, 503]);
+/** A navigation replaced by another — what a passing JS challenge does mid-load. */
+const REPLACED_NAVIGATION =
+  /interrupted by another navigation|execution context was destroyed|frame was detached/i;
 
 /**
  * Plain headless Chromium (no stealth plugin, PRD §5), one browser for the process and a fresh
@@ -10,14 +12,18 @@ const CHALLENGE_STATUSES = new Set([403, 429, 503]);
  * Glue around Playwright only — the decisions live in verifier.ts.
  */
 export async function launchBrowser(): Promise<PageBrowser & { close(): Promise<void> }> {
-  let browser: Browser | null = null;
-  const ensure = async () => {
-    if (!browser?.isConnected()) browser = await chromium.launch({ headless: true });
-    return browser;
+  // One launch shared by every visit that needs it: three jobs at once never start three browsers.
+  let launching: Promise<Browser> | null = null;
+  const ensure = async (): Promise<Browser> => {
+    const current = launching && (await launching.catch(() => null));
+    if (current?.isConnected()) return current;
+    launching = chromium.launch({ headless: true });
+    return launching;
   };
   return {
     async visit(url: string, timeoutMs: number): Promise<PageVisit> {
       const deadline = Date.now() + timeoutMs;
+      const remaining = () => Math.max(1_000, deadline - Date.now());
       const context = await (await ensure()).newContext({ viewport: { width: 1366, height: 768 } });
       try {
         const page = await context.newPage();
@@ -26,18 +32,26 @@ export async function launchBrowser(): Promise<PageBrowser & { close(): Promise<
         page.on('response', (r) => {
           if (r.request().isNavigationRequest() && r.frame() === page.mainFrame()) last = r;
         });
-        last = await page.goto(url, { timeout: timeoutMs, waitUntil: 'load' });
-        if (last && CHALLENGE_STATUSES.has(last.status())) {
-          // Give a browser challenge the rest of the 20 s to pass, as it would for a visitor.
-          await page
-            .waitForLoadState('networkidle', { timeout: Math.max(1_000, deadline - Date.now()) })
-            .catch(() => undefined);
+        try {
+          last = (await page.goto(url, { timeout: timeoutMs, waitUntil: 'load' })) ?? last;
+        } catch (err) {
+          // A challenge that passes while loading replaces the navigation: follow it, don't fail.
+          if (!REPLACED_NAVIGATION.test(String(err))) throw err;
+          await page.waitForLoadState('load', { timeout: remaining() }).catch(() => undefined);
         }
+        const first = last as Response | null;
+        if (first && CHALLENGE_STATUSES.has(first.status())) {
+          // Give a browser challenge the rest of the 20 s to pass, as it would for a visitor.
+          await page.waitForLoadState('networkidle', { timeout: remaining() }).catch(() => undefined);
+        }
+        const html = await page.content().catch(async () => {
+          await page.waitForLoadState('load', { timeout: remaining() }).catch(() => undefined);
+          return page.content();
+        });
+        const screenshot = await page
+          .screenshot({ type: 'jpeg', quality: 60, timeout: 5_000 })
+          .catch(() => null);
         const final = last as Response | null;
-        const [html, screenshot] = await Promise.all([
-          page.content(),
-          page.screenshot({ type: 'jpeg', quality: 60, timeout: 5_000 }).catch(() => null),
-        ]);
         return {
           status: final?.status() ?? null,
           headers: final ? await final.allHeaders() : {},
@@ -49,6 +63,7 @@ export async function launchBrowser(): Promise<PageBrowser & { close(): Promise<
       }
     },
     async close() {
+      const browser = launching && (await launching.catch(() => null));
       await browser?.close().catch(() => undefined);
     },
   };

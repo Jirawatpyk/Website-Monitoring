@@ -1,42 +1,17 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { z } from 'zod';
+import { leaseQuerySchema, verdictSchema, type LeasedJob } from '@dxt/shared';
+import type { z } from 'zod';
+
+export type { LeasedJob };
 
 /** Private bucket for verifier screenshots (migration verifier_and_admin_alerts, D-019). */
 export const SCREENSHOT_BUCKET = 'verifier-screenshots';
 
-/** The query of a Job API poll: how many jobs the agent can take, and its sessions in use. */
-export const leaseQuerySchema = z.object({
-  max: z.coerce.number().int().min(0).max(3).default(1),
-  sessions: z.coerce.number().int().min(0).max(3).default(0),
-});
-
-/** A job's result from the agent. The screenshot path is never the agent's: the server derives it. */
-export const completeJobSchema = z.object({
-  jobId: z.uuid(),
-  /** loaded → OK + note; failed → DOWN; blocked = a WAF page in the browser too → PROBLEM (D-020). */
-  result: z.enum(['loaded', 'failed', 'blocked']),
-  /** Plain text: it can reach a Chat card's cause (markup stripped). */
-  detail: z
-    .string()
-    .max(500)
-    .transform((s) => s.replace(/[<>]/g, ''))
-    .nullable()
-    .default(null),
-  httpStatus: z.number().int().min(100).max(599).nullable().default(null),
-  /** The agent uploaded the screenshot to the signed URL it was given. */
-  screenshot: z.boolean().default(false),
-});
-export type CompleteJobInput = z.infer<typeof completeJobSchema>;
-
-export interface LeasedJob {
-  id: string;
-  kind: 'verify' | 'evidence';
-  url: string;
-  mustContain: string[];
-  /** One PUT of a JPEG to `url` stores the screenshot; the token is only good for this path. */
-  upload: { url: string; path: string } | null;
-}
+/** The Job API's shapes live in @dxt/shared: the agent validates the same ones (CLAUDE.md rule). */
+export const completeJobSchema = verdictSchema;
+export type CompleteJobInput = z.infer<typeof verdictSchema>;
+export { leaseQuerySchema };
 
 /** `<yyyy-mm>/<job id>.jpg`, by the month the job was created: the housekeeping cron drops whole months. */
 export function screenshotPath(job: { id: string; created_at: string }): string {
@@ -93,8 +68,7 @@ export type CompleteResult =
   | { ok: false };
 
 /**
- * A job's result (POST /api/jobs), accepted only while its lease holds. A completed job proves the
- * verifier works again, so an open "verifier unavailable" alert clears (D-019).
+ * A job's result (POST /api/jobs), accepted only while its lease holds.
  */
 export async function completeJob(db: DbClient, input: CompleteJobInput): Promise<CompleteResult> {
   const found = await db
@@ -118,7 +92,8 @@ export async function completeJob(db: DbClient, input: CompleteJobInput): Promis
   const job = done.data?.[0];
   if (!job) return { ok: false };
 
-  const cleared = await db.rpc('clear_system_alert', { p_kind: 'verifier_unavailable' });
-  if (cleared.error) throw new Error(`clear_system_alert: ${cleared.error.message}`);
+  // The engine clears "verifier unavailable" once it works again (no sooner than 10 min after it
+  // opened, D-019); clearing on every verdict would let a verifier that keeps failing jobs email
+  // the Admins again and again.
   return { ok: true, kind: job.kind === 'evidence' ? 'evidence' : 'verify' };
 }

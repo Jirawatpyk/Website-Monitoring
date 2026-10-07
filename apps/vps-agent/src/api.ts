@@ -1,31 +1,14 @@
-import type { IngestBatch } from '@dxt/shared';
+import {
+  dueMonitorsResponseSchema,
+  leasedJobsResponseSchema,
+  type DueMonitor,
+  type IngestBatch,
+  type LeasedJob,
+  type Verdict,
+} from '@dxt/shared';
+import type { z } from 'zod';
 
-/** A monitor the Ingest API says is due this minute. */
-export interface DueMonitor {
-  id: string;
-  url: string;
-  method: 'GET' | 'HEAD';
-  timeoutMs: number;
-}
-
-/** A verification job leased from the Job API (60 s lease). */
-export interface LeasedJob {
-  id: string;
-  kind: 'verify' | 'evidence';
-  url: string;
-  mustContain: string[];
-  /** One PUT of a JPEG here stores the screenshot; null when the server couldn't sign one. */
-  upload: { url: string; path: string } | null;
-}
-
-export interface Verdict {
-  jobId: string;
-  /** blocked = the browser got a WAF / challenge page too (D-020). */
-  result: 'loaded' | 'failed' | 'blocked';
-  detail: string | null;
-  httpStatus: number | null;
-  screenshot: boolean;
-}
+export type { DueMonitor, LeasedJob, Verdict };
 
 export class ApiError extends Error {
   constructor(
@@ -60,21 +43,27 @@ export function createApi(baseUrl: string, token: string, fetchImpl: typeof fetc
     });
     return res;
   };
-  const json = async <T>(route: string, init?: RequestInit): Promise<T> => {
+  /** A response is checked against the shared schema: a server change can't turn into a silent misread. */
+  const json = async <S extends z.ZodType>(
+    route: string,
+    schema: S,
+    init?: RequestInit,
+  ): Promise<z.infer<S>> => {
     const res = await call(route, init);
     if (!res.ok) throw new ApiError(route.split('?')[0]!, res.status);
-    return (await res.json()) as T;
+    return schema.parse(await res.json());
   };
 
   return {
     async dueMonitors() {
-      return (await json<{ monitors: DueMonitor[] }>('/api/ingest')).monitors;
+      return (await json('/api/ingest', dueMonitorsResponseSchema)).monitors;
     },
     async postResults(results) {
-      await json('/api/ingest', { method: 'POST', body: JSON.stringify({ results }) });
+      const res = await call('/api/ingest', { method: 'POST', body: JSON.stringify({ results }) });
+      if (!res.ok) throw new ApiError('/api/ingest', res.status);
     },
     async leaseJobs(max, sessions) {
-      return (await json<{ jobs: LeasedJob[] }>(`/api/jobs?max=${max}&sessions=${sessions}`)).jobs;
+      return (await json(`/api/jobs?max=${max}&sessions=${sessions}`, leasedJobsResponseSchema)).jobs;
     },
     async completeJob(verdict) {
       const res = await call('/api/jobs', { method: 'POST', body: JSON.stringify(verdict) });

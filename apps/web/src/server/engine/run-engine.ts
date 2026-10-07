@@ -71,7 +71,11 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     escalated: 0,
   };
   const monitors = await loadMonitors(db, now);
-  if (!monitors.length) return summary;
+  if (!monitors.length) {
+    // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
+    summary.alerts = await adminAlerts(db, now, await loadVerifierState(db, [], now, now), new Map());
+    return summary;
+  }
   summary.monitors = monitors.length;
 
   const since = new Date(

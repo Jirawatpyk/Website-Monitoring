@@ -13,7 +13,7 @@ const configSchema = z.object({
   HEALTHCHECKS_PING_URL_VERIFIER: z.url().optional(),
   PROBE_SECRET_HEADER_NAME: z.string().default('X-DxT-Monitor'),
   PROBE_SECRET_HEADER_VALUE: z.string().optional(),
-  /** Browser verifier: at most 3 Chromium sessions on a 2 GB VPS (PRD §5). */
+  /** Browser verifier: at most 3 Chromium sessions (PRD §5); staging runs 1 beside production (D-019). */
   VERIFIER_MAX_SESSIONS: z.coerce.number().int().min(1).max(3).default(3),
   /** How often the verifier asks for work; a job left 30 s counts the verifier unavailable (D-019). */
   VERIFIER_POLL_MS: z.coerce.number().int().min(1_000).max(10_000).default(5_000),

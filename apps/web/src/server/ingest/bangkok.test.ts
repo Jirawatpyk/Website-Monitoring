@@ -48,6 +48,12 @@ describe('Bangkok through the Ingest API', () => {
     expect(calls.some((c) => c.table === 'probe_locations')).toBe(false);
   });
 
+  it('beats on asking only in a minute with nothing due (no batch will follow)', async () => {
+    const { db, calls } = fakeDb({ 'monitors.select': { data: [] } });
+    expect(await dueForBangkok(db, now)).toEqual([]);
+    expect(calls.some((c) => c.table === 'probe_locations' && c.op === 'update')).toBe(true);
+  });
+
   it('throws when the heartbeat fails', async () => {
     const { db } = fakeDb({ 'probe_locations.update': { error: { message: 'boom' } } });
     await expect(storeBangkokResults(db, [], now)).rejects.toThrow('heartbeat: boom');

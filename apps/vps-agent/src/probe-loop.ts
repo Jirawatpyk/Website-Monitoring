@@ -4,8 +4,8 @@ import type { Api, DueMonitor } from './api';
 
 /** The immediate recheck starts about 30 s after the scheduled check (PRD §5, spec §6). */
 export const RECHECK_DELAY_MS = 30_000;
-/** A round must be posted before the next one starts. */
-export const ROUND_BUDGET_MS = 55_000;
+/** Checks end by here so the recheck's post (≤ 10 s) lands before the next tick (+1 s). */
+export const ROUND_BUDGET_MS = 48_000;
 
 export interface ProbeDeps {
   api: Api;
