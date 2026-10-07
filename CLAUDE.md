@@ -81,8 +81,9 @@ Skills:
 - `/implement-screen <Board>` — build one canvas board as a route, following screens.md, the spec and AURA.
 - `/new-migration <name>` — add a Supabase migration with RLS and regenerate types.
 - `/engine-case <rule>` — add a table-driven engine test from a spec example.
+- `verifier-staging` — the recipe `/verify` uses on staging: deploy order, test-target modes, observing the outcome, reset.
 
-Built-in: `/code-review high` on every slice's diff (general bugs; the agents below check the domain) — Claude invokes it with the Skill tool, never a general-purpose agent standing in for it. `/verify` runs the app at the change's surface and captures runtime evidence; only Tao can start it (it can't be invoked by Claude), so `/slice-review` hands him a ready `/verify …` line and Claude doesn't do its job by hand. `slice-verifier` checks the evidence covers every Done-when line.
+Built-in: `/code-review high` on every slice's diff (general bugs; the agents below check the domain) — Claude invokes it with the Skill tool, never a general-purpose agent standing in for it. `/verify` runs the app at the change's surface and captures runtime evidence; only Tao can start it (it can't be invoked by Claude), so `/slice-review` hands him a ready `/verify …` line and Claude doesn't do its job by hand; `/verify` follows the project's `verifier-staging` skill (deploy order, test-target modes, where to read the outcome, reset). `slice-verifier` checks the evidence covers every Done-when line.
 
 Agents (read-only reviewers; which one runs when is in `docs/workflow.md`):
 
