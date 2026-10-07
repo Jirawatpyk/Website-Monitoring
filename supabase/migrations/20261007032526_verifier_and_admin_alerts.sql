@@ -41,6 +41,9 @@ create unique index verification_jobs_evidence_once
   on public.verification_jobs (incident_id) where kind = 'evidence';
 create index verification_jobs_open_idx
   on public.verification_jobs (created_at) where status in ('queued', 'leased');
+-- Foreign keys (cascades from monitors / incidents) and the housekeeping delete.
+create index verification_jobs_monitor_id_idx on public.verification_jobs (monitor_id);
+create index verification_jobs_incident_id_idx on public.verification_jobs (incident_id);
 create index verification_jobs_site_id_idx on public.verification_jobs (site_id);
 create index verification_jobs_created_idx on public.verification_jobs (created_at);
 
@@ -48,7 +51,8 @@ create trigger verification_jobs_set_updated_at before update on public.verifica
   for each row execute function private.set_updated_at();
 
 -- ── agent_heartbeats ──────────────────────────────────────────────────────
--- Workers outside Vercel that the engine must know are alive. `verifier` is stamped on every
+-- Workers outside Vercel that the engine must know are alive. Keyed by the worker's name, no `id`:
+-- a lookup of known names like `probe_locations` (D-014), never referenced by another table. `verifier` is stamped on every
 -- Job API poll (every 5 s); no poll for 2 min = verifier unavailable (D-019). `info` carries the
 -- agent's own numbers (sessions in use) for the Probes board (S12).
 create table public.agent_heartbeats (
@@ -155,7 +159,7 @@ begin
 end;
 $$;
 
--- Jobs that can no longer help: a lease that ran out, a verify job nobody picked up within 2 min
+-- Jobs that can no longer help: a lease that ran out, a verify job nobody picked up within 30 s
 -- (its round is already judged), an evidence job older than 15 min. Returns how many expired.
 create function public.expire_verification_jobs()
 returns integer
@@ -168,7 +172,7 @@ begin
   update public.verification_jobs
     set status = 'expired', lease_until = null
     where (status = 'leased' and lease_until < now())
-       or (status = 'queued' and kind = 'verify' and created_at < now() - interval '2 minutes')
+       or (status = 'queued' and kind = 'verify' and created_at < now() - interval '30 seconds')
        or (status = 'queued' and kind = 'evidence' and created_at < now() - interval '15 minutes');
   get diagnostics v_count = row_count;
   return v_count;
@@ -232,7 +236,8 @@ $$;
 -- ── Site note ─────────────────────────────────────────────────────────────
 -- The latest judged round's note: "Automated check blocked by bot protection; verified via
 -- browser" (OK + note), "Blocked, not verified" (PROBLEM unverified), or none. Never from an older
--- round than the one already recorded (engine runs overlap). No `p_note` clears it.
+-- round than the one already recorded (engine runs overlap). No `p_note` clears it. Updates only: the
+-- site's row exists by then (engine_record_round / engine_open_incident wrote the round first).
 create function public.engine_note_site(p_site_id uuid, p_round_at timestamptz, p_note text default null)
 returns void
 language sql
@@ -294,12 +299,8 @@ begin
     where s.last_round_at is null or s.last_round_at <= excluded.last_round_at;
 
   if p_trigger = 'hard_fail' then
-    if v_verify_job is null then
-      insert into public.verification_jobs (kind, monitor_id, site_id, incident_id, url)
-      select 'evidence', m.id, p_site_id, v_id, m.url
-      from public.monitors m where m.id = p_monitor_id
-      on conflict do nothing;
-    else
+    -- The browser's verdict links its job; without its screenshot, an evidence job takes one.
+    if v_verify_job is not null then
       update public.verification_jobs set incident_id = v_id where id = v_verify_job;
       insert into public.incident_events (incident_id, type, payload, at)
       select v_id, 'evidence',
@@ -307,6 +308,12 @@ begin
              coalesce(j.completed_at, p_detected_at)
       from public.verification_jobs j
       where j.id = v_verify_job and j.screenshot_path is not null;
+    end if;
+    if not exists (select 1 from public.incident_events e where e.incident_id = v_id and e.type = 'evidence') then
+      insert into public.verification_jobs (kind, monitor_id, site_id, incident_id, url)
+      select 'evidence', m.id, p_site_id, v_id, m.url
+      from public.monitors m where m.id = p_monitor_id
+      on conflict do nothing;
     end if;
   end if;
 

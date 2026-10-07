@@ -44,7 +44,8 @@ export interface Api {
   completeJob(verdict: Verdict): Promise<boolean>;
 }
 
-const TIMEOUT_MS = 15_000;
+/** Each call; a verdict must land inside its 60 s lease (verifier.ts). */
+const TIMEOUT_MS = 10_000;
 
 /**
  * The only way the agent talks to DxT Monitor: the Ingest and Job APIs with INGEST_TOKEN (PRD §10).

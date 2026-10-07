@@ -3,7 +3,7 @@
 -- one email per active Admin), the site note, read-only RLS and the private screenshot bucket.
 begin;
 \ir _helpers.psql
-select plan(34);
+select plan(35);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -92,11 +92,11 @@ select is(
   0, 'a job already done can''t be completed again'
 );
 
--- A verify job nobody picked up expires after 2 min (its round is judged already).
+-- A verify job nobody picked up expires after 30 s (the engine already counts the verifier unavailable).
 insert into public.verification_jobs (kind, monitor_id, site_id, round_at, url, created_at)
 values ('verify', '00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000a2',
         '2026-10-07 03:00Z', 'https://b.pgtap.test', now() - interval '3 minutes');
-select is(public.expire_verification_jobs(), 1, 'a verify job left queued past 2 min expires');
+select is(public.expire_verification_jobs(), 1, 'a verify job left queued past 30 s expires');
 
 -- ── Evidence after a hard-fail DOWN ──────────────────────────────────────
 select isnt(
@@ -152,6 +152,22 @@ select results_eq(
     where i.site_id = '00000000-0000-0000-0000-0000000000a1' and e.type = 'evidence'$$,
   $$values ('2026-10/f3.jpg'::text)$$,
   'whose screenshot joins the timeline'
+);
+
+-- The browser decided but its screenshot didn't upload: an evidence job takes one instead.
+insert into public.sites (id, client_id, name, tier) values
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000c1', 'Site C', 1);
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000d3', '00000000-0000-0000-0000-0000000000a3', 'http', true, 'https://c.pgtap.test');
+insert into public.verification_jobs (id, kind, monitor_id, site_id, round_at, url, status, result, completed_at)
+values ('00000000-0000-0000-0000-0000000000f4', 'verify', '00000000-0000-0000-0000-0000000000d3',
+        '00000000-0000-0000-0000-0000000000a3', '2026-10-07 03:03Z', 'https://c.pgtap.test', 'done', 'failed', now());
+select public.engine_open_incident('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000d3',
+  'hard_fail', 'down', now() - interval '1 minute', now(), date_trunc('minute', now()),
+  '{"cause":"Browser: page didn''t load","verifyJobId":"00000000-0000-0000-0000-0000000000f4"}', false);
+select is(
+  (select count(*)::int from public.verification_jobs where site_id = '00000000-0000-0000-0000-0000000000a3' and kind = 'evidence'),
+  1, 'a browser DOWN without a screenshot queues an evidence job'
 );
 
 -- ── Site note ────────────────────────────────────────────────────────────

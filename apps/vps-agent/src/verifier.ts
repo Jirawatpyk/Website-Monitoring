@@ -3,7 +3,8 @@ import type { Api, LeasedJob, Verdict } from './api';
 
 /** PRD §5: 20 s per page. */
 export const PAGE_TIMEOUT_MS = 20_000;
-const UPLOAD_TIMEOUT_MS = 15_000;
+/** Page 20 s + screenshot 5 s + upload 10 s + report 10 s stays inside the 60 s lease. */
+const UPLOAD_TIMEOUT_MS = 10_000;
 
 /** What one page visit saw. */
 export interface PageVisit {
