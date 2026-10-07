@@ -68,7 +68,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now dxt-agent@staging
 journalctl -u dxt-agent@staging -f      # "vps-agent started", then probe_round every minute
 # DNS works under the unit's IPAddressDeny (resolved's stub is allowed):
-sudo systemd-run --wait --pipe -p IPAddressDeny=localhost -p IPAddressAllow=127.0.0.53/32 getent hosts monitor.dxtspace.com
+sudo systemd-run --wait --pipe -p 'IPAddressDeny=127.0.0.0/8' -p IPAddressAllow=127.0.0.53/32 getent hosts monitor.dxtspace.com
 ```
 
 After a release: copy, install as above, then `sudo systemctl restart 'dxt-agent@*'`.
