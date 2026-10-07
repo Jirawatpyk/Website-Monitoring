@@ -12,7 +12,7 @@ How work moves from [`implementation-plan.md`](implementation-plan.md) to produc
 | 4. Build | Small commits. Engine rules test-first (`/engine-case`), schema through `/new-migration`, screens through `/implement-screen`. Stop and ask on any source conflict (see [Decisions](#decisions)) | skills |
 | 5. Check | `pnpm check` green locally (format, plan coverage, lint, types, tests) | — |
 | 6. Review | `/code-review high` on the slice's diff, then the reviewers named in the slice's **Review** line (table below); fix every High (no waivers); fix every Medium or give the reason in the PR | agents |
-| 7. Verify | Deploy the slice to staging — `git push --force-with-lease origin HEAD:staging` and, if it has migrations, `pnpm db:push:staging` (both ask first) — and collect evidence for each "Done when" line there and locally — `/verify` (built-in) runs the app and drives the changed screens, routes or crons to capture what really happens, including a wrong-input probe; `slice-verifier` then checks the evidence covers every line. Status → `In review` | `/slice-review <ID>` |
+| 7. Verify | Deploy the slice to staging — `git push --force-with-lease origin HEAD:staging` and, if it has migrations, `pnpm db:push:staging` (both ask first) — and collect evidence for each "Done when" line there and locally — `/verify` (built-in, started by Tao: Claude can't invoke it and hands him a ready `/verify …` line) runs the app and drives the changed screens, routes or crons to capture what really happens, including a wrong-input probe; `slice-verifier` then checks the evidence covers every line. Status → `In review` | `/slice-review <ID>` |
 | 8. PR | PR template with the Done-when checklist and its evidence; CI `check` and `db` green; review conversations resolved; CODEOWNERS are requested automatically | GitHub |
 | 9. Merge | `pnpm pr:merge <number>` (squash, only when CI `check` and `db` are green on the head commit — D-008) → Vercel production deploy. Status → `Done` in the plan (same PR or a follow-up). Reset `staging` to `main` (`git push --force-with-lease origin origin/main:staging`) | `/slice-review` |
 | 10. Improve | Five-minute retro (below): what went wrong or slow, and the change that stops it happening again. One line in [`retro.md`](retro.md); skip when nothing went wrong | `/slice-review` |
@@ -45,16 +45,16 @@ The workflow, the rules and the tooling improve every time something goes wrong,
 
 | When the change touches… | Run |
 |---|---|
-| Any code change — correctness bugs, edge cases, simplification | `/code-review high` on the diff (built-in skill; every slice) |
+| Any code change — correctness bugs, edge cases, simplification | `/code-review high` on the diff (built-in skill, invoked by Claude with the Skill tool — not an agent standing in for it; every slice) |
 | A screen or board | `spec-checker` (per board) |
 | `packages/engine`, the engine cron, escalation or notification timing | `engine-reviewer` |
 | Chat cards, text lines, emails, digests, webhooks payloads | `message-checker` |
 | `supabase/migrations`, RLS, `apps/web/src/app/api`, auth, env, the VPS | `security-reviewer` |
 | Tables, indexes, partitions, rollups, retention, query performance | `db-reviewer` |
-| A slice with a runtime surface (screen, route, cron, agent) | `/verify` — run the app and capture the changed behaviour |
+| A slice with a runtime surface (screen, route, cron, agent) | `/verify` — run the app and capture the changed behaviour (Tao types it) |
 | A slice claimed complete | `slice-verifier` (through `/slice-review`) |
 
-`/code-review` finds general code bugs; the agents check the domain (spec, engine rules, RLS, messages, schema) — they complement each other. `/verify` (built-in) produces runtime evidence by running the app at the change's surface; `slice-verifier` (through `/slice-review`) checks that the evidence covers every Done-when line. Docs-only changes have no runtime surface — `/verify` reports SKIP. Reviewers are read-only and report findings; the slice owner fixes them. Independent reviewers can run in parallel.
+`/code-review` finds general code bugs; the agents check the domain (spec, engine rules, RLS, messages, schema) — they complement each other. `/verify` (built-in; only Tao can start it) produces runtime evidence by running the app at the change's surface; `slice-verifier` (through `/slice-review`) checks that the evidence covers every Done-when line. Docs-only changes have no runtime surface — `/verify` reports SKIP. Reviewers are read-only and report findings; the slice owner fixes them. Independent reviewers can run in parallel.
 
 ## Definition of Done
 
