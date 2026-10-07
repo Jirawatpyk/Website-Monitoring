@@ -17,7 +17,7 @@ body{margin:0;background:#fafafa}
 a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1700px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 1732px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -123,7 +123,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.6">
 <li>DOWN confirmed on the immediate recheck, 31 s after the first failure.</li>
 <li>Flapping merged 8 status changes into one incident and one thread.</li>
-<li>RECOVERED posted on the first OK round.</li>
+<li>One RECOVERED summary after 15 min stable, instead of one per drop.</li>
 </ul>
 </div>
 <div class="aura-card" style="gap: 10px">
@@ -215,7 +215,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </x-import>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1732}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -260,9 +260,10 @@ class Component extends DCLogic {
       ],
       timeline: [
         { at: '03:12:39', icon: 'ban', color: 'var(--aura-fg-danger)', text: 'Confirmed down 03:12:39 — HTTP 502 (BKK, SIN, TYO). Posted to the Alerts Space at once. Outside Tier 2 response hours: escalation timer paused until 09:00.' },
-        { at: '03:19–04:04', icon: 'rotate-ccw', color: 'var(--aura-alert-warning-fg)', text: 'Site recovered and dropped again three more times — flapping, merged into the same incident and thread.' },
-        { at: '04:04:10', icon: 'circle-check', color: 'var(--aura-fg-positive)', text: 'First OK round — RECOVERED reply + email posted → State: Monitoring.' },
+        { at: '03:19–04:04', icon: 'rotate-ccw', color: 'var(--aura-alert-warning-fg)', text: 'RECOVERED posted at 03:19. Each later drop posted DOWN AGAIN (@Ploy) in the same thread; flapping from 03:24, so later RECOVERED replies were held.' },
+        { at: '04:04:10', icon: 'eye', color: 'var(--aura-fg-secondary)', text: 'First OK round → State: Monitoring. No RECOVERED posted — held while flapping.' },
         { at: '04:10:10', icon: 'pencil', color: 'var(--aura-alert-warning-fg)', text: 'OK for 2 rounds (≈ 6 min on Tier 2) → State: Needs root cause.' },
+        { at: '04:19:10', icon: 'circle-check', color: 'var(--aura-fg-positive)', text: 'OK for 15 min — one RECOVERED summary posted (flapped ×4, 41 min down in total).' },
         { at: '08:04:31', icon: 'check', color: 'var(--aura-fg-primary)', text: 'Acknowledged by Ploy from mobile, before response hours started (09:00).' },
         { at: '10:40:00', icon: 'file-text', color: 'var(--aura-fg-secondary)', text: 'Ploy checks host logs: PHP-FPM restarted 4× on memory limit.' },
         { at: 'Thu 24 Sep 16:20', icon: 'pencil', color: 'var(--aura-fg-secondary)', text: 'Root cause logged, resolved; review submitted for Tao’s sign-off.' }

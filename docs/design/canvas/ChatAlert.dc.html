@@ -20,7 +20,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </style>
 </helmet>
 
-<div class="r3-col" style="width: 600px; height: 7044px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+<div class="r3-col" style="width: 600px; height: 8448px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
 
 <div style="display: flex; flex-direction: column; gap: 4px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SPACE · DxT WEBSITE ALERTS · one thread per incident (INC-0142)</span>
@@ -239,6 +239,18 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 
 <div style="margin-left: 24px; padding-left: 20px; border-left: 2px solid var(--aura-border-default); display: flex; flex-direction: column; gap: 14px">
 <div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">03:19 · reply</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> RECOVERED · VOCA · down 7 min · add a root cause</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">RECOVERED · VOCA is back · down 7 min (03:12–03:19)</span>
+<span>OK from 3 locations. Needs a root cause before it can be resolved.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Posted on the first OK round (→ Monitoring). Not flapping yet — only 2 status changes so far.</span>
+</div>
+</div>
+</div>
+<div style="display: flex; gap: 12px">
 <span style="display: flex; padding-top: 5px; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import></span>
 <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">03:24 · reply</span>
@@ -250,6 +262,18 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </div>
 </div>
 <div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">03:38 · reply</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> DOWN AGAIN · VOCA (Tier 2) · same incident INC-0133 · still flapping · outside response hours · timers paused until 09:00</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">DOWN AGAIN · VOCA · was back for 3 min (03:35–03:38)</span>
+<span>Still flapping — recovery replies are still held until VOCA stays OK for 15 min. Down 18 min so far in this incident.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Same template for every later drop (03:55 too); only the times change.</span>
+</div>
+</div>
+</div>
+<div style="display: flex; gap: 12px">
 <span style="display: flex; padding-top: 5px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
 <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">04:19 · reply (after 15 min of continuous OK)</span>
@@ -257,7 +281,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
 <span style="font-weight: 600">RECOVERED · VOCA stable since 04:04 · flapped ×4 (03:12–04:04)</span>
 <span>Down 4 times: 03:12–03:19 · 03:24–03:35 · 03:38–03:52 · 03:55–04:04 — 41 min down in total. Needs a root cause before it can be resolved.</span>
-<span style="font-size: 12px; color: var(--aura-fg-secondary)">One summary instead of a RECOVERED reply per drop. Drops after 03:24 aren’t re-posted; the incident page shows each one.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">One summary instead of a RECOVERED reply per drop. Every drop still posts DOWN AGAIN (mentioning whoever acts now); only the RECOVERED replies are held, and this one summary goes out after 15 min of continuous OK.</span>
 </div>
 </div>
 </div>
@@ -273,6 +297,38 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
 <span style="font-weight: 600">PROBLEM AGAIN · WeCare Studio · slow again after 6 min OK</span>
 <span>Joined INC-0150 while it was still open (Monitoring). Nok acknowledged earlier, so only Nok is mentioned.</span>
+</div>
+</div>
+</div>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">WORDING EXAMPLE · PROBLEM AGAIN · made-up incident INC-0152 VOCA (Tier 2, owner Ploy) · home page back, key page still failing · not part of the sample ledger</span>
+<div style="margin-left: 24px; padding-left: 20px; border-left: 2px solid var(--aura-border-default); display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">example · reply (same round as the RECOVERED reply)</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> PROBLEM AGAIN · VOCA (Tier 2) · /booking still failing (HTTP 404) after the home page came back · same incident INC-0152</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">PROBLEM AGAIN · VOCA · /booking still failing after the home page came back</span>
+<span>Home page OK again (RECOVERED posted in the same round). /booking → HTTP 404 (BKK, SIN, TYO) — the same incident continues as a PROBLEM (Key page).</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Posted together with the RECOVERED reply — both come from the same round. Not “again after N min OK”: the site was never fully OK. Mentions only whoever acts now.</span>
+</div>
+</div>
+</div>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">WORDING EXAMPLE · RECOVERED · auto-resolved PROBLEM · made-up incident INC-0151 Fuji Links (Tier 2) · Key page · inside response hours · not part of the sample ledger</span>
+<div style="margin-left: 24px; padding-left: 20px; border-left: 2px solid var(--aura-border-default); display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">reply · 3 min after the PROBLEM was flagged</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span>RECOVERED · Fuji Links · /contact back 3 min after it was flagged, before anyone acknowledged · resolved automatically</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">RECOVERED · Fuji Links /contact back to normal · cleared 3 min after it was flagged</span>
+<span>/contact loads again from 3 locations (it returned HTTP 500 while the home page stayed OK). Nobody acknowledged it — a PROBLEM that clears within 5 min of being flagged, with no acknowledgement, auto-resolves on the first OK round.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Resolved automatically — no root cause needed. No @mention: nothing for anyone to do. Outside response hours a Tier 2–3 PROBLEM is held until 09:00; if it clears before then, nothing is posted.</span>
 </div>
 </div>
 </div>
@@ -306,13 +362,16 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Down again</span><span style="color: var(--aura-fg-secondary)">@ Whoever acts now (acker, else L0 person)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> DOWN AGAIN · VOCA (Tier 2) · same incident INC-0133 · outside response hours · timers paused until 09:00</span></div>
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM again</span><span style="color: var(--aura-fg-secondary)">@ Whoever acts now (acker, else L0 person)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/NOK&gt;</span> PROBLEM AGAIN · WeCare Studio (Tier 2) · slow again, p50 5.4 s · same incident INC-0150</span></div>
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Flapping summary</span><span style="color: var(--aura-fg-secondary)">@ Owner (Ploy) · after 15 min continuous OK</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> RECOVERED · VOCA · stable 15 min · flapped ×4, down 41 min in total · add a root cause</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Down again · while flapping</span><span style="color: var(--aura-fg-secondary)">@ Whoever acts now; recovery replies still held</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> DOWN AGAIN · VOCA (Tier 2) · same incident INC-0133 · still flapping · outside response hours · timers paused until 09:00</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM again · key page</span><span style="color: var(--aura-fg-secondary)">@ Whoever acts now</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> PROBLEM AGAIN · VOCA (Tier 2) · /booking still failing (HTTP 404) after the home page came back · same incident INC-0152</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Recovered · auto-resolved</span><span style="color: var(--aura-fg-secondary)">@ Nobody · PROBLEM cleared in &lt; 5 min, never acked</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">RECOVERED · Fuji Links · /contact back 3 min after it was flagged, before anyone acknowledged · resolved automatically</span></div>
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Test alert · own thread</span><span style="color: var(--aura-fg-secondary)">@ Tester only (Ploy)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> TEST — no action · alert test for Ploy’s phone</span></div>
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Monitor fault</span><span style="color: var(--aura-fg-secondary)">@ On-call (Ploy); email to Tao</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> MONITOR FAULT · all sites · heartbeat missed since 02:17 · status unknown, hand-check Tier 1</span></div>
 </div>
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":7044}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":8448}}'>
 class Component extends DCLogic {
   renderVals() { return {}; }
 }
