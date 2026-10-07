@@ -77,8 +77,9 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Postgres, Auth, REST and the API gateway: enough for pgTAP and the signed-in e2e flows.
-      - run: pnpm exec supabase start -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit
+      # Postgres, Auth, REST, Storage and the API gateway: pgTAP, the signed-in e2e flows and the
+      # verifier / housekeeping int tests on real Storage (S03).
+      - run: pnpm exec supabase start -x studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit
       - run: pnpm db:test
       - name: DB types match the migrations
         run: |
