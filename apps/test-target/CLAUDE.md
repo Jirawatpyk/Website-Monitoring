@@ -10,6 +10,8 @@ challenged (PROBLEM, D-020). S04a adds `keyword-missing` → 200 without "Test t
 staging monitor's `must_contain = {Test target}`) and `slow` → a probe waits 6 s (PROBLEM · Slow after 3 rounds). Point the staging test monitor at it (`supabase/staging/test-target.sql`) and flip `mode`
 to trigger a DOWN / RECOVERED or a blocked round.
 
+A new mode also goes in the `verifier-staging` skill's mode table (`.claude/skills/verifier-staging/SKILL.md`), with the outcome to expect.
+
 No secrets, no data, no auth: it only says which mode it is in.
 
 Vercel runs `api/index.ts` as native ESM: relative imports there must end in `.js` (`../src/handler.js`), or the function fails with `ERR_MODULE_NOT_FOUND` though tests pass.
