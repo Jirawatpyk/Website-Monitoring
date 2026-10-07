@@ -220,7 +220,7 @@ export function buildIncidentView(
     incidentId: i.id,
     site,
     title: recovered
-      ? `${site} is back`
+      ? `${site} ${problem ? 'is back to normal' : 'is back'}`
       : i.severity === 'problem'
         ? `${site} has a problem`
         : `${site} is down`,

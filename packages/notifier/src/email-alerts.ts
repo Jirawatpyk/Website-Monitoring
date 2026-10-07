@@ -375,7 +375,7 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
     color: C.warning,
     bar: C.warning,
     label: 'PROBLEM',
-    pre: `${site} ${input.summary} · detected ${formatTime(input.detectedAt)}`,
+    pre: `${site} · ${input.summary} · detected ${formatTime(input.detectedAt)}`,
     headline,
     lede:
       input.reason === 'owner'

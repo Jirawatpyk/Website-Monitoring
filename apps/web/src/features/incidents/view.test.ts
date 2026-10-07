@@ -303,8 +303,9 @@ describe('MobileAck view of a PROBLEM (spec §19, S04a)', () => {
   });
 
   it('says how long the problem lasted once recovered', () => {
-    expect(view({ ...slow, recovered_at: '2026-09-25T03:14:00Z' }, [problem]).sub).toBe(
-      'problem 26 min · Tier 1 · Fri 25 Sep',
-    );
+    const back = view({ ...slow, recovered_at: '2026-09-25T03:14:00Z' }, [problem]);
+    expect(back.sub).toBe('problem 26 min · Tier 1 · Fri 25 Sep');
+    // ChatAlert / EmailAlert: a PROBLEM is "back to normal"; only an outage is "back".
+    expect(back.title).toBe('MuvMi is back to normal');
   });
 });

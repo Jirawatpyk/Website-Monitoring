@@ -199,7 +199,7 @@ describe('PROBLEM emails (EmailAlert PROBLEM thread)', () => {
       summary: 'slow, p50 5.8 s',
     });
     expect(m.subject).toBe('Fuji Links · Tier 2 · INC-0141');
-    expect(m.html).toContain('PROBLEM — Fuji Links slow, p50 5.8 s · detected 09:52');
+    expect(m.html).toContain('PROBLEM — Fuji Links · slow, p50 5.8 s · detected 09:52');
     expect(m.html).toContain('#b45309');
     expect(m.text).toMatch(/^PROBLEM — Fuji Links is slow/);
     expect(m.text).toContain(
