@@ -15,7 +15,7 @@
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
-| S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | In progress |
+| S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | In review |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
