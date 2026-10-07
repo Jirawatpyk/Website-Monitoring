@@ -266,6 +266,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         now,
         alertQueued,
         locations.length,
+        () => (summary.relapses += 1),
       );
       if (applied) summary[applied] += 1;
       // The site note follows the latest judged round (OK + note, unverified, or none).
@@ -555,6 +556,8 @@ async function apply(
   alertQueued: boolean,
   /** Locations voting this run: the card's "3 of 3 locations". */
   reporting: number,
+  /** Counts the PROBLEM AGAIN a D-023 recovery queues in the same round. */
+  relapsed: () => void = () => {},
 ): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | null> {
   const at = now.toISOString();
   const incidentId = open?.id ?? null;
@@ -652,7 +655,8 @@ async function apply(
           ...(open?.recoveredAt ? { backSince: open.recoveredAt } : {}),
           // The reply says "Now flapping …" only on the drop that tags it (ChatAlert 03:24).
           ...(d.flapping && !open?.isFlapping ? { nowFlapping: true } : {}),
-          ...(d.flapping || open?.isFlapping ? { flapping: true } : {}),
+          // "Still flapping" only while it is (≥ 3 changes in 30 min), not for a drop hours later.
+          ...(d.flapping ? { flapping: true } : {}),
         },
         p_flapping: d.flapping,
         p_notify: !site.muted,
@@ -734,6 +738,7 @@ async function apply(
           ...judged,
         });
         if (again.error) throw new Error(`engine_relapse_incident: ${again.error.message}`);
+        if (again.data) relapsed();
       }
       return data ? 'recovered' : null;
     }

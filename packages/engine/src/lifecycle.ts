@@ -141,6 +141,16 @@ export function isFlapping(flips: readonly Date[], flipOk: boolean | null | unde
   return recent + 1 >= FLAP_CHANGES;
 }
 
+/**
+ * Is a flapping incident still flapping at this recovery? Its own change plus the others in the last
+ * 30 min reach 3 (spec §19.4). A recovery hours after the flapping ended gets a plain RECOVERED, not
+ * another summary; `is_flapping` stays as the incident's record ("flapped ×n").
+ */
+export function stillFlapping(flips: readonly Date[], at: Date): boolean {
+  const recent = flips.filter((f) => f.getTime() > at.getTime() - FLAP_WINDOW_MS && f <= at).length;
+  return recent + 1 >= FLAP_CHANGES;
+}
+
 /** One drop of an incident: from its first failed check to its recovery (null = still down). */
 export interface Episode {
   start: Date;

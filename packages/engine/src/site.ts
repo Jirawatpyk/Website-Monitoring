@@ -1,5 +1,5 @@
 import type { IncidentState, ProbeLocation, Severity, SiteStatus, Trigger } from '@dxt/shared';
-import { autoResolves, isFlapping, RECOVERED_STATES, transition } from './lifecycle';
+import { autoResolves, isFlapping, RECOVERED_STATES, stillFlapping, transition } from './lifecycle';
 import {
   buildRound,
   confirmedAt,
@@ -486,9 +486,10 @@ function recoverDecision(
     okLocations: reachable.length,
     allOk,
     autoResolve,
-    holdSummary: !!open.isFlapping && !autoResolve,
+    holdSummary: !!open.isFlapping && !autoResolve && stillFlapping(s.flips ?? [], recoveredAt),
     ...base,
-    status,
+    // Auto-resolved: nothing is open any more, so the site shows the verdicts (OK).
+    status: autoResolve ? 'ok' : status,
   };
 }
 

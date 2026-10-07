@@ -288,6 +288,8 @@ describe('decideSite — auto-resolve (spec §16.1)', () => {
       kind: 'recover',
       autoResolve: resolves,
       to: resolves ? 'resolved' : 'monitoring',
+      // Resolved: no incident holds the status up any more.
+      status: resolves ? 'ok' : (over.episodeSeverity ?? 'problem'),
       holdSummary: false,
     });
   });
@@ -299,9 +301,23 @@ describe('decideSite — flapping holds RECOVERED (spec §19.4)', () => {
     const d = decideSite(
       snapshot(start, [monitor('home', passRound(start))], {
         open: incident({ state: 'unacked', isFlapping: true }),
+        flips: [T('03:12'), T('03:19'), T('03:24')],
+        flipOk: false,
       }),
     );
     expect(d).toMatchObject({ kind: 'recover', allOk: true, holdSummary: true, to: 'monitoring' });
+  });
+
+  it('hours after the flapping ended, a recovery gets a plain RECOVERED again', () => {
+    const start = T('14:10');
+    const d = decideSite(
+      snapshot(start, [monitor('home', passRound(start))], {
+        open: incident({ state: 'unacked', isFlapping: true }),
+        flips: [T('14:00')],
+        flipOk: false,
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'recover', holdSummary: false });
   });
 });
 

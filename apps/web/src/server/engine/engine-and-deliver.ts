@@ -18,11 +18,13 @@ export async function engineAndDeliver(
   engine: (db: DbClient) => Promise<EngineSummary> = runEngine,
 ): Promise<EngineSummary & { delivery?: unknown }> {
   const summary = await engine(db);
-  // New incident messages (DOWN, PROBLEM, RECOVERED), or an Admin alert (D-019, D-022): send them now.
+  // New incident messages (DOWN, PROBLEM, RECOVERED, DOWN AGAIN / PROBLEM AGAIN), or an Admin alert
+  // (D-019, D-022, D-024): send them now. Every summary count that queues a message belongs here.
   if (
     summary.opened +
       (summary.problems ?? 0) +
       summary.recovered +
+      (summary.relapses ?? 0) +
       (summary.alerts ?? 0) +
       (summary.escalated ?? 0) ===
     0
