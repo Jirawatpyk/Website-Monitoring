@@ -36,6 +36,8 @@ async function must<T>(
 }
 
 let clientId: string;
+/** One primary URL per site (S05: a URL is monitored by one site only, `monitors_primary_url_key`). */
+const primaryUrl = (name: string) => `https://${run}.example.test/?site=${encodeURIComponent(name)}`;
 async function newSite(
   name: string,
   owners: { primary_owner_id?: string; backup_owner_id?: string } = {},
@@ -50,7 +52,7 @@ async function newSite(
   const monitor = await must(
     db
       .from('monitors')
-      .insert({ site_id: site.id, type: 'http', is_primary: true, url: `https://${run}.example.test` })
+      .insert({ site_id: site.id, type: 'http', is_primary: true, url: primaryUrl(name) })
       .select('id')
       .single(),
   );
@@ -421,7 +423,7 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
     await onlyJobsOf(monitorId);
 
     const [job] = await leaseJobs(db, { max: 1, sessions: 0 }, new Date());
-    expect(job).toMatchObject({ kind: 'verify', url: `https://${run}.example.test` });
+    expect(job).toMatchObject({ kind: 'verify', url: primaryUrl('Verified') });
     // The signed upload URL works without any key (the VPS holds none).
     const put = await fetch(job!.upload!.url, {
       method: 'PUT',

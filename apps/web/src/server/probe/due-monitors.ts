@@ -33,6 +33,9 @@ export async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonito
     .from('monitors')
     .select('id, url, method, timeout_ms, must_contain, must_not_contain, sites!inner(tier, is_active)')
     .eq('sites.is_active', true)
+    // A monitor switched off or removed (S05, D-025) isn't checked.
+    .eq('enabled', true)
+    .is('removed_at', null)
     // HTTP page monitors only: SSL / domain (S13) and browser (S23) monitors are checked their own way.
     .in('type', HTTP_MONITOR_TYPES);
   if (error) throw new Error(`monitors: ${error.message}`);

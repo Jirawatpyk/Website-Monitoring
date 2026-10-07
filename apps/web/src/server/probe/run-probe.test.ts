@@ -129,6 +129,9 @@ describe('runProbe', () => {
     // Every monitor of an active site, key pages included — not only the primary (S04a).
     expect(s.calls.find((c) => c.table === 'monitors')?.filters).toEqual([
       ['eq', 'sites.is_active', true],
+      // Switched off or removed monitors are skipped (S05, D-025).
+      ['eq', 'enabled', true],
+      ['is', 'removed_at', null],
       // HTTP page monitors only: SSL / domain (S13) and browser (S23) are checked their own way.
       ['in', 'type', ['http', 'keyword']],
     ]);
