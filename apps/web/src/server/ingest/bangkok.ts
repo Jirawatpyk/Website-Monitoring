@@ -15,11 +15,13 @@ export async function beatBangkok(db: DbClient, now: Date): Promise<void> {
   if (error) throw new Error(`heartbeat: ${error.message}`);
 }
 
-/** The monitors the Bangkok probe should check this minute — the same rule as SIN and TYO. */
-export async function dueForBangkok(db: DbClient, now: Date): Promise<DueMonitor[]> {
-  const monitors = await loadDueMonitors(db, now);
-  await beatBangkok(db, now);
-  return monitors;
+/**
+ * The monitors the Bangkok probe should check this minute — the same rule as SIN and TYO. Asking
+ * isn't a heartbeat: Bangkok beats only when its results are stored, so an agent whose posts fail
+ * never holds rounds open waiting for it.
+ */
+export function dueForBangkok(db: DbClient, now: Date): Promise<DueMonitor[]> {
+  return loadDueMonitors(db, now);
 }
 
 /** Store a batch from the VPS as BKK check results (attempt 1 or the recheck) and beat. */

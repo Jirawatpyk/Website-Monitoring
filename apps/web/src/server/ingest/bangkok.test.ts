@@ -53,7 +53,7 @@ describe('Bangkok through the Ingest API', () => {
     await expect(storeBangkokResults(db, [], now)).rejects.toThrow('heartbeat: boom');
   });
 
-  it('lists the monitors due this minute, with timeouts capped at 30 s, and beats', async () => {
+  it('lists the monitors due this minute, with timeouts capped at 30 s — asking is not a heartbeat', async () => {
     const { db, calls } = fakeDb({
       'monitors.select': {
         data: [
@@ -78,6 +78,6 @@ describe('Bangkok through the Ingest API', () => {
     expect(await dueForBangkok(db, new Date('2026-10-07T03:01:30Z'))).toEqual([
       { id: 'm1', url: 'https://a.example.test', method: 'GET', timeoutMs: 30_000 },
     ]);
-    expect(calls.some((c) => c.table === 'probe_locations' && c.op === 'update')).toBe(true);
+    expect(calls.some((c) => c.table === 'probe_locations')).toBe(false);
   });
 });

@@ -180,6 +180,19 @@ describe('runEngine — blocked rounds (S03)', () => {
     });
   });
 
+  it('names the reason the engine saw: a lease that ran out', async () => {
+    const { db, rpcCalls } = fakeDb({
+      ...verifierUp,
+      'verification_jobs.select': jobs([
+        job({ status: 'leased', result: null, lease_until: at(60), completed_at: null }),
+      ]),
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'open_system_alert')?.args).toMatchObject({
+      p_context: { reason: 'lease_expired' },
+    });
+  });
+
   it('with an incident open, an unverified round records the round and sends no second alert', async () => {
     const { db, rpcCalls } = fakeDb({
       'incidents.select': {

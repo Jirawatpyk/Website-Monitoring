@@ -95,7 +95,8 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     )
     .map((l) => l.code as ProbeLocation);
 
-  const unverifiedSites = new Set<string>();
+  /** Sites the verifier couldn't decide this run, with the reason it saw (D-019). */
+  const unverifiedSites = new Map<string, string>();
   for (const m of monitors) {
     const status = statuses.data?.find((st) => st.site_id === m.siteId);
     const open = incidents.data?.find((inc) => inc.site_id === m.siteId);
@@ -144,7 +145,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       if (decision.kind === 'verify') break;
       // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
       if (decision.kind === 'unverified' && decision.reason !== 'browser_blocked')
-        unverifiedSites.add(m.siteName);
+        unverifiedSites.set(m.siteName, decision.reason);
       // The site note follows the latest judged round (OK + note, unverified, or none).
       const next = 'note' in decision ? (decision.note ?? null) : null;
       if (next !== note) {
@@ -177,7 +178,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
 async function adminAlerts(
   db: DbClient,
   verifier: Awaited<ReturnType<typeof loadVerifierState>>,
-  unverifiedSites: ReadonlySet<string>,
+  unverifiedSites: ReadonlyMap<string, string>,
 ): Promise<number> {
   let opened = 0;
   const open = async (kind: string, context: Record<string, unknown>) => {
@@ -196,8 +197,8 @@ async function adminAlerts(
   const down = verifier.openAlerts.get('verifier_unavailable');
   if (unverifiedSites.size && !down) {
     await open('verifier_unavailable', {
-      sites: [...unverifiedSites].sort(),
-      reason: verifier.available ? 'not_picked_up' : 'no_poll',
+      sites: [...unverifiedSites.keys()].sort(),
+      reason: [...unverifiedSites.values()][0],
     });
   } else if (down && down.reason === 'no_poll' && verifier.available && !unverifiedSites.size) {
     await clear('verifier_unavailable');
