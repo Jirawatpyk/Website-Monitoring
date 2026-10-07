@@ -95,7 +95,17 @@ export async function runProbe({
     .eq('code', location);
   if (beat.error) throw new Error(`heartbeat: ${beat.error.message}`);
 
-  return { ok: true, location, checked: first.length, failed: failed.length, rechecked, recheckFailed };
+  // Blocked checks go to the browser verifier: the engine run this triggers queues the job (D-019).
+  const blocked = first.filter((r) => r.result.outcome === 'blocked').length;
+  return {
+    ok: true,
+    location,
+    checked: first.length,
+    failed: failed.length,
+    rechecked,
+    recheckFailed,
+    blocked,
+  };
 }
 
 async function insertResults(

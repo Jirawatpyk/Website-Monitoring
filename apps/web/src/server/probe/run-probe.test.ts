@@ -90,6 +90,7 @@ describe('runProbe', () => {
       failed: 0,
       rechecked: 0,
       recheckFailed: 0,
+      blocked: 0,
     });
     expect(s.check).toHaveBeenCalledWith({
       url: 'https://b.example.test',
@@ -146,6 +147,7 @@ describe('runProbe', () => {
       failed: 1,
       rechecked: 1,
       recheckFailed: 1,
+      blocked: 0,
     });
     expect(s.sleep).toHaveBeenCalledWith(30_000);
     expect(inserts(s.calls)[1]).toEqual([
