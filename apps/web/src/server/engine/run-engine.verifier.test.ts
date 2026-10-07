@@ -154,6 +154,19 @@ describe('runEngine — blocked rounds (S03)', () => {
     });
   });
 
+  it('the browser was blocked too → PROBLEM with that cause, and no Admin alert (D-020)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      ...verifierUp,
+      'verification_jobs.select': jobs([job({ result: 'blocked' })]),
+    });
+    expect(await runEngine(db, now)).toMatchObject({ unverified: 1, alerts: 0 });
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_open_incident', 'engine_note_site']);
+    expect(rpcCalls[0]?.args).toMatchObject({
+      p_trigger: 'blocked_unverified',
+      p_context: { cause: 'Blocked in the browser too', verifier: 'browser_blocked' },
+    });
+  });
+
   it('a job nobody picked up in 30 s counts the verifier unavailable even while it polls', async () => {
     const { db, rpcCalls } = fakeDb({
       ...verifierUp,
@@ -260,6 +273,7 @@ describe('verificationOf — what a job means now (D-019)', () => {
   it.each<[string, Partial<VerifyJobRow>, string, string?]>([
     ['loaded', {}, 'loaded'],
     ['failed', { result: 'failed' }, 'failed'],
+    ['blocked in the browser', { result: 'blocked' }, 'blocked'],
     ['leased, lease holds', { status: 'leased', result: null, lease_until: at(90) }, 'pending'],
     [
       'leased, lease ran out',

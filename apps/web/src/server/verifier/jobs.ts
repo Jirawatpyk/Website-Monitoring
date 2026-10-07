@@ -14,7 +14,8 @@ export const leaseQuerySchema = z.object({
 /** A job's result from the agent. The screenshot path is never the agent's: the server derives it. */
 export const completeJobSchema = z.object({
   jobId: z.uuid(),
-  result: z.enum(['loaded', 'failed']),
+  /** loaded → OK + note; failed → DOWN; blocked = a WAF page in the browser too → PROBLEM (D-020). */
+  result: z.enum(['loaded', 'failed', 'blocked']),
   detail: z.string().max(500).nullable().default(null),
   httpStatus: z.number().int().min(100).max(599).nullable().default(null),
   /** The agent uploaded the screenshot to the signed URL it was given. */

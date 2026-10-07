@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-020 | 7 Oct 2026 | A blocked site that is blocked in the browser verifier too (a WAF or challenge page in plain Chromium) is PROBLEM (unverified), not DOWN; only a page that really fails in the browser (no answer, 4xx/5xx without a WAF signature, keyword missing) is DOWN | StatusModel "Blocked · browser: page fails → DOWN" read literally (PRD §5 "a plain browser blocked → PROBLEM, not hidden") |
 | D-019 | 7 Oct 2026 | S03 verifier: the queue is a `verification_jobs` table with leases (not pgmq); PROBLEM (unverified) opens the incident and emails the Admin in S03, its Chat card comes with S04's PROBLEM rows; Admin alerts not tied to an incident live in `system_alerts`; the VPS runs a staging and a production agent from one systemd template | PRD §10 "pgmq", StatusModel "Owner + Alerts Space" for blocked_unverified (until S04), plan S03 Done-when 6 `/etc/dxt-agent/env` |
 | D-018 | 7 Oct 2026 | One page-header rhythm and one phone shell: every page header is AURA `PageHeader` with 4 px between its parts, and a breadcrumb takes the eyebrow's place 4 px above it; phones get the boards' top bar (brand + avatar) now, the back arrow with S07 and BottomNav (four main sections) with S06, while the menu drawer stays for every other page | Board drift: breadcrumb gaps of 12 / 24 px and title → meta gaps of 6 / 10 px; AppShell's menu-only phone bar |
 | D-017 | 6 Oct 2026 | Alert emails thread on a stable incident id (`<inc-<id>@<sending domain>>` in `References`, plus `In-Reply-To` after a person's first email) instead of the first email's Message-ID | Spec §10 / EmailAlert "In-Reply-To / References set to the first message" |
@@ -23,6 +24,19 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-020 — Blocked in the browser too: PROBLEM, not DOWN
+
+**Conflict.** The StatusModel row "Blocked · browser: page fails" says DOWN when "the page does not load or the keyword is missing". PRD §5 (browser verification) says the verifier uses plain Chromium with no stealth plugin, and that a plain browser that is blocked should be PROBLEM, not hidden, because real visitors may be blocked too. A WAF that blocks headless Chromium from the VPS (Bangkok Airways' Akamai 403, `docs/phase0/waf-captures.md`) would meet the board's literal reading and page the whole team for a site that is up.
+
+**Decision (7 Oct 2026, with Tao).** The verifier reports three verdicts:
+- `loaded`: the page answers below 400 and every keyword is found → OK with the note.
+- `blocked`: the browser gets a WAF or challenge page too (403 / 429 / 503 with a challenge signature, after giving a browser challenge the rest of the 20 s) → PROBLEM (unverified). The cause is "Blocked in the browser too". There is no "verifier unavailable" email, because the verifier works.
+- `failed`: anything else (no answer, timeout, 4xx / 5xx without a WAF signature, keyword missing) → DOWN, as the board says.
+
+**Why.** Each source keeps its intent. The board's DOWN covers a page that really fails. The PRD's rule covers a browser that is blocked: the problem is shown, but it never claims an outage. The allowlist (S00) stays the permanent fix.
+
+**Impact.** `verification_jobs.result` adds `blocked`; `@dxt/engine` `Verification` / `UnverifiedReason`; the runner's cause text and Admin-alert rule; `apps/vps-agent` `judgeVisit` (uses `hasChallengeSignature` from `@dxt/probe`, like the HTTP probes); test-target mode `challenge-all`.
 
 ## D-019 — S03 browser verifier: queue, PROBLEM (unverified), Admin alerts, two agents
 

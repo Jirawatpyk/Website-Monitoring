@@ -142,7 +142,9 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       const applied = await apply(db, m, decision, open?.id ?? null, now, downQueued);
       if (applied) summary[applied] += 1;
       if (decision.kind === 'verify') break;
-      if (decision.kind === 'unverified') unverifiedSites.add(m.siteName);
+      // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
+      if (decision.kind === 'unverified' && decision.reason !== 'browser_blocked')
+        unverifiedSites.add(m.siteName);
       // The site note follows the latest judged round (OK + note, unverified, or none).
       const next = 'note' in decision ? (decision.note ?? null) : null;
       if (next !== note) {
@@ -295,7 +297,10 @@ async function apply(
         p_started_at: d.startedAt.toISOString(),
         p_detected_at: at,
         p_round_at: d.roundAt.toISOString(),
-        p_context: { cause: 'Blocked, not verified', verifier: d.reason },
+        p_context: {
+          cause: d.reason === 'browser_blocked' ? 'Blocked in the browser too' : 'Blocked, not verified',
+          verifier: d.reason,
+        },
         p_notify: false,
       });
       if (error) throw new Error(`engine_open_incident: ${error.message}`);

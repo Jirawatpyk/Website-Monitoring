@@ -27,6 +27,7 @@ export function verificationOf(job: VerifyJobRow, now: Date): Verification {
   const t = now.getTime();
   switch (job.status) {
     case 'done':
+      if (job.result === 'blocked') return { state: 'blocked', jobId: job.id };
       return job.result === 'loaded'
         ? { state: 'loaded', jobId: job.id }
         : {

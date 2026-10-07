@@ -21,7 +21,8 @@ create table public.verification_jobs (
   status text not null default 'queued' check (status in ('queued', 'leased', 'done', 'expired')),
   lease_until timestamptz,
   attempts smallint not null default 0 check (attempts >= 0),
-  result text check (result in ('loaded', 'failed')),
+  -- loaded → OK + note; failed → DOWN; blocked = the browser got a WAF page too → PROBLEM (D-020).
+  result text check (result in ('loaded', 'failed', 'blocked')),
   detail text check (char_length(detail) <= 500),
   http_status smallint check (http_status between 100 and 599),
   -- Set by the Job API (never by the agent): `<yyyy-mm>/<job id>.jpg` in `verifier-screenshots`.

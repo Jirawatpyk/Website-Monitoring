@@ -468,6 +468,16 @@ describe('decideMonitor — blocked rounds and the browser verifier (S03, Status
     });
   });
 
+  it('the browser got a WAF page too → PROBLEM (unverified), not DOWN (D-020)', () => {
+    expect(decideMonitor(snapshot(blocked(), withJob({ state: 'blocked', jobId: 'j1' })))).toEqual({
+      kind: 'unverified',
+      roundAt: at(0),
+      startedAt: at(1),
+      reason: 'browser_blocked',
+      note: UNVERIFIED_NOTE,
+    });
+  });
+
   it('an unverified round while an incident is open records the round and the note, nothing new', () => {
     const d = decideMonitor(snapshot(blocked(), { ...three, open: incident('unacked') }));
     expect(d).toMatchObject({ kind: 'unverified', reason: 'no_poll' });

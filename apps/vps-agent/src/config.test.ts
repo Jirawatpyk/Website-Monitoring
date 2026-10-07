@@ -23,3 +23,15 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ INGEST_TOKEN: 'short' })).toThrow(/API_BASE_URL, INGEST_TOKEN/);
   });
 });
+
+describe('deploy/package.json', () => {
+  it('installs the same Playwright the agent is built and tested with', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const read = async (path: string) =>
+      JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8')) as {
+        dependencies: Record<string, string>;
+      };
+    const [agent, runtime] = await Promise.all([read('../package.json'), read('../deploy/package.json')]);
+    expect(runtime.dependencies).toEqual({ playwright: agent.dependencies.playwright });
+  });
+});

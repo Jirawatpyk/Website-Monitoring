@@ -42,6 +42,8 @@ export const UNVERIFIED_NOTE = 'Blocked, not verified';
 
 /** Why the verifier counts as unavailable for a round (D-019). */
 export type VerifierUnavailableReason = 'no_poll' | 'not_picked_up' | 'lease_expired';
+/** Why a blocked round couldn't be verified: the verifier was unavailable, or the browser was blocked too (D-020). */
+export type UnverifiedReason = VerifierUnavailableReason | 'browser_blocked';
 
 /** The browser verifier's job for one blocked round, as the runner found it. */
 export type Verification =
@@ -49,6 +51,8 @@ export type Verification =
   | { state: 'pending' }
   | { state: 'loaded'; jobId: string }
   | { state: 'failed'; jobId: string; completedAt: Date; detail: string | null }
+  /** The browser got a WAF / challenge page too: the site may block real visitors (D-020). */
+  | { state: 'blocked'; jobId: string }
   /** Not picked up in 30 s, or the lease ran out without a result. */
   | { state: 'unavailable'; reason: Exclude<VerifierUnavailableReason, 'no_poll'> };
 
@@ -86,7 +90,7 @@ export type MonitorDecision =
       roundAt: Date;
       /** The first blocked check of the round. */
       startedAt: Date;
-      reason: VerifierUnavailableReason;
+      reason: UnverifiedReason;
       note: string;
     }
   /** DOWN confirmed on the check and its recheck: open an incident. */
@@ -195,6 +199,9 @@ export function decideMonitor(s: MonitorSnapshot): MonitorDecision {
         return { kind: 'wait' };
       case 'unavailable':
         return { kind: 'unverified', roundAt, startedAt, reason: v.reason, note: UNVERIFIED_NOTE };
+      case 'blocked':
+        // PRD §5: a plain browser blocked too is a PROBLEM, never hidden — and never a DOWN (D-020).
+        return { kind: 'unverified', roundAt, startedAt, reason: 'browser_blocked', note: UNVERIFIED_NOTE };
       case 'loaded':
         // The browser saw the page: every location counts as reachable this round.
         return okRound(s, roundAt, round.scheduled, BLOCKED_NOTE);
