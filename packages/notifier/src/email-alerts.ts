@@ -87,10 +87,11 @@ export const EMAIL_FOOTER =
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+const senderDomain = (from: string) => /@([^>\s]+)>?\s*$/.exec(from)?.[1] ?? 'localhost';
+
 /** `<inc-<id>@notify.example>`: the id every email of one incident refers to. */
 export function incidentThreadId(incidentId: string, from: string): string {
-  const domain = /@([^>\s]+)>?\s*$/.exec(from)?.[1] ?? 'localhost';
-  return `<inc-${incidentId}@${domain}>`;
+  return `<inc-${incidentId}@${senderDomain(from)}>`;
 }
 
 const subjectOf = (i: EmailBaseInput) =>
@@ -127,7 +128,22 @@ interface Body {
 }
 
 function render(input: EmailBaseInput, b: Body): EmailMessage {
-  const why = whyOf(input);
+  const headers: Record<string, string> = input.startsThread
+    ? { References: input.threadId }
+    : { 'In-Reply-To': input.threadId, References: input.threadId };
+  return layout({ subject: subjectOf(input), why: whyOf(input), footer: EMAIL_FOOTER, headers }, b);
+}
+
+interface Envelope {
+  subject: string;
+  /** The footer's bold line: why this person got it. */
+  why: string;
+  footer: string;
+  headers: Record<string, string>;
+}
+
+/** The EmailAlert layout: status bar, label, headline, lede, facts table, buttons, footer. */
+function layout({ subject, why, footer, headers }: Envelope, b: Omit<Body, 'template'>): EmailMessage {
   const preheader = `${b.label} — ${b.pre}`;
   const facts = b.facts
     .map(
@@ -146,7 +162,7 @@ function render(input: EmailBaseInput, b: Body): EmailMessage {
     .join('');
 
   const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subjectOf(input))}</title></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subject)}</title></head>
 <body style="margin:0;padding:0;background:${C.canvas}">
 <div style="display:none;max-height:0;overflow:hidden">${escapeHtml(preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.canvas};font-family:${FONT}">
@@ -163,7 +179,7 @@ function render(input: EmailBaseInput, b: Body): EmailMessage {
 <td style="padding-left:6px"><span style="display:inline-block;padding:4px 8px;border-radius:4px;background:${C.primary};color:${C.inverted};font-size:13px;font-weight:700">DxT <span style="color:${C.accentDot}">&#9679;</span></span></td></tr></table>
 </td></tr></table>
 </td></tr>
-<tr><td style="padding:16px 8px 0;text-align:center;font-size:12px;line-height:1.5;color:${C.secondary}"><b style="font-weight:600;color:${C.primary}">${escapeHtml(why)}</b><br>${escapeHtml(EMAIL_FOOTER)}</td></tr>
+<tr><td style="padding:16px 8px 0;text-align:center;font-size:12px;line-height:1.5;color:${C.secondary}"><b style="font-weight:600;color:${C.primary}">${escapeHtml(why)}</b><br>${escapeHtml(footer)}</td></tr>
 </table>
 </td></tr></table>
 </body></html>`;
@@ -174,18 +190,13 @@ function render(input: EmailBaseInput, b: Body): EmailMessage {
     '',
     ...b.facts.map(([k, v]) => `${k}: ${v}`),
     '',
-    ...b.buttons.map((btn) => `${btn.label}: ${btn.href}`),
-    '',
+    ...(b.buttons.length ? [...b.buttons.map((btn) => `${btn.label}: ${btn.href}`), ''] : []),
     '--',
     why,
-    EMAIL_FOOTER,
+    footer,
   ].join('\n');
 
-  const headers: Record<string, string> = input.startsThread
-    ? { References: input.threadId }
-    : { 'In-Reply-To': input.threadId, References: input.threadId };
-
-  return { subject: subjectOf(input), html, text, headers };
+  return { subject, html, text, headers };
 }
 
 const confirmedLabel = (d: Date) => `${formatDay(d, { weekday: true })} ${formatTimeWithSeconds(d)}`;
@@ -257,5 +268,85 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
     ],
     // Board: the owner's only button leads; for everyone else it's secondary (nothing to do).
     buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: isOwner }],
+  });
+}
+
+/** Admin alerts that aren't about one incident (D-019, `system_alerts.kind`). */
+export type SystemAlertKind = 'verifier_unavailable' | 'verifier_backlog';
+
+/** Why the engine counted the verifier unavailable (D-019). */
+export type VerifierDownReason = 'no_poll' | 'not_picked_up' | 'lease_expired';
+
+export interface SystemAlertEmailInput {
+  alertId: string;
+  kind: SystemAlertKind;
+  openedAt: Date;
+  /** Blocked sites waiting for a verdict when the alert opened. */
+  sites: readonly string[];
+  /** verifier_unavailable: what the engine saw. */
+  reason?: VerifierDownReason;
+  /** verifier_backlog: jobs waiting when the alert opened. */
+  queued?: number;
+  /** Sender, for the alert's thread id. */
+  from: string;
+}
+
+export const SYSTEM_EMAIL_FOOTER =
+  'Times in Thailand time (UTC+7). This is an automated message — replies aren’t read.';
+
+const VERIFIER_DOWN_REASONS: Record<VerifierDownReason, string> = {
+  no_poll: 'The VPS agent hasn’t asked for work in 2 min',
+  not_picked_up: 'A verification job wasn’t picked up within 30 s',
+  lease_expired: 'A verification job ran out of time without a result',
+};
+
+const VERIFIER_CHECK = 'The dxt-agent service on the Thai VPS (runbook: Browser verifier)';
+
+/**
+ * "Admin told about the verifier" (StatusModel, D-001): one email per Admin when it becomes
+ * unavailable or falls behind, under its own subject; nothing when it is back (spec §15.3).
+ */
+export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessage {
+  const since = `${formatDay(input.openedAt, { weekday: true })} ${formatTime(input.openedAt)}`;
+  const envelope: Envelope = {
+    subject:
+      input.kind === 'verifier_unavailable'
+        ? 'DxT Monitor · Browser verifier unavailable'
+        : 'DxT Monitor · Browser verifier falling behind',
+    why: 'You got this because you’re an Admin.',
+    footer: SYSTEM_EMAIL_FOOTER,
+    headers: { References: `<alert-${input.alertId}@${senderDomain(input.from)}>` },
+  };
+  if (input.kind === 'verifier_unavailable') {
+    return layout(envelope, {
+      color: C.secondary,
+      bar: C.secondary,
+      label: 'VERIFIER UNAVAILABLE',
+      pre: `since ${formatTime(input.openedAt)} · blocked sites show PROBLEM (unverified)`,
+      headline: 'The browser verifier is unavailable',
+      lede: 'Blocked sites show PROBLEM (unverified) until it’s back, and are checked again every round. Hard fails still go DOWN on time.',
+      facts: [
+        ['Since', since],
+        ['What we saw', VERIFIER_DOWN_REASONS[input.reason ?? 'no_poll']],
+        ['Waiting', input.sites.length ? input.sites.join(', ') : 'No site right now'],
+        ['Check', VERIFIER_CHECK],
+      ],
+      buttons: [],
+    });
+  }
+  const queued = input.queued ?? 0;
+  return layout(envelope, {
+    color: C.secondary,
+    bar: C.secondary,
+    label: 'VERIFIER BEHIND',
+    pre: `${queued} jobs waiting · blocked sites wait longer for a verdict`,
+    headline: 'The browser verifier is falling behind',
+    lede: 'More than 5 verification jobs are waiting, so blocked sites wait longer for a verdict.',
+    facts: [
+      ['Since', since],
+      ['Waiting', `${queued} jobs`],
+      ['Check', VERIFIER_CHECK],
+    ],
+    buttons: [],
   });
 }

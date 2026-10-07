@@ -498,3 +498,65 @@ describe('notifierDeps', () => {
     ).toBeUndefined();
   });
 });
+
+describe('Admin alerts that aren’t about one incident (D-019)', () => {
+  const alertRow = (over: Record<string, unknown> = {}) =>
+    mail('verifier_unavailable', {
+      id: 'e-alert',
+      incident_id: null,
+      system_alert_id: 'a1',
+      user_id: 'u-tao',
+      thread_key: 'alert-a1',
+      ...over,
+    });
+  const alerts = {
+    'system_alerts.select': {
+      data: [
+        {
+          id: 'a1',
+          kind: 'verifier_unavailable',
+          opened_at: '2026-10-06T02:59:20Z',
+          context: { sites: ['Tubtong'], reason: 'no_poll' },
+        },
+      ],
+    },
+  };
+
+  it('emails the Admin under its own subject, with no timeline event and no incident lookup', async () => {
+    const send = okSend();
+    const { db, calls } = fakeDb({ ...queue([], [alertRow()]), ...alerts });
+    const result = await dispatchNotifications({ db, webhookUrl, email, appUrl, now, send });
+    expect(result).toMatchObject({ email: { sent: 1 } });
+    const [message, options] = send.mock.calls[0] as unknown as [
+      { subject: string; text: string },
+      { to: string },
+    ];
+    expect(message.subject).toBe('DxT Monitor · Browser verifier unavailable');
+    expect(message.text).toContain('Waiting: Tubtong');
+    expect(options).toMatchObject({ to: 'tao@example.test', idempotencyKey: 'notification-e-alert' });
+    expect(calls.some((c) => c.table === 'incident_events')).toBe(false);
+    expect(calls.find((c) => c.table === 'incidents')?.filters).toEqual([['in', 'id', []]]);
+  });
+
+  it.each([
+    ['an alert that is gone', {}, 'System alert not found'],
+    ['an inactive Admin', { ...alerts, 'profiles.select': { data: [] } }, 'Recipient not found or inactive'],
+  ])('fails for good on %s', async (_name, over, error) => {
+    const { db, calls } = fakeDb({ ...queue([], [alertRow()]), ...over });
+    const send = okSend();
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, now, send });
+    expect(send).not.toHaveBeenCalled();
+    expect(updates(calls)).toEqual([expect.objectContaining({ status: 'failed', error })]);
+  });
+
+  it('fails for good on a kind it can’t render', async () => {
+    const { db, calls } = fakeDb({
+      ...queue([], [alertRow({ template: 'mystery' })]),
+      ...alerts,
+    });
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, now, send: okSend() });
+    expect(updates(calls)).toEqual([
+      expect.objectContaining({ status: 'failed', error: "Can't render template mystery" }),
+    ]);
+  });
+});
