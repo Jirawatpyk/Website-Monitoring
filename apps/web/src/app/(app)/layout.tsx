@@ -20,8 +20,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <AppShell
-      // Top bar on phones only — globals.css hides it from lg (AURA request 6).
-      className="dxt-shell-phone-bar"
+      // Top bar on phones only, as the phone boards draw it (D-018; AURA 5.33 `headerHideFrom`).
+      headerHideFrom="lg"
       header={<MobileBar displayName={profile.displayName} />}
       nav={
         <AppNav

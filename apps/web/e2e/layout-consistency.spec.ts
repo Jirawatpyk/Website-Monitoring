@@ -4,7 +4,8 @@ import { ensureUser, localSupabaseEnabled, signIn } from './support/local-supaba
 /**
  * Rules every signed-in page shares, measured in the browser at 390 / 820 / 1440 — the things a
  * per-board review misses because they live across pages (docs/retro.md, 7 Oct 2026):
- * - page header rhythm (D-018): 4 px between breadcrumb or eyebrow, title and meta line;
+ * - page header rhythm (D-018): 4 px between breadcrumb or eyebrow, title and meta line (all inside
+ *   AURA PageHeader's text block since 5.33's breadcrumb slot);
  * - phone shell (D-018): the top bar with brand + avatar below lg, no top bar from lg;
  * - touch targets ≥ 44 px below lg (spec §14.17), counting the hit area AURA adds around a compact
  *   control on a touch screen (`::after` under pointer: coarse);
@@ -42,14 +43,12 @@ async function livePages(page: Page): Promise<string[]> {
   return [...new Set(hrefs.filter((h) => h.startsWith('/')))];
 }
 
-/** Vertical gaps between the header's parts, top to bottom (a breadcrumb above it included). */
+/** Vertical gaps between the header's parts, top to bottom (breadcrumb, eyebrow, title, meta). */
 function headerGaps(page: Page) {
   return page.evaluate(() => {
     const header = document.querySelector('main .aura-page-header');
     if (!header) return null;
     const parts: Element[] = [];
-    const crumbs = header.previousElementSibling;
-    if (crumbs?.classList.contains('aura-crumbs')) parts.push(crumbs);
     const text = header.querySelector('.aura-page-header__text');
     if (text) parts.push(...Array.from(text.children));
     const boxes = parts.map((el) => el.getBoundingClientRect());

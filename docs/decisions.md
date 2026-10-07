@@ -107,7 +107,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 **Why.** One rhythm means the title doesn't jump between pages, and the breadcrumb row (13 px text, 16 px icons) is the same height as the mono eyebrow, so nothing else changes. Using `PageHeader` as AURA ships it keeps the title, meta and actions in one component; the breadcrumb wrapper adds only the same 4 px. The phone bar is what every phone board shows, and a person opening an alert link on a phone should see where they are and who is signed in.
 
-**Impact.** `apps/web/src/app/(app)/layout.tsx`, `components/app-shell/{brand,mobile-bar}.tsx`, `app/globals.css` (the from-lg hide is a workaround until AURA request 6, `docs/design/aura.md`); plan S06 and S07 Scope; `apps/web/CLAUDE.md` → Building a screen. spec-checker should treat a header's 4 px gaps as correct where a board draws 6 / 10 / 12 / 24 px.
+**Impact.** `apps/web/src/app/(app)/layout.tsx`, `components/app-shell/{brand,mobile-bar}.tsx` (AURA 5.33 shipped requests 6 and 7: the bar hides from lg with `headerHideFrom="lg"`, and the breadcrumb goes in `PageHeader`'s `breadcrumb` slot instead of the wrapper — the CSS workaround is gone); plan S06 and S07 Scope; `apps/web/CLAUDE.md` → Building a screen. spec-checker should treat a header's 4 px gaps as correct where a board draws 6 / 10 / 12 / 24 px.
 
 ## D-017 — Email threads hang on an incident id, not the first Message-ID
 

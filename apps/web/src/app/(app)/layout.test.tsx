@@ -49,8 +49,9 @@ describe('AppLayout', () => {
     expect(bar).not.toBeNull();
     expect(within(bar as HTMLElement).getByText('DxT')).toBeInTheDocument();
     expect(within(bar as HTMLElement).getByLabelText('Arm')).toBeInTheDocument();
-    // Hidden from lg by globals.css (AURA request 6).
-    expect(container.querySelector('.aura-shell')).toHaveClass('dxt-shell-phone-bar');
+    // AURA hides it from lg, like a menu-only bar (`headerHideFrom="lg"`).
+    expect(bar).toHaveClass('aura-shell__bar--menu-only');
+    expect(container.querySelector('.aura-shell')).toHaveClass('aura-shell--menu-bar');
   });
 
   it.each([
