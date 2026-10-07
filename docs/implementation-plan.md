@@ -249,6 +249,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
     - after 15 min of continuous OK, one summary goes out (Tao, 7 Oct 2026; D-022).
   - **Auto-resolve:** a PROBLEM that recovers within 5 min and was never acknowledged auto-resolves (`autoResolves`, spec §16.1).
   - **D-003 lifecycle:** checked end to end.
+  - **D-023:** a DOWN incident recovers when the primary monitor is OK; a key page still failing rejoins the same incident as a PROBLEM relapse.
   - **Messages:** the "down again", "PROBLEM again" and flapping summary rows.
 - **Boards:** ChatAlert (relapse, flapping rows) · **Test plan:** —
 - **Carried from S02b review:** engine runs overlap (the probe trigger and the cron). Relapse handling must be one state-guarded SQL function, or a relapse alerts once per run.

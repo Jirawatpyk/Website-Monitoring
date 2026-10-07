@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-023 | 7 Oct 2026 | A DOWN incident recovers when the primary monitor is OK again, even if a key page still fails; the key page's problem then rejoins the same incident as a PROBLEM relapse (built in S04b). Until S04b, D-022's "recover when every monitor is OK" stays | D-022 recovery rule ("an incident recovers on the first round every monitor is OK") for DOWN incidents |
 | D-022 | 7 Oct 2026 | S04 is split into S04a / S04b. Engine rules: one verdict per monitor per round; site status = the worst verdict, never below an unrecovered incident's severity; non-primary problems are `key_page`; keyword and redirect = a majority in one round; slow = p50 over the threshold 3 rounds in a row; regional = one location failing ≥ 5 min; the faulty-location rule needs ≥ 3 monitors in the minute; fewer than 2 locations beating → Admin alert. PROBLEM is sent at any hour until S08. While flapping, states move as normal and only RECOVERED is held. Every new problem on a recovered incident is a D-004 relapse (S04b). PROBLEM message copy comes from the ChatAlert / EmailAlert rows design added (spec §19) | Gaps — PRD §5 / StatusModel name the triggers but not how they are counted; ChatAlert / EmailAlert have one PROBLEM text line only |
 | D-021 | 7 Oct 2026 | A DOWN confirmed while the site's open incident is a PROBLEM raises that incident to DOWN (same incident and thread, DOWN alert sent, back to waiting for an ack if it had recovered); a DOWN incident's relapse stays D-004 / S04 | Gap — D-004 covers a site failing again, not a PROBLEM incident turning into an outage |
 | D-020 | 7 Oct 2026 | A blocked site that is blocked in the browser verifier too (a WAF or challenge page in plain Chromium) is PROBLEM (unverified), not DOWN; only a page that really fails in the browser (no answer, 4xx/5xx without a WAF signature, keyword missing) is DOWN | StatusModel "Blocked · browser: page fails → DOWN" read literally (PRD §5 "a plain browser blocked → PROBLEM, not hidden") |
@@ -26,6 +27,20 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-023 — A DOWN ends when the home page is back; a broken key page carries on as a PROBLEM
+
+**Gap.** D-022 makes site status the worst monitor verdict and lets an incident recover only on a round where every monitor is OK. For a DOWN incident that means: the home page answers again, but a key page still returns 404, so the site stays DOWN and the incident never recovers. Those minutes count as downtime in uptime (spec §5), and from S08 the DOWN escalation keeps paging people while the site is up. Found by engine-reviewer in S04a.
+
+**Decision (7 Oct 2026, Tao).**
+- A **DOWN** incident recovers (RECOVERED, Monitoring) on the first round the **primary** monitor is OK, whatever the key pages say. The downtime ends there.
+- A key page still failing then counts as a new problem on a recovered incident: a D-004 relapse into the **same** incident and thread, as a PROBLEM ("PROBLEM AGAIN", spec §19). Severity stays as it was for the record; the site shows PROBLEM.
+- A **PROBLEM** incident keeps D-022's rule: it recovers when every monitor is OK.
+- Built in **S04b**, with the relapse function. Until then S04a keeps D-022's rule (no real sites are on production before S04b).
+
+**Why.** Uptime and escalation follow what visitors see: when the home page loads, the site is up (spec §6: only the primary monitor can make a site DOWN). The key page is still tracked, in the same thread, at the severity it deserves.
+
+**Impact.** S04b: `packages/engine/src/site.ts` recovery for DOWN incidents, the relapse path, engine and integration tests (a DOWN with a key page still 404 → RECOVERED, then PROBLEM AGAIN).
 
 ## D-022 — S04 engine rules, the S04a / S04b split and PROBLEM messages
 
