@@ -73,6 +73,8 @@ export interface AcknowledgedEmailInput extends EmailBaseInput {
   confirmedAt: Date;
   /** Set for a PROBLEM incident (EmailAlert PROBLEM thread). */
   problem?: ProblemFacts | null;
+  /** The incident's cause line, shown under a PROBLEM's ACKNOWLEDGED (EmailAlert). */
+  cause?: string | null;
 }
 
 export interface RecoveredEmailInput extends EmailBaseInput {
@@ -277,6 +279,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
             `${slow ? 'Slow' : 'Problem'} for`,
             `${duration} so far (detected ${formatTime(input.confirmedAt)})`,
           ],
+          ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
         ]
       : [
           ['Acknowledged', `${ackedBy} at ${at}`],
@@ -425,6 +428,12 @@ const LOCATION_NAMES: Record<ProbeLocation, string> = {
   TYO: 'TYO (Tokyo)',
 };
 
+const PROBE_CHECK: Record<ProbeLocation, string> = {
+  BKK: 'The BKK probe on the BKK VPS (dxt-agent)',
+  SIN: 'The SIN probe (Vercel cron probe-sin)',
+  TYO: 'The TYO probe (Vercel cron probe-tyo)',
+};
+
 const SYSTEM_TITLES: Record<SystemAlertKind, string> = {
   verifier_unavailable: 'Browser verifier unavailable',
   verifier_backlog: 'Browser verifier falling behind',
@@ -484,10 +493,7 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
           'Effect',
           'Every site keeps its status from its last complete round. No new incidents or recoveries until a second location reports.',
         ],
-        [
-          'What to check',
-          'The BKK probe on the BKK VPS and the SIN / TYO probes on Vercel — each reports every minute.',
-        ],
+        ['What to check', `${missing.map((l) => PROBE_CHECK[l]).join(' · ')} — each reports every minute.`],
       ],
       buttons: [],
     });

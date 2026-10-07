@@ -19,7 +19,7 @@ export const checkResultSchema = z.object({
   attempt: z.union([z.literal(1), z.literal(2)]).default(1),
   // S04a (D-022): where the redirects ended and the keyword result. Optional, so a probe that
   // doesn't send them yet (a VPS agent not redeployed) still reports; null = not checked.
-  finalUrl: z.string().max(2048).nullable().optional(),
+  finalUrl: z.url().max(2048).nullable().optional(),
   keywordMissing: z.array(z.string().max(200)).max(20).nullable().optional(),
   keywordForbidden: z.array(z.string().max(200)).max(20).nullable().optional(),
 });

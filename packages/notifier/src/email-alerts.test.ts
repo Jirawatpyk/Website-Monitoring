@@ -202,6 +202,9 @@ describe('Admin alert about the browser verifier (D-001, D-019)', () => {
     expect(m.text).toMatch(/^STATUSES FROZEN — Only 1 probe location is reporting/);
     expect(m.text).toContain('Still reporting: TYO (Tokyo)');
     expect(m.text).toContain('Missing: BKK (BKK VPS) · SIN (Singapore)');
+    expect(m.text).toContain(
+      'What to check: The BKK probe on the BKK VPS (dxt-agent) · The SIN probe (Vercel cron probe-sin) — each reports every minute.',
+    );
     expect(m.text).toContain('No new incidents or recoveries until a second location reports.');
     expect(m.html).toContain('STATUSES FROZEN — only TYO is reporting');
     const none = alert({ kind: 'probe_locations_low', active: [], sites: [] });

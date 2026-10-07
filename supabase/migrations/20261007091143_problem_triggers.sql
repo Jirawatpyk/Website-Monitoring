@@ -14,8 +14,8 @@
 -- Keyword and redirect results never make a check fail; the engine turns them into PROBLEMs.
 alter table public.check_results
   add column final_url text check (char_length(final_url) <= 2048),
-  add column keyword_missing text[],
-  add column keyword_forbidden text[];
+  add column keyword_missing text[] check (cardinality(keyword_missing) <= 20),
+  add column keyword_forbidden text[] check (cardinality(keyword_forbidden) <= 20);
 
 -- ── monitor_status ────────────────────────────────────────────────────────
 -- One row per monitor (keyed by monitor_id, like site_status, D-014): the engine's carry state that
@@ -61,8 +61,7 @@ alter table public.system_alerts add constraint system_alerts_kind_check
 -- Writes the judged round's monitor verdicts (`p_monitors`: [{monitorId, status, trigger, cause,
 -- slowRounds, failingSince}]) and the site status worked out from them (`p_status`). Each engine
 -- function below calls it inside its own transaction, so the carry state and the incident change
--- commit together. A monitor row never moves back to an older or the same round (two overlapping
--- engine runs judge a round from the same prior state; the second write is skipped). The site
+-- commit together. A monitor row never moves back to an older round. The site
 -- status follows the same never-backwards rule as the rest of site_status. Inline SQL: functions
 -- the service role calls can't reach `private` (supabase/CLAUDE.md).
 create function public.engine_write_monitors(
@@ -79,20 +78,27 @@ begin
   if p_monitors is not null then
     insert into public.monitor_status as ms
       (monitor_id, site_id, last_round_at, status, trigger, cause, slow_rounds, failing_since)
-    select (m ->> 'monitorId')::uuid, p_site_id, p_round_at,
-           (m ->> 'status')::public.site_state,
-           nullif(m ->> 'trigger', '')::public.incident_trigger,
-           nullif(m ->> 'cause', ''),
-           coalesce((m ->> 'slowRounds')::smallint, 0),
-           coalesce(m -> 'failingSince', '{}')
-    from jsonb_array_elements(p_monitors) m
+    select (d.m ->> 'monitorId')::uuid, p_site_id, p_round_at,
+           (d.m ->> 'status')::public.site_state,
+           nullif(d.m ->> 'trigger', '')::public.incident_trigger,
+           left(nullif(d.m ->> 'cause', ''), 500),
+           coalesce((d.m ->> 'slowRounds')::smallint, 0),
+           coalesce(d.m -> 'failingSince', '{}')
+    -- One row per monitor even if the list names one twice (the last wins).
+    from (
+      select distinct on (e ->> 'monitorId') e as m
+      from jsonb_array_elements(p_monitors) with ordinality as x(e, n)
+      order by e ->> 'monitorId', n desc
+    ) d
     -- Only this site's monitors.
-    join public.monitors mon on mon.id = (m ->> 'monitorId')::uuid and mon.site_id = p_site_id
+    join public.monitors mon on mon.id = (d.m ->> 'monitorId')::uuid and mon.site_id = p_site_id
     on conflict (monitor_id) do update
       set last_round_at = excluded.last_round_at, status = excluded.status,
           trigger = excluded.trigger, cause = excluded.cause,
           slow_rounds = excluded.slow_rounds, failing_since = excluded.failing_since
-      where ms.last_round_at < excluded.last_round_at;
+      -- Same round again (overlapping runs judge it from the same prior state): the same values, so
+      -- `<=` rewrites them harmlessly and keeps the monitor in step with site_status's `<=` guard.
+      where ms.last_round_at <= excluded.last_round_at;
   end if;
 
   if p_status is not null then

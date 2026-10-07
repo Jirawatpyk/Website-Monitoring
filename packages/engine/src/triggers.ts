@@ -151,16 +151,17 @@ export function regionalIssue(
 
 // ── Faulty location (spec §15.3) ────────────────────────────────────────────
 
-/** Below this many monitors from a location in one minute, the faulty-location rule doesn't apply (D-022). */
-export const FAULTY_MIN_MONITORS = 3;
+/** Below this many sites from a location in one minute, the faulty-location rule doesn't apply (D-022). */
+export const FAULTY_MIN_SITES = 3;
 
 /**
  * Per probe minute, the location that failed more than half of every monitor it checked — treated as
- * no data for that minute (`faultyLocations`). A location with fewer than 3 monitors that minute is
+ * no data for that minute (`faultyLocations`). A location with fewer than 3 sites that minute is
  * never judged faulty: one real failure would otherwise hide a regional problem.
  */
 export function faultyByMinute(
-  scheduled: readonly (Pick<CheckFacts, 'location' | 'outcome' | 'checkedAt'> & { monitorId: string })[],
+  /** Each site's primary scheduled checks (PRD §5 counts sites, not their key pages). */
+  scheduled: readonly (Pick<CheckFacts, 'location' | 'outcome' | 'checkedAt'> & { siteId: string })[],
 ): Map<number, Set<ProbeLocation>> {
   const minutes = new Map<number, typeof scheduled>();
   for (const c of scheduled) {
@@ -169,9 +170,9 @@ export function faultyByMinute(
   }
   const out = new Map<number, Set<ProbeLocation>>();
   for (const [minute, rows] of minutes) {
-    const monitors = new Map<ProbeLocation, Set<string>>();
-    for (const r of rows) monitors.set(r.location, (monitors.get(r.location) ?? new Set()).add(r.monitorId));
-    const judged = rows.filter((r) => (monitors.get(r.location)?.size ?? 0) >= FAULTY_MIN_MONITORS);
+    const sites = new Map<ProbeLocation, Set<string>>();
+    for (const r of rows) sites.set(r.location, (sites.get(r.location) ?? new Set()).add(r.siteId));
+    const judged = rows.filter((r) => (sites.get(r.location)?.size ?? 0) >= FAULTY_MIN_SITES);
     const faulty = faultyLocations(judged);
     if (faulty.size) out.set(minute, faulty);
   }

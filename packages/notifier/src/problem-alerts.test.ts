@@ -251,6 +251,17 @@ describe('PROBLEM emails (EmailAlert PROBLEM thread)', () => {
     expect(ack.html).toContain('ACKNOWLEDGED — by Ploy 09:58 · Fuji Links still slow');
     expect(ack.text).toContain('The site is still up but slow; you’ll get one more email when it clears.');
     expect(ack.text).toContain('Slow for: 6 min so far (detected 09:52)');
+    expect(
+      buildAcknowledgedEmail({
+        ...base,
+        ackedBy: 'Ploy',
+        ackedAt: new Date('2026-09-25T02:58:12Z'),
+        startedAt: detectedAt,
+        confirmedAt: detectedAt,
+        problem: { trigger: 'slow' },
+        cause: CAUSE,
+      }).text,
+    ).toContain(`Cause: ${CAUSE}`);
     const rec = buildRecoveredEmail({
       ...base,
       startsThread: false,

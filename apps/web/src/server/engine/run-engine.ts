@@ -117,7 +117,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     db.from('site_status').select('site_id, last_round_at, ok_rounds, note').in('site_id', siteIds),
     db
       .from('monitor_status')
-      .select('monitor_id, status, trigger, cause, slow_rounds, failing_since')
+      .select('monitor_id, status, trigger, cause, slow_rounds, failing_since, last_round_at')
       .in('monitor_id', monitorIds),
     db
       .from('incidents')
@@ -128,12 +128,18 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   ]);
   for (const r of [statuses, carries, incidents]) if (r.error) throw new Error(r.error.message);
 
+  const checksByMonitor = new Map<string, typeof checks>();
+  for (const c of checks)
+    checksByMonitor.set(c.monitor_id, [...(checksByMonitor.get(c.monitor_id) ?? []), c]);
+  const carryByMonitor = new Map((carries.data ?? []).map((c) => [c.monitor_id, c]));
+
   // A location that failed most monitors in a minute is no data for that minute (spec §15.3).
+  const siteOfPrimary = new Map(sites.map((s) => [s.monitors.find((m) => m.isPrimary)!.id, s.id]));
   const faulty = faultyByMinute(
     checks
-      .filter((c) => c.attempt !== 2)
+      .filter((c) => c.attempt !== 2 && siteOfPrimary.has(c.monitor_id))
       .map((c) => ({
-        monitorId: c.monitor_id,
+        siteId: siteOfPrimary.get(c.monitor_id)!,
         location: c.location as ProbeLocation,
         outcome: c.outcome,
         checkedAt: new Date(c.checked_at),
@@ -142,9 +148,33 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
 
   /** Sites the verifier couldn't decide this run, with the reason it saw (D-019). */
   const unverifiedSites = new Map<string, string>();
+  /** A site whose write failed: logged, the rest still judged, the run reported failed at the end. */
+  const failures: string[] = [];
   const unverifiedMonitors = new Set<string>();
   for (const site of sites) {
+    try {
+      await judgeSite(site);
+    } catch (err) {
+      failures.push(`${site.name}: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(JSON.stringify({ event: 'engine_site_failed', site: site.id, error: String(err) }));
+    }
+  }
+
+  summary.unverified = unverifiedMonitors.size;
+  summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations);
+  // The Healthchecks ping must still show the failure (cron-job.ts fails the run on a throw).
+  if (failures.length) throw new Error(failures.join('; '));
+  return summary;
+
+  async function judgeSite(site: SiteRow): Promise<void> {
     const status = statuses.data?.find((st) => st.site_id === site.id);
+    // Two reads, and engine runs overlap: a carry older than the site's round was read before another
+    // run committed that round. Judge the site next run, from a consistent pair (engine review M2).
+    const behind = site.monitors.some((m) => {
+      const c = carryByMonitor.get(m.id);
+      return !!c && !!status?.last_round_at && Date.parse(c.last_round_at) < Date.parse(status.last_round_at);
+    });
+    if (behind) return;
     const open = incidents.data?.find((inc) => inc.site_id === site.id);
     const snapshot: SiteSnapshot = {
       now,
@@ -167,8 +197,8 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         url: m.url,
         slowThresholdMs: m.slowThresholdMs,
         allowedRedirectDomains: m.allowedRedirectDomains,
-        checks: checks.filter((c) => c.monitor_id === m.id).map(toStoredCheck),
-        carry: carryOf(carries.data?.find((c) => c.monitor_id === m.id)),
+        checks: (checksByMonitor.get(m.id) ?? []).map(toStoredCheck),
+        carry: carryOf(carryByMonitor.get(m.id)),
         ...(verifier.jobs.get(m.id) ? { verifications: verifier.jobs.get(m.id)! } : {}),
       })),
       verifierAvailable: verifier.available,
@@ -195,7 +225,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         // Judged without it: a late verdict mustn't land on this round or clear the alert.
         if (u.reason === 'not_picked_up') await expireUnpicked(db, u.monitorId, decision.roundAt);
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
-        if (u.reason !== 'browser_blocked') unverifiedSites.set(site.name, u.reason);
+        if (u.reason !== 'browser_blocked') unverifiedSites.set(`${site.name} (Tier ${site.tier})`, u.reason);
       }
       const applied = await apply(
         db,
@@ -232,10 +262,6 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       }));
     }
   }
-
-  summary.unverified = unverifiedMonitors.size;
-  summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations);
-  return summary;
 }
 
 /** The active locations whose probe beat in the last 3 min (D-019). */
@@ -419,6 +445,7 @@ export const CHECKS_PAGE = 1000;
 
 async function loadChecks(db: DbClient, monitorIds: string[], since: Date) {
   const rows = [];
+  const seen = new Set<string>();
   for (let from = 0; ; from += CHECKS_PAGE) {
     const { data, error } = await db
       .from('check_results')
@@ -431,7 +458,12 @@ async function loadChecks(db: DbClient, monitorIds: string[], since: Date) {
       .order('id')
       .range(from, from + CHECKS_PAGE - 1);
     if (error) throw new Error(`check_results: ${error.message}`);
-    rows.push(...data);
+    // Rows keep arriving while we page: a row pushed onto the next page must not count twice.
+    for (const row of data) {
+      if (row.id && seen.has(row.id)) continue;
+      if (row.id) seen.add(row.id);
+      rows.push(row);
+    }
     if (data.length < CHECKS_PAGE) return rows;
   }
 }

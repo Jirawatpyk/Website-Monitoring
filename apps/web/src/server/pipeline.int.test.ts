@@ -488,7 +488,7 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
         kind: 'verifier_unavailable',
         context: expect.objectContaining({
           reason: 'no_poll',
-          sites: expect.arrayContaining([`Blocked A ${run}`, `Blocked B ${run}`]),
+          sites: expect.arrayContaining([`Blocked A ${run} (Tier 1)`, `Blocked B ${run} (Tier 1)`]),
         }),
       }),
     ]);

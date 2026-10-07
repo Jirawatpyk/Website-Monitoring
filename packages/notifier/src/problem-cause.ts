@@ -17,8 +17,13 @@ export interface ProblemCauseContext {
  */
 export function formatProblemCause(detail: ProblemDetail, ctx: ProblemCauseContext): string {
   const inner = innerCause(detail, ctx);
-  return ctx.isPrimary ? inner : `Home OK · ${pathOf(ctx.monitorUrl)} → ${inner}`;
+  return capped(ctx.isPrimary ? inner : `Home OK · ${pathOf(ctx.monitorUrl)} → ${inner}`);
 }
+
+/** What `monitor_status.cause` holds: a long keyword list or path is cut, never refused. */
+export const MAX_CAUSE_LENGTH = 500;
+const capped = (text: string) =>
+  text.length <= MAX_CAUSE_LENGTH ? text : `${text.slice(0, MAX_CAUSE_LENGTH - 1)}…`;
 
 /**
  * The short form for the Chat text line, after "PROBLEM · <site> (Tier n) · " — "slow, p50 5.8 s",
@@ -26,7 +31,7 @@ export function formatProblemCause(detail: ProblemDetail, ctx: ProblemCauseConte
  */
 export function formatProblemSummary(detail: ProblemDetail, ctx: ProblemCauseContext): string {
   const short = innerSummary(detail, ctx);
-  return ctx.isPrimary ? short : `key page ${pathOf(ctx.monitorUrl)}, ${short}`;
+  return capped(ctx.isPrimary ? short : `key page ${pathOf(ctx.monitorUrl)}, ${short}`);
 }
 
 function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
@@ -45,7 +50,7 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
         .filter(Boolean)
         .join(' · ');
     case 'redirect':
-      return `${path} → ${d.host} · not in this site’s allowlist`;
+      return `${path} → ${plain(d.host)} · not in this site’s allowlist`;
     case 'regional': {
       const failure = lowerFirst(describeFailure({ location: d.location, ...d.failure }, ctx.timeoutMs));
       return `${d.location} failing ${d.minutes} min (${failure}) · ${where(d.okLocations)} OK`;
@@ -70,7 +75,7 @@ function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
     case 'keyword':
       return d.missing.length ? `${quoted(d.missing)} missing` : `${quoted(d.forbidden)} found on the page`;
     case 'redirect':
-      return `redirects to ${d.host}`;
+      return `redirects to ${plain(d.host)}`;
     case 'regional':
       return `${d.location} failing ${d.minutes} min`;
     case 'status':
@@ -97,6 +102,9 @@ function pathOf(url: string): string {
     return url;
   }
 }
+
+/** Text from outside (a redirect host) can't open a Chat mention or link: `<…|…>` is stripped. */
+const plain = (text: string) => text.replace(/[<>|]/g, '');
 
 /** Locations in BKK / SIN / TYO order. */
 function where(locations: readonly ProbeLocation[]): string {

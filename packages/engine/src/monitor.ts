@@ -100,19 +100,23 @@ export function isReady(
   locations: readonly ProbeLocation[],
   intervalSec: number,
   now: Date,
+  /** Locations treated as no data this round (faulty, spec §15.3): they neither confirm nor hold it. */
+  excluded: ReadonlySet<ProbeLocation> = new Set(),
 ): boolean {
   const pastDeadline = now.getTime() - (round.start.getTime() + intervalSec * 1000) >= ROUND_DEADLINE_MS;
-  return isComplete(round, locations) || downDecided(round) || pastDeadline;
+  return isComplete(round, locations, excluded) || downDecided(round, excluded) || pastDeadline;
 }
 
 /**
  * Two locations failed the check and their rechecks: a third can't change the verdict, so the round
  * is judged without waiting for it (PRD §9: DOWN within 30 s of the confirm).
  */
-export function downDecided(round: Round): boolean {
+export function downDecided(round: Round, excluded: ReadonlySet<ProbeLocation> = new Set()): boolean {
   const confirmed = round.scheduled.filter(
     (c) =>
-      c.outcome === 'fail' && round.rechecks.some((r) => r.location === c.location && r.outcome === 'fail'),
+      !excluded.has(c.location) &&
+      c.outcome === 'fail' &&
+      round.rechecks.some((r) => r.location === c.location && r.outcome === 'fail'),
   );
   return confirmed.length >= 2;
 }
@@ -144,9 +148,14 @@ export function buildRound(checks: readonly StoredCheck[], start: number, interv
 }
 
 /** Complete: every expected location reported and every failure was rechecked. Nobody expected → never. */
-function isComplete(round: Round, locations: readonly ProbeLocation[]): boolean {
+function isComplete(
+  round: Round,
+  locations: readonly ProbeLocation[],
+  excluded: ReadonlySet<ProbeLocation>,
+): boolean {
   if (locations.length === 0) return false;
   return locations.every((location) => {
+    if (excluded.has(location)) return true;
     const first = round.scheduled.find((c) => c.location === location);
     if (!first) return false;
     return first.outcome !== 'fail' || round.rechecks.some((c) => c.location === location);

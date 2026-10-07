@@ -44,6 +44,13 @@ function problemOf(i: IncidentFacts, ctx: Record<string, unknown> = {}): Problem
   return { trigger: i.trigger, slowLimitMs: own ?? TIER_CONFIG[tier].slowThresholdMs };
 }
 
+/** The cause line stored when the incident opened (its `detected` event). */
+function causeOf(i: IncidentFacts): string | null {
+  const detected = i.incident_events?.find((e) => e.type === 'detected');
+  const cause = detected ? contextOf(detected.payload).cause : undefined;
+  return typeof cause === 'string' ? cause : null;
+}
+
 /** "3 of 3 locations": where the problem was seen, of the locations reporting when it opened. */
 function seenFrom(ctx: Record<string, unknown>): { count: number; of: number } | null {
   const detail = (ctx.detail ?? {}) as { locations?: unknown; location?: unknown };
@@ -164,6 +171,7 @@ export function renderEmail(
       return buildAcknowledgedEmail({
         ...base,
         problem: problemOf(i),
+        cause: causeOf(i),
         ackedBy: str(ctx.ackedBy, 'someone'),
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
         startedAt: new Date(i.started_at),

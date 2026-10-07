@@ -184,18 +184,18 @@ describe('faulty location (spec §15.3): one location failing more than half the
   const rows = (failingAtSin: number, total: number, sec = 1) =>
     Array.from({ length: total }, (_, i) =>
       (['BKK', 'SIN', 'TYO'] as const).map((location) => ({
-        monitorId: `m${i}`,
+        siteId: `s${i}`,
         location,
         outcome: (location === 'SIN' && i < failingAtSin ? 'fail' : 'pass') as CheckOutcome,
         checkedAt: at(sec + i),
       })),
     ).flat();
 
-  it('SIN fails 3 of 4 monitors in a minute → no data for that minute', () => {
+  it('SIN fails 3 of 4 sites in a minute → no data for that minute', () => {
     expect(faultyByMinute(rows(3, 4))).toEqual(new Map([[T, new Set(['SIN'])]]));
   });
 
-  it('below 3 monitors from a location the rule doesn’t apply (it would hide a regional problem)', () => {
+  it('below 3 sites from a location the rule doesn’t apply (it would hide a regional problem)', () => {
     expect(faultyByMinute(rows(2, 2))).toEqual(new Map());
   });
 

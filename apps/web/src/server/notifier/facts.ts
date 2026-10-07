@@ -23,6 +23,8 @@ export interface IncidentFacts {
   acked_at: string | null;
   recovered_at: string | null;
   acker: { display_name: string } | null;
+  /** The timeline's first rows; the `detected` one carries the cause line. */
+  incident_events?: { type: string; payload: Json }[];
   sites: { name: string; tier: number; primary: Owner | null; backup: Owner | null };
 }
 
@@ -61,6 +63,7 @@ export async function loadFacts(db: DbClient, rows: readonly Notification[]): Pr
       .select(
         `id, number, state, severity, trigger, started_at, detected_at, acked_at, recovered_at,
          acker:profiles!incidents_acked_by_fkey(display_name),
+         incident_events(type, payload),
          sites!inner(name, tier,
            primary:profiles!sites_primary_owner_id_fkey(id, display_name, google_chat_user_id),
            backup:profiles!sites_backup_owner_id_fkey(id, display_name, google_chat_user_id))`,

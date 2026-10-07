@@ -459,3 +459,42 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
     expect(old.rpcCalls).toEqual([{ name: 'clear_system_alert', args: { p_kind: 'probe_locations_low' } }]);
   });
 });
+
+describe('runEngine — one failing site never blinds the others (security review M1)', () => {
+  it('judges every site, then fails the run naming the site whose write failed', async () => {
+    const other = { ...monitor(), id: 'm2', site_id: 's2', sites: { ...monitor().sites, name: 'Other' } };
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor(), other] },
+      'check_results.select': { data: [...ok, ...ok.map((r) => ({ ...r, monitor_id: 'm2' }))] },
+      'rpc.engine_record_round': (call) =>
+        (call.values as { p_site_id: string }).p_site_id === 's1' ? { error: { message: 'boom' } } : {},
+    });
+    await expect(runEngine(db, now)).rejects.toThrow('Tubtong: engine_record_round: boom');
+    expect(rpcCalls.map((c) => (c.args as { p_site_id?: string }).p_site_id)).toEqual(['s1', 's2']);
+  });
+});
+
+describe('runEngine — overlapping runs (engine review M2)', () => {
+  it('skips a site whose monitor carry is older than its round: read mid-commit of another run', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: ok },
+      'site_status.select': { data: [{ site_id: 's1', last_round_at: at(-60), ok_rounds: 1, note: null }] },
+      'monitor_status.select': {
+        data: [
+          {
+            monitor_id: 'm1',
+            status: 'ok',
+            trigger: null,
+            cause: null,
+            slow_rounds: 2,
+            failing_since: {},
+            last_round_at: at(-120),
+          },
+        ],
+      },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.filter((c) => c.name.startsWith('engine_'))).toEqual([]);
+  });
+});

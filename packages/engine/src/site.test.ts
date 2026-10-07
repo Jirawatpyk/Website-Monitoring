@@ -355,3 +355,51 @@ describe('decideSite — status while an incident is open (D-022, S03 engine M1)
     expect(decideSite(site([monitor('home', [])]))).toEqual({ kind: 'wait' });
   });
 });
+
+describe('decideSite — engine review S04a', () => {
+  // INC-0142 MuvMi with Bangkok's own network broken that minute (spec §15.3): BKK and TYO time out
+  // and recheck, SIN answers 504 later in the minute. Tier 1 rounds.
+  const T1 = { intervalSec: 60 };
+  const inc0142 = [
+    check('BKK', 'fail', 12),
+    check('TYO', 'fail', 14),
+    check('BKK', 'fail', 41, { attempt: 2 }),
+    check('TYO', 'fail', 44, { attempt: 2 }),
+    check('SIN', 'fail', 46),
+    check('SIN', 'fail', 76, { attempt: 2 }),
+  ];
+  const faultyBkk = new Map([[R, new Set<ProbeLocation>(['BKK'])]]);
+
+  it('H1: a faulty location never makes a round ready — it waits for SIN instead of being used up', () => {
+    const early = decideSite(
+      site([monitor('home', inc0142.slice(0, 4))], { ...T1, now: at(45), faulty: faultyBkk }),
+    );
+    expect(early).toEqual({ kind: 'wait' });
+  });
+
+  it('H1: once SIN confirms, DOWN opens on TYO + SIN', () => {
+    const d = decideSite(site([monitor('home', inc0142)], { ...T1, now: at(77), faulty: faultyBkk }));
+    expect(d).toMatchObject({ kind: 'open', startedAt: at(14) });
+    expect(d.kind === 'open' && d.failing.map((c) => c.location)).toEqual(['TYO', 'SIN']);
+  });
+
+  it('M1: a failing-since clock of a location that stopped beating is dropped, not turned into Regional', () => {
+    const stale = carry({ failingSince: { BKK: at(-7200).toISOString() } });
+    const checks = [check('BKK', 'fail', 1), check('SIN', 'pass', 2), check('TYO', 'pass', 3)];
+    // BKK just came back: its clock starts again at this failure.
+    const back = decideSite(site([monitor('home', checks, { carry: stale })], { locations: ['SIN', 'TYO'] }));
+    expect(back).toMatchObject({ kind: 'none', status: 'ok' });
+    expect(back.kind === 'none' && back.monitors[0]?.failingSince).toEqual({ BKK: at(1).toISOString() });
+  });
+
+  it('L2: a blocked key page the verifier can’t decide is a key-page problem, and leaves the site note alone', () => {
+    const d = decideSite(site([monitor('home', all('pass')), monitor('booking', all('blocked'))]));
+    expect(d).toMatchObject({
+      kind: 'problem',
+      monitorId: 'booking',
+      trigger: 'key_page',
+      detail: { kind: 'blocked' },
+    });
+    expect(d).not.toHaveProperty('note');
+  });
+});

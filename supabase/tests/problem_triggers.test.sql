@@ -4,7 +4,7 @@
 -- rows, the "fewer than 2 locations" Admin alert kind, and read-only RLS.
 begin;
 \ir _helpers.psql
-select plan(26);
+select plan(31);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -85,8 +85,8 @@ select public.engine_record_round('00000000-0000-0000-0000-0000000000a1', '2026-
 select results_eq(
   $$select slow_rounds::int, last_round_at from public.monitor_status
     where monitor_id = '00000000-0000-0000-0000-0000000000d1'$$,
-  $$values (3, '2026-10-07 09:00Z'::timestamptz)$$,
-  'a monitor row never moves back, nor counts the same round twice'
+  $$values (4, '2026-10-07 09:00Z'::timestamptz)$$,
+  'a monitor row never moves back; the same round again is rewritten (values are set, never added)'
 );
 select is(
   (select status::text from public.site_status where site_id = '00000000-0000-0000-0000-0000000000a1'),
@@ -159,6 +159,42 @@ select results_eq(
     where ms.monitor_id = '00000000-0000-0000-0000-0000000000d3'$$,
   $$values ('ok', null::public.incident_trigger, 'ok')$$,
   'after the second OK round the monitor and the site are OK'
+);
+
+-- ── Escalate, a list naming a monitor twice, bounded keyword lists ───────
+select public.engine_open_incident('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1',
+  'blocked_unverified', 'problem', '2026-10-07 09:15:05Z', '2026-10-07 09:16Z', '2026-10-07 09:15Z', '{}', false);
+select ok(
+  public.engine_escalate_incident(
+    (select id from public.incidents where site_id = '00000000-0000-0000-0000-0000000000a1'
+       and state not in ('resolved', 'in_review', 'closed')),
+    '2026-10-07 09:18:32Z', '2026-10-07 09:18Z', '{}', false,
+    '[{"monitorId": "00000000-0000-0000-0000-0000000000d1", "status": "ok"},
+      {"monitorId": "00000000-0000-0000-0000-0000000000d1", "status": "down"}]'::jsonb, 'down'),
+  'escalate takes the monitor verdicts'
+);
+select results_eq(
+  $$select ms.status::text, s.status::text from public.monitor_status ms
+    join public.site_status s on s.site_id = ms.site_id
+    where ms.monitor_id = '00000000-0000-0000-0000-0000000000d1'$$,
+  $$values ('down', 'down')$$,
+  'a monitor named twice is written once, the last entry winning'
+);
+select lives_ok(
+  $$select public.engine_record_round('00000000-0000-0000-0000-0000000000a1', '2026-10-07 09:18Z',
+    '2026-10-07 09:19Z', 0::smallint,
+    '[{"monitorId": "00000000-0000-0000-0000-0000000000d1", "status": "down"}]'::jsonb, 'down')$$,
+  'the same round again (an overlapping run) is a harmless rewrite'
+);
+select throws_ok(
+  $$insert into public.check_results (monitor_id, location, checked_at, outcome, keyword_missing)
+    values ('00000000-0000-0000-0000-0000000000d1', 'SIN', '2026-10-07 09:20Z', 'pass',
+            (select array_agg('k' || g) from generate_series(1, 21) g))$$,
+  '23514', null, 'at most 20 missing keywords per check'
+);
+select is(
+  (select char_length(cause) from public.monitor_status where monitor_id = '00000000-0000-0000-0000-0000000000d1'),
+  null, 'a down verdict has no cause'
 );
 
 -- ── Admin alert: fewer than 2 locations ──────────────────────────────────

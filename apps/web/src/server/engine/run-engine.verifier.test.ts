@@ -159,7 +159,7 @@ describe('runEngine — blocked rounds (S03)', () => {
     expect(rpcCalls[1]?.args).toMatchObject({ p_note: 'Blocked, not verified' });
     expect(rpcCalls[2]?.args).toEqual({
       p_kind: 'verifier_unavailable',
-      p_context: { sites: ['Tubtong'], reason: 'no_poll' },
+      p_context: { sites: ['Tubtong (Tier 1)'], reason: 'no_poll' },
     });
   });
 

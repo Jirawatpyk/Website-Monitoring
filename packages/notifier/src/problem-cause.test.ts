@@ -121,4 +121,21 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
       'Home OK · /booking → Browser: page didn’t load',
     );
   });
+
+  it('cuts a cause to what monitor_status holds, and strips Chat markup from a redirect host', () => {
+    const long = formatProblemCause(
+      {
+        kind: 'keyword',
+        missing: Array.from({ length: 20 }, (_, i) => `k${i}-${'x'.repeat(40)}`),
+        forbidden: [],
+        locations: ['SIN'],
+      },
+      home,
+    );
+    expect(long).toHaveLength(500);
+    expect(long.endsWith('…')).toBe(true);
+    const host = { kind: 'redirect' as const, host: 'evil<users/all>|x', locations: ['SIN' as const] };
+    expect(formatProblemSummary(host, home)).toBe('redirects to evilusers/allx');
+    expect(formatProblemCause(host, home)).not.toMatch(/[<>|]/);
+  });
 });

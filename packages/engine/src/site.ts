@@ -188,14 +188,20 @@ export function decideSite(s: SiteSnapshot): SiteDecision {
   const rounds = starts.map((start) => {
     const byMonitor = new Map(s.monitors.map((m) => [m.id, buildRound(m.checks, start, s.intervalSec)]));
     const primaryRound = primary ? byMonitor.get(primary.id) : undefined;
-    const ready = s.monitors.every((m) => isReady(byMonitor.get(m.id)!, s.locations, s.intervalSec, s.now));
-    return { start, byMonitor, ready, primaryDown: !!primaryRound && downDecided(primaryRound) };
+    const ready = s.monitors.every((m) => {
+      const round = byMonitor.get(m.id)!;
+      return isReady(round, s.locations, s.intervalSec, s.now, excludedIn(s, round));
+    });
+    const primaryDown = !!primaryRound && downDecided(primaryRound, excludedIn(s, primaryRound));
+    return { start, byMonitor, ready, primaryDown };
   });
 
   const oldest = rounds[0]!;
   if (oldest.ready || oldest.primaryDown) {
     const d = judgeSiteRound(s, oldest.byMonitor, new Date(oldest.start));
-    if (d !== PENDING) return d;
+    // Judged early only for a DOWN: anything else waits for the round to be complete (never used up).
+    const early = !oldest.ready && d !== PENDING && d.kind !== 'open' && d.kind !== 'escalate';
+    if (d !== PENDING && !early) return d;
   }
   // A DOWN never waits (spec §6, PRD §9): not for a blocked round's verifier, nor for an older round
   // still missing a location. A later round that confirms DOWN is judged now; the older one it passes
@@ -219,7 +225,7 @@ function judgeSiteRound(
     // A monitor not ready yet (only when the primary's DOWN is already decided) keeps its state.
     judged.set(
       m.id,
-      isReady(round, s.locations, s.intervalSec, s.now)
+      isReady(round, s.locations, s.intervalSec, s.now, excludedIn(s, round))
         ? judgeMonitor(s, m, round)
         : { verdict: { kind: 'insufficient' }, next: m.carry },
     );
@@ -357,13 +363,13 @@ function okRound(
 /** One monitor's verdict for one round, and its carry state after it. */
 function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement | typeof PENDING {
   const roundAt = round.start;
-  // Locations that failed most monitors in a minute are no data for it (spec §15.3).
-  const excluded = new Set<ProbeLocation>();
-  for (const c of round.scheduled) {
-    if (s.faulty?.get(minuteOf(c.checkedAt))?.has(c.location)) excluded.add(c.location);
-  }
+  const excluded = excludedIn(s, round);
   const counted = round.scheduled.filter((c) => !excluded.has(c.location));
-  const failingSince = nextFailingSince(m.carry.failingSince, counted);
+  // A clock of a location that stopped beating is stale: its next failure starts a new one.
+  const beating = Object.fromEntries(
+    Object.entries(m.carry.failingSince).filter(([l]) => s.locations.includes(l as ProbeLocation)),
+  ) as FailingSince;
+  const failingSince = nextFailingSince(beating, counted);
   const carried = { slowRounds: m.carry.slowRounds, failingSince };
   const reset = { slowRounds: 0, failingSince };
 
@@ -436,7 +442,8 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     const unverified = (reason: UnverifiedReason): Judgement => ({
       verdict: {
         kind: 'problem',
-        trigger: 'blocked_unverified',
+        // D-022: any problem on a key page is `key_page`; the cause says it was blocked.
+        trigger: m.isPrimary ? 'blocked_unverified' : 'key_page',
         detail: {
           kind: 'blocked',
           reason,
@@ -444,7 +451,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
           statusCode: blocked[0]?.statusCode ?? null,
         },
         startedAt,
-        note: UNVERIFIED_NOTE,
+        ...(m.isPrimary ? { note: UNVERIFIED_NOTE } : {}),
       },
       next: reset,
     });
@@ -537,6 +544,15 @@ function issueStart(
   if (detail.kind === 'slow') return new Date(roundAt.getTime() - (slowRounds - 1) * s.intervalSec * 1000);
   if (detail.kind === 'regional') return new Date(detail.since);
   return earliest(counted);
+}
+
+/** Locations that failed most sites in a scheduled check's minute: no data for this round (spec §15.3). */
+function excludedIn(s: SiteSnapshot, round: Round): Set<ProbeLocation> {
+  const excluded = new Set<ProbeLocation>();
+  for (const c of round.scheduled) {
+    if (s.faulty?.get(minuteOf(c.checkedAt))?.has(c.location)) excluded.add(c.location);
+  }
+  return excluded;
 }
 
 function stateOf(m: SiteMonitor, j: Judgement): MonitorState {
