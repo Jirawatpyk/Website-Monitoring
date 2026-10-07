@@ -63,23 +63,12 @@ export interface VerifierState {
   openAlerts: Map<string, { context: Record<string, unknown>; openedAt: Date }>;
 }
 
-/** The verifier's heartbeat, the verify jobs of the rounds in view, the queue and open alerts. */
-export async function loadVerifierState(
-  db: DbClient,
-  monitorIds: readonly string[],
-  since: Date,
-  now: Date,
-): Promise<VerifierState> {
+/** The verifier's heartbeat, the active sites' verify jobs of the rounds in view, the queue and open alerts. */
+export async function loadVerifierState(db: DbClient, since: Date, now: Date): Promise<VerifierState> {
   const [beat, jobs, queued, leased, alerts] = await Promise.all([
     db.from('agent_heartbeats').select('last_seen_at, info').eq('name', 'verifier').maybeSingle(),
-    db
-      .from('verification_jobs')
-      .select(
-        'id, monitor_id, round_at, status, result, detail, attempts, created_at, lease_until, completed_at',
-      )
-      .eq('kind', 'verify')
-      .in('monitor_id', monitorIds)
-      .gte('round_at', since.toISOString()),
+    // The active sites' verify jobs, read server-side (no monitor ids in the query string, S04b).
+    db.rpc('engine_verify_jobs', { p_since: since.toISOString() }),
     db.from('verification_jobs').select('id', { count: 'exact', head: true }).eq('status', 'queued'),
     db
       .from('verification_jobs')

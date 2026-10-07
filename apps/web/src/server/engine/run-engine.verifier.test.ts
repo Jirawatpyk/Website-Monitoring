@@ -60,10 +60,10 @@ const fakeDb = (results: Parameters<typeof baseFakeDb>[0] = {}) =>
   baseFakeDb({
     'probe_locations.select': { data: beating },
     'monitors.select': { data: [monitor] },
-    'check_results.select': { data: blocked },
+    'rpc.engine_checks': { data: blocked },
     ...results,
   });
-/** The verify jobs query and the queued-count query share a table: tell them apart by filter. */
+/** Verify jobs come from `engine_verify_jobs`; the queued count from a `verification_jobs` head query. */
 const jobs =
   (rows: VerifyJobRow[], queued = 0) =>
   (c: FakeCall) =>
@@ -102,7 +102,7 @@ describe('runEngine — blocked rounds (S03)', () => {
   });
 
   it('page loaded → an OK round with the note on the site', async () => {
-    const { db, rpcCalls } = fakeDb({ ...verifierUp, 'verification_jobs.select': jobs([job()]) });
+    const { db, rpcCalls } = fakeDb({ ...verifierUp, 'rpc.engine_verify_jobs': jobs([job()]) });
     await runEngine(db, now);
     expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round', 'engine_note_site']);
     expect(rpcCalls[0]?.args).toMatchObject({ p_ok_rounds: 1 });
@@ -116,7 +116,7 @@ describe('runEngine — blocked rounds (S03)', () => {
   it('page failed in the browser → DOWN with the browser cause and the verify job', async () => {
     const { db, rpcCalls } = fakeDb({
       ...verifierUp,
-      'verification_jobs.select': jobs([job({ result: 'failed', detail: 'HTTP 503' })]),
+      'rpc.engine_verify_jobs': jobs([job({ result: 'failed', detail: 'HTTP 503' })]),
       'rpc.engine_open_incident': { data: 'i1' },
     });
     expect(await runEngine(db, now)).toMatchObject({ opened: 1 });
@@ -169,7 +169,7 @@ describe('runEngine — blocked rounds (S03)', () => {
   it('the browser was blocked too → PROBLEM with that cause, and no Admin alert (D-020)', async () => {
     const { db, rpcCalls } = fakeDb({
       ...verifierUp,
-      'verification_jobs.select': jobs([job({ result: 'blocked' })]),
+      'rpc.engine_verify_jobs': jobs([job({ result: 'blocked' })]),
     });
     expect(await runEngine(db, now)).toMatchObject({ unverified: 1, alerts: 0 });
     expect(rpcCalls.map((c) => c.name)).toEqual(['engine_open_incident', 'engine_note_site']);
@@ -185,7 +185,7 @@ describe('runEngine — blocked rounds (S03)', () => {
   it('a job nobody picked up in 30 s counts the verifier unavailable even while it polls', async () => {
     const { db, rpcCalls } = fakeDb({
       ...verifierUp,
-      'verification_jobs.select': jobs([
+      'rpc.engine_verify_jobs': jobs([
         job({ status: 'queued', result: null, created_at: at(30), completed_at: null }),
       ]),
     });
@@ -198,7 +198,7 @@ describe('runEngine — blocked rounds (S03)', () => {
   it('names the reason the engine saw: a lease that ran out', async () => {
     const { db, rpcCalls } = fakeDb({
       ...verifierUp,
-      'verification_jobs.select': jobs([
+      'rpc.engine_verify_jobs': jobs([
         job({ status: 'leased', result: null, lease_until: at(60), completed_at: null }),
       ]),
     });
@@ -234,7 +234,7 @@ describe('runEngine — blocked rounds (S03)', () => {
 
   it('a plain pass round clears a note left by a blocked one', async () => {
     const { db, rpcCalls } = fakeDb({
-      'check_results.select': {
+      'rpc.engine_checks': {
         data: blocked.map((c) => ({ ...c, outcome: 'pass', status_code: 200 })),
       },
       'site_status.select': {
@@ -264,7 +264,7 @@ describe('runEngine — blocked rounds (S03)', () => {
     async (_n, openedAt, queued, cleared) => {
       const { db, rpcCalls } = fakeDb({
         ...verifierUp,
-        'check_results.select': { data: [] },
+        'rpc.engine_checks': { data: [] },
         'verification_jobs.select': jobs([], queued),
         'system_alerts.select': {
           data: [{ kind: 'verifier_unavailable', context: { reason: 'lease_expired' }, opened_at: openedAt }],
@@ -280,10 +280,10 @@ describe('runEngine — blocked rounds (S03)', () => {
   it('a job queued 35 s while every session was busy with a live lease waits its turn (engine review M4, N1)', async () => {
     const { db, rpcCalls } = fakeDb({
       'agent_heartbeats.select': { data: { last_seen_at: at(60), info: { sessions: 3, free: 0 } } },
-      'verification_jobs.select': jobs(
-        [job({ status: 'queued', result: null, created_at: at(30), completed_at: null })],
-        1,
-      ),
+      'rpc.engine_verify_jobs': jobs([
+        job({ status: 'queued', result: null, created_at: at(30), completed_at: null }),
+      ]),
+      'verification_jobs.select': jobs([], 1),
     });
     expect(await runEngine(db, now)).toMatchObject({ unverified: 0 });
     expect(rpcCalls).toEqual([]);
@@ -292,7 +292,7 @@ describe('runEngine — blocked rounds (S03)', () => {
   it('a job nobody picked up is expired with its round, so a late verdict can’t land on it', async () => {
     const { db, calls } = fakeDb({
       ...verifierUp,
-      'verification_jobs.select': jobs([
+      'rpc.engine_verify_jobs': jobs([
         job({ status: 'queued', result: null, created_at: at(30), completed_at: null }),
       ]),
     });
@@ -309,7 +309,7 @@ describe('runEngine — blocked rounds (S03)', () => {
 
   it('DOWN while a PROBLEM (unverified) is open → raised to DOWN with its alert (D-021)', async () => {
     const { db, rpcCalls } = fakeDb({
-      'check_results.select': {
+      'rpc.engine_checks': {
         data: [
           {
             monitor_id: 'm1',
@@ -378,7 +378,7 @@ describe('runEngine — blocked rounds (S03)', () => {
   it('alerts when more than 5 jobs wait, and clears when the queue drains', async () => {
     const behind = fakeDb({
       ...verifierUp,
-      'check_results.select': { data: [] },
+      'rpc.engine_checks': { data: [] },
       'verification_jobs.select': jobs([], 6),
       'rpc.open_system_alert': { data: 'a2' },
     });
@@ -389,7 +389,7 @@ describe('runEngine — blocked rounds (S03)', () => {
 
     const drained = fakeDb({
       ...verifierUp,
-      'check_results.select': { data: [] },
+      'rpc.engine_checks': { data: [] },
       'verification_jobs.select': jobs([], 5),
       'system_alerts.select': { data: [{ kind: 'verifier_backlog', context: { queued: 6 } }] },
     });

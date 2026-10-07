@@ -79,7 +79,7 @@ describe('runEngine', () => {
   it('opens an incident with the cause when both locations fail the check and the recheck', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: down },
+      'rpc.engine_checks': { data: down },
       'rpc.engine_open_incident': { data: 'i1' },
     });
     expect(await runEngine(db, now)).toMatchObject({ monitors: 1, opened: 1 });
@@ -123,7 +123,7 @@ describe('runEngine', () => {
   ])('expects Bangkok only while its agent beats (D-019) — agent %s', async (_name, beat, rpcs) => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
       'probe_locations.select': { data: [...beating, { code: 'BKK', last_heartbeat_at: beat }] },
     });
     // A beating agent that hasn't reported holds an OK round until its deadline; a stopped one doesn't.
@@ -134,7 +134,7 @@ describe('runEngine', () => {
   it('a DOWN two locations confirmed is judged without waiting for a beating Bangkok (engine review M2)', async () => {
     const { db } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: down },
+      'rpc.engine_checks': { data: down },
       'probe_locations.select': {
         data: [...beating, { code: 'BKK', last_heartbeat_at: '2026-10-06T10:00:40Z' }],
       },
@@ -146,7 +146,7 @@ describe('runEngine', () => {
   it('counts nothing when the site already had an open incident (the function returns null)', async () => {
     const { db } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: down },
+      'rpc.engine_checks': { data: down },
       'rpc.engine_open_incident': { data: null },
     });
     expect(await runEngine(db, now)).toMatchObject({ opened: 0 });
@@ -155,7 +155,7 @@ describe('runEngine', () => {
   it('opens the incident of a muted site without queueing the alert', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor({ muted_until: '2026-10-06T12:00:00Z' })] },
-      'check_results.select': { data: down },
+      'rpc.engine_checks': { data: down },
       'rpc.engine_open_incident': { data: 'i1' },
     });
     await runEngine(db, now);
@@ -165,7 +165,7 @@ describe('runEngine', () => {
   it('records a quiet round in site_status', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
     });
     await runEngine(db, now);
     // Through the guarded function: a run with an older snapshot never moves the round back.
@@ -184,7 +184,7 @@ describe('runEngine', () => {
   it('recovers an open incident on the first OK round, from the OK check time', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
       'incidents.select': { data: [incident('unacked')] },
       'rpc.engine_recover_incident': { data: true },
     });
@@ -211,7 +211,7 @@ describe('runEngine', () => {
   it('sends no RECOVERED when the DOWN was held back by a mute (spec §15.1)', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
       'incidents.select': { data: [incident('unacked', false)] },
       'rpc.engine_recover_incident': { data: true },
     });
@@ -222,7 +222,7 @@ describe('runEngine', () => {
   it('judges a missed round and the next in one run', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': {
+      'rpc.engine_checks': {
         data: [
           ...ok.map((r) => ({
             ...r,
@@ -243,7 +243,7 @@ describe('runEngine', () => {
   it('settles on the second OK round', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
       'site_status.select': { data: [{ site_id: 's1', last_round_at: at(-60), ok_rounds: 1 }] },
       'incidents.select': { data: [incident('monitoring')] },
       'rpc.engine_settle_incident': { data: true },
@@ -259,7 +259,7 @@ describe('runEngine', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: down },
+      'rpc.engine_checks': { data: down },
       'incidents.select': { data: [incident('needs_root_cause')] },
     });
     expect(await runEngine(db, now)).toMatchObject({ relapses: 1, opened: 0 });
@@ -272,7 +272,7 @@ describe('runEngine', () => {
   it('waits when the round was already judged', async () => {
     const { db, calls, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
       'site_status.select': { data: [{ site_id: 's1', last_round_at: at(1), ok_rounds: 1 }] },
     });
     await runEngine(db, now);
@@ -282,12 +282,12 @@ describe('runEngine', () => {
 
   it.each([
     ['monitors.select', 'monitors: boom'],
-    ['check_results.select', 'boom'],
+    ['rpc.engine_checks', 'boom'],
     ['probe_locations.select', 'boom'],
   ])('throws when %s fails', async (key, message) => {
     const { db } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
       [key]: { error: { message: 'boom' } },
     });
     await expect(runEngine(db, now)).rejects.toThrow(message);
@@ -306,7 +306,7 @@ describe('runEngine', () => {
   ])('reports the run failed when %s fails', async (key, checks, incidents, statuses) => {
     const { db } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: checks },
+      'rpc.engine_checks': { data: checks },
       'incidents.select': { data: incidents },
       'site_status.select': { data: statuses },
       [key]: { error: { message: 'boom' } },
@@ -331,8 +331,8 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
   it('the third slow round opens PROBLEM (Slow) with its cause, summary and alert', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: slow() },
-      'monitor_status.select': {
+      'rpc.engine_checks': { data: slow() },
+      'rpc.engine_monitor_status': {
         data: [
           { monitor_id: 'm1', status: 'ok', trigger: null, cause: null, slow_rounds: 2, failing_since: {} },
         ],
@@ -361,8 +361,8 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
   it('a monitor’s own slow limit wins over the tier’s', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [page({ thresholds: { slowMs: 4_000 } })] },
-      'check_results.select': { data: slow() },
-      'monitor_status.select': {
+      'rpc.engine_checks': { data: slow() },
+      'rpc.engine_monitor_status': {
         data: [
           { monitor_id: 'm1', status: 'ok', trigger: null, cause: null, slow_rounds: 2, failing_since: {} },
         ],
@@ -376,7 +376,7 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
     const booking = page({ id: 'm2', url: 'https://tubtong.example.test/booking', is_primary: false });
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [booking, monitor()] },
-      'check_results.select': { data: [...ok, ...down.map((r) => ({ ...r, monitor_id: 'm2' }))] },
+      'rpc.engine_checks': { data: [...ok, ...down.map((r) => ({ ...r, monitor_id: 'm2' }))] },
       'rpc.engine_open_incident': { data: 'i1' },
     });
     expect(await runEngine(db, now)).toMatchObject({ sites: 1, monitors: 2, problems: 1, opened: 0 });
@@ -396,7 +396,7 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
   it('skips a site without a primary monitor (only the primary can judge DOWN)', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [page({ is_primary: false })] },
-      'check_results.select': { data: down },
+      'rpc.engine_checks': { data: down },
     });
     expect(await runEngine(db, now)).toMatchObject({ sites: 0 });
     expect(rpcCalls.filter((c) => c.name.startsWith('engine_'))).toEqual([]);
@@ -406,8 +406,8 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
     const booking = page({ id: 'm2', url: 'https://tubtong.example.test/booking', is_primary: false });
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor(), booking] },
-      'check_results.select': { data: ok },
-      'monitor_status.select': {
+      'rpc.engine_checks': { data: ok },
+      'rpc.engine_monitor_status': {
         data: [
           {
             monitor_id: 'm2',
@@ -469,7 +469,7 @@ describe('runEngine — one failing site never blinds the others (security revie
     const other = { ...monitor(), id: 'm2', site_id: 's2', sites: { ...monitor().sites, name: 'Other' } };
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor(), other] },
-      'check_results.select': { data: [...ok, ...ok.map((r) => ({ ...r, monitor_id: 'm2' }))] },
+      'rpc.engine_checks': { data: [...ok, ...ok.map((r) => ({ ...r, monitor_id: 'm2' }))] },
       'rpc.engine_record_round': (call) =>
         (call.values as { p_site_id: string }).p_site_id === 's1' ? { error: { message: 'boom' } } : {},
     });
@@ -483,7 +483,7 @@ describe('runEngine — one failing site never blinds the others (security revie
 
 describe('runEngine — overlapping runs (engine review M2)', () => {
   const carryAt = (last_round_at: string) => ({
-    'monitor_status.select': {
+    'rpc.engine_monitor_status': {
       data: [
         {
           monitor_id: 'm1',
@@ -504,7 +504,7 @@ describe('runEngine — overlapping runs (engine review M2)', () => {
   it('skips a site whose carry is ahead of its round (read after another run committed it)', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
       ...siteAt(at(-120)),
       ...carryAt(at(-60)),
     });
@@ -515,7 +515,7 @@ describe('runEngine — overlapping runs (engine review M2)', () => {
   it('a carry far behind its site is stale (the monitor was off): dropped, and the site judged', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
       ...siteAt(at(-60)),
       ...carryAt(at(-3600)),
     });
@@ -529,9 +529,9 @@ describe('runEngine — overlapping runs (engine review M2)', () => {
   it('skips a site whose monitor carry is older than its round: read mid-commit of another run', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
-      'check_results.select': { data: ok },
+      'rpc.engine_checks': { data: ok },
       'site_status.select': { data: [{ site_id: 's1', last_round_at: at(-60), ok_rounds: 1, note: null }] },
-      'monitor_status.select': {
+      'rpc.engine_monitor_status': {
         data: [
           {
             monitor_id: 'm1',

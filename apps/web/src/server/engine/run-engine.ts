@@ -101,7 +101,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   const [sites, locations] = await Promise.all([loadSites(db, now), loadLocations(db, now)]);
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
-    const verifier = await loadVerifierState(db, [], now, now);
+    const verifier = await loadVerifierState(db, now, now);
     summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations);
     return summary;
   }
@@ -113,20 +113,17 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     now.getTime() - Math.max(...sites.map((s) => lookbackMs(TIER_CONFIG[s.tier].intervalSec))),
   );
   const siteIds = sites.map((s) => s.id);
-  const monitorIds = monitors.map((m) => m.id);
   const [checks, statuses, carries, incidents, verifier] = await Promise.all([
-    loadChecks(db, monitorIds, since),
+    loadChecks(db, since),
     db.from('site_status').select('site_id, last_round_at, ok_rounds, note').in('site_id', siteIds),
-    db
-      .from('monitor_status')
-      .select('monitor_id, status, trigger, cause, slow_rounds, failing_since, last_round_at')
-      .in('monitor_id', monitorIds),
+    // Server-side reads (S04b): no monitor ids in a GET query string (8 KB limit at 200 monitors).
+    db.rpc('engine_monitor_status'),
     db
       .from('incidents')
       .select('id, site_id, monitor_id, state, severity, root_cause_category, notifications(template)')
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
-    loadVerifierState(db, monitorIds, since, now),
+    loadVerifierState(db, since, now),
   ]);
   for (const r of [statuses, carries, incidents]) if (r.error) throw new Error(r.error.message);
 
@@ -456,28 +453,22 @@ async function adminAlerts(
 /** PostgREST returns at most max_rows (1000) rows per request: read the window page by page. */
 export const CHECKS_PAGE = 1000;
 
-async function loadChecks(db: DbClient, monitorIds: string[], since: Date) {
+async function loadChecks(db: DbClient, since: Date) {
   const rows = [];
-  const seen = new Set<string>();
-  for (let from = 0; ; from += CHECKS_PAGE) {
-    const { data, error } = await db
-      .from('check_results')
-      .select(
-        'id, monitor_id, location, outcome, checked_at, attempt, status_code, error, response_ms, final_url, keyword_missing, keyword_forbidden',
-      )
-      .in('monitor_id', monitorIds)
-      .gte('checked_at', since.toISOString())
-      .order('checked_at', { ascending: false })
-      .order('id')
-      .range(from, from + CHECKS_PAGE - 1);
-    if (error) throw new Error(`check_results: ${error.message}`);
-    // Rows keep arriving while we page: a row pushed onto the next page must not count twice.
-    for (const row of data) {
-      if (row.id && seen.has(row.id)) continue;
-      if (row.id) seen.add(row.id);
-      rows.push(row);
-    }
-    if (data.length < CHECKS_PAGE) return rows;
+  // Keyset paging on (checked_at, id), newest first: a row arriving while we page can't shift
+  // another onto the next page, so nothing is read twice or skipped.
+  let after: { checked_at: string; id: string } | undefined;
+  for (;;) {
+    const { data, error } = await db.rpc('engine_checks', {
+      p_since: since.toISOString(),
+      p_limit: CHECKS_PAGE,
+      ...(after && { p_after_checked_at: after.checked_at, p_after_id: after.id }),
+    });
+    if (error) throw new Error(`engine_checks: ${error.message}`);
+    rows.push(...data);
+    const last = data.at(-1);
+    if (data.length < CHECKS_PAGE || !last) return rows;
+    after = { checked_at: last.checked_at, id: last.id };
   }
 }
 
