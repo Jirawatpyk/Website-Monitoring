@@ -12,6 +12,8 @@ export type ProblemDetail =
       kind: 'regional';
       location: ProbeLocation;
       minutes: number;
+      /** When that location started failing (ISO): the problem's start. */
+      since: string;
       /** How that location fails, for the cause line ("timeout > 30 s"). */
       failure: { statusCode: number | null; error: string | null };
       okLocations: ProbeLocation[];

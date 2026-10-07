@@ -120,7 +120,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       .in('monitor_id', monitorIds),
     db
       .from('incidents')
-      .select('id, site_id, state, severity, root_cause_category, notifications(template)')
+      .select('id, site_id, monitor_id, state, severity, root_cause_category, notifications(template)')
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
     loadVerifierState(db, monitorIds, since, now),
@@ -195,7 +195,15 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
         if (u.reason !== 'browser_blocked') unverifiedSites.set(site.name, u.reason);
       }
-      const applied = await apply(db, site, decision, open?.id ?? null, now, alertQueued, locations.length);
+      const applied = await apply(
+        db,
+        site,
+        decision,
+        open ? { id: open.id, monitorId: open.monitor_id } : null,
+        now,
+        alertQueued,
+        locations.length,
+      );
       if (applied) summary[applied] += 1;
       // The site note follows the latest judged round (OK + note, unverified, or none).
       const next = decision.note ?? null;
@@ -474,13 +482,14 @@ async function apply(
   db: DbClient,
   site: SiteRow,
   d: Exclude<SiteDecision, { kind: 'wait' | 'verify' }>,
-  incidentId: string | null,
+  open: { id: string; monitorId: string | null } | null,
   now: Date,
   alertQueued: boolean,
   /** Locations voting this run: the card's "3 of 3 locations". */
   reporting: number,
 ): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | null> {
   const at = now.toISOString();
+  const incidentId = open?.id ?? null;
   const judged = { p_monitors: monitorsJson(d, site), ...(d.status ? { p_status: d.status } : {}) };
   switch (d.kind) {
     case 'none': {
@@ -570,7 +579,13 @@ async function apply(
         // The first OK check, not the engine run: the downtime ends when the site answered again.
         p_recovered_at: d.recoveredAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
-        p_context: { okLocations: d.okLocations },
+        // A slow PROBLEM's RECOVERED says the limit it is back under: the monitor's own or the tier's.
+        p_context: {
+          okLocations: d.okLocations,
+          slowLimitMs:
+            site.monitors.find((m) => m.id === open?.monitorId)?.slowThresholdMs ??
+            TIER_CONFIG[site.tier].slowThresholdMs,
+        },
         p_notify: !site.muted && alertQueued,
         ...judged,
       });

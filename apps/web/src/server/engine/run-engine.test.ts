@@ -197,7 +197,7 @@ describe('runEngine', () => {
         p_to: 'monitoring',
         p_recovered_at: at(0),
         p_round_at: at(0),
-        p_context: { okLocations: 2 },
+        p_context: { okLocations: 2, slowLimitMs: 3_000 },
         p_notify: true,
         p_monitors: [
           { monitorId: 'm1', status: 'ok', trigger: null, cause: null, slowRounds: 0, failingSince: {} },

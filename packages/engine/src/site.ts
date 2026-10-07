@@ -530,10 +530,7 @@ function issueStart(
   slowRounds: number,
 ): Date {
   if (detail.kind === 'slow') return new Date(roundAt.getTime() - (slowRounds - 1) * s.intervalSec * 1000);
-  if (detail.kind === 'regional') {
-    const failing = counted.find((c) => c.location === detail.location);
-    return new Date((failing?.checkedAt.getTime() ?? roundAt.getTime()) - detail.minutes * 60_000);
-  }
+  if (detail.kind === 'regional') return new Date(detail.since);
   return earliest(counted);
 }
 

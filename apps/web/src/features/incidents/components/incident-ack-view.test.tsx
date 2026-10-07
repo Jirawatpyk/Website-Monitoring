@@ -20,6 +20,7 @@ const base: IncidentView = {
   escalationLevel: 0,
   recovered: false,
   role: 'You’re the owner.',
+  confirmedLabel: 'Confirmed down',
   confirmedAt: '09:48:41',
   confirmedBy: 'Confirmed by 3 locations, 2 checks',
   cause: 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)',

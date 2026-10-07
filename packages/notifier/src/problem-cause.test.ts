@@ -54,6 +54,7 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
         minutes: 6,
         failure: { statusCode: null, error: 'Timeout' },
         okLocations: ['TYO', 'BKK'],
+        since: '2026-09-14T14:06:00Z',
       },
       home,
       'SIN failing 6 min (timeout > 30 s) · BKK, TYO OK',

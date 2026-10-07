@@ -39,7 +39,7 @@ export function IncidentAckView({ view, viewerName, viewerEmail }: IncidentAckVi
 
       <dl className="aura-card m-0 flex flex-col gap-0 px-4 py-1">
         <div className="flex items-baseline justify-between gap-3 border-b border-border-subtle py-2">
-          <dt className="text-sm text-fg-secondary">Confirmed down</dt>
+          <dt className="text-sm text-fg-secondary">{view.confirmedLabel}</dt>
           <dd className="m-0 flex flex-col items-end leading-snug">
             <span className="font-medium tabular-nums">{view.confirmedAt}</span>
             <span className="text-xs text-fg-secondary">{view.confirmedBy}</span>

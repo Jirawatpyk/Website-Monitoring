@@ -159,6 +159,7 @@ describe('regional: one location failing ≥ 5 min while the others pass (INC-01
       minutes: 5,
       failure: { statusCode: 200, error: null },
       okLocations: ['BKK', 'TYO'],
+      since: at(1).toISOString(),
     });
     expect(regionalIssue(round(420, 'fail'), since)).toMatchObject({
       kind: 'regional',

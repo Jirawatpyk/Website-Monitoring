@@ -143,6 +143,7 @@ export function regionalIssue(
     kind: 'regional',
     location: one.location,
     minutes: Math.max(minutes, REGIONAL_AFTER_MIN),
+    since,
     failure: { statusCode: one.statusCode, error: one.error ?? null },
     okLocations: passing.map((c) => c.location),
   };

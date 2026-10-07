@@ -36,10 +36,12 @@ export const incidentUrl = (appUrl: string, incidentId: string) =>
   new URL(`/incidents/${incidentId}`, appUrl).toString();
 
 /** A PROBLEM incident's replies say "still slow" / "problem cleared" instead of the DOWN wording. */
-function problemOf(i: IncidentFacts): ProblemFacts | null {
+function problemOf(i: IncidentFacts, ctx: Record<string, unknown> = {}): ProblemFacts | null {
   if (i.severity !== 'problem') return null;
   const tier = (i.sites.tier >= 1 && i.sites.tier <= 3 ? i.sites.tier : 2) as Tier;
-  return { trigger: i.trigger, slowLimitMs: TIER_CONFIG[tier].slowThresholdMs };
+  // The engine stores the monitor's own limit with RECOVERED; the tier's otherwise.
+  const own = typeof ctx.slowLimitMs === 'number' ? ctx.slowLimitMs : null;
+  return { trigger: i.trigger, slowLimitMs: own ?? TIER_CONFIG[tier].slowThresholdMs };
 }
 
 /** "3 of 3 locations": where the problem was seen, of the locations reporting when it opened. */
@@ -103,7 +105,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
             recoveredAt: new Date(i.recovered_at),
             okLocations: num(ctx.okLocations, 2),
             owner: person(i.sites.primary),
-            problem: problemOf(i),
+            problem: problemOf(i, ctx),
           })
         : null;
     default:
@@ -176,7 +178,7 @@ export function renderEmail(
             okLocations: num(ctx.okLocations, 2),
             owner: i.sites.primary?.display_name ?? null,
             ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
-            problem: problemOf(i),
+            problem: problemOf(i, ctx),
           })
         : null;
     default:
