@@ -16,7 +16,13 @@ export const completeJobSchema = z.object({
   jobId: z.uuid(),
   /** loaded → OK + note; failed → DOWN; blocked = a WAF page in the browser too → PROBLEM (D-020). */
   result: z.enum(['loaded', 'failed', 'blocked']),
-  detail: z.string().max(500).nullable().default(null),
+  /** Plain text: it can reach a Chat card's cause (markup stripped). */
+  detail: z
+    .string()
+    .max(500)
+    .transform((s) => s.replace(/[<>]/g, ''))
+    .nullable()
+    .default(null),
   httpStatus: z.number().int().min(100).max(599).nullable().default(null),
   /** The agent uploaded the screenshot to the signed URL it was given. */
   screenshot: z.boolean().default(false),
@@ -60,7 +66,7 @@ export async function leaseJobs(
   return Promise.all(
     (claimed.data ?? []).map(async (job): Promise<LeasedJob> => {
       const path = screenshotPath(job);
-      const signed = await db.storage.from(SCREENSHOT_BUCKET).createSignedUploadUrl(path, { upsert: true });
+      const signed = await db.storage.from(SCREENSHOT_BUCKET).createSignedUploadUrl(path);
       if (signed.error) console.error(JSON.stringify({ event: 'screenshot_url_failed', job: job.id }));
       return {
         id: job.id,
@@ -72,6 +78,12 @@ export async function leaseJobs(
       };
     }),
   );
+}
+
+/** The agent says it uploaded the screenshot: check the file is there before the timeline links it. */
+async function uploaded(db: DbClient, path: string): Promise<boolean> {
+  const { data, error } = await db.storage.from(SCREENSHOT_BUCKET).exists(path);
+  return !error && data === true;
 }
 
 export type CompleteResult =
@@ -97,7 +109,9 @@ export async function completeJob(db: DbClient, input: CompleteJobInput): Promis
     p_result: input.result,
     ...(input.detail ? { p_detail: input.detail } : {}),
     ...(input.httpStatus ? { p_http_status: input.httpStatus } : {}),
-    ...(input.screenshot ? { p_screenshot_path: screenshotPath(found.data) } : {}),
+    ...(input.screenshot && (await uploaded(db, screenshotPath(found.data)))
+      ? { p_screenshot_path: screenshotPath(found.data) }
+      : {}),
   });
   if (done.error) throw new Error(`complete_verification_job: ${done.error.message}`);
   const job = done.data?.[0];

@@ -41,7 +41,7 @@ describe('leaseJobs (GET /api/jobs)', () => {
       {
         bucket: 'verifier-screenshots',
         method: 'createSignedUploadUrl',
-        args: ['2026-10/j1.jpg', { upsert: true }],
+        args: ['2026-10/j1.jpg'],
       },
     ]);
   });
@@ -91,6 +91,7 @@ describe('completeJob (POST /api/jobs)', () => {
     const { db, rpcCalls } = fakeDb({
       'verification_jobs.select': { data: { id: input.jobId, created_at: '2026-09-30T23:59:59Z' } },
       'rpc.complete_verification_job': { data: [{ kind: 'verify' }] },
+      'storage.exists': { data: true },
     });
     expect(await completeJob(db, input)).toEqual({ ok: true, kind: 'verify' });
     expect(rpcCalls).toEqual([
@@ -149,6 +150,20 @@ describe('completeJob (POST /api/jobs)', () => {
       [key]: { error: { message: 'boom' } },
     });
     await expect(completeJob(db, input)).rejects.toThrow(message);
+  });
+
+  it('records no screenshot the agent claims but the bucket doesn’t have', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'verification_jobs.select': { data: { id: input.jobId, created_at: '2026-10-07T03:00:00Z' } },
+      'rpc.complete_verification_job': { data: [{ kind: 'verify' }] },
+      'storage.exists': { data: false },
+    });
+    await completeJob(db, input);
+    expect(rpcCalls[0]?.args).not.toHaveProperty('p_screenshot_path');
+  });
+
+  it('strips markup from the detail (it can reach a Chat card)', () => {
+    expect(completeJobSchema.parse({ ...input, detail: '<a href="x">y</a>' }).detail).toBe('a href="x"y/a');
   });
 
   it('never takes a path or a location from the agent', () => {

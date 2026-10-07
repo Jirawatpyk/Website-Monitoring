@@ -1,4 +1,4 @@
-import { hasChallengeSignature } from '@dxt/probe';
+import { assertPublicTarget, hasChallengeSignature, TargetNotAllowedError, type Lookup } from '@dxt/probe';
 import type { Api, LeasedJob, Verdict } from './api';
 
 /** PRD §5: 20 s per page. */
@@ -59,6 +59,8 @@ export interface VerifyDeps {
   api: Api;
   browser: PageBrowser;
   fetchImpl?: typeof fetch;
+  /** DNS for the SSRF guard (tests). */
+  lookup?: Lookup;
 }
 
 /**
@@ -67,16 +69,20 @@ export interface VerifyDeps {
  */
 export async function verifyJob(
   job: LeasedJob,
-  { api, browser, fetchImpl = fetch }: VerifyDeps,
+  { api, browser, fetchImpl = fetch, lookup }: VerifyDeps,
 ): Promise<boolean> {
   let verdict: Pick<Verdict, 'result' | 'detail' | 'httpStatus'>;
   let screenshot: Uint8Array | null = null;
   try {
+    // Same SSRF guard as the HTTP probes before the browser opens anything (redirects and page
+    // requests are kept off private ranges by the systemd unit's IPAddressDeny).
+    await assertPublicTarget(new URL(job.url), lookup);
     const visit = await browser.visit(job.url, PAGE_TIMEOUT_MS);
     verdict = { ...judgeVisit(visit, job.mustContain), httpStatus: visit.status };
     screenshot = visit.screenshot;
   } catch (err) {
-    verdict = { result: 'failed', detail: describeVisitError(err), httpStatus: null };
+    const detail = err instanceof TargetNotAllowedError ? 'Target not allowed' : describeVisitError(err);
+    verdict = { result: 'failed', detail, httpStatus: null };
   }
 
   let uploaded = false;

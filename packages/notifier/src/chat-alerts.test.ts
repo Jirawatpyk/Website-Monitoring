@@ -217,3 +217,25 @@ describe('formatCause (spec §10)', () => {
     );
   });
 });
+
+describe('card rows are plain text (security review S03 M2)', () => {
+  it('escapes markup in a cause reported by a probe or the VPS', () => {
+    const card = JSON.stringify(
+      buildDownAlert({
+        incidentId: 'i1',
+        site: 'Test target',
+        tier: 1,
+        incidentNumber: 7,
+        incidentUrl: 'https://monitor.example.test/incidents/i1',
+        confirmedAt: new Date('2026-10-07T03:00:40Z'),
+        now: new Date('2026-10-07T03:00:41Z'),
+        cause: 'Browser: page didn’t load (<a href="https://phish.example">Open incident</a>)',
+        confirmingLocations: 2,
+        owner: null,
+        backup: null,
+      }),
+    );
+    expect(card).not.toContain('<a href');
+    expect(card).toContain('Browser: page didn’t load (&lt;a href=');
+  });
+});

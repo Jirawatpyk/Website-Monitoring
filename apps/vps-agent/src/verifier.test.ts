@@ -29,6 +29,8 @@ const browserOf = (v: PageVisit | Error): PageBrowser => ({
     return v;
   }),
 });
+/** Public DNS for the SSRF guard. */
+const lookup = async () => [{ address: '93.184.216.34' }];
 const quiet = () => {
   vi.spyOn(console, 'info').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -80,7 +82,7 @@ describe('verifyJob', () => {
     const api = fakeApi();
     const browser = browserOf(visit());
     const fetchImpl = vi.fn(async () => new Response(null, { status: 200 }));
-    expect(await verifyJob(job(), { api, browser, fetchImpl })).toBe(true);
+    expect(await verifyJob(job(), { api, browser, fetchImpl, lookup })).toBe(true);
     expect(browser.visit).toHaveBeenCalledWith('https://tubtong.example.test', 20_000);
     expect(fetchImpl).toHaveBeenCalledWith(
       'https://storage.example.test/upload/sign/2026-10/j1.jpg?token=t',
@@ -106,7 +108,7 @@ describe('verifyJob', () => {
     quiet();
     const api = fakeApi();
     const fetchImpl = vi.fn();
-    await verifyJob(job(), { api, browser: browserOf(err), fetchImpl });
+    await verifyJob(job(), { api, browser: browserOf(err), fetchImpl, lookup });
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(api.completeJob).toHaveBeenCalledWith({
       jobId: 'j1',
@@ -123,9 +125,28 @@ describe('verifyJob', () => {
   ])('still reports the verdict when %s', async (_name, impl) => {
     quiet();
     const api = fakeApi();
-    await verifyJob(job(), { api, browser: browserOf(visit()), fetchImpl: vi.fn(impl) });
+    await verifyJob(job(), { api, browser: browserOf(visit()), fetchImpl: vi.fn(impl), lookup });
     expect(api.completeJob).toHaveBeenCalledWith(
       expect.objectContaining({ result: 'loaded', screenshot: false }),
+    );
+  });
+
+  it.each([
+    ['a private address', 'http://10.0.0.5/', lookup],
+    [
+      'a name that resolves to the metadata service',
+      'https://evil.example.test/',
+      async () => [{ address: '169.254.169.254' }],
+    ],
+    ['a non-web port', 'https://tubtong.example.test:8443/', lookup],
+  ])('never opens %s (same SSRF guard as the probes)', async (_name, url, dns) => {
+    quiet();
+    const api = fakeApi();
+    const browser = browserOf(visit());
+    await verifyJob(job({ url }), { api, browser, fetchImpl: vi.fn(), lookup: dns });
+    expect(browser.visit).not.toHaveBeenCalled();
+    expect(api.completeJob).toHaveBeenCalledWith(
+      expect.objectContaining({ result: 'failed', detail: 'Target not allowed' }),
     );
   });
 
@@ -133,7 +154,12 @@ describe('verifyJob', () => {
     quiet();
     const fetchImpl = vi.fn();
     expect(
-      await verifyJob(job({ upload: null }), { api: fakeApi(false), browser: browserOf(visit()), fetchImpl }),
+      await verifyJob(job({ upload: null }), {
+        api: fakeApi(false),
+        browser: browserOf(visit()),
+        fetchImpl,
+        lookup,
+      }),
     ).toBe(false);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -149,7 +175,10 @@ describe('createVerifierPool (at most N sessions, PRD §5)', () => {
     vi.mocked(api.leaseJobs)
       .mockResolvedValueOnce([job({ id: 'a' }), job({ id: 'b' })])
       .mockResolvedValue([]);
-    const pool = createVerifierPool({ api, browser, fetchImpl: vi.fn(async () => new Response()) }, 2);
+    const pool = createVerifierPool(
+      { api, browser, fetchImpl: vi.fn(async () => new Response()), lookup },
+      2,
+    );
 
     expect(await pool.poll()).toBe(2);
     expect(api.leaseJobs).toHaveBeenLastCalledWith(2, 0);
@@ -169,7 +198,7 @@ describe('createVerifierPool (at most N sessions, PRD §5)', () => {
     vi.mocked(api.completeJob).mockRejectedValue(new Error('500'));
     vi.mocked(api.leaseJobs).mockResolvedValueOnce([job()]);
     const pool = createVerifierPool(
-      { api, browser: browserOf(visit()), fetchImpl: vi.fn(async () => new Response()) },
+      { api, browser: browserOf(visit()), fetchImpl: vi.fn(async () => new Response()), lookup },
       1,
     );
     await pool.poll();

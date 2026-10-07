@@ -4,7 +4,7 @@
 #
 # Layout (the agent can't rewrite its own code or secrets):
 #   /opt/dxt-agent              code + Chromium, owned by root, read-only to the service
-#   /etc/dxt-agent/<env>.env    secrets, root:dxt 0640
+#   /etc/dxt-agent/<env>.env    secrets, root:root 0600 (systemd reads it as root)
 #   /var/lib/dxt-agent-<env>    writable state (StateDirectory): Chromium's profile and cache
 # Install and update: deploy/install.md.
 [Unit]
@@ -14,8 +14,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=dxt
-Group=dxt
+# One user per instance: staging's browser can't read production's token or process.
+User=dxt-%i
+Group=dxt-%i
 WorkingDirectory=/opt/dxt-agent
 EnvironmentFile=/etc/dxt-agent/%i.env
 Environment=HOME=/var/lib/dxt-agent-%i
@@ -41,7 +42,10 @@ CapabilityBoundingSet=
 AmbientCapabilities=
 
 # Keep the probe and the browser off the VPS's own network and cloud metadata (SSRF).
-IPAddressDeny=localhost link-local multicast 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10 169.254.169.254
+# The same ranges the probe's SSRF guard refuses (packages/probe/src/target.ts) — this also covers
+# the browser's redirects and page requests. DNS goes through systemd-resolved's stub on 127.0.0.53.
+IPAddressDeny=localhost link-local multicast 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 172.16.0.0/12 192.168.0.0/16 198.18.0.0/15 240.0.0.0/4 fc00::/7 169.254.169.254
+IPAddressAllow=127.0.0.53/32
 
 [Install]
 WantedBy=multi-user.target
