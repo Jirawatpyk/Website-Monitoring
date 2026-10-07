@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { safeNextPath } from '@dxt/shared';
+import { parseAllowedDomains, safeNextPath } from '@dxt/shared';
 import { serverEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 
@@ -16,6 +16,10 @@ export async function GET(request: Request): Promise<Response> {
   const callback = new URL('/auth/callback', url.origin);
   if (next !== '/') callback.searchParams.set('next', next);
 
+  // Google shows that domain's accounts first; with several company domains, any Workspace
+  // account ('*') — the proxy and the allowlist still decide who gets in.
+  const domains = parseAllowedDomains(serverEnv().ALLOWED_EMAIL_DOMAIN);
+  const hd = domains.length === 1 ? domains[0]! : '*';
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -25,8 +29,7 @@ export async function GET(request: Request): Promise<Response> {
       queryParams: {
         // Always show Google's account chooser so "Use a different account" works.
         prompt: 'select_account',
-        // Google shows company accounts first.
-        hd: serverEnv().ALLOWED_EMAIL_DOMAIN,
+        hd,
       },
     },
   });

@@ -13,6 +13,7 @@ const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   CRON_SECRET: z.string().min(32, 'CRON_SECRET must be at least 32 characters'),
   INGEST_TOKEN: z.string().min(32, 'INGEST_TOKEN must be at least 32 characters'),
+  /** The company Workspace domain, or several separated by commas (D-007): `eqho.com,omg-group.asia`. */
   ALLOWED_EMAIL_DOMAIN: z.string().min(1),
   GOOGLE_CHAT_ALERTS_WEBHOOK_URL: z.url().optional(),
   GOOGLE_CHAT_REPORTS_WEBHOOK_URL: z.url().optional(),
