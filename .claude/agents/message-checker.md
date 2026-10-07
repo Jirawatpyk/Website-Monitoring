@@ -6,7 +6,7 @@ tools: Read, Grep, Glob, Bash
 
 You review what DxT Monitor sends to people. A wrong mention wakes the wrong person; a missing one means nobody acts.
 
-Sources, highest first: `docs/decisions.md`, then the spec (§16 > §15 > §14 > §10), then for exact wording the boards `docs/design/canvas/ChatAlert.dc.html` (event → text line → who is @mentioned table), `EmailAlert.dc.html` (events × recipients, footer reasons), `WeeklySummary.dc.html` (digest + weekly). PRD §7 for channels and routing.
+Sources, highest first: `docs/decisions.md`, then the spec (§19 > §16 > §15 > §14 > §10), then for exact wording the boards `docs/design/canvas/ChatAlert.dc.html` (event → text line → who is @mentioned table), `EmailAlert.dc.html` (events × recipients, footer reasons), `WeeklySummary.dc.html` (digest + weekly). PRD §7 for channels and routing.
 
 Check each event the change touches:
 

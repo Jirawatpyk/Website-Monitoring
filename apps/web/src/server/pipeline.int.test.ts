@@ -507,12 +507,18 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
     await clearAlerts();
     await verifierPolled(null);
     const { siteId, monitorId } = await newSite('Relapse M1');
+    // Runs reach 5 min ahead of the clock: SIN and TYO beat as of each run, or they'd drop out (D-019).
+    const judge = async (at: Date) => {
+      await beat('SIN', at);
+      await beat('TYO', at);
+      return runEngine(db, at);
+    };
     await results(monitorId, downRound());
-    await runEngine(db, t(65));
+    await judge(t(65));
     await results(monitorId, okRound(60));
-    await runEngine(db, t(125));
+    await judge(t(125));
     await results(monitorId, okRound(120));
-    await runEngine(db, t(185));
+    await judge(t(185));
     expect(await incidentsOf(siteId)).toEqual([expect.objectContaining({ state: 'needs_root_cause' })]);
     expect((await statusOf(siteId))?.status).toBe('ok');
 
@@ -520,16 +526,18 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
       ['SIN', 'blocked', t(181)],
       ['TYO', 'blocked', t(182)],
     ]);
-    await runEngine(db, t(245));
+    await judge(t(245));
     expect((await statusOf(siteId))?.status).toBe('problem');
     expect(await noteOf(siteId)).toBe('Blocked, not verified');
     // The incident moving back is S04b's relapse; nothing new opens.
     expect(await incidentsOf(siteId)).toEqual([expect.objectContaining({ state: 'needs_root_cause' })]);
 
     await results(monitorId, okRound(240));
-    await runEngine(db, t(305));
+    await judge(t(305));
     expect((await statusOf(siteId))?.status).toBe('ok');
     expect(await noteOf(siteId)).toBeNull();
+    await beat('SIN', new Date());
+    await beat('TYO', new Date());
     await clearAlerts();
   });
 

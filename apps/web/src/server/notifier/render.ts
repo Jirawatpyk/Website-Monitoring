@@ -4,6 +4,8 @@ import {
   buildAcknowledgedEmail,
   buildDownAlert,
   buildDownEmail,
+  buildProblemAlert,
+  buildProblemEmail,
   buildRecoveredAlert,
   buildRecoveredEmail,
   buildSystemAlertEmail,
@@ -12,8 +14,10 @@ import {
   type EmailBaseInput,
   type EmailMessage,
   type EmailReason,
+  type ProblemFacts,
   type VerifierDownReason,
 } from '@dxt/notifier';
+import { PROBE_LOCATIONS, TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
 import {
   contextOf,
   type IncidentFacts,
@@ -30,6 +34,21 @@ const num = (v: unknown, fallback: number) => (typeof v === 'number' ? v : fallb
 
 export const incidentUrl = (appUrl: string, incidentId: string) =>
   new URL(`/incidents/${incidentId}`, appUrl).toString();
+
+/** A PROBLEM incident's replies say "still slow" / "problem cleared" instead of the DOWN wording. */
+function problemOf(i: IncidentFacts): ProblemFacts | null {
+  if (i.severity !== 'problem') return null;
+  const tier = (i.sites.tier >= 1 && i.sites.tier <= 3 ? i.sites.tier : 2) as Tier;
+  return { trigger: i.trigger, slowLimitMs: TIER_CONFIG[tier].slowThresholdMs };
+}
+
+/** "3 of 3 locations": where the problem was seen, of the locations reporting when it opened. */
+function seenFrom(ctx: Record<string, unknown>): { count: number; of: number } | null {
+  const detail = (ctx.detail ?? {}) as { locations?: unknown; location?: unknown };
+  const count = Array.isArray(detail.locations) ? detail.locations.length : detail.location ? 1 : 0;
+  const of = typeof ctx.reporting === 'number' ? ctx.reporting : 0;
+  return count && of >= count ? { count, of } : null;
+}
 
 /** The Google Chat message for a claimed row, or null when its template has nothing to say. */
 export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, now: Date): ChatMessage | null {
@@ -50,12 +69,30 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         // MobileAck: the card's link opens the incident ready to acknowledge.
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
       });
+    case 'problem':
+      return buildProblemAlert({
+        incidentId: i.id,
+        incidentNumber: i.number,
+        site: i.sites.name,
+        tier: i.sites.tier,
+        trigger: i.trigger,
+        detectedAt: new Date(i.detected_at),
+        now,
+        cause: str(ctx.cause, 'Problem'),
+        summary: str(ctx.summary, 'problem'),
+        seenFrom: seenFrom(ctx),
+        verifier: typeof ctx.verifier === 'string' ? ctx.verifier : null,
+        owner: person(i.sites.primary),
+        backup: person(i.sites.backup),
+        incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
+      });
     case 'acknowledged':
       return buildAcknowledgedAlert({
         incidentId: i.id,
         site: i.sites.name,
         ackedBy: str(ctx.ackedBy, 'someone'),
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
+        problem: problemOf(i),
       });
     case 'recovered':
       return i.recovered_at
@@ -66,6 +103,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
             recoveredAt: new Date(i.recovered_at),
             okLocations: num(ctx.okLocations, 2),
             owner: person(i.sites.primary),
+            problem: problemOf(i),
           })
         : null;
     default:
@@ -112,9 +150,18 @@ export function renderEmail(
         // A PROBLEM raised to DOWN keeps its acknowledgement (D-021).
         ackedBy: i.state === 'acknowledged' && i.acker ? i.acker.display_name : null,
       });
+    case 'problem':
+      return buildProblemEmail({
+        ...base,
+        trigger: i.trigger,
+        detectedAt: new Date(i.detected_at),
+        cause: str(ctx.cause, 'Problem'),
+        summary: str(ctx.summary, 'problem'),
+      });
     case 'acknowledged':
       return buildAcknowledgedEmail({
         ...base,
+        problem: problemOf(i),
         ackedBy: str(ctx.ackedBy, 'someone'),
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
         startedAt: new Date(i.started_at),
@@ -129,6 +176,7 @@ export function renderEmail(
             okLocations: num(ctx.okLocations, 2),
             owner: i.sites.primary?.display_name ?? null,
             ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
+            problem: problemOf(i),
           })
         : null;
     default:
@@ -147,9 +195,13 @@ export function renderSystemAlertEmail(
   const ctx = contextOf(alert.context);
   const sites = Array.isArray(ctx.sites) ? ctx.sites.filter((s): s is string => typeof s === 'string') : [];
   const reason = VERIFIER_DOWN_REASONS.find((r) => r === ctx.reason);
+  const active = Array.isArray(ctx.active)
+    ? PROBE_LOCATIONS.filter((l: ProbeLocation) => (ctx.active as unknown[]).includes(l))
+    : [];
   switch (n.template) {
     case 'verifier_unavailable':
     case 'verifier_backlog':
+    case 'probe_locations_low':
       return buildSystemAlertEmail({
         alertId: alert.id,
         kind: n.template,
@@ -157,6 +209,7 @@ export function renderSystemAlertEmail(
         sites,
         reason,
         queued: num(ctx.queued, 0),
+        active,
         from,
       });
     default:

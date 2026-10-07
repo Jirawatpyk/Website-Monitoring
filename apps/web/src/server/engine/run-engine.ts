@@ -195,7 +195,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
         if (u.reason !== 'browser_blocked') unverifiedSites.set(site.name, u.reason);
       }
-      const applied = await apply(db, site, decision, open?.id ?? null, now, alertQueued);
+      const applied = await apply(db, site, decision, open?.id ?? null, now, alertQueued, locations.length);
       if (applied) summary[applied] += 1;
       // The site note follows the latest judged round (OK + note, unverified, or none).
       const next = decision.note ?? null;
@@ -477,6 +477,8 @@ async function apply(
   incidentId: string | null,
   now: Date,
   alertQueued: boolean,
+  /** Locations voting this run: the card's "3 of 3 locations". */
+  reporting: number,
 ): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | null> {
   const at = now.toISOString();
   const judged = { p_monitors: monitorsJson(d, site), ...(d.status ? { p_status: d.status } : {}) };
@@ -511,6 +513,8 @@ async function apply(
           summary: formatProblemSummary(d.detail, ctx),
           detail: d.detail as unknown as Json,
           monitorUrl: ctx.monitorUrl,
+          // "3 of 3 locations" on the card: the locations voting when it opened.
+          reporting,
           ...(d.detail.kind === 'blocked' ? { verifier: d.detail.reason } : {}),
         },
         p_notify: !site.muted,

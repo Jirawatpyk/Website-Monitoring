@@ -20,7 +20,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </style>
 </helmet>
 
-<div class="r3-col" style="width: 600px; height: 3369px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+<div class="r3-col" style="width: 600px; height: 7044px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
 
 <div style="display: flex; flex-direction: column; gap: 4px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SPACE · DxT WEBSITE ALERTS · one thread per incident (INC-0142)</span>
@@ -34,6 +34,8 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span>• L0 mentions only the person expected to act: the owner by day, the on-call person at night. Backup and FYI people are plain text.</span>
 <span>• An incoming webhook can’t edit a card it already posted. The first card stays as it was; each reply opens with the current state.</span>
 <span>• An ack is posted only after its 10 s Undo window closes (Arm acked 10:07:40 → posted 10:07:50).</span>
+<span>• PROBLEM is amber (triangle-alert), never red. L0 = owner @mention (Tier 1 at night: the on-call person) + Alerts Space + email to the owner; the backup is plain text. A Tier 2–3 PROBLEM outside response hours is held until 09:00.</span>
+<span>• A site that fails again while its incident is open joins that thread (DOWN AGAIN / PROBLEM AGAIN) and mentions only the person expected to act now. While a site flaps (≥ 3 changes in 30 min) RECOVERED replies are held; one summary goes after 15 min of continuous OK.</span>
 </div>
 
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">09:48 · FIRST MESSAGE · DAY (Mon–Fri 09–18) → OWNER ACTS</span>
@@ -131,6 +133,151 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div style="padding: 10px 20px; background: var(--aura-bg-canvas); border-top: 1px solid var(--aura-border-default); font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5"><b style="font-weight: 600; color: var(--aura-fg-primary)">Current status is in the latest reply.</b> Anyone can open it; the ack is recorded under their own Google account, so nobody can acknowledge as someone else.</div>
 </div>
 
+<div style="display: flex; flex-direction: column; gap: 4px; margin-top: 12px; padding-top: 16px; border-top: 1px solid var(--aura-border-default)">
+<h3 style="margin: 0; font-size: 18px; line-height: 1.35; font-weight: 600">PROBLEM — the site is up, with an issue</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Same thread rules as DOWN. Amber, never red. L0 mentions the owner (backup in plain text), posts in the Alerts Space and emails the owner. A Tier 2–3 PROBLEM outside response hours is held until 09:00. No client-update track — that is for DOWN only.</span>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">09:52 · FIRST MESSAGE · PROBLEM · Fri 25 Sep · INC-0141</span>
+
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> PROBLEM · Fuji Links (Tier 2) · slow, p50 5.8 s · please take a look</span></div>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); overflow: hidden">
+<div style="padding: 14px 20px; display: flex; gap: 12px; border-bottom: 1px solid var(--aura-border-default)">
+<span style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-alert-warning-bg); color: var(--aura-alert-warning-fg); display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-size: 16px; font-weight: 600">PROBLEM · Fuji Links</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Tier 2 · INC-0141 · Detected 09:52 (UTC+7)</span>
+</div>
+</div>
+<div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Trigger</span><span>Slow</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Cause</span><span>p50 5.8 s (BKK, SIN, TYO) · over the Tier 2 limit of 5 s for 3 checks in a row</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Seen from</span><span>3 of 3 locations — the site loads, just slowly</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Owner</span><span>Ploy · backup Nok (not notified yet)</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Next</span><span>Reminder at 10:52 if not acknowledged — Ploy, Nok</span></div>
+</div>
+<div style="padding: 0 20px 14px; display: flex; gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="external-link" href="MIncident.dc.html">Open / acknowledge</x-import>
+</div>
+<div style="padding: 10px 20px; background: var(--aura-bg-canvas); border-top: 1px solid var(--aura-border-default); font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5"><b style="font-weight: 600; color: var(--aura-fg-primary)">Current status is in the latest reply.</b> Anyone can open it; the ack is recorded under their own Google account, so nobody can acknowledge as someone else.</div>
+</div>
+
+<div style="margin-left: 24px; padding-left: 20px; border-left: 2px solid var(--aura-border-default); display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">09:58:12 · reply (held 10 s for Undo)</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span>ACKNOWLEDGED · Fuji Links · by Ploy 09:58 · reminders stopped</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">ACKNOWLEDGED · Fuji Links still slow · by Ploy 09:58</span>
+<span>Acknowledged by Ploy → the 60-min reminder and the Nok (backup) step are stopped. The site is up; it’s only slow.</span>
+</div>
+</div>
+</div>
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">10:14 · reply</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> RECOVERED · Fuji Links · problem cleared after 22 min · add a root cause</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">RECOVERED · Fuji Links back to normal · slow for 22 min (09:52–10:14)</span>
+<span>Response time back under 5 s from 3 locations. Needs a root cause before it can be resolved.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Posted on the first OK round (→ Monitoring). After the second OK round it waits for a root cause; a PROBLEM ends at Resolved — no review, no Closed.</span>
+</div>
+</div>
+</div>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">PROBLEM (UNVERIFIED) · Thu 24 Sep 14:02 · INC-0138 · blocked and the browser verifier is unavailable</span>
+
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> PROBLEM · Tubtong (Tier 2) · blocked by bot protection, not verified · please take a look</span></div>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); overflow: hidden">
+<div style="padding: 14px 20px; display: flex; gap: 12px; border-bottom: 1px solid var(--aura-border-default)">
+<span style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-alert-warning-bg); color: var(--aura-alert-warning-fg); display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="circle-dot-dashed" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<span style="font-size: 16px; font-weight: 600">PROBLEM · Tubtong · not verified</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Tier 2 · INC-0138 · Thu 24 Sep · Detected 14:02 (UTC+7)</span>
+</div>
+</div>
+<div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Trigger</span><span>Blocked, not verified</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Cause</span><span>HTTP 403 bot challenge (BKK, SIN, TYO) · browser verifier unavailable</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">What we know</span><span>No proof either way — the site may be fine. Checked again every round: OK with a note once the verifier loads the page, DOWN if the page fails.</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Owner</span><span>Ploy · backup Nok (not notified yet)</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 104px; flex-shrink: 0; color: var(--aura-fg-secondary)">Next</span><span>Reminder at 15:02 if not acknowledged — Ploy, Nok</span></div>
+</div>
+<div style="margin: 0 20px 12px; padding: 8px 12px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">The Admin is told about the verifier separately (system email). This card doesn’t ask anyone to fix it.</div>
+<div style="padding: 0 20px 14px; display: flex; gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="external-link" href="MIncident.dc.html">Open / acknowledge</x-import>
+</div>
+<div style="padding: 10px 20px; background: var(--aura-bg-canvas); border-top: 1px solid var(--aura-border-default); font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5"><b style="font-weight: 600; color: var(--aura-fg-primary)">Current status is in the latest reply.</b> Anyone can open it; the ack is recorded under their own Google account, so nobody can acknowledge as someone else.</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">PROBLEM CAUSE WORDING · ONE EXAMPLE PER TRIGGER</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Same template as DOWN: what failed, then where in brackets. The short form for lists is “Slow · p50 5.8 s”, “Key page · 500”.</span>
+</div>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--aura-border-default); font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)"><span>TRIGGER · SAMPLE</span><span>CAUSE LINE</span></div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Slow</span><span style="color: var(--aura-fg-secondary)">INC-0141 Fuji Links · limit Tier 1 &gt; 3 s, Tier 2–3 &gt; 5 s</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">p50 5.8 s (BKK, SIN, TYO) · over the Tier 2 limit of 5 s for 3 checks in a row</span></div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Keyword</span><span style="color: var(--aura-fg-secondary)">INC-0129 WeCare Asia · missing or forbidden text</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">Missing “Book a session” on / (BKK, SIN, TYO) <br>or: Found “Database error” on / (BKK, SIN, TYO)</span></div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Key page</span><span style="color: var(--aura-fg-secondary)">Home loads, a key page fails (500 or 404)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">Home OK · /booking → HTTP 500 (BKK, SIN, TYO)</span></div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Regional</span><span style="color: var(--aura-fg-secondary)">INC-0131 BA – Taiwan · one location ≥ 5 min</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">SIN failing 6 min (timeout &gt; 30 s) · BKK, TYO OK</span></div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Redirect</span><span style="color: var(--aura-fg-secondary)">Final host outside the allowlist</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">/ → 302 → [other-domain] · not in this site’s allowlist</span></div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">SSL expiring</span><span style="color: var(--aura-fg-secondary)">INC-0136 DxT AI · SSL &lt; 14 d, domain &lt; 30 d</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">SSL certificate expires in 13 days (Tue 6 Oct) · not renewed yet</span></div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Blocked, not verified</span><span style="color: var(--aura-fg-secondary)">INC-0138 Tubtong</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">HTTP 403 bot challenge (BKK, SIN, TYO) · browser verifier unavailable</span></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px; margin-top: 12px; padding-top: 16px; border-top: 1px solid var(--aura-border-default)">
+<h3 style="margin: 0; font-size: 18px; line-height: 1.35; font-weight: 600">Fails again while the incident is open</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">One incident, one thread. A site in Monitoring (recovered, waiting) that fails again joins the open incident instead of starting a new one. The reply mentions only the person expected to act now: whoever acknowledged, or the L0 person if nobody has.</span>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">EXAMPLE · INC-0133 VOCA (Tier 2) · Mon 21 Sep · outside response hours · owner Ploy, backup Tao</span>
+
+<div style="margin-left: 24px; padding-left: 20px; border-left: 2px solid var(--aura-border-default); display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">03:24 · reply</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> DOWN AGAIN · VOCA (Tier 2) · same incident INC-0133 · outside response hours · timers paused until 09:00</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">DOWN AGAIN · VOCA · was back for 5 min (03:19–03:24)</span>
+<span>Joined INC-0133 — no new incident (the incident was still open, in Monitoring). Down 7 min so far in this incident. Now flapping (3 changes in 30 min): recovery replies are held until VOCA stays OK for 15 min.</span>
+</div>
+</div>
+</div>
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">04:19 · reply (after 15 min of continuous OK)</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> RECOVERED · VOCA · stable 15 min · flapped ×4, down 41 min in total · add a root cause</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">RECOVERED · VOCA stable since 04:04 · flapped ×4 (03:12–04:04)</span>
+<span>Down 4 times: 03:12–03:19 · 03:24–03:35 · 03:38–03:52 · 03:55–04:04 — 41 min down in total. Needs a root cause before it can be resolved.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">One summary instead of a RECOVERED reply per drop. Drops after 03:24 aren’t re-posted; the incident page shows each one.</span>
+</div>
+</div>
+</div>
+</div>
+
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">WORDING EXAMPLE · PROBLEM AGAIN · made-up incident INC-0150 WeCare Studio (Tier 2, owner Nok) · not part of the sample ledger</span>
+<div style="margin-left: 24px; padding-left: 20px; border-left: 2px solid var(--aura-border-default); display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 12px">
+<span style="display: flex; padding-top: 5px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">example · reply</span>
+<div style="display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--aura-bg-surface-muted, var(--aura-bg-canvas)); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">text:</span><span><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/NOK&gt;</span> PROBLEM AGAIN · WeCare Studio (Tier 2) · slow again, p50 5.4 s · same incident INC-0150</span></div>
+<div style="padding: 10px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">PROBLEM AGAIN · WeCare Studio · slow again after 6 min OK</span>
+<span>Joined INC-0150 while it was still open (Monitoring). Nok acknowledged earlier, so only Nok is mentioned.</span>
+</div>
+</div>
+</div>
+</div>
+
 <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">COVERAGE · EVENT → TEXT LINE → WHO IS @MENTIONED</span>
 <span style="font-size: 12px; color: var(--aura-fg-secondary)">Every event the Alerts Space posts. The text line is what the phone shows; only the people after @ are notified.</span>
@@ -153,13 +300,19 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Resolved</span><span style="color: var(--aura-fg-secondary)">@ Nobody · email in the same thread to everyone who got a DOWN email</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">RESOLVED · ORCA Thailand · by Tao 10:08</span></div>
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM</span><span style="color: var(--aura-fg-secondary)">@ Owner (Ploy)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> PROBLEM · Fuji Links (Tier 2) · slow, p50 5.8 s · please take a look</span></div>
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM · 60-min reminder</span><span style="color: var(--aura-fg-secondary)">@ Owner (Ploy) + backup (Nok)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> <span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/NOK&gt;</span> STILL PROBLEM · Fuji Links · 60 min, not acknowledged · Nok (backup) please take it</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM · not verified</span><span style="color: var(--aura-fg-secondary)">@ Owner (Ploy); Admin told by email</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> PROBLEM · Tubtong (Tier 2) · blocked by bot protection, not verified · please take a look</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM · acknowledged</span><span style="color: var(--aura-fg-secondary)">@ Nobody</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">ACKNOWLEDGED · Fuji Links · by Ploy 09:58 · reminders stopped</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM · recovered</span><span style="color: var(--aura-fg-secondary)">@ Owner (Ploy) · first OK round</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> RECOVERED · Fuji Links · problem cleared after 22 min · add a root cause</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Down again</span><span style="color: var(--aura-fg-secondary)">@ Whoever acts now (acker, else L0 person)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> DOWN AGAIN · VOCA (Tier 2) · same incident INC-0133 · outside response hours · timers paused until 09:00</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">PROBLEM again</span><span style="color: var(--aura-fg-secondary)">@ Whoever acts now (acker, else L0 person)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/NOK&gt;</span> PROBLEM AGAIN · WeCare Studio (Tier 2) · slow again, p50 5.4 s · same incident INC-0150</span></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Flapping summary</span><span style="color: var(--aura-fg-secondary)">@ Owner (Ploy) · after 15 min continuous OK</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> RECOVERED · VOCA · stable 15 min · flapped ×4, down 41 min in total · add a root cause</span></div>
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Test alert · own thread</span><span style="color: var(--aura-fg-secondary)">@ Tester only (Ploy)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> TEST — no action · alert test for Ploy’s phone</span></div>
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 7px 14px; font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Monitor fault</span><span style="color: var(--aura-fg-secondary)">@ On-call (Ploy); email to Tao</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere"><span style="color: var(--aura-fg-primary); font-weight: 500">&lt;users/PLOY&gt;</span> MONITOR FAULT · all sites · heartbeat missed since 02:17 · status unknown, hand-check Tier 1</span></div>
 </div>
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":3369}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":7044}}'>
 class Component extends DCLogic {
   renderVals() { return {}; }
 }

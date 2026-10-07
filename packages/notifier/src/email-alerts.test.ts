@@ -165,18 +165,23 @@ describe('Admin alert about the browser verifier (D-001, D-019)', () => {
       ...over,
     });
 
-  it('says the verifier is unavailable, what that means for blocked sites, and what to check', () => {
+  it('EmailAlert "Verifier unavailable": its own subject with the start time, the effect and what to check', () => {
     const m = alert();
-    expect(m.subject).toBe('DxT Monitor · Browser verifier unavailable');
-    expect(m.text).toMatch(/^VERIFIER UNAVAILABLE — The browser verifier is unavailable/);
-    expect(m.text).toContain('Blocked sites show PROBLEM (unverified) until it’s back');
-    expect(m.text).toContain('Hard fails still go DOWN on time.');
-    expect(m.text).toContain('Since: Wed 7 Oct 10:14');
-    expect(m.text).toContain('What we saw: A verification job wasn’t picked up within 30 s');
-    expect(m.text).toContain('Waiting: Tubtong, Cando Asia');
+    expect(m.subject).toBe('DxT Monitor · System · Browser verifier unavailable · Wed 7 Oct 10:14');
+    expect(m.text).toMatch(/^VERIFIER UNAVAILABLE — The browser verifier isn’t answering/);
+    expect(m.text).toContain(
+      'Until the verifier is back they show PROBLEM (unverified) — no proof either way.',
+    );
+    expect(m.text).toContain(
+      'Since: Wed 7 Oct 10:14 — a blocked check found no verifier answering (BKK VPS)',
+    );
+    expect(m.text).toContain('Sites waiting: Tubtong, Cando Asia');
+    expect(m.text).toContain('Hard fails still go DOWN as usual — they don’t wait for the verifier.');
+    expect(m.text).toContain('What to check: Restart the verifier service on the BKK VPS');
     expect(m.text).toContain('You got this because you’re an Admin.');
     expect(m.text).toContain(SYSTEM_EMAIL_FOOTER);
-    // No Chat thread to discuss it in, and no page to link to yet.
+    expect(m.html).toContain('#b45309'); // amber
+    // No Chat thread to discuss it in, and no Probes page to link to until S12.
     expect(m.text).not.toContain('Chat thread');
     expect(m.html).not.toContain('<a href');
     expect(m.headers).toEqual({ References: '<alert-a-1@notify.example.test>' });
@@ -184,11 +189,24 @@ describe('Admin alert about the browser verifier (D-001, D-019)', () => {
 
   it('names each reason, and the backlog', () => {
     expect(alert({ reason: 'no_poll' }).text).toContain('hasn’t asked for work in 2 min');
-    expect(alert({ reason: 'lease_expired', sites: [] }).text).toContain('Waiting: No site right now');
+    expect(alert({ reason: 'lease_expired', sites: [] }).text).toContain('Sites waiting: No site right now');
     const behind = alert({ kind: 'verifier_backlog', queued: 7, reason: undefined });
-    expect(behind.subject).toBe('DxT Monitor · Browser verifier falling behind');
+    expect(behind.subject).toBe('DxT Monitor · System · Browser verifier falling behind · Wed 7 Oct 10:14');
     expect(behind.text).toContain('More than 5 verification jobs are waiting');
     expect(behind.text).toContain('Waiting: 7 jobs');
+  });
+
+  it('EmailAlert "Fewer than 2 locations": statuses frozen, who still reports and who is missing (D-022)', () => {
+    const m = alert({ kind: 'probe_locations_low', active: ['TYO'], sites: [], reason: undefined });
+    expect(m.subject).toBe('DxT Monitor · System · Fewer than 2 probe locations · Wed 7 Oct 10:14');
+    expect(m.text).toMatch(/^STATUSES FROZEN — Only 1 probe location is reporting/);
+    expect(m.text).toContain('Still reporting: TYO (Tokyo)');
+    expect(m.text).toContain('Missing: BKK (BKK VPS) · SIN (Singapore)');
+    expect(m.text).toContain('No new incidents or recoveries until a second location reports.');
+    expect(m.html).toContain('STATUSES FROZEN — only TYO is reporting');
+    const none = alert({ kind: 'probe_locations_low', active: [], sites: [] });
+    expect(none.text).toMatch(/^STATUSES FROZEN — No probe location is reporting/);
+    expect(none.text).toContain('Still reporting: None');
   });
 
   it('escapes site names in the HTML', () => {

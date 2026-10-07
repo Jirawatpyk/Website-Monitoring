@@ -1,5 +1,6 @@
 import 'server-only';
 import type { Database, DbClient, Json } from '@dxt/db';
+import type { Trigger } from '@dxt/shared';
 
 export type Notification = Database['public']['Tables']['notifications']['Row'];
 
@@ -14,6 +15,9 @@ export interface IncidentFacts {
   id: string;
   number: number;
   state: string;
+  /** A PROBLEM's messages are worded as one (spec §19, D-022). */
+  severity: 'down' | 'problem';
+  trigger: Trigger;
   started_at: string;
   detected_at: string;
   acked_at: string | null;
@@ -55,7 +59,7 @@ export async function loadFacts(db: DbClient, rows: readonly Notification[]): Pr
     db
       .from('incidents')
       .select(
-        `id, number, state, started_at, detected_at, acked_at, recovered_at,
+        `id, number, state, severity, trigger, started_at, detected_at, acked_at, recovered_at,
          acker:profiles!incidents_acked_by_fkey(display_name),
          sites!inner(name, tier,
            primary:profiles!sites_primary_owner_id_fkey(id, display_name, google_chat_user_id),
