@@ -15,7 +15,7 @@
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
-| S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
+| S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | In progress |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
@@ -178,9 +178,10 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   3. **T03:** verifier stopped → a hard-fail site still goes DOWN on time; a blocked site shows PROBLEM (unverified) at once and the Admin is emailed.
   4. The Job API refuses a wrong token and an expired lease; Ingest refuses results > 5 min old (tests).
   5. A Storage lifecycle job removes screenshots older than 30 days (test or SQL check).
-  6. The VPS has every variable name from `apps/vps-agent/.env.example` set in `/etc/dxt-agent/env` (moved from S00 Done-when 3, D-010; names listed, values never shared).
+  6. The VPS has every variable name from `apps/vps-agent/.env.example` set in `/etc/dxt-agent/staging.env` and `/etc/dxt-agent/production.env`, one per agent instance (moved from S00 Done-when 3, D-010; two instances, D-019; names listed, values never shared).
 - **Review:** security-reviewer (Job API, Storage, VPS unit), db-reviewer (pgmq queues, leases), engine-reviewer.
 - **Carried from S02b review:** a round can be completed by Bangkok's result arriving through Ingest; Ingest must run the engine (`engineAndDeliver`) like a failing probe recheck does, or DOWN waits up to a minute for the engine cron (PRD §9: 30 s).
+- **Notes (evidence):** started 7 Oct 2026. Queue, PROBLEM (unverified) without its Chat card until S04, Admin alerts and the two agent instances per D-019.
 
 ### S04 · PROBLEM triggers, flapping & status rules
 
