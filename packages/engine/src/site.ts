@@ -186,6 +186,17 @@ export type SiteDecision =
       allOk: boolean;
       autoResolve: boolean;
       holdSummary: boolean;
+      /**
+       * D-023 partial recovery: what still fails rejoins as PROBLEM AGAIN in the same round, right
+       * after RECOVERED (spec §19.7).
+       */
+      then?: {
+        severity: 'problem';
+        monitorId: string;
+        trigger: Trigger;
+        detail: ProblemDetail;
+        startedAt: Date;
+      };
     } & Judged)
   /** Second OK round in a row: the site is OK; incident → Needs root cause (or stays in Monitoring). */
   | ({ kind: 'settle'; from: IncidentState; to: IncidentState } & Judged);
@@ -352,7 +363,7 @@ function judgeSiteRound(
     .find((x) => x.v.kind === 'problem');
   if (problem && problem.v.kind === 'problem') {
     // D-023: a DOWN drop is over once the home page answers again, whatever a key page says.
-    // RECOVERED now (the site shows PROBLEM); what still fails joins as PROBLEM AGAIN next round.
+    // RECOVERED, and what still fails joins as PROBLEM AGAIN in the same round (spec §19.7).
     const homeBack =
       primaryVerdict.kind === 'ok' || (primaryVerdict.kind === 'problem' && !!primaryVerdict.reachable);
     if (open && !recovered && episode === 'down' && homeBack && RECOVERABLE.includes(open.state)) {
@@ -361,7 +372,18 @@ function judgeSiteRound(
           ? (primaryVerdict.reachable ?? [])
           : [];
       const d = recoverDecision(s, open, base, reachable, 'problem', false);
-      if (d) return d;
+      if (d?.kind === 'recover') {
+        return {
+          ...d,
+          then: {
+            severity: 'problem',
+            monitorId: problem.m.id,
+            trigger: problem.v.trigger,
+            detail: problem.v.detail,
+            startedAt: problem.v.startedAt,
+          },
+        };
+      }
     }
     // PROBLEM AGAIN: the recovered incident takes the new problem (D-004, D-022 — M1 included).
     if (open && recovered) {
@@ -430,9 +452,9 @@ function okRound(
 }
 
 /**
- * The drop is over. A PROBLEM incident nobody acknowledged that recovers < 5 min after its first
- * failed check goes straight to Resolved (spec §16.1, D-003); a flapping one holds its RECOVERED for
- * one summary after 15 min of continuous OK (spec §19.4).
+ * The drop is over. A PROBLEM incident nobody acknowledged that recovers < 5 min after it was flagged
+ * goes straight to Resolved (spec §16.1 as §19.6 amends it, D-003); a flapping one holds its
+ * RECOVERED for one summary after 15 min of continuous OK (spec §19.4).
  */
 function recoverDecision(
   s: SiteSnapshot,
@@ -443,15 +465,16 @@ function recoverDecision(
   allOk: boolean,
 ): SiteDecision | null {
   const recoveredAt = earliest(reachable);
+  const flaggedAt = open.detectedAt ?? open.startedAt;
   const autoResolve =
     allOk &&
-    !!open.startedAt &&
+    !!flaggedAt &&
     (open.episodeSeverity ?? open.severity) === 'problem' &&
     autoResolves({
       severity: open.severity,
       recovered: true,
       acknowledged: !!open.acked,
-      minutesToRecover: (recoveredAt.getTime() - open.startedAt.getTime()) / 60_000,
+      minutesToRecover: (recoveredAt.getTime() - flaggedAt.getTime()) / 60_000,
     });
   const next = transition(open.state, autoResolve ? 'auto_resolve' : 'recover', open);
   if (!next.ok) return null;

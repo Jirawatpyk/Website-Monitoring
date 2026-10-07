@@ -30,8 +30,10 @@ export interface OpenIncident {
   episodeSeverity?: Severity;
   /** Someone acknowledged it: a PROBLEM never auto-resolves then (spec §16.1). */
   acked?: boolean;
-  /** Its first failed check (incident duration, auto-resolve). */
+  /** Its first failed check (incident duration). */
   startedAt?: Date;
+  /** When it was flagged (`detected_at`): the 5 min of the auto-resolve count from here (spec §19.6). */
+  detectedAt?: Date;
   /** Tagged flapping (D-004): RECOVERED becomes one summary after 15 min of continuous OK. */
   isFlapping?: boolean;
 }

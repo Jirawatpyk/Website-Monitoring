@@ -54,6 +54,7 @@ const incident = (state: string, downQueued = true) => ({
   severity: 'down',
   episode_severity: 'down',
   started_at: at(-600),
+  detected_at: at(-560),
   acked_at: null,
   recovered_at: state === 'monitoring' || state === 'needs_root_cause' ? at(-120) : null,
   escalation_level: 0,

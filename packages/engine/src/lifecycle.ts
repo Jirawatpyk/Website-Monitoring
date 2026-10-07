@@ -100,8 +100,8 @@ export function clientUpdateRequired(input: {
 
 /**
  * A PROBLEM that recovers within 5 min and was never acknowledged auto-resolves and is hidden from
- * Incidents by default (spec §16.1). Call it at recovery: `minutesToRecover` is first failed check → first
- * OK round. DOWN never auto-resolves.
+ * Incidents by default (spec §16.1). Call it at recovery: `minutesToRecover` counts from when the
+ * PROBLEM was flagged (`detected_at`, spec §19.6) to its first OK check. DOWN never auto-resolves.
  */
 export function autoResolves(input: {
   severity: Severity;

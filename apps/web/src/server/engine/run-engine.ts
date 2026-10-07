@@ -127,7 +127,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     db
       .from('incidents')
       .select(
-        'id, site_id, monitor_id, state, severity, episode_severity, started_at, acked_at, recovered_at, escalation_level, is_flapping, root_cause_category, notifications(template)',
+        'id, site_id, monitor_id, state, severity, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, root_cause_category, notifications(template)',
       )
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
@@ -210,6 +210,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
             episodeSeverity: open.episode_severity,
             acked: !!open.acked_at,
             startedAt: new Date(open.started_at),
+            detectedAt: new Date(open.detected_at),
             isFlapping: open.is_flapping,
           } satisfies OpenIncident)
         : null,
@@ -699,6 +700,31 @@ async function apply(
         ...judged,
       });
       if (error) throw new Error(`engine_recover_incident: ${error.message}`);
+      if (data && d.then) {
+        // D-023: the home page is back but a key page still fails — PROBLEM AGAIN right after the
+        // RECOVERED, from the same round (spec §19.7). Not a flip: the site never was fully OK.
+        const ctx = causeContext(site, d.then.monitorId);
+        const again = await db.rpc('engine_relapse_incident', {
+          p_incident_id: incidentId,
+          p_severity: 'problem',
+          p_trigger: d.then.trigger,
+          p_started_at: d.then.startedAt.toISOString(),
+          p_detected_at: d.roundAt.toISOString(),
+          p_round_at: d.roundAt.toISOString(),
+          p_context: {
+            cause: formatProblemCause(d.then.detail, ctx),
+            summary: formatProblemSummary(d.then.detail, ctx),
+            detail: d.then.detail as unknown as Json,
+            monitorUrl: ctx.monitorUrl,
+            startedAt: d.then.startedAt.toISOString(),
+            homeBackAt: d.recoveredAt.toISOString(),
+          },
+          p_flapping: false,
+          p_notify: !site.muted,
+          ...judged,
+        });
+        if (again.error) throw new Error(`engine_relapse_incident: ${again.error.message}`);
+      }
       return data ? 'recovered' : null;
     }
 

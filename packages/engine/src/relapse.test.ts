@@ -204,7 +204,7 @@ describe('decideSite — D-023: a DOWN ends when the home page is back', () => {
   const start = T('10:20', '25');
   const broken = carry({ status: 'problem', trigger: 'key_page' });
 
-  it('home OK, /booking still 404 → RECOVERED now (not a flip), the site shows PROBLEM', () => {
+  it('home OK, /booking still 404 → RECOVERED (not a flip) and PROBLEM AGAIN from the same round (spec §19.7)', () => {
     const d = decideSite(
       snapshot(start, [monitor('home', passRound(start)), monitor('booking', failRound(start), broken)], {
         open: incident({ state: 'acknowledged', acked: true }),
@@ -218,10 +218,11 @@ describe('decideSite — D-023: a DOWN ends when the home page is back', () => {
       allOk: false,
       autoResolve: false,
       status: 'problem',
+      then: { severity: 'problem', monitorId: 'booking', trigger: 'key_page', startedAt: plus(start, 1) },
     });
   });
 
-  it('…then on the next round the key page joins as PROBLEM AGAIN, not flapping', () => {
+  it('a key page failing on the round after a partial recovery is PROBLEM AGAIN too, not flapping', () => {
     const next = plus(start, 60);
     const d = decideSite(
       snapshot(next, [monitor('home', passRound(next)), monitor('booking', failRound(next), broken)], {
@@ -266,17 +267,19 @@ describe('decideSite — auto-resolve (spec §16.1)', () => {
       state: 'unacked',
       severity: 'problem',
       episodeSeverity: 'problem',
-      startedAt: T('09:48', '25'),
+      startedAt: T('09:40', '25'),
+      // §19.6: the 5 min count from when the PROBLEM was flagged, not from its first failed check.
+      detectedAt: T('09:48', '25'),
       ...over,
     });
 
   it.each([
     [
-      '4 min 59 s after the first failed check, nobody acked → Resolved',
-      { startedAt: plus(T('09:48', '25'), 2) },
+      '4 min 59 s after it was flagged, nobody acked → Resolved',
+      { detectedAt: plus(T('09:48', '25'), 2) },
       true,
     ],
-    ['exactly 5 min → Monitoring', { startedAt: plus(T('09:48', '25'), 1) }, false],
+    ['exactly 5 min → Monitoring', { detectedAt: plus(T('09:48', '25'), 1) }, false],
     ['acknowledged → Monitoring', { state: 'acknowledged' as const, acked: true }, false],
     ['a DOWN never auto-resolves', { severity: 'down' as const, episodeSeverity: 'down' as const }, false],
   ])('%s', (_n, over: Partial<OpenIncident>, resolves) => {

@@ -994,7 +994,7 @@ describe('relapse, flapping and auto-resolve (S04b, D-004, D-024)', () => {
     expect((await rowsOf(inc.id)).filter((n) => n.template === 'recovered')).toHaveLength(1);
   });
 
-  it('D-023: the home page back while /booking still fails → RECOVERED, then PROBLEM AGAIN on the next round', async () => {
+  it('D-023: the home page back while /booking still fails → RECOVERED and PROBLEM AGAIN from the same round (spec §19.7)', async () => {
     const { siteId, monitorId } = await newSite('Key page left');
     const booking = await must(
       db
@@ -1016,12 +1016,7 @@ describe('relapse, flapping and auto-resolve (S04b, D-004, D-024)', () => {
     await results(monitorId, ok(1));
     await results(booking.id, down(1));
     await engineAt(1);
-    expect(await incidentOf(siteId)).toMatchObject({ state: 'monitoring' });
     expect((await statusOf(siteId))?.status).toBe('problem');
-
-    await results(monitorId, ok(2));
-    await results(booking.id, down(2));
-    await engineAt(2);
     const inc = await incidentOf(siteId);
     expect(inc).toMatchObject({
       state: 'unacked',
