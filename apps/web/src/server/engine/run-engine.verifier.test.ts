@@ -14,8 +14,11 @@ const beating = [
 const monitor = {
   id: 'm1',
   url: 'https://tubtong.example.test',
+  is_primary: true,
   must_contain: ['Tubtong'],
   timeout_ms: 10_000,
+  thresholds: {},
+  allowed_redirect_domains: [],
   site_id: 's1',
   sites: { name: 'Tubtong', tier: 1, is_active: true, muted_until: null },
 };
@@ -144,8 +147,14 @@ describe('runEngine — blocked rounds (S03)', () => {
       p_severity: 'problem',
       p_started_at: at(1),
       p_detected_at: now.toISOString(),
-      p_notify: false,
-      p_context: { cause: 'Blocked, not verified', verifier: 'no_poll' },
+      // Its Chat card and owner email go out now (D-019, S04a).
+      p_notify: true,
+      p_context: {
+        cause: 'HTTP 403 bot challenge (SIN, TYO) · browser verifier unavailable',
+        summary: 'blocked by bot protection, not verified',
+        verifier: 'no_poll',
+      },
+      p_status: 'problem',
     });
     expect(rpcCalls[1]?.args).toMatchObject({ p_note: 'Blocked, not verified' });
     expect(rpcCalls[2]?.args).toEqual({
@@ -163,7 +172,10 @@ describe('runEngine — blocked rounds (S03)', () => {
     expect(rpcCalls.map((c) => c.name)).toEqual(['engine_open_incident', 'engine_note_site']);
     expect(rpcCalls[0]?.args).toMatchObject({
       p_trigger: 'blocked_unverified',
-      p_context: { cause: 'Blocked in the browser too', verifier: 'browser_blocked' },
+      p_context: {
+        cause: 'HTTP 403 bot challenge (SIN, TYO) · blocked in the browser too',
+        verifier: 'browser_blocked',
+      },
     });
   });
 
