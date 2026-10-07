@@ -4,7 +4,7 @@
 -- repeats on one incident, the < 5 min auto-resolve, and the engine's read RPCs.
 begin;
 \ir _helpers.psql
-select plan(40);
+select plan(43);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -105,6 +105,15 @@ select is(
      where template = 'flap_summary'),
   0, 'the claim leaves the summary alone while it is held'
 );
+-- A newer Chat row of the same incident isn't stuck behind the held summary.
+insert into public.notifications (incident_id, channel, template, thread_key, context)
+values ((select id from inc where name = 'voca'), 'google_chat', 'note_test', (select id::text from inc where name = 'voca'), '{}');
+select is(
+  (select count(*)::int from public.claim_notifications('google_chat', 20, (select id from inc where name = 'voca'))
+     where template = 'note_test'),
+  1, 'a newer message isn''t held back by the held summary'
+);
+update public.notifications set status = 'cancelled' where template = 'note_test';
 
 -- 03:38 drops again: the held summary is cancelled.
 select ok(public.engine_relapse_incident((select id from inc where name = 'voca'), 'down', 'hard_fail',
@@ -143,6 +152,13 @@ select is(
   1, 'the same direction again is not a flip'
 );
 
+-- A stale round can't move the flips back.
+select public.engine_record_flip('00000000-0000-0000-0000-0000000000a1', '2026-09-21 03:00Z', true);
+select is(
+  (select flip_ok from public.site_status where site_id = '00000000-0000-0000-0000-0000000000a1'),
+  false, 'an older round doesn''t toggle the flip direction'
+);
+
 -- ── Acknowledged, escalated and D-023 ────────────────────────────────────
 update public.incidents set acked_at = '2026-09-21 04:10Z', acked_by = (select id from ids where name = 'ploy')
   where id = (select id from inc where name = 'voca');
@@ -177,10 +193,15 @@ select ok(not public.engine_relapse_incident((select id from inc where name = 'v
 -- Chat failed on a 2nd DOWN AGAIN: the fallback email keeps its round's key.
 select ok(
   public.queue_fallback_emails((select id from public.notifications where incident_id = (select id from inc where name = 'voca')
-     and template = 'down_again' and dedupe_key = '2026-09-21 04:55:00+00')) > 0
+     and template = 'down_again' and dedupe_key = '2026-09-21T04:55:00Z')) > 0
   and not exists (select 1 from public.notifications where incident_id = (select id from inc where name = 'voca')
-     and template = 'down_again' and channel = 'email' and dedupe_key <> '2026-09-21 04:55:00+00'),
+     and template = 'down_again' and channel = 'email' and dedupe_key <> '2026-09-21T04:55:00Z'),
   'the fallback email (Admins, no backup set) keeps the round''s dedupe key'
+);
+select ok(
+  exists (select 1 from public.notifications where incident_id = (select id from inc where name = 'voca')
+     and template = 'down_again' and channel = 'email' and user_id = (select id from ids where name = 'ploy')),
+  'the AGAIN fallback also reaches the person it mentions (the owner, nobody acked) — D-024'
 );
 
 -- ── Auto-resolve (spec §16.1) ────────────────────────────────────────────

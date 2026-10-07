@@ -76,6 +76,10 @@ function dropsOf(i: IncidentFacts): Episode[] {
   return episodesOf(events);
 }
 
+/** "Down N times" only when every drop was a DOWN; a key-page PROBLEM drop (D-023) isn't downtime. */
+const summarySeverity = (i: IncidentFacts): 'down' | 'problem' =>
+  dropsOf(i).every((d) => d.severity === 'down') ? 'down' : 'problem';
+
 /** The drop a RECOVERED row ends: its own recovery time, else the incident's latest. */
 function recoveryOf(i: IncidentFacts, ctx: Record<string, unknown>): { start: Date; end: Date } | null {
   const end = dateOf(ctx.recoveredAt) ?? dateOf(i.recovered_at);
@@ -221,7 +225,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         ? buildFlapSummaryAlert({
             incidentId: i.id,
             site: i.sites.name,
-            severity: i.severity,
+            severity: summarySeverity(i),
             owner: person(i.sites.primary),
             drops,
           })
@@ -317,7 +321,7 @@ export function renderEmail(
       return drops.length
         ? buildFlapSummaryEmail({
             ...base,
-            severity: i.severity,
+            severity: summarySeverity(i),
             drops,
             owner: i.sites.primary?.display_name ?? null,
             ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,

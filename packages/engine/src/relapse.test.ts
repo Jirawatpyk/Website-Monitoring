@@ -122,6 +122,20 @@ describe('lifecycle — relapse state, auto-resolve event, episodes (D-004, spec
     expect(episodeMinutes(episodes, T('04:19'))).toBe(41);
   });
 
+  it('D-023: the PROBLEM AGAIN at the recovery is its own drop, from the recovery on; a DOWN joining it raises it', () => {
+    const episodes = episodesOf([
+      { type: 'detected', at: T('10:01', '25'), startedAt: T('10:00', '25') },
+      { type: 'relapsed', at: T('10:21', '25'), startedAt: T('10:00', '25'), severity: 'problem' },
+      { type: 'recovered', at: T('10:21', '25') },
+      { type: 'relapsed', at: T('10:30', '25'), startedAt: T('10:30', '25'), severity: 'down' },
+      { type: 'recovered', at: T('10:40', '25') },
+    ]);
+    expect(episodes).toEqual([
+      { start: T('10:00', '25'), end: T('10:21', '25'), severity: 'down' },
+      { start: T('10:21', '25'), end: T('10:40', '25'), severity: 'down' },
+    ]);
+  });
+
   it('a drop still in progress counts to now; an escalation after a recovery is a new drop', () => {
     const episodes = episodesOf([
       { type: 'detected', at: T('10:00'), startedAt: T('09:58'), severity: 'problem' },
@@ -233,6 +247,31 @@ describe('decideSite — D-023: a DOWN ends when the home page is back', () => {
       }),
     );
     expect(d).toMatchObject({ kind: 'relapse', severity: 'problem', flapping: false, status: 'problem' });
+  });
+
+  it('a flapping incident’s partial recovery still posts RECOVERED with its PROBLEM AGAIN (§19.7)', () => {
+    const d = decideSite(
+      snapshot(start, [monitor('home', passRound(start)), monitor('booking', failRound(start), broken)], {
+        open: incident({ state: 'unacked', isFlapping: true }),
+        flips: [plus(start, -600), plus(start, -300), plus(start, -120)],
+        flipOk: false,
+      }),
+    );
+    expect(d).toMatchObject({
+      kind: 'recover',
+      allOk: false,
+      holdSummary: false,
+      then: { severity: 'problem' },
+    });
+  });
+
+  it('the home page down again during that PROBLEM drop → DOWN AGAIN in the same incident (engine review H1)', () => {
+    const d = decideSite(
+      snapshot(start, [monitor('home', failRound(start)), monitor('booking', failRound(start), broken)], {
+        open: incident({ state: 'acknowledged', acked: true, episodeSeverity: 'problem' }),
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'relapse', severity: 'down', trigger: 'hard_fail', status: 'down' });
   });
 
   it('…and that PROBLEM drop recovers only when every monitor is OK (a flip), showing PROBLEM until it settles', () => {

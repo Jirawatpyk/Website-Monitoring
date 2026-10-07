@@ -61,6 +61,10 @@ export interface AgainAlertInput {
 const STATE_WORDS: Record<string, string> = {
   monitoring: 'Monitoring',
   needs_root_cause: 'Needs root cause',
+  // D-023: the home page down again while a key page's PROBLEM was still open.
+  unacked: 'Unacked',
+  escalated: 'Escalated',
+  acknowledged: 'Acknowledged',
 };
 
 /** "slow, p50 5.4 s" → "slow again, p50 5.4 s"; the head alone for a title. */

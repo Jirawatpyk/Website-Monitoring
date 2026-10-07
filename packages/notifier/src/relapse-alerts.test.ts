@@ -118,6 +118,24 @@ describe('PROBLEM AGAIN (ChatAlert INC-0150, INC-0152)', () => {
     );
   });
 
+  it('a key page failing again after a full recovery: the summary carries the page', () => {
+    const m = buildAgainAlert(
+      voca({
+        severity: 'problem',
+        trigger: 'key_page',
+        summary: 'key page /contact, HTTP 500',
+        droppedAt: bkk('10:16', '25'),
+        backSince: bkk('10:10', '25'),
+        nowFlapping: false,
+        flapping: false,
+      }),
+    );
+    expect(m.text).toBe(
+      '<users/PLOY> PROBLEM AGAIN · VOCA (Tier 2) · key page /contact again, HTTP 500 · same incident INC-0133',
+    );
+    expect(title(m)).toBe('PROBLEM AGAIN · VOCA · key page /contact again after 6 min OK');
+  });
+
   it('a site name can’t inject a mention or markup', () => {
     const m = buildAgainAlert(voca({ site: '<users/all> VOCA' }));
     expect(m.text).not.toContain('<users/all>');

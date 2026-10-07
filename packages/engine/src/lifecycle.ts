@@ -174,13 +174,25 @@ export interface EpisodeEvent {
  */
 export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
   const out: Episode[] = [];
-  const sorted = [...events].sort((a, b) => a.at.getTime() - b.at.getTime());
+  // At the same instant a recovery comes first: D-023's RECOVERED and PROBLEM AGAIN share a round.
+  const rank = (e: EpisodeEvent) => (e.type === 'recovered' ? 0 : 1);
+  const sorted = [...events].sort((a, b) => a.at.getTime() - b.at.getTime() || rank(a) - rank(b));
   for (const e of sorted) {
     const last = out.at(-1);
     const open = !!last && last.end === null;
     if (e.type === 'detected' || e.type === 'relapsed' || (e.type === 'escalated_to_down' && !open)) {
-      if (open) continue;
-      out.push({ start: e.startedAt ?? e.at, end: null, severity: e.severity ?? 'down' });
+      // A drop joining one still in progress (the home page down again during D-023's PROBLEM) raises it.
+      if (open) {
+        if (e.severity === 'down') last.severity = 'down';
+        continue;
+      }
+      const start = e.startedAt ?? e.at;
+      // A key page broken since before the home page came back starts its drop at that recovery.
+      out.push({
+        start: last?.end && start < last.end ? last.end : start,
+        end: null,
+        severity: e.severity ?? 'down',
+      });
     } else if (e.type === 'escalated_to_down' && last) {
       last.severity = 'down';
     } else if (e.type === 'recovered' && open && last) {

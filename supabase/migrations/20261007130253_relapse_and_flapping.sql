@@ -54,7 +54,9 @@ as $$
           where f > p_round_at - interval '30 minutes'
           order by f
         )
-    where site_id = p_site_id and flip_ok is distinct from p_ok;
+    where site_id = p_site_id and flip_ok is distinct from p_ok
+      -- A run holding an older round never moves the flips back (as site_status's other columns).
+      and (last_round_at is null or last_round_at <= p_round_at);
 $$;
 
 -- ── Engine functions ──────────────────────────────────────────────────────
@@ -180,7 +182,8 @@ set search_path = ''
 as $$
 declare
   v_site_id uuid;
-  v_key text := p_round_at::text;
+  -- The round in UTC, whatever the session's TimeZone / DateStyle: overlapping callers agree.
+  v_key text := to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
 begin
   -- Auto-resolve only for a PROBLEM nobody acknowledged (spec §16.1); DOWN never auto-resolves.
   if p_auto_resolve and p_to <> 'resolved' then
@@ -402,7 +405,11 @@ declare
 begin
   select site_id, state, severity into v_site_id, v_from, v_before
   from public.incidents
-  where id = p_incident_id and state in ('monitoring', 'needs_root_cause')
+  where id = p_incident_id
+    and (state in ('monitoring', 'needs_root_cause')
+         -- D-023: the DOWN ended, a key page carried on as a PROBLEM, and the home page fails again.
+         or (p_severity = 'down' and severity = 'down' and episode_severity = 'problem'
+             and state not in ('resolved', 'in_review', 'closed')))
   for update;
 
   if v_site_id is null then
@@ -442,7 +449,7 @@ begin
   if p_notify then
     insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key)
     values (p_incident_id, 'google_chat', p_severity::text || '_again', p_incident_id::text,
-            p_context, p_round_at::text)
+            p_context, to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
     on conflict do nothing;
   end if;
 
@@ -452,7 +459,9 @@ end;
 $$;
 
 -- ── Chat failed: the fallback email keeps the row's dedupe key ───────────
--- (S02b body; a repeated template — a 2nd DOWN AGAIN — is its own fallback email.)
+-- (S02b body; a repeated template — a 2nd DOWN AGAIN — is its own fallback email.) The AGAIN replies
+-- are Chat only (D-024), so when Chat fails their email also goes to the person the reply mentions —
+-- whoever acknowledged, else the owner — who has no other copy of it.
 create or replace function public.queue_fallback_emails(p_notification_id uuid)
 returns integer
 language plpgsql
@@ -471,10 +480,14 @@ begin
     select b.id as user_id from public.profiles b where b.id = s.backup_owner_id and b.is_active
     union
     select p.id from public.profiles p where p.role = 'admin' and p.is_active
+    union
+    select a.id from public.profiles a
+    where n.template in ('down_again', 'problem_again') and a.is_active
+      and a.id = coalesce(i.acked_by, s.primary_owner_id)
   ) r
   where n.id = p_notification_id and n.channel = 'google_chat'
     and not (n.template in ('down', 'problem') and i.state not in ('unacked', 'escalated'))
-    -- An AGAIN reply also goes to whoever acknowledged; old news once the site is back.
+    -- An AGAIN reply is old news once the site is back (Monitoring); it still counts while acknowledged.
     and not (n.template in ('down_again', 'problem_again')
              and i.state not in ('unacked', 'escalated', 'acknowledged'))
     and not exists (
@@ -501,18 +514,28 @@ create function public.engine_checks(
   p_limit integer default 1000
 )
 returns setof public.check_results
-language sql
+language plpgsql
 stable
 set search_path = ''
 as $$
-  select c.*
-  from public.check_results c
-  join public.monitors m on m.id = c.monitor_id and m.type in ('http', 'keyword')
-  join public.sites s on s.id = m.site_id and s.is_active
-  where c.checked_at >= p_since
-    and (p_after_checked_at is null or (c.checked_at, c.id) < (p_after_checked_at, p_after_id))
-  order by c.checked_at desc, c.id desc
-  limit least(greatest(p_limit, 1), 1000);
+declare
+  v_limit integer := least(greatest(coalesce(p_limit, 1000), 1), 1000);
+  -- `execute` plans each call with its values: a plain SQL function here gets one generic plan,
+  -- where the optional keyset predicate turns the partition into a sequential scan (db-reviewer).
+  v_sql text := 'select c.* from public.check_results c '
+    'join public.monitors m on m.id = c.monitor_id and m.type in (''http'', ''keyword'') '
+    'join public.sites s on s.id = m.site_id and s.is_active '
+    'where c.checked_at >= $1 ';
+begin
+  if p_after_checked_at is null or p_after_id is null then
+    return query execute v_sql || 'order by c.checked_at desc, c.id desc limit $2'
+      using p_since, v_limit;
+  else
+    return query execute v_sql || 'and (c.checked_at, c.id) < ($3, $4) '
+      'order by c.checked_at desc, c.id desc limit $2'
+      using p_since, v_limit, p_after_checked_at, p_after_id;
+  end if;
+end;
 $$;
 
 -- The carry state of the active sites' monitors.
@@ -537,7 +560,51 @@ as $$
   select j.*
   from public.verification_jobs j
   join public.sites s on s.id = j.site_id and s.is_active
-  where j.kind = 'verify' and j.round_at >= p_since;
+  where j.kind = 'verify' and j.round_at >= p_since
+  -- The newest rounds first: if a flood ever passes max_rows, it is the oldest that drop.
+  order by j.round_at desc, j.id desc
+  limit 1000;
+$$;
+
+create index verification_jobs_verify_round_idx on public.verification_jobs (round_at desc)
+  where kind = 'verify';
+
+-- ── A held summary never blocks its thread ───────────────────────────────
+-- S02b body, plus: an older `flap_summary` still inside its 15-min hold doesn't hold back newer
+-- messages of the same incident (db-reviewer). The ack's 10 s hold still keeps its thread in order.
+drop function public.claim_notifications(public.notification_channel, integer, uuid);
+create function public.claim_notifications(
+  p_channel public.notification_channel,
+  p_limit integer default 20,
+  p_incident_id uuid default null
+)
+returns setof public.notifications
+language sql
+set search_path = ''
+as $$
+  with due as (
+    select id from public.notifications
+    where status = 'queued'
+      and channel = p_channel
+      and (p_incident_id is null or incident_id = p_incident_id)
+      and (hold_until is null or hold_until <= now())
+      and (next_retry_at is null or next_retry_at <= now())
+      and not exists (
+        select 1 from public.notifications older
+        where older.incident_id = notifications.incident_id and older.channel = notifications.channel
+          and older.user_id is not distinct from notifications.user_id
+          and older.status = 'queued' and older.created_at < notifications.created_at
+          and not (older.template = 'flap_summary' and older.hold_until > now())
+      )
+    order by created_at
+    limit p_limit
+    for update skip locked
+  )
+  update public.notifications n
+    set attempts = n.attempts + 1, next_retry_at = now() + interval '90 seconds'
+    from due
+    where n.id = due.id
+  returning n.*;
 $$;
 
 revoke execute on function
@@ -554,7 +621,8 @@ revoke execute on function
   public.queue_fallback_emails(uuid),
   public.engine_checks(timestamptz, timestamptz, uuid, integer),
   public.engine_monitor_status(),
-  public.engine_verify_jobs(timestamptz)
+  public.engine_verify_jobs(timestamptz),
+  public.claim_notifications(public.notification_channel, integer, uuid)
   from public, anon, authenticated;
 grant execute on function
   public.engine_record_flip(uuid, timestamptz, boolean),
@@ -570,5 +638,6 @@ grant execute on function
   public.queue_fallback_emails(uuid),
   public.engine_checks(timestamptz, timestamptz, uuid, integer),
   public.engine_monitor_status(),
-  public.engine_verify_jobs(timestamptz)
+  public.engine_verify_jobs(timestamptz),
+  public.claim_notifications(public.notification_channel, integer, uuid)
   to service_role;

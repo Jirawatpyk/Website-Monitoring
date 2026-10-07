@@ -496,7 +496,11 @@ async function loadChecks(db: DbClient, since: Date) {
     if (error) throw new Error(`engine_checks: ${error.message}`);
     rows.push(...data);
     const last = data.at(-1);
-    if (data.length < CHECKS_PAGE || !last) return rows;
+    // Stop on an empty page, not a short one: a hosted max_rows under CHECKS_PAGE would otherwise
+    // end the read after its first page without an error (db-reviewer).
+    if (!last) return rows;
+    // A cursor that doesn't move would loop forever: stop (the rows are already in).
+    if (after && last.checked_at === after.checked_at && last.id === after.id) return rows;
     after = { checked_at: last.checked_at, id: last.id };
   }
 }
@@ -728,7 +732,8 @@ async function apply(
           p_severity: 'problem',
           p_trigger: d.then.trigger,
           p_started_at: d.then.startedAt.toISOString(),
-          p_detected_at: d.roundAt.toISOString(),
+          // At the recovery itself, so the timeline reads RECOVERED then PROBLEM AGAIN (engine review M1).
+          p_detected_at: d.recoveredAt.toISOString(),
           p_round_at: d.roundAt.toISOString(),
           p_context: {
             cause: formatProblemCause(d.then.detail, ctx),
@@ -741,7 +746,8 @@ async function apply(
             homeBackAt: d.recoveredAt.toISOString(),
           },
           p_flapping: false,
-          p_notify: !site.muted,
+          // With its RECOVERED or not at all: a muted alert gets no reply out of context (engine review L3).
+          p_notify: !site.muted && alertQueued,
           ...judged,
         });
         if (again.error) throw new Error(`engine_relapse_incident: ${again.error.message}`);

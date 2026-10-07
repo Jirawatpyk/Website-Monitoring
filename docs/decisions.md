@@ -52,12 +52,15 @@ The ChatAlert board also has a note, "Drops after 03:24 aren't re-posted", that 
   - a PROBLEM episode recovers when every monitor is OK.
 
   With D-023, the same round records RECOVERED and then rejoins as PROBLEM AGAIN (spec §19.7, two guarded calls in one run); the site shows PROBLEM. `severity` keeps `down` for the record.
+  - "The home page answers again" means the primary's round passes: OK, or a PROBLEM from a passing round (slow, keyword, redirect, regional). A blocked or failing home page doesn't end the DOWN.
+  - If the home page fails again while that PROBLEM drop is still open, it is a new DOWN drop in the same incident: DOWN AGAIN, severity DOWN (engine review H1). It is not a flip, because the site never went back to OK.
+- **Flapping is per incident** (PRD §7: flapping merges into one incident). Short PROBLEMs that each auto-resolve are separate incidents, each closed and hidden, and none of them is tagged. Response hours (S08) hold Tier 2–3 PROBLEM cards at night.
 - **Flip.** A flip is the site going OK → not-OK (open, relapse, escalate) or not-OK → OK (a recovery where every monitor is OK). It is recorded at that round in `site_status.flips` and `flip_ok`, inside the guarded SQL. A D-023 partial recovery and the PROBLEM relapse after it are not flips. The relapse that makes the 3rd flip in 30 min tags `is_flapping` (VOCA: 03:12, 03:19, 03:24).
 - **While flapping.**
   - The states move as normal.
   - The RECOVERED Chat reply and email are not sent. Instead one summary (Chat + an email to the owner) is queued, held until 15 min after the recovery. Any new drop cancels it, so it goes only after 15 min of continuous OK.
   - Every drop still posts DOWN AGAIN / PROBLEM AGAIN (§19.4 wins over the board note; Tao's 7 Oct answer).
-- **Channels.** DOWN AGAIN and PROBLEM AGAIN are Chat replies only. The flapping summary also goes by email to the owner.
+- **Channels.** DOWN AGAIN and PROBLEM AGAIN are Chat replies only. The flapping summary also goes by email to the owner. When Chat fails, the D-016 fallback emails an AGAIN reply to the backup, the Admins **and the person it mentions** (whoever acknowledged, else the owner), who has no other copy (message-checker, 7 Oct; Tao: decide).
 - **Auto-resolve (§16.1, D-003).** A PROBLEM episode on a PROBLEM incident that was never acked and recovers less than 5 min after it was flagged (`detected_at`, spec §19.6 — not the first failed check) goes from its first OK round straight to Resolved (`auto_resolved = true`, hidden by S07). It still gets RECOVERED in Chat (no @mention) and by email, saying it was resolved automatically and needs no root cause. A DOWN never auto-resolves.
 - **Dedupe key (D-014).** `notifications.dedupe_key` joins the once-per-incident index. `recovered`, the AGAIN replies and the summary use the round, so they can repeat.
 - **Copy.** It comes from the ChatAlert rows (DOWN AGAIN VOCA, PROBLEM AGAIN INC-0150, flapping summary) and the rows design added on 7 Oct (spec §19.4, §19.6, §19.7): the auto-resolved RECOVERED (INC-0151), the later drop while flapping (VOCA 03:38), the key-page PROBLEM AGAIN (INC-0152) and the summary email.

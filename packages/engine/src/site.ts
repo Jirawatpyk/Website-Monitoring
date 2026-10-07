@@ -347,6 +347,21 @@ function judgeSiteRound(
         ...judgedDown,
       };
     }
+    // D-023: the DOWN ended, a key page carried on as a PROBLEM, and now the home page fails again:
+    // a new DOWN drop in the same incident (DOWN AGAIN), never silence (engine review H1).
+    if (open && open.severity === 'down' && episode === 'problem') {
+      return {
+        kind: 'relapse',
+        severity: 'down',
+        monitorId: primary.id,
+        trigger: 'hard_fail',
+        startedAt: primaryDown.startedAt,
+        detectedAt: primaryDown.confirmedAt,
+        flapping: false,
+        down: facts,
+        ...judgedDown,
+      };
+    }
     if (open) return { kind: 'none', okRounds: 0, ...judgedDown };
     return { kind: 'open', startedAt: primaryDown.startedAt, ...facts, ...judgedDown };
   }
@@ -486,7 +501,8 @@ function recoverDecision(
     okLocations: reachable.length,
     allOk,
     autoResolve,
-    holdSummary: !!open.isFlapping && !autoResolve && stillFlapping(s.flips ?? [], recoveredAt),
+    // A partial recovery (D-023) is no flip: RECOVERED goes with its PROBLEM AGAIN (spec §19.7).
+    holdSummary: allOk && !!open.isFlapping && !autoResolve && stillFlapping(s.flips ?? [], recoveredAt),
     ...base,
     // Auto-resolved: nothing is open any more, so the site shows the verdicts (OK).
     status: autoResolve ? 'ok' : status,

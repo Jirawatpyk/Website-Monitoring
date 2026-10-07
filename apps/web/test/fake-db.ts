@@ -100,6 +100,10 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
     rpc(name: string, args: unknown) {
       // The engine's read RPCs (S04b) change nothing: kept apart so `rpcCalls` lists the writes.
       (READ_RPCS.has(name) ? readCalls : rpcCalls).push({ name, args });
+      // Keyset paging: a static `rpc.engine_checks` result is the first page; the next one is empty.
+      if (name === 'engine_checks' && (args as { p_after_id?: string } | null)?.p_after_id) {
+        return Promise.resolve({ data: [], error: null });
+      }
       return Promise.resolve(
         resolve(`rpc.${name}`, { table: name, op: 'select', values: args, filters: [] }),
       );
