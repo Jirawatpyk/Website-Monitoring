@@ -17,7 +17,7 @@
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Done |
 | S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
-| S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | In progress |
+| S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | In review |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
@@ -264,6 +264,13 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   4. A PROBLEM that recovers in under 5 min with no ack is auto-resolved (test).
   5. message-checker passes the relapse and flapping rows.
 - **Review:** engine-reviewer, message-checker, db-reviewer (notifications dedupe).
+- **Notes (evidence):** started 7 Oct 2026 ~13:00Z; staging verified 15:12Z. Rules per D-024; spec §19.4 / §19.6 / §19.7 and the ChatAlert / EmailAlert / PostIncident rows design added the same day (same-round D-023, auto-resolve counted from when the PROBLEM was flagged). Staging: migration `relapse_and_flapping` by `pnpm db:push:staging` before the code; `release.sh staging` (the VPS moved to one release folder per instance, OK'd by Tao; production restarted onto its own folder with the same build).
+  - **Done-when 1 ✓** `relapse.test.ts` "INC-0133 VOCA end to end": one `open`, DOWN AGAIN at 03:24 (now flapping), 03:38, 03:55; held summaries; 4 drops; 41 min; one ack. D-003 in "D-003: a PROBLEM passes through Monitoring and Needs root cause…". `pnpm --filter @dxt/engine test` (181).
+  - **Done-when 2 ✓** int test "a relapse in Monitoring sends one DOWN AGAIN in the same thread, even when two runs overlap"; pgTAP `relapse_and_flapping.test.sql` (second call false, one reply). Staging INC-0017: `down_again` Chat at 14:44:34 and 14:49:34 in the same Chat thread (`spaces/…/messages/OqryyVIBqL4.*`); card "DOWN AGAIN · Test target · was back for 2 min (21:42–21:44)" read in the Chat space.
+  - **Done-when 3 ✓** int test "while flapping no RECOVERED goes; one summary is held 15 min and a new drop cancels it" (delivery included). Staging INC-0017: the recovery at 14:47 held a summary until 15:02, cancelled at the drop at 14:49 ("Superseded: down again"); the recovery at 14:51 → one summary at 15:06:21 (Chat "RECOVERED · Test target · stable 15 min · flapped ×3, down 8 min in total · add a root cause", email in the thread).
+  - **Done-when 4 ✓** `relapse.test.ts` auto-resolve rows (4:59 → Resolved, 5:00 → Monitoring, acked / DOWN never); int test "a PROBLEM that recovers in under 5 min with no ack is auto-resolved"; staging INC-0018 keyword → `resolved`, `auto_resolved`, RECOVERED with no mention "resolved automatically" (Chat + email).
+  - **Done-when 5 ✓** message-checker: every row word for word against the boards; Mediums fixed (partial recovery while flapping never holds RECOVERED; AGAIN fallback email reaches the person it mentions, D-024); Lows fixed or carried to S08 / S10.
+  - Reviews: `/code-review high` (6: 5 fixed, 1 altitude fixed later with one `notified` count), engine-reviewer ×2 (H1 home page down again during a D-023 PROBLEM → DOWN AGAIN; M1 drops; L-items fixed or carried to S07 / S08), db-reviewer ×2 (H1 `engine_checks` generic-plan seq scan → plpgsql `execute`; M2–M4, L5–L6 fixed; L8 justified), security-reviewer (no High / Medium; Low staging folder → `mktemp`). `/verify` (Tao) PASS.
 
 ### S05 · Sites & monitors
 
