@@ -1,5 +1,6 @@
 import {
   formatDay,
+  formatDuration,
   formatIncidentId,
   formatTier,
   formatTime,
@@ -11,6 +12,7 @@ import {
 } from '@dxt/shared';
 import type { ProblemFacts } from './chat-alerts';
 import { downtime } from './downtime';
+import { dropsSummary, type Drop, type KeyPageFacts } from './relapse-alerts';
 
 /**
  * Alert emails — EmailAlert board, spec §10, PRD §7, cut to what exists today (D-013 / D-016: no
@@ -87,7 +89,31 @@ export interface RecoveredEmailInput extends EmailBaseInput {
   problem?: ProblemFacts | null;
 }
 
-type Template = 'down' | 'problem' | 'acknowledged' | 'recovered';
+type Template =
+  'down' | 'problem' | 'acknowledged' | 'recovered' | 'flap_summary' | 'down_again' | 'problem_again';
+
+export interface FlapSummaryEmailInput extends EmailBaseInput {
+  severity: 'down' | 'problem';
+  drops: readonly Drop[];
+  owner: string | null;
+  ack: { by: string; at: Date } | null;
+}
+
+export interface AutoResolvedEmailInput extends EmailBaseInput {
+  trigger: Trigger;
+  flaggedAt: Date;
+  recoveredAt: Date;
+  /** The cause stored when it opened. */
+  cause: string | null;
+  keyPage?: KeyPageFacts | null;
+}
+
+export interface AgainEmailInput extends EmailBaseInput {
+  severity: 'down' | 'problem';
+  /** The Chat reply's own words: its title and body (D-024: the AGAIN replies are Chat; this is the fallback). */
+  title: string;
+  body: string;
+}
 
 /**
  * AURA light tokens (aura-tokens 5.31) resolved to hex: email clients don't support CSS variables.
@@ -512,5 +538,96 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
       ['What to check', 'The verifier service on the BKK VPS (dxt-agent) and its sessions.'],
     ],
     buttons: [],
+  });
+}
+
+/**
+ * The flapping summary email (EmailAlert "VOCA · flapping", spec §19.4): to the owner in the
+ * incident's thread at the same time as the Chat summary, replacing the RECOVERED emails held while
+ * the site flapped. "Add root cause" waits for S07 (D-022): until then the incident page.
+ */
+export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessage {
+  const { site, drops, owner, ack } = input;
+  const n = drops.length;
+  const last = drops.at(-1);
+  const stable = last ? formatTime(last.end) : '';
+  const { ranges, minutes } = dropsSummary(drops);
+  const total = formatDuration(minutes);
+  const down = input.severity === 'down';
+  const isOwner = input.reason === 'owner';
+  return render(input, {
+    template: 'flap_summary',
+    color: C.positive,
+    bar: C.positive,
+    label: 'RECOVERED',
+    pre: `${site} stable since ${stable} · flapped ×${n} · ${total} ${down ? 'down ' : ''}in total · root cause needed`,
+    headline: `${site} is stable again`,
+    lede: isOwner
+      ? `${site} flapped ${n} times and has been stable for 15 min. Needs a root cause before it can be resolved.`
+      : owner
+        ? `${site} flapped ${n} times and has been stable for 15 min. Nothing needed from you. ${owner} adds the root cause.`
+        : `${site} flapped ${n} times and has been stable for 15 min. Nothing needed from you.`,
+    facts: [
+      [`${down ? 'Down' : 'Had a problem'} ${n} times`, ranges],
+      [down ? 'Down in total' : 'In total', total],
+      ['Stable since', `${stable} — OK for 15 min`],
+      ['Acknowledged', ack ? `${ack.by} at ${formatTime(ack.at)}` : 'Not yet'],
+      ...(owner
+        ? [['Still to do', `Root cause (${owner}) — needed before it can be resolved`] as [string, string]]
+        : []),
+    ],
+    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: isOwner }],
+  });
+}
+
+/**
+ * RECOVERED email for an auto-resolved PROBLEM (EmailAlert "Fuji Links · auto-resolved", spec §19.6):
+ * on its first OK round, in the PROBLEM's thread, nothing to do.
+ */
+export function buildAutoResolvedEmail(input: AutoResolvedEmailInput): EmailMessage {
+  const { site, keyPage } = input;
+  const { duration } = downtime(input.flaggedAt, input.recoveredAt);
+  const what = keyPage ? `${site} ${keyPage.path}` : site;
+  return render(input, {
+    template: 'recovered',
+    color: C.positive,
+    bar: C.positive,
+    label: 'RECOVERED',
+    pre: `${what} back to normal · cleared ${duration} after it was flagged · resolved automatically`,
+    headline: `${what} is back`,
+    lede: 'Resolved automatically — no root cause needed. Nothing to do.',
+    facts: [
+      ['Cleared', `${duration} after it was flagged`],
+      ['Trigger', TRIGGER_LABELS[input.trigger]],
+      ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+      ['Acknowledged', 'Nobody — it cleared first'],
+      [
+        'Status',
+        'Resolved automatically on the first OK round — cleared within 5 min of being flagged, never acknowledged. No root cause needed.',
+      ],
+    ],
+    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
+  });
+}
+
+/**
+ * DOWN AGAIN / PROBLEM AGAIN by email: only when the Chat reply couldn't be delivered (D-016
+ * fallback to the backup and Admins) — the replies themselves are Chat only (D-024). Same words as
+ * the Chat reply, in the incident's thread.
+ */
+export function buildAgainEmail(input: AgainEmailInput): EmailMessage {
+  const down = input.severity === 'down';
+  const label = down ? 'DOWN AGAIN' : 'PROBLEM AGAIN';
+  const title = input.title.replace(/^(DOWN|PROBLEM) AGAIN · /, '');
+  return render(input, {
+    template: down ? 'down_again' : 'problem_again',
+    color: down ? C.danger : C.warning,
+    bar: down ? C.danger : C.warning,
+    label,
+    pre: `${title} · same incident ${formatIncidentId(input.incidentNumber)}`,
+    headline: down ? `${input.site} is down again` : `${input.site} has a problem again`,
+    lede: `${input.body} The Google Chat reply couldn’t be delivered, so this email is the alert.`,
+    facts: [['Same incident', formatIncidentId(input.incidentNumber)]],
+    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
   });
 }

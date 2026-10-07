@@ -12,7 +12,7 @@ Staging = Vercel project `dxt-monitor-staging` (branch `staging`, https://monito
 1. **Migrations first** — `pnpm db:push:staging --dry-run`, then `pnpm db:push:staging`. Code that calls new or changed `engine_*` parameters fails with "function not found" against the old database.
 2. **Web** — `git push --force-with-lease origin HEAD:staging`; wait until the staging deployment is Ready.
 3. **Test target** (only if `apps/test-target` changed) — the push above builds a Preview of `dxt-test-target`; promote it: `vercel --scope team_KLEKhF6PuSAbJSmgDpyEXES4 ls dxt-test-target`, then `vercel --scope team_KLEKhF6PuSAbJSmgDpyEXES4 promote <preview url> --yes`.
-4. **VPS agent** (only if `apps/vps-agent` or a package it bundles changed) — `pnpm --filter @dxt/vps-agent build`, copy `apps/vps-agent/dist` to the VPS (`ssh -i ~/.ssh/dxt_vps root@38.60.233.62`), `rsync` it into `/opt/dxt-agent/dist/`, then restart **only** `dxt-agent@staging` and read `journalctl -u dxt-agent@staging -n 6`. Both instances share `/opt/dxt-agent` today, so keep agent changes backward-compatible with production's server.
+4. **VPS agent** (only if `apps/vps-agent` or a package it bundles changed) — `apps/vps-agent/deploy/release.sh staging`: it builds, installs into `/opt/dxt-agent/staging/` and restarts **only** `dxt-agent@staging`, then prints its journal. Production keeps its own release in `/opt/dxt-agent/production/` until `release.sh production` after the merge.
 
 ## 2. Drive: the test target's mode
 
@@ -34,6 +34,15 @@ Modes (`apps/test-target/CLAUDE.md`) and the outcome to expect (StatusModel, D-0
 | `challenge-all`     | PROBLEM `blocked_unverified` ("blocked in the browser too", D-020)                                       | ~1–2 min                   |
 | `keyword-missing`   | PROBLEM `keyword` (the staging monitor has `must_contain = {Test target}`)                               | the next round             |
 | `slow`              | PROBLEM `slow` on the **3rd** slow round (Tier 1: ~3–4 min)                                              |                            |
+
+Relapse, flapping and auto-resolve (S04b, D-024), on one incident without a reset in between:
+
+| Sequence                                              | Expect                                                                                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `error` → `ok` (2 rounds) → `error`                   | DOWN, RECOVERED, then DOWN AGAIN in the same thread (`down_again`), incident back to Unacked                 |
+| `error` / `ok` once more after that                   | the 3rd change in 30 min: `is_flapping`; the next recovery queues `flap_summary` (held 15 min), no RECOVERED |
+| leave it `ok` 15 min                                  | one RECOVERED summary in Chat + one owner email ("flapped ×n, down … in total")                              |
+| fresh incident: `keyword-missing` → `ok` within 5 min | PROBLEM, then RECOVERED without a mention, "resolved automatically"; `incidents.auto_resolved`               |
 
 A round that straddles the switch can mix outcomes (e.g. part challenged, part 500 → the browser decides).
 
@@ -60,4 +69,4 @@ A round that straddles the switch can mix outcomes (e.g. part challenged, part 5
 
 ## 4. Reset between runs
 
-Until S04b builds relapse, a new problem on an incident that is still open (Monitoring / Needs root cause) opens nothing new. Before the next mode run `supabase/staging/reset-test-incident.sql` in the SQL editor, and leave the target on `ok` at the end.
+A new problem on an incident that is still open (Monitoring / Needs root cause) is a relapse into it (S04b), not a new incident. For a clean start — a fresh DOWN or PROBLEM card — run `supabase/staging/reset-test-incident.sql` in the SQL editor first, and leave the target on `ok` at the end.

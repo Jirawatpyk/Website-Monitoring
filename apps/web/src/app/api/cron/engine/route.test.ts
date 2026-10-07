@@ -40,7 +40,14 @@ describe('GET /api/cron/engine', () => {
   it('sends right away what it queued, and only then', async () => {
     const { GET } = await import('./route');
     expect(mocks.dispatch).not.toHaveBeenCalled();
-    mocks.runEngine.mockResolvedValue({ ok: true, monitors: 1, opened: 1, recovered: 0, settled: 0 });
+    mocks.runEngine.mockResolvedValue({
+      ok: true,
+      monitors: 1,
+      opened: 1,
+      notified: 1,
+      recovered: 0,
+      settled: 0,
+    });
     mocks.dispatch.mockResolvedValue({ ok: true, sent: 1, failed: 0 });
     const res = await GET(call(`Bearer ${TEST_ENV.CRON_SECRET}`));
     expect(mocks.dispatch).toHaveBeenCalledWith(expect.objectContaining({ db: 'db' }), {
@@ -67,7 +74,14 @@ describe('GET /api/cron/engine', () => {
   it('keeps the engine green when sending fails: the notifier cron retries', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const { GET } = await import('./route');
-    mocks.runEngine.mockResolvedValue({ ok: true, monitors: 1, opened: 1, recovered: 0, settled: 0 });
+    mocks.runEngine.mockResolvedValue({
+      ok: true,
+      monitors: 1,
+      opened: 1,
+      notified: 1,
+      recovered: 0,
+      settled: 0,
+    });
     mocks.dispatch.mockRejectedValue(new Error('chat down'));
     const res = await GET(call(`Bearer ${TEST_ENV.CRON_SECRET}`));
     expect(res.status).toBe(200);

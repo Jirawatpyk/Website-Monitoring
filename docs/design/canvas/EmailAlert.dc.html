@@ -19,7 +19,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 .aura-segmented--sm .aura-segmented__option{padding:0 9px}
 </style>
 </helmet>
-<div class="r3-col" style="width: 720px; height: 1712px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+<div class="r3-col" style="width: 720px; height: 1888px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
 
 <div style="display: flex; flex-direction: column; gap: 4px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">EMAIL · RESEND · RECORD COPY + FALLBACK WHEN CHAT FAILS</span>
@@ -75,6 +75,8 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <span>The first email’s Message-ID is stored; every later email sets <span style="font-family: var(--font-mono); font-size: 11px">In-Reply-To</span> and <span style="font-family: var(--font-mono); font-size: 11px">References</span> to it.</span>
 <span>The status word goes first in the preheader and the body, so it still shows in a phone notification.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">PROBLEM thread:</b> same rules, its own subject (e.g. <span style="font-family: var(--font-mono); font-size: 11px">Fuji Links · Tier 2 · INC-0141</span>). PROBLEM, ACKNOWLEDGED and RECOVERED all reply to the first PROBLEM email. A site that fails again while the incident is open stays in the same thread.</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Flapping:</b> RECOVERED emails are held like the Chat replies; one summary email goes in the incident thread after 15 min of continuous OK. DOWN AGAIN / PROBLEM AGAIN are Chat only — no email.</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Auto-resolved:</b> a PROBLEM that clears within 5 min of being flagged with no acknowledgement gets one RECOVERED email on the first OK round, saying no root cause is needed.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Admin system emails</b> aren’t about one incident: their own subject per outage with its start time (so separate outages don’t merge into one mail thread), one email when it starts, no “back up” email.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Resolved email:</b> when someone resolves the incident (always by hand), one RESOLVED email goes in this same thread to everyone emailed about this DOWN incident — for INC-0142 Arm, Ploy, Tao and Bua. Held 10 s for Undo, like the ack.</span>
 </div>
@@ -90,7 +92,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":1712}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":1888}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -210,6 +212,28 @@ class Component extends DCLogic {
         }
       }
     };
+    var V = {
+      'Flapping summary': {
+        sentTo: 'Sent 04:19, after 15 min of continuous OK, to Ploy (owner) in the INC-0133 thread. It replaces the RECOVERED emails held while VOCA flapped. DOWN AGAIN / PROBLEM AGAIN replies are Chat only — no email.',
+        bar: 'var(--aura-fg-positive)', labelColor: GREEN, label: 'RECOVERED', preStatus: 'RECOVERED —', pre: 'VOCA stable since 04:04 · flapped ×4 · 41 min down in total · root cause needed',
+        headline: 'VOCA is stable again',
+        facts: [{ k: 'Down 4 times', v: '03:12–03:19 · 03:24–03:35 · 03:38–03:52 · 03:55–04:04' }, { k: 'Down in total', v: '41 min' }, { k: 'Stable since', v: '04:04 — OK for 15 min' }, { k: 'Acknowledged', v: 'Not yet — outside response hours, timers paused until 09:00' }, { k: 'Still to do', v: 'Root cause (Ploy) — needed before it can be resolved' }],
+        people: {
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'VOCA flapped 4 times and has been stable for 15 min. Needs a root cause before it can be resolved.', btns: [P('Add root cause', 'Incident.dc.html')], why: 'You got this because you own VOCA.' }
+        }
+      }
+    };
+    var FA = {
+      'Recovered (auto-resolved)': {
+        sentTo: 'Wording example — made-up incident INC-0151, not in the sample ledger. Inside response hours. Sent to Ploy in the same thread as the PROBLEM email, on the first OK round 3 min after it was flagged. Nobody acknowledged it, so nobody else was emailed.',
+        bar: 'var(--aura-fg-positive)', labelColor: GREEN, label: 'RECOVERED', preStatus: 'RECOVERED —', pre: 'Fuji Links /contact back to normal · cleared 3 min after it was flagged · resolved automatically',
+        headline: 'Fuji Links /contact is back',
+        facts: [{ k: 'Cleared', v: '3 min after it was flagged' }, { k: 'Trigger', v: 'Key page' }, { k: 'Cause', v: 'Home OK · /contact → HTTP 500 (BKK, SIN, TYO)' }, { k: 'Acknowledged', v: 'Nobody — it cleared first' }, { k: 'Status', v: 'Resolved automatically on the first OK round — cleared within 5 min of being flagged, never acknowledged. No root cause needed.' }],
+        people: {
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Resolved automatically — no root cause needed. Nothing to do.', btns: [P('Open incident', 'Incident.dc.html')], why: 'You got this because you own Fuji Links.' }
+        }
+      }
+    };
     var ADMWHY = 'You got this because you’re an Admin.';
     var A = {
       'Verifier unavailable': {
@@ -232,6 +256,8 @@ class Component extends DCLogic {
     var TH = {
       'MuvMi · DOWN': { subject: 'MuvMi · Tier 1 · INC-0142', E: E, events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (CEO) — Proposal', 'L3 FYI (CEO + Bua)', 'Recovered'], first: 'Down', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · PROBLEM': { subject: 'Fuji Links · Tier 2 · INC-0141', E: F, events: ['PROBLEM', 'Acknowledged', 'Recovered'], first: 'PROBLEM', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
+      'Fuji Links · auto-resolved': { subject: 'Fuji Links · Tier 2 · INC-0151', E: FA, events: ['Recovered (auto-resolved)'], first: 'Recovered (auto-resolved)', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
+      'VOCA · flapping': { subject: 'VOCA · Tier 2 · INC-0133', E: V, events: ['Flapping summary'], first: 'Flapping summary', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Admin · system': { subject: '', E: A, events: ['Verifier unavailable', 'Fewer than 2 locations'], first: 'Verifier unavailable', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read.' }
     };
     var th = TH[this.state.th] ? this.state.th : 'MuvMi · DOWN';

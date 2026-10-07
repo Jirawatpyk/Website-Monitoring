@@ -18,16 +18,9 @@ export async function engineAndDeliver(
   engine: (db: DbClient) => Promise<EngineSummary> = runEngine,
 ): Promise<EngineSummary & { delivery?: unknown }> {
   const summary = await engine(db);
-  // New incident messages (DOWN, PROBLEM, RECOVERED), or an Admin alert (D-019, D-022): send them now.
-  if (
-    summary.opened +
-      (summary.problems ?? 0) +
-      summary.recovered +
-      (summary.alerts ?? 0) +
-      (summary.escalated ?? 0) ===
-    0
-  )
-    return summary;
+  // Any incident change that queued messages (one count from the runner, whatever the kind), or an
+  // Admin alert (D-019, D-022, D-024): send them now.
+  if ((summary.notified ?? 0) + (summary.alerts ?? 0) === 0) return summary;
   try {
     return { ...summary, delivery: await dispatchNotifications(notifierDeps(db, env), { deadline }) };
   } catch (err) {

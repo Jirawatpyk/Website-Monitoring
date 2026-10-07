@@ -22,9 +22,12 @@ export interface IncidentFacts {
   detected_at: string;
   acked_at: string | null;
   recovered_at: string | null;
-  acker: { display_name: string } | null;
-  /** The timeline's first rows; the `detected` one carries the cause line. */
-  incident_events?: { type: string; payload: Json }[];
+  acker: { display_name: string; google_chat_user_id?: string | null } | null;
+  /**
+   * The timeline: the `detected` one carries the cause line; `detected` / `relapsed` / `recovered`
+   * give the drops (DOWN AGAIN "Down 7 min so far", the flapping summary).
+   */
+  incident_events?: { type: string; payload: Json; at?: string }[];
   sites: { name: string; tier: number; primary: Owner | null; backup: Owner | null };
 }
 
@@ -62,8 +65,8 @@ export async function loadFacts(db: DbClient, rows: readonly Notification[]): Pr
       .from('incidents')
       .select(
         `id, number, state, severity, trigger, started_at, detected_at, acked_at, recovered_at,
-         acker:profiles!incidents_acked_by_fkey(display_name),
-         incident_events(type, payload),
+         acker:profiles!incidents_acked_by_fkey(display_name, google_chat_user_id),
+         incident_events(type, payload, at),
          sites!inner(name, tier,
            primary:profiles!sites_primary_owner_id_fkey(id, display_name, google_chat_user_id),
            backup:profiles!sites_backup_owner_id_fkey(id, display_name, google_chat_user_id))`,

@@ -154,12 +154,13 @@ describe('decideMonitor — DOWN on the check and its recheck (spec §6, S02a Do
     });
   });
 
-  it('flags a relapse while an incident is open but opens nothing new (D-004, S04)', () => {
-    expect(decideMonitor(snapshot(downRound(), { open: incident('needs_root_cause') }))).toEqual({
-      kind: 'none',
+  it('a DOWN on a recovered incident joins it: DOWN AGAIN, nothing new opens (D-004, S04b)', () => {
+    expect(decideMonitor(snapshot(downRound(), { open: incident('needs_root_cause') }))).toMatchObject({
+      kind: 'relapse',
       roundAt: at(0),
-      okRounds: 0,
-      relapse: true,
+      severity: 'down',
+      trigger: 'hard_fail',
+      flapping: false,
     });
   });
 
@@ -179,6 +180,9 @@ describe('decideMonitor — recovery (spec §16.4)', () => {
         from: state,
         to: 'monitoring',
         okLocations: 2,
+        allOk: true,
+        autoResolve: false,
+        holdSummary: false,
       });
     },
   );
@@ -431,7 +435,7 @@ describe('decideMonitor — blocked rounds and the browser verifier (S03, Status
     });
   });
 
-  it('page fails while an incident is open → a relapse, nothing new (D-004, S04)', () => {
+  it('page fails while an incident is in Monitoring → DOWN AGAIN, nothing new (D-004, S04b)', () => {
     const d = decideMonitor(
       snapshot(
         blocked(),
@@ -441,7 +445,7 @@ describe('decideMonitor — blocked rounds and the browser verifier (S03, Status
         ),
       ),
     );
-    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0, relapse: true });
+    expect(d).toMatchObject({ kind: 'relapse', roundAt: at(0), severity: 'down', detectedAt: at(41) });
   });
 
   it.each<[string, Partial<MonitorSnapshot>, string]>([

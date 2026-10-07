@@ -22,7 +22,8 @@ timedatectl show -p NTPSynchronized                      # must be yes: Ingest r
 - **Crashed or stuck:** `systemctl restart dxt-agent@production`. The alert clears by itself once the verifier polls again with nothing queued and no blocked site waiting, no sooner than 10 min after it opened (D-019). There's no "back" email.
 - **401 in the log:** the env file's `INGEST_TOKEN` doesn't match the environment's. Tao updates `/etc/dxt-agent/<env>.env`, then restart. A token changed in Vercel only takes effect after a redeploy (env is read at build time).
 - **`healthcheck_ping_failed`:** the VPS has no IPv6 route; the unit starts Node with IPv4 first (`--no-network-family-autoselection --dns-result-order=ipv4first`). Keep those flags if you edit `ExecStart`.
-- **Chromium won't start:** reinstall it (`deploy/install.md` → Build and copy).
+- **Chromium won't start:** release the instance again (`apps/vps-agent/deploy/release.sh production`); it reinstalls that Playwright version's Chromium into `/opt/dxt-agent/browsers`.
+- **Roll back a bad release:** each instance runs from its own folder (`/opt/dxt-agent/<env>/`), so either swap back the release kept beside it (`sudo mv /opt/dxt-agent/<env> /opt/dxt-agent/<env>.bad && sudo mv /opt/dxt-agent/<env>.previous /opt/dxt-agent/<env> && sudo systemctl restart dxt-agent@<env>`) or check out the previous `main` commit and run `release.sh <env>` again.
 
 **Email "falling behind" (more than 5 jobs waiting):** many sites are blocked at once. Check the log for slow pages, and consider asking those sites' WAF owners to allowlist the probe User-Agent, the secret header and the VPS IP (the permanent fix, PRD §5). It clears when the queue drops to 5.
 
@@ -53,3 +54,17 @@ The cause line says which trigger and where (spec §19 cause table, D-022): slow
 select m.url, m.is_primary, ms.status, ms.trigger, ms.cause, ms.slow_rounds, ms.failing_since, ms.last_round_at
 from monitor_status ms join monitors m on m.id = ms.monitor_id where ms.site_id = '<site id>';
 ```
+
+## A site keeps failing and recovering (relapse, flapping)
+
+A site that fails again while its incident is open (Monitoring / Needs root cause) joins the same incident and thread: DOWN AGAIN / PROBLEM AGAIN in Chat, mentioning whoever acknowledged, else the owner (D-004, D-024). The incident goes back to Acknowledged (if acked) or Unacked. The 3rd OK ↔ not-OK change in 30 min tags it flapping: RECOVERED replies and emails stop, and one summary (Chat + an email to the owner) is held until 15 min after the last recovery; any new drop cancels it. Read the flips and the held summary:
+
+```sql
+select st.status, st.flips, st.flip_ok, i.state, i.severity, i.episode_severity, i.is_flapping
+from site_status st join incidents i on i.site_id = st.site_id and i.state not in ('resolved','in_review','closed')
+where st.site_id = '<site id>';
+select template, channel, status, hold_until, dedupe_key, error from notifications
+where incident_id = '<incident id>' order by created_at;
+```
+
+A summary row `queued` with `hold_until` in the future is waiting for 15 min of OK; `cancelled` with "Superseded: down again" means the site dropped again first. A PROBLEM nobody acknowledged that clears within 5 min of being flagged resolves itself (`auto_resolved`) and still posts one RECOVERED without a mention (spec §19.6).

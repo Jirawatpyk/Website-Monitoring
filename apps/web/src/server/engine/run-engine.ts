@@ -6,6 +6,7 @@ import {
   lookbackMs,
   NEW_MONITOR,
   UNKNOWN_ROOT_CAUSE,
+  type DownFacts,
   type MonitorCarry,
   type MonitorState,
   type OpenIncident,
@@ -16,11 +17,12 @@ import {
 } from '@dxt/engine';
 import {
   formatCause,
+  formatKeyPage,
   formatProblemCause,
   formatProblemSummary,
   type ProblemCauseContext,
 } from '@dxt/notifier';
-import { TIER_CONFIG, type ProbeLocation, type Tier, type Trigger } from '@dxt/shared';
+import { TIER_CONFIG, type ProbeLocation, type ProblemDetail, type Tier, type Trigger } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
@@ -28,6 +30,8 @@ import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
 const MAX_ROUNDS_PER_RUN = 5;
 const OPEN_STATES_EXCLUDED = '("resolved","in_review","closed")';
+/** Messages that told someone the site failed: RECOVERED replies only to these (spec §15.1). */
+const ALERT_TEMPLATES = ['down', 'problem', 'down_again', 'problem_again'];
 /**
  * A round expects only the active locations whose probe beat this recently (D-019): a stopped VPS
  * agent drops out of the vote at once instead of holding every round until its deadline.
@@ -62,7 +66,7 @@ export interface EngineSummary extends CronJobResult {
   problems: number;
   recovered: number;
   settled: number;
-  /** A new problem on a recovered incident: no alert until D-004 (S04b). */
+  /** New drops that joined a recovered incident (D-004): DOWN AGAIN / PROBLEM AGAIN queued. */
   relapses: number;
   /** Blocked rounds handed to the browser verifier this run (one per monitor). */
   verifying: number;
@@ -72,6 +76,8 @@ export interface EngineSummary extends CronJobResult {
   alerts: number;
   /** Open PROBLEM incidents raised to DOWN (D-021); their DOWN alerts are queued. */
   escalated: number;
+  /** Incident changes this run that queued messages (any kind but `settled`): deliver them now. */
+  notified: number;
   /** Sites whose write failed this run (the rest were judged); the run reports `ok: false`. */
   failures?: string[];
 }
@@ -93,6 +99,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     recovered: 0,
     settled: 0,
     relapses: 0,
+    notified: 0,
     verifying: 0,
     unverified: 0,
     alerts: 0,
@@ -101,7 +108,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   const [sites, locations] = await Promise.all([loadSites(db, now), loadLocations(db, now)]);
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
-    const verifier = await loadVerifierState(db, [], now, now);
+    const verifier = await loadVerifierState(db, now, now);
     summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations);
     return summary;
   }
@@ -113,20 +120,22 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     now.getTime() - Math.max(...sites.map((s) => lookbackMs(TIER_CONFIG[s.tier].intervalSec))),
   );
   const siteIds = sites.map((s) => s.id);
-  const monitorIds = monitors.map((m) => m.id);
   const [checks, statuses, carries, incidents, verifier] = await Promise.all([
-    loadChecks(db, monitorIds, since),
-    db.from('site_status').select('site_id, last_round_at, ok_rounds, note').in('site_id', siteIds),
+    loadChecks(db, since),
     db
-      .from('monitor_status')
-      .select('monitor_id, status, trigger, cause, slow_rounds, failing_since, last_round_at')
-      .in('monitor_id', monitorIds),
+      .from('site_status')
+      .select('site_id, last_round_at, ok_rounds, note, flips, flip_ok')
+      .in('site_id', siteIds),
+    // Server-side reads (S04b): no monitor ids in a GET query string (8 KB limit at 200 monitors).
+    db.rpc('engine_monitor_status'),
     db
       .from('incidents')
-      .select('id, site_id, monitor_id, state, severity, root_cause_category, notifications(template)')
+      .select(
+        'id, site_id, monitor_id, state, severity, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, root_cause_category, notifications(template)',
+      )
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
-    loadVerifierState(db, monitorIds, since, now),
+    loadVerifierState(db, since, now),
   ]);
   for (const r of [statuses, carries, incidents]) if (r.error) throw new Error(r.error.message);
 
@@ -202,8 +211,16 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
             severity: open.severity,
             // Same rule as the resolve gate (spec §16.3): "Unknown" isn't a root cause.
             hasRootCause: !!open.root_cause_category && open.root_cause_category !== UNKNOWN_ROOT_CAUSE,
+            episodeSeverity: open.episode_severity,
+            acked: !!open.acked_at,
+            startedAt: new Date(open.started_at),
+            detectedAt: new Date(open.detected_at),
+            isFlapping: open.is_flapping,
           } satisfies OpenIncident)
         : null,
+      // OK ↔ not-OK changes at incident steps (D-024): the 3rd in 30 min tags flapping.
+      flips: (status?.flips ?? []).map((f) => new Date(f)),
+      flipOk: status?.flip_ok ?? null,
       monitors: site.monitors.map((m): SiteMonitor => ({
         id: m.id,
         isPrimary: m.isPrimary,
@@ -219,7 +236,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     };
     let note = status?.note ?? null;
     // RECOVERED only replies to an alert that was queued (not one held back by a mute, spec §15.1).
-    const alertQueued = !!open?.notifications.some((n) => n.template === 'down' || n.template === 'problem');
+    const alertQueued = !!open?.notifications.some((n) => ALERT_TEMPLATES.includes(n.template));
 
     // Judge rounds oldest first until one changes the incident or nothing is ready.
     for (let i = 0; i < MAX_ROUNDS_PER_RUN; i += 1) {
@@ -228,10 +245,6 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       if (decision.kind === 'verify') {
         summary.verifying += await queueVerifyJobs(db, site, decision.monitorIds, decision.roundAt);
         break;
-      }
-      if (decision.kind === 'none' && decision.relapse) {
-        summary.relapses += 1;
-        console.warn(JSON.stringify({ event: 'relapse_not_alerted', site: site.id, incident: open?.id }));
       }
       for (const u of decision.unverified) {
         unverifiedMonitors.add(u.monitorId);
@@ -244,12 +257,25 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         db,
         site,
         decision,
-        open ? { id: open.id, monitorId: open.monitor_id } : null,
+        open
+          ? {
+              id: open.id,
+              state: open.state,
+              monitorId: open.monitor_id,
+              recoveredAt: open.recovered_at,
+              isFlapping: open.is_flapping,
+            }
+          : null,
         now,
         alertQueued,
         locations.length,
+        () => {
+          summary.relapses += 1;
+          summary.notified += 1;
+        },
       );
       if (applied) summary[applied] += 1;
+      if (applied && applied !== 'settled') summary.notified += 1;
       // The site note follows the latest judged round (OK + note, unverified, or none).
       const next = decision.note ?? null;
       if (next !== note) {
@@ -456,28 +482,26 @@ async function adminAlerts(
 /** PostgREST returns at most max_rows (1000) rows per request: read the window page by page. */
 export const CHECKS_PAGE = 1000;
 
-async function loadChecks(db: DbClient, monitorIds: string[], since: Date) {
+async function loadChecks(db: DbClient, since: Date) {
   const rows = [];
-  const seen = new Set<string>();
-  for (let from = 0; ; from += CHECKS_PAGE) {
-    const { data, error } = await db
-      .from('check_results')
-      .select(
-        'id, monitor_id, location, outcome, checked_at, attempt, status_code, error, response_ms, final_url, keyword_missing, keyword_forbidden',
-      )
-      .in('monitor_id', monitorIds)
-      .gte('checked_at', since.toISOString())
-      .order('checked_at', { ascending: false })
-      .order('id')
-      .range(from, from + CHECKS_PAGE - 1);
-    if (error) throw new Error(`check_results: ${error.message}`);
-    // Rows keep arriving while we page: a row pushed onto the next page must not count twice.
-    for (const row of data) {
-      if (row.id && seen.has(row.id)) continue;
-      if (row.id) seen.add(row.id);
-      rows.push(row);
-    }
-    if (data.length < CHECKS_PAGE) return rows;
+  // Keyset paging on (checked_at, id), newest first: a row arriving while we page can't shift
+  // another onto the next page, so nothing is read twice or skipped.
+  let after: { checked_at: string; id: string } | undefined;
+  for (;;) {
+    const { data, error } = await db.rpc('engine_checks', {
+      p_since: since.toISOString(),
+      p_limit: CHECKS_PAGE,
+      ...(after && { p_after_checked_at: after.checked_at, p_after_id: after.id }),
+    });
+    if (error) throw new Error(`engine_checks: ${error.message}`);
+    rows.push(...data);
+    const last = data.at(-1);
+    // Stop on an empty page, not a short one: a hosted max_rows under CHECKS_PAGE would otherwise
+    // end the read after its first page without an error (db-reviewer).
+    if (!last) return rows;
+    // A cursor that doesn't move would loop forever: stop (the rows are already in).
+    if (after && last.checked_at === after.checked_at && last.id === after.id) return rows;
+    after = { checked_at: last.checked_at, id: last.id };
   }
 }
 
@@ -531,12 +555,21 @@ async function apply(
   db: DbClient,
   site: SiteRow,
   d: Exclude<SiteDecision, { kind: 'wait' | 'verify' }>,
-  open: { id: string; monitorId: string | null } | null,
+  open: {
+    id: string;
+    state: string;
+    monitorId: string | null;
+    /** The last recovery: "was back for 5 min (03:19–03:24)" on DOWN AGAIN. */
+    recoveredAt: string | null;
+    isFlapping: boolean;
+  } | null,
   now: Date,
   alertQueued: boolean,
   /** Locations voting this run: the card's "3 of 3 locations". */
   reporting: number,
-): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | null> {
+  /** Counts the PROBLEM AGAIN a D-023 recovery queues in the same round. */
+  relapsed: () => void = () => {},
+): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | null> {
   const at = now.toISOString();
   const incidentId = open?.id ?? null;
   const judged = { p_monitors: monitorsJson(d, site), ...(d.status ? { p_status: d.status } : {}) };
@@ -573,6 +606,8 @@ async function apply(
           monitorUrl: ctx.monitorUrl,
           // "3 of 3 locations" on the card: the locations voting when it opened.
           reporting,
+          // A key page's parts, for the replies that name it (auto-resolved RECOVERED, §19.6).
+          ...keyPageContext(d.detail, ctx),
           ...(d.detail.kind === 'blocked' ? { verifier: d.detail.reason } : {}),
         },
         p_notify: !site.muted,
@@ -586,6 +621,7 @@ async function apply(
       if (!incidentId) return null;
       const { data, error } = await db.rpc('engine_escalate_incident', {
         p_incident_id: incidentId,
+        p_flapping: d.flapping,
         p_detected_at: d.confirmedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
         // When the outage started, apart from the PROBLEM before it (uptime, D-002 count from here).
@@ -599,6 +635,46 @@ async function apply(
       });
       if (error) throw new Error(`engine_escalate_incident: ${error.message}`);
       return data ? 'escalated' : null;
+    }
+
+    case 'relapse': {
+      if (!incidentId) return null;
+      // DOWN AGAIN / PROBLEM AGAIN in the incident's thread, Chat only (D-004, D-024). One
+      // state-guarded function: an overlapping run gets false and queues nothing.
+      const ctx = causeContext(site, d.monitorId);
+      const problem = d.detail
+        ? {
+            cause: formatProblemCause(d.detail, ctx),
+            summary: formatProblemSummary(d.detail, ctx),
+            detail: d.detail as unknown as Json,
+            monitorUrl: ctx.monitorUrl,
+            ...keyPageContext(d.detail, ctx),
+          }
+        : {};
+      const { data, error } = await db.rpc('engine_relapse_incident', {
+        p_incident_id: incidentId,
+        p_severity: d.severity,
+        p_trigger: d.trigger,
+        p_started_at: d.startedAt.toISOString(),
+        p_detected_at: d.detectedAt.toISOString(),
+        p_round_at: d.roundAt.toISOString(),
+        p_context: {
+          ...(d.down ? downContext({ ...d.down, monitorId: d.monitorId }, site) : problem),
+          startedAt: d.startedAt.toISOString(),
+          trigger: d.trigger,
+          ...(open ? { fromState: open.state } : {}),
+          ...(open?.recoveredAt ? { backSince: open.recoveredAt } : {}),
+          // The reply says "Now flapping …" only on the drop that tags it (ChatAlert 03:24).
+          ...(d.flapping && !open?.isFlapping ? { nowFlapping: true } : {}),
+          // "Still flapping" only while it is (≥ 3 changes in 30 min), not for a drop hours later.
+          ...(d.flapping ? { flapping: true } : {}),
+        },
+        p_flapping: d.flapping,
+        p_notify: !site.muted,
+        ...judged,
+      });
+      if (error) throw new Error(`engine_relapse_incident: ${error.message}`);
+      return data ? 'relapses' : null;
     }
 
     case 'open': {
@@ -634,11 +710,49 @@ async function apply(
           slowLimitMs:
             site.monitors.find((m) => m.id === open?.monitorId)?.slowThresholdMs ??
             TIER_CONFIG[site.tier].slowThresholdMs,
+          // The reply renders from its own facts: a relapse may clear the incident's before it goes.
+          recoveredAt: d.recoveredAt.toISOString(),
+          ...(d.autoResolve ? { autoResolved: true } : {}),
         },
         p_notify: !site.muted && alertQueued,
+        // Not-OK → OK only when every monitor is OK: D-023's partial recovery is no flip (D-024).
+        p_flip_ok: d.allOk,
+        p_auto_resolve: d.autoResolve,
+        // Flapping: one summary 15 min after the recovery instead of RECOVERED (spec §19.4).
+        p_hold_summary: d.holdSummary,
         ...judged,
       });
       if (error) throw new Error(`engine_recover_incident: ${error.message}`);
+      if (data && d.then) {
+        // D-023: the home page is back but a key page still fails — PROBLEM AGAIN right after the
+        // RECOVERED, from the same round (spec §19.7). Not a flip: the site never was fully OK.
+        const ctx = causeContext(site, d.then.monitorId);
+        const again = await db.rpc('engine_relapse_incident', {
+          p_incident_id: incidentId,
+          p_severity: 'problem',
+          p_trigger: d.then.trigger,
+          p_started_at: d.then.startedAt.toISOString(),
+          // At the recovery itself, so the timeline reads RECOVERED then PROBLEM AGAIN (engine review M1).
+          p_detected_at: d.recoveredAt.toISOString(),
+          p_round_at: d.roundAt.toISOString(),
+          p_context: {
+            cause: formatProblemCause(d.then.detail, ctx),
+            summary: formatProblemSummary(d.then.detail, ctx),
+            detail: d.then.detail as unknown as Json,
+            monitorUrl: ctx.monitorUrl,
+            ...keyPageContext(d.then.detail, ctx),
+            startedAt: d.then.startedAt.toISOString(),
+            trigger: d.then.trigger,
+            homeBackAt: d.recoveredAt.toISOString(),
+          },
+          p_flapping: false,
+          // With its RECOVERED or not at all: a muted alert gets no reply out of context (engine review L3).
+          p_notify: !site.muted && alertQueued,
+          ...judged,
+        });
+        if (again.error) throw new Error(`engine_relapse_incident: ${again.error.message}`);
+        if (again.data) relapsed();
+      }
       return data ? 'recovered' : null;
     }
 
@@ -658,11 +772,14 @@ async function apply(
   }
 }
 
+/** "/booking", "HTTP 404", "/booking → HTTP 404 (…)" for a key page's PROBLEM; nothing for the home page. */
+function keyPageContext(detail: ProblemDetail, ctx: ProblemCauseContext): Record<string, Json> {
+  const k = formatKeyPage(detail, ctx);
+  return k ? { keyPage: k } : {};
+}
+
 /** The DOWN alert's facts: the confirming checks, or the browser's verdict (blocked → page failed). */
-function downContext(
-  d: Extract<SiteDecision, { kind: 'open' | 'escalate' }>,
-  site: SiteRow,
-): Record<string, Json> {
+function downContext(d: DownFacts, site: SiteRow): Record<string, Json> {
   const timeoutMs = site.monitors.find((m) => m.id === d.monitorId)?.timeoutMs ?? 30_000;
   return d.verifyJobId
     ? {

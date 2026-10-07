@@ -9,6 +9,8 @@
 export type ChatState =
   | 'DOWN'
   | 'PROBLEM'
+  | 'DOWN AGAIN'
+  | 'PROBLEM AGAIN'
   | 'ESCALATED · L1'
   | 'ESCALATED · L2'
   | 'FYI · L3'

@@ -503,7 +503,7 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
     await clearAlerts();
   });
 
-  it('M1: unverified while the incident is in Needs root cause shows PROBLEM; the next OK round shows OK (S04a)', async () => {
+  it('M1: unverified while the incident is in Needs root cause → PROBLEM AGAIN, site PROBLEM; OK again once it recovers and settles (S04a, S04b)', async () => {
     await clearAlerts();
     await verifierPolled(null);
     const { siteId, monitorId } = await newSite('Relapse M1');
@@ -529,13 +529,19 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
     await judge(t(245));
     expect((await statusOf(siteId))?.status).toBe('problem');
     expect(await noteOf(siteId)).toBe('Blocked, not verified');
-    // The incident moving back is S04b's relapse; nothing new opens.
-    expect(await incidentsOf(siteId)).toEqual([expect.objectContaining({ state: 'needs_root_cause' })]);
+    // A relapse into the same incident (D-022, D-024): back to Unacked, PROBLEM AGAIN; nothing new opens.
+    const [inc] = await incidentsOf(siteId);
+    expect(inc).toMatchObject({ state: 'unacked' });
+    expect((await notificationsOf(inc!.id)).map((n) => n.template)).toContain('problem_again');
 
     await results(monitorId, okRound(240));
     await judge(t(305));
-    expect((await statusOf(siteId))?.status).toBe('ok');
+    // First OK round: RECOVERED; the site shows the drop's severity until the second (PRD §5).
+    expect((await statusOf(siteId))?.status).toBe('problem');
     expect(await noteOf(siteId)).toBeNull();
+    await results(monitorId, okRound(300));
+    await judge(t(365));
+    expect((await statusOf(siteId))?.status).toBe('ok');
     await beat('SIN', new Date());
     await beat('TYO', new Date());
     await clearAlerts();
@@ -878,5 +884,196 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
     await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     expect(post).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('relapse, flapping and auto-resolve (S04b, D-004, D-024)', () => {
+  // A timeline 20 min back, so a flapping site has room for its rounds (Tier 1: one a minute).
+  const B = M - 20 * 60_000;
+  const r = (round: number, sec = 0) => new Date(B + round * 60_000 + sec * 1000);
+  const ok = (round: number): ['SIN' | 'TYO', Outcome, Date][] => [
+    ['SIN', 'pass', r(round, 1)],
+    ['TYO', 'pass', r(round, 2)],
+  ];
+  const down = (round: number): ['SIN' | 'TYO', Outcome, Date, (1 | 2)?][] => [
+    ['SIN', 'fail', r(round, 1)],
+    ['TYO', 'fail', r(round, 2)],
+    ['SIN', 'fail', r(round, 31), 2],
+    ['TYO', 'fail', r(round, 32), 2],
+  ];
+  /** The engine at 50 s into the round, with SIN and TYO beating then. */
+  async function engineAt(round: number) {
+    await beat('SIN', r(round, 50));
+    await beat('TYO', r(round, 50));
+    return runEngine(db, r(round, 50));
+  }
+  const rowsOf = (incidentId: string) =>
+    must(
+      db
+        .from('notifications')
+        .select('id, template, channel, status, thread_key, hold_until, dedupe_key, error')
+        .eq('incident_id', incidentId)
+        .order('created_at'),
+    );
+  const incidentOf = async (siteId: string) =>
+    (
+      await must(
+        db
+          .from('incidents')
+          .select('id, state, severity, episode_severity, is_flapping, auto_resolved, resolved_at')
+          .eq('site_id', siteId),
+      )
+    )[0]!;
+
+  it('a relapse in Monitoring sends one DOWN AGAIN in the same thread, even when two runs overlap (Done-when 2)', async () => {
+    const { siteId, monitorId } = await newSite('Relapse');
+    await results(monitorId, down(0));
+    await engineAt(0);
+    await results(monitorId, ok(1));
+    await engineAt(1);
+    await results(monitorId, ok(2));
+    await engineAt(2);
+    expect((await incidentOf(siteId)).state).toBe('needs_root_cause');
+
+    await results(monitorId, down(3));
+    await beat('SIN', r(3, 50));
+    await beat('TYO', r(3, 50));
+    // The probe trigger and the cron judge the same round at the same time.
+    const [a, b] = await Promise.all([runEngine(db, r(3, 50)), runEngine(db, r(3, 50))]);
+    expect(a.relapses + b.relapses).toBe(1);
+
+    const inc = await incidentOf(siteId);
+    expect(inc).toMatchObject({ state: 'unacked', severity: 'down', is_flapping: true });
+    const again = (await rowsOf(inc.id)).filter((n) => n.template === 'down_again');
+    expect(again).toHaveLength(1);
+    expect(again[0]).toMatchObject({ channel: 'google_chat', thread_key: inc.id });
+    expect((await incidentsOf(siteId)).length).toBe(1);
+  });
+
+  it('while flapping no RECOVERED goes; one summary is held 15 min and a new drop cancels it (Done-when 3)', async () => {
+    const { siteId, monitorId } = await newSite('Flapping');
+    // 0 down · 1 back (RECOVERED) · 2 settle · 3 down (3rd change → flapping) · 4 back · 5 down · 6 back
+    const plan: ('down' | 'ok')[] = ['down', 'ok', 'ok', 'down', 'ok', 'down', 'ok'];
+    for (const [round, kind] of plan.entries()) {
+      await results(monitorId, kind === 'down' ? down(round) : ok(round));
+      await engineAt(round);
+    }
+    const inc = await incidentOf(siteId);
+    expect(inc).toMatchObject({ state: 'monitoring', is_flapping: true });
+    const rows = await rowsOf(inc.id);
+    expect(rows.filter((n) => n.template === 'recovered')).toHaveLength(1); // round 1 only
+    expect(rows.filter((n) => n.template === 'down_again')).toHaveLength(2);
+    const summaries = rows.filter((n) => n.template === 'flap_summary');
+    expect(summaries.map((n) => n.status)).toEqual(['cancelled', 'queued']);
+    expect(summaries[0]!.error).toBe('Superseded: down again');
+    // Held until 15 min after the last recovery (its first OK check).
+    expect(Date.parse(summaries[1]!.hold_until!)).toBe(r(6, 1).getTime() + 15 * 60_000);
+
+    // Delivery: nothing of the summary while it is held; once due, exactly one summary goes.
+    const post = vi.fn(async () => ({ ok: true as const, messageName: 'spaces/S/messages/M' }));
+    const deliver = async () => {
+      // One row per thread per pass (a thread leaves in order): enough passes for the backlog.
+      for (let pass = 0; pass < 8; pass += 1)
+        await dispatchNotifications(
+          {
+            db,
+            webhookUrl: 'https://chat.example.test/webhook',
+            email: undefined,
+            appUrl: 'https://monitor.example.test',
+            post,
+          },
+          { incidentId: inc.id },
+        );
+    };
+    const texts = () => (post.mock.calls as unknown as [string, { text: string }][]).map((c) => c[1].text);
+    const held = summaries[1]!.id;
+    await db
+      .from('notifications')
+      .update({ hold_until: new Date(Date.now() + 10 * 60_000).toISOString() })
+      .eq('id', held);
+    await deliver();
+    expect(texts().filter((x) => x.includes('stable 15 min'))).toEqual([]);
+    expect(texts().filter((x) => x.startsWith('DOWN AGAIN'))).toHaveLength(2);
+    await db
+      .from('notifications')
+      .update({ hold_until: new Date(Date.now() - 1000).toISOString() })
+      .eq('id', held);
+    await deliver();
+    expect(texts().filter((x) => x.includes('stable 15 min'))).toEqual([
+      `RECOVERED · Flapping ${run} · stable 15 min · flapped ×3, down 3 min in total · add a root cause`,
+    ]);
+  });
+
+  it('a PROBLEM that recovers in under 5 min with no ack is auto-resolved, and still gets RECOVERED (Done-when 4)', async () => {
+    const { siteId, monitorId } = await newSite('Short problem');
+    const { error } = await db.from('check_results').insert(
+      (['SIN', 'TYO'] as const).map((location, i) => ({
+        monitor_id: monitorId,
+        location,
+        outcome: 'pass' as const,
+        checked_at: r(0, 1 + i).toISOString(),
+        status_code: 200,
+        keyword_missing: ['Welcome'],
+        keyword_forbidden: [],
+      })),
+    );
+    if (error) throw new Error(error.message);
+    await engineAt(0);
+    expect(await incidentOf(siteId)).toMatchObject({ state: 'unacked', severity: 'problem' });
+
+    await results(monitorId, ok(1));
+    await engineAt(1);
+    const inc = await incidentOf(siteId);
+    expect(inc).toMatchObject({ state: 'resolved', auto_resolved: true, resolved_at: expect.any(String) });
+    expect((await rowsOf(inc.id)).filter((n) => n.template === 'recovered')).toHaveLength(1);
+  });
+
+  it('D-023: the home page back while /booking still fails → RECOVERED and PROBLEM AGAIN from the same round (spec §19.7)', async () => {
+    const { siteId, monitorId } = await newSite('Key page left');
+    const booking = await must(
+      db
+        .from('monitors')
+        .insert({
+          site_id: siteId,
+          type: 'http',
+          is_primary: false,
+          url: `https://${run}.example.test/booking`,
+        })
+        .select('id')
+        .single(),
+    );
+    created.monitors.push(booking.id);
+
+    await results(monitorId, down(0));
+    await results(booking.id, down(0));
+    await engineAt(0);
+    await results(monitorId, ok(1));
+    await results(booking.id, down(1));
+    await engineAt(1);
+    expect((await statusOf(siteId))?.status).toBe('problem');
+    const inc = await incidentOf(siteId);
+    expect(inc).toMatchObject({
+      state: 'unacked',
+      severity: 'down',
+      episode_severity: 'problem',
+      is_flapping: false,
+    });
+    expect((await rowsOf(inc.id)).filter((n) => n.channel === 'google_chat').map((n) => n.template)).toEqual([
+      'down',
+      'recovered',
+      'problem_again',
+    ]);
+
+    // The home page fails again while /booking's PROBLEM is open: DOWN AGAIN, never silence.
+    await results(monitorId, down(2));
+    await results(booking.id, down(2));
+    await engineAt(2);
+    expect((await rowsOf(inc.id)).filter((n) => n.channel === 'google_chat').map((n) => n.template)).toEqual([
+      'down',
+      'recovered',
+      'problem_again',
+      'down_again',
+    ]);
+    expect((await statusOf(siteId))?.status).toBe('down');
   });
 });

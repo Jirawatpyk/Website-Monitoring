@@ -17,7 +17,7 @@
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Done |
 | S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
-| S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Todo |
+| S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | In review |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
@@ -264,6 +264,13 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   4. A PROBLEM that recovers in under 5 min with no ack is auto-resolved (test).
   5. message-checker passes the relapse and flapping rows.
 - **Review:** engine-reviewer, message-checker, db-reviewer (notifications dedupe).
+- **Notes (evidence):** started 7 Oct 2026 ~13:00Z; staging verified 15:12Z. Rules per D-024; spec §19.4 / §19.6 / §19.7 and the ChatAlert / EmailAlert / PostIncident rows design added the same day (same-round D-023, auto-resolve counted from when the PROBLEM was flagged). Staging: migration `relapse_and_flapping` by `pnpm db:push:staging` before the code; `release.sh staging` (the VPS moved to one release folder per instance, OK'd by Tao; production restarted onto its own folder with the same build).
+  - **Done-when 1 ✓** `relapse.test.ts` "INC-0133 VOCA end to end": one `open`, DOWN AGAIN at 03:24 (now flapping), 03:38, 03:55; held summaries; 4 drops; 41 min; one ack. D-003 in "D-003: a PROBLEM passes through Monitoring and Needs root cause…". `pnpm --filter @dxt/engine test` (181).
+  - **Done-when 2 ✓** int test "a relapse in Monitoring sends one DOWN AGAIN in the same thread, even when two runs overlap"; pgTAP `relapse_and_flapping.test.sql` (second call false, one reply). Staging INC-0017: `down_again` Chat at 14:44:34 and 14:49:34 in the same Chat thread (`spaces/…/messages/OqryyVIBqL4.*`); card "DOWN AGAIN · Test target · was back for 2 min (21:42–21:44)" read in the Chat space.
+  - **Done-when 3 ✓** int test "while flapping no RECOVERED goes; one summary is held 15 min and a new drop cancels it" (delivery included). Staging INC-0017: the recovery at 14:47 held a summary until 15:02, cancelled at the drop at 14:49 ("Superseded: down again"); the recovery at 14:51 → one summary at 15:06:21 (Chat "RECOVERED · Test target · stable 15 min · flapped ×3, down 8 min in total · add a root cause", email in the thread).
+  - **Done-when 4 ✓** `relapse.test.ts` auto-resolve rows (4:59 → Resolved, 5:00 → Monitoring, acked / DOWN never); int test "a PROBLEM that recovers in under 5 min with no ack is auto-resolved"; staging INC-0018 keyword → `resolved`, `auto_resolved`, RECOVERED with no mention "resolved automatically" (Chat + email).
+  - **Done-when 5 ✓** message-checker: every row word for word against the boards; Mediums fixed (partial recovery while flapping never holds RECOVERED; AGAIN fallback email reaches the person it mentions, D-024); Lows fixed or carried to S08 / S10.
+  - Reviews: `/code-review high` (6: 5 fixed, 1 altitude fixed later with one `notified` count), engine-reviewer ×2 (H1 home page down again during a D-023 PROBLEM → DOWN AGAIN; M1 drops; L-items fixed or carried to S07 / S08), db-reviewer ×2 (H1 `engine_checks` generic-plan seq scan → plpgsql `execute`; M2–M4, L5–L6 fixed; L8 justified), security-reviewer (no High / Medium; Low staging folder → `mktemp`). `/verify` (Tao) PASS.
 
 ### S05 · Sites & monitors
 
@@ -302,12 +309,20 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   4. spec-checker passes the five boards; nav "Incidents" live.
 - **Review:** spec-checker, engine-reviewer (resolve gate), message-checker.
 - **Carried from S03 `/verify`:** an evidence job queued while the verifier was down is taken when it comes back (up to 15 min later), so its screenshot can show the recovered page. The Incident board's evidence card shows the capture time next to "Confirmed down"; skip or label a screenshot taken after `recovered_at`.
+- **Carried from S04b review:**
+  - A resolve made by hand inside a flapping incident's 15-min hold must cancel its held summary (`engine_cancel_flap_summary`); otherwise the summary posts after RESOLVED (db-reviewer L-a, engine-reviewer L4).
+  - The timeline orders RECOVERED before PROBLEM AGAIN when both have the same `at` (D-023, spec §19.7); `episodesOf` already does this.
+  - `incidents.auto_resolved` drives the hidden "N short PROBLEMs auto-resolved" filter.
 
 ### S08 · Escalation L0–L1 & response hours
 
 - **Scope:** FR-09a. `escalation_policies`, `escalation_steps` seeded for Tier 1 DOWN, Tier 2–3 DOWN, PROBLEM. Organisation settings table for response hours (one value for Tier 2–3, spec §14.14) and a company holidays table, seeded (UI in S17). Engine ladder: L0 at confirm, L1 at +15 min to backup + Tao minus anyone already paged; Tier 2–3 timers pause outside response hours and on holidays, resume 09:00; PROBLEM outside hours held until 09:00; reminders every 15 min (DOWN) / 60 min (PROBLEM) in the thread; ack stops L1. Escalation page: policies with L0–L1 editing and the guardrails that apply (§14.7: L0 pinned, ≥ +15 min, ≥ 1 channel).
 - **Boards:** Escalation (L0–L1) · **Tables:** escalation_policies, escalation_steps
 - **Depends on:** S07
+- **Carried from S04b review:**
+  - DOWN AGAIN / PROBLEM AGAIN mention the L0 person. That is the owner until on-call exists, so for Tier 1 at night it moves to the on-call person in S10 (message-checker L3).
+  - `engine_escalate_incident` resets `detected_at` (D-021), while a relapse keeps the original escalation clock (D-004). The ladder must not re-fire levels that already fired (engine-reviewer L1).
+  - Add "outside response hours · timers paused until 09:00" to DOWN AGAIN, and "Not yet — outside response hours" to the summary email's Acknowledged row (D-013).
 - **Done when:**
   1. Engine tests: INC-0142 → L1 at 10:03:41 (15 min after confirmed 09:48:41); a Tier 2 DOWN confirmed Thu 22:14 (like INC-0139) that stays down → L0 posted at once, L1 at Fri 09:15; the same on a company holiday → L1 on the next working day; ack at 10:07 → no L1.
   2. On staging, an unacknowledged DOWN posts `ESCALATED · L1` mentioning the backup with "Tao FYI" 15 min after confirm.

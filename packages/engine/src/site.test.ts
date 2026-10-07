@@ -249,14 +249,14 @@ describe('decideSite — only the primary monitor can make a site DOWN (spec §6
 });
 
 describe('decideSite — status while an incident is open (D-022, S03 engine M1)', () => {
-  it('M1: blocked and unverified while the incident is in Monitoring → PROBLEM shown, relapse flagged', () => {
+  it('M1: blocked and unverified while the incident is in Monitoring → PROBLEM AGAIN, site PROBLEM (D-022)', () => {
     const d = decideSite(
       site([monitor('home', all('blocked'))], { open: incident('monitoring'), okRounds: 1 }),
     );
     expect(d).toMatchObject({
-      kind: 'none',
-      okRounds: 0,
-      relapse: true,
+      kind: 'relapse',
+      severity: 'problem',
+      trigger: 'blocked_unverified',
       status: 'problem',
       note: UNVERIFIED_NOTE,
       unverified: [{ monitorId: 'home', reason: 'no_poll' }],
@@ -284,10 +284,9 @@ describe('decideSite — status while an incident is open (D-022, S03 engine M1)
     const problem = all('pass', 1, { keywordMissing: ['Fuji'], keywordForbidden: [] });
     const p = decideSite(site([monitor('home', problem)], { open: incident('unacked', 'problem') }));
     expect(p).toEqual(expect.objectContaining({ kind: 'none', status: 'problem' }));
-    expect(p).not.toHaveProperty('relapse');
-    // The outage ended, but a key page is still broken: no RECOVERED yet, and never below DOWN.
+    // The home page is still down, a key page broken too: no RECOVERED, never below DOWN.
     const d = decideSite(
-      site([monitor('home', all('pass')), monitor('booking', failed())], { open: incident('acknowledged') }),
+      site([monitor('home', failed()), monitor('booking', failed())], { open: incident('acknowledged') }),
     );
     expect(d).toMatchObject({ kind: 'none', status: 'down' });
   });
@@ -405,7 +404,7 @@ describe('decideSite — engine review S04a', () => {
 });
 
 describe('decideSite — engine review S04a round 2', () => {
-  it('a DOWN two locations confirmed isn’t held back while a DOWN incident is in Monitoring (relapse, S04b)', () => {
+  it('a DOWN two locations confirmed isn’t held back while a DOWN incident is in Monitoring (DOWN AGAIN)', () => {
     const two = [
       check('SIN', 'fail', 1),
       check('TYO', 'fail', 2),
@@ -416,6 +415,6 @@ describe('decideSite — engine review S04a round 2', () => {
     const d = decideSite(
       site([monitor('home', two)], { intervalSec: 60, now: at(35), open: incident('monitoring') }),
     );
-    expect(d).toMatchObject({ kind: 'none', relapse: true, status: 'down' });
+    expect(d).toMatchObject({ kind: 'relapse', severity: 'down', status: 'down' });
   });
 });

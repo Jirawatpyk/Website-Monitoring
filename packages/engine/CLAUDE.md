@@ -9,14 +9,15 @@ The status engine as pure functions: no I/O, no clock (`now` is always a paramet
 - `site.ts` (S04a, D-022) — `decideSite`, the step the runner calls: every monitor of a site judged on the same round, each to a verdict (OK, PROBLEM with its trigger and `ProblemDetail`, or — the primary only — DOWN; a key page caps at PROBLEM `key_page`). Site status = the worst verdict, never below an unrecovered incident's severity (S03 M1: a blocked round the verifier can't decide while the incident is in Monitoring shows PROBLEM, the next OK round shows OK); an incident recovers on the first round every monitor is OK. Carry state between rounds (`MonitorCarry`: slow streak, per-location failing-since, last verdict) comes from `monitor_status` and goes back in each decision's `monitors`. `decideMonitor` is the one-primary-monitor view kept for the S02a / S03 round tests.
 - `triggers.ts` (S04a) — the PROBLEM triggers as pure rules: slow (p50 of passing checks over the limit 3 rounds in a row), keyword (majority of the locations that checked), redirect (majority ending outside the monitor's base host / allowlist), key page 4xx, regional (one location failing ≥ 5 min while the round passes), faulty location per probe minute (`faultyLocations`, only with ≥ 3 monitors from that location).
 - `uptime.ts` — 1 − DOWN minutes / (window − maintenance), time-weighted across sites (spec §5).
+- S04b (D-004, D-023, D-024; spec §19.3–19.7): a new DOWN / PROBLEM on a recovered incident is `relapse` (DOWN AGAIN / PROBLEM AGAIN; a DOWN on a recovered PROBLEM incident stays `escalate`, D-021). Recovery and the status floor follow `episodeSeverity`: a DOWN drop ends when the home page answers again (D-023, `recover` with `allOk: false` and `then` = the PROBLEM AGAIN from the same round), a PROBLEM drop when every monitor is OK. Flapping: `isFlapping(flips, flipOk, at)` — flips are OK ↔ not-OK changes at incident steps, kept by the SQL functions; a flapping incident's `recover` has `holdSummary`. `recover.autoResolve`: a PROBLEM nobody acknowledged, cleared < 5 min after it was flagged (`detectedAt`, §19.6). `relapseState`, `episodesOf` / `episodeMinutes` (the drops of an incident, VOCA 41 min) in `lifecycle.ts`; the VOCA timeline end to end in `relapse.test.ts`.
 
-Still to build here, by slice (`docs/implementation-plan.md`): relapse (a decision now flagged `relapse` on a recovered incident) + flapping per D-004, and `autoResolves` wired → **S04b**; 60-min PROBLEM reminders with the ladder; escalation ladder timing with response hours and holidays (spec §8, §14.1) → **S08**, L2–L3 + on-call → **S10**; client-update track wiring → **S11**; SSL / domain thresholds → **S13**.
+Still to build here, by slice (`docs/implementation-plan.md`): 60-min PROBLEM reminders with the ladder; escalation ladder timing with response hours and holidays (spec §8, §14.1) → **S08**, L2–L3 + on-call → **S10**; client-update track wiring → **S11**; SSL / domain thresholds → **S13**.
 
 Contract notes for the engine cron route:
 
 - Evaluate the immediate recheck with `evaluateRound({ …, after: <first failing check time> })` so only fresh rechecks vote.
 - `siteUptime` expects `downMinutes` already excluding minutes inside maintenance windows.
-- `autoResolves` is called at recovery with minutes from first failed check to first OK round.
+- `autoResolves` is called at recovery with minutes from when the PROBLEM was flagged (`detected_at`) to its first OK check (spec §19.6).
 
 ## Settled decisions (`docs/decisions.md` — don't change without a new decision record)
 
