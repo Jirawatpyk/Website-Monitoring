@@ -2,19 +2,25 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fakeDb as baseFakeDb } from '../../../test/fake-db';
 
-// Both Vercel locations are active, as on staging.
-const fakeDb = (results: Parameters<typeof baseFakeDb>[0] = {}) =>
-  baseFakeDb({ 'probe_locations.select': { data: [{ code: 'SIN' }, { code: 'TYO' }] }, ...results });
 import { runEngine } from './run-engine';
 
 const now = new Date('2026-10-06T10:01:05Z');
+// Both Vercel locations active and beating, as on staging before Bangkok's agent runs.
+const beating = [
+  { code: 'SIN', last_heartbeat_at: '2026-10-06T10:00:50Z' },
+  { code: 'TYO', last_heartbeat_at: '2026-10-06T10:00:30Z' },
+];
+const fakeDb = (results: Parameters<typeof baseFakeDb>[0] = {}) =>
+  baseFakeDb({ 'probe_locations.select': { data: beating }, ...results });
 const at = (sec: number) => new Date(Date.parse('2026-10-06T10:00:00Z') + sec * 1000).toISOString();
 
 const monitor = (over: Record<string, unknown> = {}) => ({
   id: 'm1',
+  url: 'https://tubtong.example.test',
+  must_contain: ['Tubtong'],
   timeout_ms: 10_000,
   site_id: 's1',
-  sites: { tier: 1, is_active: true, muted_until: null, ...over },
+  sites: { name: 'Tubtong', tier: 1, is_active: true, muted_until: null, ...over },
 });
 const row = (
   location: string,
@@ -57,6 +63,10 @@ describe('runEngine', () => {
       recovered: 0,
       settled: 0,
       relapses: 0,
+      verifying: 0,
+      unverified: 0,
+      alerts: 0,
+      escalated: 0,
     });
     expect(rpcCalls).toEqual([]);
   });
@@ -84,6 +94,33 @@ describe('runEngine', () => {
         },
       },
     ]);
+  });
+
+  it.each([
+    ['beating', '2026-10-06T10:00:40Z', []],
+    ['stopped 3 min ago', '2026-10-06T09:58:00Z', ['engine_record_round']],
+    ['never started', null, ['engine_record_round']],
+  ])('expects Bangkok only while its agent beats (D-019) — agent %s', async (_name, beat, rpcs) => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: ok },
+      'probe_locations.select': { data: [...beating, { code: 'BKK', last_heartbeat_at: beat }] },
+    });
+    // A beating agent that hasn't reported holds an OK round until its deadline; a stopped one doesn't.
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(rpcs);
+  });
+
+  it('a DOWN two locations confirmed is judged without waiting for a beating Bangkok (engine review M2)', async () => {
+    const { db } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: down },
+      'probe_locations.select': {
+        data: [...beating, { code: 'BKK', last_heartbeat_at: '2026-10-06T10:00:40Z' }],
+      },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ opened: 1 });
   });
 
   it('counts nothing when the site already had an open incident (the function returns null)', async () => {
@@ -195,7 +232,6 @@ describe('runEngine', () => {
       'monitors.select': { data: [monitor()] },
       'check_results.select': { data: down },
       'incidents.select': { data: [incident('needs_root_cause')] },
-      'probe_locations.select': { data: [{ code: 'SIN' }, { code: 'TYO' }] },
     });
     expect(await runEngine(db, now)).toMatchObject({ relapses: 1, opened: 0 });
     // Only the round is recorded: nothing opens and nothing alerts (D-004 is S04).

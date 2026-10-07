@@ -1,0 +1,9 @@
+{
+  "name": "dxt-agent-runtime",
+  "private": true,
+  "type": "module",
+  "description": "What /opt/dxt-agent needs next to dist/: the one npm dependency the bundle keeps external (deploy/install.md)",
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

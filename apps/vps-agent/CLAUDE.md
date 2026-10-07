@@ -1,9 +1,12 @@
 # apps/vps-agent
 
-Runs on the Thai VPS (2 GB, systemd unit in `deploy/`). Two jobs: the Bangkok probe loop (every minute) and the Playwright browser verifier.
+Runs on the Thai VPS (4 GB) as two systemd instances of one build, `dxt-agent@staging` and `dxt-agent@production` (D-019, `deploy/dxt-agent@.service`, install and release steps in `deploy/install.md`). Two jobs: the Bangkok probe loop (every minute) and the Playwright browser verifier.
 
 - Talks **only** to the web app's `/api/ingest` and `/api/jobs` with `INGEST_TOKEN`. It never gets a database key (PRD §10).
 - HTTP checks use `runHttpCheck` from `@dxt/probe` so Bangkok judges responses exactly like Singapore and Tokyo.
-- Verifier: plain Chromium, no stealth plugin, 20 s per page, at most 3 sessions, screenshots to Supabase Storage via the Job API (PRD §5).
-- Pings Healthchecks.io after every loop; a missed ping > 3 min emails Tao only (spec §15.3).
+- `src/probe-loop.ts`: on the UTC minute, `GET /api/ingest` for the due monitors, check them with the WAF header, post attempt 1 at the round's start, recheck failures ~30 s later and post attempt 2. The server stamps Bangkok's heartbeat; the engine expects BKK only while it beats (D-019).
+- `src/verifier.ts`: polls `GET /api/jobs` every 5 s (each poll is the verifier's heartbeat — 2 min silent = unavailable), at most `VERIFIER_MAX_SESSIONS` pages at once, plain Chromium (no stealth plugin, `src/browser.ts`), a fresh context per visit, 20 s per page (a browser challenge gets the rest of the 20 s). Verdicts: `loaded` (< 400 and every keyword), `blocked` (a WAF / challenge page in the browser too, `hasChallengeSignature` like the probes — PROBLEM, D-020), `failed` (DOWN). The JPEG goes to the signed upload URL that came with the lease; the server sets the path, the agent holds no Storage key. A verdict after the lease (60 s) is refused (409).
+- `deploy/package.json` is what `/opt/dxt-agent` installs next to `dist/` (Playwright only); a test keeps its version equal to this package's.
+- Pings Healthchecks.io: `HEALTHCHECKS_PING_URL_PROBE_BKK` after every probe round, `HEALTHCHECKS_PING_URL_VERIFIER` once a minute; a missed ping > 3 min emails Tao only (spec §15.3).
+- `src/index.ts` (loops, signals) and `src/browser.ts` (Playwright glue) are left out of coverage; the logic around them is tested with a fake API and browser.
 - `pnpm dev:agent` runs with `tsx watch`; `pnpm --filter @dxt/vps-agent build` bundles with tsup (workspace packages inlined).

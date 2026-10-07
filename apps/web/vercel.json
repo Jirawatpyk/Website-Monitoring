@@ -9,6 +9,7 @@
     { "path": "/api/cron/probe-sin", "schedule": "* * * * *" },
     { "path": "/api/cron/probe-tyo", "schedule": "* * * * *" },
     { "path": "/api/cron/engine", "schedule": "* * * * *" },
-    { "path": "/api/cron/notifier", "schedule": "* * * * *" }
+    { "path": "/api/cron/notifier", "schedule": "* * * * *" },
+    { "path": "/api/cron/housekeeping", "schedule": "30 20 * * *" }
   ]
 }

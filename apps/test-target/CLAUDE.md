@@ -3,8 +3,11 @@
 A switchable site for staging checks (S02a), deployed as its own Vercel project `dxt-test-target`
 (root `apps/test-target`) so it never depends on the app it helps test. Every path answers by the
 `mode` item in the Global Config (formerly Edge Config) store `dxt-test-target-global-config` connected to the project (env `GLOBAL_CONFIG`): `ok` → 200,
-`error` → 500, `timeout` → held 45 s (probe User-Agent only; anyone else gets 200 at once). Point the staging test monitor at it
-(`supabase/staging/test-target.sql`) and flip `mode` to trigger a DOWN / RECOVERED.
+`error` → 500, `timeout` → held 45 s (probe User-Agent only; anyone else gets 200 at once); S03 adds the blocked
+rounds for the browser verifier: `challenge` → a probe gets a Cloudflare-style 403 challenge, a browser the page (OK with
+the note), `challenge-down` → the probe is challenged and a browser gets 503 (DOWN), `challenge-all` → everyone is
+challenged (PROBLEM, D-020). Point the staging test monitor at it (`supabase/staging/test-target.sql`) and flip `mode`
+to trigger a DOWN / RECOVERED or a blocked round.
 
 No secrets, no data, no auth: it only says which mode it is in.
 

@@ -15,7 +15,7 @@
 | S01 | Foundation: schema, auth, app shell | 1 · P0 | M | — | S00 | 2 | Done |
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
-| S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Todo |
+| S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | In review |
 | S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
@@ -41,7 +41,7 @@
 | S24 | Public API & webhooks | 3 · P2 | M | FR-19 | G2 | 9–10 | Todo |
 | G3 | **Client-facing gate** | 3 | — | — | S20–S24 | end 10 | Todo |
 
-Every slice also meets the [Definition of Done](workflow.md#definition-of-done) (checks, reviews, no dead controls, docs updated). Each slice's **Review** line names the domain agents; `/code-review high` (step 6) and `/verify` (step 7, when the slice has a runtime surface) run on every slice in addition.
+Every slice also meets the [Definition of Done](workflow.md#definition-of-done) (checks, reviews, no dead controls, docs updated). Each slice's **Review** line names the domain agents; `/code-review high` (step 6, Claude) and `/verify` (step 7, typed by Tao, when the slice has a runtime surface) run on every slice in addition.
 
 ## Timeline
 
@@ -178,15 +178,25 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   3. **T03:** verifier stopped → a hard-fail site still goes DOWN on time; a blocked site shows PROBLEM (unverified) at once and the Admin is emailed.
   4. The Job API refuses a wrong token and an expired lease; Ingest refuses results > 5 min old (tests).
   5. A Storage lifecycle job removes screenshots older than 30 days (test or SQL check).
-  6. The VPS has every variable name from `apps/vps-agent/.env.example` set in `/etc/dxt-agent/env` (moved from S00 Done-when 3, D-010; names listed, values never shared).
+  6. The VPS has every variable name from `apps/vps-agent/.env.example` set in `/etc/dxt-agent/staging.env` and `/etc/dxt-agent/production.env`, one per agent instance (moved from S00 Done-when 3, D-010; two instances, D-019; names listed, values never shared).
 - **Review:** security-reviewer (Job API, Storage, VPS unit), db-reviewer (pgmq queues, leases), engine-reviewer.
 - **Carried from S02b review:** a round can be completed by Bangkok's result arriving through Ingest; Ingest must run the engine (`engineAndDeliver`) like a failing probe recheck does, or DOWN waits up to a minute for the engine cron (PRD §9: 30 s).
+- **Notes (evidence):** started 7 Oct 2026 03:15Z. Queue, PROBLEM (unverified) without its Chat card until S04, Admin alerts and the two agent instances per D-019; blocked in the browser too → PROBLEM per D-020; a PROBLEM that turns into an outage is raised to DOWN per D-021. Staging: migrations 0007-01/02/03 by `pnpm db:push:staging`; `dxt-agent@staging` on the VPS (VERIFIER_MAX_SESSIONS 1); Healthchecks `probe-bkk` + `browser-verifier` (staging project) both Up.
+  - **Done-when 1 ✓** Staging SQL 05:55Z: BKK, SIN and TYO each report every round (Test target, attempt 1, all `pass`). Agent stopped 06:00:26Z → rounds 06:10–06:11 show SIN + TYO only, mode `ok`, no incident opened and the open PROBLEM (INC-0008) recovered to Monitoring; agent restarted 06:12:44Z → BKK back from round 06:13. Engine tests: `expects Bangkok only while its agent beats` (run-engine.test.ts), `a stopped Bangkok agent leaves two voting` (monitor.test.ts), `a DOWN two locations confirmed is judged without waiting for a beating Bangkok`.
+  - **Done-when 2 ✓** Test target `challenge` 05:56:30Z → verify job for round 05:57 `done / loaded / HTTP 200`, screenshot `2026-10/048a6c82….jpg` stored, 5.6 s from job to verdict; `site_status` = `ok` with note "Automated check blocked by bot protection; verified via browser". Again after the blocked-check trigger (deploy `782a182`): job created 1.0 s after the round's last check, verdict 4 s later. Local run with real Chromium: same result + screenshot viewed.
+  - **Done-when 3 ✓ (T03)** Verifier (agent) stopped 06:00:26Z, Test target `error` 06:00:32Z → the open PROBLEM INC-0006 raised to DOWN (D-021) and DOWN sent 06:02:17.5Z email / 06:02:18.1Z Chat — **1 min 45 s** after the switch, 1.2 s / 1.8 s after the confirm. Blocked with the verifier stopped: INC-0008 `blocked_unverified / problem`, note "Blocked, not verified", no 10-min grace; the Admin "verifier unavailable" email (reason `not_picked_up`, site Test target) sent 06:02:17.9Z, one per outage; the alert cleared by itself 06:12:48Z when the verifier came back. D-020: `challenge-all` → INC-0006 `blocked_unverified / problem`, 0 messages, no Admin alert. Int tests: `verifier stopped: two blocked sites → PROBLEM (unverified) at once and one email per Admin`.
+  - **Done-when 4 ✓** Route tests `refuses a wrong token`, `refuses a verdict after the lease ran out with 409` (api/jobs/route.test.ts), `refuses a batch with a result more than 5 min old / ahead` (api/ingest/route.test.ts); pgTAP `a result after the lease ran out is refused` (verifier.test.sql); int test `a verdict after the lease ran out is refused` (pipeline.int.test.ts). Staging: a wrong token got 401 from both APIs (seen while the env was being set).
+  - **Done-when 5 ✓** `housekeeping.int.test.ts` on real local Storage: a screenshot back-dated 31 days is removed, a new one kept; unit tests in housekeeping.test.ts; daily cron `/api/cron/housekeeping` 20:30Z in vercel.json.
+  - **Done-when 6 ✓** `sed 's/=.*//' /etc/dxt-agent/staging.env` lists every name in `apps/vps-agent/.env.example` (values written by Tao, never shared; file root:root 0600). `production.env` is written when the production agent starts after the merge (deploy/install.md).
+  - `/verify` (Tao, 7 Oct 06:46–07:03Z, PASS): three locations voting; `challenge` → `loaded`, `ok` + note; clean T03 path with the verifier stopped and no open incident: `error` 06:59:12Z → INC-0010 `hard_fail` DOWN, email 07:01:18.4Z / Chat 07:01:18.8Z (**2 min 6 s**, 1.9 s / 2.3 s after the confirm); API probes: no / wrong token 401, stale result 422, empty batch 400, unknown job 409. Finding carried to S07 (evidence screenshot after a verifier outage).
+  - Reviews: security-reviewer (2 Medium + 4 Low fixed), db-reviewer (1 Medium + Lows fixed), engine-reviewer ×2 (H1, H2, N1 fixed; M2–M4, N2–N4 fixed; M1 carried to S04), a general code review by an agent (5 Medium + 5 Low fixed) and `/code-review high` (6 fixed, no High). Re-checked on staging after the last fixes (agent build `b1c9c25`): `challenge` → verify job `loaded` at 06:33:54Z. Found on staging and fixed: zod left external in the agent bundle, Node's dual-stack race timing out Healthchecks pings (no IPv6 route on the VPS), staging needing a redeploy after its env changed, blocked checks waiting for the engine cron.
 
 ### S04 · PROBLEM triggers, flapping & status rules
 
 - **Scope:** FR-03 complete. PROBLEM triggers: slow (p50 over the tier threshold 3 rounds), keyword must / must-not, key page 4xx / 5xx, regional (one location ≥ 5 min), redirect outside the allowlist. Only the primary monitor can make a site DOWN; `< 2` locations → Admin alert. Relapse + flapping (D-004). Wire the rules that already exist in `@dxt/engine` into the engine cron — `faultyLocations`, `isRegionalProblem`, `autoResolves`, the D-003 lifecycle — with integration tests. ChatAlert PROBLEM rows (the 60-min PROBLEM reminder belongs to S08). Test target gains keyword-missing and slow modes.
 - **Boards:** StatusModel · **Test plan:** T01 (the expiring-cert path finishes in S13)
 - **Carried from S02b review:** engine runs overlap (probe trigger + cron); relapse handling must be one state-guarded SQL function, or a relapse alerts once per run.
+- **Carried from S03 review (engine M1):** a blocked round the verifier can't decide while the site's incident is already open (e.g. in Monitoring / Needs root cause, site OK) records the round and the note "Blocked, not verified" but leaves `site_status` OK; S04's status rules must show it as PROBLEM (D-001) and clear it on the next OK round.
 - **Depends on:** S03
 - **Done when:**
   1. **T01:** each test-target mode gives the StatusModel outcome on staging — 200 → OK, 500 / timeout → DOWN, 403-challenge + loads → OK with note, keyword missing → PROBLEM (Keyword), slow 3 rounds → PROBLEM (Slow).
@@ -231,6 +241,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   3. A note appears on the timeline and as `NOTE · <site> · <name>: …` in the thread; RESOLVED goes to everyone who got the DOWN email, after the 10 s hold.
   4. spec-checker passes the five boards; nav "Incidents" live.
 - **Review:** spec-checker, engine-reviewer (resolve gate), message-checker.
+- **Carried from S03 `/verify`:** an evidence job queued while the verifier was down is taken when it comes back (up to 15 min later), so its screenshot can show the recovered page. The Incident board's evidence card shows the capture time next to "Confirmed down"; skip or label a screenshot taken after `recovered_at`.
 
 ### S08 · Escalation L0–L1 & response hours
 

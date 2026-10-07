@@ -67,6 +67,21 @@ describe('probeJob', () => {
       expect(await res.json()).toMatchObject({ ok: true, recheckFailed: 1, engine: { opened: 1 } });
     });
 
+    it('runs it when a check was blocked, so the verify job is queued at once (D-019)', async () => {
+      mocks.runProbe.mockResolvedValue({
+        ok: true,
+        checked: 1,
+        failed: 0,
+        rechecked: 0,
+        recheckFailed: 0,
+        blocked: 1,
+      });
+      mocks.engine.mockResolvedValue({ ok: true, verifying: 1 });
+      const { probeJob } = await import('./probe-job');
+      await probeJob('TYO', () => 1_000);
+      expect(mocks.engine).toHaveBeenCalledTimes(1);
+    });
+
     it('skips it when every recheck passed, or too little time is left', async () => {
       mocks.runProbe.mockResolvedValue({ ok: true, checked: 1, failed: 1, rechecked: 1, recheckFailed: 0 });
       const { probeJob } = await import('./probe-job');

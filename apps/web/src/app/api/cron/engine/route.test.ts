@@ -49,6 +49,21 @@ describe('GET /api/cron/engine', () => {
     expect(await res.json()).toMatchObject({ opened: 1, delivery: { sent: 1 } });
   });
 
+  it('sends an Admin alert about the verifier right away too (D-019)', async () => {
+    const { GET } = await import('./route');
+    mocks.runEngine.mockResolvedValue({
+      ok: true,
+      monitors: 1,
+      opened: 0,
+      recovered: 0,
+      settled: 0,
+      alerts: 1,
+    });
+    mocks.dispatch.mockResolvedValue({ ok: true, sent: 1, failed: 0 });
+    await GET(call(`Bearer ${TEST_ENV.CRON_SECRET}`));
+    expect(mocks.dispatch).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the engine green when sending fails: the notifier cron retries', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const { GET } = await import('./route');

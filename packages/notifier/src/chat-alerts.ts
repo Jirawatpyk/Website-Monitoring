@@ -81,8 +81,12 @@ export const plainName = (name: string) => name.replace(/[<>]/g, '');
 
 const mentionOf = (owner: ChatPerson | null) => (owner?.chatUserId ? [owner.chatUserId] : []);
 
+/**
+ * Card rows are plain text: a cause carries text from probes and the VPS (errors, verifier detail),
+ * and Chat renders tags in card text. `<` is escaped so no tag can start; "Timeout > 30 s" stays.
+ */
 const row = (topLabel: string, text: string): ChatWidget => ({
-  decoratedText: { topLabel, text, wrapText: true },
+  decoratedText: { topLabel, text: text.replace(/</g, '&lt;'), wrapText: true },
 });
 
 export function buildDownAlert(input: DownAlertInput): ChatMessage {

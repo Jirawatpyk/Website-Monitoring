@@ -1,7 +1,7 @@
 import type { DbClient } from '@dxt/db';
 
-type Op = 'select' | 'insert' | 'update' | 'upsert';
-type Result = { data?: unknown; error?: { message: string } | null };
+type Op = 'select' | 'insert' | 'update' | 'upsert' | 'delete';
+type Result = { data?: unknown; error?: { message: string; code?: string } | null; count?: number };
 
 export interface FakeCall {
   table: string;
@@ -19,11 +19,16 @@ export interface FakeCall {
 export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Result)> = {}) {
   const calls: FakeCall[] = [];
   const rpcCalls: { name: string; args: unknown }[] = [];
+  const storageCalls: { bucket: string; method: string; args: unknown[] }[] = [];
 
   const resolve = (key: string, call?: FakeCall): Result => {
     const r = results[key];
     const value = typeof r === 'function' ? r(call as FakeCall) : r;
-    return { data: value && 'data' in value ? value.data : [], error: value?.error ?? null };
+    return {
+      data: value && 'data' in value ? value.data : [],
+      error: value?.error ?? null,
+      count: value?.count ?? null,
+    } as Result;
   };
 
   const db = {
@@ -34,6 +39,10 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
         then(onFulfilled: (r: Result) => unknown, onRejected?: (e: unknown) => unknown) {
           return Promise.resolve(resolve(`${table}.${call.op}`, call)).then(onFulfilled, onRejected);
         },
+      };
+      builder.delete = () => {
+        call.op = 'delete';
+        return builder;
       };
       for (const op of ['insert', 'update', 'upsert'] as const) {
         builder[op] = (values: unknown) => {
@@ -51,6 +60,7 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
         'not',
         'gte',
         'lte',
+        'lt',
         'order',
         'range',
         'limit',
@@ -65,6 +75,24 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
       }
       return builder;
     },
+    /** `storage.from(bucket).<method>(...args)` resolves to `storage.<method>`; calls land in `storageCalls`. */
+    storage: {
+      from(bucket: string) {
+        return new Proxy(
+          {},
+          {
+            get:
+              (_t, method: string) =>
+              (...args: unknown[]) => {
+                storageCalls.push({ bucket, method, args });
+                return Promise.resolve(
+                  resolve(`storage.${method}`, { table: bucket, op: 'select', values: args, filters: [] }),
+                );
+              },
+          },
+        );
+      },
+    },
     rpc(name: string, args: unknown) {
       rpcCalls.push({ name, args });
       return Promise.resolve(
@@ -73,5 +101,5 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
     },
   };
 
-  return { db: db as unknown as DbClient, calls, rpcCalls };
+  return { db: db as unknown as DbClient, calls, rpcCalls, storageCalls };
 }

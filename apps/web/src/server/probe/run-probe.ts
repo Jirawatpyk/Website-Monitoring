@@ -1,8 +1,11 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { runHttpCheck, type HttpCheckRequest, type HttpCheckResult } from '@dxt/probe';
-import { TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
+import type { ProbeLocation } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
+import { loadDueMonitors, type DueMonitor } from './due-monitors';
+
+export { isDue } from './due-monitors';
 
 /** The Vercel region each cloud probe must run in (vercel.json `functions`). */
 export const PROBE_REGIONS = { SIN: 'sin1', TYO: 'hnd1' } as const satisfies Partial<
@@ -14,8 +17,6 @@ export type CloudLocation = keyof typeof PROBE_REGIONS;
 export const PROBE_BUDGET_MS = 85_000;
 /** The immediate recheck starts about 30 s after the scheduled check (PRD §5, spec §6). */
 export const RECHECK_DELAY_MS = 30_000;
-/** A response slower than 30 s is a failure (PRD §5); longer monitor timeouts are capped here. */
-export const MAX_CHECK_TIMEOUT_MS = 30_000;
 
 export interface ProbeDeps {
   db: DbClient;
@@ -32,19 +33,6 @@ export interface ProbeDeps {
   check?: (req: HttpCheckRequest) => Promise<HttpCheckResult>;
   clock?: () => number;
   sleep?: (ms: number) => Promise<void>;
-}
-
-interface DueMonitor {
-  id: string;
-  url: string;
-  method: 'GET' | 'HEAD';
-  timeoutMs: number;
-}
-
-/** Tier 1 every minute, Tier 2 every 3, Tier 3 every 5 (PRD §2), on the UTC minute. */
-export function isDue(tier: Tier, at: Date): boolean {
-  const everyMin = TIER_CONFIG[tier].intervalSec / 60;
-  return Math.floor(at.getTime() / 60_000) % everyMin === 0;
 }
 
 /**
@@ -107,24 +95,17 @@ export async function runProbe({
     .eq('code', location);
   if (beat.error) throw new Error(`heartbeat: ${beat.error.message}`);
 
-  return { ok: true, location, checked: first.length, failed: failed.length, rechecked, recheckFailed };
-}
-
-async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonitor[]> {
-  const { data, error } = await db
-    .from('monitors')
-    .select('id, url, method, timeout_ms, sites!inner(tier, is_active)')
-    .eq('is_primary', true)
-    .eq('sites.is_active', true);
-  if (error) throw new Error(`monitors: ${error.message}`);
-  return data
-    .filter((m) => isDue(m.sites.tier as Tier, at))
-    .map((m) => ({
-      id: m.id,
-      url: m.url,
-      method: m.method === 'HEAD' ? 'HEAD' : 'GET',
-      timeoutMs: Math.min(m.timeout_ms, MAX_CHECK_TIMEOUT_MS),
-    }));
+  // Blocked checks go to the browser verifier: the engine run this triggers queues the job (D-019).
+  const blocked = first.filter((r) => r.result.outcome === 'blocked').length;
+  return {
+    ok: true,
+    location,
+    checked: first.length,
+    failed: failed.length,
+    rechecked,
+    recheckFailed,
+    blocked,
+  };
 }
 
 async function insertResults(

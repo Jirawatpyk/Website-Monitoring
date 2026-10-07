@@ -1,5 +1,5 @@
 import 'server-only';
-import type { DbClient } from '@dxt/db';
+import type { DbClient, Json } from '@dxt/db';
 import {
   decideMonitor,
   lookbackMs,
@@ -12,15 +12,24 @@ import {
 import { formatCause } from '@dxt/notifier';
 import { TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
+import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per monitor per run: catches up after a missed run without running unbounded. */
 const MAX_ROUNDS_PER_RUN = 5;
 const OPEN_STATES_EXCLUDED = '("resolved","in_review","closed")';
+/**
+ * A round expects only the active locations whose probe beat this recently (D-019): a stopped VPS
+ * agent drops out of the vote at once instead of holding every round until its deadline.
+ */
+export const HEARTBEAT_FRESH_MS = 3 * 60_000;
 
 interface MonitorRow {
   id: string;
+  url: string;
+  mustContain: string[];
   timeoutMs: number;
   siteId: string;
+  siteName: string;
   tier: Tier;
   muted: boolean;
 }
@@ -32,6 +41,14 @@ export interface EngineSummary extends CronJobResult {
   settled: number;
   /** Confirmed DOWN while the site's incident is still open: no alert until D-004 (S04). */
   relapses: number;
+  /** Blocked rounds handed to the browser verifier this run. */
+  verifying: number;
+  /** Blocked rounds the verifier couldn't decide: PROBLEM (unverified) (D-001). */
+  unverified: number;
+  /** Admin alerts opened this run (their emails are queued). */
+  alerts: number;
+  /** Open PROBLEM incidents raised to DOWN (D-021); their DOWN alerts are queued. */
+  escalated: number;
 }
 
 /**
@@ -41,9 +58,24 @@ export interface EngineSummary extends CronJobResult {
  * harmless (one open incident per site, one message per incident).
  */
 export async function runEngine(db: DbClient, now: Date = new Date()): Promise<EngineSummary> {
-  const summary: EngineSummary = { ok: true, monitors: 0, opened: 0, recovered: 0, settled: 0, relapses: 0 };
+  const summary: EngineSummary = {
+    ok: true,
+    monitors: 0,
+    opened: 0,
+    recovered: 0,
+    settled: 0,
+    relapses: 0,
+    verifying: 0,
+    unverified: 0,
+    alerts: 0,
+    escalated: 0,
+  };
   const monitors = await loadMonitors(db, now);
-  if (!monitors.length) return summary;
+  if (!monitors.length) {
+    // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
+    summary.alerts = await adminAlerts(db, now, await loadVerifierState(db, [], now, now), new Map());
+    return summary;
+  }
   summary.monitors = monitors.length;
 
   const since = new Date(
@@ -51,23 +83,27 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   );
   const siteIds = monitors.map((m) => m.siteId);
 
-  const [checks, statuses, incidents, locations] = await Promise.all([
-    loadChecks(
-      db,
-      monitors.map((m) => m.id),
-      since,
-    ),
-    db.from('site_status').select('site_id, last_round_at, ok_rounds').in('site_id', siteIds),
+  const monitorIds = monitors.map((m) => m.id);
+  const [checks, statuses, incidents, locations, verifier] = await Promise.all([
+    loadChecks(db, monitorIds, since),
+    db.from('site_status').select('site_id, last_round_at, ok_rounds, note').in('site_id', siteIds),
     db
       .from('incidents')
       .select('id, site_id, state, severity, root_cause_category, notifications(template)')
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
-    db.from('probe_locations').select('code').eq('is_active', true),
+    db.from('probe_locations').select('code, last_heartbeat_at').eq('is_active', true),
+    loadVerifierState(db, monitorIds, since, now),
   ]);
   for (const r of [statuses, incidents, locations]) if (r.error) throw new Error(r.error.message);
-  const active = (locations.data ?? []).map((l) => l.code as ProbeLocation);
+  const active = (locations.data ?? [])
+    .filter(
+      (l) => !!l.last_heartbeat_at && now.getTime() - Date.parse(l.last_heartbeat_at) <= HEARTBEAT_FRESH_MS,
+    )
+    .map((l) => l.code as ProbeLocation);
 
+  /** Sites the verifier couldn't decide this run, with the reason it saw (D-019). */
+  const unverifiedSites = new Map<string, string>();
   for (const m of monitors) {
     const status = statuses.data?.find((st) => st.site_id === m.siteId);
     const open = incidents.data?.find((inc) => inc.site_id === m.siteId);
@@ -96,7 +132,10 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
             hasRootCause: !!open.root_cause_category && open.root_cause_category !== UNKNOWN_ROOT_CAUSE,
           } satisfies OpenIncident)
         : null,
+      verifications: verifier.jobs.get(m.id),
+      verifierAvailable: verifier.available,
     };
+    let note = status?.note ?? null;
     // RECOVERED only replies to a DOWN that was queued (not one held back by a mute, spec §15.1).
     const downQueued = !!open?.notifications.some((n) => n.template === 'down');
 
@@ -110,12 +149,89 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       }
       const applied = await apply(db, m, decision, open?.id ?? null, now, downQueued);
       if (applied) summary[applied] += 1;
-      if (decision.kind !== 'none') break;
+      if (decision.kind === 'verify') break;
+      // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
+      if (decision.kind === 'unverified' && decision.reason !== 'browser_blocked')
+        unverifiedSites.set(m.siteName, decision.reason);
+      // The site note follows the latest judged round (OK + note, unverified, or none).
+      const next = 'note' in decision ? (decision.note ?? null) : null;
+      if (next !== note) {
+        const noted = await db.rpc('engine_note_site', {
+          p_site_id: m.siteId,
+          p_round_at: decision.roundAt.toISOString(),
+          // No note clears it.
+          ...(next ? { p_note: next } : {}),
+        });
+        if (noted.error) throw new Error(`engine_note_site: ${noted.error.message}`);
+        note = next;
+      }
+      const roundOnly = decision.kind === 'none' || (decision.kind === 'unverified' && !!open);
+      if (!roundOnly) break;
       snapshot.lastRoundAt = decision.roundAt;
-      snapshot.okRounds = decision.okRounds;
+      snapshot.okRounds = 0;
+      if (decision.kind === 'none') snapshot.okRounds = decision.okRounds;
     }
   }
+
+  summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites);
   return summary;
+}
+
+/** The alert names the most telling reason seen this run. */
+const REASON_ORDER = ['no_poll', 'lease_expired', 'not_picked_up'] as const;
+/** An open "verifier unavailable" alert clears no sooner than this after it opened. */
+export const ALERT_SETTLE_MS = 10 * 60_000;
+
+/**
+ * Admin alerts about the verifier (D-001, D-019): unavailable while a blocked site waited (one
+ * email per outage, listing the sites) and more than 5 jobs queued. "Unavailable" clears once the
+ * verifier polls again with nothing stuck, no sooner than 10 min after it opened; the backlog when
+ * the queue is down to 5.
+ */
+async function adminAlerts(
+  db: DbClient,
+  now: Date,
+  verifier: Awaited<ReturnType<typeof loadVerifierState>>,
+  unverifiedSites: ReadonlyMap<string, string>,
+): Promise<number> {
+  let opened = 0;
+  const open = async (kind: string, context: Record<string, unknown>) => {
+    const { data, error } = await db.rpc('open_system_alert', {
+      p_kind: kind,
+      p_context: context as Json,
+    });
+    if (error) throw new Error(`open_system_alert: ${error.message}`);
+    if (data) opened += 1;
+  };
+  const clear = async (kind: string) => {
+    const { error } = await db.rpc('clear_system_alert', { p_kind: kind });
+    if (error) throw new Error(`clear_system_alert: ${error.message}`);
+  };
+
+  const down = verifier.openAlerts.get('verifier_unavailable');
+  if (unverifiedSites.size && !down) {
+    const seen = new Set(unverifiedSites.values());
+    await open('verifier_unavailable', {
+      sites: [...unverifiedSites.keys()].sort(),
+      reason: REASON_ORDER.find((r) => seen.has(r)) ?? 'no_poll',
+    });
+  } else if (
+    down &&
+    verifier.available &&
+    verifier.queued === 0 &&
+    !unverifiedSites.size &&
+    now.getTime() - down.openedAt.getTime() >= ALERT_SETTLE_MS
+  ) {
+    // Polling again with nothing stuck: clear, so the next outage emails again. Not before 10 min,
+    // so a verifier that keeps failing jobs can't open and clear it every round.
+    await clear('verifier_unavailable');
+  }
+
+  const behind = verifier.openAlerts.has('verifier_backlog');
+  if (verifier.queued > BACKLOG_ALERT_OVER && !behind)
+    await open('verifier_backlog', { queued: verifier.queued });
+  else if (verifier.queued <= BACKLOG_ALERT_OVER && behind) await clear('verifier_backlog');
+  return opened;
 }
 
 /** PostgREST returns at most max_rows (1000) rows per request: read the window page by page. */
@@ -141,14 +257,17 @@ async function loadChecks(db: DbClient, monitorIds: string[], since: Date) {
 async function loadMonitors(db: DbClient, now: Date): Promise<MonitorRow[]> {
   const { data, error } = await db
     .from('monitors')
-    .select('id, timeout_ms, site_id, sites!inner(tier, is_active, muted_until)')
+    .select('id, url, must_contain, timeout_ms, site_id, sites!inner(name, tier, is_active, muted_until)')
     .eq('is_primary', true)
     .eq('sites.is_active', true);
   if (error) throw new Error(`monitors: ${error.message}`);
   return data.map((m) => ({
     id: m.id,
+    url: m.url,
+    mustContain: m.must_contain,
     timeoutMs: m.timeout_ms,
     siteId: m.site_id,
+    siteName: m.sites.name,
     tier: m.sites.tier as Tier,
     muted: !!m.sites.muted_until && new Date(m.sites.muted_until) > now,
   }));
@@ -161,11 +280,84 @@ async function apply(
   incidentId: string | null,
   now: Date,
   downQueued: boolean,
-): Promise<'opened' | 'recovered' | 'settled' | null> {
+): Promise<'opened' | 'recovered' | 'settled' | 'verifying' | 'unverified' | 'escalated' | null> {
   const at = now.toISOString();
   switch (d.kind) {
     case 'wait':
       return null;
+
+    case 'verify': {
+      // One job per monitor and round (unique index): a second engine run's insert is a no-op.
+      const { error } = await db.from('verification_jobs').insert({
+        kind: 'verify',
+        monitor_id: m.id,
+        site_id: m.siteId,
+        round_at: d.roundAt.toISOString(),
+        url: m.url,
+        must_contain: m.mustContain,
+      });
+      if (error && error.code !== '23505') throw new Error(`verification_jobs: ${error.message}`);
+      return error ? null : 'verifying';
+    }
+
+    case 'escalate': {
+      if (!incidentId) return null;
+      const { data, error } = await db.rpc('engine_escalate_incident', {
+        p_incident_id: incidentId,
+        p_detected_at: d.confirmedAt.toISOString(),
+        p_round_at: d.roundAt.toISOString(),
+        // When the outage started, apart from the PROBLEM before it (uptime, D-002 count from here).
+        p_context: {
+          ...downContext(d, m.timeoutMs),
+          downStartedAt: d.downStartedAt.toISOString(),
+          escalated: true,
+        },
+        p_notify: !m.muted,
+      });
+      if (error) throw new Error(`engine_escalate_incident: ${error.message}`);
+      return data ? 'escalated' : null;
+    }
+
+    case 'unverified': {
+      if (d.reason === 'not_picked_up') {
+        // Judged without it: a late verdict mustn't land on this round or clear the alert.
+        const { error } = await db
+          .from('verification_jobs')
+          .update({ status: 'expired' })
+          .eq('monitor_id', m.id)
+          .eq('round_at', d.roundAt.toISOString())
+          .eq('status', 'queued');
+        if (error) throw new Error(`verification_jobs: ${error.message}`);
+      }
+      if (incidentId) {
+        // Already open: record the round; the incident keeps its own state and clock.
+        const { error } = await db.rpc('engine_record_round', {
+          p_site_id: m.siteId,
+          p_round_at: d.roundAt.toISOString(),
+          p_evaluated_at: at,
+          p_ok_rounds: 0,
+        });
+        if (error) throw new Error(`engine_record_round: ${error.message}`);
+        return 'unverified';
+      }
+      // PROBLEM (unverified) at once (D-001). Its Chat card comes with S04's PROBLEM rows (D-019).
+      const { error } = await db.rpc('engine_open_incident', {
+        p_site_id: m.siteId,
+        p_monitor_id: m.id,
+        p_trigger: 'blocked_unverified',
+        p_severity: 'problem',
+        p_started_at: d.startedAt.toISOString(),
+        p_detected_at: at,
+        p_round_at: d.roundAt.toISOString(),
+        p_context: {
+          cause: d.reason === 'browser_blocked' ? 'Blocked in the browser too' : 'Blocked, not verified',
+          verifier: d.reason,
+        },
+        p_notify: false,
+      });
+      if (error) throw new Error(`engine_open_incident: ${error.message}`);
+      return 'unverified';
+    }
 
     case 'none': {
       // Never moves the round back when another engine run (probe trigger, cron) got further.
@@ -190,10 +382,7 @@ async function apply(
         // When the last recheck confirmed it, not when this run noticed (PRD §9: alert within 30 s).
         p_detected_at: d.confirmedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
-        p_context: {
-          cause: formatCause(d.failing, m.timeoutMs),
-          confirmingLocations: d.failing.length,
-        },
+        p_context: downContext(d, m.timeoutMs),
         p_notify: !m.muted,
       });
       if (error) throw new Error(`engine_open_incident: ${error.message}`);
@@ -229,4 +418,18 @@ async function apply(
       return data ? 'settled' : null;
     }
   }
+}
+
+/** The DOWN alert's facts: the confirming checks, or the browser's verdict (blocked → page failed). */
+function downContext(
+  d: Extract<MonitorDecision, { kind: 'open' | 'escalate' }>,
+  timeoutMs: number,
+): Record<string, Json> {
+  return d.verifyJobId
+    ? {
+        cause: `Browser: page didn’t load${d.browserDetail ? ` (${d.browserDetail})` : ''}`,
+        confirmingLocations: d.failing.length,
+        verifyJobId: d.verifyJobId,
+      }
+    : { cause: formatCause(d.failing, timeoutMs), confirmingLocations: d.failing.length };
 }

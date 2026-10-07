@@ -14,7 +14,8 @@ export interface ResponseSnapshot {
   bodySample: string;
 }
 
-const CHALLENGE_STATUSES = new Set([403, 429, 503]);
+/** Statuses a WAF / challenge page answers with (the browser verifier waits on these too). */
+export const CHALLENGE_STATUSES: ReadonlySet<number> = new Set([403, 429, 503]);
 
 /**
  * Headers only a challenge / block response carries. Never match on `server: cloudflare` alone: every

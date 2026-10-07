@@ -3,8 +3,8 @@ import type { DbClient } from '@dxt/db';
 import { incidentThreadId, postChatMessage, sendEmail } from '@dxt/notifier';
 import { UNDO_WINDOW_SEC } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
-import { loadFacts, type Facts, type Notification } from './facts';
-import { renderChat, renderEmail } from './render';
+import { contextOf, loadFacts, type Facts, type Notification } from './facts';
+import { renderChat, renderEmail, renderSystemAlertEmail } from './render';
 
 export interface EmailConfig {
   apiKey: string;
@@ -160,7 +160,7 @@ async function dispatchChannel(
     // A Chat DOWN that hasn't left yet is old news once the incident moved on (acked, recovered):
     // the thread's latest reply must be the current status (ChatAlert), so it is dropped, not sent
     // late. The email still goes: it is each person's record of the incident (PRD §7).
-    const incident = facts.incidents.get(n.incident_id);
+    const incident = n.incident_id ? facts.incidents.get(n.incident_id) : undefined;
     const undoable =
       incident?.state === 'acknowledged' &&
       !!incident.acked_at &&
@@ -170,7 +170,10 @@ async function dispatchChannel(
       !undoable &&
       (n.template === 'down' || n.template === 'problem') &&
       incident &&
-      !WAITING_FOR_ACK.includes(incident.state)
+      !WAITING_FOR_ACK.includes(incident.state) &&
+      // A PROBLEM raised to DOWN: acknowledging "blocked, not verified" isn't acknowledging an
+      // outage, so its DOWN is posted even when the PROBLEM was acked (D-021).
+      contextOf(n.context).escalated !== true
     ) {
       const dropped = await db
         .from('notifications')
@@ -217,7 +220,7 @@ async function dispatchChannel(
     }
     summary[update.status === 'sent' ? 'sent' : update.status === 'queued' ? 'retrying' : 'failed'] += 1;
 
-    if (outcome.ok) {
+    if (outcome.ok && n.incident_id) {
       const event = await db.from('incident_events').insert({
         incident_id: n.incident_id,
         type: 'alerted',
@@ -226,6 +229,7 @@ async function dispatchChannel(
       if (event.error) throw new Error(`incident_events: ${event.error.message}`);
       continue;
     }
+    if (outcome.ok) continue;
     console.warn(
       JSON.stringify({
         event: 'delivery_failed',
@@ -264,8 +268,9 @@ async function release(db: DbClient, rows: readonly Notification[]): Promise<num
 }
 
 async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: Date): Promise<Outcome> {
-  const incident = facts.incidents.get(n.incident_id);
-  if (!incident) return { ok: false, error: 'Incident not found', retryable: false };
+  if (n.system_alert_id) return deliverSystemAlert(deps, n, facts);
+  const incident = n.incident_id ? facts.incidents.get(n.incident_id) : undefined;
+  if (!n.incident_id || !incident) return { ok: false, error: 'Incident not found', retryable: false };
 
   if (n.channel === 'google_chat') {
     const message = renderChat(n, incident, deps.appUrl, now);
@@ -291,6 +296,20 @@ async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: D
     threadId: incidentThreadId(n.incident_id, from),
     startsThread: !first || first.id === n.id,
   });
+  if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
+  const send = deps.send ?? sendEmail;
+  const result = await send(message, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });
+  return result.ok ? { ok: true, providerId: result.id } : result;
+}
+
+/** An Admin alert (D-019): email only, its own subject and thread, to an active Admin. */
+async function deliverSystemAlert(deps: DispatchDeps, n: Notification, facts: Facts): Promise<Outcome> {
+  const alert = facts.systemAlerts.get(n.system_alert_id!);
+  if (!alert) return { ok: false, error: 'System alert not found', retryable: false };
+  const to = n.channel === 'email' && n.user_id ? facts.recipients.get(n.user_id) : undefined;
+  if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
+  const { apiKey, from } = deps.email!;
+  const message = renderSystemAlertEmail(n, alert, from);
   if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
   const send = deps.send ?? sendEmail;
   const result = await send(message, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });

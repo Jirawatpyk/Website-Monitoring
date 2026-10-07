@@ -65,6 +65,8 @@ set search_path = ''
 as $$
 begin
   delete from public.notifications;
+  delete from public.system_alerts;
+  delete from public.verification_jobs;
   delete from public.incident_events;
   delete from public.incidents;
   delete from public.site_status;

@@ -30,6 +30,27 @@ describe('handle', () => {
     expect(res.status).toBe(200);
   });
 
+  const PROBE = 'DxT-Monitor/1.0';
+  const BROWSER = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 HeadlessChrome/140.0 Safari/537.36';
+  it.each([
+    ['challenge', PROBE, 403, true],
+    ['challenge', BROWSER, 200, false],
+    ['challenge-down', PROBE, 403, true],
+    ['challenge-down', BROWSER, 503, false],
+    ['challenge-all', PROBE, 403, true],
+    ['challenge-all', BROWSER, 403, true],
+  ])('%s: %s gets %i (S03, D-020)', async (mode, userAgent, status, challenged) => {
+    const res = await handle({ readMode: async () => mode, userAgent });
+    expect(res.status).toBe(status);
+    expect(res.headers.get('cf-mitigated')).toBe(challenged ? 'challenge' : null);
+    if (challenged) expect(await res.text()).toContain('Just a moment...');
+  });
+
+  it('the challenge mode page has the title a monitor keyword can look for', async () => {
+    const res = await handle({ readMode: async () => 'challenge', userAgent: BROWSER });
+    expect(await res.text()).toContain('<h1>Test target</h1>');
+  });
+
   it('really waits with the default sleep', async () => {
     vi.useFakeTimers();
     const pending = handle({ readMode: async () => 'timeout', userAgent: 'DxT-Monitor/1.0' });

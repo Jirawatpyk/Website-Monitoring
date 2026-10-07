@@ -3,7 +3,9 @@ import {
   buildAcknowledgedEmail,
   buildDownEmail,
   buildRecoveredEmail,
+  buildSystemAlertEmail,
   EMAIL_FOOTER,
+  SYSTEM_EMAIL_FOOTER,
   incidentThreadId,
   type EmailBaseInput,
 } from './email-alerts';
@@ -147,5 +149,58 @@ describe('thread root and buttons per person', () => {
       /background:#18181b;border:1px solid #18181b;color:#ffffff;font-weight:600/,
     );
     expect(recovered({ reason: 'fallback' }).html).toMatch(/background:transparent;border:1px solid #8e8e97/);
+  });
+});
+
+describe('Admin alert about the browser verifier (D-001, D-019)', () => {
+  const openedAt = new Date('2026-10-07T03:14:20Z');
+  const alert = (over: Partial<Parameters<typeof buildSystemAlertEmail>[0]> = {}) =>
+    buildSystemAlertEmail({
+      alertId: 'a-1',
+      kind: 'verifier_unavailable',
+      openedAt,
+      sites: ['Tubtong', 'Cando Asia'],
+      reason: 'not_picked_up',
+      from: 'DxT Monitor <alerts@notify.example.test>',
+      ...over,
+    });
+
+  it('says the verifier is unavailable, what that means for blocked sites, and what to check', () => {
+    const m = alert();
+    expect(m.subject).toBe('DxT Monitor · Browser verifier unavailable');
+    expect(m.text).toMatch(/^VERIFIER UNAVAILABLE — The browser verifier is unavailable/);
+    expect(m.text).toContain('Blocked sites show PROBLEM (unverified) until it’s back');
+    expect(m.text).toContain('Hard fails still go DOWN on time.');
+    expect(m.text).toContain('Since: Wed 7 Oct 10:14');
+    expect(m.text).toContain('What we saw: A verification job wasn’t picked up within 30 s');
+    expect(m.text).toContain('Waiting: Tubtong, Cando Asia');
+    expect(m.text).toContain('You got this because you’re an Admin.');
+    expect(m.text).toContain(SYSTEM_EMAIL_FOOTER);
+    // No Chat thread to discuss it in, and no page to link to yet.
+    expect(m.text).not.toContain('Chat thread');
+    expect(m.html).not.toContain('<a href');
+    expect(m.headers).toEqual({ References: '<alert-a-1@notify.example.test>' });
+  });
+
+  it('names each reason, and the backlog', () => {
+    expect(alert({ reason: 'no_poll' }).text).toContain('hasn’t asked for work in 2 min');
+    expect(alert({ reason: 'lease_expired', sites: [] }).text).toContain('Waiting: No site right now');
+    const behind = alert({ kind: 'verifier_backlog', queued: 7, reason: undefined });
+    expect(behind.subject).toBe('DxT Monitor · Browser verifier falling behind');
+    expect(behind.text).toContain('More than 5 verification jobs are waiting');
+    expect(behind.text).toContain('Waiting: 7 jobs');
+  });
+
+  it('escapes site names in the HTML', () => {
+    expect(alert({ sites: ['<b>x</b>'] }).html).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+});
+
+describe('DOWN raised from an acknowledged PROBLEM (D-021)', () => {
+  it('says who has it and offers the incident, not an ack', () => {
+    const m = buildDownEmail({ ...base, confirmedAt, cause: CAUSE, confirmingLocations: 2, ackedBy: 'Arm' });
+    expect(m.text).toContain('Arm acknowledged it while it was a problem; it is now down.');
+    expect(m.text).not.toContain('Nobody has acknowledged');
+    expect(m.text).toContain('Open incident: https://monitor.example.test/incidents/inc-1');
   });
 });

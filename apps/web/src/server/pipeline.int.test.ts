@@ -9,6 +9,9 @@ import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Database, DbClient } from '@dxt/db';
 import { runEngine } from './engine/run-engine';
+import { engineAfterReport } from './engine/engine-and-deliver';
+import { storeBangkokResults } from './ingest/bangkok';
+import { completeJob, leaseJobs } from './verifier/jobs';
 import { dispatchNotifications } from './notifier/dispatch';
 
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
@@ -56,10 +59,10 @@ async function newSite(
   return { siteId: site.id, monitorId: monitor.id };
 }
 
-type Outcome = 'pass' | 'fail';
+type Outcome = 'pass' | 'fail' | 'blocked';
 async function results(
   monitorId: string,
-  rows: [location: 'SIN' | 'TYO', Outcome, at: Date, attempt?: 1 | 2][],
+  rows: [location: 'BKK' | 'SIN' | 'TYO', Outcome, at: Date, attempt?: 1 | 2][],
 ) {
   const { error } = await db.from('check_results').insert(
     rows.map(([location, outcome, at, attempt = 1]) => ({
@@ -68,7 +71,7 @@ async function results(
       outcome,
       checked_at: at.toISOString(),
       attempt,
-      status_code: outcome === 'fail' ? 500 : 200,
+      status_code: outcome === 'fail' ? 500 : outcome === 'blocked' ? 403 : 200,
     })),
   );
   if (error) throw new Error(error.message);
@@ -97,8 +100,21 @@ const downRound = (base = 0): ['SIN' | 'TYO', Outcome, Date, (1 | 2)?][] => [
   ['TYO', 'fail', t(base + 32), 2],
 ];
 
+/** The engine expects only locations that beat in the last 3 min (D-019). */
+async function beat(location: 'BKK' | 'SIN' | 'TYO', at: Date | null) {
+  const { error } = await db
+    .from('probe_locations')
+    .update({ last_heartbeat_at: at?.toISOString() ?? null })
+    .eq('code', location);
+  if (error) throw new Error(error.message);
+}
+
 beforeAll(async () => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
+  // SIN and TYO beating, Bangkok's agent not running — as on staging before S03.
+  await beat('SIN', new Date());
+  await beat('TYO', new Date());
+  await beat('BKK', null);
   clientId = (
     await must(
       db
@@ -112,6 +128,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.from('agent_heartbeats').delete().eq('name', 'verifier');
   const incidents = await must(db.from('incidents').select('id').in('site_id', created.sites));
   const ids = incidents.map((i) => i.id);
   await db.from('notifications').delete().in('incident_id', ids);
@@ -154,6 +171,73 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     // PRD §9's 30 s clock starts when the last recheck confirmed it (board: "Confirmed down 09:48:41").
     expect(new Date(incidents[0]!.detected_at).getTime()).toBe(t(32).getTime());
     expect(await notificationsOf(incidents[0]!.id)).toHaveLength(1);
+  });
+
+  it('Bangkok completes the round through Ingest: SIN confirmed, TYO passed, BKK fails twice last → DOWN in that request (S02b review)', async () => {
+    const { siteId, monitorId } = await newSite('Bangkok last');
+    await beat('BKK', new Date());
+    try {
+      await results(monitorId, [
+        ['SIN', 'fail', t(1)],
+        ['TYO', 'pass', t(2)],
+        ['SIN', 'fail', t(31), 2],
+      ]);
+      // Bangkok is beating but hasn't reported, and one failure isn't DOWN: the round waits for it.
+      await runEngine(db, t(65));
+      expect(await incidentsOf(siteId)).toHaveLength(0);
+
+      await storeBangkokResults(
+        db,
+        [
+          {
+            monitorId,
+            checkedAt: t(3).toISOString(),
+            outcome: 'fail',
+            statusCode: 500,
+            responseMs: 150,
+            ttfbMs: 90,
+            resolvedIp: null,
+            error: null,
+            attempt: 1,
+          },
+          {
+            monitorId,
+            checkedAt: t(33).toISOString(),
+            outcome: 'fail',
+            statusCode: 500,
+            responseMs: 150,
+            ttfbMs: 90,
+            resolvedIp: null,
+            error: null,
+            attempt: 2,
+          },
+        ],
+        new Date(),
+      );
+      // The Ingest route runs this after its response; the engine runs at the round's time here.
+      vi.spyOn(console, 'info').mockImplementation(() => {});
+      await engineAfterReport(db, {} as never, Date.now() + 30_000, 'ingest', (d) => runEngine(d, t(66)));
+
+      const incidents = await incidentsOf(siteId);
+      expect(incidents).toHaveLength(1);
+      expect(await notificationsOf(incidents[0]!.id)).toEqual([
+        expect.objectContaining({ template: 'down', status: 'queued' }),
+      ]);
+      const bkk = await must(
+        db
+          .from('check_results')
+          .select('location, attempt')
+          .eq('monitor_id', monitorId)
+          .eq('location', 'BKK')
+          .order('attempt'),
+      );
+      expect(bkk).toEqual([
+        { location: 'BKK', attempt: 1 },
+        { location: 'BKK', attempt: 2 },
+      ]);
+    } finally {
+      await beat('BKK', null);
+    }
   });
 
   it('only one location fails → no incident', async () => {
@@ -279,6 +363,162 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     ]);
   });
 });
+describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
+  const blockedRound = (): ['SIN' | 'TYO', Outcome, Date][] => [
+    ['SIN', 'blocked', t(1)],
+    ['TYO', 'blocked', t(2)],
+  ];
+  const verifierPolled = (at: Date | null) =>
+    at
+      ? db.from('agent_heartbeats').upsert({ name: 'verifier', last_seen_at: at.toISOString() })
+      : db.from('agent_heartbeats').delete().eq('name', 'verifier');
+  const noteOf = async (siteId: string) =>
+    (await must(db.from('site_status').select('note').eq('site_id', siteId).single())).note;
+  // Admin alerts are global: start and end each test with none open.
+  const clearAlerts = async () => {
+    const alerts = await must(db.from('system_alerts').select('id'));
+    await db
+      .from('notifications')
+      .delete()
+      .in(
+        'system_alert_id',
+        alerts.map((a) => a.id),
+      );
+    await db
+      .from('system_alerts')
+      .delete()
+      .in(
+        'id',
+        alerts.map((a) => a.id),
+      );
+  };
+  // Jobs of other sites in the queue would be leased too: keep each test to its own.
+  const onlyJobsOf = (monitorId: string) =>
+    db
+      .from('verification_jobs')
+      .update({ status: 'expired' })
+      .eq('status', 'queued')
+      .neq('monitor_id', monitorId);
+
+  it('blocked → a verify job → the VPS leases it, uploads the screenshot, page loaded → OK with the note', async () => {
+    await clearAlerts();
+    const { siteId, monitorId } = await newSite('Verified');
+    await results(monitorId, blockedRound());
+    await verifierPolled(new Date());
+
+    expect(await runEngine(db, t(65))).toMatchObject({ verifying: 1 });
+    expect(await incidentsOf(siteId)).toHaveLength(0);
+    await onlyJobsOf(monitorId);
+
+    const [job] = await leaseJobs(db, { max: 1, sessions: 0 }, new Date());
+    expect(job).toMatchObject({ kind: 'verify', url: `https://${run}.example.test` });
+    // The signed upload URL works without any key (the VPS holds none).
+    const put = await fetch(job!.upload!.url, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/jpeg' },
+      body: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]),
+    });
+    expect(put.ok).toBe(true);
+
+    expect(
+      await completeJob(db, {
+        jobId: job!.id,
+        result: 'loaded',
+        detail: null,
+        httpStatus: 200,
+        screenshot: true,
+      }),
+    ).toEqual({
+      ok: true,
+      kind: 'verify',
+    });
+    await runEngine(db, t(70));
+    expect(await incidentsOf(siteId)).toHaveLength(0);
+    expect(await noteOf(siteId)).toBe('Automated check blocked by bot protection; verified via browser');
+    const stored = await must(
+      db.from('verification_jobs').select('screenshot_path').eq('id', job!.id).single(),
+    );
+    const file = await db.storage.from('verifier-screenshots').download(stored.screenshot_path!);
+    expect(file.error).toBeNull();
+    await db.storage.from('verifier-screenshots').remove([stored.screenshot_path!]);
+
+    // A second verdict after the first is refused, like one after the lease (Done-when 4).
+    expect(
+      await completeJob(db, {
+        jobId: job!.id,
+        result: 'failed',
+        detail: null,
+        httpStatus: null,
+        screenshot: false,
+      }),
+    ).toEqual({
+      ok: false,
+    });
+  });
+
+  it('verifier stopped: two blocked sites → PROBLEM (unverified) at once and one email per Admin (T03)', async () => {
+    await clearAlerts();
+    await verifierPolled(null);
+    const a = await newSite('Blocked A');
+    const b = await newSite('Blocked B');
+    await results(a.monitorId, blockedRound());
+    await results(b.monitorId, blockedRound());
+
+    expect(await runEngine(db, t(65))).toMatchObject({ unverified: 2, alerts: 1 });
+    for (const site of [a, b]) {
+      expect(await incidentsOf(site.siteId)).toEqual([expect.objectContaining({ state: 'unacked' })]);
+      expect(await noteOf(site.siteId)).toBe('Blocked, not verified');
+    }
+    const [incident] = await must(db.from('incidents').select('trigger, severity').eq('site_id', a.siteId));
+    expect(incident).toEqual({ trigger: 'blocked_unverified', severity: 'problem' });
+
+    const alerts = await must(db.from('system_alerts').select('id, kind, context').is('cleared_at', null));
+    expect(alerts).toEqual([
+      expect.objectContaining({
+        kind: 'verifier_unavailable',
+        context: expect.objectContaining({
+          reason: 'no_poll',
+          sites: expect.arrayContaining([`Blocked A ${run}`, `Blocked B ${run}`]),
+        }),
+      }),
+    ]);
+    const admins = await must(db.from('profiles').select('id').eq('role', 'admin').eq('is_active', true));
+    const emails = await must(
+      db.from('notifications').select('user_id, template').eq('system_alert_id', alerts[0]!.id),
+    );
+    expect(emails).toHaveLength(admins.length);
+
+    // The next run (same outage) adds nothing.
+    expect(await runEngine(db, t(66))).toMatchObject({ alerts: 0 });
+    await clearAlerts();
+  });
+
+  it('a verdict after the lease ran out is refused (Done-when 4)', async () => {
+    const { monitorId } = await newSite('Lease');
+    await results(monitorId, blockedRound());
+    await verifierPolled(new Date());
+    await runEngine(db, t(65));
+    await onlyJobsOf(monitorId);
+    const [job] = await leaseJobs(db, { max: 1, sessions: 0 }, new Date());
+    await db
+      .from('verification_jobs')
+      .update({ lease_until: new Date(Date.now() - 1000).toISOString() })
+      .eq('id', job!.id);
+    expect(
+      await completeJob(db, {
+        jobId: job!.id,
+        result: 'loaded',
+        detail: null,
+        httpStatus: 200,
+        screenshot: false,
+      }),
+    ).toEqual({
+      ok: false,
+    });
+    await verifierPolled(null);
+  });
+});
+
 describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
   const webhookUrl = 'https://chat.example.test/webhook';
   const appUrl = 'https://monitor.example.test';

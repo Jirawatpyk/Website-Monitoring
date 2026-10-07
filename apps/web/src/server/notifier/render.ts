@@ -6,13 +6,21 @@ import {
   buildDownEmail,
   buildRecoveredAlert,
   buildRecoveredEmail,
+  buildSystemAlertEmail,
   type ChatMessage,
   type ChatPerson,
   type EmailBaseInput,
   type EmailMessage,
   type EmailReason,
+  type VerifierDownReason,
 } from '@dxt/notifier';
-import { contextOf, type IncidentFacts, type Notification, type Recipient } from './facts';
+import {
+  contextOf,
+  type IncidentFacts,
+  type Notification,
+  type Recipient,
+  type SystemAlertFacts,
+} from './facts';
 
 const person = (p: IncidentFacts['sites']['primary']): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
@@ -101,6 +109,8 @@ export function renderEmail(
         confirmedAt: new Date(i.detected_at),
         cause: str(ctx.cause, 'Hard fail'),
         confirmingLocations: num(ctx.confirmingLocations, 2),
+        // A PROBLEM raised to DOWN keeps its acknowledgement (D-021).
+        ackedBy: i.state === 'acknowledged' && i.acker ? i.acker.display_name : null,
       });
     case 'acknowledged':
       return buildAcknowledgedEmail({
@@ -121,6 +131,34 @@ export function renderEmail(
             ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
           })
         : null;
+    default:
+      return null;
+  }
+}
+
+const VERIFIER_DOWN_REASONS: readonly VerifierDownReason[] = ['no_poll', 'not_picked_up', 'lease_expired'];
+
+/** The Admin alert email for a claimed row (D-019), or null for a kind it doesn't know. */
+export function renderSystemAlertEmail(
+  n: Notification,
+  alert: SystemAlertFacts,
+  from: string,
+): EmailMessage | null {
+  const ctx = contextOf(alert.context);
+  const sites = Array.isArray(ctx.sites) ? ctx.sites.filter((s): s is string => typeof s === 'string') : [];
+  const reason = VERIFIER_DOWN_REASONS.find((r) => r === ctx.reason);
+  switch (n.template) {
+    case 'verifier_unavailable':
+    case 'verifier_backlog':
+      return buildSystemAlertEmail({
+        alertId: alert.id,
+        kind: n.template,
+        openedAt: new Date(alert.opened_at),
+        sites,
+        reason,
+        queued: num(ctx.queued, 0),
+        from,
+      });
     default:
       return null;
   }

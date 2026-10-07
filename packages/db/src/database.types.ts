@@ -23,7 +23,20 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "audit_log": {
+            "agent_heartbeats": {
+                  Row: {
+                    "created_at": string,"info": NonNullable<Json>,"last_seen_at": string,"name": string,"updated_at": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"info"?: NonNullable<Json>,"last_seen_at": string,"name": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"info"?: NonNullable<Json>,"last_seen_at"?: string,"name"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"audit_log": {
                   Row: {
                     "action": string,"actor_id": string | null,"after": Json | null,"at": string,"before": Json | null,"entity": string,"entity_id": string | null,"id": string
                   }
@@ -188,13 +201,13 @@ isOneToOne: false
                   ]
                 },"notifications": {
                   Row: {
-                    "attempts": number,"channel": Database["public"]['Enums']["notification_channel"],"context": NonNullable<Json>,"created_at": string,"error": string | null,"hold_until": string | null,"id": string,"incident_id": string,"next_retry_at": string | null,"provider_message_id": string | null,"sent_at": string | null,"status": Database["public"]['Enums']["notification_status"],"template": string,"thread_key": string | null,"updated_at": string,"user_id": string | null
+                    "attempts": number,"channel": Database["public"]['Enums']["notification_channel"],"context": NonNullable<Json>,"created_at": string,"error": string | null,"hold_until": string | null,"id": string,"incident_id": string | null,"next_retry_at": string | null,"provider_message_id": string | null,"sent_at": string | null,"status": Database["public"]['Enums']["notification_status"],"system_alert_id": string | null,"template": string,"thread_key": string | null,"updated_at": string,"user_id": string | null
                   }
                   Insert: {
-                    "attempts"?: number,"channel": Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id": string,"next_retry_at"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"template": string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "attempts"?: number,"channel": Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"next_retry_at"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template": string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "attempts"?: number,"channel"?: Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string,"next_retry_at"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"template"?: string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "attempts"?: number,"channel"?: Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"next_retry_at"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template"?: string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -202,6 +215,12 @@ isOneToOne: false
       columns: ["incident_id"]
 isOneToOne: false
       referencedRelation: "incidents"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "notifications_system_alert_id_fkey"
+      columns: ["system_alert_id"]
+isOneToOne: false
+      referencedRelation: "system_alerts"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "notifications_user_id_fkey"
@@ -287,6 +306,50 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"system_alerts": {
+                  Row: {
+                    "cleared_at": string | null,"context": NonNullable<Json>,"created_at": string,"id": string,"kind": string,"opened_at": string,"updated_at": string
+                  }
+                  Insert: {
+                    "cleared_at"?: string | null,"context"?: NonNullable<Json>,"created_at"?: string,"id"?: string,"kind": string,"opened_at"?: string,"updated_at"?: string
+                  }
+                  Update: {
+                    "cleared_at"?: string | null,"context"?: NonNullable<Json>,"created_at"?: string,"id"?: string,"kind"?: string,"opened_at"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"verification_jobs": {
+                  Row: {
+                    "attempts": number,"completed_at": string | null,"created_at": string,"detail": string | null,"http_status": number | null,"id": string,"incident_id": string | null,"kind": string,"lease_until": string | null,"monitor_id": string,"must_contain": (string)[],"result": string | null,"round_at": string | null,"screenshot_path": string | null,"site_id": string,"status": string,"updated_at": string,"url": string
+                  }
+                  Insert: {
+                    "attempts"?: number,"completed_at"?: string | null,"created_at"?: string,"detail"?: string | null,"http_status"?: number | null,"id"?: string,"incident_id"?: string | null,"kind": string,"lease_until"?: string | null,"monitor_id": string,"must_contain"?: (string)[],"result"?: string | null,"round_at"?: string | null,"screenshot_path"?: string | null,"site_id": string,"status"?: string,"updated_at"?: string,"url": string
+                  }
+                  Update: {
+                    "attempts"?: number,"completed_at"?: string | null,"created_at"?: string,"detail"?: string | null,"http_status"?: number | null,"id"?: string,"incident_id"?: string | null,"kind"?: string,"lease_until"?: string | null,"monitor_id"?: string,"must_contain"?: (string)[],"result"?: string | null,"round_at"?: string | null,"screenshot_path"?: string | null,"site_id"?: string,"status"?: string,"updated_at"?: string,"url"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "verification_jobs_incident_id_fkey"
+      columns: ["incident_id"]
+isOneToOne: false
+      referencedRelation: "incidents"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "verification_jobs_monitor_id_fkey"
+      columns: ["monitor_id"]
+isOneToOne: false
+      referencedRelation: "monitors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "verification_jobs_site_id_fkey"
+      columns: ["site_id"]
+isOneToOne: false
+      referencedRelation: "sites"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -305,11 +368,12 @@ isOneToOne: false
 "error": string | null,
 "hold_until": string | null,
 "id": string,
-"incident_id": string,
+"incident_id": string | null,
 "next_retry_at": string | null,
 "provider_message_id": string | null,
 "sent_at": string | null,
 "status": Database["public"]['Enums']["notification_status"],
+"system_alert_id": string | null,
 "template": string,
 "thread_key": string | null,
 "updated_at": string,
@@ -321,8 +385,71 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"claim_verification_jobs":
+{ Args: { "p_limit"?: number }; Returns: {
+              "attempts": number,
+"completed_at": string | null,
+"created_at": string,
+"detail": string | null,
+"http_status": number | null,
+"id": string,
+"incident_id": string | null,
+"kind": string,
+"lease_until": string | null,
+"monitor_id": string,
+"must_contain": (string)[],
+"result": string | null,
+"round_at": string | null,
+"screenshot_path": string | null,
+"site_id": string,
+"status": string,
+"updated_at": string,
+"url": string
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "verification_jobs"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
+"clear_system_alert":
+{ Args: { "p_kind": string }; Returns: boolean
+                           },
+"complete_verification_job":
+{ Args: { "p_detail"?: string,"p_http_status"?: number,"p_job_id": string,"p_result": string,"p_screenshot_path"?: string }; Returns: {
+              "attempts": number,
+"completed_at": string | null,
+"created_at": string,
+"detail": string | null,
+"http_status": number | null,
+"id": string,
+"incident_id": string | null,
+"kind": string,
+"lease_until": string | null,
+"monitor_id": string,
+"must_contain": (string)[],
+"result": string | null,
+"round_at": string | null,
+"screenshot_path": string | null,
+"site_id": string,
+"status": string,
+"updated_at": string,
+"url": string
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "verification_jobs"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
 "current_app_role":
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
+                           },
+"engine_escalate_incident":
+{ Args: { "p_context": Json,"p_detected_at": string,"p_incident_id": string,"p_notify": boolean,"p_round_at": string }; Returns: boolean
+                           },
+"engine_note_site":
+{ Args: { "p_note"?: string,"p_round_at": string,"p_site_id": string }; Returns: undefined
                            },
 "engine_open_incident":
 { Args: { "p_context": Json,"p_detected_at": string,"p_monitor_id": string,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
@@ -336,6 +463,9 @@ isOneToOne: false
 "engine_settle_incident":
 { Args: { "p_at": string,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_round_at": string,"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
                            },
+"expire_verification_jobs":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "hook_before_user_created":
 { Args: { "event": Json }; Returns: Json
                            },
@@ -346,6 +476,9 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "display_name": string,"email": string,"id": string,"role": Database["public"]['Enums']["app_role"],"status": string
             }[]
+                           },
+"open_system_alert":
+{ Args: { "p_context": Json,"p_kind": string }; Returns: string
                            },
 "owns_site":
 { Args: { "p_site_id": string }; Returns: boolean

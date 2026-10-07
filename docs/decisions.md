@@ -4,6 +4,9 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-021 | 7 Oct 2026 | A DOWN confirmed while the site's open incident is a PROBLEM raises that incident to DOWN (same incident and thread, DOWN alert sent, back to waiting for an ack if it had recovered); a DOWN incident's relapse stays D-004 / S04 | Gap — D-004 covers a site failing again, not a PROBLEM incident turning into an outage |
+| D-020 | 7 Oct 2026 | A blocked site that is blocked in the browser verifier too (a WAF or challenge page in plain Chromium) is PROBLEM (unverified), not DOWN; only a page that really fails in the browser (no answer, 4xx/5xx without a WAF signature, keyword missing) is DOWN | StatusModel "Blocked · browser: page fails → DOWN" read literally (PRD §5 "a plain browser blocked → PROBLEM, not hidden") |
+| D-019 | 7 Oct 2026 | S03 verifier: the queue is a `verification_jobs` table with leases (not pgmq); PROBLEM (unverified) opens the incident and emails the Admin in S03, its Chat card comes with S04's PROBLEM rows; Admin alerts not tied to an incident live in `system_alerts`; the VPS runs a staging and a production agent from one systemd template | PRD §10 "pgmq", StatusModel "Owner + Alerts Space" for blocked_unverified (until S04), plan S03 Done-when 6 `/etc/dxt-agent/env` |
 | D-018 | 7 Oct 2026 | One page-header rhythm and one phone shell: every page header is AURA `PageHeader` with 4 px between its parts, and a breadcrumb takes the eyebrow's place 4 px above it; phones get the boards' top bar (brand + avatar) now, the back arrow with S07 and BottomNav (four main sections) with S06, while the menu drawer stays for every other page | Board drift: breadcrumb gaps of 12 / 24 px and title → meta gaps of 6 / 10 px; AppShell's menu-only phone bar |
 | D-017 | 6 Oct 2026 | Alert emails thread on a stable incident id (`<inc-<id>@<sending domain>>` in `References`, plus `In-Reply-To` after a person's first email) instead of the first email's Message-ID | Spec §10 / EmailAlert "In-Reply-To / References set to the first message" |
 | D-016 | 6 Oct 2026 | S02b ack, email and fallback: an Admin acks any site and a Responder only sites they own (on-call rule in S10); when Chat fails after its last retry the fallback email goes to the backup and every Admin not already emailed; D-013's no-promise rule covers email and the ack page too (no escalation / client-update rows, no "webhooks" in the Undo line until their slices); `/incidents/[id]` is built in S02b with the MobileAck layout | EmailAlert / MobileAck boards' escalation and client-update copy, §16.8 "webhooks" (until their slices); MLogin "any Responder acks"; PRD §9 fallback audience (gap) |
@@ -22,6 +25,77 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-021 — A PROBLEM incident that turns into an outage becomes DOWN
+
+**Gap.** The engine-reviewer found it in S03 (H2). A site whose open incident is a PROBLEM can be confirmed DOWN. S03 makes such incidents common: a site blocked while the verifier is unavailable, or blocked in the browser too (D-001, D-020). D-004 joins a relapse to the open incident, but it is about the same severity, and S02a logs that case without alerting until S04. So the outage would pass silently: no DOWN alert, the site still PROBLEM. The go-live test (PRD §12) asks for the opposite: with the verifier off, a hard-fail site still goes DOWN on time.
+
+**Decision (7 Oct 2026, from the engine review).**
+- A confirmed DOWN, whether from hard fails or the browser failing a blocked page, while the open incident is a PROBLEM, raises that incident to DOWN. One SQL function (`engine_escalate_incident`, state-guarded) does all of this in one transaction:
+  - severity becomes DOWN;
+  - "Confirmed down" (`detected_at`) is set to the DOWN confirm;
+  - if the incident had recovered (Monitoring / Needs root cause), it goes back to Acknowledged if acked, else Unacked, as in D-004;
+  - the site's status becomes DOWN;
+  - the DOWN Chat post and the owner email are queued in the incident's thread.
+- A DOWN incident's own relapse is unchanged: D-004, built in S04.
+
+**Why.** An outage must never hide behind a weaker status (spec §11: a site shows its worst status). One incident per site keeps the history and the thread together, and the alert carries the DOWN facts.
+
+**Impact.** Migration `escalate_problem_to_down`, `@dxt/engine` decision `escalate`, `run-engine.ts`. The DOWN Chat post goes out even when the PROBLEM was already acknowledged: acknowledging "blocked, not verified" isn't acknowledging an outage (the notifier doesn't drop an escalated DOWN as superseded). The DOWN's own start, its first failed check, is kept in the alert context and the `escalated_to_down` event (`downStartedAt`): uptime (spec §5) and the client-update track (D-002, S11) count from there, not from the PROBLEM's `started_at`. S08 escalation timing counts from the new "Confirmed down".
+
+## D-020 — Blocked in the browser too: PROBLEM, not DOWN
+
+**Conflict.** The StatusModel row "Blocked · browser: page fails" says DOWN when "the page does not load or the keyword is missing". PRD §5 (browser verification) says the verifier uses plain Chromium with no stealth plugin, and that a plain browser that is blocked should be PROBLEM, not hidden, because real visitors may be blocked too. A WAF that blocks headless Chromium from the VPS (Bangkok Airways' Akamai 403, `docs/phase0/waf-captures.md`) would meet the board's literal reading and page the whole team for a site that is up.
+
+**Decision (7 Oct 2026, with Tao).** The verifier reports three verdicts:
+- `loaded`: the page answers below 400 and every keyword is found → OK with the note.
+- `blocked`: the browser gets a WAF or challenge page too (403 / 429 / 503 with a challenge signature, after giving a browser challenge the rest of the 20 s) → PROBLEM (unverified). The cause is "Blocked in the browser too". There is no "verifier unavailable" email, because the verifier works.
+- `failed`: anything else (no answer, timeout, 4xx / 5xx without a WAF signature, keyword missing) → DOWN, as the board says.
+
+**Why.** Each source keeps its intent. The board's DOWN covers a page that really fails. The PRD's rule covers a browser that is blocked: the problem is shown, but it never claims an outage. The allowlist (S00) stays the permanent fix.
+
+**Impact.** `verification_jobs.result` adds `blocked`; `@dxt/engine` `Verification` / `UnverifiedReason`; the runner's cause text and Admin-alert rule; `apps/vps-agent` `judgeVisit` (uses `hasChallengeSignature` from `@dxt/probe`, like the HTTP probes); test-target mode `challenge-all`.
+
+## D-019 — S03 browser verifier: queue, PROBLEM (unverified), Admin alerts, two agents
+
+**Conflict.** PRD §10 puts the verifier's jobs on pgmq. The StatusModel row "Blocked · verifier unavailable" notifies the owner and the Alerts Space, but the ChatAlert PROBLEM rows belong to S04. The "verifier unavailable" and "queue > 5" Admin alerts aren't about one incident, while `notifications.incident_id` is required. Plan S03 Done-when 6 names one env file, `/etc/dxt-agent/env`, for one agent; there is one VPS and two environments.
+
+**Decision (7 Oct 2026, with Tao).**
+- **Queue.** `verification_jobs` is the queue, claimed with `for update skip locked` and a 60 s lease, the same way `notifications` is (D-014). One row holds the job, its result and the screenshot path. A verify job is unique per monitor and round; an evidence job is unique per incident. pgmq stays available.
+- **Verifier unavailable** means any of these:
+  - no verifier poll (`GET /api/jobs`, every 5 s) for 2 min;
+  - the round's job still queued 30 s after it was created, while the verifier had a free session at its last poll (with every session busy it waits its turn, up to 2 min);
+  - its lease ran out without a result.
+
+  Each case → PROBLEM (unverified) in that round, within about 30 s of the round being judged (D-001: "at once"). The next blocked round queues a new job, so the check retries every round.
+- **PROBLEM (unverified) in S03:**
+  - opens a PROBLEM incident (trigger `blocked_unverified`, no Chat or email row);
+  - sets `site_status` to `problem` with the note "Blocked, not verified";
+  - emails every active Admin about the verifier.
+
+  The owner and Alerts Space card comes with S04's PROBLEM rows (the D-013 rule: alerts grow with their slices). No real site is probed on production before S04 (S02a notes), so nobody misses an alert.
+- **Blocked, then the browser fails → DOWN.** This is a normal DOWN incident (trigger `hard_fail`) with the usual Chat and email. It starts at the round's first check that didn't pass, and its screenshot is the verify job's. An evidence job is queued only when that screenshot is missing.
+- **Admin alerts.**
+  - `system_alerts` (kind, opened_at, cleared_at, context) holds alerts that aren't about one incident: `verifier_unavailable`, `verifier_backlog` (> 5 jobs queued). One open alert per kind, so one outage sends one email per Admin, not one per site or round.
+  - `notifications` takes either an `incident_id` or a `system_alert_id`.
+  - "Verifier unavailable" clears once the verifier polls again with nothing queued and no blocked site waiting, but no sooner than 10 min after it opened, so a verifier that keeps failing jobs can't open and close it every round. "Queue > 5" clears when the queue drops to ≤ 5. No "back up" email.
+- **Expected locations.** A round expects the active locations whose probe beat in the last 3 min. A stopped agent drops out of the vote instead of holding every round until the deadline. BKK is active from S03; it votes only while its agent beats.
+- **Two agents.** The VPS runs `dxt-agent@staging` and `dxt-agent@production` from one systemd template. Each reads `/etc/dxt-agent/<env>.env`. Verifier sessions: staging 1, production 3. The VPS has 4 GB.
+- **Screenshots.**
+  - Stored in the private bucket `verifier-screenshots`.
+  - The VPS uploads to a signed upload URL issued with the lease, so it never holds a Storage key.
+  - A daily cron deletes them through the Storage API after 30 days.
+
+**Why.**
+- **Queue.** A table gives the result, the audit trail, the dedupe and the queue count in one place, with the same pattern the notifier already uses. pgmq would still need a results table.
+- **Unavailable.** "At once" can't wait for a 2-min heartbeat gap, so a job nobody picks up counts as unavailable too.
+- **PROBLEM card in S04.** Building one PROBLEM card in S03 and the rest in S04 would split one board's rows across two reviews.
+- **Two agents.** Staging keeps a Bangkok vote and a verifier for the slices that follow.
+
+**Impact.**
+- Migrations: verifier and Admin alerts.
+- `packages/engine` (`decideMonitor` judges blocked rounds), `apps/web/src/server/engine`, `/api/ingest`, `/api/jobs`, `/api/cron/housekeeping`, `@dxt/notifier` (Admin alert email), `apps/vps-agent`, `apps/test-target` (challenge modes).
+- Plan S03 Done-when 6; S04 adds the PROBLEM (unverified) card.
 
 ## D-018 — Page header spacing and the phone shell
 

@@ -24,8 +24,8 @@ insert into public.monitors (id, site_id, type, is_primary, url) values
 -- ── Reference data and partitions ────────────────────────────────────────
 select results_eq(
   'select code from public.probe_locations where is_active order by code',
-  $$values ('SIN'), ('TYO')$$,
-  'SIN and TYO are active; Bangkok waits for the VPS agent (S03)'
+  $$values ('BKK'), ('SIN'), ('TYO')$$,
+  'all three locations are active; Bangkok votes while its agent beats (D-019)'
 );
 select is(
   (select count(*)::int from pg_inherits where inhparent = 'public.check_results'::regclass),
