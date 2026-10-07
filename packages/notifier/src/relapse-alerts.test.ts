@@ -263,9 +263,7 @@ describe('DOWN AGAIN by email — only as the fallback when Chat failed (D-016, 
       title: 'DOWN AGAIN · VOCA · was back for 5 min (03:19–03:24)',
       body: 'Joined INC-0133 — no new incident.',
     });
-    expect(e.html).toContain(
-      'DOWN AGAIN — VOCA · was back for 5 min (03:19–03:24) · same incident INC-0133',
-    );
+    expect(e.html).toContain('DOWN AGAIN — VOCA · was back for 5 min (03:19–03:24) · same incident INC-0133');
     expect(e.text).toContain('VOCA is down again');
     expect(e.text).toContain('couldn’t be delivered, so this email is the alert');
   });

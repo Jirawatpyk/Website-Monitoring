@@ -1,7 +1,14 @@
 import 'server-only';
+import { episodesOf, type Episode, type EpisodeEvent } from '@dxt/engine';
 import {
   buildAcknowledgedAlert,
   buildAcknowledgedEmail,
+  buildAgainAlert,
+  buildAgainEmail,
+  buildAutoResolvedAlert,
+  buildAutoResolvedEmail,
+  buildFlapSummaryAlert,
+  buildFlapSummaryEmail,
   buildDownAlert,
   buildDownEmail,
   buildProblemAlert,
@@ -14,6 +21,7 @@ import {
   type EmailBaseInput,
   type EmailMessage,
   type EmailReason,
+  type KeyPageFacts,
   type ProblemFacts,
   type VerifierDownReason,
 } from '@dxt/notifier';
@@ -42,6 +50,83 @@ function problemOf(i: IncidentFacts, ctx: Record<string, unknown> = {}): Problem
   // The engine stores the monitor's own limit with RECOVERED; the tier's otherwise.
   const own = typeof ctx.slowLimitMs === 'number' ? ctx.slowLimitMs : null;
   return { trigger: i.trigger, slowLimitMs: own ?? TIER_CONFIG[tier].slowThresholdMs };
+}
+
+const dateOf = (v: unknown): Date | null =>
+  typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : null;
+
+/** The incident's drops from its timeline (D-024): first failed check → recovery. */
+function dropsOf(i: IncidentFacts): Episode[] {
+  const events: EpisodeEvent[] = [];
+  for (const e of i.incident_events ?? []) {
+    const at = dateOf(e.at);
+    if (!at) continue;
+    const p = contextOf(e.payload);
+    const startedAt =
+      e.type === 'detected'
+        ? new Date(i.started_at)
+        : e.type === 'relapsed'
+          ? dateOf(p.startedAt)
+          : e.type === 'escalated_to_down'
+            ? dateOf(p.downStartedAt)
+            : null;
+    const severity = p.severity === 'down' || p.severity === 'problem' ? p.severity : null;
+    events.push({ type: e.type, at, startedAt, severity: e.type === 'detected' ? i.severity : severity });
+  }
+  return episodesOf(events);
+}
+
+/** The drop a RECOVERED row ends: its own recovery time, else the incident's latest. */
+function recoveryOf(i: IncidentFacts, ctx: Record<string, unknown>): { start: Date; end: Date } | null {
+  const end = dateOf(ctx.recoveredAt) ?? dateOf(i.recovered_at);
+  if (!end) return null;
+  const drop = dropsOf(i).find((d) => d.end && d.end.getTime() === end.getTime());
+  return { start: drop?.start ?? new Date(i.started_at), end };
+}
+
+function keyPageOf(v: unknown): KeyPageFacts | null {
+  const k = (v ?? {}) as Record<string, unknown>;
+  return typeof k.path === 'string' && typeof k.failure === 'string' && typeof k.cause === 'string'
+    ? { path: k.path, failure: k.failure, cause: k.cause }
+    : null;
+}
+
+/** The facts the incident opened with (its `detected` event). */
+const openedWith = (i: IncidentFacts) =>
+  contextOf(i.incident_events?.find((e) => e.type === 'detected')?.payload ?? null);
+
+/** DOWN AGAIN / PROBLEM AGAIN: who acts now, the drop, the incident's downtime before it. */
+function againAlert(n: Notification, i: IncidentFacts): ChatMessage {
+  const ctx = contextOf(n.context);
+  const droppedAt = dateOf(ctx.startedAt) ?? new Date(n.created_at);
+  const before = dropsOf(i).filter((d) => d.end && d.end <= droppedAt);
+  const minutesSoFar = before.reduce(
+    (sum, d) =>
+      sum + Math.max(1, Math.floor(d.end!.getTime() / 60_000) - Math.floor(d.start.getTime() / 60_000)),
+    0,
+  );
+  const acked = !!i.acked_at && !!i.acker;
+  return buildAgainAlert({
+    incidentId: i.id,
+    incidentNumber: i.number,
+    site: i.sites.name,
+    tier: i.sites.tier,
+    severity: n.template === 'down_again' ? 'down' : 'problem',
+    trigger: (typeof ctx.trigger === 'string' ? ctx.trigger : i.trigger) as IncidentFacts['trigger'],
+    // §19.3: whoever acts now — the person who acknowledged, else the L0 person (the owner).
+    mention: acked
+      ? { name: i.acker!.display_name, chatUserId: i.acker!.google_chat_user_id ?? null }
+      : person(i.sites.primary),
+    ackedBy: acked ? i.acker!.display_name : null,
+    fromState: str(ctx.fromState, 'monitoring'),
+    droppedAt,
+    backSince: dateOf(ctx.backSince),
+    minutesSoFar,
+    nowFlapping: ctx.nowFlapping === true,
+    flapping: ctx.flapping === true,
+    summary: typeof ctx.summary === 'string' ? ctx.summary : null,
+    homeBack: ctx.homeBackAt ? keyPageOf(ctx.keyPage) : null,
+  });
 }
 
 /** The cause line stored when the incident opened (its `detected` event). */
@@ -103,18 +188,45 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
         problem: problemOf(i),
       });
-    case 'recovered':
-      return i.recovered_at
-        ? buildRecoveredAlert({
+    case 'recovered': {
+      const drop = recoveryOf(i, ctx);
+      if (!drop) return null;
+      if (ctx.autoResolved === true) {
+        return buildAutoResolvedAlert({
+          incidentId: i.id,
+          site: i.sites.name,
+          flaggedAt: new Date(i.detected_at),
+          recoveredAt: drop.end,
+          okLocations: num(ctx.okLocations, 2),
+          problem: problemOf(i, ctx) ?? { trigger: i.trigger },
+          keyPage: keyPageOf(openedWith(i).keyPage),
+        });
+      }
+      return buildRecoveredAlert({
+        incidentId: i.id,
+        site: i.sites.name,
+        startedAt: drop.start,
+        recoveredAt: drop.end,
+        okLocations: num(ctx.okLocations, 2),
+        owner: person(i.sites.primary),
+        problem: problemOf(i, ctx),
+      });
+    }
+    case 'down_again':
+    case 'problem_again':
+      return againAlert(n, i);
+    case 'flap_summary': {
+      const drops = dropsOf(i).flatMap((d) => (d.end ? [{ start: d.start, end: d.end }] : []));
+      return drops.length
+        ? buildFlapSummaryAlert({
             incidentId: i.id,
             site: i.sites.name,
-            startedAt: new Date(i.started_at),
-            recoveredAt: new Date(i.recovered_at),
-            okLocations: num(ctx.okLocations, 2),
+            severity: i.severity,
             owner: person(i.sites.primary),
-            problem: problemOf(i, ctx),
+            drops,
           })
         : null;
+    }
     default:
       return null;
   }
@@ -177,18 +289,54 @@ export function renderEmail(
         startedAt: new Date(i.started_at),
         confirmedAt: new Date(i.detected_at),
       });
-    case 'recovered':
-      return i.recovered_at
-        ? buildRecoveredEmail({
+    case 'recovered': {
+      const drop = recoveryOf(i, ctx);
+      if (!drop) return null;
+      if (ctx.autoResolved === true) {
+        return buildAutoResolvedEmail({
+          ...base,
+          trigger: i.trigger,
+          flaggedAt: new Date(i.detected_at),
+          recoveredAt: drop.end,
+          cause: causeOf(i),
+          keyPage: keyPageOf(openedWith(i).keyPage),
+        });
+      }
+      return buildRecoveredEmail({
+        ...base,
+        startedAt: drop.start,
+        recoveredAt: drop.end,
+        okLocations: num(ctx.okLocations, 2),
+        owner: i.sites.primary?.display_name ?? null,
+        ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
+        problem: problemOf(i, ctx),
+      });
+    }
+    case 'flap_summary': {
+      const drops = dropsOf(i).flatMap((d) => (d.end ? [{ start: d.start, end: d.end }] : []));
+      return drops.length
+        ? buildFlapSummaryEmail({
             ...base,
-            startedAt: new Date(i.started_at),
-            recoveredAt: new Date(i.recovered_at),
-            okLocations: num(ctx.okLocations, 2),
+            severity: i.severity,
+            drops,
             owner: i.sites.primary?.display_name ?? null,
             ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
-            problem: problemOf(i, ctx),
           })
         : null;
+    }
+    // Only as the D-016 fallback when the Chat reply failed: the reply's own words.
+    case 'down_again':
+    case 'problem_again': {
+      const chat = againAlert(n, i);
+      const card = chat.cardsV2[0]!.card;
+      const body = card.sections[0]?.widgets[0];
+      return buildAgainEmail({
+        ...base,
+        severity: n.template === 'down_again' ? 'down' : 'problem',
+        title: card.header.title,
+        body: body && 'textParagraph' in body ? body.textParagraph.text.replace(/&lt;/g, '<') : '',
+      });
+    }
     default:
       return null;
   }

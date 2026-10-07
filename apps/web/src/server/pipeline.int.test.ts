@@ -968,6 +968,40 @@ describe('relapse, flapping and auto-resolve (S04b, D-004, D-024)', () => {
     expect(summaries[0]!.error).toBe('Superseded: down again');
     // Held until 15 min after the last recovery (its first OK check).
     expect(Date.parse(summaries[1]!.hold_until!)).toBe(r(6, 1).getTime() + 15 * 60_000);
+
+    // Delivery: nothing of the summary while it is held; once due, exactly one summary goes.
+    const post = vi.fn(async () => ({ ok: true as const, messageName: 'spaces/S/messages/M' }));
+    const deliver = async () => {
+      // One row per thread per pass (a thread leaves in order): enough passes for the backlog.
+      for (let pass = 0; pass < 8; pass += 1)
+        await dispatchNotifications(
+          {
+            db,
+            webhookUrl: 'https://chat.example.test/webhook',
+            email: undefined,
+            appUrl: 'https://monitor.example.test',
+            post,
+          },
+          { incidentId: inc.id },
+        );
+    };
+    const texts = () => (post.mock.calls as unknown as [string, { text: string }][]).map((c) => c[1].text);
+    const held = summaries[1]!.id;
+    await db
+      .from('notifications')
+      .update({ hold_until: new Date(Date.now() + 10 * 60_000).toISOString() })
+      .eq('id', held);
+    await deliver();
+    expect(texts().filter((x) => x.includes('stable 15 min'))).toEqual([]);
+    expect(texts().filter((x) => x.startsWith('DOWN AGAIN'))).toHaveLength(2);
+    await db
+      .from('notifications')
+      .update({ hold_until: new Date(Date.now() - 1000).toISOString() })
+      .eq('id', held);
+    await deliver();
+    expect(texts().filter((x) => x.includes('stable 15 min'))).toEqual([
+      `RECOVERED · Flapping ${run} · stable 15 min · flapped ×3, down 3 min in total · add a root cause`,
+    ]);
   });
 
   it('a PROBLEM that recovers in under 5 min with no ack is auto-resolved, and still gets RECOVERED (Done-when 4)', async () => {

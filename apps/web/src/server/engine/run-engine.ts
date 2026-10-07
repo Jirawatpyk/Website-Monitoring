@@ -17,11 +17,12 @@ import {
 } from '@dxt/engine';
 import {
   formatCause,
+  formatKeyPage,
   formatProblemCause,
   formatProblemSummary,
   type ProblemCauseContext,
 } from '@dxt/notifier';
-import { TIER_CONFIG, type ProbeLocation, type Tier, type Trigger } from '@dxt/shared';
+import { TIER_CONFIG, type ProbeLocation, type ProblemDetail, type Tier, type Trigger } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
@@ -256,6 +257,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         open
           ? {
               id: open.id,
+              state: open.state,
               monitorId: open.monitor_id,
               recoveredAt: open.recovered_at,
               isFlapping: open.is_flapping,
@@ -543,6 +545,7 @@ async function apply(
   d: Exclude<SiteDecision, { kind: 'wait' | 'verify' }>,
   open: {
     id: string;
+    state: string;
     monitorId: string | null;
     /** The last recovery: "was back for 5 min (03:19–03:24)" on DOWN AGAIN. */
     recoveredAt: string | null;
@@ -589,6 +592,8 @@ async function apply(
           monitorUrl: ctx.monitorUrl,
           // "3 of 3 locations" on the card: the locations voting when it opened.
           reporting,
+          // A key page's parts, for the replies that name it (auto-resolved RECOVERED, §19.6).
+          ...keyPageContext(d.detail, ctx),
           ...(d.detail.kind === 'blocked' ? { verifier: d.detail.reason } : {}),
         },
         p_notify: !site.muted,
@@ -629,6 +634,7 @@ async function apply(
             summary: formatProblemSummary(d.detail, ctx),
             detail: d.detail as unknown as Json,
             monitorUrl: ctx.monitorUrl,
+            ...keyPageContext(d.detail, ctx),
           }
         : {};
       const { data, error } = await db.rpc('engine_relapse_incident', {
@@ -641,6 +647,8 @@ async function apply(
         p_context: {
           ...(d.down ? downContext({ ...d.down, monitorId: d.monitorId }, site) : problem),
           startedAt: d.startedAt.toISOString(),
+          trigger: d.trigger,
+          ...(open ? { fromState: open.state } : {}),
           ...(open?.recoveredAt ? { backSince: open.recoveredAt } : {}),
           // The reply says "Now flapping …" only on the drop that tags it (ChatAlert 03:24).
           ...(d.flapping && !open?.isFlapping ? { nowFlapping: true } : {}),
@@ -716,7 +724,9 @@ async function apply(
             summary: formatProblemSummary(d.then.detail, ctx),
             detail: d.then.detail as unknown as Json,
             monitorUrl: ctx.monitorUrl,
+            ...keyPageContext(d.then.detail, ctx),
             startedAt: d.then.startedAt.toISOString(),
+            trigger: d.then.trigger,
             homeBackAt: d.recoveredAt.toISOString(),
           },
           p_flapping: false,
@@ -742,6 +752,12 @@ async function apply(
       return data ? 'settled' : null;
     }
   }
+}
+
+/** "/booking", "HTTP 404", "/booking → HTTP 404 (…)" for a key page's PROBLEM; nothing for the home page. */
+function keyPageContext(detail: ProblemDetail, ctx: ProblemCauseContext): Record<string, Json> {
+  const k = formatKeyPage(detail, ctx);
+  return k ? { keyPage: k } : {};
 }
 
 /** The DOWN alert's facts: the confirming checks, or the browser's verdict (blocked → page failed). */

@@ -108,3 +108,117 @@ describe('render — PROBLEM rows', () => {
     expect(m.text).toContain('Still reporting: TYO (Tokyo)');
   });
 });
+
+describe('render — relapse, flapping and auto-resolve rows (S04b, D-024)', () => {
+  const voca: IncidentFacts = {
+    ...incident,
+    id: 'inc-133',
+    number: 133,
+    state: 'unacked',
+    severity: 'down',
+    trigger: 'hard_fail',
+    started_at: '2026-09-20T20:12:00Z',
+    detected_at: '2026-09-20T20:12:40Z',
+    recovered_at: null,
+    sites: { ...incident.sites, name: 'VOCA' },
+    incident_events: [
+      { type: 'detected', payload: {}, at: '2026-09-20T20:12:40Z' },
+      { type: 'recovered', payload: {}, at: '2026-09-20T20:19:00Z' },
+      {
+        type: 'relapsed',
+        payload: { startedAt: '2026-09-20T20:24:00Z', severity: 'down' },
+        at: '2026-09-20T20:24:40Z',
+      },
+    ],
+  };
+
+  it('DOWN AGAIN: mentions the owner while nobody acked, counts the downtime before the drop', () => {
+    const m = renderChat(
+      row('down_again', {
+        startedAt: '2026-09-20T20:24:00Z',
+        backSince: '2026-09-20T20:19:00Z',
+        fromState: 'monitoring',
+        nowFlapping: true,
+        flapping: true,
+      }),
+      voca,
+      appUrl,
+      now,
+    )!;
+    expect(m.text).toBe('<users/PLOY> DOWN AGAIN · VOCA (Tier 2) · same incident INC-0133');
+    expect(m.cardsV2[0]!.card.header.title).toBe('DOWN AGAIN · VOCA · was back for 5 min (03:19–03:24)');
+    expect(JSON.stringify(m.cardsV2)).toContain('Down 7 min so far in this incident.');
+  });
+
+  it('PROBLEM AGAIN mentions whoever acknowledged, not the owner', () => {
+    const acked = {
+      ...voca,
+      acked_at: '2026-09-20T20:14:00Z',
+      acker: { display_name: 'Nok', google_chat_user_id: 'NOK' },
+    };
+    const m = renderChat(
+      row('problem_again', { summary: 'slow, p50 5.4 s', startedAt: '2026-09-20T20:24:00Z' }),
+      acked,
+      appUrl,
+      now,
+    )!;
+    expect(m.text).toMatch(/^<users\/NOK> PROBLEM AGAIN · VOCA \(Tier 2\) · slow again, p50 5\.4 s/);
+  });
+
+  it('the flapping summary lists the closed drops; its email goes in the thread', () => {
+    const closed = {
+      ...voca,
+      incident_events: [
+        ...voca.incident_events!,
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:35:00Z' },
+      ],
+    };
+    const m = renderChat(row('flap_summary'), closed, appUrl, now)!;
+    expect(m.text).toBe(
+      '<users/PLOY> RECOVERED · VOCA · stable 15 min · flapped ×2, down 18 min in total · add a root cause',
+    );
+    const to = { id: 'u-ploy', email: 'ploy@example.test', display_name: 'Ploy' };
+    const e = renderEmail(row('flap_summary'), closed, to, appUrl, {
+      threadId: '<inc-inc-133@x.test>',
+      startsThread: false,
+    })!;
+    expect(e.text).toMatch(/^RECOVERED — VOCA is stable again/);
+  });
+
+  it('RECOVERED renders from its own recovery even after a relapse cleared the incident’s', () => {
+    const m = renderChat(
+      row('recovered', { okLocations: 3, recoveredAt: '2026-09-20T20:19:00Z' }),
+      voca,
+      appUrl,
+      now,
+    )!;
+    expect(m.text).toContain('down 7 min');
+  });
+
+  it('an auto-resolved PROBLEM: RECOVERED with no mention, counted from when it was flagged', () => {
+    const fuji: IncidentFacts = {
+      ...incident,
+      state: 'resolved',
+      trigger: 'key_page',
+      detected_at: '2026-09-25T03:02:00Z',
+      incident_events: [
+        {
+          type: 'detected',
+          payload: {
+            keyPage: { path: '/contact', failure: 'HTTP 500', cause: '/contact → HTTP 500 (BKK, SIN, TYO)' },
+          },
+          at: '2026-09-25T03:02:00Z',
+        },
+      ],
+    };
+    const m = renderChat(
+      row('recovered', { okLocations: 3, recoveredAt: '2026-09-25T03:05:00Z', autoResolved: true }),
+      fuji,
+      appUrl,
+      now,
+    )!;
+    expect(m.text).toBe(
+      'RECOVERED · Fuji Links · /contact back 3 min after it was flagged, before anyone acknowledged · resolved automatically',
+    );
+  });
+});

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { fakeDb as baseFakeDb } from '../../../test/fake-db';
 
 import { runEngine } from './run-engine';
