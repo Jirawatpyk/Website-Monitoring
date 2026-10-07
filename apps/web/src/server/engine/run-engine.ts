@@ -72,6 +72,8 @@ export interface EngineSummary extends CronJobResult {
   alerts: number;
   /** Open PROBLEM incidents raised to DOWN (D-021); their DOWN alerts are queued. */
   escalated: number;
+  /** Sites whose write failed this run (the rest were judged); the run reports `ok: false`. */
+  failures?: string[];
 }
 
 /**
@@ -162,19 +164,30 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
 
   summary.unverified = unverifiedMonitors.size;
   summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations);
-  // The Healthchecks ping must still show the failure (cron-job.ts fails the run on a throw).
-  if (failures.length) throw new Error(failures.join('; '));
+  // `ok: false` fails the Healthchecks ping (cron-job.ts), while what the other sites queued is
+  // still sent at once (engine-and-deliver.ts reads the counts).
+  if (failures.length) return { ...summary, ok: false, failures };
   return summary;
 
   async function judgeSite(site: SiteRow): Promise<void> {
     const status = statuses.data?.find((st) => st.site_id === site.id);
     // Two reads, and engine runs overlap: a carry older than the site's round was read before another
     // run committed that round. Judge the site next run, from a consistent pair (engine review M2).
-    const behind = site.monitors.some((m) => {
+    const siteRound = status?.last_round_at ? Date.parse(status.last_round_at) : null;
+    const intervalMs = TIER_CONFIG[site.tier].intervalSec * 1000;
+    const skew = site.monitors.some((m) => {
       const c = carryByMonitor.get(m.id);
-      return !!c && !!status?.last_round_at && Date.parse(c.last_round_at) < Date.parse(status.last_round_at);
+      if (!c || siteRound === null) return false;
+      const gap = Date.parse(c.last_round_at) - siteRound;
+      // Ahead, or a round or two behind: read mid-commit of another run. Further behind: a stale
+      // row (the monitor was off or moved) — dropped below, never a reason to skip forever.
+      return gap > 0 || (gap < 0 && -gap <= 2 * intervalMs);
     });
-    if (behind) return;
+    if (skew) return;
+    for (const m of site.monitors) {
+      const c = carryByMonitor.get(m.id);
+      if (c && siteRound !== null && Date.parse(c.last_round_at) < siteRound) carryByMonitor.delete(m.id);
+    }
     const open = incidents.data?.find((inc) => inc.site_id === site.id);
     const snapshot: SiteSnapshot = {
       now,

@@ -93,9 +93,12 @@ describe('runEngine — blocked rounds (S03)', () => {
     expect(await runEngine(db, now)).toMatchObject({ verifying: 0 });
   });
 
-  it('throws on any other insert error', async () => {
+  it('fails the run on any other insert error', async () => {
     const { db } = fakeDb({ ...verifierUp, 'verification_jobs.insert': { error: { message: 'boom' } } });
-    await expect(runEngine(db, now)).rejects.toThrow('verification_jobs: boom');
+    expect(await runEngine(db, now)).toMatchObject({
+      ok: false,
+      failures: ['Tubtong: verification_jobs: boom'],
+    });
   });
 
   it('page loaded → an OK round with the note on the site', async () => {

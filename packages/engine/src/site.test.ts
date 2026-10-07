@@ -147,8 +147,8 @@ describe('decideSite — keyword, redirect, regional on the primary', () => {
       }),
     );
     expect(d).toMatchObject({ kind: 'none', okRounds: 1, status: 'ok' });
-    // Its clock is neither stopped nor extended by a minute it had no say in.
-    expect(d.kind === 'none' && d.monitors[0]?.failingSince).toEqual({ SIN: at(-358).toISOString() });
+    // Its clock is dropped: a minute it had no say in can't carry an old start into a later Regional.
+    expect(d.kind === 'none' && d.monitors[0]?.failingSince).toEqual({});
   });
 });
 
@@ -401,5 +401,21 @@ describe('decideSite — engine review S04a', () => {
       detail: { kind: 'blocked' },
     });
     expect(d).not.toHaveProperty('note');
+  });
+});
+
+describe('decideSite — engine review S04a round 2', () => {
+  it('a DOWN two locations confirmed isn’t held back while a DOWN incident is in Monitoring (relapse, S04b)', () => {
+    const two = [
+      check('SIN', 'fail', 1),
+      check('TYO', 'fail', 2),
+      check('SIN', 'fail', 31, { attempt: 2 }),
+      check('TYO', 'fail', 32, { attempt: 2 }),
+    ];
+    // BKK beats but hasn't reported yet, 35 s into the round.
+    const d = decideSite(
+      site([monitor('home', two)], { intervalSec: 60, now: at(35), open: incident('monitoring') }),
+    );
+    expect(d).toMatchObject({ kind: 'none', relapse: true, status: 'down' });
   });
 });

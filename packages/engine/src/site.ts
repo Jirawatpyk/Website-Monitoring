@@ -200,7 +200,7 @@ export function decideSite(s: SiteSnapshot): SiteDecision {
   if (oldest.ready || oldest.primaryDown) {
     const d = judgeSiteRound(s, oldest.byMonitor, new Date(oldest.start));
     // Judged early only for a DOWN: anything else waits for the round to be complete (never used up).
-    const early = !oldest.ready && d !== PENDING && d.kind !== 'open' && d.kind !== 'escalate';
+    const early = !oldest.ready && d !== PENDING && !('status' in d && d.status === 'down');
     if (d !== PENDING && !early) return d;
   }
   // A DOWN never waits (spec §6, PRD §9): not for a blocked round's verifier, nor for an older round
@@ -367,7 +367,9 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   const counted = round.scheduled.filter((c) => !excluded.has(c.location));
   // A clock of a location that stopped beating is stale: its next failure starts a new one.
   const beating = Object.fromEntries(
-    Object.entries(m.carry.failingSince).filter(([l]) => s.locations.includes(l as ProbeLocation)),
+    Object.entries(m.carry.failingSince).filter(
+      ([l]) => s.locations.includes(l as ProbeLocation) && !excluded.has(l as ProbeLocation),
+    ),
   ) as FailingSince;
   const failingSince = nextFailingSince(beating, counted);
   const carried = { slowRounds: m.carry.slowRounds, failingSince };
