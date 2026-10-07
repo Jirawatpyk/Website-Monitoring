@@ -300,7 +300,7 @@ const VERIFIER_DOWN_REASONS: Record<VerifierDownReason, string> = {
   lease_expired: 'A verification job ran out of time without a result',
 };
 
-const VERIFIER_CHECK = 'The dxt-agent service on the Thai VPS (runbook: Browser verifier)';
+const VERIFIER_CHECK = 'The dxt-agent service on the Thai VPS (docs/runbook.md → Browser verifier)';
 
 /**
  * "Admin told about the verifier" (StatusModel, D-001): one email per Admin when it becomes
