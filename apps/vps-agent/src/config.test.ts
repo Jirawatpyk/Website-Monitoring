@@ -36,6 +36,17 @@ describe('deploy/package.json', () => {
   });
 });
 
+describe('deploy/dxt-agent@.service', () => {
+  it('runs each instance from its own release folder with the shared browsers (S04b)', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const unit = await readFile(new URL('../deploy/dxt-agent@.service', import.meta.url), 'utf8');
+    // A shared /opt/dxt-agent meant a staging release changed what production ran after a restart.
+    expect(unit).toMatch(/^WorkingDirectory=\/opt\/dxt-agent\/%i$/m);
+    expect(unit).toMatch(/^Environment=PLAYWRIGHT_BROWSERS_PATH=\/opt\/dxt-agent\/browsers$/m);
+    expect(unit).toMatch(/^ExecStart=.* dist\/index\.js$/m);
+  });
+});
+
 describe('the bundle (tsup.config.ts)', () => {
   it('keeps external only what deploy/package.json installs on the VPS', async () => {
     const { readFile } = await import('node:fs/promises');

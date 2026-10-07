@@ -3,7 +3,9 @@
 #   dxt-agent@production   → monitor,         /etc/dxt-agent/production.env
 #
 # Layout (the agent can't rewrite its own code or secrets):
-#   /opt/dxt-agent              code + Chromium, owned by root, read-only to the service
+#   /opt/dxt-agent/<env>/       that instance's release (dist + Playwright), owned by root, read-only
+#                               to the service; each instance is released on its own (deploy/release.sh)
+#   /opt/dxt-agent/browsers     Chromium, shared (one revision per Playwright version)
 #   /etc/dxt-agent/<env>.env    secrets, root:root 0600 (systemd reads it as root)
 #   /var/lib/dxt-agent-<env>    writable state (StateDirectory): Chromium's profile and cache
 # Install and update: deploy/install.md.
@@ -17,7 +19,7 @@ Type=simple
 # One user per instance: staging's browser can't read production's token or process.
 User=dxt-%i
 Group=dxt-%i
-WorkingDirectory=/opt/dxt-agent
+WorkingDirectory=/opt/dxt-agent/%i
 EnvironmentFile=/etc/dxt-agent/%i.env
 Environment=HOME=/var/lib/dxt-agent-%i
 Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/dxt-agent/browsers

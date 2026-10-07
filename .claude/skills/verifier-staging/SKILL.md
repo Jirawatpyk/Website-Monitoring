@@ -12,7 +12,7 @@ Staging = Vercel project `dxt-monitor-staging` (branch `staging`, https://monito
 1. **Migrations first** — `pnpm db:push:staging --dry-run`, then `pnpm db:push:staging`. Code that calls new or changed `engine_*` parameters fails with "function not found" against the old database.
 2. **Web** — `git push --force-with-lease origin HEAD:staging`; wait until the staging deployment is Ready.
 3. **Test target** (only if `apps/test-target` changed) — the push above builds a Preview of `dxt-test-target`; promote it: `vercel --scope team_KLEKhF6PuSAbJSmgDpyEXES4 ls dxt-test-target`, then `vercel --scope team_KLEKhF6PuSAbJSmgDpyEXES4 promote <preview url> --yes`.
-4. **VPS agent** (only if `apps/vps-agent` or a package it bundles changed) — `pnpm --filter @dxt/vps-agent build`, copy `apps/vps-agent/dist` to the VPS (`ssh -i ~/.ssh/dxt_vps root@38.60.233.62`), `rsync` it into `/opt/dxt-agent/dist/`, then restart **only** `dxt-agent@staging` and read `journalctl -u dxt-agent@staging -n 6`. Both instances share `/opt/dxt-agent` today, so keep agent changes backward-compatible with production's server.
+4. **VPS agent** (only if `apps/vps-agent` or a package it bundles changed) — `apps/vps-agent/deploy/release.sh staging`: it builds, installs into `/opt/dxt-agent/staging/` and restarts **only** `dxt-agent@staging`, then prints its journal. Production keeps its own release in `/opt/dxt-agent/production/` until `release.sh production` after the merge.
 
 ## 2. Drive: the test target's mode
 
