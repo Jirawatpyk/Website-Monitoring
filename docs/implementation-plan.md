@@ -188,6 +188,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - **Done-when 4 ✓** Route tests `refuses a wrong token`, `refuses a verdict after the lease ran out with 409` (api/jobs/route.test.ts), `refuses a batch with a result more than 5 min old / ahead` (api/ingest/route.test.ts); pgTAP `a result after the lease ran out is refused` (verifier.test.sql); int test `a verdict after the lease ran out is refused` (pipeline.int.test.ts). Staging: a wrong token got 401 from both APIs (seen while the env was being set).
   - **Done-when 5 ✓** `housekeeping.int.test.ts` on real local Storage: a screenshot back-dated 31 days is removed, a new one kept; unit tests in housekeeping.test.ts; daily cron `/api/cron/housekeeping` 20:30Z in vercel.json.
   - **Done-when 6 ✓** `sed 's/=.*//' /etc/dxt-agent/staging.env` lists every name in `apps/vps-agent/.env.example` (values written by Tao, never shared; file root:root 0600). `production.env` is written when the production agent starts after the merge (deploy/install.md).
+  - `/verify` (Tao, 7 Oct 06:46–07:03Z, PASS): three locations voting; `challenge` → `loaded`, `ok` + note; clean T03 path with the verifier stopped and no open incident: `error` 06:59:12Z → INC-0010 `hard_fail` DOWN, email 07:01:18.4Z / Chat 07:01:18.8Z (**2 min 6 s**, 1.9 s / 2.3 s after the confirm); API probes: no / wrong token 401, stale result 422, empty batch 400, unknown job 409. Finding carried to S07 (evidence screenshot after a verifier outage).
   - Reviews: security-reviewer (2 Medium + 4 Low fixed), db-reviewer (1 Medium + Lows fixed), engine-reviewer ×2 (H1, H2, N1 fixed; M2–M4, N2–N4 fixed; M1 carried to S04), a general code review by an agent (5 Medium + 5 Low fixed) and `/code-review high` (6 fixed, no High). Re-checked on staging after the last fixes (agent build `b1c9c25`): `challenge` → verify job `loaded` at 06:33:54Z. Found on staging and fixed: zod left external in the agent bundle, Node's dual-stack race timing out Healthchecks pings (no IPv6 route on the VPS), staging needing a redeploy after its env changed, blocked checks waiting for the engine cron.
 
 ### S04 · PROBLEM triggers, flapping & status rules
@@ -240,6 +241,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   3. A note appears on the timeline and as `NOTE · <site> · <name>: …` in the thread; RESOLVED goes to everyone who got the DOWN email, after the 10 s hold.
   4. spec-checker passes the five boards; nav "Incidents" live.
 - **Review:** spec-checker, engine-reviewer (resolve gate), message-checker.
+- **Carried from S03 `/verify`:** an evidence job queued while the verifier was down is taken when it comes back (up to 15 min later), so its screenshot can show the recovered page. The Incident board's evidence card shows the capture time next to "Confirmed down"; skip or label a screenshot taken after `recovered_at`.
 
 ### S08 · Escalation L0–L1 & response hours
 
