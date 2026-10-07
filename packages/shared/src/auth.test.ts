@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAllowedEmail, safeNextPath } from './auth';
+import { isAllowedEmail, parseAllowedDomains, safeNextPath } from './auth';
 
 describe('safeNextPath', () => {
   it.each([
@@ -34,7 +34,24 @@ describe('isAllowedEmail', () => {
     ['tao@dxt.co.th', '', false],
     ['tao@dxt.co.th', undefined, false],
     [undefined, 'dxt.co.th', false],
+    // Several domains (D-007): a colleague whose primary address is on the group's domain.
+    ['fluke@omg-group.asia', 'eqho.com,omg-group.asia', true],
+    ['tao@eqho.com', ' eqho.com , omg-group.asia ', true],
+    ['tao@evil.com', 'eqho.com,omg-group.asia', false],
+    ['tao@omg-group.asia.evil.com', 'eqho.com,omg-group.asia', false],
+    ['tao@eqho.com', ',', false],
   ])('%s with %s → %s', (email, domain, expected) => {
     expect(isAllowedEmail(email, domain)).toBe(expected);
+  });
+});
+
+describe('parseAllowedDomains', () => {
+  it.each([
+    ['eqho.com', ['eqho.com']],
+    ['Eqho.com, OMG-Group.asia', ['eqho.com', 'omg-group.asia']],
+    [' , ,', []],
+    [undefined, []],
+  ])('%j → %j', (value, expected) => {
+    expect(parseAllowedDomains(value)).toEqual(expected);
   });
 });

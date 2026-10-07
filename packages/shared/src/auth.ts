@@ -14,17 +14,30 @@ export function safeNextPath(next: string | null | undefined, fallback = '/'): s
 }
 
 /**
- * Sign-in is limited to the company Google Workspace domain (PRD §3). Compares the part after the
- * last "@" exactly (case-insensitive), so `a@dxt.co.th.evil.com` and `a@evil.com?@dxt.co.th` fail.
- * An empty or missing allowed domain allows nobody — fail closed.
+ * The company's Google Workspace domains from `ALLOWED_EMAIL_DOMAIN`: one domain, or several
+ * separated by commas (`eqho.com,omg-group.asia` — a colleague whose primary address is on the
+ * group's domain, D-007). Trimmed, lower-cased, empties dropped.
+ */
+export function parseAllowedDomains(value: string | null | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Sign-in is limited to the company Google Workspace domains (PRD §3, D-007). Compares the part
+ * after the last "@" exactly (case-insensitive) with each allowed domain, so
+ * `a@dxt.co.th.evil.com` and `a@evil.com?@dxt.co.th` fail. No allowed domain allows nobody — fail
+ * closed. The allowlist (`before_user_created`) still decides who gets an account.
  */
 export function isAllowedEmail(
   email: string | null | undefined,
-  allowedDomain: string | null | undefined,
+  allowedDomains: string | null | undefined,
 ): boolean {
-  const domain = allowedDomain?.trim().toLowerCase();
-  if (!email || !domain) return false;
+  const domains = parseAllowedDomains(allowedDomains);
+  if (!email || !domains.length) return false;
   const at = email.lastIndexOf('@');
   if (at <= 0) return false;
-  return email.slice(at + 1).toLowerCase() === domain;
+  return domains.includes(email.slice(at + 1).toLowerCase());
 }
