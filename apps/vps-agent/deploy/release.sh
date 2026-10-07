@@ -22,10 +22,9 @@ host="${DXT_VPS:-root@38.60.233.62}"
 key="${DXT_VPS_KEY:-$HOME/.ssh/dxt_vps}"
 repo="$(git rev-parse --show-toplevel)"
 deploy="$repo/apps/vps-agent/deploy"
-stage="/tmp/dxt-agent-$instance"
-
 pnpm --filter @dxt/vps-agent build
 
-ssh -i "$key" "$host" "rm -rf '$stage' && mkdir -p '$stage'"
+# A fresh, unguessable staging folder owned by root (security review S04b: no fixed /tmp path).
+stage="$(ssh -i "$key" "$host" 'mktemp -d /root/dxt-agent-release.XXXXXX')"
 scp -q -i "$key" -r "$repo/apps/vps-agent/dist" "$deploy/package.json" "$deploy/dxt-agent@.service" "$host:$stage/"
 ssh -i "$key" "$host" bash -s -- "$instance" "$stage" <"$deploy/install-release.sh"
