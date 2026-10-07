@@ -45,6 +45,9 @@ export async function storeBangkokResults(
       ttfb_ms: r.ttfbMs,
       resolved_ip: r.resolvedIp,
       error: r.error,
+      final_url: r.finalUrl ?? null,
+      keyword_missing: r.keywordMissing ?? null,
+      keyword_forbidden: r.keywordForbidden ?? null,
     })),
   );
   if (error) throw new Error(`check_results: ${error.message}`);

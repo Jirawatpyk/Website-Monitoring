@@ -42,6 +42,49 @@ describe('Bangkok through the Ingest API', () => {
     });
   });
 
+  it('stores the keyword result and final URL, and nulls them for an agent that sends none (D-022)', async () => {
+    const { db, calls } = fakeDb();
+    const base = {
+      checkedAt: '2026-10-07T03:00:01Z',
+      outcome: 'pass' as const,
+      statusCode: 200,
+      responseMs: 5_800,
+      ttfbMs: 400,
+      resolvedIp: null,
+      error: null,
+      attempt: 1 as const,
+    };
+    await storeBangkokResults(
+      db,
+      [
+        {
+          ...base,
+          monitorId: 'm1',
+          finalUrl: 'https://a.example.test/',
+          keywordMissing: ['Welcome'],
+          keywordForbidden: [],
+        },
+        // An agent not redeployed yet.
+        { ...base, monitorId: 'm2' },
+      ],
+      now,
+    );
+    expect(calls.find((c) => c.table === 'check_results')?.values).toEqual([
+      expect.objectContaining({
+        monitor_id: 'm1',
+        final_url: 'https://a.example.test/',
+        keyword_missing: ['Welcome'],
+        keyword_forbidden: [],
+      }),
+      expect.objectContaining({
+        monitor_id: 'm2',
+        final_url: null,
+        keyword_missing: null,
+        keyword_forbidden: null,
+      }),
+    ]);
+  });
+
   it('throws when the insert fails, before beating', async () => {
     const { db, calls } = fakeDb({ 'check_results.insert': { error: { message: 'boom' } } });
     await expect(storeBangkokResults(db, [], now)).rejects.toThrow('check_results: boom');

@@ -36,7 +36,7 @@ export interface ProbeDeps {
 }
 
 /**
- * One probe run from SIN or TYO: check every primary monitor that is due, recheck failures once in
+ * One probe run from SIN or TYO: check every monitor that is due, recheck failures once in
  * the same invocation, and store both as check_results (attempt 1, then 2). The engine judges them.
  */
 export async function runProbe({
@@ -62,13 +62,19 @@ export async function runProbe({
   // round it was due for; rechecks carry their own start time.
   const runOnce = (m: DueMonitor, timeoutMs: number, at?: number) => {
     const checkedAt = new Date(at ?? clock());
-    return check({ url: m.url, method: m.method, timeoutMs, headers, allowPrivateTargets }).then(
-      (result) => ({
-        m,
-        checkedAt,
-        result,
-      }),
-    );
+    return check({
+      url: m.url,
+      method: m.method,
+      timeoutMs,
+      headers,
+      allowPrivateTargets,
+      mustContain: m.mustContain,
+      mustNotContain: m.mustNotContain,
+    }).then((result) => ({
+      m,
+      checkedAt,
+      result,
+    }));
   };
 
   const first = await Promise.all(monitors.map((m) => runOnce(m, m.timeoutMs, started)));
@@ -126,6 +132,9 @@ async function insertResults(
       response_ms: result.responseMs,
       ttfb_ms: result.ttfbMs,
       error: result.error,
+      final_url: result.finalUrl,
+      keyword_missing: result.keywordMissing,
+      keyword_forbidden: result.keywordForbidden,
     })),
   );
   if (error) throw new Error(`check_results: ${error.message}`);

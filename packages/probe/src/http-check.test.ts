@@ -23,6 +23,13 @@ beforeAll(async () => {
       case '/big':
         res.writeHead(200).end('x'.repeat(40_000));
         break;
+      case '/deep-keyword':
+        // The brand keyword far past the first 16 KB, as on a real home page.
+        res.writeHead(200).end(`${'x'.repeat(100_000)}<footer>Welcome</footer>`);
+        break;
+      case '/defaced':
+        res.writeHead(200).end('<h1>Index of /</h1>');
+        break;
       case '/down':
         res.writeHead(504).end('Gateway Timeout');
         break;
@@ -85,6 +92,87 @@ describe('runHttpCheck', () => {
     expect(result.bodySample).toHaveLength(16_384);
   });
 
+  it('records the final URL after the redirects (PROBLEM · Redirect, D-022)', async () => {
+    expect((await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok` })).finalUrl).toBe(
+      `${base}/ok`,
+    );
+    expect((await runHttpCheck({ allowPrivateTargets: true, url: `${base}/redirect-same` })).finalUrl).toBe(
+      `${base}/ok`,
+    );
+    expect((await runHttpCheck({ allowPrivateTargets: true, url: `${base}/redirect-other` })).finalUrl).toBe(
+      `${other}/seen`,
+    );
+  });
+
+  it('checks keywords in the body, never failing the check (PROBLEM · Keyword, D-022)', async () => {
+    const found = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/ok`,
+      mustContain: ['Welcome'],
+    });
+    expect(found).toMatchObject({ outcome: 'pass', keywordMissing: [], keywordForbidden: [] });
+
+    // INC-0129 WeCare Asia: a broken deploy lost the brand keyword.
+    const missing = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/defaced`,
+      mustContain: ['Welcome'],
+      mustNotContain: ['Index of /', 'Database error'],
+    });
+    expect(missing).toMatchObject({
+      outcome: 'pass',
+      keywordMissing: ['Welcome'],
+      keywordForbidden: ['Index of /'],
+    });
+  });
+
+  it('matches keywords case-sensitively, like the browser verifier', async () => {
+    const result = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/ok`,
+      mustContain: ['welcome'],
+    });
+    expect(result.keywordMissing).toEqual(['welcome']);
+  });
+
+  it('reads up to 256 KB when the monitor has keywords', async () => {
+    const result = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/deep-keyword`,
+      mustContain: ['Welcome'],
+    });
+    expect(result.keywordMissing).toEqual([]);
+    // Without keywords the sample stays 16 KB.
+    expect(
+      (await runHttpCheck({ allowPrivateTargets: true, url: `${base}/deep-keyword` })).bodySample,
+    ).toHaveLength(16_384);
+  });
+
+  it("checks no keywords without any, on HEAD, or on a response that didn't pass", async () => {
+    const none = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok` });
+    expect(none).toMatchObject({ keywordMissing: null, keywordForbidden: null });
+    const head = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/ok`,
+      method: 'HEAD',
+      mustContain: ['Welcome'],
+    });
+    expect(head.keywordMissing).toBeNull();
+    // A challenge page or a 5xx says nothing about the content.
+    const challenge = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/challenge`,
+      mustContain: ['Welcome'],
+    });
+    expect(challenge).toMatchObject({ outcome: 'blocked', keywordMissing: null });
+    const down = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/down`,
+      mustContain: ['Welcome'],
+    });
+    expect(down).toMatchObject({ outcome: 'fail', keywordMissing: null, finalUrl: `${base}/down` });
+  });
+
   it('fails on a 5xx (INC-0142: HTTP 504 at SIN)', async () => {
     expect(await runHttpCheck({ allowPrivateTargets: true, url: `${base}/down` })).toMatchObject({
       outcome: 'fail',
@@ -101,7 +189,7 @@ describe('runHttpCheck', () => {
 
   it('fails on a timeout with the error "Timeout"', async () => {
     const result = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/hang`, timeoutMs: 200 });
-    expect(result).toMatchObject({ outcome: 'fail', statusCode: null, error: 'Timeout' });
+    expect(result).toMatchObject({ outcome: 'fail', statusCode: null, error: 'Timeout', finalUrl: null });
   });
 
   it('fails when the connection is refused', async () => {
