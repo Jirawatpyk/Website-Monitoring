@@ -16,7 +16,7 @@
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Done |
-| S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | In progress |
+| S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | In review |
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | M | — | S04a | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
@@ -225,6 +225,19 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   4. M1: a blocked round the verifier can't decide while the incident is open shows the site as PROBLEM, and the next OK round clears it (engine + integration tests).
   5. Fewer than 2 locations beating → one Admin email; it clears when they come back (test).
 - **Review:** engine-reviewer, message-checker, security-reviewer (migration, probe / ingest fields), db-reviewer (`monitor_status`, `check_results` columns).
+- **Notes (evidence):** started 7 Oct 2026 ~09:00Z; staging verified 11:43Z. Split from S04 and engine rules per D-022; PROBLEM copy from the ChatAlert / EmailAlert rows and spec §19 design added the same day. Staging: migration `problem_triggers` by `pnpm db:push:staging` (before the code, as its header says); `dxt-agent@staging` redeployed (keyword result + final URL from Bangkok too); test-target modes `keyword-missing` / `slow`; the staging monitor's `must_contain = {Test target}`; `reset-test-incident.sql` between modes (relapse is S04b).
+  - **Done-when 1 (T01) ✓** staging, 7 Oct (UTC):
+    - `keyword-missing` 11:19:01 → INC-0011 PROBLEM `keyword` detected 11:20:01.5; email 11:20:02.2, Chat 11:20:02.9; cause "Missing “Test target” on / (BKK, SIN, TYO)" (all three locations, Bangkok included). → `ok` 11:23:35 → RECOVERED email 11:25:02.8 / Chat 11:25:03.2, incident Monitoring.
+    - `slow` 11:26:39 → rounds 11:27 / 11:28 / 11:29 p50 ≈ 6.1 s → INC-0012 PROBLEM `slow` detected 11:30:07.5 (`monitor_status.slow_rounds` 3); email 11:30:08.2, Chat 11:30:08.8; cause "p50 6.1 s (BKK, SIN, TYO) · over the Tier 1 limit of 3 s for 3 checks in a row". → `ok` → RECOVERED 11:32:02.
+    - `challenge` 11:33:13 → verify job round 11:34 `done / loaded / HTTP 200`, screenshot stored; site `ok` with note "Automated check blocked by bot protection; verified via browser".
+    - `error` 11:35:23 → INC-0013 DOWN `hard_fail`, email 11:36:22.5 / Chat 11:36:23.0 (the 11:35 round straddled the switch, part challenged, so the browser decided: "Browser: page didn’t load (HTTP 500)"). → `ok` → RECOVERED 11:39:02, Needs root cause.
+    - `timeout` 11:41:22 → INC-0014 DOWN, confirmed 11:41:32.3, email 11:41:44.1 / Chat 11:41:44.9, cause "Timeout > 10 s (BKK, TYO)".
+    - `ok` before and between modes → OK.
+  - **Done-when 2 ✓** `site.test.ts` "a key page returning 500 while the home page is fine → PROBLEM (Key page), never DOWN"; `run-engine.test.ts` same case; int test `a key page returning 500 while the home page is fine → PROBLEM, never DOWN; it recovers with RECOVERED` (`pnpm --filter @dxt/web test:int`).
+  - **Done-when 3 ✓** message-checker: no High; Mediums fixed (Cause row on a PROBLEM's ACKNOWLEDGED email; Admin email site lines with tier) or justified in the PR (incident number / start in the verifier email's site lines); Lows fixed (what to check names the missing locations) or justified. Builders tested in `problem-alerts.test.ts`, `problem-cause.test.ts`, `email-alerts.test.ts`, `render.test.ts`.
+  - **Done-when 4 ✓** `site.test.ts` "M1: blocked and unverified while the incident is in Monitoring → PROBLEM shown" / "M1: the next OK round shows OK again"; int test `M1: unverified while the incident is in Needs root cause shows PROBLEM; the next OK round shows OK (S04a)`.
+  - **Done-when 5 ✓** `run-engine.test.ts` "fewer than 2 locations beating → one Admin alert; it clears 10 min later once 2 beat again"; int test `fewer than 2 probe locations beating → one Admin email, cleared once 2 beat again (D-022)`.
+  - Reviews: `/code-review high` (5: 4 fixed, deploy order documented), engine-reviewer ×2 (H1 faulty location making a round ready too early — fixed; M1–M2, L1–L3 fixed; round 2: 3 Medium + 3 Low fixed), security-reviewer (M1 cause length could stop the whole engine run — fixed with caps and per-site isolation; L1 redirect host markup — fixed), db-reviewer (no High; paging dedupe, `<=` guard, keyword bounds, Map grouping, pgTAP fixed; 200-monitor URL length → follow-up), message-checker (above).
 
 ### S04b · Relapse, flapping & auto-resolve
 
