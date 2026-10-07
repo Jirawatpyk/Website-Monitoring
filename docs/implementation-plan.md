@@ -17,7 +17,7 @@
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Done |
 | S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
-| S04b | Relapse, flapping & auto-resolve | 1 · P0 | M | — | S04a | 3 | Todo |
+| S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
@@ -49,7 +49,7 @@ Every slice also meets the [Definition of Done](workflow.md#definition-of-done) 
 | Phase | PRD target | Sum of sizes (1 developer) |
 |---|---|---|
 | 0 Prep | week 1 | week 1 |
-| 1 MVP (S01–S09) | weeks 2–3 (10 working days) | ≈ 44 days ≈ 9 weeks (S04 split into S04a L + S04b M, 7 Oct) |
+| 1 MVP (S01–S09) | weeks 2–3 (10 working days) | ≈ 45 days ≈ 9 weeks (S04 split into S04a L + S04b L, 7 Oct) |
 | 2 Team go-live (S10–S19) | weeks 4–5 + buffer, then 2-week parallel run | ≈ 36 days ≈ 7 weeks (parallel run overlaps) |
 | 3 Client-facing (S20–S24) | weeks 6–10 | ≈ 23 days ≈ 5 weeks |
 
@@ -250,6 +250,9 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - **Auto-resolve:** a PROBLEM that recovers within 5 min and was never acknowledged auto-resolves (`autoResolves`, spec §16.1).
   - **D-003 lifecycle:** checked end to end.
   - **D-023:** a DOWN incident recovers when the primary monitor is OK; a key page still failing rejoins the same incident as a PROBLEM relapse.
+  - **Carried from S04a review:**
+    - **VPS agent release per instance:** `dxt-agent@staging` and `dxt-agent@production` run from one build in `/opt/dxt-agent`, so a staging release changes what production runs after its next restart. Give each instance its own release folder (`/opt/dxt-agent/<instance>/`, shared browsers), update the systemd template, `apps/vps-agent/deploy/install.md`, the runbook and the `verifier-staging` skill; move the VPS with Tao's OK.
+    - **Engine loads by RPC (db-reviewer M2):** `run-engine.ts` / `verifier-state.ts` pass every monitor id in a GET query string (`in (…)`), near the gateway's 8 KB limit at the PRD's 200 monitors. Load checks, `monitor_status` and verify jobs through service-role RPCs with keyset paging, before S05 adds real sites.
   - **Messages:** the "down again", "PROBLEM again" and flapping summary rows.
 - **Boards:** ChatAlert (relapse, flapping rows) · **Test plan:** —
 - **Carried from S02b review:** engine runs overlap (the probe trigger and the cron). Relapse handling must be one state-guarded SQL function, or a relapse alerts once per run.
