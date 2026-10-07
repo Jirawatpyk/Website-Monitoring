@@ -52,6 +52,12 @@ const incident = (state: string, downQueued = true) => ({
   site_id: 's1',
   state,
   severity: 'down',
+  episode_severity: 'down',
+  started_at: at(-600),
+  acked_at: null,
+  recovered_at: state === 'monitoring' || state === 'needs_root_cause' ? at(-120) : null,
+  escalation_level: 0,
+  is_flapping: false,
   root_cause_category: null,
   notifications: downQueued ? [{ template: 'down' }] : [],
 });
@@ -197,8 +203,11 @@ describe('runEngine', () => {
         p_to: 'monitoring',
         p_recovered_at: at(0),
         p_round_at: at(0),
-        p_context: { okLocations: 2, slowLimitMs: 3_000 },
+        p_context: { okLocations: 2, slowLimitMs: 3_000, recoveredAt: at(0) },
         p_notify: true,
+        p_flip_ok: true,
+        p_auto_resolve: false,
+        p_hold_summary: false,
         p_monitors: [
           { monitorId: 'm1', status: 'ok', trigger: null, cause: null, slowRounds: 0, failingSince: {} },
         ],
@@ -255,18 +264,41 @@ describe('runEngine', () => {
     });
   });
 
-  it('counts and logs a relapse while the incident is open, without alerting', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('a DOWN on a recovered incident joins it: DOWN AGAIN through one guarded function (D-004)', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
       'rpc.engine_checks': { data: down },
       'incidents.select': { data: [incident('needs_root_cause')] },
+      'site_status.select': {
+        data: [
+          { site_id: 's1', last_round_at: null, ok_rounds: 2, flips: [at(-600), at(-120)], flip_ok: true },
+        ],
+      },
+      'rpc.engine_relapse_incident': { data: true },
     });
     expect(await runEngine(db, now)).toMatchObject({ relapses: 1, opened: 0 });
-    // Only the round is recorded: nothing opens and nothing alerts (D-004 is S04).
-    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('relapse_not_alerted'));
-    warn.mockRestore();
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_relapse_incident']);
+    expect(rpcCalls[0]?.args).toMatchObject({
+      p_incident_id: 'i1',
+      p_severity: 'down',
+      p_trigger: 'hard_fail',
+      p_round_at: at(0),
+      // 3rd change in 30 min: the reply says "Now flapping" (D-024).
+      p_flapping: true,
+      p_context: { backSince: at(-120), nowFlapping: true, flapping: true, startedAt: at(0) },
+      p_notify: true,
+      p_status: 'down',
+    });
+  });
+
+  it('an overlapping run that loses the relapse guard counts nothing', async () => {
+    const { db } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [incident('monitoring')] },
+      'rpc.engine_relapse_incident': { data: false },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ relapses: 0 });
   });
 
   it('waits when the round was already judged', async () => {

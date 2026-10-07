@@ -6,6 +6,7 @@ import {
   lookbackMs,
   NEW_MONITOR,
   UNKNOWN_ROOT_CAUSE,
+  type DownFacts,
   type MonitorCarry,
   type MonitorState,
   type OpenIncident,
@@ -28,6 +29,8 @@ import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
 const MAX_ROUNDS_PER_RUN = 5;
 const OPEN_STATES_EXCLUDED = '("resolved","in_review","closed")';
+/** Messages that told someone the site failed: RECOVERED replies only to these (spec §15.1). */
+const ALERT_TEMPLATES = ['down', 'problem', 'down_again', 'problem_again'];
 /**
  * A round expects only the active locations whose probe beat this recently (D-019): a stopped VPS
  * agent drops out of the vote at once instead of holding every round until its deadline.
@@ -62,7 +65,7 @@ export interface EngineSummary extends CronJobResult {
   problems: number;
   recovered: number;
   settled: number;
-  /** A new problem on a recovered incident: no alert until D-004 (S04b). */
+  /** New drops that joined a recovered incident (D-004): DOWN AGAIN / PROBLEM AGAIN queued. */
   relapses: number;
   /** Blocked rounds handed to the browser verifier this run (one per monitor). */
   verifying: number;
@@ -115,12 +118,17 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   const siteIds = sites.map((s) => s.id);
   const [checks, statuses, carries, incidents, verifier] = await Promise.all([
     loadChecks(db, since),
-    db.from('site_status').select('site_id, last_round_at, ok_rounds, note').in('site_id', siteIds),
+    db
+      .from('site_status')
+      .select('site_id, last_round_at, ok_rounds, note, flips, flip_ok')
+      .in('site_id', siteIds),
     // Server-side reads (S04b): no monitor ids in a GET query string (8 KB limit at 200 monitors).
     db.rpc('engine_monitor_status'),
     db
       .from('incidents')
-      .select('id, site_id, monitor_id, state, severity, root_cause_category, notifications(template)')
+      .select(
+        'id, site_id, monitor_id, state, severity, episode_severity, started_at, acked_at, recovered_at, escalation_level, is_flapping, root_cause_category, notifications(template)',
+      )
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
     loadVerifierState(db, since, now),
@@ -199,8 +207,15 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
             severity: open.severity,
             // Same rule as the resolve gate (spec §16.3): "Unknown" isn't a root cause.
             hasRootCause: !!open.root_cause_category && open.root_cause_category !== UNKNOWN_ROOT_CAUSE,
+            episodeSeverity: open.episode_severity,
+            acked: !!open.acked_at,
+            startedAt: new Date(open.started_at),
+            isFlapping: open.is_flapping,
           } satisfies OpenIncident)
         : null,
+      // OK ↔ not-OK changes at incident steps (D-024): the 3rd in 30 min tags flapping.
+      flips: (status?.flips ?? []).map((f) => new Date(f)),
+      flipOk: status?.flip_ok ?? null,
       monitors: site.monitors.map((m): SiteMonitor => ({
         id: m.id,
         isPrimary: m.isPrimary,
@@ -216,7 +231,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     };
     let note = status?.note ?? null;
     // RECOVERED only replies to an alert that was queued (not one held back by a mute, spec §15.1).
-    const alertQueued = !!open?.notifications.some((n) => n.template === 'down' || n.template === 'problem');
+    const alertQueued = !!open?.notifications.some((n) => ALERT_TEMPLATES.includes(n.template));
 
     // Judge rounds oldest first until one changes the incident or nothing is ready.
     for (let i = 0; i < MAX_ROUNDS_PER_RUN; i += 1) {
@@ -225,10 +240,6 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       if (decision.kind === 'verify') {
         summary.verifying += await queueVerifyJobs(db, site, decision.monitorIds, decision.roundAt);
         break;
-      }
-      if (decision.kind === 'none' && decision.relapse) {
-        summary.relapses += 1;
-        console.warn(JSON.stringify({ event: 'relapse_not_alerted', site: site.id, incident: open?.id }));
       }
       for (const u of decision.unverified) {
         unverifiedMonitors.add(u.monitorId);
@@ -241,7 +252,14 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         db,
         site,
         decision,
-        open ? { id: open.id, monitorId: open.monitor_id } : null,
+        open
+          ? {
+              id: open.id,
+              monitorId: open.monitor_id,
+              recoveredAt: open.recovered_at,
+              isFlapping: open.is_flapping,
+            }
+          : null,
         now,
         alertQueued,
         locations.length,
@@ -522,12 +540,18 @@ async function apply(
   db: DbClient,
   site: SiteRow,
   d: Exclude<SiteDecision, { kind: 'wait' | 'verify' }>,
-  open: { id: string; monitorId: string | null } | null,
+  open: {
+    id: string;
+    monitorId: string | null;
+    /** The last recovery: "was back for 5 min (03:19–03:24)" on DOWN AGAIN. */
+    recoveredAt: string | null;
+    isFlapping: boolean;
+  } | null,
   now: Date,
   alertQueued: boolean,
   /** Locations voting this run: the card's "3 of 3 locations". */
   reporting: number,
-): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | null> {
+): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | null> {
   const at = now.toISOString();
   const incidentId = open?.id ?? null;
   const judged = { p_monitors: monitorsJson(d, site), ...(d.status ? { p_status: d.status } : {}) };
@@ -577,6 +601,7 @@ async function apply(
       if (!incidentId) return null;
       const { data, error } = await db.rpc('engine_escalate_incident', {
         p_incident_id: incidentId,
+        p_flapping: d.flapping,
         p_detected_at: d.confirmedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
         // When the outage started, apart from the PROBLEM before it (uptime, D-002 count from here).
@@ -590,6 +615,42 @@ async function apply(
       });
       if (error) throw new Error(`engine_escalate_incident: ${error.message}`);
       return data ? 'escalated' : null;
+    }
+
+    case 'relapse': {
+      if (!incidentId) return null;
+      // DOWN AGAIN / PROBLEM AGAIN in the incident's thread, Chat only (D-004, D-024). One
+      // state-guarded function: an overlapping run gets false and queues nothing.
+      const ctx = causeContext(site, d.monitorId);
+      const problem = d.detail
+        ? {
+            cause: formatProblemCause(d.detail, ctx),
+            summary: formatProblemSummary(d.detail, ctx),
+            detail: d.detail as unknown as Json,
+            monitorUrl: ctx.monitorUrl,
+          }
+        : {};
+      const { data, error } = await db.rpc('engine_relapse_incident', {
+        p_incident_id: incidentId,
+        p_severity: d.severity,
+        p_trigger: d.trigger,
+        p_started_at: d.startedAt.toISOString(),
+        p_detected_at: d.detectedAt.toISOString(),
+        p_round_at: d.roundAt.toISOString(),
+        p_context: {
+          ...(d.down ? downContext({ ...d.down, monitorId: d.monitorId }, site) : problem),
+          startedAt: d.startedAt.toISOString(),
+          ...(open?.recoveredAt ? { backSince: open.recoveredAt } : {}),
+          // The reply says "Now flapping …" only on the drop that tags it (ChatAlert 03:24).
+          ...(d.flapping && !open?.isFlapping ? { nowFlapping: true } : {}),
+          ...(d.flapping || open?.isFlapping ? { flapping: true } : {}),
+        },
+        p_flapping: d.flapping,
+        p_notify: !site.muted,
+        ...judged,
+      });
+      if (error) throw new Error(`engine_relapse_incident: ${error.message}`);
+      return data ? 'relapses' : null;
     }
 
     case 'open': {
@@ -625,8 +686,16 @@ async function apply(
           slowLimitMs:
             site.monitors.find((m) => m.id === open?.monitorId)?.slowThresholdMs ??
             TIER_CONFIG[site.tier].slowThresholdMs,
+          // The reply renders from its own facts: a relapse may clear the incident's before it goes.
+          recoveredAt: d.recoveredAt.toISOString(),
+          ...(d.autoResolve ? { autoResolved: true } : {}),
         },
         p_notify: !site.muted && alertQueued,
+        // Not-OK → OK only when every monitor is OK: D-023's partial recovery is no flip (D-024).
+        p_flip_ok: d.allOk,
+        p_auto_resolve: d.autoResolve,
+        // Flapping: one summary 15 min after the recovery instead of RECOVERED (spec §19.4).
+        p_hold_summary: d.holdSummary,
         ...judged,
       });
       if (error) throw new Error(`engine_recover_incident: ${error.message}`);
@@ -650,10 +719,7 @@ async function apply(
 }
 
 /** The DOWN alert's facts: the confirming checks, or the browser's verdict (blocked → page failed). */
-function downContext(
-  d: Extract<SiteDecision, { kind: 'open' | 'escalate' }>,
-  site: SiteRow,
-): Record<string, Json> {
+function downContext(d: DownFacts, site: SiteRow): Record<string, Json> {
   const timeoutMs = site.monitors.find((m) => m.id === d.monitorId)?.timeoutMs ?? 30_000;
   return d.verifyJobId
     ? {
