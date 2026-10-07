@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readEdgeConfigItem } from './edge-config';
-import { handle, parseMode, TIMEOUT_HOLD_MS } from './handler';
+import { handle, parseMode, SLOW_HOLD_MS, TIMEOUT_HOLD_MS } from './handler';
 
 describe('handle', () => {
   it.each([
@@ -49,6 +49,26 @@ describe('handle', () => {
   it('the challenge mode page has the title a monitor keyword can look for', async () => {
     const res = await handle({ readMode: async () => 'challenge', userAgent: BROWSER });
     expect(await res.text()).toContain('<h1>Test target</h1>');
+  });
+
+  it('keyword-missing: 200, but no "Test target" anywhere on the page (PROBLEM · Keyword, S04a)', async () => {
+    for (const userAgent of [PROBE, BROWSER]) {
+      const res = await handle({ readMode: async () => 'keyword-missing', userAgent });
+      expect(res.status).toBe(200);
+      expect(await res.text()).not.toContain('Test target');
+    }
+  });
+
+  it('slow: a probe waits over both tier limits and under the monitor timeout; a browser doesn’t', async () => {
+    const sleep = vi.fn(async () => {});
+    const res = await handle({ readMode: async () => 'slow', userAgent: PROBE, sleep });
+    expect(sleep).toHaveBeenCalledWith(SLOW_HOLD_MS);
+    expect(SLOW_HOLD_MS).toBeGreaterThan(5_000);
+    expect(SLOW_HOLD_MS).toBeLessThan(10_000);
+    expect(await res.text()).toContain('<h1>Test target</h1>');
+    const quick = vi.fn(async () => {});
+    await handle({ readMode: async () => 'slow', userAgent: BROWSER, sleep: quick });
+    expect(quick).not.toHaveBeenCalled();
   });
 
   it('really waits with the default sleep', async () => {
