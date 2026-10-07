@@ -21,7 +21,9 @@ WorkingDirectory=/opt/dxt-agent
 EnvironmentFile=/etc/dxt-agent/%i.env
 Environment=HOME=/var/lib/dxt-agent-%i
 Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/dxt-agent/browsers
-ExecStart=/usr/bin/node dist/index.js
+# The VPS has no IPv6 route: IPv4 first, without Node's 250 ms dual-stack race (hosts ~300 ms away,
+# such as hc-ping.com, timed out under it).
+ExecStart=/usr/bin/node --no-network-family-autoselection --dns-result-order=ipv4first dist/index.js
 Restart=always
 RestartSec=5
 # Two instances share the 4 GB VPS: production (3 sessions) and staging (1).

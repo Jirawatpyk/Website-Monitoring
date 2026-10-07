@@ -20,7 +20,8 @@ timedatectl show -p NTPSynchronized                      # must be yes: Ingest r
 **Fix:**
 
 - **Crashed or stuck:** `systemctl restart dxt-agent@production`. The alert clears by itself once the verifier completes a job, or polls again after a no-poll outage. There's no "back" email.
-- **401 in the log:** the env file's `INGEST_TOKEN` doesn't match the environment's. Tao updates `/etc/dxt-agent/<env>.env`, then restart.
+- **401 in the log:** the env file's `INGEST_TOKEN` doesn't match the environment's. Tao updates `/etc/dxt-agent/<env>.env`, then restart. A token changed in Vercel only takes effect after a redeploy (env is read at build time).
+- **`healthcheck_ping_failed`:** the VPS has no IPv6 route; the unit starts Node with IPv4 first (`--no-network-family-autoselection --dns-result-order=ipv4first`). Keep those flags if you edit `ExecStart`.
 - **Chromium won't start:** reinstall it (`deploy/install.md` → Build and copy).
 
 **Email "falling behind" (more than 5 jobs waiting):** many sites are blocked at once. Check the log for slow pages, and consider asking those sites' WAF owners to allowlist the probe User-Agent, the secret header and the VPS IP (the permanent fix, PRD §5). It clears when the queue drops to 5.
