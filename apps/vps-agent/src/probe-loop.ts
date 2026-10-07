@@ -1,5 +1,5 @@
 import { runHttpCheck, type HttpCheckRequest, type HttpCheckResult } from '@dxt/probe';
-import type { IngestBatch } from '@dxt/shared';
+import { probeRequestHeaders, type IngestBatch } from '@dxt/shared';
 import type { Api, DueMonitor } from './api';
 
 /** The immediate recheck starts about 30 s after the scheduled check (PRD §5, spec §6). */
@@ -53,13 +53,12 @@ export async function runProbeRound({
 }: ProbeDeps): Promise<ProbeSummary> {
   const started = clock();
   const monitors = await api.dueMonitors();
-  const headers = secretHeader ? { [secretHeader.name]: secretHeader.value } : undefined;
   const run = (m: DueMonitor, timeoutMs: number) =>
     check({
       url: m.url,
       method: m.method,
       timeoutMs,
-      headers,
+      headers: probeRequestHeaders(m.headers, secretHeader),
       mustContain: m.mustContain,
       mustNotContain: m.mustNotContain,
     });

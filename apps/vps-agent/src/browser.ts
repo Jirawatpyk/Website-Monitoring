@@ -24,11 +24,21 @@ export async function launchBrowser(): Promise<PageBrowser & { close(): Promise<
     return launching;
   };
   return {
-    async visit(url: string, timeoutMs: number): Promise<PageVisit> {
+    async visit(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<PageVisit> {
       const deadline = Date.now() + timeoutMs;
       const remaining = () => Math.max(1_000, deadline - Date.now());
       const context = await (await ensure()).newContext({ viewport: { width: 1366, height: 768 } });
       try {
+        if (headers) {
+          // Custom headers go to the monitor's own origin only, as the HTTP probes send them.
+          const origin = new URL(url).origin;
+          await context.route('**/*', (route) => {
+            const req = route.request();
+            return new URL(req.url()).origin === origin
+              ? route.continue({ headers: { ...req.headers(), ...headers } })
+              : route.continue();
+          });
+        }
         const page = await context.newPage();
         // The last main-document response: after a JS challenge passes, that's the real page.
         let last: Response | null = null;

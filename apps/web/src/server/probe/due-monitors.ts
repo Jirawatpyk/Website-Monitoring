@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { TIER_CONFIG, type Tier } from '@dxt/shared';
+import { TIER_CONFIG, type MonitorHeader, type Tier } from '@dxt/shared';
 
 /** A response slower than 30 s is a failure (PRD §5); longer monitor timeouts are capped here. */
 export const MAX_CHECK_TIMEOUT_MS = 30_000;
@@ -13,6 +13,8 @@ export interface DueMonitor {
   timeoutMs: number;
   mustContain: string[];
   mustNotContain: string[];
+  /** Custom request headers (S05, D-025). */
+  headers: MonitorHeader[];
 }
 
 /** Monitor types the HTTP probes check (`keyword` is an HTTP check with keywords). */
@@ -31,7 +33,9 @@ export function isDue(tier: Tier, at: Date): boolean {
 export async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonitor[]> {
   const { data, error } = await db
     .from('monitors')
-    .select('id, url, method, timeout_ms, must_contain, must_not_contain, sites!inner(tier, is_active)')
+    .select(
+      'id, url, method, timeout_ms, must_contain, must_not_contain, headers, sites!inner(tier, is_active)',
+    )
     .eq('sites.is_active', true)
     // A monitor switched off or removed (S05, D-025) isn't checked.
     .eq('enabled', true)
@@ -48,5 +52,19 @@ export async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonito
       timeoutMs: Math.min(m.timeout_ms, MAX_CHECK_TIMEOUT_MS),
       mustContain: m.must_contain,
       mustNotContain: m.must_not_contain,
+      headers: toHeaders(m.headers),
     }));
+}
+
+/** `monitors.headers` (jsonb) as name / value pairs; anything else in the column is skipped. */
+export function toHeaders(value: unknown): MonitorHeader[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((h: unknown) =>
+    h &&
+    typeof h === 'object' &&
+    typeof (h as MonitorHeader).name === 'string' &&
+    typeof (h as MonitorHeader).value === 'string'
+      ? [{ name: (h as MonitorHeader).name, value: (h as MonitorHeader).value }]
+      : [],
+  );
 }

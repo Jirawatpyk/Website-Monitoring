@@ -24,8 +24,10 @@ describe('createApi — the only way out of the VPS (PRD §10)', () => {
   it('asks for due monitors with the bearer token, at API_BASE_URL only', async () => {
     const fetchImpl = vi.fn(async () => ok({ monitors: [MONITOR] }));
     const api = createApi('https://monitor.example.test', TOKEN, fetchImpl);
-    // A server that doesn't send keywords yet: none to check (D-022).
-    expect(await api.dueMonitors()).toEqual([{ ...MONITOR, mustContain: [], mustNotContain: [] }]);
+    // A server that doesn't send keywords (D-022) or headers (S05) yet: none to check or send.
+    expect(await api.dueMonitors()).toEqual([
+      { ...MONITOR, mustContain: [], mustNotContain: [], headers: [] },
+    ]);
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit];
     expect(url.toString()).toBe('https://monitor.example.test/api/ingest');
     expect(init.headers).toMatchObject({ authorization: `Bearer ${TOKEN}` });
@@ -37,7 +39,7 @@ describe('createApi — the only way out of the VPS (PRD §10)', () => {
     );
     const api = createApi('https://monitor.example.test', TOKEN, fetchImpl as unknown as typeof fetch);
     await api.postResults([]);
-    expect(await api.leaseJobs(2, 1)).toEqual([JOB]);
+    expect(await api.leaseJobs(2, 1)).toEqual([{ ...JOB, headers: [] }]);
     const [leaseUrl] = fetchImpl.mock.calls[1] as unknown as [URL];
     expect(leaseUrl.search).toBe('?max=2&sessions=1');
     const [, postInit] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit];

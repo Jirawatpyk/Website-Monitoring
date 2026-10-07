@@ -22,14 +22,16 @@ const monitors = [
     timeoutMs: 10_000,
     mustContain: ['Welcome'],
     mustNotContain: ['Index of /'],
+    headers: [] as { name: string; value: string }[],
   },
   {
     id: 'm-down',
     url: 'https://down.example.test',
     method: 'HEAD' as const,
     timeoutMs: 30_000,
-    mustContain: [],
-    mustNotContain: [],
+    mustContain: [] as string[],
+    mustNotContain: [] as string[],
+    headers: [{ name: 'Accept-Language', value: 'th' }],
   },
 ];
 const fakeApi = (due = monitors) => {
@@ -114,6 +116,15 @@ describe('runProbeRound (Bangkok)', () => {
     });
     expect(summary).toEqual({ checked: 1, failed: 1, rechecked: 0 });
     expect(posted).toHaveLength(1);
+  });
+
+  it('sends a monitor’s custom headers with the secret header last (S05)', async () => {
+    const { api } = fakeApi([monitors[1]!]);
+    const check = vi.fn(async () => result('pass'));
+    await runProbeRound({ api, check, secretHeader: { name: 'X-DxT-Monitor', value: 's3cret' } });
+    expect(check).toHaveBeenCalledWith(
+      expect.objectContaining({ headers: { 'Accept-Language': 'th', 'X-DxT-Monitor': 's3cret' } }),
+    );
   });
 
   it('sends no secret header when none is configured', async () => {

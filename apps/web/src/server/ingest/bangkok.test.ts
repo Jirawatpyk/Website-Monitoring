@@ -125,7 +125,7 @@ describe('Bangkok through the Ingest API', () => {
     });
     // 03:01 UTC: Tier 1 is due every minute, Tier 3 only on minutes divisible by 5.
     expect(await dueForBangkok(db, new Date('2026-10-07T03:01:30Z'))).toEqual([
-      { id: 'm1', url: 'https://a.example.test', method: 'GET', timeoutMs: 30_000 },
+      { id: 'm1', url: 'https://a.example.test', method: 'GET', timeoutMs: 30_000, headers: [] },
     ]);
     expect(calls.some((c) => c.table === 'probe_locations')).toBe(false);
   });
