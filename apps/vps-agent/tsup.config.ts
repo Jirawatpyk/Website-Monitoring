@@ -1,6 +1,7 @@
 import { defineConfig } from 'tsup';
 
-// Workspace packages ship TypeScript source, so they are bundled in; npm dependencies stay external.
+// Workspace packages (TypeScript source) and zod are bundled in; only Playwright stays external —
+// it ships a browser, so /opt/dxt-agent installs it from deploy/package.json.
 export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm'],
@@ -8,5 +9,5 @@ export default defineConfig({
   target: 'node22',
   clean: true,
   sourcemap: true,
-  noExternal: [/^@dxt\//],
+  noExternal: [/^@dxt\//, 'zod'],
 });
