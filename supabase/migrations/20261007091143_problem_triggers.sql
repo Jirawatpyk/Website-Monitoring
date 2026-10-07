@@ -3,6 +3,11 @@
 -- round to round (slow streak, per-location failing-since, last verdict), site status worked out
 -- from every monitor's verdict in the same transaction as the incident change, and the Admin alert
 -- when fewer than 2 probe locations are beating.
+--
+-- Deploy order: apply this migration BEFORE the code that passes p_monitors / p_status. The old code
+-- keeps working against the new functions (the new parameters default to null), but the new code
+-- gets "function not found" from the old ones. Production waits for `migrate-production` (Deployment
+-- Checks); on staging run `pnpm db:push:staging` before pushing the branch to `staging`.
 
 -- ── check_results: keyword and redirect facts ────────────────────────────
 -- Null = not checked (no keywords on the monitor, a HEAD request, or a check that got no answer).
