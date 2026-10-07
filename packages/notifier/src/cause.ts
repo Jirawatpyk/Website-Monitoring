@@ -31,7 +31,7 @@ export function formatCause(checks: readonly FailedCheck[], timeoutMs: number): 
 
 const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY/;
 
-function describeFailure({ statusCode, error }: FailedCheck, timeoutMs: number): string {
+export function describeFailure({ statusCode, error }: FailedCheck, timeoutMs: number): string {
   if (statusCode !== null) return `HTTP ${statusCode}`;
   if (error === 'Timeout') return `Timeout > ${Math.round(timeoutMs / 1000)} s`;
   if (error === 'ENOTFOUND' || error === 'EAI_AGAIN') return 'DNS error';

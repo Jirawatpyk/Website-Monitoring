@@ -11,6 +11,9 @@ const pass: HttpCheckResult = {
   ttfbMs: 40,
   error: null,
   bodySample: '',
+  finalUrl: 'https://a.example.test/',
+  keywordMissing: ['Welcome'],
+  keywordForbidden: [],
 };
 const fail: HttpCheckResult = {
   outcome: 'fail',
@@ -19,6 +22,9 @@ const fail: HttpCheckResult = {
   ttfbMs: 50,
   error: null,
   bodySample: '',
+  finalUrl: 'https://a.example.test/',
+  keywordMissing: null,
+  keywordForbidden: null,
 };
 
 const monitor = (id: string, tier: number, timeout_ms = 10_000) => ({
@@ -26,6 +32,8 @@ const monitor = (id: string, tier: number, timeout_ms = 10_000) => ({
   url: `https://${id}.example.test`,
   method: 'GET',
   timeout_ms,
+  must_contain: id === 'b' ? ['Welcome'] : [],
+  must_not_contain: [],
   sites: { tier, is_active: true },
 });
 
@@ -98,6 +106,8 @@ describe('runProbe', () => {
       timeoutMs: 5_000,
       headers: { 'X-DxT-Monitor': 'v' },
       allowPrivateTargets: false,
+      mustContain: ['Welcome'],
+      mustNotContain: [],
     });
     expect(inserts(s.calls)).toEqual([
       [
@@ -107,11 +117,21 @@ describe('runProbe', () => {
           attempt: 1,
           outcome: 'pass',
           status_code: 200,
+          // What the page said beyond pass / fail (D-022).
+          final_url: 'https://a.example.test/',
+          keyword_missing: ['Welcome'],
+          keyword_forbidden: [],
         }),
         expect.objectContaining({ monitor_id: 'b', attempt: 1 }),
       ],
     ]);
     expect(s.sleep).not.toHaveBeenCalled();
+    // Every monitor of an active site, key pages included — not only the primary (S04a).
+    expect(s.calls.find((c) => c.table === 'monitors')?.filters).toEqual([
+      ['eq', 'sites.is_active', true],
+      // HTTP page monitors only: SSL / domain (S13) and browser (S23) are checked their own way.
+      ['in', 'type', ['http', 'keyword']],
+    ]);
     expect(s.calls.find((c) => c.table === 'probe_locations')).toMatchObject({
       op: 'update',
       filters: [['eq', 'code', 'TYO']],

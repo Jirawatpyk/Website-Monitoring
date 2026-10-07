@@ -16,6 +16,9 @@ export interface HttpCheckRequest {
   allowPrivateTargets?: boolean;
   /** DNS lookup for the SSRF guard (tests). */
   lookup?: Lookup;
+  /** Text the page must contain / must not contain (PROBLEM · Keyword, D-022). Case-sensitive. */
+  mustContain?: readonly string[];
+  mustNotContain?: readonly string[];
 }
 
 export interface HttpCheckResult {
@@ -25,10 +28,25 @@ export interface HttpCheckResult {
   ttfbMs: number | null;
   error: string | null;
   bodySample: string;
+  /** Where the redirects ended (PROBLEM · Redirect, D-022); null when nothing answered. */
+  finalUrl: string | null;
+  /**
+   * Keywords checked on a passing GET with keywords set; null when not checked (HEAD, no keywords,
+   * or a response that didn't pass — a challenge page or a 5xx says nothing about the content).
+   */
+  keywordMissing: string[] | null;
+  keywordForbidden: string[] | null;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const BODY_SAMPLE_BYTES = 16_384;
+/** Enough of a real home page to find its keywords (D-022); read only when the monitor has some. */
+export const KEYWORD_BODY_BYTES = 262_144;
+/** What `check_results` and the Ingest schema take: a longer URL or list is cut, never refused. */
+export const MAX_FINAL_URL = 2048;
+export const MAX_KEYWORDS = 20;
+export const MAX_KEYWORD_LENGTH = 200;
+const capped = (words: string[]) => words.slice(0, MAX_KEYWORDS).map((w) => w.slice(0, MAX_KEYWORD_LENGTH));
 export const MAX_REDIRECTS = 5;
 
 /**
@@ -37,17 +55,25 @@ export const MAX_REDIRECTS = 5;
  */
 export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResult> {
   const started = performance.now();
+  const mustContain = req.mustContain ?? [];
+  const mustNotContain = req.mustNotContain ?? [];
+  const keywords = (req.method ?? 'GET') === 'GET' && mustContain.length + mustNotContain.length > 0;
   try {
-    const res = await fetchFollowing(req);
+    const { res, url } = await fetchFollowing(req);
     const ttfbMs = Math.round(performance.now() - started);
-    const bodySample = await readSample(res, BODY_SAMPLE_BYTES);
+    const bodySample = await readSample(res, keywords ? KEYWORD_BODY_BYTES : BODY_SAMPLE_BYTES);
+    const outcome = classifyResponse({ status: res.status, headers: res.headers, bodySample });
+    const checked = keywords && outcome === 'pass';
     return {
-      outcome: classifyResponse({ status: res.status, headers: res.headers, bodySample }),
+      outcome,
       statusCode: res.status,
       responseMs: Math.round(performance.now() - started),
       ttfbMs,
       error: null,
       bodySample,
+      finalUrl: url.href.slice(0, MAX_FINAL_URL),
+      keywordMissing: checked ? capped(mustContain.filter((k) => !bodySample.includes(k))) : null,
+      keywordForbidden: checked ? capped(mustNotContain.filter((k) => bodySample.includes(k))) : null,
     };
   } catch (err) {
     // DNS, TLS, refused connection and timeout all land here: a hard fail.
@@ -58,6 +84,9 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       ttfbMs: null,
       error: describeError(err),
       bodySample: '',
+      finalUrl: null,
+      keywordMissing: null,
+      keywordForbidden: null,
     };
   }
 }
@@ -66,7 +95,7 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
  * Follows redirects by hand (at most MAX_REDIRECTS): every hop passes the SSRF guard, and the extra
  * headers go only to the monitor's own origin.
  */
-async function fetchFollowing(req: HttpCheckRequest): Promise<Response> {
+async function fetchFollowing(req: HttpCheckRequest): Promise<{ res: Response; url: URL }> {
   const first = new URL(req.url);
   const signal = AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let url = first;
@@ -80,7 +109,7 @@ async function fetchFollowing(req: HttpCheckRequest): Promise<Response> {
       signal,
     });
     const location = res.headers.get('location');
-    if (res.status < 300 || res.status >= 400 || res.status === 304 || !location) return res;
+    if (res.status < 300 || res.status >= 400 || res.status === 304 || !location) return { res, url };
     if (hop >= MAX_REDIRECTS) throw new Error('Too many redirects');
     await res.body?.cancel();
     url = new URL(location, url);

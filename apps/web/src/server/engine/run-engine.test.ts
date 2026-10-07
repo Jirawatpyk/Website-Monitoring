@@ -17,8 +17,11 @@ const at = (sec: number) => new Date(Date.parse('2026-10-06T10:00:00Z') + sec * 
 const monitor = (over: Record<string, unknown> = {}) => ({
   id: 'm1',
   url: 'https://tubtong.example.test',
+  is_primary: true,
   must_contain: ['Tubtong'],
   timeout_ms: 10_000,
+  thresholds: {},
+  allowed_redirect_domains: [],
   site_id: 's1',
   sites: { name: 'Tubtong', tier: 1, is_active: true, muted_until: null, ...over },
 });
@@ -58,8 +61,10 @@ describe('runEngine', () => {
     const { db, rpcCalls } = fakeDb();
     expect(await runEngine(db, now)).toEqual({
       ok: true,
+      sites: 0,
       monitors: 0,
       opened: 0,
+      problems: 0,
       recovered: 0,
       settled: 0,
       relapses: 0,
@@ -91,6 +96,21 @@ describe('runEngine', () => {
           p_round_at: at(0),
           p_context: { cause: 'HTTP 500 (SIN, TYO)', confirmingLocations: 2 },
           p_notify: true,
+          // The monitor's verdict and the site status commit with the incident (D-022).
+          p_monitors: [
+            {
+              monitorId: 'm1',
+              status: 'down',
+              trigger: null,
+              cause: null,
+              slowRounds: 0,
+              failingSince: {
+                SIN: at(0),
+                TYO: at(1),
+              },
+            },
+          ],
+          p_status: 'down',
         },
       },
     ]);
@@ -154,6 +174,10 @@ describe('runEngine', () => {
       p_round_at: at(0),
       p_evaluated_at: now.toISOString(),
       p_ok_rounds: 1,
+      p_monitors: [
+        { monitorId: 'm1', status: 'ok', trigger: null, cause: null, slowRounds: 0, failingSince: {} },
+      ],
+      p_status: 'ok',
     });
   });
 
@@ -173,8 +197,13 @@ describe('runEngine', () => {
         p_to: 'monitoring',
         p_recovered_at: at(0),
         p_round_at: at(0),
-        p_context: { okLocations: 2 },
+        p_context: { okLocations: 2, slowLimitMs: 3_000 },
         p_notify: true,
+        p_monitors: [
+          { monitorId: 'm1', status: 'ok', trigger: null, cause: null, slowRounds: 0, failingSince: {} },
+        ],
+        // PRD §5: the site shows OK only after the second OK round.
+        p_status: 'down',
       },
     });
   });
@@ -254,7 +283,6 @@ describe('runEngine', () => {
   it.each([
     ['monitors.select', 'monitors: boom'],
     ['check_results.select', 'boom'],
-    ['rpc.engine_record_round', 'engine_record_round: boom'],
     ['probe_locations.select', 'boom'],
   ])('throws when %s fails', async (key, message) => {
     const { db } = fakeDb({
@@ -266,6 +294,7 @@ describe('runEngine', () => {
   });
 
   it.each([
+    ['rpc.engine_record_round', ok, [], []],
     ['rpc.engine_open_incident', down, [], []],
     ['rpc.engine_recover_incident', ok, [incident('unacked')], []],
     [
@@ -274,7 +303,7 @@ describe('runEngine', () => {
       [incident('monitoring')],
       [{ site_id: 's1', last_round_at: null, ok_rounds: 1 }],
     ],
-  ])('throws when %s fails', async (key, checks, incidents, statuses) => {
+  ])('reports the run failed when %s fails', async (key, checks, incidents, statuses) => {
     const { db } = fakeDb({
       'monitors.select': { data: [monitor()] },
       'check_results.select': { data: checks },
@@ -282,6 +311,241 @@ describe('runEngine', () => {
       'site_status.select': { data: statuses },
       [key]: { error: { message: 'boom' } },
     });
-    await expect(runEngine(db, now)).rejects.toThrow(`${key.slice(4)}: boom`);
+    // A site's write failing fails the run (Healthchecks), never the other sites' judging.
+    expect(await runEngine(db, now)).toMatchObject({
+      ok: false,
+      failures: [`Tubtong: ${key.slice(4)}: boom`],
+    });
+  });
+});
+
+describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
+  const page = (over: Record<string, unknown> = {}) => ({ ...monitor(), ...over });
+  const slow = (monitor_id = 'm1') =>
+    ['SIN', 'TYO'].map((location, i) => ({
+      ...row(location, 'pass', i, 1, 200),
+      monitor_id,
+      response_ms: 3_400,
+    }));
+
+  it('the third slow round opens PROBLEM (Slow) with its cause, summary and alert', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: slow() },
+      'monitor_status.select': {
+        data: [
+          { monitor_id: 'm1', status: 'ok', trigger: null, cause: null, slow_rounds: 2, failing_since: {} },
+        ],
+      },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ problems: 1, opened: 0 });
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_open_incident',
+      args: {
+        p_trigger: 'slow',
+        p_severity: 'problem',
+        p_started_at: at(-120),
+        p_detected_at: now.toISOString(),
+        p_context: {
+          cause: 'p50 3.4 s (SIN, TYO) · over the Tier 1 limit of 3 s for 3 checks in a row',
+          summary: 'slow, p50 3.4 s',
+        },
+        p_notify: true,
+        p_status: 'problem',
+        p_monitors: [{ monitorId: 'm1', status: 'problem', trigger: 'slow', slowRounds: 3 }],
+      },
+    });
+  });
+
+  it('a monitor’s own slow limit wins over the tier’s', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [page({ thresholds: { slowMs: 4_000 } })] },
+      'check_results.select': { data: slow() },
+      'monitor_status.select': {
+        data: [
+          { monitor_id: 'm1', status: 'ok', trigger: null, cause: null, slow_rounds: 2, failing_since: {} },
+        ],
+      },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_record_round', args: { p_status: 'ok' } });
+  });
+
+  it('a key page returning 500 while the home page is fine → PROBLEM (Key page), never DOWN', async () => {
+    const booking = page({ id: 'm2', url: 'https://tubtong.example.test/booking', is_primary: false });
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [booking, monitor()] },
+      'check_results.select': { data: [...ok, ...down.map((r) => ({ ...r, monitor_id: 'm2' }))] },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ sites: 1, monitors: 2, problems: 1, opened: 0 });
+    expect(rpcCalls[0]?.args).toMatchObject({
+      p_monitor_id: 'm2',
+      p_trigger: 'key_page',
+      p_severity: 'problem',
+      p_context: {
+        cause: 'Home OK · /booking → HTTP 500 (SIN, TYO)',
+        summary: 'key page /booking, HTTP 500',
+        monitorUrl: 'https://tubtong.example.test/booking',
+      },
+      p_status: 'problem',
+    });
+  });
+
+  it('skips a site without a primary monitor (only the primary can judge DOWN)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [page({ is_primary: false })] },
+      'check_results.select': { data: down },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ sites: 0 });
+    expect(rpcCalls.filter((c) => c.name.startsWith('engine_'))).toEqual([]);
+  });
+
+  it('keeps a key page’s worded cause while it has no data, and doesn’t recover what nobody saw recover', async () => {
+    const booking = page({ id: 'm2', url: 'https://tubtong.example.test/booking', is_primary: false });
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor(), booking] },
+      'check_results.select': { data: ok },
+      'monitor_status.select': {
+        data: [
+          {
+            monitor_id: 'm2',
+            status: 'problem',
+            trigger: 'key_page',
+            cause: 'Home OK · /booking → HTTP 404 (SIN, TYO)',
+            slow_rounds: 0,
+            failing_since: null,
+          },
+        ],
+      },
+      'incidents.select': {
+        data: [{ ...incident('unacked'), severity: 'problem', notifications: [{ template: 'problem' }] }],
+      },
+      'rpc.engine_recover_incident': { data: true },
+    });
+    // Past the round's deadline, home passes, but /booking has no data: its problem holds.
+    expect(await runEngine(db, new Date(at(140)))).toMatchObject({ recovered: 0 });
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_record_round' });
+    expect(rpcCalls[0]?.args).not.toHaveProperty('p_status');
+    expect(rpcCalls[0]?.args).toMatchObject({
+      p_monitors: [
+        { monitorId: 'm1', status: 'ok' },
+        {
+          monitorId: 'm2',
+          status: 'problem',
+          cause: 'Home OK · /booking → HTTP 404 (SIN, TYO)',
+          failingSince: {},
+        },
+      ],
+    });
+  });
+
+  it('fewer than 2 locations beating → one Admin alert; it clears 10 min later once 2 beat again', async () => {
+    const lonely = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'probe_locations.select': { data: [beating[0]] },
+      'rpc.open_system_alert': { data: 'a1' },
+    });
+    expect(await runEngine(lonely.db, now)).toMatchObject({ alerts: 1 });
+    expect(lonely.rpcCalls).toContainEqual({
+      name: 'open_system_alert',
+      args: { p_kind: 'probe_locations_low', p_context: { active: ['SIN'] } },
+    });
+    const alert = (opened: string) => ({
+      'system_alerts.select': { data: [{ kind: 'probe_locations_low', context: {}, opened_at: opened }] },
+    });
+    const young = fakeDb({ ...alert('2026-10-06T09:55:00Z') });
+    await runEngine(young.db, now);
+    expect(young.rpcCalls).toEqual([]);
+    const old = fakeDb({ ...alert('2026-10-06T09:50:00Z') });
+    await runEngine(old.db, now);
+    expect(old.rpcCalls).toEqual([{ name: 'clear_system_alert', args: { p_kind: 'probe_locations_low' } }]);
+  });
+});
+
+describe('runEngine — one failing site never blinds the others (security review M1)', () => {
+  it('judges every site, then fails the run naming the site whose write failed', async () => {
+    const other = { ...monitor(), id: 'm2', site_id: 's2', sites: { ...monitor().sites, name: 'Other' } };
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor(), other] },
+      'check_results.select': { data: [...ok, ...ok.map((r) => ({ ...r, monitor_id: 'm2' }))] },
+      'rpc.engine_record_round': (call) =>
+        (call.values as { p_site_id: string }).p_site_id === 's1' ? { error: { message: 'boom' } } : {},
+    });
+    expect(await runEngine(db, now)).toMatchObject({
+      ok: false,
+      failures: ['Tubtong: engine_record_round: boom'],
+    });
+    expect(rpcCalls.map((c) => (c.args as { p_site_id?: string }).p_site_id)).toEqual(['s1', 's2']);
+  });
+});
+
+describe('runEngine — overlapping runs (engine review M2)', () => {
+  const carryAt = (last_round_at: string) => ({
+    'monitor_status.select': {
+      data: [
+        {
+          monitor_id: 'm1',
+          status: 'ok',
+          trigger: null,
+          cause: null,
+          slow_rounds: 2,
+          failing_since: {},
+          last_round_at,
+        },
+      ],
+    },
+  });
+  const siteAt = (last_round_at: string) => ({
+    'site_status.select': { data: [{ site_id: 's1', last_round_at, ok_rounds: 1, note: null }] },
+  });
+
+  it('skips a site whose carry is ahead of its round (read after another run committed it)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: ok },
+      ...siteAt(at(-120)),
+      ...carryAt(at(-60)),
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.filter((c) => c.name.startsWith('engine_'))).toEqual([]);
+  });
+
+  it('a carry far behind its site is stale (the monitor was off): dropped, and the site judged', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: ok },
+      ...siteAt(at(-60)),
+      ...carryAt(at(-3600)),
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_record_round',
+      args: { p_monitors: [{ monitorId: 'm1', slowRounds: 0 }] },
+    });
+  });
+
+  it('skips a site whose monitor carry is older than its round: read mid-commit of another run', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'check_results.select': { data: ok },
+      'site_status.select': { data: [{ site_id: 's1', last_round_at: at(-60), ok_rounds: 1, note: null }] },
+      'monitor_status.select': {
+        data: [
+          {
+            monitor_id: 'm1',
+            status: 'ok',
+            trigger: null,
+            cause: null,
+            slow_rounds: 2,
+            failing_since: {},
+            last_round_at: at(-120),
+          },
+        ],
+      },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.filter((c) => c.name.startsWith('engine_'))).toEqual([]);
   });
 });

@@ -11,7 +11,12 @@ export interface DueMonitor {
   url: string;
   method: 'GET' | 'HEAD';
   timeoutMs: number;
+  mustContain: string[];
+  mustNotContain: string[];
 }
+
+/** Monitor types the HTTP probes check (`keyword` is an HTTP check with keywords). */
+export const HTTP_MONITOR_TYPES = ['http', 'keyword'] as const;
 
 /** Tier 1 every minute, Tier 2 every 3, Tier 3 every 5 (PRD §2), on the UTC minute. */
 export function isDue(tier: Tier, at: Date): boolean {
@@ -19,13 +24,17 @@ export function isDue(tier: Tier, at: Date): boolean {
   return Math.floor(at.getTime() / 60_000) % everyMin === 0;
 }
 
-/** Primary monitors of active sites that are due at `at`, timeouts capped at 30 s. */
+/**
+ * Every monitor of an active site that is due at `at` — the primary and its key pages (S04a: a key
+ * page can only raise a PROBLEM, D-022) — timeouts capped at 30 s.
+ */
 export async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonitor[]> {
   const { data, error } = await db
     .from('monitors')
-    .select('id, url, method, timeout_ms, sites!inner(tier, is_active)')
-    .eq('is_primary', true)
-    .eq('sites.is_active', true);
+    .select('id, url, method, timeout_ms, must_contain, must_not_contain, sites!inner(tier, is_active)')
+    .eq('sites.is_active', true)
+    // HTTP page monitors only: SSL / domain (S13) and browser (S23) monitors are checked their own way.
+    .in('type', HTTP_MONITOR_TYPES);
   if (error) throw new Error(`monitors: ${error.message}`);
   return data
     .filter((m) => isDue(m.sites.tier as Tier, at))
@@ -34,5 +43,7 @@ export async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonito
       url: m.url,
       method: m.method === 'HEAD' ? 'HEAD' : 'GET',
       timeoutMs: Math.min(m.timeout_ms, MAX_CHECK_TIMEOUT_MS),
+      mustContain: m.must_contain,
+      mustNotContain: m.must_not_contain,
     }));
 }

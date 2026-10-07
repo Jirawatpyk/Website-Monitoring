@@ -22,7 +22,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | MIncident | Mobile — Incident detail | 390×844 | Web app — desktop 1440 + mobile 390 |
 | StatusModel | Status model & verification logic | 1440×4680 | Status logic · Mobile ack · Alert channel |
 | MobileAck | Mobile — acknowledge from alert | 390×844 | Status logic · Mobile ack · Alert channel |
-| ChatAlert | Google Chat alert thread (content spec) | 600×3369 | Status logic · Mobile ack · Alert channel |
+| ChatAlert | Google Chat alert thread (content spec) | 600×7044 | Status logic · Mobile ack · Alert channel |
 | Incidents | Incidents list | 1440×1100 | Core flows · incidents · maintenance · onboarding |
 | Maintenance | Maintenance / mute dialog | 1440×1240 | Core flows · incidents · maintenance · onboarding |
 | AddSite | Add site + registration checklist | 1440×1680 | Core flows · incidents · maintenance · onboarding |
@@ -38,7 +38,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | StatusPage | Client status page | 1280×1380 | Reports · client-facing · admin |
 | MStatusPage | Client status page — mobile | 390×844 | Reports · client-facing · admin |
 | Users | Settings — users & roles | 1440×1468 | Reports · client-facing · admin |
-| PostIncident | Post-incident review — INC-0133 VOCA | 1440×1700 | Review loop · alert routing · dark mode |
+| PostIncident | Post-incident review — INC-0133 VOCA | 1440×1732 | Review loop · alert routing · dark mode |
 | AlertChannels | Settings — alert channels & routing | 1440×1960 | Review loop · alert routing · dark mode |
 | MainDark | Overview dashboard — dark (NOC wall) | 1440×1840 | Review loop · alert routing · dark mode |
 | MobileAckDark | Mobile ack — dark (night on-call) | 390×844 | Review loop · alert routing · dark mode |
@@ -49,7 +49,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | MainFault | Overview — monitoring degraded (heartbeat missed) | 1440×1228 | Access · monitor config · resolve · when the monitor itself fails |
 | Expiry | SSL & domain expiry | 1440×1340 | Expiry · summaries · email · account & security · empty states |
 | WeeklySummary | Weekly summary — Chat card spec | 600×2397 | Expiry · summaries · email · account & security · empty states |
-| EmailAlert | Alert email template | 720×1408 | Expiry · summaries · email · account & security · empty states |
+| EmailAlert | Alert email template | 720×1712 | Expiry · summaries · email · account & security · empty states |
 | Profile | My profile & notifications | 1440×1136 | Expiry · summaries · email · account & security · empty states |
 | Security | Settings — sign-in & security | 1440×1540 | Expiry · summaries · email · account & security · empty states |
 | EmptyStates | Empty, loading & no-access states | 1440×1562 | Expiry · summaries · email · account & security · empty states |
@@ -216,3 +216,10 @@ Role chips (single select): All · Responder · On-call · Stakeholder · Viewer
 | Reports & client status page | — | — | ✓ | — | ✓ |
 | Escalation rules, users & roles | — | — | — | — | ✓ |
 "When an alert arrives" carries a callout for Stakeholders: "Got an FYI (L3) or a client-update mention? You don't need to acknowledge — AMs act on the client update; the CEO needs no action on an FYI."
+
+## 19. PROBLEM messages, re-joins, flapping and Admin system emails (decided — overrides anything above that conflicts)
+1. **PROBLEM lifecycle includes Monitoring** (amends §15.4): Unacked/Escalated → Acknowledged → Monitoring (first OK round — RECOVERED is posted then) → Needs root cause (second OK round, unless a root cause is already written) → Resolved, by hand. A PROBLEM never goes to In review or Closed.
+2. **PROBLEM thread** (ChatAlert, EmailAlert): first card + ACKNOWLEDGED + RECOVERED replies, amber, same one-thread / one-subject rules as DOWN. L0 = owner @mention (Tier 1 at night: the on-call person) + Alerts Space + email to the owner; the backup is plain text. A Tier 2–3 PROBLEM outside response hours is held until 09:00. Cause wording per trigger: see the ChatAlert table.
+3. **Fails again while the incident is open:** open = any state before Resolved (Unacked, Escalated, Acknowledged, Monitoring, Needs root cause). There is no time window. A site that fails again while its incident is open joins that incident and its thread (DOWN AGAIN / PROBLEM AGAIN). The incident goes back to Acknowledged if someone had acknowledged it, otherwise to Unacked. The reply mentions only the person expected to act now (whoever acknowledged; otherwise the L0 person).
+4. **Flapping** (≥ 3 status changes in 30 min): the incident still moves through its states as normal; only the RECOVERED replies are held. One RECOVERED summary is sent after 15 min of continuous OK (VOCA: drops 03:12–03:19 · 03:24–03:35 · 03:38–03:52 · 03:55–04:04, summary 04:19). A drop that lasts is simply a DOWN that hasn't recovered, so nothing more is posted until it recovers.
+5. **Admin system emails** (browser verifier unavailable; fewer than 2 probe locations reporting): sent to every active Admin and nobody else. One email per outage, subject includes the start time, no "back up" email, footer "You got this because you're an Admin." The verifier email is sent when a blocked check finds no verifier answering.

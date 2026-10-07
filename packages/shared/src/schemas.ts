@@ -17,6 +17,11 @@ export const checkResultSchema = z.object({
   error: z.string().max(500).nullable(),
   /** 1 = the scheduled check, 2 = the immediate recheck of a failure about 30 s later (PRD §5). */
   attempt: z.union([z.literal(1), z.literal(2)]).default(1),
+  // S04a (D-022): where the redirects ended and the keyword result. Optional, so a probe that
+  // doesn't send them yet (a VPS agent not redeployed) still reports; null = not checked.
+  finalUrl: z.url().max(2048).nullable().optional(),
+  keywordMissing: z.array(z.string().max(200)).max(20).nullable().optional(),
+  keywordForbidden: z.array(z.string().max(200)).max(20).nullable().optional(),
 });
 export type CheckResultInput = z.infer<typeof checkResultSchema>;
 
@@ -40,6 +45,9 @@ export const dueMonitorSchema = z.object({
   url: z.string().min(1),
   method: z.enum(['GET', 'HEAD']),
   timeoutMs: z.number().int().positive(),
+  /** Keywords the probe checks (D-022); absent from a server that doesn't send them yet. */
+  mustContain: z.array(z.string()).default([]),
+  mustNotContain: z.array(z.string()).default([]),
 });
 export type DueMonitor = z.infer<typeof dueMonitorSchema>;
 export const dueMonitorsResponseSchema = z.object({ monitors: z.array(dueMonitorSchema) });

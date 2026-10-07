@@ -4,6 +4,8 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-023 | 7 Oct 2026 | A DOWN incident recovers when the primary monitor is OK again, even if a key page still fails; the key page's problem then rejoins the same incident as a PROBLEM relapse (built in S04b). Until S04b, D-022's "recover when every monitor is OK" stays | D-022 recovery rule ("an incident recovers on the first round every monitor is OK") for DOWN incidents |
+| D-022 | 7 Oct 2026 | S04 is split into S04a / S04b. Engine rules: one verdict per monitor per round; site status = the worst verdict, never below an unrecovered incident's severity; non-primary problems are `key_page`; keyword and redirect = a majority in one round; slow = p50 over the threshold 3 rounds in a row; regional = one location failing ≥ 5 min; the faulty-location rule needs ≥ 3 monitors in the minute; fewer than 2 locations beating → Admin alert. PROBLEM is sent at any hour until S08. While flapping, states move as normal and only RECOVERED is held. Every new problem on a recovered incident is a D-004 relapse (S04b). PROBLEM message copy comes from the ChatAlert / EmailAlert rows design added (spec §19) | Gaps — PRD §5 / StatusModel name the triggers but not how they are counted; ChatAlert / EmailAlert have one PROBLEM text line only |
 | D-021 | 7 Oct 2026 | A DOWN confirmed while the site's open incident is a PROBLEM raises that incident to DOWN (same incident and thread, DOWN alert sent, back to waiting for an ack if it had recovered); a DOWN incident's relapse stays D-004 / S04 | Gap — D-004 covers a site failing again, not a PROBLEM incident turning into an outage |
 | D-020 | 7 Oct 2026 | A blocked site that is blocked in the browser verifier too (a WAF or challenge page in plain Chromium) is PROBLEM (unverified), not DOWN; only a page that really fails in the browser (no answer, 4xx/5xx without a WAF signature, keyword missing) is DOWN | StatusModel "Blocked · browser: page fails → DOWN" read literally (PRD §5 "a plain browser blocked → PROBLEM, not hidden") |
 | D-019 | 7 Oct 2026 | S03 verifier: the queue is a `verification_jobs` table with leases (not pgmq); PROBLEM (unverified) opens the incident and emails the Admin in S03, its Chat card comes with S04's PROBLEM rows; Admin alerts not tied to an incident live in `system_alerts`; the VPS runs a staging and a production agent from one systemd template | PRD §10 "pgmq", StatusModel "Owner + Alerts Space" for blocked_unverified (until S04), plan S03 Done-when 6 `/etc/dxt-agent/env` |
@@ -25,6 +27,66 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-023 — A DOWN ends when the home page is back; a broken key page carries on as a PROBLEM
+
+**Gap.** D-022 makes site status the worst monitor verdict and lets an incident recover only on a round where every monitor is OK. For a DOWN incident that means: the home page answers again, but a key page still returns 404, so the site stays DOWN and the incident never recovers. Those minutes count as downtime in uptime (spec §5), and from S08 the DOWN escalation keeps paging people while the site is up. Found by engine-reviewer in S04a.
+
+**Decision (7 Oct 2026, Tao).**
+- A **DOWN** incident recovers (RECOVERED, Monitoring) on the first round the **primary** monitor is OK, whatever the key pages say. The downtime ends there.
+- A key page still failing then counts as a new problem on a recovered incident: a D-004 relapse into the **same** incident and thread, as a PROBLEM ("PROBLEM AGAIN", spec §19). Severity stays as it was for the record; the site shows PROBLEM.
+- A **PROBLEM** incident keeps D-022's rule: it recovers when every monitor is OK.
+- Built in **S04b**, with the relapse function. Until then S04a keeps D-022's rule (no real sites are on production before S04b).
+
+**Why.** Uptime and escalation follow what visitors see: when the home page loads, the site is up (spec §6: only the primary monitor can make a site DOWN). The key page is still tracked, in the same thread, at the severity it deserves.
+
+**Impact.** S04b: `packages/engine/src/site.ts` recovery for DOWN incidents, the relapse path, engine and integration tests (a DOWN with a key page still 404 → RECOVERED, then PROBLEM AGAIN).
+
+## D-022 — S04 engine rules, the S04a / S04b split and PROBLEM messages
+
+**Gap.** PRD §5 and the StatusModel board name the PROBLEM triggers and say "only the primary monitor can make a site DOWN". They don't say:
+- how a trigger is counted across locations and rounds;
+- how several monitors make one site status;
+- how the faulty-location rule behaves when only a few sites are checked in a minute.
+
+The ChatAlert board has one PROBLEM text line and no PROBLEM card. EmailAlert has no PROBLEM email. Nothing says how flapping and the Monitoring → Needs root cause steps interact. Separately, S04 (sized M) needed probe, agent, schema, engine, notifier and test-target work, well past L.
+
+**Decision (7 Oct 2026, with Tao).**
+- **Split.** S04 becomes:
+  - S04a: PROBLEM triggers, status rules, PROBLEM messages, M1, the fewer-than-2-locations alert;
+  - S04b: relapse, flapping, auto-resolve.
+
+  S07 depends on S04b, and real sites wait for S04b.
+- **Monitor verdict.** Each monitor gets one verdict per round: OK, PROBLEM (trigger, cause) or DOWN.
+  - Only the primary monitor can give DOWN. Any problem on another monitor (a confirmed hard fail, a 4xx that isn't a WAF block, slow, keyword, redirect) is trigger `key_page`, and its cause says what failed.
+  - The carry state between rounds (slow streak, per-location failing-since) lives in `monitor_status`.
+- **Site status.** It is the worst monitor verdict. While an open incident hasn't recovered, it is never lower than the incident's severity. An incident recovers on the first round in which every monitor is OK. This makes S03 engine M1 a plain case: a blocked round that can't be verified shows PROBLEM, and the next OK round shows OK.
+- **Keyword and redirect.** Both fire on a majority of the locations reporting in one round.
+  - Keyword is a `must_contain` entry missing or a `must_not_contain` entry found. It is case-sensitive, like the browser verifier, and checked in the first 256 KB of the body. A HEAD monitor is never keyword-checked.
+  - A redirect is fine when its final host is the monitor's base host (without `www.`), an entry in `allowed_redirect_domains`, or a subdomain of either.
+- **Slow.** The p50 of the passing locations' response times is over the threshold 3 rounds in a row. The threshold is `monitors.thresholds.slowMs`, or the tier default (Tier 1 3 s, Tier 2–3 5 s).
+- **Regional.** One location has failed for ≥ 5 min, counted from its first failure, while the round is an OK majority.
+- **Faulty location (spec §15.3).** Worked out per probe minute across every monitor, and only when ≥ 3 monitors reported from that location in that minute. With fewer, one real failure would mark the location faulty and hide a regional problem.
+- **Fewer than 2 locations.** When fewer than 2 locations are beating (D-019 heartbeats), every active Admin gets one email: system alert `probe_locations_low`. It clears when ≥ 2 beat again, no sooner than 10 min after it opened. The site keeps its status (PRD §5).
+- **Response hours.** Until S08 builds them, a PROBLEM is sent at any hour. S08 then holds a Tier 2–3 PROBLEM outside hours until 09:00.
+- **Home page 4xx.** Not a trigger. The PRD's failure list doesn't include it, and a brand keyword catches a wrong page.
+- **Flapping (S04b).** While a site is flapping, the incident moves through Monitoring and Needs root cause as normal. Only the RECOVERED reply is held, until 15 min of continuous OK, then one summary goes out.
+- **Relapse (S04b).** Every new PROBLEM or DOWN on a recovered incident is a D-004 relapse, the M1 case included.
+- **Messages.** Exact copy comes from the ChatAlert / EmailAlert rows design added on 7 Oct 2026, with spec §19 (the same rules as above, written into the spec): the PROBLEM card and email, PROBLEM (unverified), ACKNOWLEDGED / RECOVERED for a PROBLEM, the cause wording per trigger, the Admin system emails (their own subject with the start time), and for S04b "DOWN AGAIN", "PROBLEM AGAIN" and the flapping summary. The board rows that promise S08's ladder ("Next: reminder at …", "reminders stopped", "(not notified yet)", the backup's 60-min email) are left out until S08 (D-013), and the Admin emails' "Open Probes & heartbeat" button until that page exists (S12).
+
+**Why.** Majority and streak rules keep one location's CDN wobble from paging people (PRD §2 noise goal). The worst-of rule keeps an outage from hiding behind a lesser status, and a recovered state from hiding a new problem. The minimum-sample floor keeps the faulty-location rule from swallowing real regional problems when few sites share a probe minute. The split keeps each slice within L, so each PR can be reviewed.
+
+**Impact.**
+- `docs/implementation-plan.md`: S04a, S04b and their dependents.
+- Migration `problem_triggers`:
+  - `check_results.final_url` / `keyword_missing` / `keyword_forbidden`;
+  - `monitor_status`;
+  - the `p_monitors` / `p_status` arguments on the engine functions;
+  - the `probe_locations_low` alert kind.
+- `@dxt/probe` (keywords, final URL), `checkResultSchema`, `server/probe/due-monitors.ts` (all monitors), `apps/vps-agent`.
+- `@dxt/engine` (`triggers.ts`, `site.ts`), `run-engine.ts`.
+- `@dxt/notifier` PROBLEM builders.
+- `apps/test-target` modes.
 
 ## D-021 — A PROBLEM incident that turns into an outage becomes DOWN
 

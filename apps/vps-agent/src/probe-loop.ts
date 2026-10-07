@@ -34,6 +34,9 @@ const toResult = (m: DueMonitor, checkedAt: number, r: HttpCheckResult, attempt:
   resolvedIp: null,
   error: r.error,
   attempt,
+  finalUrl: r.finalUrl,
+  keywordMissing: r.keywordMissing,
+  keywordForbidden: r.keywordForbidden,
 });
 
 /**
@@ -52,7 +55,14 @@ export async function runProbeRound({
   const monitors = await api.dueMonitors();
   const headers = secretHeader ? { [secretHeader.name]: secretHeader.value } : undefined;
   const run = (m: DueMonitor, timeoutMs: number) =>
-    check({ url: m.url, method: m.method, timeoutMs, headers });
+    check({
+      url: m.url,
+      method: m.method,
+      timeoutMs,
+      headers,
+      mustContain: m.mustContain,
+      mustNotContain: m.mustNotContain,
+    });
 
   const first = await Promise.all(monitors.map(async (m) => ({ m, r: await run(m, m.timeoutMs) })));
   if (first.length) await api.postResults(first.map(({ m, r }) => toResult(m, started, r, 1)));

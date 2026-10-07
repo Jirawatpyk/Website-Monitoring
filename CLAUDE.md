@@ -15,7 +15,7 @@ Website monitoring and incident automation for the 17 sites DxT runs: checks eve
 | `docs/design/canvas/<Board>.dc.html` | Exact layout, copy and states of each of the 44 boards        |
 | `docs/design/aura.md`                | How this project uses the AURA design system                  |
 
-**Precedence:** `docs/decisions.md` (settled conflicts, D-xxx) wins over everything. Then: on screen behaviour, status logic, UI copy and formats the design spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. The canvas boards give layout, exact copy and states; where a board and the spec text disagree on behaviour, the spec wins (spec §0: the canvas shows how it looks, the spec says how it behaves). Inside the spec, later sections override earlier ones: §14 → §15 → §16 → §17–18. If two sources still conflict, stop and ask — don't pick one silently; record the answer as a new decision.
+**Precedence:** `docs/decisions.md` (settled conflicts, D-xxx) wins over everything. Then: on screen behaviour, status logic, UI copy and formats the design spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. The canvas boards give layout, exact copy and states; where a board and the spec text disagree on behaviour, the spec wins (spec §0: the canvas shows how it looks, the spec says how it behaves). Inside the spec, later sections override earlier ones: §14 → §15 → §16 → §17–19. If two sources still conflict, stop and ask — don't pick one silently; record the answer as a new decision.
 
 Sample data in the spec and on the canvas (owners, INC-0142, uptime figures, "Tao") is for mockups and tests only; never hard-code it into product code. The CEO answered the spec's "Proposal · pending CEO" items on 5 Oct 2026 (D-009): the Tier 1 L2 CEO page is approved and on by default, and the pending tag is not shown; Twilio voice stays built behind config, off.
 
@@ -81,8 +81,9 @@ Skills:
 - `/implement-screen <Board>` — build one canvas board as a route, following screens.md, the spec and AURA.
 - `/new-migration <name>` — add a Supabase migration with RLS and regenerate types.
 - `/engine-case <rule>` — add a table-driven engine test from a spec example.
+- `verifier-staging` — the recipe `/verify` uses on staging: deploy order, test-target modes, observing the outcome, reset.
 
-Built-in: `/code-review high` on every slice's diff (general bugs; the agents below check the domain) — Claude invokes it with the Skill tool, never a general-purpose agent standing in for it. `/verify` runs the app at the change's surface and captures runtime evidence; only Tao can start it (it can't be invoked by Claude), so `/slice-review` hands him a ready `/verify …` line and Claude doesn't do its job by hand. `slice-verifier` checks the evidence covers every Done-when line.
+Built-in: `/code-review high` on every slice's diff (general bugs; the agents below check the domain) — Claude invokes it with the Skill tool, never a general-purpose agent standing in for it. `/verify` runs the app at the change's surface and captures runtime evidence; only Tao can start it (it can't be invoked by Claude), so `/slice-review` hands him a ready `/verify …` line and Claude doesn't do its job by hand; `/verify` follows the project's `verifier-staging` skill (deploy order, test-target modes, where to read the outcome, reset). `slice-verifier` checks the evidence covers every Done-when line.
 
 Agents (read-only reviewers; which one runs when is in `docs/workflow.md`):
 

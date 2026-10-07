@@ -1,4 +1,15 @@
-import { formatDay, formatIncidentId, formatTier, formatTime, formatTimeWithSeconds } from '@dxt/shared';
+import {
+  formatDay,
+  formatIncidentId,
+  formatTier,
+  formatTime,
+  formatTimeWithSeconds,
+  PROBE_LOCATIONS,
+  TRIGGER_LABELS,
+  type ProbeLocation,
+  type Trigger,
+} from '@dxt/shared';
+import type { ProblemFacts } from './chat-alerts';
 import { downtime } from './downtime';
 
 /**
@@ -47,11 +58,23 @@ export interface DownEmailInput extends EmailBaseInput {
   ackedBy?: string | null;
 }
 
+export interface ProblemEmailInput extends EmailBaseInput {
+  trigger: Trigger;
+  detectedAt: Date;
+  /** `formatProblemCause` / `formatProblemSummary` output. */
+  cause: string;
+  summary: string;
+}
+
 export interface AcknowledgedEmailInput extends EmailBaseInput {
   ackedBy: string;
   ackedAt: Date;
   startedAt: Date;
   confirmedAt: Date;
+  /** Set for a PROBLEM incident (EmailAlert PROBLEM thread). */
+  problem?: ProblemFacts | null;
+  /** The incident's cause line, shown under a PROBLEM's ACKNOWLEDGED (EmailAlert). */
+  cause?: string | null;
 }
 
 export interface RecoveredEmailInput extends EmailBaseInput {
@@ -60,9 +83,11 @@ export interface RecoveredEmailInput extends EmailBaseInput {
   okLocations: number;
   owner: string | null;
   ack: { by: string; at: Date } | null;
+  /** Set for a PROBLEM incident (EmailAlert PROBLEM thread). */
+  problem?: ProblemFacts | null;
 }
 
-type Template = 'down' | 'acknowledged' | 'recovered';
+type Template = 'down' | 'problem' | 'acknowledged' | 'recovered';
 
 /**
  * AURA light tokens (aura-tokens 5.31) resolved to hex: email clients don't support CSS variables.
@@ -70,6 +95,8 @@ type Template = 'down' | 'acknowledged' | 'recovered';
  */
 const C = {
   danger: '#b91c1c',
+  /** PROBLEM: amber, never red (spec §11, §19). */
+  warning: '#b45309',
   positive: '#3f6212',
   secondary: '#52525b',
   primary: '#18181b',
@@ -230,29 +257,73 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
 }
 
 export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMessage {
-  const { site, ackedBy } = input;
+  const { site, ackedBy, problem } = input;
   const at = formatTime(input.ackedAt);
   const { duration } = downtime(input.startedAt, input.ackedAt);
+  const slow = problem?.trigger === 'slow';
+  const still = !problem ? 'still down' : slow ? 'still slow' : 'still has a problem';
   return render(input, {
     template: 'acknowledged',
     color: C.secondary,
     bar: C.secondary,
     label: 'ACKNOWLEDGED',
-    pre: `by ${ackedBy} ${at} · ${site} still down`,
+    pre: `by ${ackedBy} ${at} · ${site} ${still}`,
     headline: `${ackedBy} has ${site}`,
-    lede: `Acknowledged by ${ackedBy}.`,
-    facts: [
-      ['Acknowledged', `${ackedBy} at ${at}`],
-      ['Down for', `${duration} so far (confirmed down ${formatTimeWithSeconds(input.confirmedAt)})`],
-    ],
+    lede: !problem
+      ? `Acknowledged by ${ackedBy}.`
+      : `Acknowledged by ${ackedBy}. The site is still up${slow ? ' but slow' : ''}; you’ll get one more email when it clears.`,
+    facts: problem
+      ? [
+          ['Acknowledged', `${ackedBy} at ${at}`],
+          [
+            `${slow ? 'Slow' : 'Problem'} for`,
+            `${duration} so far (detected ${formatTime(input.confirmedAt)})`,
+          ],
+          ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+        ]
+      : [
+          ['Acknowledged', `${ackedBy} at ${at}`],
+          ['Down for', `${duration} so far (confirmed down ${formatTimeWithSeconds(input.confirmedAt)})`],
+        ],
     buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
 }
 
 export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
-  const { site, owner, ack } = input;
+  const { site, owner, ack, problem } = input;
   const { duration, range } = downtime(input.startedAt, input.recoveredAt);
   const isOwner = input.reason === 'owner';
+  const ackFact = ack ? [['Acknowledged', `${ack.by} at ${formatTime(ack.at)}`] as [string, string]] : [];
+  if (problem) {
+    return render(input, {
+      template: 'recovered',
+      color: C.positive,
+      bar: C.positive,
+      label: 'RECOVERED',
+      pre: `${site} back to normal at ${formatTime(input.recoveredAt)} · problem lasted ${duration} · root cause needed`,
+      headline: `${site} is back to normal`,
+      lede: isOwner
+        ? 'The problem cleared. Needs a root cause before it can be resolved.'
+        : owner
+          ? `The problem cleared. Nothing needed from you. ${owner} adds the root cause.`
+          : 'The problem cleared. Nothing needed from you.',
+      facts: [
+        ['Problem lasted', `${duration} (${range})`],
+        ['Confirmed by', `First OK round from ${input.okLocations} locations`],
+        ...ackFact,
+        ...(owner
+          ? [
+              ['Still to do', `Root cause (${owner}) · a PROBLEM ends at Resolved — no review`] as [
+                string,
+                string,
+              ],
+            ]
+          : []),
+      ],
+      // "Add root cause" waits for S07's root-cause form: until then the incident page.
+      buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: isOwner }],
+    });
+  }
   return render(input, {
     template: 'recovered',
     color: C.positive,
@@ -268,7 +339,7 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
     facts: [
       ['Down for', `${duration} (${range})`],
       ['Confirmed by', `First OK round from ${input.okLocations} locations → Monitoring`],
-      ...(ack ? [['Acknowledged', `${ack.by} at ${formatTime(ack.at)}`] as [string, string]] : []),
+      ...ackFact,
       ...(owner ? [['Still to do', `Root cause (${owner})`] as [string, string]] : []),
     ],
     // Board: the owner's only button leads; for everyone else it's secondary (nothing to do).
@@ -276,8 +347,52 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
   });
 }
 
-/** Admin alerts that aren't about one incident (D-019, `system_alerts.kind`). */
-export type SystemAlertKind = 'verifier_unavailable' | 'verifier_backlog';
+/**
+ * PROBLEM email (EmailAlert PROBLEM thread): amber, PROBLEM first in the preheader, to the owner
+ * only — the backup is first emailed with the 60-min reminder (S08). No "Next step" row until S08.
+ */
+export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
+  const { site, trigger } = input;
+  const slow = trigger === 'slow';
+  const unverified = trigger === 'blocked_unverified';
+  const headline = slow
+    ? `${site} is slow`
+    : unverified
+      ? `${site} can’t be verified`
+      : `${site} has a problem`;
+  const state = slow
+    ? 'Up — pages load, but slowly. Not an outage.'
+    : unverified
+      ? 'Unknown — blocked by bot protection; no proof either way.'
+      : 'Up — reachable, with an issue. Not an outage.';
+  const opening = slow
+    ? 'The site is up but slow.'
+    : unverified
+      ? 'The site is blocked by bot protection and couldn’t be checked in a browser.'
+      : 'The site is up, with a problem.';
+  return render(input, {
+    template: 'problem',
+    color: C.warning,
+    bar: C.warning,
+    label: 'PROBLEM',
+    pre: `${site} · ${input.summary} · detected ${formatTime(input.detectedAt)}`,
+    headline,
+    lede:
+      input.reason === 'owner'
+        ? `${opening} You own ${site} — please take a look and acknowledge, or hand it over in the Chat thread.`
+        : `${opening} The Google Chat alert couldn’t be delivered, so this email is the alert.`,
+    facts: [
+      ['Detected', `${formatDay(input.detectedAt, { weekday: true })} ${formatTime(input.detectedAt)}`],
+      ['Trigger', TRIGGER_LABELS[trigger]],
+      ['Cause', input.cause],
+      ['Site', state],
+    ],
+    buttons: [{ label: 'Open / acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
+  });
+}
+
+/** Admin alerts that aren't about one incident (D-019, D-022, `system_alerts.kind`). */
+export type SystemAlertKind = 'verifier_unavailable' | 'verifier_backlog' | 'probe_locations_low';
 
 /** Why the engine counted the verifier unavailable (D-019). */
 export type VerifierDownReason = 'no_poll' | 'not_picked_up' | 'lease_expired';
@@ -292,57 +407,101 @@ export interface SystemAlertEmailInput {
   reason?: VerifierDownReason;
   /** verifier_backlog: jobs waiting when the alert opened. */
   queued?: number;
+  /** probe_locations_low: the locations still reporting. */
+  active?: readonly ProbeLocation[];
   /** Sender, for the alert's thread id. */
   from: string;
 }
 
 export const SYSTEM_EMAIL_FOOTER =
-  'Times in Thailand time (UTC+7). This is an automated message — replies aren’t read.';
+  'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read.';
 
 const VERIFIER_DOWN_REASONS: Record<VerifierDownReason, string> = {
-  no_poll: 'The VPS agent hasn’t asked for work in 2 min',
-  not_picked_up: 'A verification job wasn’t picked up within 30 s',
-  lease_expired: 'A verification job ran out of time without a result',
+  no_poll: 'the verifier hasn’t asked for work in 2 min (BKK VPS)',
+  not_picked_up: 'a blocked check found no verifier answering (BKK VPS)',
+  lease_expired: 'a verification job ran out of time without a result (BKK VPS)',
 };
 
-const VERIFIER_CHECK = 'The dxt-agent service on the Thai VPS (docs/runbook.md → Browser verifier)';
+const LOCATION_NAMES: Record<ProbeLocation, string> = {
+  BKK: 'BKK (BKK VPS)',
+  SIN: 'SIN (Singapore)',
+  TYO: 'TYO (Tokyo)',
+};
+
+const PROBE_CHECK: Record<ProbeLocation, string> = {
+  BKK: 'The BKK probe on the BKK VPS (dxt-agent)',
+  SIN: 'The SIN probe (Vercel cron probe-sin)',
+  TYO: 'The TYO probe (Vercel cron probe-tyo)',
+};
+
+const SYSTEM_TITLES: Record<SystemAlertKind, string> = {
+  verifier_unavailable: 'Browser verifier unavailable',
+  verifier_backlog: 'Browser verifier falling behind',
+  probe_locations_low: 'Fewer than 2 probe locations',
+};
 
 /**
- * "Admin told about the verifier" (StatusModel, D-001): one email per Admin when it becomes
- * unavailable or falls behind, under its own subject; nothing when it is back (spec §15.3).
+ * Admin system emails (EmailAlert "Admin · system", spec §19.5): every active Admin, one email per
+ * outage under its own subject with the start time (separate outages never merge into one mail
+ * thread), nothing when it is back. No "Open Probes & heartbeat" button until that page (S12).
  */
 export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessage {
   const since = `${formatDay(input.openedAt, { weekday: true })} ${formatTime(input.openedAt)}`;
   const envelope: Envelope = {
-    subject:
-      input.kind === 'verifier_unavailable'
-        ? 'DxT Monitor · Browser verifier unavailable'
-        : 'DxT Monitor · Browser verifier falling behind',
+    subject: `DxT Monitor · System · ${SYSTEM_TITLES[input.kind]} · ${since}`,
     why: 'You got this because you’re an Admin.',
     footer: SYSTEM_EMAIL_FOOTER,
     headers: { References: `<alert-${input.alertId}@${senderDomain(input.from)}>` },
   };
   if (input.kind === 'verifier_unavailable') {
+    const waiting = input.sites.length;
     return layout(envelope, {
-      color: C.secondary,
-      bar: C.secondary,
+      color: C.warning,
+      bar: C.warning,
       label: 'VERIFIER UNAVAILABLE',
-      pre: `since ${formatTime(input.openedAt)} · blocked sites show PROBLEM (unverified)`,
-      headline: 'The browser verifier is unavailable',
-      lede: 'Blocked sites show PROBLEM (unverified) until it’s back, and are checked again every round. Hard fails still go DOWN on time.',
+      pre: `${waiting} blocked site${waiting === 1 ? '' : 's'} waiting, shown as PROBLEM (unverified) until it’s back`,
+      headline: 'The browser verifier isn’t answering',
+      lede: 'Blocked sites are waiting for a browser check. Until the verifier is back they show PROBLEM (unverified) — no proof either way.',
+      facts: [
+        ['Since', `${since} — ${VERIFIER_DOWN_REASONS[input.reason ?? 'no_poll']}`],
+        ['Sites waiting', waiting ? input.sites.join(', ') : 'No site right now'],
+        [
+          'Effect',
+          'Blocked sites can’t be confirmed OK or DOWN. Hard fails still go DOWN as usual — they don’t wait for the verifier.',
+        ],
+        ['What to check', 'Restart the verifier service on the BKK VPS (dxt-agent).'],
+        ['When it’s back', 'Waiting sites are re-checked on the next round and clear on their own.'],
+      ],
+      buttons: [],
+    });
+  }
+  if (input.kind === 'probe_locations_low') {
+    const active = PROBE_LOCATIONS.filter((l) => input.active?.includes(l));
+    const missing = PROBE_LOCATIONS.filter((l) => !active.includes(l));
+    return layout(envelope, {
+      color: C.warning,
+      bar: C.warning,
+      label: 'STATUSES FROZEN',
+      pre: `${active.length ? `only ${active.join(', ')} is reporting` : 'no location is reporting'} · every site held at its last round`,
+      headline: active.length === 1 ? 'Only 1 probe location is reporting' : 'No probe location is reporting',
+      lede: 'A status needs at least 2 locations to vote, so statuses are frozen at the last complete round until a second location reports again.',
       facts: [
         ['Since', since],
-        ['What we saw', VERIFIER_DOWN_REASONS[input.reason ?? 'no_poll']],
-        ['Waiting', input.sites.length ? input.sites.join(', ') : 'No site right now'],
-        ['Check', VERIFIER_CHECK],
+        ['Still reporting', active.length ? active.map((l) => LOCATION_NAMES[l]).join(' · ') : 'None'],
+        ['Missing', missing.map((l) => LOCATION_NAMES[l]).join(' · ')],
+        [
+          'Effect',
+          'Every site keeps its status from its last complete round. No new incidents or recoveries until a second location reports.',
+        ],
+        ['What to check', `${missing.map((l) => PROBE_CHECK[l]).join(' · ')} — each reports every minute.`],
       ],
       buttons: [],
     });
   }
   const queued = input.queued ?? 0;
   return layout(envelope, {
-    color: C.secondary,
-    bar: C.secondary,
+    color: C.warning,
+    bar: C.warning,
     label: 'VERIFIER BEHIND',
     pre: `${queued} jobs waiting · blocked sites wait longer for a verdict`,
     headline: 'The browser verifier is falling behind',
@@ -350,7 +509,7 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
     facts: [
       ['Since', since],
       ['Waiting', `${queued} jobs`],
-      ['Check', VERIFIER_CHECK],
+      ['What to check', 'The verifier service on the BKK VPS (dxt-agent) and its sessions.'],
     ],
     buttons: [],
   });

@@ -5,13 +5,16 @@ import {
   formatTime,
   formatTimeWithSeconds,
   isSameBangkokDay,
+  TRIGGER_LABELS,
+  type Trigger,
 } from '@dxt/shared';
 import { buildChatTextLine } from './chat-text';
 import { downtime } from './downtime';
 
 /**
- * Google Chat DOWN, ACKNOWLEDGED and RECOVERED messages — ChatAlert board, spec §10 / §14.10 /
- * §16.4, with D-013 / D-016: no escalation promise until S08 / S10.
+ * Google Chat DOWN, PROBLEM, ACKNOWLEDGED and RECOVERED messages — ChatAlert board, spec §10 / §14.10 /
+ * §16.4, with D-013 / D-016: no escalation promise ("Next" row, "reminders stopped", "(not notified
+ * yet)") until S08 / S10.
  * A message is a plain text line (the only place @mentions notify) followed by one Cards v2 card.
  */
 
@@ -56,11 +59,42 @@ export interface DownAlertInput {
   incidentUrl: string;
 }
 
+/** What a PROBLEM's replies need to word it as one (ChatAlert PROBLEM rows, D-022). */
+export interface ProblemFacts {
+  trigger: Trigger;
+  /** Slow: the limit the response time is back under. */
+  slowLimitMs?: number | null;
+}
+
+export interface ProblemAlertInput {
+  incidentId: string;
+  incidentNumber: number;
+  site: string;
+  tier: number;
+  trigger: Trigger;
+  /** When the engine opened it: "Detected 09:52". */
+  detectedAt: Date;
+  now: Date;
+  /** `formatProblemCause` output. */
+  cause: string;
+  /** `formatProblemSummary` output, for the text line. */
+  summary: string;
+  /** Locations that saw it, of those reporting; null when not known. */
+  seenFrom: { count: number; of: number } | null;
+  /** PROBLEM (unverified): why the verifier couldn't decide. */
+  verifier?: string | null;
+  owner: ChatPerson | null;
+  backup: ChatPerson | null;
+  incidentUrl: string;
+}
+
 export interface AcknowledgedAlertInput {
   incidentId: string;
   site: string;
   ackedBy: string;
   ackedAt: Date;
+  /** Set for a PROBLEM incident: "still slow" / "still has a problem", not "still down". */
+  problem?: ProblemFacts | null;
 }
 
 export interface RecoveredAlertInput {
@@ -71,6 +105,8 @@ export interface RecoveredAlertInput {
   recoveredAt: Date;
   okLocations: number;
   owner: ChatPerson | null;
+  /** Set for a PROBLEM incident: "problem cleared after …", not "is back · down …". */
+  problem?: ProblemFacts | null;
 }
 
 /**
@@ -150,14 +186,17 @@ export function buildAcknowledgedAlert(input: AcknowledgedAlertInput): ChatMessa
   const site = plainName(input.site);
   const by = plainName(input.ackedBy);
   const at = formatTime(input.ackedAt);
+  const slow = input.problem?.trigger === 'slow';
+  const still = !input.problem ? 'still down' : slow ? 'still slow' : 'still has a problem';
+  const body = slow ? `Acknowledged by ${by}. The site is up; it’s only slow.` : `Acknowledged by ${by}.`;
   return {
     text: buildChatTextLine({ state: 'ACKNOWLEDGED', site, detail: [`by ${by} ${at}`] }),
     cardsV2: [
       {
         cardId: `acknowledged-${input.incidentId}`,
         card: {
-          header: { title: `ACKNOWLEDGED · ${site} still down · by ${by} ${at}` },
-          sections: [{ widgets: [{ textParagraph: { text: `Acknowledged by ${by}.` } }] }],
+          header: { title: `ACKNOWLEDGED · ${site} ${still} · by ${by} ${at}` },
+          sections: [{ widgets: [{ textParagraph: { text: body } }] }],
         },
       },
     ],
@@ -166,30 +205,111 @@ export function buildAcknowledgedAlert(input: AcknowledgedAlertInput): ChatMessa
 
 export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
   const site = plainName(input.site);
-  const { duration: down, range } = downtime(input.startedAt, input.recoveredAt);
+  const { duration, range } = downtime(input.startedAt, input.recoveredAt);
+  const problem = input.problem;
+  const slow = problem?.trigger === 'slow';
+  const title = !problem
+    ? `RECOVERED · ${site} is back · down ${duration} (${range})`
+    : `RECOVERED · ${site} back to normal · ${slow ? 'slow' : 'problem'} for ${duration} (${range})`;
+  const back =
+    slow && problem?.slowLimitMs
+      ? `Response time back under ${seconds(problem.slowLimitMs)} from ${input.okLocations} locations.`
+      : `OK from ${input.okLocations} locations.`;
 
   return {
     text: buildChatTextLine({
       state: 'RECOVERED',
       site,
       mention: mentionOf(input.owner),
-      detail: [`down ${down}`, 'add a root cause'],
+      detail: [problem ? `problem cleared after ${duration}` : `down ${duration}`, 'add a root cause'],
     }),
     cardsV2: [
       {
         cardId: `recovered-${input.incidentId}`,
         card: {
-          header: {
-            title: `RECOVERED · ${site} is back · down ${down} (${range})`,
+          header: { title },
+          sections: [
+            {
+              widgets: [{ textParagraph: { text: `${back} Needs a root cause before it can be resolved.` } }],
+            },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * PROBLEM first card (ChatAlert "PROBLEM — the site is up, with an issue"): the owner mentioned in
+ * the text line with the short cause, then the card — trigger, cause, where it was seen (PROBLEM
+ * (unverified): what we know), owner, "Open / acknowledge". Amber on the boards; a webhook card has
+ * no colour, so the word PROBLEM carries it.
+ */
+export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
+  const { tier, detectedAt, now, owner, backup } = input;
+  const site = plainName(input.site);
+  const unverified = input.trigger === 'blocked_unverified';
+  const subtitle = [
+    formatTier(tier),
+    formatIncidentId(input.incidentNumber),
+    ...(isSameBangkokDay(detectedAt, now) ? [] : [formatDay(detectedAt, { weekday: true })]),
+    `Detected ${formatTime(detectedAt)} (UTC+7)`,
+  ].join(' · ');
+  const ownerText = [
+    owner ? plainName(owner.name) : 'No owner set',
+    ...(backup ? [`backup ${plainName(backup.name)}`] : []),
+  ].join(' · ');
+  const slowNote = input.trigger === 'slow' ? ' — the site loads, just slowly' : '';
+  const seen = input.seenFrom ? `${input.seenFrom.count} of ${input.seenFrom.of} locations${slowNote}` : null;
+  const known = unverified
+    ? [
+        row(
+          'What we know',
+          'No proof either way — the site may be fine. Checked again every round: OK with a note once the verifier loads the page, DOWN if the page fails.',
+        ),
+      ]
+    : seen
+      ? [row('Seen from', seen)]
+      : [];
+  const adminNote: ChatWidget[] =
+    unverified && input.verifier !== 'browser_blocked'
+      ? [
+          {
+            textParagraph: {
+              text: 'The Admin is told about the verifier separately (system email). This card doesn’t ask anyone to fix it.',
+            },
           },
+        ]
+      : [];
+
+  return {
+    text: buildChatTextLine({
+      state: 'PROBLEM',
+      site: `${site} (${formatTier(tier)})`,
+      mention: mentionOf(owner),
+      detail: [input.summary, 'please take a look'],
+    }),
+    cardsV2: [
+      {
+        cardId: `problem-${input.incidentId}`,
+        card: {
+          header: { title: `PROBLEM · ${site}${unverified ? ' · not verified' : ''}`, subtitle },
           sections: [
             {
               widgets: [
+                row('Trigger', TRIGGER_LABELS[input.trigger]),
+                row('Cause', input.cause),
+                ...known,
+                row('Owner', ownerText),
+                ...adminNote,
                 {
-                  textParagraph: {
-                    text: `OK from ${input.okLocations} locations. Needs a root cause before it can be resolved.`,
+                  buttonList: {
+                    buttons: [
+                      { text: 'Open / acknowledge', onClick: { openLink: { url: input.incidentUrl } } },
+                    ],
                   },
                 },
+                { textParagraph: { text: FIRST_CARD_FOOTER } },
               ],
             },
           ],
@@ -198,3 +318,6 @@ export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
     ],
   };
 }
+
+/** 5000 → "5 s", 3500 → "3.5 s". */
+const seconds = (ms: number) => `${Number((ms / 1000).toFixed(1))} s`;

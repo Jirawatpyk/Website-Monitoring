@@ -83,6 +83,8 @@ export interface IncidentView {
   recovered: boolean;
   /** "You’re the owner." — only for someone who can act. */
   role: string | null;
+  /** "Confirmed down" for a DOWN; "Detected" for a PROBLEM (spec §19: no recheck confirms it). */
+  confirmedLabel: string;
   confirmedAt: string;
   confirmedBy: string;
   cause: string;
@@ -110,6 +112,7 @@ export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
 
 const TEMPLATE_WORDS: Record<string, string> = {
   down: 'DOWN',
+  problem: 'PROBLEM',
   acknowledged: 'ACKNOWLEDGED',
   recovered: 'RECOVERED',
 };
@@ -127,6 +130,7 @@ export function buildIncidentView(
 ): IncidentView {
   const site = i.sites.name;
   const recovered = !!i.recovered_at;
+  const problem = i.severity === 'problem';
   const started = new Date(i.started_at);
   const end = i.recovered_at ? new Date(i.recovered_at) : now;
   const minutes = Math.max(1, Math.floor((end.getTime() - started.getTime()) / 60_000));
@@ -216,12 +220,12 @@ export function buildIncidentView(
     incidentId: i.id,
     site,
     title: recovered
-      ? `${site} is back`
+      ? `${site} ${problem ? 'is back to normal' : 'is back'}`
       : i.severity === 'problem'
         ? `${site} has a problem`
         : `${site} is down`,
     sub: [
-      recovered ? `down ${formatDuration(minutes)}` : formatDuration(minutes),
+      recovered ? `${problem ? 'problem' : 'down'} ${formatDuration(minutes)}` : formatDuration(minutes),
       formatTier(i.sites.tier),
       formatDay(started, { weekday: true }),
     ].join(' · '),
@@ -230,8 +234,11 @@ export function buildIncidentView(
     escalationLevel: i.escalation_level,
     recovered,
     role,
+    confirmedLabel: problem ? 'Detected' : 'Confirmed down',
     confirmedAt: formatTimeWithSeconds(new Date(i.detected_at)),
-    confirmedBy: `Confirmed by ${num(detected?.payload.confirmingLocations) ?? 2} locations, 2 checks`,
+    confirmedBy: problem
+      ? TRIGGER_LABELS[i.trigger]
+      : `Confirmed by ${num(detected?.payload.confirmingLocations) ?? 2} locations, 2 checks`,
     cause: str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
     siteUrl: i.sites.monitors.find((m) => m.is_primary)?.url ?? null,
     ack,
@@ -250,9 +257,10 @@ export function logOf(
     const at = formatTime(new Date(e.at));
     switch (e.type) {
       case 'detected':
-        return [
-          { at, text: `Confirmed down — ${num(e.payload.confirmingLocations) ?? 2} locations, 2 checks` },
-        ];
+        // A PROBLEM is detected in one round; only a DOWN is confirmed by locations and a recheck.
+        return typeof e.payload.summary === 'string'
+          ? [{ at, text: `PROBLEM detected — ${e.payload.summary}` }]
+          : [{ at, text: `Confirmed down — ${num(e.payload.confirmingLocations) ?? 2} locations, 2 checks` }];
       case 'alerted': {
         const word = TEMPLATE_WORDS[str(e.payload.template) ?? ''] ?? 'Alert';
         return e.payload.channel === 'email'

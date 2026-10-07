@@ -7,6 +7,8 @@
  *   challenge      → a probe gets a bot-protection challenge (403); a browser gets the page (S03 Done-when 2)
  *   challenge-down → a probe gets the challenge; a browser gets a 503 (blocked, then the page fails → DOWN)
  *   challenge-all  → everyone gets the challenge (blocked in the browser too → PROBLEM, D-020)
+ *   keyword-missing → 200 without "Test target" anywhere on the page (PROBLEM · Keyword, S04a)
+ *   slow           → a probe waits 6 s, over both tier limits and under the monitor timeout (PROBLEM · Slow)
  * Anything else (store missing, unknown value) counts as ok. Only a probe (User-Agent `DxT-Monitor/`)
  * is held or challenged differently, so nobody else can tie up the function.
  */
@@ -17,10 +19,14 @@ export const TARGET_MODES = [
   'challenge',
   'challenge-down',
   'challenge-all',
+  'keyword-missing',
+  'slow',
 ] as const;
 export type TargetMode = (typeof TARGET_MODES)[number];
 
 export const TIMEOUT_HOLD_MS = 45_000;
+/** Over the slow limits (Tier 1 3 s, Tier 2–3 5 s) and under the 10 s default monitor timeout. */
+export const SLOW_HOLD_MS = 6_000;
 
 export function parseMode(value: unknown): TargetMode {
   return TARGET_MODES.find((m) => m === value) ?? 'ok';
@@ -37,6 +43,9 @@ export interface HandlerDeps {
 const CHALLENGE_PAGE =
   '<!doctype html><html lang="en"><head><title>Just a moment...</title></head>' +
   '<body><p>Checking your browser before accessing the test target.</p></body></html>\n';
+/** A broken deploy: answers 200, but the brand keyword the monitor looks for is gone. */
+const BROKEN_PAGE =
+  '<!doctype html><html lang="en"><head><title>Index of /</title></head><body><h1>Index of /</h1></body></html>\n';
 const PAGE = (mode: TargetMode) =>
   `<!doctype html><html lang="en"><head><title>Test target</title></head><body><h1>Test target</h1><p>Mode: ${mode}</p></body></html>\n`;
 
@@ -57,5 +66,7 @@ export async function handle({
   }
   if (mode === 'challenge-down') return new Response('Service unavailable\n', { status: 503, headers: text });
   if (mode === 'timeout' && probe) await sleep(TIMEOUT_HOLD_MS);
+  if (mode === 'slow' && probe) await sleep(SLOW_HOLD_MS);
+  if (mode === 'keyword-missing') return new Response(BROKEN_PAGE, { status: 200, headers: html });
   return new Response(PAGE(mode), { status: 200, headers: html });
 }

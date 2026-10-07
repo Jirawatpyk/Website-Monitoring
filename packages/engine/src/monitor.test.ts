@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
-import {
-  decideMonitor,
-  UNVERIFIED_NOTE,
-  type MonitorSnapshot,
-  type OpenIncident,
-  type StoredCheck,
-  type Verification,
-} from './monitor';
+import { UNVERIFIED_NOTE, type OpenIncident, type StoredCheck, type Verification } from './monitor';
+import { decideMonitor, type MonitorSnapshot } from './site';
 import { BLOCKED_NOTE } from './round';
 
 // INC-0142 timeline (spec §4, §6) with S02a's two Vercel locations. M = 09:47:00 Bangkok
@@ -459,35 +453,38 @@ describe('decideMonitor — blocked rounds and the browser verifier (S03, Status
     ],
     ['its lease ran out', withJob({ state: 'unavailable', reason: 'lease_expired' }), 'lease_expired'],
   ])('[B, B, N] %s → PROBLEM (unverified) at once (D-001)', (_name, over, reason) => {
+    // S04a: a PROBLEM like any other trigger, opened with its reason (D-022).
     expect(decideMonitor(snapshot(blocked(), over))).toEqual({
-      kind: 'unverified',
+      kind: 'problem',
       roundAt: at(0),
+      trigger: 'blocked_unverified',
+      detail: expect.objectContaining({ kind: 'blocked', reason }),
       startedAt: at(1),
-      reason,
       note: UNVERIFIED_NOTE,
     });
   });
 
   it('the browser got a WAF page too → PROBLEM (unverified), not DOWN (D-020)', () => {
     expect(decideMonitor(snapshot(blocked(), withJob({ state: 'blocked', jobId: 'j1' })))).toEqual({
-      kind: 'unverified',
+      kind: 'problem',
       roundAt: at(0),
+      trigger: 'blocked_unverified',
+      detail: expect.objectContaining({ kind: 'blocked', reason: 'browser_blocked' }),
       startedAt: at(1),
-      reason: 'browser_blocked',
       note: UNVERIFIED_NOTE,
     });
   });
 
   it('an unverified round while an incident is open records the round and the note, nothing new', () => {
     const d = decideMonitor(snapshot(blocked(), { ...three, open: incident('unacked') }));
-    expect(d).toMatchObject({ kind: 'unverified', reason: 'no_poll' });
+    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0, note: UNVERIFIED_NOTE });
   });
 
   it('a blocked round resets the OK count, verified or not', () => {
     const d = decideMonitor(
       snapshot([check('SIN', 'blocked', 1), check('TYO', 'blocked', 2)], { okRounds: 1 }),
     );
-    expect(d).toMatchObject({ kind: 'unverified' });
+    expect(d).toMatchObject({ kind: 'problem', trigger: 'blocked_unverified' });
   });
 
   it('a plain pass round clears the note (note undefined)', () => {
@@ -571,7 +568,7 @@ describe('decideMonitor — engine review S03 (spec §6, PRD §9, D-021)', () =>
         ]),
       }),
     );
-    expect(d).toMatchObject({ kind: 'unverified', roundAt: at(0), reason: 'lease_expired' });
+    expect(d).toMatchObject({ kind: 'problem', roundAt: at(0), detail: { reason: 'lease_expired' } });
   });
 
   it('M2: two locations confirmed DOWN → judged without waiting for Bangkok (staging offsets)', () => {

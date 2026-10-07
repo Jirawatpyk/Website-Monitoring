@@ -16,17 +16,18 @@
 | S02a | Thin slice: probe → engine → DOWN / RECOVERED in Chat | 1 · P0 | S | FR-02 | S01 | 2 | Done |
 | S02b | Email, delivery guarantees, Ack + Undo | 1 · P0 | M | FR-07 | S02a | 2 | Done |
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Done |
-| S04 | PROBLEM triggers, flapping & status rules | 1 · P0 | M | FR-03 | S03 | 3 | Todo |
+| S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | In review |
+| S04b | Relapse, flapping & auto-resolve | 1 · P0 | M | — | S04a | 3 | Todo |
 | S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
-| S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04 | 3 | Todo |
+| S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
 | S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06, S08 | 3 | Todo |
-| G1 | **MVP gate** | 1 | — | — | S01–S09 | end 3 | Todo |
+| G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
 | S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06, S10, S11 | 4 | Todo |
-| S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04 | 4 | Todo |
+| S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Todo |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Todo |
@@ -48,7 +49,7 @@ Every slice also meets the [Definition of Done](workflow.md#definition-of-done) 
 | Phase | PRD target | Sum of sizes (1 developer) |
 |---|---|---|
 | 0 Prep | week 1 | week 1 |
-| 1 MVP (S01–S09) | weeks 2–3 (10 working days) | ≈ 41 days ≈ 8 weeks |
+| 1 MVP (S01–S09) | weeks 2–3 (10 working days) | ≈ 44 days ≈ 9 weeks (S04 split into S04a L + S04b M, 7 Oct) |
 | 2 Team go-live (S10–S19) | weeks 4–5 + buffer, then 2-week parallel run | ≈ 36 days ≈ 7 weeks (parallel run overlaps) |
 | 3 Client-facing (S20–S24) | weeks 6–10 | ≈ 23 days ≈ 5 weeks |
 
@@ -138,7 +139,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - **Done-when 4 ✓** Healthchecks project "DxT Monitor — staging" (separate from production): engine, probe-sin, probe-tyo, notifier all Up, last pings 11–54 s ago (checked by Claude in the browser, 12:17Z); all 4 still Up on the final deploy `e1ea685` (12:51Z). Vercel logs: `probe-sin … region:"sin1"`, `probe-tyo … region:"hnd1"` every minute.
   - **Done-when 5 ✓** message-checker: no open High; Mediums fixed (sub-minute duration floor, owner-without-Chat-id → D-015) — the live cards match ChatAlert minus the D-013 omissions.
   - **Done-when 6 ✓** ≈ 1 h 45 min of build to a verified staging run, against an S estimate — record for the Q7 re-baseline.
-  - Known limits (by design, in later slices): a confirmed relapse while the incident is open is logged, not alerted, and after the second OK round the site shows OK — so no real site may be probed on production before S04 (D-004) is Done (see S05). On staging run `supabase/staging/reset-test-incident.sql` before repeating a DOWN test.
+  - Known limits (by design, in later slices): a confirmed relapse while the incident is open is logged, not alerted, and after the second OK round the site shows OK — so no real site may be probed on production before S04b (D-004) is Done (see S05). On staging run `supabase/staging/reset-test-incident.sql` before repeating a DOWN test.
   - Engine-reviewer round 2 (fixed before the PR): rounds judged oldest first; OK = majority of reporting locations; the incident starts at the first failed check, even in a split round before (the staging run would now read 19:07:46); checks stamped with the probe run's start; monitor timeouts capped at 30 s (PRD §5) with probe `maxDuration` 90 s; RECOVERED only after a queued DOWN.
 
 ### S02b · Email, delivery guarantees, Ack + Undo
@@ -181,7 +182,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   6. The VPS has every variable name from `apps/vps-agent/.env.example` set in `/etc/dxt-agent/staging.env` and `/etc/dxt-agent/production.env`, one per agent instance (moved from S00 Done-when 3, D-010; two instances, D-019; names listed, values never shared).
 - **Review:** security-reviewer (Job API, Storage, VPS unit), db-reviewer (pgmq queues, leases), engine-reviewer.
 - **Carried from S02b review:** a round can be completed by Bangkok's result arriving through Ingest; Ingest must run the engine (`engineAndDeliver`) like a failing probe recheck does, or DOWN waits up to a minute for the engine cron (PRD §9: 30 s).
-- **Notes (evidence):** merged 7 Oct 2026 as PR #35 (`3d76f4c`); production migrations by `migrate-production` 08:06:26Z, and the production deploy answers the new APIs (401 without a token). Started 03:15Z, staging verified 07:03Z — ≈ 4 h with five review rounds (planned L, 5 days). Queue, PROBLEM (unverified) without its Chat card until S04, Admin alerts and the two agent instances per D-019; blocked in the browser too → PROBLEM per D-020; a PROBLEM that turns into an outage is raised to DOWN per D-021. Staging: migrations 0007-01/02/03 by `pnpm db:push:staging`; `dxt-agent@staging` on the VPS (VERIFIER_MAX_SESSIONS 1); Healthchecks `probe-bkk` + `browser-verifier` (staging project) both Up.
+- **Notes (evidence):** merged 7 Oct 2026 as PR #35 (`3d76f4c`); production migrations by `migrate-production` 08:06:26Z, and the production deploy answers the new APIs (401 without a token). Started 03:15Z, staging verified 07:03Z — ≈ 4 h with five review rounds (planned L, 5 days). Queue, PROBLEM (unverified) without its Chat card until S04a, Admin alerts and the two agent instances per D-019; blocked in the browser too → PROBLEM per D-020; a PROBLEM that turns into an outage is raised to DOWN per D-021. Staging: migrations 0007-01/02/03 by `pnpm db:push:staging`; `dxt-agent@staging` on the VPS (VERIFIER_MAX_SESSIONS 1); Healthchecks `probe-bkk` + `browser-verifier` (staging project) both Up.
   - **Done-when 1 ✓** Staging SQL 05:55Z: BKK, SIN and TYO each report every round (Test target, attempt 1, all `pass`). Agent stopped 06:00:26Z → rounds 06:10–06:11 show SIN + TYO only, mode `ok`, no incident opened and the open PROBLEM (INC-0008) recovered to Monitoring; agent restarted 06:12:44Z → BKK back from round 06:13. Engine tests: `expects Bangkok only while its agent beats` (run-engine.test.ts), `a stopped Bangkok agent leaves two voting` (monitor.test.ts), `a DOWN two locations confirmed is judged without waiting for a beating Bangkok`.
   - **Done-when 2 ✓** Test target `challenge` 05:56:30Z → verify job for round 05:57 `done / loaded / HTTP 200`, screenshot `2026-10/048a6c82….jpg` stored, 5.6 s from job to verdict; `site_status` = `ok` with note "Automated check blocked by bot protection; verified via browser". Again after the blocked-check trigger (deploy `782a182`): job created 1.0 s after the round's last check, verdict 4 s later. Local run with real Chromium: same result + screenshot viewed.
   - **Done-when 3 ✓ (T03)** Verifier (agent) stopped 06:00:26Z, Test target `error` 06:00:32Z → the open PROBLEM INC-0006 raised to DOWN (D-021) and DOWN sent 06:02:17.5Z email / 06:02:18.1Z Chat — **1 min 45 s** after the switch, 1.2 s / 1.8 s after the confirm. Blocked with the verifier stopped: INC-0008 `blocked_unverified / problem`, note "Blocked, not verified", no 10-min grace; the Admin "verifier unavailable" email (reason `not_picked_up`, site Test target) sent 06:02:17.9Z, one per outage; the alert cleared by itself 06:12:48Z when the verifier came back. D-020: `challenge-all` → INC-0006 `blocked_unverified / problem`, 0 messages, no Admin alert. Int tests: `verifier stopped: two blocked sites → PROBLEM (unverified) at once and one email per Admin`.
@@ -191,23 +192,79 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
   - `/verify` (Tao, 7 Oct 06:46–07:03Z, PASS): three locations voting; `challenge` → `loaded`, `ok` + note; clean T03 path with the verifier stopped and no open incident: `error` 06:59:12Z → INC-0010 `hard_fail` DOWN, email 07:01:18.4Z / Chat 07:01:18.8Z (**2 min 6 s**, 1.9 s / 2.3 s after the confirm); API probes: no / wrong token 401, stale result 422, empty batch 400, unknown job 409. Finding carried to S07 (evidence screenshot after a verifier outage).
   - Reviews: security-reviewer (2 Medium + 4 Low fixed), db-reviewer (1 Medium + Lows fixed), engine-reviewer ×2 (H1, H2, N1 fixed; M2–M4, N2–N4 fixed; M1 carried to S04), a general code review by an agent (5 Medium + 5 Low fixed) and `/code-review high` (6 fixed, no High). Re-checked on staging after the last fixes (agent build `b1c9c25`): `challenge` → verify job `loaded` at 06:33:54Z. Found on staging and fixed: zod left external in the agent bundle, Node's dual-stack race timing out Healthchecks pings (no IPv6 route on the VPS), staging needing a redeploy after its env changed, blocked checks waiting for the engine cron.
 
-### S04 · PROBLEM triggers, flapping & status rules
+### S04a · PROBLEM triggers & status rules
 
-- **Scope:** FR-03 complete. PROBLEM triggers: slow (p50 over the tier threshold 3 rounds), keyword must / must-not, key page 4xx / 5xx, regional (one location ≥ 5 min), redirect outside the allowlist. Only the primary monitor can make a site DOWN; `< 2` locations → Admin alert. Relapse + flapping (D-004). Wire the rules that already exist in `@dxt/engine` into the engine cron — `faultyLocations`, `isRegionalProblem`, `autoResolves`, the D-003 lifecycle — with integration tests. ChatAlert PROBLEM rows (the 60-min PROBLEM reminder belongs to S08). Test target gains keyword-missing and slow modes.
-- **Boards:** StatusModel · **Test plan:** T01 (the expiring-cert path finishes in S13)
-- **Carried from S02b review:** engine runs overlap (probe trigger + cron); relapse handling must be one state-guarded SQL function, or a relapse alerts once per run.
-- **Carried from S03 review (engine M1):** a blocked round the verifier can't decide while the site's incident is already open (e.g. in Monitoring / Needs root cause, site OK) records the round and the note "Blocked, not verified" but leaves `site_status` OK; S04's status rules must show it as PROBLEM (D-001) and clear it on the next OK round.
+- **Scope:** FR-03 complete except relapse and flapping (split from S04 on 7 Oct 2026; rules per D-022).
+  - **PROBLEM triggers:**
+    - slow: p50 over the tier threshold for 3 rounds;
+    - keyword: a must-contain missing or a must-not-contain found;
+    - key page: a 4xx / 5xx, or any other problem on a non-primary monitor;
+    - regional: one location failing for ≥ 5 min;
+    - redirect: a final host outside the allowlist.
+  - **Probes:** every monitor of a site is probed, not only the primary. The probe records the final URL and the keyword result, and the VPS agent ships the same fields.
+  - **Status rules:** each monitor gets a verdict every round. Only the primary monitor can make a site DOWN. Site status = the worst verdict, and while an open incident hasn't recovered it never drops below that incident's severity. The per-monitor state that carries between rounds lives in `monitor_status`. This also fixes S03 engine M1.
+  - **Wired into the engine cron:** the faulty-location exclusion (`faultyLocations`, spec §15.3) and the regional PROBLEM (`isRegionalProblem`), with integration tests.
+  - **Admin alert:** fewer than 2 locations beating → one Admin email (system alert `probe_locations_low`).
+  - **Messages:**
+    - the ChatAlert PROBLEM rows and their email: PROBLEM, PROBLEM (unverified) (the D-019 card), and ACKNOWLEDGED / RECOVERED for a PROBLEM;
+    - a PROBLEM is sent at any hour until S08 adds response hours (D-022);
+    - the 60-min PROBLEM reminder belongs to S08.
+  - **Test target:** gains `keyword-missing` and `slow` modes.
+- **Boards:** StatusModel, ChatAlert (PROBLEM rows) · **Tables:** monitor_status · **Test plan:** T01 (the expiring-cert path finishes in S13)
+- **Carried from S03 review (engine M1):** a blocked round the verifier can't decide, while the site's incident is already open (e.g. in Monitoring / Needs root cause, site OK), records the round and the note "Blocked, not verified" but leaves `site_status` OK. S04a's status rules must show it as PROBLEM (D-001) and clear it on the next OK round. Moving the incident back to Unacked / Acknowledged is the relapse in S04b.
 - **Depends on:** S03
 - **Done when:**
-  1. **T01:** each test-target mode gives the StatusModel outcome on staging — 200 → OK, 500 / timeout → DOWN, 403-challenge + loads → OK with note, keyword missing → PROBLEM (Keyword), slow 3 rounds → PROBLEM (Slow).
-  2. Engine tests cover every StatusModel row, D-003, and D-004 with the VOCA sample (flapped ×4 → one incident, 41 min down, one ack).
-  3. A key-page monitor returning 500 while the home page is fine gives PROBLEM, never DOWN (test).
-  4. message-checker passes the PROBLEM rows.
-- **Review:** engine-reviewer, message-checker.
+  1. **T01:** on staging, each test-target mode gives the StatusModel outcome:
+     - 200 → OK;
+     - 500 / timeout → DOWN;
+     - 403-challenge + the page loads → OK with the note;
+     - keyword missing → PROBLEM (Keyword);
+     - slow for 3 rounds → PROBLEM (Slow).
+  2. A key-page monitor returning 500 while the home page is fine gives PROBLEM, never DOWN (test).
+  3. message-checker passes the PROBLEM rows: PROBLEM, PROBLEM (unverified), and ACKNOWLEDGED / RECOVERED for a PROBLEM.
+  4. M1: a blocked round the verifier can't decide while the incident is open shows the site as PROBLEM, and the next OK round clears it (engine + integration tests).
+  5. Fewer than 2 locations beating → one Admin email; it clears when they come back (test).
+- **Review:** engine-reviewer, message-checker, security-reviewer (migration, probe / ingest fields), db-reviewer (`monitor_status`, `check_results` columns).
+- **Notes (evidence):** started 7 Oct 2026 ~09:00Z; staging verified 11:43Z. Split from S04 and engine rules per D-022; PROBLEM copy from the ChatAlert / EmailAlert rows and spec §19 design added the same day. Staging: migration `problem_triggers` by `pnpm db:push:staging` (before the code, as its header says); `dxt-agent@staging` redeployed (keyword result + final URL from Bangkok too); test-target modes `keyword-missing` / `slow`; the staging monitor's `must_contain = {Test target}`; `reset-test-incident.sql` between modes (relapse is S04b).
+  - **Done-when 1 (T01) ✓** staging, 7 Oct (UTC):
+    - `keyword-missing` 11:19:01 → INC-0011 PROBLEM `keyword` detected 11:20:01.5; email 11:20:02.2, Chat 11:20:02.9; cause "Missing “Test target” on / (BKK, SIN, TYO)" (all three locations, Bangkok included). → `ok` 11:23:35 → RECOVERED email 11:25:02.8 / Chat 11:25:03.2, incident Monitoring.
+    - `slow` 11:26:39 → rounds 11:27 / 11:28 / 11:29 p50 ≈ 6.1 s → INC-0012 PROBLEM `slow` detected 11:30:07.5 (`monitor_status.slow_rounds` 3); email 11:30:08.2, Chat 11:30:08.8; cause "p50 6.1 s (BKK, SIN, TYO) · over the Tier 1 limit of 3 s for 3 checks in a row". → `ok` → RECOVERED 11:32:02.
+    - `challenge` 11:33:13 → verify job round 11:34 `done / loaded / HTTP 200`, screenshot stored; site `ok` with note "Automated check blocked by bot protection; verified via browser".
+    - `error` 11:35:23 → INC-0013 DOWN `hard_fail`, email 11:36:22.5 / Chat 11:36:23.0 (the 11:35 round straddled the switch, part challenged, so the browser decided: "Browser: page didn’t load (HTTP 500)"). → `ok` → RECOVERED 11:39:02, Needs root cause.
+    - `timeout` 11:41:22 → INC-0014 DOWN, confirmed 11:41:32.3, email 11:41:44.1 / Chat 11:41:44.9, cause "Timeout > 10 s (BKK, TYO)".
+    - `ok` before and between modes → OK.
+  - **Done-when 2 ✓** `site.test.ts` "a key page returning 500 while the home page is fine → PROBLEM (Key page), never DOWN"; `run-engine.test.ts` same case; int test `a key page returning 500 while the home page is fine → PROBLEM, never DOWN; it recovers with RECOVERED` (`pnpm --filter @dxt/web test:int`).
+  - **Done-when 3 ✓** message-checker: no High; Mediums fixed (Cause row on a PROBLEM's ACKNOWLEDGED email; Admin email site lines with tier) or justified in the PR (incident number / start in the verifier email's site lines); Lows fixed (what to check names the missing locations) or justified. Builders tested in `problem-alerts.test.ts`, `problem-cause.test.ts`, `email-alerts.test.ts`, `render.test.ts`.
+  - **Done-when 4 ✓** `site.test.ts` "M1: blocked and unverified while the incident is in Monitoring → PROBLEM shown" / "M1: the next OK round shows OK again"; int test `M1: unverified while the incident is in Needs root cause shows PROBLEM; the next OK round shows OK (S04a)`.
+  - **Done-when 5 ✓** `run-engine.test.ts` "fewer than 2 locations beating → one Admin alert; it clears 10 min later once 2 beat again"; int test `fewer than 2 probe locations beating → one Admin email, cleared once 2 beat again (D-022)`.
+  - Reviews: `/code-review high` (5: 4 fixed, deploy order documented), engine-reviewer ×2 (H1 faulty location making a round ready too early — fixed; M1–M2, L1–L3 fixed; round 2: 3 Medium + 3 Low fixed), security-reviewer (M1 cause length could stop the whole engine run — fixed with caps and per-site isolation; L1 redirect host markup — fixed), db-reviewer (no High; paging dedupe, `<=` guard, keyword bounds, Map grouping, pgTAP fixed; 200-monitor URL length → follow-up), message-checker (above).
+
+### S04b · Relapse, flapping & auto-resolve
+
+- **Scope:** D-004 complete.
+  - **Relapse:** a new DOWN / PROBLEM on an open incident that has recovered (Monitoring / Needs root cause) joins it. The incident goes back to Acknowledged if it was acked, otherwise to Unacked / Escalated. Severity only goes up, and the "down again" / "PROBLEM again" reply goes in the same thread. All of this happens in one state-guarded SQL function (`engine_relapse_incident`), with a dedupe key on `notifications` so a template can repeat (D-014).
+  - **Flapping:**
+    - the 3rd status change within 30 min tags `is_flapping`;
+    - the incident still moves through its states as normal, but RECOVERED replies are held;
+    - after 15 min of continuous OK, one summary goes out (Tao, 7 Oct 2026; D-022).
+  - **Auto-resolve:** a PROBLEM that recovers within 5 min and was never acknowledged auto-resolves (`autoResolves`, spec §16.1).
+  - **D-003 lifecycle:** checked end to end.
+  - **D-023:** a DOWN incident recovers when the primary monitor is OK; a key page still failing rejoins the same incident as a PROBLEM relapse.
+  - **Messages:** the "down again", "PROBLEM again" and flapping summary rows.
+- **Boards:** ChatAlert (relapse, flapping rows) · **Test plan:** —
+- **Carried from S02b review:** engine runs overlap (the probe trigger and the cron). Relapse handling must be one state-guarded SQL function, or a relapse alerts once per run.
+- **Depends on:** S04a
+- **Done when:**
+  1. Engine tests cover D-003, and D-004 with the VOCA sample: flapped ×4 → one incident, 41 min down, one ack.
+  2. A relapse while the incident is in Monitoring sends one "down again" reply in the same thread, even when two engine runs overlap (integration test).
+  3. While a site is flapping, no RECOVERED goes out until it has been OK for 15 min continuously, then one summary (integration test).
+  4. A PROBLEM that recovers in under 5 min with no ack is auto-resolved (test).
+  5. message-checker passes the relapse and flapping rows.
+- **Review:** engine-reviewer, message-checker, db-reviewer (notifications dedupe).
 
 ### S05 · Sites & monitors
 
-- **Scope:** FR-01. `/sites` list, Add site with the registration checklist, Edit monitors (URL, method, expected status, timeout, keywords, headers, thresholds, primary, key pages, redirect allowlist). An owner must have signed in once and have a notification channel (PRD §3). Monitor URLs rejected when they resolve to private, link-local or metadata addresses (the probe enforces the same on every hop since S02a). Real sites are entered on production only once S04 is Done — before that a relapse during an open incident isn't alerted (D-004, S02a engine review). Every change writes `audit_log` with before / after. Production clients and AMs load from a reviewed SQL script (UI in S17).
+- **Scope:** FR-01. `/sites` list, Add site with the registration checklist, Edit monitors (URL, method, expected status, timeout, keywords, headers, thresholds, primary, key pages, redirect allowlist). An owner must have signed in once and have a notification channel (PRD §3). Monitor URLs rejected when they resolve to private, link-local or metadata addresses (the probe enforces the same on every hop since S02a). Real sites are entered on production only once S04b is Done — before that a relapse during an open incident isn't alerted (D-004, S02a engine review). Every change writes `audit_log` with before / after. Production clients and AMs load from a reviewed SQL script (UI in S17).
 - **Boards:** AddSite, EditMonitors · route `/sites`
 - **Depends on:** S01 (S02a for probes to pick the monitors up)
 - **Done when:**
@@ -469,7 +526,7 @@ The plan keeps the PRD's order and gates; only dates move. Q7 (answered 28 Sep 2
 | R1 | One developer; the sizes add up to about twice the PRD timeline (bus factor 1, PRD §13) | Re-baseline after S02a with its measured duration (Q7), then tell the CEO. Gates are scope gates: when a phase slips, its gate moves, never its Done-when lines. Second Admin at G1. |
 | R2 | Vercel Cron is the single point of failure for probes, engine and notifier | Healthchecks pings from S02a; watchdog and fault mode in S12 before go-live. |
 | R3 | WAF blocks grow and the verifier gets busy | S00 allowlist requests; S03 caps the verifier at 3 sessions and alerts at > 5 queued jobs. |
-| R4 | Alert fatigue during the parallel run | Majority vote, dedupe and flapping (S04, D-004); false-alert review in the S19 log. |
+| R4 | Alert fatigue during the parallel run | Majority vote, dedupe and flapping (S04a, S04b, D-004); false-alert review in the S19 log. |
 
 ## Open questions for Tao
 
@@ -493,7 +550,7 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 |---|---|
 | FR-01 | S05 |
 | FR-02 | S02a |
-| FR-03 | S04 |
+| FR-03 | S04a |
 | FR-04 | S03 |
 | FR-05 | S06 |
 | FR-06 | S07 |
@@ -527,7 +584,7 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | MobileAckDark | S02b |
 | ChatAlert | S02a |
 | EmailAlert | S02b |
-| StatusModel | S04 |
+| StatusModel | S04a |
 | AddSite | S05 |
 | EditMonitors | S05 |
 | Main | S06 |
@@ -594,7 +651,7 @@ Tables the plan adds beyond PRD §11: organisation settings and company holidays
 
 | Test | What | Slice |
 |---|---|---|
-| T01 | Staging site forced through every status path | S04 |
+| T01 | Staging site forced through every status path | S04a |
 | T02 | One probe off → no false DOWN, Admin alerted | S12 |
 | T03 | Verifier off → hard fail still DOWN; blocked → PROBLEM (unverified) | S03 |
 | T04 | Vercel Cron off → Healthchecks alerts 2 people, VPS watchdog alerts | S12 |

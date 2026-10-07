@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
 import {
   confirmsDown,
-  decideVerification,
   evaluateRound,
   faultyLocations,
   isRegionalProblem,
@@ -113,22 +112,6 @@ describe('confirmsDown — two hard-fail checks in a row', () => {
     expect(confirmsDown(null, hard)).toBe(false);
     expect(confirmsDown(pass, hard)).toBe(false);
     expect(confirmsDown(hard, hard)).toBe(true);
-  });
-});
-
-describe('decideVerification — blocked rounds (spec §6, D-001)', () => {
-  it('page loads and keyword found → OK with a note', () => {
-    expect(decideVerification('loaded')).toMatchObject({ status: 'ok' });
-  });
-  it('page fails → DOWN', () => {
-    expect(decideVerification('failed')).toEqual({ status: 'down' });
-  });
-  it('verifier unavailable → PROBLEM (unverified) at once, Admin told (INC-0138 Tubtong)', () => {
-    expect(decideVerification('unavailable')).toEqual({
-      status: 'problem',
-      trigger: 'blocked_unverified',
-      alertAdmin: true,
-    });
   });
 });
 

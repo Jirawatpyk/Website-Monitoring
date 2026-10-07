@@ -57,13 +57,13 @@ isOneToOne: false
                   ]
                 },"check_results": {
                   Row: {
-                    "attempt": number,"checked_at": string,"created_at": string,"error": string | null,"id": string,"location": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"resolved_ip": unknown,"response_ms": number | null,"status_code": number | null,"ttfb_ms": number | null
+                    "attempt": number,"checked_at": string,"created_at": string,"error": string | null,"final_url": string | null,"id": string,"keyword_forbidden": (string)[] | null,"keyword_missing": (string)[] | null,"location": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"resolved_ip": unknown,"response_ms": number | null,"status_code": number | null,"ttfb_ms": number | null
                   }
                   Insert: {
-                    "attempt"?: number,"checked_at": string,"created_at"?: string,"error"?: string | null,"id"?: string,"location": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"resolved_ip"?: unknown,"response_ms"?: number | null,"status_code"?: number | null,"ttfb_ms"?: number | null
+                    "attempt"?: number,"checked_at": string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"id"?: string,"keyword_forbidden"?: (string)[] | null,"keyword_missing"?: (string)[] | null,"location": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"resolved_ip"?: unknown,"response_ms"?: number | null,"status_code"?: number | null,"ttfb_ms"?: number | null
                   }
                   Update: {
-                    "attempt"?: number,"checked_at"?: string,"created_at"?: string,"error"?: string | null,"id"?: string,"location"?: string,"monitor_id"?: string,"outcome"?: Database["public"]['Enums']["check_outcome"],"resolved_ip"?: unknown,"response_ms"?: number | null,"status_code"?: number | null,"ttfb_ms"?: number | null
+                    "attempt"?: number,"checked_at"?: string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"id"?: string,"keyword_forbidden"?: (string)[] | null,"keyword_missing"?: (string)[] | null,"location"?: string,"monitor_id"?: string,"outcome"?: Database["public"]['Enums']["check_outcome"],"resolved_ip"?: unknown,"response_ms"?: number | null,"status_code"?: number | null,"ttfb_ms"?: number | null
                   }
                   Relationships: [
                     {
@@ -155,6 +155,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     },{
       foreignKeyName: "incidents_site_id_fkey"
+      columns: ["site_id"]
+isOneToOne: false
+      referencedRelation: "sites"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"monitor_status": {
+                  Row: {
+                    "cause": string | null,"created_at": string,"failing_since": NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds": number,"status": Database["public"]['Enums']["site_state"],"trigger": Database["public"]['Enums']["incident_trigger"] | null,"updated_at": string
+                  }
+                  Insert: {
+                    "cause"?: string | null,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "cause"?: string | null,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at"?: string,"monitor_id"?: string,"site_id"?: string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "monitor_status_monitor_id_fkey"
+      columns: ["monitor_id"]
+isOneToOne: true
+      referencedRelation: "monitors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "monitor_status_site_id_fkey"
       columns: ["site_id"]
 isOneToOne: false
       referencedRelation: "sites"
@@ -446,22 +471,25 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
                            },
 "engine_escalate_incident":
-{ Args: { "p_context": Json,"p_detected_at": string,"p_incident_id": string,"p_notify": boolean,"p_round_at": string }; Returns: boolean
+{ Args: { "p_context": Json,"p_detected_at": string,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"] }; Returns: boolean
                            },
 "engine_note_site":
 { Args: { "p_note"?: string,"p_round_at": string,"p_site_id": string }; Returns: undefined
                            },
 "engine_open_incident":
-{ Args: { "p_context": Json,"p_detected_at": string,"p_monitor_id": string,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
+{ Args: { "p_context": Json,"p_detected_at": string,"p_monitor_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
                            },
 "engine_record_round":
-{ Args: { "p_evaluated_at": string,"p_ok_rounds": number,"p_round_at": string,"p_site_id": string }; Returns: undefined
+{ Args: { "p_evaluated_at": string,"p_monitors"?: Json,"p_ok_rounds": number,"p_round_at": string,"p_site_id": string,"p_status"?: Database["public"]['Enums']["site_state"] }; Returns: undefined
                            },
 "engine_recover_incident":
-{ Args: { "p_context": Json,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_notify": boolean,"p_recovered_at": string,"p_round_at": string,"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
+{ Args: { "p_context": Json,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_recovered_at": string,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
                            },
 "engine_settle_incident":
-{ Args: { "p_at": string,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_round_at": string,"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
+{ Args: { "p_at": string,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_monitors"?: Json,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
+                           },
+"engine_write_monitors":
+{ Args: { "p_monitors": Json,"p_round_at": string,"p_site_id": string,"p_status": Database["public"]['Enums']["site_state"] }; Returns: undefined
                            },
 "expire_verification_jobs":
 { Args: Record<PropertyKey, never>; Returns: number

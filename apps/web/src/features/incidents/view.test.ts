@@ -273,3 +273,39 @@ describe('MobileAck view', () => {
     expect(unknown.ack).toMatchObject({ byName: 'someone' });
   });
 });
+
+describe('MobileAck view of a PROBLEM (spec §19, S04a)', () => {
+  const problem: EventRow = {
+    type: 'detected',
+    at: '2026-09-25T02:52:00Z',
+    actor_id: null,
+    payload: {
+      cause: 'p50 5.8 s (BKK, SIN, TYO) · over the Tier 2 limit of 5 s for 3 checks in a row',
+      summary: 'slow, p50 5.8 s',
+    },
+  };
+  const slow: Partial<IncidentRow> = {
+    severity: 'problem',
+    trigger: 'slow',
+    started_at: '2026-09-25T02:48:00Z',
+    detected_at: '2026-09-25T02:52:00Z',
+  };
+
+  it('is detected, not confirmed down, and names its trigger', () => {
+    expect(view(slow, [problem])).toMatchObject({
+      title: 'MuvMi has a problem',
+      confirmedLabel: 'Detected',
+      confirmedBy: 'Slow',
+      cause: 'p50 5.8 s (BKK, SIN, TYO) · over the Tier 2 limit of 5 s for 3 checks in a row',
+      log: [{ at: '09:52', text: 'PROBLEM detected — slow, p50 5.8 s' }],
+    });
+    expect(view().confirmedLabel).toBe('Confirmed down');
+  });
+
+  it('says how long the problem lasted once recovered', () => {
+    const back = view({ ...slow, recovered_at: '2026-09-25T03:14:00Z' }, [problem]);
+    expect(back.sub).toBe('problem 26 min · Tier 1 · Fri 25 Sep');
+    // ChatAlert / EmailAlert: a PROBLEM is "back to normal"; only an outage is "back".
+    expect(back.title).toBe('MuvMi is back to normal');
+  });
+});

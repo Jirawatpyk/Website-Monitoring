@@ -10,10 +10,27 @@ const result = (outcome: HttpCheckResult['outcome'], statusCode: number | null =
   ttfbMs: 80,
   error: outcome === 'fail' && statusCode === null ? 'Timeout' : null,
   bodySample: '',
+  finalUrl: statusCode === null ? null : 'https://ok.example.test/',
+  keywordMissing: outcome === 'pass' ? ['Welcome'] : null,
+  keywordForbidden: outcome === 'pass' ? [] : null,
 });
 const monitors = [
-  { id: 'm-ok', url: 'https://ok.example.test', method: 'GET' as const, timeoutMs: 10_000 },
-  { id: 'm-down', url: 'https://down.example.test', method: 'HEAD' as const, timeoutMs: 30_000 },
+  {
+    id: 'm-ok',
+    url: 'https://ok.example.test',
+    method: 'GET' as const,
+    timeoutMs: 10_000,
+    mustContain: ['Welcome'],
+    mustNotContain: ['Index of /'],
+  },
+  {
+    id: 'm-down',
+    url: 'https://down.example.test',
+    method: 'HEAD' as const,
+    timeoutMs: 30_000,
+    mustContain: [],
+    mustNotContain: [],
+  },
 ];
 const fakeApi = (due = monitors) => {
   const posted: unknown[][] = [];
@@ -51,6 +68,9 @@ describe('runProbeRound (Bangkok)', () => {
       method: 'GET',
       timeoutMs: 10_000,
       headers: { 'X-DxT-Monitor': 's3cret' },
+      // The page's keywords (D-022): the result says which are missing, the server judges.
+      mustContain: ['Welcome'],
+      mustNotContain: ['Index of /'],
     });
     expect(sleep).toHaveBeenCalledWith(30_000);
     expect(posted[0]).toEqual([
@@ -58,6 +78,9 @@ describe('runProbeRound (Bangkok)', () => {
         monitorId: 'm-ok',
         outcome: 'pass',
         attempt: 1,
+        finalUrl: 'https://ok.example.test/',
+        keywordMissing: ['Welcome'],
+        keywordForbidden: [],
         checkedAt: '2026-10-07T03:01:01.000Z',
       }),
       expect.objectContaining({ monitorId: 'm-down', outcome: 'fail', statusCode: 503, attempt: 1 }),

@@ -19,15 +19,16 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 .aura-segmented--sm .aura-segmented__option{padding:0 9px}
 </style>
 </helmet>
-<div class="r3-col" style="width: 720px; height: 1408px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+<div class="r3-col" style="width: 720px; height: 1712px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
 
 <div style="display: flex; flex-direction: column; gap: 4px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">EMAIL · RESEND · RECORD COPY + FALLBACK WHEN CHAT FAILS</span>
 <h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Alert email</h2>
-<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Same facts as the Chat thread. One email per event, all under one subject per incident, so a mail client stacks them the way Chat stacks the thread. Pick an event and a recipient — the footer says why that person got it.</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Same facts as the Chat thread. One email per event, all under one subject per incident, so a mail client stacks them the way Chat stacks the thread. Pick a thread (DOWN, PROBLEM or Admin system email), then an event and a recipient — the footer says why that person got it.</span>
 </div>
 
 <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Thread</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Thread" options="{{threads}}" value="{{th}}" on-change="{{pickTh}}" size="sm"></x-import></div>
 <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Event</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Event" options="{{events}}" value="{{ev}}" on-change="{{pick}}" size="sm"></x-import></div>
 <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Recipient</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Recipient" options="{{whoOptions}}" value="{{who}}" on-change="{{pickWho}}" size="sm"></x-import></div>
 </div>
@@ -37,7 +38,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px; line-height: 1.5">
 <div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">From</span><span>DxT Monitor &lt;alerts@[domain]&gt;</span></div>
 <div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">To</span><span>{{r.to}}</span></div>
-<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">Subject</span><span style="font-weight: 600">MuvMi · Tier 1 · INC-0142</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">Subject</span><span style="font-weight: 600">{{subject}}</span></div>
 <div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">Preheader</span><span><b style="font-weight: 600; color: {{e.labelColor}}">{{e.preStatus}}</b> <span style="color: var(--aura-fg-secondary)">{{e.pre}}</span></span></div>
 </div>
 
@@ -52,7 +53,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </div>
 <div style="display: flex; flex-direction: column; border-top: 1px solid var(--aura-border-default)">
 <sc-for list="{{e.facts}}" as="f" hint-placeholder-count="4">
-<div style="display: flex; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.5"><span style="width: 120px; flex-shrink: 0; color: var(--aura-fg-secondary)">{{f.k}}</span><span>{{f.v}}</span></div>
+<div style="display: flex; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.5"><span style="width: 120px; flex-shrink: 0; color: var(--aura-fg-secondary)">{{f.k}}</span><span style="min-width: 0; overflow-wrap: anywhere">{{f.v}}</span></div>
 </sc-for>
 </div>
 <div style="display: flex; align-items: center; gap: 10px">
@@ -63,7 +64,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </div>
 </div>
 </div>
-<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5; text-align: center"><b style="font-weight: 600; color: var(--aura-fg-primary)">{{r.why}}</b><br>Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5; text-align: center"><b style="font-weight: 600; color: var(--aura-fg-primary)">{{r.why}}</b><br>{{footNote}}</span>
 </div>
 </div>
 
@@ -73,23 +74,27 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <span>One subject per incident: <span style="font-family: var(--font-mono); font-size: 11px">site · Tier · incident id</span>, the same for every event, so replies never fork the thread.</span>
 <span>The first email’s Message-ID is stored; every later email sets <span style="font-family: var(--font-mono); font-size: 11px">In-Reply-To</span> and <span style="font-family: var(--font-mono); font-size: 11px">References</span> to it.</span>
 <span>The status word goes first in the preheader and the body, so it still shows in a phone notification.</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">PROBLEM thread:</b> same rules, its own subject (e.g. <span style="font-family: var(--font-mono); font-size: 11px">Fuji Links · Tier 2 · INC-0141</span>). PROBLEM, ACKNOWLEDGED and RECOVERED all reply to the first PROBLEM email. A site that fails again while the incident is open stays in the same thread.</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Admin system emails</b> aren’t about one incident: their own subject per outage with its start time (so separate outages don’t merge into one mail thread), one email when it starts, no “back up” email.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Resolved email:</b> when someone resolves the incident (always by hand), one RESOLVED email goes in this same thread to everyone emailed about this DOWN incident — for INC-0142 Arm, Ploy, Tao and Bua. Held 10 s for Undo, like the ack.</span>
 </div>
 <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
 <span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — recipients &amp; build</span>
 <span>Recipients follow the escalation step: L0 owner by day / on-call at night · L1 backup + Tao · L2 CEO (proposal · pending CEO) · L3 FYI to CEO + AM (Tier 1, even after an ack). The client-update track emails the AM. Each email is sent per person with its own footer.</span>
 <span>Tier 2–3 L2 (+30 min, no ack) is a reminder email to Tao only — no CEO. Ack and resolve emails are held until the 10 s Undo window closes.</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">PROBLEM:</b> amber, never red. L0 emails the owner only; the backup is first emailed with the 60-min reminder (+60 min, no ack). A Tier 2–3 PROBLEM outside response hours is held until 09:00. No client-update email — that track is for DOWN.</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Admin system emails</b> (browser verifier unavailable, fewer than 2 probe locations) go to every active Admin — today only Tao.</span>
 <span>Table layout, inline styles, 600 px max, system fonts. Status in words and colour. Plain-text part with the same facts and links. No tracking pixels.</span>
 </div>
 </div>
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":1408}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":1712}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { ev: 'Down', who: 'Arm' };
+    this.state = { th: 'MuvMi · DOWN', ev: 'Down', who: 'Arm' };
   }
   renderVals() {
     var self = this;
@@ -174,12 +179,74 @@ class Component extends DCLogic {
         }
       }
     };
-    var ev = this.state.ev;
-    var e = E[ev];
+    var FCAUSE = 'p50 5.8 s (BKK, SIN, TYO) · over the Tier 2 limit of 5 s for 3 checks in a row';
+    var OPENF = P('Open / acknowledge', 'Incident.dc.html');
+    var F = {
+      'PROBLEM': {
+        sentTo: 'Sent 09:52 to Ploy only — PROBLEM goes to the owner. Nok (backup) is plain text in the Chat thread and is first emailed with the 60-min reminder (10:52) if nobody acknowledges.',
+        bar: AMBER, labelColor: AMBER, label: 'PROBLEM', preStatus: 'PROBLEM —', pre: 'Fuji Links slow · p50 5.8 s, over 5 s for 3 checks · detected 09:52',
+        headline: 'Fuji Links is slow',
+        facts: [{ k: 'Detected', v: 'Fri 25 Sep 09:52' }, { k: 'Trigger', v: 'Slow' }, { k: 'Cause', v: FCAUSE }, { k: 'Site', v: 'Up — pages load, but slowly. Not an outage.' }, { k: 'Next step', v: 'Reminder + Nok (backup) at 10:52 if not acknowledged' }],
+        people: {
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'The site is up but slow. You own Fuji Links — please take a look and acknowledge, or hand it over in the Chat thread.', btns: [OPENF], why: 'You got this because you own Fuji Links.' }
+        }
+      },
+      'Acknowledged': {
+        sentTo: 'Sent 09:58:12 (held 10 s for Undo) to everyone already emailed about this incident — only Ploy. Nok was never emailed, so he isn’t told.',
+        bar: GREY, labelColor: GREY, label: 'ACKNOWLEDGED', preStatus: 'ACKNOWLEDGED —', pre: 'by Ploy 09:58 · Fuji Links still slow · reminders stopped',
+        headline: 'Ploy has Fuji Links',
+        facts: [{ k: 'Acknowledged', v: 'Ploy at 09:58' }, { k: 'Slow for', v: '6 min so far (detected 09:52)' }, { k: 'Cause', v: FCAUSE }, { k: 'Reminders', v: '60-min reminder and the Nok (backup) step are stopped' }],
+        people: {
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Acknowledged by Ploy → reminders stopped. The site is still up but slow; you’ll get one more email when it clears.', btns: [P('Open incident', 'Incident.dc.html')], why: 'You got this because you acknowledged this incident.' }
+        }
+      },
+      'Recovered': {
+        sentTo: 'Sent 10:14, on the first OK round, to Ploy — the only person emailed about this incident.',
+        bar: 'var(--aura-fg-positive)', labelColor: GREEN, label: 'RECOVERED', preStatus: 'RECOVERED —', pre: 'Fuji Links back to normal at 10:14 · problem lasted 22 min · root cause needed',
+        headline: 'Fuji Links is back to normal',
+        facts: [{ k: 'Problem lasted', v: '22 min (09:52–10:14)' }, { k: 'Confirmed by', v: 'First OK round from 3 locations' }, { k: 'Acknowledged', v: 'Ploy at 09:58' }, { k: 'Still to do', v: 'Root cause (Ploy) · a PROBLEM ends at Resolved — no review' }],
+        people: {
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'The problem cleared. Needs a root cause before it can be resolved.', btns: [P('Add root cause', 'Incident.dc.html')], why: 'You got this because you own Fuji Links.' }
+        }
+      }
+    };
+    var ADMWHY = 'You got this because you’re an Admin.';
+    var A = {
+      'Verifier unavailable': {
+        subject: 'DxT Monitor · System · Browser verifier unavailable · Thu 24 Sep 14:02',
+        sentTo: 'Sent Thu 24 Sep 14:02 to every active Admin — today only Tao. One email per outage; no “back up” email (it came back 14:14 after a restart).',
+        bar: AMBER, labelColor: AMBER, label: 'VERIFIER UNAVAILABLE', preStatus: 'VERIFIER UNAVAILABLE —', pre: '1 blocked site waiting, shown as PROBLEM (unverified) until it’s back',
+        headline: 'The browser verifier isn’t answering',
+        facts: [{ k: 'Since', v: 'Thu 24 Sep 14:02 — a blocked check found no verifier answering (BKK VPS)' }, { k: 'Sites waiting', v: 'Tubtong (Tier 2) — blocked by bot protection, PROBLEM (unverified) since 14:02 · INC-0138' }, { k: 'Effect', v: 'Blocked sites can’t be confirmed OK or DOWN. Hard fails still go DOWN as usual — they don’t wait for the verifier.' }, { k: 'What to check', v: 'Restart the verifier service on the BKK VPS, then check “Last job” on Probes & heartbeat.' }, { k: 'When it’s back', v: 'Waiting sites are re-checked on the next round and clear on their own.' }],
+        people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'Blocked sites are waiting for a browser check. Until the verifier is back they show PROBLEM (unverified) — no proof either way.', btns: [P('Open Probes & heartbeat', 'Probes.dc.html')], why: ADMWHY } }
+      },
+      'Fewer than 2 locations': {
+        subject: 'DxT Monitor · System · Fewer than 2 probe locations · Tue 22 Sep 15:40',
+        sentTo: 'Example — not in the sample ledger. Sent to every active Admin (today only Tao) when a round has fewer than 2 locations. One email per outage; no “back up” email.',
+        bar: AMBER, labelColor: AMBER, label: 'STATUSES FROZEN', preStatus: 'STATUSES FROZEN —', pre: 'only TYO is reporting · every site held at the 15:39 round',
+        headline: 'Only 1 probe location is reporting',
+        facts: [{ k: 'Since', v: 'Tue 22 Sep 15:40 (the 15:39 round was the last complete one)' }, { k: 'Still reporting', v: 'TYO (Tokyo)' }, { k: 'Missing', v: 'BKK (BKK VPS) · SIN (Singapore)' }, { k: 'Effect', v: 'Every site keeps its status from the 15:39 round, shown as “as of 15:39”. No new incidents or recoveries until a second location reports.' }, { k: 'What to check', v: 'The BKK probe on the BKK VPS and the SIN probe — Probes & heartbeat shows the last report from each.' }],
+        people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'A status needs at least 2 locations to vote, so statuses are frozen at the last complete round until a second location reports again.', btns: [P('Open Probes & heartbeat', 'Probes.dc.html')], why: ADMWHY } }
+      }
+    };
+    var TH = {
+      'MuvMi · DOWN': { subject: 'MuvMi · Tier 1 · INC-0142', E: E, events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (CEO) — Proposal', 'L3 FYI (CEO + Bua)', 'Recovered'], first: 'Down', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
+      'Fuji Links · PROBLEM': { subject: 'Fuji Links · Tier 2 · INC-0141', E: F, events: ['PROBLEM', 'Acknowledged', 'Recovered'], first: 'PROBLEM', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
+      'Admin · system': { subject: '', E: A, events: ['Verifier unavailable', 'Fewer than 2 locations'], first: 'Verifier unavailable', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read.' }
+    };
+    var th = TH[this.state.th] ? this.state.th : 'MuvMi · DOWN';
+    var T = TH[th];
+    var ev = T.E[this.state.ev] ? this.state.ev : T.first;
+    var e = T.E[ev];
     var names = Object.keys(e.people);
     var who = names.indexOf(this.state.who) >= 0 ? this.state.who : names[0];
     return {
-      events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (CEO) — Proposal', 'L3 FYI (CEO + Bua)', 'Recovered'],
+      threads: Object.keys(TH),
+      th: th,
+      pickTh: function (v) { self.setState({ th: v, ev: TH[v].first }); },
+      subject: e.subject || T.subject,
+      footNote: T.foot,
+      events: T.events,
       ev: ev,
       pick: function (v) { self.setState({ ev: v }); },
       whoOptions: names,

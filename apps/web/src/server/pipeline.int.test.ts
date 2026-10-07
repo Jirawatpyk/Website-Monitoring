@@ -6,7 +6,7 @@
  * `pnpm --filter @dxt/web test:int` (CI: the `db` job). Refuses any non-local URL.
  */
 import { createClient } from '@supabase/supabase-js';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Database, DbClient } from '@dxt/db';
 import { runEngine } from './engine/run-engine';
 import { engineAfterReport } from './engine/engine-and-deliver';
@@ -93,6 +93,10 @@ const statusOf = (siteId: string) =>
 // A probe tick two minutes ago (minute-aligned, like the cron): scheduled checks at M+1 / M+2 s.
 const M = Math.floor(Date.now() / 60_000) * 60_000 - 120_000;
 const t = (sec: number) => new Date(M + sec * 1000);
+const okRound = (base = 0): ['SIN' | 'TYO', Outcome, Date][] => [
+  ['SIN', 'pass', t(base + 1)],
+  ['TYO', 'pass', t(base + 2)],
+];
 const downRound = (base = 0): ['SIN' | 'TYO', Outcome, Date, (1 | 2)?][] => [
   ['SIN', 'fail', t(base + 1)],
   ['TYO', 'fail', t(base + 2)],
@@ -125,6 +129,12 @@ beforeAll(async () => {
     )
   ).id;
   created.clients.push(clientId);
+});
+
+// Every test builds its own site on the same timeline: the sites of earlier tests stop being judged,
+// so their checks can't count toward another test's faulty-location minute (spec §15.3, D-022).
+beforeEach(async () => {
+  if (created.sites.length) await db.from('sites').update({ is_active: false }).in('id', created.sites);
 });
 
 afterAll(async () => {
@@ -478,7 +488,7 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
         kind: 'verifier_unavailable',
         context: expect.objectContaining({
           reason: 'no_poll',
-          sites: expect.arrayContaining([`Blocked A ${run}`, `Blocked B ${run}`]),
+          sites: expect.arrayContaining([`Blocked A ${run} (Tier 1)`, `Blocked B ${run} (Tier 1)`]),
         }),
       }),
     ]);
@@ -490,6 +500,69 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
 
     // The next run (same outage) adds nothing.
     expect(await runEngine(db, t(66))).toMatchObject({ alerts: 0 });
+    await clearAlerts();
+  });
+
+  it('M1: unverified while the incident is in Needs root cause shows PROBLEM; the next OK round shows OK (S04a)', async () => {
+    await clearAlerts();
+    await verifierPolled(null);
+    const { siteId, monitorId } = await newSite('Relapse M1');
+    // Runs reach 5 min ahead of the clock: SIN and TYO beat as of each run, or they'd drop out (D-019).
+    const judge = async (at: Date) => {
+      await beat('SIN', at);
+      await beat('TYO', at);
+      return runEngine(db, at);
+    };
+    await results(monitorId, downRound());
+    await judge(t(65));
+    await results(monitorId, okRound(60));
+    await judge(t(125));
+    await results(monitorId, okRound(120));
+    await judge(t(185));
+    expect(await incidentsOf(siteId)).toEqual([expect.objectContaining({ state: 'needs_root_cause' })]);
+    expect((await statusOf(siteId))?.status).toBe('ok');
+
+    await results(monitorId, [
+      ['SIN', 'blocked', t(181)],
+      ['TYO', 'blocked', t(182)],
+    ]);
+    await judge(t(245));
+    expect((await statusOf(siteId))?.status).toBe('problem');
+    expect(await noteOf(siteId)).toBe('Blocked, not verified');
+    // The incident moving back is S04b's relapse; nothing new opens.
+    expect(await incidentsOf(siteId)).toEqual([expect.objectContaining({ state: 'needs_root_cause' })]);
+
+    await results(monitorId, okRound(240));
+    await judge(t(305));
+    expect((await statusOf(siteId))?.status).toBe('ok');
+    expect(await noteOf(siteId)).toBeNull();
+    await beat('SIN', new Date());
+    await beat('TYO', new Date());
+    await clearAlerts();
+  });
+
+  it('fewer than 2 probe locations beating → one Admin email, cleared once 2 beat again (D-022)', async () => {
+    await clearAlerts();
+    await newSite('Lonely');
+    await beat('TYO', null);
+    expect(await runEngine(db, new Date())).toMatchObject({ alerts: 1 });
+    const [alert] = await must(db.from('system_alerts').select('id, kind, context').is('cleared_at', null));
+    expect(alert).toMatchObject({ kind: 'probe_locations_low', context: { active: ['SIN'] } });
+    const admins = await must(db.from('profiles').select('id').eq('role', 'admin').eq('is_active', true));
+    expect(await must(db.from('notifications').select('id').eq('system_alert_id', alert!.id))).toHaveLength(
+      admins.length,
+    );
+    expect(await runEngine(db, new Date())).toMatchObject({ alerts: 0 });
+    await beat('TYO', new Date());
+    // Not before 10 min after it opened.
+    await runEngine(db, new Date());
+    expect(await must(db.from('system_alerts').select('id').is('cleared_at', null))).toHaveLength(1);
+    await db
+      .from('system_alerts')
+      .update({ opened_at: new Date(Date.now() - 11 * 60_000).toISOString() })
+      .eq('id', alert!.id);
+    await runEngine(db, new Date());
+    expect(await must(db.from('system_alerts').select('id').is('cleared_at', null))).toEqual([]);
     await clearAlerts();
   });
 
@@ -516,6 +589,92 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
       ok: false,
     });
     await verifierPolled(null);
+  });
+});
+
+describe('PROBLEM triggers and status rules (S04a Done-when 1, 2)', () => {
+  async function keyPage(siteId: string, path: string): Promise<string> {
+    const monitor = await must(
+      db
+        .from('monitors')
+        .insert({
+          site_id: siteId,
+          type: 'http',
+          is_primary: false,
+          url: `https://${run}.example.test${path}`,
+        })
+        .select('id')
+        .single(),
+    );
+    created.monitors.push(monitor.id);
+    return monitor.id;
+  }
+
+  it('the third slow round opens PROBLEM (Slow) with its Chat card queued (INC-0141)', async () => {
+    const { siteId, monitorId } = await newSite('Slow');
+    await must(
+      db
+        .from('monitor_status')
+        .insert({
+          monitor_id: monitorId,
+          site_id: siteId,
+          last_round_at: t(-60).toISOString(),
+          slow_rounds: 2,
+        })
+        .select('monitor_id'),
+    );
+    const { error } = await db.from('check_results').insert(
+      (['SIN', 'TYO'] as const).map((location, i) => ({
+        monitor_id: monitorId,
+        location,
+        outcome: 'pass' as const,
+        checked_at: t(i + 1).toISOString(),
+        attempt: 1,
+        status_code: 200,
+        response_ms: 3_400 + i * 400,
+      })),
+    );
+    if (error) throw new Error(error.message);
+
+    expect(await runEngine(db, t(65))).toMatchObject({ problems: 1, opened: 0 });
+    const [incident] = await must(
+      db.from('incidents').select('id, trigger, severity, started_at').eq('site_id', siteId),
+    );
+    expect(incident).toMatchObject({ trigger: 'slow', severity: 'problem' });
+    expect(Date.parse(incident!.started_at)).toBe(t(-120).getTime());
+    expect(await notificationsOf(incident!.id)).toEqual([expect.objectContaining({ template: 'problem' })]);
+    expect((await statusOf(siteId))?.status).toBe('problem');
+    expect(
+      await must(
+        db.from('monitor_status').select('status, trigger, slow_rounds, cause').eq('monitor_id', monitorId),
+      ),
+    ).toEqual([
+      {
+        status: 'problem',
+        trigger: 'slow',
+        slow_rounds: 3,
+        cause: 'p50 3.6 s (SIN, TYO) · over the Tier 1 limit of 3 s for 3 checks in a row',
+      },
+    ]);
+  });
+
+  it('a key page returning 500 while the home page is fine → PROBLEM, never DOWN; it recovers with RECOVERED', async () => {
+    const { siteId, monitorId } = await newSite('Key page');
+    const booking = await keyPage(siteId, '/booking');
+    await results(monitorId, okRound());
+    await results(booking, downRound());
+
+    expect(await runEngine(db, t(65))).toMatchObject({ problems: 1, opened: 0 });
+    const [incident] = await must(
+      db.from('incidents').select('id, trigger, severity, monitor_id').eq('site_id', siteId),
+    );
+    expect(incident).toMatchObject({ trigger: 'key_page', severity: 'problem', monitor_id: booking });
+    expect((await statusOf(siteId))?.status).toBe('problem');
+
+    await results(monitorId, okRound(60));
+    await results(booking, okRound(60));
+    expect(await runEngine(db, t(125))).toMatchObject({ recovered: 1 });
+    expect((await notificationsOf(incident!.id)).map((n) => n.template)).toEqual(['problem', 'recovered']);
   });
 });
 

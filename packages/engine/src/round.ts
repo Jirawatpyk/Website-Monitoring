@@ -70,27 +70,8 @@ export function confirmsDown(previous: RoundVerdict | null, current: RoundVerdic
   return previous?.kind === 'hard_fail' && current.kind === 'hard_fail';
 }
 
-/** Browser verifier results for a blocked round (PRD §5 "Browser verification spec"). */
-export type VerifierResult = 'loaded' | 'failed' | 'unavailable';
-
-export type VerificationDecision =
-  | { status: 'ok'; note: string }
-  | { status: 'down' }
-  | { status: 'problem'; trigger: 'blocked_unverified'; alertAdmin: true };
-
+/** The site note of a blocked round the browser verifier loaded (PRD §5, spec §6). */
 export const BLOCKED_NOTE = 'Automated check blocked by bot protection; verified via browser';
-
-/**
- * Blocked round → the browser verifier decides (spec §6, StatusModel board).
- * Verifier unavailable → PROBLEM (unverified) at once, the Admin is told about the verifier, and the
- * check retries every round. No grace period: without proof the site must not keep showing OK.
- * Decision record: docs/decisions.md D-001 (supersedes PRD §5's "keep status, PROBLEM after 10 min").
- */
-export function decideVerification(result: VerifierResult): VerificationDecision {
-  if (result === 'loaded') return { status: 'ok', note: BLOCKED_NOTE };
-  if (result === 'failed') return { status: 'down' };
-  return { status: 'problem', trigger: 'blocked_unverified', alertAdmin: true };
-}
 
 /** One location failing ≥ 5 min while the others pass → PROBLEM (regional). */
 export const REGIONAL_AFTER_MIN = 5;

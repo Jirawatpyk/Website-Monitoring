@@ -544,8 +544,8 @@ describe('Admin alerts that aren’t about one incident (D-019)', () => {
       { subject: string; text: string },
       { to: string },
     ];
-    expect(message.subject).toBe('DxT Monitor · Browser verifier unavailable');
-    expect(message.text).toContain('Waiting: Tubtong');
+    expect(message.subject).toBe('DxT Monitor · System · Browser verifier unavailable · Tue 6 Oct 09:59');
+    expect(message.text).toContain('Sites waiting: Tubtong');
     expect(options).toMatchObject({ to: 'tao@example.test', idempotencyKey: 'notification-e-alert' });
     expect(calls.some((c) => c.table === 'incident_events')).toBe(false);
     expect(calls.find((c) => c.table === 'incidents')?.filters).toEqual([['in', 'id', []]]);
