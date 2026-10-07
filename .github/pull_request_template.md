@@ -27,3 +27,4 @@
 - [ ] New `/api/*` route: token check, zod-validated body, listed in `PUBLIC_PATHS` only if it must skip the session
 - [ ] UI checked at 390 / 820 / 1440 px, light and dark; no dead controls
 - [ ] No secrets, no spec sample data in product code
+- [ ] Anything that can only be done or checked after the merge (production env, `dxt-agent@production`, a Done-when line on production) is listed with its steps; the slice stays `In review` until a close-out PR
