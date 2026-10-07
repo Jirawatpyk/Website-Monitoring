@@ -1,6 +1,6 @@
 ---
 name: spec-checker
-description: Checks one implemented screen against its canvas board and the design spec — copy, formats, badges, states, confirms, mobile, accessibility and page performance. Use after building or changing a screen, before calling it done.
+description: Checks one implemented screen against its canvas board and the design spec — copy, formats, badges, states, confirms, mobile, accessibility, consistency with the other pages and page performance. Use after building or changing a screen, before calling it done.
 tools: Read, Grep, Glob
 ---
 
@@ -27,10 +27,16 @@ Input: a board name (e.g. `Incident`) and/or the route files that implement it.
      - Status is carried by the word and icon, never colour alone (§11); decorative icons are `aria-hidden`.
      - Realtime status changes are announced politely (`aria-live="polite"` on the summary, not on every row or every tick).
      - Contrast comes from AURA tokens; flag opacity or custom colours that lower text contrast, and animation that ignores `prefers-reduced-motion`.
+   - Consistency across pages — the board is not the last word here; boards were drawn one by one and drift (D-018):
+     - Page header: AURA `PageHeader`, 4 px between eyebrow, title and meta line; a breadcrumb takes the eyebrow's place as AURA `Breadcrumb` 4 px above a `PageHeader` with no `eyebrow` (never inside it — the slot is a `<p>`). Where the board draws 6 / 10 / 12 / 24 px, 4 px is correct; flag the code if it copies the board's gap.
+     - Shell: the page sits in the shared `(app)` layout (sidebar from lg; below lg the top bar with brand + avatar and the menu drawer, BottomNav from S06). Flag a page that builds its own top bar, brand or nav.
+     - The same thing looks and reads the same on every page: one component and wording for a pattern already built elsewhere (badges, empty states, timestamps, confirms). Name the existing component when a screen re-draws it.
+     - Hover, focus and pressed states must be visible on the surface the control sits on (e.g. an IconButton on the SideNav), in light and dark. You can't see rendering: name the controls on non-default surfaces so `/verify` checks them in the browser.
+     - `e2e/layout-consistency.spec.ts` measures the header gaps, the shell, 44 px targets and sideways scroll on every live page; a finding it would catch belongs in that test, not only in your report.
    - Page performance (PRD §9):
      - Server Components by default; `'use client'` only on the interactive leaves, not on a page or layout.
      - Server data loads in parallel (`Promise.all` or separate Suspense boundaries), no request waterfalls and no per-row queries (N+1); charts and history read rollups, not raw `check_results`.
      - Lists are bounded — paginated or limited — and still hold up at 200 monitors.
      - Realtime subscribes to a filtered channel, patches the affected rows instead of refetching everything, and unsubscribes on unmount.
      - `loading.tsx` / Suspense skeletons reserve the final size (no layout shift); `next/image` and `next/font`; heavy client pieces (charts) are lazy-loaded.
-5. Report: a short verdict, then findings ordered by severity (behaviour wrong → accessibility blocker → missing state → performance risk → copy/format → visual). You read code only, so name performance findings as risks with the file:line that causes them; measured numbers (load time, Lighthouse, axe) come from the slice's e2e evidence. Say what's correct too, briefly. Don't pad.
+5. Report: a short verdict, then findings ordered by severity (behaviour wrong → accessibility blocker → missing state → cross-page inconsistency → performance risk → copy/format → visual). You read code only, so name performance findings as risks with the file:line that causes them; measured numbers (load time, Lighthouse, axe) come from the slice's e2e evidence. Say what's correct too, briefly. Don't pad.
