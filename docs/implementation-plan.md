@@ -18,7 +18,7 @@
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Done |
 | S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Done |
-| S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
+| S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | In progress |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
@@ -294,7 +294,8 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
   3. Create / update / delete of a site or monitor each leave one `audit_log` row with before / after (test).
   4. spec-checker passes AddSite and EditMonitors; nav "Sites" is live.
   5. A site can't be saved with an owner or backup who has no Google Chat user id; the form names them (D-015, test).
-- **Review:** spec-checker, security-reviewer (SSRF, RLS).
+- **Review:** spec-checker, security-reviewer (SSRF, RLS), db-reviewer (audit trigger).
+- **Notes:** started 8 Oct 2026; rules per D-025 (Drafts may leave owners empty, Start needs two linked owners — Done-when 5 reads so). Grew M → L at planning (Test check routes, custom headers through the probes and verifier, Draft / Start / Stop); if it runs past ~1.5 days, custom headers + Test check split off as S05b.
 
 ### S06 · Overview dashboard & site detail
 

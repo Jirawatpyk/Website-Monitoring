@@ -56,7 +56,9 @@ The index `/implement-screen` reads. One row per canvas board (44). The board fi
 
 | Route | What it is | Phase | Built from |
 |---|---|---|---|
-| `/sites` | Site list — the "Sites" nav item (S05) | P0 | The all-sites table on `Main`, full width, with the Tier/owner/client filters (FR-05); rows open `/sites/[siteId]` |
+| `/sites` | Site list — the "Sites" nav item (S05) | P0 | The all-sites table on `Main`, full width, with the Tier/owner/client filters (FR-05); rows open `/sites/[siteId]` (until S06 builds it: `/sites/[siteId]/edit`) |
+| `/sites/[siteId]/edit` | Edit site — the AddSite form with "Edit site", Save changes, Stop monitoring and Delete (Drafts only) (S05, D-025) | P0 | `AddSite` |
+| `/api/monitor-test/sin`, `/api/monitor-test/tyo` | Test check from SIN / TYO for AddSite and EditMonitors — Admin only, nothing stored (S05, D-025) | P0 | `AddSite` Test check, `EditMonitors` Test before saving |
 | `/auth/callback` | OAuth code exchange after Google sign-in, then redirect to `safeNextPath(next)` — built (S01) | P0 | — |
 
 Each nav item carries its slice and a `live` flag (`apps/web/src/components/app-shell/nav.tsx`); only live items show, so the sidebar never links to an unbuilt page (spec §14.16). The slice that builds the page flips it.
