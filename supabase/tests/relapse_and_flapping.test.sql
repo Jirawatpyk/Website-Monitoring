@@ -4,7 +4,7 @@
 -- repeats on one incident, the < 5 min auto-resolve, and the engine's read RPCs.
 begin;
 \ir _helpers.psql
-select plan(43);
+select plan(47);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -174,6 +174,21 @@ select is(
   (select count(*)::int from public.notifications where incident_id = (select id from inc where name = 'voca')
      and template = 'problem_again'),
   1, 'PROBLEM AGAIN is queued'
+);
+-- The home page fails again during that PROBLEM drop (still Acknowledged, not recovered): DOWN AGAIN.
+select ok(not public.engine_relapse_incident((select id from inc where name = 'voca'), 'problem', 'key_page',
+  '2026-09-21 04:46Z', '2026-09-21 04:46:40Z', '2026-09-21 04:46Z', '{}'::jsonb, false, true),
+  'another PROBLEM during the open PROBLEM drop is no relapse');
+select ok(public.engine_relapse_incident((select id from inc where name = 'voca'), 'down', 'hard_fail',
+  '2026-09-21 04:47Z', '2026-09-21 04:47:40Z', '2026-09-21 04:47Z', '{}'::jsonb, false, true),
+  'the home page down again during the D-023 PROBLEM drop joins as DOWN AGAIN (engine review H1)');
+select ok(not public.engine_relapse_incident((select id from inc where name = 'voca'), 'down', 'hard_fail',
+  '2026-09-21 04:47Z', '2026-09-21 04:47:41Z', '2026-09-21 04:47Z', '{}'::jsonb, false, true),
+  'the overlapping run gets false (the drop is DOWN now)');
+select results_eq(
+  $$select state::text, episode_severity::text from public.incidents where id = (select id from inc where name = 'voca')$$,
+  $$values ('acknowledged', 'down')$$,
+  'still Acknowledged; the drop in progress is DOWN'
 );
 select ok(public.engine_recover_incident((select id from inc where name = 'voca'), 'acknowledged', 'monitoring',
   '2026-09-21 04:50Z', '2026-09-21 04:50Z', '{}'::jsonb, true, null, null, true),

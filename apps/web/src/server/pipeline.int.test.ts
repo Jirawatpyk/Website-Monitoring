@@ -1063,5 +1063,17 @@ describe('relapse, flapping and auto-resolve (S04b, D-004, D-024)', () => {
       'recovered',
       'problem_again',
     ]);
+
+    // The home page fails again while /booking's PROBLEM is open: DOWN AGAIN, never silence.
+    await results(monitorId, down(2));
+    await results(booking.id, down(2));
+    await engineAt(2);
+    expect((await rowsOf(inc.id)).filter((n) => n.channel === 'google_chat').map((n) => n.template)).toEqual([
+      'down',
+      'recovered',
+      'problem_again',
+      'down_again',
+    ]);
+    expect((await statusOf(siteId))?.status).toBe('down');
   });
 });

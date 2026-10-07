@@ -122,17 +122,18 @@ describe('lifecycle — relapse state, auto-resolve event, episodes (D-004, spec
     expect(episodeMinutes(episodes, T('04:19'))).toBe(41);
   });
 
-  it('D-023: the PROBLEM AGAIN at the recovery is its own drop, from the recovery on; a DOWN joining it raises it', () => {
+  it('D-023: the PROBLEM AGAIN at the recovery is its own drop, from the recovery on; a DOWN during it is a new DOWN drop', () => {
     const episodes = episodesOf([
       { type: 'detected', at: T('10:01', '25'), startedAt: T('10:00', '25') },
       { type: 'relapsed', at: T('10:21', '25'), startedAt: T('10:00', '25'), severity: 'problem' },
       { type: 'recovered', at: T('10:21', '25') },
-      { type: 'relapsed', at: T('10:30', '25'), startedAt: T('10:30', '25'), severity: 'down' },
+      { type: 'relapsed', at: T('10:30', '25'), startedAt: T('10:29', '25'), severity: 'down' },
       { type: 'recovered', at: T('10:40', '25') },
     ]);
     expect(episodes).toEqual([
       { start: T('10:00', '25'), end: T('10:21', '25'), severity: 'down' },
-      { start: T('10:21', '25'), end: T('10:40', '25'), severity: 'down' },
+      { start: T('10:21', '25'), end: T('10:29', '25'), severity: 'problem' },
+      { start: T('10:29', '25'), end: T('10:40', '25'), severity: 'down' },
     ]);
   });
 

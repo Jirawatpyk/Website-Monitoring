@@ -181,9 +181,16 @@ export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
     const last = out.at(-1);
     const open = !!last && last.end === null;
     if (e.type === 'detected' || e.type === 'relapsed' || (e.type === 'escalated_to_down' && !open)) {
-      // A drop joining one still in progress (the home page down again during D-023's PROBLEM) raises it.
+      // The home page down again during D-023's PROBLEM drop: that drop ends where the DOWN starts and
+      // a DOWN drop begins (D-024: "a new DOWN drop"), so the downtime counts only the outage.
       if (open) {
-        if (e.severity === 'down') last.severity = 'down';
+        const at = e.startedAt ?? e.at;
+        if (e.severity === 'down' && last.severity === 'problem' && at > last.start) {
+          last.end = at;
+          out.push({ start: at, end: null, severity: 'down' });
+        } else if (e.severity === 'down') {
+          last.severity = 'down';
+        }
         continue;
       }
       const start = e.startedAt ?? e.at;
