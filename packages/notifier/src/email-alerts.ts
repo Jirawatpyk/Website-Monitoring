@@ -43,6 +43,8 @@ export interface DownEmailInput extends EmailBaseInput {
   confirmedAt: Date;
   cause: string;
   confirmingLocations: number;
+  /** A PROBLEM someone had acknowledged, now raised to DOWN (D-021): who has it. */
+  ackedBy?: string | null;
 }
 
 export interface AcknowledgedEmailInput extends EmailBaseInput {
@@ -210,8 +212,9 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
     label: 'DOWN',
     pre: `${site} confirmed down ${formatTimeWithSeconds(input.confirmedAt)} · ${input.cause}`,
     headline: `${site} is down`,
-    lede:
-      input.reason === 'owner'
+    lede: input.ackedBy
+      ? `${input.ackedBy} acknowledged it while it was a problem; it is now down.`
+      : input.reason === 'owner'
         ? `Nobody has acknowledged yet. You own ${site} — please acknowledge or hand it over in the Chat thread.`
         : 'Nobody has acknowledged yet. The Google Chat alert couldn’t be delivered, so this email is the alert.',
     facts: [
@@ -220,7 +223,9 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
       ['Confirmed by', `${input.confirmingLocations} locations, 2 checks`],
     ],
     // One page serves both until S07 builds the full incident: [Open incident] would repeat it.
-    buttons: [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
+    buttons: input.ackedBy
+      ? [{ label: 'Open incident', href: input.incidentUrl, primary: true }]
+      : [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
   });
 }
 

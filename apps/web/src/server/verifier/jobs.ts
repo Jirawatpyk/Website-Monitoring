@@ -13,7 +13,7 @@ export const completeJobSchema = verdictSchema;
 export type CompleteJobInput = z.infer<typeof verdictSchema>;
 export { leaseQuerySchema };
 
-/** `<yyyy-mm>/<job id>.jpg`, by the month the job was created: the housekeeping cron drops whole months. */
+/** `<yyyy-mm>/<job id>.jpg`, by the month the job was created: housekeeping lists only months old enough. */
 export function screenshotPath(job: { id: string; created_at: string }): string {
   return `${job.created_at.slice(0, 7)}/${job.id}.jpg`;
 }

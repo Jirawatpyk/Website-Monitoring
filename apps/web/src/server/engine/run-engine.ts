@@ -177,16 +177,17 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   return summary;
 }
 
-/**
- * Admin alerts about the verifier (D-001, D-019): unavailable while a blocked site waited (one
- * email per outage, listing the sites), and more than 5 jobs queued. A no-poll outage clears as
- * soon as the verifier polls again; any other clears when it completes a job (Job API).
- */
 /** The alert names the most telling reason seen this run. */
 const REASON_ORDER = ['no_poll', 'lease_expired', 'not_picked_up'] as const;
 /** An open "verifier unavailable" alert clears no sooner than this after it opened. */
 export const ALERT_SETTLE_MS = 10 * 60_000;
 
+/**
+ * Admin alerts about the verifier (D-001, D-019): unavailable while a blocked site waited (one
+ * email per outage, listing the sites) and more than 5 jobs queued. "Unavailable" clears once the
+ * verifier polls again with nothing stuck, no sooner than 10 min after it opened; the backlog when
+ * the queue is down to 5.
+ */
 async function adminAlerts(
   db: DbClient,
   now: Date,

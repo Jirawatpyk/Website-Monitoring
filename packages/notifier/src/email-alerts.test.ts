@@ -195,3 +195,12 @@ describe('Admin alert about the browser verifier (D-001, D-019)', () => {
     expect(alert({ sites: ['<b>x</b>'] }).html).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 });
+
+describe('DOWN raised from an acknowledged PROBLEM (D-021)', () => {
+  it('says who has it and offers the incident, not an ack', () => {
+    const m = buildDownEmail({ ...base, confirmedAt, cause: CAUSE, confirmingLocations: 2, ackedBy: 'Arm' });
+    expect(m.text).toContain('Arm acknowledged it while it was a problem; it is now down.');
+    expect(m.text).not.toContain('Nobody has acknowledged');
+    expect(m.text).toContain('Open incident: https://monitor.example.test/incidents/inc-1');
+  });
+});

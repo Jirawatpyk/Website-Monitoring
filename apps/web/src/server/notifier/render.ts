@@ -109,6 +109,8 @@ export function renderEmail(
         confirmedAt: new Date(i.detected_at),
         cause: str(ctx.cause, 'Hard fail'),
         confirmingLocations: num(ctx.confirmingLocations, 2),
+        // A PROBLEM raised to DOWN keeps its acknowledgement (D-021).
+        ackedBy: i.state === 'acknowledged' && i.acker ? i.acker.display_name : null,
       });
     case 'acknowledged':
       return buildAcknowledgedEmail({

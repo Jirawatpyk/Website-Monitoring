@@ -15,8 +15,11 @@ export async function launchBrowser(): Promise<PageBrowser & { close(): Promise<
   // One launch shared by every visit that needs it: three jobs at once never start three browsers.
   let launching: Promise<Browser> | null = null;
   const ensure = async (): Promise<Browser> => {
-    const current = launching && (await launching.catch(() => null));
+    const pending = launching;
+    const current = pending && (await pending.catch(() => null));
     if (current?.isConnected()) return current;
+    // Another visit may have started the relaunch while this one waited: share it.
+    if (launching !== pending) return ensure();
     launching = chromium.launch({ headless: true });
     return launching;
   };
@@ -33,7 +36,9 @@ export async function launchBrowser(): Promise<PageBrowser & { close(): Promise<
           if (r.request().isNavigationRequest() && r.frame() === page.mainFrame()) last = r;
         });
         try {
-          last = (await page.goto(url, { timeout: timeoutMs, waitUntil: 'load' })) ?? last;
+          // The listener has the latest navigation (a challenge may have redirected during load).
+          const response = await page.goto(url, { timeout: timeoutMs, waitUntil: 'load' });
+          last ??= response;
         } catch (err) {
           // A challenge that passes while loading replaces the navigation: follow it, don't fail.
           if (!REPLACED_NAVIGATION.test(String(err))) throw err;

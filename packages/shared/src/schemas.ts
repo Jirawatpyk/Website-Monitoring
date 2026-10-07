@@ -35,7 +35,9 @@ export type IngestBatch = z.infer<typeof ingestBatchSchema>;
 /** A monitor the Ingest API lists as due for the Bangkok probe (GET /api/ingest). */
 export const dueMonitorSchema = z.object({
   id: z.uuid(),
-  url: z.url(),
+  // A string, not z.url(): one URL the schema doubts would fail the whole round's list; the probe's
+  // own SSRF guard (assertPublicTarget) refuses anything that isn't http(s).
+  url: z.string().min(1),
   method: z.enum(['GET', 'HEAD']),
   timeoutMs: z.number().int().positive(),
 });
