@@ -13,8 +13,8 @@ vi.mock('@/server/db', () => ({ serviceDb: () => 'db' }));
 vi.mock('@/server/ingest/bangkok', () => ({
   dueForBangkok: m.due,
   storeBangkokResults: m.store,
-  engineAfterIngest: m.engine,
 }));
+vi.mock('@/server/engine/engine-and-deliver', () => ({ engineAfterReport: m.engine }));
 
 const NOW = Date.parse('2026-10-07T03:00:30Z');
 beforeEach(() => {
@@ -91,7 +91,7 @@ describe('POST /api/ingest (Bangkok probe)', () => {
 
     expect(m.engine).not.toHaveBeenCalled();
     await (m.after.mock.calls[0] as [() => Promise<void>])[0]();
-    expect(m.engine).toHaveBeenCalledWith('db', expect.anything(), NOW + 50_000);
+    expect(m.engine).toHaveBeenCalledWith('db', expect.anything(), NOW + 50_000, 'ingest');
   });
 });
 

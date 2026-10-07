@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
-import { decideMonitor, type MonitorSnapshot, type OpenIncident, type StoredCheck } from './monitor';
+import {
+  decideMonitor,
+  UNVERIFIED_NOTE,
+  type MonitorSnapshot,
+  type OpenIncident,
+  type StoredCheck,
+  type Verification,
+} from './monitor';
+import { BLOCKED_NOTE } from './round';
 
 // INC-0142 timeline (spec §4, §6) with S02a's two Vercel locations. M = 09:47:00 Bangkok
 // (02:47:00Z), a probe tick: scheduled checks at M+1 / M+2 s, rechecks ~30 s later.
@@ -225,13 +233,6 @@ describe('decideMonitor — recovery (spec §16.4)', () => {
       okRounds: 2,
     });
   });
-
-  it('a blocked round resets the OK count', () => {
-    const d = decideMonitor(
-      snapshot([check('SIN', 'blocked', 1), check('TYO', 'blocked', 2)], { okRounds: 1 }),
-    );
-    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0 });
-  });
 });
 
 describe('decideMonitor — engine-reviewer round 2 (spec §6, PRD §5)', () => {
@@ -349,5 +350,159 @@ describe('decideMonitor — engine-reviewer round 2 (spec §6, PRD §5)', () => 
       roundAt: at(0),
       okRounds: 0,
     });
+  });
+});
+
+// StatusModel rows "Blocked · …" (spec §6, D-001, D-019) with all three locations: B = blocked,
+// F = hard fail, P = pass. The browser verifier's job for the round comes from the runner.
+describe('decideMonitor — blocked rounds and the browser verifier (S03, StatusModel)', () => {
+  const three = { locations: ['BKK', 'SIN', 'TYO'] as const };
+  const blocked = (rest: [ProbeLocation, CheckOutcome][] = [['TYO', 'pass']]) => [
+    check('BKK', 'blocked', 1),
+    check('SIN', 'blocked', 2),
+    ...rest.map(([l, o], i) => check(l, o, 3 + i)),
+    // A hard fail is rechecked like any other.
+    ...rest.filter(([, o]) => o === 'fail').map(([l], i) => check(l, 'fail', 33 + i, 2)),
+  ];
+  const withJob = (v: Verification, over: Partial<MonitorSnapshot> = {}) => ({
+    ...three,
+    verifierAvailable: true,
+    verifications: new Map([[at(0).getTime(), v]]),
+    ...over,
+  });
+
+  it.each<[string, [ProbeLocation, CheckOutcome][]]>([
+    ['[B, B, P] 2 blocked, 1 pass', [['TYO', 'pass']]],
+    ['[B, B, B] all blocked', [['TYO', 'blocked']]],
+    ['[B, B, F] blocked + hard fail make 2', [['TYO', 'fail']]],
+  ])('%s, no job yet, verifier up → queue a verify job; the round waits for it', (_name, rest) => {
+    expect(decideMonitor(snapshot(blocked(rest), { ...three, verifierAvailable: true }))).toEqual({
+      kind: 'verify',
+      roundAt: at(0),
+    });
+  });
+
+  it('[B, P, P] a single block with a pass majority is just OK — no verifier', () => {
+    const d = decideMonitor(
+      snapshot([check('BKK', 'blocked', 1), check('SIN', 'pass', 2), check('TYO', 'pass', 3)], {
+        ...three,
+        verifierAvailable: true,
+      }),
+    );
+    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 1 });
+  });
+
+  it('the job is still running → wait', () => {
+    expect(decideMonitor(snapshot(blocked(), withJob({ state: 'pending' })))).toEqual({ kind: 'wait' });
+  });
+
+  it('page loads and keyword found → OK with the note (Done-when 2)', () => {
+    expect(decideMonitor(snapshot(blocked(), withJob({ state: 'loaded', jobId: 'j1' })))).toEqual({
+      kind: 'none',
+      roundAt: at(0),
+      okRounds: 1,
+      note: BLOCKED_NOTE,
+    });
+  });
+
+  it('a verified round recovers an open incident like a pass, with the note', () => {
+    const d = decideMonitor(
+      snapshot(blocked(), withJob({ state: 'loaded', jobId: 'j1' }, { open: incident('acknowledged') })),
+    );
+    expect(d).toMatchObject({
+      kind: 'recover',
+      from: 'acknowledged',
+      to: 'monitoring',
+      recoveredAt: at(1),
+      okLocations: 3,
+      note: BLOCKED_NOTE,
+    });
+  });
+
+  it('page fails in the browser → DOWN from the first blocked check, confirmed when the browser failed', () => {
+    const failedAt = at(41);
+    const d = decideMonitor(
+      snapshot(
+        blocked(),
+        withJob({ state: 'failed', jobId: 'j1', completedAt: failedAt, detail: 'HTTP 503' }),
+      ),
+    );
+    expect(d).toMatchObject({
+      kind: 'open',
+      roundAt: at(0),
+      startedAt: at(1),
+      confirmedAt: failedAt,
+      verifyJobId: 'j1',
+      browserDetail: 'HTTP 503',
+    });
+  });
+
+  it('page fails while an incident is open → a relapse, nothing new (D-004, S04)', () => {
+    const d = decideMonitor(
+      snapshot(
+        blocked(),
+        withJob(
+          { state: 'failed', jobId: 'j1', completedAt: at(41), detail: null },
+          { open: incident('monitoring') },
+        ),
+      ),
+    );
+    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 0, relapse: true });
+  });
+
+  it.each<[string, Partial<MonitorSnapshot>, string]>([
+    ['the verifier hasn’t polled in 2 min', { ...three, verifierAvailable: false }, 'no_poll'],
+    [
+      'its job wasn’t picked up in 30 s',
+      withJob({ state: 'unavailable', reason: 'not_picked_up' }),
+      'not_picked_up',
+    ],
+    ['its lease ran out', withJob({ state: 'unavailable', reason: 'lease_expired' }), 'lease_expired'],
+  ])('[B, B, N] %s → PROBLEM (unverified) at once (D-001)', (_name, over, reason) => {
+    expect(decideMonitor(snapshot(blocked(), over))).toEqual({
+      kind: 'unverified',
+      roundAt: at(0),
+      startedAt: at(1),
+      reason,
+      note: UNVERIFIED_NOTE,
+    });
+  });
+
+  it('an unverified round while an incident is open records the round and the note, nothing new', () => {
+    const d = decideMonitor(snapshot(blocked(), { ...three, open: incident('unacked') }));
+    expect(d).toMatchObject({ kind: 'unverified', reason: 'no_poll' });
+  });
+
+  it('a blocked round resets the OK count, verified or not', () => {
+    const d = decideMonitor(
+      snapshot([check('SIN', 'blocked', 1), check('TYO', 'blocked', 2)], { okRounds: 1 }),
+    );
+    expect(d).toMatchObject({ kind: 'unverified' });
+  });
+
+  it('a plain pass round clears the note (note undefined)', () => {
+    expect(decideMonitor(snapshot(okRound()))).toEqual({ kind: 'none', roundAt: at(0), okRounds: 1 });
+  });
+
+  it('hard fails never wait for the verifier: 2 fails + 1 blocked go DOWN on the recheck', () => {
+    const d = decideMonitor(
+      snapshot(
+        [
+          check('BKK', 'blocked', 1),
+          check('SIN', 'fail', 2),
+          check('TYO', 'fail', 3),
+          check('SIN', 'fail', 32, 2),
+          check('TYO', 'fail', 33, 2),
+        ],
+        { ...three, verifierAvailable: false },
+      ),
+    );
+    expect(d).toMatchObject({ kind: 'open', startedAt: at(2), confirmedAt: at(33) });
+    expect(d.kind === 'open' && d.verifyJobId).toBeUndefined();
+  });
+
+  it('a stopped Bangkok agent leaves two voting: SIN + TYO pass → OK, no false DOWN (Done-when 1)', () => {
+    const d = decideMonitor(snapshot(okRound(), { locations: ['SIN', 'TYO'] }));
+    expect(d).toEqual({ kind: 'none', roundAt: at(0), okRounds: 1 });
   });
 });

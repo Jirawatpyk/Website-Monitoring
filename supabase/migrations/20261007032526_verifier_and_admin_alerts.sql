@@ -123,9 +123,9 @@ $$;
 create function public.complete_verification_job(
   p_job_id uuid,
   p_result text,
-  p_detail text,
-  p_http_status smallint,
-  p_screenshot_path text
+  p_detail text default null,
+  p_http_status smallint default null,
+  p_screenshot_path text default null
 )
 returns setof public.verification_jobs
 language plpgsql
@@ -231,8 +231,8 @@ $$;
 -- ── Site note ─────────────────────────────────────────────────────────────
 -- The latest judged round's note: "Automated check blocked by bot protection; verified via
 -- browser" (OK + note), "Blocked, not verified" (PROBLEM unverified), or none. Never from an older
--- round than the one already recorded (engine runs overlap).
-create function public.engine_note_site(p_site_id uuid, p_round_at timestamptz, p_note text)
+-- round than the one already recorded (engine runs overlap). No `p_note` clears it.
+create function public.engine_note_site(p_site_id uuid, p_round_at timestamptz, p_note text default null)
 returns void
 language sql
 set search_path = ''

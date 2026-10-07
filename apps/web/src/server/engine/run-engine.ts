@@ -1,5 +1,5 @@
 import 'server-only';
-import type { DbClient } from '@dxt/db';
+import type { DbClient, Json } from '@dxt/db';
 import {
   decideMonitor,
   lookbackMs,
@@ -12,6 +12,7 @@ import {
 import { formatCause } from '@dxt/notifier';
 import { TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
+import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per monitor per run: catches up after a missed run without running unbounded. */
 const MAX_ROUNDS_PER_RUN = 5;
@@ -24,8 +25,11 @@ export const HEARTBEAT_FRESH_MS = 3 * 60_000;
 
 interface MonitorRow {
   id: string;
+  url: string;
+  mustContain: string[];
   timeoutMs: number;
   siteId: string;
+  siteName: string;
   tier: Tier;
   muted: boolean;
 }
@@ -37,6 +41,12 @@ export interface EngineSummary extends CronJobResult {
   settled: number;
   /** Confirmed DOWN while the site's incident is still open: no alert until D-004 (S04). */
   relapses: number;
+  /** Blocked rounds handed to the browser verifier this run. */
+  verifying: number;
+  /** Blocked rounds the verifier couldn't decide: PROBLEM (unverified) (D-001). */
+  unverified: number;
+  /** Admin alerts opened this run (their emails are queued). */
+  alerts: number;
 }
 
 /**
@@ -46,7 +56,17 @@ export interface EngineSummary extends CronJobResult {
  * harmless (one open incident per site, one message per incident).
  */
 export async function runEngine(db: DbClient, now: Date = new Date()): Promise<EngineSummary> {
-  const summary: EngineSummary = { ok: true, monitors: 0, opened: 0, recovered: 0, settled: 0, relapses: 0 };
+  const summary: EngineSummary = {
+    ok: true,
+    monitors: 0,
+    opened: 0,
+    recovered: 0,
+    settled: 0,
+    relapses: 0,
+    verifying: 0,
+    unverified: 0,
+    alerts: 0,
+  };
   const monitors = await loadMonitors(db, now);
   if (!monitors.length) return summary;
   summary.monitors = monitors.length;
@@ -56,19 +76,17 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   );
   const siteIds = monitors.map((m) => m.siteId);
 
-  const [checks, statuses, incidents, locations] = await Promise.all([
-    loadChecks(
-      db,
-      monitors.map((m) => m.id),
-      since,
-    ),
-    db.from('site_status').select('site_id, last_round_at, ok_rounds').in('site_id', siteIds),
+  const monitorIds = monitors.map((m) => m.id);
+  const [checks, statuses, incidents, locations, verifier] = await Promise.all([
+    loadChecks(db, monitorIds, since),
+    db.from('site_status').select('site_id, last_round_at, ok_rounds, note').in('site_id', siteIds),
     db
       .from('incidents')
       .select('id, site_id, state, severity, root_cause_category, notifications(template)')
       .in('site_id', siteIds)
       .not('state', 'in', OPEN_STATES_EXCLUDED),
     db.from('probe_locations').select('code, last_heartbeat_at').eq('is_active', true),
+    loadVerifierState(db, monitorIds, since, now),
   ]);
   for (const r of [statuses, incidents, locations]) if (r.error) throw new Error(r.error.message);
   const active = (locations.data ?? [])
@@ -77,6 +95,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     )
     .map((l) => l.code as ProbeLocation);
 
+  const unverifiedSites = new Set<string>();
   for (const m of monitors) {
     const status = statuses.data?.find((st) => st.site_id === m.siteId);
     const open = incidents.data?.find((inc) => inc.site_id === m.siteId);
@@ -105,7 +124,10 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
             hasRootCause: !!open.root_cause_category && open.root_cause_category !== UNKNOWN_ROOT_CAUSE,
           } satisfies OpenIncident)
         : null,
+      verifications: verifier.jobs.get(m.id),
+      verifierAvailable: verifier.available,
     };
+    let note = status?.note ?? null;
     // RECOVERED only replies to a DOWN that was queued (not one held back by a mute, spec §15.1).
     const downQueued = !!open?.notifications.some((n) => n.template === 'down');
 
@@ -119,12 +141,71 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       }
       const applied = await apply(db, m, decision, open?.id ?? null, now, downQueued);
       if (applied) summary[applied] += 1;
-      if (decision.kind !== 'none') break;
+      if (decision.kind === 'verify') break;
+      if (decision.kind === 'unverified') unverifiedSites.add(m.siteName);
+      // The site note follows the latest judged round (OK + note, unverified, or none).
+      const next = 'note' in decision ? (decision.note ?? null) : null;
+      if (next !== note) {
+        const noted = await db.rpc('engine_note_site', {
+          p_site_id: m.siteId,
+          p_round_at: decision.roundAt.toISOString(),
+          // No note clears it.
+          ...(next ? { p_note: next } : {}),
+        });
+        if (noted.error) throw new Error(`engine_note_site: ${noted.error.message}`);
+        note = next;
+      }
+      const roundOnly = decision.kind === 'none' || (decision.kind === 'unverified' && !!open);
+      if (!roundOnly) break;
       snapshot.lastRoundAt = decision.roundAt;
-      snapshot.okRounds = decision.okRounds;
+      snapshot.okRounds = 0;
+      if (decision.kind === 'none') snapshot.okRounds = decision.okRounds;
     }
   }
+
+  summary.alerts = await adminAlerts(db, verifier, unverifiedSites);
   return summary;
+}
+
+/**
+ * Admin alerts about the verifier (D-001, D-019): unavailable while a blocked site waited (one
+ * email per outage, listing the sites), and more than 5 jobs queued. A no-poll outage clears as
+ * soon as the verifier polls again; any other clears when it completes a job (Job API).
+ */
+async function adminAlerts(
+  db: DbClient,
+  verifier: Awaited<ReturnType<typeof loadVerifierState>>,
+  unverifiedSites: ReadonlySet<string>,
+): Promise<number> {
+  let opened = 0;
+  const open = async (kind: string, context: Record<string, unknown>) => {
+    const { data, error } = await db.rpc('open_system_alert', {
+      p_kind: kind,
+      p_context: context as Json,
+    });
+    if (error) throw new Error(`open_system_alert: ${error.message}`);
+    if (data) opened += 1;
+  };
+  const clear = async (kind: string) => {
+    const { error } = await db.rpc('clear_system_alert', { p_kind: kind });
+    if (error) throw new Error(`clear_system_alert: ${error.message}`);
+  };
+
+  const down = verifier.openAlerts.get('verifier_unavailable');
+  if (unverifiedSites.size && !down) {
+    await open('verifier_unavailable', {
+      sites: [...unverifiedSites].sort(),
+      reason: verifier.available ? 'not_picked_up' : 'no_poll',
+    });
+  } else if (down && down.reason === 'no_poll' && verifier.available && !unverifiedSites.size) {
+    await clear('verifier_unavailable');
+  }
+
+  const behind = verifier.openAlerts.has('verifier_backlog');
+  if (verifier.queued > BACKLOG_ALERT_OVER && !behind)
+    await open('verifier_backlog', { queued: verifier.queued });
+  else if (verifier.queued <= BACKLOG_ALERT_OVER && behind) await clear('verifier_backlog');
+  return opened;
 }
 
 /** PostgREST returns at most max_rows (1000) rows per request: read the window page by page. */
@@ -150,14 +231,17 @@ async function loadChecks(db: DbClient, monitorIds: string[], since: Date) {
 async function loadMonitors(db: DbClient, now: Date): Promise<MonitorRow[]> {
   const { data, error } = await db
     .from('monitors')
-    .select('id, timeout_ms, site_id, sites!inner(tier, is_active, muted_until)')
+    .select('id, url, must_contain, timeout_ms, site_id, sites!inner(name, tier, is_active, muted_until)')
     .eq('is_primary', true)
     .eq('sites.is_active', true);
   if (error) throw new Error(`monitors: ${error.message}`);
   return data.map((m) => ({
     id: m.id,
+    url: m.url,
+    mustContain: m.must_contain,
     timeoutMs: m.timeout_ms,
     siteId: m.site_id,
+    siteName: m.sites.name,
     tier: m.sites.tier as Tier,
     muted: !!m.sites.muted_until && new Date(m.sites.muted_until) > now,
   }));
@@ -170,11 +254,53 @@ async function apply(
   incidentId: string | null,
   now: Date,
   downQueued: boolean,
-): Promise<'opened' | 'recovered' | 'settled' | null> {
+): Promise<'opened' | 'recovered' | 'settled' | 'verifying' | 'unverified' | null> {
   const at = now.toISOString();
   switch (d.kind) {
     case 'wait':
       return null;
+
+    case 'verify': {
+      // One job per monitor and round (unique index): a second engine run's insert is a no-op.
+      const { error } = await db.from('verification_jobs').insert({
+        kind: 'verify',
+        monitor_id: m.id,
+        site_id: m.siteId,
+        round_at: d.roundAt.toISOString(),
+        url: m.url,
+        must_contain: m.mustContain,
+      });
+      if (error && error.code !== '23505') throw new Error(`verification_jobs: ${error.message}`);
+      return error ? null : 'verifying';
+    }
+
+    case 'unverified': {
+      if (incidentId) {
+        // Already open: record the round; the incident keeps its own state and clock.
+        const { error } = await db.rpc('engine_record_round', {
+          p_site_id: m.siteId,
+          p_round_at: d.roundAt.toISOString(),
+          p_evaluated_at: at,
+          p_ok_rounds: 0,
+        });
+        if (error) throw new Error(`engine_record_round: ${error.message}`);
+        return 'unverified';
+      }
+      // PROBLEM (unverified) at once (D-001). Its Chat card comes with S04's PROBLEM rows (D-019).
+      const { error } = await db.rpc('engine_open_incident', {
+        p_site_id: m.siteId,
+        p_monitor_id: m.id,
+        p_trigger: 'blocked_unverified',
+        p_severity: 'problem',
+        p_started_at: d.startedAt.toISOString(),
+        p_detected_at: at,
+        p_round_at: d.roundAt.toISOString(),
+        p_context: { cause: 'Blocked, not verified', verifier: d.reason },
+        p_notify: false,
+      });
+      if (error) throw new Error(`engine_open_incident: ${error.message}`);
+      return 'unverified';
+    }
 
     case 'none': {
       // Never moves the round back when another engine run (probe trigger, cron) got further.
@@ -199,10 +325,16 @@ async function apply(
         // When the last recheck confirmed it, not when this run noticed (PRD §9: alert within 30 s).
         p_detected_at: d.confirmedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
-        p_context: {
-          cause: formatCause(d.failing, m.timeoutMs),
-          confirmingLocations: d.failing.length,
-        },
+        p_context: d.verifyJobId
+          ? {
+              cause: `Browser: page didn’t load${d.browserDetail ? ` (${d.browserDetail})` : ''}`,
+              confirmingLocations: d.failing.length,
+              verifyJobId: d.verifyJobId,
+            }
+          : {
+              cause: formatCause(d.failing, m.timeoutMs),
+              confirmingLocations: d.failing.length,
+            },
         p_notify: !m.muted,
       });
       if (error) throw new Error(`engine_open_incident: ${error.message}`);

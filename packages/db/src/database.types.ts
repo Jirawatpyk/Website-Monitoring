@@ -416,7 +416,7 @@ isOneToOne: false
 { Args: { "p_kind": string }; Returns: boolean
                            },
 "complete_verification_job":
-{ Args: { "p_detail": string,"p_http_status": number,"p_job_id": string,"p_result": string,"p_screenshot_path": string }; Returns: {
+{ Args: { "p_detail"?: string,"p_http_status"?: number,"p_job_id": string,"p_result": string,"p_screenshot_path"?: string }; Returns: {
               "attempts": number,
 "completed_at": string | null,
 "created_at": string,
@@ -446,7 +446,7 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
                            },
 "engine_note_site":
-{ Args: { "p_note": string,"p_round_at": string,"p_site_id": string }; Returns: undefined
+{ Args: { "p_note"?: string,"p_round_at": string,"p_site_id": string }; Returns: undefined
                            },
 "engine_open_incident":
 { Args: { "p_context": Json,"p_detected_at": string,"p_monitor_id": string,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string

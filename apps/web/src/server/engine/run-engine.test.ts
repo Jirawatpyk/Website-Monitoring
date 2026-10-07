@@ -16,9 +16,11 @@ const at = (sec: number) => new Date(Date.parse('2026-10-06T10:00:00Z') + sec * 
 
 const monitor = (over: Record<string, unknown> = {}) => ({
   id: 'm1',
+  url: 'https://tubtong.example.test',
+  must_contain: ['Tubtong'],
   timeout_ms: 10_000,
   site_id: 's1',
-  sites: { tier: 1, is_active: true, muted_until: null, ...over },
+  sites: { name: 'Tubtong', tier: 1, is_active: true, muted_until: null, ...over },
 });
 const row = (
   location: string,
@@ -61,6 +63,9 @@ describe('runEngine', () => {
       recovered: 0,
       settled: 0,
       relapses: 0,
+      verifying: 0,
+      unverified: 0,
+      alerts: 0,
     });
     expect(rpcCalls).toEqual([]);
   });

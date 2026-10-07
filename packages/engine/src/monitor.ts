@@ -1,6 +1,6 @@
 import type { IncidentState, ProbeLocation, Severity } from '@dxt/shared';
 import { transition } from './lifecycle';
-import { confirmsDown, evaluateRound, type LocationResult } from './round';
+import { BLOCKED_NOTE, confirmsDown, evaluateRound, type LocationResult } from './round';
 
 /**
  * One engine step for one primary monitor (spec §6, §16.4; PRD §5): judge the oldest unjudged check
@@ -14,9 +14,13 @@ import { confirmsDown, evaluateRound, type LocationResult } from './round';
  * deadline has passed, so the engine never judges a round before its rechecks land and never mixes
  * two rounds' results.
  *
- * Not here yet: relapse while an incident is open (D-004, S04 — reported as `relapse`), blocked /
- * verifier (S03–S04), faulty-location exclusion and regional PROBLEM (S04), the Admin alert when
- * fewer than 2 locations report (PRD §5, S04).
+ * A blocked round (no pass or hard-fail majority, at least one location blocked) goes to the
+ * browser verifier (spec §6, D-001, D-019): the runner queues a job, the round waits for it, and its
+ * result decides — loaded → OK with a note, failed → DOWN, unavailable → PROBLEM (unverified).
+ *
+ * Not here yet: relapse while an incident is open (D-004, S04 — reported as `relapse`),
+ * faulty-location exclusion and regional PROBLEM (S04), the Admin alert when fewer than 2 locations
+ * report (PRD §5, S04).
  */
 
 export interface StoredCheck extends LocationResult {
@@ -33,6 +37,21 @@ export interface OpenIncident {
   hasRootCause: boolean;
 }
 
+/** The site note while a blocked site can't be verified (D-019; trigger label, spec §11). */
+export const UNVERIFIED_NOTE = 'Blocked, not verified';
+
+/** Why the verifier counts as unavailable for a round (D-019). */
+export type VerifierUnavailableReason = 'no_poll' | 'not_picked_up' | 'lease_expired';
+
+/** The browser verifier's job for one blocked round, as the runner found it. */
+export type Verification =
+  /** Queued less than 30 s ago, or leased and the lease still holds. */
+  | { state: 'pending' }
+  | { state: 'loaded'; jobId: string }
+  | { state: 'failed'; jobId: string; completedAt: Date; detail: string | null }
+  /** Not picked up in 30 s, or the lease ran out without a result. */
+  | { state: 'unavailable'; reason: Exclude<VerifierUnavailableReason, 'no_poll'> };
+
 export interface MonitorSnapshot {
   checks: readonly StoredCheck[];
   now: Date;
@@ -45,13 +64,31 @@ export interface MonitorSnapshot {
   /** OK rounds in a row since the last failure (site_status.ok_rounds). */
   okRounds: number;
   open: OpenIncident | null;
+  /** The verify job of each blocked round, by round start (epoch ms). */
+  verifications?: ReadonlyMap<number, Verification>;
+  /** The verifier polled the Job API in the last 2 min (D-019). */
+  verifierAvailable?: boolean;
 }
 
 export type MonitorDecision =
   /** No complete round to judge yet: look again next run. */
   | { kind: 'wait' }
-  /** Judged; no incident change. Record the round and the OK-round count. */
-  | { kind: 'none'; roundAt: Date; okRounds: number; relapse?: true }
+  /** Judged; no incident change. Record the round, the OK-round count and the site note. */
+  | { kind: 'none'; roundAt: Date; okRounds: number; relapse?: true; note?: string }
+  /** A blocked round with no job yet: queue one for the browser verifier; the round waits for it. */
+  | { kind: 'verify'; roundAt: Date }
+  /**
+   * A blocked round the verifier can't decide (D-001): PROBLEM (unverified) at once — open the
+   * incident unless one is open — and tell the Admin. The next blocked round tries again.
+   */
+  | {
+      kind: 'unverified';
+      roundAt: Date;
+      /** The first blocked check of the round. */
+      startedAt: Date;
+      reason: VerifierUnavailableReason;
+      note: string;
+    }
   /** DOWN confirmed on the check and its recheck: open an incident. */
   | {
       kind: 'open';
@@ -60,8 +97,11 @@ export type MonitorDecision =
       startedAt: Date;
       /** The last confirming recheck: "Confirmed down" — the 30 s alert clock starts here (PRD §9). */
       confirmedAt: Date;
-      /** The recheck results that confirmed it, for the cause line. */
+      /** The recheck results that confirmed it (or the blocked round's checks), for the cause line. */
       failing: readonly StoredCheck[];
+      /** Blocked, then the page failed in the browser: that job (its screenshot is the evidence). */
+      verifyJobId?: string;
+      browserDetail?: string | null;
     }
   /** First OK round: RECOVERED, incident → Monitoring (spec §16.4). */
   | {
@@ -72,9 +112,10 @@ export type MonitorDecision =
       from: IncidentState;
       to: IncidentState;
       okLocations: number;
+      note?: string;
     }
   /** Second OK round in a row: the site is OK; incident → Needs root cause (or stays in Monitoring). */
-  | { kind: 'settle'; roundAt: Date; from: IncidentState; to: IncidentState };
+  | { kind: 'settle'; roundAt: Date; from: IncidentState; to: IncidentState; note?: string };
 
 /**
  * A round still incomplete this long after it ENDS is judged with what arrived. Vercel starts each
@@ -138,29 +179,71 @@ export function decideMonitor(s: MonitorSnapshot): MonitorDecision {
   // is no majority; two passes and a regional failure is.
   const passing = round.scheduled.filter((c) => c.outcome === 'pass');
   if (first.kind === 'pass' && passing.length * 2 > round.scheduled.length) {
-    const open = s.open;
-    if (open && RECOVERABLE.includes(open.state)) {
-      const next = transition(open.state, 'recover', open);
-      if (next.ok) {
+    return okRound(s, roundAt, passing);
+  }
+
+  if (first.kind === 'needs_verification') {
+    const notPassing = round.scheduled.filter((c) => c.outcome !== 'pass');
+    const startedAt = earliest(notPassing);
+    const v = s.verifications?.get(round.start.getTime());
+    if (!v) {
+      if (s.verifierAvailable) return { kind: 'verify', roundAt };
+      return { kind: 'unverified', roundAt, startedAt, reason: 'no_poll', note: UNVERIFIED_NOTE };
+    }
+    switch (v.state) {
+      case 'pending':
+        return { kind: 'wait' };
+      case 'unavailable':
+        return { kind: 'unverified', roundAt, startedAt, reason: v.reason, note: UNVERIFIED_NOTE };
+      case 'loaded':
+        // The browser saw the page: every location counts as reachable this round.
+        return okRound(s, roundAt, round.scheduled, BLOCKED_NOTE);
+      case 'failed':
+        if (s.open) return { kind: 'none', roundAt, okRounds: 0, relapse: true };
         return {
-          kind: 'recover',
+          kind: 'open',
           roundAt,
-          recoveredAt: earliest(passing),
-          from: open.state,
-          to: next.state,
-          okLocations: passing.length,
+          startedAt,
+          confirmedAt: v.completedAt,
+          failing: notPassing,
+          verifyJobId: v.jobId,
+          browserDetail: v.detail,
         };
-      }
     }
-    if (open && open.state === 'monitoring' && s.okRounds === 1) {
-      const next = transition(open.state, 'ok_two_rounds', open);
-      if (next.ok) return { kind: 'settle', roundAt, from: open.state, to: next.state };
-    }
-    return { kind: 'none', roundAt, okRounds: Math.min(s.okRounds + 1, 2) };
   }
 
   // Too few locations reported: keep the current status (PRD §5). Split or blocked: not an OK round.
   return { kind: 'none', roundAt, okRounds: first.kind === 'insufficient_data' ? s.okRounds : 0 };
+}
+
+/** An OK round (a pass majority, or a blocked round the browser verified): recover, settle or count it. */
+function okRound(
+  s: MonitorSnapshot,
+  roundAt: Date,
+  reachable: readonly StoredCheck[],
+  note?: string,
+): MonitorDecision {
+  const withNote = note ? { note } : {};
+  const open = s.open;
+  if (open && RECOVERABLE.includes(open.state)) {
+    const next = transition(open.state, 'recover', open);
+    if (next.ok) {
+      return {
+        kind: 'recover',
+        roundAt,
+        recoveredAt: earliest(reachable),
+        from: open.state,
+        to: next.state,
+        okLocations: reachable.length,
+        ...withNote,
+      };
+    }
+  }
+  if (open && open.state === 'monitoring' && s.okRounds === 1) {
+    const next = transition(open.state, 'ok_two_rounds', open);
+    if (next.ok) return { kind: 'settle', roundAt, from: open.state, to: next.state, ...withNote };
+  }
+  return { kind: 'none', roundAt, okRounds: Math.min(s.okRounds + 1, 2), ...withNote };
 }
 
 /**

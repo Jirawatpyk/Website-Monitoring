@@ -18,11 +18,33 @@ export async function engineAndDeliver(
   engine: (db: DbClient) => Promise<EngineSummary> = runEngine,
 ): Promise<EngineSummary & { delivery?: unknown }> {
   const summary = await engine(db);
-  if (summary.opened + summary.recovered === 0) return summary;
+  // New incident messages, or an Admin alert about the verifier (D-019): send them now.
+  if (summary.opened + summary.recovered + (summary.alerts ?? 0) === 0) return summary;
   try {
     return { ...summary, delivery: await dispatchNotifications(notifierDeps(db, env), { deadline }) };
   } catch (err) {
     console.error(JSON.stringify({ event: 'inline_delivery_failed', error: String(err) }));
     return { ...summary, delivery: { ok: false, error: 'delivery failed; the notifier cron retries' } };
+  }
+}
+
+/**
+ * After a report from the VPS — a Bangkok batch (Ingest) or a verifier verdict (Job API) — judge
+ * the rounds and send at once, after the response. Any Bangkok result, even a pass, can complete a
+ * round SIN and TYO already confirmed (S02b review; PRD §9: alert within 30 s). Idempotent like
+ * the probe trigger; a failure is logged and the engine cron judges the round on its next run.
+ */
+export async function engineAfterReport(
+  db: DbClient,
+  env: ServerEnv,
+  deadline: number,
+  source: 'ingest' | 'jobs',
+  run: typeof engineAndDeliver = engineAndDeliver,
+): Promise<void> {
+  try {
+    const summary = await run(db, env, deadline);
+    console.info(JSON.stringify({ event: 'engine_after_report', source, ...summary }));
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'engine_after_report_failed', source, error: String(err) }));
   }
 }

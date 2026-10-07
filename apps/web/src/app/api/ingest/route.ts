@@ -3,7 +3,8 @@ import { ingestBatchSchema } from '@dxt/shared';
 import { serverEnv } from '@/lib/env';
 import { hasBearer, unauthorized } from '@/lib/auth/bearer';
 import { serviceDb } from '@/server/db';
-import { dueForBangkok, engineAfterIngest, storeBangkokResults } from '@/server/ingest/bangkok';
+import { engineAfterReport } from '@/server/engine/engine-and-deliver';
+import { dueForBangkok, storeBangkokResults } from '@/server/ingest/bangkok';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -38,6 +39,6 @@ export async function POST(request: Request): Promise<Response> {
   const db = serviceDb();
   const stored = await storeBangkokResults(db, parsed.data.results, new Date(now));
   // The response doesn't wait: the VPS loop moves on while the engine judges the round.
-  after(() => engineAfterIngest(db, env, now + ENGINE_BUDGET_MS));
+  after(() => engineAfterReport(db, env, now + ENGINE_BUDGET_MS, 'ingest'));
   return Response.json({ ok: true, stored });
 }
