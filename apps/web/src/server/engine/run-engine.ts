@@ -76,6 +76,8 @@ export interface EngineSummary extends CronJobResult {
   alerts: number;
   /** Open PROBLEM incidents raised to DOWN (D-021); their DOWN alerts are queued. */
   escalated: number;
+  /** Incident changes this run that queued messages (any kind but `settled`): deliver them now. */
+  notified: number;
   /** Sites whose write failed this run (the rest were judged); the run reports `ok: false`. */
   failures?: string[];
 }
@@ -97,6 +99,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     recovered: 0,
     settled: 0,
     relapses: 0,
+    notified: 0,
     verifying: 0,
     unverified: 0,
     alerts: 0,
@@ -266,9 +269,13 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         now,
         alertQueued,
         locations.length,
-        () => (summary.relapses += 1),
+        () => {
+          summary.relapses += 1;
+          summary.notified += 1;
+        },
       );
       if (applied) summary[applied] += 1;
+      if (applied && applied !== 'settled') summary.notified += 1;
       // The site note follows the latest judged round (OK + note, unverified, or none).
       const next = decision.note ?? null;
       if (next !== note) {

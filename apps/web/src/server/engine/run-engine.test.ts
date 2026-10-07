@@ -75,6 +75,7 @@ describe('runEngine', () => {
       recovered: 0,
       settled: 0,
       relapses: 0,
+      notified: 0,
       verifying: 0,
       unverified: 0,
       alerts: 0,
