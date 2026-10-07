@@ -65,7 +65,7 @@ Each nav item carries its slice and a `live` flag (`apps/web/src/components/app-
 
 | Board | Canvas title | Implemented in | Phase | Slice | Spec | PRD |
 |---|---|---|---|---|---|---|
-| StatusModel | Status model & verification logic | `packages/engine` (status, rounds, uptime) | P0 | S04 | §5, §6, §15.3 | §5, FR-03 |
+| StatusModel | Status model & verification logic | `packages/engine` (status, rounds, uptime) | P0 | S04a (relapse, flapping: S04b) | §5, §6, §15.3 | §5, FR-03 |
 | ChatAlert | Google Chat alert thread (content spec) | `packages/notifier` (Chat templates) | P0 | S02a | §10, §14.10, §15.7, §16.5 | §7 |
 | EmailAlert | Alert email template | `packages/notifier` (email templates) | P0 | S02b | §10, §14.11, §15.7 | §7 |
 | WeeklySummary | Weekly summary — Chat card spec | `packages/notifier` (digest + weekly) | P1 | S14 | §10, §15.7 | FR-12 |
