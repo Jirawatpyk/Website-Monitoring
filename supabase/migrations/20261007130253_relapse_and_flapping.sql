@@ -594,7 +594,7 @@ as $$
         where older.incident_id = notifications.incident_id and older.channel = notifications.channel
           and older.user_id is not distinct from notifications.user_id
           and older.status = 'queued' and older.created_at < notifications.created_at
-          and not (older.template = 'flap_summary' and older.hold_until > now())
+          and not (older.template = 'flap_summary' and coalesce(older.hold_until > now(), false))
       )
     order by created_at
     limit p_limit
