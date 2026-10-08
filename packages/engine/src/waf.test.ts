@@ -281,6 +281,31 @@ describe('D-027 — sites behind a WAF (decideSite)', () => {
     expect(d).toMatchObject({ kind: 'problem', detail: { kind: 'blocked', reason: 'control_failed' } });
   });
 
+  it('control down and a body-only block left voting → still untrusted, never the verifier on that VPS', () => {
+    const failed: Verification = { state: 'failed', jobId: 'j1', completedAt: at(40), detail: 'No response' };
+    const rows = [
+      check('BKK', 'fail', 1, { controlOk: false }),
+      check('SIN', 'blocked', 2, { waf: 'akamai' }),
+      check('TYO', 'blocked', 3, { statusCode: 429 }),
+      recheck('BKK', 'fail', 31, { controlOk: false }),
+    ];
+    expect(decideSite(site([home(rows, { verifications: new Map([[R, failed]]) })]))).toMatchObject({
+      kind: 'problem',
+      detail: { kind: 'blocked', reason: 'control_failed' },
+    });
+  });
+
+  it('BKK faulty with its control down and SIN / TYO silent: too few locations, the status stays (spec §6)', () => {
+    const rows = [
+      check('BKK', 'fail', 1, { controlOk: false }),
+      recheck('BKK', 'fail', 31, { controlOk: false }),
+    ];
+    expect(decideSite(site([home(rows)], { faulty: faultyBkk() }))).toMatchObject({
+      kind: 'none',
+      status: null,
+    });
+  });
+
   it('BKK fails with the control check fine, but its recheck runs with it down → PROBLEM (unverified), not a blip', () => {
     const rows = [
       check('BKK', 'fail', 1),

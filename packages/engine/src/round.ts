@@ -89,8 +89,7 @@ export function evaluateRound({
         now.getTime() - r.checkedAt.getTime() <= windowSec * 1000 &&
         r.checkedAt.getTime() - now.getTime() <= CLOCK_SKEW_TOLERANCE_MS,
     );
-  // Nobody left but the control check down (BKK excluded as faulty): untrusted, not "too few".
-  if (counted.length < minReporting && !(controlDown && !counted.length)) {
+  if (counted.length < minReporting) {
     return { kind: 'insufficient_data', reporting: counted.map((r) => r.location) };
   }
   if (wafSite) return evaluateWafRound(counted, controlDown);
@@ -124,7 +123,11 @@ function evaluateWafRound(counted: readonly LocationResult[], controlDown: boole
   const enough = (n: number) => n >= 2 || (voters.length === 1 && n === 1);
   if (enough(failing.length)) return { kind: 'hard_fail', failing, abstained };
   if (enough(passing.length)) return { kind: 'pass', failing, abstained };
-  if (by('blocked').length) return { kind: 'needs_verification', blocked: by('blocked') };
+  if (by('blocked').length) {
+    // The verifier runs on the same VPS: while its network is down it can't decide either.
+    if (controlDown) return { kind: 'untrusted', abstained };
+    return { kind: 'needs_verification', blocked: by('blocked') };
+  }
   return { kind: 'pass', failing, abstained };
 }
 
