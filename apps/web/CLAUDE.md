@@ -61,6 +61,7 @@ Rules — enforced by `dxt/feature-boundaries` in ESLint (`scripts/eslint/featur
 - `e2e/layout-consistency.spec.ts` (signed in as the seeded Admin, CI `db` job) checks every live nav page at 390 / 820 / 1440: header 4 px rhythm, phone top bar, 44 px tap areas, no sideways scroll (D-018). A page that flips `live` must pass it.
 - Signed-in e2e that need an incident (`e2e/ack.spec.ts`) create their own `E2E …` site through `openTestIncident`; `pnpm db:reset` clears them.
 - `src/components/app-shell/nav.test.ts` fails if a nav item links to a page that doesn't exist — flip `live` only with the page.
+- Focus moves (after a dialog closes, after Undo, after a save) get a component test asserting `toHaveFocus`: reading the code is not enough (S05 `/verify`). Move focus after React has rendered the target (a ref read in `useEffect`), never in a `requestAnimationFrame` from the click.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
