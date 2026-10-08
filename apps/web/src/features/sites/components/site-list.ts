@@ -92,7 +92,13 @@ export function matches(
   skip?: keyof SiteListFilters,
 ): boolean {
   const q = f.q.trim().toLowerCase();
-  if (skip !== 'q' && q && !`${r.name} ${r.client.name} ${hostAndPath(r.url)}`.toLowerCase().includes(q))
+  if (
+    skip !== 'q' &&
+    q &&
+    !`${r.name} ${r.client.internal ? 'Internal' : r.client.name} ${hostAndPath(r.url)}`
+      .toLowerCase()
+      .includes(q)
+  )
     return false;
   if (skip !== 'status' && !matchesStatus(r, f.status, ctx.now)) return false;
   if (skip !== 'tier' && f.tier !== 'all' && String(r.tier) !== f.tier) return false;

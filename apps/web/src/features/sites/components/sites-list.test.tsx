@@ -56,6 +56,11 @@ function pick(name: RegExp, option: string) {
   fireEvent.click(screen.getByRole('option', { name: option }));
 }
 
+/** The phone list (jsdom renders both trees; CSS picks one). */
+function phone() {
+  return screen.getByRole('group', { name: 'Filter sites' }).closest<HTMLElement>('.md\\:hidden')!;
+}
+
 function table() {
   return screen.getByRole('grid', { name: 'Sites' });
 }
@@ -88,7 +93,7 @@ describe('SitesList (spec §20, Sites board)', () => {
 
     expect(t.getAllByRole('img', { name: 'TYO: TLS chain error' }).length).toBeGreaterThan(0);
     expect(t.getByRole('link', { name: 'Finish setup' })).toHaveAttribute('href', '/sites/eqho-academy/edit');
-    const visit = t.getByRole('link', { name: 'Visit DxT (opens in a new tab)' });
+    const visit = t.getByRole('link', { name: 'Visit site: DxT (opens in a new tab)' });
     expect(visit).toHaveAttribute('href', 'https://dxt.example.com/');
     expect(visit).toHaveAttribute('target', '_blank');
   });
@@ -116,7 +121,7 @@ describe('SitesList (spec §20, Sites board)', () => {
     render(<SitesList sites={SITES} isAdmin meId="tao" nowIso={NOW} />);
     pick(/Sort by/, 'Name A–Z');
     expect(siteNames().map((n) => n.slice(0, 4))).toEqual(['Cand', 'DxTI', 'DxT ', 'MuvM', 'EQHO']);
-    pick(/^Tier/, 'Tier 1');
+    pick(/^Tier/, '1');
     expect(siteNames()).toHaveLength(1);
     fireEvent.click(screen.getAllByRole('button', { name: /Clear/ })[0]!);
     expect(siteNames().map((n) => n.slice(0, 4))).toEqual(['Cand', 'DxTI', 'DxT ', 'MuvM', 'EQHO']);
@@ -124,7 +129,7 @@ describe('SitesList (spec §20, Sites board)', () => {
 
   it('says when nothing matches and offers Clear filters', () => {
     render(<SitesList sites={SITES} isAdmin meId="tao" nowIso={NOW} />);
-    pick(/^Status/, 'Status: Maintenance');
+    pick(/^Status/, 'Maintenance');
     expect(screen.getAllByText('No sites match Status: Maintenance').length).toBeGreaterThan(0);
     fireEvent.click(screen.getAllByRole('button', { name: 'Clear filters' })[0]!);
     expect(siteNames()).toHaveLength(5);
@@ -140,6 +145,12 @@ describe('SitesList (spec §20, Sites board)', () => {
     expect(within(table()).queryByRole('link', { name: 'Finish setup' })).not.toBeInTheDocument();
     expect(within(table()).getByText('Only an Admin can finish setup')).toBeInTheDocument();
     expect(within(table()).queryByRole('link', { name: 'DxT' })).not.toBeInTheDocument();
+    // no menu without a working item; the phone row still links its incident
+    expect(screen.queryByRole('button', { name: 'Actions for DxT' })).not.toBeInTheDocument();
+    expect(within(phone()).getByRole('link', { name: /INC-0142/ })).toHaveAttribute(
+      'href',
+      '/incidents/inc-1',
+    );
   });
 
   it('a mute that ends on a later day names the day', () => {
@@ -156,18 +167,16 @@ describe('SitesList (spec §20, Sites board)', () => {
 
   it('phones: Clear reaches filters set on a wider screen', () => {
     render(<SitesList sites={SITES} isAdmin meId="tao" nowIso={NOW} />);
-    pick(/^Tier/, 'Tier 1');
-    const phoneClear = screen.getAllByRole('button', { name: 'Clear' }).at(-1)!;
-    fireEvent.click(phoneClear);
+    pick(/^Tier/, '1');
+    fireEvent.click(within(phone()).getByRole('button', { name: 'Clear' }));
     expect(siteNames()).toHaveLength(5);
   });
 
   it('phones: grouped by status, Mine = owner or backup', () => {
     render(<SitesList sites={SITES} isAdmin meId="arm" nowIso={NOW} />);
-    const groups = screen
-      .getAllByRole('region')
-      .map((r) => r.getAttribute('aria-label'))
-      .filter((l) => l?.includes(' · '));
+    const groups = within(phone())
+      .getAllByRole('heading', { level: 2 })
+      .map((h) => h.textContent);
     expect(groups).toEqual(['DOWN · 1', 'OK · 3', 'DRAFT · 1']);
     const chips = within(screen.getByRole('group', { name: 'Filter sites' }));
     fireEvent.click(chips.getByRole('button', { name: 'Mine 1' }));

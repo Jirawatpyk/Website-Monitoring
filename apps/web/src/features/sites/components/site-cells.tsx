@@ -18,7 +18,7 @@ import { isMuted, rowKey } from './site-list';
 
 /** A 44 px tap area around a short text link on touch screens (spec §14.17), without moving the text. */
 export const TOUCH_HIT =
-  "relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 after:content-['']";
+  "relative pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:top-1/2 pointer-coarse:after:h-11 pointer-coarse:after:-translate-y-1/2 pointer-coarse:after:content-['']";
 
 /** One location's glyph (spec §11 legend): icon, colour class and the words a screen reader hears. */
 export const GLYPHS: Record<LocationGlyph, { icon: ReactElement; tone: string; label: string }> = {

@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactElement } from 'react';
 import {
   Avatar,
+  Badge,
   Button,
   DataTable,
   DropdownMenu,
+  EmptyState,
   FilterBar,
   FilterSelect,
   IconButton,
@@ -33,6 +35,7 @@ import {
   IconX,
 } from '@jirawatpyk/aura-react/icons';
 import { formatPercent, formatTier, formatTimeWithSeconds } from '@dxt/shared';
+import { SiteStatusBadge } from '@/components/status-badges';
 import type { SiteListRow } from '../types';
 import {
   DraftBadge,
@@ -83,21 +86,23 @@ const STATUS_CHIPS: { value: StatusFilter; label: string; icon?: ReactElement }[
   { value: 'draft', label: 'Drafts', icon: <IconCircleDotDashed /> },
 ];
 
+// FilterSelect draws its own name ("Status") before the chosen option, so options carry the value
+// only; the applied-filter chips add the name back ("Status: Down").
 const STATUS_OPTIONS = [
-  { value: 'all', label: 'Status: all' },
-  { value: 'down', label: 'Status: Down' },
-  { value: 'problem', label: 'Status: Problem' },
-  { value: 'ok', label: 'Status: OK' },
-  { value: 'maintenance', label: 'Status: Maintenance' },
-  { value: 'muted', label: 'Status: Muted' },
-  { value: 'draft', label: 'Status: Drafts' },
+  { value: 'all', label: 'All' },
+  { value: 'down', label: 'Down' },
+  { value: 'problem', label: 'Problem' },
+  { value: 'ok', label: 'OK' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'muted', label: 'Muted' },
+  { value: 'draft', label: 'Drafts' },
 ];
 
 const TIER_OPTIONS = [
-  { value: 'all', label: 'Tier: all' },
-  { value: '1', label: 'Tier 1' },
-  { value: '2', label: 'Tier 2' },
-  { value: '3', label: 'Tier 3' },
+  { value: 'all', label: 'All' },
+  { value: '1', label: '1' },
+  { value: '2', label: '2' },
+  { value: '3', label: '3' },
 ];
 
 /** Mobile groups, in the default order (MSites). */
@@ -137,22 +142,18 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     const seen = new Map<string, string>();
     for (const s of sites) if (s.owner) seen.set(s.owner.id, s.owner.name);
     return [
-      { value: 'all', label: 'Owner: all' },
-      { value: 'mine', label: 'Owner: mine' },
-      ...[...seen]
-        .sort((a, b) => a[1].localeCompare(b[1]))
-        .map(([value, name]) => ({ value, label: `Owner: ${name}` })),
+      { value: 'all', label: 'All' },
+      { value: 'mine', label: 'Mine' },
+      ...[...seen].sort((a, b) => a[1].localeCompare(b[1])).map(([value, name]) => ({ value, label: name })),
     ];
   }, [sites]);
   const clientOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const s of sites) if (!s.client.internal) seen.set(s.client.id, s.client.name);
     return [
-      { value: 'all', label: 'Client: all' },
-      ...[...seen]
-        .sort((a, b) => a[1].localeCompare(b[1]))
-        .map(([value, name]) => ({ value, label: `Client: ${name}` })),
-      { value: 'internal', label: 'Client: Internal' },
+      { value: 'all', label: 'All' },
+      ...[...seen].sort((a, b) => a[1].localeCompare(b[1])).map(([value, name]) => ({ value, label: name })),
+      { value: 'internal', label: 'Internal' },
     ];
   }, [sites]);
 
@@ -161,21 +162,22 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
   if (f.status !== 'all')
     active.push({
       id: 'status',
-      label: labelOf(STATUS_OPTIONS, f.status),
+      label: `Status: ${labelOf(STATUS_OPTIONS, f.status)}`,
       onRemove: () => set({ status: 'all' }),
     });
   if (f.tier !== 'all')
-    active.push({ id: 'tier', label: labelOf(TIER_OPTIONS, f.tier), onRemove: () => set({ tier: 'all' }) });
+    active.push({ id: 'tier', label: `Tier ${f.tier}`, onRemove: () => set({ tier: 'all' }) });
   if (f.owner !== 'all')
     active.push({
       id: 'owner',
-      label: f.owner === 'mine' ? 'Owner: mine (owner or backup)' : labelOf(ownerOptions, f.owner),
+      label:
+        f.owner === 'mine' ? 'Owner: mine (owner or backup)' : `Owner: ${labelOf(ownerOptions, f.owner)}`,
       onRemove: () => set({ owner: 'all' }),
     });
   if (f.client !== 'all')
     active.push({
       id: 'client',
-      label: labelOf(clientOptions, f.client),
+      label: `Client: ${labelOf(clientOptions, f.client)}`,
       onRemove: () => set({ client: 'all' }),
     });
   if (f.attention)
@@ -323,16 +325,18 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 iconRight={<IconExternalLink />}
-                aria-label={`Visit ${r.name} (opens in a new tab)`}
+                aria-label={`Visit site: ${r.name} (opens in a new tab)`}
               >
                 Visit site
               </Button>
             )}
-            <DropdownMenu
-              label={`Actions for ${r.name}`}
-              trigger={<IconButton icon={<IconEllipsis />} label={`Actions for ${r.name}`} />}
-              items={menuItems(r)}
-            />
+            {isAdmin && (
+              <DropdownMenu
+                label={`Actions for ${r.name}`}
+                trigger={<IconButton icon={<IconEllipsis />} label={`Actions for ${r.name}`} />}
+                items={menuItems(r)}
+              />
+            )}
           </span>
         ) : isAdmin ? (
           <Button variant="secondary" size="sm" icon={<IconPencil />} href={`/sites/${r.id}/edit`}>
@@ -345,19 +349,22 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
   ];
 
   const noMatch = (
-    <div className="flex flex-col items-center gap-2 rounded-aura-lg border border-border-default bg-bg-surface p-aura-6 text-center">
-      <span className="flex text-fg-secondary">
-        <IconSearch />
-      </span>
-      <span className="font-semibold">No sites match {active.map((a) => a.label).join(' · ')}</span>
-      <span className="text-sm text-fg-secondary">
-        All {total} sites are still there — only this view is filtered.
-      </span>
-      <Button variant="secondary" icon={<IconX />} onClick={clearAll}>
-        Clear filters
-      </Button>
-    </div>
+    <EmptyState
+      bordered
+      icon={<IconSearch />}
+      headingLevel={2}
+      title={`No sites match ${active.map((a) => a.label).join(' · ')}`}
+      description={`All ${total} sites are still there — only this list is filtered.`}
+      action={
+        <Button variant="secondary" icon={<IconX />} onClick={clearAll}>
+          Clear filters
+        </Button>
+      }
+    />
   );
+  /** Anything besides the search narrows the list — the phone's "All" chip is on only without it. */
+  const narrowed =
+    f.status !== 'all' || f.tier !== 'all' || f.owner !== 'all' || f.client !== 'all' || f.attention;
 
   return (
     <div className="flex flex-col gap-4">
@@ -417,7 +424,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
         <div className="flex">
           <Switch
             label={`Needs attention (${attentionCount})`}
-            description="Open incident · draft · SSL or domain < 60 d · no backup"
+            description="Open incident · draft (setup not finished) · SSL or domain < 60 d · no backup"
             checked={f.attention}
             onChange={(attention) => set({ attention })}
           />
@@ -494,8 +501,10 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
               <Tag
                 key={c.value}
                 touchHeight
-                selected={f.owner !== 'mine' && f.status === c.value}
-                onClick={() => set({ status: c.value, owner: 'all' })}
+                selected={c.value === 'all' ? !narrowed : f.owner !== 'mine' && f.status === c.value}
+                onClick={() =>
+                  c.value === 'all' ? setF({ ...NO_FILTERS, q: f.q }) : set({ status: c.value, owner: 'all' })
+                }
                 className="shrink-0"
               >
                 {`${c.label} ${counts[c.value]}`}
@@ -511,27 +520,23 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
             </Tag>
           </div>
         </div>
-        {active.length > 0 && (
-          // filters set on a wider screen stay on; Clear reaches them here too
-          <span className="flex items-center gap-2 text-xs text-fg-secondary">
-            {`Showing ${shown.length} of ${total}`}
+        <div className="flex items-center gap-2 text-xs text-fg-secondary empty:hidden">
+          <span aria-live="polite">{active.length > 0 ? `Showing ${shown.length} of ${total}` : ''}</span>
+          {active.length > 0 && (
+            // filters set on a wider screen stay on; Clear reaches them here too
             <Button variant="ghost" size="sm" touchHeight icon={<IconX />} onClick={clearAll}>
               Clear
             </Button>
-          </span>
-        )}
+          )}
+        </div>
         {shown.length === 0
           ? noMatch
           : GROUPS.map((g) => {
               const rows = shown.filter((r) => rowKey(r) === g.key);
               if (rows.length === 0) return null;
               return (
-                <section
-                  key={g.key}
-                  aria-label={`${g.title} · ${rows.length}`}
-                  className="flex flex-col gap-1.5"
-                >
-                  <span className="pl-0.5 font-mono text-xs text-fg-tertiary">{`${g.title} · ${rows.length}`}</span>
+                <div key={g.key} className="flex flex-col gap-1.5">
+                  <h2 className="pl-0.5 font-mono text-xs font-normal text-fg-tertiary">{`${g.title} · ${rows.length}`}</h2>
                   <ul className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
                     {rows.map((r) => (
                       <li key={r.id} className="border-b border-border-subtle last:border-b-0">
@@ -539,7 +544,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
                       </li>
                     ))}
                   </ul>
-                </section>
+                </div>
               );
             })}
       </div>
@@ -555,18 +560,22 @@ function PhoneRow({ row, href, now }: { row: SiteListRow; href: string | null; n
       : formatTier(row.tier);
   const body = (
     <>
-      <span className="flex w-28 shrink-0">
+      <span className="flex w-30 shrink-0">
         <RowStatusBadge row={row} />
       </span>
       <span className="flex min-w-0 grow flex-col items-start gap-0.5 leading-snug">
         <span className="max-w-full truncate font-medium">{row.name}</span>
         <MutedBadge row={row} now={now} />
         {!row.live && <DraftBadge />}
-        <span
-          className={`max-w-full text-xs ${row.openIncident ? `font-medium ${incidentTone(row.openIncident.state)}` : 'text-fg-secondary'}`}
-        >
-          {sub}
-        </span>
+        {!href && row.openIncident ? (
+          <IncidentLink incident={row.openIncident} now={now} />
+        ) : (
+          <span
+            className={`max-w-full text-xs ${row.openIncident ? `font-medium ${incidentTone(row.openIncident.state)}` : 'text-fg-secondary'}`}
+          >
+            {sub}
+          </span>
+        )}
         {!href && !row.live && (
           <span className="text-xs text-fg-secondary">Only an Admin can finish setup</span>
         )}
@@ -577,7 +586,7 @@ function PhoneRow({ row, href, now }: { row: SiteListRow; href: string | null; n
   return (
     <Link
       href={href}
-      className="flex min-h-15 items-center gap-2.5 py-2 pr-2 pl-3.5 text-fg-primary no-underline hover:bg-bg-surface-hover"
+      className="flex min-h-15 items-center gap-2.5 py-2 pr-2 pl-3.5 text-fg-primary no-underline hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
     >
       {body}
       <span className="flex text-fg-tertiary">
@@ -587,9 +596,41 @@ function PhoneRow({ row, href, now }: { row: SiteListRow; href: string | null; n
   );
 }
 
+const STATUS_LEGEND: { badge: ReactElement; text: string }[] = [
+  { badge: <SiteStatusBadge status="down" />, text: 'hard fail at 2 of 3 locations, twice' },
+  { badge: <SiteStatusBadge status="problem" />, text: 'slow, key page, keyword, regional, SSL or domain' },
+  { badge: <SiteStatusBadge status="maintenance" />, text: 'planned window' },
+  { badge: <SiteStatusBadge status="ok" />, text: '' },
+  {
+    badge: (
+      <Badge tone="neutral" variant="outline" icon={<IconEyeOff />}>
+        Muted
+      </Badge>
+    ),
+    text: 'alerts off, status unchanged',
+  },
+  {
+    badge: (
+      <Badge tone="neutral" variant="outline" icon={<IconCircleDotDashed />}>
+        Not monitored
+      </Badge>
+    ),
+    text: 'draft, no checks yet',
+  },
+];
+
 function Legend() {
   return (
     <div className="flex flex-col gap-2.5 text-xs leading-normal text-fg-secondary">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="font-mono text-fg-tertiary">STATUS</span>
+        {STATUS_LEGEND.map((s) => (
+          <span key={s.text} className="flex items-center gap-1.5">
+            {s.badge}
+            {s.text}
+          </span>
+        ))}
+      </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="font-mono text-fg-tertiary">LOCATIONS</span>
         {GLYPH_LEGEND.map((g) => (
