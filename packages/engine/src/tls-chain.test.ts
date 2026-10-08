@@ -187,7 +187,7 @@ describe('D-029 — the browser verifier decides a chain-majority round on the h
   });
 
   it('the browser gets a 503 / times out → DOWN from the first chain error, confirmed by the browser', () => {
-    for (const detail of ['HTTP 503', 'Timeout']) {
+    for (const detail of ['HTTP 503', 'Page didn’t load in 30 s']) {
       const failed: Verification = { state: 'failed', jobId: 'j1', completedAt: at(40), detail };
       expect(decideSite(site([withJob(failed)], { verifierAvailable: true }))).toMatchObject({
         kind: 'open',
@@ -197,6 +197,82 @@ describe('D-029 — the browser verifier decides a chain-majority round on the h
         browserDetail: detail,
       });
     }
+  });
+
+  it.each([
+    ['Keyword missing: Can Do', 'a missing keyword'],
+    ['HTTP 404', 'a home-page 4xx (D-022)'],
+    ['page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://www.cando.example/', 'a certificate error'],
+  ])('the browser failed with %s (%s) → PROBLEM (TLS chain), not DOWN', (detail) => {
+    const failed: Verification = { state: 'failed', jobId: 'j1', completedAt: at(40), detail };
+    expect(decideSite(site([withJob(failed)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'tls_chain',
+    });
+  });
+
+  it('…but a refused connection in the browser is an outage → DOWN', () => {
+    const failed: Verification = {
+      state: 'failed',
+      jobId: 'j1',
+      completedAt: at(40),
+      detail: 'page.goto: net::ERR_CONNECTION_REFUSED at https://www.cando.example/',
+    };
+    expect(decideSite(site([withJob(failed)], { verifierAvailable: true }))).toMatchObject({ kind: 'open' });
+  });
+
+  it('the verifier not answering → PROBLEM (TLS chain) and the round is reported unverified for the Admin', () => {
+    const gone: Verification = { state: 'unavailable', reason: 'not_picked_up' };
+    expect(decideSite(site([withJob(gone)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'tls_chain',
+      unverified: [{ monitorId: 'home', reason: 'not_picked_up' }],
+    });
+    expect(decideSite(site([home(rows)], { verifierAvailable: false }))).toMatchObject({
+      unverified: [{ monitorId: 'home', reason: 'no_poll' }],
+    });
+  });
+
+  it('the VPS’s control check down, on a site not behind a WAF → no browser on that VPS: PROBLEM (TLS chain)', () => {
+    const untrusted = [chain('BKK', 1, { controlOk: false }), chain('SIN', 2), chain('TYO', 3)];
+    expect(decideSite(site([home(untrusted)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'tls_chain',
+    });
+  });
+
+  it('chain errors at two locations and a 5xx at one, verifier up → a verify job (engine review N7)', () => {
+    const fivexx = check('TYO', 'fail', 3, { statusCode: 503, error: null });
+    const mixed = [chain('BKK', 1), chain('SIN', 2), fivexx, recheck(fivexx, 33)];
+    expect(decideSite(site([home(mixed)], { verifierAvailable: true }))).toMatchObject({ kind: 'verify' });
+  });
+
+  it('an open unacked DOWN and the browser still failing → stays DOWN, no recovery', () => {
+    const failed: Verification = { state: 'failed', jobId: 'j1', completedAt: at(40), detail: 'HTTP 503' };
+    const open = { id: 'inc-1', state: 'unacked' as const, severity: 'down' as const, hasRootCause: false };
+    expect(decideSite(site([withJob(failed)], { verifierAvailable: true, open }))).toMatchObject({
+      kind: 'none',
+      status: 'down',
+    });
+  });
+
+  it('an open TLS chain PROBLEM and the browser failing → escalated to DOWN from the first chain error', () => {
+    const failed: Verification = {
+      state: 'failed',
+      jobId: 'j1',
+      completedAt: at(40),
+      detail: 'Page didn’t load in 30 s',
+    };
+    const open = {
+      id: 'inc-1',
+      state: 'acknowledged' as const,
+      severity: 'problem' as const,
+      hasRootCause: false,
+    };
+    expect(decideSite(site([withJob(failed)], { verifierAvailable: true, open }))).toMatchObject({
+      kind: 'escalate',
+      downStartedAt: at(1),
+    });
   });
 
   it('blocked in the browser, or the verifier unavailable → PROBLEM (TLS chain), never DOWN', () => {

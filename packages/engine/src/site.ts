@@ -210,6 +210,12 @@ const RECOVERABLE: readonly IncidentState[] = ['unacked', 'escalated', 'acknowle
 /** The round waits for a browser verifier job. */
 const PENDING = 'pending' as const;
 
+/**
+ * A browser verdict that is an outage (the verifier's details): no answer, its page timeout, a 5xx,
+ * or a network error that isn't a certificate error.
+ */
+const BROWSER_OUTAGE = /^(No response|Page didn’t load|HTTP 5\d\d)|^page\.goto: net::ERR_(?!CERT_)/;
+
 type Verdict =
   | { kind: 'insufficient' }
   /** Not an OK round, but nothing to raise: a failure the recheck cleared, a split round. */
@@ -224,6 +230,8 @@ type Verdict =
       note?: string;
       /** A passing round with a problem (slow, keyword, …): the page answered from these. */
       reachable?: StoredCheck[];
+      /** Decided without the browser that should have looked (D-029): why, for the Admin alert. */
+      unverified?: UnverifiedReason;
     }
   | ({ kind: 'down'; startedAt: Date } & Omit<DownFacts, 'monitorId'>);
 
@@ -312,6 +320,8 @@ function judgeSiteRound(
     const v = j.verdict;
     if (v.kind === 'problem' && v.detail.kind === 'blocked') {
       unverified.push({ monitorId: m.id, reason: v.detail.reason });
+    } else if (v.kind === 'problem' && v.unverified) {
+      unverified.push({ monitorId: m.id, reason: v.unverified });
     }
     if ((v.kind === 'problem' || v.kind === 'ok') && v.note) {
       // "Blocked, not verified" outranks the OK note.
@@ -646,27 +656,35 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   const failingHere = counted.filter(failsHere);
   if (chained.length && failingHere.length * 2 > counted.length && failingHere.length >= (wafRound ? 1 : 2)) {
     const startedAt = earliest(chained) ?? roundAt;
-    const tlsProblem: Judgement = {
+    const tlsProblem = (unverifiedReason?: UnverifiedReason): Judgement => ({
       verdict: {
         kind: 'problem',
         trigger: m.isPrimary ? 'tls_chain' : 'key_page',
         detail: { kind: 'tls_chain', code: chained[0]!.error!, locations: chained.map((c) => c.location) },
         startedAt,
         reachable: chained,
+        ...(unverifiedReason ? { unverified: unverifiedReason } : {}),
       },
       next: reset,
-    };
-    // A key page caps at PROBLEM anyway; a VPS its own checks can't vouch for (D-027 rule 2) can't
-    // run the browser that would decide.
-    const vpsUntrusted = wafSite && round.scheduled.some((c) => bkkUntrusted(c, akamaiSite));
-    if (!m.isPrimary || vpsUntrusted) return tlsProblem;
+    });
+    // A key page caps at PROBLEM anyway; a VPS its own checks can't vouch for (D-027 rule 2 — on any
+    // site here, the browser runs on that VPS) can't decide either.
+    const vpsUntrusted =
+      round.scheduled.some((c) => c.location === 'BKK' && c.controlOk === false) ||
+      (wafSite && round.scheduled.some((c) => bkkUntrusted(c, akamaiSite)));
+    if (!m.isPrimary || vpsUntrusted) return tlsProblem();
     // D-029 (Tao, 8 Oct 2026): the failed handshake hides HTTP, so an origin down behind a front end
     // serving the wrong chain would never show. The browser fetches the missing intermediate: it
     // decides — the page loads → TLS chain PROBLEM; it fails → DOWN.
     const v = m.verifications?.get(roundAt.getTime());
-    if (!v) return s.verifierAvailable ? { verdict: { kind: 'verify' }, next: carried } : tlsProblem;
+    if (!v)
+      return s.verifierAvailable ? { verdict: { kind: 'verify' }, next: carried } : tlsProblem('no_poll');
     if (v.state === 'pending') return PENDING;
-    if (v.state === 'failed') {
+    if (v.state === 'unavailable') return tlsProblem(v.reason);
+    // Only an outage in the browser too is DOWN: no answer, a timeout, a 5xx, a connection error.
+    // A certificate error (should Chromium ever not fetch the intermediate), a 4xx (D-022) or a missing
+    // keyword stays the TLS chain PROBLEM (engine review N1, N2).
+    if (v.state === 'failed' && BROWSER_OUTAGE.test(v.detail ?? '')) {
       return {
         verdict: {
           kind: 'down',
@@ -679,8 +697,8 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         next: reset,
       };
     }
-    // Loaded, blocked in the browser, or the verifier unavailable: the chain is the problem we know of.
-    return tlsProblem;
+    // Loaded, blocked in the browser, or failed for a non-outage reason: the chain is what we know of.
+    return tlsProblem();
   }
 
   // An OK round needs a majority of the reporting locations to pass (PRD §5): one pass and one fail
