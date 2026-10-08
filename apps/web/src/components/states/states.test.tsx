@@ -1,6 +1,15 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LoadingList, NoAccess, OfflineStrip, OFFLINE_RETRY_MS, STILL_LOADING_AFTER_MS } from '.';
+import {
+  CardSkeleton,
+  LoadingList,
+  NoAccess,
+  OfflineStrip,
+  OFFLINE_RETRY_MS,
+  PageHeaderSkeleton,
+  PageSkeleton,
+  STILL_LOADING_AFTER_MS,
+} from '.';
 
 const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
@@ -54,6 +63,24 @@ describe('LoadingList', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/^Still loading/);
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refresh).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Page skeletons', () => {
+  it('announce one busy status with what is loading; the shapes stay hidden from screen readers', () => {
+    render(
+      <PageSkeleton label="Loading site">
+        <PageHeaderSkeleton breadcrumb actions={2} />
+        <CardSkeleton fields={4} columns={2} />
+        <CardSkeleton lines={3} />
+      </PageSkeleton>,
+    );
+    const status = screen.getByRole('status');
+    expect(status).toHaveAttribute('aria-busy', 'true');
+    expect(status.textContent).toBe('Loading site');
+    for (const shape of Array.from(status.children).slice(1)) {
+      expect(shape).toHaveAttribute('aria-hidden', 'true');
+    }
   });
 });
 

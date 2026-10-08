@@ -5,4 +5,5 @@
  */
 export { LoadingList, STILL_LOADING_AFTER_MS } from './loading-list';
 export { NoAccess, type PersonWhoCanAct } from './no-access';
+export { CardSkeleton, PageHeaderSkeleton, PageSkeleton } from './page-skeletons';
 export { OfflineStrip, OFFLINE_RETRY_MS } from './offline-strip';
