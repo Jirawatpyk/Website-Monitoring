@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import {
   Badge,
   DataTable,
-  EmptyState,
   FilterSelect,
   SegmentedControl,
   type DataTableColumn,
@@ -93,13 +92,7 @@ export function SitesTable({ sites, canEdit }: SitesTableProps) {
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <SegmentedControl label="Tier" size="sm" options={TIER_OPTIONS} value={tier} onChange={setTier} />
-        <FilterSelect
-          label="Owner"
-          allLabel="all"
-          options={owners}
-          value={owner}
-          onChange={setOwner}
-        />
+        <FilterSelect label="Owner" allLabel="all" options={owners} value={owner} onChange={setOwner} />
         <FilterSelect
           label="Client"
           allLabel="all"
