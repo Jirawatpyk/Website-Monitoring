@@ -3,12 +3,13 @@
 import { useMemo, useState } from 'react';
 import {
   Badge,
+  Button,
   DataTable,
   FilterSelect,
   SegmentedControl,
   type DataTableColumn,
 } from '@jirawatpyk/aura-react';
-import { IconSearch } from '@jirawatpyk/aura-react/icons';
+import { IconExternalLink, IconSearch } from '@jirawatpyk/aura-react/icons';
 import { formatTier, formatTimeWithSeconds } from '@dxt/shared';
 import { SiteStatusBadge } from '@/components/status-badges';
 import type { SiteListRow } from '../types';
@@ -63,7 +64,6 @@ export function SitesTable({ sites, canEdit }: SitesTableProps) {
     {
       key: 'name',
       label: 'Site',
-      sortable: true,
       render: (s) => (
         <span className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{s.name}</span>
@@ -85,6 +85,28 @@ export function SitesTable({ sites, canEdit }: SitesTableProps) {
       mono: true,
       hideBelow: 'md',
       render: (s) => (s.checkedAt ? formatTimeWithSeconds(new Date(s.checkedAt)) : '—'),
+    },
+    {
+      key: 'visit',
+      label: '',
+      width: 64,
+      actions: true,
+      render: (s) =>
+        s.url ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            touchHeight
+            href={s.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            icon={<IconExternalLink />}
+            aria-label={`Visit ${s.name} (opens in a new tab)`}
+            title="Visit site"
+          >
+            <span className="sr-only">Visit site</span>
+          </Button>
+        ) : null,
     },
   ];
 
@@ -109,7 +131,6 @@ export function SitesTable({ sites, canEdit }: SitesTableProps) {
         rowKey="id"
         columns={columns}
         rows={rows}
-        defaultSort={{ key: 'name', dir: 'asc' }}
         getRowHref={canEdit ? (s) => `/sites/${s.id}/edit` : undefined}
         stackBelow={640}
         empty={{ icon: <IconSearch />, title: 'No sites match these filters.' }}

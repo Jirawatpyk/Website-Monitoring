@@ -125,3 +125,13 @@ export async function ackMessages(incidentId: string): Promise<{ channel: string
     `/rest/v1/notifications?select=channel,status&incident_id=eq.${incidentId}&template=eq.acknowledged&order=channel`,
   )) as { channel: string; status: string }[];
 }
+
+/** The audit rows of a site and its monitors, oldest first: action and actor email (S05 Done-when 3). */
+export async function siteAudit(siteId: string): Promise<{ action: string; actor: string | null }[]> {
+  const monitors = (await admin(`/rest/v1/monitors?select=id&site_id=eq.${siteId}`)) as { id: string }[];
+  const ids = [siteId, ...monitors.map((m) => m.id)].join(',');
+  const rows = (await admin(
+    `/rest/v1/audit_log?select=action,actor:profiles(email)&entity_id=in.(${ids})&order=at`,
+  )) as { action: string; actor: { email: string } | null }[];
+  return rows.map((r) => ({ action: r.action, actor: r.actor?.email ?? null }));
+}

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Alert, Breadcrumb, Button, Container, EmptyState, PageHeader } from '@jirawatpyk/aura-react';
-import { IconInbox } from '@jirawatpyk/aura-react/icons';
+import { IconExternalLink, IconInbox } from '@jirawatpyk/aura-react/icons';
 import { formatTier, TIER_CONFIG } from '@dxt/shared';
 import { NoAccess } from '@/components/states';
 import { SiteForm } from '@/features/sites';
@@ -35,10 +35,25 @@ export default async function EditSitePage({
   }
   const isAdmin = access.status === 'active' && access.profile.role === 'admin';
   const every = TIER_CONFIG[site.tier].intervalSec / 60;
+  const primaryUrl = site.monitors.find((m) => m.isPrimary)?.url;
   const header = (
     <PageHeader
       breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: site.name }]} />}
       title="Edit site"
+      actions={
+        primaryUrl ? (
+          <Button
+            variant="secondary"
+            href={primaryUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            iconRight={<IconExternalLink />}
+            aria-label={`Visit ${site.name} (opens in a new tab)`}
+          >
+            Visit site
+          </Button>
+        ) : undefined
+      }
       meta={
         site.live
           ? `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO · monitoring`

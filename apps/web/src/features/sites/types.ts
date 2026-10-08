@@ -12,6 +12,8 @@ export interface SiteListRow {
   /** Latest status; null for a Draft or before the first round. */
   status: SiteStatus | null;
   checkedAt: string | null;
+  /** The primary URL ("Visit site"). */
+  url: string | null;
 }
 
 export interface ClientOption {

@@ -23,7 +23,8 @@ export async function listSites(): Promise<SiteListRow[]> {
       `id, name, tier, is_active, monitoring_started_at,
        clients!inner(id, name, is_internal),
        owner:profiles!sites_primary_owner_id_fkey(id, display_name),
-       site_status(status, last_round_at)`,
+       site_status(status, last_round_at),
+       monitors(url, is_primary)`,
     )
     .order('name');
   if (error) throw new Error(`sites: ${error.message}`);
@@ -38,6 +39,7 @@ export async function listSites(): Promise<SiteListRow[]> {
       owner: s.owner ? { id: s.owner.id, name: s.owner.display_name } : null,
       status: s.is_active ? ((status?.status as SiteStatus | undefined) ?? null) : null,
       checkedAt: s.is_active ? (status?.last_round_at ?? null) : null,
+      url: s.monitors.find((m) => m.is_primary)?.url ?? null,
     };
   });
 }
