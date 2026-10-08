@@ -23,9 +23,9 @@ type Column = keyof typeof COLUMN_WIDTH;
 export const FLEX_MIN = 160;
 /** The row's start and end gutters (24 px each). */
 export const GUTTERS = 48;
-/** The narrowest table: the md viewport (768) less the page's 24 px margins and the table's 1 px frame
- * (measured: 820 → 770) — the table shows from md. */
-export const NARROWEST_TABLE = 718;
+/** The narrowest table: the md viewport (768) less the page's 24 px margins, the table's 1 px frame and a
+ * classic 15 px scrollbar (measured on staging: 768 → 703) — the table shows from md. */
+export const NARROWEST_TABLE = 703;
 
 /** Always shown; Checked from `CHECKED_FROM`; from a 1024 px table (`'lg'`); from `LATE_FROM`. */
 export const ALWAYS: readonly Column[] = ['status', 'tier', 'locations', 'actions'];
@@ -40,7 +40,7 @@ export function needs(columns: readonly Column[]): number {
   return GUTTERS + FLEX_MIN + columns.reduce((sum, c) => sum + COLUMN_WIDTH[c], 0);
 }
 
-/** Checked shows once it fits beside the always-shown columns (720 px: hidden only at the md edge). */
+/** Checked shows once it fits beside the always-shown columns (720 px: hidden just past the md edge). */
 export const CHECKED_FROM = needs([...ALWAYS, ...CHECKED]);
 
 /** Response 24h and Expiry show once every column fits (1120 px with the board's widths). */
