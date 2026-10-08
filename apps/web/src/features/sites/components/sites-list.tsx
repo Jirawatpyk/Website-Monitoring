@@ -66,6 +66,7 @@ import {
   type SortKey,
   type StatusFilter,
 } from './site-list';
+import { CHECKED_FROM, COLUMN_WIDTH as W, LATE_FROM } from './site-table-layout';
 
 interface SitesListProps {
   sites: SiteListRow[];
@@ -218,14 +219,12 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     },
   ];
 
-  // The board's widths. The flexible Site column never shrinks below 160 px (DataTable's minWidth only
-  // limits resizing), so the shown columns must fit: owner and uptime from a 1024 px table, response
-  // and expiry from 1130 px (960 px fixed at 1440 leaves Site 174 px).
+  // Widths and the table widths the optional columns appear at: site-table-layout.ts (tested to fit).
   const columns: DataTableColumn<SiteListRow>[] = [
     {
       key: 'status',
       label: 'Status',
-      width: 144,
+      width: W.status,
       render: (r) => (
         <span className="flex flex-col items-start gap-1 py-2">
           <RowStatusBadge row={r} />
@@ -263,11 +262,17 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
         );
       },
     },
-    { key: 'tier', label: 'Tier', width: 40, mono: true, render: (r) => formatTier(r.tier, { short: true }) },
+    {
+      key: 'tier',
+      label: 'Tier',
+      width: W.tier,
+      mono: true,
+      render: (r) => formatTier(r.tier, { short: true }),
+    },
     {
       key: 'owner',
       label: 'Owner · backup',
-      width: 136,
+      width: W.owner,
       hideBelow: 'lg',
       render: (r) =>
         r.owner ? (
@@ -287,18 +292,18 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           <span className="text-fg-secondary">—</span>
         ),
     },
-    { key: 'locations', label: 'BKK SIN TYO', width: 92, render: (r) => <LocationGlyphs row={r} /> },
+    { key: 'locations', label: 'BKK SIN TYO', width: W.locations, render: (r) => <LocationGlyphs row={r} /> },
     {
       key: 'p50',
       label: 'Response 24h',
-      width: 104,
-      hideBelow: 1130,
+      width: W.p50,
+      hideBelow: LATE_FROM,
       render: (r) => <span className="text-fg-secondary">{r.p50Ms === null ? '—' : `${r.p50Ms} ms`}</span>,
     },
     {
       key: 'uptime',
       label: 'Uptime 30d',
-      width: 96,
+      width: W.uptime,
       hideBelow: 'lg',
       render: (r) => (
         <span className={r.uptime30d === null ? 'text-fg-secondary' : ''}>
@@ -309,8 +314,8 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     {
       key: 'expiry',
       label: 'Expiry',
-      width: 64,
-      hideBelow: 1130,
+      width: W.expiry,
+      hideBelow: LATE_FROM,
       render: (r) => (
         <span className="text-fg-secondary">{r.expiryDays === null ? '—' : `${r.expiryDays} d`}</span>
       ),
@@ -318,8 +323,8 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     {
       key: 'checkedAt',
       label: 'Checked',
-      // the table's mono face is wider than the board's 12 px: 72 px broke HH:MM:SS onto two lines (Tao)
-      width: 80,
+      width: W.checked,
+      hideBelow: CHECKED_FROM,
       mono: true,
       render: (r) => (
         <span className="whitespace-nowrap">
@@ -330,7 +335,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     {
       key: 'actions',
       label: '',
-      width: 156,
+      width: W.actions,
       actions: true,
       render: (r) =>
         r.live ? (
