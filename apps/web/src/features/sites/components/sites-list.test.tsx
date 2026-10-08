@@ -129,7 +129,11 @@ describe('SitesList (spec §20, Sites board)', () => {
 
   it('says when nothing matches and offers Clear filters', () => {
     render(<SitesList sites={SITES} isAdmin meId="tao" nowIso={NOW} />);
-    pick(/^Status/, 'Maintenance');
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Sites by status' })).getByRole('button', {
+        name: /^Maintenance 0/,
+      }),
+    );
     expect(screen.getAllByText('No sites match Status: Maintenance').length).toBeGreaterThan(0);
     fireEvent.click(screen.getAllByRole('button', { name: 'Clear filters' })[0]!);
     expect(siteNames()).toHaveLength(5);
@@ -156,7 +160,9 @@ describe('SitesList (spec §20, Sites board)', () => {
   it('one site reads in the singular', () => {
     render(<SitesList sites={[row('VOCA')]} isAdmin meId="tao" nowIso={NOW} />);
     expect(screen.getAllByText('1 site').length).toBeGreaterThan(0);
-    pick(/^Status/, 'Down');
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Sites by status' })).getByRole('button', { name: /^Down 0/ }),
+    );
     expect(
       screen.getAllByText('The site is still there — only this list is filtered.').length,
     ).toBeGreaterThan(0);

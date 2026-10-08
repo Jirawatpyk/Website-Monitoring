@@ -86,8 +86,8 @@ const STATUS_CHIPS: { value: StatusFilter; label: string; icon?: ReactElement }[
   { value: 'draft', label: 'Drafts', icon: <IconCircleDotDashed /> },
 ];
 
-// FilterSelect draws its own name ("Status") before the chosen option, so options carry the value
-// only; the applied-filter chips add the name back ("Status: Down").
+// The status names the applied-filter chip uses ("Status: Down"); status is picked with the chip row.
+// FilterSelect draws its own name before the chosen option, so the other options carry the value only.
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'down', label: 'Down' },
@@ -404,13 +404,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           searchLabel="Search sites"
           searchPlaceholder="Search name, URL or client"
         >
-          <FilterSelect
-            label="Status"
-            allLabel="all"
-            options={STATUS_OPTIONS}
-            value={f.status}
-            onChange={(v) => set({ status: v as StatusFilter })}
-          />
+          {/* status is the chip row above (Tao, 8 Oct 2026: one control per filter) */}
           <FilterSelect
             label="Tier"
             allLabel="all"
@@ -622,7 +616,7 @@ const STATUS_LEGEND: { key: string; badge: ReactElement; text: string }[] = [
     text: 'slow, key page, keyword, regional, SSL or domain',
   },
   { key: 'maintenance', badge: <SiteStatusBadge status="maintenance" />, text: 'planned window' },
-  { key: 'ok', badge: <SiteStatusBadge status="ok" />, text: '' },
+  { key: 'ok', badge: <SiteStatusBadge status="ok" />, text: 'every check passes' },
   {
     key: 'muted',
     badge: (
@@ -643,35 +637,57 @@ const STATUS_LEGEND: { key: string; badge: ReactElement; text: string }[] = [
   },
 ];
 
+/** What each column means (the board's notes, one per line). */
+const COLUMN_NOTES: { term: string; text: string }[] = [
+  {
+    term: 'Uptime 30d',
+    text: 'DOWN minutes only — Problem counts as up, maintenance is excluded, muted time counts',
+  },
+  { term: 'Response 24h', text: 'median (p50) of the primary monitor; “—” while down or in maintenance' },
+  { term: 'Expiry', text: 'the sooner of SSL and domain, in days' },
+  { term: 'Checked', text: 'the last complete round' },
+];
+
+/** Legend card (Tao, 8 Oct 2026): status, locations and columns side by side from lg, stacked below. */
 function Legend() {
   return (
-    <div className="flex flex-col gap-2.5 text-xs leading-normal text-fg-secondary">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="font-mono text-fg-tertiary">STATUS</span>
-        {STATUS_LEGEND.map((s) => (
-          <span key={s.key} className="flex items-center gap-1.5">
-            {s.badge}
-            {s.text}
-          </span>
-        ))}
+    <section
+      aria-label="Legend"
+      className="grid gap-x-8 gap-y-5 rounded-aura-lg border border-border-subtle p-aura-4 text-xs leading-normal text-fg-secondary lg:grid-cols-3"
+    >
+      <div className="flex flex-col gap-2">
+        <h2 className="font-mono text-xs font-normal text-fg-tertiary">STATUS</h2>
+        <ul className="flex flex-col gap-2">
+          {STATUS_LEGEND.map((s) => (
+            <li key={s.key} className="flex items-center gap-2">
+              <span className="flex w-30 shrink-0">{s.badge}</span>
+              <span>{s.text}</span>
+            </li>
+          ))}
+        </ul>
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="font-mono text-fg-tertiary">LOCATIONS</span>
-        {GLYPH_LEGEND.map((g) => (
-          <span key={g} className="flex items-center gap-1.5">
-            <span className={`flex ${GLYPHS[g].tone}`}>{GLYPHS[g].icon}</span>
-            {GLYPHS[g].label}
-          </span>
-        ))}
+      <div className="flex flex-col gap-2">
+        <h2 className="font-mono text-xs font-normal text-fg-tertiary">LOCATIONS</h2>
+        <ul className="flex flex-col gap-2">
+          {GLYPH_LEGEND.map((g) => (
+            <li key={g} className="flex min-h-5 items-center gap-2">
+              <span className={`flex ${GLYPHS[g].tone}`}>{GLYPHS[g].icon}</span>
+              <span>{GLYPHS[g].label}</span>
+            </li>
+          ))}
+        </ul>
       </div>
-      <span>
-        <b className="font-semibold text-fg-primary">Uptime 30d</b> counts DOWN minutes only — Problem counts
-        as up, maintenance is excluded, muted time is counted.{' '}
-        <b className="font-semibold text-fg-primary">Response 24h</b> is the median (p50) of the primary
-        monitor; “—” while down or in maintenance. <b className="font-semibold text-fg-primary">Expiry</b> is
-        the sooner of SSL and domain, in days. <b className="font-semibold text-fg-primary">Checked</b> is the
-        last complete round.
-      </span>
-    </div>
+      <div className="flex flex-col gap-2">
+        <h2 className="font-mono text-xs font-normal text-fg-tertiary">COLUMNS</h2>
+        <dl className="flex flex-col gap-2">
+          {COLUMN_NOTES.map((c) => (
+            <div key={c.term}>
+              <dt className="inline font-semibold text-fg-primary">{c.term}</dt>{' '}
+              <dd className="inline">{c.text}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
   );
 }
