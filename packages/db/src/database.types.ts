@@ -620,7 +620,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "app_role": "admin"|"responder"|"stakeholder"|"viewer"|"client","check_outcome": "pass"|"fail"|"blocked","incident_state": "unacked"|"escalated"|"acknowledged"|"monitoring"|"needs_root_cause"|"resolved"|"in_review"|"closed","incident_trigger": "hard_fail"|"blocked_unverified"|"slow"|"keyword"|"key_page"|"ssl"|"domain"|"redirect"|"regional"|"manual","monitor_type": "http"|"keyword"|"ssl"|"domain"|"browser","notification_channel": "google_chat"|"email"|"voice","notification_status": "queued"|"sent"|"failed"|"cancelled","severity": "problem"|"down","site_state": "ok"|"problem"|"down"|"maintenance"
+            "app_role": "admin"|"responder"|"stakeholder"|"viewer"|"client","check_outcome": "pass"|"fail"|"blocked","incident_state": "unacked"|"escalated"|"acknowledged"|"monitoring"|"needs_root_cause"|"resolved"|"in_review"|"closed","incident_trigger": "hard_fail"|"blocked_unverified"|"slow"|"keyword"|"key_page"|"ssl"|"domain"|"redirect"|"regional"|"manual"|"tls_chain","monitor_type": "http"|"keyword"|"ssl"|"domain"|"browser","notification_channel": "google_chat"|"email"|"voice","notification_status": "queued"|"sent"|"failed"|"cancelled","severity": "problem"|"down","site_state": "ok"|"problem"|"down"|"maintenance"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -740,7 +740,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "app_role": ["admin", "responder", "stakeholder", "viewer", "client"],"check_outcome": ["pass", "fail", "blocked"],"incident_state": ["unacked", "escalated", "acknowledged", "monitoring", "needs_root_cause", "resolved", "in_review", "closed"],"incident_trigger": ["hard_fail", "blocked_unverified", "slow", "keyword", "key_page", "ssl", "domain", "redirect", "regional", "manual"],"monitor_type": ["http", "keyword", "ssl", "domain", "browser"],"notification_channel": ["google_chat", "email", "voice"],"notification_status": ["queued", "sent", "failed", "cancelled"],"severity": ["problem", "down"],"site_state": ["ok", "problem", "down", "maintenance"]
+            "app_role": ["admin", "responder", "stakeholder", "viewer", "client"],"check_outcome": ["pass", "fail", "blocked"],"incident_state": ["unacked", "escalated", "acknowledged", "monitoring", "needs_root_cause", "resolved", "in_review", "closed"],"incident_trigger": ["hard_fail", "blocked_unverified", "slow", "keyword", "key_page", "ssl", "domain", "redirect", "regional", "manual", "tls_chain"],"monitor_type": ["http", "keyword", "ssl", "domain", "browser"],"notification_channel": ["google_chat", "email", "voice"],"notification_status": ["queued", "sent", "failed", "cancelled"],"severity": ["problem", "down"],"site_state": ["ok", "problem", "down", "maintenance"]
           }
         }
 } as const
