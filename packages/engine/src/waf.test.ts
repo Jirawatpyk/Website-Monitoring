@@ -473,3 +473,83 @@ describe('D-027 — evaluateRound on a WAF site', () => {
     });
   });
 });
+
+// Retro S05b: engine-reviewer needed three rounds, each fix exposing a new edge case. These
+// invariants run every combination instead of the cases someone thought of.
+describe('D-027 invariants over every combination', () => {
+  type Bkk = 'pass' | 'fail' | 'fail-control' | 'fail-akamai' | 'blocked-waf';
+  type Abroad = 'pass' | 'fail' | 'waf' | 'body-block' | 'silent';
+  const BKK: Bkk[] = ['pass', 'fail', 'fail-control', 'fail-akamai', 'blocked-waf'];
+  const ABROAD: Abroad[] = ['pass', 'fail', 'waf', 'body-block', 'silent'];
+  const VERDICTS: (Verification | undefined)[] = [
+    undefined,
+    { state: 'loaded', jobId: 'j1' },
+    { state: 'blocked', jobId: 'j1' },
+    { state: 'failed', jobId: 'j1', completedAt: at(40), detail: 'No response' },
+  ];
+  const bkkRows = (b: Bkk): StoredCheck[] => {
+    const over: Partial<StoredCheck> =
+      b === 'fail-control'
+        ? { controlOk: false }
+        : b === 'fail-akamai'
+          ? { akamaiOk: false }
+          : { controlOk: true };
+    if (b === 'pass') return [check('BKK', 'pass', 1, over)];
+    if (b === 'blocked-waf') return [check('BKK', 'blocked', 1, { waf: 'akamai' })];
+    return [check('BKK', 'fail', 1, over), recheck('BKK', 'fail', 31, over)];
+  };
+  const abroadRows = (loc: ProbeLocation, a: Abroad, sec: number): StoredCheck[] => {
+    if (a === 'silent') return [];
+    if (a === 'pass') return [check(loc, 'pass', sec)];
+    if (a === 'waf') return [check(loc, 'blocked', sec, { waf: 'akamai' })];
+    if (a === 'body-block') return [check(loc, 'blocked', sec)];
+    return [check(loc, 'fail', sec), recheck(loc, 'fail', sec + 30)];
+  };
+  const cases = BKK.flatMap((b) =>
+    ABROAD.flatMap((sin) => ABROAD.flatMap((tyo) => VERDICTS.map((v) => ({ b, sin, tyo, v })))),
+  );
+  const rowsOf = ({ b, sin, tyo }: (typeof cases)[number]) => [
+    ...bkkRows(b),
+    ...abroadRows('SIN', sin, 2),
+    ...abroadRows('TYO', tyo, 3),
+  ];
+  const decide = (c: (typeof cases)[number], behindWaf: boolean) =>
+    decideSite(
+      site([home(rowsOf(c), c.v ? { verifications: new Map([[R, c.v]]) } : {})], {
+        behindWaf,
+        now: at(260),
+      }),
+    );
+
+  it('rule 2: with the VPS untrusted, a DOWN never rests on BKK or on its browser', () => {
+    for (const c of cases) {
+      if (c.b !== 'fail-control' && c.b !== 'fail-akamai') continue;
+      // The Akamai control only guards a site the lookback shows behind Akamai.
+      if (c.b === 'fail-akamai' && c.sin !== 'waf' && c.tyo !== 'waf') continue;
+      const d = decide(c, true);
+      if (d.kind !== 'open') continue;
+      const why = JSON.stringify(c);
+      expect(d.verifyJobId, why).toBeUndefined();
+      expect(
+        d.failing.map((f) => f.location),
+        why,
+      ).not.toContain('BKK');
+      expect(d.failing.length, why).toBeGreaterThan(0);
+    }
+  });
+
+  it('rule 5: a flagged site with no WAF signature in the round decides exactly as an unflagged one', () => {
+    for (const c of cases) {
+      if (c.b === 'blocked-waf' || c.sin === 'waf' || c.tyo === 'waf') continue;
+      if (c.b === 'fail-control' || c.b === 'fail-akamai') continue;
+      expect(decide(c, true), JSON.stringify(c)).toEqual(decide(c, false));
+    }
+  });
+
+  it('every combination decides without throwing and never starts a DOWN at an invalid time', () => {
+    for (const c of cases) {
+      const d = decide(c, true);
+      if (d.kind === 'open') expect(Number.isFinite(d.startedAt.getTime()), JSON.stringify(c)).toBe(true);
+    }
+  });
+});
