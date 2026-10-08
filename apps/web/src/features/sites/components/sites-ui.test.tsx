@@ -243,6 +243,8 @@ describe('MonitorsEditor (EditMonitors)', () => {
     expect(discard).toHaveTextContent('You will lose: removing Key page · /booking.');
     fireEvent.click(within(discard).getByRole('button', { name: 'Keep editing' }));
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    // /verify step 12: focus returns to the row, not to <body>.
+    expect(screen.getByRole('button', { name: /Key page/ })).toHaveFocus();
     // Back to clean, right after a save: the button says so.
     expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled();
   });

@@ -223,11 +223,11 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
   const interval = TIER_CONFIG[tier].intervalSec / 60;
 
   return (
-    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:grid-cols-3">
       <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
         <Card title="Site" headingLevel={2}>
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="@container flex flex-col gap-4">
+            <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
               <TextField
                 touchHeight
                 label="Site name"
@@ -297,8 +297,8 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
         </Card>
 
         <Card title="Ownership" headingLevel={2}>
-          <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="@container flex flex-col gap-3">
+            <div className="grid grid-cols-1 gap-4 @xl:grid-cols-3">
               <Select
                 touchHeight
                 label="Primary owner"
@@ -382,13 +382,13 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
               </Badge>
             }
           >
-            <div className="flex flex-col gap-4">
+            <div className="@container flex flex-col gap-4">
               <span className="text-sm leading-normal text-fg-secondary">
                 Only this monitor can make the site DOWN: at least 2 of 3 locations get a hard fail (timeout,
                 5xx, DNS/TLS error, connection refused) on two checks in a row — the second is an immediate
                 recheck about 30 s later. Key pages and every other monitor stop at PROBLEM.
               </span>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 @xl:grid-cols-3">
                 <Select
                   touchHeight
                   label="Method"
@@ -414,7 +414,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                   error={err('primary.timeoutSec')}
                 />
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
                 <TextField
                   touchHeight
                   label="Must contain (brand keyword)"
@@ -628,7 +628,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
         />
 
         <Card title="Bot protection" headingLevel={2}>
-          <div className="flex flex-col gap-4">
+          <div className="@container flex flex-col gap-4">
             <Switch label="Behind WAF / Cloudflare" checked={behindWaf} onChange={setBehindWaf} />
             {behindWaf && (
               <div className="flex flex-col gap-3">

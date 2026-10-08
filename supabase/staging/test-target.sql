@@ -10,9 +10,10 @@
 -- Since S05 the same site can also be added through Sites → Add site.
 
 with client as (
-  insert into public.clients (name)
-  values ('DxT test')
-  on conflict (name) do update set name = excluded.name
+  -- Internal: no account manager needed, so the site passes the S05 checklist (D-025).
+  insert into public.clients (name, is_internal)
+  values ('DxT test', true)
+  on conflict (name) do update set is_internal = true
   returning id
 ), site as (
   insert into public.sites (client_id, name, tier, primary_owner_id, backup_owner_id, hosting, credential_ref,

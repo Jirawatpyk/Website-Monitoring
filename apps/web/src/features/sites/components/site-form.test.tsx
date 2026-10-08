@@ -80,6 +80,13 @@ describe('SiteForm (AddSite)', () => {
     expect(screen.queryByText(/gambling/i)).not.toBeInTheDocument();
   });
 
+  // /verify: a browser tool read the tier radios as "1/2/3"; screen readers get the visible label.
+  it('names each tier radio by its label', () => {
+    renderForm();
+    expect(screen.getByRole('radio', { name: 'Tier 1 — 24/7 · every 1 min' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Tier 2 — business hours · every 3 min' })).toBeChecked();
+  });
+
   // D-015: an owner without a Chat id can't be picked, and is named.
   it('lists people without a Google Chat id as disabled', () => {
     renderForm();

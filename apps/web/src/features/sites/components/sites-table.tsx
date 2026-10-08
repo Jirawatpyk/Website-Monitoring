@@ -58,7 +58,7 @@ export function SitesTable({ sites, canEdit }: SitesTableProps) {
         s.status ? (
           <SiteStatusBadge status={s.status} />
         ) : (
-          <span className="text-sm text-fg-tertiary">{s.live ? 'No data yet' : '—'}</span>
+          <span className="text-sm text-fg-tertiary">{s.live ? 'No data yet' : 'Not monitored'}</span>
         ),
     },
     {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Alert,
@@ -75,6 +75,14 @@ export function MonitorsEditor({
   const [askRemove, setAskRemove] = useState<string | null>(null);
   const [askDiscard, setAskDiscard] = useState(false);
   const lastRemoved = useRef<string | null>(null);
+  // Undo swaps the "Removed on save" row back to a button: focus it once it exists (keyboard users
+  // would otherwise land on <body>).
+  const focusRow = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusRow.current) return;
+    document.querySelector<HTMLElement>(`[data-row="${focusRow.current}"]`)?.focus();
+    focusRow.current = null;
+  });
   const [pending, startTransition] = useTransition();
 
   const changes = describeChanges(drafts, monitors);
@@ -221,10 +229,8 @@ export function MonitorsEditor({
                       touchHeight
                       data-undo={d.key}
                       onClick={() => {
+                        focusRow.current = d.key;
                         update(d.key, { removed: false });
-                        requestAnimationFrame(() =>
-                          document.querySelector<HTMLElement>(`[data-row="${d.key}"]`)?.focus(),
-                        );
                       }}
                     >
                       Undo
