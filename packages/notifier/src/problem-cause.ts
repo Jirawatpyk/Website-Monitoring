@@ -80,7 +80,11 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
       return `Browser: page didn’t load${d.detail ? ` (${d.detail})` : ''}`;
     case 'blocked':
       return `${d.statusCode ? `HTTP ${d.statusCode} bot challenge` : 'Bot challenge'} (${where(d.locations)}) · ${
-        d.reason === 'browser_blocked' ? 'blocked in the browser too' : 'browser verifier unavailable'
+        d.reason === 'browser_blocked'
+          ? 'blocked in the browser too'
+          : d.reason === 'control_failed'
+            ? 'BKK’s network check failed, not verified'
+            : 'browser verifier unavailable'
       }`;
   }
 }
@@ -104,9 +108,9 @@ function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
     case 'browser':
       return 'page didn’t load in the browser';
     case 'blocked':
-      return d.reason === 'browser_blocked'
-        ? 'blocked by bot protection, in the browser too'
-        : 'blocked by bot protection, not verified';
+      if (d.reason === 'browser_blocked') return 'blocked by bot protection, in the browser too';
+      if (d.reason === 'control_failed') return 'blocked by bot protection, BKK’s network check failed';
+      return 'blocked by bot protection, not verified';
   }
 }
 

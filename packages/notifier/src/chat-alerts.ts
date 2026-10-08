@@ -272,7 +272,7 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
       ? [row('Seen from', seen)]
       : [];
   const adminNote: ChatWidget[] =
-    unverified && input.verifier !== 'browser_blocked'
+    unverified && input.verifier !== 'browser_blocked' && input.verifier !== 'control_failed'
       ? [
           {
             textParagraph: {

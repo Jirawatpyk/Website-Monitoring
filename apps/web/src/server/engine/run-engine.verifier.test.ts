@@ -182,6 +182,56 @@ describe('runEngine — blocked rounds (S03)', () => {
     });
   });
 
+  describe('a site behind a WAF (D-027)', () => {
+    const wafMonitor = { ...monitor, sites: { ...monitor.sites, behind_waf: true } };
+    const withBkk = [{ code: 'BKK', last_heartbeat_at: at(55) }, ...beating];
+    const bkk = (over: Record<string, unknown> = {}) => ({
+      monitor_id: 'm1',
+      location: 'BKK',
+      outcome: 'pass',
+      checked_at: at(3),
+      attempt: 1,
+      status_code: 200,
+      error: null,
+      keyword_missing: [],
+      keyword_forbidden: [],
+      ...over,
+    });
+    const akamai = blocked.map((c) => ({ ...c, waf: 'akamai' }));
+
+    it('BKK passes, Akamai blocks SIN / TYO → OK with the note, no verify job', async () => {
+      const { db, rpcCalls, calls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': { data: [bkk({ control_ok: true }), ...akamai] },
+      });
+      expect(await runEngine(db, now)).toMatchObject({ verifying: 0, unverified: 0 });
+      expect(calls.some((c) => c.table === 'verification_jobs' && c.op === 'insert')).toBe(false);
+      expect(rpcCalls.find((c) => c.name === 'engine_note_site')?.args).toMatchObject({
+        p_note: 'Verified from BKK; SIN, TYO blocked by bot protection',
+      });
+    });
+
+    it('the VPS’s control check down → PROBLEM (unverified) with that cause, and no verifier Admin alert', async () => {
+      const { db, rpcCalls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': { data: [bkk({ control_ok: false }), ...akamai] },
+      });
+      expect(await runEngine(db, now)).toMatchObject({ unverified: 1, alerts: 0 });
+      expect(rpcCalls[0]?.args).toMatchObject({
+        p_trigger: 'blocked_unverified',
+        p_context: {
+          cause: 'HTTP 403 bot challenge (SIN, TYO) · BKK’s network check failed, not verified',
+          verifier: 'control_failed',
+        },
+      });
+      expect(rpcCalls.some((c) => c.name === 'open_system_alert')).toBe(false);
+    });
+  });
+
   it('a job nobody picked up in 30 s counts the verifier unavailable even while it polls', async () => {
     const { db, rpcCalls } = fakeDb({
       ...verifierUp,

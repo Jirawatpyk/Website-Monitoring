@@ -101,6 +101,9 @@ describe('PROBLEM first card (ChatAlert)', () => {
       verifier: 'browser_blocked',
     });
     expect(JSON.stringify(blocked.cardsV2)).not.toContain('Admin is told');
+    // Behind a WAF with the VPS's control check down: not the verifier either (D-027).
+    const control = buildProblemAlert({ ...fuji, trigger: 'blocked_unverified', verifier: 'control_failed' });
+    expect(JSON.stringify(control.cardsV2)).not.toContain('Admin is told');
   });
 
   it('another trigger shows where it was seen, without the slow note; no owner, no mention', () => {

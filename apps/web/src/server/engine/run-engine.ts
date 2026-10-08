@@ -22,7 +22,14 @@ import {
   formatProblemSummary,
   type ProblemCauseContext,
 } from '@dxt/notifier';
-import { TIER_CONFIG, type ProbeLocation, type ProblemDetail, type Tier, type Trigger } from '@dxt/shared';
+import {
+  TIER_CONFIG,
+  type ProbeLocation,
+  type ProblemDetail,
+  type Tier,
+  type Trigger,
+  type WafVendor,
+} from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
@@ -53,6 +60,8 @@ interface SiteRow {
   name: string;
   tier: Tier;
   muted: boolean;
+  /** Flagged behind a WAF: WAF-signed blocks sit the round out (D-027). */
+  behindWaf: boolean;
   monitors: MonitorRow[];
 }
 
@@ -232,6 +241,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         ...(verifier.jobs.get(m.id) ? { verifications: verifier.jobs.get(m.id)! } : {}),
       })),
       verifierAvailable: verifier.available,
+      behindWaf: site.behindWaf,
       faulty,
     };
     let note = status?.note ?? null;
@@ -251,7 +261,9 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         // Judged without it: a late verdict mustn't land on this round or clear the alert.
         if (u.reason === 'not_picked_up') await expireUnpicked(db, u.monitorId, decision.roundAt);
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
-        if (u.reason !== 'browser_blocked') unverifiedSites.set(`${site.name} (Tier ${site.tier})`, u.reason);
+        // The browser blocked too (D-020) or the VPS's control check down (D-027): not the verifier's fault.
+        if (u.reason !== 'browser_blocked' && u.reason !== 'control_failed')
+          unverifiedSites.set(`${site.name} (Tier ${site.tier})`, u.reason);
       }
       const applied = await apply(
         db,
@@ -328,6 +340,8 @@ const toStoredCheck = (c: Awaited<ReturnType<typeof loadChecks>>[number]): Store
   finalUrl: c.final_url,
   keywordMissing: c.keyword_missing,
   keywordForbidden: c.keyword_forbidden,
+  waf: c.waf as WafVendor | null,
+  controlOk: c.control_ok,
 });
 
 interface CarryRow {
@@ -510,7 +524,7 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
   const { data, error } = await db
     .from('monitors')
     .select(
-      'id, url, is_primary, must_contain, timeout_ms, thresholds, allowed_redirect_domains, site_id, sites!inner(name, tier, is_active, muted_until)',
+      'id, url, is_primary, must_contain, timeout_ms, thresholds, allowed_redirect_domains, site_id, sites!inner(name, tier, is_active, muted_until, behind_waf)',
     )
     .eq('sites.is_active', true)
     // A monitor switched off or removed (S05, D-025) no longer counts towards the site.
@@ -526,6 +540,7 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
       name: m.sites.name,
       tier,
       muted: !!m.sites.muted_until && new Date(m.sites.muted_until) > now,
+      behindWaf: m.sites.behind_waf,
       monitors: [],
     };
     site.monitors.push({
