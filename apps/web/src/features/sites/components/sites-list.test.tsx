@@ -153,6 +153,15 @@ describe('SitesList (spec §20, Sites board)', () => {
     );
   });
 
+  it('one site reads in the singular', () => {
+    render(<SitesList sites={[row('VOCA')]} isAdmin meId="tao" nowIso={NOW} />);
+    expect(screen.getAllByText('1 site').length).toBeGreaterThan(0);
+    pick(/^Status/, 'Down');
+    expect(
+      screen.getAllByText('The site is still there — only this list is filtered.').length,
+    ).toBeGreaterThan(0);
+  });
+
   it('a mute that ends on a later day names the day', () => {
     render(
       <SitesList

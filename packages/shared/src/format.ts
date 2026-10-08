@@ -102,7 +102,8 @@ export function formatIncidentId(number: number): string {
 
 /**
  * An open incident in one line, as the Sites list (spec §20) and Overview show it next to the status:
- * "INC-0142 · Escalated L1 · 18 min unacked", "INC-0141 · Acked by Ploy", "INC-0139 · Needs root cause".
+ * "INC-0142 · Escalated L1 · 18 min unacked", "INC-0141 · Acked by Ploy", "INC-0139 · Needs root cause";
+ * an incident under a minute old reads "INC-0142 · unacked just now".
  */
 export function formatIncidentLine(i: {
   number: number;
@@ -113,7 +114,8 @@ export function formatIncidentLine(i: {
   ackedBy: string | null;
 }): string {
   const id = formatIncidentId(i.number);
-  const unacked = `${formatDuration(i.minutesOpen)} unacked`;
+  // under a minute "0 min" reads like a glitch (Tao, /verify S05c)
+  const unacked = i.minutesOpen < 1 ? 'unacked just now' : `${formatDuration(i.minutesOpen)} unacked`;
   switch (i.state) {
     case 'unacked':
       return `${id} · ${unacked}`;

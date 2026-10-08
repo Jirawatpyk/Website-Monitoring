@@ -186,7 +186,12 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
   // "Clear" resets the filters and keeps the sort (spec §20).
   const clearAll = () => setF(NO_FILTERS);
   const total = sites.length;
-  const countLine = shown.length === total ? `All ${total} sites` : `Showing ${shown.length} of ${total}`;
+  const countLine =
+    shown.length !== total
+      ? `Showing ${shown.length} of ${total}`
+      : total === 1
+        ? '1 site'
+        : `All ${total} sites`;
 
   /** Until Site detail ships (S06) an Admin's row opens Edit site; a Draft's opens it to finish setup. */
   const hrefOf = (r: SiteListRow) => (isAdmin ? `/sites/${r.id}/edit` : null);
@@ -354,7 +359,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
       icon={<IconSearch />}
       headingLevel={2}
       title={`No sites match ${active.map((a) => a.label).join(' · ')}`}
-      description={`All ${total} sites are still there — only this list is filtered.`}
+      description={`${total === 1 ? 'The site is' : `All ${total} sites are`} still there — only this list is filtered.`}
       action={
         <Button variant="secondary" icon={<IconX />} onClick={clearAll}>
           Clear filters

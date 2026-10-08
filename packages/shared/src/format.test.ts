@@ -113,6 +113,7 @@ describe('formatIncidentLine (Sites list, spec §20)', () => {
   const base = { number: 142, level: 0, minutesOpen: 18, ackedBy: null };
   it.each([
     [{ ...base, state: 'unacked' as const }, 'INC-0142 · 18 min unacked'],
+    [{ ...base, state: 'unacked' as const, minutesOpen: 0.4 }, 'INC-0142 · unacked just now'],
     [{ ...base, state: 'escalated' as const, level: 1 }, 'INC-0142 · Escalated L1 · 18 min unacked'],
     [
       { ...base, state: 'escalated' as const, level: 2, minutesOpen: 75 },
