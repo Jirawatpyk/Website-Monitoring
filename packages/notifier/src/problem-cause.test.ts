@@ -85,8 +85,8 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
       'behind a WAF, the VPS’s control check down (D-027)',
       { kind: 'blocked', reason: 'control_failed', locations: ['SIN', 'TYO'], statusCode: 403 },
       home,
-      'HTTP 403 bot challenge (SIN, TYO) · BKK’s network check failed, not verified',
-      'blocked by bot protection, BKK’s network check failed',
+      'HTTP 403 bot challenge (SIN, TYO) · BKK network check failed, not verified',
+      'blocked by bot protection, not verified (BKK network check failed)',
     ],
     [
       'key page 500 while home is OK',

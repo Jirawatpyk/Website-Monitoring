@@ -224,7 +224,7 @@ describe('runEngine — blocked rounds (S03)', () => {
       expect(rpcCalls[0]?.args).toMatchObject({
         p_trigger: 'blocked_unverified',
         p_context: {
-          cause: 'HTTP 403 bot challenge (SIN, TYO) · BKK’s network check failed, not verified',
+          cause: 'HTTP 403 bot challenge (SIN, TYO) · BKK network check failed, not verified',
           verifier: 'control_failed',
         },
       });

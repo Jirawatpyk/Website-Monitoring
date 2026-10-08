@@ -83,7 +83,7 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
         d.reason === 'browser_blocked'
           ? 'blocked in the browser too'
           : d.reason === 'control_failed'
-            ? 'BKK’s network check failed, not verified'
+            ? 'BKK network check failed, not verified'
             : 'browser verifier unavailable'
       }`;
   }
@@ -109,7 +109,8 @@ function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
       return 'page didn’t load in the browser';
     case 'blocked':
       if (d.reason === 'browser_blocked') return 'blocked by bot protection, in the browser too';
-      if (d.reason === 'control_failed') return 'blocked by bot protection, BKK’s network check failed';
+      if (d.reason === 'control_failed')
+        return 'blocked by bot protection, not verified (BKK network check failed)';
       return 'blocked by bot protection, not verified';
   }
 }

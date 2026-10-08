@@ -282,6 +282,7 @@ export function renderEmail(
         detectedAt: new Date(i.detected_at),
         cause: str(ctx.cause, 'Problem'),
         summary: str(ctx.summary, 'problem'),
+        verifier: typeof ctx.verifier === 'string' ? ctx.verifier : null,
       });
     case 'acknowledged':
       return buildAcknowledgedEmail({

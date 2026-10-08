@@ -265,7 +265,9 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
     ? [
         row(
           'What we know',
-          'No proof either way — the site may be fine. Checked again every round: OK with a note once the verifier loads the page, DOWN if the page fails.',
+          input.verifier === 'control_failed'
+            ? 'No proof either way — the site may be fine. Checked again every round: decided from BKK once its network check passes.'
+            : 'No proof either way — the site may be fine. Checked again every round: OK with a note once the verifier loads the page, DOWN if the page fails.',
         ),
       ]
     : seen

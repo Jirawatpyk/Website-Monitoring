@@ -66,6 +66,8 @@ export interface ProblemEmailInput extends EmailBaseInput {
   /** `formatProblemCause` / `formatProblemSummary` output. */
   cause: string;
   summary: string;
+  /** Blocked, not verified: why (the incident context's `verifier`). */
+  verifier?: string | null;
 }
 
 export interface AcknowledgedEmailInput extends EmailBaseInput {
@@ -394,7 +396,9 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
   const opening = slow
     ? 'The site is up but slow.'
     : unverified
-      ? 'The site is blocked by bot protection and couldn’t be checked in a browser.'
+      ? input.verifier === 'control_failed'
+        ? 'The site is blocked by bot protection at SIN and TYO, and the BKK probe’s network check failed.'
+        : 'The site is blocked by bot protection and couldn’t be checked in a browser.'
       : 'The site is up, with a problem.';
   return render(input, {
     template: 'problem',
