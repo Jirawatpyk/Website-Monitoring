@@ -57,7 +57,6 @@ function headerGaps(page: Page) {
   });
 }
 
-/** Visible block-level controls whose tap area is shorter than a touch target. */
 /** Visible boxes that scroll sideways (a table wider than its frame); chip rows meant to scroll opt out. */
 function sidewaysBoxes(page: Page) {
   return page.evaluate(() =>
@@ -75,6 +74,7 @@ function sidewaysBoxes(page: Page) {
   );
 }
 
+/** Visible block-level controls whose tap area is shorter than a touch target. */
 function smallTargets(page: Page) {
   return page.evaluate((min) => {
     /** The taller of the control and the hit area AURA draws around it on a touch screen. */

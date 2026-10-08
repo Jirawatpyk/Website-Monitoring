@@ -220,7 +220,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
 
   // The board's widths. The flexible Site column never shrinks below 160 px (DataTable's minWidth only
   // limits resizing), so the shown columns must fit: owner and uptime from a 1024 px table, response
-  // and expiry from 1100 px (936 px fixed at 1440 leaves Site 198 px).
+  // and expiry from 1130 px (960 px fixed at 1440 leaves Site 174 px).
   const columns: DataTableColumn<SiteListRow>[] = [
     {
       key: 'status',
@@ -267,14 +267,14 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     {
       key: 'owner',
       label: 'Owner · backup',
-      width: 112,
+      width: 136,
       hideBelow: 'lg',
       render: (r) =>
         r.owner ? (
           <span className="flex items-center gap-2">
             <Avatar name={r.owner.name} size="sm" />
             <span className="flex min-w-0 flex-col leading-tight">
-              {/* full names are long ("Jirawat (Tao) Piyakit"): two lines, the whole name on hover */}
+              {/* full names run long (first name, nickname, surname): two lines, the whole name on hover */}
               <span className="line-clamp-2 text-sm" title={r.owner.name}>
                 {r.owner.name}
               </span>
@@ -292,7 +292,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
       key: 'p50',
       label: 'Response 24h',
       width: 104,
-      hideBelow: 1100,
+      hideBelow: 1130,
       render: (r) => <span className="text-fg-secondary">{r.p50Ms === null ? '—' : `${r.p50Ms} ms`}</span>,
     },
     {
@@ -310,7 +310,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
       key: 'expiry',
       label: 'Expiry',
       width: 64,
-      hideBelow: 1100,
+      hideBelow: 1130,
       render: (r) => (
         <span className="text-fg-secondary">{r.expiryDays === null ? '—' : `${r.expiryDays} d`}</span>
       ),
