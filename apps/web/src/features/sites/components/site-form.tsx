@@ -55,7 +55,7 @@ interface SiteFormProps {
   /** The Bangkok probe's fixed IP for the allowlist, when configured. */
   bkkIp: string | null;
   secretHeaderName: string;
-  /** "10:08" right after Start monitoring (`?started=1`): the board's Started line. */
+  /** "10:08" right after Start monitoring (`?started=HH:MM`): the board's Started line. */
   started?: string | null;
 }
 
@@ -118,6 +118,11 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
 
   const [result, setResult] = useState<SiteActionResult | null>(null);
   const [confirm, setConfirm] = useState<'stop' | 'delete' | null>(null);
+  // A dialog starts and ends without an earlier save's error.
+  const openConfirm = (which: 'stop' | 'delete' | null) => {
+    setResult(null);
+    setConfirm(which);
+  };
 
   const person = (id: string) => {
     const p = options.people.find((x) => x.id === id);
@@ -557,8 +562,8 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                         ),
                     )
                   }
-                  onStop={() => setConfirm('stop')}
-                  onDelete={() => setConfirm('delete')}
+                  onStop={() => openConfirm('stop')}
+                  onDelete={() => openConfirm('delete')}
                 />
               ) : (
                 <Button
@@ -659,7 +664,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
         <>
           <Dialog
             open={confirm === 'stop'}
-            onClose={() => setConfirm(null)}
+            onClose={() => openConfirm(null)}
             role="alertdialog"
             size="sm"
             title={`Stop monitoring ${site.name}?`}
@@ -670,7 +675,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
             }
             footer={
               <>
-                <Button variant="secondary" onClick={() => setConfirm(null)}>
+                <Button variant="secondary" onClick={() => openConfirm(null)}>
                   Keep monitoring
                 </Button>
                 <Button
@@ -703,14 +708,18 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
           </Dialog>
           <Dialog
             open={confirm === 'delete'}
-            onClose={() => setConfirm(null)}
+            onClose={() => openConfirm(null)}
             role="alertdialog"
             size="sm"
             title={`Delete ${site.name}?`}
-            description="A draft that was never monitored"
+            description={
+              site.everStarted
+                ? 'Monitored before · no check results or incidents kept'
+                : 'A draft that was never monitored'
+            }
             footer={
               <>
-                <Button variant="secondary" onClick={() => setConfirm(null)}>
+                <Button variant="secondary" onClick={() => openConfirm(null)}>
                   Keep draft
                 </Button>
                 <Button

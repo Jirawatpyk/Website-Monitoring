@@ -2,7 +2,7 @@
 -- the registration checklist at Start, Draft delete, monitor remove, and who may call the RPCs.
 begin;
 \ir _helpers.psql
-select plan(40);
+select plan(41);
 
 -- The ready-to-monitor check runs at commit and a test never commits: pg_temp.run fires the deferred
 -- checks right after the statement, as a commit would.
@@ -256,6 +256,14 @@ select throws_ok(
        jsonb_build_array(jsonb_build_object('url', 'https://internal.pgtap.test/z',
          'headers', jsonb_build_array(jsonb_build_object('name', 'X-Api-Key', 'value', 'k')))), '{}') $q$) $$,
   'P0001', 'A custom header can''t set that name or value', 'save_monitors refuses a credential-like header name');
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+select tests.authenticate_as((select id from ids where name = 'admin'));
+select throws_ok(
+  $$ update public.monitors set headers = '[{"name": "Cookie", "value": "x"}]'
+     where site_id = (select id from made where name = 'internal') and is_primary $$,
+  'P0001', 'A custom header can''t set that name or value', 'a direct update cannot store a refused header either');
 reset role;
 select set_config('request.jwt.claims', '', true);
 

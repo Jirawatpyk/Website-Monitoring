@@ -143,6 +143,16 @@ describe('SiteForm (Edit site)', () => {
     expect(push).toHaveBeenCalledWith('/sites');
   });
 
+  it('a failed save’s error doesn’t follow into the Stop dialog', async () => {
+    actions.updateSite.mockResolvedValue({ ok: false, message: 'Save went wrong' });
+    renderForm({ ...site, primaryOwnerId: NOK, live: true, everStarted: true });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save changes' })));
+    expect(screen.getByRole('alert')).toHaveTextContent('Save went wrong');
+    fireEvent.click(screen.getByRole('button', { name: 'Stop monitoring' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).not.toHaveTextContent('Save went wrong');
+  });
+
   it('a live site: Stop monitoring asks first; Delete is disabled with the reason', async () => {
     actions.setSiteMonitoring.mockResolvedValue({ ok: true, siteId: site.id });
     renderForm({ ...site, primaryOwnerId: NOK, live: true, everStarted: true });

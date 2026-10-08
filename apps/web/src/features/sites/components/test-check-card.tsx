@@ -89,7 +89,6 @@ export function TestCheckCard({
             icon={results ? <IconRotateCcw /> : <IconArrowRight />}
             loading={running}
             disabled={!request.url}
-            title={request.url ? undefined : 'Add the URL first'}
             onClick={run}
           >
             {results ? 'Run again' : 'Run test now'}
@@ -99,8 +98,10 @@ export function TestCheckCard({
     >
       <div className="flex flex-col gap-3">
         <span className="text-sm text-fg-secondary">
-          Runs once from SIN and TYO with the settings above; BKK checks on the first round. Nothing is stored
-          or alerted.
+          {beforeStart
+            ? 'Runs once from SIN and TYO with the settings above; BKK checks on the first round. Nothing is stored or alerted.'
+            : 'Runs once from SIN and TYO with this monitor’s settings; BKK checks on the first round. Nothing is stored or alerted.'}
+          {!request.url && ' Add the URL first.'}
         </span>
         {failure && (
           <span role="alert" className="text-sm text-fg-danger">

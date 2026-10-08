@@ -165,6 +165,18 @@ export async function createSite(
   const { site, primary, keyPages, start } = parsed.data;
 
   // Key pages: GET on the primary's origin, its timeout, redirect allowlist and headers.
+  const offSite = keyPages.findIndex((path) => {
+    try {
+      keyPageUrl(primary.url, path);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  if (offSite >= 0) {
+    const message = 'A key page is a path on the site, like /contact';
+    return { ok: false, message, fieldErrors: { [`keyPages.${offSite}`]: message } };
+  }
   const pages = keyPages.map((path) => ({
     ...primary,
     isPrimary: false,

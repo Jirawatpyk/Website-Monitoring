@@ -332,10 +332,12 @@ export function MonitorsEditor({
         size="sm"
         title={removing ? `Remove ${monitorTitle(removing)}?` : 'Remove monitor?'}
         // Focus returns to the row's Undo, not to the trash button that no longer exists.
-        finalFocus={() =>
-          document.querySelector<HTMLElement>(`[data-undo="${lastRemoved.current}"]`) ??
-          document.querySelector<HTMLElement>('[data-row]')
-        }
+        finalFocus={() => {
+          const key = lastRemoved.current;
+          lastRemoved.current = null;
+          // null → AURA returns focus to the trash button that opened the dialog.
+          return key ? document.querySelector<HTMLElement>(`[data-undo="${key}"]`) : null;
+        }}
         description={[siteName, people].filter(Boolean).join(' · ')}
         footer={
           <>

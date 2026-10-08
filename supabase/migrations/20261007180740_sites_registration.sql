@@ -17,8 +17,8 @@ alter table public.sites
 alter table public.clients add column is_internal boolean not null default false;
 
 alter table public.monitors
-  -- Custom request headers [{name, value}] sent from every location and the browser verifier. Names
-  -- are checked in the app (D-025: no Host / Cookie / Authorization / User-Agent / probe header).
+  -- Custom request headers [{name, value}] sent from BKK, SIN and TYO to the monitor's own origin
+  -- (D-025). Refused names are checked here (trigger below) and in the app.
   add column headers jsonb not null default '[]'
     check (case when jsonb_typeof(headers) = 'array' then jsonb_array_length(headers) <= 10 else false end),
   add column enabled boolean not null default true,
@@ -31,6 +31,33 @@ alter table public.monitors
 -- One site per primary URL: "Already monitored as another site" (AddSite). The app stores URLs
 -- normalised (lower-case host, no fragment), so case and a trailing slash are the only variants left.
 create unique index monitors_primary_url_key on public.monitors (lower(rtrim(url, '/'))) where is_primary;
+
+-- ── Custom headers: refused names and values, on every write path ─────────
+-- The app refuses them too (`isRefusedHeader` in @dxt/shared); this keeps a direct insert / update
+-- through PostgREST from storing a credential that every staff role could read (security review).
+create function private.monitors_guard_headers()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if exists (
+    select 1 from jsonb_array_elements(new.headers) h
+    where jsonb_typeof(h) <> 'object'
+       or jsonb_typeof(h -> 'name') <> 'string' or jsonb_typeof(h -> 'value') <> 'string'
+       or lower(btrim(h ->> 'name')) in ('host', 'content-length', 'transfer-encoding', 'connection', 'cookie',
+                                         'authorization', 'proxy-authorization', 'user-agent', 'x-dxt-monitor')
+       or lower(h ->> 'name') ~ '(auth|token|secret|api[-_]?key|session|password|cf-access)'
+       or (h ->> 'value') ~ '[\r\n]'
+  ) then
+    raise exception 'A custom header can''t set that name or value' using errcode = 'P0001', hint = 'header_refused';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger monitors_guard_headers before insert or update of headers on public.monitors
+  for each row execute function private.monitors_guard_headers();
 
 -- ── Audit: one row per changed row ────────────────────────────────────────
 -- Actor = the signed-in person (null for the service role and SQL scripts). An update that changes
@@ -268,16 +295,6 @@ begin
   end loop;
 
   for v_m in select * from jsonb_array_elements(coalesce(p_upserts, '[]')) loop
-    -- The app refuses these names too; an RPC call straight to PostgREST must not store them either.
-    if exists (
-      select 1 from jsonb_array_elements(coalesce(v_m -> 'headers', '[]')) h
-      where lower(btrim(h ->> 'name')) in ('host', 'content-length', 'transfer-encoding', 'connection', 'cookie',
-                                           'authorization', 'proxy-authorization', 'user-agent', 'x-dxt-monitor')
-         or lower(h ->> 'name') ~ '(auth|token|secret|api[-_]?key|session|password|cf-access)'
-         or (h ->> 'value') ~ '[\r\n]'
-    ) then
-      raise exception 'A custom header can''t set that name or value' using errcode = 'P0001', hint = 'header_refused';
-    end if;
     if nullif(v_m ->> 'id', '') is not null and (v_m ->> 'enabled')::boolean is false
        and exists (select 1 from public.incidents where monitor_id = (v_m ->> 'id')::uuid
                    and state not in ('resolved', 'in_review', 'closed')) then
