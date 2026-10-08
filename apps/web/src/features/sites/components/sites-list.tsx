@@ -381,17 +381,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           onSearchChange={(q) => set({ q })}
           searchLabel="Search sites"
           searchPlaceholder="Search name, URL or client"
-          actions={
-            <FilterSelect
-              label="Sort by"
-              options={SORTS.map((s) => ({ value: s, label: SORT_LABELS[s] }))}
-              value={sort}
-              onChange={(v) => setSort(v as SortKey)}
-            />
-          }
-        />
-
-        <div role="group" aria-label="Filters" className="flex flex-wrap items-center gap-3">
+        >
           <FilterSelect
             label="Status"
             allLabel="all"
@@ -420,6 +410,9 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
             value={f.client}
             onChange={(client) => set({ client })}
           />
+        </FilterBar>
+
+        <div className="flex">
           <Switch
             label={`Needs attention (${attentionCount})`}
             description="Open incident · draft · SSL or domain < 60 d · no backup"
@@ -428,11 +421,10 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           />
         </div>
 
-        <div
-          className="flex min-h-8 flex-wrap items-center gap-2 text-sm text-fg-secondary"
-          aria-live="polite"
-        >
-          <span className="font-medium text-fg-primary">{countLine}</span>
+        <div className="flex min-h-8 flex-wrap items-center gap-2 text-sm text-fg-secondary">
+          <span className="font-medium text-fg-primary" aria-live="polite">
+            {countLine}
+          </span>
           {active.length > 0 ? (
             <>
               <span>·</span>
@@ -448,6 +440,14 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           ) : (
             <span>{`· sorted by ${SORT_WORDS[sort]}`}</span>
           )}
+          <span className="ml-auto">
+            <FilterSelect
+              label="Sort by"
+              options={SORTS.map((s) => ({ value: s, label: SORT_LABELS[s] }))}
+              value={sort}
+              onChange={(v) => setSort(v as SortKey)}
+            />
+          </span>
         </div>
 
         {shown.length === 0 ? (
