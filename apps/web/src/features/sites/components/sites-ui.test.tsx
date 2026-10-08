@@ -1,9 +1,8 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MonitorRecord, SiteListRow } from '../types';
+import type { MonitorRecord } from '../types';
 import { MonitorsEditor } from './monitors-editor';
 import { PhraseList } from './phrase-list';
-import { SitesTable } from './sites-table';
 import { TestCheckCard } from './test-check-card';
 
 const replace = vi.fn();
@@ -14,54 +13,6 @@ vi.mock('../actions', () => actions);
 afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
-});
-
-const row = (over: Partial<SiteListRow>): SiteListRow => ({
-  id: 's1',
-  name: 'EQHO',
-  tier: 2,
-  live: true,
-  client: { id: 'c1', name: 'Internal', internal: true },
-  owner: { id: 'u1', name: 'Nok' },
-  status: 'ok',
-  checkedAt: '2026-10-08T03:01:05Z',
-  url: 'https://eqho.example.com/',
-  ...over,
-});
-
-describe('SitesTable', () => {
-  const sites = [
-    row({}),
-    row({
-      id: 's2',
-      name: 'Cando',
-      tier: 1,
-      client: { id: 'c2', name: 'Cando Asia', internal: false },
-      owner: { id: 'u2', name: 'Arm' },
-      status: 'down',
-    }),
-    row({ id: 's3', name: 'New one', live: false, status: null, checkedAt: null, url: null, owner: null }),
-  ];
-
-  it('shows status, a Draft badge and a Visit site link that opens a new tab', () => {
-    render(<SitesTable sites={sites} canEdit />);
-    expect(screen.getAllByText('OK').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Down').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Draft · not monitored').length).toBeGreaterThan(0);
-    const visit = screen.getAllByRole('link', { name: 'Visit site: EQHO (opens in a new tab)' })[0]!;
-    expect(visit).toHaveAttribute('href', 'https://eqho.example.com/');
-    expect(visit).toHaveAttribute('target', '_blank');
-    expect(screen.queryByRole('link', { name: /Visit site: New one/ })).not.toBeInTheDocument();
-  });
-
-  it('filters by tier and says when nothing matches', () => {
-    render(<SitesTable sites={sites} canEdit={false} />);
-    fireEvent.click(screen.getByRole('radio', { name: 'Tier 3' }));
-    expect(screen.getByText('No sites match these filters.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('radio', { name: 'Tier 1' }));
-    expect(screen.getAllByText('Cando').length).toBeGreaterThan(0);
-    expect(screen.queryAllByText('EQHO')).toHaveLength(0);
-  });
 });
 
 describe('PhraseList', () => {

@@ -26,6 +26,16 @@ export const INCIDENT_STATES = [
 ] as const;
 export type IncidentState = (typeof INCIDENT_STATES)[number];
 
+/** States after which an incident is no longer open (spec §19: open = any state before Resolved). */
+export const CLOSED_INCIDENT_STATES = [
+  'resolved',
+  'in_review',
+  'closed',
+] as const satisfies readonly IncidentState[];
+
+/** The closed states as a PostgREST `in` list: `("resolved","in_review","closed")`. */
+export const CLOSED_INCIDENT_STATES_IN = `(${CLOSED_INCIDENT_STATES.map((s) => `"${s}"`).join(',')})`;
+
 export const TRIGGERS = [
   'hard_fail',
   'blocked_unverified',

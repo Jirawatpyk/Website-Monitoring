@@ -9,7 +9,8 @@ import { ensureUser, localSupabaseEnabled, signIn, anySiteId } from './support/l
  * - phone shell (D-018): the top bar with brand + avatar below lg, no top bar from lg;
  * - touch targets ≥ 44 px below lg (spec §14.17), counting the hit area AURA adds around a compact
  *   control on a touch screen (`::after` under pointer: coarse);
- * - no sideways scroll at any width.
+ * - no sideways scroll at any width — the page, and any box inside it such as a table's scroll area
+ *   (S05c /verify: the Sites table scrolled 2 px at 820 and 30 px at 1440 while the page didn't).
  * Below lg each width runs as a touch device (isMobile + hasTouch), as a phone or tablet would.
  * The pages come from the live nav, so each page a slice flips `live` is checked from then on.
  * Signs in as the seeded Admin to see every page. Local Supabase only (E2E_LOCAL_SUPABASE=1).
@@ -54,6 +55,23 @@ function headerGaps(page: Page) {
     const boxes = parts.map((el) => el.getBoundingClientRect());
     return boxes.slice(1).map((box, i) => Math.round((box.top - boxes[i]!.bottom) * 10) / 10);
   });
+}
+
+/** Visible boxes that scroll sideways (a table wider than its frame); chip rows meant to scroll opt out. */
+function sidewaysBoxes(page: Page) {
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('main *'))
+      .filter((el) => {
+        const x = getComputedStyle(el).overflowX;
+        if (x !== 'auto' && x !== 'scroll') return false;
+        if (el.clientWidth === 0 || el.closest('[data-scroll-x]')) return false;
+        return el.scrollWidth > el.clientWidth + 1;
+      })
+      .map(
+        (el) =>
+          `${el.tagName.toLowerCase()}.${el.className.toString().split(' ')[0]} ${el.scrollWidth}/${el.clientWidth}`,
+      ),
+  );
 }
 
 /** Visible block-level controls whose tap area is shorter than a touch target. */
@@ -112,6 +130,7 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
 
           const scroll = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
           expect(scroll, 'no sideways scroll').toBeLessThanOrEqual(0);
+          expect(await sidewaysBoxes(page), 'no box inside the page scrolls sideways').toEqual([]);
 
           const gaps = await headerGaps(page);
           expect(gaps, 'the page starts with AURA PageHeader').not.toBeNull();

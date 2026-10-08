@@ -1,14 +1,15 @@
 import { Container } from '@jirawatpyk/aura-react';
-import { LoadingList, PageHeaderSkeleton } from '@/components/states';
+import { PageHeaderSkeleton, PageSkeleton } from '@/components/states';
+import { SitesListSkeleton } from '@/features/sites';
 
-/** While `/sites` loads: the page header, then grey table rows (status pill + site). */
+/** While `/sites` loads: the page header, then the Sites list's own shape (S05c). */
 export default function Loading() {
   return (
     <Container>
-      <div className="flex flex-col gap-6">
+      <PageSkeleton label="Loading sites">
         <PageHeaderSkeleton actions={1} />
-        <LoadingList label="Loading sites" />
-      </div>
+        <SitesListSkeleton />
+      </PageSkeleton>
     </Container>
   );
 }

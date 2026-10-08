@@ -30,6 +30,7 @@ import {
   type Tier,
   type Trigger,
   type WafVendor,
+  CLOSED_INCIDENT_STATES_IN,
 } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
@@ -37,7 +38,6 @@ import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
 const MAX_ROUNDS_PER_RUN = 5;
-const OPEN_STATES_EXCLUDED = '("resolved","in_review","closed")';
 /** Messages that told someone the site failed: RECOVERED replies only to these (spec §15.1). */
 const ALERT_TEMPLATES = ['down', 'problem', 'down_again', 'problem_again'];
 /**
@@ -147,7 +147,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         'id, site_id, monitor_id, state, severity, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, root_cause_category, notifications(template)',
       )
       .in('site_id', siteIds)
-      .not('state', 'in', OPEN_STATES_EXCLUDED),
+      .not('state', 'in', CLOSED_INCIDENT_STATES_IN),
     loadVerifierState(db, since, now),
   ]);
   for (const r of [statuses, carries, incidents]) if (r.error) throw new Error(r.error.message);

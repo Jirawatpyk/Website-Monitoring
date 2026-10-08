@@ -12,7 +12,7 @@ Website monitoring and incident automation for the 17 sites DxT runs: checks eve
 | `docs/prd.md`                        | Scope, priority (P0/P1/P2), architecture, data model, budget  |
 | `docs/dxt-monitor-design-spec.md`    | Screen behaviour, statuses, escalation, UI copy, formats      |
 | `docs/design/screens.md`             | Canvas board → route → phase → governing spec sections        |
-| `docs/design/canvas/<Board>.dc.html` | Exact layout, copy and states of each of the 44 boards        |
+| `docs/design/canvas/<Board>.dc.html` | Exact layout, copy and states of each of the 46 boards        |
 | `docs/design/aura.md`                | How this project uses the AURA design system                  |
 
 **Precedence:** `docs/decisions.md` (settled conflicts, D-xxx) wins over everything. Then: on screen behaviour, status logic, UI copy and formats the design spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. The canvas boards give layout, exact copy and states; where a board and the spec text disagree on behaviour, the spec wins (spec §0: the canvas shows how it looks, the spec says how it behaves). Inside the spec, later sections override earlier ones: §14 → §15 → §16 → §17–19. If two sources still conflict, stop and ask — don't pick one silently; record the answer as a new decision.

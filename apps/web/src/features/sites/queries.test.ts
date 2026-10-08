@@ -9,67 +9,138 @@ const { getRegistrationOptions, getSite, listSites } = await import('./queries')
 const SITE = '00000000-0000-4000-8000-0000000000a1';
 
 describe('listSites', () => {
-  it('maps each site: status only while live, the primary URL for Visit site', async () => {
-    m.db = fakeDb({
-      'sites.select': {
+  const live = {
+    id: SITE,
+    name: 'EQHO',
+    tier: 2,
+    is_active: true,
+    muted_until: '2026-10-08T11:00:00Z',
+    clients: { id: 'c1', name: 'Cando Asia', is_internal: false, am: { display_name: 'Bua' } },
+    owner: { id: 'u1', display_name: 'Nok' },
+    backup: { id: 'u2', display_name: 'Ploy' },
+    site_status: [{ status: 'problem', last_round_at: '2026-10-08T00:03:00Z' }],
+    monitors: [
+      { url: 'https://eqho.example.com/contact', is_primary: false, thresholds: {} },
+      { url: 'https://eqho.example.com/', is_primary: true, thresholds: { slowMs: 2000 } },
+    ],
+    incidents: [
+      {
+        id: 'i3',
+        number: 3,
+        state: 'acknowledged',
+        escalation_level: 0,
+        detected_at: '2026-10-08T00:01:00Z',
+        acker: { display_name: 'Arm' },
+      },
+    ],
+  };
+  const draft = {
+    id: 'draft',
+    name: 'Draft',
+    tier: 3,
+    is_active: false,
+    muted_until: null,
+    clients: { id: 'c2', name: 'Internal', is_internal: true, am: null },
+    owner: null,
+    backup: null,
+    site_status: { status: 'down', last_round_at: '2026-10-08T00:03:00Z' },
+    monitors: [],
+    incidents: [],
+  };
+
+  it('maps each site: client · AM, owner · backup, mute, open incident and the location glyphs', async () => {
+    const fake = fakeDb({
+      'sites.select': { data: [live, draft] },
+      'rpc.site_list_locations': {
         data: [
           {
-            id: SITE,
-            name: 'EQHO',
-            tier: 2,
-            is_active: true,
-            monitoring_started_at: '2026-10-08T00:00:00Z',
-            clients: { id: 'c1', name: 'Internal', is_internal: true },
-            owner: { id: 'u1', display_name: 'Nok' },
-            site_status: [{ status: 'ok', last_round_at: '2026-10-08T00:03:00Z' }],
-            monitors: [
-              { url: 'https://eqho.example.com/contact', is_primary: false },
-              { url: 'https://eqho.example.com/', is_primary: true },
-            ],
+            site_id: SITE,
+            location: 'SIN',
+            outcome: 'pass',
+            error: null,
+            response_ms: 2500,
+            checked_at: 'x',
           },
           {
-            id: 'draft',
-            name: 'Draft',
-            tier: 3,
-            is_active: false,
-            monitoring_started_at: null,
-            clients: { id: 'c2', name: 'Client', is_internal: false },
-            owner: null,
-            site_status: { status: 'down', last_round_at: '2026-10-08T00:03:00Z' },
-            monitors: [],
+            site_id: SITE,
+            location: 'TYO',
+            outcome: 'fail',
+            error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+            response_ms: 90,
+            checked_at: 'x',
+          },
+          {
+            site_id: 'draft',
+            location: 'BKK',
+            outcome: 'fail',
+            error: null,
+            response_ms: 90,
+            checked_at: 'x',
           },
         ],
       },
-    }).db;
+    });
+    m.db = fake.db;
     expect(await listSites()).toEqual([
       {
         id: SITE,
         name: 'EQHO',
         tier: 2,
         live: true,
-        client: { id: 'c1', name: 'Internal', internal: true },
+        client: { id: 'c1', name: 'Cando Asia', internal: false, amName: 'Bua' },
         owner: { id: 'u1', name: 'Nok' },
-        status: 'ok',
+        backup: { id: 'u2', name: 'Ploy' },
+        status: 'problem',
         checkedAt: '2026-10-08T00:03:00Z',
         url: 'https://eqho.example.com/',
+        mutedUntil: '2026-10-08T11:00:00Z',
+        openIncident: {
+          id: 'i3',
+          number: 3,
+          state: 'acknowledged',
+          level: 0,
+          detectedAt: '2026-10-08T00:01:00Z',
+          ackedBy: 'Arm',
+        },
+        // the monitor's own slow limit (2 s); a chain error isn't a hard fail (D-029)
+        locations: { BKK: 'none', SIN: 'slow', TYO: 'chain' },
+        p50Ms: null,
+        uptime30d: null,
+        expiryDays: null,
       },
       {
         id: 'draft',
         name: 'Draft',
         tier: 3,
         live: false,
-        client: { id: 'c2', name: 'Client', internal: false },
+        client: { id: 'c2', name: 'Internal', internal: true, amName: null },
         owner: null,
+        backup: null,
         status: null,
         checkedAt: null,
         url: null,
+        mutedUntil: null,
+        openIncident: null,
+        locations: { BKK: 'none', SIN: 'none', TYO: 'none' },
+        p50Ms: null,
+        uptime30d: null,
+        expiryDays: null,
       },
+    ]);
+    // only the open incident is embedded
+    expect(fake.calls.find((c) => c.table === 'sites')?.filters).toContainEqual([
+      'not',
+      'incidents.state',
+      'in',
+      '("resolved","in_review","closed")',
     ]);
   });
 
   it('throws on a read error', async () => {
     m.db = fakeDb({ 'sites.select': { error: { message: 'boom' } } }).db;
     await expect(listSites()).rejects.toThrow('sites: boom');
+    m.db = fakeDb({ 'rpc.site_list_locations': { error: { message: 'nope' } } }).db;
+    await expect(listSites()).rejects.toThrow('site_list_locations: nope');
   });
 });
 
