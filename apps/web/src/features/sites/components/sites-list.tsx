@@ -234,6 +234,8 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     {
       key: 'name',
       label: 'Site',
+      // DataTable's default 160 px floor pushed the row 2 px past the box at 820 (/verify S05c)
+      minWidth: 120,
       render: (r) => {
         const href = hrefOf(r);
         return (
