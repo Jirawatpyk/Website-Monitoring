@@ -31,6 +31,7 @@ import {
 import {
   blockingItems,
   DEFAULT_MUST_NOT_CONTAIN,
+  formatTime,
   itemsLeftText,
   keyPagePathSchema,
   MAX_KEY_PAGES,
@@ -195,7 +196,10 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
           start,
         }),
       // The edit page says what happened ("Draft saved" / "Monitoring started").
-      (r) => router.push(`/sites/${r.siteId}/edit?${start ? 'started' : 'draft'}=1`),
+      (r) =>
+        router.push(
+          `/sites/${r.siteId}/edit?${start ? `started=${encodeURIComponent(formatTime(new Date()))}` : 'draft=1'}`,
+        ),
     );
 
   const addKeyPage = () => {
@@ -241,7 +245,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                 placeholder="Choose the client"
                 options={options.clients.map((c) => ({
                   value: c.id,
-                  label: c.internal ? `${c.name} (DxT group)` : c.name,
+                  label: c.name,
                 }))}
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
@@ -463,7 +467,10 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                         addKeyPage();
                       }
                     }}
-                    error={keyPageError ?? err('keyPages.0')}
+                    error={
+                      keyPageError ??
+                      Object.entries(fieldErrors).find(([k]) => k.startsWith('keyPages.'))?.[1]
+                    }
                   />
                   <Button
                     variant="ghost"
@@ -515,7 +522,6 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
             <div className="flex flex-col gap-2 border-t border-border-default pt-3">
               {editing ? (
                 <EditActions
-                  site={site}
                   live={live}
                   pending={pending}
                   blocked={left.length > 0}
@@ -532,7 +538,10 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                         return saved.ok ? setSiteMonitoring(site.id, true) : saved;
                       },
                       // A fresh render of the live site, with the board's "Started …" line.
-                      () => router.replace(`/sites/${site.id}/edit?started=1`),
+                      () =>
+                        router.replace(
+                          `/sites/${site.id}/edit?started=${encodeURIComponent(formatTime(new Date()))}`,
+                        ),
                     )
                   }
                   onStop={() => setConfirm('stop')}
@@ -705,7 +714,6 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
 }
 
 interface EditActionsProps {
-  site: SiteRecord;
   live: boolean;
   pending: boolean;
   blocked: boolean;
@@ -716,12 +724,9 @@ interface EditActionsProps {
 }
 
 /** Edit site: Save changes, and Start / Stop monitoring or Delete a draft (D-025). */
-function EditActions({ site, live, pending, blocked, onSave, onStart, onStop, onDelete }: EditActionsProps) {
-  const deleteReason = live
-    ? 'Has monitoring history — stop monitoring instead'
-    : site.everStarted
-      ? 'Has monitoring history — it stays for the record'
-      : null;
+function EditActions({ live, pending, blocked, onSave, onStart, onStop, onDelete }: EditActionsProps) {
+  // A stopped site with check results or incidents is refused by delete_site, which says why.
+  const deleteReason = live ? 'Has monitoring history — stop monitoring instead' : null;
   return (
     <>
       <Button

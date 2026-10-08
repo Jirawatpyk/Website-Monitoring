@@ -1,7 +1,12 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { leaseQuerySchema, verdictSchema, type LeasedJob, type MonitorHeader } from '@dxt/shared';
-import { toHeaders } from '../probe/due-monitors';
+import {
+  leaseQuerySchema,
+  toMonitorHeaders,
+  verdictSchema,
+  type LeasedJob,
+  type MonitorHeader,
+} from '@dxt/shared';
 import type { z } from 'zod';
 
 export type { LeasedJob };
@@ -49,7 +54,7 @@ export async function leaseJobs(
       .select('id, headers')
       .in('id', [...new Set(jobs.map((j) => j.monitor_id))]);
     if (monitors.error) throw new Error(`monitors: ${monitors.error.message}`);
-    for (const m of monitors.data ?? []) headersOf.set(m.id, toHeaders(m.headers));
+    for (const m of monitors.data ?? []) headersOf.set(m.id, toMonitorHeaders(m.headers));
   }
   return Promise.all(
     jobs.map(async (job): Promise<LeasedJob> => {

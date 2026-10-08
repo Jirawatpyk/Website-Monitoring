@@ -167,7 +167,7 @@ describe('refusal', () => {
 });
 
 describe('refusedTargets', () => {
-  it('names a non-standard port and a host that does not resolve', async () => {
+  it('names a non-standard port; a host that does not resolve right now is allowed', async () => {
     const lookup: Lookup = async (host) => {
       if (host === 'nowhere.example.com')
         throw Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' });
@@ -184,7 +184,6 @@ describe('refusedTargets', () => {
       ),
     ).toEqual({
       a: 'Use the standard port (80 or 443) — probes only check those',
-      b: 'This address doesn’t resolve — check it and try again',
     });
   });
 });

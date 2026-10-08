@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Alert, Breadcrumb, Button, Container, EmptyState, PageHeader } from '@jirawatpyk/aura-react';
 import { IconExternalLink, IconInbox } from '@jirawatpyk/aura-react/icons';
-import { formatTier, formatTime, TIER_CONFIG } from '@dxt/shared';
+import { formatTier, TIER_CONFIG } from '@dxt/shared';
 import { NoAccess } from '@/components/states';
 import { SiteForm } from '@/features/sites';
 import { getRegistrationOptions, getSite } from '@/features/sites/server';
@@ -22,7 +22,10 @@ export default async function EditSitePage({
   searchParams: Promise<{ draft?: string; started?: string }>;
 }) {
   const [{ siteId }, query, access] = await Promise.all([params, searchParams, getAccess()]);
-  const site = await getSite(siteId);
+  const [site, options] = await Promise.all([
+    getSite(siteId),
+    access.status === 'active' && access.profile.role === 'admin' ? getRegistrationOptions() : null,
+  ]);
   if (!site) {
     return (
       <EmptyState
@@ -74,7 +77,6 @@ export default async function EditSitePage({
       </Container>
     );
   }
-  const options = await getRegistrationOptions();
   const env = serverEnv();
   return (
     <Container>
@@ -87,11 +89,11 @@ export default async function EditSitePage({
         )}
         <SiteForm
           key={`${site.id}-${site.live}`}
-          options={options}
+          options={options!}
           site={site}
           bkkIp={env.BKK_PROBE_IP ?? null}
           secretHeaderName={env.PROBE_SECRET_HEADER_NAME}
-          started={query.started && site.live ? formatTime(new Date()) : null}
+          started={site.live && /^\d{2}:\d{2}$/.test(query.started ?? '') ? query.started : null}
         />
       </div>
     </Container>

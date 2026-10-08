@@ -1,5 +1,5 @@
 import 'server-only';
-import type { SiteStatus } from '@dxt/shared';
+import { toMonitorHeaders, type SiteStatus } from '@dxt/shared';
 import { createClient } from '@/lib/supabase/server';
 import { siteIdSchema } from './schemas';
 import type {
@@ -122,7 +122,7 @@ export async function getSite(siteId: string): Promise<SiteRecord | null> {
       mustNotContain: m.must_not_contain,
       allowedRedirectDomains: m.allowed_redirect_domains,
       slowMs: slowMsOf(m.thresholds),
-      headers: headersOf(m.headers),
+      headers: toMonitorHeaders(m.headers),
       enabled: m.enabled,
     }))
     .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.url.localeCompare(b.url));
@@ -148,14 +148,4 @@ export async function getSite(siteId: string): Promise<SiteRecord | null> {
 function slowMsOf(thresholds: unknown): number | null {
   const v = (thresholds as { slowMs?: unknown } | null)?.slowMs;
   return typeof v === 'number' && v > 0 ? v : null;
-}
-
-function headersOf(value: unknown): { name: string; value: string }[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((h: unknown) => {
-    const r = h as { name?: unknown; value?: unknown } | null;
-    return r && typeof r.name === 'string' && typeof r.value === 'string'
-      ? [{ name: r.name, value: r.value }]
-      : [];
-  });
 }

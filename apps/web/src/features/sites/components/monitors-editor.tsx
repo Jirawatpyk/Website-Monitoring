@@ -14,7 +14,7 @@ import {
   TextField,
 } from '@jirawatpyk/aura-react';
 import { IconCheck, IconGlobe, IconInfo, IconPlus, IconTrash2 } from '@jirawatpyk/aura-react/icons';
-import { defaultSlowMs, isRefusedHeader, MAX_KEY_PAGES, type Tier } from '@dxt/shared';
+import { defaultSlowMs, hostnameSchema, isRefusedHeader, MAX_KEY_PAGES, type Tier } from '@dxt/shared';
 import { saveMonitors } from '../actions';
 import type { MonitorRecord, SiteActionResult } from '../types';
 import {
@@ -42,8 +42,6 @@ interface MonitorsEditorProps {
   /** Just saved (`?saved=1`). */
   saved: boolean;
 }
-
-const HOST = /^(?=.{1,253}$)([a-z0-9-]+\.)*[a-z0-9-]+$/;
 
 /**
  * EditMonitors (docs/design/screens.md): the HTTP primary and up to 3 key pages, each with its
@@ -468,7 +466,10 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
             placeholder="cdn.example.com"
             phrases={d.allowedRedirectDomains}
             onChange={(allowedRedirectDomains) => onChange({ allowedRedirectDomains })}
-            clean={(v) => (HOST.test(v.toLowerCase()) ? v.toLowerCase() : null)}
+            clean={(v) => {
+              const host = hostnameSchema.safeParse(v);
+              return host.success ? host.data : null;
+            }}
             hint="A redirect anywhere else → PROBLEM (possible hijack). Checked on every round."
             error={errorOf('allowedRedirectDomains.0')}
           />
@@ -536,9 +537,10 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
               label="Slow when p50 is over"
               inputMode="numeric"
               suffix="ms"
-              value={String(d.slowMs ?? defaultSlowMs(tier))}
+              value={d.slowMs === null ? '' : String(d.slowMs)}
+              placeholder={String(defaultSlowMs(tier))}
               onChange={(e) => onChange({ slowMs: Number(e.target.value.replace(/\D/g, '')) || null })}
-              hint={d.slowMs ? undefined : `Tier ${tier} default`}
+              hint={`Empty = the Tier ${tier} default, ${defaultSlowMs(tier)} ms`}
               error={errorOf('slowMs')}
             />
             <TextField label="For" value="3" suffix="rounds in a row" disabled hint="Fixed for every site" />

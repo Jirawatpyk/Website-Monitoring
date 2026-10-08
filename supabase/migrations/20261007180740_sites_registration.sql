@@ -350,7 +350,8 @@ begin
     backup_owner_id = nullif(p_site ->> 'backup_owner_id', '')::uuid,
     hosting = nullif(btrim(p_site ->> 'hosting'), ''),
     credential_ref = nullif(btrim(p_site ->> 'credential_ref'), ''),
-    notes = nullif(btrim(p_site ->> 'notes'), ''),
+    -- Notes have no field in the form yet: keep them unless the caller sends the key.
+    notes = case when p_site ? 'notes' then nullif(btrim(p_site ->> 'notes'), '') else notes end,
     behind_waf = coalesce((p_site ->> 'behind_waf')::boolean, false),
     waf_allowlist_confirmed = coalesce((p_site ->> 'waf_allowlist_confirmed')::boolean, false)
   where id = p_site_id;

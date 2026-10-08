@@ -199,7 +199,8 @@ describe('MonitorsEditor (EditMonitors)', () => {
     renderEditor();
     expect(screen.getByRole('button', { name: 'No changes' })).toBeDisabled();
     expect(screen.getByText('Always on')).toBeInTheDocument();
-    expect(screen.getByLabelText('Slow when p50 is over')).toHaveValue('5000');
+    expect(screen.getByLabelText('Slow when p50 is over')).toHaveValue('');
+    expect(screen.getByText('Empty = the Tier 2 default, 5000 ms')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Timeout'), { target: { value: '20' } });
     expect(screen.getByText('1 unsaved change')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Edited, not saved' })).toBeInTheDocument();

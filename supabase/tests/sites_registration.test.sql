@@ -2,7 +2,7 @@
 -- the registration checklist at Start, Draft delete, monitor remove, and who may call the RPCs.
 begin;
 \ir _helpers.psql
-select plan(37);
+select plan(38);
 
 -- The ready-to-monitor check runs at commit and a test never commits: pg_temp.run fires the deferred
 -- checks right after the statement, as a commit would.
@@ -234,6 +234,16 @@ select lives_ok($$ update public.sites set muted_until = now() + interval '1 hou
                    where id = (select id from made where name = 'internal') $$,
   'an owner can still mute a live site whose backup has no Chat id');
 reset role;
+
+-- ── Edit site keeps notes it doesn't send ────────────────────────────────
+select set_config('request.jwt.claims', '', true);  -- a SQL script
+update public.sites set notes = 'Keep me' where id = (select id from made where name = 'internal');
+select tests.authenticate_as((select id from ids where name = 'admin'));
+select pg_temp.run($q$ select public.update_site((select id from made where name = 'internal'),
+  pg_temp.site('Internal site', '00000000-0000-0000-0000-0000000000c2', 'ploy', 'arm', 'Host 2')) $q$);
+reset role;
+select is((select notes from public.sites where id = (select id from made where name = 'internal')), 'Keep me',
+  'update_site leaves notes alone when the form has no notes field');
 
 select * from finish();
 rollback;

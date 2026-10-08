@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { TIER_CONFIG, type MonitorHeader, type Tier } from '@dxt/shared';
+import { TIER_CONFIG, toMonitorHeaders, type MonitorHeader, type Tier } from '@dxt/shared';
 
 /** A response slower than 30 s is a failure (PRD §5); longer monitor timeouts are capped here. */
 export const MAX_CHECK_TIMEOUT_MS = 30_000;
@@ -52,19 +52,6 @@ export async function loadDueMonitors(db: DbClient, at: Date): Promise<DueMonito
       timeoutMs: Math.min(m.timeout_ms, MAX_CHECK_TIMEOUT_MS),
       mustContain: m.must_contain,
       mustNotContain: m.must_not_contain,
-      headers: toHeaders(m.headers),
+      headers: toMonitorHeaders(m.headers),
     }));
-}
-
-/** `monitors.headers` (jsonb) as name / value pairs; anything else in the column is skipped. */
-export function toHeaders(value: unknown): MonitorHeader[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((h: unknown) =>
-    h &&
-    typeof h === 'object' &&
-    typeof (h as MonitorHeader).name === 'string' &&
-    typeof (h as MonitorHeader).value === 'string'
-      ? [{ name: (h as MonitorHeader).name, value: (h as MonitorHeader).value }]
-      : [],
-  );
 }

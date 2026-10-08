@@ -92,7 +92,11 @@ function invalid(error: z.ZodError): Extract<SiteActionResult, { ok: false }> {
   return { ok: false, message: 'Check the highlighted fields.', fieldErrors };
 }
 
-/** The SSRF guard on every URL (Done-when 2): field → reason for each one refused. */
+/**
+ * The SSRF guard on every URL (Done-when 2): field → reason for each one refused. A host that doesn't
+ * resolve right now is not refused — the site may be down at the DNS level, and every probe request
+ * checks again before it connects.
+ */
 export async function refusedTargets(
   urls: { field: string; url: string }[],
   lookup?: Lookup,
@@ -103,12 +107,10 @@ export async function refusedTargets(
       try {
         await assertPublicTarget(new URL(url), lookup);
       } catch (err) {
-        refused[field] =
-          err instanceof TargetNotAllowedError
-            ? err.message.endsWith('port')
-              ? 'Use the standard port (80 or 443) — probes only check those'
-              : 'This address points inside a private network — monitors check public sites only'
-            : 'This address doesn’t resolve — check it and try again';
+        if (!(err instanceof TargetNotAllowedError)) return;
+        refused[field] = err.message.endsWith('port')
+          ? 'Use the standard port (80 or 443) — probes only check those'
+          : 'This address points inside a private network — monitors check public sites only';
       }
     }),
   );

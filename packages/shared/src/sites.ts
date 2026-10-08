@@ -101,6 +101,17 @@ export const monitorHeaderSchema = z.object({
 });
 export type MonitorHeader = z.infer<typeof monitorHeaderSchema>;
 
+/** `monitors.headers` (jsonb) as name / value pairs; anything else in the column is skipped. */
+export function toMonitorHeaders(value: unknown): MonitorHeader[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((h: unknown) => {
+    const r = h as { name?: unknown; value?: unknown } | null;
+    return r && typeof r.name === 'string' && typeof r.value === 'string'
+      ? [{ name: r.name, value: r.value }]
+      : [];
+  });
+}
+
 export const monitorHeadersSchema = z
   .array(monitorHeaderSchema)
   .max(10, 'At most 10 headers')
@@ -109,7 +120,8 @@ export const monitorHeadersSchema = z
 // ── Forms ──────────────────────────────────────────────────────────────────
 
 const phrase = z.string().trim().min(1).max(200);
-const hostname = z
+/** A host name a redirect may end on (EditMonitors "Allowed final hosts"). */
+export const hostnameSchema = z
   .string()
   .trim()
   .toLowerCase()
@@ -153,7 +165,7 @@ export const monitorFormSchema = z
     timeoutSec: z.coerce.number().int().min(1, 'At least 1 s').max(60, 'At most 60 s').default(30),
     mustContain: z.array(phrase).max(20).default([]),
     mustNotContain: z.array(phrase).max(20).default([]),
-    allowedRedirectDomains: z.array(hostname).max(20).default([]),
+    allowedRedirectDomains: z.array(hostnameSchema).max(20).default([]),
     slowMs: z.coerce.number().int().min(500, 'At least 500 ms').max(60_000, 'At most 60000 ms').optional(),
     headers: monitorHeadersSchema.default([]),
     enabled: z.boolean().default(true),
