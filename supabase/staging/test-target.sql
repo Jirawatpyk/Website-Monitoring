@@ -5,7 +5,9 @@
 -- item `mode` (ok / error / timeout / challenge… / keyword-missing / slow) to trigger DOWN, RECOVERED,
 -- blocked rounds and the S04a PROBLEMs in the staging Chat space. The monitor looks for the page's
 -- title "Test target" (must_contain), so `keyword-missing` gives PROBLEM · Keyword.
--- Safe to run again: it updates the existing rows.
+-- Safe to run again: it updates the existing rows. Both people need a Google Chat id
+-- (access/chat-ids.template.sql) before the site can be edited in the UI (S05, D-015).
+-- Since S05 the same site can also be added through Sites → Add site.
 
 with client as (
   insert into public.clients (name)
@@ -13,11 +15,16 @@ with client as (
   on conflict (name) do update set name = excluded.name
   returning id
 ), site as (
-  insert into public.sites (client_id, name, tier, primary_owner_id)
+  insert into public.sites (client_id, name, tier, primary_owner_id, backup_owner_id, hosting, credential_ref,
+                            monitoring_started_at)
   select client.id, 'Test target', 1,
-         (select id from public.profiles where email = lower('<owner-email>'))  -- the owner who gets the mention
+         (select id from public.profiles where email = lower('<owner-email>')),   -- the owner who gets the mention
+         (select id from public.profiles where email = lower('<backup-email>')),  -- S05: a live site needs a backup
+         'Vercel', 'Vercel project dxt-test-target', now()
   from client
-  on conflict (name) do update set primary_owner_id = excluded.primary_owner_id, is_active = true
+  on conflict (name) do update set primary_owner_id = excluded.primary_owner_id,
+    backup_owner_id = excluded.backup_owner_id, hosting = excluded.hosting,
+    credential_ref = excluded.credential_ref, is_active = true
   returning id
 )
 insert into public.monitors (site_id, type, is_primary, url, must_contain)

@@ -67,6 +67,16 @@ A round that straddles the switch can mix outcomes (e.g. part challenged, part 5
 - **Email** — Tao's inbox through the Gmail tools: `subject:("Test target" INC-00nn)`; one thread per incident.
 - **Chat** — the staging Chat space is Tao's; `notification_attempts.provider_message_id` proves the post landed.
 
+Sites screens (S05, D-025), as Tao in the browser pane on https://monitor-staging.dxtspace.com/sites:
+
+| Do                                                                        | Expect                                                                                  |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Add site with a private URL (`http://10.0.0.5/`) → Save draft             | refused, "This address points inside a private network…", nothing saved                 |
+| Add site → Test check on the test target                                  | SIN + TYO rows from the real probe code; BKK "Runs from BKK on the first round"         |
+| Save draft with empty owners, then owners + credential → Start monitoring | Draft, then live; probes pick it up on the next round; one `audit_log` row per change   |
+| Edit monitors → add a key page / a header → Save changes                  | "Saved — takes effect on the next round"; the next `check_results` include the key page |
+| Edit site → Stop monitoring                                               | back to Draft; no new `check_results` for it                                            |
+
 ## 4. Reset between runs
 
 A new problem on an incident that is still open (Monitoring / Needs root cause) is a relapse into it (S04b), not a new incident. For a clean start — a fresh DOWN or PROBLEM card — run `supabase/staging/reset-test-incident.sql` in the SQL editor first, and leave the target on `ok` at the end.

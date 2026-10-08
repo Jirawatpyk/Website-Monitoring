@@ -49,7 +49,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - **Audit.** A trigger on `sites`, `monitors` and `clients` writes one `audit_log` row per inserted, updated or deleted row (before / after, actor = the signed-in user, null for SQL scripts), in the same transaction; a no-op update writes nothing. The EditMonitors success Alert says "Every change is in the audit log." instead of quoting one summary line.
 - **Custom headers** (`monitors.headers`, at most 10) go out from every location and the browser verifier. Host, Content-Length, Cookie, Authorization, User-Agent (WAF allowlists key on the fixed probe UA) and the probe secret header are refused, with the reason in the form.
 - **Copy dropped:** Tier 1 "(Proposal · pending CEO)" (D-009) and "Nok and Ploy notified ·" in the Started line (D-013 — nothing is sent).
-- **`/sites`** shows Status, Site (Draft badge), Tier, Owner, Client and Checked with the Tier / owner / client filters; Locations, Response 24h and Uptime 30d arrive with S06's rollups. Rows open `/sites/[siteId]/edit` (Edit site, the AddSite form) until S06 builds `/sites/[siteId]`.
+- **`/sites`** shows Status, Site (Draft badge), Tier, Owner, Client and Checked with the Tier / owner / client filters; Locations, Response 24h and Uptime 30d arrive with S06's rollups. Rows open `/sites/[siteId]/edit` (Edit site, the AddSite form) until S06 builds `/sites/[siteId]`. Each row and Edit site have a **Visit site** button that opens the primary URL in a new tab (Tao, 8 Oct 2026).
 
 **Why.** Every control shown works (spec §14.16), the engine keeps one tested rule set, and real sites can be registered before their owners are ready without weakening D-015 where it matters — before monitoring starts.
 
