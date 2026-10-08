@@ -1,19 +1,46 @@
 import type { MonitorHeader, SiteStatus, Tier } from '@dxt/shared';
 
-/** A row of the `/sites` table. */
+/** What one location's latest check looks like on the Sites list (spec §20, the §11 legend). */
+export type LocationGlyph = 'pass' | 'fail' | 'blocked' | 'slow' | 'chain' | 'none';
+
+export const LIST_LOCATIONS = ['BKK', 'SIN', 'TYO'] as const;
+export type ListLocation = (typeof LIST_LOCATIONS)[number];
+
+/** The open incident shown under a site's status (any state before Resolved). */
+export interface OpenIncident {
+  id: string;
+  number: number;
+  state: 'unacked' | 'escalated' | 'acknowledged' | 'monitoring' | 'needs_root_cause';
+  level: number;
+  detectedAt: string;
+  ackedBy: string | null;
+}
+
+/** A row of the `/sites` list (spec §20). */
 export interface SiteListRow {
   id: string;
   name: string;
   tier: Tier;
   /** Monitoring started (false = a Draft). */
   live: boolean;
-  client: { id: string; name: string; internal: boolean };
+  client: { id: string; name: string; internal: boolean; amName: string | null };
   owner: { id: string; name: string } | null;
+  backup: { id: string; name: string } | null;
   /** Latest status; null for a Draft or before the first round. */
   status: SiteStatus | null;
   checkedAt: string | null;
   /** The primary URL ("Visit site"). */
   url: string | null;
+  /** Muted until (D-012); muted while it is in the future. */
+  mutedUntil: string | null;
+  openIncident: OpenIncident | null;
+  locations: Record<ListLocation, LocationGlyph>;
+  /** p50 of the primary monitor over 24 h — S06 rollups; null until then. */
+  p50Ms: number | null;
+  /** Uptime 30 d as a ratio — S06 rollups; null until then. */
+  uptime30d: number | null;
+  /** Days to the sooner of SSL and domain expiry — S13; null until then. */
+  expiryDays: number | null;
 }
 
 export interface ClientOption {
