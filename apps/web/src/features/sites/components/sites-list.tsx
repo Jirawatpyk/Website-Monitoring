@@ -220,7 +220,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
 
   // The board's widths. The flexible Site column never shrinks below 160 px (DataTable's minWidth only
   // limits resizing), so the shown columns must fit: owner and uptime from a 1024 px table, response
-  // and expiry from 1100 px (928 px fixed at 1440 leaves Site 206 px).
+  // and expiry from 1100 px (936 px fixed at 1440 leaves Site 198 px).
   const columns: DataTableColumn<SiteListRow>[] = [
     {
       key: 'status',
@@ -313,9 +313,14 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     {
       key: 'checkedAt',
       label: 'Checked',
-      width: 72,
+      // the table's mono face is wider than the board's 12 px: 72 px broke HH:MM:SS onto two lines (Tao)
+      width: 80,
       mono: true,
-      render: (r) => (r.checkedAt ? formatTimeWithSeconds(new Date(r.checkedAt)) : '—'),
+      render: (r) => (
+        <span className="whitespace-nowrap">
+          {r.checkedAt ? formatTimeWithSeconds(new Date(r.checkedAt)) : '—'}
+        </span>
+      ),
     },
     {
       key: 'actions',
