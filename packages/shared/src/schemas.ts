@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CHECK_OUTCOMES, PROBE_LOCATIONS } from './domain';
+import { CHECK_OUTCOMES, PROBE_LOCATIONS, WAF_VENDORS } from './domain';
 
 /**
  * One check result as a probe reports it. The VPS probe posts these to the Ingest API;
@@ -22,6 +22,8 @@ export const checkResultSchema = z.object({
   finalUrl: z.url().max(2048).nullable().optional(),
   keywordMissing: z.array(z.string().max(200)).max(20).nullable().optional(),
   keywordForbidden: z.array(z.string().max(200)).max(20).nullable().optional(),
+  // S05b (D-027): the WAF signature of a blocked check; null / absent = none.
+  waf: z.enum(WAF_VENDORS).nullable().optional(),
 });
 export type CheckResultInput = z.infer<typeof checkResultSchema>;
 
@@ -34,6 +36,12 @@ export const ingestBatchSchema = z.object({
     .array(checkResultSchema.omit({ location: true }))
     .min(1)
     .max(500),
+  /**
+   * S05b (D-027): the VPS's control check this round — two public URLs from different providers.
+   * `ok` false only when both failed: the VPS's own network is suspect, so its results can't
+   * decide a site behind a WAF. Absent from an agent not redeployed = unknown, treated as ok.
+   */
+  control: z.object({ ok: z.boolean(), checkedAt: z.iso.datetime() }).optional(),
 });
 export type IngestBatch = z.infer<typeof ingestBatchSchema>;
 

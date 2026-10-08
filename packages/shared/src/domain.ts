@@ -57,6 +57,13 @@ export const TRIGGER_LABELS: Record<Trigger, string> = {
 export const CHECK_OUTCOMES = ['pass', 'fail', 'blocked'] as const;
 export type CheckOutcome = (typeof CHECK_OUTCOMES)[number];
 
+/**
+ * A blocked check's header-level WAF signature (D-027). Only these let a location abstain on a site
+ * behind a WAF; a body-only match (a "captcha" page) stays an ordinary blocked result.
+ */
+export const WAF_VENDORS = ['akamai', 'cloudflare', 'sucuri'] as const;
+export type WafVendor = (typeof WAF_VENDORS)[number];
+
 export const PROBE_LOCATIONS = ['BKK', 'SIN', 'TYO'] as const;
 export type ProbeLocation = (typeof PROBE_LOCATIONS)[number];
 
