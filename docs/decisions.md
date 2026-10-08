@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-028 | 8 Oct 2026 | The BKK probe's control check failing 3 rounds in a row opens an Admin system alert ("BKK probe network check failing") naming the WAF sites it left unverified; it clears once the check passes (≥ 10 min after it opened) | Gap — D-027 rule 2 told the site owner (PROBLEM, unverified) but nobody to fix the VPS |
 | D-027 | 8 Oct 2026 | A site marked "Behind WAF" is judged on the locations its WAF does not block: a location with a header-level WAF signature abstains; the Bangkok probe counts only while one of two control URLs answers; every location blocked → the browser verifier as before | D-020 / spec §6 "if locations are blocked, the browser verifier decides" (for WAF sites with an unblocked location) |
 | D-026 | 8 Oct 2026 | A `must_contain` keyword is looked for in up to about 3 MB of the body, and the read stops once every keyword is found; `must_not_contain` and classification still read the first 256 KB | D-022 "checked in the first 256 KB of the body" (for `must_contain`) |
 | D-025 | 8 Oct 2026 | S05 sites and monitors: a Draft may be saved with empty owners, but an owner who is set needs a Chat id and Start needs two linked owners; EditMonitors edits the HTTP primary + up to 3 key pages (keyword and redirect checks live on each HTTP monitor; SSL / Domain in S13); GET / HEAD only; expected status and redirects are shown as the fixed rule (not editable); Test check runs from SIN + TYO on demand; no shared spam list until S17; AM read-only from the client; Draft / Start / Stop monitoring; one audit row per changed row by trigger; custom headers refuse User-Agent and auth headers | AddSite / EditMonitors: POST, "Comma list or 2xx", Redirects select, locked shared-list tag, per-site AM select, "Proposal · pending CEO", "Nok and Ploy notified", "Tao edited monitors on …" audit line, Keyword / Redirect / SSL / Domain as separate monitors, User-Agent sample header; PRD §3 "Google Chat or email" (D-015 already) |
@@ -31,6 +32,15 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-028 — The BKK probe's failing network check is an Admin alert
+
+**Gap.** Under D-027 rule 2 a WAF site whose only counting location is Bangkok goes PROBLEM (unverified, `control_failed`) when the VPS's two control URLs both fail, and its owner is mentioned. The cause is the VPS's own network — the Admin's to fix — and nothing told the Admin: the heartbeat only notices a VPS that can't reach Vercel at all (message-checker, S05b review).
+
+**Decision (8 Oct 2026, Tao).**
+- The engine opens the system alert `bkk_control_failing` when the BKK probe's last 3 probe minutes all failed the control check (a minute with any passing batch counts as passed; minutes with no control reported are skipped). Every active Admin gets one email ("DxT Monitor · System · BKK probe network check failing · <since>") listing the sites left unverified, what it affects (only sites behind bot protection) and what to check (the VPS network, the dxt-agent journal).
+- It clears once the latest minute passes, no sooner than 10 min after it opened (as the other system alerts); no "back to normal" email.
+- The site's PROBLEM card says the Admin is told about the BKK probe's network separately, and the verifier Admin alert is not used for these sites.
 
 ## D-027 — Sites behind a WAF are judged on the locations it doesn't block
 

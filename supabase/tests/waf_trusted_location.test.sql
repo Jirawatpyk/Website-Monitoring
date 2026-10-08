@@ -1,7 +1,7 @@
 -- S05b (D-027): check_results.waf and control_ok — a WAF signature only on a blocked check.
 begin;
 \ir _helpers.psql
-select plan(6);
+select plan(10);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -38,6 +38,31 @@ select lives_ok(
   $$insert into public.check_results (monitor_id, location, checked_at, outcome, status_code, control_ok)
     values ('00000000-0000-0000-0000-0000000000d1', 'BKK', now(), 'pass', 200, false)$$,
   'a Bangkok check records a failed control check'
+);
+
+select throws_ok(
+  $$insert into public.check_results (monitor_id, location, checked_at, outcome, status_code, control_ok)
+    values ('00000000-0000-0000-0000-0000000000d1', 'SIN', now(), 'pass', 200, true)$$,
+  '23514', null,
+  'only a Bangkok check carries the control result'
+);
+
+-- A partition the nightly job creates later carries the constraints too.
+select private.manage_check_results_partitions(now() + interval '3 months');
+select throws_ok(
+  $$insert into public.check_results (monitor_id, location, checked_at, outcome, status_code, waf)
+    values ('00000000-0000-0000-0000-0000000000d1', 'SIN', now() + interval '3 months', 'pass', 200, 'akamai')$$,
+  '23514', null,
+  'a future partition refuses a WAF signature on a passing check'
+);
+
+-- D-028: the BKK control alert is a known system alert kind.
+select isnt(public.open_system_alert('bkk_control_failing', '{}'), null, 'bkk_control_failing opens');
+select is(
+  (select count(*)::int from public.notifications n join public.system_alerts a on a.id = n.system_alert_id
+    where a.kind = 'bkk_control_failing' and n.template = 'bkk_control_failing'),
+  (select count(*)::int from public.profiles where role = 'admin' and is_active),
+  'every active Admin gets the email'
 );
 
 select * from finish();

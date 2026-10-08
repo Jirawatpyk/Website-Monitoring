@@ -2,6 +2,7 @@ import 'server-only';
 import type { DbClient, Json } from '@dxt/db';
 import {
   decideSite,
+  bkkControlFailing,
   faultyByMinute,
   lookbackMs,
   NEW_MONITOR,
@@ -118,7 +119,10 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
     const verifier = await loadVerifierState(db, now, now);
-    summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations);
+    summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations, {
+      failing: null,
+      sites: new Set(),
+    });
     return summary;
   }
   const monitors = sites.flatMap((s) => s.monitors);
@@ -168,6 +172,8 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
 
   /** Sites the verifier couldn't decide this run, with the reason it saw (D-019). */
   const unverifiedSites = new Map<string, string>();
+  /** Sites left unverified by the BKK probe's failed control check (D-027, D-028). */
+  const controlSites = new Set<string>();
   /** A site whose write failed: logged, the rest still judged, the run reported failed at the end. */
   const failures: string[] = [];
   const unverifiedMonitors = new Set<string>();
@@ -181,7 +187,16 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   }
 
   summary.unverified = unverifiedMonitors.size;
-  summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations);
+  // D-028: the BKK probe's control check (D-027) over the window's Bangkok checks.
+  const control = bkkControlFailing(
+    checks
+      .filter((c) => c.location === 'BKK')
+      .map((c) => ({ checkedAt: new Date(c.checked_at), controlOk: c.control_ok })),
+  );
+  summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, {
+    failing: control,
+    sites: controlSites,
+  });
   // `ok: false` fails the Healthchecks ping (cron-job.ts), while what the other sites queued is
   // still sent at once (engine-and-deliver.ts reads the counts).
   if (failures.length) return { ...summary, ok: false, failures };
@@ -262,7 +277,8 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         if (u.reason === 'not_picked_up') await expireUnpicked(db, u.monitorId, decision.roundAt);
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
         // The browser blocked too (D-020) or the VPS's control check down (D-027): not the verifier's fault.
-        if (u.reason !== 'browser_blocked' && u.reason !== 'control_failed')
+        if (u.reason === 'control_failed') controlSites.add(`${site.name} (Tier ${site.tier})`);
+        else if (u.reason !== 'browser_blocked')
           unverifiedSites.set(`${site.name} (Tier ${site.tier})`, u.reason);
       }
       const applied = await apply(
@@ -452,6 +468,11 @@ async function adminAlerts(
   verifier: Awaited<ReturnType<typeof loadVerifierState>>,
   unverifiedSites: ReadonlyMap<string, string>,
   locations: readonly ProbeLocation[],
+  /**
+   * D-028: `bkkControlFailing` (true = failing, false = passing, null = no evidence: leave it) and
+   * the sites it left unverified this run.
+   */
+  control: { failing: boolean | null; sites: ReadonlySet<string> },
 ): Promise<number> {
   let opened = 0;
   const open = async (kind: string, context: Record<string, unknown>) => {
@@ -490,6 +511,13 @@ async function adminAlerts(
   const low = verifier.openAlerts.get('probe_locations_low');
   if (locations.length < 2 && !low) await open('probe_locations_low', { active: [...locations].sort() });
   else if (locations.length >= 2 && low && settled(low)) await clear('probe_locations_low');
+
+  // D-028: the BKK VPS's own network failing its control check — the Admin's to fix. The sites it
+  // leaves unverified (D-027) are listed; cleared once it passes again, no sooner than 10 min.
+  const net = verifier.openAlerts.get('bkk_control_failing');
+  if (control.failing === true && !net)
+    await open('bkk_control_failing', { sites: [...control.sites].sort() });
+  else if (control.failing === false && net && settled(net)) await clear('bkk_control_failing');
   return opened;
 }
 

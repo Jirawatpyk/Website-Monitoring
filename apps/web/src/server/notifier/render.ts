@@ -365,6 +365,7 @@ export function renderSystemAlertEmail(
     case 'verifier_unavailable':
     case 'verifier_backlog':
     case 'probe_locations_low':
+    case 'bkk_control_failing':
       return buildSystemAlertEmail({
         alertId: alert.id,
         kind: n.template,

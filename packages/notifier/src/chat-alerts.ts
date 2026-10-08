@@ -273,16 +273,13 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
     : seen
       ? [row('Seen from', seen)]
       : [];
+  // D-028: a failing BKK network check is the Admin's too, told by its own system email.
+  const adminText =
+    input.verifier === 'control_failed'
+      ? 'The Admin is told about the BKK probe’s network separately (system email) if it keeps failing. This card doesn’t ask anyone to fix it.'
+      : 'The Admin is told about the verifier separately (system email). This card doesn’t ask anyone to fix it.';
   const adminNote: ChatWidget[] =
-    unverified && input.verifier !== 'browser_blocked' && input.verifier !== 'control_failed'
-      ? [
-          {
-            textParagraph: {
-              text: 'The Admin is told about the verifier separately (system email). This card doesn’t ask anyone to fix it.',
-            },
-          },
-        ]
-      : [];
+    unverified && input.verifier !== 'browser_blocked' ? [{ textParagraph: { text: adminText } }] : [];
 
   return {
     text: buildChatTextLine({

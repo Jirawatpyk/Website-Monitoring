@@ -230,6 +230,40 @@ describe('runEngine — blocked rounds (S03)', () => {
       });
       expect(rpcCalls.some((c) => c.name === 'open_system_alert')).toBe(false);
     });
+
+    it('the control check failing 3 BKK rounds in a row → one Admin alert naming the sites (D-028); it clears once it passes', async () => {
+      // BKK batches at 09:58, 09:59 and 10:00, all with the control check down.
+      const earlier = [-120, -60].map((sec) =>
+        bkk({ control_ok: false, checked_at: at(sec), monitor_id: 'm0' }),
+      );
+      const { db, rpcCalls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': { data: [bkk({ control_ok: false }), ...akamai, ...earlier] },
+        'rpc.open_system_alert': { data: 'a1' },
+      });
+      expect(await runEngine(db, now)).toMatchObject({ alerts: 1 });
+      expect(rpcCalls.find((c) => c.name === 'open_system_alert')?.args).toEqual({
+        p_kind: 'bkk_control_failing',
+        p_context: { sites: [`${wafMonitor.sites.name} (Tier ${wafMonitor.sites.tier})`] },
+      });
+
+      const old = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': { data: [bkk({ control_ok: true }), ...akamai] },
+        'system_alerts.select': {
+          data: [{ kind: 'bkk_control_failing', context: {}, opened_at: '2026-10-06T09:40:00Z' }],
+        },
+      });
+      await runEngine(old.db, now);
+      expect(old.rpcCalls).toContainEqual({
+        name: 'clear_system_alert',
+        args: { p_kind: 'bkk_control_failing' },
+      });
+    });
   });
 
   it('a job nobody picked up in 30 s counts the verifier unavailable even while it polls', async () => {

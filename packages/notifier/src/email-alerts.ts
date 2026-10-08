@@ -422,7 +422,8 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
 }
 
 /** Admin alerts that aren't about one incident (D-019, D-022, `system_alerts.kind`). */
-export type SystemAlertKind = 'verifier_unavailable' | 'verifier_backlog' | 'probe_locations_low';
+export type SystemAlertKind =
+  'verifier_unavailable' | 'verifier_backlog' | 'probe_locations_low' | 'bkk_control_failing';
 
 /** Why the engine counted the verifier unavailable (D-019). */
 export type VerifierDownReason = 'no_poll' | 'not_picked_up' | 'lease_expired';
@@ -468,6 +469,7 @@ const SYSTEM_TITLES: Record<SystemAlertKind, string> = {
   verifier_unavailable: 'Browser verifier unavailable',
   verifier_backlog: 'Browser verifier falling behind',
   probe_locations_low: 'Fewer than 2 probe locations',
+  bkk_control_failing: 'BKK probe network check failing',
 };
 
 /**
@@ -501,6 +503,28 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
         ],
         ['What to check', 'Restart the verifier service on the BKK VPS (dxt-agent).'],
         ['When it’s back', 'Waiting sites are re-checked on the next round and clear on their own.'],
+      ],
+      buttons: [],
+    });
+  }
+  if (input.kind === 'bkk_control_failing') {
+    const waiting = input.sites.length;
+    return layout(envelope, {
+      color: C.warning,
+      bar: C.warning,
+      label: 'BKK NETWORK',
+      pre: `the BKK VPS can’t reach the internet · ${waiting} site${waiting === 1 ? '' : 's'} behind bot protection not verified`,
+      headline: 'The BKK probe’s network check is failing',
+      lede: 'Both public test addresses failed from the BKK VPS for 3 rounds in a row, so its own network is suspect. Sites behind bot protection that only BKK can reach show PROBLEM (unverified) until it passes again.',
+      facts: [
+        ['Since', since],
+        ['Sites not verified', waiting ? input.sites.join(', ') : 'No site right now'],
+        [
+          'Effect',
+          'Only sites behind bot protection are affected. Every other site is still judged from SIN and TYO as usual.',
+        ],
+        ['What to check', 'The BKK VPS network (DNS, route, firewall) and the dxt-agent journal.'],
+        ['When it’s back', 'The sites are decided from BKK again on the next round and clear on their own.'],
       ],
       buttons: [],
     });

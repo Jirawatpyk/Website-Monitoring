@@ -101,9 +101,12 @@ describe('PROBLEM first card (ChatAlert)', () => {
       verifier: 'browser_blocked',
     });
     expect(JSON.stringify(blocked.cardsV2)).not.toContain('Admin is told');
-    // Behind a WAF with the VPS's control check down: not the verifier either (D-027).
+    // Behind a WAF with the VPS's control check down: the Admin is told about the BKK network (D-028).
     const control = buildProblemAlert({ ...fuji, trigger: 'blocked_unverified', verifier: 'control_failed' });
-    expect(JSON.stringify(control.cardsV2)).not.toContain('Admin is told');
+    expect(JSON.stringify(control.cardsV2)).toContain(
+      'The Admin is told about the BKK probe’s network separately',
+    );
+    expect(JSON.stringify(control.cardsV2)).not.toContain('about the verifier');
     // …and the verifier is never asked: the card says what clears it instead.
     expect(JSON.stringify(control.cardsV2)).toContain('decided from BKK once its network check passes');
     expect(JSON.stringify(control.cardsV2)).not.toContain('once the verifier loads the page');
