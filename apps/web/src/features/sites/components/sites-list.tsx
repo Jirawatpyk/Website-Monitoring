@@ -520,15 +520,18 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
             </Tag>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-fg-secondary empty:hidden">
-          <span aria-live="polite">{active.length > 0 ? `Showing ${shown.length} of ${total}` : ''}</span>
-          {active.length > 0 && (
-            // filters set on a wider screen stay on; Clear reaches them here too
+        <span className="sr-only" aria-live="polite">
+          {active.length > 0 ? `Showing ${shown.length} of ${total}` : ''}
+        </span>
+        {active.length > 0 && (
+          // filters set on a wider screen stay on; Clear reaches them here too
+          <div className="flex items-center gap-2 text-xs text-fg-secondary">
+            <span>{`Showing ${shown.length} of ${total}`}</span>
             <Button variant="ghost" size="sm" touchHeight icon={<IconX />} onClick={clearAll}>
               Clear
             </Button>
-          )}
-        </div>
+          </div>
+        )}
         {shown.length === 0
           ? noMatch
           : GROUPS.map((g) => {
@@ -596,12 +599,17 @@ function PhoneRow({ row, href, now }: { row: SiteListRow; href: string | null; n
   );
 }
 
-const STATUS_LEGEND: { badge: ReactElement; text: string }[] = [
-  { badge: <SiteStatusBadge status="down" />, text: 'hard fail at 2 of 3 locations, twice' },
-  { badge: <SiteStatusBadge status="problem" />, text: 'slow, key page, keyword, regional, SSL or domain' },
-  { badge: <SiteStatusBadge status="maintenance" />, text: 'planned window' },
-  { badge: <SiteStatusBadge status="ok" />, text: '' },
+const STATUS_LEGEND: { key: string; badge: ReactElement; text: string }[] = [
+  { key: 'down', badge: <SiteStatusBadge status="down" />, text: 'hard fail at 2 of 3 locations, twice' },
   {
+    key: 'problem',
+    badge: <SiteStatusBadge status="problem" />,
+    text: 'slow, key page, keyword, regional, SSL or domain',
+  },
+  { key: 'maintenance', badge: <SiteStatusBadge status="maintenance" />, text: 'planned window' },
+  { key: 'ok', badge: <SiteStatusBadge status="ok" />, text: '' },
+  {
+    key: 'muted',
     badge: (
       <Badge tone="neutral" variant="outline" icon={<IconEyeOff />}>
         Muted
@@ -610,6 +618,7 @@ const STATUS_LEGEND: { badge: ReactElement; text: string }[] = [
     text: 'alerts off, status unchanged',
   },
   {
+    key: 'draft',
     badge: (
       <Badge tone="neutral" variant="outline" icon={<IconCircleDotDashed />}>
         Not monitored
@@ -625,7 +634,7 @@ function Legend() {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="font-mono text-fg-tertiary">STATUS</span>
         {STATUS_LEGEND.map((s) => (
-          <span key={s.text} className="flex items-center gap-1.5">
+          <span key={s.key} className="flex items-center gap-1.5">
             {s.badge}
             {s.text}
           </span>

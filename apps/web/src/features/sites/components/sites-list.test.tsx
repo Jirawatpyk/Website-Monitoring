@@ -172,6 +172,16 @@ describe('SitesList (spec §20, Sites board)', () => {
     expect(siteNames()).toHaveLength(5);
   });
 
+  it('phones: All clears every filter but the search, and is off while one is set', () => {
+    render(<SitesList sites={SITES} isAdmin meId="tao" nowIso={NOW} />);
+    pick(/^Tier/, '1');
+    const all = within(phone()).getByRole('button', { name: /^All 5/ });
+    expect(all).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(all);
+    expect(all).toHaveAttribute('aria-pressed', 'true');
+    expect(siteNames()).toHaveLength(5);
+  });
+
   it('phones: grouped by status, Mine = owner or backup', () => {
     render(<SitesList sites={SITES} isAdmin meId="arm" nowIso={NOW} />);
     const groups = within(phone())
