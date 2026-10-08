@@ -268,7 +268,7 @@ The ChatAlert board has one PROBLEM text line and no PROBLEM card. EmailAlert ha
 - **Admin alerts.**
   - `system_alerts` (kind, opened_at, cleared_at, context) holds alerts that aren't about one incident: `verifier_unavailable`, `verifier_backlog` (> 5 jobs queued). One open alert per kind, so one outage sends one email per Admin, not one per site or round.
   - `notifications` takes either an `incident_id` or a `system_alert_id`.
-  - "Verifier unavailable" clears once the verifier polls again with nothing queued and no blocked site waiting, but no sooner than 10 min after it opened, so a verifier that keeps failing jobs can't open and close it every round. "Queue > 5" clears when the queue drops to ≤ 5. No "back up" email.
+  - "Verifier unavailable" clears once the verifier polls again with nothing queued and no blocked site waiting, but no sooner than 10 min after it opened, so a verifier that keeps failing jobs can't open and close it every round. "Queue > 5" clears when the queue drops to ≤ 5. No "back up" email. Amended 8 Oct 2026 (two 6-second alerts on production, `fix/tls-chain-problem`): the backlog counts only jobs still queued 30 s after they were created — stuck, as PRD §5 "ค้าง" says — and clears no sooner than 10 min after it opened, like the other kinds.
 - **Expected locations.** A round expects the active locations whose probe beat in the last 3 min. A stopped agent drops out of the vote instead of holding every round until the deadline. BKK is active from S03; it votes only while its agent beats.
 - **Two agents.** The VPS runs `dxt-agent@staging` and `dxt-agent@production` from one systemd template. Each reads `/etc/dxt-agent/<env>.env`. Verifier sessions: staging 1, production 3. The VPS has 4 GB.
 - **Screenshots.**

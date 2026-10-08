@@ -509,10 +509,13 @@ async function adminAlerts(
     await clear('verifier_unavailable');
   }
 
-  const behind = verifier.openAlerts.has('verifier_backlog');
+  // Stuck jobs only (`queued` counts jobs waiting > 30 s), and cleared no sooner than 10 min after it
+  // opened like the other kinds — so a burst can't open and clear it within seconds.
+  const behind = verifier.openAlerts.get('verifier_backlog');
   if (verifier.queued > BACKLOG_ALERT_OVER && !behind)
     await open('verifier_backlog', { queued: verifier.queued });
-  else if (verifier.queued <= BACKLOG_ALERT_OVER && behind) await clear('verifier_backlog');
+  else if (verifier.queued <= BACKLOG_ALERT_OVER && behind && settled(behind))
+    await clear('verifier_backlog');
 
   // PRD §5: fewer than 2 locations → statuses stay as they are and the Admin is told (D-022).
   const low = verifier.openAlerts.get('probe_locations_low');
