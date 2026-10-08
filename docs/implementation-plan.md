@@ -20,7 +20,7 @@
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Done |
 | S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | In review |
 | S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 (merged) | 3 | Done |
-| S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 (merged) | 3 | In review |
+| S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 (merged) | 3 | Done |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
@@ -334,7 +334,7 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
   2. Filters, chips, "Needs attention" and the three sorts behave as spec §20 (component tests); drafts sort last and count in "N sites" but not "monitored".
   3. `layout-consistency` passes with the new list.
 - **Review:** spec-checker.
-- **Notes (evidence):** In review — PR open. Reviews: `/code-review high` (9: 8 fixed, "N min unacked" doesn't tick until S06 Realtime), spec-checker Sites and MSites ×2 (no High / Medium left), db-reviewer (no High / Medium; Lows fixed), security-reviewer (pass), slice-verifier. Changes from the boards Tao decided: D-030; the Sites list glyphs: D-029.
+- **Notes (evidence):** Done — merged in #53 after the migration-first #52 (8 Oct 2026). Production (8 Oct, 14:18 UTC, Tao's session): `/sites` shows "17 sites · 11 monitored · 6 drafts", the table fits (1270/1270), Cando Asia Problem with "INC-0003 · 3 h 17 min unacked" and three TLS chain glyphs (D-029), Bangkok Airways TW / CN with BKK pass and SIN / TYO blocked. On merge the `db` job first failed on the runner ("port 54322 already in use", a leftover container) and passed on a re-run. Reviews: `/code-review high` (9: 8 fixed, "N min unacked" doesn't tick until S06 Realtime), spec-checker Sites and MSites ×2 (no High / Medium left), db-reviewer (no High / Medium; Lows fixed), security-reviewer (pass), slice-verifier. Changes from the boards Tao decided: D-030; the Sites list glyphs: D-029.
   - **Done-when 1 ✓** spec-checker re-checks: Sites "All four High/Medium items are fixed, nothing new at High or Medium"; MSites "fixed every requested item, no new High or Medium". Screens: local Playwright 390 / 820 / 1440 light + dark; staging (8 Oct, browser pane) 1440 / 1360 / 820 dark, a 383 px phone in dark, `/verify` drives (filters, search, sorts, Test target error → Down + INC link + red glyphs, keyword-missing → Problem, phone chips, the menu drawer closing on a tap).
   - **Done-when 2 ✓** `apps/web/src/features/sites/components/site-list.test.ts` (filters, Needs attention, the four sorts with drafts last, counts, `listMeta` "9 sites · 8 monitored · 1 draft") and `sites-list.test.tsx` (chips, Clear keeps the sort, no-match, Admin / non-Admin rows, phone groups / All / Mine / Clear); `pnpm check` green.
   - **Done-when 3 ✓** `E2E_LOCAL_SUPABASE=1 pnpm --filter @dxt/web exec playwright test e2e/layout-consistency.spec.ts` passed; it now also fails a box inside the page that scrolls sideways (caught a 956/770 table in a trial).
