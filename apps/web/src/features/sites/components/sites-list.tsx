@@ -274,8 +274,13 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           <span className="flex items-center gap-2">
             <Avatar name={r.owner.name} size="sm" />
             <span className="flex min-w-0 flex-col leading-tight">
-              <span className="truncate text-sm">{r.owner.name}</span>
-              <span className="truncate text-xs text-fg-secondary">{r.backup?.name ?? 'No backup'}</span>
+              {/* full names are long ("Jirawat (Tao) Piyakit"): two lines, the whole name on hover */}
+              <span className="line-clamp-2 text-sm" title={r.owner.name}>
+                {r.owner.name}
+              </span>
+              <span className="truncate text-xs text-fg-secondary" title={r.backup?.name}>
+                {r.backup?.name ?? 'No backup'}
+              </span>
             </span>
           </span>
         ) : (
@@ -395,7 +400,6 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
               {`${c.label} ${counts[c.value]}`}
             </Tag>
           ))}
-          <span className="pl-2 text-xs text-fg-secondary">Muted keeps the real status</span>
         </div>
 
         <FilterBar
@@ -653,7 +657,7 @@ function Legend() {
   return (
     <section
       aria-label="Legend"
-      className="grid gap-x-8 gap-y-5 rounded-aura-lg border border-border-subtle p-aura-4 text-xs leading-normal text-fg-secondary lg:grid-cols-3"
+      className="mt-3 grid gap-x-8 gap-y-5 rounded-aura-lg border border-border-subtle p-aura-4 text-xs leading-normal text-fg-secondary lg:grid-cols-3"
     >
       <div className="flex flex-col gap-2">
         <h2 className="font-mono text-xs font-normal text-fg-tertiary">STATUS</h2>
