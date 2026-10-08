@@ -77,10 +77,23 @@ export function evaluateRound({
   }
 
   const counted = [...latest.values()];
-  if (counted.length < minReporting) {
+  // D-027: the VPS's control check counts even when BKK is excluded as faulty that minute — a VPS
+  // whose network is down fails every site, and the verifier runs on that same VPS.
+  const controlDown =
+    !!wafSite &&
+    results.some(
+      (r) =>
+        r.location === 'BKK' &&
+        r.controlOk === false &&
+        (!after || r.checkedAt.getTime() > after.getTime()) &&
+        now.getTime() - r.checkedAt.getTime() <= windowSec * 1000 &&
+        r.checkedAt.getTime() - now.getTime() <= CLOCK_SKEW_TOLERANCE_MS,
+    );
+  // Nobody left but the control check down (BKK excluded as faulty): untrusted, not "too few".
+  if (counted.length < minReporting && !(controlDown && !counted.length)) {
     return { kind: 'insufficient_data', reporting: counted.map((r) => r.location) };
   }
-  if (wafSite) return evaluateWafRound(counted);
+  if (wafSite) return evaluateWafRound(counted, controlDown);
 
   const by = (outcome: CheckOutcome) => counted.filter((r) => r.outcome === outcome).map((r) => r.location);
   const failing = by('fail');
@@ -97,14 +110,13 @@ export function evaluateRound({
  * D-027: on a site behind a WAF the locations that abstain sit out and the rest decide, one being
  * enough. Nothing left: the control check failed → untrusted; everyone WAF-blocked → the verifier.
  */
-function evaluateWafRound(counted: readonly LocationResult[]): RoundVerdict {
+function evaluateWafRound(counted: readonly LocationResult[], controlDown: boolean): RoundVerdict {
   const abstained = counted.filter(abstainsOnWafSite).map((r) => r.location);
   const voters = counted.filter((r) => !abstainsOnWafSite(r));
   const by = (outcome: CheckOutcome) => voters.filter((r) => r.outcome === outcome).map((r) => r.location);
   if (!voters.length) {
-    if (counted.some((r) => r.location === 'BKK' && r.controlOk === false)) {
-      return { kind: 'untrusted', abstained };
-    }
+    // The VPS's own network is down: neither its probe nor its browser verifier can decide.
+    if (controlDown) return { kind: 'untrusted', abstained };
     return { kind: 'needs_verification', blocked: counted.map((r) => r.location) };
   }
   const failing = by('fail');

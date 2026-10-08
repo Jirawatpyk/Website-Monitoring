@@ -258,6 +258,73 @@ describe('D-027 — sites behind a WAF (decideSite)', () => {
     expect(d.kind === 'none' && 'note' in d ? d.note : undefined).toBeUndefined();
   });
 
+  // engine-reviewer (S05b): the Bangkok Airways TW rows with the VPS's own network down.
+  const faultyBkk = (sec = 1) => new Map([[minuteOf(at(sec)), new Set<ProbeLocation>(['BKK'])]]);
+  const netDown = () => [
+    check('BKK', 'fail', 1, { controlOk: false }),
+    ...akamaiAbroad(),
+    recheck('BKK', 'fail', 31, { controlOk: false }),
+  ];
+
+  it('BKK excluded as faulty (its network down fails every site) with the control check down → untrusted, never a verify job', () => {
+    expect(decideSite(site([home(netDown())], { faulty: faultyBkk() }))).toMatchObject({
+      kind: 'problem',
+      detail: { kind: 'blocked', reason: 'control_failed' },
+    });
+  });
+
+  it('…and never DOWN, even with a failed browser verdict from that same VPS', () => {
+    const failed: Verification = { state: 'failed', jobId: 'j1', completedAt: at(40), detail: 'No response' };
+    const d = decideSite(
+      site([home(netDown(), { verifications: new Map([[R, failed]]) })], { faulty: faultyBkk() }),
+    );
+    expect(d).toMatchObject({ kind: 'problem', detail: { kind: 'blocked', reason: 'control_failed' } });
+  });
+
+  it('BKK fails with the control check fine, but its recheck runs with it down → PROBLEM (unverified), not a blip', () => {
+    const rows = [
+      check('BKK', 'fail', 1),
+      ...akamaiAbroad(),
+      recheck('BKK', 'fail', 31, { controlOk: false }),
+    ];
+    expect(decideSite(site([home(rows)]))).toMatchObject({
+      kind: 'problem',
+      detail: { kind: 'blocked', reason: 'control_failed' },
+      startedAt: at(1),
+    });
+  });
+
+  it('a split round keeps the one passing voter’s evidence: keyword missing at BKK → PROBLEM (Keyword)', () => {
+    const rows = [
+      check('BKK', 'pass', 1, { keywordMissing: ['Brand'], keywordForbidden: [] }),
+      check('SIN', 'fail', 2),
+      check('TYO', 'blocked', 3, { waf: 'akamai' }),
+      recheck('SIN', 'fail', 32),
+    ];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'problem', trigger: 'keyword' });
+  });
+
+  it('the flag alone relaxes nothing: 1 pass, 1 fail and a silent TYO keep an open DOWN open', () => {
+    const rows = [check('BKK', 'pass', 1), check('SIN', 'fail', 2), recheck('SIN', 'fail', 32)];
+    for (const behindWaf of [true, false]) {
+      const d = decideSite(
+        site([home(rows)], {
+          behindWaf,
+          open: { id: 'inc-1', state: 'unacked', severity: 'down', hasRootCause: false },
+        }),
+      );
+      expect(d).toMatchObject({ kind: 'none', status: null });
+    }
+  });
+
+  it('a key page behind the WAF doesn’t put the WAF note on a site whose home page all three see', () => {
+    const okHome = [check('BKK', 'pass', 1), check('SIN', 'pass', 2), check('TYO', 'pass', 3)];
+    const page = [check('BKK', 'pass', 1), ...akamaiAbroad()];
+    const d = decideSite(site([home(okHome), keyPage(page)]));
+    expect(d).toMatchObject({ kind: 'none', status: 'ok' });
+    expect('note' in d ? d.note : undefined).toBeUndefined();
+  });
+
   it('a WAF block never starts a regional clock', () => {
     const rows = [check('BKK', 'pass', 1), ...akamaiAbroad()];
     const d = decideSite(site([home(rows)]));

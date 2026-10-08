@@ -533,6 +533,9 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   ) as FailingSince;
   const failingSince = nextFailingSince(beating, counted);
   for (const loc of sittingOut) delete failingSince[loc];
+  // D-027: one voter decides only when the WAF (or the control check) really sat someone out; a
+  // flagged site with everyone voting keeps the majority rules (rule 5: the flag alone gains nothing).
+  const wafRound = wafSite && [...sittingOut].some((l) => !excluded.has(l));
   const carried = { slowRounds: m.carry.slowRounds, failingSince };
   const reset = { slowRounds: 0, failingSince };
   const blockedChecks = round.scheduled.filter((c) => c.outcome === 'blocked');
@@ -575,6 +578,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       wafSite,
       ...(wafSite && counted.length === 1 ? { minReporting: 1 } : {}),
     });
+    if (second.kind === 'untrusted') return unverified('control_failed', firstFail ?? roundAt);
     if (!(confirmsDown(first, second) && second.kind === 'hard_fail')) {
       return { verdict: { kind: 'blip' }, next: reset };
     }
@@ -605,14 +609,14 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   // is no majority; two passes and a regional failure is.
   const passing = counted.filter((c) => c.outcome === 'pass');
   // Behind a WAF, `evaluateWafRound` already weighed the voters: a pass stands with one voter passing.
-  const okRound = wafSite ? passing.length > 0 : passing.length * 2 > counted.length;
+  const okRound = wafRound ? passing.length > 0 : passing.length * 2 > counted.length;
   if (first.kind === 'pass' && okRound) {
     // Behind a WAF a round one location decided is evidence enough for the triggers too (D-027).
-    const minLocations = wafSite && counted.length === 1 ? 1 : 2;
+    const minLocations = wafRound ? 1 : 2;
     const p50 = roundP50(counted, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
     const next = { slowRounds, failingSince };
-    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafSite);
+    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound);
     if (issue) {
       return {
         verdict: {
@@ -625,11 +629,12 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       };
     }
     // Behind a WAF with some locations blocked: say who decided (D-027).
-    const wafBlocked = wafSite
-      ? round.scheduled
-          .filter((c) => c.outcome === 'blocked' && c.waf && !excluded.has(c.location))
-          .map((c) => c.location)
-      : [];
+    const wafBlocked =
+      wafRound && m.isPrimary
+        ? round.scheduled
+            .filter((c) => c.outcome === 'blocked' && c.waf && !excluded.has(c.location))
+            .map((c) => c.location)
+        : [];
     const note = wafBlocked.length
       ? wafNote(
           passing.map((c) => c.location),
