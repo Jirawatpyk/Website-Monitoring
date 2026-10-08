@@ -45,6 +45,7 @@ import {
 } from '@dxt/shared';
 import { createSite, deleteSite, setSiteMonitoring, updateSite } from '../actions';
 import type { RegistrationOptions, SiteActionResult, SiteRecord } from '../types';
+import { SITE_FORM_GRID, SITE_FORM_MAIN, SITE_FORM_SIDE } from './layout';
 import { splitList } from './lists';
 import { TestCheckCard } from './test-check-card';
 
@@ -223,8 +224,8 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
   const interval = TIER_CONFIG[tier].intervalSec / 60;
 
   return (
-    <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:grid-cols-3">
-      <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
+    <div className={SITE_FORM_GRID}>
+      <div className={SITE_FORM_MAIN}>
         <Card title="Site" headingLevel={2}>
           <div className="@container flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
@@ -500,7 +501,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
         )}
       </div>
 
-      <div className="flex min-w-0 flex-col gap-4">
+      <div className={SITE_FORM_SIDE}>
         <Card
           title="Registration checklist"
           headingLevel={2}

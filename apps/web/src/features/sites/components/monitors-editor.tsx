@@ -35,6 +35,7 @@ import {
   type MonitorDraft,
 } from './monitor-drafts';
 import { PhraseList } from './phrase-list';
+import { EDITOR_LIST, EDITOR_PANE, EDITOR_SPLIT } from './layout';
 import { TestCheckCard } from './test-check-card';
 
 interface MonitorsEditorProps {
@@ -202,8 +203,8 @@ export function MonitorsEditor({
         </Alert>
       )}
 
-      <div className="flex flex-col items-start gap-6 lg:flex-row">
-        <div className="flex w-full shrink-0 flex-col gap-3 lg:w-85">
+      <div className={EDITOR_SPLIT}>
+        <div className={EDITOR_LIST}>
           <div
             role="group"
             aria-label="Monitors"
@@ -314,7 +315,7 @@ export function MonitorsEditor({
         </div>
 
         {current && (
-          <div id="monitor-card" className="flex w-full min-w-0 grow scroll-mt-4 flex-col gap-4">
+          <div id="monitor-card" className={`${EDITOR_PANE} scroll-mt-4`}>
             <MonitorCard
               key={current.key}
               draft={current}

@@ -18,10 +18,10 @@ function pageDirs(dir: string): string[] {
 describe('loading skeletons', () => {
   // The shared (app)/loading.tsx is a plain list: a form or editor page that falls back to it jumps
   // from rows to cards when it arrives. Each signed-in page draws its own shape (retro 8 Oct 2026).
-  it('every signed-in page has its own loading.tsx', () => {
+  it('every signed-in page has its own loading.tsx (Overview uses the group root)', () => {
     const missing = pageDirs(APP)
-      .filter((dir) => dir !== APP && !existsSync(join(dir, 'loading.tsx')))
-      .map((dir) => relative(APP, dir).replaceAll('\\', '/'));
+      .filter((dir) => !existsSync(join(dir, 'loading.tsx')))
+      .map((dir) => relative(APP, dir).replaceAll('\\', '/') || '(app) root');
     expect(missing).toEqual([]);
   });
 });

@@ -9,13 +9,15 @@ import { Skeleton } from '@jirawatpyk/aura-react';
 interface PageSkeletonProps {
   /** Read by screen readers, e.g. "Loading sites". */
   label: string;
+  /** `page` = the 24 px rhythm between page sections; `tight` = 12 px, for a single-column page. */
+  gap?: 'page' | 'tight';
   children: ReactNode;
 }
 
-/** The wrapper every route skeleton uses: one live status, the page's 24 px rhythm. */
-export function PageSkeleton({ label, children }: PageSkeletonProps) {
+/** The wrapper every route skeleton uses: one live status, the page's rhythm. */
+export function PageSkeleton({ label, gap = 'page', children }: PageSkeletonProps) {
   return (
-    <div className="flex flex-col gap-6" role="status" aria-busy="true">
+    <div className={`flex flex-col ${gap === 'page' ? 'gap-6' : 'gap-3'}`} role="status" aria-busy="true">
       <span className="sr-only">{label}</span>
       {children}
     </div>
@@ -35,7 +37,8 @@ export function PageHeaderSkeleton({ breadcrumb = false, actions = 0 }: PageHead
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" aria-hidden>
       <div className="flex w-full max-w-xl flex-col gap-1">
         <Skeleton variant="text" width={breadcrumb ? '40%' : '15%'} />
-        <Skeleton variant="rect" height={36} width="50%" />
+        {/* The h1's line box (display serif), so the meta line and cards don't shift on arrival. */}
+        <Skeleton variant="rect" height={40} width="50%" />
         <Skeleton variant="text" width="80%" />
       </div>
       {actions > 0 && (
@@ -52,19 +55,20 @@ export function PageHeaderSkeleton({ breadcrumb = false, actions = 0 }: PageHead
 interface CardSkeletonProps {
   /** Form fields (label + input) in the card body. */
   fields?: number;
-  /** Fields per row from `md` up. */
+  /** Fields per row once the card is wide enough: 2 from `@md`, 3 from `@xl` (container queries, as
+   * the forms use — the card's width decides, not the viewport's). */
   columns?: 1 | 2 | 3;
   /** Plain text lines instead of fields (a list, a checklist, a note). */
   lines?: number;
 }
 
-const COLUMNS = { 1: '', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3' } as const;
+const COLUMNS = { 1: '', 2: '@md:grid-cols-2', 3: '@xl:grid-cols-3' } as const;
 
-/** The shape of an AURA `Card` with a title: fields in a grid, or text lines. */
+/** The shape of an AURA `Card` with a title (24 px padding): fields in a grid, or text lines. */
 export function CardSkeleton({ fields = 0, columns = 1, lines = 0 }: CardSkeletonProps) {
   return (
     <div
-      className="flex flex-col gap-4 rounded-aura-lg border border-border-default bg-bg-surface p-5"
+      className="@container flex flex-col gap-4 rounded-aura-lg border border-border-default bg-bg-surface p-6"
       aria-hidden
     >
       <Skeleton variant="text" width="30%" />
