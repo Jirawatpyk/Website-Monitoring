@@ -386,6 +386,7 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
   const { site, trigger } = input;
   const slow = trigger === 'slow';
   const unverified = trigger === 'blocked_unverified';
+  const chain = trigger === 'tls_chain';
   const headline = slow
     ? `${site} is slow`
     : unverified
@@ -395,14 +396,18 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
     ? 'Up — pages load, but slowly. Not an outage.'
     : unverified
       ? 'Unknown — blocked by bot protection; no proof either way.'
-      : 'Up — reachable, with an issue. Not an outage.';
+      : chain
+        ? 'Up in most browsers — apps and API clients can’t connect. Not an outage.'
+        : 'Up — reachable, with an issue. Not an outage.';
   const opening = slow
     ? 'The site is up but slow.'
     : unverified
       ? input.verifier === 'control_failed'
         ? 'The site is blocked by bot protection at SIN and TYO, and the BKK probe’s network check failed.'
         : 'The site is blocked by bot protection and couldn’t be checked in a browser.'
-      : 'The site is up, with a problem.';
+      : chain
+        ? 'The site opens in most browsers, but its certificate chain is misconfigured: install the right intermediate certificate.'
+        : 'The site is up, with a problem.';
   return render(input, {
     template: 'problem',
     color: C.warning,

@@ -57,7 +57,11 @@ export interface VerifierState {
   available: boolean;
   /** monitor id → round start (epoch ms) → its verify job. */
   jobs: Map<string, Map<number, Verification>>;
-  /** Jobs waiting to be leased (any kind). */
+  /**
+   * Jobs (any kind) still waiting to be leased PICKUP_WITHIN_MS after they were queued — stuck, not
+   * just queued: one round's burst that the verifier takes on its next 5 s poll is no backlog
+   * (PRD §5 "queue ค้าง > 5"; two 6-second alerts on production, 8 Oct 2026).
+   */
   queued: number;
   /** Open Admin alerts by kind, with their context and when they opened. */
   openAlerts: Map<string, { context: Record<string, unknown>; openedAt: Date }>;
@@ -69,7 +73,11 @@ export async function loadVerifierState(db: DbClient, since: Date, now: Date): P
     db.from('agent_heartbeats').select('last_seen_at, info').eq('name', 'verifier').maybeSingle(),
     // The active sites' verify jobs, read server-side (no monitor ids in the query string, S04b).
     db.rpc('engine_verify_jobs', { p_since: since.toISOString() }),
-    db.from('verification_jobs').select('id', { count: 'exact', head: true }).eq('status', 'queued'),
+    db
+      .from('verification_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'queued')
+      .lt('created_at', new Date(now.getTime() - PICKUP_WITHIN_MS).toISOString()),
     db
       .from('verification_jobs')
       .select('id', { count: 'exact', head: true })

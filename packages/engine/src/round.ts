@@ -1,4 +1,5 @@
 import type { CheckOutcome, ProbeLocation, WafVendor } from '@dxt/shared';
+import { failsHere, isHardFail } from './hard-fail';
 
 /**
  * One check round for one monitor: the latest result from each location inside the tier's window
@@ -14,6 +15,8 @@ export interface LocationResult {
   controlOk?: boolean | null;
   /** Bangkok only: false = the VPS's Akamai control failed in that batch (D-027 rule 2b). */
   akamaiOk?: boolean | null;
+  /** The failure's error code: a certificate-chain error is no hard-fail vote (D-029). */
+  error?: string | null;
 }
 
 export type RoundVerdict =
@@ -60,7 +63,7 @@ export interface RoundInput {
  */
 export function bkkUntrusted(r: LocationResult, akamaiSite = false): boolean {
   if (r.location !== 'BKK') return false;
-  return r.controlOk === false || (akamaiSite && r.outcome === 'fail' && r.akamaiOk === false);
+  return r.controlOk === false || (akamaiSite && isHardFail(r) && r.akamaiOk === false);
 }
 
 /** D-027: does this result sit the round out on a site behind a WAF? */
@@ -108,8 +111,10 @@ export function evaluateRound({
   }
   if (wafSite) return evaluateWafRound(counted, controlDown, akamaiSite);
 
-  const by = (outcome: CheckOutcome) => counted.filter((r) => r.outcome === outcome).map((r) => r.location);
-  const failing = by('fail');
+  // Never 'fail': a hard-fail vote is isHardFail (D-029).
+  const by = (outcome: Exclude<CheckOutcome, 'fail'>) =>
+    counted.filter((r) => r.outcome === outcome).map((r) => r.location);
+  const failing = counted.filter(isHardFail).map((r) => r.location);
   const blocked = by('blocked');
   const passing = by('pass');
 
@@ -130,13 +135,14 @@ function evaluateWafRound(
 ): RoundVerdict {
   const abstained = counted.filter((r) => abstainsOnWafSite(r, akamaiSite)).map((r) => r.location);
   const voters = counted.filter((r) => !abstainsOnWafSite(r, akamaiSite));
-  const by = (outcome: CheckOutcome) => voters.filter((r) => r.outcome === outcome).map((r) => r.location);
+  const by = (outcome: Exclude<CheckOutcome, 'fail'>) =>
+    voters.filter((r) => r.outcome === outcome).map((r) => r.location);
   if (!voters.length) {
     // The VPS's own network is down: neither its probe nor its browser verifier can decide.
     if (controlDown) return { kind: 'untrusted', abstained };
     return { kind: 'needs_verification', blocked: counted.map((r) => r.location) };
   }
-  const failing = by('fail');
+  const failing = voters.filter(isHardFail).map((r) => r.location);
   const passing = by('pass');
   const enough = (n: number) => n >= 2 || (voters.length === 1 && n === 1);
   if (enough(failing.length)) return { kind: 'hard_fail', failing, abstained };
@@ -180,14 +186,15 @@ export function isRegionalProblem(failingSince: Date, now: Date): boolean {
  * are down (e.g. a shared host) and nothing is excluded — otherwise a mass outage would be hidden.
  */
 export function faultyLocations(
-  roundResults: readonly Pick<LocationResult, 'location' | 'outcome'>[],
+  roundResults: readonly Pick<LocationResult, 'location' | 'outcome' | 'error'>[],
 ): Set<ProbeLocation> {
   const totals = new Map<ProbeLocation, { all: number; failed: number }>();
-  for (const { location, outcome } of roundResults) {
-    const t = totals.get(location) ?? { all: 0, failed: 0 };
+  for (const r of roundResults) {
+    const t = totals.get(r.location) ?? { all: 0, failed: 0 };
     t.all += 1;
-    if (outcome === 'fail') t.failed += 1;
-    totals.set(location, t);
+    // A probe whose trust store lacks an issuer sees chain errors on most sites: faulty too (D-029).
+    if (failsHere(r)) t.failed += 1;
+    totals.set(r.location, t);
   }
   const overHalf = [...totals].filter(([, t]) => t.failed / t.all > 0.5).map(([location]) => location);
   return overHalf.length === 1 ? new Set(overHalf) : new Set();

@@ -154,7 +154,7 @@ function Row({ loc, look, text, time }: { loc: string; look: RowLook; text: stri
         {l.icon}
       </span>
       <span className="w-9 font-semibold">{loc}</span>
-      <span className="grow">{text}</span>
+      <span className="min-w-0 grow break-words">{text}</span>
       <span className="text-fg-secondary tabular-nums">{time}</span>
     </li>
   );

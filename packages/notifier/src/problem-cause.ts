@@ -76,6 +76,8 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
       return `HTTP ${d.statusCode} (${where(d.locations)})`;
     case 'hard_fail':
       return formatCause(d.failing, ctx.timeoutMs);
+    case 'tls_chain':
+      return `TLS chain misconfigured (${where(d.locations)}) · most browsers open it, apps and API clients fail`;
     case 'browser':
       return `Browser: page didn’t load${d.detail ? ` (${d.detail})` : ''}`;
     case 'blocked':
@@ -105,6 +107,8 @@ function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
       const codes = [...new Set(d.failing.map((f) => describeFailure(f, ctx.timeoutMs)))];
       return codes.join(', ');
     }
+    case 'tls_chain':
+      return 'TLS chain misconfigured';
     case 'browser':
       return 'page didn’t load in the browser';
     case 'blocked':

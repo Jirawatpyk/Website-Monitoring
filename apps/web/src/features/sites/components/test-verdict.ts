@@ -1,3 +1,4 @@
+import { isTlsChainError } from '@dxt/shared';
 import type { TestCheckResult } from '../types';
 
 export type RowLook = 'pass' | 'blocked' | 'fail' | 'waiting';
@@ -6,6 +7,9 @@ export type RowLook = 'pass' | 'blocked' | 'fail' | 'waiting';
 export function describeResult(r: TestCheckResult, keywords: number): { text: string; look: RowLook } {
   if (r.outcome === 'refused') return { text: 'Not allowed · private address', look: 'fail' };
   if (r.outcome === 'blocked') return { text: `${r.statusCode ?? 403} · bot challenge`, look: 'blocked' };
+  if (r.outcome === 'fail' && isTlsChainError(r.error)) {
+    return { text: `TLS chain misconfigured · ${r.error}`, look: 'fail' };
+  }
   if (r.outcome === 'fail') {
     return {
       text: `Hard fail · ${r.statusCode ? `HTTP ${r.statusCode}` : (r.error ?? 'no answer')}`,
@@ -50,7 +54,15 @@ export function testVerdict(
       note: 'This address points inside a private network — monitors check public sites only.',
     };
   }
-  const fails = results.filter((r) => r.outcome === 'fail').length;
+  // D-029: a certificate-chain error is a PROBLEM for the owner, never DOWN — browsers still open it.
+  const chained = results.filter((r) => r.outcome === 'fail' && isTlsChainError(r.error)).length;
+  if (chained * 2 > results.length) {
+    return {
+      title: isPrimary ? 'Would be: PROBLEM (TLS chain).' : 'Would be: PROBLEM (Key page).',
+      note: `The certificate chain is misconfigured: most browsers still open the site, but apps and API clients can’t connect. Install the right intermediate certificate. ${nothing}`,
+    };
+  }
+  const fails = results.filter((r) => r.outcome === 'fail' && !isTlsChainError(r.error)).length;
   if (fails === results.length) {
     return {
       // Only the primary can make the site DOWN; a key page stops at PROBLEM (spec §6).
@@ -68,6 +80,12 @@ export function testVerdict(
     return {
       title: 'Would be: OK for now.',
       note: 'One location failed; one location alone never makes the site DOWN. Run again to see if it holds.',
+    };
+  }
+  if (chained > 0) {
+    return {
+      title: 'Would be: OK for now.',
+      note: 'One location got a misconfigured certificate chain — most browsers still open the site, but apps and API clients there can’t connect. Ask the site admin to install the right intermediate certificate.',
     };
   }
   if (results.some((r) => (r.keywordMissing?.length ?? 0) > 0)) {

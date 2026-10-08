@@ -112,6 +112,17 @@ describe('PROBLEM first card (ChatAlert)', () => {
     expect(JSON.stringify(control.cardsV2)).not.toContain('once the verifier loads the page');
   });
 
+  it('a TLS chain PROBLEM shows its label (D-029)', () => {
+    const m = buildProblemAlert({
+      ...fuji,
+      trigger: 'tls_chain',
+      cause: 'TLS chain misconfigured (BKK, SIN, TYO) · most browsers open it, apps and API clients fail',
+      summary: 'TLS chain misconfigured',
+    });
+    expect(JSON.stringify(m.cardsV2)).toContain('TLS chain');
+    expect(m.text).toContain('TLS chain misconfigured');
+  });
+
   it('another trigger shows where it was seen, without the slow note; no owner, no mention', () => {
     const m = buildProblemAlert({
       ...fuji,
@@ -221,6 +232,20 @@ describe('PROBLEM emails (EmailAlert PROBLEM thread)', () => {
     expect(m.text).toContain('Open / acknowledge: https://monitor.example.test/incidents/inc-141?ack=1');
     expect(m.text).toContain('You got this because you own Fuji Links.');
     expect(m.headers).toEqual({ References: '<inc-inc-141@notify.example.test>' });
+  });
+
+  it('words a misconfigured certificate chain (D-029)', () => {
+    const m = buildProblemEmail({
+      ...base,
+      trigger: 'tls_chain',
+      detectedAt,
+      cause: 'c',
+      summary: 'TLS chain misconfigured',
+    });
+    expect(m.text).toContain(
+      'Site: Up in most browsers — apps and API clients can’t connect. Not an outage.',
+    );
+    expect(m.text).toContain('install the right intermediate certificate');
   });
 
   it('words the other triggers, and the fallback reader', () => {

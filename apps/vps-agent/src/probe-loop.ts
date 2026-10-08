@@ -1,5 +1,5 @@
 import { runHttpCheck, type HttpCheckRequest, type HttpCheckResult } from '@dxt/probe';
-import { probeRequestHeaders, type IngestBatch } from '@dxt/shared';
+import { isHardFailCheck, probeRequestHeaders, type IngestBatch } from '@dxt/shared';
 import type { Api, DueMonitor } from './api';
 
 /** The immediate recheck starts about 30 s after the scheduled check (PRD §5, spec §6). */
@@ -102,7 +102,8 @@ export async function runProbeRound({
       control,
     );
 
-  const failed = first.filter(({ r }) => r.outcome === 'fail').map(({ m }) => m);
+  // A certificate-chain error is a PROBLEM, never DOWN (D-029): nothing for a recheck to confirm.
+  const failed = first.filter(({ r }) => isHardFailCheck(r)).map(({ m }) => m);
   let rechecked = 0;
   if (failed.length) {
     await sleep(Math.max(0, started + RECHECK_DELAY_MS - clock()));

@@ -1,4 +1,4 @@
-import { PROBE_LOCATIONS, type ProbeLocation } from '@dxt/shared';
+import { PROBE_LOCATIONS, type ProbeLocation, isTlsChainError } from '@dxt/shared';
 
 /** One failed check as the probe recorded it. */
 export interface FailedCheck {
@@ -29,7 +29,7 @@ export function formatCause(checks: readonly FailedCheck[], timeoutMs: number): 
     .join(' · ');
 }
 
-const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY/;
+const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY|UNABLE_TO_GET_ISSUER/;
 
 export function describeFailure({ statusCode, error }: FailedCheck, timeoutMs: number): string {
   if (statusCode !== null) return `HTTP ${statusCode}`;
@@ -37,6 +37,7 @@ export function describeFailure({ statusCode, error }: FailedCheck, timeoutMs: n
   if (error === 'ENOTFOUND' || error === 'EAI_AGAIN') return 'DNS error';
   if (error === 'ECONNREFUSED') return 'Connection refused';
   if (error === 'ECONNRESET') return 'Connection reset';
+  if (isTlsChainError(error)) return 'TLS chain misconfigured';
   if (error && TLS_ERROR.test(error)) return 'TLS error';
   return 'Connection error';
 }

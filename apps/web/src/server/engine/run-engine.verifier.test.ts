@@ -479,7 +479,7 @@ describe('runEngine — blocked rounds (S03)', () => {
     });
   });
 
-  it('alerts when more than 5 jobs wait, and clears when the queue drains', async () => {
+  it('alerts when more than 5 jobs are stuck, and clears 10 min later once the queue drains', async () => {
     const behind = fakeDb({
       ...verifierUp,
       'rpc.engine_checks': { data: [] },
@@ -490,13 +490,29 @@ describe('runEngine — blocked rounds (S03)', () => {
     expect(behind.rpcCalls).toEqual([
       { name: 'open_system_alert', args: { p_kind: 'verifier_backlog', p_context: { queued: 6 } } },
     ]);
+    // Only jobs queued more than 30 s ago count: a fresh burst the next poll takes is no backlog.
+    const count = behind.calls.find(
+      (c) =>
+        c.table === 'verification_jobs' && c.filters.some(([m, col]) => m === 'lt' && col === 'created_at'),
+    );
+    expect(count?.filters).toContainEqual([
+      'lt',
+      'created_at',
+      new Date(now.getTime() - 30_000).toISOString(),
+    ]);
 
-    const drained = fakeDb({
+    const backlog = (opened: string) => ({
       ...verifierUp,
       'rpc.engine_checks': { data: [] },
       'verification_jobs.select': jobs([], 5),
-      'system_alerts.select': { data: [{ kind: 'verifier_backlog', context: { queued: 6 } }] },
+      'system_alerts.select': {
+        data: [{ kind: 'verifier_backlog', context: { queued: 6 }, opened_at: opened }],
+      },
     });
+    const young = fakeDb(backlog(new Date(now.getTime() - 60_000).toISOString()));
+    await runEngine(young.db, now);
+    expect(young.rpcCalls).toEqual([]);
+    const drained = fakeDb(backlog(new Date(now.getTime() - 11 * 60_000).toISOString()));
     await runEngine(drained.db, now);
     expect(drained.rpcCalls).toEqual([{ name: 'clear_system_alert', args: { p_kind: 'verifier_backlog' } }]);
   });

@@ -477,10 +477,10 @@ describe('D-027 — evaluateRound on a WAF site', () => {
 // Retro S05b: engine-reviewer needed three rounds, each fix exposing a new edge case. These
 // invariants run every combination instead of the cases someone thought of.
 describe('D-027 invariants over every combination', () => {
-  type Bkk = 'pass' | 'fail' | 'fail-control' | 'fail-akamai' | 'blocked-waf';
-  type Abroad = 'pass' | 'fail' | 'waf' | 'body-block' | 'silent';
-  const BKK: Bkk[] = ['pass', 'fail', 'fail-control', 'fail-akamai', 'blocked-waf'];
-  const ABROAD: Abroad[] = ['pass', 'fail', 'waf', 'body-block', 'silent'];
+  type Bkk = 'pass' | 'fail' | 'fail-control' | 'fail-akamai' | 'blocked-waf' | 'chain' | 'chain-control';
+  type Abroad = 'pass' | 'fail' | 'waf' | 'body-block' | 'silent' | 'chain';
+  const BKK: Bkk[] = ['pass', 'fail', 'fail-control', 'fail-akamai', 'blocked-waf', 'chain', 'chain-control'];
+  const ABROAD: Abroad[] = ['pass', 'fail', 'waf', 'body-block', 'silent', 'chain'];
   const VERDICTS: (Verification | undefined)[] = [
     undefined,
     { state: 'loaded', jobId: 'j1' },
@@ -496,6 +496,16 @@ describe('D-027 invariants over every combination', () => {
           : { controlOk: true };
     if (b === 'pass') return [check('BKK', 'pass', 1, over)];
     if (b === 'blocked-waf') return [check('BKK', 'blocked', 1, { waf: 'akamai' })];
+    if (b === 'chain')
+      return [check('BKK', 'fail', 1, { statusCode: null, error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' })];
+    if (b === 'chain-control')
+      return [
+        check('BKK', 'fail', 1, {
+          statusCode: null,
+          error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+          controlOk: false,
+        }),
+      ];
     return [check('BKK', 'fail', 1, over), recheck('BKK', 'fail', 31, over)];
   };
   const abroadRows = (loc: ProbeLocation, a: Abroad, sec: number): StoredCheck[] => {
@@ -503,6 +513,9 @@ describe('D-027 invariants over every combination', () => {
     if (a === 'pass') return [check(loc, 'pass', sec)];
     if (a === 'waf') return [check(loc, 'blocked', sec, { waf: 'akamai' })];
     if (a === 'body-block') return [check(loc, 'blocked', sec)];
+    // D-029: a certificate-chain error is never a hard-fail vote.
+    if (a === 'chain')
+      return [check(loc, 'fail', sec, { statusCode: null, error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' })];
     return [check(loc, 'fail', sec), recheck(loc, 'fail', sec + 30)];
   };
   const cases = BKK.flatMap((b) =>
@@ -541,8 +554,37 @@ describe('D-027 invariants over every combination', () => {
   it('rule 5: a flagged site with no WAF signature in the round decides exactly as an unflagged one', () => {
     for (const c of cases) {
       if (c.b === 'blocked-waf' || c.sin === 'waf' || c.tyo === 'waf') continue;
-      if (c.b === 'fail-control' || c.b === 'fail-akamai') continue;
+      if (c.b === 'fail-control' || c.b === 'fail-akamai' || c.b === 'chain-control') continue;
       expect(decide(c, true), JSON.stringify(c)).toEqual(decide(c, false));
+    }
+  });
+
+  it('D-029: with the VPS’s control down, a chain round never ends in a DOWN from that VPS’s browser', () => {
+    for (const c of cases) {
+      if (c.b !== 'chain-control') continue;
+      for (const behindWaf of [true, false]) {
+        const d = decide(c, behindWaf);
+        if (d.kind === 'open' && d.verifyJobId) {
+          // only a blocked (not chain) round may still reach the browser on a site not behind a WAF
+          expect(
+            [c.sin, c.tyo].some((a) => a === 'body-block' || a === 'waf'),
+            JSON.stringify(c),
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('D-029: a DOWN never counts a chain error among the locations that confirmed it', () => {
+    for (const c of cases) {
+      for (const behindWaf of [true, false]) {
+        const d = decide(c, behindWaf);
+        if (d.kind !== 'open' || d.verifyJobId) continue;
+        expect(
+          d.failing.filter((f) => f.error === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'),
+          JSON.stringify(c),
+        ).toEqual([]);
+      }
     }
   });
 

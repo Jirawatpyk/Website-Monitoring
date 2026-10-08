@@ -1,0 +1,343 @@
+import { describe, expect, it } from 'vitest';
+import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
+import { isHardFail, isTlsChainFail } from './hard-fail';
+import type { OpenIncident, StoredCheck, Verification } from './monitor';
+import { faultyLocations } from './round';
+import { decideSite, NEW_MONITOR, type SiteMonitor, type SiteSnapshot } from './site';
+
+// D-029 — a misconfigured certificate chain is a PROBLEM, not a DOWN. Cando Asia, 8 Oct 2026: a
+// Sectigo leaf served with a Let's Encrypt E6 intermediate → every probe gets
+// UNABLE_TO_VERIFY_LEAF_SIGNATURE; browsers open the site. Tier 2 rounds of 180 s.
+const R = Date.parse('2026-10-08T06:15:00Z');
+const at = (sec: number) => new Date(R + sec * 1000);
+const CHAIN = 'UNABLE_TO_VERIFY_LEAF_SIGNATURE';
+
+function check(
+  location: ProbeLocation,
+  outcome: CheckOutcome,
+  sec: number,
+  over: Partial<StoredCheck> = {},
+): StoredCheck {
+  return {
+    location,
+    outcome,
+    checkedAt: at(sec),
+    attempt: 1,
+    statusCode: outcome === 'pass' ? 200 : null,
+    error: outcome === 'fail' ? 'Timeout' : null,
+    responseMs: 600,
+    ...over,
+  };
+}
+const chain = (location: ProbeLocation, sec: number, over: Partial<StoredCheck> = {}) =>
+  check(location, 'fail', sec, { error: CHAIN, ...over });
+const recheck = (c: StoredCheck, sec: number) => ({ ...c, checkedAt: at(sec), attempt: 2 as const });
+
+const home = (checks: StoredCheck[]): SiteMonitor => ({
+  id: 'home',
+  isPrimary: true,
+  url: 'https://www.cando.example/',
+  slowThresholdMs: 5_000,
+  allowedRedirectDomains: [],
+  checks,
+  carry: NEW_MONITOR,
+});
+const keyPage = (checks: StoredCheck[]): SiteMonitor => ({
+  ...home(checks),
+  id: 'contact',
+  isPrimary: false,
+  url: 'https://www.cando.example/contact',
+});
+const site = (monitors: SiteMonitor[], over: Partial<SiteSnapshot> = {}): SiteSnapshot => ({
+  now: at(260),
+  intervalSec: 180,
+  locations: ['BKK', 'SIN', 'TYO'],
+  lastRoundAt: null,
+  okRounds: 0,
+  open: null,
+  monitors,
+  verifierAvailable: false,
+  ...over,
+});
+
+describe('D-029 — isHardFail is the one rule', () => {
+  it.each([
+    [{ outcome: 'fail', error: 'Timeout' }, true, false],
+    [{ outcome: 'fail', error: 'CERT_HAS_EXPIRED' }, true, false],
+    [{ outcome: 'fail', error: 'ERR_TLS_CERT_ALTNAME_INVALID' }, true, false],
+    [{ outcome: 'fail', error: CHAIN }, false, true],
+    [{ outcome: 'fail', error: 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY' }, false, true],
+    [{ outcome: 'pass', error: null }, false, false],
+    [{ outcome: 'blocked', error: null }, false, false],
+  ] as const)('%o → hard fail %s, chain %s', (c, hard, isChain) => {
+    expect(isHardFail(c)).toBe(hard);
+    expect(isTlsChainFail(c)).toBe(isChain);
+  });
+});
+
+describe('D-029 — TLS chain errors are a PROBLEM, not DOWN (decideSite)', () => {
+  it('(1) a chain error at all three locations → PROBLEM (TLS chain) in that one round', () => {
+    const rows = [chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)];
+    expect(decideSite(site([home(rows)]))).toMatchObject({
+      kind: 'problem',
+      trigger: 'tls_chain',
+      detail: { kind: 'tls_chain', code: CHAIN, locations: ['BKK', 'SIN', 'TYO'] },
+      startedAt: at(1),
+    });
+  });
+
+  it('…and its rechecks change nothing: still PROBLEM, never DOWN', () => {
+    const scheduled = [chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)];
+    const rows = [...scheduled, ...scheduled.map((c, i) => recheck(c, 31 + i))];
+    const d = decideSite(site([home(rows)]));
+    expect(d).toMatchObject({ kind: 'problem', trigger: 'tls_chain' });
+  });
+
+  it('(2) an expired certificate at all three locations is still DOWN, through check + recheck', () => {
+    const expired = (l: ProbeLocation, sec: number) => check(l, 'fail', sec, { error: 'CERT_HAS_EXPIRED' });
+    const scheduled = [expired('BKK', 1), expired('SIN', 2), expired('TYO', 3)];
+    const rows = [...scheduled, ...scheduled.map((c, i) => recheck(c, 31 + i))];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'open', startedAt: at(1) });
+  });
+
+  it('(3) chain errors at two locations and a 5xx at one → PROBLEM, not DOWN (one hard fail of three)', () => {
+    const fivexx = check('TYO', 'fail', 3, { statusCode: 503, error: null });
+    const rows = [chain('BKK', 1), chain('SIN', 2), fivexx, recheck(fivexx, 33)];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'problem', trigger: 'tls_chain' });
+  });
+
+  it('two real hard fails still make DOWN, whatever the third location saw', () => {
+    const t1 = check('SIN', 'fail', 2);
+    const t2 = check('TYO', 'fail', 3);
+    const rows = [chain('BKK', 1), t1, t2, recheck(t1, 32), recheck(t2, 33)];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'open' });
+  });
+
+  it('one chain error with two passes is an OK round that starts a regional clock — PROBLEM (Regional) after 5 min, never DOWN', () => {
+    const rows = [chain('BKK', 1), check('SIN', 'pass', 2), check('TYO', 'pass', 3)];
+    const d = decideSite(site([home(rows)]));
+    expect(d).toMatchObject({ kind: 'none', status: 'ok' });
+    expect(d.kind === 'none' && d.monitors[0]?.failingSince).toEqual({ BKK: at(1).toISOString() });
+    const since = { ...NEW_MONITOR, failingSince: { BKK: at(-359).toISOString() } };
+    expect(decideSite(site([{ ...home(rows), carry: since }]))).toMatchObject({
+      kind: 'problem',
+      trigger: 'regional',
+      detail: { kind: 'regional', location: 'BKK', failure: { error: CHAIN } },
+    });
+  });
+
+  it('a key page with a broken chain is a key-page PROBLEM', () => {
+    const okHome = [check('BKK', 'pass', 1), check('SIN', 'pass', 2), check('TYO', 'pass', 3)];
+    const page = [chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)];
+    expect(decideSite(site([home(okHome), keyPage(page)]))).toMatchObject({
+      kind: 'problem',
+      monitorId: 'contact',
+      trigger: 'key_page',
+      detail: { kind: 'tls_chain' },
+    });
+  });
+
+  it('a location seeing chain errors on most sites is a faulty probe (its trust store), excluded (engine review M1)', () => {
+    const rows = [
+      { location: 'BKK' as const, outcome: 'fail' as const, error: 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY' },
+      { location: 'BKK' as const, outcome: 'fail' as const, error: 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY' },
+      { location: 'BKK' as const, outcome: 'pass' as const, error: null },
+      { location: 'SIN' as const, outcome: 'pass' as const, error: null },
+      { location: 'SIN' as const, outcome: 'pass' as const, error: null },
+    ];
+    expect(faultyLocations(rows)).toEqual(new Set(['BKK']));
+  });
+
+  // engine review M2: one confirmed hard fail + one chain error is no OK round — and no silent blip.
+  it('a hard fail at BKK (rechecked) + a chain error at SIN + a pass at TYO → PROBLEM (TLS chain)', () => {
+    const bkk = check('BKK', 'fail', 1);
+    const rows = [bkk, chain('SIN', 2), check('TYO', 'pass', 3), recheck(bkk, 31)];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'problem', trigger: 'tls_chain' });
+  });
+
+  it('two locations reporting, a chain error and a hard fail → PROBLEM (TLS chain)', () => {
+    const tyo = check('TYO', 'fail', 3);
+    const rows = [chain('SIN', 2), tyo, recheck(tyo, 33)];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'problem', trigger: 'tls_chain' });
+  });
+});
+
+// engine review H1: a DOWN drop must end when the site answers again — even with a broken chain
+// (D-023), then continue as PROBLEM (TLS chain). INC-0142 MuvMi-style DOWN, renewed cert with the
+// wrong intermediate.
+// D-029 (Tao): an origin down behind a front end serving the wrong chain — the browser decides.
+describe('D-029 — the browser verifier decides a chain-majority round on the home page', () => {
+  const rows = [chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)];
+  const withJob = (v: Verification) => ({ ...home(rows), verifications: new Map([[R, v]]) });
+
+  it('verifier up → a verify job first', () => {
+    expect(decideSite(site([home(rows)], { verifierAvailable: true }))).toEqual({
+      kind: 'verify',
+      roundAt: at(0),
+      monitorIds: ['home'],
+    });
+  });
+
+  it('the browser loads the page → PROBLEM (TLS chain)', () => {
+    const loaded: Verification = { state: 'loaded', jobId: 'j1' };
+    expect(decideSite(site([withJob(loaded)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'tls_chain',
+    });
+  });
+
+  it('the browser gets a 503 / times out → DOWN from the first chain error, confirmed by the browser', () => {
+    for (const detail of ['HTTP 503', 'Page didn’t load in 30 s']) {
+      const failed: Verification = { state: 'failed', jobId: 'j1', completedAt: at(40), detail };
+      expect(decideSite(site([withJob(failed)], { verifierAvailable: true }))).toMatchObject({
+        kind: 'open',
+        startedAt: at(1),
+        confirmedAt: at(40),
+        verifyJobId: 'j1',
+        browserDetail: detail,
+      });
+    }
+  });
+
+  it.each([
+    ['Keyword missing: Can Do', 'a missing keyword'],
+    ['HTTP 404', 'a home-page 4xx (D-022)'],
+    ['page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://www.cando.example/', 'a certificate error'],
+  ])('the browser failed with %s (%s) → PROBLEM (TLS chain), not DOWN', (detail) => {
+    const failed: Verification = { state: 'failed', jobId: 'j1', completedAt: at(40), detail };
+    expect(decideSite(site([withJob(failed)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'tls_chain',
+    });
+  });
+
+  it('…but a refused connection in the browser is an outage → DOWN', () => {
+    const failed: Verification = {
+      state: 'failed',
+      jobId: 'j1',
+      completedAt: at(40),
+      detail: 'page.goto: net::ERR_CONNECTION_REFUSED at https://www.cando.example/',
+    };
+    expect(decideSite(site([withJob(failed)], { verifierAvailable: true }))).toMatchObject({ kind: 'open' });
+  });
+
+  it('the verifier not answering → PROBLEM (TLS chain) and the round is reported unverified for the Admin', () => {
+    const gone: Verification = { state: 'unavailable', reason: 'not_picked_up' };
+    expect(decideSite(site([withJob(gone)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'tls_chain',
+      unverified: [{ monitorId: 'home', reason: 'not_picked_up' }],
+    });
+    expect(decideSite(site([home(rows)], { verifierAvailable: false }))).toMatchObject({
+      unverified: [{ monitorId: 'home', reason: 'no_poll' }],
+    });
+  });
+
+  it('the VPS’s control check down, on a site not behind a WAF → no browser on that VPS: PROBLEM (TLS chain)', () => {
+    const untrusted = [chain('BKK', 1, { controlOk: false }), chain('SIN', 2), chain('TYO', 3)];
+    expect(decideSite(site([home(untrusted)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'tls_chain',
+    });
+  });
+
+  it('chain errors at two locations and a 5xx at one, verifier up → a verify job (engine review N7)', () => {
+    const fivexx = check('TYO', 'fail', 3, { statusCode: 503, error: null });
+    const mixed = [chain('BKK', 1), chain('SIN', 2), fivexx, recheck(fivexx, 33)];
+    expect(decideSite(site([home(mixed)], { verifierAvailable: true }))).toMatchObject({ kind: 'verify' });
+  });
+
+  it('an open unacked DOWN and the browser still failing → stays DOWN, no recovery', () => {
+    const failed: Verification = { state: 'failed', jobId: 'j1', completedAt: at(40), detail: 'HTTP 503' };
+    const open = { id: 'inc-1', state: 'unacked' as const, severity: 'down' as const, hasRootCause: false };
+    expect(decideSite(site([withJob(failed)], { verifierAvailable: true, open }))).toMatchObject({
+      kind: 'none',
+      status: 'down',
+    });
+  });
+
+  it('an open TLS chain PROBLEM and the browser failing → escalated to DOWN from the first chain error', () => {
+    const failed: Verification = {
+      state: 'failed',
+      jobId: 'j1',
+      completedAt: at(40),
+      detail: 'Page didn’t load in 30 s',
+    };
+    const open = {
+      id: 'inc-1',
+      state: 'acknowledged' as const,
+      severity: 'problem' as const,
+      hasRootCause: false,
+    };
+    expect(decideSite(site([withJob(failed)], { verifierAvailable: true, open }))).toMatchObject({
+      kind: 'escalate',
+      downStartedAt: at(1),
+    });
+  });
+
+  it('blocked in the browser, or the verifier unavailable → PROBLEM (TLS chain), never DOWN', () => {
+    const blocked: Verification = { state: 'blocked', jobId: 'j1' };
+    const gone: Verification = { state: 'unavailable', reason: 'not_picked_up' };
+    for (const v of [blocked, gone]) {
+      expect(decideSite(site([withJob(v)], { verifierAvailable: true }))).toMatchObject({
+        kind: 'problem',
+        trigger: 'tls_chain',
+      });
+    }
+  });
+
+  it('a key page with a broken chain needs no browser: key-page PROBLEM at once', () => {
+    const okHome = [check('BKK', 'pass', 1), check('SIN', 'pass', 2), check('TYO', 'pass', 3)];
+    expect(decideSite(site([home(okHome), keyPage(rows)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'key_page',
+    });
+  });
+});
+
+describe('D-029 with an open incident', () => {
+  const incident = (
+    state: OpenIncident['state'],
+    severity: OpenIncident['severity'] = 'down',
+  ): OpenIncident => ({
+    id: 'inc-1',
+    state,
+    severity,
+    hasRootCause: false,
+  });
+
+  it('an unacked DOWN, then chain errors everywhere → RECOVERED, then PROBLEM (TLS chain) in the same round', () => {
+    const rows = [chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)];
+    expect(decideSite(site([home(rows)], { open: incident('unacked') }))).toMatchObject({
+      kind: 'recover',
+      then: { severity: 'problem', trigger: 'tls_chain' },
+    });
+  });
+
+  it('…and with chain errors at two locations and a pass at one', () => {
+    const rows = [chain('BKK', 1), chain('SIN', 2), check('TYO', 'pass', 3)];
+    expect(decideSite(site([home(rows)], { open: incident('unacked') }))).toMatchObject({
+      kind: 'recover',
+      then: { trigger: 'tls_chain' },
+    });
+  });
+
+  it('a recovered incident sees the chain break again → PROBLEM AGAIN in the same incident', () => {
+    const rows = [chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)];
+    expect(decideSite(site([home(rows)], { open: incident('monitoring', 'problem') }))).toMatchObject({
+      kind: 'relapse',
+      severity: 'problem',
+      trigger: 'tls_chain',
+    });
+  });
+
+  it('an open TLS chain PROBLEM, then two real hard fails with rechecks → escalated to DOWN, starting at the first timeout', () => {
+    const sin = check('SIN', 'fail', 2);
+    const tyo = check('TYO', 'fail', 3);
+    const rows = [chain('BKK', 1), sin, tyo, recheck(sin, 32), recheck(tyo, 33)];
+    expect(decideSite(site([home(rows)], { open: incident('unacked', 'problem') }))).toMatchObject({
+      kind: 'escalate',
+      downStartedAt: at(2),
+    });
+  });
+});

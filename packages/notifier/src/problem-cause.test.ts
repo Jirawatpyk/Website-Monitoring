@@ -82,6 +82,13 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
       'blocked by bot protection, in the browser too',
     ],
     [
+      'a misconfigured certificate chain (D-029)',
+      { kind: 'tls_chain', code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', locations: ['SIN', 'TYO', 'BKK'] },
+      home,
+      'TLS chain misconfigured (BKK, SIN, TYO) · most browsers open it, apps and API clients fail',
+      'TLS chain misconfigured',
+    ],
+    [
       'behind a WAF, the VPS’s control check down (D-027)',
       { kind: 'blocked', reason: 'control_failed', locations: ['SIN', 'TYO'], statusCode: 403 },
       home,

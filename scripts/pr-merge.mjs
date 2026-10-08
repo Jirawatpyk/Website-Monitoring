@@ -1,6 +1,6 @@
 // Squash-merge a pull request only when it is safe to (D-008).
 //
-//   pnpm pr:merge <number> [--workflow-changes-reviewed]
+//   pnpm pr:merge <number> [--workflow-changes-reviewed] [--schema-lag-reviewed]
 //
 // The repository is private on GitHub Free, so the ruleset "main" is not enforced and GitHub would
 // merge a PR with a red or unfinished CI. This script refuses unless the PR is open, not a draft,
@@ -8,6 +8,9 @@
 // head commit, and — when the PR changes CI files that can read repository secrets — the caller passed
 // --workflow-changes-reviewed; it then merges that exact commit (`--match-head-commit`), so a push after the check
 // can't slip in. No shell: arguments go straight to `gh`.
+// A PR that changes migrations and runtime code together also needs --schema-lag-reviewed: the new
+// deployment's crons start before `migrate-production` ends (docs/workflow.md, 8 Oct 2026), so that
+// code must work on the old schema — or the migration merges alone first.
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
@@ -15,6 +18,20 @@ export const REQUIRED_CHECKS = ['check', 'db'];
 const FAILED = new Set(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE']);
 
 export const WORKFLOW_FLAG = '--workflow-changes-reviewed';
+export const SCHEMA_FLAG = '--schema-lag-reviewed';
+
+/** Runtime code (not tests) that a deploy starts before its migrations are applied. */
+export function migrationWithCode(pr) {
+  const paths = (pr.files ?? []).map((f) => f.path);
+  if (!paths.some((p) => p.startsWith('supabase/migrations/'))) return [];
+  return paths.filter(
+    (p) =>
+      /^(apps\/web\/src|apps\/vps-agent\/src|packages\/[^/]+\/src)\//.test(p) &&
+      !/\.test\.tsx?$/.test(p) &&
+      // generated types change with every migration and run nothing
+      p !== 'packages/db/src/database.types.ts',
+  );
+}
 
 /** Changed files that run in CI and can read repository secrets (`.github/workflows/`, `.github/actions/`). */
 export function ciFiles(pr) {
@@ -22,8 +39,14 @@ export function ciFiles(pr) {
 }
 
 /** Reasons the PR must not be merged yet; empty when it may be merged. */
-export function mergeBlockers(pr, { workflowChangesReviewed = false } = {}) {
+export function mergeBlockers(pr, { workflowChangesReviewed = false, schemaLagReviewed = false } = {}) {
   const problems = [];
+  const code = migrationWithCode(pr);
+  if (code.length && !schemaLagReviewed) {
+    problems.push(
+      `it changes migrations and runtime code together (${code.length} files) — the new deployment's crons run before migrate-production: merge the migration alone first, or confirm the code works on the old schema, then re-run with ${SCHEMA_FLAG}`,
+    );
+  }
   const ci = ciFiles(pr);
   if (ci.length && !workflowChangesReviewed) {
     problems.push(
@@ -62,16 +85,19 @@ function gh(args, options = {}) {
 function main() {
   // pnpm forwards a `--` separator (`pnpm pr:merge 9 -- --flag`); ignore it.
   const [number, ...flags] = process.argv.slice(2).filter((a) => a !== '--');
-  const unknown = flags.filter((f) => f !== WORKFLOW_FLAG);
+  const unknown = flags.filter((f) => f !== WORKFLOW_FLAG && f !== SCHEMA_FLAG);
   if (!/^\d+$/.test(number ?? '') || unknown.length) {
-    console.error(`Usage: pnpm pr:merge <pull request number> [${WORKFLOW_FLAG}]`);
+    console.error(`Usage: pnpm pr:merge <pull request number> [${WORKFLOW_FLAG}] [${SCHEMA_FLAG}]`);
     process.exit(2);
   }
 
   const fields =
     'number,title,state,isDraft,baseRefName,mergeable,reviewDecision,headRefOid,statusCheckRollup,files';
   const pr = JSON.parse(gh(['pr', 'view', number, '--json', fields]));
-  const problems = mergeBlockers(pr, { workflowChangesReviewed: flags.includes(WORKFLOW_FLAG) });
+  const problems = mergeBlockers(pr, {
+    workflowChangesReviewed: flags.includes(WORKFLOW_FLAG),
+    schemaLagReviewed: flags.includes(SCHEMA_FLAG),
+  });
   if (problems.length) {
     console.error(`pr:merge — not merging #${pr.number} "${pr.title}":`);
     for (const p of problems) console.error(`  - ${p}`);
