@@ -27,6 +27,30 @@ beforeAll(async () => {
         // The brand keyword far past the first 16 KB, as on a real home page.
         res.writeHead(200).end(`${'x'.repeat(100_000)}<footer>Welcome</footer>`);
         break;
+      case '/wix-deep':
+        // A Wix home page: ~300 KB of inline CSS before the <title> with the brand (D-026).
+        res.writeHead(200).end(`${'x'.repeat(300_000)}<title>VOCA | Agency</title><p>Index of /</p>`);
+        break;
+      case '/too-deep':
+        res.writeHead(200).end(`${'x'.repeat(4_000_000)}<title>VOCA</title>`);
+        break;
+      case '/stall-tail':
+        // The sample arrives, then the rest never does (the brand isn't in it).
+        res.writeHead(200);
+        res.write('x'.repeat(300_000));
+        break;
+      case '/broken-tail':
+        // The sample arrives, then the connection drops.
+        res.writeHead(200);
+        res.write('x'.repeat(300_000));
+        setTimeout(() => res.destroy(), 20);
+        break;
+      case '/split':
+        // The keyword arrives in two chunks.
+        res.writeHead(200);
+        res.write(`${'x'.repeat(70_000)}<title>DxT `);
+        setTimeout(() => res.end('Solutions</title>'), 20);
+        break;
       case '/defaced':
         res.writeHead(200).end('<h1>Index of /</h1>');
         break;
@@ -153,6 +177,53 @@ describe('runHttpCheck', () => {
     expect(
       (await runHttpCheck({ allowPrivateTargets: true, url: `${base}/deep-keyword` })).bodySample,
     ).toHaveLength(16_384);
+  });
+
+  it('looks for a must-contain keyword past 256 KB, up to about 3 MB (D-026)', async () => {
+    const deep = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/wix-deep`,
+      mustContain: ['VOCA'],
+      mustNotContain: ['Index of /'],
+    });
+    // Found deep; a must-not-contain word past the 256 KB sample is not looked for.
+    expect(deep).toMatchObject({ keywordMissing: [], keywordForbidden: [] });
+    expect(deep.bodySample).toHaveLength(262_144);
+
+    const tooDeep = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/too-deep`,
+      mustContain: ['VOCA'],
+    });
+    expect(tooDeep.keywordMissing).toEqual(['VOCA']);
+  });
+
+  it('a tail that stalls or drops during the keyword scan is "not checked", never a hard fail', async () => {
+    const stalled = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/stall-tail`,
+      timeoutMs: 500,
+      mustContain: ['VOCA'],
+    });
+    expect(stalled).toMatchObject({ outcome: 'pass', statusCode: 200, keywordMissing: null, error: null });
+    // The response time ends with the sample, not with the timeout.
+    expect(stalled.responseMs).toBeLessThan(500);
+
+    const broken = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/broken-tail`,
+      mustContain: ['VOCA'],
+    });
+    expect(broken).toMatchObject({ outcome: 'pass', keywordMissing: null });
+  });
+
+  it('finds a keyword split across two chunks of the body', async () => {
+    const result = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `${base}/split`,
+      mustContain: ['DxT Solutions', 'Gone'],
+    });
+    expect(result.keywordMissing).toEqual(['Gone']);
   });
 
   it("checks no keywords without any, on HEAD, or on a response that didn't pass", async () => {
