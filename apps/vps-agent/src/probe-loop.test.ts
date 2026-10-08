@@ -13,6 +13,7 @@ const result = (outcome: HttpCheckResult['outcome'], statusCode: number | null =
   finalUrl: statusCode === null ? null : 'https://ok.example.test/',
   keywordMissing: outcome === 'pass' ? ['Welcome'] : null,
   keywordForbidden: outcome === 'pass' ? [] : null,
+  waf: null,
 });
 const monitors = [
   {
@@ -36,17 +37,74 @@ const monitors = [
 ];
 const fakeApi = (due = monitors) => {
   const posted: unknown[][] = [];
+  const controls: unknown[] = [];
   const api: Api = {
     dueMonitors: vi.fn(async () => due),
-    postResults: vi.fn(async (r) => void posted.push(r)),
+    postResults: vi.fn(async (r, control) => {
+      posted.push(r);
+      controls.push(control);
+    }),
     leaseJobs: vi.fn(),
     completeJob: vi.fn(),
   };
-  return { api, posted };
+  return { api, posted, controls };
 };
 
 // Round starts at 03:01:01 (a second after the minute), like the systemd loop.
 const START = Date.parse('2026-10-07T03:01:01Z');
+
+describe('runProbeRound — control check (D-027)', () => {
+  const CONTROLS = ['https://www.gstatic.com/generate_204', 'https://www.cloudflare.com/cdn-cgi/trace'];
+  const roundWith = async (controlDown: (url: string) => boolean) => {
+    let now = START;
+    const { api, controls } = fakeApi();
+    const check = vi.fn(async ({ url }: { url: string }) => {
+      if (CONTROLS.includes(url)) return controlDown(url) ? result('fail', null) : result('pass', 204);
+      return url.includes('down') ? result('fail', 503) : result('pass');
+    });
+    const summary = await runProbeRound({
+      api,
+      controlUrls: CONTROLS,
+      check,
+      clock: () => now,
+      sleep: async (ms) => void (now += ms),
+    });
+    return { summary, controls, check };
+  };
+
+  it('both control URLs down → ok: false, on both posts (scheduled and recheck)', async () => {
+    const { summary, controls } = await roundWith(() => true);
+    expect(summary.controlOk).toBe(false);
+    expect(controls).toEqual([
+      { ok: false, checkedAt: new Date(START).toISOString() },
+      { ok: false, checkedAt: new Date(START).toISOString() },
+    ]);
+  });
+
+  it('one control URL down is not a control failure', async () => {
+    const { summary, controls } = await roundWith((url) => url.includes('gstatic'));
+    expect(summary.controlOk).toBe(true);
+    expect(controls[0]).toMatchObject({ ok: true });
+  });
+
+  it('checks each control URL once a round with a short GET, never with the WAF header', async () => {
+    const { check } = await roundWith(() => false);
+    const calls = check.mock.calls.map(([req]) => req).filter((r) => CONTROLS.includes(r.url));
+    expect(calls).toHaveLength(2);
+    for (const c of calls) expect(c).toEqual({ url: c.url, method: 'GET', timeoutMs: 10_000 });
+  });
+
+  it('no control URLs → no control sent', async () => {
+    const { api, controls } = fakeApi();
+    const summary = await runProbeRound({
+      api,
+      check: vi.fn(async () => result('pass')),
+      clock: () => START,
+    });
+    expect(summary.controlOk).toBeUndefined();
+    expect(controls).toEqual([undefined]);
+  });
+});
 
 describe('runProbeRound (Bangkok)', () => {
   it('checks every due monitor with the WAF header, posts attempt 1 at the round start, rechecks failures ~30 s later', async () => {

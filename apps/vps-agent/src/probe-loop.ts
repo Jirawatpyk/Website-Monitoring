@@ -11,6 +11,8 @@ export interface ProbeDeps {
   api: Api;
   /** `{ name, value }` of the WAF allowlist header (PRD §13), when configured. */
   secretHeader?: { name: string; value: string };
+  /** Control URLs checked every round (D-027); none = no control reported. */
+  controlUrls?: readonly string[];
   check?: (req: HttpCheckRequest) => Promise<HttpCheckResult>;
   clock?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -20,7 +22,12 @@ export interface ProbeSummary {
   checked: number;
   failed: number;
   rechecked: number;
+  /** The round's control check: false = every control URL failed; undefined = none configured. */
+  controlOk?: boolean;
 }
+
+/** A control URL gets less time than a monitor: it is a well-run public endpoint. */
+export const CONTROL_TIMEOUT_MS = 10_000;
 
 type Result = IngestBatch['results'][number];
 
@@ -37,6 +44,7 @@ const toResult = (m: DueMonitor, checkedAt: number, r: HttpCheckResult, attempt:
   finalUrl: r.finalUrl,
   keywordMissing: r.keywordMissing,
   keywordForbidden: r.keywordForbidden,
+  waf: r.waf,
 });
 
 /**
@@ -47,6 +55,7 @@ const toResult = (m: DueMonitor, checkedAt: number, r: HttpCheckResult, attempt:
 export async function runProbeRound({
   api,
   secretHeader,
+  controlUrls = [],
   check = runHttpCheck,
   clock = Date.now,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -63,8 +72,19 @@ export async function runProbeRound({
       mustNotContain: m.mustNotContain,
     });
 
-  const first = await Promise.all(monitors.map(async (m) => ({ m, r: await run(m, m.timeoutMs) })));
-  if (first.length) await api.postResults(first.map(({ m, r }) => toResult(m, started, r, 1)));
+  // The control check runs beside the monitors (D-027): ok while any control URL answers.
+  const [first, controls] = await Promise.all([
+    Promise.all(monitors.map(async (m) => ({ m, r: await run(m, m.timeoutMs) }))),
+    Promise.all(controlUrls.map((url) => check({ url, method: 'GET', timeoutMs: CONTROL_TIMEOUT_MS }))),
+  ]);
+  const control = controls.length
+    ? { ok: controls.some((r) => r.outcome === 'pass'), checkedAt: new Date(started).toISOString() }
+    : undefined;
+  if (first.length)
+    await api.postResults(
+      first.map(({ m, r }) => toResult(m, started, r, 1)),
+      control,
+    );
 
   const failed = first.filter(({ r }) => r.outcome === 'fail').map(({ m }) => m);
   let rechecked = 0;
@@ -78,11 +98,19 @@ export async function runProbeRound({
           return { m, at, r: await run(m, Math.min(m.timeoutMs, remaining)) };
         }),
       );
-      await api.postResults(second.map(({ m, at, r }) => toResult(m, at, r, 2)));
+      await api.postResults(
+        second.map(({ m, at, r }) => toResult(m, at, r, 2)),
+        control,
+      );
       rechecked = second.length;
     }
   }
-  return { checked: first.length, failed: failed.length, rechecked };
+  return {
+    checked: first.length,
+    failed: failed.length,
+    rechecked,
+    ...(control ? { controlOk: control.ok } : {}),
+  };
 }
 
 /** Milliseconds until the next interval boundary (the UTC minute for 60 s), plus a small offset. */

@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+/** Google and Cloudflare: two providers, so one of them having a bad minute isn't a control failure. */
+export const DEFAULT_CONTROL_URLS = [
+  'https://www.gstatic.com/generate_204',
+  'https://www.cloudflare.com/cdn-cgi/trace',
+] as const;
+
 const configSchema = z.object({
   /** Base URL of the web app (Ingest / Job APIs). HTTPS only, so the token never travels in clear text. */
   API_BASE_URL: z.url().refine((value) => {
@@ -18,6 +24,28 @@ const configSchema = z.object({
   /** How often the verifier asks for work; a job left 30 s counts the verifier unavailable (D-019). */
   VERIFIER_POLL_MS: z.coerce.number().int().min(1_000).max(10_000).default(5_000),
   LOOP_INTERVAL_MS: z.coerce.number().int().min(10_000).default(60_000),
+  /**
+   * Control check (D-027): two or three public https URLs run by different providers, checked every
+   * round. Only when all fail is the VPS's own network suspect, so its results can't decide a site
+   * behind a WAF.
+   */
+  CONTROL_URLS: z
+    .string()
+    .optional()
+    // Unset or blank (an env file copied from .env.example) = the defaults.
+    .transform((v) => {
+      const urls = (v ?? '')
+        .split(',')
+        .map((u) => u.trim())
+        .filter(Boolean);
+      return urls.length ? urls : [...DEFAULT_CONTROL_URLS];
+    })
+    .pipe(
+      z
+        .array(z.url({ protocol: /^https$/ }))
+        .min(2)
+        .max(3),
+    ),
 });
 
 export type AgentConfig = z.infer<typeof configSchema>;

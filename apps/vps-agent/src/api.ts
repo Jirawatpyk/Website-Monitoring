@@ -21,7 +21,7 @@ export class ApiError extends Error {
 
 export interface Api {
   dueMonitors(): Promise<DueMonitor[]>;
-  postResults(results: IngestBatch['results']): Promise<void>;
+  postResults(results: IngestBatch['results'], control?: IngestBatch['control']): Promise<void>;
   leaseJobs(max: number, sessions: number): Promise<LeasedJob[]>;
   /** False when the lease ran out (409): the result no longer counts. */
   completeJob(verdict: Verdict): Promise<boolean>;
@@ -58,8 +58,8 @@ export function createApi(baseUrl: string, token: string, fetchImpl: typeof fetc
     async dueMonitors() {
       return (await json('/api/ingest', dueMonitorsResponseSchema)).monitors;
     },
-    async postResults(results) {
-      const res = await call('/api/ingest', { method: 'POST', body: JSON.stringify({ results }) });
+    async postResults(results, control) {
+      const res = await call('/api/ingest', { method: 'POST', body: JSON.stringify({ results, control }) });
       if (!res.ok) throw new ApiError('/api/ingest', res.status);
     },
     async leaseJobs(max, sessions) {

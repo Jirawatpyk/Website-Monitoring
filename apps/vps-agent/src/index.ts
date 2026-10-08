@@ -47,7 +47,7 @@ async function main() {
       await sleep(untilNextTick(Date.now(), config.LOOP_INTERVAL_MS));
       if (signal.aborted) break;
       try {
-        const summary = await runProbeRound({ api, secretHeader });
+        const summary = await runProbeRound({ api, secretHeader, controlUrls: config.CONTROL_URLS });
         console.info(JSON.stringify({ event: 'probe_round', ...summary }));
         await ping(config.HEALTHCHECKS_PING_URL_PROBE_BKK, 'ok');
       } catch (err) {

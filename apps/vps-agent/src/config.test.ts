@@ -19,6 +19,25 @@ describe('loadConfig', () => {
     );
   });
 
+  it('control URLs (D-027): two providers by default, https only, two or three', () => {
+    const base = { API_BASE_URL: 'https://monitor.example.com', INGEST_TOKEN: token };
+    expect(loadConfig(base).CONTROL_URLS).toEqual([
+      'https://www.gstatic.com/generate_204',
+      'https://www.cloudflare.com/cdn-cgi/trace',
+    ]);
+    expect(
+      loadConfig({ ...base, CONTROL_URLS: 'https://a.example.com/ok, https://b.example.net/ok' })
+        .CONTROL_URLS,
+    ).toEqual(['https://a.example.com/ok', 'https://b.example.net/ok']);
+    expect(loadConfig({ ...base, CONTROL_URLS: '' }).CONTROL_URLS).toHaveLength(2);
+    expect(() => loadConfig({ ...base, CONTROL_URLS: 'https://only-one.example.com' })).toThrow(
+      /CONTROL_URLS/,
+    );
+    expect(() =>
+      loadConfig({ ...base, CONTROL_URLS: 'http://a.example.com, https://b.example.com' }),
+    ).toThrow(/CONTROL_URLS/);
+  });
+
   it('names missing variables without echoing values', () => {
     expect(() => loadConfig({ INGEST_TOKEN: 'short' })).toThrow(/API_BASE_URL, INGEST_TOKEN/);
   });
