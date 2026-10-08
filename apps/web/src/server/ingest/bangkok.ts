@@ -2,6 +2,7 @@ import 'server-only';
 import type { DbClient } from '@dxt/db';
 import type { IngestBatch } from '@dxt/shared';
 import { loadDueMonitors, type DueMonitor } from '../probe/due-monitors';
+import { insertCheckResults } from '../check-results';
 
 /** Bangkok's results arrive here only through the Ingest API: the location is never the sender's. */
 const LOCATION = 'BKK';
@@ -38,7 +39,8 @@ export async function storeBangkokResults(
   now: Date,
   control?: IngestBatch['control'],
 ): Promise<number> {
-  const { error } = await db.from('check_results').insert(
+  await insertCheckResults(
+    db,
     results.map((r) => ({
       monitor_id: r.monitorId,
       location: LOCATION,
@@ -58,7 +60,6 @@ export async function storeBangkokResults(
       akamai_ok: control?.akamaiOk ?? null,
     })),
   );
-  if (error) throw new Error(`check_results: ${error.message}`);
   await beatBangkok(db, now);
   return results.length;
 }

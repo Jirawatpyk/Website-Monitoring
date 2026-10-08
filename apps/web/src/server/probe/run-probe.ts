@@ -4,6 +4,7 @@ import { runHttpCheck, type HttpCheckRequest, type HttpCheckResult } from '@dxt/
 import { probeRequestHeaders, type ProbeLocation } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { loadDueMonitors, type DueMonitor } from './due-monitors';
+import { insertCheckResults } from '../check-results';
 
 export { isDue } from './due-monitors';
 
@@ -120,7 +121,8 @@ async function insertResults(
   rows: { m: DueMonitor; checkedAt: Date; result: HttpCheckResult }[],
 ): Promise<void> {
   if (!rows.length) return;
-  const { error } = await db.from('check_results').insert(
+  await insertCheckResults(
+    db,
     rows.map(({ m, checkedAt, result }) => ({
       monitor_id: m.id,
       location,
@@ -137,5 +139,4 @@ async function insertResults(
       waf: result.waf,
     })),
   );
-  if (error) throw new Error(`check_results: ${error.message}`);
 }
