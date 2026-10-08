@@ -111,6 +111,22 @@ describe('runProbeRound — control check (D-027)', () => {
     }
   });
 
+  it('an Akamai control that answers with a block still proves the route (akamaiOk true)', async () => {
+    const AKAMAI = 'https://www.ibm.com/robots.txt';
+    const due = fakeApi();
+    const check = vi.fn(async ({ url }: { url: string }) =>
+      url === AKAMAI ? result('blocked', 403) : result('pass'),
+    );
+    await runProbeRound({
+      api: due.api,
+      controlUrls: CONTROLS,
+      akamaiControlUrl: AKAMAI,
+      check,
+      clock: () => START,
+    });
+    expect(due.controls[0]).toEqual({ ok: true, akamaiOk: true });
+  });
+
   it('no monitors due → no control check either', async () => {
     const { api } = fakeApi([]);
     const check = vi.fn(async () => result('pass'));

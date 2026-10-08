@@ -515,16 +515,16 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
     return layout(envelope, {
       color: C.warning,
       bar: C.warning,
-      label: 'BKK NETWORK',
-      pre: `the BKK VPS can’t reach the internet · ${waiting} site${waiting === 1 ? '' : 's'} behind bot protection not verified`,
+      label: 'BKK NETWORK SUSPECT',
+      pre: `BKK network check failed 3 rounds in a row · ${waiting} site${waiting === 1 ? '' : 's'} behind bot protection not verified`,
       headline: 'The BKK probe’s network check is failing',
-      lede: 'Both public test addresses failed from the BKK VPS for 3 rounds in a row, so its own network is suspect. Sites behind bot protection that only BKK can reach show PROBLEM (unverified) until it passes again.',
+      lede: 'The BKK VPS’s network checks (its public test addresses) failed for 3 rounds in a row, so its own network is suspect. Sites behind bot protection that only BKK can reach show PROBLEM (unverified) until it passes again.',
       facts: [
         ['Since', since],
         ['Sites not verified', waiting ? input.sites.join(', ') : 'No site right now'],
         [
           'Effect',
-          'Only sites behind bot protection are affected. Every other site is still judged from SIN and TYO as usual.',
+          'Only sites behind bot protection are affected. Other sites keep their usual vote — SIN and TYO outvote a failing BKK.',
         ],
         ['What to check', 'The BKK VPS network (DNS, route, firewall) and the dxt-agent journal.'],
         ['When it’s back', 'The sites are decided from BKK again on the next round and clear on their own.'],

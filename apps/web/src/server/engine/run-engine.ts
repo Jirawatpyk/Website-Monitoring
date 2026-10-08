@@ -154,7 +154,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
 
   const checksByMonitor = new Map<string, typeof checks>();
   for (const c of checks)
-    checksByMonitor.set(c.monitor_id, [...(checksByMonitor.get(c.monitor_id) ?? []), c]);
+    (checksByMonitor.get(c.monitor_id) ?? checksByMonitor.set(c.monitor_id, []).get(c.monitor_id)!).push(c);
   const carryByMonitor = new Map((carries.data ?? []).map((c) => [c.monitor_id, c]));
 
   // A location that failed most monitors in a minute is no data for that minute (spec §15.3).
@@ -191,7 +191,12 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   const control = bkkControlFailing(
     checks
       .filter((c) => c.location === 'BKK')
-      .map((c) => ({ checkedAt: new Date(c.checked_at), controlOk: c.control_ok })),
+      // Either VPS check failing counts: both control URLs, or the Akamai control (D-027 rule 2b) —
+      // a broken Akamai control would otherwise silently turn every Akamai DOWN into a PROBLEM.
+      .map((c) => ({
+        checkedAt: new Date(c.checked_at),
+        controlOk: c.control_ok === false || c.akamai_ok === false ? false : (c.control_ok ?? c.akamai_ok),
+      })),
   );
   summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, {
     failing: control,

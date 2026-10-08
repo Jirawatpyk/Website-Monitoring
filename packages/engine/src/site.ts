@@ -521,8 +521,9 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   const wafSite = !!s.behindWaf;
   // The rows are already chosen; the window only has to include them all.
   const windowSec = (s.now.getTime() - roundAt.getTime()) / 1000 + s.intervalSec + 60;
-  // D-027 rule 2b: the site's WAF is Akamai when a check carried its signature this round.
-  const akamaiSite = wafSite && round.scheduled.some((c) => c.waf === 'akamai');
+  // D-027 rule 2b: the site's WAF is Akamai when any check in the lookback carried its signature —
+  // a site property, so the walk back (rule 2c) judges older rows the same way as this round.
+  const akamaiSite = wafSite && m.checks.some((c) => c.waf === 'akamai');
   const first = evaluateRound({
     results: round.scheduled,
     now: s.now,
@@ -605,7 +606,9 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     const history = wafSite
       ? m.checks.map((c) => (bkkUntrusted(c, akamaiSite) ? { ...c, outcome: 'blocked' as const } : c))
       : m.checks;
-    const startedAt = firstFailedCheck(history, failing);
+    // A confirming recheck always votes, so it can't be masked; the fallback only guards that.
+    const walked = firstFailedCheck(history, failing);
+    const startedAt = Number.isFinite(walked.getTime()) ? walked : (earliest(failing) ?? roundAt);
     if (m.isPrimary) {
       return {
         verdict: {

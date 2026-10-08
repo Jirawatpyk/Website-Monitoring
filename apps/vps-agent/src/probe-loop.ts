@@ -85,7 +85,9 @@ export async function runProbeRound({
     ]);
     return {
       ok: rs.some((r) => r.outcome === 'pass'),
-      ...(akamai ? { akamaiOk: akamai.outcome === 'pass' } : {}),
+      // Any answer from the Akamai edge — a block or a 4xx included — proves the route to Akamai;
+      // only no answer (timeout, DNS, TLS, refused) or a 5xx counts as failed (D-027 rule 2b).
+      ...(akamai ? { akamaiOk: akamai.outcome !== 'fail' } : {}),
     };
   };
   const [first, control] = monitors.length

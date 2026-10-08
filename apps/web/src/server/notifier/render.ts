@@ -25,7 +25,7 @@ import {
   type ProblemFacts,
   type VerifierDownReason,
 } from '@dxt/notifier';
-import { PROBE_LOCATIONS, TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
+import { confirmedByWafOf, PROBE_LOCATIONS, TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
 import {
   contextOf,
   type IncidentFacts,
@@ -162,7 +162,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         now,
         cause: str(ctx.cause, 'Hard fail'),
         confirmingLocations: num(ctx.confirmingLocations, 2),
-        confirmedByWaf: wafOf(ctx),
+        confirmedByWaf: confirmedByWafOf(ctx),
         owner: person(i.sites.primary),
         backup: person(i.sites.backup),
         // MobileAck: the card's link opens the incident ready to acknowledge.
@@ -273,7 +273,7 @@ export function renderEmail(
         confirmedAt: new Date(i.detected_at),
         cause: str(ctx.cause, 'Hard fail'),
         confirmingLocations: num(ctx.confirmingLocations, 2),
-        confirmedByWaf: wafOf(ctx),
+        confirmedByWaf: confirmedByWafOf(ctx),
         // A PROBLEM raised to DOWN keeps its acknowledgement (D-021).
         ackedBy: i.state === 'acknowledged' && i.acker ? i.acker.display_name : null,
       });
@@ -381,12 +381,4 @@ export function renderSystemAlertEmail(
     default:
       return null;
   }
-}
-
-/** D-027: who confirmed a DOWN behind a WAF and who the WAF blocked, from the incident's context. */
-function wafOf(ctx: Record<string, unknown>): { from: string[]; blocked: string[] } | null {
-  const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
-  const from = list(ctx.confirmingFrom);
-  const blocked = list(ctx.wafBlocked);
-  return from.length && blocked.length ? { from, blocked } : null;
 }

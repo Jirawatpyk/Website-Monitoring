@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  confirmedByWafOf,
   formatConfirmedBy,
   formatDay,
   formatDuration,
@@ -23,10 +24,22 @@ describe('formatConfirmedBy (ChatAlert "Confirmed by", D-027)', () => {
       { from: ['BKK'], blocked: ['SIN', 'TYO'] },
       'BKK only, 2 checks — SIN, TYO blocked by bot protection',
     ],
-    [2, { from: ['BKK', 'SIN'], blocked: ['TYO'] }, 'BKK, SIN, 2 checks — TYO blocked by bot protection'],
+    [2, { from: ['BKK', 'SIN'], blocked: ['TYO'] }, 'BKK and SIN, 2 checks — TYO blocked by bot protection'],
     [2, { from: ['BKK', 'SIN'], blocked: [] }, '2 locations, 2 checks'],
   ] as const)('%i, %o → %s', (count, waf, expected) => {
     expect(formatConfirmedBy(count, waf)).toBe(expected);
+  });
+});
+
+describe('confirmedByWafOf', () => {
+  it('reads both lists from an incident context, or nothing when either is missing', () => {
+    expect(confirmedByWafOf({ confirmingFrom: ['BKK'], wafBlocked: ['SIN', 'TYO'] })).toEqual({
+      from: ['BKK'],
+      blocked: ['SIN', 'TYO'],
+    });
+    expect(confirmedByWafOf({ confirmingFrom: ['BKK'] })).toBeNull();
+    expect(confirmedByWafOf({ confirmingFrom: 'BKK', wafBlocked: [1] })).toBeNull();
+    expect(confirmedByWafOf(undefined)).toBeNull();
   });
 });
 

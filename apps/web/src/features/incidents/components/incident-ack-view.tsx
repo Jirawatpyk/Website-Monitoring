@@ -42,7 +42,7 @@ export function IncidentAckView({ view, viewerName, viewerEmail }: IncidentAckVi
           <dt className="text-sm text-fg-secondary">{view.confirmedLabel}</dt>
           <dd className="m-0 flex flex-col items-end leading-snug">
             <span className="font-medium tabular-nums">{view.confirmedAt}</span>
-            <span className="text-xs text-fg-secondary">{view.confirmedBy}</span>
+            <span className="text-right text-xs text-fg-secondary">{view.confirmedBy}</span>
           </dd>
         </div>
         <div className="flex flex-col gap-0.5 py-2 leading-snug">

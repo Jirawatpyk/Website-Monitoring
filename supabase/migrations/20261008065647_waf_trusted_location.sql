@@ -13,10 +13,10 @@
 -- without changing the function.
 --
 -- check_results is the big partitioned table: the constraints go in NOT VALID (no scan under the
--- ACCESS EXCLUSIVE lock) and are validated after, which only takes SHARE UPDATE EXCLUSIVE —
--- probes keep inserting meanwhile (db-reviewer, S05b).
+-- ACCESS EXCLUSIVE lock) and are validated in the next migration — its own transaction, so the
+-- scan takes only SHARE UPDATE EXCLUSIVE and probes keep inserting (db-reviewer, S05b).
 
-set lock_timeout = '5s';
+set local lock_timeout = '5s';
 
 alter table public.check_results
   add column waf text,
@@ -28,10 +28,6 @@ alter table public.check_results
   add constraint check_results_waf_blocked check (waf is null or outcome = 'blocked') not valid,
   -- Only the Bangkok probe runs the control check.
   add constraint check_results_control_bkk check (control_ok is null or location = 'BKK') not valid;
-
-alter table public.check_results validate constraint check_results_waf_vendor;
-alter table public.check_results validate constraint check_results_waf_blocked;
-alter table public.check_results validate constraint check_results_control_bkk;
 
 comment on column public.check_results.waf is
   'D-027: header-level WAF signature of a blocked check (akamai / cloudflare / sucuri), null otherwise';

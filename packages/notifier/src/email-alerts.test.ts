@@ -219,9 +219,9 @@ describe('Admin alert about the browser verifier (D-001, D-019)', () => {
       reason: undefined,
     });
     expect(m.subject).toBe('DxT Monitor · System · BKK probe network check failing · Wed 7 Oct 10:14');
-    expect(m.text).toMatch(/^BKK NETWORK — The BKK probe’s network check is failing/);
+    expect(m.text).toMatch(/^BKK NETWORK SUSPECT — The BKK probe’s network check is failing/);
     expect(m.text).toContain('Sites not verified: Bangkok Airways – Taiwan (Tier 2)');
-    expect(m.text).toContain('Every other site is still judged from SIN and TYO as usual.');
+    expect(m.text).toContain('Other sites keep their usual vote — SIN and TYO outvote a failing BKK.');
     expect(m.text).toContain(
       'What to check: The BKK VPS network (DNS, route, firewall) and the dxt-agent journal.',
     );

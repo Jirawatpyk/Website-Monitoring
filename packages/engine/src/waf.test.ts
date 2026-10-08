@@ -107,6 +107,29 @@ describe('D-027 — sites behind a WAF (decideSite)', () => {
     expect(decideSite(site([home(vouched)], judged))).toMatchObject({ kind: 'open', startedAt: at(-179) });
   });
 
+  it('(L1) an earlier untrusted failure stays no data even when the confirming round carries no Akamai signature', () => {
+    // 06:12 BKK failed with the Akamai control down while SIN / TYO were blocked by Akamai;
+    // 06:15 the origin is down and Akamai answers everyone with a 503 (no block).
+    const before = [
+      check('BKK', 'fail', -179, { akamaiOk: false }),
+      check('SIN', 'blocked', -178, { waf: 'akamai' }),
+      check('TYO', 'blocked', -177, { waf: 'akamai' }),
+    ];
+    const rows = [
+      ...before,
+      check('BKK', 'fail', 1),
+      check('SIN', 'fail', 2),
+      check('TYO', 'fail', 3),
+      recheck('BKK', 'fail', 31),
+      recheck('SIN', 'fail', 32),
+      recheck('TYO', 'fail', 33),
+    ];
+    expect(decideSite(site([home(rows)], { lastRoundAt: at(-180) }))).toMatchObject({
+      kind: 'open',
+      startedAt: at(1),
+    });
+  });
+
   it('(L2) behind Akamai, BKK failing while the Akamai control failed too is the route, not the origin → PROBLEM (unverified)', () => {
     const rows = [
       check('BKK', 'fail', 1, { akamaiOk: false }),

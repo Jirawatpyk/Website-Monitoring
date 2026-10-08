@@ -277,7 +277,7 @@ describe('MobileAck view', () => {
     ]);
     expect(waf.confirmedBy).toBe('Confirmed by BKK only, 2 checks — SIN, TYO blocked by bot protection');
     expect(JSON.stringify(waf)).toContain(
-      'Confirmed down — BKK only, 2 checks — SIN, TYO blocked by bot protection',
+      'Confirmed down from BKK only, 2 checks — SIN, TYO blocked by bot protection',
     );
     expect(view({}, [{ ...detected, payload: { confirmingLocations: 1 } }]).confirmedBy).toBe(
       'Confirmed by 1 location, 2 checks',
