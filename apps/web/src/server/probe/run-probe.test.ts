@@ -34,6 +34,14 @@ const monitor = (id: string, tier: number, timeout_ms = 10_000) => ({
   timeout_ms,
   must_contain: id === 'b' ? ['Welcome'] : [],
   must_not_contain: [],
+  // Custom headers (S05): a refused name saved before a rule changed is dropped, the secret wins.
+  headers:
+    id === 'b'
+      ? [
+          { name: 'Accept-Language', value: 'th' },
+          { name: 'User-Agent', value: 'spoof' },
+        ]
+      : [],
   sites: { tier, is_active: true },
 });
 
@@ -104,7 +112,7 @@ describe('runProbe', () => {
       url: 'https://b.example.test',
       method: 'GET',
       timeoutMs: 5_000,
-      headers: { 'X-DxT-Monitor': 'v' },
+      headers: { 'Accept-Language': 'th', 'X-DxT-Monitor': 'v' },
       allowPrivateTargets: false,
       mustContain: ['Welcome'],
       mustNotContain: [],
@@ -129,6 +137,9 @@ describe('runProbe', () => {
     // Every monitor of an active site, key pages included — not only the primary (S04a).
     expect(s.calls.find((c) => c.table === 'monitors')?.filters).toEqual([
       ['eq', 'sites.is_active', true],
+      // Switched off or removed monitors are skipped (S05, D-025).
+      ['eq', 'enabled', true],
+      ['is', 'removed_at', null],
       // HTTP page monitors only: SSL / domain (S13) and browser (S23) are checked their own way.
       ['in', 'type', ['http', 'keyword']],
     ]);

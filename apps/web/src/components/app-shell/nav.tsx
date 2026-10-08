@@ -52,7 +52,7 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         slice: 'S07',
         live: false,
       },
-      { id: 'sites', label: 'Sites', icon: <IconMonitor />, href: '/sites', slice: 'S05', live: false },
+      { id: 'sites', label: 'Sites', icon: <IconMonitor />, href: '/sites', slice: 'S05', live: true },
       {
         id: 'expiry',
         label: 'SSL & domains',

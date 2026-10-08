@@ -32,3 +32,16 @@ describe('serverEnv', () => {
     expect(serverEnv()).toBe(serverEnv());
   });
 });
+
+describe('probeAllowlistInfo', () => {
+  it('reads only the VPS IP and the secret header name, without the other secrets (S05 CI)', async () => {
+    vi.resetModules();
+    const { probeAllowlistInfo } = await import('./env');
+    vi.stubEnv('BKK_PROBE_IP', ' 203.0.113.7 ');
+    vi.stubEnv('PROBE_SECRET_HEADER_NAME', '');
+    expect(probeAllowlistInfo()).toEqual({ bkkIp: '203.0.113.7', secretHeaderName: 'X-DxT-Monitor' });
+    vi.stubEnv('BKK_PROBE_IP', '');
+    vi.stubEnv('PROBE_SECRET_HEADER_NAME', 'X-Probe');
+    expect(probeAllowlistInfo()).toEqual({ bkkIp: null, secretHeaderName: 'X-Probe' });
+  });
+});

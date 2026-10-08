@@ -40,6 +40,12 @@ begin
 end;
 $$;
 
+-- Sample Google Chat ids (D-015: owners need one); real ids are set per environment by script.
+update public.profiles p set google_chat_user_id = v.chat_id
+from (values ('Tao', '100000000000000000001'), ('Arm', '100000000000000000002'),
+             ('Ploy', '100000000000000000003'), ('Nok', '100000000000000000004')) as v(name, chat_id)
+where p.display_name = v.name;
+
 -- ── Clients ──
 insert into public.clients (name, am_user_id, language)
 select c.name, (select id from public.profiles where display_name = c.am), c.language
@@ -84,8 +90,13 @@ from (values
   ('DxT Games',                3, 'Tao',  'Nok',  'Internal')
 ) as s(name, tier, owner, backup, client);
 
+-- Registration fields (D-025): internal client, sample hosting and vault paths.
+update public.clients set is_internal = true where name = 'Internal';
+update public.sites set hosting = 'Example hosting', credential_ref = 'Team vault › ' || name, monitoring_started_at = now();
+
 -- ── One primary HTTP monitor per site ──
-insert into public.monitors (site_id, type, is_primary, url)
+insert into public.monitors (site_id, type, is_primary, url, must_contain)
 select id, 'http', true,
-       'https://' || trim(both '-' from regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g')) || '.example.test/'
+       'https://' || trim(both '-' from regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g')) || '.example.test/',
+       array[name]
 from public.sites;

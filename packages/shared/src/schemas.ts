@@ -37,6 +37,15 @@ export const ingestBatchSchema = z.object({
 });
 export type IngestBatch = z.infer<typeof ingestBatchSchema>;
 
+/**
+ * Custom headers on the wire to the VPS. Loose on purpose (names are checked where they are saved,
+ * `monitorHeadersSchema`, and the probe drops refused ones): one odd header mustn't fail a round.
+ */
+const wireHeadersSchema = z
+  .array(z.object({ name: z.string().min(1).max(64), value: z.string().max(1024) }))
+  .max(10)
+  .default([]);
+
 /** A monitor the Ingest API lists as due for the Bangkok probe (GET /api/ingest). */
 export const dueMonitorSchema = z.object({
   id: z.uuid(),
@@ -48,6 +57,8 @@ export const dueMonitorSchema = z.object({
   /** Keywords the probe checks (D-022); absent from a server that doesn't send them yet. */
   mustContain: z.array(z.string()).default([]),
   mustNotContain: z.array(z.string()).default([]),
+  /** Custom request headers (S05, D-025); absent from a server that doesn't send them yet. */
+  headers: wireHeadersSchema,
 });
 export type DueMonitor = z.infer<typeof dueMonitorSchema>;
 export const dueMonitorsResponseSchema = z.object({ monitors: z.array(dueMonitorSchema) });

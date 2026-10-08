@@ -18,7 +18,7 @@
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Done |
 | S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Done |
-| S05 | Sites & monitors | 1 · P0 | M | FR-01 | S01 | 3 | Todo |
+| S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | In review |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
@@ -294,7 +294,15 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
   3. Create / update / delete of a site or monitor each leave one `audit_log` row with before / after (test).
   4. spec-checker passes AddSite and EditMonitors; nav "Sites" is live.
   5. A site can't be saved with an owner or backup who has no Google Chat user id; the form names them (D-015, test).
-- **Review:** spec-checker, security-reviewer (SSRF, RLS).
+- **Review:** spec-checker, security-reviewer (SSRF, RLS), db-reviewer (audit trigger).
+- **Notes (evidence):** In review — Done-when 2–5 verified; Done-when 1 is production data entry after the merge (close-out PR). Built 8 Oct 2026 in one day with two review rounds (planned L). Staging: migration `sites_registration` by `pnpm db:push:staging`, `release.sh staging` (the Bangkok probe sends custom headers).
+  - **Done-when 1 — after merge:** owners sign in → `supabase/access/clients.template.sql` and `chat-ids.template.sql` (reviewed, run by Claude with Tao's OK) → the 17 sites entered as Drafts through Add site → Tao starts each → close-out PR with the production SQL count (17 active, both owners linked, client, hosting) and the `site.create` audit rows.
+  - **Done-when 2 ✓** `mutations.test.ts` "refuses http://169.254.169.254/ / http://10.0.0.5/ / a host resolving to 127.0.0.1" (injected DNS, nothing saved), `test-check.test.ts`, probe `target.test.ts`; staging `/verify`: both addresses refused "This address points inside a private network — monitors check public sites only".
+  - **Done-when 3 ✓** pgTAP `sites_registration.test.sql` (41: one row per create / update / delete of a site and a monitor, before / after, actor, no-op skipped, script actor null); e2e `sites.spec.ts` audit sequence; staging `audit_log` after `/verify`: site.create, monitor.create ×2, monitor.delete ×2, site.delete — all by Tao.
+  - **Done-when 4 ✓** spec-checker AddSite + EditMonitors, two rounds each (High: a key page's Test check said DOWN → PROBLEM; Mediums fixed in 784a425 / 41c83da; `/verify` focus-after-Undo fixed in 04caa21 and re-checked on staging). Nav "Sites" live; `layout-consistency` passes and now also covers the Sites detail pages.
+  - **Done-when 5 ✓** (as D-025 reads it) pgTAP "Owners need a Google Chat id: Nok", empty-owner Draft saves, Start refused without two linked owners; `site-form.test.tsx` "Arm · no Chat id" disabled and "Arm has no Google Chat id — ask an Admin to add it"; staging Edit site on Test target names "Jirawat (Tao) Piyakit has no Google Chat id".
+  - Reviews: `/code-review high` (10 fixed), security-reviewer (no High; M1 browser verifier headers → removed; Lows fixed incl. a table trigger for header names; re-review clean), db-reviewer (M1 open-incident monitors kept; M2 justified — credential-like header names are refused, so the audit log holds none), spec-checker ×2 rounds. `/verify` (Tao): one FAIL (focus after Undo) → fixed, re-checked.
+- **Notes:** started 8 Oct 2026; rules per D-025 (Drafts may leave owners empty, Start needs two linked owners — Done-when 5 reads so). Grew M → L at planning (Test check routes, custom headers through the probes and verifier, Draft / Start / Stop); if it runs past ~1.5 days, custom headers + Test check split off as S05b.
 
 ### S06 · Overview dashboard & site detail
 

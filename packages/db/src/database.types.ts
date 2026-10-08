@@ -82,13 +82,13 @@ isOneToOne: false
                   ]
                 },"clients": {
                   Row: {
-                    "am_user_id": string | null,"contact_email": string | null,"created_at": string,"id": string,"language": string,"name": string,"updated_at": string
+                    "am_user_id": string | null,"contact_email": string | null,"created_at": string,"id": string,"is_internal": boolean,"language": string,"name": string,"updated_at": string
                   }
                   Insert: {
-                    "am_user_id"?: string | null,"contact_email"?: string | null,"created_at"?: string,"id"?: string,"language"?: string,"name": string,"updated_at"?: string
+                    "am_user_id"?: string | null,"contact_email"?: string | null,"created_at"?: string,"id"?: string,"is_internal"?: boolean,"language"?: string,"name": string,"updated_at"?: string
                   }
                   Update: {
-                    "am_user_id"?: string | null,"contact_email"?: string | null,"created_at"?: string,"id"?: string,"language"?: string,"name"?: string,"updated_at"?: string
+                    "am_user_id"?: string | null,"contact_email"?: string | null,"created_at"?: string,"id"?: string,"is_internal"?: boolean,"language"?: string,"name"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -188,13 +188,13 @@ isOneToOne: false
                   ]
                 },"monitors": {
                   Row: {
-                    "allowed_redirect_domains": (string)[],"created_at": string,"expected_status": number,"id": string,"is_primary": boolean,"method": string,"must_contain": (string)[],"must_not_contain": (string)[],"site_id": string,"thresholds": NonNullable<Json>,"timeout_ms": number,"type": Database["public"]['Enums']["monitor_type"],"updated_at": string,"url": string
+                    "allowed_redirect_domains": (string)[],"created_at": string,"enabled": boolean,"expected_status": number,"headers": NonNullable<Json>,"id": string,"is_primary": boolean,"method": string,"must_contain": (string)[],"must_not_contain": (string)[],"removed_at": string | null,"site_id": string,"thresholds": NonNullable<Json>,"timeout_ms": number,"type": Database["public"]['Enums']["monitor_type"],"updated_at": string,"url": string
                   }
                   Insert: {
-                    "allowed_redirect_domains"?: (string)[],"created_at"?: string,"expected_status"?: number,"id"?: string,"is_primary"?: boolean,"method"?: string,"must_contain"?: (string)[],"must_not_contain"?: (string)[],"site_id": string,"thresholds"?: NonNullable<Json>,"timeout_ms"?: number,"type": Database["public"]['Enums']["monitor_type"],"updated_at"?: string,"url": string
+                    "allowed_redirect_domains"?: (string)[],"created_at"?: string,"enabled"?: boolean,"expected_status"?: number,"headers"?: NonNullable<Json>,"id"?: string,"is_primary"?: boolean,"method"?: string,"must_contain"?: (string)[],"must_not_contain"?: (string)[],"removed_at"?: string | null,"site_id": string,"thresholds"?: NonNullable<Json>,"timeout_ms"?: number,"type": Database["public"]['Enums']["monitor_type"],"updated_at"?: string,"url": string
                   }
                   Update: {
-                    "allowed_redirect_domains"?: (string)[],"created_at"?: string,"expected_status"?: number,"id"?: string,"is_primary"?: boolean,"method"?: string,"must_contain"?: (string)[],"must_not_contain"?: (string)[],"site_id"?: string,"thresholds"?: NonNullable<Json>,"timeout_ms"?: number,"type"?: Database["public"]['Enums']["monitor_type"],"updated_at"?: string,"url"?: string
+                    "allowed_redirect_domains"?: (string)[],"created_at"?: string,"enabled"?: boolean,"expected_status"?: number,"headers"?: NonNullable<Json>,"id"?: string,"is_primary"?: boolean,"method"?: string,"must_contain"?: (string)[],"must_not_contain"?: (string)[],"removed_at"?: string | null,"site_id"?: string,"thresholds"?: NonNullable<Json>,"timeout_ms"?: number,"type"?: Database["public"]['Enums']["monitor_type"],"updated_at"?: string,"url"?: string
                   }
                   Relationships: [
                     {
@@ -302,13 +302,13 @@ isOneToOne: true
                   ]
                 },"sites": {
                   Row: {
-                    "backup_owner_id": string | null,"client_id": string,"created_at": string,"hosting": string | null,"id": string,"is_active": boolean,"mute_reason": string | null,"muted_until": string | null,"name": string,"notes": string | null,"primary_owner_id": string | null,"tier": number,"updated_at": string
+                    "backup_owner_id": string | null,"behind_waf": boolean,"client_id": string,"created_at": string,"credential_ref": string | null,"hosting": string | null,"id": string,"is_active": boolean,"monitoring_started_at": string | null,"mute_reason": string | null,"muted_until": string | null,"name": string,"notes": string | null,"primary_owner_id": string | null,"tier": number,"updated_at": string,"waf_allowlist_confirmed": boolean
                   }
                   Insert: {
-                    "backup_owner_id"?: string | null,"client_id": string,"created_at"?: string,"hosting"?: string | null,"id"?: string,"is_active"?: boolean,"mute_reason"?: string | null,"muted_until"?: string | null,"name": string,"notes"?: string | null,"primary_owner_id"?: string | null,"tier": number,"updated_at"?: string
+                    "backup_owner_id"?: string | null,"behind_waf"?: boolean,"client_id": string,"created_at"?: string,"credential_ref"?: string | null,"hosting"?: string | null,"id"?: string,"is_active"?: boolean,"monitoring_started_at"?: string | null,"mute_reason"?: string | null,"muted_until"?: string | null,"name": string,"notes"?: string | null,"primary_owner_id"?: string | null,"tier": number,"updated_at"?: string,"waf_allowlist_confirmed"?: boolean
                   }
                   Update: {
-                    "backup_owner_id"?: string | null,"client_id"?: string,"created_at"?: string,"hosting"?: string | null,"id"?: string,"is_active"?: boolean,"mute_reason"?: string | null,"muted_until"?: string | null,"name"?: string,"notes"?: string | null,"primary_owner_id"?: string | null,"tier"?: number,"updated_at"?: string
+                    "backup_owner_id"?: string | null,"behind_waf"?: boolean,"client_id"?: string,"created_at"?: string,"credential_ref"?: string | null,"hosting"?: string | null,"id"?: string,"is_active"?: boolean,"monitoring_started_at"?: string | null,"mute_reason"?: string | null,"muted_until"?: string | null,"name"?: string,"notes"?: string | null,"primary_owner_id"?: string | null,"tier"?: number,"updated_at"?: string,"waf_allowlist_confirmed"?: boolean
                   }
                   Relationships: [
                     {
@@ -468,8 +468,14 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"create_site":
+{ Args: { "p_monitors": Json,"p_site": Json,"p_start"?: boolean }; Returns: string
+                           },
 "current_app_role":
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
+                           },
+"delete_site":
+{ Args: { "p_site_id": string }; Returns: undefined
                            },
 "engine_cancel_flap_summary":
 { Args: { "p_incident_id": string }; Returns: undefined
@@ -594,8 +600,17 @@ isOneToOne: false
 "queue_fallback_emails":
 { Args: { "p_notification_id": string }; Returns: number
                            },
+"save_monitors":
+{ Args: { "p_removals"?: (string)[],"p_site_id": string,"p_upserts": Json }; Returns: undefined
+                           },
+"set_site_monitoring":
+{ Args: { "p_on": boolean,"p_site_id": string }; Returns: undefined
+                           },
 "undo_ack":
 { Args: { "p_incident_id": string }; Returns: undefined
+                           },
+"update_site":
+{ Args: { "p_site": Json,"p_site_id": string }; Returns: undefined
                            },
 "write_audit":
 { Args: { "p_action": string,"p_after"?: Json,"p_before"?: Json,"p_entity": string,"p_entity_id"?: string }; Returns: string

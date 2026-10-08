@@ -68,6 +68,26 @@ export default tseslint.config(
       ],
     },
   },
+  // Pages render without the cron / ingest secrets (the CI e2e job has none): read the few values a
+  // page shows through their own helpers, not serverEnv(), which refuses to run without every secret
+  // (S05 CI failure, docs/retro.md).
+  {
+    files: ['apps/web/src/app/**/page.tsx', 'apps/web/src/app/**/layout.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@/lib/env',
+              importNames: ['serverEnv'],
+              message: 'A page must render without every server secret: add a small helper in lib/env.ts.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     files: ['apps/web/src/**/*.test.{ts,tsx}'],
     rules: { 'dxt/no-hardcoded-design-values': 'off' },

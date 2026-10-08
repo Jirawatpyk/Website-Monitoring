@@ -1,7 +1,7 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { runHttpCheck, type HttpCheckRequest, type HttpCheckResult } from '@dxt/probe';
-import type { ProbeLocation } from '@dxt/shared';
+import { probeRequestHeaders, type ProbeLocation } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { loadDueMonitors, type DueMonitor } from './due-monitors';
 
@@ -56,7 +56,6 @@ export async function runProbe({
 
   const started = clock();
   const monitors = await loadDueMonitors(db, new Date(started));
-  const headers = secretHeader ? { [secretHeader.name]: secretHeader.value } : undefined;
 
   // Scheduled checks carry the run's start time, so a run that starts at :59.9 still lands in the
   // round it was due for; rechecks carry their own start time.
@@ -66,7 +65,7 @@ export async function runProbe({
       url: m.url,
       method: m.method,
       timeoutMs,
-      headers,
+      headers: probeRequestHeaders(m.headers, secretHeader),
       allowPrivateTargets,
       mustContain: m.mustContain,
       mustNotContain: m.mustNotContain,

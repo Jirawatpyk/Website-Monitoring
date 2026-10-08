@@ -21,6 +21,8 @@ const serverEnvSchema = z.object({
   ALERT_EMAIL_FROM: z.string().optional(),
   PROBE_SECRET_HEADER_NAME: z.string().default('X-DxT-Monitor'),
   PROBE_SECRET_HEADER_VALUE: z.string().optional(),
+  /** The Bangkok VPS's fixed public IP, shown on Add site for a WAF allowlist (S05; not a secret). */
+  BKK_PROBE_IP: z.string().optional(),
   HEALTHCHECKS_PING_URL_ENGINE: z.url().optional(),
   HEALTHCHECKS_PING_URL_PROBE_SIN: z.url().optional(),
   HEALTHCHECKS_PING_URL_PROBE_TYO: z.url().optional(),
@@ -41,4 +43,16 @@ export function serverEnv(): ServerEnv {
   }
   cached = parsed.data;
   return cached;
+}
+
+/**
+ * The probe facts Add site shows for a WAF allowlist (S05): the Bangkok VPS IP and the secret
+ * header's name — never its value. Read on their own so a page doesn't need every server secret
+ * (`serverEnv()` refuses to run without them, e.g. in the CI e2e job).
+ */
+export function probeAllowlistInfo(): { bkkIp: string | null; secretHeaderName: string } {
+  return {
+    bkkIp: process.env.BKK_PROBE_IP?.trim() || null,
+    secretHeaderName: process.env.PROBE_SECRET_HEADER_NAME?.trim() || 'X-DxT-Monitor',
+  };
 }

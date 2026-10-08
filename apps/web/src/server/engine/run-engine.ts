@@ -513,6 +513,9 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
       'id, url, is_primary, must_contain, timeout_ms, thresholds, allowed_redirect_domains, site_id, sites!inner(name, tier, is_active, muted_until)',
     )
     .eq('sites.is_active', true)
+    // A monitor switched off or removed (S05, D-025) no longer counts towards the site.
+    .eq('enabled', true)
+    .is('removed_at', null)
     .in('type', HTTP_MONITOR_TYPES);
   if (error) throw new Error(`monitors: ${error.message}`);
   const sites = new Map<string, SiteRow>();
