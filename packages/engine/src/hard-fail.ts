@@ -1,4 +1,4 @@
-import { isTlsChainError, type CheckOutcome } from '@dxt/shared';
+import { isHardFailCheck, isTlsChainError, type CheckOutcome } from '@dxt/shared';
 
 type Vote = { outcome: CheckOutcome; error?: string | null };
 
@@ -9,8 +9,7 @@ type Vote = { outcome: CheckOutcome; error?: string | null };
  * refuses the raw comparison in packages/engine).
  */
 export function isHardFail(c: Vote): boolean {
-  // eslint-disable-next-line no-restricted-syntax -- the one raw comparison (D-029)
-  return c.outcome === 'fail' && !isTlsChainError(c.error);
+  return isHardFailCheck(c);
 }
 
 /**

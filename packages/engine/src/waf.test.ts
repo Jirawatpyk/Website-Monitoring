@@ -477,9 +477,9 @@ describe('D-027 — evaluateRound on a WAF site', () => {
 // Retro S05b: engine-reviewer needed three rounds, each fix exposing a new edge case. These
 // invariants run every combination instead of the cases someone thought of.
 describe('D-027 invariants over every combination', () => {
-  type Bkk = 'pass' | 'fail' | 'fail-control' | 'fail-akamai' | 'blocked-waf';
+  type Bkk = 'pass' | 'fail' | 'fail-control' | 'fail-akamai' | 'blocked-waf' | 'chain';
   type Abroad = 'pass' | 'fail' | 'waf' | 'body-block' | 'silent' | 'chain';
-  const BKK: Bkk[] = ['pass', 'fail', 'fail-control', 'fail-akamai', 'blocked-waf'];
+  const BKK: Bkk[] = ['pass', 'fail', 'fail-control', 'fail-akamai', 'blocked-waf', 'chain'];
   const ABROAD: Abroad[] = ['pass', 'fail', 'waf', 'body-block', 'silent', 'chain'];
   const VERDICTS: (Verification | undefined)[] = [
     undefined,
@@ -496,6 +496,8 @@ describe('D-027 invariants over every combination', () => {
           : { controlOk: true };
     if (b === 'pass') return [check('BKK', 'pass', 1, over)];
     if (b === 'blocked-waf') return [check('BKK', 'blocked', 1, { waf: 'akamai' })];
+    if (b === 'chain')
+      return [check('BKK', 'fail', 1, { statusCode: null, error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' })];
     return [check('BKK', 'fail', 1, over), recheck('BKK', 'fail', 31, over)];
   };
   const abroadRows = (loc: ProbeLocation, a: Abroad, sec: number): StoredCheck[] => {
@@ -546,6 +548,19 @@ describe('D-027 invariants over every combination', () => {
       if (c.b === 'blocked-waf' || c.sin === 'waf' || c.tyo === 'waf') continue;
       if (c.b === 'fail-control' || c.b === 'fail-akamai') continue;
       expect(decide(c, true), JSON.stringify(c)).toEqual(decide(c, false));
+    }
+  });
+
+  it('D-029: a DOWN never counts a chain error among the locations that confirmed it', () => {
+    for (const c of cases) {
+      for (const behindWaf of [true, false]) {
+        const d = decide(c, behindWaf);
+        if (d.kind !== 'open' || d.verifyJobId) continue;
+        expect(
+          d.failing.filter((f) => f.error === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'),
+          JSON.stringify(c),
+        ).toEqual([]);
+      }
     }
   });
 

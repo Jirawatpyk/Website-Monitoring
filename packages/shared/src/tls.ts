@@ -14,3 +14,11 @@ export const TLS_CHAIN_ERRORS = [
 export function isTlsChainError(error: string | null | undefined): boolean {
   return !!error && (TLS_CHAIN_ERRORS as readonly string[]).includes(error);
 }
+
+/**
+ * D-029: is this check a hard-fail vote? A failure that isn't a certificate-chain error. The engine's
+ * `isHardFail` and the probes' recheck decision both use it — the one rule.
+ */
+export function isHardFailCheck(c: { outcome: string; error?: string | null }): boolean {
+  return c.outcome === 'fail' && !isTlsChainError(c.error);
+}

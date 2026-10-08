@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
 import { isHardFail, isTlsChainFail } from './hard-fail';
-import type { StoredCheck } from './monitor';
+import type { OpenIncident, StoredCheck } from './monitor';
 import { faultyLocations } from './round';
 import { decideSite, NEW_MONITOR, type SiteMonitor, type SiteSnapshot } from './site';
 
@@ -137,13 +137,77 @@ describe('D-029 — TLS chain errors are a PROBLEM, not DOWN (decideSite)', () =
     });
   });
 
-  it('chain errors never mark a probe location faulty (spec §15.3 counts outages, not chain mistakes)', () => {
+  it('a location seeing chain errors on most sites is a faulty probe (its trust store), excluded (engine review M1)', () => {
     const rows = [
-      { location: 'SIN' as const, outcome: 'fail' as const, error: CHAIN },
-      { location: 'SIN' as const, outcome: 'fail' as const, error: CHAIN },
+      { location: 'BKK' as const, outcome: 'fail' as const, error: 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY' },
+      { location: 'BKK' as const, outcome: 'fail' as const, error: 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY' },
+      { location: 'BKK' as const, outcome: 'pass' as const, error: null },
       { location: 'SIN' as const, outcome: 'pass' as const, error: null },
-      { location: 'TYO' as const, outcome: 'pass' as const, error: null },
+      { location: 'SIN' as const, outcome: 'pass' as const, error: null },
     ];
-    expect(faultyLocations(rows)).toEqual(new Set());
+    expect(faultyLocations(rows)).toEqual(new Set(['BKK']));
+  });
+
+  // engine review M2: one confirmed hard fail + one chain error is no OK round — and no silent blip.
+  it('a hard fail at BKK (rechecked) + a chain error at SIN + a pass at TYO → PROBLEM (TLS chain)', () => {
+    const bkk = check('BKK', 'fail', 1);
+    const rows = [bkk, chain('SIN', 2), check('TYO', 'pass', 3), recheck(bkk, 31)];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'problem', trigger: 'tls_chain' });
+  });
+
+  it('two locations reporting, a chain error and a hard fail → PROBLEM (TLS chain)', () => {
+    const tyo = check('TYO', 'fail', 3);
+    const rows = [chain('SIN', 2), tyo, recheck(tyo, 33)];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'problem', trigger: 'tls_chain' });
+  });
+});
+
+// engine review H1: a DOWN drop must end when the site answers again — even with a broken chain
+// (D-023), then continue as PROBLEM (TLS chain). INC-0142 MuvMi-style DOWN, renewed cert with the
+// wrong intermediate.
+describe('D-029 with an open incident', () => {
+  const incident = (
+    state: OpenIncident['state'],
+    severity: OpenIncident['severity'] = 'down',
+  ): OpenIncident => ({
+    id: 'inc-1',
+    state,
+    severity,
+    hasRootCause: false,
+  });
+
+  it('an unacked DOWN, then chain errors everywhere → RECOVERED, then PROBLEM (TLS chain) in the same round', () => {
+    const rows = [chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)];
+    expect(decideSite(site([home(rows)], { open: incident('unacked') }))).toMatchObject({
+      kind: 'recover',
+      then: { severity: 'problem', trigger: 'tls_chain' },
+    });
+  });
+
+  it('…and with chain errors at two locations and a pass at one', () => {
+    const rows = [chain('BKK', 1), chain('SIN', 2), check('TYO', 'pass', 3)];
+    expect(decideSite(site([home(rows)], { open: incident('unacked') }))).toMatchObject({
+      kind: 'recover',
+      then: { trigger: 'tls_chain' },
+    });
+  });
+
+  it('a recovered incident sees the chain break again → PROBLEM AGAIN in the same incident', () => {
+    const rows = [chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)];
+    expect(decideSite(site([home(rows)], { open: incident('monitoring', 'problem') }))).toMatchObject({
+      kind: 'relapse',
+      severity: 'problem',
+      trigger: 'tls_chain',
+    });
+  });
+
+  it('an open TLS chain PROBLEM, then two real hard fails with rechecks → escalated to DOWN, starting at the first timeout', () => {
+    const sin = check('SIN', 'fail', 2);
+    const tyo = check('TYO', 'fail', 3);
+    const rows = [chain('BKK', 1), sin, tyo, recheck(sin, 32), recheck(tyo, 33)];
+    expect(decideSite(site([home(rows)], { open: incident('unacked', 'problem') }))).toMatchObject({
+      kind: 'escalate',
+      downStartedAt: at(2),
+    });
   });
 });

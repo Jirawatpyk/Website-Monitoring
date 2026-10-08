@@ -1,4 +1,4 @@
-import { isHardFail, isTlsChainFail } from './hard-fail';
+import { failsHere, isHardFail, isTlsChainFail } from './hard-fail';
 import type { IncidentState, ProbeLocation, Severity, SiteStatus, Trigger } from '@dxt/shared';
 import { autoResolves, isFlapping, RECOVERED_STATES, stillFlapping, transition } from './lifecycle';
 import {
@@ -639,14 +639,19 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
 
   // D-029: a certificate chain misconfigured at most reporting locations is a PROBLEM in one round —
   // steady until someone fixes it, like a missing keyword. A real hard fail (above) still wins.
+  // With chain errors in the round, chain + real failures as a majority is no OK round either: say
+  // TLS chain rather than leave it a silent blip (engine review M2). The server answered the
+  // handshake, so the home page counts as back for a DOWN drop (D-023, engine review H1).
   const chained = counted.filter(isTlsChainFail);
-  if (chained.length * 2 > counted.length && chained.length >= (wafRound ? 1 : 2)) {
+  const failingHere = counted.filter(failsHere);
+  if (chained.length && failingHere.length * 2 > counted.length && failingHere.length >= (wafRound ? 1 : 2)) {
     return {
       verdict: {
         kind: 'problem',
         trigger: m.isPrimary ? 'tls_chain' : 'key_page',
         detail: { kind: 'tls_chain', code: chained[0]!.error!, locations: chained.map((c) => c.location) },
         startedAt: earliest(chained) ?? roundAt,
+        reachable: chained,
       },
       next: reset,
     };
@@ -687,7 +692,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   }
 
   if (first.kind === 'needs_verification') {
-    const notPassing = round.scheduled.filter((c) => c.outcome !== 'pass');
+    const notPassing = round.scheduled.filter((c) => c.outcome !== 'pass' && !isTlsChainFail(c));
     const startedAt = earliest(notPassing);
     const v = m.verifications?.get(roundAt.getTime());
     if (!v)

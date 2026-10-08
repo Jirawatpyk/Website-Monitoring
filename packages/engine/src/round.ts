@@ -1,5 +1,5 @@
 import type { CheckOutcome, ProbeLocation, WafVendor } from '@dxt/shared';
-import { isHardFail } from './hard-fail';
+import { failsHere, isHardFail } from './hard-fail';
 
 /**
  * One check round for one monitor: the latest result from each location inside the tier's window
@@ -192,7 +192,8 @@ export function faultyLocations(
   for (const r of roundResults) {
     const t = totals.get(r.location) ?? { all: 0, failed: 0 };
     t.all += 1;
-    if (isHardFail(r)) t.failed += 1;
+    // A probe whose trust store lacks an issuer sees chain errors on most sites: faulty too (D-029).
+    if (failsHere(r)) t.failed += 1;
     totals.set(r.location, t);
   }
   const overHalf = [...totals].filter(([, t]) => t.failed / t.all > 0.5).map(([location]) => location);

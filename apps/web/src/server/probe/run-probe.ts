@@ -1,7 +1,7 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { runHttpCheck, type HttpCheckRequest, type HttpCheckResult } from '@dxt/probe';
-import { isTlsChainError, probeRequestHeaders, type ProbeLocation } from '@dxt/shared';
+import { isHardFailCheck, probeRequestHeaders, type ProbeLocation } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { loadDueMonitors, type DueMonitor } from './due-monitors';
 import { insertCheckResults } from '../check-results';
@@ -81,7 +81,7 @@ export async function runProbe({
   await insertResults(db, location, 1, first);
 
   // A certificate-chain error is a PROBLEM, never DOWN (D-029): nothing for a recheck to confirm.
-  const hardFail = (r: HttpCheckResult) => r.outcome === 'fail' && !isTlsChainError(r.error);
+  const hardFail = (r: HttpCheckResult) => isHardFailCheck(r);
   const failed = first.filter((r) => hardFail(r.result)).map((r) => r.m);
   let rechecked = 0;
   let recheckFailed = 0;
