@@ -27,10 +27,13 @@ export type ProblemDetail =
     }
   /** A blocked key page whose page then failed in the browser. */
   | { kind: 'browser'; detail: string | null }
-  /** Blocked and not verified: the verifier was unavailable or the browser was blocked too (D-001, D-020). */
+  /**
+   * Blocked and not verified: the verifier was unavailable, the browser was blocked too (D-001, D-020),
+   * or behind a WAF the VPS's control check failed (D-027).
+   */
   | {
       kind: 'blocked';
-      reason: 'no_poll' | 'not_picked_up' | 'lease_expired' | 'browser_blocked';
+      reason: 'no_poll' | 'not_picked_up' | 'lease_expired' | 'browser_blocked' | 'control_failed';
       /** The blocked locations and the status they got (403 / 429 / 503). */
       locations: ProbeLocation[];
       statusCode: number | null;

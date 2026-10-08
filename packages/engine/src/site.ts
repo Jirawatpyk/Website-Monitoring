@@ -15,7 +15,7 @@ import {
   type UnverifiedReason,
   type Verification,
 } from './monitor';
-import { BLOCKED_NOTE, confirmsDown, evaluateRound } from './round';
+import { abstainsOnWafSite, BLOCKED_NOTE, confirmsDown, evaluateRound, wafNote } from './round';
 import {
   keywordIssue,
   minuteOf,
@@ -92,6 +92,8 @@ export interface SiteSnapshot {
   monitors: readonly SiteMonitor[];
   /** The verifier polled the Job API in the last 2 min (D-019). */
   verifierAvailable?: boolean;
+  /** The site is flagged `behind_waf`: WAF-signed blocks abstain (D-027). */
+  behindWaf?: boolean;
   /** Per probe minute, locations treated as no data (spec §15.3, `faultyByMinute`). */
   faulty?: ReadonlyMap<number, ReadonlySet<ProbeLocation>>;
   /** OK ↔ not-OK changes at incident steps in the last 30 min, and the last one's direction (D-024). */
@@ -513,7 +515,16 @@ function recoverDecision(
 function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement | typeof PENDING {
   const roundAt = round.start;
   const excluded = excludedIn(s, round);
-  const counted = round.scheduled.filter((c) => !excluded.has(c.location));
+  const wafSite = !!s.behindWaf;
+  // The rows are already chosen; the window only has to include them all.
+  const windowSec = (s.now.getTime() - roundAt.getTime()) / 1000 + s.intervalSec + 60;
+  const first = evaluateRound({ results: round.scheduled, now: s.now, windowSec, excluded, wafSite });
+  // D-027: behind a WAF, the locations that sat the round out don't count — not for the majority,
+  // and not as a regional failure.
+  const sittingOut = wafSite
+    ? new Set(round.scheduled.filter(abstainsOnWafSite).map((c) => c.location))
+    : new Set<ProbeLocation>();
+  const counted = round.scheduled.filter((c) => !excluded.has(c.location) && !sittingOut.has(c.location));
   // A clock of a location that stopped beating is stale: its next failure starts a new one.
   const beating = Object.fromEntries(
     Object.entries(m.carry.failingSince).filter(
@@ -523,21 +534,45 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   const failingSince = nextFailingSince(beating, counted);
   const carried = { slowRounds: m.carry.slowRounds, failingSince };
   const reset = { slowRounds: 0, failingSince };
+  const blockedChecks = round.scheduled.filter((c) => c.outcome === 'blocked');
+  const unverified = (reason: UnverifiedReason, startedAt: Date): Judgement => ({
+    verdict: {
+      kind: 'problem',
+      // D-022: any problem on a key page is `key_page`; the cause says it was blocked.
+      trigger: m.isPrimary ? 'blocked_unverified' : 'key_page',
+      detail: {
+        kind: 'blocked',
+        reason,
+        locations: blockedChecks.map((c) => c.location),
+        statusCode: blockedChecks[0]?.statusCode ?? null,
+      },
+      startedAt,
+      ...(m.isPrimary ? { note: UNVERIFIED_NOTE } : {}),
+    },
+    next: reset,
+  });
 
-  // The rows are already chosen; the window only has to include them all.
-  const windowSec = (s.now.getTime() - roundAt.getTime()) / 1000 + s.intervalSec + 60;
-  const first = evaluateRound({ results: round.scheduled, now: s.now, windowSec, excluded });
+  // Behind a WAF with nobody left to vote and the VPS's control check down (D-027).
+  if (first.kind === 'untrusted') {
+    return unverified(
+      'control_failed',
+      earliest(round.scheduled.filter((c) => c.outcome !== 'pass')) ?? roundAt,
+    );
+  }
 
   if (first.kind === 'hard_fail') {
     const firstFail = earliest(round.scheduled.filter((c) => first.failing.includes(c.location)));
     // Only rechecks vote in the second round, each after its own scheduled check: a location that
-    // didn't recheck can't vote twice with its scheduled result.
+    // didn't recheck can't vote twice with its scheduled result. Behind a WAF, a round decided by one
+    // location is confirmed by that location's recheck alone (D-027).
     const second = evaluateRound({
       results: round.rechecks,
       now: s.now,
       windowSec,
       after: firstFail,
       excluded,
+      wafSite,
+      ...(wafSite && counted.length === 1 ? { minReporting: 1 } : {}),
     });
     if (!(confirmsDown(first, second) && second.kind === 'hard_fail')) {
       return { verdict: { kind: 'blip' }, next: reset };
@@ -569,10 +604,12 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   // is no majority; two passes and a regional failure is.
   const passing = counted.filter((c) => c.outcome === 'pass');
   if (first.kind === 'pass' && passing.length * 2 > counted.length) {
-    const p50 = roundP50(counted);
+    // Behind a WAF a round one location decided is evidence enough for the triggers too (D-027).
+    const minLocations = wafSite && counted.length === 1 ? 1 : 2;
+    const p50 = roundP50(counted, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
     const next = { slowRounds, failingSince };
-    const issue = problemOf(m, counted, failingSince, slowRounds, p50);
+    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations);
     if (issue) {
       return {
         verdict: {
@@ -584,40 +621,35 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         next,
       };
     }
-    return { verdict: { kind: 'ok', reachable: passing }, next };
+    // Behind a WAF with some locations blocked: say who decided (D-027).
+    const wafBlocked = wafSite
+      ? round.scheduled.filter((c) => c.outcome === 'blocked' && c.waf).map((c) => c.location)
+      : [];
+    const note = wafBlocked.length
+      ? wafNote(
+          passing.map((c) => c.location),
+          wafBlocked,
+        )
+      : undefined;
+    return { verdict: { kind: 'ok', reachable: passing, ...(note ? { note } : {}) }, next };
   }
 
   if (first.kind === 'needs_verification') {
     const notPassing = round.scheduled.filter((c) => c.outcome !== 'pass');
     const startedAt = earliest(notPassing);
-    const blocked = round.scheduled.filter((c) => c.outcome === 'blocked');
-    const unverified = (reason: UnverifiedReason): Judgement => ({
-      verdict: {
-        kind: 'problem',
-        // D-022: any problem on a key page is `key_page`; the cause says it was blocked.
-        trigger: m.isPrimary ? 'blocked_unverified' : 'key_page',
-        detail: {
-          kind: 'blocked',
-          reason,
-          locations: blocked.map((c) => c.location),
-          statusCode: blocked[0]?.statusCode ?? null,
-        },
-        startedAt,
-        ...(m.isPrimary ? { note: UNVERIFIED_NOTE } : {}),
-      },
-      next: reset,
-    });
     const v = m.verifications?.get(roundAt.getTime());
     if (!v)
-      return s.verifierAvailable ? { verdict: { kind: 'verify' }, next: carried } : unverified('no_poll');
+      return s.verifierAvailable
+        ? { verdict: { kind: 'verify' }, next: carried }
+        : unverified('no_poll', startedAt);
     switch (v.state) {
       case 'pending':
         return PENDING;
       case 'unavailable':
-        return unverified(v.reason);
+        return unverified(v.reason, startedAt);
       case 'blocked':
         // PRD §5: a plain browser blocked too is a PROBLEM, never hidden — and never a DOWN (D-020).
-        return unverified('browser_blocked');
+        return unverified('browser_blocked', startedAt);
       case 'loaded':
         // The browser saw the page: the blocked locations count as reachable this round.
         return {
@@ -666,13 +698,14 @@ function problemOf(
   failingSince: FailingSince,
   slowRounds: number,
   p50: number | null,
+  minLocations = 2,
 ): { trigger: Trigger; detail: ProblemDetail } | null {
   const as = (trigger: Trigger, detail: ProblemDetail | null) =>
     detail ? { trigger: m.isPrimary ? trigger : ('key_page' as const), detail } : null;
   return (
-    (m.isPrimary ? null : as('key_page', statusIssue(counted))) ??
-    as('keyword', keywordIssue(counted)) ??
-    as('redirect', redirectIssue(counted, m.url, m.allowedRedirectDomains)) ??
+    (m.isPrimary ? null : as('key_page', statusIssue(counted, minLocations))) ??
+    as('keyword', keywordIssue(counted, minLocations)) ??
+    as('redirect', redirectIssue(counted, m.url, m.allowedRedirectDomains, minLocations)) ??
     (slowRounds >= SLOW_ROUNDS && p50 !== null
       ? as('slow', {
           kind: 'slow',

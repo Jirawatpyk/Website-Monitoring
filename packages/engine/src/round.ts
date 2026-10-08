@@ -1,4 +1,4 @@
-import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
+import type { CheckOutcome, ProbeLocation, WafVendor } from '@dxt/shared';
 
 /**
  * One check round for one monitor: the latest result from each location inside the tier's window
@@ -8,17 +8,26 @@ export interface LocationResult {
   location: ProbeLocation;
   outcome: CheckOutcome;
   checkedAt: Date;
+  /** A blocked check's header-level WAF signature (D-027). */
+  waf?: WafVendor | null;
+  /** Bangkok only: false = both VPS control URLs failed in that batch (D-027); null / absent = ok. */
+  controlOk?: boolean | null;
 }
 
 export type RoundVerdict =
   /** Fewer than 2 locations reported: keep the current status and alert the Admin. */
   | { kind: 'insufficient_data'; reporting: readonly ProbeLocation[] }
   /** At least 2 locations hard-failed (timeout, 5xx, DNS/TLS error, connection refused). */
-  | { kind: 'hard_fail'; failing: readonly ProbeLocation[] }
+  | { kind: 'hard_fail'; failing: readonly ProbeLocation[]; abstained?: readonly ProbeLocation[] }
   /** Blocked (403/429/challenge) with no majority either way: the browser verifier decides. */
   | { kind: 'needs_verification'; blocked: readonly ProbeLocation[] }
   /** No DOWN majority. `failing` lists any minority failures (a regional PROBLEM candidate). */
-  | { kind: 'pass'; failing: readonly ProbeLocation[] };
+  | { kind: 'pass'; failing: readonly ProbeLocation[]; abstained?: readonly ProbeLocation[] }
+  /**
+   * A site behind a WAF where nothing could vote: the others were WAF-blocked and the VPS's control
+   * check failed, so its result can't be trusted (D-027). PROBLEM (unverified), never DOWN.
+   */
+  | { kind: 'untrusted'; abstained: readonly ProbeLocation[] };
 
 export interface RoundInput {
   results: readonly LocationResult[];
@@ -31,12 +40,32 @@ export interface RoundInput {
    * the first failing check, so a location that didn't recheck can't vote twice with its old result.
    */
   after?: Date;
+  /**
+   * The site is flagged `behind_waf` (D-027): a WAF-signed block and a Bangkok result whose control
+   * check failed abstain, and the locations left decide — one is enough.
+   */
+  wafSite?: boolean;
+  /** Fewer reporting locations than this = insufficient data (default 2; the WAF recheck uses 1). */
+  minReporting?: number;
+}
+
+/** D-027: does this result sit the round out on a site behind a WAF? */
+export function abstainsOnWafSite(r: LocationResult): boolean {
+  return (r.outcome === 'blocked' && !!r.waf) || (r.location === 'BKK' && r.controlOk === false);
 }
 
 /** Probe clocks may run slightly ahead of the engine; results up to this far "in the future" still count. */
 export const CLOCK_SKEW_TOLERANCE_MS = 10_000;
 
-export function evaluateRound({ results, now, windowSec, excluded, after }: RoundInput): RoundVerdict {
+export function evaluateRound({
+  results,
+  now,
+  windowSec,
+  excluded,
+  after,
+  wafSite,
+  minReporting = 2,
+}: RoundInput): RoundVerdict {
   const latest = new Map<ProbeLocation, LocationResult>();
   for (const r of results) {
     if (excluded?.has(r.location)) continue;
@@ -48,7 +77,10 @@ export function evaluateRound({ results, now, windowSec, excluded, after }: Roun
   }
 
   const counted = [...latest.values()];
-  if (counted.length < 2) return { kind: 'insufficient_data', reporting: counted.map((r) => r.location) };
+  if (counted.length < minReporting) {
+    return { kind: 'insufficient_data', reporting: counted.map((r) => r.location) };
+  }
+  if (wafSite) return evaluateWafRound(counted);
 
   const by = (outcome: CheckOutcome) => counted.filter((r) => r.outcome === outcome).map((r) => r.location);
   const failing = by('fail');
@@ -59,6 +91,34 @@ export function evaluateRound({ results, now, windowSec, excluded, after }: Roun
   if (passing.length >= 2) return { kind: 'pass', failing };
   if (blocked.length > 0) return { kind: 'needs_verification', blocked };
   return { kind: 'pass', failing };
+}
+
+/**
+ * D-027: on a site behind a WAF the locations that abstain sit out and the rest decide, one being
+ * enough. Nothing left: the control check failed → untrusted; everyone WAF-blocked → the verifier.
+ */
+function evaluateWafRound(counted: readonly LocationResult[]): RoundVerdict {
+  const abstained = counted.filter(abstainsOnWafSite).map((r) => r.location);
+  const voters = counted.filter((r) => !abstainsOnWafSite(r));
+  const by = (outcome: CheckOutcome) => voters.filter((r) => r.outcome === outcome).map((r) => r.location);
+  if (!voters.length) {
+    if (counted.some((r) => r.location === 'BKK' && r.controlOk === false)) {
+      return { kind: 'untrusted', abstained };
+    }
+    return { kind: 'needs_verification', blocked: counted.map((r) => r.location) };
+  }
+  const failing = by('fail');
+  const passing = by('pass');
+  const enough = (n: number) => n >= 2 || (voters.length === 1 && n === 1);
+  if (enough(failing.length)) return { kind: 'hard_fail', failing, abstained };
+  if (enough(passing.length)) return { kind: 'pass', failing, abstained };
+  if (by('blocked').length) return { kind: 'needs_verification', blocked: by('blocked') };
+  return { kind: 'pass', failing, abstained };
+}
+
+/** The site note of an OK round on a site behind a WAF: who decided, who the WAF blocked (D-027). */
+export function wafNote(verifiedFrom: readonly ProbeLocation[], blocked: readonly ProbeLocation[]): string {
+  return `Verified from ${verifiedFrom.join(', ')}; ${blocked.join(', ')} blocked by bot protection`;
 }
 
 /**
