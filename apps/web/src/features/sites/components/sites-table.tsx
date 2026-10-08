@@ -39,7 +39,7 @@ export function SitesTable({ sites, canEdit }: SitesTableProps) {
   const owners = useMemo(() => {
     const seen = new Map<string, string>();
     for (const s of sites) if (s.owner) seen.set(s.owner.id, s.owner.name);
-    return [...seen].map(([value, name]) => ({ value, label: `Owner: ${name}` }));
+    return [...seen].map(([value, name]) => ({ value, label: name }));
   }, [sites]);
 
   const rows = sites.filter(
@@ -94,15 +94,15 @@ export function SitesTable({ sites, canEdit }: SitesTableProps) {
       <div className="flex flex-wrap items-center gap-2">
         <SegmentedControl label="Tier" size="sm" options={TIER_OPTIONS} value={tier} onChange={setTier} />
         <FilterSelect
-          label="Owner filter"
-          allLabel="Owner: all"
+          label="Owner"
+          allLabel="all"
           options={owners}
           value={owner}
           onChange={setOwner}
         />
         <FilterSelect
-          label="Client filter"
-          allLabel="Client: all"
+          label="Client"
+          allLabel="all"
           options={[
             { value: 'client', label: 'Client sites' },
             { value: 'internal', label: 'Internal' },
