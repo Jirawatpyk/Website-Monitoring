@@ -25,6 +25,8 @@ export type ProblemDetail =
       kind: 'hard_fail';
       failing: { location: ProbeLocation; statusCode: number | null; error: string | null }[];
     }
+  /** The certificate chain is misconfigured at most locations (D-029): browsers open it, apps don't. */
+  | { kind: 'tls_chain'; code: string; locations: ProbeLocation[] }
   /** A blocked key page whose page then failed in the browser. */
   | { kind: 'browser'; detail: string | null }
   /**

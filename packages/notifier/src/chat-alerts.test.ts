@@ -213,6 +213,7 @@ describe('formatCause (spec §10)', () => {
     ['ECONNREFUSED', 'Connection refused (SIN)'],
     ['ECONNRESET', 'Connection reset (SIN)'],
     ['CERT_HAS_EXPIRED', 'TLS error (SIN)'],
+    ['UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'TLS error (SIN)'],
     ['something odd with secrets', 'Connection error (SIN)'],
     [null, 'Connection error (SIN)'],
   ])('%s → %s', (error, expected) => {

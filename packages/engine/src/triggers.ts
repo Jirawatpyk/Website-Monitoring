@@ -1,3 +1,4 @@
+import { isHardFail } from './hard-fail';
 import type { CheckOutcome, ProbeLocation, ProblemDetail } from '@dxt/shared';
 import { faultyLocations, isRegionalProblem, REGIONAL_AFTER_MIN } from './round';
 
@@ -128,7 +129,7 @@ export type FailingSince = Readonly<Partial<Record<ProbeLocation, string>>>;
 export function nextFailingSince(previous: FailingSince, scheduled: readonly CheckFacts[]): FailingSince {
   const next: Partial<Record<ProbeLocation, string>> = { ...previous };
   for (const c of scheduled) {
-    if (c.outcome === 'fail') next[c.location] ??= c.checkedAt.toISOString();
+    if (isHardFail(c)) next[c.location] ??= c.checkedAt.toISOString();
     else delete next[c.location];
   }
   return next;
@@ -143,7 +144,7 @@ export function regionalIssue(
   failingSince: FailingSince,
   wafSite = false,
 ): Extract<ProblemDetail, { kind: 'regional' }> | null {
-  const failing = scheduled.filter((c) => c.outcome === 'fail');
+  const failing = scheduled.filter(isHardFail);
   const passing = scheduled.filter((c) => c.outcome === 'pass');
   const majority = wafSite ? passing.length > 0 : passing.length * 2 > scheduled.length;
   if (failing.length !== 1 || !majority) return null;
@@ -173,7 +174,9 @@ export const FAULTY_MIN_SITES = 3;
  */
 export function faultyByMinute(
   /** Each site's primary scheduled checks (PRD §5 counts sites, not their key pages). */
-  scheduled: readonly (Pick<CheckFacts, 'location' | 'outcome' | 'checkedAt'> & { siteId: string })[],
+  scheduled: readonly (Pick<CheckFacts, 'location' | 'outcome' | 'checkedAt' | 'error'> & {
+    siteId: string;
+  })[],
 ): Map<number, Set<ProbeLocation>> {
   const minutes = new Map<number, typeof scheduled>();
   for (const c of scheduled) {

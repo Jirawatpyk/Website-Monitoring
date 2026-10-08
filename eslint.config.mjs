@@ -68,6 +68,21 @@ export default tseslint.config(
       ],
     },
   },
+  // D-029: whether a check is a hard-fail vote is decided once, by isHardFail (packages/engine/src/
+  // hard-fail.ts) — a certificate-chain error is no outage, and uptime / reports must not count it.
+  {
+    files: ['packages/engine/src/**/*.ts'],
+    ignores: ['packages/engine/src/**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "BinaryExpression[operator=/^[!=]==?$/] > Literal[value='fail']",
+          message: "Use isHardFail(check) from './hard-fail' (D-029), not outcome === 'fail'.",
+        },
+      ],
+    },
+  },
   // Pages render without the cron / ingest secrets (the CI e2e job has none): read the few values a
   // page shows through their own helpers, not serverEnv(), which refuses to run without every secret
   // (S05 CI failure, docs/retro.md).

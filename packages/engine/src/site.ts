@@ -1,3 +1,4 @@
+import { isHardFail, isTlsChainFail } from './hard-fail';
 import type { IncidentState, ProbeLocation, Severity, SiteStatus, Trigger } from '@dxt/shared';
 import { autoResolves, isFlapping, RECOVERED_STATES, stillFlapping, transition } from './lifecycle';
 import {
@@ -636,6 +637,21 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     };
   }
 
+  // D-029: a certificate chain misconfigured at most reporting locations is a PROBLEM in one round —
+  // steady until someone fixes it, like a missing keyword. A real hard fail (above) still wins.
+  const chained = counted.filter(isTlsChainFail);
+  if (chained.length * 2 > counted.length && chained.length >= (wafRound ? 1 : 2)) {
+    return {
+      verdict: {
+        kind: 'problem',
+        trigger: m.isPrimary ? 'tls_chain' : 'key_page',
+        detail: { kind: 'tls_chain', code: chained[0]!.error!, locations: chained.map((c) => c.location) },
+        startedAt: earliest(chained) ?? roundAt,
+      },
+      next: reset,
+    };
+  }
+
   // An OK round needs a majority of the reporting locations to pass (PRD §5): one pass and one fail
   // is no majority; two passes and a regional failure is.
   const passing = counted.filter((c) => c.outcome === 'pass');
@@ -691,7 +707,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         return {
           verdict: {
             kind: 'ok',
-            reachable: round.scheduled.filter((c) => c.outcome !== 'fail'),
+            reachable: round.scheduled.filter((c) => !isHardFail(c)),
             note: BLOCKED_NOTE,
           },
           next: reset,

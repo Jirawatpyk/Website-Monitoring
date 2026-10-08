@@ -29,7 +29,7 @@ export function formatCause(checks: readonly FailedCheck[], timeoutMs: number): 
     .join(' · ');
 }
 
-const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY/;
+const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY|UNABLE_TO_GET_ISSUER/;
 
 export function describeFailure({ statusCode, error }: FailedCheck, timeoutMs: number): string {
   if (statusCode !== null) return `HTTP ${statusCode}`;

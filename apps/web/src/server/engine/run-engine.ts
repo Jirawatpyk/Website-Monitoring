@@ -166,6 +166,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         siteId: siteOfPrimary.get(c.monitor_id)!,
         location: c.location as ProbeLocation,
         outcome: c.outcome,
+        error: c.error,
         checkedAt: new Date(c.checked_at),
       })),
   );

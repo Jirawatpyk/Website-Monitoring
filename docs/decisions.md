@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-029 | 8 Oct 2026 | A misconfigured certificate chain (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `UNABLE_TO_GET_ISSUER_CERT(_LOCALLY)`) is a PROBLEM (TLS chain) in one round, never a DOWN and never a hard-fail vote; expired, wrong-host, self-signed and not-yet-valid certificates stay hard fails | Spec §6 counts every TLS failure as a hard fail (→ DOWN) |
 | D-028 | 8 Oct 2026 | The BKK probe's control check failing 3 rounds in a row opens an Admin system alert ("BKK probe network check failing") naming the WAF sites it left unverified; it clears once the check passes (≥ 10 min after it opened) | Gap — D-027 rule 2 told the site owner (PROBLEM, unverified) but nobody to fix the VPS |
 | D-027 | 8 Oct 2026 | A site marked "Behind WAF" is judged on the locations its WAF does not block: a location with a header-level WAF signature abstains; the Bangkok probe counts only while one of two control URLs answers; every location blocked → the browser verifier as before | D-020 / spec §6 "if locations are blocked, the browser verifier decides" (for WAF sites with an unblocked location) |
 | D-026 | 8 Oct 2026 | A `must_contain` keyword is looked for in up to about 3 MB of the body, and the read stops once every keyword is found; `must_not_contain` and classification still read the first 256 KB | D-022 "checked in the first 256 KB of the body" (for `must_contain`) |
@@ -32,6 +33,18 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-029 — TLS chain errors are a PROBLEM, not DOWN
+
+**Conflict.** Spec §6 counts every TLS failure as a hard fail (→ DOWN). A misconfigured certificate chain — Cando Asia, 8 Oct 2026: a Sectigo leaf served with a Let's Encrypt E6 intermediate — fails in Node, apps and API clients (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`), but most browsers still open the site because they fetch the missing intermediate themselves. DOWN + escalation overstates it.
+
+**Decision (8 Oct 2026, Tao).**
+- Chain errors → PROBLEM, trigger `tls_chain` ("TLS chain"), cause "TLS chain misconfigured (…) · most browsers open it, apps and API clients fail": `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`, `UNABLE_TO_GET_ISSUER_CERT` (`TLS_CHAIN_ERRORS` in `@dxt/shared`). A key page → `key_page`.
+- **One round is enough** (a chain error is steady until someone fixes it, like a missing keyword): a majority of the reporting locations with a chain error opens it.
+- A chain error is **never a hard-fail vote** — not for DOWN, a regional failure or a faulty location. Two real hard fails still make DOWN whatever the third location saw. `isHardFail(check)` in `packages/engine` is the one rule; ESLint refuses `outcome === 'fail'` elsewhere in the engine, so uptime and reports can't count a chain error as downtime later.
+- Everything else stays a hard fail → DOWN as before: `CERT_HAS_EXPIRED`, `ERR_TLS_CERT_ALTNAME_INVALID`, `DEPTH_ZERO_SELF_SIGNED_CERT`, `SELF_SIGNED_CERT_IN_CHAIN`, `CERT_NOT_YET_VALID`, handshake failures.
+- The probe never fetches missing intermediates itself and never disables verification.
+- **Shape (Tao chose the lighter one over the draft's new outcome):** the check stays `outcome: 'fail'` with the code in `check_results.error` — no `check_outcome` change, no Ingest contract change, no VPS redeploy; only `incident_trigger` gains `tls_chain`.
 
 ## D-028 — The BKK probe's failing network check is an Admin alert
 

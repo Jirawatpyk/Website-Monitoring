@@ -1,3 +1,4 @@
+import { isHardFail } from './hard-fail';
 import type { IncidentState, ProbeLocation, Severity } from '@dxt/shared';
 import type { LocationResult } from './round';
 import type { CheckFacts } from './triggers';
@@ -129,8 +130,8 @@ export function downDecided(round: Round, excluded: ReadonlySet<ProbeLocation> =
   const confirmed = round.scheduled.filter(
     (c) =>
       !excluded.has(c.location) &&
-      c.outcome === 'fail' &&
-      round.rechecks.some((r) => r.location === c.location && r.outcome === 'fail'),
+      isHardFail(c) &&
+      round.rechecks.some((r) => r.location === c.location && isHardFail(r)),
   );
   return confirmed.length >= 2;
 }
@@ -172,7 +173,7 @@ function isComplete(
     if (excluded.has(location)) return true;
     const first = round.scheduled.find((c) => c.location === location);
     if (!first) return false;
-    return first.outcome !== 'fail' || round.rechecks.some((c) => c.location === location);
+    return !isHardFail(first) || round.rechecks.some((c) => c.location === location);
   });
 }
 
@@ -188,7 +189,7 @@ export function firstFailedCheck(checks: readonly StoredCheck[], confirming: rea
       .filter((c) => c.location === recheck.location && c.checkedAt <= recheck.checkedAt)
       .sort((a, b) => b.checkedAt.getTime() - a.checkedAt.getTime());
     for (const c of history) {
-      if (c.outcome !== 'fail') break;
+      if (!isHardFail(c)) break;
       start = Math.min(start, c.checkedAt.getTime());
     }
   }

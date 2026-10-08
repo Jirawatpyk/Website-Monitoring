@@ -120,6 +120,19 @@ describe('Test check words', () => {
     [[r({}), r({ location: 'TYO' })], 'Would be: OK.', '2 of 2 locations pass and “EQHO” is on the page.'],
     [[r({ outcome: 'refused' }), r({})], 'Not allowed.', 'private network'],
     [[r({ outcome: 'fail' }), r({ outcome: 'fail' })], 'Would be: DOWN.', 'hard fail'],
+    [
+      [
+        r({ outcome: 'fail', error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' }),
+        r({ outcome: 'fail', error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' }),
+      ],
+      'Would be: PROBLEM (TLS chain).',
+      'most browsers open the site',
+    ],
+    [
+      [r({ outcome: 'fail', error: 'CERT_HAS_EXPIRED' }), r({ outcome: 'fail', error: 'CERT_HAS_EXPIRED' })],
+      'Would be: DOWN.',
+      'hard fail',
+    ],
     [[r({ outcome: 'blocked' }), r({})], 'Would be: checked in the browser.', 'browser verifier'],
     [[r({ outcome: 'fail' }), r({})], 'Would be: OK for now.', 'never makes the site DOWN'],
     [[r({ keywordMissing: ['EQHO'] }), r({})], 'Would be: PROBLEM (Keyword).', '“EQHO” isn’t on the page.'],

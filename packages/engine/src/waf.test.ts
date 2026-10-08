@@ -478,9 +478,9 @@ describe('D-027 — evaluateRound on a WAF site', () => {
 // invariants run every combination instead of the cases someone thought of.
 describe('D-027 invariants over every combination', () => {
   type Bkk = 'pass' | 'fail' | 'fail-control' | 'fail-akamai' | 'blocked-waf';
-  type Abroad = 'pass' | 'fail' | 'waf' | 'body-block' | 'silent';
+  type Abroad = 'pass' | 'fail' | 'waf' | 'body-block' | 'silent' | 'chain';
   const BKK: Bkk[] = ['pass', 'fail', 'fail-control', 'fail-akamai', 'blocked-waf'];
-  const ABROAD: Abroad[] = ['pass', 'fail', 'waf', 'body-block', 'silent'];
+  const ABROAD: Abroad[] = ['pass', 'fail', 'waf', 'body-block', 'silent', 'chain'];
   const VERDICTS: (Verification | undefined)[] = [
     undefined,
     { state: 'loaded', jobId: 'j1' },
@@ -503,6 +503,9 @@ describe('D-027 invariants over every combination', () => {
     if (a === 'pass') return [check(loc, 'pass', sec)];
     if (a === 'waf') return [check(loc, 'blocked', sec, { waf: 'akamai' })];
     if (a === 'body-block') return [check(loc, 'blocked', sec)];
+    // D-029: a certificate-chain error is never a hard-fail vote.
+    if (a === 'chain')
+      return [check(loc, 'fail', sec, { statusCode: null, error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' })];
     return [check(loc, 'fail', sec), recheck(loc, 'fail', sec + 30)];
   };
   const cases = BKK.flatMap((b) =>
