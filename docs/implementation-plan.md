@@ -19,7 +19,7 @@
 | S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Done |
 | S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | In review |
-| S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 | 3 | In progress |
+| S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 (merged) | 3 | In progress |
 | S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
@@ -310,7 +310,7 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
 
 - **Scope:** D-027. A site marked "Behind WAF" whose WAF blocks some probe locations (Bangkok Airways TW / CN: Akamai answers SIN and TYO with 403, the browser verifier too, while the Bangkok probe gets 200) is judged on the locations that are not blocked. A location counts as WAF-blocked only on a header-level WAF signature (Akamai `Server: AkamaiGHost` with "Access Denied" / "Reference #", Cloudflare `cf-mitigated`, Sucuri); a body-only match stays an ordinary blocked result. The VPS checks two control URLs from different providers each round; only when both fail is the Bangkok result "no data" for WAF sites (PROBLEM unverified, never DOWN). All locations blocked → the browser verifier as before (spec §6); through the WAF a 5xx or timeout in the browser is DOWN. Non-WAF sites are unchanged.
 - **Boards:** — (StatusModel rules; the site note "Verified from BKK; SIN, TYO blocked by bot protection") · **Tables:** — (columns on `check_results`)
-- **Depends on:** S05
+- **Depends on:** S05 (merged; its Done-when 1 is production data entry, not code — Tao, 8 Oct 2026)
 - **Done when:**
   1. Engine table tests: (a) WAF site, BKK 5xx ×2 (with recheck), SIN/TYO Akamai 403 → DOWN; (b) VPS control both fail + BKK fail → PROBLEM (unverified), not DOWN; (c) every location blocked → verifier decides, browser blocked → PROBLEM (unverified); (d) verifier through the WAF gets 5xx / timeout → DOWN; (e) BKK pass + SIN/TYO Akamai 403 → OK with the note; (f) the same results on a site not behind a WAF → today's rule.
   2. Probe classifier tests: Akamai 403 with `Server: AkamaiGHost` and "Reference #" → blocked with the WAF signature; a 403 without it keeps D-022 behaviour.
