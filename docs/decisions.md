@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-026 | 8 Oct 2026 | A `must_contain` keyword is looked for in up to about 3 MB of the body, and the read stops once every keyword is found; `must_not_contain` and classification still read the first 256 KB | D-022 "checked in the first 256 KB of the body" (for `must_contain`) |
 | D-025 | 8 Oct 2026 | S05 sites and monitors: a Draft may be saved with empty owners, but an owner who is set needs a Chat id and Start needs two linked owners; EditMonitors edits the HTTP primary + up to 3 key pages (keyword and redirect checks live on each HTTP monitor; SSL / Domain in S13); GET / HEAD only; expected status and redirects are shown as the fixed rule (not editable); Test check runs from SIN + TYO on demand; no shared spam list until S17; AM read-only from the client; Draft / Start / Stop monitoring; one audit row per changed row by trigger; custom headers refuse User-Agent and auth headers | AddSite / EditMonitors: POST, "Comma list or 2xx", Redirects select, locked shared-list tag, per-site AM select, "Proposal · pending CEO", "Nok and Ploy notified", "Tao edited monitors on …" audit line, Keyword / Redirect / SSL / Domain as separate monitors, User-Agent sample header; PRD §3 "Google Chat or email" (D-015 already) |
 | D-024 | 7 Oct 2026 | S04b rules: a relapse is one state-guarded SQL function; recovery and the status floor follow the severity of what is failing now (`episode_severity`); a flip is an OK ↔ not-OK change at an incident step and the 3rd in 30 min tags flapping; while flapping RECOVERED (Chat + email) becomes one summary held 15 min, every DOWN AGAIN / PROBLEM AGAIN is still posted (Chat only); a < 5 min unacked PROBLEM auto-resolves on its first OK round and still gets RECOVERED; `notifications.dedupe_key` lets a template repeat | ChatAlert note "Drops after 03:24 aren't re-posted"; PostIncident "RECOVERED 04:04:10"; D-004 reply wording "DOWN · site · down again"; gaps — when a relapse emails, what counts as a status change |
 | D-023 | 7 Oct 2026 | A DOWN incident recovers when the primary monitor is OK again, even if a key page still fails; the key page's problem then rejoins the same incident as a PROBLEM relapse (built in S04b). Until S04b, D-022's "recover when every monitor is OK" stays | D-022 recovery rule ("an incident recovers on the first round every monitor is OK") for DOWN incidents |
@@ -29,6 +30,16 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-026 — A brand keyword is looked for past the first 256 KB
+
+**Gap.** D-022 checks keywords in the first 256 KB of the body. Entering the 17 sites (8 Oct) showed that Wix pages inline 70–280 KB of CSS before `<title>`, so VOCA's brand name sits past 256 KB and DxT Solutions' and DxT AI's sit close to the edge; they had to use their domain as the keyword, which says little about the page's content. The browser verifier already searches the whole page.
+
+**Decision (8 Oct 2026, Tao).**
+- A `must_contain` keyword is looked for while the body streams, up to about 3 MB (`KEYWORD_SCAN_BYTES`, whole chunks), and the download stops as soon as every keyword has been seen. A page whose keyword is early still reads only what it did.
+- `must_not_contain` and the challenge / classification checks keep the first 256 KB sample: the pages they catch (a directory listing, a database error, a challenge) are small, and reading every large page to its end to prove a word absent would cost bandwidth on every round.
+- A keyword split across two chunks is still found.
+- The response time ends with the 256 KB sample: the deeper scan is not load time and never feeds the slow rule. If the body stalls or drops while the scan is still looking, the keyword is "not checked" for that round (as on a HEAD) — the page already answered, so it is never a hard fail.
 
 ## D-025 — S05: sites, monitors and the registration checklist
 
@@ -138,7 +149,7 @@ The ChatAlert board has one PROBLEM text line and no PROBLEM card. EmailAlert ha
   - The carry state between rounds (slow streak, per-location failing-since) lives in `monitor_status`.
 - **Site status.** It is the worst monitor verdict. While an open incident hasn't recovered, it is never lower than the incident's severity. An incident recovers on the first round in which every monitor is OK. This makes S03 engine M1 a plain case: a blocked round that can't be verified shows PROBLEM, and the next OK round shows OK.
 - **Keyword and redirect.** Both fire on a majority of the locations reporting in one round.
-  - Keyword is a `must_contain` entry missing or a `must_not_contain` entry found. It is case-sensitive, like the browser verifier, and checked in the first 256 KB of the body. A HEAD monitor is never keyword-checked.
+  - Keyword is a `must_contain` entry missing or a `must_not_contain` entry found. It is case-sensitive, like the browser verifier, and checked in the first 256 KB of the body (`must_contain` further since D-026). A HEAD monitor is never keyword-checked.
   - A redirect is fine when its final host is the monitor's base host (without `www.`), an entry in `allowed_redirect_domains`, or a subdomain of either.
 - **Slow.** The p50 of the passing locations' response times is over the threshold 3 rounds in a row. The threshold is `monitors.thresholds.slowMs`, or the tier default (Tier 1 3 s, Tier 2–3 5 s).
 - **Regional.** One location has failed for ≥ 5 min, counted from its first failure, while the round is an OK majority.

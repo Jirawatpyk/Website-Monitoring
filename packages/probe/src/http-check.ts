@@ -40,8 +40,17 @@ export interface HttpCheckResult {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const BODY_SAMPLE_BYTES = 16_384;
-/** Enough of a real home page to find its keywords (D-022); read only when the monitor has some. */
+/**
+ * The body sample when the monitor has keywords: classification and `must_not_contain` look here
+ * (D-022) — the error pages those words catch are small.
+ */
 export const KEYWORD_BODY_BYTES = 262_144;
+/**
+ * How far a `must_contain` keyword is looked for (D-026; whole chunks, so a few KB more). The read
+ * stops as soon as every keyword is found, so only a page whose brand sits deep (Wix inlines
+ * ~200 KB+ of CSS before `<title>`) reads further than the sample.
+ */
+export const KEYWORD_SCAN_BYTES = 3_145_728;
 /** What `check_results` and the Ingest schema take: a longer URL or list is cut, never refused. */
 export const MAX_FINAL_URL = 2048;
 export const MAX_KEYWORDS = 20;
@@ -61,18 +70,23 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
   try {
     const { res, url } = await fetchFollowing(req);
     const ttfbMs = Math.round(performance.now() - started);
-    const bodySample = await readSample(res, keywords ? KEYWORD_BODY_BYTES : BODY_SAMPLE_BYTES);
+    const { bodySample, missing, sampleAt } = await readBody(
+      res,
+      keywords ? KEYWORD_BODY_BYTES : BODY_SAMPLE_BYTES,
+      keywords ? mustContain : [],
+    );
     const outcome = classifyResponse({ status: res.status, headers: res.headers, bodySample });
     const checked = keywords && outcome === 'pass';
     return {
       outcome,
       statusCode: res.status,
-      responseMs: Math.round(performance.now() - started),
+      // The page's response time ends with the sample; a deeper keyword scan (D-026) isn't load time.
+      responseMs: Math.round(sampleAt - started),
       ttfbMs,
       error: null,
       bodySample,
       finalUrl: url.href.slice(0, MAX_FINAL_URL),
-      keywordMissing: checked ? capped(mustContain.filter((k) => !bodySample.includes(k))) : null,
+      keywordMissing: checked && missing ? capped(missing) : null,
       keywordForbidden: checked ? capped(mustNotContain.filter((k) => bodySample.includes(k))) : null,
     };
   } catch (err) {
@@ -129,30 +143,68 @@ export function sameSite(url: URL, first: URL): boolean {
   );
 }
 
-/** Reads at most `limit` bytes of the body as text, then stops the download. */
-async function readSample(res: Response, limit: number): Promise<string> {
-  if (!res.body) return '';
+/**
+ * Reads the first `sampleLimit` bytes as the body sample. While a `mustContain` keyword is still
+ * unseen it keeps reading — up to KEYWORD_SCAN_BYTES — and stops the download as soon as every one
+ * is found. Returns the sample, when it was complete (`sampleAt`, for the response time), and the
+ * keywords never seen — or null when the scan past the sample broke off (a stalled or failed tail):
+ * the page already answered, so that is "not checked", never a hard fail.
+ */
+async function readBody(
+  res: Response,
+  sampleLimit: number,
+  mustContain: readonly string[],
+): Promise<{ bodySample: string; missing: string[] | null; sampleAt: number }> {
+  let pending = [...new Set(mustContain)];
+  if (!res.body) return { bodySample: '', missing: pending, sampleAt: performance.now() };
   const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
+  const decoder = new TextDecoder();
+  // A keyword split across two chunks: keep the end of the text read so far.
+  const overlap = Math.max(0, ...pending.map((k) => k.length)) - 1;
+  let sample = '';
+  let tail = '';
   let size = 0;
-  while (size < limit) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    size += value.byteLength;
+  let done = false;
+  const take = (text: string) => {
+    if (sample.length < sampleLimit) sample += text.slice(0, sampleLimit - sample.length);
+    if (pending.length > 0) {
+      const window = tail + text;
+      pending = pending.filter((k) => !window.includes(k));
+      tail = overlap > 0 ? window.slice(-overlap) : '';
+    }
+  };
+  // The sample: a read error here is the page failing to load, as before.
+  while (!done && size < sampleLimit) {
+    const chunk = await reader.read();
+    done = chunk.done;
+    if (chunk.value) {
+      size += chunk.value.byteLength;
+      take(decoder.decode(chunk.value, { stream: true }));
+    }
   }
+  const sampleAt = performance.now();
+  // Past the sample, only while a keyword is still unseen.
+  let broke = false;
+  try {
+    while (!done && pending.length > 0 && size < KEYWORD_SCAN_BYTES) {
+      const chunk = await reader.read();
+      done = chunk.done;
+      if (chunk.value) {
+        size += chunk.value.byteLength;
+        take(decoder.decode(chunk.value, { stream: true }));
+      }
+    }
+  } catch {
+    broke = true;
+  }
+  if (done) take(decoder.decode());
   try {
     await reader.cancel();
   } catch {
-    // The sample is already read; a failed cancel only leaves the rest undownloaded.
+    // Everything needed is read; a failed cancel only leaves the rest undownloaded.
   }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const c of chunks) {
-    bytes.set(c, offset);
-    offset += c.byteLength;
-  }
-  return new TextDecoder().decode(bytes).slice(0, limit);
+  const missing = broke && pending.length > 0 ? null : mustContain.filter((k) => pending.includes(k));
+  return { bodySample: sample, missing, sampleAt };
 }
 
 function describeError(err: unknown): string {
