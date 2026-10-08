@@ -505,7 +505,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
             aria-label="Filter sites"
             // a row of chips that scrolls on purpose (layout-consistency skips it)
             data-scroll-x
-            className="-mx-aura-4 flex min-w-0 grow gap-2 overflow-x-auto px-aura-4"
+            className="-mx-aura-4 flex min-w-0 grow gap-2 overflow-x-auto px-aura-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {STATUS_CHIPS.filter((c) => c.value !== 'ok').map((c) => (
               <Tag
