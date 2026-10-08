@@ -37,6 +37,7 @@ export const TRIGGERS = [
   'redirect',
   'regional',
   'manual',
+  'tls_chain',
 ] as const;
 export type Trigger = (typeof TRIGGERS)[number];
 
@@ -52,6 +53,7 @@ export const TRIGGER_LABELS: Record<Trigger, string> = {
   redirect: 'Redirect',
   regional: 'Regional',
   manual: 'Manual (hand check)',
+  tls_chain: 'TLS chain',
 };
 
 export const CHECK_OUTCOMES = ['pass', 'fail', 'blocked'] as const;
