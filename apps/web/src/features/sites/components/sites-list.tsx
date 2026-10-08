@@ -652,12 +652,13 @@ const COLUMN_NOTES: { term: string; text: string }[] = [
   { term: 'Checked', text: 'the last complete round' },
 ];
 
-/** Legend card (Tao, 8 Oct 2026): status, locations and columns side by side from lg, stacked below. */
+/** Legend card (Tao, 8 Oct 2026): status and locations side by side from md with columns under them,
+ * all three side by side from xl. Phones have no legend (MSites): each row says it in words. */
 function Legend() {
   return (
     <section
       aria-label="Legend"
-      className="mt-3 grid gap-x-8 gap-y-5 rounded-aura-lg border border-border-subtle p-aura-4 text-xs leading-normal text-fg-secondary lg:grid-cols-3"
+      className="mt-3 grid gap-x-8 gap-y-5 rounded-aura-lg border border-border-subtle p-aura-4 text-xs leading-normal text-fg-secondary md:grid-cols-2 xl:grid-cols-3"
     >
       <div className="flex flex-col gap-2">
         <h2 className="font-mono text-xs font-normal text-fg-tertiary">STATUS</h2>
@@ -681,7 +682,7 @@ function Legend() {
           ))}
         </ul>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 md:col-span-2 xl:col-span-1">
         <h2 className="font-mono text-xs font-normal text-fg-tertiary">COLUMNS</h2>
         <dl className="flex flex-col gap-2">
           {COLUMN_NOTES.map((c) => (
