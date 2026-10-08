@@ -4,7 +4,7 @@ import { NoAccess } from '@/components/states';
 import { SiteForm } from '@/features/sites';
 import { getRegistrationOptions } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
-import { serverEnv } from '@/lib/env';
+import { probeAllowlistInfo } from '@/lib/env';
 
 export const metadata: Metadata = { title: 'Add site' };
 
@@ -33,16 +33,12 @@ export default async function AddSitePage() {
     );
   }
   const options = await getRegistrationOptions();
-  const env = serverEnv();
+  const probe = probeAllowlistInfo();
   return (
     <Container>
       <div className="flex flex-col gap-6">
         {header}
-        <SiteForm
-          options={options}
-          bkkIp={env.BKK_PROBE_IP ?? null}
-          secretHeaderName={env.PROBE_SECRET_HEADER_NAME}
-        />
+        <SiteForm options={options} bkkIp={probe.bkkIp} secretHeaderName={probe.secretHeaderName} />
       </div>
     </Container>
   );

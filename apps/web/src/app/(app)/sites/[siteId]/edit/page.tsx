@@ -7,7 +7,7 @@ import { NoAccess } from '@/components/states';
 import { SiteForm } from '@/features/sites';
 import { getRegistrationOptions, getSite } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
-import { serverEnv } from '@/lib/env';
+import { probeAllowlistInfo } from '@/lib/env';
 
 export const metadata: Metadata = { title: 'Edit site' };
 
@@ -69,7 +69,7 @@ export default async function EditSitePage({
       </Container>
     );
   }
-  const env = serverEnv();
+  const probe = probeAllowlistInfo();
   return (
     <Container>
       <div className="flex flex-col gap-6">
@@ -93,8 +93,8 @@ export default async function EditSitePage({
           key={`${site.id}-${site.live}`}
           options={options!}
           site={site}
-          bkkIp={env.BKK_PROBE_IP ?? null}
-          secretHeaderName={env.PROBE_SECRET_HEADER_NAME}
+          bkkIp={probe.bkkIp}
+          secretHeaderName={probe.secretHeaderName}
           started={site.live && /^\d{2}:\d{2}$/.test(query.started ?? '') ? query.started : null}
         />
       </div>

@@ -4,6 +4,7 @@ One line per lesson: what went wrong or slow, and the change that stops it happe
 
 | Date | What happened | What changed | Where |
 | --- | --- | --- | --- |
+| 8 Oct 2026 | CI `db` failed: Add site / Edit site called `serverEnv()` for two display values, and the e2e server has no cron / ingest secrets; locally the launch config had them all | `probeAllowlistInfo()` reads just those two; ESLint refuses `serverEnv` in `app/**/page.tsx` / `layout.tsx` | S05 |
 | 8 Oct 2026 | Shell heredocs carrying patch scripts broke again (unbalanced quotes, `$$`, curly quotes) — the fourth slice with the same failure despite two retro rows | Promoted to a rule in the root `CLAUDE.md` (Rules → Scripts): multi-line scripts are written with the Write tool to a file and run from there; S01 / S02a rows marked promoted. PreToolUse hook `.claude/hooks/no-long-heredoc.mjs` refuses heredocs over 15 lines (Tao OK, 8 Oct) | S05 |
 | 8 Oct 2026 | A focus fix (row after Undo) passed spec-checker on reading but failed in `/verify`: the row didn't exist yet when focus moved | Focus moves are tested with `toHaveFocus` next to the component (`apps/web/CLAUDE.md` → Testing); the editor focuses after render | S05 |
 | 8 Oct 2026 | `layout-consistency` only measured nav pages, so Add site / Edit site / Edit monitors (reached from lists) weren't checked for 44 px targets or the header rhythm | The spec also checks pages reached from a list; it measures a field's AURA box, not the bare `<input>` | S05 |
