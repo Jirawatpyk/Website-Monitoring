@@ -645,16 +645,42 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   const chained = counted.filter(isTlsChainFail);
   const failingHere = counted.filter(failsHere);
   if (chained.length && failingHere.length * 2 > counted.length && failingHere.length >= (wafRound ? 1 : 2)) {
-    return {
+    const startedAt = earliest(chained) ?? roundAt;
+    const tlsProblem: Judgement = {
       verdict: {
         kind: 'problem',
         trigger: m.isPrimary ? 'tls_chain' : 'key_page',
         detail: { kind: 'tls_chain', code: chained[0]!.error!, locations: chained.map((c) => c.location) },
-        startedAt: earliest(chained) ?? roundAt,
+        startedAt,
         reachable: chained,
       },
       next: reset,
     };
+    // A key page caps at PROBLEM anyway; a VPS its own checks can't vouch for (D-027 rule 2) can't
+    // run the browser that would decide.
+    const vpsUntrusted = wafSite && round.scheduled.some((c) => bkkUntrusted(c, akamaiSite));
+    if (!m.isPrimary || vpsUntrusted) return tlsProblem;
+    // D-029 (Tao, 8 Oct 2026): the failed handshake hides HTTP, so an origin down behind a front end
+    // serving the wrong chain would never show. The browser fetches the missing intermediate: it
+    // decides — the page loads → TLS chain PROBLEM; it fails → DOWN.
+    const v = m.verifications?.get(roundAt.getTime());
+    if (!v) return s.verifierAvailable ? { verdict: { kind: 'verify' }, next: carried } : tlsProblem;
+    if (v.state === 'pending') return PENDING;
+    if (v.state === 'failed') {
+      return {
+        verdict: {
+          kind: 'down',
+          startedAt,
+          confirmedAt: v.completedAt,
+          failing: failingHere,
+          verifyJobId: v.jobId,
+          browserDetail: v.detail,
+        },
+        next: reset,
+      };
+    }
+    // Loaded, blocked in the browser, or the verifier unavailable: the chain is the problem we know of.
+    return tlsProblem;
   }
 
   // An OK round needs a majority of the reporting locations to pass (PRD §5): one pass and one fail

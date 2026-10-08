@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
 import { isHardFail, isTlsChainFail } from './hard-fail';
-import type { OpenIncident, StoredCheck } from './monitor';
+import type { OpenIncident, StoredCheck, Verification } from './monitor';
 import { faultyLocations } from './round';
 import { decideSite, NEW_MONITOR, type SiteMonitor, type SiteSnapshot } from './site';
 
@@ -56,7 +56,7 @@ const site = (monitors: SiteMonitor[], over: Partial<SiteSnapshot> = {}): SiteSn
   okRounds: 0,
   open: null,
   monitors,
-  verifierAvailable: true,
+  verifierAvailable: false,
   ...over,
 });
 
@@ -165,6 +165,60 @@ describe('D-029 — TLS chain errors are a PROBLEM, not DOWN (decideSite)', () =
 // engine review H1: a DOWN drop must end when the site answers again — even with a broken chain
 // (D-023), then continue as PROBLEM (TLS chain). INC-0142 MuvMi-style DOWN, renewed cert with the
 // wrong intermediate.
+// D-029 (Tao): an origin down behind a front end serving the wrong chain — the browser decides.
+describe('D-029 — the browser verifier decides a chain-majority round on the home page', () => {
+  const rows = [chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)];
+  const withJob = (v: Verification) => ({ ...home(rows), verifications: new Map([[R, v]]) });
+
+  it('verifier up → a verify job first', () => {
+    expect(decideSite(site([home(rows)], { verifierAvailable: true }))).toEqual({
+      kind: 'verify',
+      roundAt: at(0),
+      monitorIds: ['home'],
+    });
+  });
+
+  it('the browser loads the page → PROBLEM (TLS chain)', () => {
+    const loaded: Verification = { state: 'loaded', jobId: 'j1' };
+    expect(decideSite(site([withJob(loaded)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'tls_chain',
+    });
+  });
+
+  it('the browser gets a 503 / times out → DOWN from the first chain error, confirmed by the browser', () => {
+    for (const detail of ['HTTP 503', 'Timeout']) {
+      const failed: Verification = { state: 'failed', jobId: 'j1', completedAt: at(40), detail };
+      expect(decideSite(site([withJob(failed)], { verifierAvailable: true }))).toMatchObject({
+        kind: 'open',
+        startedAt: at(1),
+        confirmedAt: at(40),
+        verifyJobId: 'j1',
+        browserDetail: detail,
+      });
+    }
+  });
+
+  it('blocked in the browser, or the verifier unavailable → PROBLEM (TLS chain), never DOWN', () => {
+    const blocked: Verification = { state: 'blocked', jobId: 'j1' };
+    const gone: Verification = { state: 'unavailable', reason: 'not_picked_up' };
+    for (const v of [blocked, gone]) {
+      expect(decideSite(site([withJob(v)], { verifierAvailable: true }))).toMatchObject({
+        kind: 'problem',
+        trigger: 'tls_chain',
+      });
+    }
+  });
+
+  it('a key page with a broken chain needs no browser: key-page PROBLEM at once', () => {
+    const okHome = [check('BKK', 'pass', 1), check('SIN', 'pass', 2), check('TYO', 'pass', 3)];
+    expect(decideSite(site([home(okHome), keyPage(rows)], { verifierAvailable: true }))).toMatchObject({
+      kind: 'problem',
+      trigger: 'key_page',
+    });
+  });
+});
+
 describe('D-029 with an open incident', () => {
   const incident = (
     state: OpenIncident['state'],
