@@ -113,11 +113,17 @@ describe('D-029 — TLS chain errors are a PROBLEM, not DOWN (decideSite)', () =
     expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'open' });
   });
 
-  it('one chain error with two passes is an OK round, and starts no regional clock', () => {
+  it('one chain error with two passes is an OK round that starts a regional clock — PROBLEM (Regional) after 5 min, never DOWN', () => {
     const rows = [chain('BKK', 1), check('SIN', 'pass', 2), check('TYO', 'pass', 3)];
     const d = decideSite(site([home(rows)]));
     expect(d).toMatchObject({ kind: 'none', status: 'ok' });
-    expect(d.kind === 'none' && d.monitors[0]?.failingSince).toEqual({});
+    expect(d.kind === 'none' && d.monitors[0]?.failingSince).toEqual({ BKK: at(1).toISOString() });
+    const since = { ...NEW_MONITOR, failingSince: { BKK: at(-359).toISOString() } };
+    expect(decideSite(site([{ ...home(rows), carry: since }]))).toMatchObject({
+      kind: 'problem',
+      trigger: 'regional',
+      detail: { kind: 'regional', location: 'BKK', failure: { error: CHAIN } },
+    });
   });
 
   it('a key page with a broken chain is a key-page PROBLEM', () => {

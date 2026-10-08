@@ -1,4 +1,4 @@
-import { isHardFail } from './hard-fail';
+import { failsHere } from './hard-fail';
 import type { CheckOutcome, ProbeLocation, ProblemDetail } from '@dxt/shared';
 import { faultyLocations, isRegionalProblem, REGIONAL_AFTER_MIN } from './round';
 
@@ -129,7 +129,7 @@ export type FailingSince = Readonly<Partial<Record<ProbeLocation, string>>>;
 export function nextFailingSince(previous: FailingSince, scheduled: readonly CheckFacts[]): FailingSince {
   const next: Partial<Record<ProbeLocation, string>> = { ...previous };
   for (const c of scheduled) {
-    if (isHardFail(c)) next[c.location] ??= c.checkedAt.toISOString();
+    if (failsHere(c)) next[c.location] ??= c.checkedAt.toISOString();
     else delete next[c.location];
   }
   return next;
@@ -144,7 +144,7 @@ export function regionalIssue(
   failingSince: FailingSince,
   wafSite = false,
 ): Extract<ProblemDetail, { kind: 'regional' }> | null {
-  const failing = scheduled.filter(isHardFail);
+  const failing = scheduled.filter(failsHere);
   const passing = scheduled.filter((c) => c.outcome === 'pass');
   const majority = wafSite ? passing.length > 0 : passing.length * 2 > scheduled.length;
   if (failing.length !== 1 || !majority) return null;

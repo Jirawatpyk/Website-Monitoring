@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { mergeBlockers, WORKFLOW_FLAG } from './pr-merge.mjs';
+import { mergeBlockers, WORKFLOW_FLAG, SCHEMA_FLAG } from './pr-merge.mjs';
 
 const green = {
   state: 'OPEN',
@@ -76,4 +76,28 @@ test('refuses CI file changes until they are marked as reviewed', () => {
   assert.ok(problems[0].includes('.github/workflows/ci.yml') && problems[0].includes(WORKFLOW_FLAG));
   assert.deepEqual(mergeBlockers(pr, { workflowChangesReviewed: true }), []);
   assert.deepEqual(mergeBlockers({ ...green, files: [{ path: 'docs/workflow.md' }] }), []);
+});
+
+test('refuses migrations and runtime code together unless the schema lag was reviewed (8 Oct 2026)', () => {
+  const pr = {
+    ...green,
+    files: [
+      { path: 'supabase/migrations/20261008093801_tls_chain_trigger.sql' },
+      { path: 'packages/engine/src/site.ts' },
+      { path: 'packages/engine/src/site.test.ts' },
+    ],
+  };
+  const problems = mergeBlockers(pr);
+  assert.equal(problems.length, 1);
+  assert.ok(problems[0].includes('1 files') && problems[0].includes(SCHEMA_FLAG));
+  assert.deepEqual(mergeBlockers(pr, { schemaLagReviewed: true }), []);
+  // a migration with its tests and docs only, or code without a migration, needs no flag
+  assert.deepEqual(
+    mergeBlockers({
+      ...green,
+      files: [{ path: 'supabase/migrations/x.sql' }, { path: 'supabase/tests/x.test.sql' }],
+    }),
+    [],
+  );
+  assert.deepEqual(mergeBlockers({ ...green, files: [{ path: 'packages/engine/src/site.ts' }] }), []);
 });

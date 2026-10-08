@@ -111,7 +111,9 @@ export function evaluateRound({
   }
   if (wafSite) return evaluateWafRound(counted, controlDown, akamaiSite);
 
-  const by = (outcome: CheckOutcome) => counted.filter((r) => r.outcome === outcome).map((r) => r.location);
+  // Never 'fail': a hard-fail vote is isHardFail (D-029).
+  const by = (outcome: Exclude<CheckOutcome, 'fail'>) =>
+    counted.filter((r) => r.outcome === outcome).map((r) => r.location);
   const failing = counted.filter(isHardFail).map((r) => r.location);
   const blocked = by('blocked');
   const passing = by('pass');
@@ -133,7 +135,8 @@ function evaluateWafRound(
 ): RoundVerdict {
   const abstained = counted.filter((r) => abstainsOnWafSite(r, akamaiSite)).map((r) => r.location);
   const voters = counted.filter((r) => !abstainsOnWafSite(r, akamaiSite));
-  const by = (outcome: CheckOutcome) => voters.filter((r) => r.outcome === outcome).map((r) => r.location);
+  const by = (outcome: Exclude<CheckOutcome, 'fail'>) =>
+    voters.filter((r) => r.outcome === outcome).map((r) => r.location);
   if (!voters.length) {
     // The VPS's own network is down: neither its probe nor its browser verifier can decide.
     if (controlDown) return { kind: 'untrusted', abstained };

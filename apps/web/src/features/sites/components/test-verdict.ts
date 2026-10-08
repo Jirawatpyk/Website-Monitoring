@@ -76,6 +76,12 @@ export function testVerdict(
       note: 'A bot challenge answered — the browser verifier decides. Allowlist the probes to stop relying on it.',
     };
   }
+  if (chained > 0) {
+    return {
+      title: 'Would be: OK for now.',
+      note: 'One location got a misconfigured certificate chain — most browsers still open the site, apps and API clients there can’t. Ask the site admin to install the right intermediate certificate.',
+    };
+  }
   if (fails > 0) {
     return {
       title: 'Would be: OK for now.',

@@ -129,6 +129,11 @@ describe('Test check words', () => {
       'most browsers open the site',
     ],
     [
+      [r({ outcome: 'fail', error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' }), r({})],
+      'Would be: OK for now.',
+      'misconfigured certificate chain',
+    ],
+    [
       [r({ outcome: 'fail', error: 'CERT_HAS_EXPIRED' }), r({ outcome: 'fail', error: 'CERT_HAS_EXPIRED' })],
       'Would be: DOWN.',
       'hard fail',

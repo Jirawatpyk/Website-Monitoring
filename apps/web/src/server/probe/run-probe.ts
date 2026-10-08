@@ -1,7 +1,7 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { runHttpCheck, type HttpCheckRequest, type HttpCheckResult } from '@dxt/probe';
-import { probeRequestHeaders, type ProbeLocation } from '@dxt/shared';
+import { isTlsChainError, probeRequestHeaders, type ProbeLocation } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { loadDueMonitors, type DueMonitor } from './due-monitors';
 import { insertCheckResults } from '../check-results';
@@ -80,7 +80,9 @@ export async function runProbe({
   const first = await Promise.all(monitors.map((m) => runOnce(m, m.timeoutMs, started)));
   await insertResults(db, location, 1, first);
 
-  const failed = first.filter((r) => r.result.outcome === 'fail').map((r) => r.m);
+  // A certificate-chain error is a PROBLEM, never DOWN (D-029): nothing for a recheck to confirm.
+  const hardFail = (r: HttpCheckResult) => r.outcome === 'fail' && !isTlsChainError(r.error);
+  const failed = first.filter((r) => hardFail(r.result)).map((r) => r.m);
   let rechecked = 0;
   let recheckFailed = 0;
   if (failed.length) {
@@ -91,7 +93,7 @@ export async function runProbe({
       const second = await Promise.all(failed.map((m) => runOnce(m, Math.min(m.timeoutMs, remaining))));
       await insertResults(db, location, 2, second);
       rechecked = second.length;
-      recheckFailed = second.filter((r) => r.result.outcome === 'fail').length;
+      recheckFailed = second.filter((r) => hardFail(r.result)).length;
     }
   }
 

@@ -37,7 +37,8 @@ describe('insertCheckResults — the database a migration behind the code (8 Oct
     );
     await insertCheckResults(db, [row]);
     expect(inserts).toHaveLength(2);
-    expect(inserts[1]).toEqual([{ ...row, waf: undefined }].map(({ waf: _w, ...r }) => r));
+    const { waf: _waf, ...withoutWaf } = row;
+    expect(inserts[1]).toEqual([withoutWaf]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('"schema_lag"'));
     warn.mockRestore();
   });
