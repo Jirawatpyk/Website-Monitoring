@@ -26,7 +26,10 @@ export function migrationWithCode(pr) {
   if (!paths.some((p) => p.startsWith('supabase/migrations/'))) return [];
   return paths.filter(
     (p) =>
-      /^(apps\/web\/src|apps\/vps-agent\/src|packages\/[^/]+\/src)\//.test(p) && !/\.test\.tsx?$/.test(p),
+      /^(apps\/web\/src|apps\/vps-agent\/src|packages\/[^/]+\/src)\//.test(p) &&
+      !/\.test\.tsx?$/.test(p) &&
+      // generated types change with every migration and run nothing
+      p !== 'packages/db/src/database.types.ts',
   );
 }
 

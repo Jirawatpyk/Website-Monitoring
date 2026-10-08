@@ -100,4 +100,12 @@ test('refuses migrations and runtime code together unless the schema lag was rev
     [],
   );
   assert.deepEqual(mergeBlockers({ ...green, files: [{ path: 'packages/engine/src/site.ts' }] }), []);
+  // a migration with only its regenerated types is the migration-first PR
+  assert.deepEqual(
+    mergeBlockers({
+      ...green,
+      files: [{ path: 'supabase/migrations/x.sql' }, { path: 'packages/db/src/database.types.ts' }],
+    }),
+    [],
+  );
 });
