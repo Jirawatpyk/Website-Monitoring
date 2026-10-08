@@ -21,6 +21,8 @@ const serverEnvSchema = z.object({
   ALERT_EMAIL_FROM: z.string().optional(),
   PROBE_SECRET_HEADER_NAME: z.string().default('X-DxT-Monitor'),
   PROBE_SECRET_HEADER_VALUE: z.string().optional(),
+  /** The Bangkok VPS's fixed public IP, shown on Add site for a WAF allowlist (S05; not a secret). */
+  BKK_PROBE_IP: z.string().optional(),
   HEALTHCHECKS_PING_URL_ENGINE: z.url().optional(),
   HEALTHCHECKS_PING_URL_PROBE_SIN: z.url().optional(),
   HEALTHCHECKS_PING_URL_PROBE_TYO: z.url().optional(),

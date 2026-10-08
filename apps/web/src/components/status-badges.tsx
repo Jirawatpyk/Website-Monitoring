@@ -3,6 +3,7 @@ import { Badge, type Tone } from '@jirawatpyk/aura-react';
 import {
   IconArrowUpRight,
   IconBan,
+  IconCalendar,
   IconCheck,
   IconCircleCheck,
   IconClock,
@@ -11,7 +12,7 @@ import {
   IconPencil,
   IconTriangleAlert,
 } from '@jirawatpyk/aura-react/icons';
-import type { IncidentState, Severity } from '@dxt/shared';
+import type { IncidentState, Severity, SiteStatus } from '@dxt/shared';
 
 type BadgeSpec = { tone: Tone; variant: 'outline' | 'soft'; icon: ReactElement | undefined; label: string };
 
@@ -55,6 +56,26 @@ export function SeverityBadge({ severity, recovered }: { severity: Severity; rec
   ) : (
     <Badge tone="danger" variant="solid" icon={<IconBan />}>
       Down
+    </Badge>
+  );
+}
+
+/**
+ * A site's status (spec §11, §14.2): Down = danger solid ban, Problem = warning soft triangle-alert,
+ * OK = success soft circle-check, Maintenance = accent soft calendar (accent is Maintenance's only).
+ */
+const SITE: Record<SiteStatus, Omit<BadgeSpec, 'variant'> & { variant: 'outline' | 'soft' | 'solid' }> = {
+  down: { tone: 'danger', variant: 'solid', icon: <IconBan />, label: 'Down' },
+  problem: { tone: 'warning', variant: 'soft', icon: <IconTriangleAlert />, label: 'Problem' },
+  ok: { tone: 'success', variant: 'soft', icon: <IconCircleCheck />, label: 'OK' },
+  maintenance: { tone: 'accent', variant: 'soft', icon: <IconCalendar />, label: 'Maintenance' },
+};
+
+export function SiteStatusBadge({ status }: { status: SiteStatus }) {
+  const b = SITE[status];
+  return (
+    <Badge tone={b.tone} variant={b.variant} icon={b.icon}>
+      {b.label}
     </Badge>
   );
 }
