@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Alert, Breadcrumb, Button, Container, EmptyState, PageHeader } from '@jirawatpyk/aura-react';
 import { IconExternalLink, IconInbox } from '@jirawatpyk/aura-react/icons';
-import { formatTier, TIER_CONFIG } from '@dxt/shared';
+import { formatTier, formatTime, TIER_CONFIG } from '@dxt/shared';
 import { NoAccess } from '@/components/states';
 import { SiteForm } from '@/features/sites';
 import { getRegistrationOptions, getSite } from '@/features/sites/server';
@@ -80,11 +80,6 @@ export default async function EditSitePage({
     <Container>
       <div className="flex flex-col gap-6">
         {header}
-        {query.started && site.live && (
-          <Alert tone="success" role="status" title="Monitoring started">
-            First round within {every} min from BKK, SIN and TYO · in the audit log.
-          </Alert>
-        )}
         {query.draft && !site.live && (
           <Alert tone="success" role="status" title="Draft saved">
             Nothing is checked until monitoring starts. Finish the checklist, then press Start monitoring.
@@ -96,6 +91,7 @@ export default async function EditSitePage({
           site={site}
           bkkIp={env.BKK_PROBE_IP ?? null}
           secretHeaderName={env.PROBE_SECRET_HEADER_NAME}
+          started={query.started && site.live ? formatTime(new Date()) : null}
         />
       </div>
     </Container>

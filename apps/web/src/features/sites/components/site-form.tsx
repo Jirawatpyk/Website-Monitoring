@@ -31,7 +31,6 @@ import {
 import {
   blockingItems,
   DEFAULT_MUST_NOT_CONTAIN,
-  formatTime,
   itemsLeftText,
   keyPagePathSchema,
   MAX_KEY_PAGES,
@@ -55,6 +54,8 @@ interface SiteFormProps {
   /** The Bangkok probe's fixed IP for the allowlist, when configured. */
   bkkIp: string | null;
   secretHeaderName: string;
+  /** "10:08" right after Start monitoring (`?started=1`): the board's Started line. */
+  started?: string | null;
 }
 
 const TIERS: { value: string; label: string; description: string }[] = [
@@ -89,7 +90,7 @@ const CHECK_ICON: Record<
  * AddSite (docs/design/screens.md) and Edit site (the same form, D-025): the registration
  * checklist decides when monitoring can start (PRD §4); the SQL functions check it again.
  */
-export function SiteForm({ options, site, bkkIp, secretHeaderName }: SiteFormProps) {
+export function SiteForm({ options, site, bkkIp, secretHeaderName, started = null }: SiteFormProps) {
   const router = useRouter();
   const editing = !!site;
   const primary = site?.monitors.find((m) => m.isPrimary);
@@ -115,7 +116,6 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName }: SiteFormPro
   const [allowlist, setAllowlist] = useState(site?.wafAllowlistConfirmed ?? false);
 
   const [result, setResult] = useState<SiteActionResult | null>(null);
-  const [started, setStarted] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<'stop' | 'delete' | null>(null);
 
   const person = (id: string) => {
@@ -150,7 +150,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName }: SiteFormPro
   });
   const left = blockingItems(checklist);
   const doneCount = checklist.filter((i) => i.state === 'done').length;
-  const live = (site?.live ?? false) || !!started;
+  const live = site?.live ?? false;
 
   const fieldErrors = result && !result.ok ? (result.fieldErrors ?? {}) : {};
   const err = (key: string) => fieldErrors[key] ?? fieldErrors[`site.${key}`];
@@ -531,10 +531,8 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName }: SiteFormPro
                         const saved = await updateSite({ siteId: site.id, site: siteInput() });
                         return saved.ok ? setSiteMonitoring(site.id, true) : saved;
                       },
-                      () => {
-                        setStarted(formatTime(new Date()));
-                        router.refresh();
-                      },
+                      // A fresh render of the live site, with the board's "Started …" line.
+                      () => router.replace(`/sites/${site.id}/edit?started=1`),
                     )
                   }
                   onStop={() => setConfirm('stop')}
@@ -654,8 +652,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName }: SiteFormPro
                       () => setSiteMonitoring(site.id, false),
                       () => {
                         setConfirm(null);
-                        setStarted(null);
-                        router.refresh();
+                        router.replace(`/sites/${site.id}/edit`);
                       },
                     )
                   }
