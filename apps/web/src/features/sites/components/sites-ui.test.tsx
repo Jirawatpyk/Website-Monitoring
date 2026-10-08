@@ -118,14 +118,17 @@ describe('TestCheckCard', () => {
 
   it('runs SIN and TYO with the form’s settings and words the verdict', async () => {
     const fetchMock = vi.fn(
-      async (url: string) => new Response(JSON.stringify(pass(url.endsWith('sin') ? 'SIN' : 'TYO'))),
+      async (url: string, _init?: RequestInit) =>
+        new Response(JSON.stringify(pass(url.endsWith('sin') ? 'SIN' : 'TYO'))),
     );
     vi.stubGlobal('fetch', fetchMock);
     render(<TestCheckCard request={{ url: 'https://example.com', mustContain: ['Example Domain'] }} />);
     expect(screen.getByText('No test run yet for this monitor.')).toBeInTheDocument();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Run test now' })));
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(['/api/monitor-test/sin', '/api/monitor-test/tyo']);
-    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toMatchObject({ url: 'https://example.com' });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toMatchObject({
+      url: 'https://example.com',
+    });
     expect(screen.getByText('Runs from BKK on the first round')).toBeInTheDocument();
     expect(screen.getAllByText('HTTP 200 · keyword found')).toHaveLength(2);
     expect(screen.getByRole('status')).toHaveTextContent('Would be: OK.');
