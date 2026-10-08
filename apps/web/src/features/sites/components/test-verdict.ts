@@ -59,7 +59,7 @@ export function testVerdict(
   if (chained * 2 > results.length) {
     return {
       title: isPrimary ? 'Would be: PROBLEM (TLS chain).' : 'Would be: PROBLEM (Key page).',
-      note: `The certificate chain is misconfigured: most browsers open the site, apps and API clients can’t. Install the right intermediate certificate. ${nothing}`,
+      note: `The certificate chain is misconfigured: most browsers still open the site, but apps and API clients can’t connect. Install the right intermediate certificate. ${nothing}`,
     };
   }
   const fails = results.filter((r) => r.outcome === 'fail' && !isTlsChainError(r.error)).length;
@@ -76,16 +76,16 @@ export function testVerdict(
       note: 'A bot challenge answered — the browser verifier decides. Allowlist the probes to stop relying on it.',
     };
   }
-  if (chained > 0) {
-    return {
-      title: 'Would be: OK for now.',
-      note: 'One location got a misconfigured certificate chain — most browsers still open the site, apps and API clients there can’t. Ask the site admin to install the right intermediate certificate.',
-    };
-  }
   if (fails > 0) {
     return {
       title: 'Would be: OK for now.',
       note: 'One location failed; one location alone never makes the site DOWN. Run again to see if it holds.',
+    };
+  }
+  if (chained > 0) {
+    return {
+      title: 'Would be: OK for now.',
+      note: 'One location got a misconfigured certificate chain — most browsers still open the site, but apps and API clients there can’t connect. Ask the site admin to install the right intermediate certificate.',
     };
   }
   if (results.some((r) => (r.keywordMissing?.length ?? 0) > 0)) {

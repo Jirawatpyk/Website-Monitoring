@@ -23,7 +23,7 @@ export const LAG_TOLERANT_COLUMNS = [
 /** The column a "no such column" error names: PostgREST PGRST204 or Postgres 42703. */
 export function missingColumn(error: { code?: string; message: string }): string | null {
   if (error.code !== 'PGRST204' && error.code !== '42703') return null;
-  return /'([a-z_]+)' column|column "([a-z_]+)"/.exec(error.message)?.slice(1).find(Boolean) ?? null;
+  return /'([a-z0-9_]+)' column|column "([a-z0-9_]+)"/.exec(error.message)?.slice(1).find(Boolean) ?? null;
 }
 
 /**

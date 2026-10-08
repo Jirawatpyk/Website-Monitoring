@@ -126,7 +126,7 @@ describe('Test check words', () => {
         r({ outcome: 'fail', error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' }),
       ],
       'Would be: PROBLEM (TLS chain).',
-      'most browsers open the site',
+      'most browsers still open the site',
     ],
     [
       [r({ outcome: 'fail', error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' }), r({})],
