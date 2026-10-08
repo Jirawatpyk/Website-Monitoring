@@ -41,7 +41,7 @@ import {
   GLYPHS,
   IncidentLink,
   incidentText,
-  incidentToneOf,
+  incidentTone,
   LocationGlyphs,
   MutedBadge,
   RowStatusBadge,
@@ -58,6 +58,7 @@ import {
   SORTS,
   sortSites,
   statusCounts,
+  type RowKey,
   type SiteListFilters,
   type SortKey,
   type StatusFilter,
@@ -100,7 +101,7 @@ const TIER_OPTIONS = [
 ];
 
 /** Mobile groups, in the default order (MSites). */
-const GROUPS: { key: ReturnType<typeof rowKey>; title: string }[] = [
+const GROUPS: { key: RowKey; title: string }[] = [
   { key: 'down', title: 'DOWN' },
   { key: 'problem', title: 'PROBLEM' },
   { key: 'maintenance', title: 'MAINTENANCE' },
@@ -233,9 +234,10 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
             {href ? (
               <Link
                 href={href}
-                className={`max-w-full truncate font-medium text-fg-primary hover:underline ${TOUCH_HIT}`}
+                className={`max-w-full font-medium text-fg-primary hover:underline ${TOUCH_HIT}`}
               >
-                {r.name}
+                {/* truncate inside, so the 44 px tap area isn't clipped */}
+                <span className="block truncate">{r.name}</span>
               </Link>
             ) : (
               <span className="max-w-full truncate font-medium">{r.name}</span>
@@ -509,8 +511,14 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
             </Tag>
           </div>
         </div>
-        {(f.q.trim() || f.status !== 'all' || f.owner !== 'all') && (
-          <span className="text-xs text-fg-secondary">{`Showing ${shown.length} of ${total}`}</span>
+        {active.length > 0 && (
+          // filters set on a wider screen stay on; Clear reaches them here too
+          <span className="flex items-center gap-2 text-xs text-fg-secondary">
+            {`Showing ${shown.length} of ${total}`}
+            <Button variant="ghost" size="sm" touchHeight icon={<IconX />} onClick={clearAll}>
+              Clear
+            </Button>
+          </span>
         )}
         {shown.length === 0
           ? noMatch
@@ -555,7 +563,7 @@ function PhoneRow({ row, href, now }: { row: SiteListRow; href: string | null; n
         <MutedBadge row={row} now={now} />
         {!row.live && <DraftBadge />}
         <span
-          className={`max-w-full text-xs ${row.openIncident ? `font-medium ${incidentToneOf(row.openIncident)}` : 'text-fg-secondary'}`}
+          className={`max-w-full text-xs ${row.openIncident ? `font-medium ${incidentTone(row.openIncident.state)}` : 'text-fg-secondary'}`}
         >
           {sub}
         </span>

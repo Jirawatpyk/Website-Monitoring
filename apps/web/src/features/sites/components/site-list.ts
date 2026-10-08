@@ -92,7 +92,7 @@ export function matches(
   skip?: keyof SiteListFilters,
 ): boolean {
   const q = f.q.trim().toLowerCase();
-  if (skip !== 'q' && q && !`${r.name} ${r.client.name} ${r.url ?? ''}`.toLowerCase().includes(q))
+  if (skip !== 'q' && q && !`${r.name} ${r.client.name} ${hostAndPath(r.url)}`.toLowerCase().includes(q))
     return false;
   if (skip !== 'status' && !matchesStatus(r, f.status, ctx.now)) return false;
   if (skip !== 'tier' && f.tier !== 'all' && String(r.tier) !== f.tier) return false;
@@ -106,6 +106,11 @@ export function matches(
   }
   if (skip !== 'attention' && f.attention && !needsAttention(r)) return false;
   return true;
+}
+
+/** A URL as people search it: no scheme, no leading www ("https" would match every site). */
+function hostAndPath(url: string | null): string {
+  return (url ?? '').replace(/^https?:\/\//i, '').replace(/^www\./i, '');
 }
 
 export function filterSites(

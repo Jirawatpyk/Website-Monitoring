@@ -85,6 +85,7 @@ describe('SitesList (spec §20, Sites board)', () => {
     );
     expect(t.getByText('MuvMi · AM Bua')).toBeInTheDocument();
     expect(t.getByText('Muted · until 18:00')).toBeInTheDocument();
+
     expect(t.getAllByRole('img', { name: 'TYO: TLS chain error' }).length).toBeGreaterThan(0);
     expect(t.getByRole('link', { name: 'Finish setup' })).toHaveAttribute('href', '/sites/eqho-academy/edit');
     const visit = t.getByRole('link', { name: 'Visit DxT (opens in a new tab)' });
@@ -139,6 +140,26 @@ describe('SitesList (spec §20, Sites board)', () => {
     expect(within(table()).queryByRole('link', { name: 'Finish setup' })).not.toBeInTheDocument();
     expect(within(table()).getByText('Only an Admin can finish setup')).toBeInTheDocument();
     expect(within(table()).queryByRole('link', { name: 'DxT' })).not.toBeInTheDocument();
+  });
+
+  it('a mute that ends on a later day names the day', () => {
+    render(
+      <SitesList
+        sites={[row('VOCA', { mutedUntil: '2026-10-12T02:00:00Z' })]}
+        isAdmin
+        meId="tao"
+        nowIso={NOW}
+      />,
+    );
+    expect(within(table()).getByText('Muted · until Mon 12 Oct 09:00')).toBeInTheDocument();
+  });
+
+  it('phones: Clear reaches filters set on a wider screen', () => {
+    render(<SitesList sites={SITES} isAdmin meId="tao" nowIso={NOW} />);
+    pick(/^Tier/, 'Tier 1');
+    const phoneClear = screen.getAllByRole('button', { name: 'Clear' }).at(-1)!;
+    fireEvent.click(phoneClear);
+    expect(siteNames()).toHaveLength(5);
   });
 
   it('phones: grouped by status, Mine = owner or backup', () => {

@@ -127,6 +127,12 @@ describe('Sites list filters (spec §20)', () => {
     expect(only(f)).toEqual(expected);
   });
 
+  it('search ignores the URL scheme and www', () => {
+    expect(only({ q: 'https' })).toEqual([]);
+    expect(only({ q: 'www' })).toEqual([]);
+    expect(only({ q: 'dxtgames.example' })).toEqual(['DxT Games']);
+  });
+
   it('needsAttention reads each reason on its own', () => {
     expect(needsAttention(site('A'))).toBe(false);
     expect(needsAttention(site('A', { backup: null }))).toBe(true);

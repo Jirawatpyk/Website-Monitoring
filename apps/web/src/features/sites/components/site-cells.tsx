@@ -11,7 +11,7 @@ import {
   IconPencil,
   IconShieldAlert,
 } from '@jirawatpyk/aura-react/icons';
-import { formatIncidentLine, formatTime } from '@dxt/shared';
+import { formatDay, formatIncidentLine, formatTime, isSameBangkokDay } from '@dxt/shared';
 import { SiteStatusBadge } from '@/components/status-badges';
 import { LIST_LOCATIONS, type LocationGlyph, type OpenIncident, type SiteListRow } from '../types';
 import { isMuted, rowKey } from './site-list';
@@ -81,9 +81,16 @@ export function MutedBadge({ row, now }: { row: SiteListRow; now: Date }) {
   if (!isMuted(row, now) || !row.mutedUntil) return null;
   return (
     <Badge tone="neutral" variant="outline" icon={<IconEyeOff />}>
-      {`Muted · until ${formatTime(new Date(row.mutedUntil))}`}
+      {`Muted · until ${untilText(new Date(row.mutedUntil), now)}`}
     </Badge>
   );
+}
+
+/** "18:00" today, "Mon 12 Oct 09:00" on a later day. */
+function untilText(until: Date, now: Date): string {
+  return isSameBangkokDay(until, now)
+    ? formatTime(until)
+    : `${formatDay(until, { weekday: true })} ${formatTime(until)}`;
 }
 
 export function DraftBadge() {
@@ -95,7 +102,7 @@ export function DraftBadge() {
 }
 
 /** Waiting on someone (unacked, escalated) reads red; a missing root cause amber; the rest quiet. */
-function incidentTone(state: OpenIncident['state']): string {
+export function incidentTone(state: OpenIncident['state']): string {
   if (state === 'unacked' || state === 'escalated') return 'text-fg-danger';
   if (state === 'needs_root_cause') return 'text-alert-warning-fg';
   return 'text-fg-secondary';
@@ -120,8 +127,4 @@ export function IncidentLink({ incident, now }: { incident: OpenIncident; now: D
       {incidentText(incident, now)}
     </Link>
   );
-}
-
-export function incidentToneOf(i: OpenIncident): string {
-  return incidentTone(i.state);
 }

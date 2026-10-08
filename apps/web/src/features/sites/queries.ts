@@ -1,6 +1,5 @@
 import 'server-only';
-import { defaultSlowMs, toMonitorHeaders, type SiteStatus } from '@dxt/shared';
-import { serverEnv } from '@/lib/env';
+import { CLOSED_INCIDENT_STATES_IN, defaultSlowMs, toMonitorHeaders, type SiteStatus } from '@dxt/shared';
 import { createClient } from '@/lib/supabase/server';
 import { locationGlyph } from './components/site-list';
 import { siteIdSchema } from './schemas';
@@ -17,9 +16,6 @@ import type {
 } from './types';
 
 type Client = Awaited<ReturnType<typeof createClient>>;
-
-/** Incident states that are no longer open (spec §19: open = any state before Resolved). */
-const CLOSED_STATES = '("resolved","in_review","closed")';
 
 /**
  * `/sites` (spec §20): every site with its client · AM, owner · backup, mute, open incident, latest
@@ -41,7 +37,7 @@ export async function listSites(): Promise<SiteListRow[]> {
                    acker:profiles!incidents_acked_by_fkey(display_name))`,
       )
       .eq('monitors.is_primary', true)
-      .not('incidents.state', 'in', CLOSED_STATES)
+      .not('incidents.state', 'in', CLOSED_INCIDENT_STATES_IN)
       .order('name'),
     supabase.rpc('site_list_locations'),
   ]);
@@ -203,7 +199,10 @@ function slowMsOf(thresholds: unknown): number | null {
   return typeof v === 'number' && v > 0 ? v : null;
 }
 
-/** Whether the alerts Chat Space is set up — the empty Sites list's first setup step. */
+/**
+ * Whether the alerts Chat Space is set up — the empty Sites list's first setup step. Read on its own,
+ * like `probeAllowlistInfo`, so the page doesn't need every server secret.
+ */
 export function chatConnected(): boolean {
-  return !!serverEnv().GOOGLE_CHAT_ALERTS_WEBHOOK_URL;
+  return !!process.env.GOOGLE_CHAT_ALERTS_WEBHOOK_URL?.trim();
 }
