@@ -19,7 +19,7 @@
 | S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Done |
 | S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | In review |
-| S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 (merged) | 3 | In review |
+| S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 (merged) | 3 | Done |
 | S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
@@ -317,6 +317,12 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
   3. The VPS agent reports the two control results with each batch; one control down is not a control failure (test).
   4. On production Bangkok Airways TW and CN show OK with the note while SIN / TYO stay blocked (SQL: site_status, check_results), and staging `challenge` mode still goes through the verifier on a non-WAF site.
 - **Review:** engine-reviewer, security-reviewer (agent → Ingest payload), db-reviewer (check_results columns).
+- **Notes (evidence):** Done — merged in #48 (8 Oct 2026). Grew in review: D-027 rules 2b–2d (Akamai control, DOWN starts at proof, "Confirmed by" names who confirmed it) and D-028 (Admin alert when the BKK network check fails). Reviews: `/code-review high` (8 fixed), engine-reviewer ×3, db-reviewer ×2, message-checker ×2, security (none).
+  - **Done-when 1 ✓** `packages/engine/src/waf.test.ts` "D-027 — sites behind a WAF" (a)–(f) plus "D-027 invariants over every combination"; engine 234 tests, coverage 98.8 / 93.6.
+  - **Done-when 2 ✓** `packages/probe/src/classify.test.ts` "wafSignature (D-027)" with the real Akamai page; a plain 403 keeps D-022; an Akamai 5xx origin-error page stays a fail.
+  - **Done-when 3 ✓** `apps/vps-agent/src/probe-loop.test.ts` "runProbeRound — control check (D-027)"; `dxt-agent@production` journal `{"event":"probe_round","checked":20,…,"controlOk":true}` (08:58 UTC); production `check_results` BKK rows `control_ok = true, akamai_ok = true`.
+  - **Done-when 4 ✓** Production (08:55 UTC): `site_status` Bangkok Airways – Taiwan and – China `ok`, note "Verified from BKK; SIN, TYO blocked by bot protection"; `check_results` SIN / TYO `blocked 403, waf = akamai`, BKK `pass 200`; INC-0001 / INC-0002 (PROBLEM unverified) recovered 08:52:01. Staging `/verify` (Tao, PASS): flag off + `challenge` → verify jobs `loaded`, OK with the browser note; `waf-partial` / `waf-partial-down` / `challenge-all` as the `verifier-staging` table says.
+  - Seen at the deploy (not S05b): SIN / TYO wrote no results 08:48–08:50 UTC while the new production deployment waited for `migrate-production`, so `probe_locations_low` opened 08:51 and cleared 09:01 (one Admin email).
 
 ### S05c · Sites list (board)
 
