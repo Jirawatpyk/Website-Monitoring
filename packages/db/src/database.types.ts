@@ -609,6 +609,11 @@ isOneToOne: false
 "set_site_monitoring":
 { Args: { "p_on": boolean,"p_site_id": string }; Returns: undefined
                            },
+"site_list_locations":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "checked_at": string,"error": string,"location": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms": number,"site_id": string
+            }[]
+                           },
 "undo_ack":
 { Args: { "p_incident_id": string }; Returns: undefined
                            },
