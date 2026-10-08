@@ -13,7 +13,6 @@ import {
   IconButton,
   Switch,
   Tag,
-  TextField,
   type ActiveFilter,
   type DataTableColumn,
   type MenuItem,
@@ -381,7 +380,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           search={f.q}
           onSearchChange={(q) => set({ q })}
           searchLabel="Search sites"
-          searchPlaceholder="Name, URL or client"
+          searchPlaceholder="Search name, URL or client"
           actions={
             <FilterSelect
               label="Sort by"
@@ -476,13 +475,12 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
 
       {/* ── phones (MSites) ── */}
       <div className="flex flex-col gap-3 md:hidden">
-        <TextField
-          label="Search sites"
-          icon={<IconSearch />}
-          placeholder="Name, URL or client"
-          value={f.q}
-          onChange={(e) => set({ q: e.target.value })}
-          touchHeight
+        <FilterBar
+          search={f.q}
+          onSearchChange={(q) => set({ q })}
+          searchLabel="Search sites"
+          searchPlaceholder="Search name, URL or client"
+          label="Search"
         />
         <div className="flex items-center">
           <div

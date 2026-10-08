@@ -146,7 +146,7 @@ describe('SitesList (spec §20, Sites board)', () => {
     const groups = screen
       .getAllByRole('region')
       .map((r) => r.getAttribute('aria-label'))
-      .filter((l) => l !== 'Filters');
+      .filter((l) => l?.includes(' · '));
     expect(groups).toEqual(['DOWN · 1', 'OK · 3', 'DRAFT · 1']);
     const chips = within(screen.getByRole('group', { name: 'Filter sites' }));
     fireEvent.click(chips.getByRole('button', { name: 'Mine 1' }));
