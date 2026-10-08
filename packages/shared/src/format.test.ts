@@ -5,6 +5,7 @@ import {
   formatDay,
   formatDuration,
   formatIncidentId,
+  formatIncidentLine,
   formatPercent,
   formatTier,
   formatTime,
@@ -105,5 +106,23 @@ describe('alert times and incident ids (ChatAlert, D-013)', () => {
     [12345, 'INC-12345'],
   ])('incident %i → %s', (n, expected) => {
     expect(formatIncidentId(n)).toBe(expected);
+  });
+});
+
+describe('formatIncidentLine (Sites list, spec §20)', () => {
+  const base = { number: 142, level: 0, minutesOpen: 18, ackedBy: null };
+  it.each([
+    [{ ...base, state: 'unacked' as const }, 'INC-0142 · 18 min unacked'],
+    [{ ...base, state: 'escalated' as const, level: 1 }, 'INC-0142 · Escalated L1 · 18 min unacked'],
+    [
+      { ...base, state: 'escalated' as const, level: 2, minutesOpen: 75 },
+      'INC-0142 · Escalated L2 · 1 h 15 min unacked',
+    ],
+    [{ ...base, number: 141, state: 'acknowledged' as const, ackedBy: 'Ploy' }, 'INC-0141 · Acked by Ploy'],
+    [{ ...base, state: 'acknowledged' as const }, 'INC-0142 · Acknowledged'],
+    [{ ...base, state: 'monitoring' as const }, 'INC-0142 · Monitoring'],
+    [{ ...base, number: 139, state: 'needs_root_cause' as const }, 'INC-0139 · Needs root cause'],
+  ])('%o → %s', (i, expected) => {
+    expect(formatIncidentLine(i)).toBe(expected);
   });
 });

@@ -101,6 +101,34 @@ export function formatIncidentId(number: number): string {
 }
 
 /**
+ * An open incident in one line, as the Sites list (spec §20) and Overview show it next to the status:
+ * "INC-0142 · Escalated L1 · 18 min unacked", "INC-0141 · Acked by Ploy", "INC-0139 · Needs root cause".
+ */
+export function formatIncidentLine(i: {
+  number: number;
+  state: 'unacked' | 'escalated' | 'acknowledged' | 'monitoring' | 'needs_root_cause';
+  level: number;
+  /** Minutes since the incident was detected. */
+  minutesOpen: number;
+  ackedBy: string | null;
+}): string {
+  const id = formatIncidentId(i.number);
+  const unacked = `${formatDuration(i.minutesOpen)} unacked`;
+  switch (i.state) {
+    case 'unacked':
+      return `${id} · ${unacked}`;
+    case 'escalated':
+      return `${id} · Escalated L${i.level} · ${unacked}`;
+    case 'acknowledged':
+      return i.ackedBy ? `${id} · Acked by ${i.ackedBy}` : `${id} · Acknowledged`;
+    case 'monitoring':
+      return `${id} · Monitoring`;
+    case 'needs_root_cause':
+      return `${id} · Needs root cause`;
+  }
+}
+
+/**
  * The "Confirmed by" fact of a DOWN (ChatAlert / EmailAlert / the incident page): "3 locations, 2 checks";
  * behind a WAF where only some locations could vote (D-027), who confirmed it and who was blocked —
  * "BKK only, 2 checks — SIN, TYO blocked by bot protection".
