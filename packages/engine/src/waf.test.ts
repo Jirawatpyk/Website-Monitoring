@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
 import { UNVERIFIED_NOTE, type StoredCheck, type Verification } from './monitor';
 import { BLOCKED_NOTE, evaluateRound } from './round';
+import { minuteOf } from './triggers';
 import { decideSite, NEW_MONITOR, type SiteMonitor, type SiteSnapshot } from './site';
 
 // D-027 — sites behind a WAF. Bangkok Airways – Taiwan, 8 Oct 2026: Akamai answers SIN and TYO with
@@ -207,6 +208,54 @@ describe('D-027 — sites behind a WAF (decideSite)', () => {
       monitorId: 'flightdeals',
       trigger: 'key_page',
     });
+  });
+
+  it('BKK failing while SIN passes and TYO is WAF-blocked → OK with a regional clock, then PROBLEM (Regional)', () => {
+    const rows = [
+      check('BKK', 'fail', 1),
+      check('SIN', 'pass', 2),
+      check('TYO', 'blocked', 3, { waf: 'cloudflare' }),
+      recheck('BKK', 'fail', 31),
+    ];
+    const d = decideSite(site([home(rows)]));
+    expect(d).toMatchObject({
+      kind: 'none',
+      status: 'ok',
+      note: 'Verified from SIN; TYO blocked by bot protection',
+    });
+    expect(d.kind === 'none' && d.monitors[0]?.failingSince).toEqual({ BKK: at(1).toISOString() });
+    const since = { ...NEW_MONITOR, failingSince: { BKK: at(-358).toISOString() } };
+    expect(decideSite(site([home(rows, { carry: since })]))).toMatchObject({
+      kind: 'problem',
+      trigger: 'regional',
+      detail: { kind: 'regional', location: 'BKK' },
+    });
+  });
+
+  it('a location the WAF now blocks drops its old failure clock', () => {
+    const rows = [
+      check('BKK', 'pass', 1),
+      check('SIN', 'pass', 2),
+      check('TYO', 'blocked', 3, { waf: 'akamai' }),
+    ];
+    const since = { ...NEW_MONITOR, failingSince: { TYO: at(-3600).toISOString() } };
+    const d = decideSite(site([home(rows, { carry: since })]));
+    expect(d).toMatchObject({ kind: 'none', status: 'ok' });
+    expect(d.kind === 'none' && d.monitors[0]?.failingSince).toEqual({});
+  });
+
+  it('a location excluded as no data isn’t named in the note', () => {
+    const rows = [
+      check('BKK', 'pass', 1),
+      check('SIN', 'pass', 2),
+      check('TYO', 'blocked', 3, { waf: 'akamai' }),
+    ];
+    const minute = minuteOf(at(3));
+    const d = decideSite(
+      site([home(rows)], { faulty: new Map([[minute, new Set<ProbeLocation>(['TYO'])]]) }),
+    );
+    expect(d).toMatchObject({ kind: 'none', status: 'ok' });
+    expect(d.kind === 'none' && 'note' in d ? d.note : undefined).toBeUndefined();
   });
 
   it('a WAF block never starts a regional clock', () => {

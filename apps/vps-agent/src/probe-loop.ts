@@ -72,14 +72,20 @@ export async function runProbeRound({
       mustNotContain: m.mustNotContain,
     });
 
-  // The control check runs beside the monitors (D-027): ok while any control URL answers.
-  const [first, controls] = await Promise.all([
-    Promise.all(monitors.map(async (m) => ({ m, r: await run(m, m.timeoutMs) }))),
-    Promise.all(controlUrls.map((url) => check({ url, method: 'GET', timeoutMs: CONTROL_TIMEOUT_MS }))),
-  ]);
-  const control = controls.length
-    ? { ok: controls.some((r) => r.outcome === 'pass'), checkedAt: new Date(started).toISOString() }
-    : undefined;
+  // The control check runs beside each batch it vouches for (D-027): ok while any control URL answers.
+  const runControl = async () => {
+    if (!controlUrls.length) return undefined;
+    const rs = await Promise.all(
+      controlUrls.map((url) => check({ url, method: 'GET', timeoutMs: CONTROL_TIMEOUT_MS })),
+    );
+    return { ok: rs.some((r) => r.outcome === 'pass') };
+  };
+  const [first, control] = monitors.length
+    ? await Promise.all([
+        Promise.all(monitors.map(async (m) => ({ m, r: await run(m, m.timeoutMs) }))),
+        runControl(),
+      ])
+    : [[], undefined];
   if (first.length)
     await api.postResults(
       first.map(({ m, r }) => toResult(m, started, r, 1)),
@@ -92,15 +98,19 @@ export async function runProbeRound({
     await sleep(Math.max(0, started + RECHECK_DELAY_MS - clock()));
     const remaining = started + ROUND_BUDGET_MS - clock();
     if (remaining >= 1_000) {
-      const second = await Promise.all(
-        failed.map(async (m) => {
-          const at = clock();
-          return { m, at, r: await run(m, Math.min(m.timeoutMs, remaining)) };
-        }),
-      );
+      // The recheck gets its own control check: the network may have changed in 30 s.
+      const [second, recheckControl] = await Promise.all([
+        Promise.all(
+          failed.map(async (m) => {
+            const at = clock();
+            return { m, at, r: await run(m, Math.min(m.timeoutMs, remaining)) };
+          }),
+        ),
+        runControl(),
+      ]);
       await api.postResults(
         second.map(({ m, at, r }) => toResult(m, at, r, 2)),
-        control,
+        recheckControl,
       );
       rechecked = second.length;
     }

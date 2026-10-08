@@ -39,8 +39,13 @@ export function hasChallengeSignature(res: ResponseSnapshot): boolean {
   return CHALLENGE_BODY.test(res.bodySample);
 }
 
-/** Akamai's own block page: "Access Denied" with a "Reference #…" (the `#` often HTML-encoded). */
-const AKAMAI_BODY = /access denied|reference(?:\s|&#32;)*(?:#|&#35;)/i;
+/**
+ * Akamai's own block page: "Access Denied" and a "Reference #…" (the `#` often HTML-encoded), both.
+ * "Reference #" alone is also on Akamai's origin-error page (a 5xx: an outage); "Access denied" alone
+ * can be the origin's own page.
+ */
+const AKAMAI_DENIED = /access denied/i;
+const AKAMAI_REFERENCE = /reference(?:\s|&#32;)*(?:#|&#35;)/i;
 
 /**
  * The header-level WAF signature of a challenge response (D-027), or null. Only these let a location
@@ -51,7 +56,12 @@ export function wafSignature(res: ResponseSnapshot): WafVendor | null {
   if (!CHALLENGE_STATUSES.has(res.status)) return null;
   if (res.headers.get('cf-mitigated') !== null) return 'cloudflare';
   if (res.headers.get('x-sucuri-block') !== null) return 'sucuri';
-  if (/akamaighost/i.test(res.headers.get('server') ?? '') && AKAMAI_BODY.test(res.bodySample)) {
+  if (
+    res.status === 403 &&
+    /akamaighost/i.test(res.headers.get('server') ?? '') &&
+    AKAMAI_DENIED.test(res.bodySample) &&
+    AKAMAI_REFERENCE.test(res.bodySample)
+  ) {
     return 'akamai';
   }
   return null;

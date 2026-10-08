@@ -41,7 +41,7 @@ export const ingestBatchSchema = z.object({
    * `ok` false only when both failed: the VPS's own network is suspect, so its results can't
    * decide a site behind a WAF. Absent from an agent not redeployed = unknown, treated as ok.
    */
-  control: z.object({ ok: z.boolean(), checkedAt: z.iso.datetime() }).optional(),
+  control: z.object({ ok: z.boolean() }).optional(),
 });
 export type IngestBatch = z.infer<typeof ingestBatchSchema>;
 

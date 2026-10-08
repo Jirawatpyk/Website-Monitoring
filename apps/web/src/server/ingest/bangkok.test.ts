@@ -103,7 +103,7 @@ describe('Bangkok through the Ingest API', () => {
         { ...base, monitorId: 'm2', outcome: 'pass', statusCode: 200, waf: 'akamai' },
       ],
       now,
-      { ok: false, checkedAt: now.toISOString() },
+      { ok: false },
     );
     expect(calls.find((c) => c.table === 'check_results')?.values).toEqual([
       expect.objectContaining({ monitor_id: 'm1', waf: 'akamai', control_ok: false }),

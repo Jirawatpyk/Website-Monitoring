@@ -134,14 +134,19 @@ export function nextFailingSince(previous: FailingSince, scheduled: readonly Che
   return next;
 }
 
-/** One location failing for ≥ 5 min while the round's majority passes (spec §6). */
+/**
+ * One location failing for ≥ 5 min while the round's majority passes (spec §6). Behind a WAF
+ * (`wafSite`, D-027) the round's voters already decided it was OK: one passing voter is enough.
+ */
 export function regionalIssue(
   scheduled: readonly CheckFacts[],
   failingSince: FailingSince,
+  wafSite = false,
 ): Extract<ProblemDetail, { kind: 'regional' }> | null {
   const failing = scheduled.filter((c) => c.outcome === 'fail');
   const passing = scheduled.filter((c) => c.outcome === 'pass');
-  if (failing.length !== 1 || passing.length * 2 <= scheduled.length) return null;
+  const majority = wafSite ? passing.length > 0 : passing.length * 2 > scheduled.length;
+  if (failing.length !== 1 || !majority) return null;
   const one = failing[0]!;
   const since = failingSince[one.location];
   if (!since || !isRegionalProblem(new Date(since), one.checkedAt)) return null;

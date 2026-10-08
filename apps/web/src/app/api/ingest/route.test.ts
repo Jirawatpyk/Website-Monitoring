@@ -96,7 +96,7 @@ describe('POST /api/ingest (Bangkok probe)', () => {
 
   it('passes the batch’s control check to the store (D-027)', async () => {
     const { POST } = await import('./route');
-    const control = { ok: false, checkedAt: '2026-10-07T03:00:01Z' };
+    const control = { ok: false };
     await POST(post({ results: [result('2026-10-07T03:00:01Z')], control }));
     expect(m.store.mock.calls[0]?.[3]).toEqual(control);
   });

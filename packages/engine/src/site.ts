@@ -532,6 +532,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     ),
   ) as FailingSince;
   const failingSince = nextFailingSince(beating, counted);
+  for (const loc of sittingOut) delete failingSince[loc];
   const carried = { slowRounds: m.carry.slowRounds, failingSince };
   const reset = { slowRounds: 0, failingSince };
   const blockedChecks = round.scheduled.filter((c) => c.outcome === 'blocked');
@@ -603,13 +604,15 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   // An OK round needs a majority of the reporting locations to pass (PRD §5): one pass and one fail
   // is no majority; two passes and a regional failure is.
   const passing = counted.filter((c) => c.outcome === 'pass');
-  if (first.kind === 'pass' && passing.length * 2 > counted.length) {
+  // Behind a WAF, `evaluateWafRound` already weighed the voters: a pass stands with one voter passing.
+  const okRound = wafSite ? passing.length > 0 : passing.length * 2 > counted.length;
+  if (first.kind === 'pass' && okRound) {
     // Behind a WAF a round one location decided is evidence enough for the triggers too (D-027).
     const minLocations = wafSite && counted.length === 1 ? 1 : 2;
     const p50 = roundP50(counted, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
     const next = { slowRounds, failingSince };
-    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations);
+    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafSite);
     if (issue) {
       return {
         verdict: {
@@ -623,7 +626,9 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     }
     // Behind a WAF with some locations blocked: say who decided (D-027).
     const wafBlocked = wafSite
-      ? round.scheduled.filter((c) => c.outcome === 'blocked' && c.waf).map((c) => c.location)
+      ? round.scheduled
+          .filter((c) => c.outcome === 'blocked' && c.waf && !excluded.has(c.location))
+          .map((c) => c.location)
       : [];
     const note = wafBlocked.length
       ? wafNote(
@@ -699,6 +704,7 @@ function problemOf(
   slowRounds: number,
   p50: number | null,
   minLocations = 2,
+  wafSite = false,
 ): { trigger: Trigger; detail: ProblemDetail } | null {
   const as = (trigger: Trigger, detail: ProblemDetail | null) =>
     detail ? { trigger: m.isPrimary ? trigger : ('key_page' as const), detail } : null;
@@ -714,7 +720,7 @@ function problemOf(
           locations: counted.filter((c) => c.outcome === 'pass').map((c) => c.location),
         })
       : null) ??
-    as('regional', regionalIssue(counted, failingSince))
+    as('regional', regionalIssue(counted, failingSince, wafSite))
   );
 }
 

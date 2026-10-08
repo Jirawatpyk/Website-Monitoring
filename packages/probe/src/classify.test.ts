@@ -39,7 +39,21 @@ describe('wafSignature (D-027)', () => {
     [
       'Akamai 403: Reference # alone',
       res(403, { server: 'AkamaiGHost' }, 'Reference&#32;&#35;18&#46;4c0c'),
-      'akamai',
+      null,
+    ],
+    [
+      'Akamai 403: the origin’s own "Access denied" page',
+      res(403, { server: 'AkamaiGHost' }, '<h1>Access denied</h1><p>Please sign in.</p>'),
+      null,
+    ],
+    [
+      'Akamai 503 origin-error page with a Reference # is an outage',
+      res(
+        503,
+        { server: 'AkamaiGHost' },
+        'An error occurred while processing your request.<p>Reference&#32;&#35;97&#46;1a2b',
+      ),
+      null,
     ],
     ['Cloudflare challenge', res(403, { 'cf-mitigated': 'challenge' }), 'cloudflare'],
     ['Sucuri block', res(403, { 'x-sucuri-block': '1' }), 'sucuri'],
@@ -59,5 +73,11 @@ describe('wafSignature (D-027)', () => {
   it('an Akamai block is blocked; a plain 403 keeps the D-022 rule (a pass)', () => {
     expect(classifyResponse(res(403, { server: 'AkamaiGHost' }, AKAMAI_PAGE))).toBe('blocked');
     expect(classifyResponse(res(403, { server: 'AkamaiGHost' }, '<h1>Forbidden</h1>'))).toBe('pass');
+    // Akamai's origin-error page is an outage, never a block.
+    expect(
+      classifyResponse(
+        res(503, { server: 'AkamaiGHost' }, 'An error occurred.<p>Reference&#32;&#35;97&#46;1a'),
+      ),
+    ).toBe('fail');
   });
 });

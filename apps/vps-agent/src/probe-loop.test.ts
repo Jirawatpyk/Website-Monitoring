@@ -55,11 +55,13 @@ const START = Date.parse('2026-10-07T03:01:01Z');
 
 describe('runProbeRound — control check (D-027)', () => {
   const CONTROLS = ['https://www.gstatic.com/generate_204', 'https://www.cloudflare.com/cdn-cgi/trace'];
-  const roundWith = async (controlDown: (url: string) => boolean) => {
+  const roundWith = async (controlDown: (url: string, call: number) => boolean) => {
     let now = START;
+    let call = 0;
     const { api, controls } = fakeApi();
     const check = vi.fn(async ({ url }: { url: string }) => {
-      if (CONTROLS.includes(url)) return controlDown(url) ? result('fail', null) : result('pass', 204);
+      if (CONTROLS.includes(url))
+        return controlDown(url, call++) ? result('fail', null) : result('pass', 204);
       return url.includes('down') ? result('fail', 503) : result('pass');
     });
     const summary = await runProbeRound({
@@ -75,10 +77,21 @@ describe('runProbeRound — control check (D-027)', () => {
   it('both control URLs down → ok: false, on both posts (scheduled and recheck)', async () => {
     const { summary, controls } = await roundWith(() => true);
     expect(summary.controlOk).toBe(false);
-    expect(controls).toEqual([
-      { ok: false, checkedAt: new Date(START).toISOString() },
-      { ok: false, checkedAt: new Date(START).toISOString() },
-    ]);
+    expect(controls).toEqual([{ ok: false }, { ok: false }]);
+  });
+
+  it('the recheck gets its own control check: a network blip at the round start doesn’t follow it', async () => {
+    // Calls 0 and 1 are the round start's two control URLs; the recheck's come after.
+    const { controls } = await roundWith((_url, call) => call < 2);
+    expect(controls).toEqual([{ ok: false }, { ok: true }]);
+  });
+
+  it('no monitors due → no control check either', async () => {
+    const { api } = fakeApi([]);
+    const check = vi.fn(async () => result('pass'));
+    const summary = await runProbeRound({ api, controlUrls: CONTROLS, check, clock: () => START });
+    expect(check).not.toHaveBeenCalled();
+    expect(summary.controlOk).toBeUndefined();
   });
 
   it('one control URL down is not a control failure', async () => {
@@ -87,10 +100,10 @@ describe('runProbeRound — control check (D-027)', () => {
     expect(controls[0]).toMatchObject({ ok: true });
   });
 
-  it('checks each control URL once a round with a short GET, never with the WAF header', async () => {
+  it('checks each control URL once per batch (scheduled + recheck) with a short GET, never with the WAF header', async () => {
     const { check } = await roundWith(() => false);
     const calls = check.mock.calls.map(([req]) => req).filter((r) => CONTROLS.includes(r.url));
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(4);
     for (const c of calls) expect(c).toEqual({ url: c.url, method: 'GET', timeoutMs: 10_000 });
   });
 
