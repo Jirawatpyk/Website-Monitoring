@@ -88,6 +88,59 @@ describe('D-027 — sites behind a WAF (decideSite)', () => {
     expect(d).toMatchObject({ kind: 'open', monitorId: 'home', startedAt: at(1), confirmedAt: at(31) });
     if (d.kind !== 'open') throw new Error('expected open');
     expect(d.failing.map((c) => c.location)).toEqual(['BKK']);
+    // "Confirmed by" names who confirmed it and who the WAF blocked.
+    expect(d.wafBlocked).toEqual(['SIN', 'TYO']);
+  });
+
+  it('(L1) the DOWN starts at the first failure the control check vouched for, not an earlier one it didn’t', () => {
+    // The round before (already judged): BKK failed while the VPS's control check was down — no data.
+    const judged = { lastRoundAt: at(-180) };
+    const before = [
+      check('BKK', 'fail', -179, { controlOk: false }),
+      check('SIN', 'blocked', -178, { waf: 'akamai' }),
+      check('TYO', 'blocked', -177, { waf: 'akamai' }),
+    ];
+    const rows = [...before, check('BKK', 'fail', 1), ...akamaiAbroad(), recheck('BKK', 'fail', 31)];
+    expect(decideSite(site([home(rows)], judged))).toMatchObject({ kind: 'open', startedAt: at(1) });
+    // The same earlier failure with the control fine is the start, as spec §6 says.
+    const vouched = [{ ...before[0]!, controlOk: true }, ...rows.slice(1)];
+    expect(decideSite(site([home(vouched)], judged))).toMatchObject({ kind: 'open', startedAt: at(-179) });
+  });
+
+  it('(L2) behind Akamai, BKK failing while the Akamai control failed too is the route, not the origin → PROBLEM (unverified)', () => {
+    const rows = [
+      check('BKK', 'fail', 1, { akamaiOk: false }),
+      ...akamaiAbroad(),
+      recheck('BKK', 'fail', 31, { akamaiOk: false }),
+    ];
+    expect(decideSite(site([home(rows)]))).toMatchObject({
+      kind: 'problem',
+      detail: { kind: 'blocked', reason: 'control_failed' },
+    });
+  });
+
+  it('(L2) the Akamai control passing while the site fails is the origin → DOWN', () => {
+    const rows = [
+      check('BKK', 'fail', 1, { akamaiOk: true }),
+      ...akamaiAbroad(),
+      recheck('BKK', 'fail', 31, { akamaiOk: true }),
+    ];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'open', startedAt: at(1) });
+  });
+
+  it('(L2) the Akamai control only guards sites behind Akamai: behind Cloudflare a failure still counts', () => {
+    const rows = [
+      check('BKK', 'fail', 1, { akamaiOk: false }),
+      check('SIN', 'blocked', 2, { waf: 'cloudflare' }),
+      check('TYO', 'blocked', 3, { waf: 'cloudflare' }),
+      recheck('BKK', 'fail', 31, { akamaiOk: false }),
+    ];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'open' });
+  });
+
+  it('(L2) a pass with the Akamai control down still counts: the site answered', () => {
+    const rows = [check('BKK', 'pass', 1, { akamaiOk: false }), ...akamaiAbroad()];
+    expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'none', status: 'ok' });
   });
 
   it('BKK fails but its recheck passes → a blip, not DOWN', () => {

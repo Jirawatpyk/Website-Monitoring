@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from './config';
+import { DEFAULT_AKAMAI_CONTROL_URL, loadConfig } from './config';
 
 const token = 'x'.repeat(32);
+
+describe('AKAMAI_CONTROL_URL (D-027 rule 2b)', () => {
+  it('defaults when unset or blank, takes an https URL, refuses http', () => {
+    const base = { API_BASE_URL: 'https://monitor.example.test', INGEST_TOKEN: token };
+    expect(loadConfig(base).AKAMAI_CONTROL_URL).toBe(DEFAULT_AKAMAI_CONTROL_URL);
+    expect(loadConfig({ ...base, AKAMAI_CONTROL_URL: ' ' }).AKAMAI_CONTROL_URL).toBe(
+      DEFAULT_AKAMAI_CONTROL_URL,
+    );
+    expect(loadConfig({ ...base, AKAMAI_CONTROL_URL: 'https://a.example/x' }).AKAMAI_CONTROL_URL).toBe(
+      'https://a.example/x',
+    );
+    expect(() => loadConfig({ ...base, AKAMAI_CONTROL_URL: 'http://a.example/' })).toThrow();
+  });
+});
 
 describe('loadConfig', () => {
   it('applies defaults', () => {

@@ -1,4 +1,5 @@
 import {
+  formatConfirmedBy,
   formatDay,
   formatDuration,
   formatIncidentId,
@@ -238,7 +239,7 @@ export function buildIncidentView(
     confirmedAt: formatTimeWithSeconds(new Date(i.detected_at)),
     confirmedBy: problem
       ? TRIGGER_LABELS[i.trigger]
-      : `Confirmed by ${num(detected?.payload.confirmingLocations) ?? 2} locations, 2 checks`,
+      : `Confirmed by ${formatConfirmedBy(num(detected?.payload.confirmingLocations) ?? 2, wafOf(detected?.payload))}`,
     cause: str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
     siteUrl: i.sites.monitors.find((m) => m.is_primary)?.url ?? null,
     ack,
@@ -260,7 +261,12 @@ export function logOf(
         // A PROBLEM is detected in one round; only a DOWN is confirmed by locations and a recheck.
         return typeof e.payload.summary === 'string'
           ? [{ at, text: `PROBLEM detected — ${e.payload.summary}` }]
-          : [{ at, text: `Confirmed down — ${num(e.payload.confirmingLocations) ?? 2} locations, 2 checks` }];
+          : [
+              {
+                at,
+                text: `Confirmed down — ${formatConfirmedBy(num(e.payload.confirmingLocations) ?? 2, wafOf(e.payload))}`,
+              },
+            ];
       case 'alerted': {
         const word = TEMPLATE_WORDS[str(e.payload.template) ?? ''] ?? 'Alert';
         return e.payload.channel === 'email'
@@ -302,4 +308,12 @@ export function logOf(
         return [];
     }
   });
+}
+
+/** D-027: who confirmed a DOWN behind a WAF and who the WAF blocked, from the timeline payload. */
+function wafOf(payload: Record<string, unknown> | undefined): { from: string[]; blocked: string[] } | null {
+  const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  const from = list(payload?.confirmingFrom);
+  const blocked = list(payload?.wafBlocked);
+  return from.length && blocked.length ? { from, blocked } : null;
 }

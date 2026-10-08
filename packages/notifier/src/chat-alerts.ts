@@ -3,6 +3,7 @@ import {
   formatIncidentId,
   formatTier,
   formatTime,
+  formatConfirmedBy,
   formatTimeWithSeconds,
   isSameBangkokDay,
   TRIGGER_LABELS,
@@ -53,6 +54,8 @@ export interface DownAlertInput {
   /** `formatCause` output. */
   cause: string;
   confirmingLocations: number;
+  /** Behind a WAF (D-027): who confirmed it and who the WAF blocked. */
+  confirmedByWaf?: { from: readonly string[]; blocked: readonly string[] } | null;
   owner: ChatPerson | null;
   backup: ChatPerson | null;
   /** The incident page, where the ack happens (`?ack=1`, MobileAck). */
@@ -154,7 +157,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
             {
               widgets: [
                 row('Cause', input.cause),
-                row('Confirmed by', `${input.confirmingLocations} locations, 2 checks`),
+                row('Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)),
                 row('Owner', ownerText),
                 {
                   buttonList: {

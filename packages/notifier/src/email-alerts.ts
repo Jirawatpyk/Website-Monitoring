@@ -4,6 +4,7 @@ import {
   formatIncidentId,
   formatTier,
   formatTime,
+  formatConfirmedBy,
   formatTimeWithSeconds,
   PROBE_LOCATIONS,
   TRIGGER_LABELS,
@@ -56,6 +57,8 @@ export interface DownEmailInput extends EmailBaseInput {
   confirmedAt: Date;
   cause: string;
   confirmingLocations: number;
+  /** Behind a WAF (D-027): who confirmed it and who the WAF blocked. */
+  confirmedByWaf?: { from: readonly string[]; blocked: readonly string[] } | null;
   /** A PROBLEM someone had acknowledged, now raised to DOWN (D-021): who has it. */
   ackedBy?: string | null;
 }
@@ -275,7 +278,7 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
     facts: [
       ['Confirmed down', confirmedLabel(input.confirmedAt)],
       ['Cause', input.cause],
-      ['Confirmed by', `${input.confirmingLocations} locations, 2 checks`],
+      ['Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)],
     ],
     // One page serves both until S07 builds the full incident: [Open incident] would repeat it.
     buttons: input.ackedBy

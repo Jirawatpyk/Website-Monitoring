@@ -235,6 +235,19 @@ describe('Admin alert about the browser verifier (D-001, D-019)', () => {
   });
 });
 
+describe('DOWN behind a WAF (D-027)', () => {
+  it('"Confirmed by" says who confirmed it and who was blocked', () => {
+    const m = buildDownEmail({
+      ...base,
+      confirmedAt,
+      cause: CAUSE,
+      confirmingLocations: 1,
+      confirmedByWaf: { from: ['BKK'], blocked: ['SIN', 'TYO'] },
+    });
+    expect(m.text).toContain('Confirmed by: BKK only, 2 checks — SIN, TYO blocked by bot protection');
+  });
+});
+
 describe('DOWN raised from an acknowledged PROBLEM (D-021)', () => {
   it('says who has it and offers the incident, not an ack', () => {
     const m = buildDownEmail({ ...base, confirmedAt, cause: CAUSE, confirmingLocations: 2, ackedBy: 'Arm' });

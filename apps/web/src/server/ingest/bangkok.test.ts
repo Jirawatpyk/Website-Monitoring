@@ -103,10 +103,10 @@ describe('Bangkok through the Ingest API', () => {
         { ...base, monitorId: 'm2', outcome: 'pass', statusCode: 200, waf: 'akamai' },
       ],
       now,
-      { ok: false },
+      { ok: false, akamaiOk: false },
     );
     expect(calls.find((c) => c.table === 'check_results')?.values).toEqual([
-      expect.objectContaining({ monitor_id: 'm1', waf: 'akamai', control_ok: false }),
+      expect.objectContaining({ monitor_id: 'm1', waf: 'akamai', control_ok: false, akamai_ok: false }),
       expect.objectContaining({ monitor_id: 'm2', waf: null, control_ok: false }),
     ]);
 
@@ -114,7 +114,7 @@ describe('Bangkok through the Ingest API', () => {
     // An agent not redeployed sends no control: unknown, stored as null.
     await storeBangkokResults(db2, [{ ...base, monitorId: 'm3', outcome: 'pass', statusCode: 200 }], now);
     expect(calls2.find((c) => c.table === 'check_results')?.values).toEqual([
-      expect.objectContaining({ monitor_id: 'm3', waf: null, control_ok: null }),
+      expect.objectContaining({ monitor_id: 'm3', waf: null, control_ok: null, akamai_ok: null }),
     ]);
   });
 

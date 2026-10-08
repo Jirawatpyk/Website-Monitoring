@@ -1,7 +1,7 @@
 -- S05b (D-027): check_results.waf and control_ok — a WAF signature only on a blocked check.
 begin;
 \ir _helpers.psql
-select plan(10);
+select plan(12);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -45,6 +45,19 @@ select throws_ok(
     values ('00000000-0000-0000-0000-0000000000d1', 'SIN', now(), 'pass', 200, true)$$,
   '23514', null,
   'only a Bangkok check carries the control result'
+);
+
+-- D-027 rule 2b: the Akamai control, Bangkok only.
+select lives_ok(
+  $$insert into public.check_results (monitor_id, location, checked_at, outcome, status_code, akamai_ok)
+    values ('00000000-0000-0000-0000-0000000000d1', 'BKK', now(), 'fail', 503, false)$$,
+  'a Bangkok check records a failed Akamai control'
+);
+select throws_ok(
+  $$insert into public.check_results (monitor_id, location, checked_at, outcome, status_code, akamai_ok)
+    values ('00000000-0000-0000-0000-0000000000d1', 'TYO', now(), 'pass', 200, true)$$,
+  '23514', null,
+  'only a Bangkok check carries the Akamai control'
 );
 
 -- A partition the nightly job creates later carries the constraints too.

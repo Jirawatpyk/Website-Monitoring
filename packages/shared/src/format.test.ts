@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatConfirmedBy,
   formatDay,
   formatDuration,
   formatIncidentId,
@@ -12,6 +13,22 @@ import {
 
 // Fri 25 Sep 2026 10:07 in Bangkok = 03:07 UTC (spec §1 snapshot time).
 const snapshot = new Date('2026-09-25T03:07:12Z');
+
+describe('formatConfirmedBy (ChatAlert "Confirmed by", D-027)', () => {
+  it.each([
+    [3, null, '3 locations, 2 checks'],
+    [1, null, '1 location, 2 checks'],
+    [
+      1,
+      { from: ['BKK'], blocked: ['SIN', 'TYO'] },
+      'BKK only, 2 checks — SIN, TYO blocked by bot protection',
+    ],
+    [2, { from: ['BKK', 'SIN'], blocked: ['TYO'] }, 'BKK, SIN, 2 checks — TYO blocked by bot protection'],
+    [2, { from: ['BKK', 'SIN'], blocked: [] }, '2 locations, 2 checks'],
+  ] as const)('%i, %o → %s', (count, waf, expected) => {
+    expect(formatConfirmedBy(count, waf)).toBe(expected);
+  });
+});
 
 describe('formatDuration (spec §13)', () => {
   it.each([

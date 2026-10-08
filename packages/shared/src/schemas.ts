@@ -41,7 +41,8 @@ export const ingestBatchSchema = z.object({
    * `ok` false only when both failed: the VPS's own network is suspect, so its results can't
    * decide a site behind a WAF. Absent from an agent not redeployed = unknown, treated as ok.
    */
-  control: z.object({ ok: z.boolean() }).optional(),
+  // `akamaiOk`: the Akamai control (a public site served by Akamai) — D-027 rule 2b.
+  control: z.object({ ok: z.boolean(), akamaiOk: z.boolean().optional() }).optional(),
 });
 export type IngestBatch = z.infer<typeof ingestBatchSchema>;
 

@@ -99,3 +99,19 @@ export function formatTier(tier: number, options: { short?: boolean } = {}): str
 export function formatIncidentId(number: number): string {
   return `INC-${String(number).padStart(4, '0')}`;
 }
+
+/**
+ * The "Confirmed by" fact of a DOWN (ChatAlert / EmailAlert / the incident page): "3 locations, 2 checks";
+ * behind a WAF where only some locations could vote (D-027), who confirmed it and who was blocked —
+ * "BKK only, 2 checks — SIN, TYO blocked by bot protection".
+ */
+export function formatConfirmedBy(
+  count: number,
+  waf?: { from: readonly string[]; blocked: readonly string[] } | null,
+): string {
+  if (waf && waf.blocked.length && waf.from.length) {
+    const from = waf.from.length === 1 ? `${waf.from[0]} only` : waf.from.join(', ');
+    return `${from}, 2 checks — ${waf.blocked.join(', ')} blocked by bot protection`;
+  }
+  return `${count} location${count === 1 ? '' : 's'}, 2 checks`;
+}

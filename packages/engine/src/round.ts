@@ -12,6 +12,8 @@ export interface LocationResult {
   waf?: WafVendor | null;
   /** Bangkok only: false = both VPS control URLs failed in that batch (D-027); null / absent = ok. */
   controlOk?: boolean | null;
+  /** Bangkok only: false = the VPS's Akamai control failed in that batch (D-027 rule 2b). */
+  akamaiOk?: boolean | null;
 }
 
 export type RoundVerdict =
@@ -47,11 +49,23 @@ export interface RoundInput {
   wafSite?: boolean;
   /** Fewer reporting locations than this = insufficient data (default 2; the WAF recheck uses 1). */
   minReporting?: number;
+  /** The site's WAF is Akamai (a check carried `waf: 'akamai'`): the Akamai control guards BKK. */
+  akamaiSite?: boolean;
+}
+
+/**
+ * D-027 rule 2: a Bangkok result the VPS's own checks can't vouch for — both control URLs failed, or
+ * (rule 2b) on a site behind Akamai, it failed while the Akamai control failed too: the route from
+ * the VPS to Akamai is broken, not the origin.
+ */
+export function bkkUntrusted(r: LocationResult, akamaiSite = false): boolean {
+  if (r.location !== 'BKK') return false;
+  return r.controlOk === false || (akamaiSite && r.outcome === 'fail' && r.akamaiOk === false);
 }
 
 /** D-027: does this result sit the round out on a site behind a WAF? */
-export function abstainsOnWafSite(r: LocationResult): boolean {
-  return (r.outcome === 'blocked' && !!r.waf) || (r.location === 'BKK' && r.controlOk === false);
+export function abstainsOnWafSite(r: LocationResult, akamaiSite = false): boolean {
+  return (r.outcome === 'blocked' && !!r.waf) || bkkUntrusted(r, akamaiSite);
 }
 
 /** Probe clocks may run slightly ahead of the engine; results up to this far "in the future" still count. */
@@ -65,6 +79,7 @@ export function evaluateRound({
   after,
   wafSite,
   minReporting = 2,
+  akamaiSite = false,
 }: RoundInput): RoundVerdict {
   const latest = new Map<ProbeLocation, LocationResult>();
   for (const r of results) {
@@ -83,8 +98,7 @@ export function evaluateRound({
     !!wafSite &&
     results.some(
       (r) =>
-        r.location === 'BKK' &&
-        r.controlOk === false &&
+        bkkUntrusted(r, akamaiSite) &&
         (!after || r.checkedAt.getTime() > after.getTime()) &&
         now.getTime() - r.checkedAt.getTime() <= windowSec * 1000 &&
         r.checkedAt.getTime() - now.getTime() <= CLOCK_SKEW_TOLERANCE_MS,
@@ -92,7 +106,7 @@ export function evaluateRound({
   if (counted.length < minReporting) {
     return { kind: 'insufficient_data', reporting: counted.map((r) => r.location) };
   }
-  if (wafSite) return evaluateWafRound(counted, controlDown);
+  if (wafSite) return evaluateWafRound(counted, controlDown, akamaiSite);
 
   const by = (outcome: CheckOutcome) => counted.filter((r) => r.outcome === outcome).map((r) => r.location);
   const failing = by('fail');
@@ -109,9 +123,13 @@ export function evaluateRound({
  * D-027: on a site behind a WAF the locations that abstain sit out and the rest decide, one being
  * enough. Nothing left: the control check failed → untrusted; everyone WAF-blocked → the verifier.
  */
-function evaluateWafRound(counted: readonly LocationResult[], controlDown: boolean): RoundVerdict {
-  const abstained = counted.filter(abstainsOnWafSite).map((r) => r.location);
-  const voters = counted.filter((r) => !abstainsOnWafSite(r));
+function evaluateWafRound(
+  counted: readonly LocationResult[],
+  controlDown: boolean,
+  akamaiSite: boolean,
+): RoundVerdict {
+  const abstained = counted.filter((r) => abstainsOnWafSite(r, akamaiSite)).map((r) => r.location);
+  const voters = counted.filter((r) => !abstainsOnWafSite(r, akamaiSite));
   const by = (outcome: CheckOutcome) => voters.filter((r) => r.outcome === outcome).map((r) => r.location);
   if (!voters.length) {
     // The VPS's own network is down: neither its probe nor its browser verifier can decide.

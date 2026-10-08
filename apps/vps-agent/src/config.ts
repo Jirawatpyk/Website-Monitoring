@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
 /** Google and Cloudflare: two providers, so one of them having a bad minute isn't a control failure. */
+/**
+ * A small, stable public file served by Akamai (`Server: AkamaiNetStorage`, the same 23.x edge network as
+ * the client sites behind Akamai): D-027 rule 2b.
+ */
+export const DEFAULT_AKAMAI_CONTROL_URL = 'https://www.ibm.com/robots.txt';
+
 export const DEFAULT_CONTROL_URLS = [
   'https://www.gstatic.com/generate_204',
   'https://www.cloudflare.com/cdn-cgi/trace',
@@ -46,6 +52,12 @@ const configSchema = z.object({
         .min(2)
         .max(3),
     ),
+  /** The Akamai control (D-027 rule 2b); blank = the default. */
+  AKAMAI_CONTROL_URL: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || DEFAULT_AKAMAI_CONTROL_URL)
+    .pipe(z.url({ protocol: /^https$/ })),
 });
 
 export type AgentConfig = z.infer<typeof configSchema>;

@@ -13,6 +13,8 @@ export interface ProbeDeps {
   secretHeader?: { name: string; value: string };
   /** Control URLs checked every round (D-027); none = no control reported. */
   controlUrls?: readonly string[];
+  /** A public site served by Akamai, checked with the controls (D-027 rule 2b); none = not reported. */
+  akamaiControlUrl?: string;
   check?: (req: HttpCheckRequest) => Promise<HttpCheckResult>;
   clock?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -56,6 +58,7 @@ export async function runProbeRound({
   api,
   secretHeader,
   controlUrls = [],
+  akamaiControlUrl,
   check = runHttpCheck,
   clock = Date.now,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -75,10 +78,15 @@ export async function runProbeRound({
   // The control check runs beside each batch it vouches for (D-027): ok while any control URL answers.
   const runControl = async () => {
     if (!controlUrls.length) return undefined;
-    const rs = await Promise.all(
-      controlUrls.map((url) => check({ url, method: 'GET', timeoutMs: CONTROL_TIMEOUT_MS })),
-    );
-    return { ok: rs.some((r) => r.outcome === 'pass') };
+    const get = (url: string) => check({ url, method: 'GET', timeoutMs: CONTROL_TIMEOUT_MS });
+    const [rs, akamai] = await Promise.all([
+      Promise.all(controlUrls.map(get)),
+      akamaiControlUrl ? get(akamaiControlUrl) : Promise.resolve(null),
+    ]);
+    return {
+      ok: rs.some((r) => r.outcome === 'pass'),
+      ...(akamai ? { akamaiOk: akamai.outcome === 'pass' } : {}),
+    };
   };
   const [first, control] = monitors.length
     ? await Promise.all([

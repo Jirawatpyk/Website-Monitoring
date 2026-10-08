@@ -55,6 +55,7 @@ export async function storeBangkokResults(
       keyword_forbidden: r.keywordForbidden ?? null,
       waf: r.outcome === 'blocked' ? (r.waf ?? null) : null,
       control_ok: control?.ok ?? null,
+      akamai_ok: control?.akamaiOk ?? null,
     })),
   );
   if (error) throw new Error(`check_results: ${error.message}`);

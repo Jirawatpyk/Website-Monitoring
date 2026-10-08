@@ -358,6 +358,7 @@ const toStoredCheck = (c: Awaited<ReturnType<typeof loadChecks>>[number]): Store
   keywordForbidden: c.keyword_forbidden,
   waf: c.waf as WafVendor | null,
   controlOk: c.control_ok,
+  akamaiOk: c.akamai_ok,
 });
 
 interface CarryRow {
@@ -833,5 +834,12 @@ function downContext(d: DownFacts, site: SiteRow): Record<string, Json> {
         confirmingLocations: d.failing.length,
         verifyJobId: d.verifyJobId,
       }
-    : { cause: formatCause(d.failing, timeoutMs), confirmingLocations: d.failing.length };
+    : {
+        cause: formatCause(d.failing, timeoutMs),
+        confirmingLocations: d.failing.length,
+        // D-027: behind a WAF, who confirmed it and who the WAF blocked ("BKK only, 2 checks — …").
+        ...(d.wafBlocked?.length
+          ? { confirmingFrom: d.failing.map((c) => c.location), wafBlocked: [...d.wafBlocked] }
+          : {}),
+      };
 }

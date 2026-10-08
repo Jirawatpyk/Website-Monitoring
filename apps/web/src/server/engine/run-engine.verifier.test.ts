@@ -231,6 +231,26 @@ describe('runEngine — blocked rounds (S03)', () => {
       expect(rpcCalls.some((c) => c.name === 'open_system_alert')).toBe(false);
     });
 
+    it('a DOWN confirmed by BKK alone names who confirmed it and who the WAF blocked (D-027)', async () => {
+      const { db, rpcCalls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': {
+          data: [
+            bkk({ outcome: 'fail', status_code: 503, control_ok: true }),
+            bkk({ outcome: 'fail', status_code: 503, control_ok: true, attempt: 2, checked_at: at(33) }),
+            ...akamai,
+          ],
+        },
+        'rpc.engine_open_incident': { data: 'i1' },
+      });
+      await runEngine(db, now);
+      expect(rpcCalls.find((c) => c.name === 'engine_open_incident')?.args).toMatchObject({
+        p_context: { confirmingLocations: 1, confirmingFrom: ['BKK'], wafBlocked: ['SIN', 'TYO'] },
+      });
+    });
+
     it('the control check failing 3 BKK rounds in a row → one Admin alert naming the sites (D-028); it clears once it passes', async () => {
       // BKK batches at 09:58, 09:59 and 10:00, all with the control check down.
       const earlier = [-120, -60].map((sec) =>

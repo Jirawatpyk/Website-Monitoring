@@ -86,6 +86,31 @@ describe('runProbeRound — control check (D-027)', () => {
     expect(controls).toEqual([{ ok: false }, { ok: true }]);
   });
 
+  it('reports the Akamai control beside the two controls (D-027 rule 2b)', async () => {
+    const AKAMAI = 'https://www.ibm.com/robots.txt';
+    for (const akamaiDown of [true, false]) {
+      const { api, controls } = fakeApi();
+      const check = vi.fn(async ({ url }: { url: string }) =>
+        url === AKAMAI && akamaiDown
+          ? result('fail', null)
+          : url.includes('down')
+            ? result('fail', 503)
+            : result('pass'),
+      );
+      let now = START;
+      await runProbeRound({
+        api,
+        controlUrls: CONTROLS,
+        akamaiControlUrl: AKAMAI,
+        check,
+        clock: () => now,
+        sleep: async (ms) => void (now += ms),
+      });
+      expect(controls[0]).toEqual({ ok: true, akamaiOk: !akamaiDown });
+      expect(controls[1]).toEqual({ ok: true, akamaiOk: !akamaiDown });
+    }
+  });
+
   it('no monitors due → no control check either', async () => {
     const { api } = fakeApi([]);
     const check = vi.fn(async () => result('pass'));

@@ -15,7 +15,7 @@ import {
   type UnverifiedReason,
   type Verification,
 } from './monitor';
-import { abstainsOnWafSite, BLOCKED_NOTE, confirmsDown, evaluateRound, wafNote } from './round';
+import { abstainsOnWafSite, bkkUntrusted, BLOCKED_NOTE, confirmsDown, evaluateRound, wafNote } from './round';
 import {
   keywordIssue,
   minuteOf,
@@ -135,6 +135,8 @@ export interface DownFacts {
   /** Blocked, then the page failed in the browser: that job (its screenshot is the evidence). */
   verifyJobId?: string;
   browserDetail?: string | null;
+  /** Behind a WAF (D-027): the locations it blocked, so "Confirmed by" says who confirmed it. */
+  wafBlocked?: readonly ProbeLocation[];
 }
 
 export type SiteDecision =
@@ -330,6 +332,7 @@ function judgeSiteRound(
       confirmedAt: primaryDown.confirmedAt,
       ...(primaryDown.verifyJobId ? { verifyJobId: primaryDown.verifyJobId } : {}),
       ...(primaryDown.browserDetail !== undefined ? { browserDetail: primaryDown.browserDetail } : {}),
+      ...(primaryDown.wafBlocked?.length ? { wafBlocked: primaryDown.wafBlocked } : {}),
     };
     const judgedDown = { ...base, status: 'down' as const };
     if (open?.severity === 'problem') {
@@ -518,11 +521,20 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   const wafSite = !!s.behindWaf;
   // The rows are already chosen; the window only has to include them all.
   const windowSec = (s.now.getTime() - roundAt.getTime()) / 1000 + s.intervalSec + 60;
-  const first = evaluateRound({ results: round.scheduled, now: s.now, windowSec, excluded, wafSite });
+  // D-027 rule 2b: the site's WAF is Akamai when a check carried its signature this round.
+  const akamaiSite = wafSite && round.scheduled.some((c) => c.waf === 'akamai');
+  const first = evaluateRound({
+    results: round.scheduled,
+    now: s.now,
+    windowSec,
+    excluded,
+    wafSite,
+    akamaiSite,
+  });
   // D-027: behind a WAF, the locations that sat the round out don't count — not for the majority,
   // and not as a regional failure.
   const sittingOut = wafSite
-    ? new Set(round.scheduled.filter(abstainsOnWafSite).map((c) => c.location))
+    ? new Set(round.scheduled.filter((c) => abstainsOnWafSite(c, akamaiSite)).map((c) => c.location))
     : new Set<ProbeLocation>();
   const counted = round.scheduled.filter((c) => !excluded.has(c.location) && !sittingOut.has(c.location));
   // A clock of a location that stopped beating is stale: its next failure starts a new one.
@@ -536,6 +548,12 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   // D-027: one voter decides only when the WAF (or the control check) really sat someone out; a
   // flagged site with everyone voting keeps the majority rules (rule 5: the flag alone gains nothing).
   const wafRound = wafSite && [...sittingOut].some((l) => !excluded.has(l));
+  /** The locations the WAF itself blocked this round (not those sat out for the control check). */
+  const wafBlocked = wafRound
+    ? round.scheduled
+        .filter((c) => c.outcome === 'blocked' && c.waf && !excluded.has(c.location))
+        .map((c) => c.location)
+    : [];
   const carried = { slowRounds: m.carry.slowRounds, failingSince };
   const reset = { slowRounds: 0, failingSince };
   const blockedChecks = round.scheduled.filter((c) => c.outcome === 'blocked');
@@ -576,6 +594,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       after: firstFail,
       excluded,
       wafSite,
+      akamaiSite,
       ...(wafSite && counted.length === 1 ? { minReporting: 1 } : {}),
     });
     if (second.kind === 'untrusted') return unverified('control_failed', firstFail ?? roundAt);
@@ -583,10 +602,19 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       return { verdict: { kind: 'blip' }, next: reset };
     }
     const failing = round.rechecks.filter((c) => second.failing.includes(c.location));
-    const startedAt = firstFailedCheck(m.checks, failing);
+    const history = wafSite
+      ? m.checks.map((c) => (bkkUntrusted(c, akamaiSite) ? { ...c, outcome: 'blocked' as const } : c))
+      : m.checks;
+    const startedAt = firstFailedCheck(history, failing);
     if (m.isPrimary) {
       return {
-        verdict: { kind: 'down', startedAt, confirmedAt: confirmedAt(failing), failing },
+        verdict: {
+          kind: 'down',
+          startedAt,
+          confirmedAt: confirmedAt(failing),
+          failing,
+          ...(wafBlocked.length ? { wafBlocked } : {}),
+        },
         next: reset,
       };
     }
@@ -628,19 +656,14 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         next,
       };
     }
-    // Behind a WAF with some locations blocked: say who decided (D-027).
-    const wafBlocked =
-      wafRound && m.isPrimary
-        ? round.scheduled
-            .filter((c) => c.outcome === 'blocked' && c.waf && !excluded.has(c.location))
-            .map((c) => c.location)
-        : [];
-    const note = wafBlocked.length
-      ? wafNote(
-          passing.map((c) => c.location),
-          wafBlocked,
-        )
-      : undefined;
+    // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
+    const note =
+      m.isPrimary && wafBlocked.length
+        ? wafNote(
+            passing.map((c) => c.location),
+            wafBlocked,
+          )
+        : undefined;
     return { verdict: { kind: 'ok', reachable: passing, ...(note ? { note } : {}) }, next };
   }
 
