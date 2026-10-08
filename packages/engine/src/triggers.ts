@@ -28,13 +28,17 @@ export type { ProblemDetail } from '@dxt/shared';
 
 export const SLOW_ROUNDS = 3;
 
-/** The median response time of the passing checks; null with fewer than 2 (no evidence either way). */
-export function roundP50(checks: readonly CheckFacts[]): number | null {
+/**
+ * The median response time of the passing checks; null with fewer than `min` (no evidence either way).
+ * `min` is 2, or 1 on a site behind a WAF whose round only one location could decide (D-027) — the
+ * same goes for the keyword, redirect and key-page status rules below.
+ */
+export function roundP50(checks: readonly CheckFacts[], min = 2): number | null {
   const ms = checks
     .filter((c) => c.outcome === 'pass' && typeof c.responseMs === 'number')
     .map((c) => c.responseMs as number)
     .sort((a, b) => a - b);
-  if (ms.length < 2) return null;
+  if (ms.length < min) return null;
   const mid = Math.floor(ms.length / 2);
   return ms.length % 2 ? ms[mid]! : (ms[mid - 1]! + ms[mid]!) / 2;
 }
@@ -50,10 +54,11 @@ export function nextSlowRounds(previous: number, p50: number | null, thresholdMs
 /** Missing or forbidden text at a majority of the locations that checked keywords (2 or more). */
 export function keywordIssue(
   checks: readonly CheckFacts[],
+  min = 2,
 ): Extract<ProblemDetail, { kind: 'keyword' }> | null {
   const checked = checks.filter((c) => c.keywordMissing != null || c.keywordForbidden != null);
   const bad = checked.filter((c) => (c.keywordMissing?.length ?? 0) + (c.keywordForbidden?.length ?? 0) > 0);
-  if (checked.length < 2 || bad.length * 2 <= checked.length) return null;
+  if (checked.length < min || bad.length * 2 <= checked.length) return null;
   return {
     kind: 'keyword',
     missing: unique(bad.flatMap((c) => c.keywordMissing ?? [])),
@@ -89,10 +94,11 @@ export function redirectIssue(
   checks: readonly CheckFacts[],
   monitorUrl: string,
   allowlist: readonly string[],
+  min = 2,
 ): Extract<ProblemDetail, { kind: 'redirect' }> | null {
   const ended = checks.filter((c) => !!c.finalUrl);
   const off = ended.filter((c) => !isAllowedHost(hostOf(c.finalUrl!), monitorUrl, allowlist));
-  if (ended.length < 2 || off.length * 2 <= ended.length) return null;
+  if (ended.length < min || off.length * 2 <= ended.length) return null;
   return { kind: 'redirect', host: hostOf(off[0]!.finalUrl!), locations: off.map((c) => c.location) };
 }
 
@@ -101,11 +107,12 @@ export function redirectIssue(
 /** A key page answering 4xx (a WAF block is `blocked`, not here) at a majority of the reporting locations. */
 export function statusIssue(
   checks: readonly CheckFacts[],
+  min = 2,
 ): Extract<ProblemDetail, { kind: 'status' }> | null {
   const client = checks.filter(
     (c) => c.outcome === 'pass' && c.statusCode !== null && c.statusCode >= 400 && c.statusCode < 500,
   );
-  if (checks.length < 2 || client.length * 2 <= checks.length) return null;
+  if (checks.length < min || client.length * 2 <= checks.length) return null;
   return { kind: 'status', statusCode: client[0]!.statusCode!, locations: client.map((c) => c.location) };
 }
 
@@ -127,14 +134,19 @@ export function nextFailingSince(previous: FailingSince, scheduled: readonly Che
   return next;
 }
 
-/** One location failing for ≥ 5 min while the round's majority passes (spec §6). */
+/**
+ * One location failing for ≥ 5 min while the round's majority passes (spec §6). Behind a WAF
+ * (`wafSite`, D-027) the round's voters already decided it was OK: one passing voter is enough.
+ */
 export function regionalIssue(
   scheduled: readonly CheckFacts[],
   failingSince: FailingSince,
+  wafSite = false,
 ): Extract<ProblemDetail, { kind: 'regional' }> | null {
   const failing = scheduled.filter((c) => c.outcome === 'fail');
   const passing = scheduled.filter((c) => c.outcome === 'pass');
-  if (failing.length !== 1 || passing.length * 2 <= scheduled.length) return null;
+  const majority = wafSite ? passing.length > 0 : passing.length * 2 > scheduled.length;
+  if (failing.length !== 1 || !majority) return null;
   const one = failing[0]!;
   const since = failingSince[one.location];
   if (!since || !isRegionalProblem(new Date(since), one.checkedAt)) return null;

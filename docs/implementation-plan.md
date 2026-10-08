@@ -19,6 +19,8 @@
 | S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Done |
 | S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | In review |
+| S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 (merged) | 3 | In review |
+| S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 | 3 | Todo |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
@@ -302,7 +304,30 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
   - **Done-when 4 ✓** spec-checker AddSite + EditMonitors, two rounds each (High: a key page's Test check said DOWN → PROBLEM; Mediums fixed in 784a425 / 41c83da; `/verify` focus-after-Undo fixed in 04caa21 and re-checked on staging). Nav "Sites" live; `layout-consistency` passes and now also covers the Sites detail pages.
   - **Done-when 5 ✓** (as D-025 reads it) pgTAP "Owners need a Google Chat id: Nok", empty-owner Draft saves, Start refused without two linked owners; `site-form.test.tsx` "Arm · no Chat id" disabled and "Arm has no Google Chat id — ask an Admin to add it"; staging Edit site on Test target names "Jirawat (Tao) Piyakit has no Google Chat id".
   - Reviews: `/code-review high` (10 fixed), security-reviewer (no High; M1 browser verifier headers → removed; Lows fixed incl. a table trigger for header names; re-review clean), db-reviewer (M1 open-incident monitors kept; M2 justified — credential-like header names are refused, so the audit log holds none), spec-checker ×2 rounds. `/verify` (Tao): one FAIL (focus after Undo) → fixed, re-checked.
-- **Notes:** started 8 Oct 2026; rules per D-025 (Drafts may leave owners empty, Start needs two linked owners — Done-when 5 reads so). Grew M → L at planning (Test check routes, custom headers through the probes and verifier, Draft / Start / Stop); if it runs past ~1.5 days, custom headers + Test check split off as S05b.
+- **Notes:** started 8 Oct 2026; rules per D-025 (Drafts may leave owners empty, Start needs two linked owners — Done-when 5 reads so). Grew M → L at planning (Test check routes, custom headers through the probes and verifier, Draft / Start / Stop); it finished in one day, so nothing split off (S05b now names the WAF slice).
+
+### S05b · Sites behind a WAF: trusted location + control check
+
+- **Scope:** D-027. A site marked "Behind WAF" whose WAF blocks some probe locations (Bangkok Airways TW / CN: Akamai answers SIN and TYO with 403, the browser verifier too, while the Bangkok probe gets 200) is judged on the locations that are not blocked. A location counts as WAF-blocked only on a header-level WAF signature (Akamai: a 403 with `Server: AkamaiGHost`, "Access Denied" and "Reference #" together, Cloudflare `cf-mitigated`, Sucuri); a body-only match stays an ordinary blocked result. The VPS checks two control URLs from different providers each round; only when both fail is the Bangkok result "no data" for WAF sites (PROBLEM unverified, never DOWN). All locations blocked → the browser verifier as before (spec §6); through the WAF a 5xx or timeout in the browser is DOWN. Non-WAF sites are unchanged.
+- **Boards:** — (StatusModel rules; the site note "Verified from BKK; SIN, TYO blocked by bot protection") · **Tables:** — (columns on `check_results`)
+- **Depends on:** S05 (merged; its Done-when 1 is production data entry, not code — Tao, 8 Oct 2026)
+- **Done when:**
+  1. Engine table tests: (a) WAF site, BKK 5xx ×2 (with recheck), SIN/TYO Akamai 403 → DOWN; (b) VPS control both fail + BKK fail → PROBLEM (unverified), not DOWN; (c) every location blocked → verifier decides, browser blocked → PROBLEM (unverified); (d) verifier through the WAF gets 5xx / timeout → DOWN; (e) BKK pass + SIN/TYO Akamai 403 → OK with the note; (f) the same results on a site not behind a WAF → today's rule.
+  2. Probe classifier tests: Akamai 403 with `Server: AkamaiGHost` and "Reference #" → blocked with the WAF signature; a 403 without it keeps D-022 behaviour.
+  3. The VPS agent reports the two control results with each batch; one control down is not a control failure (test).
+  4. On production Bangkok Airways TW and CN show OK with the note while SIN / TYO stay blocked (SQL: site_status, check_results), and staging `challenge` mode still goes through the verifier on a non-WAF site.
+- **Review:** engine-reviewer, security-reviewer (agent → Ingest payload), db-reviewer (check_results columns).
+
+### S05c · Sites list (board)
+
+- **Scope:** Spec §20, boards Sites and MSites: the `/sites` management list rebuilt from the boards (it was built in S05 without one) — status (badge + Muted overlay + open incident link), site (name, client · AM, URL), tier, owner · backup, locations (latest round glyphs), checked, Visit site, ⋯ menu, search, status chips, Tier / Owner / Client filters, "Needs attention", sorts, drafts last with "Finish setup", empty state, mobile grouped by status. Columns that need later data show "—" until their slice: Response 24h and Uptime 30d (S06 rollups), Expiry (S13); Mute / Schedule maintenance in the ⋯ menu are disabled with the reason until S09.
+- **Boards:** Sites, MSites
+- **Depends on:** S05
+- **Done when:**
+  1. spec-checker passes Sites and MSites at 390 / 820 / 1440, light and dark.
+  2. Filters, chips, "Needs attention" and the three sorts behave as spec §20 (component tests); drafts sort last and count in "N sites" but not "monitored".
+  3. `layout-consistency` passes with the new list.
+- **Review:** spec-checker.
 
 ### S06 · Overview dashboard & site detail
 
@@ -576,6 +601,7 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
 | Q5 | ~~Confirm synthetic checks cap at PROBLEM.~~ **Answered 5 Oct 2026:** confirmed by the CEO. | — |
 | Q6 | ~~Google Workspace admin access for the Directory API (2-Step status).~~ **Closed 28 Sep 2026 (D-007):** not needed — no Directory API. | — |
 | Q7 | ~~Timeline: re-baseline, add a developer, or cut scope?~~ **Answered 28 Sep 2026:** measure S02a first, then decide with real numbers. | — |
+| Q8 | D-022 counts a home page answering 403 without a WAF signature as a pass ("home page 4xx is not a trigger"), so an origin that answers 403 by misconfiguration stays green. Keep, or treat a home-page 403 as a hard fail? (raised in the S05b review, 8 Oct 2026; not changed there) | — |
 
 ## Appendix — coverage matrix
 

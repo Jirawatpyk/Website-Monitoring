@@ -25,7 +25,7 @@ import {
   type ProblemFacts,
   type VerifierDownReason,
 } from '@dxt/notifier';
-import { PROBE_LOCATIONS, TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
+import { confirmedByWafOf, PROBE_LOCATIONS, TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
 import {
   contextOf,
   type IncidentFacts,
@@ -162,6 +162,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         now,
         cause: str(ctx.cause, 'Hard fail'),
         confirmingLocations: num(ctx.confirmingLocations, 2),
+        confirmedByWaf: confirmedByWafOf(ctx),
         owner: person(i.sites.primary),
         backup: person(i.sites.backup),
         // MobileAck: the card's link opens the incident ready to acknowledge.
@@ -272,6 +273,7 @@ export function renderEmail(
         confirmedAt: new Date(i.detected_at),
         cause: str(ctx.cause, 'Hard fail'),
         confirmingLocations: num(ctx.confirmingLocations, 2),
+        confirmedByWaf: confirmedByWafOf(ctx),
         // A PROBLEM raised to DOWN keeps its acknowledgement (D-021).
         ackedBy: i.state === 'acknowledged' && i.acker ? i.acker.display_name : null,
       });
@@ -282,6 +284,7 @@ export function renderEmail(
         detectedAt: new Date(i.detected_at),
         cause: str(ctx.cause, 'Problem'),
         summary: str(ctx.summary, 'problem'),
+        verifier: typeof ctx.verifier === 'string' ? ctx.verifier : null,
       });
     case 'acknowledged':
       return buildAcknowledgedEmail({
@@ -364,6 +367,7 @@ export function renderSystemAlertEmail(
     case 'verifier_unavailable':
     case 'verifier_backlog':
     case 'probe_locations_low':
+    case 'bkk_control_failing':
       return buildSystemAlertEmail({
         alertId: alert.id,
         kind: n.template,

@@ -52,6 +52,14 @@ describe('DOWN alert (ChatAlert, D-013)', () => {
     );
   });
 
+  it('behind a WAF, "Confirmed by" says who confirmed it and who was blocked (D-027)', () => {
+    const m = down({ confirmingLocations: 1, confirmedByWaf: { from: ['BKK'], blocked: ['SIN', 'TYO'] } });
+    expect(rows(m)).toContainEqual([
+      'Confirmed by',
+      'BKK only, 2 checks — SIN, TYO blocked by bot protection',
+    ]);
+  });
+
   it('lists cause, confirmation and owners — no "Next" row until S10', () => {
     expect(rows(down())).toEqual([
       ['Cause', 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)'],

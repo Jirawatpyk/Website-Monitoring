@@ -99,3 +99,32 @@ export function formatTier(tier: number, options: { short?: boolean } = {}): str
 export function formatIncidentId(number: number): string {
   return `INC-${String(number).padStart(4, '0')}`;
 }
+
+/**
+ * The "Confirmed by" fact of a DOWN (ChatAlert / EmailAlert / the incident page): "3 locations, 2 checks";
+ * behind a WAF where only some locations could vote (D-027), who confirmed it and who was blocked —
+ * "BKK only, 2 checks — SIN, TYO blocked by bot protection".
+ */
+export function formatConfirmedBy(
+  count: number,
+  waf?: { from: readonly string[]; blocked: readonly string[] } | null,
+): string {
+  if (waf && waf.blocked.length && waf.from.length) {
+    const from =
+      waf.from.length === 1
+        ? `${waf.from[0]} only`
+        : `${waf.from.slice(0, -1).join(', ')} and ${waf.from.at(-1)}`;
+    return `${from}, 2 checks — ${waf.blocked.join(', ')} blocked by bot protection`;
+  }
+  return `${count} location${count === 1 ? '' : 's'}, 2 checks`;
+}
+
+/** Who confirmed a DOWN behind a WAF and who it blocked, read back from an incident's context (D-027). */
+export function confirmedByWafOf(
+  ctx: Record<string, unknown> | null | undefined,
+): { from: string[]; blocked: string[] } | null {
+  const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  const from = list(ctx?.confirmingFrom);
+  const blocked = list(ctx?.wafBlocked);
+  return from.length && blocked.length ? { from, blocked } : null;
+}

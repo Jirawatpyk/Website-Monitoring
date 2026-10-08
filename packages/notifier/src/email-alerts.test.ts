@@ -212,8 +212,39 @@ describe('Admin alert about the browser verifier (D-001, D-019)', () => {
     expect(none.text).toContain('Still reporting: None');
   });
 
+  it('BKK network check failing (D-028): what it affects and what to check', () => {
+    const m = alert({
+      kind: 'bkk_control_failing',
+      sites: ['Bangkok Airways – Taiwan (Tier 2)'],
+      reason: undefined,
+    });
+    expect(m.subject).toBe('DxT Monitor · System · BKK probe network check failing · Wed 7 Oct 10:14');
+    expect(m.text).toMatch(/^BKK NETWORK SUSPECT — The BKK probe’s network check is failing/);
+    expect(m.text).toContain('Sites not verified: Bangkok Airways – Taiwan (Tier 2)');
+    expect(m.text).toContain('Other sites keep their usual vote — SIN and TYO outvote a failing BKK.');
+    expect(m.text).toContain(
+      'What to check: The BKK VPS network (DNS, route, firewall) and the dxt-agent journal.',
+    );
+    expect(alert({ kind: 'bkk_control_failing', sites: [] }).text).toContain(
+      'Sites not verified: No site right now',
+    );
+  });
+
   it('escapes site names in the HTML', () => {
     expect(alert({ sites: ['<b>x</b>'] }).html).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+});
+
+describe('DOWN behind a WAF (D-027)', () => {
+  it('"Confirmed by" says who confirmed it and who was blocked', () => {
+    const m = buildDownEmail({
+      ...base,
+      confirmedAt,
+      cause: CAUSE,
+      confirmingLocations: 1,
+      confirmedByWaf: { from: ['BKK'], blocked: ['SIN', 'TYO'] },
+    });
+    expect(m.text).toContain('Confirmed by: BKK only, 2 checks — SIN, TYO blocked by bot protection');
   });
 });
 

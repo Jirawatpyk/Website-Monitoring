@@ -1,5 +1,5 @@
-import { PROBE_USER_AGENT, type CheckOutcome } from '@dxt/shared';
-import { classifyResponse } from './classify';
+import { PROBE_USER_AGENT, type CheckOutcome, type WafVendor } from '@dxt/shared';
+import { classifyResponse, wafSignature } from './classify';
 import { assertPublicTarget, TargetNotAllowedError, type Lookup } from './target';
 
 export interface HttpCheckRequest {
@@ -36,6 +36,8 @@ export interface HttpCheckResult {
    */
   keywordMissing: string[] | null;
   keywordForbidden: string[] | null;
+  /** A blocked response's header-level WAF signature (D-027); null otherwise. */
+  waf: WafVendor | null;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -75,7 +77,8 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       keywords ? KEYWORD_BODY_BYTES : BODY_SAMPLE_BYTES,
       keywords ? mustContain : [],
     );
-    const outcome = classifyResponse({ status: res.status, headers: res.headers, bodySample });
+    const snapshot = { status: res.status, headers: res.headers, bodySample };
+    const outcome = classifyResponse(snapshot);
     const checked = keywords && outcome === 'pass';
     return {
       outcome,
@@ -88,6 +91,7 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       finalUrl: url.href.slice(0, MAX_FINAL_URL),
       keywordMissing: checked && missing ? capped(missing) : null,
       keywordForbidden: checked ? capped(mustNotContain.filter((k) => bodySample.includes(k))) : null,
+      waf: outcome === 'blocked' ? wafSignature(snapshot) : null,
     };
   } catch (err) {
     // DNS, TLS, refused connection and timeout all land here: a hard fail.
@@ -101,6 +105,7 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       finalUrl: null,
       keywordMissing: null,
       keywordForbidden: null,
+      waf: null,
     };
   }
 }

@@ -15,7 +15,7 @@ import {
   type UnverifiedReason,
   type Verification,
 } from './monitor';
-import { BLOCKED_NOTE, confirmsDown, evaluateRound } from './round';
+import { abstainsOnWafSite, bkkUntrusted, BLOCKED_NOTE, confirmsDown, evaluateRound, wafNote } from './round';
 import {
   keywordIssue,
   minuteOf,
@@ -92,6 +92,8 @@ export interface SiteSnapshot {
   monitors: readonly SiteMonitor[];
   /** The verifier polled the Job API in the last 2 min (D-019). */
   verifierAvailable?: boolean;
+  /** The site is flagged `behind_waf`: WAF-signed blocks abstain (D-027). */
+  behindWaf?: boolean;
   /** Per probe minute, locations treated as no data (spec §15.3, `faultyByMinute`). */
   faulty?: ReadonlyMap<number, ReadonlySet<ProbeLocation>>;
   /** OK ↔ not-OK changes at incident steps in the last 30 min, and the last one's direction (D-024). */
@@ -133,6 +135,8 @@ export interface DownFacts {
   /** Blocked, then the page failed in the browser: that job (its screenshot is the evidence). */
   verifyJobId?: string;
   browserDetail?: string | null;
+  /** Behind a WAF (D-027): the locations it blocked, so "Confirmed by" says who confirmed it. */
+  wafBlocked?: readonly ProbeLocation[];
 }
 
 export type SiteDecision =
@@ -328,6 +332,7 @@ function judgeSiteRound(
       confirmedAt: primaryDown.confirmedAt,
       ...(primaryDown.verifyJobId ? { verifyJobId: primaryDown.verifyJobId } : {}),
       ...(primaryDown.browserDetail !== undefined ? { browserDetail: primaryDown.browserDetail } : {}),
+      ...(primaryDown.wafBlocked?.length ? { wafBlocked: primaryDown.wafBlocked } : {}),
     };
     const judgedDown = { ...base, status: 'down' as const };
     if (open?.severity === 'problem') {
@@ -513,7 +518,26 @@ function recoverDecision(
 function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement | typeof PENDING {
   const roundAt = round.start;
   const excluded = excludedIn(s, round);
-  const counted = round.scheduled.filter((c) => !excluded.has(c.location));
+  const wafSite = !!s.behindWaf;
+  // The rows are already chosen; the window only has to include them all.
+  const windowSec = (s.now.getTime() - roundAt.getTime()) / 1000 + s.intervalSec + 60;
+  // D-027 rule 2b: the site's WAF is Akamai when any check in the lookback carried its signature —
+  // a site property, so the walk back (rule 2c) judges older rows the same way as this round.
+  const akamaiSite = wafSite && m.checks.some((c) => c.waf === 'akamai');
+  const first = evaluateRound({
+    results: round.scheduled,
+    now: s.now,
+    windowSec,
+    excluded,
+    wafSite,
+    akamaiSite,
+  });
+  // D-027: behind a WAF, the locations that sat the round out don't count — not for the majority,
+  // and not as a regional failure.
+  const sittingOut = wafSite
+    ? new Set(round.scheduled.filter((c) => abstainsOnWafSite(c, akamaiSite)).map((c) => c.location))
+    : new Set<ProbeLocation>();
+  const counted = round.scheduled.filter((c) => !excluded.has(c.location) && !sittingOut.has(c.location));
   // A clock of a location that stopped beating is stale: its next failure starts a new one.
   const beating = Object.fromEntries(
     Object.entries(m.carry.failingSince).filter(
@@ -521,32 +545,79 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     ),
   ) as FailingSince;
   const failingSince = nextFailingSince(beating, counted);
+  for (const loc of sittingOut) delete failingSince[loc];
+  // D-027: one voter decides only when the WAF (or the control check) really sat someone out; a
+  // flagged site with everyone voting keeps the majority rules (rule 5: the flag alone gains nothing).
+  const wafRound = wafSite && [...sittingOut].some((l) => !excluded.has(l));
+  /** The locations the WAF itself blocked this round (not those sat out for the control check). */
+  const wafBlocked = wafRound
+    ? round.scheduled
+        .filter((c) => c.outcome === 'blocked' && c.waf && !excluded.has(c.location))
+        .map((c) => c.location)
+    : [];
   const carried = { slowRounds: m.carry.slowRounds, failingSince };
   const reset = { slowRounds: 0, failingSince };
+  const blockedChecks = round.scheduled.filter((c) => c.outcome === 'blocked');
+  const unverified = (reason: UnverifiedReason, startedAt: Date): Judgement => ({
+    verdict: {
+      kind: 'problem',
+      // D-022: any problem on a key page is `key_page`; the cause says it was blocked.
+      trigger: m.isPrimary ? 'blocked_unverified' : 'key_page',
+      detail: {
+        kind: 'blocked',
+        reason,
+        locations: blockedChecks.map((c) => c.location),
+        statusCode: blockedChecks[0]?.statusCode ?? null,
+      },
+      startedAt,
+      ...(m.isPrimary ? { note: UNVERIFIED_NOTE } : {}),
+    },
+    next: reset,
+  });
 
-  // The rows are already chosen; the window only has to include them all.
-  const windowSec = (s.now.getTime() - roundAt.getTime()) / 1000 + s.intervalSec + 60;
-  const first = evaluateRound({ results: round.scheduled, now: s.now, windowSec, excluded });
+  // Behind a WAF with nobody left to vote and the VPS's control check down (D-027).
+  if (first.kind === 'untrusted') {
+    return unverified(
+      'control_failed',
+      earliest(round.scheduled.filter((c) => c.outcome !== 'pass')) ?? roundAt,
+    );
+  }
 
   if (first.kind === 'hard_fail') {
     const firstFail = earliest(round.scheduled.filter((c) => first.failing.includes(c.location)));
     // Only rechecks vote in the second round, each after its own scheduled check: a location that
-    // didn't recheck can't vote twice with its scheduled result.
+    // didn't recheck can't vote twice with its scheduled result. Behind a WAF, a round decided by one
+    // location is confirmed by that location's recheck alone (D-027).
     const second = evaluateRound({
       results: round.rechecks,
       now: s.now,
       windowSec,
       after: firstFail,
       excluded,
+      wafSite,
+      akamaiSite,
+      ...(wafSite && counted.length === 1 ? { minReporting: 1 } : {}),
     });
+    if (second.kind === 'untrusted') return unverified('control_failed', firstFail ?? roundAt);
     if (!(confirmsDown(first, second) && second.kind === 'hard_fail')) {
       return { verdict: { kind: 'blip' }, next: reset };
     }
     const failing = round.rechecks.filter((c) => second.failing.includes(c.location));
-    const startedAt = firstFailedCheck(m.checks, failing);
+    const history = wafSite
+      ? m.checks.map((c) => (bkkUntrusted(c, akamaiSite) ? { ...c, outcome: 'blocked' as const } : c))
+      : m.checks;
+    // A confirming recheck always votes, so it can't be masked; the fallback only guards that.
+    const walked = firstFailedCheck(history, failing);
+    const startedAt = Number.isFinite(walked.getTime()) ? walked : (earliest(failing) ?? roundAt);
     if (m.isPrimary) {
       return {
-        verdict: { kind: 'down', startedAt, confirmedAt: confirmedAt(failing), failing },
+        verdict: {
+          kind: 'down',
+          startedAt,
+          confirmedAt: confirmedAt(failing),
+          failing,
+          ...(wafBlocked.length ? { wafBlocked } : {}),
+        },
         next: reset,
       };
     }
@@ -568,11 +639,15 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   // An OK round needs a majority of the reporting locations to pass (PRD §5): one pass and one fail
   // is no majority; two passes and a regional failure is.
   const passing = counted.filter((c) => c.outcome === 'pass');
-  if (first.kind === 'pass' && passing.length * 2 > counted.length) {
-    const p50 = roundP50(counted);
+  // Behind a WAF, `evaluateWafRound` already weighed the voters: a pass stands with one voter passing.
+  const okRound = wafRound ? passing.length > 0 : passing.length * 2 > counted.length;
+  if (first.kind === 'pass' && okRound) {
+    // Behind a WAF a round one location decided is evidence enough for the triggers too (D-027).
+    const minLocations = wafRound ? 1 : 2;
+    const p50 = roundP50(counted, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
     const next = { slowRounds, failingSince };
-    const issue = problemOf(m, counted, failingSince, slowRounds, p50);
+    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound);
     if (issue) {
       return {
         verdict: {
@@ -584,40 +659,33 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         next,
       };
     }
-    return { verdict: { kind: 'ok', reachable: passing }, next };
+    // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
+    const note =
+      m.isPrimary && wafBlocked.length
+        ? wafNote(
+            passing.map((c) => c.location),
+            wafBlocked,
+          )
+        : undefined;
+    return { verdict: { kind: 'ok', reachable: passing, ...(note ? { note } : {}) }, next };
   }
 
   if (first.kind === 'needs_verification') {
     const notPassing = round.scheduled.filter((c) => c.outcome !== 'pass');
     const startedAt = earliest(notPassing);
-    const blocked = round.scheduled.filter((c) => c.outcome === 'blocked');
-    const unverified = (reason: UnverifiedReason): Judgement => ({
-      verdict: {
-        kind: 'problem',
-        // D-022: any problem on a key page is `key_page`; the cause says it was blocked.
-        trigger: m.isPrimary ? 'blocked_unverified' : 'key_page',
-        detail: {
-          kind: 'blocked',
-          reason,
-          locations: blocked.map((c) => c.location),
-          statusCode: blocked[0]?.statusCode ?? null,
-        },
-        startedAt,
-        ...(m.isPrimary ? { note: UNVERIFIED_NOTE } : {}),
-      },
-      next: reset,
-    });
     const v = m.verifications?.get(roundAt.getTime());
     if (!v)
-      return s.verifierAvailable ? { verdict: { kind: 'verify' }, next: carried } : unverified('no_poll');
+      return s.verifierAvailable
+        ? { verdict: { kind: 'verify' }, next: carried }
+        : unverified('no_poll', startedAt);
     switch (v.state) {
       case 'pending':
         return PENDING;
       case 'unavailable':
-        return unverified(v.reason);
+        return unverified(v.reason, startedAt);
       case 'blocked':
         // PRD §5: a plain browser blocked too is a PROBLEM, never hidden — and never a DOWN (D-020).
-        return unverified('browser_blocked');
+        return unverified('browser_blocked', startedAt);
       case 'loaded':
         // The browser saw the page: the blocked locations count as reachable this round.
         return {
@@ -666,13 +734,15 @@ function problemOf(
   failingSince: FailingSince,
   slowRounds: number,
   p50: number | null,
+  minLocations = 2,
+  wafSite = false,
 ): { trigger: Trigger; detail: ProblemDetail } | null {
   const as = (trigger: Trigger, detail: ProblemDetail | null) =>
     detail ? { trigger: m.isPrimary ? trigger : ('key_page' as const), detail } : null;
   return (
-    (m.isPrimary ? null : as('key_page', statusIssue(counted))) ??
-    as('keyword', keywordIssue(counted)) ??
-    as('redirect', redirectIssue(counted, m.url, m.allowedRedirectDomains)) ??
+    (m.isPrimary ? null : as('key_page', statusIssue(counted, minLocations))) ??
+    as('keyword', keywordIssue(counted, minLocations)) ??
+    as('redirect', redirectIssue(counted, m.url, m.allowedRedirectDomains, minLocations)) ??
     (slowRounds >= SLOW_ROUNDS && p50 !== null
       ? as('slow', {
           kind: 'slow',
@@ -681,7 +751,7 @@ function problemOf(
           locations: counted.filter((c) => c.outcome === 'pass').map((c) => c.location),
         })
       : null) ??
-    as('regional', regionalIssue(counted, failingSince))
+    as('regional', regionalIssue(counted, failingSince, wafSite))
   );
 }
 

@@ -43,8 +43,11 @@ export const UNVERIFIED_NOTE = 'Blocked, not verified';
 
 /** Why the verifier counts as unavailable for a round (D-019). */
 export type VerifierUnavailableReason = 'no_poll' | 'not_picked_up' | 'lease_expired';
-/** Why a blocked round couldn't be verified: the verifier was unavailable, or the browser was blocked too (D-020). */
-export type UnverifiedReason = VerifierUnavailableReason | 'browser_blocked';
+/**
+ * Why a blocked round couldn't be verified: the verifier was unavailable, the browser was blocked too
+ * (D-020), or — behind a WAF — the VPS's control check failed so Bangkok can't decide (D-027).
+ */
+export type UnverifiedReason = VerifierUnavailableReason | 'browser_blocked' | 'control_failed';
 
 /** The browser verifier's job for one blocked round, as the runner found it. */
 export type Verification =

@@ -1,4 +1,4 @@
-import type { CheckOutcome } from '@dxt/shared';
+import type { CheckOutcome, WafVendor } from '@dxt/shared';
 
 /**
  * Turn one HTTP response into pass / fail / blocked (PRD §5).
@@ -39,8 +39,37 @@ export function hasChallengeSignature(res: ResponseSnapshot): boolean {
   return CHALLENGE_BODY.test(res.bodySample);
 }
 
+/**
+ * Akamai's own block page: "Access Denied" and a "Reference #…" (the `#` often HTML-encoded), both.
+ * "Reference #" alone is also on Akamai's origin-error page (a 5xx: an outage); "Access denied" alone
+ * can be the origin's own page.
+ */
+const AKAMAI_DENIED = /access denied/i;
+const AKAMAI_REFERENCE = /reference(?:\s|&#32;)*(?:#|&#35;)/i;
+
+/**
+ * The header-level WAF signature of a challenge response (D-027), or null. Only these let a location
+ * abstain on a site behind a WAF; a body-only match is never enough (an origin page saying "captcha"
+ * must not hide an outage). Akamai needs its server header and its block page together.
+ */
+export function wafSignature(res: ResponseSnapshot): WafVendor | null {
+  if (!CHALLENGE_STATUSES.has(res.status)) return null;
+  if (res.headers.get('cf-mitigated') !== null) return 'cloudflare';
+  if (res.headers.get('x-sucuri-block') !== null) return 'sucuri';
+  if (
+    res.status === 403 &&
+    /akamaighost/i.test(res.headers.get('server') ?? '') &&
+    AKAMAI_DENIED.test(res.bodySample) &&
+    AKAMAI_REFERENCE.test(res.bodySample)
+  ) {
+    return 'akamai';
+  }
+  return null;
+}
+
 export function classifyResponse(res: ResponseSnapshot): CheckOutcome {
-  if (CHALLENGE_STATUSES.has(res.status) && hasChallengeSignature(res)) return 'blocked';
+  if (CHALLENGE_STATUSES.has(res.status) && (hasChallengeSignature(res) || wafSignature(res)))
+    return 'blocked';
   if (res.status >= 500) return 'fail';
   return 'pass';
 }

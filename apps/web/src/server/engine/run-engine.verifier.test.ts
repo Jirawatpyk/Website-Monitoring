@@ -182,6 +182,110 @@ describe('runEngine — blocked rounds (S03)', () => {
     });
   });
 
+  describe('a site behind a WAF (D-027)', () => {
+    const wafMonitor = { ...monitor, sites: { ...monitor.sites, behind_waf: true } };
+    const withBkk = [{ code: 'BKK', last_heartbeat_at: at(55) }, ...beating];
+    const bkk = (over: Record<string, unknown> = {}) => ({
+      monitor_id: 'm1',
+      location: 'BKK',
+      outcome: 'pass',
+      checked_at: at(3),
+      attempt: 1,
+      status_code: 200,
+      error: null,
+      keyword_missing: [],
+      keyword_forbidden: [],
+      ...over,
+    });
+    const akamai = blocked.map((c) => ({ ...c, waf: 'akamai' }));
+
+    it('BKK passes, Akamai blocks SIN / TYO → OK with the note, no verify job', async () => {
+      const { db, rpcCalls, calls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': { data: [bkk({ control_ok: true }), ...akamai] },
+      });
+      expect(await runEngine(db, now)).toMatchObject({ verifying: 0, unverified: 0 });
+      expect(calls.some((c) => c.table === 'verification_jobs' && c.op === 'insert')).toBe(false);
+      expect(rpcCalls.find((c) => c.name === 'engine_note_site')?.args).toMatchObject({
+        p_note: 'Verified from BKK; SIN, TYO blocked by bot protection',
+      });
+    });
+
+    it('the VPS’s control check down → PROBLEM (unverified) with that cause, and no verifier Admin alert', async () => {
+      const { db, rpcCalls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': { data: [bkk({ control_ok: false }), ...akamai] },
+      });
+      expect(await runEngine(db, now)).toMatchObject({ unverified: 1, alerts: 0 });
+      expect(rpcCalls[0]?.args).toMatchObject({
+        p_trigger: 'blocked_unverified',
+        p_context: {
+          cause: 'HTTP 403 bot challenge (SIN, TYO) · BKK network check failed, not verified',
+          verifier: 'control_failed',
+        },
+      });
+      expect(rpcCalls.some((c) => c.name === 'open_system_alert')).toBe(false);
+    });
+
+    it('a DOWN confirmed by BKK alone names who confirmed it and who the WAF blocked (D-027)', async () => {
+      const { db, rpcCalls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': {
+          data: [
+            bkk({ outcome: 'fail', status_code: 503, control_ok: true }),
+            bkk({ outcome: 'fail', status_code: 503, control_ok: true, attempt: 2, checked_at: at(33) }),
+            ...akamai,
+          ],
+        },
+        'rpc.engine_open_incident': { data: 'i1' },
+      });
+      await runEngine(db, now);
+      expect(rpcCalls.find((c) => c.name === 'engine_open_incident')?.args).toMatchObject({
+        p_context: { confirmingLocations: 1, confirmingFrom: ['BKK'], wafBlocked: ['SIN', 'TYO'] },
+      });
+    });
+
+    it('the control check failing 3 BKK rounds in a row → one Admin alert naming the sites (D-028); it clears once it passes', async () => {
+      // BKK batches at 09:58, 09:59 and 10:00, all with the control check down.
+      const earlier = [-120, -60].map((sec) =>
+        bkk({ control_ok: false, checked_at: at(sec), monitor_id: 'm0' }),
+      );
+      const { db, rpcCalls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': { data: [bkk({ control_ok: false }), ...akamai, ...earlier] },
+        'rpc.open_system_alert': { data: 'a1' },
+      });
+      expect(await runEngine(db, now)).toMatchObject({ alerts: 1 });
+      expect(rpcCalls.find((c) => c.name === 'open_system_alert')?.args).toEqual({
+        p_kind: 'bkk_control_failing',
+        p_context: { sites: [`${wafMonitor.sites.name} (Tier ${wafMonitor.sites.tier})`] },
+      });
+
+      const old = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': { data: [bkk({ control_ok: true }), ...akamai] },
+        'system_alerts.select': {
+          data: [{ kind: 'bkk_control_failing', context: {}, opened_at: '2026-10-06T09:40:00Z' }],
+        },
+      });
+      await runEngine(old.db, now);
+      expect(old.rpcCalls).toContainEqual({
+        name: 'clear_system_alert',
+        args: { p_kind: 'bkk_control_failing' },
+      });
+    });
+  });
+
   it('a job nobody picked up in 30 s counts the verifier unavailable even while it polls', async () => {
     const { db, rpcCalls } = fakeDb({
       ...verifierUp,

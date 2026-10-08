@@ -263,6 +263,25 @@ describe('MobileAck view', () => {
       confirmedBy: 'Confirmed by 2 locations, 2 checks',
       siteUrl: null,
     });
+    // Behind a WAF (D-027): who confirmed it and who the WAF blocked, on the card and in the log.
+    const waf = view({}, [
+      {
+        ...detected,
+        payload: {
+          cause: 'HTTP 503 (BKK)',
+          confirmingLocations: 1,
+          confirmingFrom: ['BKK'],
+          wafBlocked: ['SIN', 'TYO'],
+        },
+      },
+    ]);
+    expect(waf.confirmedBy).toBe('Confirmed by BKK only, 2 checks — SIN, TYO blocked by bot protection');
+    expect(JSON.stringify(waf)).toContain(
+      'Confirmed down from BKK only, 2 checks — SIN, TYO blocked by bot protection',
+    );
+    expect(view({}, [{ ...detected, payload: { confirmingLocations: 1 } }]).confirmedBy).toBe(
+      'Confirmed by 1 location, 2 checks',
+    );
     const unknown = buildIncidentView(
       { ...incident, state: 'acknowledged', acked_at: '2026-09-25T03:07:40Z', acked_by: 'u-gone' },
       [{ type: 'detected', at: '2026-09-25T02:48:41Z', actor_id: null, payload: {} }],

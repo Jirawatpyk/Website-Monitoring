@@ -2,6 +2,7 @@ import 'server-only';
 import type { DbClient, Json } from '@dxt/db';
 import {
   decideSite,
+  bkkControlFailing,
   faultyByMinute,
   lookbackMs,
   NEW_MONITOR,
@@ -22,7 +23,14 @@ import {
   formatProblemSummary,
   type ProblemCauseContext,
 } from '@dxt/notifier';
-import { TIER_CONFIG, type ProbeLocation, type ProblemDetail, type Tier, type Trigger } from '@dxt/shared';
+import {
+  TIER_CONFIG,
+  type ProbeLocation,
+  type ProblemDetail,
+  type Tier,
+  type Trigger,
+  type WafVendor,
+} from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
@@ -53,6 +61,8 @@ interface SiteRow {
   name: string;
   tier: Tier;
   muted: boolean;
+  /** Flagged behind a WAF: WAF-signed blocks sit the round out (D-027). */
+  behindWaf: boolean;
   monitors: MonitorRow[];
 }
 
@@ -109,7 +119,10 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
     const verifier = await loadVerifierState(db, now, now);
-    summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations);
+    summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations, {
+      failing: null,
+      sites: new Set(),
+    });
     return summary;
   }
   const monitors = sites.flatMap((s) => s.monitors);
@@ -141,7 +154,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
 
   const checksByMonitor = new Map<string, typeof checks>();
   for (const c of checks)
-    checksByMonitor.set(c.monitor_id, [...(checksByMonitor.get(c.monitor_id) ?? []), c]);
+    (checksByMonitor.get(c.monitor_id) ?? checksByMonitor.set(c.monitor_id, []).get(c.monitor_id)!).push(c);
   const carryByMonitor = new Map((carries.data ?? []).map((c) => [c.monitor_id, c]));
 
   // A location that failed most monitors in a minute is no data for that minute (spec §15.3).
@@ -159,6 +172,8 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
 
   /** Sites the verifier couldn't decide this run, with the reason it saw (D-019). */
   const unverifiedSites = new Map<string, string>();
+  /** Sites left unverified by the BKK probe's failed control check (D-027, D-028). */
+  const controlSites = new Set<string>();
   /** A site whose write failed: logged, the rest still judged, the run reported failed at the end. */
   const failures: string[] = [];
   const unverifiedMonitors = new Set<string>();
@@ -172,7 +187,21 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   }
 
   summary.unverified = unverifiedMonitors.size;
-  summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations);
+  // D-028: the BKK probe's control check (D-027) over the window's Bangkok checks.
+  const control = bkkControlFailing(
+    checks
+      .filter((c) => c.location === 'BKK')
+      // Either VPS check failing counts: both control URLs, or the Akamai control (D-027 rule 2b) —
+      // a broken Akamai control would otherwise silently turn every Akamai DOWN into a PROBLEM.
+      .map((c) => ({
+        checkedAt: new Date(c.checked_at),
+        controlOk: c.control_ok === false || c.akamai_ok === false ? false : (c.control_ok ?? c.akamai_ok),
+      })),
+  );
+  summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, {
+    failing: control,
+    sites: controlSites,
+  });
   // `ok: false` fails the Healthchecks ping (cron-job.ts), while what the other sites queued is
   // still sent at once (engine-and-deliver.ts reads the counts).
   if (failures.length) return { ...summary, ok: false, failures };
@@ -232,6 +261,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         ...(verifier.jobs.get(m.id) ? { verifications: verifier.jobs.get(m.id)! } : {}),
       })),
       verifierAvailable: verifier.available,
+      behindWaf: site.behindWaf,
       faulty,
     };
     let note = status?.note ?? null;
@@ -251,7 +281,10 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         // Judged without it: a late verdict mustn't land on this round or clear the alert.
         if (u.reason === 'not_picked_up') await expireUnpicked(db, u.monitorId, decision.roundAt);
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
-        if (u.reason !== 'browser_blocked') unverifiedSites.set(`${site.name} (Tier ${site.tier})`, u.reason);
+        // The browser blocked too (D-020) or the VPS's control check down (D-027): not the verifier's fault.
+        if (u.reason === 'control_failed') controlSites.add(`${site.name} (Tier ${site.tier})`);
+        else if (u.reason !== 'browser_blocked')
+          unverifiedSites.set(`${site.name} (Tier ${site.tier})`, u.reason);
       }
       const applied = await apply(
         db,
@@ -328,6 +361,9 @@ const toStoredCheck = (c: Awaited<ReturnType<typeof loadChecks>>[number]): Store
   finalUrl: c.final_url,
   keywordMissing: c.keyword_missing,
   keywordForbidden: c.keyword_forbidden,
+  waf: c.waf as WafVendor | null,
+  controlOk: c.control_ok,
+  akamaiOk: c.akamai_ok,
 });
 
 interface CarryRow {
@@ -438,6 +474,11 @@ async function adminAlerts(
   verifier: Awaited<ReturnType<typeof loadVerifierState>>,
   unverifiedSites: ReadonlyMap<string, string>,
   locations: readonly ProbeLocation[],
+  /**
+   * D-028: `bkkControlFailing` (true = failing, false = passing, null = no evidence: leave it) and
+   * the sites it left unverified this run.
+   */
+  control: { failing: boolean | null; sites: ReadonlySet<string> },
 ): Promise<number> {
   let opened = 0;
   const open = async (kind: string, context: Record<string, unknown>) => {
@@ -476,6 +517,13 @@ async function adminAlerts(
   const low = verifier.openAlerts.get('probe_locations_low');
   if (locations.length < 2 && !low) await open('probe_locations_low', { active: [...locations].sort() });
   else if (locations.length >= 2 && low && settled(low)) await clear('probe_locations_low');
+
+  // D-028: the BKK VPS's own network failing its control check — the Admin's to fix. The sites it
+  // leaves unverified (D-027) are listed; cleared once it passes again, no sooner than 10 min.
+  const net = verifier.openAlerts.get('bkk_control_failing');
+  if (control.failing === true && !net)
+    await open('bkk_control_failing', { sites: [...control.sites].sort() });
+  else if (control.failing === false && net && settled(net)) await clear('bkk_control_failing');
   return opened;
 }
 
@@ -510,7 +558,7 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
   const { data, error } = await db
     .from('monitors')
     .select(
-      'id, url, is_primary, must_contain, timeout_ms, thresholds, allowed_redirect_domains, site_id, sites!inner(name, tier, is_active, muted_until)',
+      'id, url, is_primary, must_contain, timeout_ms, thresholds, allowed_redirect_domains, site_id, sites!inner(name, tier, is_active, muted_until, behind_waf)',
     )
     .eq('sites.is_active', true)
     // A monitor switched off or removed (S05, D-025) no longer counts towards the site.
@@ -526,6 +574,7 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
       name: m.sites.name,
       tier,
       muted: !!m.sites.muted_until && new Date(m.sites.muted_until) > now,
+      behindWaf: m.sites.behind_waf,
       monitors: [],
     };
     site.monitors.push({
@@ -790,5 +839,12 @@ function downContext(d: DownFacts, site: SiteRow): Record<string, Json> {
         confirmingLocations: d.failing.length,
         verifyJobId: d.verifyJobId,
       }
-    : { cause: formatCause(d.failing, timeoutMs), confirmingLocations: d.failing.length };
+    : {
+        cause: formatCause(d.failing, timeoutMs),
+        confirmingLocations: d.failing.length,
+        // D-027: behind a WAF, who confirmed it and who the WAF blocked ("BKK only, 2 checks — …").
+        ...(d.wafBlocked?.length
+          ? { confirmingFrom: d.failing.map((c) => c.location), wafBlocked: [...d.wafBlocked] }
+          : {}),
+      };
 }

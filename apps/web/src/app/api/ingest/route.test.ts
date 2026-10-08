@@ -93,6 +93,13 @@ describe('POST /api/ingest (Bangkok probe)', () => {
     await (m.after.mock.calls[0] as [() => Promise<void>])[0]();
     expect(m.engine).toHaveBeenCalledWith('db', expect.anything(), NOW + 50_000, 'ingest');
   });
+
+  it('passes the batch’s control check to the store (D-027)', async () => {
+    const { POST } = await import('./route');
+    const control = { ok: false };
+    await POST(post({ results: [result('2026-10-07T03:00:01Z')], control }));
+    expect(m.store.mock.calls[0]?.[3]).toEqual(control);
+  });
 });
 
 describe('GET /api/ingest (monitors due for Bangkok)', () => {

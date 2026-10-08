@@ -101,6 +101,15 @@ describe('PROBLEM first card (ChatAlert)', () => {
       verifier: 'browser_blocked',
     });
     expect(JSON.stringify(blocked.cardsV2)).not.toContain('Admin is told');
+    // Behind a WAF with the VPS's control check down: the Admin is told about the BKK network (D-028).
+    const control = buildProblemAlert({ ...fuji, trigger: 'blocked_unverified', verifier: 'control_failed' });
+    expect(JSON.stringify(control.cardsV2)).toContain(
+      'The Admin is told about the BKK probe’s network separately',
+    );
+    expect(JSON.stringify(control.cardsV2)).not.toContain('about the verifier');
+    // …and the verifier is never asked: the card says what clears it instead.
+    expect(JSON.stringify(control.cardsV2)).toContain('decided from BKK once its network check passes');
+    expect(JSON.stringify(control.cardsV2)).not.toContain('once the verifier loads the page');
   });
 
   it('another trigger shows where it was seen, without the slow note; no owner, no mention', () => {
@@ -224,6 +233,19 @@ describe('PROBLEM emails (EmailAlert PROBLEM thread)', () => {
     });
     expect(unverified.text).toMatch(/^PROBLEM — Fuji Links can’t be verified/);
     expect(unverified.text).toContain('Site: Unknown — blocked by bot protection; no proof either way.');
+    expect(unverified.text).toContain('couldn’t be checked in a browser');
+    const control = buildProblemEmail({
+      ...base,
+      trigger: 'blocked_unverified',
+      detectedAt,
+      cause: 'c',
+      summary: 's',
+      verifier: 'control_failed',
+    });
+    expect(control.text).toContain(
+      'The site is blocked by bot protection at SIN and TYO, and the BKK probe’s network check failed.',
+    );
+    expect(control.text).not.toContain('couldn’t be checked in a browser');
     const keyword = buildProblemEmail({
       ...base,
       reason: 'fallback',

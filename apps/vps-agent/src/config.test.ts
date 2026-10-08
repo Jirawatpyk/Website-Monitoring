@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from './config';
+import { DEFAULT_AKAMAI_CONTROL_URL, loadConfig } from './config';
 
 const token = 'x'.repeat(32);
+
+describe('AKAMAI_CONTROL_URL (D-027 rule 2b)', () => {
+  it('defaults when unset or blank, takes an https URL, refuses http', () => {
+    const base = { API_BASE_URL: 'https://monitor.example.test', INGEST_TOKEN: token };
+    expect(loadConfig(base).AKAMAI_CONTROL_URL).toBe(DEFAULT_AKAMAI_CONTROL_URL);
+    expect(loadConfig({ ...base, AKAMAI_CONTROL_URL: ' ' }).AKAMAI_CONTROL_URL).toBe(
+      DEFAULT_AKAMAI_CONTROL_URL,
+    );
+    expect(loadConfig({ ...base, AKAMAI_CONTROL_URL: 'https://a.example/x' }).AKAMAI_CONTROL_URL).toBe(
+      'https://a.example/x',
+    );
+    expect(() => loadConfig({ ...base, AKAMAI_CONTROL_URL: 'http://a.example/' })).toThrow();
+  });
+});
 
 describe('loadConfig', () => {
   it('applies defaults', () => {
@@ -17,6 +31,25 @@ describe('loadConfig', () => {
     expect(loadConfig({ API_BASE_URL: 'http://localhost:3500', INGEST_TOKEN: token }).API_BASE_URL).toBe(
       'http://localhost:3500',
     );
+  });
+
+  it('control URLs (D-027): two providers by default, https only, two or three', () => {
+    const base = { API_BASE_URL: 'https://monitor.example.com', INGEST_TOKEN: token };
+    expect(loadConfig(base).CONTROL_URLS).toEqual([
+      'https://www.gstatic.com/generate_204',
+      'https://www.cloudflare.com/cdn-cgi/trace',
+    ]);
+    expect(
+      loadConfig({ ...base, CONTROL_URLS: 'https://a.example.com/ok, https://b.example.net/ok' })
+        .CONTROL_URLS,
+    ).toEqual(['https://a.example.com/ok', 'https://b.example.net/ok']);
+    expect(loadConfig({ ...base, CONTROL_URLS: '' }).CONTROL_URLS).toHaveLength(2);
+    expect(() => loadConfig({ ...base, CONTROL_URLS: 'https://only-one.example.com' })).toThrow(
+      /CONTROL_URLS/,
+    );
+    expect(() =>
+      loadConfig({ ...base, CONTROL_URLS: 'http://a.example.com, https://b.example.com' }),
+    ).toThrow(/CONTROL_URLS/);
   });
 
   it('names missing variables without echoing values', () => {

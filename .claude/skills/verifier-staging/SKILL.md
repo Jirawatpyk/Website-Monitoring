@@ -26,14 +26,16 @@ curl -s -o /dev/null -w "%{http_code} %header{x-target-mode}\n" -A "DxT-Monitor/
 
 Modes (`apps/test-target/CLAUDE.md`) and the outcome to expect (StatusModel, D-022):
 
-| Mode                | Expect                                                                                                   | When                       |
-| ------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `ok`                | OK                                                                                                       | next round                 |
-| `error` / `timeout` | DOWN (`hard_fail`), Chat + email                                                                         | ~1–2 min (check + recheck) |
-| `challenge`         | OK with the note "Automated check blocked by bot protection; verified via browser" (verify job `loaded`) | ~1–2 min                   |
-| `challenge-all`     | PROBLEM `blocked_unverified` ("blocked in the browser too", D-020)                                       | ~1–2 min                   |
-| `keyword-missing`   | PROBLEM `keyword` (the staging monitor has `must_contain = {Test target}`)                               | the next round             |
-| `slow`              | PROBLEM `slow` on the **3rd** slow round (Tier 1: ~3–4 min)                                              |                            |
+| Mode                | Expect                                                                                                                                                                                                                                    | When                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `ok`                | OK                                                                                                                                                                                                                                        | next round                 |
+| `error` / `timeout` | DOWN (`hard_fail`), Chat + email                                                                                                                                                                                                          | ~1–2 min (check + recheck) |
+| `challenge`         | OK with the note "Automated check blocked by bot protection; verified via browser" (verify job `loaded`)                                                                                                                                  | ~1–2 min                   |
+| `challenge-all`     | PROBLEM `blocked_unverified` ("blocked in the browser too", D-020)                                                                                                                                                                        | ~1–2 min                   |
+| `keyword-missing`   | PROBLEM `keyword` (the staging monitor has `must_contain = {Test target}`)                                                                                                                                                                | the next round             |
+| `slow`              | PROBLEM `slow` on the **3rd** slow round (Tier 1: ~3–4 min)                                                                                                                                                                               |                            |
+| `waf-partial`       | with the site flagged Behind WAF: OK with "Verified from BKK; SIN, TYO blocked by bot protection"; `check_results.waf = 'cloudflare'` at SIN / TYO, `control_ok = true` at BKK. Flag off: the verifier path, as `challenge` (S05b, D-027) | next round                 |
+| `waf-partial-down`  | with the flag on: DOWN on the Bangkok probe alone (503 + its recheck), Chat + email                                                                                                                                                       | ~1–2 min                   |
 
 Relapse, flapping and auto-resolve (S04b, D-024), on one incident without a reset in between:
 

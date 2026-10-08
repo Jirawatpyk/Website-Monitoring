@@ -1,4 +1,6 @@
 import {
+  confirmedByWafOf,
+  formatConfirmedBy,
   formatDay,
   formatDuration,
   formatIncidentId,
@@ -238,7 +240,7 @@ export function buildIncidentView(
     confirmedAt: formatTimeWithSeconds(new Date(i.detected_at)),
     confirmedBy: problem
       ? TRIGGER_LABELS[i.trigger]
-      : `Confirmed by ${num(detected?.payload.confirmingLocations) ?? 2} locations, 2 checks`,
+      : `Confirmed by ${formatConfirmedBy(num(detected?.payload.confirmingLocations) ?? 2, confirmedByWafOf(detected?.payload))}`,
     cause: str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
     siteUrl: i.sites.monitors.find((m) => m.is_primary)?.url ?? null,
     ack,
@@ -260,7 +262,14 @@ export function logOf(
         // A PROBLEM is detected in one round; only a DOWN is confirmed by locations and a recheck.
         return typeof e.payload.summary === 'string'
           ? [{ at, text: `PROBLEM detected — ${e.payload.summary}` }]
-          : [{ at, text: `Confirmed down — ${num(e.payload.confirmingLocations) ?? 2} locations, 2 checks` }];
+          : [
+              {
+                at,
+                text: confirmedByWafOf(e.payload)
+                  ? `Confirmed down from ${formatConfirmedBy(num(e.payload.confirmingLocations) ?? 2, confirmedByWafOf(e.payload))}`
+                  : `Confirmed down — ${formatConfirmedBy(num(e.payload.confirmingLocations) ?? 2)}`,
+              },
+            ];
       case 'alerted': {
         const word = TEMPLATE_WORDS[str(e.payload.template) ?? ''] ?? 'Alert';
         return e.payload.channel === 'email'

@@ -9,6 +9,9 @@
  *   challenge-all  → everyone gets the challenge (blocked in the browser too → PROBLEM, D-020)
  *   keyword-missing → 200 without "Test target" anywhere on the page (PROBLEM · Keyword, S04a)
  *   slow           → a probe waits 6 s, over both tier limits and under the monitor timeout (PROBLEM · Slow)
+ *   waf-partial    → a WAF blocks every request from outside Thailand (403 + cf-mitigated); Thailand gets the
+ *                    page — SIN / TYO blocked, the Bangkok VPS passes (S05b, D-027: OK with the note)
+ *   waf-partial-down → the same block abroad, and a 503 in Thailand (D-027: DOWN on the Bangkok probe alone)
  * Anything else (store missing, unknown value) counts as ok. Only a probe (User-Agent `DxT-Monitor/`)
  * is held or challenged differently, so nobody else can tie up the function.
  */
@@ -21,6 +24,8 @@ export const TARGET_MODES = [
   'challenge-all',
   'keyword-missing',
   'slow',
+  'waf-partial',
+  'waf-partial-down',
 ] as const;
 export type TargetMode = (typeof TARGET_MODES)[number];
 
@@ -36,6 +41,8 @@ export interface HandlerDeps {
   readMode: () => Promise<unknown>;
   /** The request's User-Agent: tells a probe from a browser. */
   userAgent?: string | null;
+  /** Vercel's `x-vercel-ip-country` of the caller: where a WAF-partial block applies (S05b). */
+  country?: string | null;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -52,6 +59,7 @@ const PAGE = (mode: TargetMode) =>
 export async function handle({
   readMode,
   userAgent = null,
+  country = null,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
 }: HandlerDeps) {
   const mode = parseMode(await readMode());
@@ -61,6 +69,11 @@ export async function handle({
   const html = { ...headers, 'content-type': 'text/html; charset=utf-8' };
 
   if (mode === 'error') return new Response('Test target: error mode\n', { status: 500, headers: text });
+  if (mode.startsWith('waf-partial') && country !== 'TH') {
+    return new Response(CHALLENGE_PAGE, { status: 403, headers: { ...html, 'cf-mitigated': 'challenge' } });
+  }
+  if (mode === 'waf-partial-down')
+    return new Response('Service unavailable\n', { status: 503, headers: text });
   if ((mode.startsWith('challenge') && probe) || mode === 'challenge-all') {
     return new Response(CHALLENGE_PAGE, { status: 403, headers: { ...html, 'cf-mitigated': 'challenge' } });
   }
