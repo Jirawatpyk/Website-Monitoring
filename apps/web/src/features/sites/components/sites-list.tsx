@@ -218,11 +218,14 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     },
   ];
 
+  // The board's widths. The flexible Site column never shrinks below 160 px (DataTable's minWidth only
+  // limits resizing), so the shown columns must fit: owner and uptime from a 1024 px table, response
+  // and expiry from 1100 px (928 px fixed at 1440 leaves Site 206 px).
   const columns: DataTableColumn<SiteListRow>[] = [
     {
       key: 'status',
       label: 'Status',
-      width: 160,
+      width: 144,
       render: (r) => (
         <span className="flex flex-col items-start gap-1 py-2">
           <RowStatusBadge row={r} />
@@ -234,8 +237,6 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     {
       key: 'name',
       label: 'Site',
-      // DataTable's default 160 px floor pushed the row 2 px past the box at 820 (/verify S05c)
-      minWidth: 120,
       render: (r) => {
         const href = hrefOf(r);
         return (
@@ -262,11 +263,11 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
         );
       },
     },
-    { key: 'tier', label: 'Tier', width: 56, mono: true, render: (r) => formatTier(r.tier, { short: true }) },
+    { key: 'tier', label: 'Tier', width: 40, mono: true, render: (r) => formatTier(r.tier, { short: true }) },
     {
       key: 'owner',
       label: 'Owner · backup',
-      width: 128,
+      width: 112,
       hideBelow: 'lg',
       render: (r) =>
         r.owner ? (
@@ -281,12 +282,12 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           <span className="text-fg-secondary">—</span>
         ),
     },
-    { key: 'locations', label: 'BKK SIN TYO', width: 104, render: (r) => <LocationGlyphs row={r} /> },
+    { key: 'locations', label: 'BKK SIN TYO', width: 92, render: (r) => <LocationGlyphs row={r} /> },
     {
       key: 'p50',
       label: 'Response 24h',
       width: 104,
-      hideBelow: 'lg',
+      hideBelow: 1100,
       render: (r) => <span className="text-fg-secondary">{r.p50Ms === null ? '—' : `${r.p50Ms} ms`}</span>,
     },
     {
@@ -304,7 +305,7 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
       key: 'expiry',
       label: 'Expiry',
       width: 64,
-      hideBelow: 'lg',
+      hideBelow: 1100,
       render: (r) => (
         <span className="text-fg-secondary">{r.expiryDays === null ? '—' : `${r.expiryDays} d`}</span>
       ),
@@ -312,14 +313,14 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
     {
       key: 'checkedAt',
       label: 'Checked',
-      width: 80,
+      width: 72,
       mono: true,
       render: (r) => (r.checkedAt ? formatTimeWithSeconds(new Date(r.checkedAt)) : '—'),
     },
     {
       key: 'actions',
       label: '',
-      width: 164,
+      width: 156,
       actions: true,
       render: (r) =>
         r.live ? (
@@ -502,6 +503,8 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           <div
             role="group"
             aria-label="Filter sites"
+            // a row of chips that scrolls on purpose (layout-consistency skips it)
+            data-scroll-x
             className="-mx-aura-4 flex min-w-0 grow gap-2 overflow-x-auto px-aura-4"
           >
             {STATUS_CHIPS.filter((c) => c.value !== 'ok').map((c) => (
