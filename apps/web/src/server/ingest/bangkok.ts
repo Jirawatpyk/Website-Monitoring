@@ -27,11 +27,16 @@ export async function dueForBangkok(db: DbClient, now: Date): Promise<DueMonitor
   return monitors;
 }
 
-/** Store a batch from the VPS as BKK check results (attempt 1 or the recheck) and beat. */
+/**
+ * Store a batch from the VPS as BKK check results (attempt 1 or the recheck) and beat. The batch's
+ * control check (D-027) is stamped on every row: false = both control URLs failed, so these results
+ * can't decide a site behind a WAF; absent (an agent not redeployed) = null, treated as ok.
+ */
 export async function storeBangkokResults(
   db: DbClient,
   results: IngestBatch['results'],
   now: Date,
+  control?: IngestBatch['control'],
 ): Promise<number> {
   const { error } = await db.from('check_results').insert(
     results.map((r) => ({
@@ -48,6 +53,8 @@ export async function storeBangkokResults(
       final_url: r.finalUrl ?? null,
       keyword_missing: r.keywordMissing ?? null,
       keyword_forbidden: r.keywordForbidden ?? null,
+      waf: r.outcome === 'blocked' ? (r.waf ?? null) : null,
+      control_ok: control?.ok ?? null,
     })),
   );
   if (error) throw new Error(`check_results: ${error.message}`);

@@ -20,6 +20,7 @@ const pass: HttpCheckResult = {
   finalUrl: 'https://eqho.example.com/',
   keywordMissing: [],
   keywordForbidden: [],
+  waf: null,
 };
 
 const post = (body: unknown) =>

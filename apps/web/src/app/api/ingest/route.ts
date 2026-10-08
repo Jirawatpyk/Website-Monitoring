@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
   if (stale) return Response.json({ error: 'stale_results' }, { status: 422 });
 
   const db = serviceDb();
-  const stored = await storeBangkokResults(db, parsed.data.results, new Date(now));
+  const stored = await storeBangkokResults(db, parsed.data.results, new Date(now), parsed.data.control);
   // The response doesn't wait: the VPS loop moves on while the engine judges the round.
   after(() => engineAfterReport(db, env, now + ENGINE_BUDGET_MS, 'ingest'));
   return Response.json({ ok: true, stored });

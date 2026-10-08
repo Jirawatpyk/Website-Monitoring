@@ -14,6 +14,7 @@ const pass: HttpCheckResult = {
   finalUrl: 'https://a.example.test/',
   keywordMissing: ['Welcome'],
   keywordForbidden: [],
+  waf: null,
 };
 const fail: HttpCheckResult = {
   outcome: 'fail',
@@ -25,6 +26,7 @@ const fail: HttpCheckResult = {
   finalUrl: 'https://a.example.test/',
   keywordMissing: null,
   keywordForbidden: null,
+  waf: null,
 };
 
 const monitor = (id: string, tier: number, timeout_ms = 10_000) => ({
@@ -129,6 +131,7 @@ describe('runProbe', () => {
           final_url: 'https://a.example.test/',
           keyword_missing: ['Welcome'],
           keyword_forbidden: [],
+          waf: null,
         }),
         expect.objectContaining({ monitor_id: 'b', attempt: 1 }),
       ],

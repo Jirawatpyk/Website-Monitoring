@@ -134,6 +134,7 @@ async function insertResults(
       final_url: result.finalUrl,
       keyword_missing: result.keywordMissing,
       keyword_forbidden: result.keywordForbidden,
+      waf: result.waf,
     })),
   );
   if (error) throw new Error(`check_results: ${error.message}`);

@@ -85,6 +85,39 @@ describe('Bangkok through the Ingest API', () => {
     ]);
   });
 
+  it('stores a blocked check’s WAF signature and the batch’s control check on every row (D-027)', async () => {
+    const { db, calls } = fakeDb();
+    const base = {
+      checkedAt: now.toISOString(),
+      responseMs: 120,
+      ttfbMs: 60,
+      resolvedIp: null,
+      error: null,
+      attempt: 1 as const,
+    };
+    await storeBangkokResults(
+      db,
+      [
+        { ...base, monitorId: 'm1', outcome: 'blocked', statusCode: 403, waf: 'akamai' },
+        // A WAF value on a non-blocked row never reaches the table (its check constraint refuses it).
+        { ...base, monitorId: 'm2', outcome: 'pass', statusCode: 200, waf: 'akamai' },
+      ],
+      now,
+      { ok: false, checkedAt: now.toISOString() },
+    );
+    expect(calls.find((c) => c.table === 'check_results')?.values).toEqual([
+      expect.objectContaining({ monitor_id: 'm1', waf: 'akamai', control_ok: false }),
+      expect.objectContaining({ monitor_id: 'm2', waf: null, control_ok: false }),
+    ]);
+
+    const { db: db2, calls: calls2 } = fakeDb();
+    // An agent not redeployed sends no control: unknown, stored as null.
+    await storeBangkokResults(db2, [{ ...base, monitorId: 'm3', outcome: 'pass', statusCode: 200 }], now);
+    expect(calls2.find((c) => c.table === 'check_results')?.values).toEqual([
+      expect.objectContaining({ monitor_id: 'm3', waf: null, control_ok: null }),
+    ]);
+  });
+
   it('throws when the insert fails, before beating', async () => {
     const { db, calls } = fakeDb({ 'check_results.insert': { error: { message: 'boom' } } });
     await expect(storeBangkokResults(db, [], now)).rejects.toThrow('check_results: boom');
