@@ -15,9 +15,11 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | Screen (file) | Canvas title | Size | Canvas row |
 |---|---|---|---|
 | Main | Overview dashboard | 1440×1840 | Web app — desktop 1440 + mobile 390 |
+| Sites | Sites list | 1440×2588 | Web app — desktop 1440 + mobile 390 |
 | SiteDetail | Site detail — Bangkok Airways – Taiwan | 1440×1680 | Web app — desktop 1440 + mobile 390 |
 | Incident | Incident — INC-0142 MuvMi DOWN | 1440×1660 | Web app — desktop 1440 + mobile 390 |
 | MOverview | Mobile — Overview | 390×844 | Web app — desktop 1440 + mobile 390 |
+| MSites | Mobile — Sites | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MSite | Mobile — Site detail | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MIncident | Mobile — Incident detail | 390×844 | Web app — desktop 1440 + mobile 390 |
 | StatusModel | Status model & verification logic | 1440×4680 | Status logic · Mobile ack · Alert channel |
@@ -225,3 +227,14 @@ Role chips (single select): All · Responder · On-call · Stakeholder · Viewer
 5. **Admin system emails** (browser verifier unavailable; fewer than 2 probe locations reporting): sent to every active Admin and nobody else. One email per outage, subject includes the start time, no "back up" email, footer "You got this because you're an Admin." The verifier email is sent when a blocked check finds no verifier answering.
 6. **Auto-resolved PROBLEM** (amends §16.1): a PROBLEM that is never acknowledged and recovers within 5 min of being flagged (the 5 min counts from when the PROBLEM opens, not from the first failed check) auto-resolves on its first OK round — manual Resolve still needs 2 OK rounds. It gets one RECOVERED reply + one RECOVERED email, no @mention, saying it was resolved automatically and needs no root cause. A Tier 2–3 PROBLEM held outside response hours that clears before 09:00 posts nothing.
 7. **Partial recovery:** if the home page recovers but a key page still fails, RECOVERED and PROBLEM AGAIN (Key page) are posted together from the same round, and the same incident continues as a PROBLEM — titled by what still fails, e.g. "/booking still failing after the home page came back".
+
+## 20. Sites list (/sites) — added 8 Oct 2026
+- The sidebar "Sites" item, every "Sites" breadcrumb and the mobile bottom-nav "Sites" tab open the Sites list (boards Sites, MSites) — not a site's detail. Overview keeps its live status table for watching; Sites is the management list.
+- Header meta exactly "N sites · N monitored · N drafts". "Add site" (and the empty state's "Add first site") is shown to Admins only. The sidebar "Sites" count = monitored sites (drafts excluded).
+- One row per site; a row (or "Open") opens Site detail for that site (/sites/[id]). A **draft** (saved from Add site before the checklist is complete) shows Status "Not monitored" (neutral outline), a "Draft · not monitored" badge under the name, "—" in every live column, action "Finish setup" → Add site for Admins; non-Admins still see draft rows but can't open them — the action area reads "Only an Admin can finish setup"; drafts count in "N sites" but not in "monitored" or any uptime figure, and sort last.
+- Columns: Status (§11 badge; Muted is an extra overlay, never replaces status; open incident ID links to the incident) · Site (name, client · AM, URL) · Tier · Owner · backup · Locations (BKK/SIN/TYO glyphs, §11 legend) · Response 24h (p50 of the primary monitor; "—" while down or in maintenance) · Uptime 30d (§5 rule) · Expiry (sooner of SSL and domain in days; amber within 60 d, auto-renew certificates 30 d) · Checked (time of the last complete round, HH:MM:SS) · "Visit site" (opens the site's URL in a new tab) · ⋯ menu (Open, Edit site, Mute…, Schedule maintenance). On a site that is DOWN or has an open incident, Schedule maintenance shows "Can't start maintenance now … Mute instead" (§14.5); the Mute hint follows §15.1/§19 ("keeps escalating until someone acknowledges" while unacked/escalated, otherwise "stays open").
+- Filters (AND): search (name, URL, client), status chips/filter (All, Down, Problem, Maintenance, OK, Muted, Drafts), Tier (All / 1 / 2 / 3), Owner (a person or "Mine" = owner or backup), Client (incl. "Internal"), toggle "Needs attention" = open incident · draft · SSL or domain due within 60 d · no backup owner. Default sort: Down → Problem → Maintenance → OK → Not monitored, then Tier 1 → 3, then name; other sorts (labels exactly): "Name A–Z", "Uptime 30d lowest first", "Expiry soonest first". "Clear" resets filters, keeps the sort.
+- Empty state (no sites yet) = Empty states panel 1 "Add first site" (non-Admins see "Only an Admin can add sites" instead of the button).
+- Mobile: search, status chips (All · Down · Problem · Maintenance · Muted · Drafts · Mine), rows grouped by status, each row → that site's mobile Site detail (§17); drafts → Add site.
+- Changes from the current build: the separate Client column moves into the Site cell's second line (client · AM, Client stays a filter); Owner becomes "Owner · backup". Sample values on the boards ([site URL], counts, names) are mock data — compute them. Search matches name, client and URL.
+- Build order is the team's call: Locations, Response 24h and Uptime 30d need rollup data; until /sites/[id] exists a row may open Edit site.

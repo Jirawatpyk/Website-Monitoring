@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Sites</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.aura-input{min-height:44px;box-sizing:border-box}
+.aura-input__control{min-height:44px;box-sizing:border-box}
+.aura-tag.is-selectable{min-height:44px;padding-inline:14px;flex-shrink:0;white-space:nowrap}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.ms-chips{scrollbar-width:none}.ms-chips::-webkit-scrollbar{display:none}
+.ms-icon{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:0;background:none;border-radius:9999px;color:var(--aura-fg-secondary);cursor:pointer}
+.ms-icon[aria-expanded="true"]{background:var(--aura-bg-selected);color:var(--aura-fg-primary)}
+.ms-icon:focus-visible{outline:2px solid var(--aura-focus-ring);outline-offset:-2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<span style="flex-grow: 1; font-size: 17px; font-weight: 600">Sites</span>
+<button type="button" class="ms-icon" aria-label="{{searchBtn}}" aria-expanded="{{searchOpen}}" onClick="{{toggleSearch}}"><x-import component-from-global-scope="Aura.Icon" name="{{searchIcon}}" size="md"></x-import></button>
+<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+</header>
+
+<sc-if value="{{searchOpen}}" hint-placeholder-val="{{false}}">
+<div style="flex-shrink: 0; box-sizing: border-box; padding: 10px 16px 12px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.TextField" label="Search sites" icon="search" placeholder="Name, URL or client" value="{{q}}" on-change="{{setQ}}"></x-import>
+</div>
+</sc-if>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" full-width="{{yes}}" size="sm"></x-import></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.4">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">FRI 25 SEP 10:07 · UTC+7</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); position: relative">{{meta}}</span>
+</div>
+
+<sc-if value="{{hasSites}}" hint-placeholder-val="{{true}}">
+
+<div class="ms-chips" role="group" aria-label="Filter sites" style="margin: 0 -16px; padding: 0 16px; display: flex; gap: 8px; overflow-x: auto">
+<sc-for list="{{chips}}" as="c" hint-placeholder-count="6">
+<x-import component-from-global-scope="Aura.Tag" selected="{{c.on}}" on-click="{{c.pick}}">{{c.label}}</x-import>
+</sc-for>
+<span style="width: 8px; flex-shrink: 0"></span>
+</div>
+<sc-if value="{{filtered}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{countLine}}</span></sc-if>
+
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary); padding-left: 2px">{{g.title}}</span>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{g.rows}}" as="s" hint-placeholder-count="3">
+<sc-if value="{{s.link}}" hint-placeholder-val="{{true}}">
+<a href="{{s.href}}" aria-label="{{s.aria}}" style="min-height: 60px; box-sizing: border-box; padding: 8px 8px 8px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--aura-border-subtle); color: inherit; text-decoration: none">
+<span style="width: 118px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3; gap: 2px">
+<span style="max-width: 100%; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{s.name}}</span>
+<sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted · until 18:00</x-import></sc-if>
+<sc-if value="{{s.draft}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="pencil">Draft · not monitored</x-import></sc-if>
+<span style="max-width: 100%; font-size: 12px; color: {{s.subColor}}; font-weight: {{s.subWeight}}">{{s.sub}}</span>
+</div>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span>
+</a>
+</sc-if>
+<sc-if value="{{s.locked}}" hint-placeholder-val="{{false}}">
+<div role="group" aria-label="{{s.aria}}" style="min-height: 60px; box-sizing: border-box; padding: 8px 14px 8px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--aura-border-subtle)">
+<span style="width: 118px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3; gap: 2px">
+<span style="max-width: 100%; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{s.name}}</span>
+<sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted · until 18:00</x-import></sc-if>
+<sc-if value="{{s.draft}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="pencil">Draft · not monitored</x-import></sc-if>
+<span style="max-width: 100%; font-size: 12px; color: {{s.subColor}}; font-weight: {{s.subWeight}}">{{s.sub}}</span>
+<span style="max-width: 100%; font-size: 12px; color: var(--aura-fg-secondary)">Only an Admin can finish setup</span>
+</div>
+</div>
+</sc-if>
+</sc-for>
+</div>
+</div>
+</sc-for>
+
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 28px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-surface-hover); color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="search" size="md"></x-import></span>
+<span style="font-size: 15px; font-weight: 600">No sites match {{emptyWhat}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">All 18 sites are still there — only this list is filtered.</span>
+<span style="padding-top: 6px"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="x" on-click="{{clearAll}}">Clear filters</x-import></span>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{noSites}}" hint-placeholder-val="{{false}}">
+<div style="box-sizing: border-box; padding: 20px 16px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius)">
+<div class="aura-empty is-sm" style="padding-bottom: 4px">
+<span class="aura-empty__icon"><x-import component-from-global-scope="Aura.Icon" name="monitor" size="md"></x-import></span>
+<h3 class="aura-empty__title">Nothing is being monitored yet</h3>
+<p class="aura-empty__text">Three steps and the first check runs within a minute.</p>
+</div>
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{setup}}" as="s" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.4">
+<span style="display: flex; color: {{s.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{s.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column"><span>{{s.text}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{s.note}}</span></span>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 13px; line-height: 1.45; color: var(--aura-fg-secondary); text-align: center">Only an Admin can add sites — ask Tao.</span>
+</div>
+</sc-if>
+
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Sites list, same rules as desktop: grouped Down → Problem → Maintenance → OK, then Tier, then name. A row shows the open incident instead of uptime. Muted is an overlay (real status kept). Drafts are listed last as “Not monitored”; everyone sees them, only Admins can open them (→ Add site). Arm is a Responder, so the draft row isn’t tappable and says “Only an Admin can finish setup”. “Mine” = sites where you’re the owner or backup. Every other row opens Site detail for that site — the sample screen shows Bangkok Airways – Taiwan. “Add first site” in the empty state is Admin-only, so Arm (Responder) sees “Only an Admin can add sites”. Sample values ([site URL], “0 of 17”, “ask Tao”, names) are mock data — compute them; never copy.</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="sites" label="Sections"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { f: 'all', q: '', searchOpen: false, view: 'Sites' };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var ME = 'Arm';
+    var ADMIN = false; // viewer Arm is a Responder
+    var ST = {
+      down: { label: 'Down', tone: 'danger', variant: 'solid', icon: 'ban', rank: 0, group: 'DOWN' },
+      problem: { label: 'Problem', tone: 'warning', variant: 'soft', icon: 'triangle-alert', rank: 1, group: 'PROBLEM' },
+      maint: { label: 'Maintenance', tone: 'accent', variant: 'soft', icon: 'calendar', rank: 2, group: 'MAINTENANCE' },
+      ok: { label: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check', rank: 3, group: 'OK' },
+      draft: { label: 'Not monitored', tone: 'neutral', variant: 'outline', icon: 'circle-dot-dashed', rank: 4, group: 'DRAFT' }
+    };
+    var DANGER = 'var(--aura-fg-danger)', WARN = 'var(--aura-alert-warning-fg)', SEC = 'var(--aura-fg-secondary)';
+    // name, tier, owner, backup, client, status, uptime 30d, open incident [text, colour], muted, note — same data as Overview at 10:07
+    var raw = [
+      ['MuvMi', 1, 'Arm', 'Ploy', 'MuvMi', 'down', '99.77%', ['INC-0142 · Escalated L1 · 18 min unacked', DANGER]],
+      ['Fuji Links', 2, 'Ploy', 'Nok', 'Fuji Links', 'problem', '100.00%', ['INC-0141 · Acked by Ploy', SEC]],
+      ['WeCare Studio', 2, 'Nok', 'Ploy', 'WeCare', 'maint', '100.00%', null, false, 'Tier 2 · until 14:00'],
+      ['Bangkok Airways – Taiwan', 1, 'Arm', 'Ploy', 'Bangkok Airways', 'ok', '99.97%'],
+      ['Bangkok Airways – China', 1, 'Arm', 'Ploy', 'Bangkok Airways', 'ok', '100.00%'],
+      ['ENEOS Industrial', 1, 'Ploy', 'Arm', 'ENEOS', 'ok', '100.00%'],
+      ['realme.link', 1, 'Nok', 'Arm', 'realme', 'ok', '100.00%'],
+      ['ORCA Thailand', 2, 'Tao', 'Nok', 'ORCA', 'ok', '99.98%', ['INC-0139 · Needs root cause', WARN]],
+      ['Tubtong', 2, 'Ploy', 'Nok', 'Tubtong', 'ok', '100.00%'],
+      ['Cando Asia', 2, 'Nok', 'Ploy', 'Cando Asia', 'ok', '99.97%'],
+      ['WeCare Asia', 2, 'Nok', 'Ploy', 'WeCare', 'ok', '100.00%'],
+      ['VOCA', 2, 'Ploy', 'Tao', 'Internal', 'ok', '99.91%'],
+      ['EQHO', 2, 'Tao', 'Nok', 'Internal', 'ok', '100.00%'],
+      ['DxT', 2, 'Tao', 'Nok', 'Internal', 'ok', '100.00%'],
+      ['DxT Solutions', 3, 'Tao', 'Nok', 'Internal', 'ok', '100.00%'],
+      ['DxT AI', 3, 'Tao', 'Nok', 'Internal', 'ok', '100.00%'],
+      ['DxT Games', 3, 'Tao', 'Nok', 'Internal', 'ok', '100.00%', null, true],
+      ['EQHO Academy', 2, 'Nok', 'Ploy', 'Internal', 'draft', '—', null, false, 'Tier 2 · draft saved 10:07']
+    ];
+    var all = raw.map(function (r) {
+      var S = ST[r[5]];
+      var inc = r[7];
+      var sub = inc ? inc[0] : (r[9] || ('Tier ' + r[1] + ' · ' + r[6] + ' · 30 d'));
+      return { name: r[0], draft: r[5] === 'draft', link: r[5] !== 'draft' || ADMIN, locked: r[5] === 'draft' && !ADMIN, href: r[5] === 'draft' ? 'AddSite.dc.html' : 'MSite.dc.html', tier: r[1], owner: r[2], backup: r[3], client: r[4], key: r[5], rank: S.rank, group: S.group,
+        label: S.label, tone: S.tone, variant: S.variant, icon: S.icon, muted: !!r[8],
+        sub: sub, subColor: inc ? inc[1] : SEC, subWeight: inc ? 500 : 400,
+        aria: r[0] + ', ' + S.label + (r[5] === 'draft' ? (ADMIN ? ', draft — finish setup' : ', draft — only an Admin can finish setup') : '') + (r[8] ? ', muted until 18:00' : '') + ', ' + sub };
+    });
+    var q = (st.q || '').trim().toLowerCase();
+    function test(r, f) {
+      if (f === 'down' || f === 'problem' || f === 'maint' || f === 'draft') return r.key === f;
+      if (f === 'muted') return r.muted;
+      if (f === 'mine') return r.owner === ME || r.backup === ME;
+      return true;
+    }
+    var shown = all.filter(function (r) { return test(r, st.f) && (!q || (r.name + ' ' + r.client).toLowerCase().indexOf(q) >= 0); })
+      .sort(function (a, b) { return a.rank - b.rank || a.tier - b.tier || a.name.localeCompare(b.name); });
+    var order = ['DOWN', 'PROBLEM', 'MAINTENANCE', 'OK', 'DRAFT'];
+    var groups = order.map(function (g) {
+      var rows = shown.filter(function (r) { return r.group === g; });
+      return { title: g + ' · ' + rows.length, rows: rows };
+    }).filter(function (g) { return g.rows.length > 0; });
+    var CH = [['all', 'All'], ['down', 'Down'], ['problem', 'Problem'], ['maint', 'Maintenance'], ['muted', 'Muted'], ['draft', 'Drafts'], ['mine', 'Mine']];
+    var chips = CH.map(function (c) {
+      var n = all.filter(function (r) { return test(r, c[0]); }).length;
+      return { label: c[1] + ' ' + n, on: st.f === c[0], pick: function () { self.setState({ f: c[0] }); } };
+    });
+    var fLabel = CH.filter(function (c) { return c[0] === st.f; })[0][1];
+    var what = [];
+    if (q) what.push('“' + st.q.trim() + '”');
+    if (st.f !== 'all') what.push(fLabel);
+    return {
+      searchOpen: st.searchOpen,
+      searchBtn: st.searchOpen ? "Close search" : "Open search",
+      searchIcon: st.searchOpen ? 'x' : 'search',
+      toggleSearch: function () { self.setState({ searchOpen: !self.state.searchOpen, q: '' }); },
+      q: st.q,
+      setQ: function (e) { self.setState({ q: e && e.target ? e.target.value : e }); },
+      chips: chips,
+      groups: groups,
+      countLine: 'Showing ' + shown.length + ' of 18',
+      filtered: st.f !== 'all' || !!q,
+      yes: true,
+      views: ['Sites', 'Empty'], view: st.view,
+      setView: function (v) { self.setState({ view: v }); },
+      hasSites: st.view === 'Sites', noSites: st.view !== 'Sites',
+      meta: st.view === 'Sites' ? '18 sites · 17 monitored · 1 draft' : '0 sites · 0 monitored · 0 drafts',
+      setup: [
+        { icon: 'circle-check', color: 'var(--aura-fg-positive)', text: 'Connect the Google Chat Space', note: 'Done · test card sent' },
+        { icon: 'circle-dot-dashed', color: 'var(--aura-fg-secondary)', text: 'Add sites and pick a tier', note: '0 of 17' },
+        { icon: 'circle', color: 'var(--aura-fg-tertiary)', text: 'Give every site an owner and backup', note: 'Needed before alerts' }
+      ],
+      empty: shown.length === 0,
+      emptyWhat: what.join(' · '),
+      clearAll: function () { self.setState({ f: 'all', q: '' }); },
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

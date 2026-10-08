@@ -20,7 +20,7 @@
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Done |
 | S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | In review |
 | S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 (merged) | 3 | Done |
-| S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 | 3 | Todo |
+| S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 (merged) | 3 | In progress |
 | S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
@@ -328,7 +328,7 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
 
 - **Scope:** Spec §20, boards Sites and MSites: the `/sites` management list rebuilt from the boards (it was built in S05 without one) — status (badge + Muted overlay + open incident link), site (name, client · AM, URL), tier, owner · backup, locations (latest round glyphs), checked, Visit site, ⋯ menu, search, status chips, Tier / Owner / Client filters, "Needs attention", sorts, drafts last with "Finish setup", empty state, mobile grouped by status. Columns that need later data show "—" until their slice: Response 24h and Uptime 30d (S06 rollups), Expiry (S13); Mute / Schedule maintenance in the ⋯ menu are disabled with the reason until S09.
 - **Boards:** Sites, MSites
-- **Depends on:** S05
+- **Depends on:** S05 (merged — its close-out waits only on owners signing in, as for S05b)
 - **Done when:**
   1. spec-checker passes Sites and MSites at 390 / 820 / 1440, light and dark.
   2. Filters, chips, "Needs attention" and the three sorts behave as spec §20 (component tests); drafts sort last and count in "N sites" but not "monitored".
@@ -656,6 +656,8 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | StatusModel | S04a |
 | AddSite | S05 |
 | EditMonitors | S05 |
+| Sites | S05c |
+| MSites | S05c |
 | Main | S06 |
 | MOverview | S06 |
 | MainDark | S06 |
