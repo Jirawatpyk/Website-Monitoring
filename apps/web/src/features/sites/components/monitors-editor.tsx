@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Alert,
@@ -14,7 +14,15 @@ import {
   TextField,
 } from '@jirawatpyk/aura-react';
 import { IconCheck, IconGlobe, IconInfo, IconPlus, IconTrash2 } from '@jirawatpyk/aura-react/icons';
-import { defaultSlowMs, hostnameSchema, isRefusedHeader, MAX_KEY_PAGES, type Tier } from '@dxt/shared';
+import {
+  defaultSlowMs,
+  hostnameSchema,
+  isRefusedHeader,
+  MAX_KEY_PAGES,
+  REFUSED_HEADER_MESSAGE,
+  type Tier,
+} from '@dxt/shared';
+import { SiteStatusBadge } from '@/components/status-badges';
 import { saveMonitors } from '../actions';
 import type { MonitorRecord, SiteActionResult } from '../types';
 import {
@@ -66,6 +74,7 @@ export function MonitorsEditor({
   const [errorKeys, setErrorKeys] = useState<string[]>([]);
   const [askRemove, setAskRemove] = useState<string | null>(null);
   const [askDiscard, setAskDiscard] = useState(false);
+  const lastRemoved = useRef<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const changes = describeChanges(drafts, monitors);
@@ -87,9 +96,12 @@ export function MonitorsEditor({
 
   // Field errors from the server name `upserts.<i>.<field>`; map them back to the draft.
   const fieldErrors = result && !result.ok ? (result.fieldErrors ?? {}) : {};
+  // A field's error, or the first error inside it (an array or one of its items).
   const errorOf = (key: string, field: string) => {
     const i = errorKeys.indexOf(key);
-    return i >= 0 ? fieldErrors[`upserts.${i}.${field}`] : undefined;
+    if (i < 0) return undefined;
+    const prefix = field ? `upserts.${i}.${field}` : `upserts.${i}`;
+    return Object.entries(fieldErrors).find(([k]) => k === prefix || k.startsWith(`${prefix}.`))?.[1];
   };
 
   const addMonitor = () => {
@@ -122,11 +134,16 @@ export function MonitorsEditor({
       const r = await saveMonitors(input);
       setResult(r);
       setErrorKeys(keys);
-      if (r.ok) router.replace(`/sites/${siteId}/monitors?saved=1`);
+      if (r.ok) return router.replace(`/sites/${siteId}/monitors?saved=1`);
+      // Show the first monitor that has an error.
+      const errored = Object.keys(r.fieldErrors ?? {});
+      const first = keys.findIndex((_, i) => errored.some((k) => k.startsWith(`upserts.${i}.`)));
+      if (first >= 0) setSelected(keys[first]!);
     });
   };
 
   const removing = drafts.find((d) => d.key === askRemove);
+  const alerted = [ownerName, backupName].filter(Boolean).join(' and ');
   const people = [ownerName && `owner ${ownerName}`, backupName && `backup ${backupName}`]
     .filter(Boolean)
     .join(' · ');
@@ -179,7 +196,11 @@ export function MonitorsEditor({
 
       <div className="flex flex-col items-start gap-6 lg:flex-row">
         <div className="flex w-full shrink-0 flex-col gap-3 lg:w-85">
-          <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
+          <div
+            role="group"
+            aria-label="Monitors"
+            className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface"
+          >
             {drafts.map((d) =>
               d.removed ? (
                 d.id && (
@@ -198,7 +219,13 @@ export function MonitorsEditor({
                       variant="secondary"
                       size="sm"
                       touchHeight
-                      onClick={() => update(d.key, { removed: false })}
+                      data-undo={d.key}
+                      onClick={() => {
+                        update(d.key, { removed: false });
+                        requestAnimationFrame(() =>
+                          document.querySelector<HTMLElement>(`[data-row="${d.key}"]`)?.focus(),
+                        );
+                      }}
                     >
                       Undo
                     </Button>
@@ -209,8 +236,17 @@ export function MonitorsEditor({
                   key={d.key}
                   type="button"
                   aria-pressed={current?.key === d.key}
-                  onClick={() => setSelected(d.key)}
-                  className={`flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-border-default px-4 py-3.5 text-left hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring ${current?.key === d.key ? 'bg-bg-canvas border-l-4 border-l-accent-violet' : ''}`}
+                  data-row={d.key}
+                  onClick={() => {
+                    setSelected(d.key);
+                    // Below lg the card sits under the list: bring it into view.
+                    if (window.matchMedia('(max-width: 1023px)').matches) {
+                      requestAnimationFrame(() =>
+                        document.getElementById('monitor-card')?.scrollIntoView({ block: 'start' }),
+                      );
+                    }
+                  }}
+                  className={`flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-border-default px-4 py-3.5 text-left hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring ${current?.key === d.key ? 'bg-bg-selected border-l-4 border-l-accent-violet' : ''}`}
                 >
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-aura-sm border border-border-default bg-bg-canvas text-fg-secondary [&_svg]:size-4">
                     <IconGlobe />
@@ -223,9 +259,10 @@ export function MonitorsEditor({
                           Primary
                         </Badge>
                       )}
+                      {errorOf(d.key, '') && <span className="text-xs text-fg-danger">Has errors</span>}
                       {isEdited(d, monitors) && (
                         <span
-                          className="size-1.5 rounded-aura-full bg-alert-warning-fg"
+                          className="size-2 rounded-aura-full bg-alert-warning-fg"
                           role="img"
                           aria-label="Edited, not saved"
                           title="Edited, not saved"
@@ -271,7 +308,7 @@ export function MonitorsEditor({
         </div>
 
         {current && (
-          <div className="flex w-full min-w-0 grow flex-col gap-4">
+          <div id="monitor-card" className="flex w-full min-w-0 grow scroll-mt-4 flex-col gap-4">
             <MonitorCard
               key={current.key}
               draft={current}
@@ -294,6 +331,11 @@ export function MonitorsEditor({
         role="alertdialog"
         size="sm"
         title={removing ? `Remove ${monitorTitle(removing)}?` : 'Remove monitor?'}
+        // Focus returns to the row's Undo, not to the trash button that no longer exists.
+        finalFocus={() =>
+          document.querySelector<HTMLElement>(`[data-undo="${lastRemoved.current}"]`) ??
+          document.querySelector<HTMLElement>('[data-row]')
+        }
         description={[siteName, people].filter(Boolean).join(' · ')}
         footer={
           <>
@@ -303,7 +345,10 @@ export function MonitorsEditor({
             <Button
               icon={<IconTrash2 />}
               onClick={() => {
-                if (removing) update(removing.key, { removed: true });
+                if (removing) {
+                  lastRemoved.current = removing.key;
+                  update(removing.key, { removed: true });
+                }
                 setAskRemove(null);
               }}
             >
@@ -315,11 +360,10 @@ export function MonitorsEditor({
         {removing && (
           <div className="flex flex-col gap-2 text-sm leading-normal">
             <p className="m-0">
-              Checks for {monitorTitle(removing)} ({pathOf(removing.url)}) stop after you save.
-              {ownerName && backupName
-                ? ` ${ownerName} and ${backupName} will no longer get PROBLEM alerts from it,`
-                : ''}{' '}
-              and it drops out of the site status.
+              Checks for {monitorTitle(removing)} ({pathOf(removing.url)}) stop after you save.{' '}
+              {alerted
+                ? `${alerted} will no longer get PROBLEM alerts from it, and it drops out of the site status.`
+                : 'It drops out of the site status.'}
             </p>
             <p className="m-0 text-fg-secondary">
               Nothing changes until you press Save changes. Past results stay in the check log for 90 days.
@@ -368,7 +412,7 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
       ? 'Stops at PROBLEM — a slow key page is worth a look, not a page at 3 a.m.'
       : 'New monitor · added on save · stops at PROBLEM';
   const headerErrors = d.headers.map((h) =>
-    h.name && isRefusedHeader(h.name) ? 'Not allowed here' : undefined,
+    h.name && isRefusedHeader(h.name) ? REFUSED_HEADER_MESSAGE : undefined,
   );
   return (
     <>
@@ -395,6 +439,7 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
         <Section title="Request">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
             <TextField
+              touchHeight
               label="URL"
               required
               inputMode="url"
@@ -403,6 +448,7 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
               error={errorOf('url')}
             />
             <Select
+              touchHeight
               label="Method"
               options={['GET', 'HEAD']}
               value={d.method}
@@ -412,12 +458,14 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <TextField
+              touchHeight
               label="Expected status"
               value="2xx–3xx"
               disabled
               hint="Fixed: 4xx → PROBLEM, 5xx → hard fail"
             />
             <TextField
+              touchHeight
               label="Timeout"
               inputMode="numeric"
               suffix="s"
@@ -427,6 +475,7 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
               error={errorOf('timeoutSec')}
             />
             <Select
+              touchHeight
               label="Redirects"
               disabled
               options={[{ value: 'follow', label: 'Follow (max 5)' }]}
@@ -444,7 +493,7 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
               placeholder="Brand name or page title"
               phrases={d.mustContain}
               onChange={(mustContain) => onChange({ mustContain })}
-              hint="Missing → PROBLEM (keyword). Checked on the final page after redirects."
+              hint="Missing → PROBLEM (Keyword). Checked on the final page after redirects."
               error={errorOf('mustContain')}
             />
             <PhraseList
@@ -453,7 +502,7 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
               placeholder="e.g. Index of /"
               phrases={d.mustNotContain}
               onChange={(mustNotContain) => onChange({ mustNotContain })}
-              hint="Found → PROBLEM (keyword). Checked on the final page after redirects."
+              hint="Found → PROBLEM (Keyword). Checked on the final page after redirects."
               error={errorOf('mustNotContain')}
             />
           </div>
@@ -471,17 +520,18 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
               return host.success ? host.data : null;
             }}
             hint="A redirect anywhere else → PROBLEM (possible hijack). Checked on every round."
-            error={errorOf('allowedRedirectDomains.0')}
+            error={errorOf('allowedRedirectDomains')}
           />
         </Section>
 
-        <Section title="Custom headers" note="Sent from all 3 locations and the browser verifier">
+        <Section title="Custom headers" note="Sent from BKK, SIN and TYO to the site’s own address">
           {d.headers.map((h, i) => (
             <div
               key={i}
               className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] md:items-start"
             >
               <TextField
+                touchHeight
                 label="Header name"
                 placeholder="Accept-Language"
                 className="font-mono"
@@ -494,6 +544,7 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
                 error={headerErrors[i] ?? errorOf(`headers.${i}.name`)}
               />
               <TextField
+                touchHeight
                 label="Value"
                 className="col-span-2 font-mono md:col-span-1"
                 value={h.value}
@@ -524,6 +575,11 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
             >
               Add header
             </Button>
+            {errorOf('headers') && (
+              <span role="alert" className="text-xs text-fg-danger">
+                {errorOf('headers')}
+              </span>
+            )}
             <span className="text-xs text-fg-secondary">
               Never put passwords or tokens here — anyone with Responder access can read them. User-Agent,
               Cookie and Authorization are set by the monitor itself.
@@ -534,6 +590,7 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
         <Section title="Thresholds" last>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <TextField
+              touchHeight
               label="Slow when p50 is over"
               inputMode="numeric"
               suffix="ms"
@@ -543,14 +600,26 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
               hint={`Empty = the Tier ${tier} default, ${defaultSlowMs(tier)} ms`}
               error={errorOf('slowMs')}
             />
-            <TextField label="For" value="3" suffix="rounds in a row" disabled hint="Fixed for every site" />
-            <Select label="Result" disabled options={[{ value: 'p', label: 'PROBLEM (slow)' }]} value="p" />
+            <TextField
+              touchHeight
+              label="For"
+              value="3"
+              suffix="rounds in a row"
+              disabled
+              hint="Fixed for every site"
+            />
+            <Select
+              touchHeight
+              label="Result"
+              disabled
+              options={[{ value: 'p', label: 'PROBLEM (slow)' }]}
+              value="p"
+              hint="Fixed for every site"
+            />
           </div>
           {d.isPrimary && (
             <div className="flex flex-wrap items-start gap-2 text-sm leading-normal">
-              <Badge tone="danger" variant="solid">
-                Down
-              </Badge>
+              <SiteStatusBadge status="down" />
               <span className="min-w-0 flex-1">
                 When at least <b>2 of 3</b> locations get a hard fail (timeout, 5xx, DNS/TLS error, connection
                 refused) on <b>two checks in a row</b> — the second is an immediate recheck about 30 s later.
@@ -563,6 +632,7 @@ function MonitorCard({ draft: d, tier, errorOf, onChange, onRemove }: MonitorCar
 
       <TestCheckCard
         title="Test before saving"
+        isPrimary={d.isPrimary}
         request={{
           url: d.url,
           method: d.method,

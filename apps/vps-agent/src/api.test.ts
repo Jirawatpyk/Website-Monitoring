@@ -39,7 +39,7 @@ describe('createApi — the only way out of the VPS (PRD §10)', () => {
     );
     const api = createApi('https://monitor.example.test', TOKEN, fetchImpl as unknown as typeof fetch);
     await api.postResults([]);
-    expect(await api.leaseJobs(2, 1)).toEqual([{ ...JOB, headers: [] }]);
+    expect(await api.leaseJobs(2, 1)).toEqual([JOB]);
     const [leaseUrl] = fetchImpl.mock.calls[1] as unknown as [URL];
     expect(leaseUrl.search).toBe('?max=2&sessions=1');
     const [, postInit] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit];

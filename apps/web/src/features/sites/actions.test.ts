@@ -11,6 +11,8 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock('next/cache', () => ({ revalidatePath: m.revalidatePath }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ rpc: vi.fn() }) }));
+const access = vi.hoisted(() => ({ getAccess: vi.fn() }));
+vi.mock('@/lib/auth/session', () => access);
 vi.mock('./mutations', () => ({
   createSite: m.createSite,
   updateSite: m.updateSite,
@@ -23,7 +25,13 @@ const actions = await import('./actions');
 const OK = { ok: true, siteId: 's1' };
 const NO = { ok: false, message: 'no' };
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  access.getAccess.mockResolvedValue({
+    status: 'active',
+    profile: { id: 'u', email: 'a@x.test', displayName: 'Tao', role: 'admin' },
+  });
+});
 
 describe('Sites Server Actions', () => {
   it.each([
@@ -40,6 +48,25 @@ describe('Sites Server Actions', () => {
     mutation.mockResolvedValueOnce(NO);
     expect(await call()).toEqual(NO);
     expect(m.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  // Security review L2: nobody but an Admin gets as far as zod or a DNS lookup.
+  it('refuses anyone but an Admin before doing anything', async () => {
+    access.getAccess.mockResolvedValue({
+      status: 'active',
+      profile: { id: 'u', email: 'v@x.test', displayName: 'V', role: 'viewer' },
+    });
+    for (const call of [
+      () => actions.createSite({} as never),
+      () => actions.updateSite({} as never),
+      () => actions.setSiteMonitoring('s1', true),
+      () => actions.deleteSite('s1'),
+      () => actions.saveMonitors({} as never),
+    ]) {
+      expect(await call()).toEqual({ ok: false, message: 'Only an Admin can change sites and monitors.' });
+    }
+    expect(m.createSite).not.toHaveBeenCalled();
+    expect(m.saveMonitors).not.toHaveBeenCalled();
   });
 
   it('deleteSite refreshes the list only', async () => {

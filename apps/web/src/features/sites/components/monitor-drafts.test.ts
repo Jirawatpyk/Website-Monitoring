@@ -99,6 +99,15 @@ describe('Test check words', () => {
     expect(describeResult(result, keywords as number)).toEqual({ text, look });
   });
 
+  it('a key page that fails everywhere is a PROBLEM, never DOWN (spec §6)', () => {
+    const fail = [r({ outcome: 'fail' }), r({ outcome: 'fail', location: 'TYO' })];
+    expect(testVerdict(fail, '', { isPrimary: false }).title).toBe('Would be: PROBLEM (Key page).');
+    expect(testVerdict(fail, '').note).toBe(
+      'Every location tested got a hard fail. Nothing is stored or alerted.',
+    );
+    expect(testVerdict([r({})], '', { beforeStart: true }).note).toContain('until monitoring starts');
+  });
+
   it('formats response time', () => {
     expect([formatResponse(412), formatResponse(1234), formatResponse(null)]).toEqual([
       '412 ms',

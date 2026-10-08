@@ -20,7 +20,7 @@ alter table public.monitors
   -- Custom request headers [{name, value}] sent from every location and the browser verifier. Names
   -- are checked in the app (D-025: no Host / Cookie / Authorization / User-Agent / probe header).
   add column headers jsonb not null default '[]'
-    check (jsonb_typeof(headers) = 'array' and jsonb_array_length(headers) <= 10),
+    check (case when jsonb_typeof(headers) = 'array' then jsonb_array_length(headers) <= 10 else false end),
   add column enabled boolean not null default true,
   -- A monitor with history is removed, not deleted: its results stay for their 90 days.
   add column removed_at timestamptz,
@@ -245,6 +245,15 @@ begin
 
   -- Removals first, so a removed key page frees its place for a new one.
   foreach v_id in array coalesce(p_removals, '{}') loop
+    if not exists (select 1 from public.monitors where id = v_id and site_id = p_site_id) then
+      raise exception 'Monitor not found' using errcode = 'P0002';
+    end if;
+    -- An open incident on this monitor would be "recovered" by its disappearing (D-024).
+    if exists (select 1 from public.incidents where monitor_id = v_id
+               and state not in ('resolved', 'in_review', 'closed')) then
+      raise exception 'This monitor has an open incident — resolve it first'
+        using errcode = 'P0001', hint = 'monitor_has_open_incident';
+    end if;
     if exists (select 1 from public.monitors where id = v_id and site_id = p_site_id and is_primary) then
       raise exception 'The primary monitor can''t be removed'
         using errcode = 'P0001', hint = 'primary_not_removable';
@@ -259,6 +268,22 @@ begin
   end loop;
 
   for v_m in select * from jsonb_array_elements(coalesce(p_upserts, '[]')) loop
+    -- The app refuses these names too; an RPC call straight to PostgREST must not store them either.
+    if exists (
+      select 1 from jsonb_array_elements(coalesce(v_m -> 'headers', '[]')) h
+      where lower(btrim(h ->> 'name')) in ('host', 'content-length', 'transfer-encoding', 'connection', 'cookie',
+                                           'authorization', 'proxy-authorization', 'user-agent', 'x-dxt-monitor')
+         or lower(h ->> 'name') ~ '(auth|token|secret|api[-_]?key|session|password|cf-access)'
+         or (h ->> 'value') ~ '[\r\n]'
+    ) then
+      raise exception 'A custom header can''t set that name or value' using errcode = 'P0001', hint = 'header_refused';
+    end if;
+    if nullif(v_m ->> 'id', '') is not null and (v_m ->> 'enabled')::boolean is false
+       and exists (select 1 from public.incidents where monitor_id = (v_m ->> 'id')::uuid
+                   and state not in ('resolved', 'in_review', 'closed')) then
+      raise exception 'This monitor has an open incident — resolve it first'
+        using errcode = 'P0001', hint = 'monitor_has_open_incident';
+    end if;
     if nullif(v_m ->> 'id', '') is null then
       insert into public.monitors (
         site_id, type, is_primary, url, method, timeout_ms, must_contain, must_not_contain,

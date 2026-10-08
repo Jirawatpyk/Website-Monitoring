@@ -35,7 +35,14 @@ export function formatResponse(ms: number | null): string {
  * What the scheduled checks would make of these results, in the engine's words: a hard fail at one
  * location never makes DOWN on its own; a bot challenge goes to the browser verifier.
  */
-export function testVerdict(results: TestCheckResult[], keyword: string): { title: string; note: string } {
+export function testVerdict(
+  results: TestCheckResult[],
+  keyword: string,
+  { isPrimary = true, beforeStart = false }: { isPrimary?: boolean; beforeStart?: boolean } = {},
+): { title: string; note: string } {
+  const nothing = beforeStart
+    ? 'Nothing is stored or alerted until monitoring starts.'
+    : 'Nothing is stored or alerted.';
   const quoted = keyword ? `“${keyword}”` : 'The brand keyword';
   if (results.some((r) => r.outcome === 'refused')) {
     return {
@@ -46,8 +53,9 @@ export function testVerdict(results: TestCheckResult[], keyword: string): { titl
   const fails = results.filter((r) => r.outcome === 'fail').length;
   if (fails === results.length) {
     return {
-      title: 'Would be: DOWN.',
-      note: 'Every location tested got a hard fail. Nothing is stored or alerted until monitoring starts.',
+      // Only the primary can make the site DOWN; a key page stops at PROBLEM (spec §6).
+      title: isPrimary ? 'Would be: DOWN.' : 'Would be: PROBLEM (Key page).',
+      note: `Every location tested got a hard fail. ${nothing}`,
     };
   }
   if (results.some((r) => r.outcome === 'blocked')) {
@@ -75,6 +83,6 @@ export function testVerdict(results: TestCheckResult[], keyword: string): { titl
   const n = results.length;
   return {
     title: 'Would be: OK.',
-    note: `${n} of ${n} locations pass${keyword ? ` and ${quoted} is on the page` : ''}. Nothing is stored or alerted until monitoring starts.`,
+    note: `${n} of ${n} locations pass${keyword ? ` and ${quoted} is on the page` : ''}. ${nothing}`,
   };
 }

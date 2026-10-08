@@ -1,5 +1,4 @@
 import { assertPublicTarget, classifyResponse, TargetNotAllowedError, type Lookup } from '@dxt/probe';
-import { probeRequestHeaders } from '@dxt/shared';
 import type { Api, LeasedJob, Verdict } from './api';
 
 /** PRD §5: 20 s per page. */
@@ -20,8 +19,7 @@ export interface PageVisit {
 
 /** A plain browser (no stealth: if Chromium is blocked, real visitors may be too — PRD §5). */
 export interface PageBrowser {
-  /** `headers`: the monitor's custom headers, sent to the page's own origin only (S05, D-025). */
-  visit(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<PageVisit>;
+  visit(url: string, timeoutMs: number): Promise<PageVisit>;
 }
 
 /**
@@ -78,7 +76,7 @@ export async function verifyJob(
     // Same SSRF guard as the HTTP probes before the browser opens anything (redirects and page
     // requests are kept off private ranges by the systemd unit's IPAddressDeny).
     await assertPublicTarget(new URL(job.url), lookup);
-    const visit = await browser.visit(job.url, PAGE_TIMEOUT_MS, probeRequestHeaders(job.headers));
+    const visit = await browser.visit(job.url, PAGE_TIMEOUT_MS);
     verdict = { ...judgeVisit(visit, job.mustContain), httpStatus: visit.status };
     screenshot = visit.screenshot;
   } catch (err) {

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { Breadcrumb, Button, Container, EmptyState, PageHeader } from '@jirawatpyk/aura-react';
-import { IconInbox } from '@jirawatpyk/aura-react/icons';
+import { notFound } from 'next/navigation';
+import { Breadcrumb, Container, PageHeader } from '@jirawatpyk/aura-react';
 import { formatTier, TIER_CONFIG } from '@dxt/shared';
 import { NoAccess } from '@/components/states';
 import { MonitorsEditor } from '@/features/sites';
@@ -19,16 +19,7 @@ export default async function EditMonitorsPage({
 }) {
   const [{ siteId }, query, access] = await Promise.all([params, searchParams, getAccess()]);
   const site = await getSite(siteId);
-  if (!site) {
-    return (
-      <EmptyState
-        icon={<IconInbox />}
-        title="Site not found"
-        description="The link may be wrong, or the site was deleted."
-        action={<Button href="/sites">Go to Sites</Button>}
-      />
-    );
-  }
+  if (!site) notFound();
   const isAdmin = access.status === 'active' && access.profile.role === 'admin';
   const every = TIER_CONFIG[site.tier].intervalSec / 60;
   const breadcrumb = (
@@ -40,7 +31,9 @@ export default async function EditMonitorsPage({
       ]}
     />
   );
-  const meta = `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO${site.ownerName ? ` · owner ${site.ownerName}` : ''} · site status is the worst of these monitors`;
+  const meta = site.live
+    ? `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO${site.ownerName ? ` · owner ${site.ownerName}` : ''} · site status is the worst of these monitors`
+    : `${formatTier(site.tier)} · Draft · not monitored${site.ownerName ? ` · owner ${site.ownerName}` : ''}`;
   return (
     <Container>
       <div className="flex flex-col gap-6">

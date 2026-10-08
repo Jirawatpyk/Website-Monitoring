@@ -13,6 +13,7 @@ interface WhatwgUrl {
   username: string;
   password: string;
   hash: string;
+  origin: string;
 }
 const Url = (globalThis as unknown as { URL: new (input: string, base?: string) => WhatwgUrl }).URL;
 
@@ -52,11 +53,14 @@ export const monitorUrlSchema = z
 export const keyPagePathSchema = z
   .string()
   .trim()
-  .regex(/^\/[^\s#]{0,511}$/, 'Start the path with / (for example /contact)');
+  .regex(/^\/(?![/\\])[^\s#]{0,510}$/, 'Start the path with / (for example /contact)');
 
 /** The key page's full URL on the primary URL's origin. */
 export function keyPageUrl(primaryUrl: string, path: string): string {
-  return normalizeMonitorUrl(new Url(path, primaryUrl).href);
+  const url = normalizeMonitorUrl(new Url(path, primaryUrl).href);
+  // "//other.host/x" or "/\\other.host" would leave the site: a key page stays on the primary's origin.
+  if (new Url(url).origin !== new Url(primaryUrl).origin) throw new Error('a key page stays on the site');
+  return url;
 }
 
 // ── Custom headers ─────────────────────────────────────────────────────────
@@ -81,9 +85,14 @@ export const REFUSED_HEADER_NAMES: readonly string[] = [
   DEFAULT_PROBE_SECRET_HEADER.toLowerCase(),
 ];
 
+/** Names that look like a credential (staff of every role can read monitor settings, D-025). */
+const CREDENTIAL_LIKE = /(auth|token|secret|api[-_]?key|session|password|cf-access)/i;
+
+export const REFUSED_HEADER_MESSAGE = 'Set by the monitor itself or a credential — not allowed here';
+
 export function isRefusedHeader(name: string, probeSecretHeader = DEFAULT_PROBE_SECRET_HEADER): boolean {
   const n = name.trim().toLowerCase();
-  return REFUSED_HEADER_NAMES.includes(n) || n === probeSecretHeader.toLowerCase();
+  return REFUSED_HEADER_NAMES.includes(n) || n === probeSecretHeader.toLowerCase() || CREDENTIAL_LIKE.test(n);
 }
 
 export const monitorHeaderSchema = z.object({
@@ -91,9 +100,7 @@ export const monitorHeaderSchema = z.object({
     .string()
     .trim()
     .regex(/^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$/, 'Use a header name like Accept-Language')
-    .refine((n) => !isRefusedHeader(n), {
-      message: 'Set by the monitor itself or a credential — not allowed here',
-    }),
+    .refine((n) => !isRefusedHeader(n), { message: REFUSED_HEADER_MESSAGE }),
   value: z
     .string()
     .max(1024)

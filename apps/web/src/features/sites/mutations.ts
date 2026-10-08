@@ -57,6 +57,13 @@ export function refusal(error: DbError): Extract<SiteActionResult, { ok: false }
       return { ok: false, message: 'A site needs its primary monitor.' };
     case 'site_is_live':
       return { ok: false, message: 'Stop monitoring before deleting the site.' };
+    case 'monitor_has_open_incident':
+      return {
+        ok: false,
+        message: 'This monitor has an open incident — resolve it before you switch it off or remove it.',
+      };
+    case 'header_refused':
+      return { ok: false, message: 'A custom header can’t set that name or value.' };
     case 'site_has_history':
       return {
         ok: false,

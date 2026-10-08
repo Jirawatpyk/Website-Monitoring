@@ -26,6 +26,10 @@ interface TestCheckCardProps {
   /** The monitor's current (unsaved) settings. */
   request: TestCheckInput;
   title?: string;
+  /** Only the primary can make the site DOWN; a key page tops out at PROBLEM (spec §6). */
+  isPrimary?: boolean;
+  /** Add site: nothing is monitored yet. */
+  beforeStart?: boolean;
 }
 
 /**
@@ -33,7 +37,12 @@ interface TestCheckCardProps {
  * the settings on screen; BKK runs on the first round, because the VPS only pulls work (D-025).
  * Nothing is stored or alerted.
  */
-export function TestCheckCard({ request, title = 'Test check' }: TestCheckCardProps) {
+export function TestCheckCard({
+  request,
+  title = 'Test check',
+  isPrimary = true,
+  beforeStart = false,
+}: TestCheckCardProps) {
   const [results, setResults] = useState<TestCheckResult[] | null>(null);
   const [ranAt, setRanAt] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -66,7 +75,7 @@ export function TestCheckCard({ request, title = 'Test check' }: TestCheckCardPr
   };
 
   const keyword = request.mustContain?.[0] ?? '';
-  const verdict = results ? testVerdict(results, keyword) : null;
+  const verdict = results ? testVerdict(results, keyword, { isPrimary, beforeStart }) : null;
   return (
     <Card
       title={title}
@@ -80,6 +89,7 @@ export function TestCheckCard({ request, title = 'Test check' }: TestCheckCardPr
             icon={results ? <IconRotateCcw /> : <IconArrowRight />}
             loading={running}
             disabled={!request.url}
+            title={request.url ? undefined : 'Add the URL first'}
             onClick={run}
           >
             {results ? 'Run again' : 'Run test now'}

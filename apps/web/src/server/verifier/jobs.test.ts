@@ -9,7 +9,6 @@ const leased = (over: Record<string, unknown> = {}) => ({
   kind: 'verify',
   url: 'https://tubtong.example.test',
   must_contain: ['Tubtong'],
-  monitor_id: 'm1',
   created_at: '2026-10-07T03:01:05Z',
   ...over,
 });
@@ -18,8 +17,6 @@ describe('leaseJobs (GET /api/jobs)', () => {
   it('beats, expires stale jobs, leases up to max, and signs one upload URL per job', async () => {
     const { db, calls, rpcCalls, storageCalls } = fakeDb({
       'rpc.claim_verification_jobs': { data: [leased()] },
-      // The browser sends the monitor's custom headers too (S05).
-      'monitors.select': { data: [{ id: 'm1', headers: [{ name: 'Accept-Language', value: 'th' }] }] },
       'storage.createSignedUploadUrl': {
         data: { signedUrl: 'https://s.example.test/upload?token=t', token: 't' },
       },
@@ -30,7 +27,6 @@ describe('leaseJobs (GET /api/jobs)', () => {
         kind: 'verify',
         url: 'https://tubtong.example.test',
         mustContain: ['Tubtong'],
-        headers: [{ name: 'Accept-Language', value: 'th' }],
         upload: { url: 'https://s.example.test/upload?token=t', path: '2026-10/j1.jpg' },
       },
     ]);

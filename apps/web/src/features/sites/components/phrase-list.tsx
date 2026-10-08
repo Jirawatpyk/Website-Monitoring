@@ -43,7 +43,7 @@ export function PhraseList({
     setRefused(undefined);
   };
   return (
-    <div className="flex flex-col gap-2">
+    <div role="group" aria-label={title} className="flex flex-col gap-2">
       <span className="text-sm font-medium">{title}</span>
       {(phrases.length > 0 || locked) && (
         <div className="flex flex-wrap gap-1.5">
@@ -61,6 +61,7 @@ export function PhraseList({
       )}
       <div className="flex items-end gap-2">
         <TextField
+          touchHeight
           label={addLabel}
           placeholder={placeholder}
           className="min-w-0 grow"
@@ -74,7 +75,13 @@ export function PhraseList({
           }}
           error={refused ?? error}
         />
-        <Button variant="ghost" icon={<IconPlus />} disabled={!draft.trim()} onClick={add}>
+        <Button
+          variant="ghost"
+          icon={<IconPlus />}
+          disabled={!draft.trim()}
+          onClick={add}
+          aria-label={`Add to ${title}`}
+        >
           Add
         </Button>
       </div>

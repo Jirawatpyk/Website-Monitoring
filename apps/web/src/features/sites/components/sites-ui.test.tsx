@@ -48,10 +48,10 @@ describe('SitesTable', () => {
     expect(screen.getAllByText('OK').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Down').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Draft · not monitored').length).toBeGreaterThan(0);
-    const visit = screen.getAllByRole('link', { name: 'Visit EQHO (opens in a new tab)' })[0]!;
+    const visit = screen.getAllByRole('link', { name: 'Visit site: EQHO (opens in a new tab)' })[0]!;
     expect(visit).toHaveAttribute('href', 'https://eqho.example.com/');
     expect(visit).toHaveAttribute('target', '_blank');
-    expect(screen.queryByRole('link', { name: /Visit New one/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Visit site: New one/ })).not.toBeInTheDocument();
   });
 
   it('filters by tier and says when nothing matches', () => {
@@ -83,7 +83,7 @@ describe('PhraseList', () => {
     fireEvent.keyDown(field, { key: 'Enter' });
     expect(onChange).toHaveBeenLastCalledWith(['a.com', 'b.com']);
     fireEvent.change(field, { target: { value: 'nope' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Hosts' }));
     expect(screen.getByText('“nope” isn’t valid here')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Remove a.com' }));
     expect(onChange).toHaveBeenLastCalledWith([]);
@@ -254,7 +254,9 @@ describe('MonitorsEditor (EditMonitors)', () => {
     expect(screen.getAllByText('Key page · new').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Add header' }));
     fireEvent.change(screen.getByLabelText('Header name'), { target: { value: 'Cookie' } });
-    expect(screen.getByText('Not allowed here')).toBeInTheDocument();
+    expect(
+      screen.getByText('Set by the monitor itself or a credential — not allowed here'),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'x' } });
     fireEvent.click(screen.getByRole('button', { name: 'Remove header Cookie' }));
     fireEvent.click(screen.getByRole('switch', { name: 'Enabled' }));

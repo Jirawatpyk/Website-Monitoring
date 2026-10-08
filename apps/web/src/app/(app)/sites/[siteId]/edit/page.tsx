@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
-import { Alert, Breadcrumb, Button, Container, EmptyState, PageHeader } from '@jirawatpyk/aura-react';
-import { IconExternalLink, IconInbox } from '@jirawatpyk/aura-react/icons';
+import { notFound } from 'next/navigation';
+import { Alert, Breadcrumb, Button, Container, PageHeader } from '@jirawatpyk/aura-react';
+import { IconExternalLink } from '@jirawatpyk/aura-react/icons';
 import { formatTier, TIER_CONFIG } from '@dxt/shared';
 import { NoAccess } from '@/components/states';
 import { SiteForm } from '@/features/sites';
@@ -19,23 +20,14 @@ export default async function EditSitePage({
   searchParams,
 }: {
   params: Promise<{ siteId: string }>;
-  searchParams: Promise<{ draft?: string; started?: string }>;
+  searchParams: Promise<{ draft?: string; started?: string; saved?: string; stopped?: string }>;
 }) {
   const [{ siteId }, query, access] = await Promise.all([params, searchParams, getAccess()]);
   const [site, options] = await Promise.all([
     getSite(siteId),
     access.status === 'active' && access.profile.role === 'admin' ? getRegistrationOptions() : null,
   ]);
-  if (!site) {
-    return (
-      <EmptyState
-        icon={<IconInbox />}
-        title="Site not found"
-        description="The link may be wrong, or the site was deleted."
-        action={<Button href="/sites">Go to Sites</Button>}
-      />
-    );
-  }
+  if (!site) notFound();
   const isAdmin = access.status === 'active' && access.profile.role === 'admin';
   const every = TIER_CONFIG[site.tier].intervalSec / 60;
   const primaryUrl = site.monitors.find((m) => m.isPrimary)?.url;
@@ -51,7 +43,7 @@ export default async function EditSitePage({
             target="_blank"
             rel="noopener noreferrer"
             iconRight={<IconExternalLink />}
-            aria-label={`Visit ${site.name} (opens in a new tab)`}
+            aria-label={`Visit site: ${site.name} (opens in a new tab)`}
           >
             Visit site
           </Button>
@@ -60,7 +52,7 @@ export default async function EditSitePage({
       meta={
         site.live
           ? `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO · monitoring`
-          : `${formatTier(site.tier)} · Draft — not monitored yet`
+          : `${formatTier(site.tier)} · Draft · not monitored`
       }
     />
   );
@@ -82,6 +74,16 @@ export default async function EditSitePage({
     <Container>
       <div className="flex flex-col gap-6">
         {header}
+        {query.saved && (
+          <Alert tone="success" role="status" title="Changes saved">
+            Every change is in the audit log.
+          </Alert>
+        )}
+        {query.stopped && !site.live && (
+          <Alert tone="success" role="status" title="Monitoring stopped">
+            Checks have stopped and nobody is alerted about this site. Start monitoring again from this page.
+          </Alert>
+        )}
         {query.draft && !site.live && (
           <Alert tone="success" role="status" title="Draft saved">
             Nothing is checked until monitoring starts. Finish the checklist, then press Start monitoring.

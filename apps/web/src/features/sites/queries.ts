@@ -26,6 +26,7 @@ export async function listSites(): Promise<SiteListRow[]> {
        site_status(status, last_round_at),
        monitors(url, is_primary)`,
     )
+    .eq('monitors.is_primary', true)
     .order('name');
   if (error) throw new Error(`sites: ${error.message}`);
   return data.map((s) => {

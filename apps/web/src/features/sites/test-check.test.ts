@@ -31,6 +31,7 @@ function handler(access: Access, result: HttpCheckResult = pass) {
     access: async () => access,
     check,
     secretHeader: () => ({ name: 'X-DxT-Monitor', value: 's3cret' }),
+    knownHost: async (host) => host === 'eqho.example.com',
   });
   return { POST, check };
 }
@@ -66,6 +67,12 @@ describe('Test check route (D-025)', () => {
       mustNotContain: [],
     });
     expect(check.mock.calls[0]).not.toHaveProperty('0.allowPrivateTargets', true);
+  });
+
+  it('a host nobody monitors yet gets no secret header', async () => {
+    const { POST, check } = handler(admin);
+    await POST(post({ url: 'https://new.example.com', headers: [{ name: 'Accept-Language', value: 'th' }] }));
+    expect(check).toHaveBeenCalledWith(expect.objectContaining({ headers: { 'Accept-Language': 'th' } }));
   });
 
   it('a private target comes back refused (the probe’s SSRF guard)', async () => {

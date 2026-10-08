@@ -25,7 +25,7 @@ test.describe('register a site (local Supabase)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Add site' })).toBeVisible();
 
     await page.getByLabel('Site name').fill(`E2E site ${run}`);
-    await choose(page, 'Client', 'Internal (DxT group)');
+    await choose(page, 'Client', 'Internal');
     await page.getByRole('textbox', { name: /Primary URL/ }).fill(`https://example.com/?e2e=${run}`);
     await page.getByLabel('Hosting provider').fill('Example hosting');
     await page.getByLabel(/Must contain/).fill('Example Domain');
@@ -75,7 +75,7 @@ test.describe('register a site (local Supabase)', () => {
   test('the Sites list opens the site and refuses a private URL', async ({ page }) => {
     await page.goto('/sites/new');
     await page.getByLabel('Site name').fill(`E2E private ${crypto.randomUUID().slice(0, 8)}`);
-    await choose(page, 'Client', 'Internal (DxT group)');
+    await choose(page, 'Client', 'Internal');
     await page.getByRole('textbox', { name: /Primary URL/ }).fill('http://10.0.0.5/');
     await page.getByRole('button', { name: 'Save draft' }).click();
     await expect(page.getByRole('alert').filter({ hasText: 'Not saved' })).toContainText(

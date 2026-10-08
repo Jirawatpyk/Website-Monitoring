@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { ensureUser, localSupabaseEnabled, signIn } from './support/local-supabase';
+import { ensureUser, localSupabaseEnabled, signIn, anySiteId } from './support/local-supabase';
 
 /**
  * Rules every signed-in page shares, measured in the browser at 390 / 820 / 1440 — the things a
@@ -60,7 +60,11 @@ function headerGaps(page: Page) {
 function smallTargets(page: Page) {
   return page.evaluate((min) => {
     /** The taller of the control and the hit area AURA draws around it on a touch screen. */
-    const hitHeight = (el: HTMLElement) => {
+    const hitHeight = (control: HTMLElement) => {
+      // A field's input sits inside AURA's bordered box (.aura-input); a radio or checkbox inside its
+      // label row (.aura-choice / .aura-switch-row / label): that box is what a finger hits (S05, the first forms).
+      const el =
+        control.closest<HTMLElement>('.aura-input, .aura-choice, .aura-switch-row, label') ?? control;
       const after = getComputedStyle(el, '::after');
       const extra = after.content !== 'none' && after.position === 'absolute' ? parseFloat(after.height) : 0;
       return Math.max(el.getBoundingClientRect().height, Number.isNaN(extra) ? 0 : extra);
@@ -94,6 +98,9 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
     const pages = await livePages(desktop);
     await desktop.context().close();
     expect(pages).not.toHaveLength(0);
+    // Pages reached from a list, not the nav (S05 review): Add site, Edit site, Edit monitors.
+    const site = await anySiteId();
+    pages.push('/sites/new', `/sites/${site}/edit`, `/sites/${site}/monitors`);
 
     for (const width of WIDTHS) {
       const page = await signedInAt(browser, baseURL!, width);

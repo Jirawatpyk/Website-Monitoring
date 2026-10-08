@@ -74,7 +74,8 @@ A summary row `queued` with `hold_until` in the future is waiting for 15 min of 
 - **Before adding:** the owner and backup have signed in once and have a Google Chat id (`supabase/access/chat-ids.template.sql`); the client exists with its AM (`supabase/access/clients.template.sql`).
 - **Add:** Sites → Add site. Save draft keeps it unmonitored; Start monitoring is enabled once the registration checklist is complete (URL, brand keyword, owners with Chat ids, client + AM, hosting + credential reference). Run Test check first: it checks once from SIN and TYO and stores nothing.
 - **A wrong Start, or a site to retire:** Edit site → Stop monitoring. Checks stop at once and nobody is alerted; an open incident stays open (resolve it). For a short pause use maintenance / mute (S09).
-- **Delete:** only a Draft that was never monitored. Anything with history stays for the record — stop it instead.
+- **Delete:** only a stopped site with no check results or incidents. Anything with history stays for the record — stop it instead.
+- **Switch off or remove a key page:** resolve its open incident first; the save is refused while one is open.
 - **Every change** is one `audit_log` row per site / monitor / client row (`entity` = site, monitor or client).
 - **"This address points inside a private network":** the URL resolves to a private, loopback or metadata address — the probes never check those (SSRF guard).
 

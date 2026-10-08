@@ -101,8 +101,7 @@ export function SitesTable({ sites, canEdit }: SitesTableProps) {
             target="_blank"
             rel="noopener noreferrer"
             icon={<IconExternalLink />}
-            aria-label={`Visit ${s.name} (opens in a new tab)`}
-            title="Visit site"
+            aria-label={`Visit site: ${s.name} (opens in a new tab)`}
           >
             <span className="sr-only">Visit site</span>
           </Button>

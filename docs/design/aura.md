@@ -48,7 +48,11 @@ Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build proj
 
 ## Requests to AURA
 
-Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). All eight requests have shipped and DxT's workarounds are gone. None is open; a new request goes in the doc (template at its foot) and here.
+Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). The first eight requests have shipped. Open (S05, 8 Oct 2026; add it to the doc with the next batch):
+
+- **Breadcrumb links: touch hit area.** A crumb link is ~20 px tall; on a coarse pointer it should get the same 44 px `::after` hit area as `Button size="sm"`. Workaround: `.aura-crumbs a::after` in `apps/web/src/app/globals.css` — remove it when AURA ships this.
+
+A new request goes in the doc (template at its foot) and here.
 
 AURA 5.32 (requests 1–4, 6 Oct 2026):
 

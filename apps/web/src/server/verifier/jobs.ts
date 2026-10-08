@@ -1,12 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import {
-  leaseQuerySchema,
-  toMonitorHeaders,
-  verdictSchema,
-  type LeasedJob,
-  type MonitorHeader,
-} from '@dxt/shared';
+import { leaseQuerySchema, verdictSchema, type LeasedJob } from '@dxt/shared';
 import type { z } from 'zod';
 
 export type { LeasedJob };
@@ -45,19 +39,8 @@ export async function leaseJobs(
 
   const claimed = await db.rpc('claim_verification_jobs', { p_limit: max });
   if (claimed.error) throw new Error(`claim_verification_jobs: ${claimed.error.message}`);
-  const jobs = claimed.data ?? [];
-  // The browser sends the monitor's custom headers too (S05, D-025); at most 3 jobs, so one read.
-  const headersOf = new Map<string, MonitorHeader[]>();
-  if (jobs.length) {
-    const monitors = await db
-      .from('monitors')
-      .select('id, headers')
-      .in('id', [...new Set(jobs.map((j) => j.monitor_id))]);
-    if (monitors.error) throw new Error(`monitors: ${monitors.error.message}`);
-    for (const m of monitors.data ?? []) headersOf.set(m.id, toMonitorHeaders(m.headers));
-  }
   return Promise.all(
-    jobs.map(async (job): Promise<LeasedJob> => {
+    (claimed.data ?? []).map(async (job): Promise<LeasedJob> => {
       const path = screenshotPath(job);
       const signed = await db.storage.from(SCREENSHOT_BUCKET).createSignedUploadUrl(path);
       if (signed.error) console.error(JSON.stringify({ event: 'screenshot_url_failed', job: job.id }));
@@ -66,7 +49,6 @@ export async function leaseJobs(
         kind: job.kind === 'evidence' ? 'evidence' : 'verify',
         url: job.url,
         mustContain: job.must_contain,
-        headers: headersOf.get(job.monitor_id) ?? [],
         // Without an upload URL the job still runs: the verdict matters more than the picture.
         upload: signed.data ? { url: signed.data.signedUrl, path } : null,
       };

@@ -75,8 +75,6 @@ export const leasedJobSchema = z.object({
   kind: z.enum(['verify', 'evidence']),
   url: z.url(),
   mustContain: z.array(z.string()),
-  /** The monitor's custom headers, sent by the browser too (S05, D-025). */
-  headers: wireHeadersSchema,
   /** One PUT of a JPEG to `url` stores the screenshot; the token is only good for this path. */
   upload: z.object({ url: z.url(), path: z.string() }).nullable(),
 });

@@ -151,7 +151,7 @@ describe('SiteForm (Edit site)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stop monitoring' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveTextContent('Stop monitoring EQHO Academy?');
-    expect(dialog).toHaveTextContent('Owner and backup: Nok and Ploy');
+    expect(dialog).toHaveTextContent('Owner and backup: Arm and Ploy');
     await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Stop monitoring' })));
     expect(actions.setSiteMonitoring).toHaveBeenCalledWith(site.id, false);
   });

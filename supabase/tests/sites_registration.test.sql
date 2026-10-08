@@ -2,7 +2,7 @@
 -- the registration checklist at Start, Draft delete, monitor remove, and who may call the RPCs.
 begin;
 \ir _helpers.psql
-select plan(38);
+select plan(40);
 
 -- The ready-to-monitor check runs at commit and a test never commits: pg_temp.run fires the deferred
 -- checks right after the statement, as a commit would.
@@ -234,6 +234,30 @@ select lives_ok($$ update public.sites set muted_until = now() + interval '1 hou
                    where id = (select id from made where name = 'internal') $$,
   'an owner can still mute a live site whose backup has no Chat id');
 reset role;
+
+-- ── A monitor with an open incident stays; refused headers never reach the table ──
+select set_config('request.jwt.claims', '', true);  -- a script puts linked owners back
+update public.sites set primary_owner_id = (select id from ids where name = 'ploy'),
+  backup_owner_id = (select id from ids where name = 'arm') where id = (select id from made where name = 'internal');
+select tests.authenticate_as((select id from ids where name = 'admin'));
+select pg_temp.run($q$ select public.save_monitors((select id from made where name = 'internal'),
+  jsonb_build_array(jsonb_build_object('url', 'https://internal.pgtap.test/y')), '{}') $q$);
+reset role;
+insert into public.incidents (site_id, monitor_id, state, severity, episode_severity, trigger, started_at, detected_at)
+select (select id from made where name = 'internal'), m.id, 'unacked', 'problem', 'problem', 'key_page', now(), now()
+from public.monitors m where m.url = 'https://internal.pgtap.test/y';
+select tests.authenticate_as((select id from ids where name = 'admin'));
+select throws_ok(
+  $$ select pg_temp.run($q$ select public.save_monitors((select id from made where name = 'internal'), '[]',
+       array(select id from public.monitors where url = 'https://internal.pgtap.test/y')) $q$) $$,
+  'P0001', 'This monitor has an open incident — resolve it first', 'a key page with an open incident cannot be removed');
+select throws_ok(
+  $$ select pg_temp.run($q$ select public.save_monitors((select id from made where name = 'internal'),
+       jsonb_build_array(jsonb_build_object('url', 'https://internal.pgtap.test/z',
+         'headers', jsonb_build_array(jsonb_build_object('name', 'X-Api-Key', 'value', 'k')))), '{}') $q$) $$,
+  'P0001', 'A custom header can''t set that name or value', 'save_monitors refuses a credential-like header name');
+reset role;
+select set_config('request.jwt.claims', '', true);
 
 -- ── Edit site keeps notes it doesn't send ────────────────────────────────
 select set_config('request.jwt.claims', '', true);  -- a SQL script

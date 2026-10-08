@@ -14,7 +14,6 @@ const job = (over: Partial<LeasedJob> = {}): LeasedJob => ({
   kind: 'verify',
   url: 'https://tubtong.example.test',
   mustContain: ['Tubtong'],
-  headers: [],
   upload: { url: 'https://storage.example.test/upload/sign/2026-10/j1.jpg?token=t', path: '2026-10/j1.jpg' },
   ...over,
 });
@@ -84,7 +83,7 @@ describe('verifyJob', () => {
     const browser = browserOf(visit());
     const fetchImpl = vi.fn(async () => new Response(null, { status: 200 }));
     expect(await verifyJob(job(), { api, browser, fetchImpl, lookup })).toBe(true);
-    expect(browser.visit).toHaveBeenCalledWith('https://tubtong.example.test', 20_000, undefined);
+    expect(browser.visit).toHaveBeenCalledWith('https://tubtong.example.test', 20_000);
     expect(fetchImpl).toHaveBeenCalledWith(
       'https://storage.example.test/upload/sign/2026-10/j1.jpg?token=t',
       expect.objectContaining({ method: 'PUT', headers: { 'content-type': 'image/jpeg' } }),
@@ -149,22 +148,6 @@ describe('verifyJob', () => {
     expect(api.completeJob).toHaveBeenCalledWith(
       expect.objectContaining({ result: 'failed', detail: 'Target not allowed' }),
     );
-  });
-
-  it('opens the page with the monitor’s custom headers, refused names dropped (S05)', async () => {
-    const browser = browserOf(visit());
-    await verifyJob(
-      job({
-        headers: [
-          { name: 'Accept-Language', value: 'th' },
-          { name: 'Cookie', value: 'x' },
-        ],
-      }),
-      { api: fakeApi(), browser, fetchImpl: vi.fn(async () => new Response(null, { status: 200 })), lookup },
-    );
-    expect(browser.visit).toHaveBeenCalledWith('https://tubtong.example.test', 20_000, {
-      'Accept-Language': 'th',
-    });
   });
 
   it('skips the upload without a signed URL, and passes on a refused (late) verdict', async () => {

@@ -36,6 +36,7 @@ export default async function SitesPage() {
         {sites.length === 0 ? (
           <EmptyState
             icon={<IconMonitor />}
+            headingLevel={2}
             title="No sites yet"
             description={
               isAdmin

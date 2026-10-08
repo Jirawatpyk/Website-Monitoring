@@ -5,6 +5,7 @@ import {
   defaultSlowMs,
   isRefusedHeader,
   itemsLeftText,
+  keyPagePathSchema,
   keyPageUrl,
   monitorFormSchema,
   monitorHeadersSchema,
@@ -41,19 +42,35 @@ describe('normalizeMonitorUrl', () => {
     expect(monitorUrlKey('https://EQHO.example.com/')).toBe(monitorUrlKey('https://eqho.example.com'));
   });
 
+  // Security review L1: a key page never leaves the site.
+  it.each(['//evil.example/x', '/\\evil.example/x'])(
+    'refuses a key page path %s that would leave the site',
+    (path) => {
+      expect(() => keyPageUrl('https://eqho.example.com/', path)).toThrow();
+      expect(keyPagePathSchema.safeParse(path).success).toBe(false);
+    },
+  );
+
   it('builds a key page on the primary URL’s origin', () => {
     expect(keyPageUrl('https://eqho.example.com/th/', '/contact')).toBe('https://eqho.example.com/contact');
   });
 });
 
 describe('custom headers (D-025)', () => {
-  it.each(['User-Agent', 'host', 'Cookie', 'Authorization', 'x-dxt-monitor', 'Content-Length'])(
-    'refuses %s',
-    (name) => {
-      expect(isRefusedHeader(name)).toBe(true);
-      expect(monitorHeadersSchema.safeParse([{ name, value: 'x' }]).success).toBe(false);
-    },
-  );
+  it.each([
+    'User-Agent',
+    'host',
+    'Cookie',
+    'Authorization',
+    'x-dxt-monitor',
+    'Content-Length',
+    'X-Api-Key',
+    'X-Auth-Token',
+    'CF-Access-Client-Secret',
+  ])('refuses %s', (name) => {
+    expect(isRefusedHeader(name)).toBe(true);
+    expect(monitorHeadersSchema.safeParse([{ name, value: 'x' }]).success).toBe(false);
+  });
 
   it('refuses a renamed probe secret header too', () => {
     expect(isRefusedHeader('X-Probe-Key', 'X-Probe-Key')).toBe(true);

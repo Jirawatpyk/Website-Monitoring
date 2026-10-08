@@ -215,24 +215,16 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
     label: p.linked ? p.name : `${p.name} · no Chat id`,
     disabled: !p.linked,
   }));
-  const ownerNames = [person(primaryOwnerId)?.name, person(backupOwnerId)?.name]
-    .filter(Boolean)
-    .join(' and ');
   const interval = TIER_CONFIG[tier].intervalSec / 60;
 
   return (
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
       <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
-        {result && !result.ok && (
-          <Alert tone="danger" role="alert" title="Not saved">
-            {result.message}
-          </Alert>
-        )}
-
         <Card title="Site" headingLevel={2}>
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <TextField
+                touchHeight
                 label="Site name"
                 required
                 value={name}
@@ -240,6 +232,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                 error={err('name')}
               />
               <Select
+                touchHeight
                 label="Client"
                 required
                 placeholder="Choose the client"
@@ -252,6 +245,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                 error={err('clientId')}
               />
               <TextField
+                touchHeight
                 label="Primary URL"
                 required
                 icon={<IconExternalLink />}
@@ -268,6 +262,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                 }
               />
               <TextField
+                touchHeight
                 label="Hosting provider"
                 required
                 value={hosting}
@@ -275,6 +270,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
               />
             </div>
             <TextField
+              touchHeight
               label="Credential reference"
               required
               placeholder="e.g. 1Password › Internal › Site name"
@@ -287,6 +283,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
 
         <Card title="Tier" headingLevel={2}>
           <RadioGroup
+            touchHeight
             label="Tier sets check interval, response hours and escalation timers"
             options={TIERS}
             value={String(tier)}
@@ -298,6 +295,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
           <div className="flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <Select
+                touchHeight
                 label="Primary owner"
                 required
                 placeholder="Choose the owner"
@@ -306,6 +304,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                 onChange={(e) => setPrimaryOwnerId(e.target.value)}
               />
               <Select
+                touchHeight
                 label="Backup owner"
                 required
                 placeholder="Choose the backup"
@@ -323,6 +322,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
               />
               {client && !client.internal ? (
                 <Select
+                  touchHeight
                   label="Account manager"
                   disabled
                   options={[{ value: 'am', label: client.amName ?? 'Not set' }]}
@@ -335,11 +335,12 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                 />
               ) : (
                 <Select
+                  touchHeight
                   label="Account manager"
                   disabled
                   options={[{ value: 'none', label: 'None' }]}
                   value="none"
-                  hint="Internal site — not needed"
+                  hint={client ? 'Internal site — not needed' : 'Choose the client first'}
                 />
               )}
             </div>
@@ -384,6 +385,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
               </span>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Select
+                  touchHeight
                   label="Method"
                   options={['GET', 'HEAD']}
                   value={method}
@@ -391,12 +393,14 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                   error={err('primary.method')}
                 />
                 <TextField
+                  touchHeight
                   label="Expected status"
                   value="2xx–3xx"
                   disabled
                   hint="Fixed: 4xx on a key page → PROBLEM, 5xx → hard fail"
                 />
                 <TextField
+                  touchHeight
                   label="Timeout"
                   inputMode="numeric"
                   suffix="s"
@@ -407,6 +411,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <TextField
+                  touchHeight
                   label="Must contain (brand keyword)"
                   required
                   placeholder="Brand name or page title"
@@ -415,6 +420,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                   hint="Missing → PROBLEM (Keyword)"
                 />
                 <TextField
+                  touchHeight
                   label="Must not contain"
                   value={mustNot}
                   onChange={(e) => setMustNot(e.target.value)}
@@ -422,6 +428,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                 />
               </div>
               <TextField
+                touchHeight
                 label="Allowed redirect domains"
                 placeholder="site domain, CDN domain"
                 value={redirects}
@@ -439,7 +446,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                     className="flex items-center gap-3 rounded-aura-md border border-border-default px-3.5 py-1 text-sm"
                   >
                     <span className="grow font-mono text-xs">{k}</span>
-                    <span className="text-fg-secondary">Expect 2xx</span>
+                    <span className="text-fg-secondary">Expect 2xx–3xx</span>
                     <IconButton
                       icon={<IconTrash2 />}
                       label={`Remove ${k}`}
@@ -455,6 +462,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                 )}
                 <div className="flex flex-wrap items-end gap-2">
                   <TextField
+                    touchHeight
                     label="Key page path"
                     placeholder="/contact"
                     className="min-w-0 grow"
@@ -520,6 +528,11 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
               })}
             </ul>
             <div className="flex flex-col gap-2 border-t border-border-default pt-3">
+              {result && !result.ok && !confirm && (
+                <Alert tone="danger" role="alert" title="Not saved">
+                  {result.message}
+                </Alert>
+              )}
               {editing ? (
                 <EditActions
                   live={live}
@@ -528,7 +541,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                   onSave={() =>
                     run(
                       () => updateSite({ siteId: site.id, site: siteInput() }),
-                      () => router.refresh(),
+                      () => router.replace(`/sites/${site.id}/edit?saved=1`),
                     )
                   }
                   onStart={() =>
@@ -558,9 +571,11 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                   Start monitoring
                 </Button>
               )}
-              {left.length > 0 && !live && (
+              {left.length > 0 && (
                 <span className="text-center text-xs leading-normal text-alert-warning-fg">
-                  {itemsLeftText(checklist)}
+                  {live
+                    ? `A monitored site can’t be saved without: ${left.map((i) => i.short).join(', ')}`
+                    : itemsLeftText(checklist)}
                 </span>
               )}
               {started && (
@@ -585,6 +600,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
         </Card>
 
         <TestCheckCard
+          beforeStart={!editing}
           request={
             editing && primary
               ? {
@@ -647,7 +663,11 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
             role="alertdialog"
             size="sm"
             title={`Stop monitoring ${site.name}?`}
-            description={ownerNames ? `Owner and backup: ${ownerNames}` : undefined}
+            description={
+              [site.ownerName, site.backupName].filter(Boolean).length
+                ? `Owner and backup: ${[site.ownerName, site.backupName].filter(Boolean).join(' and ')}`
+                : undefined
+            }
             footer={
               <>
                 <Button variant="secondary" onClick={() => setConfirm(null)}>
@@ -661,7 +681,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
                       () => setSiteMonitoring(site.id, false),
                       () => {
                         setConfirm(null);
-                        router.replace(`/sites/${site.id}/edit`);
+                        router.replace(`/sites/${site.id}/edit?stopped=1`);
                       },
                     )
                   }
@@ -671,6 +691,11 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
               </>
             }
           >
+            {result && !result.ok && (
+              <Alert tone="danger" role="alert" title="Not done">
+                {result.message}
+              </Alert>
+            )}
             <p className="m-0 text-sm leading-normal">
               Checks stop now and nobody is alerted about this site. An open incident stays open. You can
               start monitoring again from this page.
@@ -703,6 +728,11 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
               </>
             }
           >
+            {result && !result.ok && (
+              <Alert tone="danger" role="alert" title="Not done">
+                {result.message}
+              </Alert>
+            )}
             <p className="m-0 text-sm leading-normal">
               The draft and its monitors are removed. This can’t be undone; the audit log keeps a record.
             </p>

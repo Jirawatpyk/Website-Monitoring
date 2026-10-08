@@ -59,6 +59,12 @@ export async function ensureUser(email: string): Promise<string> {
   return created.id;
 }
 
+/** A seeded site's id (layout checks of the pages under /sites). */
+export async function anySiteId(): Promise<string> {
+  const [site] = (await admin('/rest/v1/sites?select=id&order=name&limit=1')) as { id: string }[];
+  return site!.id;
+}
+
 /** Set a profile's is_active through the local service role. */
 export async function setActive(userId: string, isActive: boolean): Promise<void> {
   await admin(`/rest/v1/profiles?id=eq.${userId}`, {
