@@ -214,6 +214,19 @@ export async function getSite(siteId: string): Promise<SiteRecord | null> {
 }
 
 /**
+ * The sidebar's Sites count (spec §20, §21.2): monitored sites, drafts left out. A head count — no
+ * rows travel. Null if it can't be read, so the nav just shows no number.
+ */
+export async function countMonitoredSites(): Promise<number | null> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from('sites')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_active', true);
+  return error ? null : count;
+}
+
+/**
  * Whether the alerts Chat Space is set up — the empty Sites list's first setup step. Read on its own,
  * like `probeAllowlistInfo`, so the page doesn't need every server secret.
  */

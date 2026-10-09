@@ -40,8 +40,8 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         label: 'Overview',
         icon: <IconLayoutDashboard />,
         href: '/',
-        slice: 'S06',
-        // The landing page: live from S01 as a placeholder, real dashboard in S06.
+        slice: 'S06b',
+        // The landing page: live from S01 as a placeholder, the real dashboard since S06b.
         live: true,
       },
       {
@@ -127,6 +127,33 @@ export const NAV_SECTIONS: NavSections = SECTIONS.map(({ title, items }) => ({
   title,
   items: items.filter((item) => item.live).map(({ id, label, icon, href }) => ({ id, label, icon, href })),
 })).filter((section) => section.items.length > 0);
+
+/** Counts beside nav items (spec §20, §21.2): Sites = monitored sites, drafts left out. */
+export interface NavCounts {
+  sites?: number;
+}
+
+/** The sections with their counts filled in; a count of 0 isn't shown. */
+export function navSectionsWithCounts(counts: NavCounts): NavSections {
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.map((item) =>
+      item.id === 'sites' && counts.sites ? { ...item, count: counts.sites } : item,
+    ),
+  }));
+}
+
+/** The phone boards' four sections, in their order (D-018, D-031): Overview, Incidents, Sites, On-call. */
+const PHONE_SECTIONS = ['overview', 'incidents', 'sites', 'oncall'] as const;
+
+/**
+ * BottomNav items below lg: the phone sections whose pages exist (D-032 — Incidents joins with S07,
+ * On-call with S10). AURA needs 2 to 5.
+ */
+export const BOTTOM_NAV_ITEMS = PHONE_SECTIONS.flatMap((id) => {
+  const entry = SECTIONS.flatMap((section) => section.items).find((item) => item.id === id);
+  return entry?.live ? [{ id: entry.id, label: entry.label, icon: entry.icon, href: entry.href }] : [];
+});
 
 /**
  * The nav item for the current path (SideNav `value`): exact match or a sub-page, longest href wins;
