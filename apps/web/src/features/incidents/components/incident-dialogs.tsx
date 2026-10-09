@@ -467,10 +467,11 @@ export function ResolveDialog({
       )}
       {done?.kind === 'resolved' ? (
         <div className="flex flex-col gap-2">
-          <p
-            role="status"
-            className="sr-only"
-          >{`Resolved. Posting to Chat and email in a few seconds — nothing is sent until then`}</p>
+          <p role="status" className="sr-only">
+            {postedAt
+              ? `Posted to Chat and email at ${formatTimeWithSeconds(new Date(postedAt))}`
+              : 'Resolved. Posting to Chat and email in a few seconds — nothing is sent until then'}
+          </p>
           <p
             ref={doneTitle}
             tabIndex={-1}

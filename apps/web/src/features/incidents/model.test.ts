@@ -375,6 +375,14 @@ describe('resolveGate (T10, D-033)', () => {
     const i = { ...gateBase, state: 'monitoring' as const, recoveredAt: at('25T10:40:00') };
     expect(okTwoRoundsAt(i, [ev('ok_two_rounds', '25T10:32:10')])).toBeNull();
   });
+  it('once resolved the card still reads "2 rounds done", not "waiting" (S07 /verify)', () => {
+    const g = resolveGate(
+      { ...gateBase, state: 'resolved', recoveredAt: at('25T10:31:00'), rootCauseCategory: 'dns' },
+      [ev('ok_two_rounds', '25T10:32:10')],
+      nameOf,
+    );
+    expect(g.conditions[0]).toMatchObject({ met: true, detail: 'OK since 10:31 · 2 rounds done 10:32' });
+  });
   it('client update required and not marked (S11): locked on it', () => {
     const g = resolveGate(
       { ...gateBase, state: 'needs_root_cause', recoveredAt: at('25T10:31:00'), clientUpdateRequired: true },

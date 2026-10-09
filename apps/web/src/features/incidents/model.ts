@@ -381,7 +381,10 @@ export interface GateIncident {
  * root cause — exactly what `resolve_incident` checks, so the button and the database agree.
  */
 export function okTwoRoundsAt(i: GateIncident, events: readonly EventRow[]): string | null {
-  if (!i.recoveredAt || (i.state !== 'monitoring' && i.state !== 'needs_root_cause')) return null;
+  // Still in a drop (Unacked / Escalated / Acknowledged): an earlier recovery's rounds don't count.
+  if (!i.recoveredAt || i.state === 'unacked' || i.state === 'escalated' || i.state === 'acknowledged') {
+    return null;
+  }
   const since = new Date(i.recoveredAt).getTime();
   const ok = events
     .filter((e) => e.type === 'ok_two_rounds' && new Date(e.at).getTime() >= since)
