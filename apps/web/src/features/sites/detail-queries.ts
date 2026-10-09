@@ -45,7 +45,8 @@ const LOG_ROWS = 6;
 const INCIDENT_ROWS = 200;
 const DAY_MS = 86_400_000;
 
-function slowMsOf(thresholds: unknown): number | null {
+/** A monitor's own slow limit (ms), if it has one; else the tier default applies. */
+export function slowMsOf(thresholds: unknown): number | null {
   const v = (thresholds as { slowMs?: unknown } | null)?.slowMs;
   return typeof v === 'number' && v > 0 ? v : null;
 }
@@ -90,7 +91,7 @@ function assertionsOf(
  * or resolved after `from`, may hold drops inside the window. `siteIds` null = every readable site.
  * Paged: PostgREST answers 1,000 rows a request.
  */
-export async function downEpisodesBySite(supabase: Client, siteIds: readonly string[] | null, from: Date) {
+export async function downEpisodesBySite(supabase: DbClient, siteIds: readonly string[] | null, from: Date) {
   const out = new Map<string, ReturnType<typeof downEpisodesFromTimeline>>();
   if (siteIds?.length === 0) return out;
   const data = await fetchAllPages(
