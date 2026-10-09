@@ -228,7 +228,7 @@ export function IncidentsList({ incidents, sites, nowIso, viewer, initialView }:
             value={kpis.mttrMinutes !== null ? formatDuration(kpis.mttrMinutes) : '—'}
             caption={
               kpis.mttrMinutes !== null
-                ? 'DOWN only · median · first failed check → recovered'
+                ? 'DOWN only · median · minutes down'
                 : 'Not enough incidents yet'
             }
             icon={<IconRotateCcw />}

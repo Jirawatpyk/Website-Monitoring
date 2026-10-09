@@ -33,6 +33,13 @@ body {
   }
 }
 
+/* DataTable's row link (getRowHref) draws its focus ring 2 px outside itself, but the cell clips its
+   content (overflow: hidden) and the link sits on the cell's edge, so the ring lost its left side
+   (S07 /verify). Draw it inside the link instead; AURA request in docs/design/aura.md. */
+.aura-table__row-link:focus-visible {
+  outline-offset: calc(-1 * var(--aura-focus-ring-width));
+}
+
 /* BottomNav away (components/app-shell/phone-nav.tsx). Scrolled away: sticky bars and toasts sit on the
    safe area instead. A page with its own bottom action bar ([data-hides-bottomnav], the incident page)
    keeps it away for good — no spacer, not focusable — in CSS, so there is no shift after load.

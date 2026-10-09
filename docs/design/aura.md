@@ -55,6 +55,8 @@ Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://c
 - **Request 14 — BottomNav hides on scroll and for a page's own bottom bar** (S06b). Workaround: `components/app-shell/phone-nav.tsx` (scroll listener, `data-bottomnav-hidden`) and the `data-hides-bottomnav` rules in `app/globals.css` — remove both when AURA ships it.
 - **Request 11 — Breadcrumb links: touch hit area** (S05). A crumb link is ~20 px tall; on a coarse pointer it should get the same 44 px `::after` hit area as `Button size="sm"`. Workaround: `.aura-crumbs a::after` in `apps/web/src/app/globals.css` — remove it when AURA ships this.
 
+- **Request 15 — DataTable row link: focus ring clipped** (S07 `/verify`). `.aura-table__row-link:focus-visible` draws its outline 2 px outside the link, the cell clips (`overflow: hidden`) and the link sits on the cell's left edge, so the ring loses its left side. Ask for an inset ring (`outline-offset: -width`) or cell padding room. Workaround: the `.aura-table__row-link:focus-visible` rule in `apps/web/src/app/globals.css` — remove it when AURA ships this.
+
 A new request goes in the doc (template at its foot) and here.
 
 AURA 5.32 (requests 1–4, 6 Oct 2026):

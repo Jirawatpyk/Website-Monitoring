@@ -503,9 +503,12 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
           <div
             role="group"
             aria-label="Filter sites"
-            // a row of chips that scrolls on purpose (layout-consistency skips it)
+            // a row of chips that scrolls on purpose (layout-consistency skips it); py-1 / scroll-px-4 leave
+            // room for a chip's focus ring when the row clips or scrolls it into view (S07 /verify)
             data-scroll-x
-            className="-mx-aura-4 flex min-w-0 grow gap-2 overflow-x-auto px-aura-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            // Tab doesn't scroll a chip that is only partly cut off: bring the focused one fully in
+            onFocus={(e) => e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+            className="-mx-aura-4 -my-1 flex min-w-0 grow scroll-px-4 gap-2 overflow-x-auto px-aura-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {STATUS_CHIPS.filter((c) => c.value !== 'ok').map((c) => (
               <Tag
