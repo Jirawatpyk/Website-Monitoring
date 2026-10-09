@@ -388,7 +388,7 @@ describe('Recent events (§21.6, §16.11, D-032)', () => {
     const list = Array.from({ length: 10 }, (_, n) =>
       ev(n % 3 === 0 ? 'google_chat' : 'acknowledged', { id: `e${n}`, at: at(`09:${String(10 + n)}`) }),
     );
-    const out = recentEvents(list);
+    const out = recentEvents(list, NOW);
     expect(out).toHaveLength(6);
     expect(out[0]).toEqual({ id: 'e8', time: '09:18', text: 'INC-0140 acked by Nok' });
   });

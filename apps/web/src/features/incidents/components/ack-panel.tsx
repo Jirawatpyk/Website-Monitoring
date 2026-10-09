@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from 'reac
 import { useRouter } from 'next/navigation';
 import { Alert, Button } from '@jirawatpyk/aura-react';
 import { IconCheck, IconClock, IconRotateCcw, IconUser } from '@jirawatpyk/aura-react/icons';
-import { formatTimeWithSeconds, UNDO_WINDOW_SEC } from '@dxt/shared';
+import { formatTimeWithSeconds } from '@dxt/shared';
+import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge } from '../actions';
 import type { AckState } from '../view';
 
@@ -25,28 +26,6 @@ const POLL_MS = 15_000;
 const POLL_FOR_MS = 11 * 60_000;
 /** Past this the copy says it's still being tried rather than "now". */
 const LATE_AFTER_MS = 30_000;
-
-/**
- * Whole seconds left until `iso`. The clock starts on the client (null on the server and in the
- * first render, so hydration matches: the full window shows until the first tick, right after).
- */
-function useSecondsLeft(iso: string | null): number {
-  const [now, setNow] = useState<number | null>(null);
-  const target = iso ? new Date(iso).getTime() : 0;
-  useEffect(() => {
-    if (!iso) return;
-    const tick = () => setNow(Date.now());
-    const first = setTimeout(tick, 0);
-    const timer = setInterval(tick, 1000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(timer);
-    };
-  }, [iso]);
-  if (!iso) return 0;
-  if (now === null) return UNDO_WINDOW_SEC;
-  return Math.max(0, Math.ceil((target - now) / 1000));
-}
 
 /**
  * The ack card, the Undo countdown and the sticky action bar of MobileAck (spec §14.3, §15.6,

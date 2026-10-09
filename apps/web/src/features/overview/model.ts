@@ -3,6 +3,8 @@ import {
   formatIncidentId,
   formatPercent,
   formatTime,
+  formatWhen,
+  isSameBangkokDay,
   TRIGGER_LABELS,
   type Role,
 } from '@dxt/shared';
@@ -407,13 +409,17 @@ export const EVENT_TYPES = [
 /** Newest first, at most `max` (Main3: 7); events only grow (§16.11). */
 export function recentEvents(
   events: readonly OverviewEvent[],
+  now: Date,
   max = 7,
 ): { id: string; time: string; text: string }[] {
   return [...events]
     .sort((a, b) => b.at.localeCompare(a.at))
     .flatMap((e) => {
       const text = eventLine(e);
-      return text ? [{ id: e.id, time: formatTime(new Date(e.at)), text }] : [];
+      const at = new Date(e.at);
+      return text
+        ? [{ id: e.id, time: isSameBangkokDay(at, now) ? formatTime(at) : formatWhen(at, now), text }]
+        : [];
     })
     .slice(0, max);
 }
