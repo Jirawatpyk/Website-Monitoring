@@ -622,6 +622,11 @@ isOneToOne: false
 "open_system_alert":
 { Args: { "p_context": Json,"p_kind": string }; Returns: string
                            },
+"overview_response_24h":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "bucket_starts": (string)[],"checks": (number)[],"hard_fails": (number)[],"p50_ms": (number)[],"site_id": string
+            }[]
+                           },
 "owns_site":
 { Args: { "p_site_id": string }; Returns: boolean
                            },
