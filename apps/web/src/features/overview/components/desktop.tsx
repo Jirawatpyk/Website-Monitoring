@@ -263,7 +263,7 @@ function ResponseCell({ site }: { site: OverviewSite }) {
         label={label}
       />
       <span
-        className={`text-xs tabular-nums ${site.status === 'problem' ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}
+        className={`shrink-0 whitespace-nowrap text-xs tabular-nums ${site.status === 'problem' ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}
       >
         {site.p50Ms === null ? '—' : formatMs(site.p50Ms)}
       </span>
@@ -373,7 +373,8 @@ export function LiveIssuesTable({
                   key={site.id}
                   className="relative hover:bg-bg-surface-hover has-[a.overview-row:focus-visible]:outline-2 has-[a.overview-row:focus-visible]:-outline-offset-2 has-[a.overview-row:focus-visible]:outline-focus-ring"
                 >
-                  <Td className="min-w-56">
+                  {/* 14rem at 820 (Owner and Response hidden); 11rem from xl so Site · why keeps its room */}
+                  <Td className="min-w-56 xl:min-w-44">
                     <span className="flex flex-col items-start gap-1">
                       {site.status ? (
                         <SiteStatusBadge status={site.status} />
@@ -437,7 +438,7 @@ export function LiveIssuesTable({
                   <Td>
                     <GlyphRow locations={site.locations} />
                   </Td>
-                  <Td className="max-xl:hidden">
+                  <Td className="whitespace-nowrap max-xl:hidden">
                     <ResponseCell site={site} />
                   </Td>
                   <Td align="end">

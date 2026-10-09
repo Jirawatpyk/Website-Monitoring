@@ -10,7 +10,8 @@ import { ensureUser, localSupabaseEnabled, signIn, anySiteId, busySiteId } from 
  * - touch targets ≥ 44 px below lg (spec §14.17), counting the hit area AURA adds around a compact
  *   control on a touch screen (`::after` under pointer: coarse);
  * - no sideways scroll at any width — the page, and any box inside it such as a table's scroll area
- *   (S05c /verify: the Sites table scrolled 2 px at 820 and 30 px at 1440 while the page didn't).
+ *   (S05c /verify: the Sites table scrolled 2 px at 820 and 30 px at 1440 while the page didn't);
+ * - no short text squeezed a character or two a line (S06b production, the Live issues p50).
  * Below lg each width runs as a touch device (isMobile + hasTouch), as a phone or tablet would.
  * The pages come from the live nav, so each page a slice flips `live` is checked from then on.
  * Signs in as the seeded Admin to see every page. Local Supabase only (E2E_LOCAL_SUPABASE=1).
@@ -103,6 +104,32 @@ function boxesPastEdge(page: Page) {
   });
 }
 
+/**
+ * Short text squeezed into a sliver of a table or flex row, one or two characters a line (S06b
+ * production: the Live issues p50 "628 ms" stood 11 px wide and 80 px tall at 1440).
+ */
+function squeezedText(page: Page) {
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('main *'))
+      .filter((el) => {
+        const own = Array.from(el.childNodes)
+          .filter((n) => n.nodeType === Node.TEXT_NODE)
+          .map((n) => n.textContent ?? '')
+          .join('')
+          .trim();
+        if (own.length < 3 || own.length > 40) return false;
+        const r = el.getBoundingClientRect();
+        const line = parseFloat(getComputedStyle(el).lineHeight) || 20;
+        return r.width > 0 && r.height > line * 2.5 && r.width < line * 1.5;
+      })
+      .slice(0, 5)
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return `"${el.textContent?.trim()}" ${Math.round(r.width)}×${Math.round(r.height)}`;
+      }),
+  );
+}
+
 /** Visible block-level controls whose tap area is shorter than a touch target. */
 function smallTargets(page: Page) {
   return page.evaluate((min) => {
@@ -166,6 +193,7 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
           expect(scroll, 'no sideways scroll').toBeLessThanOrEqual(0);
           expect(await sidewaysBoxes(page), 'no box inside the page scrolls sideways').toEqual([]);
           expect(await boxesPastEdge(page), 'no box reaches past the screen edge').toEqual([]);
+          expect(await squeezedText(page), 'no text squeezed a character or two a line').toEqual([]);
 
           const gaps = await headerGaps(page);
           expect(gaps, 'the page starts with AURA PageHeader').not.toBeNull();
