@@ -106,7 +106,7 @@ describe('Acknowledged email (EmailAlert, D-016)', () => {
 });
 
 describe('Recovered email (EmailAlert, spec §16.4, D-016)', () => {
-  it('has the board facts for the owner, without the root-cause button (S07)', () => {
+  it('has the board facts for the owner, and "Add root cause" first (S07)', () => {
     const m = recovered();
     expect(m.html).toContain('RECOVERED — MuvMi back at 10:31 · down 43 min · root cause needed');
     expect(m.text).toContain(
@@ -119,10 +119,10 @@ describe('Recovered email (EmailAlert, spec §16.4, D-016)', () => {
         'Acknowledged: Arm at 10:07',
         'Still to do: Root cause (Arm)',
         '',
+        'Add root cause: https://monitor.example.test/incidents/inc-1#resolve',
         'Open incident: https://monitor.example.test/incidents/inc-1',
       ].join('\n'),
     );
-    expect(m.text).not.toContain('Add root cause');
   });
 
   it('tells everyone else nothing is needed, and leaves out a missing ack or owner', () => {
