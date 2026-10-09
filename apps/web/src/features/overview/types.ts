@@ -20,7 +20,11 @@ export interface OverviewIncident {
   id: string;
   number: number;
   state: 'unacked' | 'escalated' | 'acknowledged' | 'monitoring' | 'needs_root_cause';
+  /** The incident's severity (it only goes up, D-021). */
   severity: 'down' | 'problem';
+  /** The severity of the drop it is in now — a key page still failing after the home page came back is a
+   * PROBLEM drop on a DOWN incident (D-023). */
+  dropSeverity: 'down' | 'problem';
   trigger: Trigger;
   level: number;
   /** First failed check of the drop it is in now — a relapse or an escalation starts its own (spec
@@ -77,6 +81,8 @@ export interface OverviewEvent {
   severity: 'down' | 'problem';
   trigger: Trigger;
   siteName: string;
+  /** The incident resolved itself (a short PROBLEM, §19.6): its RECOVERED and auto-resolve share one line. */
+  autoResolved: boolean;
 }
 
 /** The header pill (D-032): probe locations beating and the verifier. */

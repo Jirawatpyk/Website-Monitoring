@@ -85,9 +85,31 @@ describe('responseKpis (spec §21.3, PRD §2 means, D-032)', () => {
     expect(k.mttdSeconds === null ? null : formatDurationSeconds(k.mttdSeconds)).toBe(expected.mttd);
   });
 
-  it('never counts a negative wait (clock skew between the engine and an ack)', () => {
-    const k = responseKpis([inc({ ackedAt: at('2026-09-25T09:48:00') }), muvmi, muvmi], FROM, NOW);
-    expect(k.mttaSeconds).toBeCloseTo((0 + 1099 + 1099) / 3);
+  it('a PROBLEM raised to DOWN (D-021): MTTD from the outage start, not the PROBLEM start', () => {
+    const raised = inc({
+      startedAt: at('2026-09-25T09:30:00'), // slow since 09:30
+      downStartedAt: at('2026-09-25T09:47:41'),
+      detectedAt: at('2026-09-25T09:48:41'),
+    });
+    const k = responseKpis([raised, muvmi, muvmi], FROM, NOW);
+    expect(formatDurationSeconds(k.mttdSeconds!)).toBe('1 min'); // not 18 min 41 s
+    expect(formatDurationSeconds(k.mttaSeconds!)).toBe('18 min 19 s');
+  });
+
+  it('acknowledged while still a PROBLEM, then raised to DOWN: left out of MTTA, not counted as 0', () => {
+    const ackedEarly = inc({ ackedAt: at('2026-09-25T09:40:00') });
+    const k = responseKpis([ackedEarly, muvmi, muvmi], FROM, NOW);
+    expect(k.downCount).toBe(3);
+    expect(formatDurationSeconds(k.mttaSeconds!)).toBe('18 min 19 s');
+  });
+
+  it('an outage that started inside the window counts, even if its PROBLEM began before it', () => {
+    const k = responseKpis(
+      [inc({ startedAt: at('2026-08-20T10:00:00'), downStartedAt: at('2026-09-20T10:00:00') }), muvmi, muvmi],
+      FROM,
+      NOW,
+    );
+    expect(k.downCount).toBe(3);
   });
 });
 

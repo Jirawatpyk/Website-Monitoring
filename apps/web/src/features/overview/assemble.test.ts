@@ -71,53 +71,90 @@ describe('chainStreakStart', () => {
   });
 });
 
-describe('currentDrop (D-004 relapse, D-021 escalation)', () => {
-  const started = '2026-09-25T03:12:00Z';
-  it('the first drop: the incident start and the detected cause', () => {
+describe('currentDrop (D-004 relapse, D-021 escalation, D-023)', () => {
+  const incident = { startedAt: '2026-09-25T02:47:41Z', severity: 'down' as const };
+  it('the first drop: the incident start, severity and the detected cause', () => {
     expect(
       currentDrop(
-        [{ type: 'detected', at: '2026-09-25T03:12:40Z', payload: { cause: 'HTTP 503 (BKK, SIN, TYO)' } }],
-        started,
+        [{ type: 'detected', at: '2026-09-25T02:48:41Z', payload: { cause: 'HTTP 503 (BKK, SIN, TYO)' } }],
+        incident,
       ),
-    ).toEqual({ startedAt: started, cause: 'HTTP 503 (BKK, SIN, TYO)', summary: null });
+    ).toEqual({
+      startedAt: incident.startedAt,
+      severity: 'down',
+      cause: 'HTTP 503 (BKK, SIN, TYO)',
+      summary: null,
+    });
   });
-  it('a relapse: its own start and cause (VOCA drops again at 03:55)', () => {
+  it('a relapse: its own start, severity and cause (VOCA drops again at 03:55)', () => {
     const events = [
       { type: 'detected', at: '2026-09-25T03:12:40Z', payload: { cause: 'HTTP 503 (BKK, SIN, TYO)' } },
       { type: 'acknowledged', at: '2026-09-25T03:20:00Z', payload: {} },
       {
         type: 'relapsed',
         at: '2026-09-25T03:55:40Z',
-        payload: { cause: 'Timeout > 30 s (BKK, TYO)', startedAt: '2026-09-25T03:55:00Z' },
+        payload: { cause: 'Timeout > 30 s (BKK, TYO)', startedAt: '2026-09-25T03:55:00Z', severity: 'down' },
       },
     ];
-    expect(currentDrop(events, started)).toEqual({
+    expect(currentDrop(events, incident)).toEqual({
       startedAt: '2026-09-25T03:55:00Z',
+      severity: 'down',
       cause: 'Timeout > 30 s (BKK, TYO)',
       summary: null,
     });
   });
-  it('a PROBLEM raised to DOWN: from the escalation, with the DOWN cause', () => {
+  it('D-023: the home page came back, a key page still fails — a PROBLEM drop on a DOWN incident', () => {
+    const events = [
+      { type: 'detected', at: '2026-09-25T03:12:40Z', payload: { cause: 'HTTP 503 (BKK, SIN, TYO)' } },
+      {
+        type: 'relapsed',
+        at: '2026-09-25T03:40:00Z',
+        payload: {
+          cause: 'Home OK · /booking → HTTP 500 (BKK, SIN, TYO)',
+          summary: 'key page /booking, HTTP 500',
+          startedAt: '2026-09-25T03:39:00Z',
+          severity: 'problem',
+        },
+      },
+    ];
+    expect(currentDrop(events, incident)).toMatchObject({
+      startedAt: '2026-09-25T03:39:00Z',
+      severity: 'problem',
+      summary: 'key page /booking, HTTP 500',
+    });
+  });
+  it('a PROBLEM raised to DOWN: a DOWN from the outage start (downStartedAt), with the DOWN cause', () => {
     const events = [
       {
         type: 'detected',
-        at: '2026-09-25T03:12:40Z',
+        at: '2026-09-25T02:30:40Z',
         payload: { cause: 'p50 5.8 s (BKK)', summary: 'slow, p50 5.8 s' },
       },
       {
         type: 'escalated_to_down',
-        at: '2026-09-25T03:30:00Z',
-        payload: { cause: 'HTTP 503 (BKK, SIN, TYO)' },
+        at: '2026-09-25T02:48:41Z',
+        payload: {
+          cause: 'HTTP 503 (BKK, SIN, TYO)',
+          confirmingLocations: 2,
+          downStartedAt: '2026-09-25T02:47:41Z',
+          escalated: true,
+        },
       },
     ];
-    expect(currentDrop(events, started)).toEqual({
-      startedAt: '2026-09-25T03:30:00Z',
+    expect(currentDrop(events, { startedAt: '2026-09-25T02:30:00Z', severity: 'down' })).toEqual({
+      startedAt: '2026-09-25T02:47:41Z',
+      severity: 'down',
       cause: 'HTTP 503 (BKK, SIN, TYO)',
       summary: null,
     });
   });
-  it('no events: the incident start', () => {
-    expect(currentDrop([], started)).toEqual({ startedAt: started, cause: null, summary: null });
+  it('no events: the incident start and severity', () => {
+    expect(currentDrop([], { startedAt: incident.startedAt, severity: 'problem' })).toEqual({
+      startedAt: incident.startedAt,
+      severity: 'problem',
+      cause: null,
+      summary: null,
+    });
   });
 });
 

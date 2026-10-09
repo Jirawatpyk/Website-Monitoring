@@ -64,6 +64,7 @@ const incident = (number: number, over: Partial<OverviewIncident> = {}): Overvie
   ackedBy: null,
   cause: null,
   ...over,
+  dropSeverity: over.dropSeverity ?? over.severity ?? 'down',
 });
 
 const muvmi = site('MuvMi', {
@@ -278,6 +279,27 @@ describe('Banners (§21.1)', () => {
     expect(b.more).toBe(0);
   });
 
+  it('D-023: a DOWN incident in a PROBLEM drop (key page still failing) gets no banner, reason Problem from that drop', () => {
+    const partial = site('Partial', {
+      status: 'problem',
+      incident: incident(150, {
+        dropSeverity: 'problem',
+        startedAt: at('10:01'),
+        cause: 'key page /booking, HTTP 500',
+      }),
+    });
+    expect(bannersOf([partial], NOW).shown).toEqual([]);
+    expect(reasonOf(partial, NOW)).toEqual({ kind: 'problem', since: at('10:01') });
+  });
+
+  it('a relapse of a DOWN nobody acknowledged: a banner again, down for the new drop, unacked from the first confirm (D-004)', () => {
+    const relapse = site('VOCA', {
+      status: 'down',
+      incident: incident(133, { startedAt: at('10:05'), detectedAt: at('09:20') }),
+    });
+    expect(bannersOf([relapse], NOW).shown[0]).toMatchObject({ downMinutes: 2, unackedMinutes: 47 });
+  });
+
   it('a PROBLEM and an acked DOWN never get one', () => {
     expect(bannersOf([fuji, cando], NOW).shown).toEqual([]);
   });
@@ -360,6 +382,7 @@ describe('Recent events (§21.6, §16.11, D-032)', () => {
     severity: 'down',
     trigger: 'hard_fail',
     siteName: 'Cando Asia',
+    autoResolved: false,
     ...over,
   });
   it.each<[OverviewEvent, string | null]>([
@@ -377,6 +400,8 @@ describe('Recent events (§21.6, §16.11, D-032)', () => {
     [ev('recovered'), 'Cando Asia back up — root cause needed'],
     [ev('recovered', { severity: 'problem' }), 'Cando Asia back to OK'],
     [ev('auto_resolved', { severity: 'problem' }), 'Cando Asia back to OK — resolved automatically'],
+    [ev('relapsed', { payload: { severity: 'problem' } }), 'Cando Asia PROBLEM again'],
+    [ev('recovered', { severity: 'problem', autoResolved: true }), null],
     [ev('relapsed'), 'Cando Asia DOWN again'],
     [ev('google_chat'), null],
     [ev('evidence'), null],

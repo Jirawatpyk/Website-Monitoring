@@ -1,9 +1,13 @@
 /**
  * Response KPIs for the Overview (spec §21.3, PRD §2, D-032): MTTA and MTTD over DOWN incidents that
  * started in a window. Both are means (PRD §2 "Mean Time to …"):
- * - MTTA = acknowledged − confirmed down (`detected_at`), DOWN incidents of every tier that were acknowledged;
- * - MTTD = confirmed down − first failed check (`started_at`), Tier 1 DOWN incidents, manual ones left out
- *   (a hand-opened incident has no detection to measure).
+ * - MTTA = acknowledged − confirmed down (`detected_at`), DOWN incidents of every tier acknowledged after
+ *   they were confirmed down (one acked while still a PROBLEM, then raised to DOWN — D-021 — had nobody
+ *   waiting on a DOWN ack, so it is left out rather than counted as 0);
+ * - MTTD = confirmed down − first failed check of the outage, Tier 1 DOWN incidents, manual ones left out
+ *   (a hand-opened incident has no detection to measure). A PROBLEM raised to DOWN (D-021) counts from
+ *   `downStartedAt`, not from the PROBLEM's start — the same start uptime uses.
+ * An incident falls in a window by when its outage started.
  * Neither is shown until the window holds `MIN_DOWN_INCIDENTS` DOWN incidents, open or closed.
  */
 export const MIN_DOWN_INCIDENTS = 3;
@@ -12,6 +16,8 @@ export interface MetricIncident {
   severity: 'down' | 'problem';
   tier: number;
   startedAt: Date;
+  /** When the outage started, for a PROBLEM raised to DOWN (the `escalated_to_down` event, D-021). */
+  downStartedAt?: Date | null;
   detectedAt: Date | null;
   ackedAt: Date | null;
   isManual: boolean;
@@ -35,12 +41,17 @@ const seconds = (from: Date, to: Date) => Math.max(0, (to.getTime() - from.getTi
 
 /** MTTA / MTTD over the DOWN incidents that started in [from, to). */
 export function responseKpis(incidents: readonly MetricIncident[], from: Date, to: Date): ResponseKpis {
-  const down = incidents.filter((i) => i.severity === 'down' && i.startedAt >= from && i.startedAt < to);
+  const outageStart = (i: MetricIncident) => i.downStartedAt ?? i.startedAt;
+  const down = incidents.filter(
+    (i) => i.severity === 'down' && outageStart(i) >= from && outageStart(i) < to,
+  );
   const enough = down.length >= MIN_DOWN_INCIDENTS;
   if (!enough) return { downCount: down.length, enough, mttaSeconds: null, mttdSeconds: null };
-  const acks = down.flatMap((i) => (i.detectedAt && i.ackedAt ? [seconds(i.detectedAt, i.ackedAt)] : []));
+  const acks = down.flatMap((i) =>
+    i.detectedAt && i.ackedAt && i.ackedAt >= i.detectedAt ? [seconds(i.detectedAt, i.ackedAt)] : [],
+  );
   const detections = down.flatMap((i) =>
-    i.tier === 1 && !i.isManual && i.detectedAt ? [seconds(i.startedAt, i.detectedAt)] : [],
+    i.tier === 1 && !i.isManual && i.detectedAt ? [seconds(outageStart(i), i.detectedAt)] : [],
   );
   return { downCount: down.length, enough, mttaSeconds: mean(acks), mttdSeconds: mean(detections) };
 }

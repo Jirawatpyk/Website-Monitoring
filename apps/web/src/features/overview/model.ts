@@ -53,15 +53,17 @@ export interface Reason {
  */
 export function reasonOf(s: OverviewSite, now: Date): Reason | null {
   const inc = s.incident;
+  // the incident's current drop, when it is the same kind as the status (D-023: a PROBLEM drop on a
+  // DOWN incident starts with that drop)
   const incidentSince = (severity: 'down' | 'problem') =>
-    inc && inc.severity === severity && !RECOVERED.includes(inc.state) ? inc.startedAt : s.statusSince;
+    inc && inc.dropSeverity === severity && !RECOVERED.includes(inc.state) ? inc.startedAt : s.statusSince;
   if (s.status === 'down') return { kind: 'down', since: incidentSince('down') };
   if (s.status === 'problem') return { kind: 'problem', since: incidentSince('problem') };
   if (s.status === 'maintenance') return { kind: 'maintenance', since: s.statusSince };
   if (inc) {
     if (RECOVERED.includes(inc.state)) return { kind: 'root_cause', since: inc.recoveredAt };
     // an open incident whose site already reads OK (between rounds): its own severity
-    return { kind: inc.severity, since: inc.startedAt };
+    return { kind: inc.dropSeverity, since: inc.startedAt };
   }
   if (chainLocations(s).length) return { kind: 'location', since: s.chainSince };
   if (isMuted(s, now)) return { kind: 'muted', since: null };
@@ -368,6 +370,10 @@ export function tileState(
   return { state, markers };
 }
 
+/** The severity of the drop an event is about: a relapse carries its own (D-023), else the incident's. */
+const dropSeverity = (e: OverviewEvent) =>
+  e.payload.severity === 'down' || e.payload.severity === 'problem' ? e.payload.severity : e.severity;
+
 /** Recent events wording (Main3); null = not shown. No escalation copy until S08 (D-032). */
 export function eventLine(e: OverviewEvent): string | null {
   const inc = formatIncidentId(e.incidentNumber);
@@ -385,11 +391,15 @@ export function eventLine(e: OverviewEvent): string | null {
     case 'ack_undone':
       return `${inc} acknowledgement undone by ${e.actorName ?? 'someone'}`;
     case 'recovered':
-      return e.severity === 'down' ? `${e.siteName} back up — root cause needed` : `${e.siteName} back to OK`;
+      // a short PROBLEM that resolved itself says so once, on its auto_resolved line
+      if (e.autoResolved) return null;
+      return dropSeverity(e) === 'down'
+        ? `${e.siteName} back up — root cause needed`
+        : `${e.siteName} back to OK`;
     case 'auto_resolved':
       return `${e.siteName} back to OK — resolved automatically`;
     case 'relapsed':
-      return `${e.siteName} ${e.severity === 'down' ? 'DOWN' : 'PROBLEM'} again`;
+      return `${e.siteName} ${dropSeverity(e) === 'down' ? 'DOWN' : 'PROBLEM'} again`;
     default:
       return null;
   }

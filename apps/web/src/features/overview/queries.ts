@@ -62,14 +62,18 @@ export async function loadOverview(
       downEpisodesBySite(db, null, from30d),
       db
         .from('incidents')
-        .select('severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier)')
+        .select(
+          'severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier), incident_events(type, payload)',
+        )
         .eq('severity', 'down')
-        .gte('started_at', from60d.toISOString()),
+        .eq('incident_events.type', 'escalated_to_down')
+        // a PROBLEM raised to DOWN may have started before the window its outage falls in
+        .gte('started_at', new Date(now.getTime() - 90 * DAY_MS).toISOString()),
       db
         .from('incident_events')
         .select(
           `id, type, at, payload, actor:profiles(display_name),
-         incidents!inner(number, severity, trigger, sites!inner(name))`,
+         incidents!inner(number, severity, trigger, auto_resolved, sites!inner(name))`,
         )
         .in('type', [...EVENT_TYPES])
         .order('at', { ascending: false })
@@ -120,7 +124,9 @@ export async function loadOverview(
     const siteStatus = (status?.status as SiteStatus | undefined) ?? null;
     const inc = s.incidents[0];
     // the drop it is in now: a relapse or an escalation has its own start and cause (D-004, D-021)
-    const drop = inc ? currentDrop(inc.incident_events, inc.started_at) : null;
+    const drop = inc
+      ? currentDrop(inc.incident_events, { startedAt: inc.started_at, severity: inc.severity })
+      : null;
     const cause = drop?.cause ?? null;
     const summary = drop?.summary ?? null;
     const incident: OverviewIncident | null = inc
@@ -129,14 +135,15 @@ export async function loadOverview(
           number: inc.number,
           state: inc.state as OverviewIncident['state'],
           severity: inc.severity,
+          dropSeverity: drop?.severity ?? inc.severity,
           trigger: inc.trigger,
           level: inc.escalation_level,
           startedAt: drop?.startedAt ?? inc.started_at,
           detectedAt: inc.detected_at,
           recoveredAt: inc.recovered_at,
           ackedBy: inc.acker?.display_name ?? null,
-          // a PROBLEM's short summary ("slow, p50 5.8 s"); a DOWN's cause in short form (spec §10)
-          cause: inc.severity === 'problem' ? (summary ?? cause) : cause ? shortCause(cause) : null,
+          // a PROBLEM drop's short summary ("slow, p50 5.8 s"); a DOWN's cause in short form (spec §10)
+          cause: drop?.severity === 'problem' ? (summary ?? cause) : cause ? shortCause(cause) : null,
         }
       : null;
     const lastRound = OVERVIEW_LOCATIONS.map((l) => {
@@ -179,6 +186,7 @@ export async function loadOverview(
     severity: i.severity,
     tier: i.sites.tier,
     startedAt: new Date(i.started_at),
+    downStartedAt: downStartOf(i.incident_events),
     detectedAt: i.detected_at ? new Date(i.detected_at) : null,
     ackedAt: i.acked_at ? new Date(i.acked_at) : null,
     isManual: i.is_manual,
@@ -196,6 +204,7 @@ export async function loadOverview(
     severity: e.incidents.severity,
     trigger: e.incidents.trigger,
     siteName: e.incidents.sites.name,
+    autoResolved: e.incidents.auto_resolved,
   }));
 
   const rounds = rows
@@ -267,6 +276,13 @@ async function fillChainSince(
       .sort();
     r.chainSince = starts[0] ?? null;
   }
+}
+
+/** When a PROBLEM raised to DOWN became an outage (the `escalated_to_down` event's `downStartedAt`, D-021). */
+function downStartOf(events: readonly { type: string; payload: unknown }[]): Date | null {
+  const p = events.find((e) => e.type === 'escalated_to_down')?.payload as
+    Record<string, unknown> | undefined;
+  return typeof p?.downStartedAt === 'string' ? new Date(p.downStartedAt) : null;
 }
 
 /** `/` for the signed-in person. */

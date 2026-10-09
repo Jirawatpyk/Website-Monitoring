@@ -46,6 +46,7 @@ const muvmi = site('MuvMi', {
     number: 142,
     state: 'unacked',
     severity: 'down',
+    dropSeverity: 'down',
     trigger: 'hard_fail',
     level: 0,
     startedAt: at('09:48'),
@@ -74,6 +75,7 @@ const data = (over: Partial<OverviewData> = {}): OverviewData => ({
       severity: 'down',
       trigger: 'hard_fail',
       siteName: 'MuvMi',
+      autoResolved: false,
     },
   ],
   kpis: {

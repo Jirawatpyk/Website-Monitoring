@@ -57,13 +57,14 @@ export function chainStreakStart(
 /**
  * The drop an open incident is in now (code review S06b): its newest `detected`, `escalated_to_down`
  * (D-021) or `relapsed` (D-004) event says when it started and why — not the incident's first drop.
- * A relapse carries its own `startedAt` (first failed check); an escalation counts from the escalation,
- * as uptime does (D-021); the first drop is the incident's `started_at`.
+ * A relapse carries its own `startedAt` and `severity`; an escalation is a DOWN from its
+ * `downStartedAt` (the outage's first failed check, as uptime counts it, D-021); the first drop is the
+ * incident's own start and severity.
  */
 export function currentDrop(
   events: readonly { type: string; at: string; payload: unknown }[],
-  incidentStartedAt: string,
-): { startedAt: string; cause: string | null; summary: string | null } {
+  incident: { startedAt: string; severity: 'down' | 'problem' },
+): { startedAt: string; severity: 'down' | 'problem'; cause: string | null; summary: string | null } {
   const newest = [...events]
     .filter((e) => e.type === 'detected' || e.type === 'escalated_to_down' || e.type === 'relapsed')
     .sort((a, b) => b.at.localeCompare(a.at))[0];
@@ -72,9 +73,15 @@ export function currentDrop(
     unknown
   >;
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
-  const startedAt =
-    !newest || newest.type === 'detected' ? incidentStartedAt : (text(p.startedAt) ?? newest.at);
-  return { startedAt, cause: text(p.cause), summary: text(p.summary) };
+  const base = { cause: text(p.cause), summary: text(p.summary) };
+  if (!newest || newest.type === 'detected') {
+    return { startedAt: incident.startedAt, severity: incident.severity, ...base };
+  }
+  if (newest.type === 'escalated_to_down') {
+    return { startedAt: text(p.downStartedAt) ?? newest.at, severity: 'down', ...base };
+  }
+  const severity = p.severity === 'down' || p.severity === 'problem' ? p.severity : incident.severity;
+  return { startedAt: text(p.startedAt) ?? newest.at, severity, ...base };
 }
 
 const PROBE_GRACE_MS = 3 * 60_000;
