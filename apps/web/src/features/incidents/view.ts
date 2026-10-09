@@ -16,6 +16,7 @@ import {
   type Trigger,
 } from '@dxt/shared';
 import type { PersonWhoCanAct } from '@/components/states';
+import { mayAcknowledge } from './ack-rule';
 
 /** Rows the page reads (RLS as the signed-in person). */
 export interface IncidentRow {
@@ -100,16 +101,12 @@ const ACKABLE: readonly IncidentState[] = ['unacked', 'escalated'];
 const str = (v: unknown) => (typeof v === 'string' ? v : null);
 const num = (v: unknown) => (typeof v === 'number' ? v : null);
 
-/**
- * Who may acknowledge (D-016): an Admin, or a Responder on a site they own (primary or backup).
- * Display only — the `ack_incident` SQL function (`private.can_ack`) is the rule that counts.
- */
+/** Who may acknowledge this incident (D-016, `mayAcknowledge`). */
 export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
-  if (viewer.role === 'admin') return true;
-  return (
-    viewer.role === 'responder' &&
-    (i.sites.primary_owner_id === viewer.id || i.sites.backup_owner_id === viewer.id)
-  );
+  return mayAcknowledge(viewer, {
+    primaryOwnerId: i.sites.primary_owner_id,
+    backupOwnerId: i.sites.backup_owner_id,
+  });
 }
 
 const TEMPLATE_WORDS: Record<string, string> = {
