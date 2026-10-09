@@ -118,7 +118,7 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
     expect(pages).not.toHaveLength(0);
     // Pages reached from a list, not the nav (S05 review): Add site, Edit site, Edit monitors.
     const site = await anySiteId();
-    pages.push('/sites/new', `/sites/${site}/edit`, `/sites/${site}/monitors`);
+    pages.push(`/sites/${site}`, '/sites/new', `/sites/${site}/edit`, `/sites/${site}/monitors`);
 
     for (const width of WIDTHS) {
       const page = await signedInAt(browser, baseURL!, width);

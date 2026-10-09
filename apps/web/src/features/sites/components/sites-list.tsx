@@ -194,17 +194,13 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
         ? '1 site'
         : `All ${total} sites`;
 
-  /** Until Site detail ships (S06) an Admin's row opens Edit site; a Draft's opens it to finish setup. */
-  const hrefOf = (r: SiteListRow) => (isAdmin ? `/sites/${r.id}/edit` : null);
+  /** A row opens Site detail for everyone (spec §20); a Draft opens Add site's form to finish setup, for Admins only. */
+  const hrefOf = (r: SiteListRow) => (r.live ? `/sites/${r.id}` : isAdmin ? `/sites/${r.id}/edit` : null);
 
   const menuItems = (r: SiteListRow): MenuItem[] => [
-    ...(isAdmin
-      ? [
-          { label: 'Open', icon: <IconMonitor />, href: `/sites/${r.id}/edit` },
-          { label: 'Edit site', icon: <IconPencil />, href: `/sites/${r.id}/edit` },
-          { separator: true },
-        ]
-      : []),
+    ...(r.live ? [{ label: 'Open', icon: <IconMonitor />, href: `/sites/${r.id}` }] : []),
+    ...(isAdmin ? [{ label: 'Edit site', icon: <IconPencil />, href: `/sites/${r.id}/edit` }] : []),
+    ...(r.live || isAdmin ? [{ separator: true as const }] : []),
     {
       label: isMuted(r, now) ? 'End or edit mute…' : 'Mute…',
       icon: <IconEyeOff />,
@@ -484,14 +480,10 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
             columns={columns}
             rows={shown}
             rowHeight="auto"
-            onRowActivate={
-              isAdmin
-                ? (r) => {
-                    const href = hrefOf(r);
-                    if (href) router.push(href);
-                  }
-                : undefined
-            }
+            onRowActivate={(r) => {
+              const href = hrefOf(r);
+              if (href) router.push(href);
+            }}
           />
         )}
 

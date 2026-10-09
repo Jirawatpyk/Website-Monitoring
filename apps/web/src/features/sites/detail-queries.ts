@@ -9,6 +9,7 @@ import {
   type Tier,
   type Trigger,
 } from '@dxt/shared';
+import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { locationGlyph } from './components/site-list';
 import {
@@ -32,7 +33,7 @@ import {
 } from './types';
 
 type Client = Awaited<ReturnType<typeof createClient>>;
-type DbClient = Client | import('@dxt/db').DbClient;
+type DbClient = Client | ServiceDbClient;
 
 const HISTORY_DAYS = 90;
 const LOG_ROWS = 8;

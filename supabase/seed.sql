@@ -100,3 +100,41 @@ select id, 'http', true,
        'https://' || trim(both '-' from regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g')) || '.example.test/',
        array[name]
 from public.sites;
+
+-- ── S06: state and incident history so Site detail and the Sites list show something locally ──
+-- (sample from spec §4 / §5, relative to now: MuvMi 101 DOWN min in 30 days with one drop still open,
+-- BA – Taiwan a DOWN and a regional PROBLEM, Fuji Links slow)
+update public.sites set monitoring_started_at = now() - interval '120 days';
+
+insert into public.site_status (site_id, status, since, last_round_at, last_evaluated_at)
+select id,
+  case name when 'MuvMi' then 'down' when 'Fuji Links' then 'problem' else 'ok' end::public.site_state,
+  case name when 'MuvMi' then now() - interval '19 minutes' when 'Fuji Links' then now() - interval '15 minutes'
+            else now() - interval '10 days 13 hours' end,
+  now() - interval '50 seconds', now() - interval '50 seconds'
+from public.sites;
+
+with i (site, trigger, severity, state, started, minutes) as (values
+  ('MuvMi', 'hard_fail', 'down', 'resolved', interval '17 days', 47),
+  ('MuvMi', 'hard_fail', 'down', 'closed', interval '14 days', 35),
+  ('MuvMi', 'hard_fail', 'down', 'escalated', interval '19 minutes', null),
+  ('Bangkok Airways – Taiwan', 'regional', 'problem', 'resolved', interval '11 days', 6),
+  ('Bangkok Airways – Taiwan', 'hard_fail', 'down', 'closed', interval '23 days', 11),
+  ('Bangkok Airways – Taiwan', 'slow', 'problem', 'resolved', interval '52 days', 14),
+  ('Fuji Links', 'slow', 'problem', 'acknowledged', interval '15 minutes', null)
+), ins as (
+  insert into public.incidents (site_id, monitor_id, trigger, severity, episode_severity, state, escalation_level,
+                                started_at, detected_at, acked_at, recovered_at, resolved_at)
+  select s.id, m.id, i.trigger::public.incident_trigger, i.severity::public.severity, i.severity::public.severity,
+    i.state::public.incident_state, case i.state when 'escalated' then 1 else 0 end,
+    now() - i.started, now() - i.started + interval '30 seconds',
+    case when i.state <> 'escalated' then now() - i.started + interval '5 minutes' end,
+    case when i.minutes is not null then now() - i.started + make_interval(mins => i.minutes) end,
+    case when i.state in ('resolved', 'closed') then now() - i.started + make_interval(mins => i.minutes + 30) end
+  from i join public.sites s on s.name = i.site join public.monitors m on m.site_id = s.id and m.is_primary
+  returning id, started_at, detected_at, recovered_at
+)
+insert into public.incident_events (incident_id, type, at, payload)
+select id, 'detected', detected_at, '{}'::jsonb from ins
+union all
+select id, 'recovered', recovered_at, '{}'::jsonb from ins where recovered_at is not null;

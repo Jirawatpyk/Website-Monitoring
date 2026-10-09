@@ -4,7 +4,9 @@
  * wording of spec §12. No I/O, no clock (`now` is passed in).
  */
 import {
+  formatDay,
   formatDuration,
+  formatTime,
   TIER_CONFIG,
   TRIGGER_LABELS,
   type Severity,
@@ -149,4 +151,16 @@ export function incidentsCaption(rows: readonly IncidentSummaryRow[]): string {
   const counts = [part('down', 'DOWN'), part('problem', 'PROBLEM')].filter(Boolean).join(' · ');
   const mttr = mttrMinutes(rows);
   return mttr === null ? counts : `${counts} · MTTR ${formatDuration(mttr)} (DOWN only · median)`;
+}
+
+/** The chart's x labels: four ticks and "now" — times for 24 h, weekdays for 7 d, dates beyond (spec §13). */
+export function axisLabels(range: SiteRange, from: number, to: number): string[] {
+  const ticks = [0, 1, 2, 3].map((i) => new Date(from + ((to - from) * i) / 4));
+  const word = (d: Date) =>
+    range === '24h'
+      ? formatTime(d)
+      : range === '7d'
+        ? formatDay(d, { weekday: true }).split(' ').slice(0, 2).join(' ')
+        : formatDay(d);
+  return [...ticks.map(word), 'now'];
 }

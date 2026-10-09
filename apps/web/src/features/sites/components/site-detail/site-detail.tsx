@@ -1,0 +1,652 @@
+import Link from 'next/link';
+import {
+  Badge,
+  Breadcrumb,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  Stat,
+  StatusPill,
+  Table,
+  TBody,
+  Td,
+  Th,
+  THead,
+  Tr,
+} from '@jirawatpyk/aura-react';
+import {
+  IconBell,
+  IconCalendar,
+  IconChartColumn,
+  IconChevronRight,
+  IconCircleDotDashed,
+  IconClock,
+  IconDownload,
+  IconEyeOff,
+  IconPencil,
+  IconTrendingUp,
+} from '@jirawatpyk/aura-react/icons';
+import {
+  formatDay,
+  formatDuration,
+  formatIncidentId,
+  formatPercent,
+  formatTier,
+  formatTime,
+  formatTimeWithSeconds,
+  isSameBangkokDay,
+  TIER_CONFIG,
+} from '@dxt/shared';
+import { LineChart, SeriesKey, type ChartSeries } from '@/components/charts/line-chart';
+import { SiteStatusBadge, WorkflowBadge } from '@/components/status-badges';
+import {
+  axisLabels,
+  intervalLabel,
+  responseHoursLabel,
+  severityLine,
+  SITE_RANGES,
+  triggerWord,
+  type SiteRange,
+} from '../../detail';
+import { LIST_LOCATIONS, type DetailIncident, type RoundCheck, type SiteDetail } from '../../types';
+import { GLYPHS, IncidentLink, TOUCH_HIT } from '../site-cells';
+import { RangeControl } from './range-control';
+
+const NOT_YET = 'Mute and maintenance come with maintenance windows.';
+const WHERE: Record<string, string> = { BKK: 'Thai VPS', SIN: 'Vercel sin1', TYO: 'Vercel hnd1' };
+const COLORS: Record<string, ChartSeries['color']> = {
+  BKK: '--aura-chart-1',
+  SIN: '--aura-chart-2',
+  TYO: '--aura-chart-4',
+};
+
+/** "10 d 13 h" from a time to now. */
+const since = (iso: string, now: Date) => formatDuration((now.getTime() - Date.parse(iso)) / 60_000);
+/** "Today 10:07" / "Mon 14 Sep 21:18" (spec §13). */
+const when = (iso: string, now: Date) => {
+  const d = new Date(iso);
+  return isSameBangkokDay(d, now)
+    ? `Today ${formatTime(d)}`
+    : `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
+};
+const ms = (v: number | null) => (v === null ? '—' : String(v));
+
+function series(detail: SiteDetail): ChartSeries[] {
+  return LIST_LOCATIONS.map((loc) => ({
+    label: loc,
+    color: COLORS[loc]!,
+    points: detail.chart[loc].map((p) => ({ t: p.t, v: p.ms })),
+  }));
+}
+
+function statusLine(detail: SiteDetail, now: Date): string | null {
+  if (!detail.live) return 'Draft · not monitored';
+  if (!detail.status) return 'No data yet — the first round runs within a minute';
+  if (!detail.statusSince) return null;
+  const word = { ok: 'OK', problem: 'Problem', down: 'Down', maintenance: 'In maintenance' }[detail.status];
+  return `${word} since ${when(detail.statusSince, now)} · ${since(detail.statusSince, now)}`;
+}
+
+/** `/sites/[siteId]` — boards SiteDetail (md and up) and MSite (phones), one data load. */
+export function SiteDetailView({
+  detail,
+  range,
+  isAdmin,
+  nowIso,
+}: {
+  detail: SiteDetail;
+  range: SiteRange;
+  isAdmin: boolean;
+  nowIso: string;
+}) {
+  const now = new Date(nowIso);
+  const line = statusLine(detail, now);
+  const lines = series(detail);
+  const xLabels = axisLabels(range, detail.chartFrom, detail.chartTo);
+  const rangeFrom = detail.chartFrom;
+  const inRange = detail.history.filter((h) => Date.parse(h.startedAt) >= rangeFrom || h.minutes === null);
+  const chartLabel = `Response time in ms over ${SITE_RANGES[range].label} from Bangkok, Singapore and Tokyo${
+    detail.stats.p50 === null ? ', no data yet' : `; p50 ${detail.stats.p50} ms`
+  }`;
+
+  const muteActions = (
+    <>
+      <Button variant="secondary" icon={<IconEyeOff />} disabled aria-describedby="site-not-yet">
+        Mute
+      </Button>
+      <Button variant="secondary" icon={<IconCalendar />} disabled aria-describedby="site-not-yet">
+        <span className="max-md:hidden">Schedule maintenance</span>
+        <span className="md:hidden">Maintenance</span>
+      </Button>
+    </>
+  );
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <PageHeader
+          breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />}
+          title={detail.name}
+          meta={
+            <span className="flex flex-wrap items-center gap-2">
+              <StatusBadge detail={detail} />
+              {detail.mutedUntil && Date.parse(detail.mutedUntil) > now.getTime() && (
+                <Badge tone="neutral" variant="outline" icon={<IconEyeOff />}>
+                  {`Muted · until ${formatTime(new Date(detail.mutedUntil))}`}
+                </Badge>
+              )}
+              <span className="max-md:hidden contents">
+                <Badge tone="neutral" variant="outline">
+                  {formatTier(detail.tier)}
+                </Badge>
+                <Badge tone="neutral" variant="outline">
+                  {intervalLabel(detail.tier)}
+                </Badge>
+                <Badge tone="neutral" variant="outline">
+                  {responseHoursLabel(detail.tier)}
+                </Badge>
+              </span>
+              {line && <span className="text-sm text-fg-secondary">{line}</span>}
+            </span>
+          }
+          actions={
+            <span className="flex flex-wrap items-center gap-3 max-md:grid max-md:w-full max-md:grid-cols-2">
+              {detail.live && muteActions}
+              {isAdmin && (
+                <Button
+                  variant="primary"
+                  icon={<IconPencil />}
+                  href={detail.live ? `/sites/${detail.id}/monitors` : `/sites/${detail.id}/edit`}
+                  className="max-md:col-span-2"
+                >
+                  {detail.live ? 'Edit monitors' : 'Finish setup'}
+                </Button>
+              )}
+            </span>
+          }
+        />
+        <p className="m-0 text-sm text-fg-secondary md:hidden">
+          {`${formatTier(detail.tier)} · every ${TIER_CONFIG[detail.tier].intervalSec / 60} min · ${responseHoursLabel(detail.tier)}`}
+          {detail.owner ? ` · owner ${detail.owner}` : ''}
+          {detail.backup ? ` · backup ${detail.backup}` : ''}
+        </p>
+        {detail.live && (
+          <p id="site-not-yet" className="m-0 text-xs text-fg-secondary">
+            {NOT_YET}
+          </p>
+        )}
+        {detail.openIncident && (
+          <span className="flex">
+            <IncidentLink incident={detail.openIncident} now={now} />
+          </span>
+        )}
+      </div>
+
+      {!detail.live ? (
+        <Card>
+          <EmptyState
+            icon={<IconCircleDotDashed />}
+            title="Not monitored yet"
+            description={
+              isAdmin
+                ? 'This site is a draft. Finish the registration checklist and start monitoring.'
+                : 'This site is a draft. Only an Admin can finish setup.'
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <InfoStrip detail={detail} />
+
+          <section className="flex flex-col gap-4" aria-labelledby="availability">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="availability" className="m-0 text-2xl font-semibold max-md:sr-only">
+                Availability
+              </h2>
+              <div className="max-md:w-full">
+                <RangeControl value={range} fullWidth />
+              </div>
+            </div>
+            {/* desktop: four stats */}
+            <div className="grid grid-cols-2 gap-4 max-md:hidden xl:grid-cols-4">
+              <Stat
+                label={`Uptime · ${SITE_RANGES[range].label}`}
+                value={detail.stats.uptime === null ? '—' : formatPercent(detail.stats.uptime)}
+                icon={<IconChartColumn />}
+                caption="DOWN minutes only · maintenance excluded"
+              />
+              <Stat
+                label="Response p50"
+                value={ms(detail.stats.p50)}
+                unit={detail.stats.p50 === null ? undefined : 'ms'}
+                icon={<IconClock />}
+                caption="Median across 3 locations"
+              />
+              <Stat
+                label="Response p95"
+                value={ms(detail.stats.p95)}
+                unit={detail.stats.p95 === null ? undefined : 'ms'}
+                icon={<IconTrendingUp />}
+                caption={`Slow rule uses p50: PROBLEM when p50 > ${TIER_CONFIG[detail.tier].slowThresholdMs / 1000} s for 3 rounds`}
+              />
+              <Stat
+                label="Incidents"
+                value={String(detail.stats.incidents)}
+                icon={<IconBell />}
+                caption={detail.stats.caption}
+              />
+            </div>
+            {/* phone: three compact cards (MSite) */}
+            <div className="grid grid-cols-3 gap-2 md:hidden">
+              <PhoneStat
+                value={detail.stats.uptime === null ? '—' : formatPercent(detail.stats.uptime)}
+                label="Uptime"
+              />
+              <PhoneStat value={detail.stats.p50 === null ? '—' : `${detail.stats.p50} ms`} label="p50" />
+              <PhoneStat value={String(detail.stats.incidents)} label="Incidents" />
+            </div>
+          </section>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <Card
+              className="xl:col-span-2"
+              title={
+                <>
+                  <span className="md:hidden">Response time</span>
+                  <span className="max-md:hidden">{`Response time by location · ms · ${SITE_RANGES[range].label}`}</span>
+                </>
+              }
+            >
+              <div className="flex flex-col gap-3">
+                <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-secondary">
+                  {lines.map((s) => (
+                    <SeriesKey key={s.label} series={{ ...s, label: `${s.label} · ${WHERE[s.label]}` }} />
+                  ))}
+                </span>
+                <div className="max-md:hidden">
+                  <LineChart
+                    series={lines}
+                    from={detail.chartFrom}
+                    to={detail.chartTo}
+                    xLabels={xLabels}
+                    label={chartLabel}
+                  />
+                </div>
+                <div className="md:hidden">
+                  <LineChart
+                    series={lines}
+                    from={detail.chartFrom}
+                    to={detail.chartTo}
+                    xLabels={[xLabels[0]!, 'now']}
+                    label={chartLabel}
+                    heightClass="h-20"
+                  />
+                </div>
+              </div>
+            </Card>
+            <IncidentsInRange incidents={inRange} now={now} />
+            <LatestRound detail={detail} now={now} />
+          </div>
+
+          <MonitorsTable detail={detail} />
+
+          <div className="grid items-start gap-4 max-md:hidden xl:grid-cols-2">
+            <IncidentHistory detail={detail} now={now} />
+            <CheckLog detail={detail} now={now} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StatusBadge({ detail }: { detail: SiteDetail }) {
+  if (detail.status) return <SiteStatusBadge status={detail.status} />;
+  return (
+    <Badge tone="neutral" variant="outline" icon={<IconCircleDotDashed />}>
+      {detail.live ? 'No data yet' : 'Not monitored'}
+    </Badge>
+  );
+}
+
+function PhoneStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-col rounded-aura-md border border-border-default bg-bg-surface px-3 py-2.5 leading-tight">
+      <span className="text-xl font-semibold">{value}</span>
+      <span className="text-xs text-fg-secondary">{label}</span>
+    </div>
+  );
+}
+
+function InfoStrip({ detail }: { detail: SiteDetail }) {
+  const items: [string, React.ReactNode][] = [
+    [
+      'URL',
+      detail.url ? (
+        <a href={detail.url} target="_blank" rel="noopener noreferrer" className={`break-all ${TOUCH_HIT}`}>
+          {detail.url.replace(/^https?:\/\//, '')}
+        </a>
+      ) : (
+        '—'
+      ),
+    ],
+    [
+      'CLIENT · AM',
+      detail.client.internal ? 'Internal' : `${detail.client.name} · ${detail.client.amName ?? '—'}`,
+    ],
+    ['PRIMARY · BACKUP', `${detail.owner ?? '—'} · ${detail.backup ?? '—'}`],
+    ['HOSTING', detail.hosting ?? '—'],
+    ['CREDENTIALS', detail.credentialRef ? `Reference only — ${detail.credentialRef}` : '—'],
+  ];
+  return (
+    <Card className="max-md:hidden">
+      <dl className="m-0 grid grid-cols-3 gap-x-6 gap-y-4 xl:grid-cols-5">
+        {items.map(([k, v]) => (
+          <div key={k} className="flex min-w-0 flex-col leading-normal">
+            <dt className="font-mono text-xs text-fg-tertiary">{k}</dt>
+            <dd className="m-0 text-sm font-medium">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
+  );
+}
+
+function LatestRound({ detail, now }: { detail: SiteDetail; now: Date }) {
+  const round = detail.round;
+  const passing = round.filter((r) => r.outcome === 'pass').length;
+  const times = round.map((r) => Date.parse(r.checkedAt)).sort((a, b) => a - b);
+  const verdict = detail.status
+    ? { ok: 'OK', problem: 'PROBLEM', down: 'DOWN', maintenance: 'MAINTENANCE' }[detail.status]
+    : null;
+  return (
+    <Card
+      title="Latest round"
+      actions={
+        times.length ? (
+          <span className="font-mono text-xs text-fg-secondary">
+            {formatTimeWithSeconds(new Date(times.at(-1)!))}
+          </span>
+        ) : undefined
+      }
+    >
+      {round.length === 0 ? (
+        <p className="m-0 text-sm text-fg-secondary">No checks in the last 15 minutes.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {round.map((r) => (
+            <RoundRow key={r.location} r={r} />
+          ))}
+          <dl className="m-0 mt-1 flex flex-col gap-1 border-t border-border-default pt-3 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-fg-secondary">Vote</dt>
+              <dd className="m-0 font-semibold">{`${passing}/${round.length} pass${verdict ? ` → ${verdict}` : ''}`}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-fg-secondary">Round window</dt>
+              <dd className="m-0">{`${TIER_CONFIG[detail.tier].roundWindowSec} s (${formatTier(detail.tier)})`}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-fg-secondary">Checked at</dt>
+              <dd className="m-0">
+                {times.length > 1
+                  ? `${formatTimeWithSeconds(new Date(times[0]!))}–${formatTimeWithSeconds(new Date(times.at(-1)!))}`
+                  : formatTimeWithSeconds(new Date(times[0]!))}
+                {isSameBangkokDay(new Date(times[0]!), now) ? '' : ` · ${formatDay(new Date(times[0]!))}`}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function RoundRow({ r }: { r: RoundCheck }) {
+  const g = GLYPHS[r.glyph];
+  return (
+    <div className="flex items-center gap-3 rounded-aura-md border border-border-default px-3 py-2.5 leading-snug">
+      <span className={`flex ${g.tone}`} role="img" aria-label={`${r.location}: ${g.label}`}>
+        {g.icon}
+      </span>
+      <span className="flex min-w-0 grow flex-col">
+        <span className="truncate text-sm font-semibold">
+          {r.location} <span className="font-normal text-fg-secondary">{WHERE[r.location]}</span>
+        </span>
+        <span className="font-mono text-xs text-fg-tertiary">
+          {formatTimeWithSeconds(new Date(r.checkedAt))}
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-col items-end">
+        <span className="text-sm tabular-nums">{r.responseMs === null ? '—' : `${r.responseMs} ms`}</span>
+        <span className="font-mono text-xs text-fg-tertiary">
+          {r.statusCode ? `HTTP ${r.statusCode}` : g.label}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/** Phone only (MSite "Incidents in range"); desktop shows the 90-day history table instead. */
+function IncidentsInRange({ incidents, now }: { incidents: DetailIncident[]; now: Date }) {
+  return (
+    <Card className="md:hidden" title="Incidents in range" headingLevel={2}>
+      {incidents.length === 0 ? (
+        <p className="m-0 text-sm text-fg-secondary">No incidents in this range.</p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col p-0">
+          {incidents.map((i) => (
+            <li key={i.id} className="border-b border-border-subtle last:border-b-0">
+              <Link
+                href={`/incidents/${i.id}`}
+                className="flex min-h-11 items-center gap-2 py-1 text-fg-primary no-underline hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
+              >
+                <span className="flex w-28 shrink-0">
+                  <WorkflowBadge state={i.state} level={i.level} />
+                </span>
+                <span className="flex min-w-0 grow flex-col leading-tight">
+                  <span className="truncate text-sm">{triggerWord(i.trigger)}</span>
+                  <span className="text-xs text-fg-secondary">{when(i.startedAt, now)}</span>
+                </span>
+                <span className="text-sm whitespace-nowrap tabular-nums">
+                  {i.minutes === null ? 'Open' : formatDuration(i.minutes)}
+                </span>
+                <span className="flex text-fg-tertiary">
+                  <IconChevronRight />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function MonitorsTable({ detail }: { detail: SiteDetail }) {
+  return (
+    <section className="flex flex-col gap-3 max-md:hidden" aria-labelledby="monitors">
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h2 id="monitors" className="m-0 text-2xl font-semibold">
+          Monitors
+        </h2>
+        <span className="text-sm text-fg-secondary">
+          Site status = worst of these. Only the primary monitor can make the site DOWN.
+        </span>
+      </div>
+      <Table caption="Monitors" captionHidden stackBelow="md" rowHeight="density" align="middle">
+        <THead>
+          <Tr>
+            <Th>Type</Th>
+            <Th>Target</Th>
+            <Th>Assertions</Th>
+            <Th>Max severity</Th>
+            <Th>Status</Th>
+            <Th align="end">Last result</Th>
+          </Tr>
+        </THead>
+        <TBody>
+          {detail.monitors.map((m) => (
+            <Tr key={m.id}>
+              <Td>
+                <span className="flex items-center gap-2 whitespace-nowrap">
+                  <span className="font-medium">{m.isPrimary ? 'HTTP' : 'Key page'}</span>
+                  {m.isPrimary && (
+                    <Badge tone="neutral" variant="outline">
+                      Primary
+                    </Badge>
+                  )}
+                </span>
+              </Td>
+              <Td mono>{m.target}</Td>
+              <Td className="text-fg-secondary">{m.assertions}</Td>
+              <Td mono>{m.isPrimary ? 'DOWN' : 'PROBLEM'}</Td>
+              <Td>
+                {m.status ? (
+                  <SiteStatusBadge status={m.status} />
+                ) : (
+                  <span className="text-fg-secondary">—</span>
+                )}
+              </Td>
+              <Td numeric>{m.lastMs === null ? '—' : `${m.lastMs} ms`}</Td>
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
+    </section>
+  );
+}
+
+function IncidentHistory({ detail, now }: { detail: SiteDetail; now: Date }) {
+  const n = detail.history.length;
+  return (
+    <section className="flex min-w-0 flex-col gap-3" aria-labelledby="history">
+      <div className="flex min-h-8 items-center justify-between gap-3">
+        <h2 id="history" className="m-0 text-2xl font-semibold">
+          Incident history
+        </h2>
+        {n > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<IconDownload />}
+            href={`/sites/${detail.id}/incidents.csv`}
+          >
+            Export
+          </Button>
+        )}
+      </div>
+      {n === 0 ? (
+        <p className="m-0 text-sm text-fg-secondary">No incidents in the last 90 days.</p>
+      ) : (
+        <Table caption="Incident history, last 90 days" captionHidden rowHeight="density" align="middle">
+          <THead>
+            <Tr>
+              <Th>ID</Th>
+              <Th>Started</Th>
+              <Th align="end">Dur.</Th>
+              <Th>Trigger</Th>
+              <Th>State</Th>
+            </Tr>
+          </THead>
+          <TBody>
+            {detail.history.map((h) => (
+              <Tr key={h.id}>
+                <Td mono className="whitespace-nowrap">
+                  <Link href={`/incidents/${h.id}`} className={TOUCH_HIT}>
+                    {formatIncidentId(h.number)}
+                  </Link>
+                </Td>
+                <Td className="whitespace-nowrap tabular-nums">{`${formatDay(new Date(h.startedAt))} ${formatTime(new Date(h.startedAt))}`}</Td>
+                <Td numeric className="whitespace-nowrap">
+                  {h.minutes === null ? 'Open' : formatDuration(h.minutes)}
+                </Td>
+                <Td>
+                  <span className="flex flex-col leading-tight">
+                    <span>{triggerWord(h.trigger)}</span>
+                    <span className="text-xs whitespace-nowrap text-fg-secondary">
+                      {severityLine(h.severity, h.trigger)}
+                    </span>
+                  </span>
+                </Td>
+                <Td>
+                  <WorkflowBadge state={h.state} level={h.level} />
+                </Td>
+              </Tr>
+            ))}
+          </TBody>
+        </Table>
+      )}
+      <p className="m-0 text-sm text-fg-secondary">
+        {`${n} in 90 days${detail.historyMttr === null ? '' : ` · MTTR ${formatDuration(detail.historyMttr)} (DOWN only · median)`}`}
+        {n > 0 && ` · as of ${formatTime(now)}`}
+      </p>
+    </section>
+  );
+}
+
+function CheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
+  return (
+    <section className="flex min-w-0 flex-col gap-3" aria-labelledby="checklog">
+      <div className="flex min-h-8 items-center justify-between gap-3">
+        <h2 id="checklog" className="m-0 text-2xl font-semibold">
+          Check log
+        </h2>
+        <span className="text-sm text-fg-secondary">Raw results kept 90 days</span>
+      </div>
+      {detail.log.length === 0 ? (
+        <p className="m-0 text-sm text-fg-secondary">No checks in the last 24 hours.</p>
+      ) : (
+        <Table
+          caption="Latest checks of the primary monitor"
+          captionHidden
+          rowHeight="density"
+          align="middle"
+        >
+          <THead>
+            <Tr>
+              <Th>Time</Th>
+              <Th>Loc</Th>
+              <Th>Outcome</Th>
+              <Th align="end">HTTP</Th>
+              <Th align="end">Response</Th>
+              <Th align="end">TTFB</Th>
+            </Tr>
+          </THead>
+          <TBody>
+            {detail.log.map((c) => (
+              <Tr key={c.id}>
+                <Td mono>
+                  {formatTimeWithSeconds(new Date(c.checkedAt))}
+                  {isSameBangkokDay(new Date(c.checkedAt), now)
+                    ? ''
+                    : ` · ${formatDay(new Date(c.checkedAt))}`}
+                </Td>
+                <Td mono>{c.location}</Td>
+                <Td>
+                  <StatusPill
+                    tone={c.outcome === 'pass' ? 'ready' : c.outcome === 'blocked' ? 'neutral' : 'blocked'}
+                  >
+                    {c.outcome === 'pass' ? 'Pass' : c.outcome === 'blocked' ? 'Blocked' : 'Fail'}
+                  </StatusPill>
+                </Td>
+                <Td numeric>{c.statusCode ?? '—'}</Td>
+                <Td numeric>{c.responseMs === null ? '—' : `${c.responseMs} ms`}</Td>
+                <Td numeric>{c.ttfbMs === null ? '—' : `${c.ttfbMs} ms`}</Td>
+              </Tr>
+            ))}
+          </TBody>
+        </Table>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-fg-secondary">
+        <span>{`Latest ${detail.log.length} of ${detail.checksToday.toLocaleString('en-US')} checks today`}</span>
+        {detail.checksToday > 0 && (
+          <Button variant="ghost" size="sm" icon={<IconDownload />} href={`/sites/${detail.id}/checks.csv`}>
+            Download today’s log
+          </Button>
+        )}
+      </div>
+    </section>
+  );
+}
