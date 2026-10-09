@@ -612,7 +612,10 @@ function IncidentHistory({ detail }: { detail: SiteDetail }) {
             {shown.map((h) => (
               <Tr key={h.id}>
                 <Td mono className="whitespace-nowrap">
-                  <Link href={`/incidents/${h.id}`} className={TOUCH_HIT}>
+                  <Link
+                    href={`/incidents/${h.id}`}
+                    className={`underline underline-offset-2 hover:decoration-2 ${TOUCH_HIT}`}
+                  >
                     {formatIncidentId(h.number)}
                   </Link>
                 </Td>
