@@ -201,12 +201,73 @@ export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
         severity: e.severity ?? 'down',
       });
     } else if (e.type === 'escalated_to_down' && last) {
-      last.severity = 'down';
+      // D-021 while the PROBLEM drop is still open: the PROBLEM ends where the outage starts and a DOWN
+      // drop begins, like D-023's DOWN AGAIN above (its payload carries no severity, so go by the type)
+      const at = e.startedAt ?? e.at;
+      if (last.severity === 'problem' && at > last.start) {
+        last.end = at;
+        out.push({ start: at, end: null, severity: 'down' });
+      } else {
+        last.severity = 'down';
+      }
     } else if (e.type === 'recovered' && open && last) {
       last.end = e.at;
     }
   }
   return out;
+}
+
+/** A stored `incident_events` row, as the database returns it. */
+export interface IncidentEventRow {
+  type: string;
+  at?: string | null;
+  payload: unknown;
+}
+
+const dateOf = (v: unknown): Date | null =>
+  typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : null;
+
+/**
+ * The drops of a stored incident (D-024): its `detected` drop starts at `started_at` with the incident's
+ * severity; a relapse at its payload's `startedAt`; a PROBLEM turned DOWN (D-021) at `downStartedAt`.
+ */
+export function episodesFromTimeline(
+  incident: { started_at: string; severity: Severity; resolved_at?: string | null },
+  events: readonly IncidentEventRow[],
+): Episode[] {
+  const out: EpisodeEvent[] = [];
+  const raised = events.some((e) => e.type === 'escalated_to_down');
+  for (const e of events) {
+    const at = dateOf(e.at);
+    if (!at) continue;
+    const p = e.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : {};
+    const startedAt =
+      e.type === 'detected'
+        ? new Date(incident.started_at)
+        : e.type === 'relapsed'
+          ? dateOf(p.startedAt)
+          : e.type === 'escalated_to_down'
+            ? dateOf(p.downStartedAt)
+            : null;
+    const severity = p.severity === 'down' || p.severity === 'problem' ? p.severity : null;
+    // `incidents.severity` is 'down' once raised (D-021): its first drop was a PROBLEM then
+    const first = raised ? 'problem' : incident.severity;
+    out.push({ type: e.type, at, startedAt, severity: e.type === 'detected' ? first : severity });
+  }
+  // A resolved incident's drop with no `recovered` row (a script resolved it, a lost event) ends at the
+  // resolve, never at now (engine review L3: staging's reset script left 0.00% uptime)
+  const resolved = dateOf(incident.resolved_at);
+  return episodesOf(out).map((d) =>
+    d.end === null && resolved ? { ...d, end: resolved > d.start ? resolved : d.start } : d,
+  );
+}
+
+/** The DOWN drops of a stored incident, for uptime (spec §5: PROBLEM counts as up; D-021 via the timeline). */
+export function downEpisodesFromTimeline(
+  incident: { started_at: string; severity: Severity; resolved_at?: string | null },
+  events: readonly IncidentEventRow[],
+): Episode[] {
+  return episodesFromTimeline(incident, events).filter((d) => d.severity === 'down');
 }
 
 /** Minutes the episodes were down (or had a problem), the drop still in progress counted to `now`. */

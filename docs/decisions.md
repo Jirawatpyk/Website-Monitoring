@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-031 | 9 Oct 2026 | S06 is split: **S06 Site detail & check rollups** first, **S06b Overview (option A)** after it (BottomNav moves with S06b); AM / CEO keep D-016 (no Acknowledge, "Open INC-…"); `check_rollups` per monitor and per location with no uptime column; uptime windows start no earlier than monitoring started; 7 d / 30 d / 90 d p50 / p95 come from rollups; the 90-day load test runs on local Supabase | Plan S06 (one slice, Overview first), D-018 "BottomNav with S06", spec §21.8 "AM / CEO: Acknowledge allowed", PRD §11 `check_rollups.uptime_pct`, plan S06 Done-when 1 "90 days on staging" |
 | D-030 | 8 Oct 2026 | Sites list (S05c): status is filtered by the chip row only (no Status dropdown beside Tier / Owner / Client); the search and the three filters share a row, Needs attention below, Sort by at the end of the count line; the legend is a card with Status, Locations and Columns (two columns from md with Columns under them, three from xl; none on phones, as MSites), 24 px below the table, and the chip row drops "Muted keeps the real status" (the legend says it); owner names take two lines; phones keep an always-visible search field instead of a top-bar search icon | Sites board: a Status select duplicating the chips, the filter-row order, the inline legend; MSites: the search icon in the top bar |
 | D-029 | 8 Oct 2026 | A misconfigured certificate chain (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `UNABLE_TO_GET_ISSUER_CERT(_LOCALLY)`) is a PROBLEM (TLS chain) in one round, never a DOWN and never a hard-fail vote; expired, wrong-host, self-signed and not-yet-valid certificates stay hard fails | Spec §6 counts every TLS failure as a hard fail (→ DOWN) |
 | D-028 | 8 Oct 2026 | The BKK probe's control check failing 3 rounds in a row opens an Admin system alert ("BKK probe network check failing") naming the WAF sites it left unverified; it clears once the check passes (≥ 10 min after it opened) | Gap — D-027 rule 2 told the site owner (PROBLEM, unverified) but nobody to fix the VPS |
@@ -34,6 +35,27 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-031 — S06 split: Site detail first, the Overview in S06b
+
+**Conflict / gap.**
+- Plan S06 bundled the Overview (now three boards, spec §21 of 9 Oct), Site detail (two boards), `check_rollups`, Realtime and BottomNav — well past L. Built in that order, every Overview row, tile and "View checks" would link to a Site detail that doesn't exist (no dead controls, §14.16).
+- Spec §21.8 lets AMs and the CEO acknowledge ("allowed, not expected"); D-016 and `ack_incident` refuse Stakeholders and Viewers.
+- PRD §11 gives `check_rollups` an `uptime_pct`, but spec §5 counts uptime from DOWN minutes (incidents), not from passed checks. The Site detail chart needs response time per location, which a per-monitor rollup can't give.
+- Plan S06 Done-when 1 wants 90 days of generated checks on staging: about 3.3 million rows (~1 GB), past the staging project's free-tier 500 MB.
+
+**Decision (Tao, 9 Oct 2026).**
+- **Two slices, Site detail first.** S06 = `check_rollups` + pg_cron jobs + Site detail (SiteDetail, MSite) + the Sites list rows opening it for every role with Response 24h / Uptime 30d filled in (FR-08). S06b = the Overview (Main3, MainDark3, MOverview4), Realtime and BottomNav (FR-05). D-018's "BottomNav with S06" now reads S06b; MSite draws BottomNav, and it joins when S06b ships.
+- **D-016 stays.** AMs, the CEO and Viewers don't get Acknowledge on the Overview; banners and rows offer "Open INC-…". §21.8's "allowed, not expected" is not built.
+- **`check_rollups` shape:** one row per monitor, location (BKK / SIN / TYO, plus an all-locations row with `location` null), bucket (hour / day) and bucket start — `checks`, `hard_fails` (TLS chain errors excluded, D-029), `blocked`, `p50_ms`, `p95_ms` over passing checks. No uptime column. Day buckets start at Bangkok midnight. Hour rows are kept 90 days, day rows 2 years.
+- **Uptime window:** a range starts at the later of (now − range) and the site's `monitoring_started_at`, so a site monitored for 3 days isn't credited with 27 unmonitored days. Maintenance minutes are 0 until S09.
+- **p50 / p95 per range:** 24 h is exact from raw checks; 7 d uses hour rollups, 30 d and 90 d day rollups — the median of the buckets' p50 / p95 weighted by their checks. Close to the true value for steady sites, and cheap.
+- **TLS chain on Incident history:** shows the trigger word ("TLS chain") without a client word ("Outage" / "Degraded"); D-029 leaves that to S21.
+- **Load test:** the full 90 days runs on local Supabase (the same Postgres, the same partitions); staging gets 90 days of rollups and 2 days of raw checks for the `/verify` drive, deleted afterwards.
+
+**Why.** Site detail first keeps every link live. Two smaller slices review faster. Uptime from incidents is the rule the reports use (§5); a pass rate would count a blocked or TLS chain check as downtime. Per-location rows are what the chart draws. The Overview reads raw checks only for the last 24 h, so 90 days of raw data on staging would prove nothing the local run doesn't.
+
+**Impact.** `docs/implementation-plan.md` (S06, new S06b, S09 / S12 depend on S06b), `docs/design/screens.md`, `supabase/migrations` (`check_rollups`), `features/sites` (Site detail, Sites list values), D-018 (BottomNav slice).
 
 ## D-029 — TLS chain errors are a PROBLEM, not DOWN
 
@@ -300,7 +322,7 @@ The ChatAlert board has one PROBLEM text line and no PROBLEM card. EmailAlert ha
 
 **Decision (7 Oct 2026, with Tao).**
 - Every page header is AURA `PageHeader`: 4 px between eyebrow, title and meta line, as on Overview today. A breadcrumb is the eyebrow: AURA `Breadcrumb` sits 4 px above a `PageHeader` that has no `eyebrow` (one `flex flex-col gap-1` wrapper), so a page with a breadcrumb and one with a section name line up. It can't go inside the `eyebrow` slot — that renders a `<p>`, and a `<nav>` inside a `<p>` is invalid HTML (React hydration error); AURA request 7 asks for a breadcrumb slot. The other gaps on the boards are drawing drift, not intent.
-- Phones get the boards' top bar now: brand (compact tile) + the signed-in person's avatar (`components/app-shell/mobile-bar.tsx`), hidden from lg where the sidebar shows. In S06 AURA `BottomNav` adds the phone boards' four sections (Overview, Incidents, Sites, On-call) below lg — phones and tablets (820 px) alike. The menu button and drawer stay beside it: the boards draw no other way to reach the rest (Escalation, Maintenance, Reports, Settings …), and no rule makes those pages desktop-only; the back arrow comes with S07, when the Incidents list it returns to exists (no dead controls, §14.16).
+- Phones get the boards' top bar now: brand (compact tile) + the signed-in person's avatar (`components/app-shell/mobile-bar.tsx`), hidden from lg where the sidebar shows. In S06b (D-031) AURA `BottomNav` adds the phone boards' four sections (Overview, Incidents, Sites, On-call) below lg — phones and tablets (820 px) alike. The menu button and drawer stay beside it: the boards draw no other way to reach the rest (Escalation, Maintenance, Reports, Settings …), and no rule makes those pages desktop-only; the back arrow comes with S07, when the Incidents list it returns to exists (no dead controls, §14.16).
 
 **Why.** One rhythm means the title doesn't jump between pages, and the breadcrumb row (13 px text, 16 px icons) is the same height as the mono eyebrow, so nothing else changes. Using `PageHeader` as AURA ships it keeps the title, meta and actions in one component; the breadcrumb wrapper adds only the same 4 px. The phone bar is what every phone board shows, and a person opening an alert link on a phone should see where they are and who is signed in.
 

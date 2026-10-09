@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Overview</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.mo-more{display:flex;align-items:center;justify-content:space-between;min-height:44px;padding:0 16px;box-sizing:border-box;border:1px solid var(--aura-alert-danger-border);border-radius:var(--aura-radius-lg);font-size:13px;font-weight:600;color:var(--aura-alert-danger-fg);text-decoration:none;background:var(--aura-bg-surface)}
+.mo-more:hover{color:var(--aura-alert-danger-fg)}
+.mo-all{min-height:48px;box-sizing:border-box;padding:0 14px;display:flex;align-items:center;gap:10px;background:var(--aura-bg-surface);border:1px solid var(--aura-border-default);border-radius:var(--aura-radius-lg);color:inherit;text-decoration:none;font-size:14px;font-weight:500}
+.mo-tile{min-height:60px;box-sizing:border-box;padding:10px 10px;display:flex;flex-direction:column;justify-content:center;gap:4px;border:1px solid;border-radius:var(--aura-radius-md);color:inherit;text-decoration:none;line-height:1.3;font-size:13px}
+.mo-tile:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px}
+.mo-name{flex-grow:1;min-width:0;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<div style="display: flex; align-items: center; gap: 8px">
+<div style="height: 28px; padding: 0 8px; display: flex; align-items: center; gap: 5px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 14px; font-weight: 600">DxT</span>
+<span style="width: 5px; height: 5px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--aura-fg-secondary)">{{me}}<x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="sm"></x-import></span>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" full-width="{{yes}}" size="sm"></x-import></div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; margin-top: -4px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">VIEW AS</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview as role" options="{{roles}}" value="{{role}}" on-change="{{setRole}}" full-width="{{yes}}" size="sm"></x-import></div>
+</div>
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between">
+<div style="display: flex; flex-direction: column; line-height: 1.2; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">FRI 25 SEP 10:07 · UTC+7</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: -0.01em">{{okCount}}/{{monitored}} OK</h1>
+</div>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><span style="width: 8px; height: 8px; border-radius: 9999px; background: var(--aura-fg-positive)"></span>Probes 3/3</span>
+</div>
+
+<sc-for list="{{banners}}" as="b" hint-placeholder-count="2">
+<a href="MIncident.dc.html" aria-label="{{b.aria}}" style="display: flex; gap: 12px; padding: 14px 16px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-lg); color: inherit; text-decoration: none">
+<span style="display: flex; padding-top: 2px; color: var(--aura-alert-danger-fg)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="md"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.45">
+<span style="font-weight: 600; color: var(--aura-alert-danger-fg)">{{b.title}}</span>
+<span style="font-size: 13px">{{b.sub}}</span>
+</div>
+<span style="display: flex; align-self: center; color: var(--aura-alert-danger-fg)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="md"></x-import></span>
+</a>
+</sc-for>
+<sc-if value="{{hasMore}}" hint-placeholder-val="{{true}}">
+<a href="MIncidents.dc.html" class="mo-more"><span>{{moreText}}</span></a>
+</sc-if>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<a href="MIncidents.dc.html" style="padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; line-height: 1.3; color: inherit; text-decoration: none"><span style="font-size: 20px; font-weight: 600">{{nOpen}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Open</span></a>
+<a href="MIncidents.dc.html" style="padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; line-height: 1.3; color: inherit; text-decoration: none"><span style="font-size: 20px; font-weight: 600; color: {{unColor}}">{{nUnacked}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Unacked</span></a>
+<div style="padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); display: flex; flex-direction: column; line-height: 1.3"><span style="font-size: 20px; font-weight: 600; color: {{yoursColor}}">{{card3Value}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{card3Label}}</span></div>
+</div>
+
+<section aria-label="Live issues" style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">Live issues</h2>
+<sc-if value="{{hasAttn}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{attnMeta}}</span></sc-if>
+</div>
+<sc-if value="{{hasAttn}}" hint-placeholder-val="{{true}}">
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{attn}}" as="s" hint-placeholder-count="6">
+<a href="{{s.href}}" aria-label="{{s.aria}}" style="min-height: 60px; box-sizing: border-box; padding: 8px 8px 8px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--aura-border-subtle); color: inherit; text-decoration: none">
+<span style="width: 88px; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import><sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted</x-import></sc-if></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3; gap: 2px">
+<span style="max-width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px"><span style="max-width: 100%; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{s.name}}</span><sc-if value="{{s.yours}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="{{s.yoursIcon}}">{{s.yoursLabel}}</x-import></span></sc-if></span>
+<span style="max-width: 100%; font-size: 12px; color: {{s.noteColor}}; font-weight: {{s.noteWeight}}; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">{{s.note}}</span>
+</div>
+<span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; font-variant-numeric: tabular-nums"><span style="font-size: 13px; font-weight: {{s.durWeight}}; color: {{s.durColor}}; white-space: nowrap">{{s.dur}}</span><span style="font-size: 11px; color: var(--aura-fg-secondary); white-space: nowrap">{{s.since}}</span></span>
+<span style="display: flex; color: var(--aura-fg-tertiary); margin-left: -4px"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span>
+</a>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{noAttn}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); line-height: 1.4">
+<span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="md"></x-import></span>
+<span style="display: flex; flex-direction: column"><span style="font-weight: 600">All {{monitored}} monitored sites OK</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{allOkLine}}</span></span>
+</div>
+</sc-if>
+</section>
+
+<a href="MSites.dc.html" class="mo-all"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="monitor" size="sm"></x-import></span><span style="flex-grow: 1">All {{monitored}} sites <span style="color: var(--aura-fg-secondary)">· {{okCount}} OK</span></span><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Phone Overview answers three things, in order: anything to do now (banners — same rules as desktop), what is wrong and is it mine (Live issues), and is the rest fine (“x/y OK” in the header, “All N sites” row → Sites). Live issues: same inclusion and sort as desktop; each row = status + one reason + Since; a neutral outline chip with the user icon shows when you own the site (“Yours”) or are its backup (“Backup”) — never accent/violet, which status badges reserve for Maintenance (spec §11). Third count by role: Responder / Admin → “Yours” (Live issues you own or back up; chips “Yours” / “Backup”, user icon) · AM (Stakeholder) → “Your clients” (Live issues on sites of clients you manage; chip “Your client”, users icon) — they act on client updates · CEO (Stakeholder, no clients) and Viewer → “Uptime 30 d”, no chips. Chips are neutral outline, never accent/violet (status badges reserve it for Maintenance, spec §11). Viewer is read-only: banners and rows open the incident without Acknowledge; AM and CEO can acknowledge but don’t need to (spec §18). Use VIEW AS to compare. Not on phones: site tiles, KPIs MTTA / MTTD / uptime, Recent events (Incidents tab), legend, sparklines. All OK → one line “Nothing needs you”. The User guide icon comes back to the top bar with the guide. Sample viewers: Arm (Responder), Bua (AM: MuvMi, Bangkok Airways, Tubtong, Cando Asia), Mint (Viewer); values are mock data — compute them; never copy.</div>
+</div>
+
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="overview" label="Sections"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: '2 + more', tier: 'All', role: 'Responder' };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var V = st.view, three = V === '2 + more', one = V === '1 banner', allOk = V === 'All OK';
+    var DANGER = 'var(--aura-fg-danger)', WARN = 'var(--aura-alert-warning-fg)', SEC = 'var(--aura-fg-secondary)';
+    var ST = {
+      down: { label: 'Down', tone: 'danger', variant: 'solid', icon: 'ban', rank: 0 },
+      problem: { label: 'Problem', tone: 'warning', variant: 'soft', icon: 'triangle-alert', rank: 1 },
+      maint: { label: 'Maintenance', tone: 'accent', variant: 'soft', icon: 'calendar', rank: 2 },
+      ok: { label: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check', rank: 3 }
+    };
+    // Same sample as Main3: 11 monitored sites + 1 draft (not shown)
+    var downs = {};
+    if (three || one) downs['MuvMi'] = { id: 'INC-0142', min: 19, un: 18, esc: true, cause: 'Timeout ×2 · 504 ×1', at: '09:48' };
+    if (three) {
+      downs['realme.link'] = { id: 'INC-0143', min: 6, un: 6, cause: 'Connection refused ×3', at: '10:01' };
+      downs['Tubtong'] = { id: 'INC-0144', min: 3, un: 3, cause: '503 ×3', at: '10:04' };
+      downs['Cando Asia'] = { id: 'INC-0140', min: 12, ackBy: 'Nok', cause: 'DNS not resolving ×3', at: '09:55' };
+    }
+    var fuji = three || V === 'None';
+    var base = [
+      // name, tier, p50, owner, backup — same owners as the Sites board; the viewer is Arm (Responder)
+      ['MuvMi', 1, '412 ms', 'Arm', 'Ploy', 'Bua'], ['realme.link', 1, '241 ms', 'Nok', 'Arm', 'Thee'], ['Bangkok Airways – Taiwan', 1, '412 ms', 'Arm', 'Ploy', 'Bua'], ['Bangkok Airways – China', 1, '688 ms', 'Arm', 'Ploy', 'Bua'],
+      ['ENEOS Industrial', 1, '356 ms', 'Ploy', 'Arm', 'Thee'], ['Fuji Links', 2, fuji ? '5.8 s' : '1.9 s', 'Ploy', 'Nok', 'Thee'], ['ORCA Thailand', 2, '520 ms', 'Tao', 'Nok', 'Thee'], ['Tubtong', 2, '1.1 s', 'Ploy', 'Nok', 'Bua'],
+      ['Cando Asia', 2, '940 ms', 'Nok', 'Ploy', 'Bua'], ['VOCA', 2, '298 ms', 'Ploy', 'Tao', ''], ['DxT Games', 3, '390 ms', 'Tao', 'Nok', '']
+    ];
+    var ROLE = st.role, ME = ROLE === 'AM' ? 'Bua' : (ROLE === 'Viewer' ? 'Mint' : 'Arm');
+    var all = base.map(function (r) {
+      var name = r[0], d = downs[name];
+      var key = d ? 'down' : (name === 'Fuji Links' && fuji ? 'problem' : 'ok'), S = ST[key];
+      var o = { name: name, tier: r[1], key: key, rank: S.rank, label: S.label, tone: S.tone, variant: S.variant, icon: S.icon, p50: d ? '—' : r[2],
+        reason: '', ackRank: 0, durMin: 0, noteColor: SEC, noteWeight: 400, durColor: 'var(--aura-fg-primary)', durWeight: 400, muted: name === 'DxT Games' && !allOk, href: 'MSite.dc.html', open: false };
+      if (d) {
+        var isAck = !!d.ackBy;
+        o.reason = 'down'; o.note = (isAck ? 'Acked by ' + d.ackBy + ' · ' : (d.esc ? 'Escalated L1 · ' : 'Unacked · ')) + d.cause; o.noteColor = DANGER; o.noteWeight = 500;
+        o.dur = d.min + ' min'; o.durMin = d.min; o.since = 'since ' + d.at; o.durColor = DANGER; o.durWeight = 600;
+        o.ackRank = isAck ? 2 : (d.esc ? 0 : 1); o.href = 'MIncident.dc.html'; o.open = true; o.id = d.id; o.esc = !!d.esc; o.un = d.un;
+      } else if (key === 'problem') {
+        o.reason = 'problem'; o.note = 'Slow: p50 5.8 s > 5 s'; o.noteColor = WARN; o.dur = '15 min'; o.durMin = 15; o.since = 'since 09:52'; o.href = 'MIncident.dc.html'; o.open = true;
+      } else if (name === 'ORCA Thailand' && !allOk) {
+        o.reason = 'rootcause'; o.note = 'Root cause not added yet'; o.noteColor = WARN; o.dur = '1 h 55 min'; o.durMin = 115; o.since = 'since 08:12'; o.href = 'MIncident.dc.html'; o.open = true; o.flagInc = true;
+      } else if (name === 'ENEOS Industrial' && !allOk) {
+        o.reason = 'warn'; o.note = 'TLS chain error at SIN'; o.dur = '36 min'; o.durMin = 36; o.since = 'since 09:31'; o.flagShield = true;
+      } else if (o.muted) {
+        o.reason = 'muted'; o.note = 'Muted by Tao until 18:00'; o.dur = '1 h 27 min'; o.durMin = 87; o.since = 'since 08:40';
+      }
+      if (ROLE === 'Responder') { o.yours = r[3] === ME || r[4] === ME; o.yoursLabel = r[3] === ME ? 'Yours' : 'Backup'; o.yoursIcon = 'user'; o.yoursAria = r[3] === ME ? ', you are the owner' : ', you are the backup'; }
+      else if (ROLE === 'AM') { o.yours = r[5] === ME; o.yoursLabel = 'Your client'; o.yoursIcon = 'users'; o.yoursAria = ', your client'; }
+      else { o.yours = false; o.yoursLabel = ''; o.yoursIcon = 'user'; o.yoursAria = ''; }
+      o.aria = name + ', ' + S.label + (o.yours ? o.yoursAria : '') + (o.muted ? ', muted until 18:00' : '') + (o.note ? ', ' + o.note : '') + (o.dur ? ', for ' + o.dur : '');
+      return o;
+    });
+    function cmp(a, b) { return a.rank - b.rank || a.ackRank - b.ackRank || a.tier - b.tier || b.durMin - a.durMin || a.name.localeCompare(b.name); }
+    var monitored = all.length;
+    var okCount = all.filter(function (r) { return r.key === 'ok'; }).length;
+    var attn = all.filter(function (r) { return !!r.reason; }).sort(cmp);
+    var q = attn.filter(function (r) { return r.key === 'down' && r.ackRank < 2; });
+    var banners = q.slice(0, 2).map(function (r) {
+      var sub = r.esc ? 'Escalated · L1 · ' + r.un + ' min unacked · CEO at 10:18' : r.un + ' min unacked · ' + downs[r.name].cause;
+      return { title: r.name + ' is DOWN — ' + r.durMin + ' min', sub: sub, aria: r.name + ' is DOWN, ' + r.durMin + ' minutes. ' + sub + '. Open ' + r.id };
+    });
+    var more = q.length - banners.length;
+    var nEsc = q.filter(function (r) { return r.esc; }).length;
+    var TILE = {
+      down: { bg: 'var(--aura-alert-danger-bg)', bd: 'var(--aura-alert-danger-border)', c: DANGER },
+      problem: { bg: 'var(--aura-alert-warning-bg)', bd: 'var(--aura-alert-warning-border)', c: WARN },
+      maint: { bg: 'var(--aura-bg-surface)', bd: 'var(--aura-border-default)', c: 'var(--aura-fg-accent)' },
+      ok: { bg: 'var(--aura-bg-surface)', bd: 'var(--aura-border-default)', c: 'var(--aura-fg-positive)' }
+    };
+    var tier = st.tier;
+    var tiles = all.filter(function (r) { return tier === 'All' || ('Tier ' + r.tier) === tier; }).sort(cmp).map(function (r) {
+      var t = TILE[r.key], dn = r.key === 'down';
+      return { name: r.name, tier: r.tier, icon: r.icon, color: t.c, bg: t.bg, bd: t.bd, muted: r.muted, flagShield: !!r.flagShield, flagInc: !!r.flagInc,
+        right: dn ? r.dur : r.p50, rightColor: dn ? DANGER : (r.key === 'problem' ? WARN : SEC), rightWeight: dn ? 600 : 400,
+        aria: r.name + ', ' + r.label + (dn ? ' for ' + r.dur : ', p50 ' + r.p50) + (r.muted ? ', muted' : '') };
+    });
+    var nOpen = all.filter(function (r) { return r.open; }).length;
+    return {
+      yes: true,
+      views: ['2 + more', '1 banner', 'None', 'All OK'], view: V,
+      setView: function (v) { self.setState({ view: v }); },
+      okCount: okCount, monitored: monitored,
+      banners: banners, hasMore: more > 0, moreText: 'and ' + more + ' more → Incidents',
+      nOpen: nOpen, nUnacked: q.length, unColor: q.length ? DANGER : 'var(--aura-fg-primary)',
+      attn: attn, hasAttn: attn.length > 0, noAttn: attn.length === 0,
+      attnMeta: attn.length + ' of ' + monitored + ' sites',
+      me: ME, roles: ['Responder', 'AM', 'Viewer'], role: ROLE,
+      setRole: function (v) { self.setState({ role: v }); },
+      card3Value: ROLE === 'Viewer' ? '99.98%' : String(attn.filter(function (r) { return r.yours; }).length),
+      card3Label: ROLE === 'Responder' ? 'Yours' : (ROLE === 'AM' ? 'Your clients' : 'Uptime 30 d'),
+      allOkLine: (ROLE === 'Viewer' ? 'Nothing is wrong' : 'Nothing needs you') + ' · last full round 10:07',
+      yoursColor: 'var(--aura-fg-primary)',
+      tier: tier, tierOptions: ['All', 'Tier 1', 'Tier 2', 'Tier 3'],
+      setTier: function (v) { self.setState({ tier: v }); },
+      tiles: tiles,
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: nOpen || undefined },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

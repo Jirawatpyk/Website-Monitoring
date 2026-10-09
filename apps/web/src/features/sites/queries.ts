@@ -1,6 +1,8 @@
 import 'server-only';
 import { CLOSED_INCIDENT_STATES_IN, defaultSlowMs, toMonitorHeaders, type SiteStatus } from '@dxt/shared';
+import { siteUptimeOver } from '@dxt/engine';
 import { createClient } from '@/lib/supabase/server';
+import { downEpisodesBySite, watchedSince } from './detail-queries';
 import { locationGlyph } from './components/site-list';
 import { siteIdSchema } from './schemas';
 import type {
@@ -17,17 +19,21 @@ import type {
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 
+const THIRTY_DAYS_MIN = 30 * 1440;
+
 /**
  * `/sites` (spec §20): every site with its client · AM, owner · backup, mute, open incident, latest
- * status and each location's latest check of the primary monitor (RLS: staff read all).
+ * status, each location's latest check of the primary monitor, the 24 h p50 and the 30-day uptime
+ * (RLS: staff read all).
  */
-export async function listSites(): Promise<SiteListRow[]> {
+export async function listSites(now = new Date()): Promise<SiteListRow[]> {
   const supabase = await createClient();
-  const [sites, checks] = await Promise.all([
+  const from30d = new Date(now.getTime() - THIRTY_DAYS_MIN * 60_000);
+  const [sites, checks, response, drops] = await Promise.all([
     supabase
       .from('sites')
       .select(
-        `id, name, tier, is_active, muted_until,
+        `id, name, tier, is_active, muted_until, monitoring_started_at, created_at,
          clients!inner(id, name, is_internal, am:profiles!clients_am_user_id_fkey(display_name)),
          owner:profiles!sites_primary_owner_id_fkey(id, display_name),
          backup:profiles!sites_backup_owner_id_fkey(id, display_name),
@@ -40,9 +46,13 @@ export async function listSites(): Promise<SiteListRow[]> {
       .not('incidents.state', 'in', CLOSED_INCIDENT_STATES_IN)
       .order('name'),
     supabase.rpc('site_list_locations'),
+    supabase.rpc('site_list_response_24h'),
+    downEpisodesBySite(supabase, null, from30d),
   ]);
   if (sites.error) throw new Error(`sites: ${sites.error.message}`);
   if (checks.error) throw new Error(`site_list_locations: ${checks.error.message}`);
+  if (response.error) throw new Error(`site_list_response_24h: ${response.error.message}`);
+  const p50 = new Map(response.data.map((r) => [r.site_id, r.p50_ms]));
 
   const latest = new Map<string, (typeof checks.data)[number]>();
   for (const c of checks.data) latest.set(`${c.site_id}|${c.location}`, c);
@@ -86,8 +96,17 @@ export async function listSites(): Promise<SiteListRow[]> {
           }
         : null,
       locations: { BKK: glyph('BKK'), SIN: glyph('SIN'), TYO: glyph('TYO') },
-      p50Ms: null,
-      uptime30d: null,
+      // "—" while down or in maintenance (spec §20)
+      p50Ms:
+        s.is_active && status?.status !== 'down' && status?.status !== 'maintenance'
+          ? (p50.get(s.id) ?? null)
+          : null,
+      uptime30d:
+        siteUptimeOver(drops.get(s.id) ?? [], {
+          now,
+          rangeMinutes: THIRTY_DAYS_MIN,
+          monitoringStartedAt: watchedSince(s),
+        })?.uptime ?? null,
       expiryDays: null,
     };
   });

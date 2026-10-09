@@ -56,12 +56,12 @@ export const EXPIRY_SOON_DAYS = 60;
 
 const RANK: Record<RowKey, number> = { down: 0, problem: 1, maintenance: 2, ok: 3, pending: 4, draft: 5 };
 
-export function rowKey(r: SiteListRow): RowKey {
+export function rowKey(r: Pick<SiteListRow, 'live' | 'status'>): RowKey {
   if (!r.live) return 'draft';
   return r.status ?? 'pending';
 }
 
-export function isMuted(r: SiteListRow, now: Date): boolean {
+export function isMuted(r: Pick<SiteListRow, 'mutedUntil'>, now: Date): boolean {
   return !!r.mutedUntil && new Date(r.mutedUntil).getTime() > now.getTime();
 }
 

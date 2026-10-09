@@ -199,6 +199,14 @@
       "x": 0,
       "y": 0
     },
+    "Main3.dc.html": {
+      "h": 2575,
+      "is_interactive": true,
+      "title": "Overview — option A (Live issues + All sites tiles)",
+      "w": 1440,
+      "x": 7960,
+      "y": 0
+    },
     "MainDark.dc.html": {
       "h": 1840,
       "is_interactive": true,
@@ -206,6 +214,14 @@
       "w": 1440,
       "x": 3040,
       "y": 19941
+    },
+    "MainDark3.dc.html": {
+      "h": 2575,
+      "is_interactive": true,
+      "title": "Overview — option A · dark (NOC wall)",
+      "w": 1440,
+      "x": 9480,
+      "y": 0
     },
     "MainFault.dc.html": {
       "h": 1228,
@@ -363,6 +379,14 @@
       "w": 600,
       "x": 1520,
       "y": 24461
+    },
+    "MOverview4.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Overview: what phones show (Yours, no tiles)",
+      "w": 390,
+      "x": 11000,
+      "y": 0
     }
   },
   "createdOnFiles": {
@@ -384,15 +408,15 @@
   "notes": {
     "aura-fixes": {
       "fill": "orange",
-      "maxH": 1400,
-      "text": "AURA — ต้องแก้ (เจอจากงาน DxT Monitor)\n\n1. StatusPill ไม่มี tone warning → PROBLEM ต้องใช้ Badge แทน. เพิ่ม tone \"warning\" (amber + triangle-alert)\n2. Checkbox: prop label ไม่แสดงบนจอ (เป็นแค่ aria-label) ต่างจาก Switch / TextField → render label หรือเปลี่ยนชื่อ prop\n3. Design System artifact ไม่มี tokens.css → bundle.css หา CSS variables ไม่เจอ ต้องสร้างเองจาก tokens.json. Publish tokens.css (aura.css) ด้วย\n4. README ไม่มีส่วน \"Consuming this system\" (namespace, ลำดับโหลด) และ index การ์ด project/api/… → ใช้งานผ่านเครื่องมือแล้วหา component ไม่เจอ\n5. bundle.css @import Google Fonts บรรทัดแรก — ขัดกฎใน README เอง, พังเมื่อมี CSP / offline → ย้ายไป aura-fonts.css\n6. .aura-table__td ตั้ง flex: none → คอลัมน์ที่ยืด (flex-grow) ไม่หด ข้อความยาวดันคอลัมน์อื่นล้นขวา → ให้หดได้ + min-width: 0\n7. DataTable คอลัมน์ width คงที่ รวมแล้วเกิน container แคบ (~550px) → scrollbar แนวนอน; ควรมีคอลัมน์ flex\n8. SideNav ไม่มีระยะด้านบนเมื่อไม่ใช้ header และมี border-right ของตัวเอง → ปุ่มแรกติดขอบ / เส้นซ้อนกับ layout\n9. Dialog เปิดแล้วโฟกัสปุ่มปิด โชว์ focus ring ทันที → โฟกัส field แรกหรือหัวข้อแทน\n10. Icon set ขาด: server, globe, activity, shield-alert, phone, wrench (ตอนนี้ใช้ monitor / lock แทน)\n11. ไม่มี dark theme แบบไฟล์ CSS (มีแค่ค่า dark ใน tokens.json) → ต้อง resolve เองเป็น aura-tokens-dark.css. Publish [data-theme=dark] / prefers-color-scheme ด้วย\n12. SideNav item badge ไม่มี tone (danger / warning) → แจ้ง Fault ใน nav เป็นตัวหนังสือเทาธรรมดา ไม่เด่น\n13. Tag ที่ children ไม่ใช่ string ปกติ → ปุ่มลบได้ aria-label ว่า \"Remove \" (ชื่อหาย) ต้องส่ง removeLabel เองทุกครั้ง\n14. Switch ที่ disabled + checked เป็นสีเทาเหมือนตอนปิด → แยกไม่ออกว่า \"ล็อกเปิด\" หรือ \"ปิด\" (หน้า Security ต้องเปลี่ยนไปใช้ Badge \"Always on\" แทน)",
+      "maxH": 2000,
+      "text": "AURA — รายการแก้ (เจอจากงาน DxT Monitor)\nเช็กกับ AURA ล่าสุด 9 ต.ค. 2026 (5.34, version 1791515520) — ครบทั้ง 16 ข้อแล้ว. canvas นี้ยังใช้ AURA ที่ copy มา 25 ก.ย. บางบอร์ดจึงยังวาดของแทนไว้ — dev ใช้ AURA ล่าสุดได้เลย\n\n✓ แก้แล้ว (1–16)\n1. StatusPill มี tone warning แล้ว (5.1) — amber + triangle-alert, คำว่า Problem / Degraded เข้า warning อัตโนมัติ\n2. Checkbox: ข้อความที่เห็นใส่เป็น children, label + hideLabel สำหรับกล่องเปล่า (5.1); 6.0 จะแสดง label บนจอ\n3. มี tokens.css แล้ว (token ทั้งหมด + @font-face)\n4. README มี “Consuming this system” + index การ์ด api/… แล้ว\n5. bundle.css ไม่ @import ฟอนต์แล้ว (ใช้ aura-fonts.css หรือ <link>)\n6. .aura-table__td ใช้ --aura-cell-flex / --aura-cell-min (ค่าเริ่ม min-width: 0) — คอลัมน์ยืดหดได้แล้ว\n7. DataTable มีคอลัมน์ auto + resizable / minWidth / maxWidth แล้ว\n8. SideNav: ไม่มี header → เว้นด้านบน space-3, bordered={false} ปิดเส้นขวา (5.1)\n9. Dialog โฟกัส data-autofocus / control แรก ไม่ใช่ปุ่มปิด (5.1)\n10. ไอคอน server, globe, activity, shield-alert, phone, wrench มีแล้ว (5.1) — Overview ใช้ shield-alert ได้เลย\n11. dark theme อยู่ใน tokens.css ใต้ [data-theme=\"dark\"] + ColorSchemeScript\n12. SideNav item รับ badge เป็น Badge ที่มี tone ได้ (danger / warning) — ใช้แจ้ง Fault\n13. Tag ตั้งชื่อปุ่มลบจากข้อความใน children เอง (5.10.1); ต้องส่ง removeLabel เฉพาะ children ที่ไม่มีข้อความ\n14. Switch disabled + checked แยกจากปิดได้แล้ว (5.10.1, 5.30) และมี readOnly (5.19) — AURA แนะนำให้ใช้ Switch ล็อกแทน Badge “Always on” (หน้า Security เปลี่ยนกลับได้ถ้าต้องการ)\n15. StatusTile + TileGrid มีแล้ว (5.34) — status, title 2 บรรทัด, value + valueTone, meta, markers (icon, label, tone), href, ธีมมืด; TileGrid columns ค่าเริ่ม 2 / md 3, gap 8. ต่างจากที่ DxT วาด: ไอคอน down = circle-alert, maintenance = wrench (badge สถานะ DxT ใช้ ban / calendar) และยังไม่มี prop เปลี่ยนไอคอน · value ย้ายลงใต้ title เมื่อช่องแคบกว่า 226px\n16. Sparkline มีแล้ว (5.34) — data (null = เส้นขาด), failed + failures none / band / ticks (ค่าเริ่ม none), tone, size sm 80×24 / md 120×32, min / max, label. Overview ใช้ failures=\"none\"",
       "w": 560,
-      "x": 7960,
+      "x": 11470,
       "y": 0
     },
     "row1": {
       "kind": "title1",
-      "maxW": 7880,
+      "maxW": 8000,
       "text": "Web app — desktop 1440 + mobile 390",
       "w": 240,
       "x": 0,
@@ -486,6 +510,9 @@
     "Incident.dc.html",
     "MSites.dc.html",
     "MIncident.dc.html",
+    "Main3.dc.html",
+    "MainDark3.dc.html",
+    "MOverview4.dc.html",
     "StatusModel.dc.html",
     "MobileAck.dc.html",
     "ChatAlert.dc.html",

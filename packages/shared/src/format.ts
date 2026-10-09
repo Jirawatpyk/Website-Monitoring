@@ -74,6 +74,28 @@ export function formatDay(date: Date, options: { weekday?: boolean } = {}): stri
   return options.weekday ? `${WEEKDAYS[p.weekday]} ${day}` : day;
 }
 
+/**
+ * When something happened, relative to `now` (spec §13): "Today 10:07", "Yesterday 16:40", else
+ * "Mon 14 Sep 21:18". `midSentence` lower-cases Today / Yesterday ("OK since today 10:50").
+ */
+export function formatWhen(date: Date, now: Date, options: { midSentence?: boolean } = {}): string {
+  const yesterday = new Date(now.getTime() - 86_400_000);
+  const word = isSameBangkokDay(date, now) ? 'Today' : isSameBangkokDay(date, yesterday) ? 'Yesterday' : null;
+  if (!word) return `${formatDay(date, { weekday: true })} ${formatTime(date)}`;
+  return `${options.midSentence ? word.toLowerCase() : word} ${formatTime(date)}`;
+}
+
+/** Midnight in Bangkok at the start of `now`'s Bangkok day ("checks today", today's log). */
+export function bangkokDayStart(now: Date): Date {
+  const p = bangkokParts(now);
+  return new Date(Date.UTC(p.year, p.month, p.day) - 7 * 3_600_000);
+}
+
+/** "2,007" — counts with thousands separators. */
+export function formatCount(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
 /** "43 min", "1 h 2 min", "2 h", "1 d 2 h". Minutes are dropped once a duration reaches a day. */
 export function formatDuration(totalMinutes: number): string {
   const minutes = Math.max(0, Math.floor(totalMinutes));

@@ -15,6 +15,8 @@ describe('listSites', () => {
     tier: 2,
     is_active: true,
     muted_until: '2026-10-08T11:00:00Z',
+    monitoring_started_at: null, // a site started before S05: its creation time stands in
+    created_at: '2026-08-01T00:00:00Z',
     clients: { id: 'c1', name: 'Cando Asia', is_internal: false, am: { display_name: 'Bua' } },
     owner: { id: 'u1', display_name: 'Nok' },
     backup: { id: 'u2', display_name: 'Ploy' },
@@ -51,6 +53,22 @@ describe('listSites', () => {
   it('maps each site: client · AM, owner · backup, mute, open incident and the location glyphs', async () => {
     const fake = fakeDb({
       'sites.select': { data: [live, draft] },
+      'rpc.site_list_response_24h': { data: [{ site_id: SITE, p50_ms: 412 }] },
+      // one 43 min 12 s DOWN in the last 30 days → 1 − 43.2 / 43,200 = 99.90%
+      'incidents.select': {
+        data: [
+          {
+            id: 'i1',
+            site_id: SITE,
+            started_at: '2026-10-07T00:00:00Z',
+            severity: 'down',
+            incident_events: [
+              { type: 'detected', at: '2026-10-07T00:00:30Z', payload: {} },
+              { type: 'recovered', at: '2026-10-07T00:43:12Z', payload: {} },
+            ],
+          },
+        ],
+      },
       'rpc.site_list_locations': {
         data: [
           {
@@ -81,7 +99,7 @@ describe('listSites', () => {
       },
     });
     m.db = fake.db;
-    expect(await listSites()).toEqual([
+    expect(await listSites(new Date('2026-10-08T01:00:00Z'))).toEqual([
       {
         id: SITE,
         name: 'EQHO',
@@ -104,8 +122,8 @@ describe('listSites', () => {
         },
         // the monitor's own slow limit (2 s); a chain error isn't a hard fail (D-029)
         locations: { BKK: 'none', SIN: 'slow', TYO: 'chain' },
-        p50Ms: null,
-        uptime30d: null,
+        p50Ms: 412,
+        uptime30d: 0.999,
         expiryDays: null,
       },
       {

@@ -139,21 +139,25 @@ describe('SitesList (spec §20, Sites board)', () => {
     expect(siteNames()).toHaveLength(5);
   });
 
-  it('an Admin opens a row (Edit site until Site detail ships); others can’t open drafts', () => {
+  it('every role opens a live row on Site detail (spec §20); only an Admin opens a draft', () => {
     const { unmount } = render(<SitesList sites={SITES} isAdmin meId="tao" nowIso={NOW} />);
     fireEvent.click(within(table()).getAllByRole('row')[3]!);
-    expect(push).toHaveBeenCalledWith('/sites/dxt/edit');
+    expect(push).toHaveBeenCalledWith('/sites/dxt');
     unmount();
+    push.mockClear();
 
     render(<SitesList sites={SITES} isAdmin={false} meId="tao" nowIso={NOW} />);
+    expect(within(table()).getByRole('link', { name: 'DxT' })).toHaveAttribute('href', '/sites/dxt');
+    fireEvent.click(within(table()).getAllByRole('row')[3]!);
+    expect(push).toHaveBeenCalledWith('/sites/dxt');
     expect(within(table()).queryByRole('link', { name: 'Finish setup' })).not.toBeInTheDocument();
     expect(within(table()).getByText('Only an Admin can finish setup')).toBeInTheDocument();
-    expect(within(table()).queryByRole('link', { name: 'DxT' })).not.toBeInTheDocument();
-    // no menu without a working item; the phone row still links its incident
+    // the ⋯ menu stays Admin-only (its other items are Admin actions); the row itself opens the site
     expect(screen.queryByRole('button', { name: 'Actions for DxT' })).not.toBeInTheDocument();
-    expect(within(phone()).getByRole('link', { name: /INC-0142/ })).toHaveAttribute(
+    // phone rows open Site detail too (spec §17)
+    expect(within(phone()).getAllByRole('link', { name: /MuvMi/ })[0]).toHaveAttribute(
       'href',
-      '/incidents/inc-1',
+      '/sites/muvmi',
     );
   });
 

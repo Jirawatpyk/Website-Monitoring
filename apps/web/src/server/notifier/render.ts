@@ -1,5 +1,5 @@
 import 'server-only';
-import { episodesOf, type Episode, type EpisodeEvent } from '@dxt/engine';
+import { episodesFromTimeline, type Episode } from '@dxt/engine';
 import {
   buildAcknowledgedAlert,
   buildAcknowledgedEmail,
@@ -55,25 +55,25 @@ function problemOf(i: IncidentFacts, ctx: Record<string, unknown> = {}): Problem
 const dateOf = (v: unknown): Date | null =>
   typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : null;
 
-/** The incident's drops from its timeline (D-024): first failed check → recovery. */
+/**
+ * The incident's drops from its timeline (D-024): first failed check → recovery — as the messages
+ * have worded them since S04b. Uptime splits a D-021 incident at its escalation (S06); the messages
+ * keep the PROBLEM time before it as part of the outage until S07 reworks the summaries (plan S07
+ * "Carried from S06 review"): drops before the first DOWN read as DOWN, and a PROBLEM drop that runs
+ * straight into the outage joins it.
+ */
 function dropsOf(i: IncidentFacts): Episode[] {
-  const events: EpisodeEvent[] = [];
-  for (const e of i.incident_events ?? []) {
-    const at = dateOf(e.at);
-    if (!at) continue;
-    const p = contextOf(e.payload);
-    const startedAt =
-      e.type === 'detected'
-        ? new Date(i.started_at)
-        : e.type === 'relapsed'
-          ? dateOf(p.startedAt)
-          : e.type === 'escalated_to_down'
-            ? dateOf(p.downStartedAt)
-            : null;
-    const severity = p.severity === 'down' || p.severity === 'problem' ? p.severity : null;
-    events.push({ type: e.type, at, startedAt, severity: e.type === 'detected' ? i.severity : severity });
-  }
-  return episodesOf(events);
+  const drops = episodesFromTimeline(i, i.incident_events ?? []);
+  if (!i.incident_events?.some((e) => e.type === 'escalated_to_down')) return drops;
+  const firstDown = drops.findIndex((d) => d.severity === 'down');
+  const out: Episode[] = [];
+  drops.forEach((d, n) => {
+    const asDown = firstDown >= 0 && n <= firstDown ? { ...d, severity: 'down' as const } : d;
+    const prev = out.at(-1);
+    if (prev && n <= firstDown && prev.end && prev.end.getTime() === d.start.getTime()) prev.end = d.end;
+    else out.push(asDown);
+  });
+  return out;
 }
 
 /** "Down N times" only when every drop was a DOWN; a key-page PROBLEM drop (D-023) isn't downtime. */

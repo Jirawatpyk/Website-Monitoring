@@ -65,6 +65,17 @@ export async function anySiteId(): Promise<string> {
   return site!.id;
 }
 
+/**
+ * A live site with an incident whose cause is worded (Site detail's fullest page: its incident list,
+ * long causes) — the seed's MuvMi; any live site when there is none.
+ */
+export async function busySiteId(): Promise<string> {
+  const [i] = (await admin(
+    '/rest/v1/incidents?select=site_id,sites!inner(is_active)&sites.is_active=eq.true&order=started_at.desc&limit=1',
+  )) as { site_id: string }[];
+  return i?.site_id ?? anySiteId();
+}
+
 /** Set a profile's is_active through the local service role. */
 export async function setActive(userId: string, isActive: boolean): Promise<void> {
   await admin(`/rest/v1/profiles?id=eq.${userId}`, {

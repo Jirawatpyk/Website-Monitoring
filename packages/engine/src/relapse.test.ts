@@ -144,8 +144,10 @@ describe('lifecycle — relapse state, auto-resolve event, episodes (D-004, spec
       { type: 'recovered', at: T('10:05') },
       { type: 'escalated_to_down', at: T('10:20') },
     ]);
+    // D-021 while the PROBLEM drop is open: the PROBLEM ends at the outage's start (S06 engine review)
     expect(episodes).toEqual([
-      { start: T('09:58'), end: T('10:05'), severity: 'down' },
+      { start: T('09:58'), end: T('10:02'), severity: 'problem' },
+      { start: T('10:02'), end: T('10:05'), severity: 'down' },
       { start: T('10:20'), end: null, severity: 'down' },
     ]);
     expect(episodeMinutes(episodes, T('10:30'))).toBe(17);

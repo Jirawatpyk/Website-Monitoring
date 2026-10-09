@@ -69,6 +69,10 @@ export const TRIGGER_LABELS: Record<Trigger, string> = {
 export const CHECK_OUTCOMES = ['pass', 'fail', 'blocked'] as const;
 export type CheckOutcome = (typeof CHECK_OUTCOMES)[number];
 
+/** `check_rollups.bucket` (D-031): hour rows kept 90 days, day rows (Bangkok days) 2 years. */
+export const ROLLUP_BUCKETS = ['hour', 'day'] as const;
+export type RollupBucket = (typeof ROLLUP_BUCKETS)[number];
+
 /**
  * A blocked check's header-level WAF signature (D-027). Only these let a location abstain on a site
  * behind a WAF; a body-only match (a "captcha" page) stays an ordinary blocked result.
