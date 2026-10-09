@@ -3,9 +3,15 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, Button, Dialog, Select, Textarea, TextField, type DialogProps } from '@jirawatpyk/aura-react';
-import { IconCircle, IconCircleCheck, IconPencil, IconRotateCcw } from '@jirawatpyk/aura-react/icons';
+import {
+  IconCircle,
+  IconCircleCheck,
+  IconClock,
+  IconPencil,
+  IconRotateCcw,
+} from '@jirawatpyk/aura-react/icons';
 import { canResolve, UNKNOWN_ROOT_CAUSE } from '@dxt/engine';
-import { formatTime, ROOT_CAUSE_CATEGORIES, ROOT_CAUSE_LABELS } from '@dxt/shared';
+import { formatTime, formatTimeWithSeconds, ROOT_CAUSE_CATEGORIES, ROOT_CAUSE_LABELS } from '@dxt/shared';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { addNote, resolveIncident, saveRootCause, undoResolve } from '../actions';
 import type { Condition } from '../model';
@@ -270,6 +276,8 @@ export function ResolveDialog({
   initial,
   conditions,
   summary,
+  lasted,
+  postedAt,
   viewerName,
   open,
   onClose,
@@ -282,6 +290,10 @@ export function ResolveDialog({
   conditions: Condition[];
   /** "Down 8 min · Window Thu 22:14–22:22 · OK since 22:22" cells. */
   summary: { label: string; value: string }[];
+  /** "Down 8 min" / "Problem lasted 12 min" for the outcome sentence (Resolve board). */
+  lasted?: string;
+  /** When the RESOLVED messages went out, once the page knows (after a refresh). */
+  postedAt?: string | null;
   viewerName: string;
   open: boolean;
   onClose: () => void;
@@ -467,22 +479,37 @@ export function ResolveDialog({
             {`Resolved at ${formatTime(done.at)} by ${viewerName}`}
           </p>
           <p className="m-0 text-sm text-fg-secondary">
-            {`Root cause: ${label(done.category)}. `}
+            {`Root cause: ${label(done.category)}. ${lasted ? `${lasted}. ` : ''}`}
             {seconds > 0
               ? `Posting to Chat and email in ${seconds} s — nothing is sent until then`
-              : 'Posting to the Chat thread and email now'}
+              : postedAt
+                ? `Posted to Chat and email at ${formatTimeWithSeconds(new Date(postedAt))}`
+                : 'Posting to the Chat thread and email now'}
           </p>
-          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-            <li>
-              {seconds > 0
-                ? 'Resolved reply to the Chat thread · held for undo'
-                : 'Resolved reply to the Chat thread · sending'}
-            </li>
-            <li>
-              {seconds > 0
-                ? 'Resolved email to everyone emailed about it · held for undo'
-                : 'Resolved email to everyone emailed about it · sending'}
-            </li>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+            {[
+              ['Resolved reply to the Chat thread', 'Resolved reply posted in the Chat thread'],
+              ['Resolved email to everyone emailed about it', 'Resolved email sent in the incident thread'],
+            ].map(([held, sent]) => (
+              <li key={held} className="flex items-start gap-2">
+                <span
+                  className={`flex pt-0.5 ${postedAt ? 'text-fg-positive' : 'text-fg-secondary'}`}
+                  aria-hidden
+                >
+                  {postedAt ? <IconCircleCheck className="size-4" /> : <IconClock className="size-4" />}
+                </span>
+                <span className="grow">
+                  {postedAt ? sent : seconds > 0 ? `${held} · held for undo` : `${held} · sending`}
+                </span>
+                <span className="shrink-0 font-mono text-xs text-fg-secondary tabular-nums">
+                  {postedAt
+                    ? formatTimeWithSeconds(new Date(postedAt))
+                    : seconds > 0
+                      ? `in ${seconds} s`
+                      : 'now'}
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
       ) : done?.kind === 'kept' ? (

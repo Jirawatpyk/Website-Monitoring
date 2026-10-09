@@ -440,6 +440,8 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
             initial={initialRc}
             conditions={d.gate.conditions}
             summary={summary}
+            lasted={`${d.severity === 'down' ? 'Down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`}
+            postedAt={d.resolved?.posted ?? null}
             viewerName={viewerName}
             open={resolveOpen}
             onClose={() => setResolveOpen(false)}
