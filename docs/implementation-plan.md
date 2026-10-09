@@ -22,7 +22,7 @@
 | S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 (merged) | 3 | Done |
 | S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 (merged) | 3 | Done |
 | S06 | Site detail & check rollups | 1 · P0 | L | FR-08 | S02a, S05 (merged) | 3 | Done |
-| S06b | Overview (option A) | 1 · P0 | L | FR-05 | S06, S02b | 3 | Todo |
+| S06b | Overview (option A) | 1 · P0 | L | FR-05 | S06, S02b | 3 | In progress |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
 | S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06b, S08 | 3 | Todo |
