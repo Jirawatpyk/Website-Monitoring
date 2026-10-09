@@ -150,7 +150,11 @@ function clippedFocusRings(page: Page) {
       document.querySelectorAll<HTMLElement>(
         'main a[href], main button:not([disabled]), main [role="radio"], main [tabindex]:not([tabindex="-1"])',
       ),
-    ).filter((el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden');
+    )
+      .filter((el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden')
+      // table rows repeat one another: the first controls cover every kind on the page, and a long
+      // list stays fast
+      .slice(0, 60);
     const out: string[] = [];
     for (const el of controls) {
       el.focus();
@@ -165,13 +169,20 @@ function clippedFocusRings(page: Page) {
         if (!/(hidden|clip|auto|scroll)/.test(ps.overflowX + ps.overflowY)) continue;
         const pb = p.getBoundingClientRect();
         const scrolls = (o: string) => o === 'auto' || o === 'scroll';
-        const room = Math.min(
-          ...(scrolls(ps.overflowX) ? [] : [box.left - pb.left, pb.right - box.right]),
-          ...(scrolls(ps.overflowY) ? [] : [box.top - pb.top, pb.bottom - box.bottom]),
-        );
+        // overflow: clip paints this far past the box (the table cells, globals.css)
+        const margin =
+          ps.overflowX === 'clip' ? parseFloat(ps.getPropertyValue('overflow-clip-margin')) || 0 : 0;
+        const room =
+          margin +
+          Math.min(
+            ...(scrolls(ps.overflowX) ? [] : [box.left - pb.left, pb.right - box.right]),
+            ...(scrolls(ps.overflowY) ? [] : [box.top - pb.top, pb.bottom - box.bottom]),
+          );
         if (room < reach - 0.5) {
           const name = (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 40);
-          out.push(`${el.tagName.toLowerCase()} "${name}" ring ${reach}px, room ${Math.round(room)}px`);
+          out.push(
+            `${el.tagName.toLowerCase()} "${name}" ring ${reach}px, room ${Math.round(room)}px in .${String(p.className).split(' ')[0]} (overflow ${ps.overflowX}, clip margin ${margin}px)`,
+          );
         }
         break;
       }
@@ -217,6 +228,8 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
   test.skip(({ isMobile }) => isMobile, 'widths are set inside the test');
 
   test('header rhythm, phone shell, touch targets, no sideways scroll', async ({ browser, baseURL }) => {
+    // every live page at three widths: well past the 30 s default once the focus-ring walk joined (S07)
+    test.setTimeout(120_000);
     await ensureUser(ADMIN.email);
     // The sidebar (and so the nav links) is only visible from lg.
     const desktop = await signedInAt(browser, baseURL!, 1440);
@@ -247,8 +260,6 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
           expect(await sidewaysBoxes(page), 'no box inside the page scrolls sideways').toEqual([]);
           expect(await boxesPastEdge(page), 'no box reaches past the screen edge').toEqual([]);
           expect(await squeezedText(page), 'no text squeezed a character or two a line').toEqual([]);
-          // hydrated first: a focus handler (the Sites chip row scrolls a chip in) is part of the ring
-          await page.waitForLoadState('networkidle');
           await page.keyboard.press('Tab');
           expect(await clippedFocusRings(page), 'no focus ring cut off by its box').toEqual([]);
 

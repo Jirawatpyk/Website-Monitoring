@@ -35,9 +35,17 @@ body {
 
 /* A table cell clips its content (overflow: hidden), and a link or button in it — DataTable's row link,
    a site name, an INC link — draws its focus ring outside itself, so the ring lost the sides that touch
-   the cell (S07 /verify). Draw rings inside in table cells; AURA request 15 in docs/design/aura.md. */
-.aura-table__td :focus-visible {
-  outline-offset: calc(-1 * var(--aura-focus-ring-width));
+   the cell (S07 /verify). Clip with room for the ring instead (text still truncates with "…"); where
+   overflow-clip-margin isn't supported, draw the ring inside. AURA request 15 in docs/design/aura.md. */
+.aura-table__td {
+  overflow: clip;
+  /* a plain length: Chrome refuses calc() here; space-1 (4 px) = ring width + its 2 px offset */
+  overflow-clip-margin: var(--aura-space-1);
+}
+@supports not (overflow-clip-margin: 1px) {
+  .aura-table__td :focus-visible {
+    outline-offset: calc(-1 * var(--aura-focus-ring-width));
+  }
 }
 
 /* BottomNav away (components/app-shell/phone-nav.tsx). Scrolled away: sticky bars and toasts sit on the

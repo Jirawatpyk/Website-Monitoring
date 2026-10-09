@@ -55,7 +55,7 @@ Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://c
 - **Request 14 — BottomNav hides on scroll and for a page's own bottom bar** (S06b). Workaround: `components/app-shell/phone-nav.tsx` (scroll listener, `data-bottomnav-hidden`) and the `data-hides-bottomnav` rules in `app/globals.css` — remove both when AURA ships it.
 - **Request 11 — Breadcrumb links: touch hit area** (S05). A crumb link is ~20 px tall; on a coarse pointer it should get the same 44 px `::after` hit area as `Button size="sm"`. Workaround: `.aura-crumbs a::after` in `apps/web/src/app/globals.css` — remove it when AURA ships this.
 
-- **Request 15 — Table cells clip focus rings** (S07 `/verify`). `.aura-table__td` is `overflow: hidden`, and a link or button in it (DataTable row link, a site name, an INC link) draws its outline 2 px outside itself, so the sides touching the cell are cut. Ask for inset rings in cells (`outline-offset: -width`) or room in the cell. Workaround: the `.aura-table__td :focus-visible` rule in `apps/web/src/app/globals.css` — remove it when AURA ships this.
+- **Request 15 — Table cells clip focus rings** (S07 `/verify`). `.aura-table__td` is `overflow: hidden`, and a link or button in it (DataTable row link, a site name, an INC link) draws its outline 2 px outside itself, so the sides touching the cell are cut. Ask for `overflow: clip` with an `overflow-clip-margin` on cells (rings keep their outside offset; text still truncates). Workaround: the `.aura-table__td` rules in `apps/web/src/app/globals.css` — remove it when AURA ships this.
 
 A new request goes in the doc (template at its foot) and here.
 
