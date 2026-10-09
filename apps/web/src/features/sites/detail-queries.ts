@@ -38,7 +38,8 @@ type Client = Awaited<ReturnType<typeof createClient>>;
 type DbClient = Client | ServiceDbClient;
 
 const HISTORY_DAYS = 90;
-const LOG_ROWS = 8;
+/** Two full rounds of the three locations. */
+const LOG_ROWS = 6;
 /** Incidents read for a page (the history shows 90 days; Export has every row). */
 const INCIDENT_ROWS = 200;
 const DAY_MS = 86_400_000;

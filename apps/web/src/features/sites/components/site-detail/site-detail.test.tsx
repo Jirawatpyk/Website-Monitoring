@@ -207,7 +207,7 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     expect(screen.getByRole('link', { name: 'Export' })).toHaveAttribute('href', '/sites/s1/incidents.csv');
   });
 
-  it('Incident history shows the latest 8 rows, like the Check log beside it; Export has all', () => {
+  it('Incident history shows the latest 6 rows, like the Check log beside it; Export has all', () => {
     const h = (n: number) => ({ ...detail().history[0]!, id: `i${n}`, number: n });
     const many = Array.from({ length: 22 }, (_, i) => h(i + 1));
     render(
@@ -220,10 +220,10 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
       />,
     );
     const table = screen.getByRole('table', { name: 'Incident history, last 90 days' });
-    expect(within(table).getAllByRole('link')).toHaveLength(8);
+    expect(within(table).getAllByRole('link')).toHaveLength(6);
     expect(
       screen.getByText(
-        /22 in 90 days · MTTR 11 min \(DOWN only · median\) · showing the latest 8, Export has all/,
+        /22 in 90 days · MTTR 11 min \(DOWN only · median\) · showing the latest 6, Export has all/,
       ),
     ).toBeInTheDocument();
   });
