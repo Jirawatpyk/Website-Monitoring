@@ -2,23 +2,30 @@
 -- p50 per live site's primary monitor over the last 24 h; staff read through check_results' RLS.
 begin;
 \ir _helpers.psql
-select plan(11);
+select plan(15);
 
--- Realtime publication
-select ok(
-  exists (select 1 from pg_publication_tables
-          where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'site_status'),
-  'site_status is in supabase_realtime'
+-- Realtime publication: exactly these two public tables, so adding another (monitor_status,
+-- notifications, incident_events, profiles …) has to be a reviewed change.
+select set_eq(
+  $$select tablename::text from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public'$$,
+  array['site_status', 'incidents'],
+  'supabase_realtime publishes exactly site_status and incidents'
+);
+select is(
+  (select bool_and(c.relrowsecurity) from pg_class c
+   where c.oid in ('public.site_status'::regclass, 'public.incidents'::regclass)),
+  true,
+  'the published tables keep RLS on (Realtime filters events by it)'
 );
 select ok(
-  exists (select 1 from pg_publication_tables
-          where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'incidents'),
-  'incidents is in supabase_realtime'
+  not has_table_privilege('anon', 'public.site_status', 'select')
+  and not has_table_privilege('anon', 'public.incidents', 'select'),
+  'anon cannot select the published tables'
 );
 select ok(
-  exists (select 1 from pg_publication_tables
-          where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'monitor_status'),
-  'monitor_status is in supabase_realtime'
+  not has_function_privilege('anon', 'public.overview_response_24h()', 'execute')
+  and has_function_privilege('authenticated', 'public.overview_response_24h()', 'execute'),
+  'overview_response_24h: authenticated may execute, anon may not'
 );
 
 select tests.clear_sites();
@@ -65,21 +72,39 @@ from q, lateral (values
   ('00000000-0000-0000-0000-0000000000d2', 'BKK', q.q1 + interval '1 min', 1, 'pass', 200, 999, null)
 ) as v(monitor_id, location, at, attempt, outcome, code, ms, err);
 
+-- One row in each published table: what Realtime would send is what each person may select.
+insert into public.site_status (site_id, status, since) values ('00000000-0000-0000-0000-0000000000a1', 'down', now());
+insert into public.incidents (site_id, monitor_id, trigger, severity, episode_severity, state, started_at, detected_at)
+  values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 'hard_fail', 'down', 'down',
+          'unacked', now() - interval '5 min', now() - interval '4 min');
+
+select tests.authenticate_as((select id from ids where name = 'cli'));
+select is(
+  (select count(*)::int from public.site_status) + (select count(*)::int from public.incidents),
+  0,
+  'a client account selects nothing from the published tables, so Realtime sends it no changes'
+);
+
 select tests.authenticate_as((select id from ids where name = 'mint'));
+select is(
+  (select count(*)::int from public.site_status) + (select count(*)::int from public.incidents),
+  2,
+  'a viewer selects them (and gets their changes)'
+);
 select results_eq(
-  $$select r.bucket_start = q.q1, r.checks, r.hard_fails, r.p50_ms
-    from public.overview_response_24h() r, q order by r.bucket_start$$,
-  $$values (true, 5, 1, 300), (false, 2, 2, null::integer)$$,
-  'a viewer gets per-bucket checks, hard fails (TLS chain excluded) and the p50 of passing checks'
+  $$select r.bucket_starts = array[q.q1, q.q2], r.checks, r.hard_fails, r.p50_ms
+    from public.overview_response_24h() r, q$$,
+  $$values (true, array[5, 2], array[1, 2], array[300, null]::integer[])$$,
+  'a viewer gets one row per site: buckets oldest first, checks, hard fails (TLS chain excluded), p50 of passes'
 );
 select is(
-  (select count(distinct site_id)::int from public.overview_response_24h()),
+  (select count(*)::int from public.overview_response_24h()),
   1,
   'only the live site''s primary monitor counts (key pages, Drafts, > 24 h and future stamps left out)'
 );
 select is(
-  (select count(*)::int from public.overview_response_24h()
-   where extract(epoch from bucket_start)::bigint % 900 <> 0),
+  (select count(*)::int from public.overview_response_24h() r, unnest(r.bucket_starts) b
+   where extract(epoch from b)::bigint % 900 <> 0),
   0,
   'buckets start on the quarter hour'
 );
@@ -87,7 +112,7 @@ select is(
 select tests.authenticate_as((select id from ids where name = 'arm'));
 select is(
   (select count(*)::int from public.overview_response_24h()),
-  2,
+  1,
   'a responder reads every site''s line, as on Overview'
 );
 
@@ -96,6 +121,15 @@ select is(
   (select count(*)::int from public.overview_response_24h()),
   0,
   'a client account sees no check results (RLS)'
+);
+
+reset role;
+update public.profiles set is_active = false where id = (select id from ids where name = 'mint');
+select tests.authenticate_as((select id from ids where name = 'mint'));
+select is(
+  (select count(*)::int from public.overview_response_24h()),
+  0,
+  'a deactivated staff account gets no rows'
 );
 
 select tests.as_anon();

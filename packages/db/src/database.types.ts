@@ -624,7 +624,7 @@ isOneToOne: false
                            },
 "overview_response_24h":
 { Args: Record<PropertyKey, never>; Returns: {
-              "bucket_start": string,"checks": number,"hard_fails": number,"p50_ms": number,"site_id": string
+              "bucket_starts": (string)[],"checks": (number)[],"hard_fails": (number)[],"p50_ms": (number)[],"site_id": string
             }[]
                            },
 "owns_site":

@@ -56,12 +56,12 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - **AM vs CEO:** a stakeholder who is the AM of at least one client gets "Your client" chips and the "Your clients" card; any other stakeholder is treated as the CEO (no chips, "Uptime 30 d"). D-016 / D-031 stand: neither gets Acknowledge.
 - **Muted Since** shows "—" until S09 records when a mute starts.
 - **Breakpoints:** the phone layout (MOverview4) shows below md, as on Sites and Site detail; from md the desktop grids reflow (KPIs 2 → 3 → 5 columns, tiles 2 → 3, Recent events under the tiles below xl, Live issues drops Owner and Response 24h below xl). BottomNav hides from lg (D-018).
-- **Realtime:** `site_status`, `incidents` and `monitor_status` join `supabase_realtime`; the page coalesces change events into at most one refresh per ~1.5 s, which also keeps "last full round" and the p50 current. The round bookkeeping stays in `site_status` (D-014) unless load shows otherwise.
+- **Realtime:** `site_status` and `incidents` join `supabase_realtime` (INSERT / UPDATE subscriptions only — a DELETE bypasses RLS); `monitor_status` stays out, since it changes every round for every monitor and the Overview needs nothing from its events (plan S06b listed it; db review M2). The page coalesces change events into at most one refresh per ~1.5 s, which also keeps "last full round" and the p50 current. The round bookkeeping stays in `site_status` (D-014); if the per-round events load Realtime at 200 monitors, move to a trigger that broadcasts only status changes.
 - **Tiles** keep StatusTile's own icons (§21.10 "build with AURA as is").
 
 **Why.** Every control works or isn't drawn (§14.16); no copy promises what the system can't do yet (D-013). The PRD defines the KPIs as means. Treating "stakeholder without clients" as the CEO needs no new role. Coalesced refreshes keep the < 5 s target without a refresh per round.
 
-**Impact.** S06b (`features/overview`, `app/(app)/layout.tsx`, a migration adding the publication and `overview_response_24h`); S07, S08, S09, S10 and S12 add their parts back; spec-checker treats these differences as intended.
+**Impact.** S06b (`features/overview`, `app/(app)/layout.tsx`, a migration adding `site_status` and `incidents` to the publication and `overview_response_24h`); S07, S08, S09, S10 and S12 add their parts back; spec-checker treats these differences as intended.
 
 ## D-031 — S06 split: Site detail first, the Overview in S06b
 
