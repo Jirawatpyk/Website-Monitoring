@@ -6,6 +6,7 @@ import { IconChevronRight, IconCircleAlert, IconEyeOff, IconMonitor } from '@jir
 import { formatIncidentId } from '@dxt/shared';
 import { SiteStatusBadge } from '@/components/status-badges';
 import {
+  allSitesRow,
   chipOf,
   durationText,
   isMuted,
@@ -198,7 +199,7 @@ export function PhoneAllSites({ monitored, ok }: { monitored: number; ok: number
         <IconMonitor />
       </span>
       <span className="grow text-sm font-medium">
-        {`All ${monitored} sites`}
+        {allSitesRow(monitored)}
         <span className="font-normal text-fg-secondary">{` · ${ok} OK`}</span>
       </span>
       <span className="flex text-fg-tertiary">

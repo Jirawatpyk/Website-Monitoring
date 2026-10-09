@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allOkLine,
+  allSitesRow,
   attnMeta,
   bannersOf,
   chipOf,
   countsOf,
   eventLine,
   liveIssues,
+  monitoredSites,
   nextStep,
   openCaption,
   phoneHref,
@@ -349,6 +352,17 @@ describe('Chips, header line and the phone third card (§21.8)', () => {
     expect(thirdCard(bua, issues, 0.9998)).toEqual({ value: '3', label: 'Your clients' });
     expect(thirdCard(ceo, issues, 0.9998)).toEqual({ value: '99.98%', label: 'Uptime 30 d' });
     expect(thirdCard(mint, issues, 0.9998)).toEqual({ value: '99.98%', label: 'Uptime 30 d' });
+  });
+});
+
+describe('site counts in words (/verify S06b)', () => {
+  it.each<[number, string, string, string]>([
+    [1, '1 monitored site', '1 monitored site OK', '1 site'],
+    [17, '17 monitored sites', 'All 17 monitored sites OK', 'All 17 sites'],
+  ])('%i', (n, monitored, allOk, row) => {
+    expect(monitoredSites(n)).toBe(monitored);
+    expect(allOkLine(n)).toBe(allOk);
+    expect(allSitesRow(n)).toBe(row);
   });
 });
 

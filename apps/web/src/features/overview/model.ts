@@ -337,6 +337,15 @@ export function attnMeta(viewer: OverviewViewer, issues: readonly LiveIssue[], c
   return parts.join(' · ');
 }
 
+/** "1 monitored site", "17 monitored sites" (/verify S06b: "1 monitored sites"). */
+export const monitoredSites = (n: number) => `${n} monitored ${n === 1 ? 'site' : 'sites'}`;
+
+/** Nothing listed (§21.4): "All 17 monitored sites OK"; one site reads "1 monitored site OK". */
+export const allOkLine = (n: number) => (n === 1 ? '1 monitored site OK' : `All ${n} monitored sites OK`);
+
+/** The phone's row to Sites (§21.7): "All 17 sites"; one site reads "1 site". */
+export const allSitesRow = (n: number) => (n === 1 ? '1 site' : `All ${n} sites`);
+
 /** The phone's third count card (§21.8): Yours · Your clients · Uptime 30 d. */
 export function thirdCard(
   viewer: OverviewViewer,

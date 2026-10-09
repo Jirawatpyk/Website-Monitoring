@@ -61,7 +61,9 @@ import {
   attnMeta,
   canAck,
   chipOf,
+  allOkLine,
   durationText,
+  monitoredSites,
   nextStep,
   openCaption,
   reasonLine,
@@ -421,11 +423,12 @@ export function LiveIssuesTable({
                       <span className="text-fg-secondary">—</span>
                     )}
                   </Td>
-                  <Td className="max-xl:hidden">
+                  <Td className="max-w-40 max-xl:hidden">
                     {site.ownerName ? (
                       <span className="flex items-center gap-2">
                         <Avatar name={site.ownerName} size="sm" />
-                        <span className="text-sm whitespace-nowrap">{site.ownerName}</span>
+                        {/* wraps between words only, never mid-word (the 1440 "Ar / m" of round 1) */}
+                        <span className="min-w-0 text-sm wrap-normal break-normal">{site.ownerName}</span>
                       </span>
                     ) : (
                       <span className="text-fg-secondary">—</span>
@@ -474,7 +477,7 @@ export function AllOk({
         <IconCircleCheck />
       </span>
       <span className="flex flex-col">
-        <span className="font-semibold">{`All ${monitored} monitored sites OK`}</span>
+        <span className="font-semibold">{allOkLine(monitored)}</span>
         <span className="text-sm text-fg-secondary">{sub}</span>
       </span>
     </div>
@@ -548,8 +551,8 @@ export function SiteTiles({ sites, drafts, now }: { sites: OverviewSite[]; draft
       </TileGrid>
       <p className="m-0 text-sm text-fg-secondary">
         {tier === 'All'
-          ? `${sites.length} monitored sites${draftLine}`
-          : `${shown.length} of ${sites.length} monitored sites (${tier})${draftLine}`}
+          ? `${monitoredSites(sites.length)}${draftLine}`
+          : `${shown.length} of ${monitoredSites(sites.length)} (${tier})${draftLine}`}
       </p>
     </section>
   );
