@@ -1,6 +1,7 @@
 import 'server-only';
 
-export { getIncidentForAck } from './queries';
+export { getIncident, listIncidents } from './detail-queries';
+export { incidentsListCsv } from './downloads';
 export {
   acknowledgeIncident,
   addNote,

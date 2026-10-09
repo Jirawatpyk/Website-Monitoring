@@ -26,4 +26,5 @@ export const rootCauseSchema = z.object({
 });
 
 export type NoteInput = z.input<typeof noteSchema>;
-export type RootCauseInput = z.input<typeof rootCauseSchema>;
+/** What a form sends: the category is any string until the schema checks it. */
+export type RootCauseInput = Omit<z.input<typeof rootCauseSchema>, 'category'> & { category: string };

@@ -1,18 +1,20 @@
-import { Skeleton } from '@jirawatpyk/aura-react';
-import { PageSkeleton } from '@/components/states';
+import { Container } from '@jirawatpyk/aura-react';
+import { CardSkeleton, PageHeaderSkeleton, PageSkeleton } from '@/components/states';
 
-/** While the incident loads: the shape of the MobileAck page. */
+/** While the incident loads: the header, the facts strip, then the evidence / timeline and Resolve cards. */
 export default function Loading() {
   return (
-    <div className="mx-auto w-full max-w-xl">
-      <PageSkeleton label="Loading incident" gap="tight">
-        <Skeleton variant="text" lines={1} width="40%" />
-        <Skeleton variant="rect" height={40} />
-        <Skeleton variant="rect" height={120} />
-        <Skeleton variant="text" lines={3} />
-        {/* The action bar's place, so nothing jumps when the page arrives. */}
-        <Skeleton variant="rect" height={96} />
+    <Container>
+      <PageSkeleton label="Loading incident">
+        <PageHeaderSkeleton breadcrumb actions={2} />
+        <div className="hidden md:block">
+          <CardSkeleton lines={2} />
+        </div>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*88)]">
+          <CardSkeleton lines={6} />
+          <CardSkeleton lines={4} />
+        </div>
       </PageSkeleton>
-    </div>
+    </Container>
   );
 }

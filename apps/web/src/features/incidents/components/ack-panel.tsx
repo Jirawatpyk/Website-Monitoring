@@ -17,6 +17,8 @@ interface AckPanelProps {
   siteUrl: string | null;
   /** The LATEST log: it sits between the ack card and the bar, as on the board. */
   children: ReactNode;
+  /** The bar once there is nothing to acknowledge: Add note and Resolve (MIncident, S07). */
+  barActions?: ReactNode;
 }
 
 /** After the window: refresh at these delays, then every POLL_MS, to show "Posted …". */
@@ -31,7 +33,15 @@ const LATE_AFTER_MS = 30_000;
  * The ack card, the Undo countdown and the sticky action bar of MobileAck (spec §14.3, §15.6,
  * §16.8; D-016 copy). The server decides the state; this part only runs the actions and the clock.
  */
-export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, children }: AckPanelProps) {
+export function AckPanel({
+  incidentId,
+  ack,
+  viewerName,
+  viewerEmail,
+  siteUrl,
+  children,
+  barActions,
+}: AckPanelProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -200,6 +210,7 @@ export function AckPanel({ incidentId, ack, viewerName, viewerEmail, siteUrl, ch
             </Button>
           </>
         )}
+        {ack.kind !== 'can-ack' && barActions}
         {siteUrl && (
           <Button variant="secondary" fullWidth href={siteUrl} target="_blank" rel="noopener noreferrer">
             Visit site <span aria-hidden>↗</span>

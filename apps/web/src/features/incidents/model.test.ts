@@ -514,3 +514,62 @@ describe('timelineOf (§16.11, §19.7)', () => {
     ]);
   });
 });
+
+describe('timelineOf — acknowledgements (from the S02b log tests)', () => {
+  const i = {
+    severity: 'down' as const,
+    trigger: 'hard_fail' as const,
+    startedAt: at('25T09:48:12'),
+    recoveredAt: null,
+  };
+  const ackAt = (local: string, payload: Record<string, unknown> = {}) =>
+    ev(
+      'acknowledged',
+      local,
+      { posts_at: new Date(Date.parse(at(local)) + 10_000).toISOString(), ...payload },
+      'u-arm',
+    );
+  const titles = (events: EventRow[], when: string) =>
+    timelineOf(i, events, nameOf, new Date(at(when)))
+      .map((t) => t.title)
+      .filter((t) => t.startsWith('Acknowledg'));
+  it('an ack undone, then acked again and posted: only the later one posted', () => {
+    expect(
+      titles(
+        [
+          ackAt('25T10:07:00'),
+          ev('ack_undone', '25T10:07:05', {}, 'u-arm'),
+          ackAt('25T10:07:40'),
+          ev('alerted', '25T10:07:51', { channel: 'google_chat', template: 'acknowledged' }),
+        ],
+        '25T10:08:00',
+      ),
+    ).toEqual([
+      'Acknowledged by Arm',
+      'Acknowledgement undone by Arm',
+      'Acknowledged by Arm (posted 10:07:51)',
+    ]);
+  });
+  it('a muted ack posts nothing: no "posts … unless undone"', () => {
+    expect(titles([ackAt('25T10:07:40', { notifies: false })], '25T10:07:43')).toEqual([
+      'Acknowledged by Arm',
+    ]);
+  });
+  it('confirmed behind a WAF names who confirmed it (D-027)', () => {
+    const t = timelineOf(
+      i,
+      [
+        ev('detected', '25T09:48:41', {
+          confirmingLocations: 1,
+          confirmingFrom: ['BKK'],
+          wafBlocked: ['SIN', 'TYO'],
+        }),
+      ],
+      nameOf,
+      NOW,
+    );
+    expect(t[1]!.detail).toBe(
+      'Confirmed by BKK only, 2 checks — SIN, TYO blocked by bot protection. Incident opened.',
+    );
+  });
+});
