@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getAccess } from '@/lib/auth/session';
 import { downEpisodesBySite, locationGlyph, slowMsOf, watchedSince } from '@/features/sites/server';
 import { chainStreakStart, currentDrop, lastRoundP50, probeHealth, seriesOf, viewerKindOf } from './assemble';
-import { EVENT_TYPES } from './model';
+import { EVENT_TYPES, reasonOf } from './model';
 import {
   OVERVIEW_LOCATIONS,
   type OverviewData,
@@ -143,7 +143,7 @@ export async function loadOverview(
           recoveredAt: inc.recovered_at,
           ackedBy: inc.acker?.display_name ?? null,
           // a PROBLEM drop's short summary ("slow, p50 5.8 s"); a DOWN's cause in short form (spec §10)
-          cause: drop?.severity === 'problem' ? (summary ?? cause) : cause ? shortCause(cause) : null,
+          cause: drop?.severity === 'problem' && summary ? summary : cause ? shortCause(cause) : null,
         }
       : null;
     const lastRound = OVERVIEW_LOCATIONS.map((l) => {
@@ -181,6 +181,14 @@ export async function loadOverview(
   });
 
   await fillChainSince(db, rows, live, now);
+  // Only Live issues draw the Response 24h line (§21.5; tiles show the p50): the other sites' 96 points
+  // stay on the server (spec-check S06b, 200 monitors)
+  for (const r of rows) {
+    if (!reasonOf(r, now)) {
+      r.series = [];
+      r.failed = [];
+    }
+  }
 
   const kpiIncidents = (kpiRows.data ?? []).map((i) => ({
     severity: i.severity,
@@ -245,10 +253,15 @@ export async function loadOverview(
   };
 }
 
+const CHAIN_ERRORS =
+  '(UNABLE_TO_VERIFY_LEAF_SIGNATURE,UNABLE_TO_GET_ISSUER_CERT_LOCALLY,UNABLE_TO_GET_ISSUER_CERT)';
+
 /**
- * When each TLS chain warning started (§21.4 Since for a location warning): the primary monitor's
- * checks at the warned locations over the last 24 h, newest first, walked back while they are chain
- * errors. Only sites with a warning are read, so this is usually nothing.
+ * When each TLS chain warning started (§21.4 Since for a location warning): per warned location of
+ * the primary monitor, the last check that wasn't a chain error (within the 90 days kept), then the
+ * first check after it. Two index reads per warned location (check_results_monitor_location_idx);
+ * only sites with a warning are read, so this is usually nothing. Spec-check S06b: a shared 24 h,
+ * 1,000-row read cut long streaks short.
  */
 async function fillChainSince(
   db: DbClient,
@@ -256,26 +269,41 @@ async function fillChainSince(
   live: readonly { id: string; monitors: { id: string; is_primary: boolean }[] }[],
   now: Date,
 ): Promise<void> {
-  const warned = rows.filter((r) => OVERVIEW_LOCATIONS.some((l) => r.locations[l] === 'chain'));
-  if (!warned.length) return;
   const monitorOf = new Map(live.map((s) => [s.id, s.monitors.find((m) => m.is_primary)?.id]));
-  const ids = warned.map((r) => monitorOf.get(r.id)).filter((id): id is string => !!id);
-  const { data, error } = await db
-    .from('check_results')
-    .select('monitor_id, location, checked_at, outcome, error')
-    .in('monitor_id', ids)
-    .gte('checked_at', new Date(now.getTime() - DAY_MS).toISOString())
-    .order('checked_at', { ascending: false })
-    .limit(1000);
-  if (error) throw new Error(`check_results: ${error.message}`);
-  for (const r of warned) {
-    const monitor = monitorOf.get(r.id);
-    const starts = OVERVIEW_LOCATIONS.filter((l: OverviewLocation) => r.locations[l] === 'chain')
-      .map((l) => chainStreakStart((data ?? []).filter((c) => c.monitor_id === monitor && c.location === l)))
-      .filter((t): t is string => !!t)
-      .sort();
-    r.chainSince = starts[0] ?? null;
-  }
+  const from = new Date(now.getTime() - 90 * DAY_MS).toISOString();
+  const streakStart = async (monitorId: string, location: OverviewLocation): Promise<string | null> => {
+    const lastGood = await db
+      .from('check_results')
+      .select('checked_at')
+      .eq('monitor_id', monitorId)
+      .eq('location', location)
+      .gte('checked_at', from)
+      .or(`outcome.neq.fail,error.is.null,error.not.in.${CHAIN_ERRORS}`)
+      .order('checked_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastGood.error) throw new Error(`check_results: ${lastGood.error.message}`);
+    const first = await db
+      .from('check_results')
+      .select('checked_at, outcome, error')
+      .eq('monitor_id', monitorId)
+      .eq('location', location)
+      .gt('checked_at', lastGood.data?.checked_at ?? from)
+      .order('checked_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (first.error) throw new Error(`check_results: ${first.error.message}`);
+    return first.data ? chainStreakStart([first.data]) : null;
+  };
+  await Promise.all(
+    rows.map(async (r) => {
+      const monitor = monitorOf.get(r.id);
+      const warned = OVERVIEW_LOCATIONS.filter((l) => r.locations[l] === 'chain');
+      if (!monitor || !warned.length) return;
+      const starts = await Promise.all(warned.map((l) => streakStart(monitor, l)));
+      r.chainSince = starts.filter((t): t is string => !!t).sort()[0] ?? null;
+    }),
+  );
 }
 
 /** When a PROBLEM raised to DOWN became an outage (the `escalated_to_down` event's `downStartedAt`, D-021). */

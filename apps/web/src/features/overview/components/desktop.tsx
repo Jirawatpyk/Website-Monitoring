@@ -25,7 +25,6 @@ import {
 } from '@jirawatpyk/aura-react';
 import {
   IconArrowRight,
-  IconArrowUpRight,
   IconBell,
   IconChartColumn,
   IconCheck,
@@ -57,11 +56,12 @@ import {
   MutedOverlay,
   TOUCH_HIT,
 } from '@/components/site-cells';
-import { SiteStatusBadge } from '@/components/status-badges';
+import { SiteStatusBadge, WorkflowBadge } from '@/components/status-badges';
 import {
   attnMeta,
   canAck,
   chipOf,
+  durationText,
   nextStep,
   openCaption,
   reasonLine,
@@ -101,13 +101,9 @@ export function DesktopBanners({
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
             <div className="flex min-w-0 flex-col gap-1">
               <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-base font-semibold text-fg-danger">
-                <span>{`${b.site.name} is DOWN — ${formatDuration(b.downMinutes)}`}</span>
-                {b.escalated && (
-                  <Badge tone="warning" variant="outline" icon={<IconArrowUpRight />}>
-                    {`Escalated · L${b.level}`}
-                  </Badge>
-                )}
-                <span className="text-sm font-medium">{`${formatDuration(b.unackedMinutes)} unacked`}</span>
+                <span>{`${b.site.name} is DOWN — ${durationText(b.downMinutes)}`}</span>
+                {b.escalated && <WorkflowBadge state="escalated" level={b.level} />}
+                <span className="text-sm font-medium">{durationText(b.unackedMinutes, 'unacked')}</span>
               </p>
               <p className="m-0">{b.cause ?? 'Hard fail'}</p>
             </div>
@@ -326,7 +322,11 @@ export function LiveIssuesTable({
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h2 id={`${LIVE_ISSUES_ID}-title`} className="m-0 text-2xl font-semibold">
+          <h2
+            id={`${LIVE_ISSUES_ID}-title`}
+            tabIndex={-1}
+            className="m-0 text-2xl font-semibold outline-none"
+          >
             Live issues
           </h2>
           {issues.length > 0 && (
@@ -352,7 +352,7 @@ export function LiveIssuesTable({
               <Th>Site · why</Th>
               <Th>Since</Th>
               <Th className="max-xl:hidden">Owner</Th>
-              <Th className="max-xl:hidden">BKK SIN TYO</Th>
+              <Th>BKK SIN TYO</Th>
               <Th className="max-xl:hidden">Response 24h</Th>
               <Th align="end">Next step</Th>
             </Tr>
@@ -399,7 +399,7 @@ export function LiveIssuesTable({
                       </span>
                       <span
                         title={reasonLine(issue)}
-                        className={`truncate text-xs ${down ? 'font-medium text-fg-danger' : reason.kind === 'problem' ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}
+                        className={`relative z-10 truncate text-xs ${down ? 'font-medium text-fg-danger' : reason.kind === 'problem' ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}
                       >
                         {reasonLine(issue)}
                       </span>
@@ -429,7 +429,7 @@ export function LiveIssuesTable({
                       <span className="text-fg-secondary">—</span>
                     )}
                   </Td>
-                  <Td className="max-xl:hidden">
+                  <Td>
                     <GlyphRow locations={site.locations} />
                   </Td>
                   <Td className="max-xl:hidden">

@@ -11,15 +11,16 @@ export function OverviewSkeleton() {
           <Skeleton key={i} variant="rect" height={60} />
         ))}
       </div>
-      <div
-        className="grid grid-cols-1 gap-4 max-md:hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-        aria-hidden
-      >
+      <div className="grid grid-cols-2 gap-4 max-md:hidden md:grid-cols-3 xl:grid-cols-5" aria-hidden>
         {Array.from({ length: 5 }, (_, i) => (
-          <Skeleton key={i} variant="rect" height={112} />
+          <Skeleton key={i} variant="rect" height={144} />
         ))}
       </div>
       <CardSkeleton lines={6} />
+      {/* the phone's "All N sites" row */}
+      <div className="md:hidden" aria-hidden>
+        <Skeleton variant="rect" height={48} />
+      </div>
       <div
         className="grid grid-cols-1 gap-4 max-md:hidden xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*90)]"
         aria-hidden

@@ -98,6 +98,9 @@ describe('dates in Bangkok time', () => {
   it('formats the day without padding or "Sept"', () => {
     expect(formatDay(snapshot)).toBe('25 Sep');
     expect(formatDay(snapshot, { weekday: true })).toBe('Fri 25 Sep');
+    expect(formatDay(snapshot, { weekday: true, year: true })).toBe('Fri 25 Sep 2026');
+    // the Bangkok year: 31 Dec 17:30 UTC is already 1 Jan in Bangkok
+    expect(formatDay(new Date('2026-12-31T17:30:00Z'), { year: true })).toBe('1 Jan 2027');
     expect(formatDay(new Date('2026-09-02T00:00:00Z'))).toBe('2 Sep');
   });
 

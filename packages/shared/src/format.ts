@@ -67,10 +67,10 @@ export function isSameBangkokDay(a: Date, b: Date): boolean {
   return pa.year === pb.year && pa.month === pb.month && pa.day === pb.day;
 }
 
-/** "25 Sep", or "Fri 25 Sep" with `weekday`. Never zero-padded, never "Sept". */
-export function formatDay(date: Date, options: { weekday?: boolean } = {}): string {
+/** "25 Sep", "Fri 25 Sep" with `weekday`, "Fri 25 Sep 2026" with `year` too. Never zero-padded, never "Sept". */
+export function formatDay(date: Date, options: { weekday?: boolean; year?: boolean } = {}): string {
   const p = bangkokParts(date);
-  const day = `${p.day} ${MONTHS[p.month]}`;
+  const day = `${p.day} ${MONTHS[p.month]}${options.year ? ` ${p.year}` : ''}`;
   return options.weekday ? `${WEEKDAYS[p.weekday]} ${day}` : day;
 }
 

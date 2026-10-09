@@ -1,21 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buttonClass, PageHeader } from '@jirawatpyk/aura-react';
 import { IconPlus } from '@jirawatpyk/aura-react/icons';
 import { formatDay, formatTime, formatTimeWithSeconds } from '@dxt/shared';
 import { bannersOf, countsOf, liveIssues, recentEvents, withAck } from '../model';
 import type { OverviewData, ProbeHealth } from '../types';
-import { DesktopBanners, Kpis, LiveIssuesTable, RecentEvents, SiteTiles } from './desktop';
+import { DesktopBanners, Kpis, LIVE_ISSUES_ID, LiveIssuesTable, RecentEvents, SiteTiles } from './desktop';
 import { PhoneAllSites, PhoneBanners, PhoneCounts, PhoneLiveIssues } from './phone';
 import { useLiveRefresh } from './use-live-refresh';
 import { useOverviewAck, type AckAction, type UndoAction } from './use-overview-ack';
-
-/** "Fri 25 Sep 2026" — the day in Bangkok with its year (Main3 meta line). */
-function dayWithYear(d: Date): string {
-  return `${formatDay(d, { weekday: true })} ${new Date(d.getTime() + 7 * 3_600_000).getUTCFullYear()}`;
-}
 
 /** "Probes 3/3 | BKK · SIN · TYO | Verifier idle" (D-032: no heartbeat age until S12). */
 function ProbePill({ probes, compact = false }: { probes: ProbeHealth; compact?: boolean }) {
@@ -23,7 +18,7 @@ function ProbePill({ probes, compact = false }: { probes: ProbeHealth; compact?:
   const dot = (
     <span
       aria-hidden
-      className={`size-2 shrink-0 rounded-aura-full ${allUp ? 'bg-fg-positive' : 'bg-alert-warning-fg'}`}
+      className={`size-2 shrink-0 rounded-aura-full ${allUp ? 'bg-fg-positive' : probes.beating.length === 0 ? 'bg-fg-danger' : 'bg-alert-warning-fg'}`}
     />
   );
   const count = `Probes ${probes.beating.length}/${probes.total}`;
@@ -71,6 +66,19 @@ export function OverviewView({
 }) {
   const live = useLiveRefresh();
   const { acked, acknowledge } = useOverviewAck({ ack: ackAction, undo: undoAction });
+  // Acknowledge removes the button that had focus (its banner or row changes): put focus on the Live
+  // issues heading once React has drawn the page without it (WCAG 2.4.3, apps/web/CLAUDE.md → Testing)
+  const [ackFocus, setAckFocus] = useState(0);
+  useEffect(() => {
+    if (ackFocus) document.getElementById(`${LIVE_ISSUES_ID}-title`)?.focus();
+  }, [ackFocus]);
+  const onAck = useCallback(
+    (incidentId: string, number: number) => {
+      acknowledge(incidentId, number);
+      setAckFocus((n) => n + 1);
+    },
+    [acknowledge],
+  );
   const now = useMemo(() => new Date(data.nowIso), [data.nowIso]);
   const sites = useMemo(() => {
     let out = data.sites;
@@ -83,16 +91,20 @@ export function OverviewView({
   const banners = bannersOf(sites, now);
   const events = recentEvents(data.events, now);
   const isAdmin = data.viewer.kind === 'admin';
-  const meta = `${dayWithYear(now)} · ${formatTimeWithSeconds(now)} (UTC+7)${live ? ' · live' : ''}`;
+  const meta = `${formatDay(now, { weekday: true, year: true })} · ${formatTimeWithSeconds(now)} (UTC+7)${live ? ' · live' : ''}`;
 
   return (
     <div className="flex flex-col gap-3 md:gap-6">
+      {/* What Realtime changed, said once (it updates without a reload); one polite line, not every row */}
+      <p className="sr-only" aria-live="polite">
+        {`${counts.ok} of ${counts.monitored} sites OK · ${issues.length} live ${issues.length === 1 ? 'issue' : 'issues'}${counts.unacked ? ` · ${counts.unacked} unacknowledged DOWN` : ''}`}
+      </p>
       {/* One page header (one h1) whose parts switch at md: Main3 above, MOverview4 below. */}
       <PageHeader
         eyebrow={
           <>
             <span className="max-md:hidden">OVERVIEW</span>
-            <span className="md:hidden">{`${formatDay(now, { weekday: true }).toUpperCase()} ${formatTime(now)} · UTC+7`}</span>
+            <span className="uppercase md:hidden">{`${formatDay(now, { weekday: true })} ${formatTime(now)} · UTC+7`}</span>
           </>
         }
         title={
@@ -122,7 +134,7 @@ export function OverviewView({
 
       {/* desktop and tablet (md up): Main3 / MainDark3 */}
       <div className="flex flex-col gap-6 max-md:hidden">
-        <DesktopBanners {...banners} viewer={data.viewer} onAck={acknowledge} />
+        <DesktopBanners {...banners} viewer={data.viewer} onAck={onAck} />
         <Kpis counts={counts} kpis={data.kpis} />
         <LiveIssuesTable
           issues={issues}
@@ -130,7 +142,7 @@ export function OverviewView({
           viewer={data.viewer}
           now={now}
           lastRoundAt={data.lastRoundAt}
-          onAck={acknowledge}
+          onAck={onAck}
         />
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*90)]">
           <SiteTiles sites={sites} drafts={data.drafts} now={now} />

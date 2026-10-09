@@ -112,7 +112,21 @@ export function liveIssues(sites: readonly OverviewSite[], now: Date): LiveIssue
 /** Duration over "since HH:MM" (§21.4); null when the start isn't known. */
 export function sinceText(since: string | null, now: Date): { duration: string; at: string } | null {
   if (!since) return null;
-  return { duration: formatDuration(minutesBetween(since, now)), at: `since ${formatTime(new Date(since))}` };
+  const start = new Date(since);
+  // "since 08:12" today; "since yesterday 16:40" / "since Mon 14 Sep 21:18" before (spec §13)
+  const at = isSameBangkokDay(start, now) ? formatTime(start) : formatWhen(start, now, { midSentence: true });
+  return { duration: durationText(minutesBetween(since, now)), at: `since ${at}` };
+}
+
+/**
+ * A duration on the Overview: "19 min", "1 h 2 min"; under a minute "just now", as the incident line
+ * says ("INC-0142 · unacked just now", `formatIncidentLine`) — "0 min" reads like a glitch.
+ * With a word: "18 min unacked" / "unacked just now".
+ */
+export function durationText(minutes: number, word?: string): string {
+  if (minutes < 1) return word ? `${word} just now` : 'just now';
+  const d = formatDuration(minutes);
+  return word ? `${d} ${word}` : d;
 }
 
 const capitalise = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -285,8 +299,10 @@ export function countsOf(sites: readonly OverviewSite[]): Counts {
     if (s.status === 'problem') c.problem += 1;
     if (s.incident) {
       c.open += 1;
-      if (UNACKED.includes(s.incident.state)) c.unacked += 1;
-      if (s.incident.state === 'escalated') c.escalated += 1;
+      // Unacked = DOWN incidents waiting for an ack, the ones with banners (MOverview4, D-032); a PROBLEM
+      // waits in Live issues without turning the count red
+      if (s.incident.severity === 'down' && UNACKED.includes(s.incident.state)) c.unacked += 1;
+      if (s.incident.severity === 'down' && s.incident.state === 'escalated') c.escalated += 1;
     }
   }
   return c;
@@ -381,9 +397,10 @@ export function eventLine(e: OverviewEvent): string | null {
   const confirmed = `${e.siteName} DOWN confirmed${where ? ` — ${where}/3 locations` : ''}`;
   switch (e.type) {
     case 'detected':
-      return typeof e.payload.summary === 'string'
-        ? `${e.siteName} PROBLEM — ${capitalise(e.payload.summary)}`
-        : confirmed;
+      // a PROBLEM opens with its summary; without one (a script-made incident), one never raised to DOWN
+      if (typeof e.payload.summary === 'string')
+        return `${e.siteName} PROBLEM — ${capitalise(e.payload.summary)}`;
+      return e.severity === 'problem' ? `${e.siteName} PROBLEM — ${TRIGGER_LABELS[e.trigger]}` : confirmed;
     case 'escalated_to_down':
       return confirmed;
     case 'acknowledged':

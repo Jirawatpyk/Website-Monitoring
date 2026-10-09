@@ -150,7 +150,9 @@ describe('loadOverview (S06b, spec §21)', () => {
     expect(ms).toBeLessThan(2000);
 
     expect(data.viewer.kind).toBe('admin');
-    expect(data.sites.every((s) => s.series.length === SERIES_POINTS)).toBe(true);
+    // only Live issues carry the 96-point line; the rest send none
+    const issueIds = new Set(liveIssues(data.sites, new Date(data.nowIso)).map((i) => i.site.id));
+    expect(data.sites.every((s) => s.series.length === (issueIds.has(s.id) ? SERIES_POINTS : 0))).toBe(true);
     const ours = data.sites.find((s) => s.id === siteId);
     expect(ours?.incident).toMatchObject({ number: expect.any(Number), cause: 'Timeout ×2 · 504 ×1' });
     expect(ours?.p50Ms).toBeNull(); // "—" while down

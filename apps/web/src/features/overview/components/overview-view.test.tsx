@@ -193,6 +193,25 @@ describe('OverviewView (Main3 / MOverview4)', () => {
     expect(screen.getAllByText('MuvMi is DOWN — 19 min').length).toBe(2);
   });
 
+  it('focus moves to the Live issues heading when Acknowledge takes its button away (WCAG 2.4.3)', async () => {
+    ackAction.mockReturnValue(new Promise(() => {}));
+    renderView(data());
+    const button = within(desktop()).getAllByRole('button', { name: 'Acknowledge' })[0]!;
+    button.focus();
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(screen.getAllByRole('heading', { level: 2, name: 'Live issues' })[0]).toHaveFocus();
+  });
+
+  it('says what changed once, politely (Realtime updates without a reload)', () => {
+    renderView(data());
+    expect(screen.getByText('2 of 3 sites OK · 1 live issue · 1 unacknowledged DOWN')).toHaveAttribute(
+      'aria-live',
+      'polite',
+    );
+  });
+
   it('a thrown action (network) is treated as a refusal', async () => {
     ackAction.mockRejectedValue(new Error('fetch failed'));
     renderView(data());
