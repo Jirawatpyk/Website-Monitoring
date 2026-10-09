@@ -33,6 +33,7 @@ import {
   formatTime,
   formatTimeWithSeconds,
 } from '@dxt/shared';
+import { UNKNOWN_ROOT_CAUSE } from '@dxt/engine';
 import { FOCUS_TARGET } from '@/components/focus-target';
 import { SeverityBadge, WorkflowBadge } from '@/components/status-badges';
 import { NoAccess } from '@/components/states';
@@ -144,8 +145,11 @@ export function IncidentDetailView({
     if (!focusResolve) return;
     const button = shown(resolveDesktop.current, resolvePhone.current);
     if (!button) return;
-    button.focus();
-    if (document.activeElement !== button) return;
+    // A Resolve that came back disabled can't take focus: stop waiting rather than grab it later.
+    if (!(button as HTMLButtonElement).disabled) {
+      button.focus();
+      if (document.activeElement !== button) return;
+    }
     const t = setTimeout(() => setFocusResolve(false), 0);
     return () => clearTimeout(t);
   });
@@ -593,7 +597,7 @@ function ResolveCard({
             {g.ok
               ? 'All 3 conditions met. Resolve is manual — resolve it when you’re sure.'
               : (g.lockedReason ??
-                (g.conditions[2]!.detail === 'Unknown keeps the incident open'
+                (d.rootCause.category === UNKNOWN_ROOT_CAUSE
                   ? 'Unknown keeps the incident open. Pick a category once you know what happened.'
                   : 'Needs a root cause before it can be resolved.'))}
           </p>
