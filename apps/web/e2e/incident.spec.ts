@@ -22,15 +22,25 @@ test.describe('incidents, notes and resolve (local Supabase)', () => {
 
   test('the list shows an open incident and opens it', async ({ page }, info) => {
     const id = await openTestIncident('arm@example.test');
+    // The site's name, from the incident's own title ("E2E 1a2b3c4d is down").
+    await page.goto(`/incidents/${id}`);
+    const site = (await page.getByRole('heading', { level: 1 }).textContent())!.replace(/ is down$/, '');
     await page.goto('/incidents');
     await expect(page.getByRole('heading', { level: 1, name: 'Incidents' })).toBeVisible();
     if (info.project.name === 'mobile') {
       await page.getByRole('radio', { name: /^Unacked/ }).click();
-      await page.locator(`a[href="/incidents/${id}"]:visible`).first().click();
+      // a long local list stops at a page: open it all
+      const all = page.getByRole('button', { name: /^Show all \d+$/ });
+      if (await all.isVisible()) await all.click();
     } else {
       await expect(page.getByText(/^\d+ open$/)).toBeVisible();
-      await page.locator(`a[href="/incidents/${id}"]:visible`).first().click();
+      // the table shows 50 a page: page on until the incident's row is there
+      const row = page.locator(`a[href="/incidents/${id}"]:visible`);
+      const next = page.getByRole('button', { name: 'Next page' });
+      while (!(await row.count()) && (await next.isVisible()) && (await next.isEnabled())) await next.click();
+      await expect(page.getByText(site).filter({ visible: true }).first()).toBeVisible();
     }
+    await page.locator(`a[href="/incidents/${id}"]:visible`).first().click();
     await expect(page).toHaveURL(new RegExp(`/incidents/${id}$`));
   });
 

@@ -378,14 +378,16 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
             ))}
           </ul>
         )}
-        {phoneView === 'past' && phoneRows.length > PAST_SHOWN && (
+        {phoneRows.length > (phoneView === 'past' ? PAST_SHOWN : PAGE_SIZE) && (
           <Button
             variant="secondary"
             fullWidth
             icon={showAllPast ? <IconChevronUp /> : <IconChevronDown />}
             onClick={() => setShowAllPast(!showAllPast)}
           >
-            {showAllPast ? `Show latest ${PAST_SHOWN} only` : `Show all ${phoneRows.length}`}
+            {showAllPast
+              ? `Show latest ${phoneView === 'past' ? PAST_SHOWN : PAGE_SIZE} only`
+              : `Show all ${phoneRows.length}`}
           </Button>
         )}
       </div>
