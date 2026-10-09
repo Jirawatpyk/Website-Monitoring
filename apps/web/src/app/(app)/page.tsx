@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Container, PageHeader } from '@jirawatpyk/aura-react';
+import { Button, Container, EmptyState, PageHeader } from '@jirawatpyk/aura-react';
+import { IconMonitor } from '@jirawatpyk/aura-react/icons';
 import { OverviewView } from '@/features/overview';
 import { getOverview } from '@/features/overview/server';
 import { acknowledgeIncident, undoAcknowledge } from '@/features/incidents/server';
@@ -16,7 +17,21 @@ export default async function OverviewPage() {
       <Container>
         <div className="flex flex-col gap-6">
           <PageHeader eyebrow="OVERVIEW" title="Overview" />
-          <SitesEmpty isAdmin={data.viewer.kind === 'admin'} chatConnected={chatConnected()} />
+          {data.drafts > 0 ? (
+            // sites were added but none is monitored yet: no "Add first site" (code review S06b)
+            <EmptyState
+              icon={<IconMonitor />}
+              title="No site is monitored yet"
+              description={`${data.drafts} ${data.drafts === 1 ? 'draft waits' : 'drafts wait'} for setup to finish.`}
+              action={
+                <Button variant="secondary" href="/sites">
+                  Open Sites
+                </Button>
+              }
+            />
+          ) : (
+            <SitesEmpty isAdmin={data.viewer.kind === 'admin'} chatConnected={chatConnected()} />
+          )}
         </div>
       </Container>
     );
