@@ -23,7 +23,7 @@
 | S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 (merged) | 3 | Done |
 | S06 | Site detail & check rollups | 1 · P0 | L | FR-08 | S02a, S05 (merged) | 3 | Done |
 | S06b | Overview (option A) | 1 · P0 | L | FR-05 | S06, S02b | 3 | Done |
-| S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
+| S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | In progress |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
 | S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06b, S08 | 3 | Todo |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
@@ -376,7 +376,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
 - **Scope:** FR-06. Incidents list (filters, "N short PROBLEMs auto-resolved (hidden)"), Incident detail (state badges §11 / §14.3, timeline that only grows, notes, root cause, MTTA / MTTR), mobile list and detail, Resolve dialog with the three conditions, resolve held 10 s, NOTE and RESOLVED Chat replies, RESOLVED email. Until S11 builds the client-update track it never fires, so that condition shows "Not required" (D-002, spec §16.2). Phone detail pages get the top bar's back arrow (MobileAck, MIncident → Incidents; D-018).
 - **Boards:** Incidents, MIncidents, Incident, MIncident, Resolve · **Test plan:** T10
-- **Depends on:** S04
+- **Depends on:** S04b
 - **Done when:**
   1. **T10:** Resolve stays disabled, naming the unmet condition, until OK 2 rounds + client update (or Not required) + root cause; "Unknown — keep investigating" doesn't count (UI test + engine test).
   2. Each incident state renders the exact badge from spec §11 / §14.3 (component test per state).
