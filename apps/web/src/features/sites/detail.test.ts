@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  axisLabels,
   chartLines,
   clientWord,
   incidentsCaption,
@@ -151,5 +152,18 @@ describe('incident summaries (SiteDetail board, BA – Taiwan)', () => {
     expect(mttrMinutes([d(10), d(30), d(20)])).toBe(20);
     expect(mttrMinutes([d(10), d(31)])).toBe(21);
     expect(mttrMinutes([inc131])).toBeNull();
+  });
+});
+
+describe('axisLabels (spec §13)', () => {
+  const to = Date.parse('2026-09-25T03:07:00Z'); // Fri 25 Sep 10:07 Bangkok
+  it('24 h: times, then now', () => {
+    expect(axisLabels('24h', to - 86_400_000, to)).toEqual(['10:07', '16:07', '22:07', '04:07', 'now']);
+  });
+  it('7 d: weekday and day', () => {
+    expect(axisLabels('7d', to - 7 * 86_400_000, to)[0]).toBe('Fri 18');
+  });
+  it('30 d: dates', () => {
+    expect(axisLabels('30d', to - 30 * 86_400_000, to)[0]).toBe('26 Aug');
   });
 });
