@@ -449,4 +449,3 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
     sites: sites.data ?? [],
   };
 }
-
