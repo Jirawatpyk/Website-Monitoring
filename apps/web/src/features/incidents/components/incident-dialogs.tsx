@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, Button, Dialog, Select, Textarea, TextField, type DialogProps } from '@jirawatpyk/aura-react';
 import { IconCircle, IconCircleCheck, IconPencil, IconRotateCcw } from '@jirawatpyk/aura-react/icons';
@@ -298,6 +298,10 @@ export function ResolveDialog({
   const [pending, start] = useTransition();
   const doneTitle = useRef<HTMLParagraphElement>(null);
   const seconds = useSecondsLeft(done?.kind === 'resolved' ? done.postsAt : null);
+  // The button pressed is gone once the dialog shows the outcome: focus its first line (WCAG 2.4.3).
+  useEffect(() => {
+    if (done) doneTitle.current?.focus();
+  }, [done]);
 
   const unknown = value.category === UNKNOWN_ROOT_CAUSE;
   const filled = !!value.category && !!value.what.trim();
@@ -372,7 +376,7 @@ export function ResolveDialog({
     <Dialog
       open={open}
       onClose={close}
-      size="lg"
+      size="md"
       title={
         done
           ? done.kind === 'resolved'
@@ -450,32 +454,45 @@ export function ResolveDialog({
         </Alert>
       )}
       {done?.kind === 'resolved' ? (
-        <div className="flex flex-col gap-2" role="status">
-          <p ref={doneTitle} className="m-0 text-base font-semibold">
+        <div className="flex flex-col gap-2">
+          <p
+            role="status"
+            className="sr-only"
+          >{`Resolved. Posting to Chat and email in a few seconds — nothing is sent until then`}</p>
+          <p
+            ref={doneTitle}
+            tabIndex={-1}
+            className="m-0 rounded-aura-sm text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
+          >
             {`Resolved at ${formatTime(done.at)} by ${viewerName}`}
           </p>
           <p className="m-0 text-sm text-fg-secondary">
             {`Root cause: ${label(done.category)}. `}
             {seconds > 0
-              ? `Posting to Chat and email in ${seconds} s — nothing is sent until then.`
-              : 'Posted to Chat and email.'}
+              ? `Posting to Chat and email in ${seconds} s — nothing is sent until then`
+              : 'Posting to the Chat thread and email now'}
           </p>
           <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
             <li>
               {seconds > 0
                 ? 'Resolved reply to the Chat thread · held for undo'
-                : 'Resolved reply posted in the Chat thread'}
+                : 'Resolved reply to the Chat thread · sending'}
             </li>
             <li>
               {seconds > 0
                 ? 'Resolved email to everyone emailed about it · held for undo'
-                : 'Resolved email sent in the incident thread'}
+                : 'Resolved email to everyone emailed about it · sending'}
             </li>
           </ul>
         </div>
       ) : done?.kind === 'kept' ? (
-        <div className="flex flex-col gap-2" role="status">
-          <p className="m-0 text-base font-semibold">{`Saved at ${formatTime(done.at)} by ${viewerName} — still open`}</p>
+        <div className="flex flex-col gap-2">
+          <p
+            ref={doneTitle}
+            tabIndex={-1}
+            role="status"
+            className="m-0 rounded-aura-sm text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
+          >{`Saved at ${formatTime(done.at)} by ${viewerName} — still open`}</p>
           <p className="m-0 text-sm text-fg-secondary">
             It stays in “Needs root cause”. Notes are saved; pick a category when you know more.
           </p>
@@ -483,7 +500,7 @@ export function ResolveDialog({
       ) : (
         <div className="flex flex-col gap-5">
           {summary.length > 0 && (
-            <dl className="m-0 grid grid-cols-3 gap-3">
+            <dl className="m-0 grid grid-cols-3 gap-3 rounded-aura-md border border-border-default bg-bg-canvas p-aura-3">
               {summary.map((s) => (
                 <div key={s.label} className="flex flex-col">
                   <dt className="text-xs text-fg-secondary">{s.label}</dt>
@@ -492,11 +509,24 @@ export function ResolveDialog({
               ))}
             </dl>
           )}
-          <section aria-label="Before you can resolve" className="flex flex-col gap-2">
-            <h3 className="m-0 text-sm font-semibold">Before you can resolve</h3>
+          <section
+            aria-labelledby="resolve-conditions-title"
+            className="flex flex-col gap-2 rounded-aura-md border border-border-default p-aura-3"
+          >
+            <h3 id="resolve-conditions-title" className="m-0 text-sm font-semibold">
+              Before you can resolve
+            </h3>
             <ConditionList conditions={live} />
           </section>
-          <RootCauseFields value={value} onChange={setValue} errors={errors} stillDown={incident.stillDown} />
+          <RootCauseFields
+            value={value}
+            onChange={(v) => {
+              setValue(v);
+              setErrors({});
+            }}
+            errors={errors}
+            stillDown={incident.stillDown}
+          />
           {unknown && (
             <Alert tone="warning" title="Unknown keeps the incident open">
               It stays in “Needs root cause” until someone picks a real category. Your notes are saved.

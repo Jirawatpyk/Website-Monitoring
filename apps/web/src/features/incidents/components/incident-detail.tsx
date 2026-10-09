@@ -130,9 +130,14 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
   // The Resolve card is drawn twice (desktop column, phone stack): focus returns to the one showing.
   const resolveDesktop = useRef<HTMLButtonElement>(null);
   const resolvePhone = useRef<HTMLButtonElement>(null);
-  const shownResolve = () =>
-    [resolveDesktop.current, resolvePhone.current].find((b) => b && b.getClientRects().length > 0) ??
-    resolveDesktop.current;
+  const resolvedDesktop = useRef<HTMLHeadingElement>(null);
+  const resolvedPhone = useRef<HTMLHeadingElement>(null);
+  const shown = <T extends HTMLElement>(...els: (T | null)[]) =>
+    els.find((e) => e && e.getClientRects().length > 0) ?? els[0] ?? null;
+  // Resolve while it's there; once resolved (the page re-rendered), the "Resolved" card's heading.
+  const shownResolve = (): HTMLElement | null =>
+    shown(resolveDesktop.current, resolvePhone.current) ??
+    shown(resolvedDesktop.current, resolvedPhone.current);
   const resolved = d.state === 'resolved' || d.state === 'in_review' || d.state === 'closed';
   const stillDown = !d.recoveredAt;
   const { acked, acknowledge } = useAckToast({ ack: acknowledgeIncident, undo: undoAcknowledge });
@@ -182,7 +187,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
     ? `${formatTime(new Date(d.startedAt))}–${formatTime(new Date(d.recoveredAt))}`
     : null;
   const summary = [
-    { label: d.severity === 'down' ? 'Down' : 'Problem', value: formatDuration(d.durationMinutes) },
+    { label: 'Duration', value: formatDuration(d.durationMinutes) },
     ...(downRange
       ? [{ label: 'Window', value: `${formatDay(new Date(d.startedAt), { weekday: true })} ${downRange}` }]
       : []),
@@ -193,8 +198,9 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
       ? v.title
       : `${d.siteName} ${d.severity === 'down' ? 'recovered' : 'is back to normal'}`;
 
-  const resolveCard = (ref: React.RefObject<HTMLButtonElement | null>) => (
+  const resolveCard = (ref: React.RefObject<HTMLButtonElement | null>, primary: boolean) => (
     <ResolveCard
+      primary={primary}
       detail={d}
       resolved={resolved}
       onResolve={openResolve}
@@ -275,7 +281,12 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
               <Timeline items={d.timeline} newestFirst={false} />
             </Card>
           </div>
-          <div className="flex flex-col gap-6">{resolveCard(resolveDesktop)}</div>
+          <div className="flex flex-col gap-6">
+            {d.resolved && (
+              <ResolvedCard detail={d} headingRef={resolvedDesktop} onUndone={() => setFocusResolve(true)} />
+            )}
+            {resolveCard(resolveDesktop, true)}
+          </div>
         </div>
       </div>
 
@@ -306,9 +317,11 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
             items={menu}
           />
         </span>
-        {d.resolved && <ResolvedCard detail={d} onUndone={() => setFocusResolve(true)} />}
+        {d.resolved && (
+          <ResolvedCard detail={d} headingRef={resolvedPhone} onUndone={() => setFocusResolve(true)} />
+        )}
         <LatestRoundCard detail={d} />
-        {resolveCard(resolvePhone)}
+        {resolveCard(resolvePhone, false)}
         {v.ack.kind === 'read-only' && (
           <NoAccess title={v.ack.title} description={v.ack.description} people={v.ack.people} />
         )}
@@ -320,19 +333,29 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
           siteUrl={v.siteUrl}
           barActions={
             d.canAct && !resolved ? (
-              <span className="flex gap-2">
-                <Button variant="secondary" icon={<IconPencil />} fullWidth onClick={() => setNoteOpen(true)}>
-                  Add note
-                </Button>
-                <Button
-                  variant="primary"
-                  icon={<IconCircleCheck />}
-                  fullWidth
-                  disabled={!d.gate.canOpenDialog}
-                  onClick={openResolve}
-                >
-                  Resolve
-                </Button>
+              <span className="flex flex-col gap-1.5">
+                {d.gate.lockedReason && (
+                  <span className="text-center text-xs text-fg-secondary">{d.gate.lockedReason}</span>
+                )}
+                <span className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    icon={<IconPencil />}
+                    fullWidth
+                    onClick={() => setNoteOpen(true)}
+                  >
+                    Add note
+                  </Button>
+                  <Button
+                    variant="primary"
+                    icon={<IconCircleCheck />}
+                    fullWidth
+                    disabled={!d.gate.canOpenDialog}
+                    onClick={openResolve}
+                  >
+                    Resolve
+                  </Button>
+                </span>
               </span>
             ) : undefined
           }
@@ -531,15 +554,32 @@ function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
 }
 
 /** Phone: "Resolved 10:33" with the held RESOLVED and its Undo (MIncident). */
-function ResolvedCard({ detail: d, onUndone }: { detail: IncidentDetail; onUndone: () => void }) {
+function ResolvedCard({
+  detail: d,
+  onUndone,
+  headingRef,
+}: {
+  detail: IncidentDetail;
+  onUndone: () => void;
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
+}) {
   const r = d.resolved!;
   const seconds = useSecondsLeft(r.posted ? null : r.postsAt);
   const [failure, setFailure] = useState<string | null>(null);
   return (
     <section className="flex flex-col gap-1.5 rounded-aura-lg border border-l-4 border-border-default border-l-fg-positive bg-bg-surface px-3.5 py-3">
-      <h2 className="m-0 text-base font-semibold">{`Resolved ${formatTime(new Date(r.at))}`}</h2>
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className="m-0 rounded-aura-sm text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
+      >{`Resolved ${formatTime(new Date(r.at))}`}</h2>
       <span className="text-sm">{`Resolved by ${r.by}.`}</span>
-      <span className="text-xs text-fg-secondary" role="status">
+      <p role="status" className="sr-only">
+        {seconds > 0
+          ? 'Resolved — posting to Chat and email in a few seconds, nothing is sent until then'
+          : ''}
+      </p>
+      <span className="text-xs text-fg-secondary">
         {seconds > 0
           ? `Posting to Chat and email in ${seconds} s — nothing is sent until then`
           : r.posted
@@ -572,8 +612,11 @@ function ResolveCard({
   onResolve,
   onRootCause,
   resolveButton,
+  primary,
 }: {
   detail: IncidentDetail;
+  /** Desktop: the page's primary action; on a phone the sticky bar has it. */
+  primary: boolean;
   resolved: boolean;
   onResolve: () => void;
   onRootCause: () => void;
@@ -590,7 +633,7 @@ function ResolveCard({
             <IconCircleCheck aria-hidden className="size-4 text-fg-positive" />
           ) : g.ok ? (
             <IconCircleCheck aria-hidden className="size-4 text-fg-positive" />
-          ) : (
+          ) : g.canOpenDialog ? null : (
             <IconLock aria-hidden className="size-4" />
           )}
           {resolved ? 'Resolved' : `${g.metCount} of 3 met`}
@@ -619,7 +662,7 @@ function ResolveCard({
           <span className="flex flex-wrap gap-2">
             <Button
               ref={resolveButton}
-              variant={g.canOpenDialog ? 'primary' : 'secondary'}
+              variant={g.canOpenDialog && primary ? 'primary' : 'secondary'}
               size="sm"
               icon={g.canOpenDialog ? <IconCircleCheck /> : <IconLock />}
               disabled={!g.canOpenDialog}

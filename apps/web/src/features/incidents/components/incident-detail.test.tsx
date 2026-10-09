@@ -157,6 +157,8 @@ describe('Incident page — Resolve (T10, D-033)', () => {
       fix: '',
     });
     const done = await screen.findByRole('dialog', { name: 'Incident resolved' });
+    // the pressed button is gone: focus is on the outcome (WCAG 2.4.3)
+    await waitFor(() => expect(within(done).getByText(/^Resolved at \d\d:\d\d by Tao$/)).toHaveFocus());
     expect(within(done).getByText(/Posting to Chat and email in \d+ s/)).toBeInTheDocument();
     await act(async () => fireEvent.click(within(done).getByRole('button', { name: /^Undo · \d+ s$/ })));
     expect(m.undoResolve).toHaveBeenCalledWith('i139');
