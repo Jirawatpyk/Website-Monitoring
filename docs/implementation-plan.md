@@ -382,7 +382,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - **Carried from S06 review** (engine-reviewer; existed before S06):
   - RECOVERED words its drop by the incident's severity (`render.ts` `problemOf` / `recoveryOf`): a D-023 key-page PROBLEM drop on a DOWN incident says "back · down X" instead of "back to normal · problem for X". Take the severity (and the trigger, from its `relapsed` payload) from the drop that recovered (N3).
   - `engine_relapse_incident` lets a PROBLEM incident relapse as DOWN without an `escalated_to_down` event; the runner always escalates first, but add the SQL guard `not (p_severity = 'down' and severity = 'problem')` with a pgTAP test (L2).
-  - A drop with no `recovered` row on a resolved incident runs to `now`; cap its end at `resolved_at` in `episodesFromTimeline` (L3).
+  - Flap summary and "Down X so far" for a mixed incident (D-021 PROBLEM → DOWN, D-023 key-page PROBLEM drops): S06 split a D-021 incident's drops at the escalation for uptime, but `render.ts` `dropsOf` keeps the S04b view for messages (the PROBLEM time reads as part of the outage). Decide with Tao and message-checker how a mixed incident is worded — DOWN-only totals as uptime counts them (spec §5), flips / span / "stable since" over every drop, "Down once" for one — record a D-xxx, then drop the S04b view.
 
 ### S08 · Escalation L0–L1 & response hours
 

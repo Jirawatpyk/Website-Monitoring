@@ -232,7 +232,7 @@ const dateOf = (v: unknown): Date | null =>
  * severity; a relapse at its payload's `startedAt`; a PROBLEM turned DOWN (D-021) at `downStartedAt`.
  */
 export function episodesFromTimeline(
-  incident: { started_at: string; severity: Severity },
+  incident: { started_at: string; severity: Severity; resolved_at?: string | null },
   events: readonly IncidentEventRow[],
 ): Episode[] {
   const out: EpisodeEvent[] = [];
@@ -254,12 +254,17 @@ export function episodesFromTimeline(
     const first = raised ? 'problem' : incident.severity;
     out.push({ type: e.type, at, startedAt, severity: e.type === 'detected' ? first : severity });
   }
-  return episodesOf(out);
+  // A resolved incident's drop with no `recovered` row (a script resolved it, a lost event) ends at the
+  // resolve, never at now (engine review L3: staging's reset script left 0.00% uptime)
+  const resolved = dateOf(incident.resolved_at);
+  return episodesOf(out).map((d) =>
+    d.end === null && resolved ? { ...d, end: resolved > d.start ? resolved : d.start } : d,
+  );
 }
 
 /** The DOWN drops of a stored incident, for uptime (spec §5: PROBLEM counts as up; D-021 via the timeline). */
 export function downEpisodesFromTimeline(
-  incident: { started_at: string; severity: Severity },
+  incident: { started_at: string; severity: Severity; resolved_at?: string | null },
   events: readonly IncidentEventRow[],
 ): Episode[] {
   return episodesFromTimeline(incident, events).filter((d) => d.severity === 'down');

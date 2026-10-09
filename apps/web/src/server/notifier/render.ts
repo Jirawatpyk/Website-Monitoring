@@ -55,23 +55,30 @@ function problemOf(i: IncidentFacts, ctx: Record<string, unknown> = {}): Problem
 const dateOf = (v: unknown): Date | null =>
   typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : null;
 
-/** The incident's drops from its timeline (D-024): first failed check → recovery. */
-const dropsOf = (i: IncidentFacts): Episode[] => episodesFromTimeline(i, i.incident_events ?? []);
-
 /**
- * The flap summary's drops (spec §19.4): when the incident was ever DOWN it counts the DOWN drops only
- * ("Down N times … X down in total", the same minutes as uptime, spec §5) — a key-page PROBLEM drop
- * (D-023) or the PROBLEM before a D-021 escalation isn't downtime; a PROBLEM-only incident lists its
- * PROBLEM drops ("Had a problem N times").
+ * The incident's drops from its timeline (D-024): first failed check → recovery — as the messages
+ * have worded them since S04b. Uptime splits a D-021 incident at its escalation (S06); the messages
+ * keep the PROBLEM time before it as part of the outage until S07 reworks the summaries (plan S07
+ * "Carried from S06 review"): drops before the first DOWN read as DOWN, and a PROBLEM drop that runs
+ * straight into the outage joins it.
  */
-function summaryOf(i: IncidentFacts): { severity: 'down' | 'problem'; drops: { start: Date; end: Date }[] } {
-  const all = dropsOf(i);
-  const severity = all.some((d) => d.severity === 'down') ? 'down' : 'problem';
-  const drops = all
-    .filter((d) => d.severity === severity)
-    .flatMap((d) => (d.end ? [{ start: d.start, end: d.end }] : []));
-  return { severity, drops };
+function dropsOf(i: IncidentFacts): Episode[] {
+  const drops = episodesFromTimeline(i, i.incident_events ?? []);
+  if (!i.incident_events?.some((e) => e.type === 'escalated_to_down')) return drops;
+  const firstDown = drops.findIndex((d) => d.severity === 'down');
+  const out: Episode[] = [];
+  drops.forEach((d, n) => {
+    const asDown = firstDown >= 0 && n <= firstDown ? { ...d, severity: 'down' as const } : d;
+    const prev = out.at(-1);
+    if (prev && n <= firstDown && prev.end && prev.end.getTime() === d.start.getTime()) prev.end = d.end;
+    else out.push(asDown);
+  });
+  return out;
 }
+
+/** "Down N times" only when every drop was a DOWN; a key-page PROBLEM drop (D-023) isn't downtime. */
+const summarySeverity = (i: IncidentFacts): 'down' | 'problem' =>
+  dropsOf(i).every((d) => d.severity === 'down') ? 'down' : 'problem';
 
 /** The drop a RECOVERED row ends: its own recovery time, else the incident's latest. */
 function recoveryOf(i: IncidentFacts, ctx: Record<string, unknown>): { start: Date; end: Date } | null {
@@ -96,7 +103,7 @@ const openedWith = (i: IncidentFacts) =>
 function againAlert(n: Notification, i: IncidentFacts): ChatMessage {
   const ctx = contextOf(n.context);
   const droppedAt = dateOf(ctx.startedAt) ?? new Date(n.created_at);
-  const before = dropsOf(i).filter((d) => d.severity === 'down' && d.end && d.end <= droppedAt);
+  const before = dropsOf(i).filter((d) => d.end && d.end <= droppedAt);
   const minutesSoFar = before.reduce(
     (sum, d) =>
       sum + Math.max(1, Math.floor(d.end!.getTime() / 60_000) - Math.floor(d.start.getTime() / 60_000)),
@@ -214,12 +221,12 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
     case 'problem_again':
       return againAlert(n, i);
     case 'flap_summary': {
-      const { severity, drops } = summaryOf(i);
+      const drops = dropsOf(i).flatMap((d) => (d.end ? [{ start: d.start, end: d.end }] : []));
       return drops.length
         ? buildFlapSummaryAlert({
             incidentId: i.id,
             site: i.sites.name,
-            severity,
+            severity: summarySeverity(i),
             owner: person(i.sites.primary),
             drops,
           })
@@ -313,11 +320,11 @@ export function renderEmail(
       });
     }
     case 'flap_summary': {
-      const { severity, drops } = summaryOf(i);
+      const drops = dropsOf(i).flatMap((d) => (d.end ? [{ start: d.start, end: d.end }] : []));
       return drops.length
         ? buildFlapSummaryEmail({
             ...base,
-            severity,
+            severity: summarySeverity(i),
             drops,
             owner: i.sites.primary?.display_name ?? null,
             ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,

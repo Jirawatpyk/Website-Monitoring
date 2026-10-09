@@ -95,7 +95,7 @@ export async function downEpisodesBySite(supabase: Client, siteIds: readonly str
     (x, y) => {
       let q = supabase
         .from('incidents')
-        .select('id, site_id, started_at, severity, incident_events(type, at, payload)')
+        .select('id, site_id, started_at, resolved_at, severity, incident_events(type, at, payload)')
         .in('incident_events.type', ['detected', 'relapsed', 'escalated_to_down', 'recovered'])
         .eq('severity', 'down')
         .or(`resolved_at.is.null,resolved_at.gte.${from.toISOString()}`);
@@ -105,10 +105,7 @@ export async function downEpisodesBySite(supabase: Client, siteIds: readonly str
     { max: 50_000 },
   );
   for (const i of data) {
-    const drops = downEpisodesFromTimeline(
-      { started_at: i.started_at, severity: i.severity },
-      i.incident_events,
-    );
+    const drops = downEpisodesFromTimeline(i, i.incident_events);
     out.set(i.site_id, [...(out.get(i.site_id) ?? []), ...drops]);
   }
   return out;
@@ -182,7 +179,7 @@ export async function loadSiteDetail(
     supabase
       .from('incidents')
       .select(
-        `id, number, state, severity, trigger, escalation_level, started_at, detected_at,
+        `id, number, state, severity, trigger, escalation_level, started_at, detected_at, resolved_at,
          acker:profiles!incidents_acked_by_fkey(display_name), incident_events(type, at, payload)`,
       )
       .eq('site_id', s.id)
@@ -241,7 +238,7 @@ export async function loadSiteDetail(
 
   // Incidents, their drops and the uptime over the range (D-031: from monitoring start at the latest)
   const rows = incidents.data.map((i) => {
-    const drops = episodesFromTimeline({ started_at: i.started_at, severity: i.severity }, i.incident_events);
+    const drops = episodesFromTimeline(i, i.incident_events);
     const open =
       !(CLOSED_INCIDENT_STATES as readonly string[]).includes(i.state) &&
       (drops.length === 0 || drops.some((d) => !d.end));

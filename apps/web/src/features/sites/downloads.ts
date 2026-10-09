@@ -88,10 +88,7 @@ export async function incidentsCsv(siteId: string, now = new Date()): Promise<Re
       'resolved_at_utc',
     ],
     data.map((i) => {
-      const drops = episodesFromTimeline(
-        { started_at: i.started_at, severity: i.severity },
-        i.incident_events,
-      );
+      const drops = episodesFromTimeline(i, i.incident_events);
       const open =
         !(CLOSED_INCIDENT_STATES as readonly string[]).includes(i.state) &&
         (drops.length === 0 || drops.some((d) => !d.end));

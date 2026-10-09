@@ -217,6 +217,14 @@ describe('downEpisodesFromTimeline (D-021: PROBLEM time before the escalation is
     expect(downMinutesIn(drops, at('2026-09-21T00:00:00'), at('2026-09-21T12:00:00'))).toBe(41);
   });
 
+  it('a resolved incident without a recovered row ends its drop at the resolve (L3)', () => {
+    const drops = downEpisodesFromTimeline(
+      { started_at: '2026-09-25T08:00:00+07:00', severity: 'down', resolved_at: '2026-09-25T08:30:00+07:00' },
+      [{ type: 'detected', at: '2026-09-25T08:00:30+07:00', payload: {} }],
+    );
+    expect(downMinutesIn(drops, at('2026-09-25T00:00:00'), NOW)).toBe(30);
+  });
+
   it('a plain DOWN incident keeps every drop', () => {
     const drops = downEpisodesFromTimeline({ started_at: '2026-09-25T09:48:12+07:00', severity: 'down' }, [
       { type: 'detected', at: '2026-09-25T09:48:41+07:00', payload: {} },
