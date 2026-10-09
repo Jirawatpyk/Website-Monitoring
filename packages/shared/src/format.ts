@@ -107,6 +107,26 @@ export function formatDuration(totalMinutes: number): string {
   return `${m} min`;
 }
 
+/**
+ * A short duration with seconds, for KPIs like MTTA (Main3): "18 s", "1 min 52 s", "6 min 40 s",
+ * "15 min"; from an hour on it reads as `formatDuration` ("1 h 2 min").
+ */
+export function formatDurationSeconds(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  if (seconds >= 3600) return formatDuration(seconds / 60);
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s} s`;
+  return s > 0 ? `${m} min ${s} s` : `${m} min`;
+}
+
+/** A response time: "412 ms" under a second, then one decimal — "1.1 s", "5.8 s" (Main3). */
+export function formatMs(ms: number): string {
+  const rounded = Math.round(ms);
+  if (rounded < 1000) return `${rounded} ms`;
+  return `${(rounded / 1000).toFixed(1)} s`;
+}
+
 /** 0.999764 → "99.98%". Two decimals, rounded, the % sign inside the value (spec §5, §14.12). */
 export function formatPercent(ratio: number): string {
   return `${(ratio * 100).toFixed(2)}%`;

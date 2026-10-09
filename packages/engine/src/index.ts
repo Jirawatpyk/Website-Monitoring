@@ -6,3 +6,4 @@ export * from './site';
 export * from './triggers';
 export * from './control';
 export * from './hard-fail';
+export * from './metrics';
