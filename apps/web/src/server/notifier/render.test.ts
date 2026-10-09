@@ -185,6 +185,55 @@ describe('render — relapse, flapping and auto-resolve rows (S04b, D-024)', () 
     expect(e.text).toMatch(/^RECOVERED — VOCA is stable again/);
   });
 
+  it('a flapping incident raised from PROBLEM (D-021) sums only its DOWN drops (spec §5, §19.4)', () => {
+    // slow from 03:00, an outage from 03:10 (escalated while the PROBLEM drop was open), back 03:15,
+    // down again 03:20–03:25
+    const raised: IncidentFacts = {
+      ...voca,
+      severity: 'down',
+      started_at: '2026-09-20T20:00:00Z',
+      incident_events: [
+        { type: 'detected', payload: {}, at: '2026-09-20T20:00:30Z' },
+        {
+          type: 'escalated_to_down',
+          payload: { downStartedAt: '2026-09-20T20:10:00Z' },
+          at: '2026-09-20T20:10:40Z',
+        },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:15:00Z' },
+        {
+          type: 'relapsed',
+          payload: { startedAt: '2026-09-20T20:20:00Z', severity: 'down' },
+          at: '2026-09-20T20:20:30Z',
+        },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:25:00Z' },
+      ],
+    };
+    const m = renderChat(row('flap_summary'), raised, appUrl, now)!;
+    expect(m.text).toContain('flapped ×2, down 10 min in total');
+    const again = renderChat(row('down_again', { startedAt: '2026-09-20T20:20:00Z' }), raised, appUrl, now)!;
+    expect(JSON.stringify(again.cardsV2)).toContain('Down 5 min so far in this incident.');
+  });
+
+  it('a DOWN with a key-page PROBLEM drop (D-023) counts the DOWN only', () => {
+    const mixed: IncidentFacts = {
+      ...voca,
+      severity: 'down',
+      started_at: '2026-09-20T20:00:00Z',
+      incident_events: [
+        { type: 'detected', payload: {}, at: '2026-09-20T20:00:30Z' },
+        {
+          type: 'relapsed',
+          payload: { startedAt: '2026-09-20T20:08:00Z', severity: 'problem' },
+          at: '2026-09-20T20:08:00Z',
+        },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:08:00Z' },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:30:00Z' },
+      ],
+    };
+    const m = renderChat(row('flap_summary'), mixed, appUrl, now)!;
+    expect(m.text).toContain('flapped ×1, down 8 min in total');
+  });
+
   it('RECOVERED renders from its own recovery even after a relapse cleared the incident’s', () => {
     const m = renderChat(
       row('recovered', { okLocations: 3, recoveredAt: '2026-09-20T20:19:00Z' }),
