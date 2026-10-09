@@ -115,9 +115,24 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
   const [noteOpen, setNoteOpen] = useState(false);
   const [rcOpen, setRcOpen] = useState(false);
   const [resolveOpen, setResolveOpen] = useState(false);
+  // A fresh form each time a dialog opens; the dialogs stay mounted so AURA can return focus on close.
+  const [dialogKey, setDialogKey] = useState(0);
+  const openResolve = () => {
+    setDialogKey((k) => k + 1);
+    setResolveOpen(true);
+  };
+  const openRootCause = () => {
+    setDialogKey((k) => k + 1);
+    setRcOpen(true);
+  };
   const [shotOpen, setShotOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const resolveButton = useRef<HTMLButtonElement>(null);
+  // The Resolve card is drawn twice (desktop column, phone stack): focus returns to the one showing.
+  const resolveDesktop = useRef<HTMLButtonElement>(null);
+  const resolvePhone = useRef<HTMLButtonElement>(null);
+  const shownResolve = () =>
+    [resolveDesktop.current, resolvePhone.current].find((b) => b && b.getClientRects().length > 0) ??
+    resolveDesktop.current;
   const resolved = d.state === 'resolved' || d.state === 'in_review' || d.state === 'closed';
   const stillDown = !d.recoveredAt;
   const { acknowledge } = useAckToast({ ack: acknowledgeIncident, undo: undoAcknowledge });
@@ -144,7 +159,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
   // An email's "Add root cause" (…#resolve, D-033): open the form that fits where the incident is.
   useEffect(() => {
     if (typeof window === 'undefined' || window.location.hash !== '#resolve' || !d.canAct || resolved) return;
-    const t = setTimeout(() => (d.gate.canOpenDialog ? setResolveOpen(true) : setRcOpen(true)), 0);
+    const t = setTimeout(() => (d.gate.canOpenDialog ? openResolve() : openRootCause()), 0);
     return () => clearTimeout(t);
   }, [d.canAct, d.gate.canOpenDialog, resolved]);
 
@@ -164,13 +179,13 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
       ? v.title
       : `${d.siteName} recovered`;
 
-  const resolveCard = (
+  const resolveCard = (ref: React.RefObject<HTMLButtonElement | null>) => (
     <ResolveCard
       detail={d}
       resolved={resolved}
-      onResolve={() => setResolveOpen(true)}
-      onRootCause={() => setRcOpen(true)}
-      resolveButton={resolveButton}
+      onResolve={openResolve}
+      onRootCause={openRootCause}
+      resolveButton={ref}
     />
   );
 
@@ -246,7 +261,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
               <Timeline items={d.timeline} newestFirst={false} />
             </Card>
           </div>
-          <div className="flex flex-col gap-6">{resolveCard}</div>
+          <div className="flex flex-col gap-6">{resolveCard(resolveDesktop)}</div>
         </div>
       </div>
 
@@ -261,16 +276,16 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
             .filter(Boolean)
             .join(' · ')}
         </span>
-        <span className="text-sm">
-          {[
-            d.owner ? `Owner ${d.owner}` : 'No owner set',
-            d.backup ? `backup ${d.backup}` : null,
-            d.am ? `AM ${d.am}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
-        <span className="flex justify-end">
+        <span className="flex items-center gap-2">
+          <span className="grow text-sm">
+            {[
+              d.owner ? `Owner ${d.owner}` : 'No owner set',
+              d.backup ? `backup ${d.backup}` : null,
+              d.am ? `AM ${d.am}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
           <DropdownMenu
             label="More actions"
             trigger={<IconButton icon={<IconEllipsis />} label="More actions" />}
@@ -279,7 +294,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
         </span>
         {d.resolved && <ResolvedCard detail={d} />}
         <LatestRoundCard detail={d} />
-        {resolveCard}
+        {resolveCard(resolvePhone)}
         {v.ack.kind === 'read-only' && (
           <NoAccess title={v.ack.title} description={v.ack.description} people={v.ack.people} />
         )}
@@ -300,7 +315,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
                   icon={<IconCircleCheck />}
                   fullWidth
                   disabled={!d.gate.canOpenDialog}
-                  onClick={() => setResolveOpen(true)}
+                  onClick={openResolve}
                 >
                   Resolve
                 </Button>
@@ -327,26 +342,24 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
             open={noteOpen}
             onClose={() => setNoteOpen(false)}
           />
-          {rcOpen && (
-            <RootCauseDialog
-              incident={dialogIncident}
-              initial={initialRc}
-              open
-              onClose={() => setRcOpen(false)}
-            />
-          )}
-          {resolveOpen && (
-            <ResolveDialog
-              incident={dialogIncident}
-              initial={initialRc}
-              conditions={d.gate.conditions}
-              summary={summary}
-              viewerName={viewerName}
-              open
-              onClose={() => setResolveOpen(false)}
-              returnFocus={resolveButton}
-            />
-          )}
+          <RootCauseDialog
+            key={`rc-${dialogKey}`}
+            incident={dialogIncident}
+            initial={initialRc}
+            open={rcOpen}
+            onClose={() => setRcOpen(false)}
+          />
+          <ResolveDialog
+            key={`resolve-${dialogKey}`}
+            incident={dialogIncident}
+            initial={initialRc}
+            conditions={d.gate.conditions}
+            summary={summary}
+            viewerName={viewerName}
+            open={resolveOpen}
+            onClose={() => setResolveOpen(false)}
+            returnFocus={shownResolve}
+          />
         </>
       )}
       {d.evidence && (

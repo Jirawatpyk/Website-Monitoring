@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState, useTransition, type RefObject } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Button, Dialog, Select, Textarea, TextField } from '@jirawatpyk/aura-react';
+import { Alert, Button, Dialog, Select, Textarea, TextField, type DialogProps } from '@jirawatpyk/aura-react';
 import { IconCircle, IconCircleCheck, IconPencil, IconRotateCcw } from '@jirawatpyk/aura-react/icons';
 import { canResolve, UNKNOWN_ROOT_CAUSE } from '@dxt/engine';
 import { formatTime, ROOT_CAUSE_CATEGORIES, ROOT_CAUSE_LABELS } from '@dxt/shared';
@@ -281,7 +281,8 @@ export function ResolveDialog({
   viewerName: string;
   open: boolean;
   onClose: () => void;
-  returnFocus?: RefObject<HTMLElement | null>;
+  /** Where focus goes when it closes, Undo included (WCAG 2.4.3): the page's Resolve button. */
+  returnFocus?: DialogProps['finalFocus'];
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initial);
@@ -356,8 +357,6 @@ export function ResolveDialog({
       setDone(null);
       onClose();
       router.refresh();
-      // Back where the resolve started (WCAG 2.4.3): the page's Resolve button.
-      returnFocus?.current?.focus();
     });
 
   const label = (c: string) => ROOT_CAUSE_LABELS[c as keyof typeof ROOT_CAUSE_LABELS] ?? c;
