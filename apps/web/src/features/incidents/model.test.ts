@@ -45,6 +45,8 @@ const base: ListIncident = {
   isFlapping: false,
   isManual: false,
   ownerName: 'Arm',
+  primaryOwnerId: null,
+  backupOwnerId: null,
   rootCauseCategory: null,
   rootCause: null,
   rootCauseFix: null,

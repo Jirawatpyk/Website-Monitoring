@@ -29,6 +29,8 @@ const row: ListIncident = {
   isFlapping: false,
   isManual: false,
   ownerName: 'Tao',
+  primaryOwnerId: null,
+  backupOwnerId: null,
   rootCauseCategory: 'hosting',
   rootCause: '=Host rebooted, "quietly"',
   rootCauseFix: null,

@@ -11,6 +11,7 @@ import {
   UNDO_WINDOW_SEC,
   type IncidentState,
   type ProbeLocation,
+  type Role,
   type Severity,
   type Trigger,
 } from '@dxt/shared';
@@ -366,6 +367,8 @@ export async function countOpenIncidents(): Promise<number | null> {
 // ── List ─────────────────────────────────────────────────────────────────
 
 export interface IncidentList {
+  /** The signed-in person (`listIncidents` only; the CSV reads without one). */
+  viewer?: { id: string; role: Role };
   incidents: ListIncident[];
   sites: { id: string; name: string }[];
 }
@@ -390,14 +393,21 @@ interface ListRow {
   root_cause: string | null;
   root_cause_fix: string | null;
   acker: { display_name: string } | null;
-  sites: { name: string; tier: number; owner: { display_name: string } | null };
+  sites: {
+    name: string;
+    tier: number;
+    primary_owner_id: string | null;
+    backup_owner_id: string | null;
+    owner: { display_name: string } | null;
+  };
 }
 
 /** Incidents of the last 30 days plus any still open (the list, its KPIs and the CSV). */
 export async function listIncidents(now = new Date()): Promise<IncidentList | null> {
   const access = await getAccess();
   if (access.status !== 'active') return null;
-  return loadIncidentList(await createClient(), now);
+  const list = await loadIncidentList(await createClient(), now);
+  return { ...list, viewer: { id: access.profile.id, role: access.profile.role } };
 }
 
 export async function loadIncidentList(db: DbClient, now: Date): Promise<IncidentList> {
@@ -412,7 +422,8 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
              acked_at, recovered_at, resolved_at, auto_resolved, is_flapping, is_manual,
              root_cause_category, root_cause, root_cause_fix,
              acker:profiles!incidents_acked_by_fkey(display_name),
-             sites!inner(name, tier, owner:profiles!sites_primary_owner_id_fkey(display_name))`,
+             sites!inner(name, tier, primary_owner_id, backup_owner_id,
+               owner:profiles!sites_primary_owner_id_fkey(display_name))`,
           )
           .or(`started_at.gte.${from},state.not.in.(resolved,in_review,closed)`)
           .order('started_at', { ascending: false })
@@ -469,6 +480,8 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
       isFlapping: r.is_flapping,
       isManual: r.is_manual,
       ownerName: r.sites.owner?.display_name ?? null,
+      primaryOwnerId: r.sites.primary_owner_id,
+      backupOwnerId: r.sites.backup_owner_id,
       rootCauseCategory: r.root_cause_category,
       rootCause: r.root_cause,
       rootCauseFix: r.root_cause_fix,

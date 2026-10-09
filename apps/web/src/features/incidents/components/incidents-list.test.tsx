@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { Role } from '@dxt/shared';
 import { describe, expect, it, vi } from 'vitest';
 import type { ListIncident } from '../model';
 import { IncidentsList } from './incidents-list';
@@ -29,6 +30,8 @@ const base: ListIncident = {
   isFlapping: false,
   isManual: false,
   ownerName: 'Arm',
+  primaryOwnerId: null,
+  backupOwnerId: null,
   rootCauseCategory: null,
   rootCause: null,
   rootCauseFix: null,
@@ -61,8 +64,17 @@ const sites = [
   { id: 's-muvmi', name: 'MuvMi' },
   { id: 's-tubtong', name: 'Tubtong' },
 ];
-const show = (initialView?: 'unacked') =>
-  render(<IncidentsList incidents={incidents} sites={sites} nowIso={NOW} initialView={initialView} />);
+const ADMIN = { id: 'u-admin', role: 'admin' as const };
+const show = (initialView?: 'unacked', viewer: { id: string; role: Role } = ADMIN) =>
+  render(
+    <IncidentsList
+      incidents={incidents}
+      sites={sites}
+      nowIso={NOW}
+      viewer={viewer}
+      initialView={initialView}
+    />,
+  );
 
 describe('Incidents list (Incidents, MIncidents, D-033)', () => {
   it('KPIs: Unacked (not "Escalated, not acked" until S08) and MTTA / MTTR wait for 3 DOWN incidents', () => {
@@ -98,5 +110,25 @@ describe('Incidents list (Incidents, MIncidents, D-033)', () => {
     expect(screen.getByText('1 not acknowledged')).toBeInTheDocument();
     const card = screen.getAllByRole('link').find((a) => a.textContent?.includes('Acknowledge'))!;
     expect(card).toHaveAttribute('href', '/incidents/i142');
+  });
+
+  it('nothing resolved with the default filters: says so, with no Clear filters that would change nothing', () => {
+    render(<IncidentsList incidents={[]} sites={sites} nowIso={NOW} viewer={ADMIN} />);
+    fireEvent.click(screen.getByRole('radio', { name: /^Resolved & closed/ }));
+    expect(screen.getByText('No past incidents')).toBeInTheDocument();
+    expect(screen.getByText('Nothing resolved in the last 30 days.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+  });
+
+  it('phone: someone who can’t acknowledge (a Viewer, a Responder off the site) gets no Acknowledge row (D-016)', () => {
+    for (const viewer of [
+      { id: 'u-mint', role: 'viewer' as const },
+      { id: 'u-other', role: 'responder' as const },
+    ]) {
+      const { unmount } = show('unacked', viewer);
+      expect(screen.getByText('1 not acknowledged')).toBeInTheDocument();
+      expect(screen.getAllByRole('link').some((a) => a.textContent?.includes('Acknowledge'))).toBe(false);
+      unmount();
+    }
   });
 });

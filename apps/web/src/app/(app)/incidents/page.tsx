@@ -27,6 +27,7 @@ export default async function IncidentsPage({
           incidents={list?.incidents ?? []}
           sites={list?.sites ?? []}
           nowIso={now.toISOString()}
+          viewer={list?.viewer ?? { id: '', role: 'viewer' }}
           initialView={
             asked === 'unacked' || asked === 'past' || asked === 'open' || asked === 'done' || asked === 'all'
               ? asked

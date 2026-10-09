@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   Button,
   DataTable,
@@ -27,9 +27,10 @@ import {
   IconPencil,
   IconRotateCcw,
 } from '@jirawatpyk/aura-react/icons';
-import { formatDuration, formatDurationSeconds, formatIncidentId, formatWhen } from '@dxt/shared';
+import { formatDuration, formatDurationSeconds, formatIncidentId, formatWhen, type Role } from '@dxt/shared';
 import { SeverityBadge, WorkflowBadge } from '@/components/status-badges';
 import { useLiveRefresh } from '@/components/use-live-refresh';
+import { useNow } from '@/components/use-now';
 import {
   countLabel,
   DEFAULT_FILTERS,
@@ -50,6 +51,7 @@ import {
   type ListIncident,
   type PhoneView,
 } from '../model';
+import { mayAcknowledge } from '../ack-rule';
 import { INCIDENT_COLUMNS } from './incident-columns';
 
 /** The phone's Past view shows the latest few until "Show all" (MIncidents). */
@@ -57,6 +59,8 @@ const PAST_SHOWN = 4;
 const LIST_TABLES = ['incidents'] as const;
 /** Rows per page (desktop) and cards before "Show all" (phone): the list stays light. */
 const PAGE_SIZE = 50;
+/** How often the waits and durations of open incidents move on screen. */
+const AGE_EVERY_MS = 60_000;
 
 const SEVERITY_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -80,6 +84,8 @@ export interface IncidentsListProps {
   incidents: ListIncident[];
   sites: { id: string; name: string }[];
   nowIso: string;
+  /** The signed-in person: only someone who may acknowledge sees a card's Acknowledge row (D-016). */
+  viewer: { id: string; role: Role };
   /** The view a link asked for (`?view=unacked` from the Overview's phone card). */
   initialView?: DesktopView | PhoneView;
 }
@@ -88,8 +94,9 @@ export interface IncidentsListProps {
  * Incidents (desktop) and MIncidents (phone) — spec §4, §11, §16.1, D-033. The server reads the last
  * 30 days plus anything still open; views, filters and counts are worked out here (`model.ts`).
  */
-export function IncidentsList({ incidents, sites, nowIso, initialView }: IncidentsListProps) {
-  const now = useMemo(() => new Date(nowIso), [nowIso]);
+export function IncidentsList({ incidents, sites, nowIso, viewer, initialView }: IncidentsListProps) {
+  // "18 min unacked" and running durations age while the page stays open (§14.3).
+  const now = useNow(nowIso, AGE_EVERY_MS, incidents.some(isOpen));
   // New incidents, acks and resolves show without a reload (PRD §9).
   useLiveRefresh(LIST_TABLES);
   const phoneStart: PhoneView = initialView === 'unacked' || initialView === 'past' ? initialView : 'open';
@@ -285,6 +292,14 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
                 title="No open incidents"
                 description={lastOneLine(incidents, now)}
               />
+            ) : isDefaultFilter(f) ? (
+              <EmptyState
+                bordered
+                headingLevel={2}
+                icon={<IconCircleCheck />}
+                title={f.view === 'done' ? 'No past incidents' : 'No incidents'}
+                description={`Nothing ${f.view === 'done' ? 'resolved' : 'opened'} in the last ${f.period} days.`}
+              />
             ) : (
               <EmptyState
                 bordered
@@ -373,7 +388,7 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
           <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
             {phoneShown.map((i) => (
               <li key={i.id}>
-                <PhoneCard incident={i} now={now} />
+                <PhoneCard incident={i} now={now} canAck={mayAcknowledge(viewer, i)} />
               </li>
             ))}
           </ul>
@@ -396,7 +411,7 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
 }
 
 /** One MIncidents card: the whole card opens the incident; an unacked DOWN adds its Acknowledge row. */
-function PhoneCard({ incident: i, now }: { incident: ListIncident; now: Date }) {
+function PhoneCard({ incident: i, now, canAck }: { incident: ListIncident; now: Date; canAck: boolean }) {
   const next = nextLine(i, now, true);
   const unacked = isUnackedDown(i);
   return (
@@ -427,7 +442,7 @@ function PhoneCard({ incident: i, now }: { incident: ListIncident; now: Date }) 
           Details <IconChevronRight aria-hidden className="size-4" />
         </span>
       </span>
-      {unacked && (
+      {unacked && canAck && (
         <span className="mt-1 flex items-center gap-2 border-t border-alert-danger-border pt-2 text-sm font-medium">
           <IconCheck aria-hidden className="size-4" />
           <span className="grow">Acknowledge</span>
@@ -443,7 +458,7 @@ function filterWords(f: ListFilters, sites: { id: string; name: string }[]): str
   return [
     f.severity !== 'all' ? `Severity: ${f.severity === 'down' ? 'Down' : 'Problem'}` : null,
     f.siteId ? `Site: ${sites.find((s) => s.id === f.siteId)?.name ?? 'that site'}` : null,
-    `Last ${f.period} days`,
+    `last ${f.period} days`,
   ]
     .filter(Boolean)
     .join(' · ');

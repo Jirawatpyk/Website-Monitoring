@@ -53,6 +53,9 @@ export interface ListIncident {
   isFlapping: boolean;
   isManual: boolean;
   ownerName: string | null;
+  /** The site's owners: who may acknowledge it (`mayAcknowledge`, D-016). */
+  primaryOwnerId: string | null;
+  backupOwnerId: string | null;
   rootCauseCategory: string | null;
   rootCause: string | null;
   rootCauseFix: string | null;
