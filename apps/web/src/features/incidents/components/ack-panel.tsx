@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Alert, Button } from '@jirawatpyk/aura-react';
 import { IconCheck, IconClock, IconRotateCcw, IconUser } from '@jirawatpyk/aura-react/icons';
 import { formatTimeWithSeconds } from '@dxt/shared';
+import { FOCUS_TARGET } from '@/components/focus-target';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge } from '../actions';
 import type { AckState } from '../view';
@@ -142,7 +143,7 @@ export function AckPanel({
               id="ack-card-title"
               ref={cardTitle}
               tabIndex={-1}
-              className="m-0 grow rounded-aura-sm text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
+              className={`m-0 grow text-base font-semibold ${FOCUS_TARGET}`}
             >
               {ack.byViewer ? `Acknowledged as ${viewerName}` : `Acknowledged by ${ack.byName}`}
             </h2>

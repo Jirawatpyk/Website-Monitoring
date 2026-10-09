@@ -34,6 +34,7 @@ import {
   formatTime,
   formatTimeWithSeconds,
 } from '@dxt/shared';
+import { FOCUS_TARGET } from '@/components/focus-target';
 import { SeverityBadge, WorkflowBadge } from '@/components/status-badges';
 import { NoAccess } from '@/components/states';
 import { useAckToast } from '@/components/use-ack-toast';
@@ -510,7 +511,7 @@ function ResolvedCard({
       <h2
         ref={headingRef}
         tabIndex={-1}
-        className="m-0 rounded-aura-sm text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
+        className={`m-0 text-base font-semibold ${FOCUS_TARGET}`}
       >{`Resolved ${formatTime(new Date(r.at))}`}</h2>
       <span className="text-sm">{`Resolved by ${r.by}.`}</span>
       <p role="status" className="sr-only">

@@ -12,6 +12,7 @@ import {
 } from '@jirawatpyk/aura-react/icons';
 import { canResolve, UNKNOWN_ROOT_CAUSE } from '@dxt/engine';
 import { formatTime, formatTimeWithSeconds, ROOT_CAUSE_CATEGORIES, ROOT_CAUSE_LABELS } from '@dxt/shared';
+import { FOCUS_TARGET } from '@/components/focus-target';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { addNote, resolveIncident, saveRootCause, undoResolve } from '../actions';
 import type { Condition } from '../model';
@@ -472,11 +473,7 @@ export function ResolveDialog({
               ? `Posted to Chat and email at ${formatTimeWithSeconds(new Date(postedAt))}`
               : 'Resolved. Posting to Chat and email in a few seconds — nothing is sent until then'}
           </p>
-          <p
-            ref={doneTitle}
-            tabIndex={-1}
-            className="m-0 rounded-aura-sm text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
-          >
+          <p ref={doneTitle} tabIndex={-1} className={`m-0 text-base font-semibold ${FOCUS_TARGET}`}>
             {`Resolved at ${formatTime(done.at)} by ${viewerName}`}
           </p>
           <p className="m-0 text-sm text-fg-secondary">
@@ -519,7 +516,7 @@ export function ResolveDialog({
             ref={doneTitle}
             tabIndex={-1}
             role="status"
-            className="m-0 rounded-aura-sm text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
+            className={`m-0 text-base font-semibold ${FOCUS_TARGET}`}
           >{`Saved at ${formatTime(done.at)} by ${viewerName} — still open`}</p>
           <p className="m-0 text-sm text-fg-secondary">
             It stays in “Needs root cause”. Notes are saved; pick a category when you know more.
