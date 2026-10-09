@@ -1,24 +1,27 @@
 # DxT Monitor — Design spec for developer handoff
 
-Version: 28 Sep 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
-Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (44 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
+Version: 9 Oct 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
+Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (49 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
 
 ## 0. How to use this spec
 - **What this is:** the rules every screen follows — statuses, escalation, lifecycle, messages, copy and formats. The canvas shows how it looks; this file says how it behaves.
-- **Precedence:** on screen behaviour, UI copy and formats this spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. Inside this spec, later sections refine earlier ones: §14 → §15 → §16 → §17–18 override anything above them that conflicts.
+- **Precedence:** on screen behaviour, UI copy and formats this spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. Inside this spec, later sections refine earlier ones: §14 → §15 → §16 → §17–21 override anything above them that conflicts.
 - **Sample data:** names of owners, backups, AMs and on-call people, the rotation, incident IDs, times and uptime figures (§1–§5) are realistic sample data used consistently across the mockups — not production values. Real owners and tiers come from the Site Registration Checklist (PRD Phase 0). Items marked "Proposal · pending CEO" are not final until the CEO approves.
 - **Build from AURA:** use AURA components and tokens as drawn; don't restyle. Known AURA gaps are listed in the orange note on the canvas.
-- **Icons available in AURA today:** arrow-down arrow-left arrow-right arrow-up arrow-up-down arrow-up-right ban bell calendar chart-column check chevron-down chevron-left chevron-right chevron-up circle circle-alert circle-check circle-dot-dashed clock cloud-upload columns-3 copy download ellipsis external-link eye eye-off file file-text filter folder house image inbox info layout-dashboard loader-circle lock log-out mail menu minus monitor moon panel-left-close panel-left-open paperclip pencil pin pin-off plus rotate-ccw search settings sun trash-2 trending-down trending-up triangle-alert upload user users x
-- **Badge / pill variants:** success, warning, danger, accent, neutral; variants: soft (default), solid, outline. StatusPill tones: neutral, progress, ready, blocked. Confirmations use the AURA Dialog (modal).
+- **Icons available in AURA (canvas copy):** arrow-down arrow-left arrow-right arrow-up arrow-up-down arrow-up-right ban bell calendar chart-column check chevron-down chevron-left chevron-right chevron-up circle circle-alert circle-check circle-dot-dashed clock cloud-upload columns-3 copy download ellipsis external-link eye eye-off file file-text filter folder house image inbox info layout-dashboard loader-circle lock log-out mail menu minus monitor moon panel-left-close panel-left-open paperclip pencil pin pin-off plus rotate-ccw search settings sun trash-2 trending-down trending-up triangle-alert upload user users x. AURA 5.1+ (use in code) also has server, globe, activity, shield-alert, phone, wrench, and 5.34 adds StatusTile + TileGrid and Sparkline — the canvas still carries an older AURA copy, so boards draw look-alikes of these.
+- **Badge / pill variants:** success, warning, danger, accent, neutral; variants: soft (default), solid, outline. StatusPill tones: neutral, progress, ready, warning (AURA 5.1+), blocked. Confirmations use the AURA Dialog (modal).
 
 ### Screen index ("board" in this spec = one screen on the canvas)
 | Screen (file) | Canvas title | Size | Canvas row |
 |---|---|---|---|
-| Main | Overview dashboard | 1440×1840 | Web app — desktop 1440 + mobile 390 |
+| Main3 | Overview — option A (Live issues + All sites tiles) · **S06, build this** | 1440×2555 | Web app — desktop 1440 + mobile 390 |
+| MainDark3 | Overview — option A · dark (NOC wall) · **S06** | 1440×2555 | Web app — desktop 1440 + mobile 390 |
+| MOverview4 | Mobile — Overview · **S06, build this** | 390×844 | Web app — desktop 1440 + mobile 390 |
+| Main | Overview dashboard (pre-S06 reference — superseded by Main3, §21) | 1440×1840 | Web app — desktop 1440 + mobile 390 |
 | Sites | Sites list | 1440×2588 | Web app — desktop 1440 + mobile 390 |
 | SiteDetail | Site detail — Bangkok Airways – Taiwan | 1440×1680 | Web app — desktop 1440 + mobile 390 |
 | Incident | Incident — INC-0142 MuvMi DOWN | 1440×1660 | Web app — desktop 1440 + mobile 390 |
-| MOverview | Mobile — Overview | 390×844 | Web app — desktop 1440 + mobile 390 |
+| MOverview | Mobile — Overview (pre-S06 reference — superseded by MOverview4, §21) | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MSites | Mobile — Sites | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MSite | Mobile — Site detail | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MIncident | Mobile — Incident detail | 390×844 | Web app — desktop 1440 + mobile 390 |
@@ -42,7 +45,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | Users | Settings — users & roles | 1440×1468 | Reports · client-facing · admin |
 | PostIncident | Post-incident review — INC-0133 VOCA | 1440×1732 | Review loop · alert routing · dark mode |
 | AlertChannels | Settings — alert channels & routing | 1440×1960 | Review loop · alert routing · dark mode |
-| MainDark | Overview dashboard — dark (NOC wall) | 1440×1840 | Review loop · alert routing · dark mode |
+| MainDark | Overview dashboard — dark (pre-S06 reference — superseded by MainDark3, §21) | 1440×1840 | Review loop · alert routing · dark mode |
 | MobileAckDark | Mobile ack — dark (night on-call) | 390×844 | Review loop · alert routing · dark mode |
 | Login | Sign in — Google SSO + Admin 2-step | 1440×900 | Access · monitor config · resolve · when the monitor itself fails |
 | MLogin | Mobile — session expired from alert link | 390×844 | Access · monitor config · resolve · when the monitor itself fails |
@@ -139,7 +142,8 @@ Use role tokens in the Escalation editor: "Owner / on-call", "Backup", "Admin (T
 - Incident workflow state (never solid red, never ban icon): Unacked = Badge danger outline clock · Escalated L1/L2 = Badge warning outline arrow-up-right ("Escalated · L1") · Acknowledged = Badge neutral outline check · Monitoring (recovered, waiting) = Badge neutral outline eye · Needs root cause = Badge warning outline pencil · Resolved = Badge success outline circle-check · In review = Badge neutral outline file-text · Closed = Badge neutral soft.
 - Recovered incidents show severity as outline ("Was down" = Badge danger outline ban) in lists of past/needs-action items.
 - Phase tags: Badge neutral outline "Phase 3" (never accent). "Primary" monitor tag: neutral outline.
-- Location glyphs (BKK SIN TYO): circle-check pass (positive) · ban hard fail (danger) · lock blocked but verified OK (fg-secondary, NOT amber) · clock slow (warning) · circle-dot-dashed no data (tertiary) · circle paused/maintenance (tertiary). Show a one-line legend near the column.
+- Ownership chips ("Yours", "Backup", "Your client" — §21): Badge neutral outline with the user / users icon. Never accent: they sit next to status badges, and accent there means Maintenance.
+- Location glyphs (BKK SIN TYO): circle-check pass (positive) · ban hard fail (danger) · lock "Blocked by bot protection" — blocked but verified OK (fg-secondary, NOT amber) · shield-alert "TLS chain error" (warning; a location warning, the site status is unchanged) · clock slow (warning) · circle-dot-dashed no data (tertiary) · circle paused/maintenance (tertiary). Show a one-line legend near the column.
 
 ## 12. Client-facing mapping (status page + client report)
 DOWN → "Outage" (red), counted in uptime, listed. PROBLEM slow / key page / regional → "Degraded" (amber), listed, not counted. PROBLEM SSL/domain, keyword, redirect, blocked_unverified and OK+note → internal only: not listed, not coloured. Maintenance → "Planned maintenance" (grey), not counted. Monitor fault / stale data (> 5 min) → neutral "Live status temporarily unavailable · last confirmed Sat 26 Sep 02:17" and no green banner. "Last checked" always includes the date.
@@ -200,7 +204,7 @@ DOWN → "Outage" (red), counted in uptime, listed. PROBLEM slow / key page / re
 
 ## 17. Mobile detail screens are templates
 - Every incident on mobile opens Mobile Incident detail (MIncident) for that incident; every site opens Mobile Site detail (MSite) for that site. The sample screens show INC-0142 (MuvMi) and Bangkok Airways – Taiwan. "Open on desktop — not on mobile yet" is not used anywhere.
-- Entry points: MOverview site rows → MSite (the DOWN banner → MobileAck); MIncidents cards → MIncident (INC-0142 "Acknowledge" row → MobileAck); MSite incident rows → MIncident; MobileAck after ack → MIncident; MobileAckDark "Open incident" → MIncident.
+- Entry points: MOverview4 (§21) banners → MIncident; Live issues rows with an open incident → MIncident, other rows → MSite; "All N sites" → MSites; MIncidents cards → MIncident (INC-0142 "Acknowledge" row → MobileAck); MSite incident rows → MIncident; MobileAck after ack → MIncident; MobileAckDark "Open incident" → MIncident.
 
 ## 18. User guide — topics by role
 Role chips (single select): All · Responder · On-call · Stakeholder · Viewer · Admin. "Stakeholder" covers AMs and the CEO; "On-call" is a duty, not an RBAC role. The chip opens pre-selected to the viewer's own role — the On-call chip when they are on call this week (desktop Tao → Admin; mobile Arm → Responder) — with "All" one tap away. Same mapping on desktop (Guide) and mobile (MGuide; the Admin topic is split in two on mobile).
@@ -229,7 +233,7 @@ Role chips (single select): All · Responder · On-call · Stakeholder · Viewer
 7. **Partial recovery:** if the home page recovers but a key page still fails, RECOVERED and PROBLEM AGAIN (Key page) are posted together from the same round, and the same incident continues as a PROBLEM — titled by what still fails, e.g. "/booking still failing after the home page came back".
 
 ## 20. Sites list (/sites) — added 8 Oct 2026
-- The sidebar "Sites" item, every "Sites" breadcrumb and the mobile bottom-nav "Sites" tab open the Sites list (boards Sites, MSites) — not a site's detail. Overview keeps its live status table for watching; Sites is the management list.
+- The sidebar "Sites" item, every "Sites" breadcrumb and the mobile bottom-nav "Sites" tab open the Sites list (boards Sites, MSites) — not a site's detail. Overview shows what needs attention now (§21); Sites is the management list.
 - Header meta exactly "N sites · N monitored · N drafts". "Add site" (and the empty state's "Add first site") is shown to Admins only. The sidebar "Sites" count = monitored sites (drafts excluded).
 - One row per site; a row (or "Open") opens Site detail for that site (/sites/[id]). A **draft** (saved from Add site before the checklist is complete) shows Status "Not monitored" (neutral outline), a "Draft · not monitored" badge under the name, "—" in every live column, action "Finish setup" → Add site for Admins; non-Admins still see draft rows but can't open them — the action area reads "Only an Admin can finish setup"; drafts count in "N sites" but not in "monitored" or any uptime figure, and sort last.
 - Columns: Status (§11 badge; Muted is an extra overlay, never replaces status; open incident ID links to the incident) · Site (name, client · AM, URL) · Tier · Owner · backup · Locations (BKK/SIN/TYO glyphs, §11 legend) · Response 24h (p50 of the primary monitor; "—" while down or in maintenance) · Uptime 30d (§5 rule) · Expiry (sooner of SSL and domain in days; amber within 60 d, auto-renew certificates 30 d) · Checked (time of the last complete round, HH:MM:SS) · "Visit site" (opens the site's URL in a new tab) · ⋯ menu (Open, Edit site, Mute…, Schedule maintenance). On a site that is DOWN or has an open incident, Schedule maintenance shows "Can't start maintenance now … Mute instead" (§14.5); the Mute hint follows §15.1/§19 ("keeps escalating until someone acknowledges" while unacked/escalated, otherwise "stays open").
@@ -238,3 +242,34 @@ Role chips (single select): All · Responder · On-call · Stakeholder · Viewer
 - Mobile: search, status chips (All · Down · Problem · Maintenance · Muted · Drafts · Mine), rows grouped by status, each row → that site's mobile Site detail (§17); drafts → Add site.
 - Changes from the current build: the separate Client column moves into the Site cell's second line (client · AM, Client stays a filter); Owner becomes "Owner · backup". Sample values on the boards ([site URL], counts, names) are mock data — compute them. Search matches name, client and URL.
 - Build order is the team's call: Locations, Response 24h and Uptime 30d need rollup data; until /sites/[id] exists a row may open Edit site.
+
+## 21. Overview (/) — slice S06, added 8 Oct 2026 (overrides earlier Overview rules)
+Boards: **Main3** (desktop), **MainDark3** (NOC wall, same rules), **MOverview4** (mobile). Main / MainDark / MOverview are pre-S06 references only. Use the boards' STATE control (2 banners + more · 1 banner · None · All OK) and VIEW AS control to see each case.
+
+**Job of the page.** Overview answers "what is happening now and what do I do next". Sites (§20) is the list you manage — search, owner/client filters, sort, drafts, row menu and expiry live there, not here. The only management control on Overview is the Admin-only "Add site".
+
+1. **Incident banners.** One banner per DOWN incident that is not yet acknowledged (escalated or not). Acknowledging stops escalation, so an acked incident never keeps a banner — it stays in Live issues. Order: escalated first, then Tier 1 → 3, then longest down. At most 2 banners; if more qualify, a line "and N more → Incidents" (N = the rest). A PROBLEM never gets a banner. Acknowledge removes the banner at once with the 10 s undo (§16.8) and the next one moves up. Banner: "<site> is DOWN — 19 min", Escalated badge when escalated, "18 min unacked", the cause and escalation line, "Open INC-…" (secondary) and "Acknowledge" (primary, §14.13). No "Proposal · pending CEO" badge (approved, D-009) and no client-update line on the banner (the client-update track comes with a later slice). Mobile banners are tappable cards → that incident (MIncident).
+2. **Counts are computed, never typed.** "x/y OK" and the "Sites OK" KPI count monitored sites only — drafts are left out. OK = status OK; a muted site counts by its real status. Sidebar "Sites" = monitored count (§20). "Open" = incidents in any state before Resolved. "3 unacked (1 escalated)" — escalated is a subset of unacked.
+3. **KPIs (desktop):** Sites OK · Open incidents · MTTA · 30d (DOWN incidents, all tiers) · MTTD · 30d (DOWN incidents, Tier 1 only) · Uptime · 30d (§5). MTTA and MTTD show "—" with the caption "Not enough incidents yet" until there are at least 3 DOWN incidents in the last 30 days (open or closed); the "vs last 30d" change is hidden until then. KPIs are organisation-wide for every role.
+4. **Live issues** (replaces the full sites table). A monitored site is listed when any of these is true: status Down, Problem or Maintenance · an open incident (any state before Resolved) · muted · a location warning (TLS chain error). "Blocked by bot protection, verified OK" is not an issue. This is a different rule from the "Needs attention" switch on Sites (setup: drafts, expiry, missing backup) — don't share the predicate.
+   - Sort: Down first — escalated, then unacked, then acked — then Problem, Maintenance, OK; inside each group Tier 1 → 3, then longest "Since", then name.
+   - Columns (desktop): Status (same cell as Sites: badge, Muted overlay, incident link) · Site · why (name, tier, one reason line) · Since · Owner · BKK SIN TYO (§11 glyphs) · Response 24h (sparkline + p50) · Next step. The ⓘ button on the section header opens the legend (STATUS + LOCATIONS); phones show no legend.
+   - **One reason per row**, picked in this order: Down › Problem › Maintenance › incident waiting for root cause › location warning › muted. **Since** = the start of that same reason, shown as duration over "since HH:MM".
+   - **Next step:** unacked DOWN → Acknowledge (same action and undo as the banner) · acked DOWN or PROBLEM → "Open INC-…" · waiting for root cause → "Add root cause" (Resolve) · location warning → "View checks" (Site detail) · muted → "View site" (End mute arrives with maintenance & mutes). The whole row opens Site detail.
+   - Nothing listed → one line "All N monitored sites OK" with the time of the last full round.
+5. **Response 24h sparkline:** 96 points = p50 per 15-minute bucket over the last 24 h. A bucket where checks failed has no point, so the line breaks — no extra marker, the row already says Down. The line gains a point when a bucket closes; no animation in between. The p50 next to it = last completed round; "—" while down.
+6. **All sites tiles (desktop only).** One tile per monitored site, 3 columns, for a glance on the NOC wall — not a management list. Tile: status icon + name (wraps to 2 lines, never cut to "…") + p50, or the DOWN duration in red · second line: tier and a short state (ack state for DOWN, "Slow · 15 min" for Problem) · markers: shield-alert = TLS chain error, bell = open incident, eye-off = muted. Down tiles are red, Problem tiles amber; the icon always carries the status. The Tier control filters the tiles only. Tile opens Site detail. One link to Sites: "Manage on Sites →". Recent events sits beside the tiles.
+7. **Mobile (MOverview4)** answers three things in order: anything to do now (banners), what is wrong and is it mine (Live issues: status badge + one reason + Since, ownership chip), is the rest fine ("x/y OK" in the header and one row "All N sites · N OK ›" → Sites). Counts: Open · Unacked · third card by role (item 8). Not on phones: site tiles, MTTA / MTTD, Recent events (Incidents tab), legend, sparklines.
+8. **By role (VIEW AS on the boards).** Same page for everyone; only these change:
+
+| | Ownership chip in Live issues | Mobile third card | Acknowledge | Add root cause | Add site |
+|---|---|---|---|---|---|
+| Admin / Responder | "Yours" (owner) · "Backup" — user icon | Yours | ✓ | ✓ (Responder: own sites) | Admin only |
+| AM (Stakeholder) | "Your client" on sites of clients they manage — users icon | Your clients | allowed, not expected (§18) | — (→ Open INC-…) | — |
+| CEO (Stakeholder) | none | Uptime 30 d | allowed, not expected | — | — |
+| Viewer | none | Uptime 30 d | — (banners and rows open the incident read-only) | — | — |
+
+   Chips are Badge neutral outline (§11), never accent.
+9. **Not in S06** (draw the page without them): On-call card — comes back with on-call; Maintenance & mutes card and the header "Maintenance" button — come back with maintenance; the User guide icon in the phone top bar — comes back with the guide.
+10. **AURA components (5.34):** tiles = `Aura.TileGrid` (`columns` 3 on desktop) + `Aura.StatusTile` (`status`, `title`, `value` = p50 or the DOWN duration, `meta` = tier + short state, `markers` = shield-alert / bell / eye-off with labels, `href`); Response 24h = `Aura.Sparkline` (`failures="none"`, `failed` from the checks, `label` summarising range). TLS glyph = `Aura.Icon name="shield-alert"`. **Open:** StatusTile draws down with circle-alert and maintenance with wrench, while status badges (§11) use ban and calendar, and it has no prop to change the icon — accept the difference on tiles or ask AURA for an icon override; until decided, build with AURA as is.
+11. Sample data on these boards (names, times, incident IDs INC-0140…0144, counts, viewer Tao / Arm / Bua / Mint) is mock data — compute it; never copy.

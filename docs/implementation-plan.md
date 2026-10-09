@@ -21,14 +21,15 @@
 | S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | In review |
 | S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 (merged) | 3 | Done |
 | S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 (merged) | 3 | Done |
-| S06 | Overview dashboard & site detail | 1 · P0 | L | FR-05, FR-08 | S02a, S05 | 3 | Todo |
+| S06 | Site detail & check rollups | 1 · P0 | L | FR-08 | S02a, S05 (merged) | 3 | In progress |
+| S06b | Overview (option A) | 1 · P0 | L | FR-05 | S06, S02b | 3 | Todo |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Todo |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
-| S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06, S08 | 3 | Todo |
+| S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06b, S08 | 3 | Todo |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
-| S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06, S10, S11 | 4 | Todo |
+| S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06b, S10, S11 | 4 | Todo |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Todo |
@@ -66,7 +67,7 @@ The dates skip the Thai public holidays on Tue 13 Oct and Fri 23 Oct. The order,
 - **G2:** UAT with owners on phones, the game day and the restore drill (S19), then the 2-week parallel run against the CEO's checks, which can't be compressed.
 - **G3:** P2 scope is confirmed with the CEO at G2. A smaller P2 lands earlier.
 
-Re-measure after S06 (the first slice heavy on screens) and adjust if screen slices run longer than 1.5 days.
+Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if screen slices run longer than 1.5 days.
 
 ---
 
@@ -339,17 +340,28 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
   - **Done-when 2 ✓** `apps/web/src/features/sites/components/site-list.test.ts` (filters, Needs attention, the four sorts with drafts last, counts, `listMeta` "9 sites · 8 monitored · 1 draft") and `sites-list.test.tsx` (chips, Clear keeps the sort, no-match, Admin / non-Admin rows, phone groups / All / Mine / Clear); `pnpm check` green.
   - **Done-when 3 ✓** `E2E_LOCAL_SUPABASE=1 pnpm --filter @dxt/web exec playwright test e2e/layout-consistency.spec.ts` passed; it now also fails a box inside the page that scrolls sideways (caught a 956/770 table in a trial).
 
-### S06 · Overview dashboard & site detail
+### S06 · Site detail & check rollups
 
-- **Scope:** FR-05, FR-08. Overview (desktop, mobile, dark NOC): X/17 OK, status per site with Realtime, filters (tier, owner, client), 24 h sparkline, open incidents; the "Maintenance & mutes" card lands in S09. Phone shell (D-018): AURA `BottomNav` with the four sections of MOverview (Overview, Incidents, Sites, On-call; the live ones only) below lg, phones and tablets; the menu drawer stays for the other pages. Site detail: uptime 24 h / 7 d / 30 d / 90 d, response time per location, incident history, check log. `check_rollups` hourly and daily via pg_cron (daily kept 2 years); partition create / drop jobs (90-day raw retention).
-- **Boards:** Main, MOverview, MainDark, SiteDetail, MSite · **Tables:** check_rollups
-- **Depends on:** S02a, S05
+- **Scope:** FR-08 and the data the Overview needs. Split from the old S06 (Overview + Site detail) on 9 Oct 2026, Site detail first so every Overview link has its target (D-031). `check_rollups` hourly and daily per monitor and per location via pg_cron (hour rows 90 days, day rows 2 years; no uptime column — uptime is DOWN minutes from incidents, spec §5), next to the existing monthly partition job (create ahead, drop raw > 90 days, built in S02a). Site detail (`/sites/[siteId]`): status and since, info strip, availability for 24 h / 7 d / 30 d / 90 d (uptime, p50, p95, incidents), response time per location, latest round, monitors, incident history (90 days), check log with today's CSV. The Sites list rows open it for every role and its Response 24h / Uptime 30d columns get values. Mute / Schedule maintenance stay disabled with the reason until S09; the phone back arrow comes with S07 and BottomNav with S06b (D-018 as amended by D-031).
+- **Boards:** SiteDetail, MSite · **Tables:** check_rollups
+- **Depends on:** S02a, S05 (merged — its close-out waits only on owners signing in, as for S05b / S05c)
 - **Done when:**
-  1. With 17 sites and 90 days of generated check data on staging, `/` renders in < 2 s (server timing in the PR) and a status change shows in < 5 s via Realtime (PRD §9).
-  2. Site detail uptime for the seeded sample equals `siteUptime` (MuvMi 30 d = 99.77%).
-  3. pg_cron jobs exist for hourly / daily rollups, next-month partition and dropping raw partitions > 90 days (SQL test).
-  4. spec-checker passes all five boards at 390 / 820 / 1440, light and dark; the Overview nav item (live since S01 as the landing page) now shows the real dashboard.
-- **Review:** spec-checker, db-reviewer, security-reviewer (rollup grants, Realtime).
+  1. pg_cron jobs exist for hourly / daily rollups, next-month partitions and dropping raw partitions > 90 days (SQL test).
+  2. Site detail uptime for the sample equals `siteUptime` (MuvMi 30 d = 99.77%).
+  3. spec-checker passes SiteDetail and MSite at 390 / 820 / 1440, light and dark; Sites list rows open Site detail for every role and show Response 24h and Uptime 30d.
+- **Review:** spec-checker, db-reviewer, security-reviewer (rollup grants, the read function).
+- **Notes:** started 9 Oct 2026. Ships as two PRs (the migration first, schema lag).
+
+### S06b · Overview (option A)
+
+- **Scope:** FR-05, spec §21. Overview (`/`): incident banners (unacked DOWN, at most 2 + "and N more"), KPIs (Sites OK, Open incidents, MTTA / MTTD once 3 DOWN incidents in 30 days, Uptime 30d), Live issues (one reason, Since, Next step, ownership chips), All sites tiles (AURA 5.34 StatusTile / TileGrid) with the Tier filter, Response 24h sparkline (AURA Sparkline, 15-min p50), Recent events; dark NOC board; phone Overview (banners, Open / Unacked / third card by role, Live issues, "All N sites" row). Acknowledge with the 10 s undo from the banner and Live issues; AM / CEO / Viewer see "Open INC-…" (D-016, D-031). Realtime: `site_status`, `incidents` and `monitor_status` changes refresh the page. Phone shell (D-018): AURA `BottomNav` with the four sections of the phone boards (Overview, Incidents, Sites, On-call; the live ones only) below lg, phones and tablets; the menu drawer stays for the other pages. Not in S06b (§21.9): the On-call card, the Maintenance & mutes card and header button, the phone guide icon. Until their slices: no escalation line on banners (S08 / S10), "Add root cause" reads "Open INC-…" (S07), the Undo line has no "webhooks" (S24).
+- **Boards:** Main3, MainDark3, MOverview4 (Main, MainDark, MOverview are pre-S06 references, superseded by §21)
+- **Depends on:** S06, S02b
+- **Done when:**
+  1. With 17 sites and 90 days of generated check data (local Supabase — staging's free tier can't hold 90 days of raw checks, D-031), `/` renders in < 2 s (server timing in the PR), and on staging a status change shows in < 5 s via Realtime (PRD §9).
+  2. Live issues inclusion, reason, Since, sort and Next step behave as spec §21.4 (table tests from the board's states), banners as §21.1, KPIs as §21.2–3.
+  3. spec-checker passes Main3, MainDark3 and MOverview4 at 390 / 820 / 1440, light and dark; BottomNav shows below lg; the Overview nav item (live since S01 as the landing page) now shows the real dashboard.
+- **Review:** spec-checker, db-reviewer, security-reviewer (Realtime, the read functions).
 
 ### S07 · Incidents, timeline & resolve
 
@@ -388,7 +400,7 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
 
 - **Scope:** FR-10a and FR-14 (pulled forward from P1: the Maintenance dialog's guard offers Mute, so both ship together). One-off windows: schedule, suppress alerts, excluded from uptime, reason required, > 24 h needs Admin approval (Admins approve their own), can't start on a DOWN site or one with an open incident (§14.5). Mute: reason required, max 24 h, auto-expires, stops new alerts only and never counts as an ack (§15.1). End early / edit / cancel from the Overview "Maintenance & mutes" card, all logged.
 - **Boards:** Maintenance, MMaintenance · **Tables:** maintenance_windows · **Test plan:** T09
-- **Depends on:** S06, S08
+- **Depends on:** S06b, S08
 - **Done when:**
   1. **T09:** muting a site with an open incident keeps its escalation running (test); the L3 FYI and client-update parts are re-checked in S10 / S11.
   2. Starting a window now on a DOWN site is blocked with the spec text and offers Mute.
@@ -437,7 +449,7 @@ Re-measure after S06 (the first slice heavy on screens) and adjust if screen sli
 
 - **Scope:** FR-21, PRD §9. Heartbeat routing: engine missing > 3 min → email Tao + Alerts Space post mentioning on-call through a sender that doesn't depend on the engine; a single probe missing > 3 min → email Tao only, suppressed during an engine fault. Overview fault banner with "as of" data; hand check → manual incident (L0 through the fallback sender, client-update track started, "Escalate now" by hand). VPS watchdog. Probes & heartbeat page.
 - **Boards:** MainFault, Probes · **Test plan:** T02, T04, T11
-- **Depends on:** S06, S10, S11
+- **Depends on:** S06b, S10, S11
 - **Done when:**
   1. **T02:** stopping one probe → no false DOWN on any site and Tao gets the probe email only.
   2. **T04:** disabling Vercel Cron on staging → Healthchecks alerts reach both Admins and the VPS watchdog posts on its own.
@@ -625,7 +637,7 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | FR-02 | S02a |
 | FR-03 | S04a |
 | FR-04 | S03 |
-| FR-05 | S06 |
+| FR-05 | S06b |
 | FR-06 | S07 |
 | FR-07 | S02b |
 | FR-08 | S06 |
@@ -662,9 +674,12 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | EditMonitors | S05 |
 | Sites | S05c |
 | MSites | S05c |
-| Main | S06 |
-| MOverview | S06 |
-| MainDark | S06 |
+| Main | S06b |
+| MOverview | S06b |
+| MainDark | S06b |
+| Main3 | S06b |
+| MainDark3 | S06b |
+| MOverview4 | S06b |
 | SiteDetail | S06 |
 | MSite | S06 |
 | Incidents | S07 |

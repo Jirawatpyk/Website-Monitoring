@@ -1,6 +1,6 @@
 # Screen map — canvas board → route → rules
 
-The index `/implement-screen` reads. One row per canvas board (46). The board file is in `docs/design/canvas/`; open the [live canvas](https://claude.ai/artifact/Sqa6gYe5eGqTQtBFmjbyMW) in Play mode to click through flows.
+The index `/implement-screen` reads. One row per canvas board (49). The board file is in `docs/design/canvas/`; open the [live canvas](https://claude.ai/artifact/Sqa6gYe5eGqTQtBFmjbyMW) in Play mode to click through flows.
 
 - **Phase** follows PRD §6 priority: `P0` = MVP (Phase 1), `P1` = team go-live (Phase 2), `P2` = client-facing (Phase 3). **Slice** is the slice in [`../implementation-plan.md`](../implementation-plan.md) that builds the board; work in slice order.
 - **Spec** = sections of `docs/dxt-monitor-design-spec.md` that govern the screen. §11 (badges), §13 (copy & formats) and §14.15–17 (eyebrows, no dead controls, 44 px tap targets) apply to every screen and are not repeated below.
@@ -13,13 +13,16 @@ The index `/implement-screen` reads. One row per canvas board (46). The board fi
 |---|---|---|---|---|---|---|
 | Login | Sign in — Google SSO (2-step enforced by Workspace, D-007) | `/login` | P0 | S01 | §14.12, §15.2, §16.7 | §3, FR-07 |
 | MLogin | Mobile — session expired from alert link | `/login?next=…` (390) | P0 | S01 | §15.2, §16.7 | §3 |
-| Main | Overview dashboard | `/` | P0 | S06 | §1, §5, §11, §14.13, §15.1 | FR-05 |
-| MOverview | Mobile — Overview | `/` (390) | P0 | S06 | §17 | FR-05 |
-| MainDark | Overview dashboard — dark (NOC wall) | `/` with `data-theme="dark"` | P0 | S06 | §14.2, §14.13 | FR-05 |
+| Main3 | Overview — option A (Live issues + All sites tiles) | `/` | P0 | S06b | §21, §5, §14.13, §15.1 | FR-05 |
+| MainDark3 | Overview — option A · dark (NOC wall) | `/` with `data-theme="dark"` | P0 | S06b | §21, §14.2 | FR-05 |
+| MOverview4 | Mobile — Overview: what phones show (Yours, no tiles) | `/` (390) | P0 | S06b | §21.7–8, §17 | FR-05 |
+| Main | Overview dashboard — pre-S06 reference, superseded by Main3 (§21) | — | P0 | S06b | §21 | FR-05 |
+| MOverview | Mobile — Overview — pre-S06 reference, superseded by MOverview4 (§21) | — | P0 | S06b | §21 | FR-05 |
+| MainDark | Overview dashboard — dark — pre-S06 reference, superseded by MainDark3 (§21) | — | P0 | S06b | §21 | FR-05 |
 | MainFault | Overview — monitoring degraded (heartbeat missed) | `/` fault state | P1 | S12 | §14.4, §14.6, §16.10 | FR-21, §9 |
 | Sites | Sites list | `/sites` | P0 | S05c | §5, §11, §14.5, §20 | FR-05 |
 | MSites | Mobile — Sites | `/sites` (390) | P0 | S05c | §17, §20 | FR-05 |
-| SiteDetail | Site detail — Bangkok Airways – Taiwan | `/sites/[siteId]` | P0 | S06 | §5, §11, §12 | FR-08 |
+| SiteDetail | Site detail — Bangkok Airways – Taiwan | `/sites/[siteId]` | P0 | S06 | §5, §11, §12, §20 | FR-08 |
 | MSite | Mobile — Site detail | `/sites/[siteId]` (390) | P0 | S06 | §17 | FR-08 |
 | AddSite | Add site + registration checklist | `/sites/new` | P0 | S05 | §3, §8 | FR-01, §4 |
 | EditMonitors | Edit monitors | `/sites/[siteId]/monitors` | P0 | S05 | §6 | FR-01 |
