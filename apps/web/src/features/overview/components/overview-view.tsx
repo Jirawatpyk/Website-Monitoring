@@ -9,7 +9,7 @@ import { bannersOf, countsOf, liveIssues, recentEvents, withAck } from '../model
 import type { OverviewData, ProbeHealth } from '../types';
 import { DesktopBanners, Kpis, LIVE_ISSUES_ID, LiveIssuesTable, RecentEvents, SiteTiles } from './desktop';
 import { PhoneAllSites, PhoneBanners, PhoneCounts, PhoneLiveIssues } from './phone';
-import { useLiveRefresh } from './use-live-refresh';
+import { useLiveRefresh } from '@/components/use-live-refresh';
 import { useAckToast, type AckAction, type UndoAction } from '@/components/use-ack-toast';
 
 /** "Probes 3/3 | BKK · SIN · TYO | Verifier idle" (D-032: no heartbeat age until S12). */

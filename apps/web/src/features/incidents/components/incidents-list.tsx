@@ -13,7 +13,10 @@ import {
   type DataTableColumn,
 } from '@jirawatpyk/aura-react';
 import {
-  IconArrowUpRight,
+  IconClock,
+  IconDownload,
+  IconSearch,
+  IconX,
   IconBell,
   IconCheck,
   IconChevronDown,
@@ -26,6 +29,7 @@ import {
 } from '@jirawatpyk/aura-react/icons';
 import { formatDuration, formatDurationSeconds, formatIncidentId, formatWhen } from '@dxt/shared';
 import { SeverityBadge, WorkflowBadge } from '@/components/status-badges';
+import { useLiveRefresh } from '@/components/use-live-refresh';
 import {
   countLabel,
   DEFAULT_FILTERS,
@@ -33,6 +37,8 @@ import {
   durationMinutes,
   filterIncidents,
   hiddenNote,
+  isDefaultFilter,
+  lastOneLine,
   isOpen,
   isUnackedDown,
   listKpis,
@@ -48,6 +54,9 @@ import { INCIDENT_COLUMNS } from './incident-columns';
 
 /** The phone's Past view shows the latest few until "Show all" (MIncidents). */
 const PAST_SHOWN = 4;
+const LIST_TABLES = ['incidents'] as const;
+/** Rows per page (desktop) and cards before "Show all" (phone): the list stays light. */
+const PAGE_SIZE = 50;
 
 const SEVERITY_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -81,6 +90,8 @@ export interface IncidentsListProps {
  */
 export function IncidentsList({ incidents, sites, nowIso, initialView }: IncidentsListProps) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
+  // New incidents, acks and resolves show without a reload (PRD §9).
+  useLiveRefresh(LIST_TABLES);
   const phoneStart: PhoneView = initialView === 'unacked' || initialView === 'past' ? initialView : 'open';
   const desktopStart: DesktopView =
     initialView === 'done' || initialView === 'all' ? initialView : 'needs_action';
@@ -172,7 +183,12 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
 
   const phoneRows = filterIncidents(incidents, { ...DEFAULT_FILTERS, view: phoneView }, now).rows;
   const phoneCounts = phoneViewCounts(incidents, now);
-  const phoneShown = phoneView === 'past' && !showAllPast ? phoneRows.slice(0, PAST_SHOWN) : phoneRows;
+  const phoneShown =
+    phoneView === 'past' && !showAllPast
+      ? phoneRows.slice(0, PAST_SHOWN)
+      : showAllPast
+        ? phoneRows
+        : phoneRows.slice(0, PAGE_SIZE);
   const phoneCount =
     phoneView === 'past' && !showAllPast && phoneRows.length > PAST_SHOWN
       ? `Last 30 days · latest ${PAST_SHOWN} of ${phoneRows.length} resolved, in review or closed`
@@ -185,12 +201,7 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
           <Stat label="Open" value={kpis.open} caption={kpis.openCaption} icon={<IconBell />} />
           {/* "Escalated, not acked" counts nothing until escalation exists (S08, D-033). */}
-          <Stat
-            label="Unacked"
-            value={kpis.unacked}
-            caption={kpis.unackedCaption}
-            icon={<IconArrowUpRight />}
-          />
+          <Stat label="Unacked" value={kpis.unacked} caption={kpis.unackedCaption} icon={<IconClock />} />
           <Stat
             label="Needs root cause"
             value={kpis.needsRootCause}
@@ -259,22 +270,39 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
               {countLabel(incidents, f, now)}
             </span>
             <span className="ml-auto">
-              <Button variant="secondary" size="sm" href={exportHref} download>
+              <Button variant="secondary" size="sm" icon={<IconDownload />} href={exportHref} download>
                 Export CSV
               </Button>
             </span>
           </div>
 
           {rows.length === 0 ? (
-            <EmptyState
-              icon={<IconCircleCheck />}
-              title={f.view === 'needs_action' ? 'Nothing needs action' : 'No incidents'}
-              description={
-                f.view === 'needs_action'
-                  ? 'Every incident in this period is resolved.'
-                  : 'No incident matches these filters in this period.'
-              }
-            />
+            isDefaultFilter(f) && f.view === 'needs_action' ? (
+              <EmptyState
+                bordered
+                headingLevel={2}
+                icon={<IconCircleCheck />}
+                title="No open incidents"
+                description={lastOneLine(incidents, now)}
+              />
+            ) : (
+              <EmptyState
+                bordered
+                headingLevel={2}
+                icon={<IconSearch />}
+                title={`No incidents match ${filterWords(f, sites)}`}
+                description="Every incident is still there — only this list is filtered."
+                action={
+                  <Button
+                    variant="secondary"
+                    icon={<IconX />}
+                    onClick={() => setF({ ...DEFAULT_FILTERS, view: f.view })}
+                  >
+                    Clear filters
+                  </Button>
+                }
+              />
+            )
           ) : (
             <DataTable
               label="Incidents"
@@ -284,6 +312,7 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
               rowHeight="auto"
               getRowHref={hrefOf}
               linkComponent={Link}
+              pageSize={PAGE_SIZE}
             />
           )}
         </div>
@@ -294,8 +323,9 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
           </span>
           <span>
             {note ? `${note} ` : ''}
-            Unacknowledged DOWN incidents sort first, then the other open ones, then those waiting for a root
-            cause. Downtime with no root cause stays in “Needs action”. A PROBLEM ends at Resolved.
+            Unacknowledged DOWN incidents sort first, escalated ones on top, then the other open ones, then
+            those waiting for a root cause or review. Downtime with no root cause stays in “Needs action”. A
+            PROBLEM ends at Resolved.
           </span>
         </p>
       </div>
@@ -322,10 +352,21 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
         </span>
         {phoneShown.length === 0 ? (
           <EmptyState
+            headingLevel={2}
             icon={<IconCircleCheck />}
-            title={phoneView === 'past' ? 'No past incidents' : 'Nothing open'}
+            title={
+              phoneView === 'past'
+                ? 'No past incidents'
+                : phoneView === 'unacked'
+                  ? 'Nobody waiting for an ack'
+                  : 'No open incidents'
+            }
             description={
-              phoneView === 'past' ? 'Nothing resolved in the last 30 days.' : 'Every site is quiet.'
+              phoneView === 'past'
+                ? 'Nothing resolved in the last 30 days.'
+                : phoneView === 'unacked'
+                  ? 'Every open DOWN incident has been acknowledged.'
+                  : lastOneLine(incidents, now)
             }
           />
         ) : (
@@ -354,13 +395,15 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
 
 /** One MIncidents card: the whole card opens the incident; an unacked DOWN adds its Acknowledge row. */
 function PhoneCard({ incident: i, now }: { incident: ListIncident; now: Date }) {
-  const next = nextLine(i, now);
+  const next = nextLine(i, now, true);
   const unacked = isUnackedDown(i);
   return (
     <Link
       href={hrefOf(i)}
-      className={`flex flex-col gap-1 rounded-aura-lg border px-3.5 py-3 text-fg-primary no-underline hover:bg-bg-surface-hover ${
-        unacked ? 'border-alert-danger-border bg-alert-danger-bg' : 'border-border-default bg-bg-surface'
+      className={`flex flex-col gap-1 rounded-aura-lg border px-3.5 py-3 text-fg-primary no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+        unacked
+          ? 'border-alert-danger-border bg-alert-danger-bg hover:border-fg-danger'
+          : 'border-border-default bg-bg-surface hover:bg-bg-surface-hover'
       }`}
     >
       <span className="flex items-center gap-2">
@@ -375,7 +418,9 @@ function PhoneCard({ incident: i, now }: { incident: ListIncident; now: Date }) 
           .join(' · ')}
       </span>
       <span className="flex items-center gap-2 text-sm">
-        <span className={`grow ${TONE[next.tone]}`}>{next.text}</span>
+        <span className={`grow ${TONE[next.tone]}`}>
+          {isOpen(i) ? next.text : `${triggerWords(i)} · ${next.text}`}
+        </span>
         <span className="flex items-center gap-0.5 text-fg-secondary">
           Details <IconChevronRight aria-hidden className="size-4" />
         </span>
@@ -389,4 +434,15 @@ function PhoneCard({ incident: i, now }: { incident: ListIncident; now: Date }) 
       )}
     </Link>
   );
+}
+
+/** "Severity: Down · Site: MuvMi · Last 7 days" — the filters a no-match names (EmptyStates panel 3). */
+function filterWords(f: ListFilters, sites: { id: string; name: string }[]): string {
+  return [
+    f.severity !== 'all' ? `Severity: ${f.severity === 'down' ? 'Down' : 'Problem'}` : null,
+    f.siteId ? `Site: ${sites.find((s) => s.id === f.siteId)?.name ?? 'that site'}` : null,
+    `Last ${f.period} days`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }

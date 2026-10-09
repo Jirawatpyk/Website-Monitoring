@@ -7,7 +7,7 @@ import { OverviewView } from './overview-view';
 const refresh = vi.fn();
 const router = { refresh };
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
-vi.mock('./use-live-refresh', () => ({ useLiveRefresh: () => true }));
+vi.mock('@/components/use-live-refresh', () => ({ useLiveRefresh: () => true }));
 
 // Fri 25 Sep 2026 10:07:12 (UTC+7) — the boards' "now"; sample names are test fixtures only (§21.11).
 const NOW = new Date('2026-09-25T03:07:12Z');

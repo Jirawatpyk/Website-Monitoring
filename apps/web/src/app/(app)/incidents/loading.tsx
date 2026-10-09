@@ -12,6 +12,7 @@ export default function Loading() {
             <CardSkeleton key={n} lines={2} />
           ))}
         </div>
+        <CardSkeleton lines={1} />
         <CardSkeleton lines={8} />
       </PageSkeleton>
     </Container>

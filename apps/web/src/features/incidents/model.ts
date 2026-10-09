@@ -18,6 +18,7 @@ import {
   formatDuration,
   formatTime,
   formatTimeWithSeconds,
+  formatWhen,
   ROOT_CAUSE_CATEGORIES,
   ROOT_CAUSE_LABELS,
   TRIGGER_LABELS,
@@ -91,7 +92,8 @@ const needsAction = (i: ListIncident) => i.state !== 'resolved' && i.state !== '
 
 /**
  * Sort (Incidents footer, D-033): unacked / escalated DOWN first, then the other open ones, then those
- * waiting for a root cause or review, then the done ones; inside each, the newest start first.
+ * waiting for a root cause or review, then the done ones. Inside the first group escalated before
+ * unacked, then the longest wait (§21.4, as the Overview); inside the others the newest start first.
  */
 export function sortGroup(i: ListIncident): number {
   if (isUnackedDown(i)) return 0;
@@ -101,9 +103,15 @@ export function sortGroup(i: ListIncident): number {
 }
 
 export function sortIncidents(list: readonly ListIncident[]): ListIncident[] {
-  return [...list].sort(
-    (a, b) => sortGroup(a) - sortGroup(b) || b.startedAt.localeCompare(a.startedAt) || b.number - a.number,
-  );
+  const escalated = (i: ListIncident) => (i.state === 'escalated' ? 0 : 1);
+  return [...list].sort((a, b) => {
+    const group = sortGroup(a) - sortGroup(b);
+    if (group) return group;
+    if (sortGroup(a) === 0) {
+      return escalated(a) - escalated(b) || a.detectedAt.localeCompare(b.detectedAt) || a.number - b.number;
+    }
+    return b.startedAt.localeCompare(a.startedAt) || b.number - a.number;
+  });
 }
 
 const inView = (i: ListIncident, view: ListFilters['view']) => {
@@ -183,7 +191,7 @@ export function countLabel(list: readonly ListIncident[], f: ListFilters, now: D
       const hidden = hiddenAutoResolved
         ? ` · ${plural(hiddenAutoResolved, 'short PROBLEM')} auto-resolved (hidden)`
         : '';
-      return `Last ${f.period} days · ${rows.length} resolved, in review or closed${hidden}`;
+      return `Last ${f.period} days · all ${rows.length} resolved, in review or closed${hidden}`;
     }
     default:
       return `${plural(rows.length, 'incident')} · ${period}`;
@@ -212,7 +220,7 @@ export function durationMinutes(
 
 /** The trigger as the list writes it: "Hard fail", "Slow, flapped". */
 export function triggerWords(i: Pick<ListIncident, 'trigger' | 'isFlapping'>): string {
-  return `${TRIGGER_LABELS[i.trigger]}${i.isFlapping ? ', flapping' : ''}`;
+  return `${TRIGGER_LABELS[i.trigger]}${i.isFlapping ? ', flapped' : ''}`;
 }
 
 export const rootCauseLabel = (category: string | null) =>
@@ -226,6 +234,8 @@ const shorten = (text: string, max = 60) => (text.length > max ? `${text.slice(0
 export function nextLine(
   i: ListIncident,
   now: Date,
+  /** MIncidents writes "Acknowledged by Ploy 09:58"; the desktop column "Acked by …". */
+  long = false,
 ): { text: string; tone: 'danger' | 'warning' | 'secondary' } {
   if (WAITING_ACK.includes(i.state)) {
     const waited = minutesBetween(i.detectedAt, now);
@@ -233,7 +243,12 @@ export function nextLine(
   }
   if (i.state === 'acknowledged') {
     return {
-      text: `Acked by ${i.ackedByName ?? 'someone'} ${i.ackedAt ? formatTime(new Date(i.ackedAt)) : ''}`.trim(),
+      text: [
+        i.ackedByName ? `${long ? 'Acknowledged' : 'Acked'} by ${i.ackedByName}` : 'Acknowledged',
+        i.ackedAt ? formatTime(new Date(i.ackedAt)) : null,
+      ]
+        .filter(Boolean)
+        .join(' '),
       tone: 'secondary',
     };
   }
@@ -249,6 +264,18 @@ export function nextLine(
     text: summary ? shorten(summary) : (rootCauseLabel(i.rootCauseCategory) ?? 'Resolved'),
     tone: 'secondary',
   };
+}
+
+/** EmptyStates panel 2: with nothing open, what was last true ("Last one: …, N in the last 7 days"). */
+export function lastOneLine(list: readonly ListIncident[], now: Date): string {
+  const last = [...list].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+  if (!last) return 'No incidents in the last 30 days.';
+  const week = list.filter((i) => Date.parse(i.startedAt) >= now.getTime() - 7 * 86_400_000).length;
+  const what = `${last.siteName}, ${last.severity === 'down' ? 'Down' : 'Problem'} ${formatDuration(durationMinutes(last, now))}`;
+  const back = last.recoveredAt
+    ? `, recovered ${formatWhen(new Date(last.recoveredAt), now, { midSentence: true })}`
+    : '';
+  return `Last one: ${what}${back}. ${week} ${week === 1 ? 'incident' : 'incidents'} in the last 7 days.`;
 }
 
 // ── KPIs ─────────────────────────────────────────────────────────────────

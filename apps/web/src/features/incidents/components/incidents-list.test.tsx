@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ListIncident } from '../model';
 import { IncidentsList } from './incidents-list';
+
+vi.mock('@/components/use-live-refresh', () => ({ useLiveRefresh: () => true }));
 
 // Fixtures from the Incidents board (test data only, §21.11).
 const NOW = '2026-09-25T03:07:00Z';

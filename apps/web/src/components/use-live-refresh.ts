@@ -6,17 +6,19 @@ import { createClient } from '@/lib/supabase/client';
 
 /** Events inside this window become one refresh (D-032): a round updates every site at once. */
 export const COALESCE_MS = 1500;
-/** Tables the Overview follows (the migration publishes exactly these). */
+/** Tables in the Realtime publication (the S06b migration publishes exactly these). */
 export const LIVE_TABLES = ['site_status', 'incidents'] as const;
+export type LiveTable = (typeof LIVE_TABLES)[number];
 
 /**
- * Realtime for `/` (PRD §9: a status change on screen < 5 s): changes to `site_status` and `incidents`
- * re-render the page from the server. A burst (a round touches every site) becomes one refresh at most
+ * Realtime for a page (PRD §9: a status change on screen < 5 s): changes to the given tables — the
+ * Overview follows `site_status` and `incidents`, the Incidents pages `incidents` (S07) — re-render it
+ * from the server. A burst (a round touches every site) becomes one refresh at most
  * every `COALESCE_MS`; a reconnect or coming back to the tab refreshes once, since events missed meanwhile
  * aren't replayed. INSERT and UPDATE only — a DELETE skips RLS and the page needs none (security review).
  * Returns whether the channel is live, for the header's "· live".
  */
-export function useLiveRefresh(): boolean {
+export function useLiveRefresh(tables: readonly LiveTable[] = LIVE_TABLES): boolean {
   const router = useRouter();
   const [live, setLive] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -31,8 +33,8 @@ export function useLiveRefresh(): boolean {
       }, COALESCE_MS);
     };
     // a topic per mount: React's dev double mount would otherwise get the channel still being removed
-    let channel = supabase.channel(`overview-${crypto.randomUUID()}`);
-    for (const table of LIVE_TABLES) {
+    let channel = supabase.channel(`live-${crypto.randomUUID()}`);
+    for (const table of tables) {
       for (const event of ['INSERT', 'UPDATE'] as const) {
         channel = channel.on('postgres_changes', { event, schema: 'public', table }, refresh);
       }
@@ -55,7 +57,9 @@ export function useLiveRefresh(): boolean {
       timer.current = null;
       void supabase.removeChannel(channel);
     };
-  }, [router]);
+    // the table list is a constant per page; joined so a new array each render doesn't resubscribe
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the joined names below
+  }, [router, tables.join(',')]);
 
   return live;
 }

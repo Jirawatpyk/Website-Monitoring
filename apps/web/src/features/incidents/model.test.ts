@@ -6,6 +6,7 @@ import {
   filterIncidents,
   hiddenNote,
   isUnackedDown,
+  lastOneLine,
   listKpis,
   nextLine,
   okTwoRoundsAt,
@@ -171,10 +172,26 @@ describe('views and sort (Incidents, MIncidents, D-033)', () => {
   it('desktop view counts', () => {
     expect(desktopViewCounts(ALL, DEFAULT_FILTERS, NOW)).toEqual({ needs_action: 3, done: 2, all: 5 });
   });
-  it('sort: inside a group the newest start first', () => {
-    const a = inc({ id: 'a', number: 1, startedAt: at('25T08:00:00') });
-    const b = inc({ id: 'b', number: 2, startedAt: at('25T09:00:00') });
-    expect(sortIncidents([a, b]).map((r) => r.id)).toEqual(['b', 'a']);
+  it('sort: waiting DOWN — escalated first, then the longest wait (§21.4); others newest first', () => {
+    const a = inc({ id: 'a', number: 1, detectedAt: at('25T08:00:00') });
+    const b = inc({ id: 'b', number: 2, detectedAt: at('25T09:00:00') });
+    const e = inc({ id: 'e', number: 3, state: 'escalated', detectedAt: at('25T09:30:00') });
+    expect(sortIncidents([b, a, e]).map((r) => r.id)).toEqual(['e', 'a', 'b']);
+    const x = inc({ id: 'x', number: 4, state: 'acknowledged', startedAt: at('25T08:00:00') });
+    const y = inc({ id: 'y', number: 5, state: 'acknowledged', startedAt: at('25T09:00:00') });
+    expect(sortIncidents([x, y]).map((r) => r.id)).toEqual(['y', 'x']);
+  });
+  it('nothing open: what was last true (EmptyStates panel 2)', () => {
+    expect(lastOneLine([tubtong, wecare], NOW)).toBe(
+      'Last one: Tubtong, Problem 12 min, recovered yesterday 14:14. 1 incident in the last 7 days.',
+    );
+    expect(lastOneLine([], NOW)).toBe('No incidents in the last 30 days.');
+  });
+  it('acked by nobody named reads Acknowledged; the phone writes it out', () => {
+    expect(nextLine(inc({ state: 'acknowledged', ackedAt: at('25T09:58:00') }), NOW).text).toBe(
+      'Acknowledged 09:58',
+    );
+    expect(nextLine(fuji, NOW, true).text).toBe('Acknowledged by Ploy 09:58');
   });
 });
 
@@ -187,7 +204,7 @@ describe('count line and hidden note', () => {
     [{ ...DEFAULT_FILTERS, view: 'unacked' as const }, '1 not acknowledged'],
     [
       { ...DEFAULT_FILTERS, view: 'past' as const },
-      'Last 30 days · 2 resolved, in review or closed · 2 short PROBLEMs auto-resolved (hidden)',
+      'Last 30 days · all 2 resolved, in review or closed · 2 short PROBLEMs auto-resolved (hidden)',
     ],
   ])('%o → %s', (f, label) => {
     expect(countLabel(ALL, f, NOW)).toBe(label);
@@ -226,7 +243,7 @@ describe('row words', () => {
     expect(nextLine(i, NOW)).toEqual({ text, tone });
   });
   it('trigger words', () => {
-    expect(triggerWords(inc({ isFlapping: true }))).toBe('Hard fail, flapping');
+    expect(triggerWords(inc({ isFlapping: true }))).toBe('Hard fail, flapped');
     expect(triggerWords(inc({ trigger: 'tls_chain' }))).toBe('TLS chain');
   });
 });
