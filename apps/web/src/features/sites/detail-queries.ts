@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { downEpisodesFromTimeline, episodeMinutes, episodesFromTimeline, siteUptimeOver } from '@dxt/engine';
 import {
   bangkokDayStart,
@@ -134,6 +135,15 @@ function causeOf(events: readonly { type: string; payload: unknown }[]): string 
   const cause = p && typeof p === 'object' ? (p as Record<string, unknown>).cause : null;
   return typeof cause === 'string' && cause.trim() ? cause : null;
 }
+
+/** A site's name, for the page's tab title; null when unknown or unreadable. */
+export const getSiteName = cache(async (siteId: string): Promise<string | null> => {
+  if (!siteIdSchema.safeParse(siteId).success) return null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('sites').select('name').eq('id', siteId).maybeSingle();
+  if (error) throw new Error(`site: ${error.message}`);
+  return data?.name ?? null;
+});
 
 /** `/sites/[siteId]` for the range asked; null when the site doesn't exist or isn't readable. */
 export async function getSiteDetail(

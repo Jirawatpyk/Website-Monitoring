@@ -27,6 +27,11 @@ export default function Loading() {
           <CardSkeleton lines={4} />
         </div>
         <div className="flex flex-col gap-6 md:hidden">
+          {/* the header's phone row: Mute / Maintenance */}
+          <div className="grid grid-cols-2 gap-3">
+            <Skeleton className="h-11" />
+            <Skeleton className="h-11" />
+          </div>
           <Skeleton className="h-11 w-full" />
           <div className="grid grid-cols-3 gap-2">
             <Skeleton className="h-16" />

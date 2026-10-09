@@ -2,10 +2,18 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Container } from '@jirawatpyk/aura-react';
 import { SiteDetailView, rangeOf } from '@/features/sites';
-import { getSiteDetail } from '@/features/sites/server';
+import { getSiteDetail, getSiteName } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
 
-export const metadata: Metadata = { title: 'Site detail' };
+/** The tab reads the site's name ("Test target · DxT Monitor"). */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ siteId: string }>;
+}): Promise<Metadata> {
+  const name = await getSiteName((await params).siteId);
+  return { title: name ?? 'Site not found' };
+}
 
 /** `/sites/[siteId]` — Site detail (spec §20, boards SiteDetail and MSite). */
 export default async function SiteDetailPage({
