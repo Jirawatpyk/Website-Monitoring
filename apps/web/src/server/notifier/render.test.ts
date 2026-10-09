@@ -351,6 +351,10 @@ describe('render — NOTE and RESOLVED (S07, D-033)', () => {
     trigger: 'hard_fail',
     started_at: '2026-09-24T15:14:00Z',
     recovered_at: '2026-09-24T15:22:00Z',
+    incident_events: [
+      { type: 'detected', payload: {}, at: '2026-09-24T15:14:30Z' },
+      { type: 'recovered', payload: {}, at: '2026-09-24T15:22:00Z' },
+    ],
     sites: { ...incident.sites, name: 'ORCA Thailand' },
   };
   const resolvedCtx = {
@@ -369,7 +373,7 @@ describe('render — NOTE and RESOLVED (S07, D-033)', () => {
     const m = renderChat(row('resolved', resolvedCtx), orca, appUrl, now)!;
     expect(m.text).toBe('RESOLVED · ORCA Thailand · by Tao 10:08');
     expect(JSON.stringify(m.cardsV2)).toContain('Hosting / server');
-    expect(JSON.stringify(m.cardsV2)).toContain('Down for');
+    expect(JSON.stringify(m.cardsV2)).toContain('8 min (22:14–22:22)');
   });
   it('the RESOLVED email: the owner as owner, anyone else as emailed', () => {
     const thread = { threadId: '<t@x>', startsThread: false };

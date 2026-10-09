@@ -1,7 +1,8 @@
-import { formatTime } from '@dxt/shared';
+import { formatDuration, formatTime } from '@dxt/shared';
 import { plainName, type ChatMessage } from './chat-alerts';
 import { buildChatTextLine } from './chat-text';
 import { downtime } from './downtime';
+import { flapCounts, type Drop } from './relapse-alerts';
 
 /**
  * NOTE and RESOLVED thread replies (ChatAlert board rows "Note" and "Resolved", spec §16.5, D-033):
@@ -43,23 +44,38 @@ export interface ResolvedAlertInput {
   rootCause: string;
   whatHappened: string;
   whatFixedIt: string | null;
-  severity: 'down' | 'problem';
-  startedAt: Date;
-  recoveredAt: Date | null;
+  /** The incident's closed drops (with their severity): "Down for" counts the DOWN ones (D-033). */
+  drops: readonly Drop[];
+}
+
+/**
+ * How long, in RESOLVED (message-checker H1): DOWN minutes only, as uptime and the flapping summary
+ * count them — "Down for 43 min (09:48–10:31)" for one drop, "Down in total 41 min (03:12–04:04)" for
+ * several; "Problem lasted …" only when nothing went down.
+ */
+export function resolvedLasted(drops: readonly Drop[]): [string, string] | null {
+  if (!drops.length) return null;
+  const down = drops.some((d) => d.severity !== 'problem');
+  const { counted, first, last, minutes } = flapCounts(drops, down ? 'down' : 'problem');
+  if (!first || !last) return null;
+  if (counted === 1) {
+    const one = drops.find((d) => (down ? d.severity !== 'problem' : true))!;
+    const { duration, range } = downtime(one.start, one.end);
+    return [down ? 'Down for' : 'Problem lasted', `${duration} (${range})`];
+  }
+  const span = downtime(first.start, last.end).range;
+  return [down ? 'Down in total' : 'Problem lasted', `${formatDuration(minutes)} (${span})`];
 }
 
 export function buildResolvedAlert(input: ResolvedAlertInput): ChatMessage {
   const site = plainName(input.site);
   const by = plainName(input.resolvedBy);
   const at = formatTime(input.resolvedAt);
-  const lasted = input.recoveredAt ? downtime(input.startedAt, input.recoveredAt) : null;
+  const lasted = resolvedLasted(input.drops);
   const rows = [
-    ['Root cause', input.rootCause],
     ['What happened', input.whatHappened],
     ...(input.whatFixedIt ? [['What fixed it', input.whatFixedIt]] : []),
-    ...(lasted
-      ? [[input.severity === 'down' ? 'Down for' : 'Problem for', `${lasted.duration} (${lasted.range})`]]
-      : []),
+    ...(lasted ? [lasted] : []),
   ];
   return {
     text: buildChatTextLine({ state: 'RESOLVED', site, detail: [`by ${by} ${at}`] }),
@@ -67,7 +83,7 @@ export function buildResolvedAlert(input: ResolvedAlertInput): ChatMessage {
       {
         cardId: `resolved-${input.incidentId}`,
         card: {
-          header: { title: `RESOLVED · ${site} · by ${by} ${at}` },
+          header: { title: `Root cause · ${plainName(input.rootCause)}` },
           sections: [
             {
               widgets: rows.map(([topLabel, text]) => ({

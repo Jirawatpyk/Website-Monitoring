@@ -14,6 +14,7 @@ import {
 import type { ProblemFacts } from './chat-alerts';
 import { downtime } from './downtime';
 import { flapCounts, timesWord, type Drop, type KeyPageFacts } from './relapse-alerts';
+import { resolvedLasted } from './resolve-alerts';
 
 /**
  * Alert emails — EmailAlert board, spec §10, PRD §7, cut to what exists today (D-013 / D-016: no
@@ -105,11 +106,10 @@ type Template =
   | 'resolved';
 
 export interface ResolvedEmailInput extends EmailBaseInput {
-  severity: 'down' | 'problem';
   resolvedBy: string;
   resolvedAt: Date;
-  startedAt: Date;
-  recoveredAt: Date | null;
+  /** The incident's closed drops: the "Down for" row counts the DOWN ones (D-033). */
+  drops: readonly Drop[];
   /** The category's words ("Hosting / server"). */
   rootCause: string;
   whatHappened: string;
@@ -301,7 +301,7 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
       ['Cause', input.cause],
       ['Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)],
     ],
-    // One page serves both until S07 builds the full incident: [Open incident] would repeat it.
+    // The board adds [Open incident], but Acknowledge opens that same page (one incident page, D-033).
     buttons: input.ackedBy
       ? [{ label: 'Open incident', href: input.incidentUrl, primary: true }]
       : [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
@@ -373,10 +373,7 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
           : []),
       ],
       buttons: isOwner
-        ? [
-            { label: 'Add root cause', href: `${input.incidentUrl}#resolve`, primary: true },
-            { label: 'Open incident', href: input.incidentUrl, primary: false },
-          ]
+        ? [{ label: 'Add root cause', href: `${input.incidentUrl}#resolve`, primary: true }]
         : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
     });
   }
@@ -610,7 +607,7 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
 /**
  * The flapping summary email (EmailAlert "VOCA · flapping", spec §19.4): to the owner in the
  * incident's thread at the same time as the Chat summary, replacing the RECOVERED emails held while
- * the site flapped. "Add root cause" waits for S07 (D-022): until then the incident page.
+ * the site flapped. The owner's one button is "Add root cause" (the Resolve card, S07).
  */
 export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessage {
   const { site, drops, owner, ack } = input;
@@ -640,7 +637,9 @@ export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessag
         ? [['Still to do', `Root cause (${owner}) — needed before it can be resolved`] as [string, string]]
         : []),
     ],
-    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: isOwner }],
+    buttons: isOwner
+      ? [{ label: 'Add root cause', href: `${input.incidentUrl}#resolve`, primary: true }]
+      : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
 }
 
@@ -704,8 +703,7 @@ export function buildAgainEmail(input: AgainEmailInput): EmailMessage {
 export function buildResolvedEmail(input: ResolvedEmailInput): EmailMessage {
   const { site, resolvedBy } = input;
   const at = formatTime(input.resolvedAt);
-  const lasted = input.recoveredAt ? downtime(input.startedAt, input.recoveredAt) : null;
-  const down = input.severity === 'down';
+  const lasted = resolvedLasted(input.drops);
   return render(input, {
     template: 'resolved',
     color: C.positive,
@@ -718,9 +716,7 @@ export function buildResolvedEmail(input: ResolvedEmailInput): EmailMessage {
       ['Root cause', input.rootCause],
       ['What happened', input.whatHappened],
       ...(input.whatFixedIt ? [['What fixed it', input.whatFixedIt] as [string, string]] : []),
-      ...(lasted
-        ? [[down ? 'Down for' : 'Problem lasted', `${lasted.duration} (${lasted.range})`] as [string, string]]
-        : []),
+      ...(lasted ? [lasted] : []),
     ],
     buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });

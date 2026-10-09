@@ -168,7 +168,6 @@ function resolvedOf(n: Notification, i: IncidentFacts) {
   const ctx = contextOf(n.context);
   const category = str(ctx.category, '');
   return {
-    severity: i.severity,
     resolvedBy: str(ctx.resolvedBy, 'someone'),
     resolvedAt: dateOf(ctx.resolvedAt) ?? new Date(n.created_at),
     rootCause: (ROOT_CAUSE_CATEGORIES as readonly string[]).includes(category)
@@ -176,8 +175,7 @@ function resolvedOf(n: Notification, i: IncidentFacts) {
       : category || 'Not given',
     whatHappened: str(ctx.what, ''),
     whatFixedIt: typeof ctx.fix === 'string' && ctx.fix ? ctx.fix : null,
-    startedAt: new Date(i.started_at),
-    recoveredAt: dateOf(i.recovered_at),
+    drops: closedDrops(i),
   };
 }
 

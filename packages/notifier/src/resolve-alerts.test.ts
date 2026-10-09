@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildResolvedEmail } from './email-alerts';
-import { buildNoteAlert, buildResolvedAlert, plainText } from './resolve-alerts';
+import { buildNoteAlert, buildResolvedAlert, plainText, resolvedLasted } from './resolve-alerts';
 
 // ChatAlert board rows "Note" and "Resolved" (spec §16.5, D-033).
 describe('NOTE reply', () => {
@@ -35,18 +35,15 @@ const resolved = {
   rootCause: 'Hosting / server',
   whatHappened: 'Host rebooted the app server without notice',
   whatFixedIt: 'Nothing from our side — provider reboot finished',
-  severity: 'down' as const,
-  startedAt: new Date('2026-09-24T15:14:00Z'),
-  recoveredAt: new Date('2026-09-24T15:22:00Z'),
+  drops: [{ start: new Date('2026-09-24T15:14:00Z'), end: new Date('2026-09-24T15:22:00Z') }],
 };
 
 describe('RESOLVED reply', () => {
   it('has the board text line, no mention, and a card with the root cause', () => {
     const m = buildResolvedAlert(resolved);
     expect(m.text).toBe('RESOLVED · ORCA Thailand · by Tao 10:08');
-    expect(m.cardsV2[0]!.card.header.title).toBe('RESOLVED · ORCA Thailand · by Tao 10:08');
+    expect(m.cardsV2[0]!.card.header.title).toBe('Root cause · Hosting / server');
     expect(m.cardsV2[0]!.card.sections[0]!.widgets).toEqual([
-      { decoratedText: { topLabel: 'Root cause', text: 'Hosting / server', wrapText: true } },
       {
         decoratedText: {
           topLabel: 'What happened',
@@ -119,5 +116,30 @@ describe('RESOLVED email', () => {
     });
     expect(e.html).not.toContain('<script>');
     expect(e.html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('resolvedLasted — DOWN minutes only (message-checker H1, D-033)', () => {
+  const d = (from: string, to: string, severity?: 'down' | 'problem') => ({
+    start: new Date(`2026-09-20T${from}:00+07:00`),
+    end: new Date(`2026-09-20T${to}:00+07:00`),
+    ...(severity ? { severity } : {}),
+  });
+  it.each([
+    ['one DOWN drop', [d('09:48', '10:31')], ['Down for', '43 min (09:48–10:31)']],
+    [
+      'VOCA, flapped: DOWN minutes in total over the span',
+      [d('03:12', '03:19'), d('03:24', '03:35'), d('03:38', '03:52'), d('03:55', '04:04')],
+      ['Down in total', '41 min (03:12–04:04)'],
+    ],
+    [
+      'D-021: the PROBLEM before the outage isn’t down',
+      [d('03:00', '03:10', 'problem'), d('03:10', '03:15', 'down')],
+      ['Down for', '5 min (03:10–03:15)'],
+    ],
+    ['a PROBLEM only', [d('09:52', '10:14', 'problem')], ['Problem lasted', '22 min (09:52–10:14)']],
+    ['never recovered (none closed)', [], null],
+  ])('%s', (_n, drops, expected) => {
+    expect(resolvedLasted(drops)).toEqual(expected);
   });
 });
