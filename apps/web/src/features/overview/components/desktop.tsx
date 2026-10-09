@@ -95,23 +95,23 @@ export function DesktopBanners({
   return (
     <section aria-label="Unacknowledged DOWN incidents" className="flex flex-col gap-2">
       {shown.map((b) => (
-        <Alert
-          key={b.incidentId}
-          tone="danger"
-          icon={<IconCircleAlert />}
-          title={
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>{`${b.site.name} is DOWN — ${formatDuration(b.downMinutes)}`}</span>
-              {b.escalated && (
-                <Badge tone="warning" variant="outline" icon={<IconArrowUpRight />}>
-                  {`Escalated · L${b.level}`}
-                </Badge>
-              )}
-              <span className="text-sm font-medium">{`${formatDuration(b.unackedMinutes)} unacked`}</span>
-            </span>
-          }
-          action={
-            <span className="flex flex-wrap items-center gap-2">
+        // The buttons sit at the end of the banner's row, as on Main3 (Alert's `action` would put them
+        // underneath); they wrap under the text only when the row runs out of room.
+        <Alert key={b.incidentId} tone="danger" icon={<IconCircleAlert />}>
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-base font-semibold text-fg-danger">
+                <span>{`${b.site.name} is DOWN — ${formatDuration(b.downMinutes)}`}</span>
+                {b.escalated && (
+                  <Badge tone="warning" variant="outline" icon={<IconArrowUpRight />}>
+                    {`Escalated · L${b.level}`}
+                  </Badge>
+                )}
+                <span className="text-sm font-medium">{`${formatDuration(b.unackedMinutes)} unacked`}</span>
+              </p>
+              <p className="m-0">{b.cause ?? 'Hard fail'}</p>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Link href={`/incidents/${b.incidentId}`} className={buttonClass({ variant: 'secondary' })}>
                 {`Open ${formatIncidentId(b.number)}`}
               </Link>
@@ -120,10 +120,8 @@ export function DesktopBanners({
                   Acknowledge
                 </Button>
               )}
-            </span>
-          }
-        >
-          {b.cause ?? 'Hard fail'}
+            </div>
+          </div>
         </Alert>
       ))}
       {more > 0 && (
