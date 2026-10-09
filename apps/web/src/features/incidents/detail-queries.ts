@@ -2,6 +2,7 @@ import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { describeFailure } from '@dxt/notifier';
 import {
+  CLOSED_INCIDENT_STATES_IN,
   PROBE_LOCATIONS,
   TRIGGER_LABELS,
   UNDO_WINDOW_SEC,
@@ -340,6 +341,16 @@ export async function loadIncident(
           }
         : null,
   };
+}
+
+/** Open incidents (any state before Resolved) for the nav count; null when it can't be read. */
+export async function countOpenIncidents(): Promise<number | null> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from('incidents')
+    .select('id', { count: 'exact', head: true })
+    .not('state', 'in', CLOSED_INCIDENT_STATES_IN);
+  return error ? null : count;
 }
 
 // ── List ─────────────────────────────────────────────────────────────────

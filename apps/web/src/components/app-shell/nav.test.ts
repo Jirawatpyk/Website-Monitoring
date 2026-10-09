@@ -29,7 +29,7 @@ describe('activeNavId', () => {
   it.each([
     ['/', 'overview'],
     ['/login', null],
-    ['/incidents/x', null], // Incidents isn't shown until S07
+    ['/incidents/x', 'incidents'], // live since S07
     ['/overview-x', null],
   ])('%s → %s', (pathname, expected) => {
     expect(activeNavId(pathname)).toBe(expected);

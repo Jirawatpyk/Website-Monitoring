@@ -7,6 +7,7 @@ import { MobileBar } from '@/components/app-shell/mobile-bar';
 import { PhoneNav } from '@/components/app-shell/phone-nav';
 import { OfflineStrip } from '@/components/states';
 import { AccountFooter } from '@/features/auth';
+import { countOpenIncidents } from '@/features/incidents/server';
 import { countMonitoredSites } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
 
@@ -15,8 +16,12 @@ import { getAccess } from '@/lib/auth/session';
  * profile (deactivated, or never on the access list) is signed out by /auth/refused (D-007).
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  // Side by side: the count is a head count under RLS, harmless (0 or null) for a session that then redirects.
-  const [access, sites] = await Promise.all([getAccess(), countMonitoredSites()]);
+  // Side by side: the counts are head counts under RLS, harmless (0 or null) for a session that then redirects.
+  const [access, sites, incidents] = await Promise.all([
+    getAccess(),
+    countMonitoredSites(),
+    countOpenIncidents(),
+  ]);
   if (access.status === 'signed-out') redirect('/login');
   if (access.status !== 'active') redirect('/auth/refused');
   const { profile } = access;
@@ -30,7 +35,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <AppNav
           header={<Brand />}
           footer={<AccountFooter displayName={profile.displayName} role={profile.role} />}
-          counts={{ sites: sites ?? undefined }}
+          counts={{ sites: sites ?? undefined, incidents: incidents ?? undefined }}
         />
       }
       // The phone boards' sections below lg (D-018, D-031); the menu drawer stays for the rest.

@@ -1,6 +1,6 @@
 import 'server-only';
 
-export { getIncident, listIncidents } from './detail-queries';
+export { countOpenIncidents, getIncident, listIncidents } from './detail-queries';
 export { incidentsListCsv } from './downloads';
 export {
   acknowledgeIncident,

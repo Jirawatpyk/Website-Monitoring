@@ -5,12 +5,14 @@ import AppLayout from './layout';
 const mocks = vi.hoisted(() => ({
   getAccess: vi.fn(),
   countMonitoredSites: vi.fn(async () => 17 as number | null),
+  countOpenIncidents: vi.fn(async () => 3 as number | null),
   redirect: vi.fn((to: string) => {
     throw new Error(`redirect:${to}`);
   }),
 }));
 vi.mock('@/lib/auth/session', () => ({ getAccess: mocks.getAccess }));
 vi.mock('@/features/sites/server', () => ({ countMonitoredSites: mocks.countMonitoredSites }));
+vi.mock('@/features/incidents/server', () => ({ countOpenIncidents: mocks.countOpenIncidents }));
 vi.mock('next/navigation', () => ({
   redirect: mocks.redirect,
   useRouter: () => ({ refresh: vi.fn() }),
@@ -32,7 +34,7 @@ describe('AppLayout', () => {
 
     expect(screen.getAllByText('DxT').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Overview' }).length).toBeGreaterThan(0);
-    expect(screen.queryByRole('link', { name: 'Incidents' })).toBeNull(); // not live until S07
+    expect(screen.getAllByRole('link', { name: /Incidents/ }).length).toBeGreaterThan(0); // live since S07
     expect(screen.getAllByText('Arm').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Responder').length).toBeGreaterThan(0);
     // AURA 5.32: the name shows in AURA's own tip (hover + keyboard focus), not a native title.
@@ -49,13 +51,14 @@ describe('AppLayout', () => {
 
     const sideNav = screen.getAllByRole('navigation', { name: 'Main navigation' })[0]!;
     expect(within(sideNav).getByRole('link', { name: /Sites/ })).toHaveTextContent('17');
+    expect(within(sideNav).getByRole('link', { name: /Incidents/ })).toHaveTextContent('3');
     const bottom = screen.getByRole('navigation', { name: 'Sections' });
-    // live sections only (D-032): Incidents joins with S07, On-call with S10
+    // live sections only (D-032): Incidents since S07, On-call joins with S10
     expect(
       within(bottom)
         .getAllByRole('link')
         .map((a) => a.textContent),
-    ).toEqual(['Overview', 'Sites']);
+    ).toEqual(['Overview', 'Incidents', 'Sites']);
   });
 
   it('shows no number when the count cannot be read', async () => {

@@ -50,7 +50,7 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         icon: <IconBell />,
         href: '/incidents',
         slice: 'S07',
-        live: false,
+        live: true,
       },
       { id: 'sites', label: 'Sites', icon: <IconMonitor />, href: '/sites', slice: 'S05', live: true },
       {
@@ -128,9 +128,13 @@ export const NAV_SECTIONS: NavSections = SECTIONS.map(({ title, items }) => ({
   items: items.filter((item) => item.live).map(({ id, label, icon, href }) => ({ id, label, icon, href })),
 })).filter((section) => section.items.length > 0);
 
-/** Counts beside nav items (spec §20, §21.2): Sites = monitored sites, drafts left out. */
+/**
+ * Counts beside nav items (spec §20, §21.2): Sites = monitored sites, drafts left out; Incidents = open
+ * incidents (any state before Resolved, Incidents board).
+ */
 export interface NavCounts {
   sites?: number;
+  incidents?: number;
 }
 
 /** The sections with their counts filled in; a count of 0 isn't shown. */
@@ -138,7 +142,11 @@ export function navSectionsWithCounts(counts: NavCounts): NavSections {
   return NAV_SECTIONS.map((section) => ({
     ...section,
     items: section.items.map((item) =>
-      item.id === 'sites' && counts.sites ? { ...item, count: counts.sites } : item,
+      item.id === 'sites' && counts.sites
+        ? { ...item, count: counts.sites }
+        : item.id === 'incidents' && counts.incidents
+          ? { ...item, count: counts.incidents }
+          : item,
     ),
   }));
 }

@@ -251,7 +251,8 @@ describe('Next step by role (§21.4, §21.8, D-016, D-031, D-032)', () => {
     ['Viewer opens the incident read-only', mint, muvmi, 'Open INC-0142'],
     ['an acked DOWN opens the incident', tao, cando, 'Open INC-0140'],
     ['a PROBLEM opens the incident', tao, fuji, 'Open INC-0141'],
-    ['"Add root cause" reads "Open INC-…" until S07', tao, orca, 'Open INC-0139'],
+    ['a root cause to write → "Add root cause" (S07)', tao, orca, 'Add root cause'],
+    ['a Viewer can only open it', mint, orca, 'Open INC-0139'],
     ['a location warning → View checks', mint, eneos, 'View checks'],
     ['a mute → View site', tao, games, 'View site'],
   ])('%s', (_name, v, s, expected) => {
