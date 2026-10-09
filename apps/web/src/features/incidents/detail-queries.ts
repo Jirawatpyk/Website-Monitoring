@@ -18,7 +18,6 @@ import { SCREENSHOT_BUCKET } from '@/server/verifier/jobs';
 import {
   durationMinutes,
   resolveGate,
-  rootCauseLabel,
   timelineOf,
   type EventRow,
   type Gate,
