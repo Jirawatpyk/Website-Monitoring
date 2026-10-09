@@ -1,4 +1,11 @@
 import 'server-only';
 
 export { getIncidentForAck } from './queries';
-export { acknowledgeIncident, undoAcknowledge } from './actions';
+export {
+  acknowledgeIncident,
+  addNote,
+  resolveIncident,
+  saveRootCause,
+  undoAcknowledge,
+  undoResolve,
+} from './actions';
