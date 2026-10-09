@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   toast,
   Badge,
@@ -11,35 +11,23 @@ import {
   DropdownMenu,
   IconButton,
   PageHeader,
-  Table,
-  TBody,
-  Td,
-  Th,
-  THead,
-  Tr,
   type MenuItem,
 } from '@jirawatpyk/aura-react';
 import {
-  IconBan,
-  IconBell,
   IconCheck,
-  IconCircleAlert,
   IconCircleCheck,
   IconClock,
   IconCopy,
   IconEllipsis,
   IconExternalLink,
-  IconEye,
   IconImage,
   IconLock,
   IconPencil,
   IconRotateCcw,
-  IconTriangleAlert,
 } from '@jirawatpyk/aura-react/icons';
 import {
   formatDay,
   formatDuration,
-  formatDurationSeconds,
   formatIncidentId,
   formatTier,
   formatTime,
@@ -51,9 +39,8 @@ import { useAckToast } from '@/components/use-ack-toast';
 import { useLiveRefresh } from '@/components/use-live-refresh';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge, undoResolve } from '../actions';
-import { GLYPH_LEGEND, GLYPHS } from '@/components/site-cells';
-import type { CheckCell, IncidentDetail } from '../detail-queries';
-import type { TimelineItem } from '../model';
+import type { IncidentDetail } from '../detail-queries';
+import type { IncidentSections } from './incident-sections';
 import { AckPanel } from './ack-panel';
 import {
   AddNoteDialog,
@@ -64,51 +51,22 @@ import {
   type RootCauseValue,
 } from './incident-dialogs';
 
-const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: string }> = {
-  failed: { icon: <IconCircleAlert />, tone: 'text-fg-danger' },
-  down: { icon: <IconBan />, tone: 'text-fg-danger' },
-  problem: { icon: <IconTriangleAlert />, tone: 'text-fg-warning' },
-  alert: { icon: <IconBell />, tone: 'text-fg-secondary' },
-  ack: { icon: <IconCheck />, tone: 'text-fg-primary' },
-  evidence: { icon: <IconImage />, tone: 'text-fg-secondary' },
-  recovered: { icon: <IconEye />, tone: 'text-fg-positive' },
-  ok: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
-  note: { icon: <IconPencil />, tone: 'text-fg-secondary' },
-  root_cause: { icon: <IconPencil />, tone: 'text-fg-warning' },
-  resolved: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
-  undone: { icon: <IconRotateCcw />, tone: 'text-fg-secondary' },
-};
-
 const LIVE = ['incidents'] as const;
-/** Lines a phone shows before "Show all" (a long flapping incident has hundreds). */
+/** Lines a phone shows before "Show all" (a long flapping incident has hundreds); the CSS above hides from 21. */
 const PHONE_LINES = 20;
 
-function Timeline({ items, newestFirst }: { items: TimelineItem[]; newestFirst: boolean }) {
-  const [all, setAll] = useState(!newestFirst);
-  const ordered = newestFirst ? [...items].reverse() : items;
-  const shown = all ? ordered : ordered.slice(0, PHONE_LINES);
+/**
+ * The phone's timeline, newest first, shows the latest `PHONE_LINES` until "Show all": the lines come
+ * from the server (`TimelineLines`), this part only hides the rest.
+ */
+function ShowAllLines({ count, children }: { count: number; children: React.ReactNode }) {
+  const [all, setAll] = useState(false);
   return (
     <>
-      <ol className="m-0 flex list-none flex-col p-0">
-        {shown.map((t, n) => (
-          <li
-            key={`${t.at}-${n}`}
-            className="flex gap-3 border-b border-border-subtle py-2.5 last:border-b-0"
-          >
-            <span className="w-16 shrink-0 pt-px font-mono text-xs text-fg-secondary">{t.time}</span>
-            <span className={`flex shrink-0 pt-0.5 [&_svg]:size-4 ${KIND_ICON[t.kind].tone}`} aria-hidden>
-              {KIND_ICON[t.kind].icon}
-            </span>
-            <span className="flex min-w-0 flex-col leading-snug">
-              <span className="text-sm font-medium">{t.title}</span>
-              {t.detail && <span className="text-sm break-words text-fg-secondary">{t.detail}</span>}
-            </span>
-          </li>
-        ))}
-      </ol>
-      {!all && ordered.length > PHONE_LINES && (
+      <div className={all ? undefined : '[&_li:nth-child(n+21)]:hidden'}>{children}</div>
+      {!all && count > PHONE_LINES && (
         <Button variant="secondary" fullWidth className="mt-3" onClick={() => setAll(true)}>
-          {`Show all ${ordered.length}`}
+          {`Show all ${count}`}
         </Button>
       )}
     </>
@@ -117,9 +75,10 @@ function Timeline({ items, newestFirst }: { items: TimelineItem[]; newestFirst: 
 
 export interface IncidentDetailViewProps {
   detail: IncidentDetail;
+  /** The display-only parts, drawn on the server (`incidentSections`). */
+  sections: IncidentSections;
   viewerName: string;
   viewerEmail: string;
-  nowIso: string;
 }
 
 /**
@@ -127,8 +86,12 @@ export interface IncidentDetailViewProps {
  * D-033. One page at the incident URL (D-016): the phone keeps MobileAck's acknowledge parts while the
  * viewer can acknowledge. Escalation, client update and review cards join with S08 / S11 / S22.
  */
-export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso }: IncidentDetailViewProps) {
-  const now = useMemo(() => new Date(nowIso), [nowIso]);
+export function IncidentDetailView({
+  detail: d,
+  sections,
+  viewerName,
+  viewerEmail,
+}: IncidentDetailViewProps) {
   const v = d.view;
   // Someone else's ack, a recovery, a resolve: on screen without a reload (PRD §9).
   useLiveRefresh(LIVE);
@@ -308,16 +271,16 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
 
       {/* ── desktop and tablets (Incident) ── */}
       <div className="hidden flex-col gap-6 md:flex">
-        <FactsStrip detail={d} now={now} />
+        {sections.facts}
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*88)]">
           <div className="flex min-w-0 flex-col gap-6">
-            <EvidenceCard detail={d} onOpenShot={() => setShotOpen(true)} />
+            <EvidenceCard detail={d} table={sections.evidenceTable} onOpenShot={() => setShotOpen(true)} />
             <Card
               title="Timeline"
               headingLevel={2}
               description="All times UTC+7 · every event is in the audit log"
             >
-              <Timeline items={d.timeline} newestFirst={false} />
+              {sections.timelineDesktop}
             </Card>
           </div>
           <div className="flex flex-col gap-6">
@@ -359,7 +322,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
         {d.resolved && (
           <ResolvedCard detail={d} headingRef={resolvedPhone} onUndone={() => setFocusResolve(true)} />
         )}
-        <LatestRoundCard detail={d} />
+        {sections.latestRound}
         {resolveCard(null, false)}
         {v.ack.kind === 'read-only' && (
           <NoAccess title={v.ack.title} description={v.ack.description} people={v.ack.people} />
@@ -409,7 +372,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
           }
         >
           <Card title="Timeline" headingLevel={2} description="Newest first · UTC+7">
-            <Timeline items={d.timeline} newestFirst />
+            <ShowAllLines count={d.timeline.length}>{sections.timelinePhone}</ShowAllLines>
           </Card>
           <p className="m-0 text-xs text-fg-secondary">
             Every event is also in the audit log. Evidence screenshots open on desktop.
@@ -471,89 +434,19 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
   );
 }
 
-function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {
-  const confirmedAt = new Date(d.detectedAt);
-  const facts = [
-    { label: 'STARTED', value: formatTimeWithSeconds(new Date(d.startedAt)), caption: 'First failed check' },
-    {
-      label: d.severity === 'down' ? 'CONFIRMED DOWN' : 'DETECTED',
-      value: formatTimeWithSeconds(confirmedAt),
-      caption: `MTTD ${formatDurationSeconds(d.detectSeconds)}`,
-    },
-    {
-      label: 'DURATION',
-      value: formatDuration(d.durationMinutes),
-      caption: d.recoveredAt ? `Recovered ${formatTime(new Date(d.recoveredAt))}` : 'Still down',
-      danger: !d.recoveredAt,
-    },
-    {
-      label: 'OWNER',
-      value: d.owner ?? 'No owner set',
-      caption:
-        [d.backup ? `Backup ${d.backup}` : null, d.am ? `AM ${d.am}` : null].filter(Boolean).join(' · ') ||
-        ' ',
-    },
-    {
-      label: 'ACKNOWLEDGED',
-      value: d.acked ? d.acked.by : '—',
-      caption: d.acked
-        ? `${formatTimeWithSeconds(new Date(d.acked.at))} · ${formatDuration(
-            Math.max(1, Math.round((Date.parse(d.acked.at) - confirmedAt.getTime()) / 60_000)),
-          )} after ${d.severity === 'down' ? 'confirmed down' : 'detected'}`
-        : d.recoveredAt || d.resolvedAt
-          ? 'Not acknowledged'
-          : `${formatDuration(Math.max(1, Math.round((now.getTime() - confirmedAt.getTime()) / 60_000)))} since ${
-              d.severity === 'down' ? 'confirmed down' : 'detected'
-            }`,
-    },
-  ];
-  return (
-    <dl className="aura-card m-0 grid grid-cols-2 gap-4 p-aura-5 lg:grid-cols-5">
-      {facts.map((f) => (
-        <div key={f.label} className="flex min-w-0 flex-col gap-0.5">
-          <dt className="font-mono text-xs text-fg-tertiary">{f.label}</dt>
-          <dd className={`m-0 text-lg font-semibold tabular-nums ${f.danger ? 'text-fg-danger' : ''}`}>
-            {f.value}
-          </dd>
-          <dd className="m-0 text-xs text-fg-secondary">{f.caption}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function EvidenceCard({ detail: d, onOpenShot }: { detail: IncidentDetail; onOpenShot: () => void }) {
-  const first = new Date(d.startedAt);
-  const recheck = new Date(d.detectedAt);
+function EvidenceCard({
+  detail: d,
+  table,
+  onOpenShot,
+}: {
+  detail: IncidentDetail;
+  /** `EvidenceTable`, drawn on the server. */
+  table: React.ReactNode;
+  onOpenShot: () => void;
+}) {
   return (
     <Card title="Evidence by location" headingLevel={2}>
-      {d.locations.length === 0 ? (
-        <p className="m-0 text-sm text-fg-secondary">No checks found around the start.</p>
-      ) : (
-        <Table aria-label="Evidence by location">
-          <THead>
-            <Tr>
-              <Th>Location</Th>
-              <Th>{`First check · ${formatTimeWithSeconds(first)}`}</Th>
-              <Th>{`Recheck · ${formatTimeWithSeconds(recheck)}`}</Th>
-              <Th>Latest</Th>
-            </Tr>
-          </THead>
-          <TBody>
-            {d.locations.map((l) => (
-              <Tr key={l.location}>
-                <Td className="font-medium">{l.location}</Td>
-                {[l.first, l.recheck, l.latest].map((c, n) => (
-                  <Td key={n}>
-                    <CheckText cell={c} location={l.location} />
-                  </Td>
-                ))}
-              </Tr>
-            ))}
-          </TBody>
-        </Table>
-      )}
-      {d.locations.length > 0 && <GlyphLegend />}
+      {table}
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border-subtle pt-4">
         {d.evidence ? (
           <>
@@ -575,58 +468,6 @@ function EvidenceCard({ detail: d, onOpenShot }: { detail: IncidentDetail; onOpe
           </span>
         )}
       </div>
-    </Card>
-  );
-}
-
-/** A check in words beside its §11 glyph (colour never alone), as Sites and Site detail draw them. */
-function CheckText({ cell, location }: { cell: CheckCell | null; location: string }) {
-  if (!cell) return <span className="text-fg-tertiary">—</span>;
-  const g = GLYPHS[cell.glyph];
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={`flex [&_svg]:size-4 ${g.tone}`} role="img" aria-label={`${location}: ${g.label}`}>
-        {g.icon}
-      </span>
-      <span>{cell.text}</span>
-    </span>
-  );
-}
-
-function GlyphLegend() {
-  return (
-    <ul className="m-0 mt-3 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-fg-secondary">
-      {GLYPH_LEGEND.filter((k) => k !== 'slow' && k !== 'none').map((k) => (
-        <li key={k} className="flex items-center gap-1">
-          <span className={`flex [&_svg]:size-3.5 ${GLYPHS[k].tone}`} aria-hidden>
-            {GLYPHS[k].icon}
-          </span>
-          {GLYPHS[k].label}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
-  const latest = d.locations.filter((l) => l.latest);
-  if (!latest.length) return null;
-  const fails = latest.filter((l) => l.latest!.glyph !== 'pass').length;
-  return (
-    <Card
-      title="Latest round"
-      headingLevel={2}
-      description={fails ? `${fails}/${latest.length} failing` : `${latest.length}/${latest.length} pass`}
-    >
-      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-        {latest.map((l) => (
-          <li key={l.location} className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium">{l.location}</span>
-            <CheckText cell={l.latest} location={l.location} />
-          </li>
-        ))}
-      </ul>
-      <GlyphLegend />
     </Card>
   );
 }

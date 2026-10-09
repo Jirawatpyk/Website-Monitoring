@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Container } from '@jirawatpyk/aura-react';
 import { formatIncidentId } from '@dxt/shared';
-import { IncidentDetailView } from '@/features/incidents';
+import { IncidentDetailView, incidentSections } from '@/features/incidents';
 import { getIncident } from '@/features/incidents/server';
 import { getAccess } from '@/lib/auth/session';
 
@@ -33,9 +33,9 @@ export default async function IncidentPage({ params }: { params: Promise<{ incid
     <Container>
       <IncidentDetailView
         detail={detail}
+        sections={incidentSections(detail, now)}
         viewerName={access.profile.displayName}
         viewerEmail={access.profile.email}
-        nowIso={now.toISOString()}
       />
     </Container>
   );

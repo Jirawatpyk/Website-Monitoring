@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IncidentDetail } from '../detail-queries';
 import { resolveGate, timelineOf, type EventRow } from '../model';
 import { IncidentDetailView } from './incident-detail';
+import { incidentSections } from './incident-sections';
 
 const m = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -106,7 +107,14 @@ const settled = [
   { type: 'ok_two_rounds', at: at('24T22:23:00'), actor_id: null, payload: { state: 'needs_root_cause' } },
 ];
 const show = (d: IncidentDetail) =>
-  render(<IncidentDetailView detail={d} viewerName="Tao" viewerEmail="tao@example.test" nowIso={NOW} />);
+  render(
+    <IncidentDetailView
+      detail={d}
+      sections={incidentSections(d, new Date(NOW))}
+      viewerName="Tao"
+      viewerEmail="tao@example.test"
+    />,
+  );
 const resolveButton = () => screen.getAllByRole('button', { name: /^Resolve…$/ })[0]!;
 
 beforeEach(() => vi.clearAllMocks());
@@ -238,7 +246,12 @@ describe('Incident page — acknowledge on desktop', () => {
       },
     };
     rerender(
-      <IncidentDetailView detail={acked} viewerName="Tao" viewerEmail="tao@example.test" nowIso={NOW} />,
+      <IncidentDetailView
+        detail={acked}
+        sections={incidentSections(acked, new Date(NOW))}
+        viewerName="Tao"
+        viewerEmail="tao@example.test"
+      />,
     );
     expect(screen.getAllByRole('button', { name: 'Add note' })[0]).toHaveFocus();
   });
