@@ -50,6 +50,10 @@ insert into public.notifications (incident_id, user_id, channel, template, threa
 values ((select id from inc where name = 'a'), (select id from ids where name = 'ploy'), 'email',
         'acknowledged', (select id from inc where name = 'a')::text, 'sent');
 update public.notifications set status = 'sent', sent_at = now() where template = 'down';
+-- Nok's email never went out (failed): he isn't told it's resolved (EmailAlert).
+insert into public.notifications (incident_id, user_id, channel, template, thread_key, status)
+values ((select id from inc where name = 'a'), (select id from ids where name = 'nok'), 'email',
+        'down', (select id from inc where name = 'a')::text, 'failed');
 
 -- ── Who may act ──────────────────────────────────────────────────────────
 select tests.as_anon();
@@ -112,7 +116,8 @@ select results_eq(
   'each note is its own NOTE reply in the thread, not held, no email (§16.5)'
 );
 select is(
-  (select count(*)::int from public.audit_log where action = 'incident.note'),
+  (select count(*)::int from public.audit_log where action = 'incident.note'
+     and entity_id = (select id from inc where name = 'a')),
   2, 'each note writes an audit row'
 );
 select tests.authenticate_as((select id from ids where name = 'admin'));
@@ -213,7 +218,7 @@ select results_eq(
       ('email', (select id from ids where name = 'ploy'), now() + interval '10 seconds', 'Arm'),
       ('google_chat', null::uuid, now() + interval '10 seconds', 'Arm')) v
     order by 1, 2$$,
-  'RESOLVED held 10 s in the thread and to everyone already emailed'
+  'RESOLVED held 10 s in the thread and to everyone really emailed (not Nok, whose email failed)'
 );
 select is(
   (select status::text || '/' || error from public.notifications where template = 'flap_summary'),

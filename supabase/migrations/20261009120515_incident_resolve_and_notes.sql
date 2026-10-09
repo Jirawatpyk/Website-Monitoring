@@ -249,14 +249,15 @@ begin
   )
   on conflict do nothing;
 
-  -- Everyone who got an email about this incident (PRD §7: everyone who got the DOWN email).
+  -- Everyone really emailed about this incident (PRD §7: everyone who got the DOWN email; EmailAlert:
+  -- someone whose email never went out isn't told).
   insert into public.notifications
     (incident_id, user_id, channel, template, thread_key, context, hold_until)
   select distinct p_incident_id, n.user_id, 'email'::public.notification_channel, 'resolved',
          p_incident_id::text, v_context, v_hold
   from public.notifications n
   join public.profiles p on p.id = n.user_id and p.is_active
-  where n.incident_id = p_incident_id and n.channel = 'email' and n.status <> 'cancelled'
+  where n.incident_id = p_incident_id and n.channel = 'email' and n.status = 'sent'
   on conflict do nothing;
 
   insert into public.incident_events (incident_id, type, actor_id, payload, at)
