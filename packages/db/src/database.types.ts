@@ -80,6 +80,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"check_rollups": {
+                  Row: {
+                    "blocked": number,"bucket": Database["public"]['Enums']["rollup_bucket"],"bucket_start": string,"checks": number,"created_at": string,"hard_fails": number,"id": string,"location": string | null,"monitor_id": string,"p50_ms": number | null,"p95_ms": number | null,"updated_at": string
+                  }
+                  Insert: {
+                    "blocked": number,"bucket": Database["public"]['Enums']["rollup_bucket"],"bucket_start": string,"checks": number,"created_at"?: string,"hard_fails": number,"id"?: string,"location"?: string | null,"monitor_id": string,"p50_ms"?: number | null,"p95_ms"?: number | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "blocked"?: number,"bucket"?: Database["public"]['Enums']["rollup_bucket"],"bucket_start"?: string,"checks"?: number,"created_at"?: string,"hard_fails"?: number,"id"?: string,"location"?: string | null,"monitor_id"?: string,"p50_ms"?: number | null,"p95_ms"?: number | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "check_rollups_location_fkey"
+      columns: ["location"]
+isOneToOne: false
+      referencedRelation: "probe_locations"
+      referencedColumns: ["code"]
+    },{
+      foreignKeyName: "check_rollups_monitor_id_fkey"
+      columns: ["monitor_id"]
+isOneToOne: false
+      referencedRelation: "monitors"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"clients": {
                   Row: {
                     "am_user_id": string | null,"contact_email": string | null,"created_at": string,"id": string,"is_internal": boolean,"language": string,"name": string,"updated_at": string
@@ -614,6 +639,16 @@ isOneToOne: false
               "checked_at": string,"error": string,"location": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms": number,"site_id": string
             }[]
                            },
+"site_list_response_24h":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "p50_ms": number,"site_id": string
+            }[]
+                           },
+"site_response_series":
+{ Args: { "p_bucket": string,"p_from": string,"p_site_id": string }; Returns: {
+              "bucket_start": string,"checks": number,"hard_fails": number,"location": string,"p50_ms": number,"p95_ms": number
+            }[]
+                           },
 "undo_ack":
 { Args: { "p_incident_id": string }; Returns: undefined
                            },
@@ -625,7 +660,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "app_role": "admin"|"responder"|"stakeholder"|"viewer"|"client","check_outcome": "pass"|"fail"|"blocked","incident_state": "unacked"|"escalated"|"acknowledged"|"monitoring"|"needs_root_cause"|"resolved"|"in_review"|"closed","incident_trigger": "hard_fail"|"blocked_unverified"|"slow"|"keyword"|"key_page"|"ssl"|"domain"|"redirect"|"regional"|"manual"|"tls_chain","monitor_type": "http"|"keyword"|"ssl"|"domain"|"browser","notification_channel": "google_chat"|"email"|"voice","notification_status": "queued"|"sent"|"failed"|"cancelled","severity": "problem"|"down","site_state": "ok"|"problem"|"down"|"maintenance"
+            "app_role": "admin"|"responder"|"stakeholder"|"viewer"|"client","check_outcome": "pass"|"fail"|"blocked","incident_state": "unacked"|"escalated"|"acknowledged"|"monitoring"|"needs_root_cause"|"resolved"|"in_review"|"closed","incident_trigger": "hard_fail"|"blocked_unverified"|"slow"|"keyword"|"key_page"|"ssl"|"domain"|"redirect"|"regional"|"manual"|"tls_chain","monitor_type": "http"|"keyword"|"ssl"|"domain"|"browser","notification_channel": "google_chat"|"email"|"voice","notification_status": "queued"|"sent"|"failed"|"cancelled","rollup_bucket": "hour"|"day","severity": "problem"|"down","site_state": "ok"|"problem"|"down"|"maintenance"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -745,7 +780,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "app_role": ["admin", "responder", "stakeholder", "viewer", "client"],"check_outcome": ["pass", "fail", "blocked"],"incident_state": ["unacked", "escalated", "acknowledged", "monitoring", "needs_root_cause", "resolved", "in_review", "closed"],"incident_trigger": ["hard_fail", "blocked_unverified", "slow", "keyword", "key_page", "ssl", "domain", "redirect", "regional", "manual", "tls_chain"],"monitor_type": ["http", "keyword", "ssl", "domain", "browser"],"notification_channel": ["google_chat", "email", "voice"],"notification_status": ["queued", "sent", "failed", "cancelled"],"severity": ["problem", "down"],"site_state": ["ok", "problem", "down", "maintenance"]
+            "app_role": ["admin", "responder", "stakeholder", "viewer", "client"],"check_outcome": ["pass", "fail", "blocked"],"incident_state": ["unacked", "escalated", "acknowledged", "monitoring", "needs_root_cause", "resolved", "in_review", "closed"],"incident_trigger": ["hard_fail", "blocked_unverified", "slow", "keyword", "key_page", "ssl", "domain", "redirect", "regional", "manual", "tls_chain"],"monitor_type": ["http", "keyword", "ssl", "domain", "browser"],"notification_channel": ["google_chat", "email", "voice"],"notification_status": ["queued", "sent", "failed", "cancelled"],"rollup_bucket": ["hour", "day"],"severity": ["problem", "down"],"site_state": ["ok", "problem", "down", "maintenance"]
           }
         }
 } as const
