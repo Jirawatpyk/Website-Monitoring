@@ -32,15 +32,15 @@ describe('Evidence by location (Incident board)', () => {
     expect(locationsOf(around, latest, '2026-09-25T09:48:41+07:00', 30_000)).toEqual([
       {
         location: 'BKK',
-        first: { text: 'Timeout > 30 s', pass: false },
-        recheck: { text: 'Timeout > 30 s', pass: false },
-        latest: { text: 'Blocked by bot protection', pass: false },
+        first: { text: 'Timeout > 30 s', glyph: 'fail' },
+        recheck: { text: 'Timeout > 30 s', glyph: 'fail' },
+        latest: { text: 'Blocked by bot protection', glyph: 'blocked' },
       },
       {
         location: 'SIN',
-        first: { text: 'HTTP 504 · 12.4 s', pass: false },
-        recheck: { text: 'HTTP 504 · 11.9 s', pass: false },
-        latest: { text: '200 · 412 ms', pass: true },
+        first: { text: 'HTTP 504 · 12.4 s', glyph: 'fail' },
+        recheck: { text: 'HTTP 504 · 11.9 s', glyph: 'fail' },
+        latest: { text: '200 · 412 ms', glyph: 'pass' },
       },
     ]);
   });
@@ -48,7 +48,7 @@ describe('Evidence by location (Incident board)', () => {
   it('a location with only one check has no separate recheck; none at all is left out', () => {
     const rows = locationsOf([check('TYO', '09:48:41')], [], '2026-09-25T09:48:41+07:00', 10_000);
     expect(rows).toEqual([
-      { location: 'TYO', first: { text: 'Timeout > 10 s', pass: false }, recheck: null, latest: null },
+      { location: 'TYO', first: { text: 'Timeout > 10 s', glyph: 'fail' }, recheck: null, latest: null },
     ]);
   });
 });

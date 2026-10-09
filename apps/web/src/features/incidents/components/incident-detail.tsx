@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  toast,
   Badge,
   Breadcrumb,
   Button,
@@ -47,9 +48,11 @@ import {
 import { SeverityBadge, WorkflowBadge } from '@/components/status-badges';
 import { NoAccess } from '@/components/states';
 import { useAckToast } from '@/components/use-ack-toast';
+import { useLiveRefresh } from '@/components/use-live-refresh';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge, undoResolve } from '../actions';
-import type { IncidentDetail } from '../detail-queries';
+import { GLYPH_LEGEND, GLYPHS } from '@/components/site-cells';
+import type { CheckCell, IncidentDetail } from '../detail-queries';
 import type { TimelineItem } from '../model';
 import { AckPanel } from './ack-panel';
 import {
@@ -76,23 +79,39 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   undone: { icon: <IconRotateCcw />, tone: 'text-fg-secondary' },
 };
 
+const LIVE = ['incidents'] as const;
+/** Lines a phone shows before "Show all" (a long flapping incident has hundreds). */
+const PHONE_LINES = 20;
+
 function Timeline({ items, newestFirst }: { items: TimelineItem[]; newestFirst: boolean }) {
-  const shown = newestFirst ? [...items].reverse() : items;
+  const [all, setAll] = useState(!newestFirst);
+  const ordered = newestFirst ? [...items].reverse() : items;
+  const shown = all ? ordered : ordered.slice(0, PHONE_LINES);
   return (
-    <ol className="m-0 flex list-none flex-col p-0">
-      {shown.map((t, n) => (
-        <li key={`${t.at}-${n}`} className="flex gap-3 border-b border-border-subtle py-2.5 last:border-b-0">
-          <span className="w-16 shrink-0 pt-px font-mono text-xs text-fg-secondary">{t.time}</span>
-          <span className={`flex shrink-0 pt-0.5 [&_svg]:size-4 ${KIND_ICON[t.kind].tone}`} aria-hidden>
-            {KIND_ICON[t.kind].icon}
-          </span>
-          <span className="flex min-w-0 flex-col leading-snug">
-            <span className="text-sm font-medium">{t.title}</span>
-            {t.detail && <span className="text-sm break-words text-fg-secondary">{t.detail}</span>}
-          </span>
-        </li>
-      ))}
-    </ol>
+    <>
+      <ol className="m-0 flex list-none flex-col p-0">
+        {shown.map((t, n) => (
+          <li
+            key={`${t.at}-${n}`}
+            className="flex gap-3 border-b border-border-subtle py-2.5 last:border-b-0"
+          >
+            <span className="w-16 shrink-0 pt-px font-mono text-xs text-fg-secondary">{t.time}</span>
+            <span className={`flex shrink-0 pt-0.5 [&_svg]:size-4 ${KIND_ICON[t.kind].tone}`} aria-hidden>
+              {KIND_ICON[t.kind].icon}
+            </span>
+            <span className="flex min-w-0 flex-col leading-snug">
+              <span className="text-sm font-medium">{t.title}</span>
+              {t.detail && <span className="text-sm break-words text-fg-secondary">{t.detail}</span>}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {!all && ordered.length > PHONE_LINES && (
+        <Button variant="secondary" fullWidth className="mt-3" onClick={() => setAll(true)}>
+          {`Show all ${ordered.length}`}
+        </Button>
+      )}
+    </>
   );
 }
 
@@ -111,6 +130,8 @@ export interface IncidentDetailViewProps {
 export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso }: IncidentDetailViewProps) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const v = d.view;
+  // Someone else's ack, a recovery, a resolve: on screen without a reload (PRD §9).
+  useLiveRefresh(LIVE);
   const incidentLabel = formatIncidentId(Number(v.id.replace('INC-', '')));
   const [noteOpen, setNoteOpen] = useState(false);
   const [rcOpen, setRcOpen] = useState(false);
@@ -141,6 +162,16 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
   const resolved = d.state === 'resolved' || d.state === 'in_review' || d.state === 'closed';
   const stillDown = !d.recoveredAt;
   const { acked, acknowledge } = useAckToast({ ack: acknowledgeIncident, undo: undoAcknowledge });
+  const addNoteDesktop = useRef<HTMLButtonElement>(null);
+  const ackKind = useRef(v.ack.kind);
+  useEffect(() => {
+    const before = ackKind.current;
+    ackKind.current = v.ack.kind;
+    // a hidden button (the phone layout) takes no focus; AckPanel moves it there
+    if (before === 'can-ack' && v.ack.kind === 'acked') {
+      addNoteDesktop.current?.focus();
+    }
+  }, [v.ack.kind]);
   // After an Undo of a resolve the page re-renders unresolved: focus Resolve once it is back (WCAG 2.4.3).
   const [focusResolve, setFocusResolve] = useState(false);
   useEffect(() => {
@@ -198,7 +229,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
       ? v.title
       : `${d.siteName} ${d.severity === 'down' ? 'recovered' : 'is back to normal'}`;
 
-  const resolveCard = (ref: React.RefObject<HTMLButtonElement | null>, primary: boolean) => (
+  const resolveCard = (ref: React.RefObject<HTMLButtonElement | null> | null, primary: boolean) => (
     <ResolveCard
       primary={primary}
       detail={d}
@@ -219,7 +250,10 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
       onSelect: () => {
         void navigator.clipboard
           ?.writeText(window.location.href.replace(/#.*$/, ''))
-          .then(() => setCopied(true));
+          .then(() => setCopied(true))
+          .catch(() =>
+            toast.error('Couldn’t copy the link', { description: 'Copy it from the address bar.' }),
+          );
       },
     },
   ];
@@ -246,8 +280,13 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
         }
         actions={
           <span className="hidden flex-wrap items-center gap-2 md:flex">
-            {d.canAct && !resolved && (
-              <Button variant="ghost" icon={<IconPencil />} onClick={() => setNoteOpen(true)}>
+            {d.canAct && (
+              <Button
+                ref={addNoteDesktop}
+                variant="ghost"
+                icon={<IconPencil />}
+                onClick={() => setNoteOpen(true)}
+              >
                 Add note
               </Button>
             )}
@@ -321,7 +360,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
           <ResolvedCard detail={d} headingRef={resolvedPhone} onUndone={() => setFocusResolve(true)} />
         )}
         <LatestRoundCard detail={d} />
-        {resolveCard(resolvePhone, false)}
+        {resolveCard(null, false)}
         {v.ack.kind === 'read-only' && (
           <NoAccess title={v.ack.title} description={v.ack.description} people={v.ack.people} />
         )}
@@ -330,13 +369,20 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
           ack={v.ack}
           viewerName={viewerName}
           viewerEmail={viewerEmail}
-          siteUrl={v.siteUrl}
+          siteUrl={v.ack.kind === 'can-ack' ? v.siteUrl : null}
           barActions={
-            d.canAct && !resolved ? (
+            d.canAct && resolved ? (
+              <Button variant="secondary" icon={<IconPencil />} fullWidth onClick={() => setNoteOpen(true)}>
+                Add note
+              </Button>
+            ) : d.canAct ? (
               <span className="flex flex-col gap-1.5">
-                {d.gate.lockedReason && (
-                  <span className="text-center text-xs text-fg-secondary">{d.gate.lockedReason}</span>
-                )}
+                <span id="phone-resolve-why" className="text-center text-xs text-fg-secondary">
+                  {d.gate.lockedReason ??
+                    (d.gate.ok
+                      ? 'All 3 conditions met · Resolve is a manual step'
+                      : 'Write the root cause in Resolve')}
+                </span>
                 <span className="flex gap-2">
                   <Button
                     variant="secondary"
@@ -347,10 +393,12 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
                     Add note
                   </Button>
                   <Button
+                    ref={resolvePhone}
                     variant="primary"
                     icon={<IconCircleCheck />}
                     fullWidth
                     disabled={!d.gate.canOpenDialog}
+                    aria-describedby={d.gate.lockedReason ? 'phone-resolve-why' : undefined}
                     onClick={openResolve}
                   >
                     Resolve
@@ -450,9 +498,11 @@ function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {
         ? `${formatTimeWithSeconds(new Date(d.acked.at))} · ${formatDuration(
             Math.max(1, Math.round((Date.parse(d.acked.at) - confirmedAt.getTime()) / 60_000)),
           )} after ${d.severity === 'down' ? 'confirmed down' : 'detected'}`
-        : `${formatDuration(Math.max(1, Math.round((now.getTime() - confirmedAt.getTime()) / 60_000)))} since ${
-            d.severity === 'down' ? 'confirmed down' : 'detected'
-          }`,
+        : d.recoveredAt || d.resolvedAt
+          ? 'Not acknowledged'
+          : `${formatDuration(Math.max(1, Math.round((now.getTime() - confirmedAt.getTime()) / 60_000)))} since ${
+              d.severity === 'down' ? 'confirmed down' : 'detected'
+            }`,
     },
   ];
   return (
@@ -476,9 +526,7 @@ function EvidenceCard({ detail: d, onOpenShot }: { detail: IncidentDetail; onOpe
   return (
     <Card title="Evidence by location" headingLevel={2}>
       {d.locations.length === 0 ? (
-        <p className="m-0 text-sm text-fg-secondary">
-          No checks stored around the start — they are kept 90 days.
-        </p>
+        <p className="m-0 text-sm text-fg-secondary">No checks found around the start.</p>
       ) : (
         <Table aria-label="Evidence by location">
           <THead>
@@ -494,11 +542,8 @@ function EvidenceCard({ detail: d, onOpenShot }: { detail: IncidentDetail; onOpe
               <Tr key={l.location}>
                 <Td className="font-medium">{l.location}</Td>
                 {[l.first, l.recheck, l.latest].map((c, n) => (
-                  <Td
-                    key={n}
-                    className={c ? (c.pass ? 'text-fg-positive' : 'text-fg-danger') : 'text-fg-tertiary'}
-                  >
-                    {c?.text ?? '—'}
+                  <Td key={n}>
+                    <CheckText cell={c} location={l.location} />
                   </Td>
                 ))}
               </Tr>
@@ -506,6 +551,7 @@ function EvidenceCard({ detail: d, onOpenShot }: { detail: IncidentDetail; onOpe
           </TBody>
         </Table>
       )}
+      {d.locations.length > 0 && <GlyphLegend />}
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border-subtle pt-4">
         {d.evidence ? (
           <>
@@ -531,10 +577,39 @@ function EvidenceCard({ detail: d, onOpenShot }: { detail: IncidentDetail; onOpe
   );
 }
 
+/** A check in words beside its §11 glyph (colour never alone), as Sites and Site detail draw them. */
+function CheckText({ cell, location }: { cell: CheckCell | null; location: string }) {
+  if (!cell) return <span className="text-fg-tertiary">—</span>;
+  const g = GLYPHS[cell.glyph];
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`flex [&_svg]:size-4 ${g.tone}`} role="img" aria-label={`${location}: ${g.label}`}>
+        {g.icon}
+      </span>
+      <span>{cell.text}</span>
+    </span>
+  );
+}
+
+function GlyphLegend() {
+  return (
+    <ul className="m-0 mt-3 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-fg-secondary">
+      {GLYPH_LEGEND.filter((k) => k !== 'slow' && k !== 'none').map((k) => (
+        <li key={k} className="flex items-center gap-1">
+          <span className={`flex [&_svg]:size-3.5 ${GLYPHS[k].tone}`} aria-hidden>
+            {GLYPHS[k].icon}
+          </span>
+          {GLYPHS[k].label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
   const latest = d.locations.filter((l) => l.latest);
   if (!latest.length) return null;
-  const fails = latest.filter((l) => !l.latest!.pass).length;
+  const fails = latest.filter((l) => l.latest!.glyph !== 'pass').length;
   return (
     <Card
       title="Latest round"
@@ -545,10 +620,11 @@ function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
         {latest.map((l) => (
           <li key={l.location} className="flex items-center justify-between gap-3 text-sm">
             <span className="font-medium">{l.location}</span>
-            <span className={l.latest!.pass ? 'text-fg-positive' : 'text-fg-danger'}>{l.latest!.text}</span>
+            <CheckText cell={l.latest} location={l.location} />
           </li>
         ))}
       </ul>
+      <GlyphLegend />
     </Card>
   );
 }
@@ -620,7 +696,7 @@ function ResolveCard({
   resolved: boolean;
   onResolve: () => void;
   onRootCause: () => void;
-  resolveButton: React.RefObject<HTMLButtonElement | null>;
+  resolveButton: React.RefObject<HTMLButtonElement | null> | null;
 }) {
   const g = d.gate;
   return (
@@ -660,17 +736,25 @@ function ResolveCard({
         )}
         {d.canAct && !resolved && (
           <span className="flex flex-wrap gap-2">
+            {primary && (
+              <Button
+                ref={resolveButton ?? undefined}
+                variant={g.canOpenDialog && primary ? 'primary' : 'secondary'}
+                size="sm"
+                icon={g.canOpenDialog ? <IconCircleCheck /> : <IconLock />}
+                disabled={!g.canOpenDialog}
+                onClick={onResolve}
+              >
+                Resolve…
+              </Button>
+            )}
             <Button
-              ref={resolveButton}
-              variant={g.canOpenDialog && primary ? 'primary' : 'secondary'}
-              size="sm"
-              icon={g.canOpenDialog ? <IconCircleCheck /> : <IconLock />}
-              disabled={!g.canOpenDialog}
-              onClick={onResolve}
+              variant={primary ? 'ghost' : 'secondary'}
+              size={primary ? 'sm' : 'md'}
+              fullWidth={!primary}
+              icon={<IconPencil />}
+              onClick={onRootCause}
             >
-              Resolve…
-            </Button>
-            <Button variant="ghost" size="sm" icon={<IconPencil />} onClick={onRootCause}>
               {d.rootCause.category ? 'Edit root cause' : 'Write root cause'}
             </Button>
           </span>

@@ -1,8 +1,11 @@
 import 'server-only';
+import { cache } from 'react';
 import type { DbClient } from '@dxt/db';
 import { describeFailure } from '@dxt/notifier';
+import type { LocationGlyph } from '@/components/site-cells';
 import {
   CLOSED_INCIDENT_STATES_IN,
+  isTlsChainError,
   PROBE_LOCATIONS,
   TRIGGER_LABELS,
   UNDO_WINDOW_SEC,
@@ -44,7 +47,8 @@ export interface LocationEvidence {
 }
 export interface CheckCell {
   text: string;
-  pass: boolean;
+  /** The §11 legend glyph (D-029: a broken certificate chain is not a hard fail). */
+  glyph: LocationGlyph;
 }
 
 export interface IncidentDetail {
@@ -107,15 +111,15 @@ interface CheckRow {
 const cellOf = (c: CheckRow | undefined, timeoutMs: number): CheckCell | null => {
   if (!c) return null;
   if (c.outcome === 'pass') {
-    return { text: `${c.status_code ?? 200} · ${c.response_ms ?? '—'} ms`, pass: true };
+    return { text: `${c.status_code ?? 200} · ${c.response_ms ?? '—'} ms`, glyph: 'pass' };
   }
-  if (c.outcome === 'blocked') return { text: 'Blocked by bot protection', pass: false };
+  if (c.outcome === 'blocked') return { text: 'Blocked by bot protection', glyph: 'blocked' };
   const what = describeFailure(
     { location: c.location as ProbeLocation, statusCode: c.status_code, error: c.error },
     timeoutMs,
   );
   const secs = c.response_ms !== null && c.status_code ? ` · ${(c.response_ms / 1000).toFixed(1)} s` : '';
-  return { text: `${what}${secs}`, pass: false };
+  return { text: `${what}${secs}`, glyph: isTlsChainError(c.error) ? 'chain' : 'fail' };
 };
 
 /**
@@ -177,12 +181,15 @@ function resolvedOf(
 }
 
 /** The incident page (Incident / MIncident boards), read as the signed-in person. */
-export async function getIncident(incidentId: string, now = new Date()): Promise<IncidentDetail | null> {
+export const getIncident = cache(async function getIncident(
+  incidentId: string,
+  now = new Date(),
+): Promise<IncidentDetail | null> {
   if (!incidentIdSchema.safeParse(incidentId).success) return null;
   const access = await getAccess();
   if (access.status !== 'active') return null;
   return loadIncident(await createClient(), access.profile, incidentId, now, signScreenshot);
-}
+});
 
 /** A short-lived link to a verifier screenshot (private bucket, no storage policies: S03). */
 async function signScreenshot(path: string): Promise<string | null> {

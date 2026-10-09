@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   addNote: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: m.refresh }) }));
+vi.mock('@/components/use-live-refresh', () => ({ useLiveRefresh: () => true }));
 vi.mock('../actions', () => ({
   acknowledgeIncident: vi.fn(),
   undoAcknowledge: vi.fn(),
@@ -206,6 +207,38 @@ describe('Incident page — roles that can’t acknowledge (D-016)', () => {
     expect(screen.getByText('Your role can’t acknowledge (Viewer)')).toBeInTheDocument();
     expect(screen.getByText('Tao — owner')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
+  });
+});
+
+describe('Incident page — acknowledge on desktop', () => {
+  it('after the ack the header button goes: focus moves to Add note (WCAG 2.4.3)', () => {
+    const d = detail({ state: 'unacked', recoveredAt: null });
+    const unacked = {
+      ...d,
+      view: { ...d.view, state: 'unacked' as const, ack: { kind: 'can-ack' as const } },
+    };
+    const { rerender } = show(unacked);
+    const acked = {
+      ...unacked,
+      state: 'acknowledged' as const,
+      view: {
+        ...unacked.view,
+        state: 'acknowledged' as const,
+        ack: {
+          kind: 'acked' as const,
+          byName: 'Tao',
+          byViewer: true,
+          postsAt: NOW,
+          windowOpen: false,
+          notifies: true,
+          posted: null,
+        },
+      },
+    };
+    rerender(
+      <IncidentDetailView detail={acked} viewerName="Tao" viewerEmail="tao@example.test" nowIso={NOW} />,
+    );
+    expect(screen.getAllByRole('button', { name: 'Add note' })[0]).toHaveFocus();
   });
 });
 
