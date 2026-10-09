@@ -56,6 +56,26 @@ export function responseKpis(incidents: readonly MetricIncident[], from: Date, t
   return { downCount: down.length, enough, mttaSeconds: mean(acks), mttdSeconds: mean(detections) };
 }
 
+/** One incident's duration, as MTTR needs it. */
+export interface DurationRow {
+  severity: 'down' | 'problem';
+  /** Minutes from its first failed check to recovered; null while still open. */
+  minutes: number | null;
+}
+
+/**
+ * MTTR · DOWN only · median (SiteDetail, Incidents; D-033): the median duration of the recovered DOWN
+ * incidents, null with none. A median, as both boards caption it — unlike MTTA / MTTD (means, D-032).
+ */
+export function mttrMinutes(rows: readonly DurationRow[]): number | null {
+  const d = rows
+    .flatMap((r) => (r.severity === 'down' && r.minutes !== null ? [r.minutes] : []))
+    .sort((a, b) => a - b);
+  if (d.length === 0) return null;
+  const mid = Math.floor(d.length / 2);
+  return d.length % 2 ? d[mid]! : Math.round((d[mid - 1]! + d[mid]!) / 2);
+}
+
 /**
  * "vs last 30d" (Main3): the change from the previous window to this one, shown only when both have
  * a value (§21.3 hides it until there are enough incidents). Lower is better for both KPIs.

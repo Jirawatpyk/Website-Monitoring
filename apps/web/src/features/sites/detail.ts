@@ -1,3 +1,4 @@
+import { mttrMinutes } from '@dxt/engine';
 /**
  * Site detail (spec §20 → `/sites/[siteId]`, boards SiteDetail / MSite): the pure rules the page uses —
  * ranges, how range stats are read from the response series, incident summaries and the client
@@ -123,17 +124,6 @@ export interface IncidentSummaryRow {
   startedAt: Date;
   /** Minutes it was down or had a problem (its drops), null while still open. */
   minutes: number | null;
-}
-
-/** The median of the DOWN incidents' durations (MTTR · DOWN only · median); null with none recovered. */
-export function mttrMinutes(rows: readonly IncidentSummaryRow[]): number | null {
-  const d = rows
-    .filter((r) => r.severity === 'down' && r.minutes !== null)
-    .map((r) => r.minutes!)
-    .sort((a, b) => a - b);
-  if (d.length === 0) return null;
-  const mid = Math.floor(d.length / 2);
-  return d.length % 2 ? d[mid]! : Math.round((d[mid - 1]! + d[mid]!) / 2);
 }
 
 /**

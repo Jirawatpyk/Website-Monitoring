@@ -3,7 +3,7 @@
 -- S06-review guard on engine_relapse_incident.
 begin;
 \ir _helpers.psql
-select plan(47);
+select plan(65);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -25,7 +25,9 @@ insert into public.sites (id, client_id, name, tier, primary_owner_id, backup_ow
   ('00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000c1', 'Site B', 2,
    (select id from ids where name = 'arm'), (select id from ids where name = 'ploy')),
   ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000c1', 'Site C', 2,
-   null, null);
+   null, null),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000c1', 'Site D', 1,
+   (select id from ids where name = 'arm'), null);
 
 create temp table inc (name text primary key, id uuid) on commit drop;
 grant select on inc to anon, authenticated;
@@ -38,7 +40,10 @@ insert into inc values
      '{"cause":"Keyword missing"}', true)),
   ('c', public.engine_open_incident('00000000-0000-0000-0000-0000000000a3', null, 'hard_fail', 'down',
      now() - interval '30 minutes', now() - interval '29 minutes', now() - interval '29 minutes',
-     '{}', false));
+     '{}', false)),
+  ('d', public.engine_open_incident('00000000-0000-0000-0000-0000000000a4', null, 'hard_fail', 'down',
+     now() - interval '40 minutes', now() - interval '39 minutes', now() - interval '39 minutes',
+     '{}', true));
 
 -- Ploy (backup) also got an email about A, as an ack or fallback would have sent; a sent DOWN email.
 insert into public.notifications (incident_id, user_id, channel, template, thread_key, status)
@@ -50,12 +55,20 @@ update public.notifications set status = 'sent', sent_at = now() where template 
 select tests.as_anon();
 select throws_ok(format($$select public.add_incident_note(%L, 'hi')$$, (select id from inc where name = 'a')),
   '42501', null, 'anon can''t add a note');
+select throws_ok(format($$select public.save_root_cause(%L, 'hosting', 'x', null)$$, (select id from inc where name = 'a')),
+  '42501', null, 'anon can''t write the root cause');
+select throws_ok(format($$select public.resolve_incident(%L, 'hosting', 'x', null)$$, (select id from inc where name = 'a')),
+  '42501', null, 'anon can''t resolve');
+select throws_ok(format('select public.undo_resolve(%L)', (select id from inc where name = 'a')),
+  '42501', null, 'anon can''t undo a resolve');
 reset role;
 select tests.authenticate_as((select id from ids where name = 'mint'));
 select throws_ok(format($$select public.add_incident_note(%L, 'hi')$$, (select id from inc where name = 'a')),
   '42501', null, 'a Viewer can''t add a note');
 select throws_ok(format($$select public.save_root_cause(%L, 'hosting', 'x', null)$$, (select id from inc where name = 'a')),
   '42501', null, 'a Viewer can''t write the root cause');
+select throws_ok(format($$select public.resolve_incident(%L, 'hosting', 'x', null)$$, (select id from inc where name = 'a')),
+  '42501', null, 'a Viewer can''t resolve');
 reset role;
 select tests.authenticate_as((select id from ids where name = 'bua'));
 select throws_ok(format($$select public.add_incident_note(%L, 'hi')$$, (select id from inc where name = 'a')),
@@ -139,9 +152,23 @@ select throws_like(format($$select public.resolve_incident(%L, 'hosting', 'Host 
   '%2 OK rounds%', 'still down: OK for 2 rounds is not met');
 reset role;
 
--- Recovered and settled: Needs root cause (as engine_recover + engine_settle leave it).
-update public.incidents set state = 'needs_root_cause', recovered_at = now() - interval '3 minutes'
-  where id in ((select id from inc where name = 'a'), (select id from inc where name = 'b'));
+-- A recovers (first OK round): still refused until the second.
+select ok(public.engine_recover_incident((select id from inc where name = 'a'), 'unacked', 'monitoring', now() - interval '3 minutes',
+  now() - interval '3 minutes', '{}', true), 'A recovers');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select throws_like(format($$select public.resolve_incident(%L, 'hosting', 'Host rebooted', null)$$, (select id from inc where name = 'a')),
+  '%2 OK rounds%', 'one OK round: OK for 2 rounds is not met yet');
+reset role;
+-- Second OK round. Its root cause was written first, so the engine keeps it in Monitoring (§16.4).
+select ok(public.engine_settle_incident((select id from inc where name = 'a'), 'monitoring', 'monitoring', now() - interval '2 minutes',
+  now() - interval '2 minutes'), 'A settles, staying in Monitoring');
+select is((select state::text from public.incidents where id = (select id from inc where name = 'a')), 'monitoring',
+  'a root cause written first keeps it in Monitoring');
+-- B (no root cause yet): recover → settle → Needs root cause.
+select ok(public.engine_recover_incident((select id from inc where name = 'b'), 'unacked', 'monitoring',
+  now() - interval '3 minutes', now() - interval '3 minutes', '{}', true), 'B recovers');
+select ok(public.engine_settle_incident((select id from inc where name = 'b'), 'monitoring',
+  'needs_root_cause', now() - interval '2 minutes', now() - interval '2 minutes'), 'B settles');
 update public.incidents set client_update_required = true where id = (select id from inc where name = 'a');
 
 select tests.authenticate_as((select id from ids where name = 'arm'));
@@ -215,8 +242,8 @@ reset role;
 select is(
   (select state::text || '/' || coalesce(resolved_by::text, 'nobody') || '/' || root_cause_category
    from public.incidents where id = (select id from inc where name = 'a')),
-  'needs_root_cause/nobody/hosting',
-  'back to Needs root cause; the root cause stays saved'
+  'monitoring/nobody/hosting',
+  'back to the state it was resolved from (Monitoring); the root cause stays saved'
 );
 select is(
   (select string_agg(distinct status::text, ',') from public.notifications where template = 'resolved'),
@@ -236,6 +263,16 @@ select is(
   (select count(*)::int from public.notifications where template = 'resolved' and status = 'queued'),
   3, 'fresh RESOLVED messages are held again'
 );
+update public.notifications set hold_until = now() - interval '1 second'
+  where template = 'resolved' and status = 'queued' and channel = 'google_chat';
+select is(
+  (select count(*)::int from public.claim_notifications('google_chat', 10) where template = 'resolved'),
+  1, 'the hold passed: the notifier claims RESOLVED'
+);
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select throws_like(format('select public.undo_resolve(%L)', (select id from inc where name = 'a')),
+  '%window has closed%', 'Undo refused once a message was claimed');
+reset role;
 update public.incidents set resolved_at = now() - interval '11 seconds' where id = (select id from inc where name = 'a');
 select tests.authenticate_as((select id from ids where name = 'arm'));
 select throws_like(format('select public.undo_resolve(%L)', (select id from inc where name = 'a')),
@@ -256,6 +293,23 @@ select tests.authenticate_as((select id from ids where name = 'ploy'));
 select throws_like(format('select public.undo_resolve(%L)', (select id from inc where name = 'b')),
   '%new incident%', 'Undo refused: the site has a new incident');
 reset role;
+
+-- ── A relapse needs 2 new OK rounds ──────────────────────────────────────
+select ok(public.engine_recover_incident((select id from inc where name = 'd'), 'unacked', 'monitoring',
+  now() - interval '10 minutes', now() - interval '10 minutes', '{}', true), 'D recovers');
+select ok(public.engine_settle_incident((select id from inc where name = 'd'), 'monitoring',
+  'needs_root_cause', now() - interval '9 minutes', now() - interval '9 minutes'), 'D settles');
+select ok(public.engine_relapse_incident((select id from inc where name = 'd'), 'down', 'hard_fail',
+  now() - interval '6 minutes', now() - interval '6 minutes', now() - interval '6 minutes', '{}', false, true),
+  'D goes down again');
+select ok(public.engine_recover_incident((select id from inc where name = 'd'), 'unacked', 'monitoring',
+  now() - interval '1 minute', now() - interval '1 minute', '{}', true), 'D recovers again');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select throws_like(format($$select public.resolve_incident(%L, 'hosting', 'Host rebooted', null)$$, (select id from inc where name = 'd')),
+  '%2 OK rounds%', 'the OK rounds before the relapse don''t count');
+reset role;
+select throws_ok(format($$update public.incidents set root_cause_category = 'test' where id = %L$$, (select id from inc where name = 'd')),
+  '23514', null, 'a category outside the nine is refused by the table too');
 
 -- ── S06 review L2: a DOWN never relapses a PROBLEM incident ──────────────
 update public.incidents set state = 'monitoring', recovered_at = now()

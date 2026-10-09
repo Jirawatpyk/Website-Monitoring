@@ -7,18 +7,31 @@
 -- Root cause = category + "What happened" (root_cause, PRD §11) + "What fixed it" (optional).
 alter table public.incidents
   add column root_cause_fix text,
-  add column resolved_by uuid references public.profiles (id) on delete set null;
+  add column resolved_by uuid references public.profiles (id) on delete restrict;
 
 create index incidents_resolved_by_idx on public.incidents (resolved_by) where resolved_by is not null;
 
 -- The nine categories of the Incident / Resolve boards (mirrors ROOT_CAUSE_CATEGORIES in
--- packages/shared/src/domain.ts). `not valid`: staging's reset script wrote 'test' before S07; new
--- writes must use a real key.
+-- packages/shared/src/domain.ts). Staging's reset script wrote 'test' before S07: such values are
+-- cleared first (with an audit row), so the table is small enough to validate here.
+with cleared as (
+  update public.incidents
+    set root_cause_category = null
+    where root_cause_category is not null
+      and root_cause_category not in ('hosting', 'deploy', 'dns', 'ssl', 'third_party', 'traffic',
+                                      'client_change', 'false_alarm', 'unknown')
+    returning id
+)
+insert into public.audit_log (action, entity, entity_id, before, after)
+select 'incident.root_cause', 'incident', id, jsonb_build_object('category', 'not one of the nine'),
+       jsonb_build_object('category', null, 'by', 'S07 migration')
+from cleared;
+
 alter table public.incidents
   add constraint incidents_root_cause_category_check check (
     root_cause_category in ('hosting', 'deploy', 'dns', 'ssl', 'third_party', 'traffic',
                             'client_change', 'false_alarm', 'unknown')
-  ) not valid;
+  );
 
 -- ── Shared input check ──────────────────────────────────────────────────────
 -- The root-cause fields as one checked jsonb (errors read as the form's: 22023).
@@ -117,7 +130,7 @@ declare
   v_rc jsonb;
   v_name text;
 begin
-  select * into v_inc from public.incidents where id = p_incident_id for update;
+  select * into v_inc from public.incidents where id = p_incident_id for no key update;
   if not found then
     raise exception 'incident not found' using errcode = 'P0002';
   end if;
@@ -152,7 +165,8 @@ $$;
 
 -- ── Resolve ─────────────────────────────────────────────────────────────────
 -- Resolves an incident when all three conditions hold (§15.4, §16.1–3, T10) — checked here, never
--- trusted from the page: OK for 2 rounds (the engine settled it into Needs root cause), the client
+-- trusted from the page: OK for 2 rounds (an ok_two_rounds event since the latest recovery: Needs
+-- root cause, or Monitoring when the root cause was written first, §16.4), the client
 -- update not required or marked (D-002; nothing requires it until S11), and a root cause other than
 -- Unknown. Saves the root cause with it, cancels a held flapping summary (it would post after
 -- RESOLVED, S04b carry-over) and holds the RESOLVED reply (no @mention) and an email to everyone
@@ -172,7 +186,7 @@ declare
   v_name text;
   v_context jsonb;
 begin
-  select * into v_inc from public.incidents where id = p_incident_id for update;
+  select * into v_inc from public.incidents where id = p_incident_id for no key update;
   if not found then
     raise exception 'incident not found' using errcode = 'P0002';
   end if;
@@ -182,7 +196,10 @@ begin
   if v_inc.state in ('resolved', 'in_review', 'closed') then
     raise exception 'This incident is already resolved' using errcode = '55000';
   end if;
-  if v_inc.state <> 'needs_root_cause' then
+  if v_inc.state not in ('monitoring', 'needs_root_cause') or v_inc.recovered_at is null
+     or not exists (select 1 from public.incident_events
+                    where incident_id = p_incident_id and type = 'ok_two_rounds'
+                      and at >= v_inc.recovered_at) then
     raise exception 'It needs 2 OK rounds in a row before it can be resolved' using errcode = '55000';
   end if;
   if v_inc.client_update_required and v_inc.client_updated_at is null then
@@ -247,8 +264,8 @@ end;
 $$;
 
 -- Takes back the signed-in person's own resolve inside its 10 s window: the held messages are
--- cancelled, a summary it set aside is due again, and the incident goes back to Needs root cause
--- (the root cause stays saved). Too late once the window passed, a message was claimed, or the site
+-- cancelled, a summary it set aside is due again, and the incident goes back to the state it was
+-- resolved from (Needs root cause or Monitoring; the root cause stays saved). Too late once the window passed, a message was claimed, or the site
 -- opened a new incident meanwhile. Errors: 42501 · P0002 · 55000.
 create function public.undo_resolve(p_incident_id uuid)
 returns void
@@ -258,8 +275,9 @@ set search_path = ''
 as $$
 declare
   v_inc public.incidents%rowtype;
+  v_from public.incident_state;
 begin
-  select * into v_inc from public.incidents where id = p_incident_id for update;
+  select * into v_inc from public.incidents where id = p_incident_id for no key update;
   if not found then
     raise exception 'incident not found' using errcode = 'P0002';
   end if;
@@ -297,19 +315,32 @@ begin
 
   update public.notifications
     set status = 'queued', error = null, next_retry_at = null
-    where incident_id = p_incident_id and status = 'cancelled' and error = 'Superseded: resolved';
+    where incident_id = p_incident_id and template = 'flap_summary' and status = 'cancelled'
+      and error = 'Superseded: resolved';
 
-  update public.incidents
-    set state = 'needs_root_cause', resolved_at = null, resolved_by = null
-    where id = p_incident_id;
+  select (payload->>'from')::public.incident_state into v_from
+  from public.incident_events
+  where incident_id = p_incident_id and type = 'resolved'
+  order by at desc
+  limit 1;
+  v_from := coalesce(v_from, 'needs_root_cause');
+
+  begin
+    update public.incidents
+      set state = v_from, resolved_at = null, resolved_by = null
+      where id = p_incident_id;
+  exception when unique_violation then
+    -- The engine opened a new incident for the site between the check above and here.
+    raise exception 'The site has a new incident — this one stays resolved' using errcode = '55000';
+  end;
 
   insert into public.incident_events (incident_id, type, actor_id, payload)
-  values (p_incident_id, 'resolve_undone', auth.uid(), jsonb_build_object('state', 'needs_root_cause'));
+  values (p_incident_id, 'resolve_undone', auth.uid(), jsonb_build_object('state', v_from));
 
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), 'incident.resolve_undone', 'incident', p_incident_id,
           jsonb_build_object('state', 'resolved', 'resolved_at', v_inc.resolved_at),
-          jsonb_build_object('state', 'needs_root_cause'));
+          jsonb_build_object('state', v_from));
 end;
 $$;
 
@@ -406,6 +437,54 @@ begin
             p_context, to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
     on conflict do nothing;
   end if;
+
+  perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
+  return true;
+end;
+$$;
+
+-- ── OK for 2 rounds, on the timeline every time ─────────────────────────────
+-- engine_settle_incident as in S04a (20261007091143), except that the ok_two_rounds event is written
+-- on every settle — also when the incident stays in Monitoring because its root cause was written
+-- first (§16.4). resolve_incident reads it (engine-review H1); the audit row stays for a state change.
+create or replace function public.engine_settle_incident(
+  p_incident_id uuid,
+  p_from public.incident_state,
+  p_to public.incident_state,
+  p_at timestamptz,
+  p_round_at timestamptz,
+  p_monitors jsonb default null,
+  p_status public.site_state default null
+)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_site_id uuid;
+begin
+  update public.incidents
+    set state = p_to
+    where id = p_incident_id and state = p_from
+    returning site_id into v_site_id;
+
+  if v_site_id is null then
+    return false;
+  end if;
+
+  insert into public.incident_events (incident_id, type, payload, at)
+  values (p_incident_id, 'ok_two_rounds', jsonb_build_object('state', p_to), p_at);
+
+  if p_to is distinct from p_from then
+    insert into public.audit_log (action, entity, entity_id, before, after)
+    values ('incident.state', 'incident', p_incident_id,
+            jsonb_build_object('state', p_from), jsonb_build_object('state', p_to));
+  end if;
+
+  update public.site_status
+    set status = 'ok', since = p_at, ok_rounds = 2, last_evaluated_at = p_at,
+        last_round_at = p_round_at
+    where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
 
   perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
   return true;
