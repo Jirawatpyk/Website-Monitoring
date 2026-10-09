@@ -2,7 +2,7 @@ import 'server-only';
 import { CLOSED_INCIDENT_STATES_IN, defaultSlowMs, toMonitorHeaders, type SiteStatus } from '@dxt/shared';
 import { siteUptimeOver } from '@dxt/engine';
 import { createClient } from '@/lib/supabase/server';
-import { downEpisodesBySite } from './detail-queries';
+import { downEpisodesBySite, watchedSince } from './detail-queries';
 import { locationGlyph } from './components/site-list';
 import { siteIdSchema } from './schemas';
 import type {
@@ -33,7 +33,7 @@ export async function listSites(now = new Date()): Promise<SiteListRow[]> {
     supabase
       .from('sites')
       .select(
-        `id, name, tier, is_active, muted_until, monitoring_started_at,
+        `id, name, tier, is_active, muted_until, monitoring_started_at, created_at,
          clients!inner(id, name, is_internal, am:profiles!clients_am_user_id_fkey(display_name)),
          owner:profiles!sites_primary_owner_id_fkey(id, display_name),
          backup:profiles!sites_backup_owner_id_fkey(id, display_name),
@@ -105,7 +105,7 @@ export async function listSites(now = new Date()): Promise<SiteListRow[]> {
         siteUptimeOver(drops.get(s.id) ?? [], {
           now,
           rangeMinutes: THIRTY_DAYS_MIN,
-          monitoringStartedAt: s.monitoring_started_at ? new Date(s.monitoring_started_at) : null,
+          monitoringStartedAt: watchedSince(s),
         })?.uptime ?? null,
       expiryDays: null,
     };

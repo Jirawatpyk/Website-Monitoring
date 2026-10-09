@@ -113,6 +113,20 @@ export async function downEpisodesBySite(supabase: Client, siteIds: readonly str
   return out;
 }
 
+/**
+ * When monitoring of a site started, for its uptime window (D-031). A live site created before S05
+ * added `monitoring_started_at` (a script-made test site) has none: its creation time stands in.
+ * Null for a Draft never started.
+ */
+export function watchedSince(s: {
+  is_active: boolean;
+  monitoring_started_at: string | null;
+  created_at: string;
+}): Date | null {
+  const at = s.monitoring_started_at ?? (s.is_active ? s.created_at : null);
+  return at ? new Date(at) : null;
+}
+
 /** The cause the engine wrote when the incident opened ("Timeout > 30 s (BKK, TYO) · …"), if any. */
 function causeOf(events: readonly { type: string; payload: unknown }[]): string | null {
   const p = events.find((e) => e.type === 'detected')?.payload;
@@ -140,7 +154,7 @@ export async function loadSiteDetail(
   const { data: s, error } = await supabase
     .from('sites')
     .select(
-      `id, name, tier, is_active, muted_until, monitoring_started_at, hosting, credential_ref,
+      `id, name, tier, is_active, muted_until, monitoring_started_at, created_at, hosting, credential_ref,
        clients!inner(name, is_internal, am:profiles!clients_am_user_id_fkey(display_name)),
        owner:profiles!sites_primary_owner_id_fkey(id, display_name),
        backup:profiles!sites_backup_owner_id_fkey(id, display_name),
@@ -240,7 +254,7 @@ export async function loadSiteDetail(
   const uptime = siteUptimeOver(downs.get(s.id) ?? [], {
     now,
     rangeMinutes: spec.minutes,
-    monitoringStartedAt: s.monitoring_started_at ? new Date(s.monitoring_started_at) : null,
+    monitoringStartedAt: watchedSince(s),
   });
   // In range = overlapping it, the same window the uptime counts (spec-checker: a 99.9% next to "none")
   const inRange = rows.filter((r) => r.endsAt >= from.getTime());

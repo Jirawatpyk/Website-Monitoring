@@ -15,7 +15,8 @@ describe('listSites', () => {
     tier: 2,
     is_active: true,
     muted_until: '2026-10-08T11:00:00Z',
-    monitoring_started_at: '2026-08-01T00:00:00Z',
+    monitoring_started_at: null, // a site started before S05: its creation time stands in
+    created_at: '2026-08-01T00:00:00Z',
     clients: { id: 'c1', name: 'Cando Asia', is_internal: false, am: { display_name: 'Bua' } },
     owner: { id: 'u1', display_name: 'Nok' },
     backup: { id: 'u2', display_name: 'Ploy' },
