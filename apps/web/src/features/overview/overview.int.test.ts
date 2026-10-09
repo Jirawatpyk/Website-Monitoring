@@ -143,7 +143,7 @@ describe('loadOverview (S06b, spec §21)', () => {
     const started = performance.now();
     const data = await loadOverview(asAdmin, { ...admin, role: 'admin' }, NOW);
     const ms = Math.round(performance.now() - started);
-    console.log(`loadOverview: ${ms} ms for ${data.sites.length} live sites`);
+    console.info(`loadOverview: ${ms} ms for ${data.sites.length} live sites`);
     // Done-when 1's budget is the whole page (< 2 s); the loader is most of it
     expect(ms).toBeLessThan(2000);
 
