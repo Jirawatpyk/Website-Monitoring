@@ -227,7 +227,8 @@ export async function loadIncident(
     (m) => m.is_primary,
   );
   const monitorId = i.monitor_id;
-  const aroundFrom = new Date(Date.parse(i.started_at) - 60_000).toISOString();
+  // From the first failed check (`started_at`): a passing check before it isn't evidence.
+  const aroundFrom = i.started_at;
   const aroundTo = new Date(Date.parse(i.detected_at) + 60_000).toISOString();
   const checkCols = 'location, outcome, status_code, response_ms, error, checked_at';
   const [events, around, latest] = await Promise.all([

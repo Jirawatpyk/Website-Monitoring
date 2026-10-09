@@ -206,8 +206,15 @@ export function hiddenNote(list: readonly ListIncident[], f: ListFilters, now: D
   return `${rows.length} shown · ${plural(hiddenAutoResolved, 'short PROBLEM')} auto-resolved in < 5 min ${hiddenAutoResolved === 1 ? 'is' : 'are'} hidden.`;
 }
 
+/** Elapsed whole minutes, at least 1 (how long someone has waited). */
 const minutesBetween = (from: string, to: Date) =>
   Math.max(1, Math.floor((to.getTime() - new Date(from).getTime()) / 60_000));
+
+/** Whole clock minutes, as the Chat / email wording (`downtime` in `@dxt/notifier`): 19:37–19:42 = 5 min. */
+const clockMinutesBetween = (from: string, to: Date) => {
+  const minute = (t: number) => Math.floor(t / 60_000);
+  return Math.max(1, minute(to.getTime()) - minute(Date.parse(from)));
+};
 
 /** Duration: first failed check → recovered, or until now while still down (§14.3). */
 export function durationMinutes(
@@ -215,7 +222,7 @@ export function durationMinutes(
   now: Date,
 ) {
   const end = i.recoveredAt ?? i.resolvedAt;
-  return minutesBetween(i.startedAt, end ? new Date(end) : now);
+  return clockMinutesBetween(i.startedAt, end ? new Date(end) : now);
 }
 
 /** The trigger as the list writes it: "Hard fail", "Slow, flapped". */

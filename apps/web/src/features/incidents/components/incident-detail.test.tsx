@@ -176,6 +176,75 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     await waitFor(() => expect(resolveButton()).toHaveFocus());
   });
 
+  it('Undo after the page refreshed to Resolved: focus lands on Resolve once the next refresh brings it back', async () => {
+    m.resolveIncident.mockResolvedValue({ ok: true, postsAt: new Date(Date.now() + 10_000).toISOString() });
+    m.undoResolve.mockResolvedValue({ ok: true });
+    const open = detail({
+      events: settled,
+      rootCause: { category: 'hosting', what: 'Host rebooted the app server', fix: null },
+    });
+    const resolvedNow = {
+      ...open,
+      state: 'resolved' as const,
+      view: { ...open.view, state: 'resolved' as const },
+      resolvedAt: new Date().toISOString(),
+      resolved: {
+        by: 'Tao',
+        byViewer: true,
+        at: new Date().toISOString(),
+        postsAt: new Date(Date.now() + 10_000).toISOString(),
+        posted: null,
+      },
+    };
+    const draw = (x: IncidentDetail) => (
+      <IncidentDetailView
+        detail={x}
+        sections={incidentSections(x, new Date(NOW))}
+        viewerName="Tao"
+        viewerEmail="tao@example.test"
+      />
+    );
+    const { rerender } = render(draw(open));
+    fireEvent.click(resolveButton());
+    const dialog = screen.getByRole('dialog', { name: 'Resolve incident' });
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Resolve incident' })));
+    // the action's refresh lands: the page is Resolved, the Resolve button is gone
+    rerender(draw(resolvedNow));
+    const done = await screen.findByRole('dialog', { name: 'Incident resolved' });
+    await act(async () => fireEvent.click(within(done).getByRole('button', { name: /^Undo · \d+ s$/ })));
+    expect(screen.queryByRole('button', { name: /^Resolve…$/ })).toBeNull();
+    // the Undo's refresh lands: Resolve is back and takes focus
+    rerender(draw(open));
+    await waitFor(() => expect(resolveButton()).toHaveFocus());
+  });
+
+  it('resolved and still sending: the page refreshes after the hold until the RESOLVED shows as sent', () => {
+    vi.useFakeTimers();
+    try {
+      const d = detail({ events: settled });
+      show({
+        ...d,
+        state: 'resolved',
+        view: { ...d.view, state: 'resolved' },
+        resolved: {
+          by: 'Tao',
+          byViewer: true,
+          at: NOW,
+          postsAt: new Date(Date.now() + 10_000).toISOString(),
+          posted: null,
+        },
+      });
+      act(() => vi.advanceTimersByTime(12_000));
+      expect(m.refresh).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(1_500));
+      expect(m.refresh).toHaveBeenCalledTimes(1);
+      act(() => vi.advanceTimersByTime(3_500));
+      expect(m.refresh).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a refusal stays in the dialog and says why', async () => {
     m.resolveIncident.mockResolvedValue({
       ok: false,

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
   toast,
@@ -54,6 +55,9 @@ import {
 const LIVE = ['incidents'] as const;
 /** Lines a phone shows before "Show all" (a long flapping incident has hundreds); the CSS above hides from 21. */
 const PHONE_LINES = 20;
+/** After the hold, look for the sent RESOLVED this long after it was due, up to this many times. */
+const POSTED_CHECK_MS = 3_000;
+const MAX_POSTED_CHECKS = 5;
 
 /**
  * The phone's timeline, newest first, shows the latest `PHONE_LINES` until "Show all": the lines come
@@ -95,6 +99,7 @@ export function IncidentDetailView({
   const v = d.view;
   // Someone else's ack, a recovery, a resolve: on screen without a reload (PRD §9).
   useLiveRefresh(LIVE);
+  const router = useRouter();
   const incidentLabel = formatIncidentId(Number(v.id.replace('INC-', '')));
   const [noteOpen, setNoteOpen] = useState(false);
   const [rcOpen, setRcOpen] = useState(false);
@@ -137,14 +142,29 @@ export function IncidentDetailView({
   }, [v.ack.kind]);
   // After an Undo of a resolve the page re-renders unresolved: focus Resolve once it is back (WCAG 2.4.3).
   const [focusResolve, setFocusResolve] = useState(false);
+  // Waits for the refresh: until it lands the page still shows the "Resolved" card, which is about to go.
   useEffect(() => {
     if (!focusResolve) return;
-    const button = shownResolve();
+    const button = shown(resolveDesktop.current, resolvePhone.current);
     if (!button) return;
     button.focus();
+    if (document.activeElement !== button) return;
     const t = setTimeout(() => setFocusResolve(false), 0);
     return () => clearTimeout(t);
   });
+  // RESOLVED leaves after the hold (`after()` in the action): refresh until the page knows it was sent,
+  // so the dialog and the card stop at "sending" (S07 /verify).
+  const postsAt = d.resolved && !d.resolved.posted ? d.resolved.postsAt : null;
+  const [postedChecks, setPostedChecks] = useState(0);
+  useEffect(() => {
+    if (!postsAt || postedChecks >= MAX_POSTED_CHECKS) return;
+    const wait = Math.max(0, Date.parse(postsAt) - Date.now()) + POSTED_CHECK_MS;
+    const t = setTimeout(() => {
+      setPostedChecks((n) => n + 1);
+      router.refresh();
+    }, wait);
+    return () => clearTimeout(t);
+  }, [postsAt, postedChecks, router]);
 
   const initialRc: RootCauseValue = {
     category: d.rootCause.category ?? '',

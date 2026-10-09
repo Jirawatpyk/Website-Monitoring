@@ -17,7 +17,8 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // Evidence screenshots load from Supabase Storage signed URLs (S07).
+  ["img-src 'self' data: blob:", ...supabaseOrigins().slice(0, 1)].join(' '),
   "font-src 'self'",
   [
     "connect-src 'self'",

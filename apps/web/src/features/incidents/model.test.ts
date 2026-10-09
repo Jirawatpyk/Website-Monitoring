@@ -3,6 +3,7 @@ import {
   countLabel,
   DEFAULT_FILTERS,
   desktopViewCounts,
+  durationMinutes,
   filterIncidents,
   hiddenNote,
   isUnackedDown,
@@ -588,5 +589,21 @@ describe('timelineOf — acknowledgements (from the S02b log tests)', () => {
     expect(t[1]!.detail).toBe(
       'Confirmed by BKK only, 2 checks — SIN, TYO blocked by bot protection. Incident opened.',
     );
+  });
+});
+
+describe('durationMinutes — whole clock minutes, as the RECOVERED message (S07 /verify)', () => {
+  it.each([
+    [
+      '22:14:50 → 22:23:10 reads 9 min, as the range 22:14–22:23',
+      '2026-09-24T15:14:50Z',
+      '2026-09-24T15:23:10Z',
+      9,
+    ],
+    ['inside one minute reads 1 min, never 0', '2026-09-24T15:14:10Z', '2026-09-24T15:14:40Z', 1],
+  ])('%s', (_, startedAt, recoveredAt, minutes) => {
+    expect(
+      durationMinutes({ startedAt, recoveredAt, resolvedAt: null }, new Date('2026-09-25T00:00:00Z')),
+    ).toBe(minutes);
   });
 });
