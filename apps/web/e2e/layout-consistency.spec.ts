@@ -1,5 +1,12 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { ensureUser, localSupabaseEnabled, signIn, anySiteId, busySiteId } from './support/local-supabase';
+import {
+  anySiteId,
+  busySiteId,
+  ensureUser,
+  localSupabaseEnabled,
+  openTestIncident,
+  signIn,
+} from './support/local-supabase';
 
 /**
  * Rules every signed-in page shares, measured in the browser at 390 / 820 / 1440 — the things a
@@ -172,13 +179,15 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
     const pages = await livePages(desktop);
     await desktop.context().close();
     expect(pages).not.toHaveLength(0);
-    // Pages reached from a list, not the nav (S05 review): Add site, Edit site, Edit monitors.
+    // Pages reached from a list, not the nav (S05 review): Add site, Edit site, Edit monitors; and an
+    // open incident (S07).
     const site = await anySiteId();
     pages.push(
       `/sites/${await busySiteId()}`,
       '/sites/new',
       `/sites/${site}/edit`,
       `/sites/${site}/monitors`,
+      `/incidents/${await openTestIncident(ADMIN.email)}`,
     );
 
     for (const width of WIDTHS) {

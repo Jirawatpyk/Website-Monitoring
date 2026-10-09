@@ -8,7 +8,8 @@ import {
 } from './support/local-supabase';
 
 // MobileAck (S02b Done-when 4 and 5): the card link opens the incident signed in, one tap acks, and
-// Undo inside 10 s sends nothing. Local Supabase only (E2E_LOCAL_SUPABASE=1, after `pnpm db:reset`).
+// Undo inside 10 s sends nothing — on a phone; from md the Incident page acks from its header with the
+// toast (S07). Local Supabase only (E2E_LOCAL_SUPABASE=1, after `pnpm db:reset`).
 test.describe('acknowledge from the alert link (local Supabase)', () => {
   test.skip(!localSupabaseEnabled, 'needs the local Supabase stack: E2E_LOCAL_SUPABASE=1');
   test.describe.configure({ mode: 'serial' });
@@ -44,7 +45,8 @@ test.describe('acknowledge from the alert link (local Supabase)', () => {
     await expect.poll(top).toBeLessThan(height - 1);
   });
 
-  test('T08: Ack → Undo within 10 s → nothing is sent, the rows end cancelled', async ({ page }) => {
+  test('T08: Ack → Undo within 10 s → nothing is sent, the rows end cancelled', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile', 'MobileAck parts show below md; desktop acks from the header');
     const id = await openTestIncident('arm@example.test');
     await page.goto(`/incidents/${id}?ack=1`);
     await expect(page.getByText('Signed in as')).toContainText('arm@example.test');
@@ -62,14 +64,18 @@ test.describe('acknowledge from the alert link (local Supabase)', () => {
     await undo.click();
 
     await expect(page.getByRole('button', { name: 'Acknowledge' })).toBeVisible();
-    await expect(page.getByText('Acknowledgement undone by Arm')).toBeVisible();
+    // desktop and phone timelines are both in the page; the phone's is the one showing
+    await expect(page.getByText('Acknowledgement undone by Arm').filter({ visible: true })).toBeVisible();
     expect(await ackMessages(id)).toEqual([
       { channel: 'google_chat', status: 'cancelled' },
       { channel: 'email', status: 'cancelled' },
     ]);
   });
 
-  test('the action bar sits on the bottom edge of the screen, even with little content', async ({ page }) => {
+  test('the action bar sits on the bottom edge of the screen, even with little content', async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== 'mobile', 'MobileAck parts show below md; desktop acks from the header');
     const id = await openTestIncident('arm@example.test');
     await page.goto(`/incidents/${id}`);
     const bar = page
@@ -80,7 +86,10 @@ test.describe('acknowledge from the alert link (local Supabase)', () => {
     expect(Math.abs(box!.y + box!.height - height)).toBeLessThanOrEqual(1);
   });
 
-  test('one tap acknowledges under the person’s name; Undo goes once the window closes', async ({ page }) => {
+  test('one tap acknowledges under the person’s name; Undo goes once the window closes', async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== 'mobile', 'MobileAck parts show below md; desktop acks from the header');
     const id = await openTestIncident('arm@example.test');
     await page.goto(`/incidents/${id}?ack=1`);
     await page.getByRole('button', { name: 'Acknowledge' }).click();
@@ -88,5 +97,21 @@ test.describe('acknowledge from the alert link (local Supabase)', () => {
     await expect(page.getByText('Acknowledged', { exact: true })).toBeVisible(); // workflow badge
     await expect(page.getByRole('button', { name: /^Undo/ })).toBeHidden({ timeout: 15_000 });
     expect((await ackMessages(id)).map((m) => m.status)).not.toContain('cancelled');
+  });
+
+  test('T08 on desktop: Acknowledge in the header, the toast counts down, Undo sends nothing (S07)', async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name === 'mobile', 'desktop header');
+    const id = await openTestIncident('arm@example.test');
+    await page.goto(`/incidents/${id}`);
+    await page.getByRole('button', { name: 'Acknowledge' }).click();
+    await expect(page.getByText(/^Acknowledged INC-\d+/)).toBeVisible();
+    await page.getByRole('button', { name: /^Undo · \d+ s$/ }).click();
+    await expect(page.getByText(/^Acknowledgement of INC-\d+ undone/)).toBeVisible();
+    expect(await ackMessages(id)).toEqual([
+      { channel: 'google_chat', status: 'cancelled' },
+      { channel: 'email', status: 'cancelled' },
+    ]);
   });
 });

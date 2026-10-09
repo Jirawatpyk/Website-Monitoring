@@ -44,6 +44,7 @@ import {
   type ListIncident,
   type PhoneView,
 } from '../model';
+import { INCIDENT_COLUMNS } from './incident-columns';
 
 /** The phone's Past view shows the latest few until "Show all" (MIncidents). */
 const PAST_SHOWN = 4;
@@ -98,54 +99,74 @@ export function IncidentsList({ incidents, sites, nowIso, initialView }: Inciden
     ...(f.siteId ? { site: f.siteId } : {}),
   }).toString()}`;
 
+  // Widths and the table widths each optional column appears from (`INCIDENT_COLUMNS`, tested to fit):
+  // ID, Site, Severity and State always; Started, Duration, Trigger as the table grows. The owner reads
+  // under the site and the next step under the state, as Sites stacks its cells (D-033; fits 820 px).
+  const C = INCIDENT_COLUMNS;
   const columns: DataTableColumn<ListIncident>[] = [
     {
       key: 'id',
       label: 'ID',
-      width: 96,
+      width: C.id.width,
       // The row is the link (getRowHref): no link of its own inside it.
       render: (i) => <span className="font-mono text-sm">{formatIncidentId(i.number)}</span>,
     },
     {
       key: 'site',
       label: 'Site',
-      render: (i) => <span className="block truncate font-medium">{i.siteName}</span>,
+      render: (i) => (
+        <span className="flex min-w-0 flex-col py-1.5 leading-snug">
+          <span className="truncate font-medium">{i.siteName}</span>
+          <span className="truncate text-xs text-fg-secondary">
+            {i.ownerName ? `Owner ${i.ownerName}` : 'No owner set'}
+          </span>
+        </span>
+      ),
     },
     {
       key: 'severity',
       label: 'Severity',
-      width: 144,
+      width: C.severity.width,
       render: (i) => <SeverityBadge severity={i.severity} recovered={!!i.recoveredAt || !isOpen(i)} />,
     },
-    { key: 'trigger', label: 'Trigger', render: (i) => <span className="text-sm">{triggerWords(i)}</span> },
+    {
+      key: 'trigger',
+      label: 'Trigger',
+      width: C.trigger.width,
+      hideBelow: C.trigger.from,
+      render: (i) => <span className="text-sm">{triggerWords(i)}</span>,
+    },
     {
       key: 'state',
-      label: 'State',
-      width: 176,
-      render: (i) => <WorkflowBadge state={i.state} level={i.escalationLevel} />,
+      label: 'State · next',
+      width: C.state.width,
+      render: (i) => {
+        const n = nextLine(i, now);
+        return (
+          <span className="flex flex-col items-start gap-1 py-1.5 leading-snug">
+            <WorkflowBadge state={i.state} level={i.escalationLevel} />
+            <span className={`text-xs ${TONE[n.tone]}`}>{n.text}</span>
+          </span>
+        );
+      },
     },
     {
       key: 'started',
       label: 'Started',
+      width: C.started.width,
+      hideBelow: C.started.from,
       render: (i) => <span className="text-sm tabular-nums">{formatWhen(new Date(i.startedAt), now)}</span>,
     },
     {
       key: 'duration',
       label: 'Duration',
+      width: C.duration.width,
+      hideBelow: C.duration.from,
       render: (i) => (
         <span className="text-sm whitespace-nowrap tabular-nums">
           {formatDuration(durationMinutes(i, now))}
         </span>
       ),
-    },
-    { key: 'owner', label: 'Owner', render: (i) => <span className="text-sm">{i.ownerName ?? '—'}</span> },
-    {
-      key: 'next',
-      label: 'Next / ack',
-      render: (i) => {
-        const n = nextLine(i, now);
-        return <span className={`text-sm ${TONE[n.tone]}`}>{n.text}</span>;
-      },
     },
   ];
 
