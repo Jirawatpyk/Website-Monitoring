@@ -137,12 +137,12 @@ function squeezedText(page: Page) {
   );
 }
 
-/** Visible block-level controls whose tap area is shorter than a touch target. */
 /**
  * Controls whose focus ring would be cut off: the outline reaches past the nearest ancestor that clips
- * (overflow hidden / clip / auto / scroll). Twice in S07 a ring lost a side to its box — a dialog's
- * outcome line, DataTable's row link — and only Tao's eye caught it. Call after a key press, so the
- * page is in keyboard mode and `:focus-visible` matches a programmatic focus.
+ * (overflow hidden / clip on every side; auto / scroll across the axis it doesn't scroll — along it, a
+ * control half out of view is a scroll position, not a cut ring). Twice in S07 a ring lost a side to
+ * its box — a dialog's outcome line, DataTable's row link — and only Tao's eye caught it. Call after a
+ * key press, so the page is in keyboard mode and `:focus-visible` matches a programmatic focus.
  */
 function clippedFocusRings(page: Page) {
   return page.evaluate(() => {
@@ -164,11 +164,10 @@ function clippedFocusRings(page: Page) {
         const ps = getComputedStyle(p);
         if (!/(hidden|clip|auto|scroll)/.test(ps.overflowX + ps.overflowY)) continue;
         const pb = p.getBoundingClientRect();
+        const scrolls = (o: string) => o === 'auto' || o === 'scroll';
         const room = Math.min(
-          box.left - pb.left,
-          pb.right - box.right,
-          box.top - pb.top,
-          pb.bottom - box.bottom,
+          ...(scrolls(ps.overflowX) ? [] : [box.left - pb.left, pb.right - box.right]),
+          ...(scrolls(ps.overflowY) ? [] : [box.top - pb.top, pb.bottom - box.bottom]),
         );
         if (room < reach - 0.5) {
           const name = (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 40);
@@ -182,6 +181,7 @@ function clippedFocusRings(page: Page) {
   });
 }
 
+/** Visible block-level controls whose tap area is shorter than a touch target. */
 function smallTargets(page: Page) {
   return page.evaluate((min) => {
     /** The taller of the control and the hit area AURA draws around it on a touch screen. */
