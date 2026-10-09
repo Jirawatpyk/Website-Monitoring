@@ -1,5 +1,5 @@
 import 'server-only';
-import { episodesOf, type Episode, type EpisodeEvent } from '@dxt/engine';
+import { episodesFromTimeline, type Episode } from '@dxt/engine';
 import {
   buildAcknowledgedAlert,
   buildAcknowledgedEmail,
@@ -56,25 +56,7 @@ const dateOf = (v: unknown): Date | null =>
   typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : null;
 
 /** The incident's drops from its timeline (D-024): first failed check → recovery. */
-function dropsOf(i: IncidentFacts): Episode[] {
-  const events: EpisodeEvent[] = [];
-  for (const e of i.incident_events ?? []) {
-    const at = dateOf(e.at);
-    if (!at) continue;
-    const p = contextOf(e.payload);
-    const startedAt =
-      e.type === 'detected'
-        ? new Date(i.started_at)
-        : e.type === 'relapsed'
-          ? dateOf(p.startedAt)
-          : e.type === 'escalated_to_down'
-            ? dateOf(p.downStartedAt)
-            : null;
-    const severity = p.severity === 'down' || p.severity === 'problem' ? p.severity : null;
-    events.push({ type: e.type, at, startedAt, severity: e.type === 'detected' ? i.severity : severity });
-  }
-  return episodesOf(events);
-}
+const dropsOf = (i: IncidentFacts): Episode[] => episodesFromTimeline(i, i.incident_events ?? []);
 
 /** "Down N times" only when every drop was a DOWN; a key-page PROBLEM drop (D-023) isn't downtime. */
 const summarySeverity = (i: IncidentFacts): 'down' | 'problem' =>

@@ -209,6 +209,43 @@ export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
   return out;
 }
 
+/** A stored `incident_events` row, as the database returns it. */
+export interface IncidentEventRow {
+  type: string;
+  at?: string | null;
+  payload: unknown;
+}
+
+const dateOf = (v: unknown): Date | null =>
+  typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : null;
+
+/**
+ * The drops of a stored incident (D-024): its `detected` drop starts at `started_at` with the incident's
+ * severity; a relapse at its payload's `startedAt`; a PROBLEM turned DOWN (D-021) at `downStartedAt`.
+ */
+export function episodesFromTimeline(
+  incident: { started_at: string; severity: Severity },
+  events: readonly IncidentEventRow[],
+): Episode[] {
+  const out: EpisodeEvent[] = [];
+  for (const e of events) {
+    const at = dateOf(e.at);
+    if (!at) continue;
+    const p = e.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : {};
+    const startedAt =
+      e.type === 'detected'
+        ? new Date(incident.started_at)
+        : e.type === 'relapsed'
+          ? dateOf(p.startedAt)
+          : e.type === 'escalated_to_down'
+            ? dateOf(p.downStartedAt)
+            : null;
+    const severity = p.severity === 'down' || p.severity === 'problem' ? p.severity : null;
+    out.push({ type: e.type, at, startedAt, severity: e.type === 'detected' ? incident.severity : severity });
+  }
+  return episodesOf(out);
+}
+
 /** Minutes the episodes were down (or had a problem), the drop still in progress counted to `now`. */
 export function episodeMinutes(episodes: readonly Episode[], now: Date): number {
   const ms = episodes.reduce((sum, e) => sum + Math.max(0, (e.end ?? now).getTime() - e.start.getTime()), 0);
