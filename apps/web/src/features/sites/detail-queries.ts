@@ -20,7 +20,7 @@ import {
 import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { locationGlyph } from './components/site-list';
-import { fetchAllPages } from './csv';
+import { fetchAllPages } from '@/lib/csv';
 import {
   chartLines,
   incidentsCaption,

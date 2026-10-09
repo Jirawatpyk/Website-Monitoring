@@ -2,7 +2,7 @@ import 'server-only';
 import { episodeMinutes, episodesFromTimeline } from '@dxt/engine';
 import { bangkokDayStart, CLOSED_INCIDENT_STATES, formatIncidentId, type Trigger } from '@dxt/shared';
 import { createClient } from '@/lib/supabase/server';
-import { csvResponse, fetchAllPages, fileSlug, toCsv } from './csv';
+import { csvResponse, fetchAllPages, fileSlug, toCsv } from '@/lib/csv';
 import { clientWord, triggerWord } from './detail';
 import { siteIdSchema } from './schemas';
 
