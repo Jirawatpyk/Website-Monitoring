@@ -318,7 +318,7 @@ export function SiteDetailView({
 
             <MonitorsTable detail={detail} />
 
-            <div className="grid grid-cols-1 items-start gap-4 max-md:hidden xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 max-md:hidden xl:grid-cols-2">
               <IncidentHistory detail={detail} />
               <CheckLog detail={detail} now={now} />
             </div>
@@ -476,17 +476,22 @@ function IncidentsInRange({ incidents, now }: { incidents: DetailIncident[]; now
   const shown = incidents.slice(0, PHONE_INCIDENTS);
   const more = incidents.length - shown.length;
   return (
-    <Card className="md:hidden" title="Incidents in range" headingLevel={2}>
+    <Card className="overflow-hidden md:hidden" title="Incidents in range" headingLevel={2}>
       {incidents.length === 0 ? (
         <p className="m-0 text-sm text-fg-secondary">No incidents in this range.</p>
       ) : (
         <>
-          <ul className="m-0 flex list-none flex-col p-0">
+          {/* the rows and their hover reach the card's edges (out by AURA's card padding), as on the Sites list */}
+          <ul
+            className="m-0 flex list-none flex-col p-0"
+            style={{ marginInline: 'calc(-1 * var(--aura-card-padding))' }}
+          >
             {shown.map((i) => (
               <li key={i.id} className="border-b border-border-subtle last:border-b-0">
                 <Link
                   href={`/incidents/${i.id}`}
                   className="flex min-h-11 items-center gap-2 py-1 text-fg-primary no-underline hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
+                  style={{ paddingInline: 'var(--aura-card-padding)' }}
                 >
                   <span className="flex w-28 shrink-0">
                     {i.open ? (
@@ -638,7 +643,8 @@ function IncidentHistory({ detail }: { detail: SiteDetail }) {
           </TBody>
         </Table>
       )}
-      <p className="m-0 text-sm text-fg-secondary">
+      {/* same row as the Check log footer, pinned to the bottom so both line up side by side */}
+      <p className="m-0 mt-auto flex min-h-8 items-center text-sm text-fg-secondary">
         {`${detail.historyCount} in 90 days${detail.historyMttr === null ? '' : ` · MTTR ${formatDuration(detail.historyMttr)} (DOWN only · median)`}`}
         {detail.historyCount > shown.length && ` · showing the latest ${shown.length}, Export has all`}
       </p>
@@ -703,7 +709,7 @@ function CheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
           </TBody>
         </Table>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-fg-secondary">
+      <div className="mt-auto flex min-h-8 flex-wrap items-center justify-between gap-3 text-sm text-fg-secondary">
         <span>{`Latest ${detail.log.length} of ${formatCount(detail.checksToday)} checks today`}</span>
         {detail.checksToday > 0 && (
           <Button variant="ghost" size="sm" icon={<IconDownload />} href={`/sites/${detail.id}/checks.csv`}>
