@@ -2,7 +2,7 @@ import 'server-only';
 import { CLOSED_INCIDENT_STATES_IN, defaultSlowMs, toMonitorHeaders, type SiteStatus } from '@dxt/shared';
 import { siteUptimeOver } from '@dxt/engine';
 import { createClient } from '@/lib/supabase/server';
-import { downEpisodesBySite, watchedSince } from './detail-queries';
+import { downEpisodesBySite, slowMsOf, watchedSince } from './detail-queries';
 import { locationGlyph } from './components/site-list';
 import { siteIdSchema } from './schemas';
 import type {
@@ -213,9 +213,17 @@ export async function getSite(siteId: string): Promise<SiteRecord | null> {
   };
 }
 
-function slowMsOf(thresholds: unknown): number | null {
-  const v = (thresholds as { slowMs?: unknown } | null)?.slowMs;
-  return typeof v === 'number' && v > 0 ? v : null;
+/**
+ * The sidebar's Sites count (spec §20, §21.2): monitored sites, drafts left out. A head count — no
+ * rows travel. Null if it can't be read, so the nav just shows no number.
+ */
+export async function countMonitoredSites(): Promise<number | null> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from('sites')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_active', true);
+  return error ? null : count;
 }
 
 /**

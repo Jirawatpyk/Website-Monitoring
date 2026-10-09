@@ -1,12 +1,13 @@
 import { Container } from '@jirawatpyk/aura-react';
-import { LoadingList } from '@/components/states';
+import { OverviewSkeleton } from '@/features/overview';
 
-/** Shown while a signed-in page loads: grey shape first, never a green dashboard (EmptyStates board).
+/** While `/` loads: the Overview's shape, never a green dashboard (EmptyStates board). Every other
+ * signed-in page has its own loading.tsx (`loading-coverage.test.ts`), so this is the Overview's.
  * AppShell already pads the page, so no extra padding here. */
 export default function Loading() {
   return (
     <Container>
-      <LoadingList label="Loading" />
+      <OverviewSkeleton />
     </Container>
   );
 }

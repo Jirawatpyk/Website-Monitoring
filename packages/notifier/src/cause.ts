@@ -29,6 +29,23 @@ export function formatCause(checks: readonly FailedCheck[], timeoutMs: number): 
     .join(' · ');
 }
 
+/**
+ * The cause's short form (spec §10: "Timeout ×2 · 504 ×1"), read back from `formatCause`'s words —
+ * Overview banners and Live issues have one line. "HTTP 504" shortens to "504", "Timeout > 30 s" to
+ * "Timeout"; a part without locations (or text that isn't `formatCause` output) is kept as it is.
+ */
+export function shortCause(cause: string): string {
+  return cause
+    .split(' · ')
+    .map((part) => {
+      const m = /^(.*) \(([A-Z, ]+)\)$/.exec(part);
+      if (!m?.[1] || !m[2]) return part;
+      const kind = m[1].replace(/^HTTP (\d{3})$/, '$1').replace(/^Timeout > .*$/, 'Timeout');
+      return `${kind} ×${m[2].split(', ').length}`;
+    })
+    .join(' · ');
+}
+
 const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY|UNABLE_TO_GET_ISSUER/;
 
 export function describeFailure({ statusCode, error }: FailedCheck, timeoutMs: number): string {

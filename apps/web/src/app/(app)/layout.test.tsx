@@ -4,11 +4,13 @@ import AppLayout from './layout';
 
 const mocks = vi.hoisted(() => ({
   getAccess: vi.fn(),
+  countMonitoredSites: vi.fn(async () => 17 as number | null),
   redirect: vi.fn((to: string) => {
     throw new Error(`redirect:${to}`);
   }),
 }));
 vi.mock('@/lib/auth/session', () => ({ getAccess: mocks.getAccess }));
+vi.mock('@/features/sites/server', () => ({ countMonitoredSites: mocks.countMonitoredSites }));
 vi.mock('next/navigation', () => ({
   redirect: mocks.redirect,
   useRouter: () => ({ refresh: vi.fn() }),
@@ -36,6 +38,35 @@ describe('AppLayout', () => {
     // AURA 5.32: the name shows in AURA's own tip (hover + keyboard focus), not a native title.
     expect(screen.getAllByRole('button', { name: 'Sign out' })[0]).toHaveAttribute('data-aura-tip');
     expect(screen.getByText('page content')).toBeInTheDocument();
+  });
+
+  it('counts monitored sites beside Sites and shows the phone sections in BottomNav (S06b)', async () => {
+    mocks.getAccess.mockResolvedValue({
+      status: 'active',
+      profile: { id: 'u1', email: 'arm@example.test', displayName: 'Arm', role: 'responder' },
+    });
+    render(await AppLayout({ children: page }));
+
+    const sideNav = screen.getAllByRole('navigation', { name: 'Main navigation' })[0]!;
+    expect(within(sideNav).getByRole('link', { name: /Sites/ })).toHaveTextContent('17');
+    const bottom = screen.getByRole('navigation', { name: 'Sections' });
+    // live sections only (D-032): Incidents joins with S07, On-call with S10
+    expect(
+      within(bottom)
+        .getAllByRole('link')
+        .map((a) => a.textContent),
+    ).toEqual(['Overview', 'Sites']);
+  });
+
+  it('shows no number when the count cannot be read', async () => {
+    mocks.getAccess.mockResolvedValue({
+      status: 'active',
+      profile: { id: 'u1', email: 'arm@example.test', displayName: 'Arm', role: 'responder' },
+    });
+    mocks.countMonitoredSites.mockResolvedValueOnce(null);
+    render(await AppLayout({ children: page }));
+    const sideNav = screen.getAllByRole('navigation', { name: 'Main navigation' })[0]!;
+    expect(within(sideNav).getByRole('link', { name: /Sites/ })).toHaveTextContent(/^Sites$/);
   });
 
   it('puts the brand and the avatar in the phone top bar', async () => {

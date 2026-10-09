@@ -1,7 +1,8 @@
 import 'server-only';
 
-export { chatConnected, getRegistrationOptions, getSite, listSites } from './queries';
-export { getSiteDetail, getSiteName } from './detail-queries';
+export { chatConnected, countMonitoredSites, getRegistrationOptions, getSite, listSites } from './queries';
+export { downEpisodesBySite, getSiteDetail, getSiteName, slowMsOf, watchedSince } from './detail-queries';
+export { locationGlyph } from './components/site-list';
 export { checksCsv, incidentsCsv } from './downloads';
 export { createSite, deleteSite, saveMonitors, setSiteMonitoring, updateSite } from './actions';
 export { monitorTestHandler } from './test-check';

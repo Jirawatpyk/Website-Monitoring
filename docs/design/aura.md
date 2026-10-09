@@ -4,7 +4,7 @@ AURA is the only UI kit. Its full docs live in the [AURA design system](https://
 
 ## Packages
 
-- `@jirawatpyk/aura-react` and `@jirawatpyk/aura-tokens`, pinned `^5.33.0` in `apps/web` (tokens also at the root for the ESLint plugin). Both always share one version.
+- `@jirawatpyk/aura-react` and `@jirawatpyk/aura-tokens`, pinned `^5.34.0` in `apps/web` (tokens also at the root for the ESLint plugin). Both always share one version.
 - CSS is wired in two places — don't add more imports:
   - `apps/web/src/app/layout.tsx` imports `@jirawatpyk/aura-tokens/aura-fonts.local.css` (self-hosted fonts) and `./globals.css`, and renders `<ColorSchemeScript />` in `<head>`.
   - `apps/web/src/app/globals.css` declares `@layer theme, base, aura, components, utilities;`, then imports `tailwindcss`, `@jirawatpyk/aura-tokens/tailwind.css` (Tailwind v4 theme **and** `aura.css` tokens) and `@jirawatpyk/aura-react/styles.layer.css` (components inside `@layer aura`). The layer order lets Tailwind utilities override AURA component styles. Never also import `aura.css` or `styles.css` — that duplicates tokens and components outside the layers.
@@ -48,9 +48,12 @@ Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build proj
 
 ## Requests to AURA
 
-Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). The first eight requests have shipped. Open (S05, 8 Oct 2026; add it to the doc with the next batch):
+Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). Requests 1–10 have shipped (5.32–5.34). Open in the doc (9 Oct 2026):
 
-- **Breadcrumb links: touch hit area.** A crumb link is ~20 px tall; on a coarse pointer it should get the same 44 px `::after` hit area as `Button size="sm"`. Workaround: `.aura-crumbs a::after` in `apps/web/src/app/globals.css` — remove it when AURA ships this.
+- **Request 12 — StatusTile: a neutral "no data" status** (S06b). `status` is down / problem / maintenance / ok; a monitored site before its first round has none, so the Overview draws it as `ok` with `statusLabel="No data yet"` — the check icon says more than is known. Ask for `status="unknown"` (circle-dot-dashed, tertiary, plain surface), the Sites list's "No data yet" badge in tile form (D-032).
+- **Request 13 — AppShell top bar hides while scrolling down** (S06b, Tao). Waits for AURA; no workaround.
+- **Request 14 — BottomNav hides on scroll and for a page's own bottom bar** (S06b). Workaround: `components/app-shell/phone-nav.tsx` (scroll listener, `data-bottomnav-hidden`) and the `data-hides-bottomnav` rules in `app/globals.css` — remove both when AURA ships it.
+- **Request 11 — Breadcrumb links: touch hit area** (S05). A crumb link is ~20 px tall; on a coarse pointer it should get the same 44 px `::after` hit area as `Button size="sm"`. Workaround: `.aura-crumbs a::after` in `apps/web/src/app/globals.css` — remove it when AURA ships this.
 
 A new request goes in the doc (template at its foot) and here.
 
@@ -67,3 +70,9 @@ AURA 5.33 (requests 5–8, 7 Oct 2026):
 - Phone-only top bar → `AppShell headerHideFrom="lg"` (`app/(app)/layout.tsx`): the bar, header and all, shows only below 1024 px, and `--aura-shell-bar-height` is 0 from lg (D-018).
 - Breadcrumb → `PageHeader breadcrumb={<Breadcrumb … />}`: its own `div` 4 px above the title, Breadcrumb keeps its 13 px sans; with an eyebrow too, the breadcrumb comes first (D-018). Never put a Breadcrumb in `eyebrow` (a `<p>`).
 - Phone drawer header → takes the bar's measured height so the two lines meet; the drawer's close button is a 44 px target on touch. Nothing to change in DxT.
+
+AURA 5.34 (S06b Overview, 9 Oct 2026):
+
+- `StatusTile` + `TileGrid` → the Overview's All sites tiles (`columns={{ base: 2, xl: 3 }}`). Its icons are circle-alert (down) and wrench (maintenance), not the badges' ban and calendar; spec §21.10 accepts that (D-032). A title past two lines ends with "…" and shows in full in a tip.
+- `Sparkline` → the Response 24h line in Live issues (`failures="none"`, `null` = no point, so the line breaks).
+- All three are stateless and also exported from `/server`.

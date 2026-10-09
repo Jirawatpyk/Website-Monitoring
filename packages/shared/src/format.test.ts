@@ -6,7 +6,9 @@ import {
   formatCount,
   formatDay,
   formatDuration,
+  formatDurationSeconds,
   formatIncidentId,
+  formatMs,
   formatIncidentLine,
   formatPercent,
   formatTier,
@@ -61,6 +63,33 @@ describe('formatDuration (spec §13)', () => {
   });
 });
 
+describe('formatDurationSeconds (Main3 MTTA / MTTD)', () => {
+  it.each([
+    [18, '18 s'],
+    [0, '0 s'],
+    [112, '1 min 52 s'],
+    [400, '6 min 40 s'],
+    [72.4, '1 min 12 s'],
+    [900, '15 min'],
+    [3720, '1 h 2 min'],
+    [-5, '0 s'],
+  ])('%d s → %s', (seconds, expected) => {
+    expect(formatDurationSeconds(seconds)).toBe(expected);
+  });
+});
+
+describe('formatMs (Main3 response times)', () => {
+  it.each([
+    [412, '412 ms'],
+    [999.4, '999 ms'],
+    [999.6, '1.0 s'],
+    [1100, '1.1 s'],
+    [5800, '5.8 s'],
+  ])('%d ms → %s', (ms, expected) => {
+    expect(formatMs(ms)).toBe(expected);
+  });
+});
+
 describe('dates in Bangkok time', () => {
   it('formats the time as 24-hour', () => {
     expect(formatTime(snapshot)).toBe('10:07');
@@ -69,6 +98,9 @@ describe('dates in Bangkok time', () => {
   it('formats the day without padding or "Sept"', () => {
     expect(formatDay(snapshot)).toBe('25 Sep');
     expect(formatDay(snapshot, { weekday: true })).toBe('Fri 25 Sep');
+    expect(formatDay(snapshot, { weekday: true, year: true })).toBe('Fri 25 Sep 2026');
+    // the Bangkok year: 31 Dec 17:30 UTC is already 1 Jan in Bangkok
+    expect(formatDay(new Date('2026-12-31T17:30:00Z'), { year: true })).toBe('1 Jan 2027');
     expect(formatDay(new Date('2026-09-02T00:00:00Z'))).toBe('2 Sep');
   });
 

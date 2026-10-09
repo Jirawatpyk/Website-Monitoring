@@ -56,6 +56,7 @@ export async function acknowledgeIncident(incidentId: string): Promise<AckResult
     }
   });
   revalidatePath(`/incidents/${id.data}`);
+  revalidatePath('/'); // the Overview banners and Live issues (S06b)
   return { ok: true, postsAt };
 }
 
@@ -67,5 +68,6 @@ export async function undoAcknowledge(incidentId: string): Promise<UndoResult> {
   const { error } = await supabase.rpc('undo_ack', { p_incident_id: id.data });
   if (error) return { ok: false, message: UNDO_REFUSALS[error.code] ?? FAILED };
   revalidatePath(`/incidents/${id.data}`);
+  revalidatePath('/'); // the Overview banners and Live issues (S06b)
   return { ok: true };
 }
