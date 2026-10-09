@@ -366,7 +366,7 @@ describe('Recent events (§21.6, §16.11, D-032)', () => {
     [ev('detected', { payload: { confirmingLocations: 3 } }), 'Cando Asia DOWN confirmed — 3/3 locations'],
     [
       ev('detected', { severity: 'problem', trigger: 'slow', payload: { summary: 'slow, p50 5.8 s' } }),
-      'Cando Asia PROBLEM — Slow',
+      'Cando Asia PROBLEM — Slow, p50 5.8 s',
     ],
     [
       ev('escalated_to_down', { payload: { confirmingLocations: 2 } }),

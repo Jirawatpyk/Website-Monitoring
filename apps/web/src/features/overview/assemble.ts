@@ -54,6 +54,29 @@ export function chainStreakStart(
   return start;
 }
 
+/**
+ * The drop an open incident is in now (code review S06b): its newest `detected`, `escalated_to_down`
+ * (D-021) or `relapsed` (D-004) event says when it started and why — not the incident's first drop.
+ * A relapse carries its own `startedAt` (first failed check); an escalation counts from the escalation,
+ * as uptime does (D-021); the first drop is the incident's `started_at`.
+ */
+export function currentDrop(
+  events: readonly { type: string; at: string; payload: unknown }[],
+  incidentStartedAt: string,
+): { startedAt: string; cause: string | null; summary: string | null } {
+  const newest = [...events]
+    .filter((e) => e.type === 'detected' || e.type === 'escalated_to_down' || e.type === 'relapsed')
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
+  const p = (newest?.payload && typeof newest.payload === 'object' ? newest.payload : {}) as Record<
+    string,
+    unknown
+  >;
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
+  const startedAt =
+    !newest || newest.type === 'detected' ? incidentStartedAt : (text(p.startedAt) ?? newest.at);
+  return { startedAt, cause: text(p.cause), summary: text(p.summary) };
+}
+
 const PROBE_GRACE_MS = 3 * 60_000;
 const VERIFIER_GRACE_MS = 2 * 60_000;
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   chainStreakStart,
+  currentDrop,
   lastRoundP50,
   probeHealth,
   SERIES_POINTS,
@@ -67,6 +68,56 @@ describe('chainStreakStart', () => {
     ).toBeNull();
     expect(chainStreakStart([{ checked_at: '09:40', outcome: 'fail', error: null }])).toBeNull();
     expect(chainStreakStart([])).toBeNull();
+  });
+});
+
+describe('currentDrop (D-004 relapse, D-021 escalation)', () => {
+  const started = '2026-09-25T03:12:00Z';
+  it('the first drop: the incident start and the detected cause', () => {
+    expect(
+      currentDrop(
+        [{ type: 'detected', at: '2026-09-25T03:12:40Z', payload: { cause: 'HTTP 503 (BKK, SIN, TYO)' } }],
+        started,
+      ),
+    ).toEqual({ startedAt: started, cause: 'HTTP 503 (BKK, SIN, TYO)', summary: null });
+  });
+  it('a relapse: its own start and cause (VOCA drops again at 03:55)', () => {
+    const events = [
+      { type: 'detected', at: '2026-09-25T03:12:40Z', payload: { cause: 'HTTP 503 (BKK, SIN, TYO)' } },
+      { type: 'acknowledged', at: '2026-09-25T03:20:00Z', payload: {} },
+      {
+        type: 'relapsed',
+        at: '2026-09-25T03:55:40Z',
+        payload: { cause: 'Timeout > 30 s (BKK, TYO)', startedAt: '2026-09-25T03:55:00Z' },
+      },
+    ];
+    expect(currentDrop(events, started)).toEqual({
+      startedAt: '2026-09-25T03:55:00Z',
+      cause: 'Timeout > 30 s (BKK, TYO)',
+      summary: null,
+    });
+  });
+  it('a PROBLEM raised to DOWN: from the escalation, with the DOWN cause', () => {
+    const events = [
+      {
+        type: 'detected',
+        at: '2026-09-25T03:12:40Z',
+        payload: { cause: 'p50 5.8 s (BKK)', summary: 'slow, p50 5.8 s' },
+      },
+      {
+        type: 'escalated_to_down',
+        at: '2026-09-25T03:30:00Z',
+        payload: { cause: 'HTTP 503 (BKK, SIN, TYO)' },
+      },
+    ];
+    expect(currentDrop(events, started)).toEqual({
+      startedAt: '2026-09-25T03:30:00Z',
+      cause: 'HTTP 503 (BKK, SIN, TYO)',
+      summary: null,
+    });
+  });
+  it('no events: the incident start', () => {
+    expect(currentDrop([], started)).toEqual({ startedAt: started, cause: null, summary: null });
   });
 });
 

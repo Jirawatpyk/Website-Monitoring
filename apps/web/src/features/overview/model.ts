@@ -376,7 +376,7 @@ export function eventLine(e: OverviewEvent): string | null {
   switch (e.type) {
     case 'detected':
       return typeof e.payload.summary === 'string'
-        ? `${e.siteName} PROBLEM — ${TRIGGER_LABELS[e.trigger]}`
+        ? `${e.siteName} PROBLEM — ${capitalise(e.payload.summary)}`
         : confirmed;
     case 'escalated_to_down':
       return confirmed;

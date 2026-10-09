@@ -129,6 +129,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // the seed Admin signs in with Google only: don't leave it a password known from this file
+  await db.auth.admin.updateUserById(admin.id, { password: crypto.randomUUID() });
   await db.from('incident_events').delete().eq('incident_id', incidentId);
   await db.from('incidents').delete().eq('site_id', siteId);
   await db.from('site_status').delete().eq('site_id', siteId);

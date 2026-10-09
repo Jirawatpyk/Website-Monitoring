@@ -12,6 +12,8 @@ export type AckAction = (
 ) => Promise<{ ok: true; postsAt: string } | { ok: false; message: string }>;
 export type UndoAction = (incidentId: string) => Promise<{ ok: true } | { ok: false; message: string }>;
 
+const FAILED = 'Couldn’t reach the server. Check your connection and try again.';
+
 /** The toast's body: the hold line and "Undo · N s" while the window is open (spec §16.8, D-016 copy). */
 function UndoLine({ postsAt, onUndo }: { postsAt: string; onUndo: () => void }) {
   const seconds = useSecondsLeft(postsAt);
@@ -51,18 +53,20 @@ export function useOverviewAck({ ack, undo }: { ack: AckAction; undo: UndoAction
       const toastId = `ack-${incidentId}`;
       setAcked((prev) => new Set(prev).add(incidentId));
       startTransition(async () => {
-        const result = await ack(incidentId);
+        // A thrown action (network drop, a deploy) is a refusal too: never leave the banner hidden.
+        const result = await ack(incidentId).catch(() => ({ ok: false as const, message: FAILED }));
+        // Optimistic only while the action runs: its revalidation has brought the page's own data by
+        // now, so the server's state shows from here — a later relapse to Unacked brings the banner back.
+        forget(incidentId);
         if (!result.ok) {
-          forget(incidentId);
           toast.error(`Couldn't acknowledge ${id}`, { id: toastId, description: result.message });
           router.refresh();
           return;
         }
         const onUndo = () =>
           startTransition(async () => {
-            const undone = await undo(incidentId);
+            const undone = await undo(incidentId).catch(() => ({ ok: false as const, message: FAILED }));
             if (undone.ok) {
-              forget(incidentId);
               toast({ id: toastId, title: `Acknowledgement of ${id} undone`, duration: 4000 });
             } else {
               toast.error(`Couldn't undo ${id}`, { id: toastId, description: undone.message });

@@ -134,17 +134,36 @@ describe('OverviewView (Main3 / MOverview4)', () => {
   });
 
   it('Acknowledge removes the banner at once and the toast offers Undo (§21.1, §16.8, D-016)', async () => {
-    ackAction.mockResolvedValue({ ok: true, postsAt: new Date(NOW.getTime() + 10_000).toISOString() });
+    let finish: (v: { ok: true; postsAt: string }) => void = () => {};
+    ackAction.mockReturnValue(new Promise((resolve) => (finish = resolve)));
     undoAction.mockResolvedValue({ ok: true });
-    renderView(data());
+    const view = renderView(data());
     const [bannerAck] = within(desktop()).getAllByRole('button', { name: 'Acknowledge' });
     await act(async () => {
       fireEvent.click(bannerAck!);
     });
+    // at once, while the action runs
     expect(ackAction).toHaveBeenCalledWith('i-142');
     expect(screen.queryByText('MuvMi is DOWN — 19 min')).toBeNull();
     expect(screen.getByText('INC-0142 · Acked by Tao')).toBeInTheDocument();
-    await act(async () => {});
+    // the action's revalidation brings the server's acked row with its result
+    const acked = data({
+      sites: data().sites.map((s) =>
+        s.incident
+          ? { ...s, incident: { ...s.incident, state: 'acknowledged' as const, ackedBy: 'Tao' } }
+          : s,
+      ),
+    });
+    view.rerender(
+      <>
+        <OverviewView data={acked} ackAction={ackAction} undoAction={undoAction} />
+        <Toaster />
+      </>,
+    );
+    await act(async () => {
+      finish({ ok: true, postsAt: new Date(NOW.getTime() + 10_000).toISOString() });
+    });
+    expect(screen.queryByText('MuvMi is DOWN — 19 min')).toBeNull();
     expect(screen.getByText('Acknowledged INC-0142')).toBeInTheDocument();
     expect(
       screen.getByText('Posting to Chat and email in 10 s — nothing is sent until then'),
@@ -153,7 +172,34 @@ describe('OverviewView (Main3 / MOverview4)', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Undo · 10 s' }));
     });
     expect(undoAction).toHaveBeenCalledWith('i-142');
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it('after an ack, a relapse to Unacked brings the banner back (code review S06b)', async () => {
+    ackAction.mockResolvedValue({ ok: true, postsAt: new Date(NOW.getTime() + 10_000).toISOString() });
+    const view = renderView(data());
+    await act(async () => {
+      fireEvent.click(within(desktop()).getAllByRole('button', { name: 'Acknowledge' })[0]!);
+    });
+    // Realtime later delivers the same incident unacked again (DOWN AGAIN, D-004)
+    view.rerender(
+      <>
+        <OverviewView data={data()} ackAction={ackAction} undoAction={undoAction} />
+        <Toaster />
+      </>,
+    );
     expect(screen.getAllByText('MuvMi is DOWN — 19 min').length).toBe(2);
+  });
+
+  it('a thrown action (network) is treated as a refusal', async () => {
+    ackAction.mockRejectedValue(new Error('fetch failed'));
+    renderView(data());
+    await act(async () => {
+      fireEvent.click(within(desktop()).getAllByRole('button', { name: 'Acknowledge' })[0]!);
+    });
+    await act(async () => {});
+    expect(screen.getAllByText('MuvMi is DOWN — 19 min').length).toBe(2);
+    expect(screen.getByText(/Couldn’t reach the server/)).toBeInTheDocument();
   });
 
   it('a refused ack puts the banner back and says why', async () => {

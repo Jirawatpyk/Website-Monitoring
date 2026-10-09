@@ -15,11 +15,11 @@ import { getAccess } from '@/lib/auth/session';
  * profile (deactivated, or never on the access list) is signed out by /auth/refused (D-007).
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const access = await getAccess();
+  // Side by side: the count is a head count under RLS, harmless (0 or null) for a session that then redirects.
+  const [access, sites] = await Promise.all([getAccess(), countMonitoredSites()]);
   if (access.status === 'signed-out') redirect('/login');
   if (access.status !== 'active') redirect('/auth/refused');
   const { profile } = access;
-  const sites = await countMonitoredSites();
 
   return (
     <AppShell

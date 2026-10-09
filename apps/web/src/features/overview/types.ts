@@ -23,7 +23,8 @@ export interface OverviewIncident {
   severity: 'down' | 'problem';
   trigger: Trigger;
   level: number;
-  /** First failed check (duration counts from here, spec §14.3). */
+  /** First failed check of the drop it is in now — a relapse or an escalation starts its own (spec
+   * §14.3: duration counts from here; D-004, D-021). */
   startedAt: string;
   /** Confirmed down / flagged (the unacked wait counts from here, spec §14.3). */
   detectedAt: string;

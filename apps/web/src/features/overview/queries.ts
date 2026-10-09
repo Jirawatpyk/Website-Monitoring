@@ -6,7 +6,7 @@ import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { getAccess } from '@/lib/auth/session';
 import { downEpisodesBySite, locationGlyph, slowMsOf, watchedSince } from '@/features/sites/server';
-import { chainStreakStart, lastRoundP50, probeHealth, seriesOf, viewerKindOf } from './assemble';
+import { chainStreakStart, currentDrop, lastRoundP50, probeHealth, seriesOf, viewerKindOf } from './assemble';
 import { EVENT_TYPES } from './model';
 import {
   OVERVIEW_LOCATIONS,
@@ -25,11 +25,10 @@ const THIRTY_DAYS_MIN = 30 * 1440;
 /** Recent events read before wording (some types aren't worded); the page shows 7. */
 const EVENT_ROWS = 20;
 
-const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
-
 /**
  * Everything `/` shows (spec §21, D-032), read as the signed-in person (RLS: staff read all). Takes
- * any client so the integration test and the timing run can call it. Independent reads run side by
+ * a client so the integration test and the timing run can call it — never pass the service-role
+ * client: RLS is the access rule here (security review S06b). Independent reads run side by
  * side; only the TLS chain streaks wait for the location glyphs.
  */
 export async function loadOverview(
@@ -52,11 +51,11 @@ export async function loadOverview(
          monitors(id, is_primary, thresholds),
          incidents(id, number, state, severity, trigger, escalation_level, started_at, detected_at, recovered_at,
                    acker:profiles!incidents_acked_by_fkey(display_name),
-                   incident_events(type, payload))`,
+                   incident_events(type, at, payload))`,
         )
         .eq('monitors.is_primary', true)
         .not('incidents.state', 'in', CLOSED_INCIDENT_STATES_IN)
-        .eq('incidents.incident_events.type', 'detected')
+        .in('incidents.incident_events.type', ['detected', 'escalated_to_down', 'relapsed'])
         .order('name'),
       db.rpc('site_list_locations'),
       db.rpc('overview_response_24h'),
@@ -120,12 +119,10 @@ export async function loadOverview(
     ) as OverviewSite['locations'];
     const siteStatus = (status?.status as SiteStatus | undefined) ?? null;
     const inc = s.incidents[0];
-    const cause = str(
-      inc?.incident_events[0]?.payload && (inc.incident_events[0].payload as Record<string, unknown>).cause,
-    );
-    const summary = str(
-      inc?.incident_events[0]?.payload && (inc.incident_events[0].payload as Record<string, unknown>).summary,
-    );
+    // the drop it is in now: a relapse or an escalation has its own start and cause (D-004, D-021)
+    const drop = inc ? currentDrop(inc.incident_events, inc.started_at) : null;
+    const cause = drop?.cause ?? null;
+    const summary = drop?.summary ?? null;
     const incident: OverviewIncident | null = inc
       ? {
           id: inc.id,
@@ -134,7 +131,7 @@ export async function loadOverview(
           severity: inc.severity,
           trigger: inc.trigger,
           level: inc.escalation_level,
-          startedAt: inc.started_at,
+          startedAt: drop?.startedAt ?? inc.started_at,
           detectedAt: inc.detected_at,
           recoveredAt: inc.recovered_at,
           ackedBy: inc.acker?.display_name ?? null,
@@ -209,7 +206,8 @@ export async function loadOverview(
     nowIso: now.toISOString(),
     viewer: { id: person.id, name: person.name, kind: viewerKindOf(person.role, (managed.count ?? 0) > 0) },
     sites: rows,
-    drafts: (sites.data ?? []).length - live.length,
+    // a Draft has never been started; a stopped site is neither monitored nor a draft
+    drafts: (sites.data ?? []).filter((s) => !s.is_active && !s.monitoring_started_at).length,
     events: eventRows,
     kpis: {
       enough: current.enough,
