@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatPercent } from '@dxt/shared';
-import { episodesFromTimeline, type Episode } from './lifecycle';
+import { downEpisodesFromTimeline, episodesFromTimeline, type Episode } from './lifecycle';
 import { aggregateUptime, downMinutesIn, siteUptime, siteUptimeOver } from './uptime';
 
 const WINDOW_30D = 43_200;
@@ -139,6 +139,37 @@ describe('episodesFromTimeline (stored incident_events → drops)', () => {
       },
     ]);
     expect(downMinutesIn(drops, at('2026-09-25T00:00:00'), NOW)).toBe(17);
+  });
+});
+
+describe('downEpisodesFromTimeline (D-021: PROBLEM time before the escalation is up)', () => {
+  it('a PROBLEM raised to DOWN while still failing counts only from downStartedAt', () => {
+    // stored after the escalation: severity 'down'; slow from 09:30, an outage from 10:00, back 10:10
+    const drops = downEpisodesFromTimeline({ started_at: '2026-09-25T09:30:00+07:00', severity: 'down' }, [
+      { type: 'detected', at: '2026-09-25T09:31:00+07:00', payload: {} },
+      {
+        type: 'escalated_to_down',
+        at: '2026-09-25T10:00:40+07:00',
+        payload: { downStartedAt: '2026-09-25T10:00:00+07:00', severity: 'down' },
+      },
+      { type: 'recovered', at: '2026-09-25T10:10:00+07:00', payload: {} },
+    ]);
+    expect(downMinutesIn(drops, at('2026-09-25T00:00:00'), at('2026-09-25T12:00:00'))).toBe(10);
+  });
+
+  it('a plain DOWN incident keeps every drop', () => {
+    const drops = downEpisodesFromTimeline({ started_at: '2026-09-25T09:48:12+07:00', severity: 'down' }, [
+      { type: 'detected', at: '2026-09-25T09:48:41+07:00', payload: {} },
+    ]);
+    expect(downMinutesIn(drops, at('2026-09-25T00:00:00'), NOW)).toBeCloseTo(18.8, 1);
+  });
+
+  it('a PROBLEM incident never raised has no downtime', () => {
+    expect(
+      downEpisodesFromTimeline({ started_at: '2026-09-25T09:52:00+07:00', severity: 'problem' }, [
+        { type: 'detected', at: '2026-09-25T09:52:30+07:00', payload: {} },
+      ]),
+    ).toEqual([]);
   });
 });
 

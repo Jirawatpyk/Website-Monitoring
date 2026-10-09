@@ -29,7 +29,7 @@ const THIRTY_DAYS_MIN = 30 * 1440;
 export async function listSites(now = new Date()): Promise<SiteListRow[]> {
   const supabase = await createClient();
   const from30d = new Date(now.getTime() - THIRTY_DAYS_MIN * 60_000);
-  const [sites, checks, response] = await Promise.all([
+  const [sites, checks, response, drops] = await Promise.all([
     supabase
       .from('sites')
       .select(
@@ -47,16 +47,12 @@ export async function listSites(now = new Date()): Promise<SiteListRow[]> {
       .order('name'),
     supabase.rpc('site_list_locations'),
     supabase.rpc('site_list_response_24h'),
+    downEpisodesBySite(supabase, null, from30d),
   ]);
   if (sites.error) throw new Error(`sites: ${sites.error.message}`);
   if (checks.error) throw new Error(`site_list_locations: ${checks.error.message}`);
   if (response.error) throw new Error(`site_list_response_24h: ${response.error.message}`);
   const p50 = new Map(response.data.map((r) => [r.site_id, r.p50_ms]));
-  const drops = await downEpisodesBySite(
-    supabase,
-    sites.data.filter((s) => s.monitoring_started_at).map((s) => s.id),
-    from30d,
-  );
 
   const latest = new Map<string, (typeof checks.data)[number]>();
   for (const c of checks.data) latest.set(`${c.site_id}|${c.location}`, c);

@@ -384,7 +384,8 @@ function LatestRound({ detail, now }: { detail: SiteDetail; now: Date }) {
   const times = round.map((r) => Date.parse(r.checkedAt)).sort((a, b) => a - b);
   const first = times[0];
   const last = times.at(-1);
-  const next = last !== undefined ? new Date(last + TIER_CONFIG[detail.tier].intervalSec * 1000) : null;
+  const interval = TIER_CONFIG[detail.tier].intervalSec * 1000;
+  const next = last !== undefined ? new Date((Math.floor(last / interval) + 1) * interval) : null;
   return (
     <Card
       headingLevel={2}

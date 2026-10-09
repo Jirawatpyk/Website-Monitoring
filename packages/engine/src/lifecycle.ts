@@ -246,6 +246,31 @@ export function episodesFromTimeline(
   return episodesOf(out);
 }
 
+/**
+ * The DOWN part of a stored incident's drops, for uptime (spec §5: PROBLEM counts as up). An incident
+ * raised from PROBLEM to DOWN (D-021) carries `severity = 'down'` afterwards, so its timeline reads as
+ * DOWN from the first PROBLEM check; its downtime starts at the first escalation's `downStartedAt`.
+ */
+export function downEpisodesFromTimeline(
+  incident: { started_at: string; severity: Severity },
+  events: readonly IncidentEventRow[],
+): Episode[] {
+  const drops = episodesFromTimeline(incident, events).filter((d) => d.severity === 'down');
+  const escalations = events
+    .filter((e) => e.type === 'escalated_to_down')
+    .map((e) => {
+      const p = e.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : {};
+      return dateOf(p.downStartedAt) ?? dateOf(e.at);
+    })
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => a.getTime() - b.getTime());
+  const firstDown = escalations[0];
+  if (!firstDown) return drops;
+  return drops
+    .filter((d) => d.end === null || d.end > firstDown)
+    .map((d) => (d.start < firstDown ? { ...d, start: firstDown } : d));
+}
+
 /** Minutes the episodes were down (or had a problem), the drop still in progress counted to `now`. */
 export function episodeMinutes(episodes: readonly Episode[], now: Date): number {
   const ms = episodes.reduce((sum, e) => sum + Math.max(0, (e.end ?? now).getTime() - e.start.getTime()), 0);

@@ -1,6 +1,6 @@
 import 'server-only';
 import { episodeMinutes, episodesFromTimeline } from '@dxt/engine';
-import { CLOSED_INCIDENT_STATES, formatIncidentId, type Trigger } from '@dxt/shared';
+import { bangkokDayStart, CLOSED_INCIDENT_STATES, formatIncidentId, type Trigger } from '@dxt/shared';
 import { createClient } from '@/lib/supabase/server';
 import { csvResponse, fetchAllPages, fileSlug, toCsv } from './csv';
 import { clientWord, triggerWord } from './detail';
@@ -22,9 +22,7 @@ export async function checksCsv(siteId: string, now = new Date()): Promise<Respo
   const found = await siteName(siteId);
   if (!found) return new Response('Not found', { status: 404 });
   const { supabase, site } = found;
-  const midnight = new Date(now.getTime() + 7 * 3_600_000);
-  midnight.setUTCHours(0, 0, 0, 0);
-  const from = new Date(midnight.getTime() - 7 * 3_600_000);
+  const from = bangkokDayStart(now);
   const data = await fetchAllPages(
     (a, b) =>
       supabase
@@ -71,7 +69,7 @@ export async function incidentsCsv(siteId: string, now = new Date()): Promise<Re
           'number, state, severity, trigger, started_at, recovered_at, resolved_at, incident_events(type, at, payload)',
         )
         .eq('site_id', site.id)
-        .or(`started_at.gte.${from.toISOString()},resolved_at.is.null`)
+        .or(`started_at.gte.${from.toISOString()},resolved_at.is.null,resolved_at.gte.${from.toISOString()}`)
         .order('started_at', { ascending: false })
         .order('id')
         .range(x, y),
@@ -95,11 +93,12 @@ export async function incidentsCsv(siteId: string, now = new Date()): Promise<Re
         i.incident_events,
       );
       const open =
-        !(CLOSED_INCIDENT_STATES as readonly string[]).includes(i.state) && drops.some((d) => !d.end);
+        !(CLOSED_INCIDENT_STATES as readonly string[]).includes(i.state) &&
+        (drops.length === 0 || drops.some((d) => !d.end));
       return [
         formatIncidentId(i.number),
         i.started_at,
-        open || drops.length === 0 ? null : episodeMinutes(drops, now),
+        open ? null : episodeMinutes(drops, now),
         triggerWord(i.trigger as Trigger),
         i.severity,
         clientWord(i.severity, i.trigger as Trigger),

@@ -85,6 +85,12 @@ export function formatWhen(date: Date, now: Date, options: { midSentence?: boole
   return `${options.midSentence ? word.toLowerCase() : word} ${formatTime(date)}`;
 }
 
+/** Midnight in Bangkok at the start of `now`'s Bangkok day ("checks today", today's log). */
+export function bangkokDayStart(now: Date): Date {
+  const p = bangkokParts(now);
+  return new Date(Date.UTC(p.year, p.month, p.day) - 7 * 3_600_000);
+}
+
 /** "2,007" — counts with thousands separators. */
 export function formatCount(n: number): string {
   return n.toLocaleString('en-US');

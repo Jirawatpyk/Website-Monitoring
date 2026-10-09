@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bangkokDayStart,
   confirmedByWafOf,
   formatConfirmedBy,
   formatCount,
@@ -140,6 +141,14 @@ describe('formatWhen (spec §13)', () => {
     ['2026-09-24T09:40:00Z', { midSentence: true }, 'yesterday 16:40'],
   ] as const)('%s %j → %s', (iso, options, out) => {
     expect(formatWhen(new Date(iso), snapshot, options)).toBe(out);
+  });
+});
+
+describe('bangkokDayStart', () => {
+  it('midnight Bangkok, even when UTC is still the day before', () => {
+    expect(bangkokDayStart(snapshot).toISOString()).toBe('2026-09-24T17:00:00.000Z');
+    expect(bangkokDayStart(new Date('2026-09-24T17:30:00Z')).toISOString()).toBe('2026-09-24T17:00:00.000Z');
+    expect(bangkokDayStart(new Date('2026-09-24T16:59:00Z')).toISOString()).toBe('2026-09-23T17:00:00.000Z');
   });
 });
 

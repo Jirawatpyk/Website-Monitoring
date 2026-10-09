@@ -1,6 +1,7 @@
 import 'server-only';
-import { episodeMinutes, episodesFromTimeline, siteUptimeOver } from '@dxt/engine';
+import { downEpisodesFromTimeline, episodeMinutes, episodesFromTimeline, siteUptimeOver } from '@dxt/engine';
 import {
+  bangkokDayStart,
   CLOSED_INCIDENT_STATES,
   defaultSlowMs,
   type IncidentState,
@@ -12,6 +13,7 @@ import {
 import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { locationGlyph } from './components/site-list';
+import { fetchAllPages } from './csv';
 import {
   chartLines,
   incidentsCaption,
@@ -40,13 +42,6 @@ const LOG_ROWS = 8;
 /** Incidents read for a page (the history shows 90 days; Export has every row). */
 const INCIDENT_ROWS = 200;
 const DAY_MS = 86_400_000;
-
-/** The start of today in Bangkok (the Check log's "checks today"). */
-function bangkokMidnight(now: Date): Date {
-  const shifted = new Date(now.getTime() + 7 * 3_600_000);
-  shifted.setUTCHours(0, 0, 0, 0);
-  return new Date(shifted.getTime() - 7 * 3_600_000);
-}
 
 function slowMsOf(thresholds: unknown): number | null {
   const v = (thresholds as { slowMs?: unknown } | null)?.slowMs;
@@ -88,22 +83,31 @@ function assertionsOf(
 }
 
 /**
- * DOWN episodes of the given sites since `from`, read from their incidents' timelines (spec §5:
- * uptime counts DOWN minutes only). An incident still open, or resolved after `from`, may hold drops
- * inside the window.
+ * DOWN episodes per site since `from`, read from their incidents' timelines (spec §5: uptime counts
+ * DOWN minutes only; D-021: a PROBLEM raised to DOWN counts from the escalation). An incident still open,
+ * or resolved after `from`, may hold drops inside the window. `siteIds` null = every readable site.
+ * Paged: PostgREST answers 1,000 rows a request.
  */
-export async function downEpisodesBySite(supabase: Client, siteIds: readonly string[], from: Date) {
-  const out = new Map<string, ReturnType<typeof episodesFromTimeline>>();
-  if (siteIds.length === 0) return out;
-  const { data, error } = await supabase
-    .from('incidents')
-    .select('site_id, started_at, severity, incident_events(type, at, payload)')
-    .in('site_id', [...siteIds])
-    .eq('severity', 'down')
-    .or(`resolved_at.is.null,resolved_at.gte.${from.toISOString()}`);
-  if (error) throw new Error(`incidents: ${error.message}`);
+export async function downEpisodesBySite(supabase: Client, siteIds: readonly string[] | null, from: Date) {
+  const out = new Map<string, ReturnType<typeof downEpisodesFromTimeline>>();
+  if (siteIds?.length === 0) return out;
+  const data = await fetchAllPages(
+    (x, y) => {
+      let q = supabase
+        .from('incidents')
+        .select('id, site_id, started_at, severity, incident_events(type, at, payload)')
+        .eq('severity', 'down')
+        .or(`resolved_at.is.null,resolved_at.gte.${from.toISOString()}`);
+      if (siteIds) q = q.in('site_id', [...siteIds]);
+      return q.order('id').range(x, y);
+    },
+    { max: 50_000 },
+  );
   for (const i of data) {
-    const drops = episodesFromTimeline({ started_at: i.started_at, severity: i.severity }, i.incident_events);
+    const drops = downEpisodesFromTimeline(
+      { started_at: i.started_at, severity: i.severity },
+      i.incident_events,
+    );
     out.set(i.site_id, [...(out.get(i.site_id) ?? []), ...drops]);
   }
   return out;
@@ -165,7 +169,9 @@ export async function loadSiteDetail(
          acker:profiles!incidents_acked_by_fkey(display_name), incident_events(type, at, payload)`,
       )
       .eq('site_id', s.id)
-      .or(`started_at.gte.${historyFrom.toISOString()},resolved_at.is.null`)
+      .or(
+        `started_at.gte.${historyFrom.toISOString()},resolved_at.is.null,resolved_at.gte.${historyFrom.toISOString()}`,
+      )
       .order('started_at', { ascending: false })
       .limit(INCIDENT_ROWS),
     supabase.rpc('site_response_series', {
@@ -197,7 +203,7 @@ export async function loadSiteDetail(
           .from('check_results')
           .select('id', { count: 'exact', head: true })
           .eq('monitor_id', primary.id)
-          .gte('checked_at', bangkokMidnight(now).toISOString())
+          .gte('checked_at', bangkokDayStart(now).toISOString())
       : Promise.resolve({ count: 0, error: null }),
     // uptime counts every DOWN drop in the range, whatever the row cap above
     downEpisodesBySite(supabase, [s.id], from),
@@ -205,7 +211,9 @@ export async function loadSiteDetail(
       .from('incidents')
       .select('id', { count: 'exact', head: true })
       .eq('site_id', s.id)
-      .or(`started_at.gte.${historyFrom.toISOString()},resolved_at.is.null`),
+      .or(
+        `started_at.gte.${historyFrom.toISOString()},resolved_at.is.null,resolved_at.gte.${historyFrom.toISOString()}`,
+      ),
   ]);
   if (counted.error) throw new Error(`incidents: ${counted.error.message}`);
   if (incidents.error) throw new Error(`incidents: ${incidents.error.message}`);
@@ -218,7 +226,8 @@ export async function loadSiteDetail(
   const rows = incidents.data.map((i) => {
     const drops = episodesFromTimeline({ started_at: i.started_at, severity: i.severity }, i.incident_events);
     const open =
-      !(CLOSED_INCIDENT_STATES as readonly string[]).includes(i.state) && drops.some((d) => !d.end);
+      !(CLOSED_INCIDENT_STATES as readonly string[]).includes(i.state) &&
+      (drops.length === 0 || drops.some((d) => !d.end));
     const lastEnd = drops.reduce((t, d) => Math.max(t, (d.end ?? now).getTime()), Date.parse(i.started_at));
     return {
       i,
@@ -253,20 +262,7 @@ export async function loadSiteDetail(
     cause: causeOf(r.i.incident_events),
   });
   const rangeIncidents = inRange.map(toRow);
-  const history: DetailIncident[] = rows
-    .filter((r) => r.endsAt >= historyFrom.getTime())
-    .map((r) => ({
-      id: r.i.id,
-      number: r.i.number,
-      startedAt: r.i.started_at,
-      minutes: r.minutes,
-      open: r.open,
-      cause: causeOf(r.i.incident_events),
-      trigger: r.i.trigger as Trigger,
-      severity: r.i.severity as Severity,
-      state: r.i.state as IncidentState,
-      level: r.i.escalation_level,
-    }));
+  const history: DetailIncident[] = rows.filter((r) => r.endsAt >= historyFrom.getTime()).map(toRow);
   const openRow = rows.find((r) => !(CLOSED_INCIDENT_STATES as readonly string[]).includes(r.i.state));
   const openIncident: OpenIncident | null = openRow
     ? {
