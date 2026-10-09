@@ -53,7 +53,10 @@ export function RangeControl({ fullWidth = false }: { fullWidth?: boolean }) {
 export function RangeDependent({ children, className = '' }: { children: ReactNode; className?: string }) {
   const { pending } = useRange();
   return (
-    <div aria-busy={pending} className={`transition-opacity ${pending ? 'opacity-60' : ''} ${className}`}>
+    <div
+      aria-busy={pending}
+      className={`transition-opacity motion-reduce:transition-none ${pending ? 'opacity-60' : ''} ${className}`}
+    >
       {children}
     </div>
   );

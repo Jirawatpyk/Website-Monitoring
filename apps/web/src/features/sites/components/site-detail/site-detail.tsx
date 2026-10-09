@@ -93,7 +93,8 @@ function statusLine(detail: SiteDetail, now: Date): string | null {
     return `No data yet — the first round runs within ${TIER_CONFIG[detail.tier].intervalSec / 60} min`;
   if (!detail.statusSince) return null;
   const since = formatDuration((now.getTime() - Date.parse(detail.statusSince)) / 60_000);
-  return `since ${formatWhen(new Date(detail.statusSince), now, { midSentence: true })} · ${since}`;
+  const word = { ok: 'OK', problem: 'Problem', down: 'Down', maintenance: 'In maintenance' }[detail.status];
+  return `${word} since ${formatWhen(new Date(detail.statusSince), now, { midSentence: true })} · ${since}`;
 }
 
 /**
@@ -140,6 +141,7 @@ export function SiteDetailView({
                 <span className="flex flex-wrap items-center gap-2">
                   <RowStatusBadge row={detail} />
                   <MutedBadge row={detail} now={now} />
+                  {line && <span className="text-sm text-fg-secondary">{line}</span>}
                   <span className="contents max-md:hidden">
                     <Badge tone="neutral" variant="outline">
                       {formatTier(detail.tier)}
@@ -151,7 +153,6 @@ export function SiteDetailView({
                       {responseHoursLabel(detail.tier)}
                     </Badge>
                   </span>
-                  {line && <span className="text-sm text-fg-secondary">{line}</span>}
                 </span>
                 <span className="text-sm text-fg-secondary md:hidden">
                   {[
@@ -473,7 +474,11 @@ function IncidentsInRange({ incidents, now }: { incidents: DetailIncident[]; now
                   className="flex min-h-11 items-center gap-2 py-1 text-fg-primary no-underline hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
                 >
                   <span className="flex w-28 shrink-0">
-                    <SeverityBadge severity={i.severity} recovered={!i.open} />
+                    {i.open ? (
+                      <WorkflowBadge state={i.state} level={i.level} />
+                    ) : (
+                      <SeverityBadge severity={i.severity} recovered />
+                    )}
                   </span>
                   <span className="flex min-w-0 grow flex-col leading-tight">
                     <span className="truncate text-sm">
@@ -494,7 +499,13 @@ function IncidentsInRange({ incidents, now }: { incidents: DetailIncident[]; now
             ))}
           </ul>
           {more > 0 && (
-            <p className="m-0 pt-2 text-xs text-fg-secondary">{`+ ${more} more in this range — see them on a larger screen`}</p>
+            <p className="m-0 pt-2 text-xs text-fg-secondary">{`+ ${more} more: ${incidents
+              .slice(PHONE_INCIDENTS)
+              .map(
+                (i) =>
+                  `${triggerWord(i.trigger)} ${formatDay(new Date(i.startedAt))}${i.minutes !== null && !i.open ? ` (${formatDuration(i.minutes)})` : ''}`,
+              )
+              .join(', ')}`}</p>
           )}
         </>
       )}
@@ -618,8 +629,8 @@ function IncidentHistory({ detail }: { detail: SiteDetail }) {
         </Table>
       )}
       <p className="m-0 text-sm text-fg-secondary">
-        {`${n} in 90 days${detail.historyMttr === null ? '' : ` · MTTR ${formatDuration(detail.historyMttr)} (DOWN only · median)`}`}
-        {n > HISTORY_ROWS && ` · showing the latest ${HISTORY_ROWS}, Export has all`}
+        {`${detail.historyCount} in 90 days${detail.historyMttr === null ? '' : ` · MTTR ${formatDuration(detail.historyMttr)} (DOWN only · median)`}`}
+        {detail.historyCount > shown.length && ` · showing the latest ${shown.length}, Export has all`}
       </p>
     </section>
   );

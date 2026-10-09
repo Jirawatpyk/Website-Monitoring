@@ -87,6 +87,7 @@ const detail = (over: Partial<SiteDetail> = {}): SiteDetail => ({
     },
   ],
   historyMttr: 11,
+  historyCount: 2,
   rangeIncidents: [],
   log: [],
   checksToday: 1830,
@@ -97,7 +98,7 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
   it('shows status, since, the stats and the latest round in words', () => {
     render(<SiteDetailView detail={detail()} range="30d" role="admin" meId="tao" nowIso={NOW} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Bangkok Airways – Taiwan' })).toBeInTheDocument();
-    expect(screen.getByText('since Mon 14 Sep 21:18 · 10 d 12 h')).toBeInTheDocument();
+    expect(screen.getByText('OK since Mon 14 Sep 21:18 · 10 d 12 h')).toBeInTheDocument();
     expect(screen.getAllByText('99.97%').length).toBeGreaterThan(0);
     expect(screen.getByText('1 DOWN 11 min · 1 PROBLEM 6 min')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'SIN: Blocked by bot protection' })).toBeInTheDocument();
@@ -176,7 +177,9 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
         nowIso={NOW}
       />,
     );
-    expect(screen.getByText('+ 2 more in this range — see them on a larger screen')).toBeInTheDocument();
+    expect(
+      screen.getByText('+ 2 more: Regional 14 Sep (6 min), Regional 14 Sep (6 min)'),
+    ).toBeInTheDocument();
     expect(screen.getAllByText('Was a problem')).toHaveLength(5);
   });
 

@@ -157,7 +157,7 @@ export async function loadSiteDetail(
   const primary = monitors.find((m) => m.is_primary);
   const ids = monitors.map((m) => m.id);
 
-  const [incidents, series, latest, log, today] = await Promise.all([
+  const [incidents, series, latest, log, today, downs, counted] = await Promise.all([
     supabase
       .from('incidents')
       .select(
@@ -199,7 +199,15 @@ export async function loadSiteDetail(
           .eq('monitor_id', primary.id)
           .gte('checked_at', bangkokMidnight(now).toISOString())
       : Promise.resolve({ count: 0, error: null }),
+    // uptime counts every DOWN drop in the range, whatever the row cap above
+    downEpisodesBySite(supabase, [s.id], from),
+    supabase
+      .from('incidents')
+      .select('id', { count: 'exact', head: true })
+      .eq('site_id', s.id)
+      .or(`started_at.gte.${historyFrom.toISOString()},resolved_at.is.null`),
   ]);
+  if (counted.error) throw new Error(`incidents: ${counted.error.message}`);
   if (incidents.error) throw new Error(`incidents: ${incidents.error.message}`);
   if (series.error) throw new Error(`site_response_series: ${series.error.message}`);
   if (latest.error) throw new Error(`check_results: ${latest.error.message}`);
@@ -220,8 +228,7 @@ export async function loadSiteDetail(
       minutes: open ? null : episodeMinutes(drops, now),
     };
   });
-  const downDrops = rows.filter((r) => r.i.severity === 'down').flatMap((r) => r.drops);
-  const uptime = siteUptimeOver(downDrops, {
+  const uptime = siteUptimeOver(downs.get(s.id) ?? [], {
     now,
     rangeMinutes: spec.minutes,
     monitoringStartedAt: s.monitoring_started_at ? new Date(s.monitoring_started_at) : null,
@@ -352,6 +359,7 @@ export async function loadSiteDetail(
     round,
     monitors: detailMonitors,
     history,
+    historyCount: Math.max(counted.count ?? 0, history.length),
     rangeIncidents,
     historyMttr: mttrMinutes(
       history.map((h) => ({ severity: h.severity, startedAt: new Date(h.startedAt), minutes: h.minutes })),

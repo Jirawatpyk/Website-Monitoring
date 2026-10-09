@@ -201,6 +201,8 @@ export interface SiteDetail {
   round: RoundCheck[];
   monitors: DetailMonitor[];
   history: DetailIncident[];
+  /** Incidents in the last 90 days (may be more than `history` holds). */
+  historyCount: number;
   /** Incidents overlapping the range (the phone list and the Incidents stat). */
   rangeIncidents: DetailIncident[];
   historyMttr: number | null;
