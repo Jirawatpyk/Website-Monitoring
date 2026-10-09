@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { ensureUser, localSupabaseEnabled, signIn, anySiteId } from './support/local-supabase';
+import { ensureUser, localSupabaseEnabled, signIn, anySiteId, busySiteId } from './support/local-supabase';
 
 /**
  * Rules every signed-in page shares, measured in the browser at 390 / 820 / 1440 — the things a
@@ -74,6 +74,35 @@ function sidewaysBoxes(page: Page) {
   );
 }
 
+/**
+ * Boxes inside the page whose right edge is past the screen's — clipped rather than scrolled, so the
+ * sideways check above can't see them (S06 /verify: a chart card wider than a 375 px phone). Boxes in a
+ * box that scrolls or clips on its own (`data-scroll-x`, any overflow-x but visible below main, e.g.
+ * DataTable's off-screen measuring rows) are left out.
+ */
+function boxesPastEdge(page: Page) {
+  return page.evaluate(() => {
+    const edge = document.documentElement.clientWidth + 1;
+    const inScroller = (el: Element) => {
+      for (let p = el.parentElement; p && p.tagName !== 'MAIN'; p = p.parentElement) {
+        const x = getComputedStyle(p).overflowX;
+        if (x !== 'visible' || p.hasAttribute('data-scroll-x')) return true;
+      }
+      return false;
+    };
+    return Array.from(document.querySelectorAll<HTMLElement>('main *'))
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.right > edge && !inScroller(el);
+      })
+      .slice(0, 5)
+      .map(
+        (el) =>
+          `${el.tagName.toLowerCase()}.${el.className.toString().split(' ')[0]} right ${Math.round(el.getBoundingClientRect().right)}`,
+      );
+  });
+}
+
 /** Visible block-level controls whose tap area is shorter than a touch target. */
 function smallTargets(page: Page) {
   return page.evaluate((min) => {
@@ -118,7 +147,12 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
     expect(pages).not.toHaveLength(0);
     // Pages reached from a list, not the nav (S05 review): Add site, Edit site, Edit monitors.
     const site = await anySiteId();
-    pages.push(`/sites/${site}`, '/sites/new', `/sites/${site}/edit`, `/sites/${site}/monitors`);
+    pages.push(
+      `/sites/${await busySiteId()}`,
+      '/sites/new',
+      `/sites/${site}/edit`,
+      `/sites/${site}/monitors`,
+    );
 
     for (const width of WIDTHS) {
       const page = await signedInAt(browser, baseURL!, width);
@@ -131,6 +165,7 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
           const scroll = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
           expect(scroll, 'no sideways scroll').toBeLessThanOrEqual(0);
           expect(await sidewaysBoxes(page), 'no box inside the page scrolls sideways').toEqual([]);
+          expect(await boxesPastEdge(page), 'no box reaches past the screen edge').toEqual([]);
 
           const gaps = await headerGaps(page);
           expect(gaps, 'the page starts with AURA PageHeader').not.toBeNull();

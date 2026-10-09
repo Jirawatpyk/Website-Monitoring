@@ -135,6 +135,6 @@ with i (site, trigger, severity, state, started, minutes) as (values
   returning id, started_at, detected_at, recovered_at
 )
 insert into public.incident_events (incident_id, type, at, payload)
-select id, 'detected', detected_at, '{}'::jsonb from ins
+select id, 'detected', detected_at, jsonb_build_object('cause', 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)') from ins
 union all
 select id, 'recovered', recovered_at, '{}'::jsonb from ins where recovered_at is not null;

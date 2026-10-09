@@ -284,7 +284,7 @@ export function SiteDetailView({
               </RangeDependent>
             </section>
 
-            <div className="grid gap-4 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
               <Card
                 className="xl:col-span-2"
                 headingLevel={2}
@@ -317,7 +317,7 @@ export function SiteDetailView({
 
             <MonitorsTable detail={detail} />
 
-            <div className="grid items-start gap-4 max-md:hidden xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-4 max-md:hidden xl:grid-cols-2">
               <IncidentHistory detail={detail} />
               <CheckLog detail={detail} now={now} />
             </div>
@@ -346,7 +346,7 @@ function InfoStrip({ detail }: { detail: SiteDetail }) {
           href={detail.url}
           target="_blank"
           rel="noopener noreferrer"
-          className={`inline-flex items-center gap-1 break-all ${TOUCH_HIT}`}
+          className={`inline-flex items-center gap-1 [overflow-wrap:anywhere] ${TOUCH_HIT}`}
         >
           {detail.url.replace(/^https?:\/\//, '')}
           <IconExternalLink aria-hidden />
@@ -457,6 +457,19 @@ function RoundRow({ r }: { r: RoundCheck }) {
   );
 }
 
+/** "+ 2 more: Slow 18 Aug (14 min), SSL expiring 11 Aug" — at most three named, then a count (MSite 90 d). */
+function moreLine(rest: DetailIncident[]): string {
+  const named = rest
+    .slice(0, 3)
+    .map(
+      (i) =>
+        `${triggerWord(i.trigger)} ${formatDay(new Date(i.startedAt))}${i.minutes !== null && !i.open ? ` (${formatDuration(i.minutes)})` : ''}`,
+    )
+    .join(', ');
+  const others = rest.length - 3;
+  return `+ ${rest.length} more: ${named}${others > 0 ? ` and ${others} earlier` : ''}`;
+}
+
 /** Phone only (MSite "Incidents in range"); desktop shows the 90-day history table instead. */
 function IncidentsInRange({ incidents, now }: { incidents: DetailIncident[]; now: Date }) {
   const shown = incidents.slice(0, PHONE_INCIDENTS);
@@ -500,13 +513,7 @@ function IncidentsInRange({ incidents, now }: { incidents: DetailIncident[]; now
             ))}
           </ul>
           {more > 0 && (
-            <p className="m-0 pt-2 text-xs text-fg-secondary">{`+ ${more} more: ${incidents
-              .slice(PHONE_INCIDENTS)
-              .map(
-                (i) =>
-                  `${triggerWord(i.trigger)} ${formatDay(new Date(i.startedAt))}${i.minutes !== null && !i.open ? ` (${formatDuration(i.minutes)})` : ''}`,
-              )
-              .join(', ')}`}</p>
+            <p className="m-0 pt-2 text-xs text-fg-secondary">{moreLine(incidents.slice(PHONE_INCIDENTS))}</p>
           )}
         </>
       )}
@@ -616,9 +623,7 @@ function IncidentHistory({ detail }: { detail: SiteDetail }) {
                 <Td>
                   <span className="flex flex-col leading-tight">
                     <span>{triggerWord(h.trigger)}</span>
-                    <span className="text-xs whitespace-nowrap text-fg-secondary">
-                      {severityLine(h.severity, h.trigger)}
-                    </span>
+                    <span className="text-xs text-fg-secondary">{severityLine(h.severity, h.trigger)}</span>
                   </span>
                 </Td>
                 <Td>

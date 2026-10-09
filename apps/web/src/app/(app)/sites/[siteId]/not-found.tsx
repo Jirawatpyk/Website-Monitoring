@@ -1,5 +1,8 @@
 import { Breadcrumb, Button, Card, Container, EmptyState, PageHeader } from '@jirawatpyk/aura-react';
+import type { Metadata } from 'next';
 import { IconMonitor } from '@jirawatpyk/aura-react/icons';
+
+export const metadata: Metadata = { title: 'Site not found' };
 
 /** `/sites/<id>` for a site that doesn't exist, was deleted, or the signed-in person can't read. */
 export default function SiteNotFound() {

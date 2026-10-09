@@ -51,7 +51,8 @@ export async function checksCsv(siteId: string, now = new Date()): Promise<Respo
       c.error,
     ]),
   );
-  const day = from.toISOString().slice(0, 10);
+  // the Bangkok date of "today" (from is 17:00 UTC the day before)
+  const day = new Date(from.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
   return csvResponse(body, `${fileSlug(site.name)}-checks-${day}.csv`);
 }
 
