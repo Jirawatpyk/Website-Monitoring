@@ -135,7 +135,7 @@ describe('episodesFromTimeline (stored incident_events → drops)', () => {
       {
         type: 'escalated_to_down',
         at: '2026-09-25T09:51:00+07:00',
-        payload: { downStartedAt: '2026-09-25T09:50:00+07:00', severity: 'down' },
+        payload: { downStartedAt: '2026-09-25T09:50:00+07:00' },
       },
     ]);
     expect(downMinutesIn(drops, at('2026-09-25T00:00:00'), NOW)).toBe(17);
@@ -150,11 +150,71 @@ describe('downEpisodesFromTimeline (D-021: PROBLEM time before the escalation is
       {
         type: 'escalated_to_down',
         at: '2026-09-25T10:00:40+07:00',
-        payload: { downStartedAt: '2026-09-25T10:00:00+07:00', severity: 'down' },
+        payload: { downStartedAt: '2026-09-25T10:00:00+07:00' },
       },
       { type: 'recovered', at: '2026-09-25T10:10:00+07:00', payload: {} },
     ]);
     expect(downMinutesIn(drops, at('2026-09-25T00:00:00'), at('2026-09-25T12:00:00'))).toBe(10);
+  });
+
+  it('raised after the PROBLEM recovered: the first drop stays a PROBLEM (D-021), downtime from downStartedAt', () => {
+    const events = [
+      { type: 'detected', at: '2026-09-25T09:30:30+07:00', payload: {} },
+      { type: 'recovered', at: '2026-09-25T09:40:00+07:00', payload: {} },
+      {
+        type: 'escalated_to_down',
+        at: '2026-09-25T09:51:00+07:00',
+        payload: { downStartedAt: '2026-09-25T09:38:00+07:00' },
+      },
+      { type: 'recovered', at: '2026-09-25T10:00:00+07:00', payload: {} },
+    ];
+    const incident = { started_at: '2026-09-25T09:30:00+07:00', severity: 'down' as const };
+    expect(episodesFromTimeline(incident, events).map((d) => d.severity)).toEqual(['problem', 'down']);
+    expect(
+      downMinutesIn(
+        downEpisodesFromTimeline(incident, events),
+        at('2026-09-25T00:00:00'),
+        at('2026-09-25T12:00:00'),
+      ),
+    ).toBe(20);
+  });
+
+  it('raised while the PROBLEM drop is open: the drop splits at downStartedAt', () => {
+    const drops = episodesFromTimeline({ started_at: '2026-09-25T09:30:00+07:00', severity: 'down' }, [
+      { type: 'detected', at: '2026-09-25T09:31:00+07:00', payload: {} },
+      {
+        type: 'escalated_to_down',
+        at: '2026-09-25T10:00:40+07:00',
+        payload: { downStartedAt: '2026-09-25T10:00:00+07:00' },
+      },
+      { type: 'recovered', at: '2026-09-25T10:10:00+07:00', payload: {} },
+    ]);
+    expect(drops).toEqual([
+      { start: at('2026-09-25T09:30:00'), end: at('2026-09-25T10:00:00'), severity: 'problem' },
+      { start: at('2026-09-25T10:00:00'), end: at('2026-09-25T10:10:00'), severity: 'down' },
+    ]);
+  });
+
+  it('VOCA INC-0133: four relapsed drops = 41 DOWN minutes', () => {
+    const r = (start: string, end: string, first = false) => [
+      {
+        type: first ? 'detected' : 'relapsed',
+        at: `2026-09-21T${start}:30+07:00`,
+        payload: first ? {} : { startedAt: `2026-09-21T${start}:00+07:00`, severity: 'down' },
+      },
+      { type: 'recovered', at: `2026-09-21T${end}:00+07:00`, payload: {} },
+    ];
+    const events = [
+      ...r('03:12', '03:19', true),
+      ...r('03:24', '03:35'),
+      ...r('03:38', '03:52'),
+      ...r('03:55', '04:04'),
+    ];
+    const drops = downEpisodesFromTimeline(
+      { started_at: '2026-09-21T03:12:00+07:00', severity: 'down' },
+      events,
+    );
+    expect(downMinutesIn(drops, at('2026-09-21T00:00:00'), at('2026-09-21T12:00:00'))).toBe(41);
   });
 
   it('a plain DOWN incident keeps every drop', () => {

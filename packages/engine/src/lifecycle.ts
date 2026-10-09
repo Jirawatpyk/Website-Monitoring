@@ -201,7 +201,15 @@ export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
         severity: e.severity ?? 'down',
       });
     } else if (e.type === 'escalated_to_down' && last) {
-      last.severity = 'down';
+      // D-021 while the PROBLEM drop is still open: the PROBLEM ends where the outage starts and a DOWN
+      // drop begins, like D-023's DOWN AGAIN above (its payload carries no severity, so go by the type)
+      const at = e.startedAt ?? e.at;
+      if (last.severity === 'problem' && at > last.start) {
+        last.end = at;
+        out.push({ start: at, end: null, severity: 'down' });
+      } else {
+        last.severity = 'down';
+      }
     } else if (e.type === 'recovered' && open && last) {
       last.end = e.at;
     }
@@ -228,6 +236,7 @@ export function episodesFromTimeline(
   events: readonly IncidentEventRow[],
 ): Episode[] {
   const out: EpisodeEvent[] = [];
+  const raised = events.some((e) => e.type === 'escalated_to_down');
   for (const e of events) {
     const at = dateOf(e.at);
     if (!at) continue;
@@ -241,34 +250,19 @@ export function episodesFromTimeline(
             ? dateOf(p.downStartedAt)
             : null;
     const severity = p.severity === 'down' || p.severity === 'problem' ? p.severity : null;
-    out.push({ type: e.type, at, startedAt, severity: e.type === 'detected' ? incident.severity : severity });
+    // `incidents.severity` is 'down' once raised (D-021): its first drop was a PROBLEM then
+    const first = raised ? 'problem' : incident.severity;
+    out.push({ type: e.type, at, startedAt, severity: e.type === 'detected' ? first : severity });
   }
   return episodesOf(out);
 }
 
-/**
- * The DOWN part of a stored incident's drops, for uptime (spec §5: PROBLEM counts as up). An incident
- * raised from PROBLEM to DOWN (D-021) carries `severity = 'down'` afterwards, so its timeline reads as
- * DOWN from the first PROBLEM check; its downtime starts at the first escalation's `downStartedAt`.
- */
+/** The DOWN drops of a stored incident, for uptime (spec §5: PROBLEM counts as up; D-021 via the timeline). */
 export function downEpisodesFromTimeline(
   incident: { started_at: string; severity: Severity },
   events: readonly IncidentEventRow[],
 ): Episode[] {
-  const drops = episodesFromTimeline(incident, events).filter((d) => d.severity === 'down');
-  const escalations = events
-    .filter((e) => e.type === 'escalated_to_down')
-    .map((e) => {
-      const p = e.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : {};
-      return dateOf(p.downStartedAt) ?? dateOf(e.at);
-    })
-    .filter((d): d is Date => d !== null)
-    .sort((a, b) => a.getTime() - b.getTime());
-  const firstDown = escalations[0];
-  if (!firstDown) return drops;
-  return drops
-    .filter((d) => d.end === null || d.end > firstDown)
-    .map((d) => (d.start < firstDown ? { ...d, start: firstDown } : d));
+  return episodesFromTimeline(incident, events).filter((d) => d.severity === 'down');
 }
 
 /** Minutes the episodes were down (or had a problem), the drop still in progress counted to `now`. */

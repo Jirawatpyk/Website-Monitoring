@@ -96,6 +96,7 @@ export async function downEpisodesBySite(supabase: Client, siteIds: readonly str
       let q = supabase
         .from('incidents')
         .select('id, site_id, started_at, severity, incident_events(type, at, payload)')
+        .in('incident_events.type', ['detected', 'relapsed', 'escalated_to_down', 'recovered'])
         .eq('severity', 'down')
         .or(`resolved_at.is.null,resolved_at.gte.${from.toISOString()}`);
       if (siteIds) q = q.in('site_id', [...siteIds]);
@@ -116,15 +117,17 @@ export async function downEpisodesBySite(supabase: Client, siteIds: readonly str
 /**
  * When monitoring of a site started, for its uptime window (D-031). A live site created before S05
  * added `monitoring_started_at` (a script-made test site) has none: its creation time stands in.
- * Null for a Draft never started.
+ * Null for a site that isn't monitored now (a Draft, or stopped).
  */
 export function watchedSince(s: {
   is_active: boolean;
   monitoring_started_at: string | null;
   created_at: string;
 }): Date | null {
-  const at = s.monitoring_started_at ?? (s.is_active ? s.created_at : null);
-  return at ? new Date(at) : null;
+  // A stopped site shows no uptime: its stopped days would count as up (engine review M2; the
+  // start / stop history comes with maintenance windows, S09)
+  if (!s.is_active) return null;
+  return new Date(s.monitoring_started_at ?? s.created_at);
 }
 
 /** The cause the engine wrote when the incident opened ("Timeout > 30 s (BKK, TYO) · …"), if any. */
