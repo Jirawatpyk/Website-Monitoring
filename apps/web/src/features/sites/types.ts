@@ -147,6 +147,9 @@ export interface DetailIncident {
   startedAt: string;
   /** Minutes down or with a problem (its drops); null while still open. */
   minutes: number | null;
+  open: boolean;
+  /** The cause worded when it opened, if stored. */
+  cause: string | null;
   trigger: Trigger;
   severity: Severity;
   state: IncidentState;
@@ -162,6 +165,7 @@ export interface CheckLogRow {
   statusCode: number | null;
   responseMs: number | null;
   ttfbMs: number | null;
+  error: string | null;
 }
 
 /** `/sites/[siteId]` (boards SiteDetail, MSite). */
@@ -176,6 +180,10 @@ export interface SiteDetail {
   client: { name: string; internal: boolean; amName: string | null };
   owner: string | null;
   backup: string | null;
+  /** Owner and backup profile ids (who may mute, S09). */
+  ownerIds: string[];
+  /** The primary monitor's slow limit (its own or the tier's). */
+  slowMs: number;
   hosting: string | null;
   credentialRef: string | null;
   mutedUntil: string | null;
@@ -193,6 +201,8 @@ export interface SiteDetail {
   round: RoundCheck[];
   monitors: DetailMonitor[];
   history: DetailIncident[];
+  /** Incidents overlapping the range (the phone list and the Incidents stat). */
+  rangeIncidents: DetailIncident[];
   historyMttr: number | null;
   log: CheckLogRow[];
   checksToday: number;

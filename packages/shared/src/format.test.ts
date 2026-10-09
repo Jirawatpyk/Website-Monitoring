@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   confirmedByWafOf,
   formatConfirmedBy,
+  formatCount,
   formatDay,
   formatDuration,
   formatIncidentId,
@@ -10,6 +11,7 @@ import {
   formatTier,
   formatTime,
   formatTimeWithSeconds,
+  formatWhen,
   isSameBangkokDay,
 } from './format';
 
@@ -125,5 +127,25 @@ describe('formatIncidentLine (Sites list, spec §20)', () => {
     [{ ...base, number: 139, state: 'needs_root_cause' as const }, 'INC-0139 · Needs root cause'],
   ])('%o → %s', (i, expected) => {
     expect(formatIncidentLine(i)).toBe(expected);
+  });
+});
+
+describe('formatWhen (spec §13)', () => {
+  it.each([
+    ['2026-09-25T02:48:00Z', {}, 'Today 09:48'],
+    ['2026-09-24T09:40:00Z', {}, 'Yesterday 16:40'],
+    ['2026-09-24T17:30:00Z', {}, 'Today 00:30'],
+    ['2026-09-14T14:18:00Z', {}, 'Mon 14 Sep 21:18'],
+    ['2026-09-25T02:48:00Z', { midSentence: true }, 'today 09:48'],
+    ['2026-09-24T09:40:00Z', { midSentence: true }, 'yesterday 16:40'],
+  ] as const)('%s %j → %s', (iso, options, out) => {
+    expect(formatWhen(new Date(iso), snapshot, options)).toBe(out);
+  });
+});
+
+describe('formatCount', () => {
+  it('thousands separators', () => {
+    expect(formatCount(2007)).toBe('2,007');
+    expect(formatCount(8)).toBe('8');
   });
 });

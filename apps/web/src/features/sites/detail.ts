@@ -155,7 +155,11 @@ export function incidentsCaption(rows: readonly IncidentSummaryRow[]): string {
 
 /** The chart's x labels: four ticks and "now" — times for 24 h, weekdays for 7 d, dates beyond (spec §13). */
 export function axisLabels(range: SiteRange, from: number, to: number): string[] {
-  const ticks = [0, 1, 2, 3].map((i) => new Date(from + ((to - from) * i) / 4));
+  // 24 h ticks fall on the hour, six hours apart ("10:00, 16:00 …", SiteDetail board)
+  const hour = 3_600_000;
+  const start = range === '24h' ? Math.ceil(from / hour) * hour : from;
+  const step = range === '24h' ? 6 * hour : (to - from) / 4;
+  const ticks = [0, 1, 2, 3].map((i) => new Date(start + step * i));
   const word = (d: Date) =>
     range === '24h'
       ? formatTime(d)

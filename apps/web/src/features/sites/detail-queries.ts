@@ -37,6 +37,8 @@ type DbClient = Client | ServiceDbClient;
 
 const HISTORY_DAYS = 90;
 const LOG_ROWS = 8;
+/** Incidents read for a page (the history shows 90 days; Export has every row). */
+const INCIDENT_ROWS = 200;
 const DAY_MS = 86_400_000;
 
 /** The start of today in Bangkok (the Check log's "checks today"). */
@@ -107,6 +109,13 @@ export async function downEpisodesBySite(supabase: Client, siteIds: readonly str
   return out;
 }
 
+/** The cause the engine wrote when the incident opened ("Timeout > 30 s (BKK, TYO) · …"), if any. */
+function causeOf(events: readonly { type: string; payload: unknown }[]): string | null {
+  const p = events.find((e) => e.type === 'detected')?.payload;
+  const cause = p && typeof p === 'object' ? (p as Record<string, unknown>).cause : null;
+  return typeof cause === 'string' && cause.trim() ? cause : null;
+}
+
 /** `/sites/[siteId]` for the range asked; null when the site doesn't exist or isn't readable. */
 export async function getSiteDetail(
   siteId: string,
@@ -129,8 +138,8 @@ export async function loadSiteDetail(
     .select(
       `id, name, tier, is_active, muted_until, monitoring_started_at, hosting, credential_ref,
        clients!inner(name, is_internal, am:profiles!clients_am_user_id_fkey(display_name)),
-       owner:profiles!sites_primary_owner_id_fkey(display_name),
-       backup:profiles!sites_backup_owner_id_fkey(display_name),
+       owner:profiles!sites_primary_owner_id_fkey(id, display_name),
+       backup:profiles!sites_backup_owner_id_fkey(id, display_name),
        site_status(status, since),
        monitors(id, is_primary, url, timeout_ms, must_contain, must_not_contain, allowed_redirect_domains,
                 thresholds, removed_at, monitor_status(status, cause))`,
@@ -157,7 +166,8 @@ export async function loadSiteDetail(
       )
       .eq('site_id', s.id)
       .or(`started_at.gte.${historyFrom.toISOString()},resolved_at.is.null`)
-      .order('started_at', { ascending: false }),
+      .order('started_at', { ascending: false })
+      .limit(INCIDENT_ROWS),
     supabase.rpc('site_response_series', {
       p_site_id: s.id,
       p_from: from.toISOString(),
@@ -176,7 +186,7 @@ export async function loadSiteDetail(
     primary
       ? supabase
           .from('check_results')
-          .select('id, location, outcome, status_code, response_ms, ttfb_ms, checked_at')
+          .select('id, location, outcome, status_code, response_ms, ttfb_ms, error, checked_at')
           .eq('monitor_id', primary.id)
           .gt('checked_at', new Date(now.getTime() - DAY_MS).toISOString())
           .order('checked_at', { ascending: false })
@@ -201,7 +211,14 @@ export async function loadSiteDetail(
     const drops = episodesFromTimeline({ started_at: i.started_at, severity: i.severity }, i.incident_events);
     const open =
       !(CLOSED_INCIDENT_STATES as readonly string[]).includes(i.state) && drops.some((d) => !d.end);
-    return { i, drops, minutes: open || drops.length === 0 ? null : episodeMinutes(drops, now) };
+    const lastEnd = drops.reduce((t, d) => Math.max(t, (d.end ?? now).getTime()), Date.parse(i.started_at));
+    return {
+      i,
+      drops,
+      open,
+      endsAt: open ? now.getTime() : lastEnd,
+      minutes: open ? null : episodeMinutes(drops, now),
+    };
   });
   const downDrops = rows.filter((r) => r.i.severity === 'down').flatMap((r) => r.drops);
   const uptime = siteUptimeOver(downDrops, {
@@ -209,19 +226,35 @@ export async function loadSiteDetail(
     rangeMinutes: spec.minutes,
     monitoringStartedAt: s.monitoring_started_at ? new Date(s.monitoring_started_at) : null,
   });
-  const inRange = rows.filter((r) => new Date(r.i.started_at) >= from || r.minutes === null);
+  // In range = overlapping it, the same window the uptime counts (spec-checker: a 99.9% next to "none")
+  const inRange = rows.filter((r) => r.endsAt >= from.getTime());
   const summary = inRange.map((r) => ({
     severity: r.i.severity as Severity,
     startedAt: new Date(r.i.started_at),
     minutes: r.minutes,
   }));
+  const toRow = (r: (typeof rows)[number]): DetailIncident => ({
+    id: r.i.id,
+    number: r.i.number,
+    startedAt: r.i.started_at,
+    minutes: r.minutes,
+    open: r.open,
+    trigger: r.i.trigger as Trigger,
+    severity: r.i.severity as Severity,
+    state: r.i.state as IncidentState,
+    level: r.i.escalation_level,
+    cause: causeOf(r.i.incident_events),
+  });
+  const rangeIncidents = inRange.map(toRow);
   const history: DetailIncident[] = rows
-    .filter((r) => new Date(r.i.started_at) >= historyFrom || r.minutes === null)
+    .filter((r) => r.endsAt >= historyFrom.getTime())
     .map((r) => ({
       id: r.i.id,
       number: r.i.number,
       startedAt: r.i.started_at,
       minutes: r.minutes,
+      open: r.open,
+      cause: causeOf(r.i.incident_events),
       trigger: r.i.trigger as Trigger,
       severity: r.i.severity as Severity,
       state: r.i.state as IncidentState,
@@ -300,6 +333,8 @@ export async function loadSiteDetail(
     },
     owner: s.owner?.display_name ?? null,
     backup: s.backup?.display_name ?? null,
+    ownerIds: [s.owner?.id, s.backup?.id].filter((v): v is string => !!v),
+    slowMs,
     hosting: s.hosting,
     credentialRef: s.credential_ref,
     mutedUntil: s.muted_until,
@@ -317,6 +352,7 @@ export async function loadSiteDetail(
     round,
     monitors: detailMonitors,
     history,
+    rangeIncidents,
     historyMttr: mttrMinutes(
       history.map((h) => ({ severity: h.severity, startedAt: new Date(h.startedAt), minutes: h.minutes })),
     ),
@@ -328,6 +364,7 @@ export async function loadSiteDetail(
       statusCode: c.status_code,
       responseMs: c.response_ms,
       ttfbMs: c.ttfb_ms,
+      error: c.error,
     })),
     checksToday: today.count ?? 0,
   };

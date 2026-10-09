@@ -2,8 +2,8 @@ import 'server-only';
 import { episodeMinutes, episodesFromTimeline } from '@dxt/engine';
 import { CLOSED_INCIDENT_STATES, formatIncidentId, type Trigger } from '@dxt/shared';
 import { createClient } from '@/lib/supabase/server';
-import { csvResponse, fileSlug, toCsv } from './csv';
-import { severityLine, triggerWord } from './detail';
+import { csvResponse, fetchAllPages, fileSlug, toCsv } from './csv';
+import { clientWord, triggerWord } from './detail';
 import { siteIdSchema } from './schemas';
 
 const DAY_MS = 86_400_000;
@@ -25,17 +25,21 @@ export async function checksCsv(siteId: string, now = new Date()): Promise<Respo
   const midnight = new Date(now.getTime() + 7 * 3_600_000);
   midnight.setUTCHours(0, 0, 0, 0);
   const from = new Date(midnight.getTime() - 7 * 3_600_000);
-  const { data, error } = await supabase
-    .from('check_results')
-    .select(
-      'checked_at, location, attempt, outcome, status_code, response_ms, ttfb_ms, error, monitors!inner(site_id, is_primary)',
-    )
-    .eq('monitors.site_id', site.id)
-    .eq('monitors.is_primary', true)
-    .gte('checked_at', from.toISOString())
-    .order('checked_at')
-    .limit(MAX_ROWS);
-  if (error) throw new Error(`check_results: ${error.message}`);
+  const data = await fetchAllPages(
+    (a, b) =>
+      supabase
+        .from('check_results')
+        .select(
+          'id, checked_at, location, attempt, outcome, status_code, response_ms, ttfb_ms, error, monitors!inner(site_id, is_primary)',
+        )
+        .eq('monitors.site_id', site.id)
+        .eq('monitors.is_primary', true)
+        .gte('checked_at', from.toISOString())
+        .order('checked_at')
+        .order('id')
+        .range(a, b),
+    { max: MAX_ROWS },
+  );
   const body = toCsv(
     ['checked_at_utc', 'location', 'attempt', 'outcome', 'http_status', 'response_ms', 'ttfb_ms', 'error'],
     data.map((c) => [
@@ -59,15 +63,20 @@ export async function incidentsCsv(siteId: string, now = new Date()): Promise<Re
   if (!found) return new Response('Not found', { status: 404 });
   const { supabase, site } = found;
   const from = new Date(now.getTime() - 90 * DAY_MS);
-  const { data, error } = await supabase
-    .from('incidents')
-    .select(
-      'number, state, severity, trigger, started_at, recovered_at, resolved_at, incident_events(type, at, payload)',
-    )
-    .eq('site_id', site.id)
-    .or(`started_at.gte.${from.toISOString()},resolved_at.is.null`)
-    .order('started_at', { ascending: false });
-  if (error) throw new Error(`incidents: ${error.message}`);
+  const data = await fetchAllPages(
+    (x, y) =>
+      supabase
+        .from('incidents')
+        .select(
+          'number, state, severity, trigger, started_at, recovered_at, resolved_at, incident_events(type, at, payload)',
+        )
+        .eq('site_id', site.id)
+        .or(`started_at.gte.${from.toISOString()},resolved_at.is.null`)
+        .order('started_at', { ascending: false })
+        .order('id')
+        .range(x, y),
+    { max: MAX_ROWS },
+  );
   const body = toCsv(
     [
       'incident',
@@ -75,6 +84,7 @@ export async function incidentsCsv(siteId: string, now = new Date()): Promise<Re
       'minutes',
       'trigger',
       'severity',
+      'client_word',
       'state',
       'recovered_at_utc',
       'resolved_at_utc',
@@ -91,7 +101,8 @@ export async function incidentsCsv(siteId: string, now = new Date()): Promise<Re
         i.started_at,
         open || drops.length === 0 ? null : episodeMinutes(drops, now),
         triggerWord(i.trigger as Trigger),
-        severityLine(i.severity, i.trigger as Trigger),
+        i.severity,
+        clientWord(i.severity, i.trigger as Trigger),
         i.state,
         i.recovered_at,
         i.resolved_at,

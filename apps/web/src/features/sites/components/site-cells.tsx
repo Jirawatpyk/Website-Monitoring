@@ -57,7 +57,7 @@ export function LocationGlyphs({ row }: { row: SiteListRow }) {
 }
 
 /** Not monitored (a Draft) or no round yet (a live site before its first check). */
-export function RowStatusBadge({ row }: { row: SiteListRow }) {
+export function RowStatusBadge({ row }: { row: Pick<SiteListRow, 'live' | 'status'> }) {
   const key = rowKey(row);
   if (key === 'draft') {
     return (
@@ -77,7 +77,7 @@ export function RowStatusBadge({ row }: { row: SiteListRow }) {
 }
 
 /** Muted is an overlay under the status, never a status (spec §11). */
-export function MutedBadge({ row, now }: { row: SiteListRow; now: Date }) {
+export function MutedBadge({ row, now }: { row: Pick<SiteListRow, 'mutedUntil'>; now: Date }) {
   if (!isMuted(row, now) || !row.mutedUntil) return null;
   return (
     <Badge tone="neutral" variant="outline" icon={<IconEyeOff />}>

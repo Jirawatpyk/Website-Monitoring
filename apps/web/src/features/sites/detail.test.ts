@@ -158,7 +158,7 @@ describe('incident summaries (SiteDetail board, BA – Taiwan)', () => {
 describe('axisLabels (spec §13)', () => {
   const to = Date.parse('2026-09-25T03:07:00Z'); // Fri 25 Sep 10:07 Bangkok
   it('24 h: times, then now', () => {
-    expect(axisLabels('24h', to - 86_400_000, to)).toEqual(['10:07', '16:07', '22:07', '04:07', 'now']);
+    expect(axisLabels('24h', to - 86_400_000, to)).toEqual(['11:00', '17:00', '23:00', '05:00', 'now']);
   });
   it('7 d: weekday and day', () => {
     expect(axisLabels('7d', to - 7 * 86_400_000, to)[0]).toBe('Fri 18');
