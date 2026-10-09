@@ -101,7 +101,7 @@ const renderView = (d: OverviewData) =>
 
 /** The desktop part (md up); the phone part is in the DOM too, hidden by CSS. */
 const desktop = () =>
-  screen.getAllByRole('heading', { level: 1, name: 'Overview' })[0]!.closest('div.flex')!.parentElement!;
+  screen.getAllByRole('region', { name: 'Unacknowledged DOWN incidents' })[0]!.parentElement!;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'Date'] });
@@ -126,7 +126,9 @@ describe('OverviewView (Main3 / MOverview4)', () => {
     expect(screen.getByText('3 monitored sites · 1 draft not monitored yet')).toBeInTheDocument();
     expect(screen.getByText('MuvMi DOWN confirmed — 3/3 locations')).toBeInTheDocument();
     // phone: x/y OK, counts, the All sites row
-    expect(screen.getByRole('heading', { level: 1, name: '2/3 OK' })).toBeInTheDocument();
+    // one h1 (D-018 page header): "Overview" from md, "2/3 OK" on phones (CSS picks one; jsdom has both)
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Overview2/3 OK');
     expect(screen.getByRole('link', { name: /All 3 sites/ })).toHaveAttribute('href', '/sites');
     expect(screen.getByRole('link', { name: /Add site/ })).toHaveAttribute('href', '/sites/new');
   });

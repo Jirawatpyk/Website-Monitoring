@@ -86,25 +86,42 @@ export function OverviewView({
   const meta = `${dayWithYear(now)} · ${formatTimeWithSeconds(now)} (UTC+7)${live ? ' · live' : ''}`;
 
   return (
-    <>
+    <div className="flex flex-col gap-3 md:gap-6">
+      {/* One page header (one h1) whose parts switch at md: Main3 above, MOverview4 below. */}
+      <PageHeader
+        eyebrow={
+          <>
+            <span className="max-md:hidden">OVERVIEW</span>
+            <span className="md:hidden">{`${formatDay(now, { weekday: true }).toUpperCase()} ${formatTime(now)} · UTC+7`}</span>
+          </>
+        }
+        title={
+          <>
+            <span className="max-md:hidden">Overview</span>
+            <span className="md:hidden">{`${counts.ok}/${counts.monitored} OK`}</span>
+          </>
+        }
+        meta={<span className="max-md:hidden">{meta}</span>}
+        actions={
+          <span className="flex flex-wrap items-center gap-3">
+            <span className="max-md:hidden">
+              <ProbePill probes={data.probes} />
+            </span>
+            <span className="md:hidden">
+              <ProbePill probes={data.probes} compact />
+            </span>
+            {isAdmin && (
+              <Link href="/sites/new" className={`max-md:hidden ${buttonClass({ variant: 'secondary' })}`}>
+                <IconPlus />
+                Add site
+              </Link>
+            )}
+          </span>
+        }
+      />
+
       {/* desktop and tablet (md up): Main3 / MainDark3 */}
       <div className="flex flex-col gap-6 max-md:hidden">
-        <PageHeader
-          eyebrow="OVERVIEW"
-          title="Overview"
-          meta={meta}
-          actions={
-            <span className="flex flex-wrap items-center gap-3">
-              <ProbePill probes={data.probes} />
-              {isAdmin && (
-                <Link href="/sites/new" className={buttonClass({ variant: 'secondary' })}>
-                  <IconPlus />
-                  Add site
-                </Link>
-              )}
-            </span>
-          }
-        />
         <DesktopBanners {...banners} viewer={data.viewer} onAck={acknowledge} />
         <Kpis counts={counts} kpis={data.kpis} />
         <LiveIssuesTable
@@ -123,11 +140,6 @@ export function OverviewView({
 
       {/* phones (below md): MOverview4 */}
       <div className="flex flex-col gap-3 md:hidden">
-        <PageHeader
-          eyebrow={`${formatDay(now, { weekday: true }).toUpperCase()} ${formatTime(now)} · UTC+7`}
-          title={`${counts.ok}/${counts.monitored} OK`}
-          actions={<ProbePill probes={data.probes} compact />}
-        />
         <PhoneBanners {...banners} />
         <PhoneCounts counts={counts} viewer={data.viewer} issues={issues} uptime30d={data.kpis.uptime30d} />
         <PhoneLiveIssues
@@ -139,6 +151,6 @@ export function OverviewView({
         />
         <PhoneAllSites monitored={counts.monitored} ok={counts.ok} />
       </div>
-    </>
+    </div>
   );
 }
