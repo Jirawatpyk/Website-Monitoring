@@ -3,7 +3,7 @@
 -- S06-review guard on engine_relapse_incident.
 begin;
 \ir _helpers.psql
-select plan(65);
+select plan(75);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -164,6 +164,12 @@ select ok(public.engine_settle_incident((select id from inc where name = 'a'), '
   now() - interval '2 minutes'), 'A settles, staying in Monitoring');
 select is((select state::text from public.incidents where id = (select id from inc where name = 'a')), 'monitoring',
   'a root cause written first keeps it in Monitoring');
+select ok(public.engine_settle_incident((select id from inc where name = 'a'), 'monitoring', 'monitoring',
+  now() - interval '1 minute', now() - interval '1 minute'), 'an overlapping run settles it again');
+select is(
+  (select count(*)::int from public.incident_events
+   where incident_id = (select id from inc where name = 'a') and type = 'ok_two_rounds'),
+  1, 'one "OK for 2 rounds" event per recovery');
 -- B (no root cause yet): recover → settle → Needs root cause.
 select ok(public.engine_recover_incident((select id from inc where name = 'b'), 'unacked', 'monitoring',
   now() - interval '3 minutes', now() - interval '3 minutes', '{}', true), 'B recovers');
@@ -294,11 +300,35 @@ select throws_like(format('select public.undo_resolve(%L)', (select id from inc 
   '%new incident%', 'Undo refused: the site has a new incident');
 reset role;
 
+-- ── Unknown after settling in Monitoring: back to Needs root cause (engine-review L3) ──
+select tests.authenticate_as((select id from ids where name = 'admin'));
+select lives_ok(format($$select public.save_root_cause(%L, 'hosting', 'Host rebooted', null)$$,
+  (select id from inc where name = 'c')), 'C: root cause written while down');
+reset role;
+select ok(public.engine_recover_incident((select id from inc where name = 'c'), 'unacked', 'monitoring',
+  now() - interval '3 minutes', now() - interval '3 minutes', '{}', false), 'C recovers');
+select ok(public.engine_settle_incident((select id from inc where name = 'c'), 'monitoring', 'monitoring',
+  now() - interval '2 minutes', now() - interval '2 minutes'), 'C settles in Monitoring');
+select tests.authenticate_as((select id from ids where name = 'admin'));
+select lives_ok(format($$select public.save_root_cause(%L, 'unknown', 'Not sure after all', null)$$,
+  (select id from inc where name = 'c')), 'C''s root cause is changed to Unknown');
+reset role;
+select is((select state::text from public.incidents where id = (select id from inc where name = 'c')),
+  'needs_root_cause', 'it now needs a root cause again');
+
 -- ── A relapse needs 2 new OK rounds ──────────────────────────────────────
 select ok(public.engine_recover_incident((select id from inc where name = 'd'), 'unacked', 'monitoring',
   now() - interval '10 minutes', now() - interval '10 minutes', '{}', true), 'D recovers');
 select ok(public.engine_settle_incident((select id from inc where name = 'd'), 'monitoring',
   'needs_root_cause', now() - interval '9 minutes', now() - interval '9 minutes'), 'D settles');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok(format($$select public.resolve_incident(%L, 'dns', 'DNS record removed', null)$$,
+  (select id from inc where name = 'd')), 'D resolves from Needs root cause');
+select lives_ok(format('select public.undo_resolve(%L)', (select id from inc where name = 'd')),
+  'and the resolver undoes it');
+reset role;
+select is((select state::text from public.incidents where id = (select id from inc where name = 'd')),
+  'needs_root_cause', 'Undo returns it to Needs root cause');
 select ok(public.engine_relapse_incident((select id from inc where name = 'd'), 'down', 'hard_fail',
   now() - interval '6 minutes', now() - interval '6 minutes', now() - interval '6 minutes', '{}', false, true),
   'D goes down again');

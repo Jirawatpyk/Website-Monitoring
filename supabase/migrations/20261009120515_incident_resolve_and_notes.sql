@@ -146,7 +146,15 @@ begin
 
   update public.incidents
     set root_cause_category = v_rc->>'category', root_cause = v_rc->>'what',
-        root_cause_fix = v_rc->>'fix'
+        root_cause_fix = v_rc->>'fix',
+        -- Settled in Monitoring because a root cause was written (§16.4), now Unknown: it needs one.
+        state = case
+          when state = 'monitoring' and v_rc->>'category' = 'unknown' and recovered_at is not null
+               and exists (select 1 from public.incident_events e
+                           where e.incident_id = p_incident_id and e.type = 'ok_two_rounds'
+                             and e.at >= recovered_at)
+          then 'needs_root_cause'::public.incident_state
+          else state end
     where id = p_incident_id;
 
   -- `first` and `state` let the timeline say written / draft (still down) / edited.
@@ -445,7 +453,7 @@ $$;
 
 -- ── OK for 2 rounds, on the timeline every time ─────────────────────────────
 -- engine_settle_incident as in S04a (20261007091143), except that the ok_two_rounds event is written
--- on every settle — also when the incident stays in Monitoring because its root cause was written
+-- once per recovery — also when the incident stays in Monitoring because its root cause was written
 -- first (§16.4). resolve_incident reads it (engine-review H1); the audit row stays for a state change.
 create or replace function public.engine_settle_incident(
   p_incident_id uuid,
@@ -472,8 +480,15 @@ begin
     return false;
   end if;
 
+  -- Once per recovery: overlapping runs queue on the row lock above, and the second sees the first's
+  -- event (READ COMMITTED); a relapse moves recovered_at, so the next recovery gets its own.
   insert into public.incident_events (incident_id, type, payload, at)
-  values (p_incident_id, 'ok_two_rounds', jsonb_build_object('state', p_to), p_at);
+  select p_incident_id, 'ok_two_rounds', jsonb_build_object('state', p_to), p_at
+  where p_to is distinct from p_from
+     or not exists (
+       select 1 from public.incident_events e
+       where e.incident_id = p_incident_id and e.type = 'ok_two_rounds'
+         and e.at >= (select recovered_at from public.incidents where id = p_incident_id));
 
   if p_to is distinct from p_from then
     insert into public.audit_log (action, entity, entity_id, before, after)
