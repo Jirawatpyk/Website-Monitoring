@@ -135,7 +135,17 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
     resolveDesktop.current;
   const resolved = d.state === 'resolved' || d.state === 'in_review' || d.state === 'closed';
   const stillDown = !d.recoveredAt;
-  const { acknowledge } = useAckToast({ ack: acknowledgeIncident, undo: undoAcknowledge });
+  const { acked, acknowledge } = useAckToast({ ack: acknowledgeIncident, undo: undoAcknowledge });
+  // After an Undo of a resolve the page re-renders unresolved: focus Resolve once it is back (WCAG 2.4.3).
+  const [focusResolve, setFocusResolve] = useState(false);
+  useEffect(() => {
+    if (!focusResolve) return;
+    const button = shownResolve();
+    if (!button) return;
+    button.focus();
+    const t = setTimeout(() => setFocusResolve(false), 0);
+    return () => clearTimeout(t);
+  });
 
   const initialRc: RootCauseValue = {
     category: d.rootCause.category ?? '',
@@ -156,12 +166,17 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
     stillDown,
   };
 
-  // An email's "Add root cause" (…#resolve, D-033): open the form that fits where the incident is.
+  // An email's "Add root cause" (…#resolve, D-033): open the form that fits, once — the hash leaves the
+  // URL, so an Undo or a refresh later never reopens it.
+  const hashHandled = useRef(false);
   useEffect(() => {
-    if (typeof window === 'undefined' || window.location.hash !== '#resolve' || !d.canAct || resolved) return;
+    if (hashHandled.current || window.location.hash !== '#resolve') return;
+    hashHandled.current = true;
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (!d.canAct || resolved) return;
     const t = setTimeout(() => (d.gate.canOpenDialog ? openResolve() : openRootCause()), 0);
     return () => clearTimeout(t);
-  }, [d.canAct, d.gate.canOpenDialog, resolved]);
+  });
 
   const downRange = d.recoveredAt
     ? `${formatTime(new Date(d.startedAt))}–${formatTime(new Date(d.recoveredAt))}`
@@ -173,11 +188,10 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
       : []),
     ...(d.recoveredAt ? [{ label: 'OK since', value: formatTime(new Date(d.recoveredAt)) }] : []),
   ];
-  const title = resolved
-    ? `${d.siteName} ${d.severity === 'down' ? 'recovered' : 'is back to normal'}`
-    : stillDown
+  const title =
+    stillDown && !resolved
       ? v.title
-      : `${d.siteName} recovered`;
+      : `${d.siteName} ${d.severity === 'down' ? 'recovered' : 'is back to normal'}`;
 
   const resolveCard = (ref: React.RefObject<HTMLButtonElement | null>) => (
     <ResolveCard
@@ -234,7 +248,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
             <Button variant="secondary" href={`/sites/${d.siteId}`}>
               View site
             </Button>
-            {v.ack.kind === 'can-ack' && (
+            {v.ack.kind === 'can-ack' && !acked.has(v.incidentId) && (
               <Button
                 variant="primary"
                 icon={<IconCheck />}
@@ -292,7 +306,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
             items={menu}
           />
         </span>
-        {d.resolved && <ResolvedCard detail={d} />}
+        {d.resolved && <ResolvedCard detail={d} onUndone={() => setFocusResolve(true)} />}
         <LatestRoundCard detail={d} />
         {resolveCard(resolvePhone)}
         {v.ack.kind === 'read-only' && (
@@ -359,6 +373,7 @@ export function IncidentDetailView({ detail: d, viewerName, viewerEmail, nowIso 
             open={resolveOpen}
             onClose={() => setResolveOpen(false)}
             returnFocus={shownResolve}
+            onUndone={() => setFocusResolve(true)}
           />
         </>
       )}
@@ -516,7 +531,7 @@ function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
 }
 
 /** Phone: "Resolved 10:33" with the held RESOLVED and its Undo (MIncident). */
-function ResolvedCard({ detail: d }: { detail: IncidentDetail }) {
+function ResolvedCard({ detail: d, onUndone }: { detail: IncidentDetail; onUndone: () => void }) {
   const r = d.resolved!;
   const seconds = useSecondsLeft(r.posted ? null : r.postsAt);
   const [failure, setFailure] = useState<string | null>(null);
@@ -540,6 +555,7 @@ function ResolvedCard({ detail: d }: { detail: IncidentDetail }) {
           onClick={async () => {
             const res = await undoResolve(d.view.incidentId);
             if (!res.ok) setFailure(res.message);
+            else onUndone();
           }}
         >
           {`Undo · ${seconds} s`}
@@ -566,7 +582,6 @@ function ResolveCard({
   const g = d.gate;
   return (
     <Card
-      id="resolve"
       title="Resolve"
       headingLevel={2}
       actions={

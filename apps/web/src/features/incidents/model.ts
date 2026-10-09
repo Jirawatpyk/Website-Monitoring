@@ -238,13 +238,8 @@ export function nextLine(
     };
   }
   if (i.state === 'monitoring') {
-    return {
-      text: `Recovered ${i.recoveredAt ? formatTime(new Date(i.recoveredAt)) : ''} — watching for 2 OK rounds`.replace(
-        '  ',
-        ' ',
-      ),
-      tone: 'secondary',
-    };
+    const when = i.recoveredAt ? ` ${formatTime(new Date(i.recoveredAt))}` : '';
+    return { text: `Recovered${when} — watching for 2 OK rounds`, tone: 'secondary' };
   }
   if (i.state === 'needs_root_cause') {
     return { text: 'Recovered — add a root cause to resolve', tone: 'warning' };
@@ -284,8 +279,11 @@ const toMetric = (i: ListIncident): MetricIncident => ({
 
 export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
   const open = list.filter(isOpen);
-  const down = open.filter((i) => i.severity === 'down' && i.state !== 'needs_root_cause').length;
-  const problem = open.filter((i) => i.severity === 'problem' && i.state !== 'needs_root_cause').length;
+  // What each is now: failing (DOWN / PROBLEM), recovered and being watched, or waiting for a root cause.
+  const failing = open.filter((i) => !['monitoring', 'needs_root_cause', 'in_review'].includes(i.state));
+  const down = failing.filter((i) => i.severity === 'down').length;
+  const problem = failing.filter((i) => i.severity === 'problem').length;
+  const watching = open.filter((i) => i.state === 'monitoring').length;
   const rc = open.filter((i) => i.state === 'needs_root_cause');
   const unacked = sortIncidents(open.filter(isUnackedDown));
   const from = new Date(now.getTime() - 30 * 86_400_000);
@@ -298,6 +296,7 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
       ? [
           down ? `${down} DOWN` : null,
           problem ? `${problem} PROBLEM` : null,
+          watching ? `${watching} recovering` : null,
           rc.length ? `${rc.length} needs root cause` : null,
         ]
           .filter(Boolean)

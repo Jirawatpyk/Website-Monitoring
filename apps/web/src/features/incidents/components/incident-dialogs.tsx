@@ -9,6 +9,7 @@ import { formatTime, ROOT_CAUSE_CATEGORIES, ROOT_CAUSE_LABELS } from '@dxt/share
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { addNote, resolveIncident, saveRootCause, undoResolve } from '../actions';
 import type { Condition } from '../model';
+import { rootCauseSchema } from '../schemas';
 
 const CATEGORY_OPTIONS = ROOT_CAUSE_CATEGORIES.map((c) => ({ value: c, label: ROOT_CAUSE_LABELS[c] }));
 const FAILED = 'Couldn’t reach the server. Check your connection and try again.';
@@ -70,14 +71,16 @@ function RootCauseFields({
   );
 }
 
-/** Checks the form as the action will (so the field says it before a round trip). */
+/** Checks the form with the action's own schema, so the field says it before a round trip. */
 function check(v: RootCauseValue): Partial<Record<Field, string>> {
-  return {
-    ...(v.category ? {} : { category: 'Choose a category.' }),
-    ...(v.what.trim()
-      ? {}
-      : { what: 'Required — say what happened, even if the site recovered on its own.' }),
-  };
+  const r = rootCauseSchema.safeParse({ incidentId: '00000000-0000-4000-8000-000000000000', ...v });
+  if (r.success) return {};
+  const out: Partial<Record<Field, string>> = {};
+  for (const issue of r.error.issues) {
+    const f = issue.path[0];
+    if ((f === 'category' || f === 'what' || f === 'fix') && !out[f]) out[f] = issue.message;
+  }
+  return out;
 }
 
 export interface DialogIncident {
@@ -271,6 +274,7 @@ export function ResolveDialog({
   open,
   onClose,
   returnFocus,
+  onUndone,
 }: {
   incident: DialogIncident;
   initial: RootCauseValue;
@@ -283,6 +287,8 @@ export function ResolveDialog({
   onClose: () => void;
   /** Where focus goes when it closes, Undo included (WCAG 2.4.3): the page's Resolve button. */
   returnFocus?: DialogProps['finalFocus'];
+  /** After an Undo: the page brings focus back to Resolve once it renders it again. */
+  onUndone?: () => void;
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initial);
@@ -356,6 +362,7 @@ export function ResolveDialog({
       }
       setDone(null);
       onClose();
+      onUndone?.();
       router.refresh();
     });
 

@@ -185,6 +185,28 @@ describe('Incident page — Resolve (T10, D-033)', () => {
   });
 });
 
+describe('Incident page — roles that can’t acknowledge (D-016)', () => {
+  it('is read-only and says who can act; no Acknowledge', () => {
+    const d = detail({ state: 'unacked', recoveredAt: null, canAct: false });
+    show({
+      ...d,
+      view: {
+        ...d.view,
+        state: 'unacked',
+        ack: {
+          kind: 'read-only',
+          title: 'Your role can’t acknowledge (Viewer)',
+          description: 'mint@example.test can see this incident but not acknowledge it.',
+          people: [{ name: 'Tao', duty: 'owner', status: 'Not acked', urgent: true }],
+        },
+      },
+    });
+    expect(screen.getByText('Your role can’t acknowledge (Viewer)')).toBeInTheDocument();
+    expect(screen.getByText('Tao — owner')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
+  });
+});
+
 describe('Incident page — notes', () => {
   it('Add note posts the trimmed text and closes', async () => {
     m.addNote.mockResolvedValue({ ok: true });

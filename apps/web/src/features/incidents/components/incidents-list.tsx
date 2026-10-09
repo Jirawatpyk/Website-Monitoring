@@ -360,7 +360,7 @@ function PhoneCard({ incident: i, now }: { incident: ListIncident; now: Date }) 
     <Link
       href={hrefOf(i)}
       className={`flex flex-col gap-1 rounded-aura-lg border px-3.5 py-3 text-fg-primary no-underline hover:bg-bg-surface-hover ${
-        unacked ? 'border-border-danger bg-bg-danger-subtle' : 'border-border-default bg-bg-surface'
+        unacked ? 'border-alert-danger-border bg-alert-danger-bg' : 'border-border-default bg-bg-surface'
       }`}
     >
       <span className="flex items-center gap-2">
@@ -381,7 +381,7 @@ function PhoneCard({ incident: i, now }: { incident: ListIncident; now: Date }) 
         </span>
       </span>
       {unacked && (
-        <span className="mt-1 flex items-center gap-2 border-t border-border-danger pt-2 text-sm font-medium">
+        <span className="mt-1 flex items-center gap-2 border-t border-alert-danger-border pt-2 text-sm font-medium">
           <IconCheck aria-hidden className="size-4" />
           <span className="grow">Acknowledge</span>
           <IconChevronRight aria-hidden className="size-4" />

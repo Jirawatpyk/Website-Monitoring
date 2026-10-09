@@ -32,6 +32,8 @@ import { buildIncidentView, canAcknowledge, type IncidentRow, type IncidentView,
 const SIGNED_URL_SEC = 600;
 /** A long incident's timeline is read in pages (PostgREST answers 1,000 rows at most). */
 const MAX_EVENTS = 5000;
+/** Ids per `in` filter (kept well under URL limits). */
+const ID_CHUNK = 150;
 
 /** One location's checks for the Evidence card: first check, the recheck and the latest. */
 export interface LocationEvidence {
@@ -416,14 +418,21 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
   if (sites.error) throw new Error(`sites: ${sites.error.message}`);
   const ids = rows.filter((r) => r.severity === 'down').map((r) => r.id);
   // D-021: a PROBLEM raised to DOWN counts its outage from the escalation (MTTA / MTTR, D-032).
-  const raised = ids.length
-    ? await db
+  // In chunks: an `in` list rides in the URL, which a few hundred uuids would overflow.
+  const chunks: string[][] = [];
+  for (let n = 0; n < ids.length; n += ID_CHUNK) chunks.push(ids.slice(n, n + ID_CHUNK));
+  const parts = await Promise.all(
+    chunks.map((chunk) =>
+      db
         .from('incident_events')
         .select('incident_id, payload')
         .eq('type', 'escalated_to_down')
-        .in('incident_id', ids)
-    : { data: [], error: null };
-  if (raised.error) throw new Error(`incident_events: ${raised.error.message}`);
+        .in('incident_id', chunk),
+    ),
+  );
+  const failed = parts.find((p) => p.error);
+  if (failed?.error) throw new Error(`incident_events: ${failed.error.message}`);
+  const raised = { data: parts.flatMap((p) => p.data ?? []) };
   const downStart = new Map(
     (raised.data ?? []).flatMap((e) => {
       const p = e.payload as Record<string, unknown> | null;
