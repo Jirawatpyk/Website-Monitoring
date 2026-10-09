@@ -81,6 +81,8 @@ Sites screens (S05, D-025), as Tao in the browser pane on https://monitor-stagin
 
 Staging has one person (Tao) and no Google Chat id on that profile, so Start monitoring and Stop on a new site can't be driven there (Start needs two different owners with Chat ids, D-015): the local e2e `e2e/sites.spec.ts` covers them. For the same reason the live Test target can't be saved from Edit site until it has a backup owner with a Chat id — re-run `staging/test-target.sql` with a second linked person if a run needs it. On the production build, set form fields by typing (click the field first), not by `form_input`, which doesn't reach React state.
 
+- **Browser pane under width emulation** (`resize_window` 1440 / 820 / 390): clicks by coordinate can miss and screenshots can be stale or half-size (S06b `/verify`: "Acknowledge did nothing"). Check the control is on top with `document.elementFromPoint`, act with a DOM `.click()`, and read layout with `getBoundingClientRect`; screenshots at those widths come from Playwright locally (e2e helpers) or from the pane without emulation. A hidden (not fronted) tab pauses `requestAnimationFrame` and CSS transitions — front it before timing anything.
+
 ## 4. Reset between runs
 
 A new problem on an incident that is still open (Monitoring / Needs root cause) is a relapse into it (S04b), not a new incident. For a clean start — a fresh DOWN or PROBLEM card — run `supabase/staging/reset-test-incident.sql` in the SQL editor first, and leave the target on `ok` at the end.
