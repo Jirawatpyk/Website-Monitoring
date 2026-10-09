@@ -379,6 +379,10 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   - A resolve made by hand inside a flapping incident's 15-min hold must cancel its held summary (`engine_cancel_flap_summary`); otherwise the summary posts after RESOLVED (db-reviewer L-a, engine-reviewer L4).
   - The timeline orders RECOVERED before PROBLEM AGAIN when both have the same `at` (D-023, spec §19.7); `episodesOf` already does this.
   - `incidents.auto_resolved` drives the hidden "N short PROBLEMs auto-resolved" filter.
+- **Carried from S06 review** (engine-reviewer; existed before S06):
+  - RECOVERED words its drop by the incident's severity (`render.ts` `problemOf` / `recoveryOf`): a D-023 key-page PROBLEM drop on a DOWN incident says "back · down X" instead of "back to normal · problem for X". Take the severity (and the trigger, from its `relapsed` payload) from the drop that recovered (N3).
+  - `engine_relapse_incident` lets a PROBLEM incident relapse as DOWN without an `escalated_to_down` event; the runner always escalates first, but add the SQL guard `not (p_severity = 'down' and severity = 'problem')` with a pgTAP test (L2).
+  - A drop with no `recovered` row on a resolved incident runs to `now`; cap its end at `resolved_at` in `episodesFromTimeline` (L3).
 
 ### S08 · Escalation L0–L1 & response hours
 
