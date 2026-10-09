@@ -161,6 +161,8 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     // the pressed button is gone: focus is on the outcome (WCAG 2.4.3)
     await waitFor(() => expect(within(done).getByText(/^Resolved at \d\d:\d\d by Tao$/)).toHaveFocus());
     expect(within(done).getByText(/Posting to Chat and email in \d+ s/)).toBeInTheDocument();
+    expect(within(done).getByText(/Root cause: Hosting \/ server\. Down 8 min\./)).toBeInTheDocument();
+    expect(within(done).getAllByText(/^in \d+ s$/)).toHaveLength(2);
     await act(async () => fireEvent.click(within(done).getByRole('button', { name: /^Undo · \d+ s$/ })));
     expect(m.undoResolve).toHaveBeenCalledWith('i139');
     await waitFor(() => expect(resolveButton()).toHaveFocus());
