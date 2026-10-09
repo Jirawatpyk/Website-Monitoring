@@ -32,3 +32,16 @@ body {
     transform: translate(-50%, -50%);
   }
 }
+
+/* BottomNav away (components/app-shell/phone-nav.tsx). Scrolled away: sticky bars and toasts sit on the
+   safe area instead. A page with its own bottom action bar ([data-hides-bottomnav], the incident page)
+   keeps it away for good — no spacer, not focusable — in CSS, so there is no shift after load.
+   Unlayered, so these win over AURA's :root:has(.aura-bottomnav--below-lg) rule. */
+:root[data-bottomnav-hidden],
+:root:has([data-hides-bottomnav]) {
+  --aura-bottomnav-offset: env(safe-area-inset-bottom, 0px);
+}
+:root:has([data-hides-bottomnav]) .aura-bottomnav,
+:root:has([data-hides-bottomnav]) .aura-bottomnav-spacer {
+  display: none;
+}

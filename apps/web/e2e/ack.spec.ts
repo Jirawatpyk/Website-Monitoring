@@ -18,6 +18,32 @@ test.describe('acknowledge from the alert link (local Supabase)', () => {
     await signIn(context, baseURL!, 'arm@example.test');
   });
 
+  test('on a phone the incident page keeps the BottomNav away, so its action bar has the bottom edge (S06b)', async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== 'mobile', 'BottomNav shows below lg');
+    const id = await openTestIncident('arm@example.test');
+    await page.goto(`/incidents/${id}`);
+    await expect(page.getByRole('button', { name: 'Acknowledge' })).toBeVisible();
+    // gone from the first paint (CSS on the bar's marker), not after the client runs
+    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeHidden();
+  });
+
+  test('on a phone the BottomNav slides away scrolling down and comes back scrolling up (S06b)', async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== 'mobile', 'BottomNav shows below lg');
+    await page.goto('/sites');
+    const nav = page.locator('.aura-bottomnav');
+    const height = page.viewportSize()!.height;
+    const top = async () => (await nav.boundingBox())!.y;
+    await expect.poll(top).toBeLessThan(height - 1);
+    await page.mouse.wheel(0, 600);
+    await expect.poll(top).toBeGreaterThanOrEqual(height - 1);
+    await page.mouse.wheel(0, -300);
+    await expect.poll(top).toBeLessThan(height - 1);
+  });
+
   test('T08: Ack → Undo within 10 s → nothing is sent, the rows end cancelled', async ({ page }) => {
     const id = await openTestIncident('arm@example.test');
     await page.goto(`/incidents/${id}?ack=1`);

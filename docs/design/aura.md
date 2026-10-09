@@ -51,6 +51,8 @@ Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build proj
 Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). Requests 1–10 have shipped (5.32–5.34). Open in the doc (9 Oct 2026):
 
 - **Request 12 — StatusTile: a neutral "no data" status** (S06b). `status` is down / problem / maintenance / ok; a monitored site before its first round has none, so the Overview draws it as `ok` with `statusLabel="No data yet"` — the check icon says more than is known. Ask for `status="unknown"` (circle-dot-dashed, tertiary, plain surface), the Sites list's "No data yet" badge in tile form (D-032).
+- **Request 13 — AppShell top bar hides while scrolling down** (S06b, Tao). Waits for AURA; no workaround.
+- **Request 14 — BottomNav hides on scroll and for a page's own bottom bar** (S06b). Workaround: `components/app-shell/phone-nav.tsx` (scroll listener, `data-bottomnav-hidden`) and the `data-hides-bottomnav` rules in `app/globals.css` — remove both when AURA ships it.
 - **Request 11 — Breadcrumb links: touch hit area** (S05). A crumb link is ~20 px tall; on a coarse pointer it should get the same 44 px `::after` hit area as `Button size="sm"`. Workaround: `.aura-crumbs a::after` in `apps/web/src/app/globals.css` — remove it when AURA ships this.
 
 A new request goes in the doc (template at its foot) and here.
