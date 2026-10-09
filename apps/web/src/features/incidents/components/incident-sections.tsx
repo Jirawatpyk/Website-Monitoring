@@ -11,7 +11,14 @@ import {
   IconRotateCcw,
   IconTriangleAlert,
 } from '@jirawatpyk/aura-react/icons';
-import { formatDuration, formatDurationSeconds, formatTime, formatTimeWithSeconds } from '@dxt/shared';
+import {
+  formatDay,
+  formatDuration,
+  formatDurationSeconds,
+  formatTime,
+  formatTimeWithSeconds,
+  isSameBangkokDay,
+} from '@dxt/shared';
 import { GLYPH_LEGEND, GLYPHS } from '@/components/site-cells';
 import type { CheckCell, IncidentDetail } from '../detail-queries';
 import type { TimelineItem } from '../model';
@@ -40,7 +47,11 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {
   const confirmedAt = new Date(d.detectedAt);
   const facts = [
-    { label: 'STARTED', value: formatTimeWithSeconds(new Date(d.startedAt)), caption: 'First failed check' },
+    {
+      label: 'STARTED',
+      value: [startedOn(d, now), formatTimeWithSeconds(new Date(d.startedAt))].filter(Boolean).join(' '),
+      caption: 'First failed check',
+    },
     {
       label: d.severity === 'down' ? 'CONFIRMED DOWN' : 'DETECTED',
       value: formatTimeWithSeconds(confirmedAt),
@@ -195,7 +206,15 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
   );
 }
 
+/** "Thu 24 Sep" for an incident that started before today (Bangkok), else null: today's times stand alone. */
+export function startedOn(d: Pick<IncidentDetail, 'startedAt'>, now: Date): string | null {
+  const started = new Date(d.startedAt);
+  return isSameBangkokDay(started, now) ? null : formatDay(started, { weekday: true });
+}
+
 export interface IncidentSections {
+  /** The start day when it isn't today (`startedOn`), for the phone's summary line. */
+  startedOn: string | null;
   facts: React.ReactNode;
   evidenceTable: React.ReactNode;
   latestRound: React.ReactNode;
@@ -206,6 +225,7 @@ export interface IncidentSections {
 /** The slots `IncidentDetailView` places, drawn once on the server. */
 export function incidentSections(d: IncidentDetail, now: Date): IncidentSections {
   return {
+    startedOn: startedOn(d, now),
     facts: <FactsStrip detail={d} now={now} />,
     evidenceTable: <EvidenceTable detail={d} />,
     latestRound: <LatestRoundCard detail={d} />,

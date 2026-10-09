@@ -218,8 +218,11 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     await waitFor(() => expect(resolveButton()).toHaveFocus());
   });
 
-  it('resolved and still sending: the page refreshes after the hold until the RESOLVED shows as sent', () => {
+  it('resolved and still sending: refreshes once the hold is over, then says it is still being tried (as the ack panel)', () => {
     vi.useFakeTimers();
+    const walk = (ms: number) => {
+      for (let n = 0; n < ms; n += 1_000) act(() => vi.advanceTimersByTime(1_000));
+    };
     try {
       const d = detail({ events: settled });
       show({
@@ -229,20 +232,34 @@ describe('Incident page — Resolve (T10, D-033)', () => {
         resolved: {
           by: 'Tao',
           byViewer: true,
-          at: NOW,
+          at: new Date().toISOString(),
           postsAt: new Date(Date.now() + 10_000).toISOString(),
           posted: null,
         },
       });
-      act(() => vi.advanceTimersByTime(12_000));
+      // held: nothing to look for yet
+      walk(9_000);
       expect(m.refresh).not.toHaveBeenCalled();
-      act(() => vi.advanceTimersByTime(1_500));
+      // the hold ends at 10 s; refreshes at +2 s and +8 s, then every 15 s
+      walk(4_000);
       expect(m.refresh).toHaveBeenCalledTimes(1);
-      act(() => vi.advanceTimersByTime(3_500));
+      walk(6_000);
       expect(m.refresh).toHaveBeenCalledTimes(2);
+      expect(screen.getAllByText('Posting to the Chat thread and email now').length).toBeGreaterThan(0);
+      // 30 s after it was due: not "now" any more
+      walk(25_000);
+      expect(
+        screen.getAllByText('Still sending — retried automatically until it goes through').length,
+      ).toBeGreaterThan(0);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('started before today: STARTED and the phone line name the day (§13)', () => {
+    show(detail({ events: settled }));
+    expect(screen.getByText('Thu 24 Sep 22:14:00')).toBeInTheDocument();
+    expect(screen.getByText(/Thu 24 Sep 22:14–22:22/)).toBeInTheDocument();
   });
 
   it('a refusal stays in the dialog and says why', async () => {

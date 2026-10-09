@@ -13,6 +13,7 @@ import {
 import { canResolve, UNKNOWN_ROOT_CAUSE } from '@dxt/engine';
 import { formatTime, formatTimeWithSeconds, ROOT_CAUSE_CATEGORIES, ROOT_CAUSE_LABELS } from '@dxt/shared';
 import { FOCUS_TARGET } from '@/components/focus-target';
+import { POST_WAIT_WORDS, type PostOverdue } from './use-post-wait';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { addNote, resolveIncident, saveRootCause, undoResolve } from '../actions';
 import type { Condition } from '../model';
@@ -279,6 +280,7 @@ export function ResolveDialog({
   summary,
   lasted,
   postedAt,
+  postOverdue = 'no',
   viewerName,
   open,
   onClose,
@@ -295,6 +297,8 @@ export function ResolveDialog({
   lasted?: string;
   /** When the RESOLVED messages went out, once the page knows (after a refresh). */
   postedAt?: string | null;
+  /** How late they are while unposted (`usePostWait` on the page). */
+  postOverdue?: PostOverdue;
   viewerName: string;
   open: boolean;
   onClose: () => void;
@@ -482,7 +486,7 @@ export function ResolveDialog({
               ? `Posting to Chat and email in ${seconds} s — nothing is sent until then`
               : postedAt
                 ? `Posted to Chat and email at ${formatTimeWithSeconds(new Date(postedAt))}`
-                : 'Posting to the Chat thread and email now'}
+                : POST_WAIT_WORDS[postOverdue]}
           </p>
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
             {[
@@ -497,14 +501,20 @@ export function ResolveDialog({
                   {postedAt ? <IconCircleCheck className="size-4" /> : <IconClock className="size-4" />}
                 </span>
                 <span className="grow">
-                  {postedAt ? sent : seconds > 0 ? `${held} · held for undo` : `${held} · sending`}
+                  {postedAt
+                    ? sent
+                    : seconds > 0
+                      ? `${held} · held for undo`
+                      : `${held} · ${postOverdue === 'stale' ? 'not confirmed' : 'sending'}`}
                 </span>
                 <span className="shrink-0 font-mono text-xs text-fg-secondary tabular-nums">
                   {postedAt
                     ? formatTimeWithSeconds(new Date(postedAt))
                     : seconds > 0
                       ? `in ${seconds} s`
-                      : 'now'}
+                      : postOverdue === 'no'
+                        ? 'now'
+                        : 'retrying'}
                 </span>
               </li>
             ))}

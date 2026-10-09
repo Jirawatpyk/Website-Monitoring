@@ -8,6 +8,7 @@ import { formatTimeWithSeconds } from '@dxt/shared';
 import { FOCUS_TARGET } from '@/components/focus-target';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge } from '../actions';
+import { POST_WAIT_WORDS, usePostWait } from './use-post-wait';
 import type { AckState } from '../view';
 
 interface AckPanelProps {
@@ -21,14 +22,6 @@ interface AckPanelProps {
   /** The bar once there is nothing to acknowledge: Add note and Resolve (MIncident, S07). */
   barActions?: ReactNode;
 }
-
-/** After the window: refresh at these delays, then every POLL_MS, to show "Posted …". */
-const REFRESH_AFTER_MS = [2_000, 8_000];
-const POLL_MS = 15_000;
-/** Retries run up to ~10 min (30 s, 2 min, 8 min); stop polling after that. */
-const POLL_FOR_MS = 11 * 60_000;
-/** Past this the copy says it's still being tried rather than "now". */
-const LATE_AFTER_MS = 30_000;
 
 /**
  * The ack card, the Undo countdown and the sticky action bar of MobileAck (spec §14.3, §15.6,
@@ -46,8 +39,6 @@ export function AckPanel({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  /** How long it has been unposted: `late` after 30 s, `stale` once the retries (~11 min) are over. */
-  const [overdue, setOverdue] = useState<'no' | 'late' | 'stale'>('no');
   const ackButton = useRef<HTMLButtonElement>(null);
   const undoButton = useRef<HTMLButtonElement>(null);
   const cardTitle = useRef<HTMLHeadingElement>(null);
@@ -61,30 +52,8 @@ export function AckPanel({
   const holding = holdingUntil !== null && seconds > 0;
   const waitingForPost = ack.kind === 'acked' && ack.notifies && !ack.posted && !holding;
   const postsAt = ack.kind === 'acked' ? ack.postsAt : null;
-
   // Once the window has closed the messages leave (or are retried): refresh until "Posted …".
-  useEffect(() => {
-    if (!waitingForPost || !postsAt) return;
-    const since = Date.now() - new Date(postsAt).getTime();
-    // A page opened after the retries are over says so at once, rather than "now" for ever.
-    if (since > POLL_FOR_MS) {
-      const staleTimer = setTimeout(() => setOverdue('stale'), 0);
-      return () => clearTimeout(staleTimer);
-    }
-    const timers = REFRESH_AFTER_MS.map((ms) => setTimeout(() => router.refresh(), ms));
-    const poll = setInterval(() => router.refresh(), POLL_MS);
-    const lateTimer = setTimeout(() => setOverdue('late'), Math.max(0, LATE_AFTER_MS - since));
-    const stop = setTimeout(() => {
-      clearInterval(poll);
-      setOverdue('stale');
-    }, POLL_FOR_MS - since);
-    return () => {
-      timers.forEach(clearTimeout);
-      clearInterval(poll);
-      clearTimeout(lateTimer);
-      clearTimeout(stop);
-    };
-  }, [waitingForPost, postsAt, router]);
+  const overdue = usePostWait(waitingForPost, postsAt);
 
   // Keep keyboard and screen-reader users where the action left them (WCAG 2.4.3): after an ack, on
   // Undo (or the card); after an Undo, back on Acknowledge.
@@ -116,11 +85,7 @@ export function AckPanel({
           ? 'Nothing to post — no alert went out for this incident.'
           : ack.posted
             ? `Posted to ${ack.posted.to} at ${formatTimeWithSeconds(new Date(ack.posted.at))}`
-            : overdue === 'stale'
-              ? 'Not confirmed as posted — Chat and email didn’t answer. Tell the team in the Chat thread.'
-              : overdue === 'late'
-                ? 'Still sending — retried automatically until it goes through'
-                : 'Posting to the Chat thread and email now';
+            : POST_WAIT_WORDS[overdue];
 
   return (
     <>

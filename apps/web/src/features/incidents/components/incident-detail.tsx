@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
   toast,
@@ -52,13 +51,11 @@ import {
   type DialogIncident,
   type RootCauseValue,
 } from './incident-dialogs';
+import { POST_WAIT_WORDS, usePostWait, type PostOverdue } from './use-post-wait';
 
 const LIVE = ['incidents'] as const;
 /** Lines a phone shows before "Show all" (a long flapping incident has hundreds); the CSS above hides from 21. */
 const PHONE_LINES = 20;
-/** After the hold, look for the sent RESOLVED this long after it was due, up to this many times. */
-const POSTED_CHECK_MS = 3_000;
-const MAX_POSTED_CHECKS = 5;
 
 /**
  * The phone's timeline, newest first, shows the latest `PHONE_LINES` until "Show all": the lines come
@@ -100,7 +97,6 @@ export function IncidentDetailView({
   const v = d.view;
   // Someone else's ack, a recovery, a resolve: on screen without a reload (PRD §9).
   useLiveRefresh(LIVE);
-  const router = useRouter();
   const incidentLabel = formatIncidentId(Number(v.id.replace('INC-', '')));
   const [noteOpen, setNoteOpen] = useState(false);
   const [rcOpen, setRcOpen] = useState(false);
@@ -153,19 +149,10 @@ export function IncidentDetailView({
     const t = setTimeout(() => setFocusResolve(false), 0);
     return () => clearTimeout(t);
   });
-  // RESOLVED leaves after the hold (`after()` in the action): refresh until the page knows it was sent,
-  // so the dialog and the card stop at "sending" (S07 /verify).
-  const postsAt = d.resolved && !d.resolved.posted ? d.resolved.postsAt : null;
-  const [postedChecks, setPostedChecks] = useState(0);
-  useEffect(() => {
-    if (!postsAt || postedChecks >= MAX_POSTED_CHECKS) return;
-    const wait = Math.max(0, Date.parse(postsAt) - Date.now()) + POSTED_CHECK_MS;
-    const t = setTimeout(() => {
-      setPostedChecks((n) => n + 1);
-      router.refresh();
-    }, wait);
-    return () => clearTimeout(t);
-  }, [postsAt, postedChecks, router]);
+  // RESOLVED leaves after the hold (`after()` in the action): refresh until the page shows it sent.
+  const resolvedPostsAt = d.resolved && !d.resolved.posted ? d.resolved.postsAt : null;
+  const holdLeft = useSecondsLeft(resolvedPostsAt);
+  const postOverdue = usePostWait(!!resolvedPostsAt && holdLeft === 0, resolvedPostsAt);
 
   const initialRc: RootCauseValue = {
     category: d.rootCause.category ?? '',
@@ -306,7 +293,12 @@ export function IncidentDetailView({
           </div>
           <div className="flex flex-col gap-6">
             {d.resolved && (
-              <ResolvedCard detail={d} headingRef={resolvedDesktop} onUndone={() => setFocusResolve(true)} />
+              <ResolvedCard
+                detail={d}
+                overdue={postOverdue}
+                headingRef={resolvedDesktop}
+                onUndone={() => setFocusResolve(true)}
+              />
             )}
             {resolveCard(resolveDesktop, true)}
           </div>
@@ -318,7 +310,7 @@ export function IncidentDetailView({
         <span className="text-sm text-fg-secondary">
           {[
             `${stillDown ? (d.severity === 'down' ? 'Down' : 'Problem') : d.severity === 'down' ? 'Was down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`,
-            downRange,
+            downRange ? [sections.startedOn, downRange].filter(Boolean).join(' ') : sections.startedOn,
             `confirmed ${formatTimeWithSeconds(new Date(d.detectedAt))}`,
           ]
             .filter(Boolean)
@@ -341,7 +333,12 @@ export function IncidentDetailView({
           />
         </span>
         {d.resolved && (
-          <ResolvedCard detail={d} headingRef={resolvedPhone} onUndone={() => setFocusResolve(true)} />
+          <ResolvedCard
+            detail={d}
+            overdue={postOverdue}
+            headingRef={resolvedPhone}
+            onUndone={() => setFocusResolve(true)}
+          />
         )}
         {sections.latestRound}
         {resolveCard(null, false)}
@@ -426,6 +423,7 @@ export function IncidentDetailView({
             summary={summary}
             lasted={`${d.severity === 'down' ? 'Down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`}
             postedAt={d.resolved?.posted ?? null}
+            postOverdue={postOverdue}
             viewerName={viewerName}
             open={resolveOpen}
             onClose={() => setResolveOpen(false)}
@@ -496,10 +494,12 @@ function EvidenceCard({
 /** Phone: "Resolved 10:33" with the held RESOLVED and its Undo (MIncident). */
 function ResolvedCard({
   detail: d,
+  overdue,
   onUndone,
   headingRef,
 }: {
   detail: IncidentDetail;
+  overdue: PostOverdue;
   onUndone: () => void;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
 }) {
@@ -524,7 +524,7 @@ function ResolvedCard({
           ? `Posting to Chat and email in ${seconds} s — nothing is sent until then`
           : r.posted
             ? `Posted to the Chat thread and email at ${formatTimeWithSeconds(new Date(r.posted))}`
-            : 'Posting to the Chat thread and email now'}
+            : POST_WAIT_WORDS[overdue]}
       </span>
       {failure && <span className="text-sm text-fg-danger">{failure}</span>}
       {seconds > 0 && r.byViewer && (
