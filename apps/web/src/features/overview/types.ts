@@ -1,9 +1,10 @@
 import type { SiteStatus, Tier, Trigger } from '@dxt/shared';
+import { SITE_LOCATIONS, type LocationGlyph, type SiteLocation } from '@/components/site-cells';
 
 /** BKK / SIN / TYO glyphs, as the Sites list draws them (spec §11 legend). */
-export type LocationGlyph = 'pass' | 'fail' | 'blocked' | 'slow' | 'chain' | 'none';
-export const OVERVIEW_LOCATIONS = ['BKK', 'SIN', 'TYO'] as const;
-export type OverviewLocation = (typeof OVERVIEW_LOCATIONS)[number];
+export type { LocationGlyph };
+export const OVERVIEW_LOCATIONS = SITE_LOCATIONS;
+export type OverviewLocation = SiteLocation;
 
 /** Who is looking (spec §21.8): an AM is a stakeholder who manages a client; any other stakeholder is the CEO (D-032). */
 export type ViewerKind = 'admin' | 'responder' | 'am' | 'ceo' | 'viewer';

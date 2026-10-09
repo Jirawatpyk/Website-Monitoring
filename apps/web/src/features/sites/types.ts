@@ -1,20 +1,17 @@
 import type { IncidentState, MonitorHeader, Severity, SiteStatus, Tier, Trigger } from '@dxt/shared';
+import {
+  SITE_LOCATIONS,
+  type IncidentLinkData,
+  type LocationGlyph,
+  type SiteLocation,
+} from '@/components/site-cells';
 
-/** What one location's latest check looks like on the Sites list (spec §20, the §11 legend). */
-export type LocationGlyph = 'pass' | 'fail' | 'blocked' | 'slow' | 'chain' | 'none';
-
-export const LIST_LOCATIONS = ['BKK', 'SIN', 'TYO'] as const;
-export type ListLocation = (typeof LIST_LOCATIONS)[number];
-
+// Shared with the Overview through components/site-cells (S06b).
+export type { LocationGlyph };
+export const LIST_LOCATIONS = SITE_LOCATIONS;
+export type ListLocation = SiteLocation;
 /** The open incident shown under a site's status (any state before Resolved). */
-export interface OpenIncident {
-  id: string;
-  number: number;
-  state: 'unacked' | 'escalated' | 'acknowledged' | 'monitoring' | 'needs_root_cause';
-  level: number;
-  detectedAt: string;
-  ackedBy: string | null;
-}
+export type OpenIncident = IncidentLinkData;
 
 /** A row of the `/sites` list (spec §20). */
 export interface SiteListRow {
