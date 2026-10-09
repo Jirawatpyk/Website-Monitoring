@@ -227,9 +227,7 @@ export function IncidentsList({ incidents, sites, nowIso, viewer, initialView }:
             label="MTTR · 30d"
             value={kpis.mttrMinutes !== null ? formatDuration(kpis.mttrMinutes) : '—'}
             caption={
-              kpis.mttrMinutes !== null
-                ? 'DOWN only · median · minutes down'
-                : 'Not enough incidents yet'
+              kpis.mttrMinutes !== null ? 'DOWN only · median · minutes down' : 'Not enough incidents yet'
             }
             icon={<IconRotateCcw />}
           />
