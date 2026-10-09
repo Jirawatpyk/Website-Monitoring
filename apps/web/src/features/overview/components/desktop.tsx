@@ -164,14 +164,14 @@ export function Kpis({ counts, kpis }: { counts: Counts; kpis: OverviewKpis }) {
       <Stat
         label="MTTA · 30d"
         value={kpis.enough && kpis.mttaSeconds !== null ? formatDurationSeconds(kpis.mttaSeconds) : '—'}
-        caption={kpis.enough ? 'DOWN, all tiers · target ≤ 15 min' : notEnough}
+        caption={kpis.enough ? 'DOWN, all tiers · target ≤ 15 min' : notEnough}
         change={kpis.enough ? changeOf(kpis.mttaChange) : undefined}
         icon={<IconClock />}
       />
       <Stat
         label="MTTD · 30d"
         value={kpis.enough && kpis.mttdSeconds !== null ? formatDurationSeconds(kpis.mttdSeconds) : '—'}
-        caption={kpis.enough ? 'DOWN, Tier 1 · target ≤ 3 min' : notEnough}
+        caption={kpis.enough ? 'DOWN, Tier 1 · target ≤ 3 min' : notEnough}
         change={kpis.enough ? changeOf(kpis.mttdChange) : undefined}
         icon={<IconTrendingDown />}
       />
@@ -248,6 +248,9 @@ function ResponseCell({ site }: { site: OverviewSite }) {
   const label = down
     ? `Response last 24 h, failing since ${since ? formatTime(new Date(since)) : 'now'}`
     : `Response last 24 h, p50 ${site.p50Ms === null ? 'no data' : formatMs(site.p50Ms)}`;
+  if (site.series.every((v) => v === null)) {
+    return <span className="text-xs text-fg-secondary">{down ? 'No response in 24 h' : 'No data'}</span>;
+  }
   return (
     <span className="flex items-center gap-2">
       <Sparkline
@@ -325,7 +328,7 @@ export function LiveIssuesTable({
           <h2
             id={`${LIVE_ISSUES_ID}-title`}
             tabIndex={-1}
-            className="m-0 text-2xl font-semibold outline-none"
+            className="m-0 rounded-aura-sm text-2xl font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             Live issues
           </h2>
@@ -398,8 +401,7 @@ export function LiveIssuesTable({
                         {chip && <ChipBadge chip={chip} />}
                       </span>
                       <span
-                        title={reasonLine(issue)}
-                        className={`relative z-10 truncate text-xs ${down ? 'font-medium text-fg-danger' : reason.kind === 'problem' ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}
+                        className={`line-clamp-2 text-xs ${down ? 'font-medium text-fg-danger' : reason.kind === 'problem' ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}
                       >
                         {reasonLine(issue)}
                       </span>

@@ -1,7 +1,15 @@
 import 'server-only';
 import { aggregateUptime, kpiChange, responseKpis, siteUptimeOver } from '@dxt/engine';
 import { shortCause } from '@dxt/notifier';
-import { CLOSED_INCIDENT_STATES_IN, defaultSlowMs, type Role, type SiteStatus, type Tier } from '@dxt/shared';
+import {
+  CLOSED_INCIDENT_STATES_IN,
+  defaultSlowMs,
+  TLS_CHAIN_ERRORS,
+  TRIGGER_LABELS,
+  type Role,
+  type SiteStatus,
+  type Tier,
+} from '@dxt/shared';
 import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { getAccess } from '@/lib/auth/session';
@@ -143,7 +151,12 @@ export async function loadOverview(
           recoveredAt: inc.recovered_at,
           ackedBy: inc.acker?.display_name ?? null,
           // a PROBLEM drop's short summary ("slow, p50 5.8 s"); a DOWN's cause in short form (spec §10)
-          cause: drop?.severity === 'problem' && summary ? summary : cause ? shortCause(cause) : null,
+          cause:
+            drop?.severity === 'problem'
+              ? (summary ?? TRIGGER_LABELS[inc.trigger])
+              : cause
+                ? shortCause(cause)
+                : null,
         }
       : null;
     const lastRound = OVERVIEW_LOCATIONS.map((l) => {
@@ -253,8 +266,7 @@ export async function loadOverview(
   };
 }
 
-const CHAIN_ERRORS =
-  '(UNABLE_TO_VERIFY_LEAF_SIGNATURE,UNABLE_TO_GET_ISSUER_CERT_LOCALLY,UNABLE_TO_GET_ISSUER_CERT)';
+/** The chain error codes as a PostgREST `in` list, from the one list in `@dxt/shared` (D-029). */ const CHAIN_ERRORS = `(${TLS_CHAIN_ERRORS.join(',')})`;
 
 /**
  * When each TLS chain warning started (§21.4 Since for a location warning): per warned location of
