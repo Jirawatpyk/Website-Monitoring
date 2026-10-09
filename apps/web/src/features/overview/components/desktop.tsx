@@ -423,7 +423,7 @@ export function LiveIssuesTable({
                       <span className="text-fg-secondary">—</span>
                     )}
                   </Td>
-                  <Td className="max-w-40 max-xl:hidden">
+                  <Td className="w-44 min-w-44 max-xl:hidden">
                     {site.ownerName ? (
                       <span className="flex items-center gap-2">
                         <Avatar name={site.ownerName} size="sm" />
