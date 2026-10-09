@@ -5,7 +5,6 @@ import {
   clientWord,
   incidentsCaption,
   intervalLabel,
-  mttrMinutes,
   rangeOf,
   rangeStats,
   responseHoursLabel,
@@ -146,12 +145,6 @@ describe('incident summaries (SiteDetail board, BA – Taiwan)', () => {
   });
   it('a DOWN still open has no MTTR', () => {
     expect(incidentsCaption([{ severity: 'down', startedAt: at, minutes: null }])).toBe('1 DOWN');
-  });
-  it('MTTR is the median of recovered DOWN incidents', () => {
-    const d = (minutes: number): IncidentSummaryRow => ({ severity: 'down', startedAt: at, minutes });
-    expect(mttrMinutes([d(10), d(30), d(20)])).toBe(20);
-    expect(mttrMinutes([d(10), d(31)])).toBe(21);
-    expect(mttrMinutes([inc131])).toBeNull();
   });
 });
 

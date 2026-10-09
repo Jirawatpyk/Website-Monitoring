@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatDurationSeconds } from '@dxt/shared';
-import { kpiChange, responseKpis, type MetricIncident } from './metrics';
+import { kpiChange, mttrMinutes, responseKpis, type MetricIncident } from './metrics';
 
 // Spec §1: Fri 25 Sep 2026 10:07 (UTC+7). The window is the last 30 days (spec §21.3).
 const NOW = new Date('2026-09-25T03:07:12Z');
@@ -122,5 +122,19 @@ describe('kpiChange ("vs last 30d")', () => {
     [null, 400, null],
   ])('%s vs %s', (current, previous, expected) => {
     expect(kpiChange(current, previous)).toEqual(expected);
+  });
+});
+
+describe('mttrMinutes (MTTR · DOWN only · median, D-033)', () => {
+  const d = (minutes: number | null) => ({ severity: 'down' as const, minutes });
+  it.each([
+    ['odd count: the middle one', [d(10), d(30), d(20)], 20],
+    ['even count: the mean of the middle two, rounded', [d(10), d(31)], 21],
+    ['open DOWN incidents (no recovery yet) are left out', [d(null), d(12)], 12],
+    ['PROBLEM incidents are left out', [{ severity: 'problem' as const, minutes: 5 }, d(40)], 40],
+    ['none recovered: no MTTR', [d(null)], null],
+    ['no incidents: no MTTR', [], null],
+  ])('%s', (_name, rows, expected) => {
+    expect(mttrMinutes(rows)).toBe(expected);
   });
 });

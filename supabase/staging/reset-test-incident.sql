@@ -1,13 +1,13 @@
 -- DxT Monitor · close the staging test target's open incident (S02a). STAGING ONLY.
--- Until incidents can be resolved in the app (S07), an open "Test target" incident takes the next
--- failure as a relapse (DOWN AGAIN, S04b). Run this in the staging SQL editor for a clean start —
--- a fresh DOWN / PROBLEM card and no flapping history. It resolves the incident and writes
--- the audit row like any state change.
+-- Incidents resolve in the app since S07, but only from Needs root cause; an open "Test target"
+-- incident takes the next failure as a relapse (DOWN AGAIN, S04b). Run this in the staging SQL editor
+-- for a clean start — a fresh DOWN / PROBLEM card and no flapping history. It resolves the incident
+-- and writes the audit row like any state change.
 
 with closed as (
   update public.incidents i
   set state = 'resolved', resolved_at = now(),
-      root_cause_category = coalesce(root_cause_category, 'test'), root_cause = coalesce(root_cause, 'Staging test')
+      root_cause_category = coalesce(root_cause_category, 'false_alarm'), root_cause = coalesce(root_cause, 'Staging test')
   from public.sites s
   where s.id = i.site_id and s.name = 'Test target'
     and i.state not in ('resolved', 'in_review', 'closed')

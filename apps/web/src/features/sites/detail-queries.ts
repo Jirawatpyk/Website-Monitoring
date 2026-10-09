@@ -1,6 +1,12 @@
 import 'server-only';
 import { cache } from 'react';
-import { downEpisodesFromTimeline, episodeMinutes, episodesFromTimeline, siteUptimeOver } from '@dxt/engine';
+import {
+  downEpisodesFromTimeline,
+  episodeMinutes,
+  episodesFromTimeline,
+  siteUptimeOver,
+  mttrMinutes,
+} from '@dxt/engine';
 import {
   bangkokDayStart,
   CLOSED_INCIDENT_STATES,
@@ -18,7 +24,6 @@ import { fetchAllPages } from './csv';
 import {
   chartLines,
   incidentsCaption,
-  mttrMinutes,
   rangeStats,
   SITE_RANGES,
   type SeriesRow,

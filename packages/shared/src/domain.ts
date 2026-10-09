@@ -66,6 +66,35 @@ export const TRIGGER_LABELS: Record<Trigger, string> = {
   tls_chain: 'TLS chain',
 };
 
+/**
+ * Root-cause categories of the Incident / Resolve boards (D-033), in board order; mirrors the check
+ * on `incidents.root_cause_category`. `unknown` never meets the resolve condition (spec §16.3).
+ */
+export const ROOT_CAUSE_CATEGORIES = [
+  'hosting',
+  'deploy',
+  'dns',
+  'ssl',
+  'third_party',
+  'traffic',
+  'client_change',
+  'false_alarm',
+  'unknown',
+] as const;
+export type RootCauseCategory = (typeof ROOT_CAUSE_CATEGORIES)[number];
+
+export const ROOT_CAUSE_LABELS: Record<RootCauseCategory, string> = {
+  hosting: 'Hosting / server',
+  deploy: 'Deploy / code change',
+  dns: 'DNS / domain',
+  ssl: 'SSL certificate',
+  third_party: 'Third-party / CDN',
+  traffic: 'Traffic / capacity',
+  client_change: 'Client-side change',
+  false_alarm: 'False alarm (monitor)',
+  unknown: 'Unknown — keep investigating',
+};
+
 export const CHECK_OUTCOMES = ['pass', 'fail', 'blocked'] as const;
 export type CheckOutcome = (typeof CHECK_OUTCOMES)[number];
 
