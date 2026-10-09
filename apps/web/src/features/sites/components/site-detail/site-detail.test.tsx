@@ -207,6 +207,27 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     expect(screen.getByRole('link', { name: 'Export' })).toHaveAttribute('href', '/sites/s1/incidents.csv');
   });
 
+  it('Incident history shows the latest 8 rows, like the Check log beside it; Export has all', () => {
+    const h = (n: number) => ({ ...detail().history[0]!, id: `i${n}`, number: n });
+    const many = Array.from({ length: 22 }, (_, i) => h(i + 1));
+    render(
+      <SiteDetailView
+        detail={detail({ history: many, historyCount: 22 })}
+        range="90d"
+        role="admin"
+        meId="tao"
+        nowIso={NOW}
+      />,
+    );
+    const table = screen.getByRole('table', { name: 'Incident history, last 90 days' });
+    expect(within(table).getAllByRole('link')).toHaveLength(8);
+    expect(
+      screen.getByText(
+        /22 in 90 days · MTTR 11 min \(DOWN only · median\) · showing the latest 8, Export has all/,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('a draft says it is not monitored; only an Admin can finish setup', () => {
     const { unmount } = render(
       <SiteDetailView
