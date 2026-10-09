@@ -1,5 +1,5 @@
 import 'server-only';
-import { episodesFromTimeline, type Episode } from '@dxt/engine';
+import { episodesFromTimeline, outageMinutes, type Episode } from '@dxt/engine';
 import {
   buildAcknowledgedAlert,
   buildAcknowledgedEmail,
@@ -29,6 +29,7 @@ import {
   type VerifierDownReason,
 } from '@dxt/notifier';
 import {
+  clockMinutes,
   confirmedByWafOf,
   PROBE_LOCATIONS,
   ROOT_CAUSE_CATEGORIES,
@@ -74,6 +75,14 @@ const dateOf = (v: unknown): Date | null =>
  */
 function dropsOf(i: IncidentFacts): Episode[] {
   return episodesFromTimeline(i, i.incident_events ?? []);
+}
+
+/** How long it had been down at `at` (D-033's one number: DOWN drops only), for ACKNOWLEDGED "so far". */
+function outageAt(i: IncidentFacts, at: Date): number | null {
+  const upTo = dropsOf(i)
+    .filter((d) => d.start <= at)
+    .map((d) => ({ ...d, end: d.end && d.end < at ? d.end : at }));
+  return outageMinutes(upTo, at);
 }
 
 const closedDrops = (i: IncidentFacts) =>
@@ -134,11 +143,7 @@ function againAlert(n: Notification, i: IncidentFacts): ChatMessage {
   const down = n.template === 'down_again';
   // "Down 7 min so far" counts the DOWN drops only (D-033); "with a problem … so far" every drop.
   const before = dropsOf(i).filter((d) => d.end && d.end <= droppedAt && (!down || d.severity === 'down'));
-  const minutesSoFar = before.reduce(
-    (sum, d) =>
-      sum + Math.max(1, Math.floor(d.end!.getTime() / 60_000) - Math.floor(d.start.getTime() / 60_000)),
-    0,
-  );
+  const minutesSoFar = before.reduce((sum, d) => sum + clockMinutes(d.start, d.end!), 0);
   const acked = !!i.acked_at && !!i.acker;
   return buildAgainAlert({
     incidentId: i.id,
@@ -346,6 +351,7 @@ export function renderEmail(
         ackedBy: str(ctx.ackedBy, 'someone'),
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
         startedAt: new Date(i.started_at),
+        downMinutes: outageAt(i, new Date(str(ctx.ackedAt, n.created_at))),
         confirmedAt: new Date(i.detected_at),
       });
     case 'recovered': {

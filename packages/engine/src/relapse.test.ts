@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
 import {
   outageMinutes,
+  settledOutageMinutes,
   episodesOf,
   FLAP_STABLE_MS,
   relapseState,
@@ -499,5 +500,26 @@ describe('outageMinutes — how long an incident was down, on every page (D-033)
   });
   it('no drop: null', () => {
     expect(outageMinutes([], T('10:30'))).toBeNull();
+  });
+});
+
+describe('settledOutageMinutes — what MTTR and history rows count, on Incidents and Site detail alike', () => {
+  const down = (start: string, end: string | null) => ({
+    start: T(start),
+    end: end ? T(end) : null,
+    severity: 'down' as const,
+  });
+  it.each([
+    ['open with a drop in progress: not yet', [down('10:00', null)], false, null],
+    ['Monitoring / Needs root cause: every drop over, counts', [down('10:00', '10:07')], false, 7],
+    [
+      'resolved with no recovered row: the drop ends at the resolve, counts',
+      [down('10:00', '10:20')],
+      true,
+      20,
+    ],
+    ['open with no drop read yet: not yet', [], false, null],
+  ])('%s', (_, episodes, closed, minutes) => {
+    expect(settledOutageMinutes(episodes, closed, T('10:30'))).toBe(minutes);
   });
 });

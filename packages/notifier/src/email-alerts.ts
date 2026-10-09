@@ -83,6 +83,8 @@ export interface AcknowledgedEmailInput extends EmailBaseInput {
   problem?: ProblemFacts | null;
   /** The incident's cause line, shown under a PROBLEM's ACKNOWLEDGED (EmailAlert). */
   cause?: string | null;
+  /** Minutes down so far by the incident's drops (D-033); without it, first failed check → ack. */
+  downMinutes?: number | null;
 }
 
 export interface RecoveredEmailInput extends EmailBaseInput {
@@ -311,7 +313,10 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
 export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMessage {
   const { site, ackedBy, problem } = input;
   const at = formatTime(input.ackedAt);
-  const { duration } = downtime(input.startedAt, input.ackedAt);
+  const duration =
+    input.downMinutes != null
+      ? formatDuration(input.downMinutes)
+      : downtime(input.startedAt, input.ackedAt).duration;
   const slow = problem?.trigger === 'slow';
   const still = !problem ? 'still down' : slow ? 'still slow' : 'still has a problem';
   return render(input, {

@@ -2,7 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import {
   downEpisodesFromTimeline,
-  outageMinutes,
+  settledOutageMinutes,
   episodesFromTimeline,
   siteUptimeOver,
   mttrMinutes,
@@ -265,7 +265,11 @@ export async function loadSiteDetail(
       drops,
       open,
       endsAt: open ? now.getTime() : lastEnd,
-      minutes: open ? null : outageMinutes(drops, now),
+      minutes: settledOutageMinutes(
+        drops,
+        (CLOSED_INCIDENT_STATES as readonly string[]).includes(i.state),
+        now,
+      ),
     };
   });
   const uptime = siteUptimeOver(downs.get(s.id) ?? [], {

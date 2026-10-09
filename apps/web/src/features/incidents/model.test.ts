@@ -281,6 +281,14 @@ describe('KPIs (D-032 MTTA mean, D-033 MTTR median, Unacked until S08)', () => {
         recoveredAt: new Date(Date.parse(at('24T10:00:00')) + minutes * 60_000).toISOString(),
         ackedAt: new Date(Date.parse(at('24T10:00:30')) + ackSec * 1000).toISOString(),
         state: 'resolved',
+        // the drop the list reads from the timeline (episodesFromTimeline)
+        drops: [
+          {
+            start: at('24T10:00:00'),
+            end: new Date(Date.parse(at('24T10:00:00')) + minutes * 60_000).toISOString(),
+            severity: 'down',
+          },
+        ],
       });
     const k = listKpis([d(1, 10, 60), d(2, 30, 120), d(3, 20, 180)], NOW);
     expect(k).toMatchObject({

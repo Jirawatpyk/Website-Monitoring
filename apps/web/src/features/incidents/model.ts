@@ -7,6 +7,7 @@ import {
   canResolve,
   mttrMinutes,
   outageMinutes,
+  settledOutageMinutes,
   responseKpis,
   UNKNOWN_ROOT_CAUSE,
   type MetricIncident,
@@ -362,7 +363,15 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
       ? mttrMinutes(
           recent.map((i) => ({
             severity: i.severity,
-            minutes: i.recoveredAt ? durationMinutes(i, now) : null,
+            minutes: settledOutageMinutes(
+              i.drops.map((d) => ({
+                start: new Date(d.start),
+                end: d.end ? new Date(d.end) : null,
+                severity: d.severity,
+              })),
+              !isOpen(i),
+              now,
+            ),
           })),
         )
       : null,

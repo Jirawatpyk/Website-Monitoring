@@ -261,7 +261,8 @@ export function bannersOf(
           number: inc.number,
           escalated: inc.state === 'escalated',
           level: inc.level,
-          // The drop in progress in whole clock minutes, as the Incidents list counts it (D-033)
+          // The drop in progress (the Overview's Since), in whole clock minutes (D-033); the Incidents
+          // list and the incident page add up every drop
           downMinutes: clockMinutes(new Date(inc.startedAt), now),
           unackedMinutes: minutesBetween(inc.detectedAt, now),
           cause: inc.cause,

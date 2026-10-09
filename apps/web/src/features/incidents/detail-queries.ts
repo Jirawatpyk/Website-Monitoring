@@ -448,19 +448,23 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
   for (let n = 0; n < ids.length; n += ID_CHUNK) chunks.push(ids.slice(n, n + ID_CHUNK));
   const parts = await Promise.all(
     chunks.map((chunk) =>
-      db
-        .from('incident_events')
-        .select('incident_id, type, at, payload')
-        .in('type', DROP_EVENTS)
-        .in('incident_id', chunk)
-        .order('at')
-        .order('id'),
+      fetchAllPages<{ incident_id: string; type: string; at: string; payload: unknown }>(
+        (lo, hi) =>
+          db
+            .from('incident_events')
+            .select('incident_id, type, at, payload')
+            .in('type', DROP_EVENTS)
+            .in('incident_id', chunk)
+            .order('at')
+            .order('id')
+            .range(lo, hi),
+        // a flapping night is hundreds of rows; past PostgREST's max_rows a page would end silently
+        { max: MAX_EVENTS * ID_CHUNK },
+      ),
     ),
   );
-  const failed = parts.find((p) => p.error);
-  if (failed?.error) throw new Error(`incident_events: ${failed.error.message}`);
   const dropEvents = new Map<string, { type: string; at: string; payload: unknown }[]>();
-  for (const e of parts.flatMap((p) => p.data ?? [])) {
+  for (const e of parts.flat()) {
     dropEvents.set(e.incident_id, [...(dropEvents.get(e.incident_id) ?? []), e]);
   }
   const downStart = new Map(

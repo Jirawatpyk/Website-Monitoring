@@ -133,6 +133,17 @@ describe('render — relapse, flapping and auto-resolve rows (S04b, D-024)', () 
     ],
   };
 
+  it('ACKNOWLEDGED email after a relapse: "Down for" is the drops so far (7 + 6 min), as the incident page (D-033)', () => {
+    const ack = renderEmail(
+      row('acknowledged', { ackedBy: 'Ploy', ackedAt: '2026-09-20T20:30:10Z' }),
+      voca,
+      ploy,
+      appUrl,
+      { threadId: '<inc-inc-133@notify.example.test>', startsThread: false },
+    )!;
+    expect(ack.text).toContain('13 min so far');
+  });
+
   it('DOWN AGAIN: mentions the owner while nobody acked, counts the downtime before the drop', () => {
     const m = renderChat(
       row('down_again', {

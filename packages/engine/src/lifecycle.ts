@@ -276,6 +276,20 @@ export function downEpisodesFromTimeline(
  * messages word it), the drop still in progress counted to `now`. Every page uses it: Incidents,
  * the incident page, Site detail, MTTR. Null with no drop.
  */
+/**
+ * The outage once it is over — what MTTR and the history rows count (D-033): null while the incident is
+ * still open with a drop in progress (or none read yet); a closed one counts even if its last drop had
+ * no `recovered` row (it ends at the resolve). Incidents and Site detail both use it.
+ */
+export function settledOutageMinutes(
+  episodes: readonly Episode[],
+  closed: boolean,
+  now: Date,
+): number | null {
+  const open = !closed && (episodes.length === 0 || episodes.some((e) => !e.end));
+  return open ? null : outageMinutes(episodes, now);
+}
+
 export function outageMinutes(episodes: readonly Episode[], now: Date): number | null {
   const down = episodes.some((e) => e.severity === 'down');
   const counted = down ? episodes.filter((e) => e.severity === 'down') : episodes;
