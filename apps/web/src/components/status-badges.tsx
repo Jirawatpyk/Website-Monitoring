@@ -45,7 +45,7 @@ export function SeverityBadge({ severity, recovered }: { severity: Severity; rec
   if (severity === 'problem') {
     return (
       <Badge tone="warning" variant={recovered ? 'outline' : 'soft'} icon={<IconTriangleAlert />}>
-        {recovered ? 'Was a problem' : 'Problem'}
+        {recovered ? 'Was problem' : 'Problem'}
       </Badge>
     );
   }
