@@ -1,5 +1,5 @@
 import 'server-only';
-import { episodeMinutes, episodesFromTimeline } from '@dxt/engine';
+import { outageMinutes, episodesFromTimeline } from '@dxt/engine';
 import { bangkokDayStart, CLOSED_INCIDENT_STATES, formatIncidentId, type Trigger } from '@dxt/shared';
 import { createClient } from '@/lib/supabase/server';
 import { csvResponse, fetchAllPages, fileSlug, toCsv } from '@/lib/csv';
@@ -96,7 +96,7 @@ export async function incidentsCsv(siteId: string, now = new Date()): Promise<Re
       return [
         formatIncidentId(i.number),
         i.started_at,
-        open ? null : episodeMinutes(drops, now),
+        open ? null : outageMinutes(drops, now),
         triggerWord(i.trigger as Trigger),
         i.severity,
         clientWord(i.severity, i.trigger as Trigger),

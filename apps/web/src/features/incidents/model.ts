@@ -6,12 +6,14 @@
 import {
   canResolve,
   mttrMinutes,
+  outageMinutes,
   responseKpis,
   UNKNOWN_ROOT_CAUSE,
   type MetricIncident,
   type ResolveBlocker,
 } from '@dxt/engine';
 import {
+  clockMinutes,
   CLOSED_INCIDENT_STATES,
   formatConfirmedBy,
   confirmedByWafOf,
@@ -59,6 +61,8 @@ export interface ListIncident {
   rootCauseCategory: string | null;
   rootCause: string | null;
   rootCauseFix: string | null;
+  /** Its drops from the timeline (`episodesFromTimeline`), for how long it was down (`outageMinutes`). */
+  drops: { start: string; end: string | null; severity: Severity }[];
 }
 
 export type DesktopView = 'needs_action' | 'done' | 'all';
@@ -213,19 +217,26 @@ export function hiddenNote(list: readonly ListIncident[], f: ListFilters, now: D
 const minutesBetween = (from: string, to: Date) =>
   Math.max(1, Math.floor((to.getTime() - new Date(from).getTime()) / 60_000));
 
-/** Whole clock minutes, as the Chat / email wording (`downtime` in `@dxt/notifier`): 19:37–19:42 = 5 min. */
-const clockMinutesBetween = (from: string, to: Date) => {
-  const minute = (t: number) => Math.floor(t / 60_000);
-  return Math.max(1, minute(to.getTime()) - minute(Date.parse(from)));
-};
-
-/** Duration: first failed check → recovered, or until now while still down (§14.3). */
+/**
+ * How long it was down (D-033): the sum of its drops, DOWN ones only for a DOWN incident, in whole clock
+ * minutes — the number Site detail, MTTR and the Chat / email messages use. Without drops (no timeline
+ * read) it falls back to first failed check → recovered, or now while still down.
+ */
 export function durationMinutes(
-  i: Pick<ListIncident, 'startedAt' | 'recoveredAt' | 'resolvedAt'>,
+  i: Pick<ListIncident, 'startedAt' | 'recoveredAt' | 'resolvedAt' | 'drops'>,
   now: Date,
-) {
+): number {
+  const fromDrops = outageMinutes(
+    i.drops.map((d) => ({
+      start: new Date(d.start),
+      end: d.end ? new Date(d.end) : null,
+      severity: d.severity,
+    })),
+    now,
+  );
+  if (fromDrops !== null) return fromDrops;
   const end = i.recoveredAt ?? i.resolvedAt;
-  return clockMinutesBetween(i.startedAt, end ? new Date(end) : now);
+  return clockMinutes(new Date(i.startedAt), end ? new Date(end) : now);
 }
 
 /** The trigger as the list writes it: "Hard fail", "Slow, flapped". */
@@ -351,7 +362,7 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
       ? mttrMinutes(
           recent.map((i) => ({
             severity: i.severity,
-            minutes: i.recoveredAt ? durationMinutes({ ...i, resolvedAt: null }, now) : null,
+            minutes: i.recoveredAt ? durationMinutes(i, now) : null,
           })),
         )
       : null,

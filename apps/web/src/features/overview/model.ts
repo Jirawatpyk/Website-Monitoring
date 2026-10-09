@@ -1,4 +1,5 @@
 import {
+  clockMinutes,
   formatDuration,
   formatIncidentId,
   formatPercent,
@@ -260,7 +261,8 @@ export function bannersOf(
           number: inc.number,
           escalated: inc.state === 'escalated',
           level: inc.level,
-          downMinutes: minutesBetween(inc.startedAt, now),
+          // The drop in progress in whole clock minutes, as the Incidents list counts it (D-033)
+          downMinutes: clockMinutes(new Date(inc.startedAt), now),
           unackedMinutes: minutesBetween(inc.detectedAt, now),
           cause: inc.cause,
         },

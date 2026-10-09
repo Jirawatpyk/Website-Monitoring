@@ -32,6 +32,7 @@ const base: ListIncident = {
   ownerName: 'Arm',
   primaryOwnerId: null,
   backupOwnerId: null,
+  drops: [],
   rootCauseCategory: null,
   rootCause: null,
   rootCauseFix: null,

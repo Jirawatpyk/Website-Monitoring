@@ -1,6 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import type { DbClient } from '@dxt/db';
+import { episodesFromTimeline, outageMinutes } from '@dxt/engine';
 import { describeFailure } from '@dxt/notifier';
 import type { LocationGlyph } from '@/components/site-cells';
 import {
@@ -38,6 +39,8 @@ const SIGNED_URL_SEC = 600;
 const MAX_EVENTS = 5000;
 /** Ids per `in` filter (kept well under URL limits). */
 const ID_CHUNK = 150;
+/** The events `episodesFromTimeline` reads an incident's drops from. */
+const DROP_EVENTS = ['detected', 'recovered', 'relapsed', 'escalated_to_down'];
 
 /** One location's checks for the Evidence card: first check, the recheck and the latest. */
 export interface LocationEvidence {
@@ -308,10 +311,12 @@ export async function loadIncident(
     resolvedAt: i.resolved_at,
     autoResolved: i.auto_resolved,
     detectSeconds: Math.max(0, Math.round((Date.parse(i.detected_at) - Date.parse(i.started_at)) / 1000)),
-    durationMinutes: durationMinutes(
-      { startedAt: i.started_at, recoveredAt: i.recovered_at, resolvedAt: i.resolved_at },
-      now,
-    ),
+    durationMinutes:
+      outageMinutes(episodesFromTimeline(i, events), now) ??
+      durationMinutes(
+        { startedAt: i.started_at, recoveredAt: i.recovered_at, resolvedAt: i.resolved_at, drops: [] },
+        now,
+      ),
     owner: i.sites.primary_owner_id ? nameOf(i.sites.primary_owner_id) : null,
     backup: i.sites.backup_owner_id ? nameOf(i.sites.backup_owner_id) : null,
     am: am ? nameOf(am) : null,
@@ -435,8 +440,9 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
     db.from('sites').select('id, name').order('name'),
   ]);
   if (sites.error) throw new Error(`sites: ${sites.error.message}`);
-  const ids = rows.filter((r) => r.severity === 'down').map((r) => r.id);
-  // D-021: a PROBLEM raised to DOWN counts its outage from the escalation (MTTA / MTTR, D-032).
+  const ids = rows.map((r) => r.id);
+  // The drop events: how long each was down (D-033), and D-021's escalation, which counts the outage
+  // from the escalation (MTTA / MTTR, D-032). A few rows per incident (one per drop and recovery).
   // In chunks: an `in` list rides in the URL, which a few hundred uuids would overflow.
   const chunks: string[][] = [];
   for (let n = 0; n < ids.length; n += ID_CHUNK) chunks.push(ids.slice(n, n + ID_CHUNK));
@@ -444,20 +450,32 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
     chunks.map((chunk) =>
       db
         .from('incident_events')
-        .select('incident_id, payload')
-        .eq('type', 'escalated_to_down')
-        .in('incident_id', chunk),
+        .select('incident_id, type, at, payload')
+        .in('type', DROP_EVENTS)
+        .in('incident_id', chunk)
+        .order('at')
+        .order('id'),
     ),
   );
   const failed = parts.find((p) => p.error);
   if (failed?.error) throw new Error(`incident_events: ${failed.error.message}`);
-  const raised = { data: parts.flatMap((p) => p.data ?? []) };
+  const dropEvents = new Map<string, { type: string; at: string; payload: unknown }[]>();
+  for (const e of parts.flatMap((p) => p.data ?? [])) {
+    dropEvents.set(e.incident_id, [...(dropEvents.get(e.incident_id) ?? []), e]);
+  }
   const downStart = new Map(
-    (raised.data ?? []).flatMap((e) => {
-      const p = e.payload as Record<string, unknown> | null;
-      return typeof p?.downStartedAt === 'string' ? [[e.incident_id, p.downStartedAt] as const] : [];
+    [...dropEvents].flatMap(([id, events]) => {
+      const raised = events.find((e) => e.type === 'escalated_to_down');
+      const p = raised?.payload as Record<string, unknown> | null | undefined;
+      return typeof p?.downStartedAt === 'string' ? [[id, p.downStartedAt] as const] : [];
     }),
   );
+  const dropsOf = (r: ListRow) =>
+    episodesFromTimeline(r, dropEvents.get(r.id) ?? []).map((d) => ({
+      start: d.start.toISOString(),
+      end: d.end?.toISOString() ?? null,
+      severity: d.severity,
+    }));
   return {
     incidents: rows.map((r): ListIncident => ({
       id: r.id,
@@ -485,6 +503,7 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
       rootCauseCategory: r.root_cause_category,
       rootCause: r.root_cause,
       rootCauseFix: r.root_cause_fix,
+      drops: dropsOf(r),
     })),
     sites: sites.data ?? [],
   };

@@ -1,4 +1,5 @@
 import {
+  clockMinutes,
   formatDuration,
   formatIncidentId,
   formatTier,
@@ -176,10 +177,9 @@ export interface FlapSummaryInput {
 
 /** "03:12–03:19 · 03:24–03:35" and the total in whole clock minutes, as `downtime` counts one drop. */
 export function dropsSummary(drops: readonly Drop[]): { ranges: string; minutes: number } {
-  const minute = (d: Date) => Math.floor(d.getTime() / 60_000);
   return {
     ranges: drops.map((d) => downtime(d.start, d.end).range).join(' · '),
-    minutes: drops.reduce((sum, d) => sum + Math.max(1, minute(d.end) - minute(d.start)), 0),
+    minutes: drops.reduce((sum, d) => sum + clockMinutes(d.start, d.end), 0),
   };
 }
 

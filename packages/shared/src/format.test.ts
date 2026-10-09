@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bangkokDayStart,
+  clockMinutes,
   confirmedByWafOf,
   formatConfirmedBy,
   formatCount,
@@ -188,5 +189,16 @@ describe('formatCount', () => {
   it('thousands separators', () => {
     expect(formatCount(2007)).toBe('2,007');
     expect(formatCount(8)).toBe('8');
+  });
+});
+
+describe('clockMinutes (D-033: one minute rule for pages and messages)', () => {
+  const t = (hhmmss: string) => new Date(`2026-09-25T${hhmmss}Z`);
+  it.each([
+    ['19:37:50 → 19:42:10 reads 5, as the range 19:37–19:42', '12:37:50', '12:42:10', 5],
+    ['inside one minute reads 1, never 0', '12:37:10', '12:37:40', 1],
+    ['across an hour', '12:58:30', '13:03:00', 5],
+  ])('%s', (_, start, end, minutes) => {
+    expect(clockMinutes(t(start), t(end))).toBe(minutes);
   });
 });

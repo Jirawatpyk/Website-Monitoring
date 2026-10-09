@@ -47,6 +47,7 @@ const base: ListIncident = {
   ownerName: 'Arm',
   primaryOwnerId: null,
   backupOwnerId: null,
+  drops: [],
   rootCauseCategory: null,
   rootCause: null,
   rootCauseFix: null,
@@ -613,7 +614,21 @@ describe('durationMinutes — whole clock minutes, as the RECOVERED message (S07
     ['inside one minute reads 1 min, never 0', '2026-09-24T15:14:10Z', '2026-09-24T15:14:40Z', 1],
   ])('%s', (_, startedAt, recoveredAt, minutes) => {
     expect(
-      durationMinutes({ startedAt, recoveredAt, resolvedAt: null }, new Date('2026-09-25T00:00:00Z')),
+      durationMinutes(
+        { startedAt, recoveredAt, resolvedAt: null, drops: [] },
+        new Date('2026-09-25T00:00:00Z'),
+      ),
     ).toBe(minutes);
+  });
+});
+
+describe('durationMinutes — from the drops, the same number as Site detail and RESOLVED (D-033)', () => {
+  it('two DOWN drops 03:12–03:19 · 03:24–03:35 read 18 min, not the 23 min span', () => {
+    const drops = [
+      { start: '2026-09-21T03:12:00Z', end: '2026-09-21T03:19:00Z', severity: 'down' as const },
+      { start: '2026-09-21T03:24:00Z', end: '2026-09-21T03:35:00Z', severity: 'down' as const },
+    ];
+    const i = { startedAt: drops[0]!.start, recoveredAt: drops[1]!.end, resolvedAt: null, drops };
+    expect(durationMinutes(i, new Date('2026-09-21T04:00:00Z'))).toBe(18);
   });
 });

@@ -96,6 +96,16 @@ export function formatCount(n: number): string {
   return n.toLocaleString('en-US');
 }
 
+/**
+ * How many minutes a drop lasted, in whole clock minutes so the number matches the range shown
+ * (19:37–19:42 = 5 min), and at least 1 — a confirmed drop always lasted some time and "0 min" reads
+ * as no outage. The one rule for every page and message (D-033).
+ */
+export function clockMinutes(start: Date, end: Date): number {
+  const minute = (d: Date) => Math.floor(d.getTime() / 60_000);
+  return Math.max(1, minute(end) - minute(start));
+}
+
 /** "43 min", "1 h 2 min", "2 h", "1 d 2 h". Minutes are dropped once a duration reaches a day. */
 export function formatDuration(totalMinutes: number): string {
   const minutes = Math.max(0, Math.floor(totalMinutes));

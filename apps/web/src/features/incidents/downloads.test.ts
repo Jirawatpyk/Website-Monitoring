@@ -31,6 +31,7 @@ const row: ListIncident = {
   ownerName: 'Tao',
   primaryOwnerId: null,
   backupOwnerId: null,
+  drops: [],
   rootCauseCategory: 'hosting',
   rootCause: '=Host rebooted, "quietly"',
   rootCauseFix: null,
