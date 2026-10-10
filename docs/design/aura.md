@@ -4,7 +4,7 @@ AURA is the only UI kit. Its full docs live in the [AURA design system](https://
 
 ## Packages
 
-- `@jirawatpyk/aura-react` and `@jirawatpyk/aura-tokens`, pinned `^5.35.0` in `apps/web` (tokens also at the root for the ESLint plugin). Both always share one version.
+- `@jirawatpyk/aura-react` and `@jirawatpyk/aura-tokens`, pinned `^5.35.0` in `apps/web` (tokens also at the root for the ESLint plugin). Both always share one version. After a bump, delete `apps/web/.next` and restart `pnpm dev`: Turbopack keeps serving the old AURA CSS from its cache (5.35: the new crumb and BottomNav rules looked missing).
 - CSS is wired in two places — don't add more imports:
   - `apps/web/src/app/layout.tsx` imports `@jirawatpyk/aura-tokens/aura-fonts.local.css` (self-hosted fonts) and `./globals.css`, and renders `<ColorSchemeScript />` in `<head>`.
   - `apps/web/src/app/globals.css` declares `@layer theme, base, aura, components, utilities;`, then imports `tailwindcss`, `@jirawatpyk/aura-tokens/tailwind.css` (Tailwind v4 theme **and** `aura.css` tokens) and `@jirawatpyk/aura-react/styles.layer.css` (components inside `@layer aura`). The layer order lets Tailwind utilities override AURA component styles. Never also import `aura.css` or `styles.css` — that duplicates tokens and components outside the layers.
