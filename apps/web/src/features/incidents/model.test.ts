@@ -191,6 +191,16 @@ describe('views and sort (Incidents, MIncidents, D-033)', () => {
     );
     expect(lastOneLine([], NOW)).toBe('No incidents in the last 30 days.');
   });
+  it('the last one and the week count skip auto-resolved PROBLEMs, as the list hides them (D-033)', () => {
+    const hidden = inc({
+      id: 'h',
+      number: 9,
+      severity: 'problem',
+      autoResolved: true,
+      startedAt: at('25T09:30:00'),
+    });
+    expect(lastOneLine([tubtong, wecare, hidden], NOW)).toBe(lastOneLine([tubtong, wecare], NOW));
+  });
   it('acked by nobody named reads Acknowledged; the phone writes it out', () => {
     expect(nextLine(inc({ state: 'acknowledged', ackedAt: at('25T09:58:00') }), NOW).text).toBe(
       'Acknowledged 09:58',

@@ -74,7 +74,7 @@ const PERIOD_OPTIONS = [
 
 const TONE: Record<'danger' | 'warning' | 'secondary', string> = {
   danger: 'text-fg-danger',
-  warning: 'text-fg-warning',
+  warning: 'text-alert-warning-fg',
   secondary: 'text-fg-secondary',
 };
 
@@ -383,7 +383,7 @@ export function IncidentsList({ incidents, sites, nowIso, viewer, initialView }:
             }
           />
         ) : (
-          <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+          <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {phoneShown.map((i) => (
               <li key={i.id}>
                 <PhoneCard incident={i} now={now} canAck={mayAcknowledge(viewer, i)} />
@@ -415,7 +415,7 @@ function PhoneCard({ incident: i, now, canAck }: { incident: ListIncident; now: 
   return (
     <Link
       href={hrefOf(i)}
-      className={`flex flex-col gap-1 rounded-aura-lg border px-3.5 py-3 text-fg-primary no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+      className={`flex flex-col gap-2 rounded-aura-lg border px-4 py-3.5 text-fg-primary no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
         unacked
           ? 'border-alert-danger-border bg-alert-danger-bg hover:border-fg-danger'
           : 'border-border-default bg-bg-surface hover:bg-bg-surface-hover'

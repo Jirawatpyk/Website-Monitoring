@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { BottomNav } from '@jirawatpyk/aura-react';
-import { activeNavId, BOTTOM_NAV_ITEMS } from './nav';
+import { activeNavId, bottomNavWithCounts, type NavCounts } from './nav';
 
 /** Scroll this far in one direction before the bar moves, so a finger's jitter doesn't flicker it. */
 const SCROLL_STEP = 8;
@@ -17,7 +17,7 @@ const SCROLL_STEP = 8;
  * A page with its own bottom action bar (`data-hides-bottomnav`, the incident page) keeps it away for good,
  * in CSS, so the server's HTML is already right.
  */
-export function PhoneNav() {
+export function PhoneNav({ counts = {} }: { counts?: NavCounts }) {
   const pathname = usePathname();
   const value = activeNavId(pathname) ?? undefined;
   // the page the bar slid away on: a new page starts with it in view, no reset needed
@@ -54,7 +54,7 @@ export function PhoneNav() {
   return (
     <div className="contents" onFocus={() => setAwayOn(null)}>
       <BottomNav
-        items={BOTTOM_NAV_ITEMS}
+        items={bottomNavWithCounts(counts)}
         value={value}
         label="Sections"
         hideFrom="lg"

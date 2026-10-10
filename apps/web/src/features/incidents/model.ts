@@ -289,7 +289,9 @@ export function nextLine(
 }
 
 /** EmptyStates panel 2: with nothing open, what was last true ("Last one: …, N in the last 7 days"). */
-export function lastOneLine(list: readonly ListIncident[], now: Date): string {
+export function lastOneLine(all: readonly ListIncident[], now: Date): string {
+  // auto-resolved PROBLEMs are hidden everywhere (D-033): not the "last one", not in the count
+  const list = all.filter((i) => !i.autoResolved);
   const last = [...list].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
   if (!last) return 'No incidents in the last 30 days.';
   const week = list.filter((i) => Date.parse(i.startedAt) >= now.getTime() - 7 * 86_400_000).length;

@@ -1,5 +1,6 @@
 import 'server-only';
 import {
+  INCIDENT_STATE_LABELS,
   formatDay,
   formatDuration,
   formatIncidentId,
@@ -53,7 +54,7 @@ export async function incidentsListCsv(query: URLSearchParams, now = new Date())
       i.siteName,
       i.severity === 'down' ? 'Down' : 'Problem',
       TRIGGER_LABELS[i.trigger],
-      i.state.replace(/_/g, ' '),
+      INCIDENT_STATE_LABELS[i.state],
       at(i.startedAt),
       at(i.recoveredAt),
       at(i.resolvedAt),

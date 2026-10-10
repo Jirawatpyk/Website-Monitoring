@@ -56,6 +56,7 @@ Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://c
 - **Request 11 — Breadcrumb links: touch hit area** (S05). A crumb link is ~20 px tall; on a coarse pointer it should get the same 44 px `::after` hit area as `Button size="sm"`. Workaround: `.aura-crumbs a::after` in `apps/web/src/app/globals.css` — remove it when AURA ships this.
 
 - **Request 15 — Table cells clip focus rings** (S07 `/verify`). `.aura-table__td` is `overflow: hidden`, and a link or button in it (DataTable row link, a site name, an INC link) draws its outline 2 px outside itself, so the sides touching the cell are cut. Ask for `overflow: clip` with an `overflow-clip-margin` on cells (rings keep their outside offset; text still truncates). Workaround: the `.aura-table__td` rules in `apps/web/src/app/globals.css` — remove it when AURA ships this.
+- **Request 16 — DataTable: right-aligned columns** (S07 spec-check). `DataTableColumn` has no alignment, so the Incidents Duration column can't sit right as the board draws it (header and values). Ask for `align?: 'start' | 'end'` applied to the header and every cell. No workaround: Duration stays left-aligned until then.
 
 A new request goes in the doc (template at its foot) and here.
 

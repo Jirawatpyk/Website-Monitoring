@@ -12,20 +12,50 @@ import {
   IconPencil,
   IconTriangleAlert,
 } from '@jirawatpyk/aura-react/icons';
-import type { IncidentState, Severity, SiteStatus } from '@dxt/shared';
+import { INCIDENT_STATE_LABELS, type IncidentState, type Severity, type SiteStatus } from '@dxt/shared';
 
 type BadgeSpec = { tone: Tone; variant: 'outline' | 'soft'; icon: ReactElement | undefined; label: string };
 
 /** Incident workflow state (spec §11): never solid red, never the ban icon. */
 const WORKFLOW: Record<IncidentState, BadgeSpec> = {
-  unacked: { tone: 'danger', variant: 'outline', icon: <IconClock />, label: 'Unacked' },
-  escalated: { tone: 'warning', variant: 'outline', icon: <IconArrowUpRight />, label: 'Escalated' },
-  acknowledged: { tone: 'neutral', variant: 'outline', icon: <IconCheck />, label: 'Acknowledged' },
-  monitoring: { tone: 'neutral', variant: 'outline', icon: <IconEye />, label: 'Monitoring' },
-  needs_root_cause: { tone: 'warning', variant: 'outline', icon: <IconPencil />, label: 'Needs root cause' },
-  resolved: { tone: 'success', variant: 'outline', icon: <IconCircleCheck />, label: 'Resolved' },
-  in_review: { tone: 'neutral', variant: 'outline', icon: <IconFileText />, label: 'In review' },
-  closed: { tone: 'neutral', variant: 'soft', icon: undefined, label: 'Closed' },
+  unacked: { tone: 'danger', variant: 'outline', icon: <IconClock />, label: INCIDENT_STATE_LABELS.unacked },
+  escalated: {
+    tone: 'warning',
+    variant: 'outline',
+    icon: <IconArrowUpRight />,
+    label: INCIDENT_STATE_LABELS.escalated,
+  },
+  acknowledged: {
+    tone: 'neutral',
+    variant: 'outline',
+    icon: <IconCheck />,
+    label: INCIDENT_STATE_LABELS.acknowledged,
+  },
+  monitoring: {
+    tone: 'neutral',
+    variant: 'outline',
+    icon: <IconEye />,
+    label: INCIDENT_STATE_LABELS.monitoring,
+  },
+  needs_root_cause: {
+    tone: 'warning',
+    variant: 'outline',
+    icon: <IconPencil />,
+    label: INCIDENT_STATE_LABELS.needs_root_cause,
+  },
+  resolved: {
+    tone: 'success',
+    variant: 'outline',
+    icon: <IconCircleCheck />,
+    label: INCIDENT_STATE_LABELS.resolved,
+  },
+  in_review: {
+    tone: 'neutral',
+    variant: 'outline',
+    icon: <IconFileText />,
+    label: INCIDENT_STATE_LABELS.in_review,
+  },
+  closed: { tone: 'neutral', variant: 'soft', icon: undefined, label: INCIDENT_STATE_LABELS.closed },
 };
 
 export function WorkflowBadge({ state, level }: { state: IncidentState; level?: number }) {
