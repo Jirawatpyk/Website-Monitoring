@@ -382,9 +382,18 @@ export function IncidentDetailView({
           siteUrl={v.ack.kind === 'can-ack' ? v.siteUrl : null}
           barActions={
             d.canAct && resolved ? (
-              <Button variant="secondary" icon={<IconPencil />} fullWidth onClick={() => setNoteOpen(true)}>
-                Add note
-              </Button>
+              <span className="flex flex-col gap-1.5">
+                {d.resolved && (
+                  <span className="text-center text-xs text-fg-secondary">
+                    {holdLeft > 0
+                      ? `Resolved — posting to Chat and email in ${holdLeft} s. Undo is at the top.`
+                      : `Resolved ${formatTime(new Date(d.resolved.at))}`}
+                  </span>
+                )}
+                <Button variant="secondary" icon={<IconPencil />} fullWidth onClick={() => setNoteOpen(true)}>
+                  Add note
+                </Button>
+              </span>
             ) : d.canAct ? (
               <span className="flex flex-col gap-1.5">
                 <span id="phone-resolve-why" className="text-center text-xs text-fg-secondary">
