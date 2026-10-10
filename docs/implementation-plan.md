@@ -24,7 +24,7 @@
 | S06 | Site detail & check rollups | 1 · P0 | L | FR-08 | S02a, S05 (merged) | 3 | Done |
 | S06b | Overview (option A) | 1 · P0 | L | FR-05 | S06, S02b | 3 | Done |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Done |
-| S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
+| S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | In progress |
 | S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06b, S08 | 3 | Todo |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
@@ -397,7 +397,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S08 · Escalation L0–L1 & response hours
 
 - **Scope:** FR-09a. `escalation_policies`, `escalation_steps` seeded for Tier 1 DOWN, Tier 2–3 DOWN, PROBLEM. Organisation settings table for response hours (one value for Tier 2–3, spec §14.14) and a company holidays table, seeded (UI in S17). Engine ladder: L0 at confirm, L1 at +15 min to backup + Tao minus anyone already paged; Tier 2–3 timers pause outside response hours and on holidays, resume 09:00; PROBLEM outside hours held until 09:00; reminders every 15 min (DOWN) / 60 min (PROBLEM) in the thread; ack stops L1. Escalation page: policies with L0–L1 editing and the guardrails that apply (§14.7: L0 pinned, ≥ +15 min, ≥ 1 channel).
-- **Boards:** Escalation (L0–L1) · **Tables:** escalation_policies, escalation_steps
+- **Boards:** Escalation (L0–L1), MEscalation (requested from design, 10 Oct 2026) · **Tables:** escalation_policies, escalation_steps, organisation_settings, company_holidays · **Decisions:** D-034
 - **Depends on:** S07
 - **Carried from S04b review:**
   - DOWN AGAIN / PROBLEM AGAIN mention the L0 person. That is the owner until on-call exists, so for Tier 1 at night it moves to the on-call person in S10 (message-checker L3).
