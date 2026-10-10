@@ -527,8 +527,7 @@ export function SiteTiles({ sites, drafts, now }: { sites: OverviewSite[]; draft
           return (
             <StatusTile
               key={s.id}
-              status={s.status ?? 'ok'}
-              statusLabel={s.status === null ? 'No data yet' : undefined}
+              status={s.status ?? 'unknown'}
               title={s.name}
               value={
                 downFor

@@ -16,23 +16,6 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Breadcrumb links get the same touch hit area AURA draws around small buttons (S05: Sites pages,
-   44 px on touch screens; AURA request in docs/design/aura.md). */
-@media (pointer: coarse) {
-  .aura-crumbs a {
-    position: relative;
-  }
-  .aura-crumbs a::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: max(100%, var(--aura-touch-target));
-    height: max(100%, var(--aura-touch-target));
-    transform: translate(-50%, -50%);
-  }
-}
-
 /* A table cell clips its content (overflow: hidden), and a link or button in it — DataTable's row link,
    a site name, an INC link — draws its focus ring outside itself, so the ring lost the sides that touch
    the cell (S07 /verify). Clip with room for the ring instead (text still truncates with "…"); where
@@ -46,17 +29,4 @@ body {
   .aura-table__td :focus-visible {
     outline-offset: calc(-1 * var(--aura-focus-ring-width));
   }
-}
-
-/* BottomNav away (components/app-shell/phone-nav.tsx). Scrolled away: sticky bars and toasts sit on the
-   safe area instead. A page with its own bottom action bar ([data-hides-bottomnav], the incident page)
-   keeps it away for good — no spacer, not focusable — in CSS, so there is no shift after load.
-   Unlayered, so these win over AURA's :root:has(.aura-bottomnav--below-lg) rule. */
-:root[data-bottomnav-hidden],
-:root:has([data-hides-bottomnav]) {
-  --aura-bottomnav-offset: env(safe-area-inset-bottom, 0px);
-}
-:root:has([data-hides-bottomnav]) .aura-bottomnav,
-:root:has([data-hides-bottomnav]) .aura-bottomnav-spacer {
-  display: none;
 }

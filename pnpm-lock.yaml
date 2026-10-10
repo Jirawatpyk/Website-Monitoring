@@ -170,8 +170,8 @@ importers:
         specifier: ^9.39.0
         version: 9.39.5
       '@jirawatpyk/aura-tokens':
-        specifier: ^5.34.0
-        version: 5.34.0
+        specifier: ^5.35.0
+        version: 5.35.0
       '@next/eslint-plugin-next':
         specifier: ^16.3.8
         version: 16.3.8(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))
@@ -267,11 +267,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@jirawatpyk/aura-react':
-        specifier: ^5.34.0
-        version: 5.34.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: ^5.35.0
+        version: 5.35.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@jirawatpyk/aura-tokens':
-        specifier: ^5.34.0
-        version: 5.34.0
+        specifier: ^5.35.0
+        version: 5.35.0
       '@supabase/ssr':
         specifier: ^0.12.7
         version: 0.12.7(@supabase/supabase-js@2.117.2)
@@ -1108,15 +1108,15 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@jirawatpyk/aura-react@5.34.0':
-    resolution: {integrity: sha512-/eluBNtsy75o7aYPgBbQSyCsqhP34voxYW1yF4JoiajNY/26d9JRi/fYkygyMeZRLvOYBRBaABTclOr1z5A24g==}
+  '@jirawatpyk/aura-react@5.35.0':
+    resolution: {integrity: sha512-JlE9FhG+VkvP9YRwMHAJNo1ZyZWzYtKFP1tystDvScXCmLPAo/Gw0THo7FtHHWO/ycqHoBbfBZxbz/X57pNY1g==}
     hasBin: true
     peerDependencies:
       react: '>=18'
       react-dom: '>=18'
 
-  '@jirawatpyk/aura-tokens@5.34.0':
-    resolution: {integrity: sha512-VGe1dY0lHUEkkXKNUN2hH5HogNSc0KhlsYssCQknnjtjHWvGzl0NK7q0+elxuoCdpeoJ0NhotmHIIzWmmNcoTg==}
+  '@jirawatpyk/aura-tokens@5.35.0':
+    resolution: {integrity: sha512-/vsrXNXKyDcoZopqQ3+PTNoIggWcH28Ad5lPVMbT+pWZjlWcUy+Rtbi6vWrC9YuRoUXjuUe/GrdOvMKqvnv4fQ==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -3523,12 +3523,12 @@ snapshots:
   '@img/sharp-win32-x64@0.35.4':
     optional: true
 
-  '@jirawatpyk/aura-react@5.34.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@jirawatpyk/aura-react@5.35.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@jirawatpyk/aura-tokens@5.34.0': {}
+  '@jirawatpyk/aura-tokens@5.35.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
