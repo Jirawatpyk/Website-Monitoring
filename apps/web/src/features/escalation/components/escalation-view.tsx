@@ -5,7 +5,9 @@ import { IconBell, IconEye, IconLock, IconMail, IconUsers } from '@jirawatpyk/au
 import type { EscalationChannel } from '@dxt/shared';
 import { useMemo, useState, type ReactElement } from 'react';
 import { stepCondition, stepNote, targetLabels, type PolicyDraft } from '../model';
-import { hoursLabel, hoursOf, scenario, stepNames } from '../preview';
+import { hoursLabel, hoursOf, nobodyWhy, scenario, stepNames } from '../preview';
+
+const upperFirst = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 import type { EscalationPageData } from '../types';
 import { useNow } from '../use-now';
 
@@ -136,7 +138,7 @@ export function EscalationView({
                   </span>
                 </span>
                 <span>
-                  {names.join(' + ') || 'Nobody new (already told)'}
+                  {names.join(' + ') || upperFirst(nobodyWhy(s, site, data.admins))}
                   {s.channels.includes('space') ? ' + Alerts Space' : ''}
                 </span>
                 {site && (

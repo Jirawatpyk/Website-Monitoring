@@ -304,6 +304,8 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
             setNoteError(null);
             setFailure(null);
             setSaveOpen(true);
+            // "N open incidents keep their current timers" must be current, not as of page load (/verify).
+            router.refresh();
           }}
         />
       )}

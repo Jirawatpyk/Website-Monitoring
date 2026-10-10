@@ -176,6 +176,15 @@ describe('Escalation editor — saving', () => {
     expect(screen.getByRole('heading', { name: 'Tier 1 DOWN steps' })).toHaveFocus();
   });
 
+  it('opening the save dialog refreshes the page data, so the open incidents are current', () => {
+    render(<EscalationEditor data={data} now={NOW} />);
+    fireEvent.change(screen.getByLabelText('DOWN reminder'), { target: { value: '10' } });
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Unsaved changes' })).getByRole('button', { name: 'Save' }),
+    );
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('after a save: a "Saved" status and focus on the ladder heading', async () => {
     actions.saveEscalation.mockResolvedValue({ ok: true });
     render(<EscalationEditor data={data} now={NOW} />);

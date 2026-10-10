@@ -70,6 +70,38 @@ export function stepNames(
   return [...new Set(namesOf(steps[i]!))].filter((n) => !told.has(n));
 }
 
+const NO_ONE: Partial<Record<EscalationStep['targets'][number], string>> = {
+  owner: 'no owner set',
+  backup: 'no backup set',
+  site_am: 'no site AM',
+  admins: 'no active Admin',
+};
+
+/**
+ * Why a step reaches nobody for the site: everyone it names was told already, or a token has no one
+ * behind it — "nobody new (already told · no backup set)", "nobody (no backup set)" (S08 /verify).
+ */
+export function nobodyWhy(
+  s: EscalationStep,
+  site: PreviewSite | undefined,
+  admins: readonly string[],
+): string {
+  const unset = s.targets.filter((t) =>
+    t === 'admins'
+      ? !admins.length
+      : t === 'owner'
+        ? !site?.owner
+        : t === 'backup'
+          ? !site?.backup
+          : t === 'site_am'
+            ? !site?.am
+            : false,
+  );
+  const told = unset.length < s.targets.length;
+  const why = [...(told ? ['already told'] : []), ...unset.flatMap((t) => NO_ONE[t] ?? [])];
+  return `${told ? 'nobody new' : 'nobody'} (${why.join(' · ')})`;
+}
+
 const at = (d: Date, now: Date) =>
   isSameBangkokDay(d, now)
     ? formatTime(d)
@@ -130,7 +162,7 @@ export function scenario(
       : !s.targets.length
         ? 'notifies nobody (no one picked)'
         : !names.length
-          ? 'nobody new (already told)'
+          ? nobodyWhy(s, site, admins)
           : null;
     const space = i === 0 && s.channels.includes('space') ? ' + Alerts Space' : '';
     const suffix = i > 0 ? '' : held ? ' (held until response hours)' : outside ? ' · timers paused' : '';

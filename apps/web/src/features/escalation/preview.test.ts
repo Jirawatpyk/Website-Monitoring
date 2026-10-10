@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PolicyDraft } from './model';
-import { scenario, sitesOf, stepNames, tokenRows } from './preview';
+import { nobodyWhy, scenario, sitesOf, stepNames, tokenRows } from './preview';
 
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
 const hours = { startMin: 540, endMin: 1080, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };
@@ -122,6 +122,25 @@ describe('preview (S08, D-034)', () => {
       '10:03',
       '10:33',
     ]);
+  });
+
+  it('says why a step reaches nobody: already told, or no backup set (S08 /verify)', () => {
+    const solo = { ...muvmi, owner: 'Tao', backup: null };
+    const rows = scenario(down(1), solo, ['Tao'], hours, bkk('2026-09-25T09:48:00')).rows;
+    expect(rows[1]?.what).toBe('L1 → nobody new (already told · no backup set)');
+    const problem: PolicyDraft = {
+      ...down(1),
+      key: 'problem',
+      severity: 'problem',
+      tier: null,
+      steps: [down(1).steps[0]!, { ...down(1).steps[1]!, delayMin: 60, targets: ['backup'] }],
+    };
+    expect(
+      scenario(problem, solo, ['Tao'], hours, bkk('2026-09-25T09:48:00'), { reminderMin: 60 }).rows[1]?.what,
+    ).toBe('L1 → nobody (no backup set)');
+    expect(nobodyWhy(down(1).steps[1]!, { ...muvmi, owner: 'Ploy' }, ['Tao'])).toBe(
+      'nobody new (already told)',
+    );
   });
 
   it('a policy covers its tier; PROBLEM covers all', () => {

@@ -714,7 +714,7 @@ export function timelineOf(
             e,
             'escalated',
             `L${level} reached — nobody new to tell`,
-            'Everyone on this step was already told.',
+            'Everyone on this step was already told, or the step names no one for this site.',
           );
           return;
         }
