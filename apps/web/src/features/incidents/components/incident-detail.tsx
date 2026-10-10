@@ -165,6 +165,8 @@ export function IncidentDetailView({
   };
   const dialogIncident: DialogIncident = {
     incidentId: v.incidentId,
+    label: incidentLabel,
+    severity: d.severity,
     description: [
       incidentLabel,
       d.siteName,
@@ -409,6 +411,7 @@ export function IncidentDetailView({
             incidentLabel={incidentLabel}
             siteName={d.siteName}
             viewerName={viewerName}
+            viewerEmail={viewerEmail}
             open={noteOpen}
             onClose={() => setNoteOpen(false)}
           />
@@ -416,6 +419,7 @@ export function IncidentDetailView({
             key={`rc-${dialogKey}`}
             incident={dialogIncident}
             initial={initialRc}
+            viewerEmail={viewerEmail}
             open={rcOpen}
             onClose={() => setRcOpen(false)}
           />
