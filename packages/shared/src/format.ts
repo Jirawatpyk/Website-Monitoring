@@ -86,9 +86,12 @@ export function formatWhen(date: Date, now: Date, options: { midSentence?: boole
 }
 
 /** Midnight in Bangkok at the start of `now`'s Bangkok day ("checks today", today's log). */
+/** Bangkok is UTC+7 all year (no daylight saving). */
+export const BANGKOK_OFFSET_MS = 7 * 3_600_000;
+
 export function bangkokDayStart(now: Date): Date {
   const p = bangkokParts(now);
-  return new Date(Date.UTC(p.year, p.month, p.day) - 7 * 3_600_000);
+  return new Date(Date.UTC(p.year, p.month, p.day) - BANGKOK_OFFSET_MS);
 }
 
 /** "2,007" — counts with thousands separators. */

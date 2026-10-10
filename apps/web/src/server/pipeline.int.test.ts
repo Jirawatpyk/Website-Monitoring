@@ -328,7 +328,12 @@ describe('engine on stored results (S02a Done-when 3)', () => {
     // The notifier renders both from the stored rows and records the deliveries.
     expect((await deliver(incident!.id)).chat).toMatchObject({ sent: 1 });
     const texts = (post.mock.calls as unknown as [string, { text: string }][]).map((c) => c[1].text);
-    expect(texts).toContain(`DOWN · Recovers ${run} (Tier 1)`);
+    // S08 (D-034): the DOWN went out while unacked, with the L1 promise.
+    expect(texts).toContainEqual(
+      expect.stringMatching(
+        new RegExp(`^DOWN · Recovers ${run} \\(Tier 1\\) · acknowledge by \\d\\d:\\d\\d or it escalates$`),
+      ),
+    );
     expect(texts).toContain(`RECOVERED · Recovers ${run} · down 1 min · add a root cause`);
     expect((await notificationsOf(incident!.id)).map((n) => n.status)).toEqual(['sent', 'sent']);
   });
@@ -852,7 +857,8 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
     await due(incidentId, 'acknowledged');
     await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     const text = (post.mock.calls[0] as unknown as [string, { text: string }])[1].text;
-    expect(text).toMatch(new RegExp(`^ACKNOWLEDGED · Ack ${run} · by Arm \\d\\d:\\d\\d$`));
+    // S08 (D-034): the ack stops L1.
+    expect(text).toMatch(new RegExp(`^ACKNOWLEDGED · Ack ${run} · by Arm \\d\\d:\\d\\d · L1 stopped$`));
     expect(sentEmails(send)).toEqual([
       {
         to: 'arm@example.test',
@@ -1077,5 +1083,51 @@ describe('relapse, flapping and auto-resolve (S04b, D-004, D-024)', () => {
       'down_again',
     ]);
     expect((await statusOf(siteId))?.status).toBe('down');
+  });
+});
+
+describe('escalation ladder (S08, D-034, Done-when 1)', () => {
+  const profileId = async (address: string) =>
+    (await must(db.from('profiles').select('id').eq('email', address).single())).id;
+  const stepRows = (incidentId: string) =>
+    must(
+      db
+        .from('notifications')
+        .select('template, channel, user_id, context')
+        .eq('incident_id', incidentId)
+        .in('template', ['step_fired', 'reminder'])
+        .order('created_at'),
+    );
+
+  it('L1 at +15 min after Confirmed down: one Chat reply, the backup asked, the Admin FYI — once across overlapping runs; STILL DOWN at +30', async () => {
+    const arm = await profileId('arm@example.test');
+    const ploy = await profileId('ploy@example.test');
+    const { siteId, monitorId } = await newSite('Ladder', { primary_owner_id: arm, backup_owner_id: ploy });
+    await results(monitorId, downRound());
+    await runEngine(db, t(65));
+    const [inc] = await must(
+      db.from('incidents').select('id, detected_at, escalation_plan').eq('site_id', siteId),
+    );
+    expect(inc!.escalation_plan).toMatchObject({ severity: 'down', tier: 1, reminderMin: 15 });
+    const confirmed = new Date(inc!.detected_at).getTime();
+    const at = (min: number, sec = 0) => new Date(confirmed + min * 60_000 + sec * 1000);
+
+    await runEngine(db, at(14, 59));
+    expect(await stepRows(inc!.id)).toEqual([]);
+
+    // The cron and a probe's recheck judging the same minute: one L1.
+    await Promise.all([runEngine(db, at(15)), runEngine(db, at(15, 1))]);
+    const l1 = await stepRows(inc!.id);
+    expect(l1.filter((n) => n.channel === 'google_chat')).toHaveLength(1);
+    const emails = l1.filter((n) => n.channel === 'email');
+    expect(emails.map((n) => n.user_id)).toContain(ploy);
+    expect(emails.find((n) => n.user_id === ploy)?.context).toMatchObject({ asFyi: false, level: 1 });
+    expect(emails.filter((n) => (n.context as { asFyi?: boolean }).asFyi).length).toBeGreaterThan(0);
+    const [state] = await must(db.from('incidents').select('state, escalation_level').eq('id', inc!.id));
+    expect(state).toMatchObject({ state: 'escalated', escalation_level: 1 });
+
+    await runEngine(db, at(30));
+    await runEngine(db, at(30, 30));
+    expect((await stepRows(inc!.id)).filter((n) => n.template === 'reminder')).toHaveLength(1);
   });
 });

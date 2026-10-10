@@ -14,7 +14,7 @@ import {
   type DataTableColumn,
 } from '@jirawatpyk/aura-react';
 import {
-  IconClock,
+  IconArrowUpRight,
   IconDownload,
   IconSearch,
   IconX,
@@ -223,8 +223,12 @@ export function IncidentsList({ meta, incidents, sites, nowIso, viewer, initialV
       <div className="hidden flex-col gap-6 md:flex">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
           <Stat label="Open" value={kpis.open} caption={kpis.openCaption} icon={<IconBell />} />
-          {/* "Escalated, not acked" counts nothing until escalation exists (S08, D-033). */}
-          <Stat label="Unacked" value={kpis.unacked} caption={kpis.unackedCaption} icon={<IconClock />} />
+          <Stat
+            label="Escalated, not acked"
+            value={kpis.escalated}
+            caption={kpis.escalatedCaption}
+            icon={<IconArrowUpRight />}
+          />
           <Stat
             label="Needs root cause"
             value={kpis.needsRootCause}

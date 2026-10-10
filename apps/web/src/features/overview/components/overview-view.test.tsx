@@ -166,7 +166,7 @@ describe('OverviewView (Main3 / MOverview4)', () => {
       finish({ ok: true, postsAt: new Date(NOW.getTime() + 10_000).toISOString() });
     });
     expect(screen.queryByText('MuvMi is DOWN — 19 min')).toBeNull();
-    expect(screen.getByText('Acknowledged INC-0142')).toBeInTheDocument();
+    expect(screen.getByText('Acknowledged INC-0142 · escalation stopped')).toBeInTheDocument();
     expect(
       screen.getByText('Posting to Chat and email in 10 s — nothing is sent until then'),
     ).toBeInTheDocument();

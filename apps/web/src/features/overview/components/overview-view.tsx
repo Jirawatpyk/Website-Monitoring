@@ -73,8 +73,8 @@ export function OverviewView({
     if (ackFocus) document.getElementById(`${LIVE_ISSUES_ID}-title`)?.focus();
   }, [ackFocus]);
   const onAck = useCallback(
-    (incidentId: string, number: number) => {
-      acknowledge(incidentId, number);
+    (incidentId: string, number: number, severity?: 'down' | 'problem') => {
+      acknowledge(incidentId, number, severity);
       setAckFocus((n) => n + 1);
     },
     [acknowledge],

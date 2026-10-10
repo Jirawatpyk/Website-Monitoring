@@ -79,7 +79,7 @@ import type { OverviewKpis, OverviewSite, OverviewViewer } from '../types';
 
 export const LIVE_ISSUES_ID = 'live-issues';
 
-type Acknowledge = (incidentId: string, number: number) => void;
+type Acknowledge = (incidentId: string, number: number, severity?: 'down' | 'problem') => void;
 
 /** One banner per unacknowledged DOWN (§21.1, §14.13): Acknowledge is the page's primary button. */
 export function DesktopBanners({
@@ -114,7 +114,11 @@ export function DesktopBanners({
                 {`Open ${formatIncidentId(b.number)}`}
               </Link>
               {canAck(viewer, b.site) && (
-                <Button variant="primary" icon={<IconCheck />} onClick={() => onAck(b.incidentId, b.number)}>
+                <Button
+                  variant="primary"
+                  icon={<IconCheck />}
+                  onClick={() => onAck(b.incidentId, b.number, 'down')}
+                >
                   Acknowledge
                 </Button>
               )}
@@ -288,7 +292,7 @@ function NextStepCell({
         size="sm"
         icon={<IconCheck />}
         className="relative z-10"
-        onClick={() => onAck(step.incidentId, step.number)}
+        onClick={() => onAck(step.incidentId, step.number, issue.site.incident?.severity)}
       >
         Acknowledge
       </Button>

@@ -9,7 +9,7 @@ argument-hint: <SliceID, e.g. S02a>
 Follow `docs/workflow.md`. Work on this one slice only.
 
 1. **Load the slice.** Read the `### $ARGUMENTS ·` section and its row in the table of `docs/implementation-plan.md`: Scope, Boards, Tables, Test plan, Depends on, Done when, Review.
-2. **Check it can start.** Every slice in "Depends on" must be `Done` in the table. If not, stop and report which one blocks and what's left in it. If the status is already `In progress`, continue from the branch and the unchecked Done-when lines.
+2. **Check it can start.** Every slice in "Depends on" must be `Done` in the table. If not, stop and report which one blocks and what's left in it. If the status is already `In progress`, continue from the branch and the unchecked Done-when lines. If a Done-when line needs people on staging (a backup, a second Admin, a Chat id), check the staging `profiles` now — staging can't add a person outside the company domain and allowlist (D-007) — and agree with Tao up front how that line is proved (integration test + a production check) instead of finding out at `/slice-review`.
 3. **Branch.** From an up-to-date `main`: `git switch -c slice/$ARGUMENTS-<short-kebab-name>` (or switch to the existing slice branch). Never work on `main`.
 4. **Load context** (read, don't skim):
    - The FR rows (`docs/prd.md` §6) and the PRD sections the scope names.

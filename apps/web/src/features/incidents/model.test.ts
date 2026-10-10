@@ -326,6 +326,7 @@ const ev = (
 const names = new Map([
   ['u-arm', 'Arm'],
   ['u-tao', 'Tao'],
+  ['u-ploy', 'Ploy'],
 ]);
 const nameOf = (id: string | null) => (id ? (names.get(id) ?? 'someone') : 'someone');
 const gateBase = {
@@ -559,6 +560,44 @@ describe('timelineOf (§16.11, §19.7)', () => {
       ['Resolved automatically', 'Short PROBLEM, never acknowledged — no root cause needed'],
       ['OK for 2 rounds → Needs root cause', 'Needs a root cause before it can be resolved'],
     ]);
+  });
+});
+
+describe('timelineOf — escalation (S08, D-034)', () => {
+  const i = {
+    severity: 'down' as const,
+    trigger: 'hard_fail' as const,
+    startedAt: at('25T09:48:12'),
+    recoveredAt: null,
+  };
+  it('L1 names who it asked and who it told FYI (ChatAlert 10:03)', () => {
+    const t = timelineOf(
+      i,
+      [
+        ev('step_fired', '25T10:03:41', {
+          level: 1,
+          notified: ['u-ploy', 'u-tao'],
+          mentioned: ['u-ploy'],
+          fyi: ['u-tao'],
+        }),
+      ],
+      nameOf,
+      new Date(at('25T10:05:00')),
+    );
+    expect(t.at(-1)).toMatchObject({
+      kind: 'escalated',
+      title: 'Escalated to L1 — not acknowledged',
+      detail: '“@Ploy · please acknowledge · Tao FYI” in the thread + email',
+    });
+  });
+  it('a step with nobody new to tell says so', () => {
+    const t = timelineOf(
+      i,
+      [ev('step_fired', '25T10:03:41', { level: 1, notified: [] })],
+      nameOf,
+      new Date(at('25T10:05:00')),
+    );
+    expect(t.at(-1)?.title).toBe('L1 reached — nobody new to tell');
   });
 });
 

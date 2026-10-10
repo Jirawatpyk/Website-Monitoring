@@ -18,6 +18,9 @@ import {
   buildProblemEmail,
   buildRecoveredAlert,
   buildRecoveredEmail,
+  buildReminderAlert,
+  buildStepAlert,
+  buildStepEmail,
   buildSystemAlertEmail,
   type ChatMessage,
   type ChatPerson,
@@ -46,6 +49,7 @@ import {
   type Recipient,
   type SystemAlertFacts,
 } from './facts';
+import { ladderFactsOf, namedIn, stepWhy, stoppedOf, toldAtOf } from './ladder-facts';
 
 const person = (p: IncidentFacts['sites']['primary']): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
@@ -137,7 +141,7 @@ const openedWith = (i: IncidentFacts) =>
   contextOf(i.incident_events?.find((e) => e.type === 'detected')?.payload ?? null);
 
 /** DOWN AGAIN / PROBLEM AGAIN: who acts now, the drop, the incident's downtime before it. */
-function againAlert(n: Notification, i: IncidentFacts): ChatMessage {
+function againAlert(n: Notification, i: IncidentFacts, now: Date = new Date(n.created_at)): ChatMessage {
   const ctx = contextOf(n.context);
   const droppedAt = dateOf(ctx.startedAt) ?? new Date(n.created_at);
   const down = n.template === 'down_again';
@@ -165,6 +169,8 @@ function againAlert(n: Notification, i: IncidentFacts): ChatMessage {
     flapping: ctx.flapping === true,
     summary: typeof ctx.summary === 'string' ? ctx.summary : null,
     homeBack: ctx.homeBackAt ? keyPageOf(ctx.keyPage) : null,
+    // S08: a Tier 2–3 DOWN AGAIN outside response hours says the timers are paused (D-034).
+    pausedUntil: down && !acked ? (ladderFactsOf(i, now)?.pausedUntil ?? null) : null,
   });
 }
 
@@ -218,6 +224,8 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         backup: person(i.sites.backup),
         // MobileAck: the card's link opens the incident ready to acknowledge.
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
+        // A PROBLEM someone acknowledged, raised to DOWN (D-021), isn't waiting on the ladder.
+        ladder: i.state === 'acknowledged' ? null : ladderFactsOf(i, now),
       });
     case 'problem':
       return buildProblemAlert({
@@ -235,6 +243,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         owner: person(i.sites.primary),
         backup: person(i.sites.backup),
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
+        ladder: ladderFactsOf(i, now),
       });
     case 'acknowledged':
       return buildAcknowledgedAlert({
@@ -243,6 +252,30 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         ackedBy: str(ctx.ackedBy, 'someone'),
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
         problem: problemOf(i),
+        stopped: stoppedOf(i, ctx),
+      });
+    case 'step_fired': {
+      const named = namedIn(i, n.context);
+      return buildStepAlert({
+        incidentId: i.id,
+        site: i.sites.name,
+        severity: ctx.severity === 'problem' ? 'problem' : 'down',
+        level: num(ctx.level, 1),
+        elapsedMin: num(ctx.elapsedMin, 15),
+        owner: person(i.sites.primary),
+        asked: named.asked,
+        fyi: named.fyi,
+        incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
+      });
+    }
+    case 'reminder':
+      return buildReminderAlert({
+        incidentId: i.id,
+        site: i.sites.name,
+        severity: ctx.severity === 'problem' ? 'problem' : 'down',
+        elapsedMin: num(ctx.elapsedMin, num(ctx.afterMin, 30)),
+        mention: namedIn(i, n.context).mentioned,
+        incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
       });
     case 'recovered': {
       const drop = recoveryOf(i, ctx);
@@ -270,7 +303,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
     }
     case 'down_again':
     case 'problem_again':
-      return againAlert(n, i);
+      return againAlert(n, i, now);
     case 'note':
       return buildNoteAlert({ site: i.sites.name, by: str(ctx.by, 'someone'), text: str(ctx.text, '') });
     case 'resolved':
@@ -299,6 +332,8 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
  */
 export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   if (n.template === 'acknowledged' && contextOf(n.context).ackedById === n.user_id) return 'acked';
+  // A step's own email (its people); the Chat fallback goes to the backup and Admins (D-016).
+  if (n.template === 'step_fired') return contextOf(n.context).fallback === true ? 'fallback' : 'step';
   if (i.sites.primary?.id === n.user_id) return 'owner';
   if (n.template === 'resolved') return 'emailed';
   return 'fallback';
@@ -313,6 +348,8 @@ export function renderEmail(
   thread: { threadId: string; startsThread: boolean },
 ): EmailMessage | null {
   const ctx = contextOf(n.context);
+  // When it goes out: "acknowledge by 10:03" reads as a time today or tomorrow.
+  const sentAt = new Date(n.hold_until ?? n.created_at);
   const base: EmailBaseInput = {
     incidentId: i.id,
     incidentNumber: i.number,
@@ -333,6 +370,8 @@ export function renderEmail(
         confirmedByWaf: confirmedByWafOf(ctx),
         // A PROBLEM raised to DOWN keeps its acknowledgement (D-021).
         ackedBy: i.state === 'acknowledged' && i.acker ? i.acker.display_name : null,
+        ladder: ladderFactsOf(i, sentAt),
+        now: sentAt,
       });
     case 'problem':
       return buildProblemEmail({
@@ -342,7 +381,27 @@ export function renderEmail(
         cause: str(ctx.cause, 'Problem'),
         summary: str(ctx.summary, 'problem'),
         verifier: typeof ctx.verifier === 'string' ? ctx.verifier : null,
+        ladder: ladderFactsOf(i, sentAt),
+        now: sentAt,
       });
+    case 'step_fired': {
+      const asFyi = ctx.asFyi === true;
+      const level = num(ctx.level, 1);
+      return buildStepEmail({
+        ...base,
+        why: stepWhy(i, to.id, level, asFyi),
+        severity: ctx.severity === 'problem' ? 'problem' : 'down',
+        level,
+        elapsedMin: num(ctx.elapsedMin, 15),
+        confirmedAt: new Date(i.detected_at),
+        owner: i.sites.primary?.display_name ?? null,
+        asFyi,
+        asked: namedIn(i, n.context).askedNames.join(' and ') || null,
+        cause: causeOf(i),
+        toldAt: toldAtOf(i),
+        fallback: ctx.fallback === true,
+      });
+    }
     case 'acknowledged':
       return buildAcknowledgedEmail({
         ...base,
@@ -353,6 +412,7 @@ export function renderEmail(
         startedAt: new Date(i.started_at),
         downMinutes: outageAt(i, new Date(str(ctx.ackedAt, n.created_at))),
         confirmedAt: new Date(i.detected_at),
+        stopped: stoppedOf(i, ctx),
       });
     case 'recovered': {
       const drop = recoveryOf(i, ctx);
@@ -388,6 +448,7 @@ export function renderEmail(
             drops,
             owner: i.sites.primary?.display_name ?? null,
             ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
+            pausedUntil: i.acked_at ? null : (ladderFactsOf(i, sentAt)?.pausedUntil ?? null),
           })
         : null;
     }

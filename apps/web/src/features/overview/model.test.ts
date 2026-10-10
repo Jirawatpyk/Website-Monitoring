@@ -410,7 +410,12 @@ describe('Recent events (§21.6, §16.11, D-032)', () => {
       ev('escalated_to_down', { payload: { confirmingLocations: 2 } }),
       'Cando Asia DOWN confirmed — 2/3 locations',
     ],
-    [ev('acknowledged'), 'INC-0140 acked by Nok'],
+    [ev('acknowledged'), 'INC-0140 acked by Nok — escalation stopped'],
+    [
+      ev('step_fired', { payload: { level: 1, notified: ['u1'] } }),
+      'INC-0140 escalated to L1 — not acknowledged',
+    ],
+    [ev('step_fired', { payload: { level: 1, notified: [] } }), null],
     [ev('ack_undone'), 'INC-0140 acknowledgement undone by Nok'],
     [ev('recovered'), 'Cando Asia back up — root cause needed'],
     [ev('recovered', { severity: 'problem' }), 'Cando Asia back to OK'],
@@ -430,6 +435,6 @@ describe('Recent events (§21.6, §16.11, D-032)', () => {
     );
     const out = recentEvents(list, NOW);
     expect(out).toHaveLength(6);
-    expect(out[0]).toEqual({ id: 'e8', time: '09:18', text: 'INC-0140 acked by Nok' });
+    expect(out[0]).toEqual({ id: 'e8', time: '09:18', text: 'INC-0140 acked by Nok — escalation stopped' });
   });
 });
