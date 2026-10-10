@@ -82,6 +82,11 @@ describe('Page skeletons', () => {
       expect(shape).toHaveAttribute('aria-hidden', 'true');
     }
   });
+  it('a desktop-only header action is drawn from md only (Incidents: Export CSV)', () => {
+    const { container } = render(<PageHeaderSkeleton actions={1} actionsFromMd />);
+    const actions = container.querySelector('[aria-hidden] > div:last-child')!;
+    expect(actions).toHaveClass('hidden', 'md:flex');
+  });
 });
 
 describe('OfflineStrip', () => {

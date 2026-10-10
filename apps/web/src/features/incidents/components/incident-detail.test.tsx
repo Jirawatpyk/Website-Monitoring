@@ -418,3 +418,19 @@ describe('Incident page — notes', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add a note' })).toBeNull());
   });
 });
+
+describe('Incident page — screenshot evidence', () => {
+  it('shows the preview beside the words; the preview and "Open full size" both open it full size', () => {
+    const url = 'https://storage.example.test/shot.png?token=x';
+    const { container } = show(
+      detail({ evidence: { url, takenAt: at('24T22:15:35'), afterRecovery: false } }),
+    );
+    const preview = container.querySelector(`button[aria-hidden] img[src="${url}"]`)!;
+    expect(preview).not.toBeNull();
+    fireEvent.click(preview);
+    expect(screen.getByRole('img', { name: 'Browser screenshot of ORCA Thailand' })).toHaveAttribute(
+      'src',
+      url,
+    );
+  });
+});

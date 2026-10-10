@@ -6,9 +6,9 @@ describe('Incidents table columns (no sideways scroll, S07 layout-consistency)',
     expect(ALWAYS_NEEDS).toBeLessThanOrEqual(NARROWEST_TABLE);
   });
   it('each optional column joins only once the table has room for it and those before it', () => {
-    expect(INCIDENT_COLUMNS.started.from).toBe(744);
-    expect(INCIDENT_COLUMNS.duration.from).toBe(832);
-    expect(INCIDENT_COLUMNS.trigger.from).toBe(960);
+    expect(INCIDENT_COLUMNS.started.from).toBe(768);
+    expect(INCIDENT_COLUMNS.duration.from).toBe(856);
+    expect(INCIDENT_COLUMNS.trigger.from).toBe(984);
     expect(INCIDENT_COLUMNS.id.from).toBeUndefined();
   });
 });

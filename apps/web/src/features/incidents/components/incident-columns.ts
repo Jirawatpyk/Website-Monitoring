@@ -13,7 +13,8 @@ const WIDTH = {
   id: 88,
   severity: 128,
   state: 200,
-  started: 120,
+  // "Yesterday 06:04" / "Wed 7 Oct 06:04" on one line (120 wrapped them)
+  started: 144,
   duration: 88,
   trigger: 128,
 } as const;

@@ -69,6 +69,7 @@ const ADMIN = { id: 'u-admin', role: 'admin' as const };
 const show = (initialView?: 'unacked', viewer: { id: string; role: Role } = ADMIN) =>
   render(
     <IncidentsList
+      meta="Fri 25 Sep 2026 · 10:07 (UTC+7)"
       incidents={incidents}
       sites={sites}
       nowIso={NOW}
@@ -114,7 +115,15 @@ describe('Incidents list (Incidents, MIncidents, D-033)', () => {
   });
 
   it('nothing resolved with the default filters: says so, with no Clear filters that would change nothing', () => {
-    render(<IncidentsList incidents={[]} sites={sites} nowIso={NOW} viewer={ADMIN} />);
+    render(
+      <IncidentsList
+        meta="Fri 25 Sep 2026 · 10:07 (UTC+7)"
+        incidents={[]}
+        sites={sites}
+        nowIso={NOW}
+        viewer={ADMIN}
+      />,
+    );
     fireEvent.click(screen.getByRole('radio', { name: /^Resolved & closed/ }));
     expect(screen.getByText('No past incidents')).toBeInTheDocument();
     expect(screen.getByText('Nothing resolved in the last 30 days.')).toBeInTheDocument();

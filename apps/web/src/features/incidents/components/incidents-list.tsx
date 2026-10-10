@@ -8,6 +8,7 @@ import {
   EmptyState,
   FilterBar,
   FilterSelect,
+  PageHeader,
   SegmentedControl,
   Stat,
   type DataTableColumn,
@@ -81,6 +82,8 @@ const TONE: Record<'danger' | 'warning' | 'secondary', string> = {
 const hrefOf = (i: Pick<ListIncident, 'id'>) => `/incidents/${i.id}`;
 
 export interface IncidentsListProps {
+  /** The header's date line, from the server's clock. */
+  meta: string;
   incidents: ListIncident[];
   sites: { id: string; name: string }[];
   nowIso: string;
@@ -94,7 +97,7 @@ export interface IncidentsListProps {
  * Incidents (desktop) and MIncidents (phone) — spec §4, §11, §16.1, D-033. The server reads the last
  * 30 days plus anything still open; views, filters and counts are worked out here (`model.ts`).
  */
-export function IncidentsList({ incidents, sites, nowIso, viewer, initialView }: IncidentsListProps) {
+export function IncidentsList({ meta, incidents, sites, nowIso, viewer, initialView }: IncidentsListProps) {
   // "18 min unacked" and running durations age while the page stays open (§14.3).
   const now = useNow(nowIso, AGE_EVERY_MS, incidents.some(isOpen));
   // New incidents, acks and resolves show without a reload (PRD §9).
@@ -203,6 +206,20 @@ export function IncidentsList({ incidents, sites, nowIso, viewer, initialView }:
 
   return (
     <>
+      {/* The header lives here, not in the route: Export CSV follows the filters (Incidents board: in the
+          header's actions; MIncidents has no export). */}
+      <PageHeader
+        eyebrow="INCIDENTS"
+        title="Incidents"
+        meta={meta}
+        actions={
+          <span className="hidden md:inline-flex">
+            <Button variant="secondary" icon={<IconDownload />} href={exportHref} download>
+              Export CSV
+            </Button>
+          </span>
+        }
+      />
       {/* ── desktop and tablets (Incidents) ── */}
       <div className="hidden flex-col gap-6 md:flex">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
@@ -235,9 +252,10 @@ export function IncidentsList({ incidents, sites, nowIso, viewer, initialView }:
 
         <div className="flex flex-col gap-3">
           <FilterBar>
+            {/* Default size, as tall as the FilterSelects beside it (the board draws both at 32 px; AURA's
+                FilterSelect has no small size). */}
             <SegmentedControl
               label="State"
-              size="sm"
               value={f.view}
               onChange={(v) => setF({ ...f, view: v as DesktopView })}
               options={[
@@ -273,11 +291,6 @@ export function IncidentsList({ incidents, sites, nowIso, viewer, initialView }:
           <div className="flex min-h-8 flex-wrap items-center gap-2 text-sm">
             <span className="font-medium" aria-live="polite">
               {countLabel(incidents, f, now)}
-            </span>
-            <span className="ml-auto">
-              <Button variant="secondary" size="sm" icon={<IconDownload />} href={exportHref} download>
-                Export CSV
-              </Button>
             </span>
           </div>
 
