@@ -338,6 +338,24 @@ describe('emails', () => {
     expect(e.text).toContain('Please take it — you’re the next person for this incident.');
   });
 
+  it('INC-0139: a Tier 2 DOWN from the night, L1 at Fri 09:15 — the detection carries its day', () => {
+    const e = buildStepEmail({
+      ...base,
+      site: 'ORCA Thailand',
+      tier: 2,
+      recipientId: 'nok',
+      reason: 'step',
+      severity: 'down',
+      level: 1,
+      elapsedMin: 661,
+      confirmedAt: bkk('2026-09-24T22:14:00'),
+      owner: 'Tao',
+      asked: 'Nok',
+      asFyi: false,
+    });
+    expect(e.text).toContain('Down for: 11 h 1 min (confirmed down Thu 24 Sep 22:14:00)');
+  });
+
   it('an L1 email the same day shows the time alone', () => {
     const e = buildStepEmail({
       ...base,

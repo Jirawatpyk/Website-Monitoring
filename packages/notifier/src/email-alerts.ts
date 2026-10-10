@@ -812,6 +812,9 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
   const duration = formatDuration(input.elapsedMin);
   const down = input.severity === 'down';
   const owner = input.owner ?? 'The owner';
+  // Sent `elapsedMin` after the owner was told: INC-0139's L1 at Fri 09:15 says "confirmed down Thu 24 Sep 22:14".
+  const sentAt = new Date((input.toldAt ?? input.confirmedAt).getTime() + input.elapsedMin * 60_000);
+  const detected = `${isSameBangkokDay(input.confirmedAt, sentAt) ? '' : `${formatDay(input.confirmedAt, { weekday: true })} `}${formatTimeWithSeconds(input.confirmedAt)}`;
   const ask = input.fallback
     ? `${owner} hasn’t acknowledged. The Google Chat reply couldn’t be delivered, so this email is the alert.`
     : input.asFyi
@@ -832,7 +835,7 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
     facts: [
       [
         down ? 'Down for' : 'Problem for',
-        `${duration} (${down ? 'confirmed down' : 'detected'} ${isSameBangkokDay(input.confirmedAt, input.toldAt ?? input.confirmedAt) ? '' : `${formatDay(input.confirmedAt, { weekday: true })} `}${formatTimeWithSeconds(input.confirmedAt)})`,
+        `${duration} (${down ? 'confirmed down' : 'detected'} ${detected})`,
       ],
       ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
       ...(input.owner

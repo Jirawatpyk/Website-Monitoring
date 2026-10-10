@@ -203,6 +203,8 @@ describe('Escalation editor — saving', () => {
     const save = dialog('Save escalation changes?');
     fireEvent.change(within(save).getByLabelText(/Change note/), { target: { value: 'shorter' } });
     await act(async () => fireEvent.click(within(save).getByRole('button', { name: 'Save and log' })));
+    // Before the refresh lands: no unsaved bar beside "Saved".
+    expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull();
     rerender(<EscalationEditor data={{ ...data, downReminder: 10 }} now={NOW} />);
     expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull();
     expect(screen.getByText(/New incidents use it straight away/)).toBeInTheDocument();

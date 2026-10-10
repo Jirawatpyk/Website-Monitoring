@@ -59,7 +59,8 @@ async function tick(
   const due = ladderDue(input);
   // How long it has gone unacknowledged since the owner was told: a DOWN at confirm ("11 h" after a
   // night — L0 posted at 22:14), a Tier 2–3 PROBLEM held overnight at the opening ("60 min" at 10:00,
-  // not "11 h 46 min"; message-check round 2).
+  // not "11 h 46 min"; message-check round 2 asked for response-hours minutes — D-034 keeps the wall
+  // clock so a DOWN from the night stays honest).
   const toldAt =
     input.plan.severity === 'problem'
       ? (problemHoldUntil(input.plan.tier as Tier, input.detectedAt, input.hours) ?? input.detectedAt)

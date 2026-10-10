@@ -46,7 +46,10 @@ const draftOf = (d: EscalationPageData): EscalationDraft => ({
  */
 export function EscalationEditor({ data, now }: { data: EscalationPageData; now: string }) {
   const router = useRouter();
-  const saved = useMemo(() => draftOf(data), [data]);
+  // After a save the draft is what's saved, until the refresh brings `data` back — so the unsaved bar
+  // never shows beside "Saved" in between (spec-check round 2).
+  const [savedNow, setSavedNow] = useState<{ data: EscalationPageData; draft: EscalationDraft } | null>(null);
+  const saved = useMemo(() => (savedNow?.data === data ? savedNow.draft : draftOf(data)), [data, savedNow]);
   const [draft, setDraft] = useState(saved);
   const [key, setKey] = useState<PolicyKey>('t1');
   const [editing, setEditing] = useState<{ index: number; adding: boolean } | null>(null);
@@ -111,11 +114,13 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
       setSaveOpen(false);
       setNote('');
       // The draft as the server keeps it, so the unsaved bar doesn't come back over "Saved".
-      setDraft((d) => ({
-        ...d,
-        downReminder: normalInterval(d.downReminder),
-        problemReminder: normalInterval(d.problemReminder),
-      }));
+      const kept = {
+        ...draft,
+        downReminder: normalInterval(draft.downReminder),
+        problemReminder: normalInterval(draft.problemReminder),
+      };
+      setDraft(kept);
+      setSavedNow({ data, draft: kept });
       setJustSaved(true);
       setRefocus((n) => n + 1);
       router.refresh();
