@@ -283,6 +283,32 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     expect(within(dialog).getAllByText('Unknown keeps the incident open').length).toBeGreaterThan(0);
   });
 
+  it('header and facts: the cause says since when it is OK; confirmed by an immediate recheck; Resolve summary says "Down"', () => {
+    show(detail({ events: settled }));
+    expect(screen.getByText('HTTP 502 (BKK, SIN, TYO) · OK since 22:22')).toBeInTheDocument();
+    expect(screen.getByText('Immediate recheck · MTTD 30 s')).toBeInTheDocument();
+    fireEvent.click(resolveButton());
+    const dialog = screen.getByRole('dialog', { name: 'Resolve incident' });
+    expect(within(dialog).getByText('Down')).toBeInTheDocument();
+  });
+
+  it('resolved: the card says who, how long and why (MIncident)', () => {
+    const d = detail({
+      events: settled,
+      rootCause: { category: 'hosting', what: 'Host rebooted', fix: null },
+    });
+    show({
+      ...d,
+      state: 'resolved',
+      view: { ...d.view, state: 'resolved' },
+      resolved: { by: 'Tao', byViewer: true, at: NOW, postsAt: NOW, posted: NOW },
+    });
+    expect(
+      screen.getAllByText('Resolved by Tao · ORCA Thailand was down 8 min · root cause: Hosting / server.')
+        .length,
+    ).toBeGreaterThan(0);
+  });
+
   it('conditions say Met / Not met in words beside the icon (MIncident)', () => {
     show(detail({ events: settled }));
     fireEvent.click(resolveButton());

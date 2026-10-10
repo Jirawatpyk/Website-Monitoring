@@ -53,6 +53,8 @@ export interface CheckCell {
   text: string;
   /** The §11 legend glyph (D-029: a broken certificate chain is not a hard fail). */
   glyph: LocationGlyph;
+  /** When the check ran. */
+  at?: string;
 }
 
 export interface IncidentDetail {
@@ -112,8 +114,10 @@ interface CheckRow {
   checked_at: string;
 }
 
-const cellOf = (c: CheckRow | undefined, timeoutMs: number): CheckCell | null => {
-  if (!c) return null;
+const cellOf = (c: CheckRow | undefined, timeoutMs: number): CheckCell | null =>
+  c ? { ...checkWords(c, timeoutMs), at: c.checked_at } : null;
+
+const checkWords = (c: CheckRow, timeoutMs: number): CheckCell => {
   if (c.outcome === 'pass') {
     return { text: `${c.status_code ?? 200} · ${c.response_ms ?? '—'} ms`, glyph: 'pass' };
   }

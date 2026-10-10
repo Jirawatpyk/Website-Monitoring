@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   toast,
   Badge,
@@ -42,6 +42,7 @@ import { useLiveRefresh } from '@/components/use-live-refresh';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge, undoResolve } from '../actions';
 import type { IncidentDetail } from '../detail-queries';
+import { rootCauseLabel } from '../model';
 import type { IncidentSections } from './incident-sections';
 import { AckPanel } from './ack-panel';
 import {
@@ -195,7 +196,7 @@ export function IncidentDetailView({
     ? `${formatTime(new Date(d.startedAt))}–${formatTime(new Date(d.recoveredAt))}`
     : null;
   const summary = [
-    { label: 'Duration', value: formatDuration(d.durationMinutes) },
+    { label: d.severity === 'down' ? 'Down' : 'Problem lasted', value: formatDuration(d.durationMinutes) },
     ...(downRange
       ? [{ label: 'Window', value: `${formatDay(new Date(d.startedAt), { weekday: true })} ${downRange}` }]
       : []),
@@ -237,6 +238,9 @@ export function IncidentDetailView({
 
   return (
     <div className="flex flex-col gap-6 max-md:min-h-full max-md:gap-3">
+      <p role="status" className="sr-only">
+        {copied ? 'Incident link copied' : ''}
+      </p>
       <PageHeader
         breadcrumb={
           <Breadcrumb items={[{ label: 'Incidents', href: '/incidents' }, { label: incidentLabel }]} />
@@ -247,12 +251,26 @@ export function IncidentDetailView({
             <span className="flex flex-wrap items-center gap-2">
               <SeverityBadge severity={d.severity} recovered={!!d.recoveredAt || resolved} />
               <WorkflowBadge state={d.state} level={d.escalationLevel} />
+              {sections.unackedFor && (
+                <span className="text-sm font-medium text-fg-danger">{sections.unackedFor}</span>
+              )}
               <Badge tone="neutral" variant="outline">
                 {formatTier(d.tier)}
               </Badge>
               <Badge tone="neutral" variant="outline">{`Trigger: ${d.triggerLabel}`}</Badge>
             </span>
-            <span className="text-sm text-fg-secondary">{v.cause}</span>
+            <span className="text-sm text-fg-secondary">
+              {[
+                v.cause,
+                stillDown
+                  ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
+                  : d.recoveredAt && !resolved
+                    ? `OK since ${formatTime(new Date(d.recoveredAt))}`
+                    : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
           </span>
         }
         actions={
@@ -288,7 +306,12 @@ export function IncidentDetailView({
         {sections.facts}
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*88)]">
           <div className="flex min-w-0 flex-col gap-6">
-            <EvidenceCard detail={d} table={sections.evidenceTable} onOpenShot={() => setShotOpen(true)} />
+            <EvidenceCard
+              detail={d}
+              table={sections.evidenceTable}
+              summary={sections.evidenceSummary}
+              onOpenShot={() => setShotOpen(true)}
+            />
             <Card
               title="Timeline"
               headingLevel={2}
@@ -313,7 +336,7 @@ export function IncidentDetailView({
 
       {/* ── phones (MIncident, with MobileAck's ack parts) ── */}
       <div className="flex grow flex-col gap-3 md:hidden">
-        <span className="text-sm text-fg-secondary">
+        <span className={`text-sm ${stillDown ? 'font-medium text-fg-danger' : 'text-fg-secondary'}`}>
           {[
             `${stillDown ? (d.severity === 'down' ? 'Down' : 'Problem') : d.severity === 'down' ? 'Was down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`,
             downRange ? [sections.startedOn, downRange].filter(Boolean).join(' ') : sections.startedOn,
@@ -325,7 +348,7 @@ export function IncidentDetailView({
         <span className="flex items-center gap-2">
           <span className="grow text-sm">
             {[
-              d.owner ? `Owner ${d.owner}` : 'No owner set',
+              d.owner ? `Owner ${d.owner}${d.owner === viewerName ? ' (you)' : ''}` : 'No owner set',
               d.backup ? `backup ${d.backup}` : null,
               d.am ? `AM ${d.am}` : null,
             ]
@@ -464,15 +487,18 @@ export function IncidentDetailView({
 function EvidenceCard({
   detail: d,
   table,
+  summary,
   onOpenShot,
 }: {
   detail: IncidentDetail;
   /** `EvidenceTable`, drawn on the server. */
   table: React.ReactNode;
+  /** `evidenceSummary`: how the DOWN was decided. */
+  summary: string | null;
   onOpenShot: () => void;
 }) {
   return (
-    <Card title="Evidence by location" headingLevel={2}>
+    <Card title="Evidence by location" headingLevel={2} description={summary ?? undefined}>
       {table}
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border-subtle pt-4">
         {d.evidence ? (
@@ -482,6 +508,8 @@ function EvidenceCard({
               <span className="text-fg-secondary">
                 {`Taken by the browser verifier in Bangkok at ${formatTimeWithSeconds(new Date(d.evidence.takenAt))}`}
                 {d.evidence.afterRecovery ? ' — after the site recovered.' : ', after DOWN was confirmed.'}{' '}
+                {d.trigger === 'hard_fail' &&
+                  'Hard fails don’t wait for the browser verifier — it only takes a screenshot afterwards as evidence. '}
                 Kept for 30 days.
               </span>
             </span>
@@ -514,25 +542,42 @@ function ResolvedCard({
   const r = d.resolved!;
   const seconds = useSecondsLeft(r.posted ? null : r.postsAt);
   const [failure, setFailure] = useState<string | null>(null);
+  const [undoing, startUndo] = useTransition();
+  const cause = rootCauseLabel(d.rootCause.category);
   return (
     <section className="flex flex-col gap-1.5 rounded-aura-lg border border-l-4 border-border-default border-l-fg-positive bg-bg-surface px-3.5 py-3">
       <h2
         ref={headingRef}
         tabIndex={-1}
-        className={`m-0 text-base font-semibold ${FOCUS_TARGET}`}
-      >{`Resolved ${formatTime(new Date(r.at))}`}</h2>
-      <span className="text-sm">{`Resolved by ${r.by}.`}</span>
-      <p role="status" className="sr-only">
-        {seconds > 0
-          ? 'Resolved — posting to Chat and email in a few seconds, nothing is sent until then'
-          : ''}
-      </p>
-      <span className="text-xs text-fg-secondary">
-        {seconds > 0
-          ? `Posting to Chat and email in ${seconds} s — nothing is sent until then`
-          : r.posted
-            ? `Posted to the Chat thread and email at ${formatTimeWithSeconds(new Date(r.posted))}`
-            : POST_WAIT_WORDS[overdue]}
+        className={`m-0 flex items-center gap-2 text-base font-semibold ${FOCUS_TARGET}`}
+      >
+        <IconCircleCheck aria-hidden className="size-5 text-fg-positive" />
+        {`Resolved ${formatTime(new Date(r.at))}`}
+      </h2>
+      <span className="text-sm">
+        {[
+          `Resolved by ${r.by}`,
+          `${d.siteName} ${d.severity === 'down' ? 'was down' : 'had a problem for'} ${formatDuration(d.durationMinutes)}`,
+          cause ? `root cause: ${cause}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') + '.'}
+      </span>
+      {/* the visible line is the live region: each phase is announced once (the count isn't) */}
+      <span className="flex items-center gap-1.5 text-xs text-fg-secondary">
+        {r.posted ? (
+          <IconCheck aria-hidden className="size-3.5 text-fg-positive" />
+        ) : (
+          <IconClock aria-hidden className="size-3.5" />
+        )}
+        <span role="status">
+          {seconds > 0
+            ? 'Posting to Chat and email in a few seconds — nothing is sent until then.'
+            : r.posted
+              ? `Posted to the Chat thread and email at ${formatTimeWithSeconds(new Date(r.posted))}`
+              : POST_WAIT_WORDS[overdue]}
+        </span>
+        {seconds > 0 && <span aria-hidden className="tabular-nums">{`· ${seconds} s`}</span>}
       </span>
       {failure && <span className="text-sm text-fg-danger">{failure}</span>}
       {seconds > 0 && r.byViewer && (
@@ -540,11 +585,17 @@ function ResolvedCard({
           variant="secondary"
           icon={<IconRotateCcw />}
           fullWidth
-          onClick={async () => {
-            const res = await undoResolve(d.view.incidentId);
-            if (!res.ok) setFailure(res.message);
-            else onUndone();
-          }}
+          loading={undoing}
+          onClick={() =>
+            startUndo(async () => {
+              const res = await undoResolve(d.view.incidentId).catch(() => ({
+                ok: false as const,
+                message: 'That didn’t go through — try again.',
+              }));
+              if (!res.ok) setFailure(res.message);
+              else onUndone();
+            })
+          }
         >
           {`Undo · ${seconds} s`}
         </Button>
