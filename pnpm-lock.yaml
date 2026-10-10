@@ -267,8 +267,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@jirawatpyk/aura-react':
-        specifier: ^5.35.0
-        version: 5.35.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: ^5.36.0
+        version: 5.36.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@jirawatpyk/aura-tokens':
         specifier: ^5.35.0
         version: 5.35.0
@@ -1108,8 +1108,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@jirawatpyk/aura-react@5.35.0':
-    resolution: {integrity: sha512-JlE9FhG+VkvP9YRwMHAJNo1ZyZWzYtKFP1tystDvScXCmLPAo/Gw0THo7FtHHWO/ycqHoBbfBZxbz/X57pNY1g==}
+  '@jirawatpyk/aura-react@5.36.0':
+    resolution: {integrity: sha512-U36j9NNzCzu/KNUdhGLFO66XakFag5HoE1phwckX+y+iS+zdp2a8W/k3nevdhz4mRdh5kNbtOmo1XWTOGCXqKQ==}
     hasBin: true
     peerDependencies:
       react: '>=18'
@@ -3523,7 +3523,7 @@ snapshots:
   '@img/sharp-win32-x64@0.35.4':
     optional: true
 
-  '@jirawatpyk/aura-react@5.35.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@jirawatpyk/aura-react@5.36.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)

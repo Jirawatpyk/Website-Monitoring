@@ -181,12 +181,11 @@ export function IncidentsList({ meta, incidents, sites, nowIso, viewer, initialV
     {
       key: 'duration',
       label: 'Duration',
+      align: 'end',
       width: C.duration.width,
       hideBelow: C.duration.from,
       render: (i) => (
-        <span className="text-sm whitespace-nowrap tabular-nums">
-          {formatDuration(durationMinutes(i, now))}
-        </span>
+        <span className="text-sm whitespace-nowrap">{formatDuration(durationMinutes(i, now))}</span>
       ),
     },
   ];
