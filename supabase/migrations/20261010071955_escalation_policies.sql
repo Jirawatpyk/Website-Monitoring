@@ -861,7 +861,7 @@ begin
   values (p_incident_id, 'google_chat', 'reminder', p_incident_id::text,
           p_context || jsonb_build_object('dueAt', p_due_at, 'severity', v_inc.severity,
                                           'mentioned', to_jsonb(v_mention)),
-          to_char(p_due_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI"Z"'))
+          v_inc.severity || ':' || to_char(p_due_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI"Z"'))
   on conflict do nothing
   returning id into v_id;
 
