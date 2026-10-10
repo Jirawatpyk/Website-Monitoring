@@ -4,7 +4,7 @@
 -- (once per due time), D-021 restarting the ladder, and the PROBLEM held for response hours.
 begin;
 \ir _helpers.psql
-select plan(49);
+select plan(61);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -115,7 +115,7 @@ select throws_ok(
 select throws_ok(
   format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, jsonb_build_array(jsonb_build_object(
     'policyId', (select id from pol where name = 'down1'),
-    'steps', jsonb_build_array(jsonb_build_object('level', 0, 'delayMin', 0, 'targets', array['owner'], 'channels', array['chat', 'space']))))),
+    'steps', jsonb_build_array(jsonb_build_object('level', 0, 'delayMin', 0, 'targets', array['owner'], 'channels', array['chat', 'space', 'email']))))),
   '22023', 'Tier 1 DOWN needs at least one step after L0 — otherwise nobody else is ever told.',
   'a DOWN policy needs a step after L0');
 select lives_ok(
@@ -172,7 +172,7 @@ select is((select state::text || ' L' || escalation_level from public.incidents 
   'escalated L1', 'the incident is Escalated · L1');
 select results_eq(
   $$select channel::text, user_id, (context->>'asFyi')::boolean from public.notifications
-    where incident_id = (select id from inc where name = 'a') and template = 'step_fired' order by channel, (context->>'fyi')$$,
+    where incident_id = (select id from inc where name = 'a') and template = 'step_fired' order by channel, (context->>'asFyi')$$,
   $$values ('email', (select id from ids where name = 'ploy'), false),
            ('email', (select id from ids where name = 'tao'), true),
            ('google_chat', null::uuid, null::boolean)$$,
@@ -268,6 +268,97 @@ select is(
   (select string_agg(template || ':' || status, ',' order by template, channel) from public.notifications
    where incident_id = (select id from inc where name = 'h') and template in ('problem', 'recovered')),
   'problem:cancelled,problem:cancelled', 'cleared before 09:00: nothing is posted, not even RECOVERED (§19.6)');
+
+-- PROBLEM AGAIN outside response hours waits too (engine review H2).
+insert into inc values ('r', public.engine_open_incident('00000000-0000-0000-0000-0000000000d1', null, 'slow', 'problem',
+  now() - interval '30 minutes', now() - interval '20 minutes', now(), '{}', true));
+select public.engine_recover_incident((select id from inc where name = 'r'), 'unacked', 'monitoring',
+  now(), now(), '{}', true);
+select public.engine_relapse_incident((select id from inc where name = 'r'), 'problem', 'slow', now(), now(), now(),
+  '{}', false, true, null, null, now() + interval '9 hours');
+select is(
+  (select hold_until from public.notifications where incident_id = (select id from inc where name = 'r') and template = 'problem_again'),
+  now() + interval '9 hours', 'PROBLEM AGAIN at night is held until the next opening');
+update public.incidents set state = 'resolved' where id = (select id from inc where name = 'r');
+
+-- RECOVERED still follows a DOWN that was tried and is waiting for a retry (engine review H1).
+insert into inc values ('w', public.engine_open_incident('00000000-0000-0000-0000-0000000000a1', null, 'hard_fail', 'down',
+  now() - interval '5 minutes', now() - interval '4 minutes', now(), '{}', true));
+update public.notifications set attempts = 1, next_retry_at = now() + interval '2 minutes'
+  where incident_id = (select id from inc where name = 'w') and channel = 'google_chat';
+insert into public.notification_attempts (notification_id, attempt, ok, error)
+  select id, 1, false, 'Chat 503' from public.notifications
+  where incident_id = (select id from inc where name = 'w') and channel = 'google_chat';
+update public.notifications set status = 'sent', attempts = 1
+  where incident_id = (select id from inc where name = 'w') and channel = 'email';
+select public.engine_recover_incident((select id from inc where name = 'w'), 'unacked', 'monitoring',
+  now(), now(), '{}', true);
+select is(
+  (select string_agg(channel::text, ',' order by channel::text) from public.notifications
+   where incident_id = (select id from inc where name = 'w') and template = 'recovered'),
+  'email,google_chat', 'a DOWN set aside for a retry still gets RECOVERED in Chat and by email');
+update public.incidents set state = 'resolved' where id = (select id from inc where name = 'w');
+
+-- An ack stops the chain: a reminder still waiting is set aside, and Undo brings it back.
+insert into inc values ('k', public.engine_open_incident('00000000-0000-0000-0000-0000000000a1', null, 'hard_fail', 'down',
+  now() - interval '31 minutes', now() - interval '30 minutes', now(), '{}', true));
+select public.engine_remind((select id from inc where name = 'k'), date_trunc('minute', now()), '{}');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select public.ack_incident((select id from inc where name = 'k'));
+reset role;
+select is(
+  (select status::text from public.notifications where incident_id = (select id from inc where name = 'k') and template = 'reminder'),
+  'cancelled', 'the ack cancels a reminder that hasn''t gone');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select public.undo_ack((select id from inc where name = 'k'));
+reset role;
+select is(
+  (select status::text from public.notifications where incident_id = (select id from inc where name = 'k') and template = 'reminder'),
+  'queued', 'Undo puts it back');
+update public.incidents set state = 'resolved' where id = (select id from inc where name = 'k');
+
+-- Muted when it opened: no first alert, so no ladder (spec §15.1).
+insert into inc values ('m', public.engine_open_incident('00000000-0000-0000-0000-0000000000a1', null, 'hard_fail', 'down',
+  now() - interval '31 minutes', now() - interval '30 minutes', now(), '{}', false));
+select ok(not public.engine_fire_step((select id from inc where name = 'm'), 1::smallint, now(), '{}'),
+  'no L1 for an incident whose first alert never went');
+select ok(not public.engine_remind((select id from inc where name = 'm'), now(), '{}'), 'and no reminder');
+
+-- S08 limits on the save.
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok(
+  format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, jsonb_build_array(jsonb_build_object(
+    'policyId', (select id from pol where name = 'down1'),
+    'steps', jsonb_build_array(
+      jsonb_build_object('level', 0, 'delayMin', 0, 'targets', array['owner', 'backup'], 'channels', array['chat', 'space', 'email']),
+      jsonb_build_object('level', 1, 'delayMin', 15, 'targets', array['admins'], 'channels', array['chat']))))),
+  '22023', 'L0 is pinned on every policy', 'L0 names the owner only (what the first alert really reaches)');
+select throws_ok(
+  format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, jsonb_build_array(jsonb_build_object(
+    'policyId', (select id from pol where name = 'down1'),
+    'steps', jsonb_build_array(
+      jsonb_build_object('level', 0, 'delayMin', 0, 'targets', array['owner'], 'channels', array['chat', 'space', 'email']),
+      jsonb_build_object('level', 1, 'delayMin', 15, 'targets', array['backup'], 'channels', array['chat']),
+      jsonb_build_object('level', 2, 'delayMin', 30, 'targets', array['admins'], 'channels', array['chat']))))),
+  '22023', 'Only L0 and L1 can be set for now', 'L2 and later wait for S10');
+select throws_ok(
+  format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, jsonb_build_array(jsonb_build_object(
+    'policyId', (select id from pol where name = 'down1'),
+    'steps', jsonb_build_array(jsonb_build_object('level', 0, 'targets', array['owner'], 'channels', array['chat']))))),
+  '22023', 'A step is missing its delay, people or channels', 'a step without a delay is refused cleanly');
+reset role;
+
+-- The engine's functions are the service role's only.
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok(format('select public.engine_fire_step(%L, 1::smallint, now())', (select id from inc where name = 'm')),
+  '42501', null, 'a signed-in Admin can''t fire a step');
+select throws_ok(format('select public.engine_remind(%L, now())', (select id from inc where name = 'm')),
+  '42501', null, 'or queue a reminder');
+reset role;
+select tests.as_anon();
+select throws_ok(format('select public.engine_fire_step(%L, 1::smallint, now())', (select id from inc where name = 'm')),
+  '42501', null, 'nor can anon');
+reset role;
 
 select * from finish();
 rollback;

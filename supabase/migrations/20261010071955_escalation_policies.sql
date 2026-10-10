@@ -169,11 +169,8 @@ as $$
   where p.severity = p_severity and (p.tier = p_tier or (p_severity = 'problem' and p.tier is null));
 $$;
 
--- Open incidents keep the policy as it is today.
-update public.incidents i
-  set escalation_plan = public.escalation_plan_for(s.tier, i.severity)
-  from public.sites s
-  where s.id = i.site_id and i.state not in ('resolved', 'in_review', 'closed');
+-- Incidents opened before S08 keep no plan, so the ladder never starts on them: an incident that
+-- opened days ago would otherwise page its backup the minute this ships.
 
 -- ── Open: the plan, and the PROBLEM hold ────────────────────────────────────
 -- S04b body, plus: the incident keeps its plan, and `p_hold_until` (a Tier 2–3 PROBLEM outside
@@ -275,7 +272,8 @@ begin
 end;
 $$;
 
--- A PROBLEM card (and its owner email) still held for response hours: never sent, never claimed.
+-- A PROBLEM card or PROBLEM AGAIN reply (and the owner email) still held for response hours: never
+-- sent, never claimed.
 create function public.engine_cancel_held_problem(p_incident_id uuid, p_reason text)
 returns integer
 language sql
@@ -284,8 +282,28 @@ as $$
   with c as (
     update public.notifications
       set status = 'cancelled', error = p_reason, next_retry_at = null
-      where incident_id = p_incident_id and template = 'problem'
+      where incident_id = p_incident_id and template in ('problem', 'problem_again')
         and status = 'queued' and attempts = 0 and hold_until > now()
+      returning 1
+  )
+  select count(*)::integer from c;
+$$;
+
+-- The ladder's messages still waiting (a step or reminder not yet claimed, or held back for a retry):
+-- an ack or a recovery stops the chain (spec §8), so they never go, and they don't hold ACKNOWLEDGED /
+-- RECOVERED back in the thread. One the notifier is sending right now (claimed, attempt not logged)
+-- goes.
+create function public.engine_cancel_ladder(p_incident_id uuid, p_reason text)
+returns integer
+language sql
+set search_path = ''
+as $$
+  with c as (
+    update public.notifications n
+      set status = 'cancelled', error = p_reason, next_retry_at = null
+      where n.incident_id = p_incident_id and n.template in ('step_fired', 'reminder')
+        and n.status = 'queued'
+        and n.attempts = (select count(*) from public.notification_attempts a where a.notification_id = n.id)
       returning 1
   )
   select count(*)::integer from c;
@@ -366,12 +384,15 @@ begin
       and n.attempts = (select count(*) from public.notification_attempts a where a.notification_id = n.id);
 
   perform public.engine_cancel_held_problem(p_incident_id, 'Superseded: recovered before response hours');
+  perform public.engine_cancel_ladder(p_incident_id, 'Superseded: recovered first');
 
-  -- Nothing to follow up when the thread never got (and won't get) an alert.
+  -- Nothing to follow up when the thread never got an alert: one went (or is going), or was tried and
+  -- set aside for a retry above — a held card cancelled before its hour never was (§19.6).
   v_notify := p_notify and exists (
     select 1 from public.notifications
-    where incident_id = p_incident_id and channel = 'google_chat' and status <> 'cancelled'
-      and template in ('down', 'problem', 'down_again', 'problem_again'));
+    where incident_id = p_incident_id and channel = 'google_chat'
+      and template in ('down', 'problem', 'down_again', 'problem_again')
+      and (status <> 'cancelled' or attempts > 0));
 
   if v_notify and p_hold_summary then
     insert into public.notifications
@@ -505,7 +526,159 @@ begin
 end;
 $$;
 
+-- ── Relapse: PROBLEM AGAIN waits for response hours too ─────────────────────
+-- S07 body (20261009120515), plus `p_hold_until`: a Tier 2–3 PROBLEM AGAIN outside response hours is
+-- held until the next opening like the first card (spec §7, §19.2), and cancelled with it if the site
+-- clears first. DOWN AGAIN always posts at once.
+drop function public.engine_relapse_incident(
+  uuid, public.severity, public.incident_trigger, timestamptz, timestamptz, timestamptz, jsonb,
+  boolean, boolean, jsonb, public.site_state);
+
+create function public.engine_relapse_incident(
+  p_incident_id uuid,
+  p_severity public.severity,
+  p_trigger public.incident_trigger,
+  p_started_at timestamptz,
+  p_detected_at timestamptz,
+  p_round_at timestamptz,
+  p_context jsonb,
+  p_flapping boolean,
+  p_notify boolean,
+  p_monitors jsonb default null,
+  p_status public.site_state default null,
+  p_hold_until timestamptz default null
+)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_site_id uuid;
+  v_from public.incident_state;
+  v_before public.severity;
+  v_to public.incident_state;
+  v_after public.severity;
+begin
+  select site_id, state, severity into v_site_id, v_from, v_before
+  from public.incidents
+  where id = p_incident_id
+    -- A DOWN never relapses a PROBLEM incident: that is engine_escalate_incident (D-021), which
+    -- writes the escalated_to_down event (S06 engine-review L2).
+    and not (p_severity = 'down' and severity = 'problem')
+    and (state in ('monitoring', 'needs_root_cause')
+         -- D-023: the DOWN ended, a key page carried on as a PROBLEM, and the home page fails again.
+         or (p_severity = 'down' and severity = 'down' and episode_severity = 'problem'
+             and state not in ('resolved', 'in_review', 'closed')))
+  for update;
+
+  if v_site_id is null then
+    return false;
+  end if;
+
+  update public.incidents
+    set severity = case when p_severity = 'down' then 'down'::public.severity else severity end,
+        episode_severity = p_severity,
+        recovered_at = null,
+        is_flapping = is_flapping or coalesce(p_flapping, false),
+        state = case when acked_at is not null then 'acknowledged'::public.incident_state
+                     when escalation_level > 0 then 'escalated'::public.incident_state
+                     else 'unacked'::public.incident_state end
+    where id = p_incident_id
+    returning state, severity into v_to, v_after;
+
+  insert into public.incident_events (incident_id, type, payload, at)
+  values (p_incident_id, 'relapsed',
+          coalesce(p_context, '{}') || jsonb_build_object(
+            'severity', p_severity, 'trigger', p_trigger, 'startedAt', p_started_at,
+            'flapping', coalesce(p_flapping, false)),
+          p_detected_at);
+
+  insert into public.audit_log (action, entity, entity_id, before, after)
+  values ('incident.relapsed', 'incident', p_incident_id,
+          jsonb_build_object('state', v_from, 'severity', v_before),
+          jsonb_build_object('state', v_to, 'severity', v_after, 'episode', p_severity));
+
+  update public.site_status
+    set ok_rounds = 0, last_evaluated_at = p_detected_at, last_round_at = p_round_at
+    where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
+
+  perform public.engine_record_flip(v_site_id, p_round_at, false);
+  perform public.engine_cancel_flap_summary(p_incident_id);
+
+  if p_notify then
+    insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key, hold_until)
+    values (p_incident_id, 'google_chat', p_severity::text || '_again', p_incident_id::text,
+            p_context, to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+            case when p_severity = 'problem' and p_hold_until > p_detected_at then p_hold_until end)
+    on conflict do nothing;
+  end if;
+
+  perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
+  return true;
+end;
+$$;
+
+-- ── Chat failed: no fallback for the ladder's chatter ───────────────────────
+-- S04b body, plus (D-034): a reminder is a Chat reply only, so its failure emails nobody; a step's
+-- Chat reply that failed after the ack (or the recovery) is old news, like a superseded DOWN. A
+-- step's own emails already went to its people, so the fallback reaches the others only.
+create or replace function public.queue_fallback_emails(p_notification_id uuid)
+returns integer
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  insert into public.notifications (incident_id, user_id, channel, template, thread_key, context, dedupe_key)
+  select n.incident_id, r.user_id, 'email', n.template, n.thread_key,
+         n.context || jsonb_build_object('fallback', true), n.dedupe_key
+  from public.notifications n
+  join public.incidents i on i.id = n.incident_id
+  join public.sites s on s.id = i.site_id
+  cross join lateral (
+    select b.id as user_id from public.profiles b where b.id = s.backup_owner_id and b.is_active
+    union
+    select p.id from public.profiles p where p.role = 'admin' and p.is_active
+    union
+    select a.id from public.profiles a
+    where n.template in ('down_again', 'problem_again') and a.is_active
+      and a.id = coalesce(i.acked_by, s.primary_owner_id)
+  ) r
+  where n.id = p_notification_id and n.channel = 'google_chat'
+    and n.template <> 'reminder'
+    and not (n.template in ('down', 'problem', 'step_fired') and i.state not in ('unacked', 'escalated'))
+    -- An AGAIN reply is old news once the site is back (Monitoring); it still counts while acknowledged.
+    and not (n.template in ('down_again', 'problem_again')
+             and i.state not in ('unacked', 'escalated', 'acknowledged'))
+    and not exists (
+      select 1 from public.notifications e
+      where e.incident_id = n.incident_id and e.channel = 'email' and e.template = n.template
+        and e.dedupe_key = n.dedupe_key and e.user_id = r.user_id and e.status <> 'cancelled'
+    )
+  on conflict do nothing;
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
 -- ── The ladder's writes ─────────────────────────────────────────────────────
+-- Whether the incident's thread has its first alert out (or going now): a Chat DOWN / PROBLEM /
+-- AGAIN that isn't cancelled — or was tried — and isn't waiting for response hours.
+create function public.engine_thread_live(p_incident_id uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.notifications
+    where incident_id = p_incident_id and channel = 'google_chat'
+      and template in ('down', 'problem', 'down_again', 'problem_again')
+      and (status <> 'cancelled' or attempts > 0)
+      and (hold_until is null or hold_until <= now()));
+$$;
+
 -- The people a step's tokens name for the incident's site: active profiles only, in token order,
 -- with the token that named them (the first, when two name the same person).
 create function public.escalation_people(p_incident_id uuid, p_targets jsonb)
@@ -570,6 +743,12 @@ begin
     return false;
   end if;
 
+  -- The thread needs its first alert: none for an incident opened while muted (mute stops new
+  -- alerts, §15.1), and none yet while a PROBLEM card waits for response hours (§19.2).
+  if not public.engine_thread_live(p_incident_id) then
+    return false;
+  end if;
+
   select s into v_step
   from jsonb_array_elements(v_inc.escalation_plan -> 'steps') s
   where (s ->> 'level')::smallint = p_level;
@@ -603,8 +782,11 @@ begin
   from public.escalation_people(p_incident_id, v_step -> 'targets') pe
   where pe.user_id = any (v_new);
 
+  -- Nobody new to tell (all told already, or not active): the level is passed, but nothing is posted
+  -- and the incident doesn't read "Escalated" (spec §14.3) for a step that paged no one.
   update public.incidents
-    set state = 'escalated', escalation_level = p_level
+    set state = case when cardinality(v_new) > 0 then 'escalated'::public.incident_state else state end,
+        escalation_level = p_level
     where id = p_incident_id;
 
   v_payload := jsonb_build_object(
@@ -657,7 +839,8 @@ declare
   v_id uuid;
 begin
   select * into v_inc from public.incidents where id = p_incident_id for update;
-  if not found or v_inc.state not in ('unacked', 'escalated') then
+  if not found or v_inc.state not in ('unacked', 'escalated') or v_inc.escalation_plan is null
+     or not public.engine_thread_live(p_incident_id) then
     return false;
   end if;
 
@@ -711,7 +894,8 @@ as $$
         where older.incident_id = notifications.incident_id and older.channel = notifications.channel
           and older.user_id is not distinct from notifications.user_id
           and older.status = 'queued' and older.created_at < notifications.created_at
-          and not (older.template in ('flap_summary', 'problem') and coalesce(older.hold_until > now(), false))
+          and not (older.template in ('flap_summary', 'problem', 'problem_again')
+                   and coalesce(older.hold_until > now(), false))
       )
     order by created_at
     limit p_limit
@@ -766,6 +950,8 @@ begin
           jsonb_build_object('state', 'acknowledged', 'acked_at', v_now));
 
   perform public.engine_cancel_held_problem(p_incident_id, 'Superseded: acknowledged first');
+  -- The chain stops (spec §8): a reminder or step still waiting never goes; Undo puts it back.
+  perform public.engine_cancel_ladder(p_incident_id, 'Superseded: acknowledged first');
 
   insert into public.notifications (incident_id, channel, template, thread_key, context, hold_until)
   select p_incident_id, 'google_chat', 'acknowledged', p_incident_id::text, v_context, v_hold
@@ -856,6 +1042,9 @@ begin
     raise exception 'Nothing to save' using errcode = '22023', hint = 'invalid';
   end if;
 
+  -- One save at a time, so the audit row's "before" is what this save changed.
+  perform 1 from public.organisation_settings where singleton for update;
+
   select jsonb_build_object(
     'policies', (select jsonb_agg(jsonb_build_object('severity', p.severity, 'tier', p.tier,
                    'steps', (select jsonb_agg(jsonb_build_object('level', s.level, 'delayMin', s.delay_min,
@@ -878,6 +1067,12 @@ begin
     for v_step in
       select s from jsonb_array_elements(v_pol -> 'steps') s order by (s ->> 'level')::integer
     loop
+      if jsonb_typeof(v_step -> 'level') is distinct from 'number'
+         or jsonb_typeof(v_step -> 'delayMin') is distinct from 'number'
+         or jsonb_typeof(v_step -> 'targets') is distinct from 'array'
+         or jsonb_typeof(v_step -> 'channels') is distinct from 'array' then
+        raise exception 'A step is missing its delay, people or channels' using errcode = '22023', hint = 'invalid';
+      end if;
       v_level := (v_step ->> 'level')::integer;
       v_delay := (v_step ->> 'delayMin')::integer;
       v_targets := array(select jsonb_array_elements_text(v_step -> 'targets'));
@@ -885,13 +1080,23 @@ begin
       if v_level is distinct from v_count then
         raise exception 'Steps must run L0, L1, … in order' using errcode = '22023', hint = 'levels';
       end if;
+      -- S08 edits L0–L1; L2 and later come with S10 (D-034).
+      if v_level > 1 then
+        raise exception 'Only L0 and L1 can be set for now' using errcode = '22023', hint = 'too_many_steps';
+      end if;
       if not (v_targets <@ array['owner', 'backup', 'admins', 'site_am', 'ceo']
               and v_channels <@ array['chat', 'space', 'email', 'voice']) then
         raise exception 'Unknown person or channel' using errcode = '22023', hint = 'invalid';
       end if;
-      if v_level = 0 and not (v_delay = 0 and 'owner' = any (v_targets)
-                              and v_channels @> array['chat', 'space']) then
+      -- L0 is the owner by Chat @mention, the Alerts Space and email, at once (PRD §8: locked) —
+      -- exactly what engine_open_incident sends, so "already told" at L1 is true.
+      if v_level = 0 and not (v_delay = 0 and v_targets = array['owner']
+                              and v_channels @> array['chat', 'space', 'email']
+                              and v_channels <@ array['chat', 'space', 'email']) then
         raise exception 'L0 is pinned on every policy' using errcode = '22023', hint = 'l0_pinned';
+      end if;
+      if v_delay > 10080 then
+        raise exception 'At most a week (10080 min)' using errcode = '22023', hint = 'step_too_late';
       end if;
       if cardinality(v_channels) = 0 then
         raise exception 'No channel ticked — this step notifies nobody.' using errcode = '22023', hint = 'no_channel';
@@ -909,7 +1114,8 @@ begin
       if 'voice' = any (v_channels) then
         raise exception 'Voice calls are off until approved' using errcode = '22023', hint = 'voice_off';
       end if;
-      if 'ceo' = any (v_targets) and not (v_policy.severity = 'down' and v_policy.tier = 1 and v_level >= 2) then
+      -- The CEO is paged only on Tier 1 DOWN from L2 (§15.5), which S10 builds.
+      if 'ceo' = any (v_targets) then
         raise exception 'The CEO can be paged only from L2 onward, on Tier 1 DOWN.'
           using errcode = '22023', hint = 'ceo_not_allowed';
       end if;
@@ -964,6 +1170,10 @@ revoke execute on function
   public.engine_open_incident(uuid, uuid, public.incident_trigger, public.severity, timestamptz,
     timestamptz, timestamptz, jsonb, boolean, jsonb, public.site_state, timestamptz),
   public.engine_cancel_held_problem(uuid, text),
+  public.engine_cancel_ladder(uuid, text),
+  public.engine_thread_live(uuid),
+  public.engine_relapse_incident(uuid, public.severity, public.incident_trigger, timestamptz,
+    timestamptz, timestamptz, jsonb, boolean, boolean, jsonb, public.site_state, timestamptz),
   public.escalation_people(uuid, jsonb),
   public.engine_fire_step(uuid, smallint, timestamptz, jsonb),
   public.engine_remind(uuid, timestamptz, jsonb)
@@ -973,6 +1183,10 @@ grant execute on function
   public.engine_open_incident(uuid, uuid, public.incident_trigger, public.severity, timestamptz,
     timestamptz, timestamptz, jsonb, boolean, jsonb, public.site_state, timestamptz),
   public.engine_cancel_held_problem(uuid, text),
+  public.engine_cancel_ladder(uuid, text),
+  public.engine_thread_live(uuid),
+  public.engine_relapse_incident(uuid, public.severity, public.incident_trigger, timestamptz,
+    timestamptz, timestamptz, jsonb, boolean, boolean, jsonb, public.site_state, timestamptz),
   public.escalation_people(uuid, jsonb),
   public.engine_fire_step(uuid, smallint, timestamptz, jsonb),
   public.engine_remind(uuid, timestamptz, jsonb)

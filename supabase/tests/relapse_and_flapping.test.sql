@@ -276,7 +276,7 @@ select is(
   'engine_monitor_status reads the active sites'' carries'
 );
 select ok(
-  not has_function_privilege('authenticated', 'public.engine_relapse_incident(uuid, public.severity, public.incident_trigger, timestamptz, timestamptz, timestamptz, jsonb, boolean, boolean, jsonb, public.site_state)', 'execute')
+  not has_function_privilege('authenticated', 'public.engine_relapse_incident(uuid, public.severity, public.incident_trigger, timestamptz, timestamptz, timestamptz, jsonb, boolean, boolean, jsonb, public.site_state, timestamptz)', 'execute')
   and not has_function_privilege('anon', 'public.engine_checks(timestamptz, timestamptz, uuid, integer)', 'execute')
   and has_function_privilege('service_role', 'public.engine_checks(timestamptz, timestamptz, uuid, integer)', 'execute'),
   'the new functions are the service role''s only'

@@ -575,6 +575,9 @@ isOneToOne: false
 "engine_cancel_held_problem":
 { Args: { "p_incident_id": string,"p_reason": string }; Returns: number
                            },
+"engine_cancel_ladder":
+{ Args: { "p_incident_id": string,"p_reason": string }; Returns: number
+                           },
 "engine_checks":
 { Args: { "p_after_checked_at"?: string,"p_after_id"?: string,"p_limit"?: number,"p_since": string }; Returns: {
               "akamai_ok": boolean | null,
@@ -643,13 +646,16 @@ isOneToOne: false
 { Args: { "p_auto_resolve"?: boolean,"p_context": Json,"p_flip_ok"?: boolean,"p_from": Database["public"]['Enums']["incident_state"],"p_hold_summary"?: boolean,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_recovered_at": string,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
                            },
 "engine_relapse_incident":
-{ Args: { "p_context": Json,"p_detected_at": string,"p_flapping": boolean,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: boolean
+{ Args: { "p_context": Json,"p_detected_at": string,"p_flapping": boolean,"p_hold_until"?: string,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: boolean
                            },
 "engine_remind":
 { Args: { "p_context"?: Json,"p_due_at": string,"p_incident_id": string }; Returns: boolean
                            },
 "engine_settle_incident":
 { Args: { "p_at": string,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_monitors"?: Json,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
+                           },
+"engine_thread_live":
+{ Args: { "p_incident_id": string }; Returns: boolean
                            },
 "engine_verify_jobs":
 { Args: { "p_since": string }; Returns: {
