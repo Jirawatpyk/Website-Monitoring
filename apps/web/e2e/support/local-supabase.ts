@@ -103,8 +103,10 @@ export async function signIn(context: BrowserContext, baseURL: string, email: st
 /**
  * Opens a DOWN incident (Chat + owner email queued, as the engine would) on a new site whose
  * primary owner is `ownerEmail`, so tests never compete for seeded sites. Returns the incident id.
+ * `ageMinutes` backdates it: an incident left unacked for hours ("since yesterday 14:10", "11 h 34 min
+ * unacked") is the longest copy a page has to fit.
  */
-export async function openTestIncident(ownerEmail: string): Promise<string> {
+export async function openTestIncident(ownerEmail: string, { ageMinutes = 2 } = {}): Promise<string> {
   const [owner] = (await admin(`/rest/v1/profiles?select=id&email=eq.${encodeURIComponent(ownerEmail)}`)) as {
     id: string;
   }[];
@@ -127,9 +129,9 @@ export async function openTestIncident(ownerEmail: string): Promise<string> {
       p_monitor_id: null,
       p_trigger: 'hard_fail',
       p_severity: 'down',
-      p_started_at: new Date(now - 120_000).toISOString(),
-      p_detected_at: new Date(now - 60_000).toISOString(),
-      p_round_at: new Date(now - 120_000).toISOString(),
+      p_started_at: new Date(now - ageMinutes * 60_000).toISOString(),
+      p_detected_at: new Date(now - (ageMinutes - 1) * 60_000).toISOString(),
+      p_round_at: new Date(now - ageMinutes * 60_000).toISOString(),
       p_context: { cause: 'HTTP 500 (SIN, TYO)', confirmingLocations: 2 },
       p_notify: true,
     }),
