@@ -124,6 +124,51 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"company_holidays": {
+                  Row: {
+                    "created_at": string,"day": string,"id": string,"name": string,"updated_at": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"day": string,"id"?: string,"name": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"day"?: string,"id"?: string,"name"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"escalation_policies": {
+                  Row: {
+                    "created_at": string,"id": string,"severity": Database["public"]['Enums']["severity"],"tier": number | null,"updated_at": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"severity": Database["public"]['Enums']["severity"],"tier"?: number | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"severity"?: Database["public"]['Enums']["severity"],"tier"?: number | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"escalation_steps": {
+                  Row: {
+                    "channels": (string)[],"created_at": string,"delay_min": number,"id": string,"level": number,"policy_id": string,"targets": (string)[],"updated_at": string
+                  }
+                  Insert: {
+                    "channels": (string)[],"created_at"?: string,"delay_min": number,"id"?: string,"level": number,"policy_id": string,"targets": (string)[],"updated_at"?: string
+                  }
+                  Update: {
+                    "channels"?: (string)[],"created_at"?: string,"delay_min"?: number,"id"?: string,"level"?: number,"policy_id"?: string,"targets"?: (string)[],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "escalation_steps_policy_id_fkey"
+      columns: ["policy_id"]
+isOneToOne: false
+      referencedRelation: "escalation_policies"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"incident_events": {
                   Row: {
                     "actor_id": string | null,"at": string,"id": string,"incident_id": string,"payload": NonNullable<Json>,"type": string
@@ -151,13 +196,13 @@ isOneToOne: false
                   ]
                 },"incidents": {
                   Row: {
-                    "acked_at": string | null,"acked_by": string | null,"auto_resolved": boolean,"client_update_due_at": string | null,"client_update_note": string | null,"client_update_required": boolean,"client_updated_at": string | null,"client_updated_by": string | null,"created_at": string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level": number,"id": string,"is_flapping": boolean,"is_manual": boolean,"monitor_id": string | null,"number": number,"recovered_at": string | null,"resolved_at": string | null,"resolved_by": string | null,"review_state": string | null,"root_cause": string | null,"root_cause_category": string | null,"root_cause_fix": string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state": Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at": string
+                    "acked_at": string | null,"acked_by": string | null,"auto_resolved": boolean,"client_update_due_at": string | null,"client_update_note": string | null,"client_update_required": boolean,"client_updated_at": string | null,"client_updated_by": string | null,"created_at": string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level": number,"escalation_plan": Json | null,"id": string,"is_flapping": boolean,"is_manual": boolean,"monitor_id": string | null,"number": number,"recovered_at": string | null,"resolved_at": string | null,"resolved_by": string | null,"review_state": string | null,"root_cause": string | null,"root_cause_category": string | null,"root_cause_fix": string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state": Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at": string
                   }
                   Insert: {
-                    "acked_at"?: string | null,"acked_by"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level"?: number,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state"?: Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
+                    "acked_at"?: string | null,"acked_by"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state"?: Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
                   }
                   Update: {
-                    "acked_at"?: string | null,"acked_by"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at"?: string,"episode_severity"?: Database["public"]['Enums']["severity"],"escalation_level"?: number,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity"?: Database["public"]['Enums']["severity"],"site_id"?: string,"started_at"?: string,"state"?: Database["public"]['Enums']["incident_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
+                    "acked_at"?: string | null,"acked_by"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at"?: string,"episode_severity"?: Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity"?: Database["public"]['Enums']["severity"],"site_id"?: string,"started_at"?: string,"state"?: Database["public"]['Enums']["incident_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -285,6 +330,19 @@ isOneToOne: false
       referencedRelation: "profiles"
       referencedColumns: ["id"]
     }
+                  ]
+                },"organisation_settings": {
+                  Row: {
+                    "created_at": string,"down_reminder_min": number,"id": string,"problem_reminder_min": number,"response_days": (number)[],"response_end": string,"response_start": string,"singleton": boolean,"updated_at": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"down_reminder_min"?: number,"id"?: string,"problem_reminder_min"?: number,"response_days"?: (number)[],"response_end"?: string,"response_start"?: string,"singleton"?: boolean,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"down_reminder_min"?: number,"id"?: string,"problem_reminder_min"?: number,"response_days"?: (number)[],"response_end"?: string,"response_start"?: string,"singleton"?: boolean,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
                   ]
                 },"probe_locations": {
                   Row: {
@@ -514,6 +572,12 @@ isOneToOne: false
 "engine_cancel_flap_summary":
 { Args: { "p_incident_id": string }; Returns: undefined
                            },
+"engine_cancel_held_problem":
+{ Args: { "p_incident_id": string,"p_reason": string }; Returns: number
+                           },
+"engine_cancel_ladder":
+{ Args: { "p_incident_id": string,"p_reason": string }; Returns: number
+                           },
 "engine_checks":
 { Args: { "p_after_checked_at"?: string,"p_after_id"?: string,"p_limit"?: number,"p_since": string }; Returns: {
               "akamai_ok": boolean | null,
@@ -544,6 +608,9 @@ isOneToOne: false
 "engine_escalate_incident":
 { Args: { "p_context": Json,"p_detected_at": string,"p_flapping"?: boolean,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"] }; Returns: boolean
                            },
+"engine_fire_step":
+{ Args: { "p_context"?: Json,"p_due_at": string,"p_incident_id": string,"p_level": number }; Returns: boolean
+                           },
 "engine_monitor_status":
 { Args: Record<PropertyKey, never>; Returns: {
               "cause": string | null,
@@ -567,7 +634,7 @@ isOneToOne: false
 { Args: { "p_note"?: string,"p_round_at": string,"p_site_id": string }; Returns: undefined
                            },
 "engine_open_incident":
-{ Args: { "p_context": Json,"p_detected_at": string,"p_monitor_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
+{ Args: { "p_context": Json,"p_detected_at": string,"p_hold_until"?: string,"p_monitor_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
                            },
 "engine_record_flip":
 { Args: { "p_ok": boolean,"p_round_at": string,"p_site_id": string }; Returns: undefined
@@ -579,10 +646,16 @@ isOneToOne: false
 { Args: { "p_auto_resolve"?: boolean,"p_context": Json,"p_flip_ok"?: boolean,"p_from": Database["public"]['Enums']["incident_state"],"p_hold_summary"?: boolean,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_recovered_at": string,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
                            },
 "engine_relapse_incident":
-{ Args: { "p_context": Json,"p_detected_at": string,"p_flapping": boolean,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: boolean
+{ Args: { "p_context": Json,"p_detected_at": string,"p_flapping": boolean,"p_hold_until"?: string,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: boolean
+                           },
+"engine_remind":
+{ Args: { "p_context"?: Json,"p_due_at": string,"p_incident_id": string }; Returns: boolean
                            },
 "engine_settle_incident":
 { Args: { "p_at": string,"p_from": Database["public"]['Enums']["incident_state"],"p_incident_id": string,"p_monitors"?: Json,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_to": Database["public"]['Enums']["incident_state"] }; Returns: boolean
+                           },
+"engine_thread_live":
+{ Args: { "p_incident_id": string }; Returns: boolean
                            },
 "engine_verify_jobs":
 { Args: { "p_since": string }; Returns: {
@@ -614,6 +687,14 @@ isOneToOne: false
 "engine_write_monitors":
 { Args: { "p_monitors": Json,"p_round_at": string,"p_site_id": string,"p_status": Database["public"]['Enums']["site_state"] }; Returns: undefined
                            },
+"escalation_people":
+{ Args: { "p_incident_id": string,"p_targets": Json }; Returns: {
+              "chat_user_id": string,"token": string,"user_id": string
+            }[]
+                           },
+"escalation_plan_for":
+{ Args: { "p_severity": Database["public"]['Enums']["severity"],"p_tier": number }; Returns: Json
+                           },
 "expire_verification_jobs":
 { Args: Record<PropertyKey, never>; Returns: number
                            },
@@ -644,6 +725,9 @@ isOneToOne: false
                            },
 "resolve_incident":
 { Args: { "p_category": string,"p_fix": string,"p_incident_id": string,"p_what": string }; Returns: string
+                           },
+"save_escalation_policies":
+{ Args: { "p_down_reminder_min": number,"p_note": string,"p_policies": Json,"p_problem_reminder_min": number }; Returns: undefined
                            },
 "save_monitors":
 { Args: { "p_removals"?: (string)[],"p_site_id": string,"p_upserts": Json }; Returns: undefined
