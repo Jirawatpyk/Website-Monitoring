@@ -115,3 +115,17 @@ export function scenario(
     rows,
   };
 }
+
+const DAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+/** "Mon–Fri 09:00–18:00" from the organisation's response hours. */
+export function hoursLabel(h: EscalationPageData['hours']): string {
+  const days = [...h.days].sort();
+  const run = days.every((d, i) => i === 0 || d === days[i - 1]! + 1);
+  const dayText =
+    run && days.length > 1
+      ? `${DAY[days[0]! - 1]}–${DAY[days.at(-1)! - 1]}`
+      : days.map((d) => DAY[d - 1]).join(', ');
+  return `${dayText} ${hm(h.startMin)}–${hm(h.endMin)}`;
+}

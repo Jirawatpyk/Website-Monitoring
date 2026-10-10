@@ -81,7 +81,7 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         icon: <IconArrowUpRight />,
         href: '/escalation',
         slice: 'S08',
-        live: false,
+        live: true,
       },
     ],
   },

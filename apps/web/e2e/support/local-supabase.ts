@@ -155,6 +155,12 @@ export async function siteAudit(siteId: string): Promise<{ action: string; actor
   return rows.map((r) => ({ action: r.action, actor: r.actor?.email ?? null }));
 }
 
+/** How many escalation saves the audit log holds (S08: one row per save, with the note). */
+export async function escalationAudit(): Promise<number> {
+  const rows = (await admin(`/rest/v1/audit_log?select=id&action=eq.escalation.update`)) as unknown[];
+  return rows.length;
+}
+
 /**
  * Recovers the test incident and settles it (two OK rounds), as the engine would: it reaches Needs
  * root cause (or stays in Monitoring when a root cause was written first) and Resolve opens (S07).
