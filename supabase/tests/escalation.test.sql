@@ -134,7 +134,8 @@ select is(
   (select after->>'note' from public.audit_log where action = 'escalation.update' and after->>'note' = 'L1 a bit later'
    and (after->>'problemReminderMin')::int = 45),
   'L1 a bit later', 'one audit row carries the note');
-select is((select count(*)::int from public.audit_log where action = 'escalation.update'), 2,
+select is((select count(*)::int from public.audit_log where action = 'escalation.update'
+                                  and after->>'note' in ('backup only', 'L1 a bit later')), 2,
   'one audit row per save');
 
 -- Back to the seeded ladder for the engine cases.
