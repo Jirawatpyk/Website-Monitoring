@@ -74,7 +74,7 @@ export function useAckToast({ ack, undo }: { ack: AckAction; undo: UndoAction })
             router.refresh();
           });
         const left = new Date(result.postsAt).getTime() - Date.now();
-        toast.success(`Acknowledged ${id}`, {
+        toast.success(`Acknowledged ${id} · escalation stopped`, {
           id: toastId,
           description: <UndoLine postsAt={result.postsAt} onUndo={onUndo} />,
           // the window, then a moment to read "Posted"

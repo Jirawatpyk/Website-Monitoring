@@ -309,6 +309,9 @@ export interface ListKpis {
   openCaption: string;
   unacked: number;
   unackedCaption: string;
+  /** Escalated (a step paged someone, S08) and still not acknowledged. */
+  escalated: number;
+  escalatedCaption: string;
   needsRootCause: number;
   needsRootCauseCaption: string;
   /** MTTA as the Overview counts it (D-032): null until 3 DOWN incidents in 30 days. */
@@ -341,6 +344,8 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
   const kpis = responseKpis(list.map(toMetric), from, now);
   const recent = list.filter((i) => new Date(i.downStartedAt ?? i.startedAt) >= from);
   const first = unacked[0];
+  const escalated = sortIncidents(open.filter((i) => i.state === 'escalated'));
+  const firstEscalated = escalated[0];
   return {
     open: open.length,
     openCaption: open.length
@@ -357,6 +362,10 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
     unackedCaption: first
       ? `${first.siteName} · ${formatDuration(minutesBetween(first.detectedAt, now))} unacked`
       : 'Nobody waiting',
+    escalated: escalated.length,
+    escalatedCaption: firstEscalated
+      ? `${firstEscalated.siteName} · ${formatDuration(minutesBetween(firstEscalated.detectedAt, now))} unacked`
+      : 'None escalated',
     needsRootCause: rc.length,
     needsRootCauseCaption: rc[0] ? `${rc[0].siteName} · recovered, not resolved` : 'None waiting',
     mttaSeconds: kpis.mttaSeconds,
@@ -521,6 +530,7 @@ export interface TimelineItem {
     | 'note'
     | 'root_cause'
     | 'resolved'
+    | 'escalated'
     | 'undone';
   title: string;
   detail: string | null;
@@ -690,6 +700,32 @@ export function timelineOf(
       case 'escalated_to_down':
         item(e, 'down', 'PROBLEM became DOWN', str(e.payload.cause));
         return;
+      case 'step_fired': {
+        // S08 (D-034): who the step asked (@mentioned) and told FYI, in the thread and by email.
+        const ids = (k: string) =>
+          (Array.isArray(e.payload[k]) ? (e.payload[k] as unknown[]) : []).filter(
+            (x): x is string => typeof x === 'string',
+          );
+        const asked = ids('mentioned').map((id) => nameOf(id));
+        const fyi = ids('fyi').map((id) => nameOf(id));
+        const level = num(e.payload.level) ?? 1;
+        if (!ids('notified').length) {
+          item(
+            e,
+            'escalated',
+            `L${level} reached — nobody new to tell`,
+            'Everyone on this step was already told.',
+          );
+          return;
+        }
+        const words = [
+          ...asked.map((n) => `@${n}`),
+          ...(asked.length ? ['please acknowledge'] : []),
+          ...(fyi.length ? [`${fyi.join(' and ')} FYI`] : []),
+        ].join(' · ');
+        item(e, 'escalated', `Escalated to L${level} — not acknowledged`, `“${words}” in the thread + email`);
+        return;
+      }
       case 'note':
         item(e, 'note', `Note by ${by}`, str(e.payload.text));
         return;

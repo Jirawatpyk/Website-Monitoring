@@ -79,10 +79,9 @@ const show = (initialView?: 'unacked', viewer: { id: string; role: Role } = ADMI
   );
 
 describe('Incidents list (Incidents, MIncidents, D-033)', () => {
-  it('KPIs: Unacked (not "Escalated, not acked" until S08) and MTTA / MTTR wait for 3 DOWN incidents', () => {
+  it('KPIs: "Escalated, not acked" (S08, D-034) and MTTA / MTTR wait for 3 DOWN incidents', () => {
     show();
-    expect(screen.getAllByText('Unacked').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Escalated, not acked')).toBeNull();
+    expect(screen.getByText('Escalated, not acked')).toBeInTheDocument();
     expect(screen.getAllByText('Not enough incidents yet')).toHaveLength(2);
   });
 

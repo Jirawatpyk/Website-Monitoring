@@ -1,5 +1,6 @@
 import { Card, Table, TBody, Td, Th, THead, Tr } from '@jirawatpyk/aura-react';
 import {
+  IconArrowUpRight,
   IconBan,
   IconBell,
   IconCheck,
@@ -41,6 +42,7 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   note: { icon: <IconPencil />, tone: 'text-fg-secondary' },
   root_cause: { icon: <IconPencil />, tone: 'text-fg-warning' },
   resolved: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
+  escalated: { icon: <IconArrowUpRight />, tone: 'text-fg-warning' },
   undone: { icon: <IconRotateCcw />, tone: 'text-fg-secondary' },
 };
 

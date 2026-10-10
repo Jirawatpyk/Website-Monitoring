@@ -407,7 +407,7 @@ export function tileState(
 const dropSeverity = (e: OverviewEvent) =>
   e.payload.severity === 'down' || e.payload.severity === 'problem' ? e.payload.severity : e.severity;
 
-/** Recent events wording (Main3); null = not shown. No escalation copy until S08 (D-032). */
+/** Recent events wording (Main3); null = not shown. Escalation copy from S08 (L1 only, D-034). */
 export function eventLine(e: OverviewEvent): string | null {
   const inc = formatIncidentId(e.incidentNumber);
   const where = typeof e.payload.confirmingLocations === 'number' ? e.payload.confirmingLocations : null;
@@ -421,7 +421,7 @@ export function eventLine(e: OverviewEvent): string | null {
     case 'escalated_to_down':
       return confirmed;
     case 'acknowledged':
-      return `${inc} acked by ${e.actorName ?? 'someone'}`;
+      return `${inc} acked by ${e.actorName ?? 'someone'} — escalation stopped`;
     case 'ack_undone':
       return `${inc} acknowledgement undone by ${e.actorName ?? 'someone'}`;
     case 'recovered':
@@ -432,6 +432,12 @@ export function eventLine(e: OverviewEvent): string | null {
         : `${e.siteName} back to OK`;
     case 'auto_resolved':
       return `${e.siteName} back to OK — resolved automatically`;
+    case 'step_fired': {
+      // A step that told nobody new isn't news (D-034).
+      const told = Array.isArray(e.payload.notified) ? e.payload.notified.length : 0;
+      const level = typeof e.payload.level === 'number' ? e.payload.level : 1;
+      return told ? `${inc} escalated to L${level} — not acknowledged` : null;
+    }
     case 'relapsed':
       return `${e.siteName} ${dropSeverity(e) === 'down' ? 'DOWN' : 'PROBLEM'} again`;
     default:
@@ -448,6 +454,7 @@ export const EVENT_TYPES = [
   'recovered',
   'auto_resolved',
   'relapsed',
+  'step_fired',
 ] as const;
 
 /** Newest first, at most `max` (Main3: 7); events only grow (§16.11). */
