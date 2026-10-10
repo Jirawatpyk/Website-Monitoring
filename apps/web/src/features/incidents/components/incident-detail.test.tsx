@@ -282,6 +282,67 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     expect(within(dialog).getByRole('button', { name: 'Save, keep open' })).toBeEnabled();
     expect(within(dialog).getAllByText('Unknown keeps the incident open').length).toBeGreaterThan(0);
   });
+
+  it('header and facts: the cause says since when it is OK; confirmed by an immediate recheck; Resolve summary says "Down"', () => {
+    show(detail({ events: settled }));
+    expect(screen.getByText('HTTP 502 (BKK, SIN, TYO) · OK since 22:22')).toBeInTheDocument();
+    expect(screen.getByText('Immediate recheck · MTTD 30 s')).toBeInTheDocument();
+    fireEvent.click(resolveButton());
+    const dialog = screen.getByRole('dialog', { name: 'Resolve incident' });
+    expect(within(dialog).getByText('Down')).toBeInTheDocument();
+  });
+
+  it('resolved: the card says who, how long and why (MIncident)', () => {
+    const d = detail({
+      events: settled,
+      rootCause: { category: 'hosting', what: 'Host rebooted', fix: null },
+    });
+    show({
+      ...d,
+      state: 'resolved',
+      view: { ...d.view, state: 'resolved' },
+      resolved: { by: 'Tao', byViewer: true, at: NOW, postsAt: NOW, posted: NOW },
+    });
+    expect(
+      screen.getAllByText('Resolved by Tao · ORCA Thailand was down 8 min · root cause: Hosting / server.')
+        .length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('conditions say Met / Not met in words beside the icon (MIncident)', () => {
+    show(detail({ events: settled }));
+    fireEvent.click(resolveButton());
+    const dialog = screen.getByRole('dialog', { name: 'Resolve incident' });
+    expect(within(dialog).getAllByText('Met')).toHaveLength(2);
+    expect(within(dialog).getByText('Not met')).toBeInTheDocument();
+  });
+
+  it('Root cause once recovered: "Save root cause", the board foot line; a failed save says to fix the fields', () => {
+    show(detail({ events: settled }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Write root cause' })[0]!);
+    const dialog = screen.getByRole('dialog', { name: 'Root cause' });
+    expect(
+      within(dialog).getByText(
+        'Saving meets the root-cause condition. Resolve stays a separate, manual step.',
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save root cause' }));
+    expect(within(dialog).getByText('Fix the highlighted fields to save.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Signed in as tao@example.test')).toBeInTheDocument();
+  });
+
+  it('resolved a DOWN: the email row names the DOWN recipients; the sentence ends with a full stop', async () => {
+    m.resolveIncident.mockResolvedValue({ ok: true, postsAt: new Date(Date.now() + 10_000).toISOString() });
+    show(detail({ events: settled, rootCause: { category: 'dns', what: 'Record removed', fix: null } }));
+    fireEvent.click(resolveButton());
+    const dialog = screen.getByRole('dialog', { name: 'Resolve incident' });
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Resolve incident' })));
+    const done = await screen.findByRole('dialog', { name: 'Incident resolved' });
+    expect(
+      within(done).getByText('Resolved email to the DOWN recipients · held for undo'),
+    ).toBeInTheDocument();
+    expect(within(done).getAllByText(/nothing is sent until then\.$/).length).toBeGreaterThan(0);
+  });
 });
 
 describe('Incident page — roles that can’t acknowledge (D-016)', () => {

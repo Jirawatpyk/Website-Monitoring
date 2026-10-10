@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { activeNavId, NAV_SECTIONS } from './nav';
+import { activeNavId, bottomNavWithCounts, NAV_SECTIONS } from './nav';
 
 const appDir = path.resolve(import.meta.dirname, '../../app');
 
@@ -33,5 +33,16 @@ describe('activeNavId', () => {
     ['/overview-x', null],
   ])('%s → %s', (pathname, expected) => {
     expect(activeNavId(pathname)).toBe(expected);
+  });
+});
+
+describe('bottomNavWithCounts', () => {
+  it('puts the open-incident count on Incidents, as the phone boards draw it; 0 shows none', () => {
+    expect(bottomNavWithCounts({ incidents: 3 }).find((i) => i.id === 'incidents')).toMatchObject({
+      count: 3,
+    });
+    expect(bottomNavWithCounts({ incidents: 0 }).find((i) => i.id === 'incidents')).not.toHaveProperty(
+      'count',
+    );
   });
 });

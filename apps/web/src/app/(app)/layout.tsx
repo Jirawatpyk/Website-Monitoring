@@ -39,7 +39,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         />
       }
       // The phone boards' sections below lg (D-018, D-031); the menu drawer stays for the rest.
-      bottomNav={<PhoneNav />}
+      bottomNav={<PhoneNav counts={{ incidents: incidents ?? undefined }} />}
     >
       <OfflineStrip />
       {children}

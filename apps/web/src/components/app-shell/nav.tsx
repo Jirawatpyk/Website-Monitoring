@@ -163,6 +163,13 @@ export const BOTTOM_NAV_ITEMS = PHONE_SECTIONS.flatMap((id) => {
   return entry?.live ? [{ id: entry.id, label: entry.label, icon: entry.icon, href: entry.href }] : [];
 });
 
+/** The BottomNav items with the open-incident count on Incidents (MIncidents, MOverview; 0 isn't shown). */
+export function bottomNavWithCounts(counts: NavCounts) {
+  return BOTTOM_NAV_ITEMS.map((item) =>
+    item.id === 'incidents' && counts.incidents ? { ...item, count: counts.incidents } : item,
+  );
+}
+
 /**
  * The nav item for the current path (SideNav `value`): exact match or a sub-page, longest href wins;
  * `/` only matches itself. Null when no shown item owns the page.

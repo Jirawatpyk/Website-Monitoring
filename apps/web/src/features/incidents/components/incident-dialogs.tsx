@@ -93,9 +93,17 @@ function check(v: RootCauseValue): Partial<Record<Field, string>> {
 
 export interface DialogIncident {
   incidentId: string;
+  /** "INC-0139" */
+  label: string;
+  severity: 'down' | 'problem';
   /** "INC-0139 · ORCA Thailand · Tier 2 · owner Tao" */
   description: string;
   stillDown: boolean;
+}
+
+/** "Signed in as arm@…" under a phone dialog's fields (MIncident). */
+function SignedInAs({ email }: { email: string }) {
+  return <p className="m-0 text-xs text-fg-secondary md:hidden">{`Signed in as ${email}`}</p>;
 }
 
 // ── Add note ─────────────────────────────────────────────────────────────
@@ -105,6 +113,7 @@ export function AddNoteDialog({
   incidentLabel,
   siteName,
   viewerName,
+  viewerEmail,
   open,
   onClose,
 }: {
@@ -112,6 +121,7 @@ export function AddNoteDialog({
   incidentLabel: string;
   siteName: string;
   viewerName: string;
+  viewerEmail: string;
   open: boolean;
   onClose: () => void;
 }) {
@@ -161,6 +171,7 @@ export function AddNoteDialog({
           placeholder="e.g. Host says the app server is restarting"
           error={error ?? undefined}
         />
+        <SignedInAs email={viewerEmail} />
       </div>
     </Dialog>
   );
@@ -171,11 +182,13 @@ export function AddNoteDialog({
 export function RootCauseDialog({
   incident,
   initial,
+  viewerEmail,
   open,
   onClose,
 }: {
   incident: DialogIncident;
   initial: RootCauseValue;
+  viewerEmail: string;
   open: boolean;
   onClose: () => void;
 }) {
@@ -184,9 +197,11 @@ export function RootCauseDialog({
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [tried, setTried] = useState(false);
   const submit = () => {
     const found = check(value);
     setErrors(found);
+    setTried(true);
     if (Object.keys(found).length) return;
     start(async () => {
       setFailure(null);
@@ -213,16 +228,24 @@ export function RootCauseDialog({
       description={incident.description}
       footer={
         <>
-          <span className="mr-auto text-xs text-fg-secondary">
-            {value.category === UNKNOWN_ROOT_CAUSE
-              ? 'Saves your notes · Unknown keeps the incident open — it doesn’t meet the root-cause condition.'
-              : 'Saving records it on the timeline. Resolve unlocks when all 3 conditions are met.'}
+          <span
+            className={`mr-auto text-xs ${tried && Object.keys(errors).length ? 'text-fg-danger' : 'text-fg-secondary'}`}
+          >
+            {tried && Object.keys(errors).length
+              ? 'Fix the highlighted fields to save.'
+              : value.category === UNKNOWN_ROOT_CAUSE
+                ? 'Saves your notes · Unknown keeps the incident open — it doesn’t meet the root-cause condition.'
+                : incident.stillDown
+                  ? 'Same form as Resolve. Saving records a draft on the timeline; Resolve unlocks when all 3 conditions are met.'
+                  : 'Saving meets the root-cause condition. Resolve stays a separate, manual step.'}
           </span>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="primary" icon={<IconPencil />} loading={pending} onClick={submit}>
-            Save, keep open
+            {incident.stillDown || value.category === UNKNOWN_ROOT_CAUSE
+              ? 'Save, keep open'
+              : 'Save root cause'}
           </Button>
         </>
       }
@@ -234,6 +257,7 @@ export function RootCauseDialog({
           </Alert>
         )}
         <RootCauseFields value={value} onChange={setValue} errors={errors} stillDown={incident.stillDown} />
+        <SignedInAs email={viewerEmail} />
       </div>
     </Dialog>
   );
@@ -246,11 +270,11 @@ type ResolveDone =
 
 const CondIcon = ({ met }: { met: boolean }) =>
   met ? (
-    <span className="flex text-fg-positive" role="img" aria-label="Met">
+    <span className="flex text-fg-positive" aria-hidden>
       <IconCircleCheck className="size-4" />
     </span>
   ) : (
-    <span className="flex text-fg-tertiary" role="img" aria-label="Not met">
+    <span className="flex text-fg-tertiary" aria-hidden>
       <IconCircle className="size-4" />
     </span>
   );
@@ -263,9 +287,12 @@ export function ConditionList({ conditions }: { conditions: Condition[] }) {
           <span className="pt-0.5">
             <CondIcon met={c.met} />
           </span>
-          <span className="flex flex-col">
+          <span className="flex min-w-0 grow flex-col">
             <span className="font-medium">{c.label}</span>
             <span className="text-xs text-fg-secondary">{c.detail}</span>
+          </span>
+          <span className={`shrink-0 text-xs font-medium ${c.met ? 'text-fg-positive' : 'text-fg-tertiary'}`}>
+            {c.met ? 'Met' : 'Not met'}
           </span>
         </li>
       ))}
@@ -474,26 +501,41 @@ export function ResolveDialog({
         <div className="flex flex-col gap-2">
           <p role="status" className="sr-only">
             {postedAt
-              ? `Posted to Chat and email at ${formatTimeWithSeconds(new Date(postedAt))}`
-              : 'Resolved. Posting to Chat and email in a few seconds — nothing is sent until then'}
+              ? `Posted to Chat and email ${formatTimeWithSeconds(new Date(postedAt))}.`
+              : 'Resolved. Posting to Chat and email in a few seconds — nothing is sent until then.'}
           </p>
-          <p ref={doneTitle} tabIndex={-1} className={`m-0 text-base font-semibold ${FOCUS_TARGET}`}>
-            {`Resolved at ${formatTime(done.at)} by ${viewerName}`}
-          </p>
-          <p className="m-0 text-sm text-fg-secondary">
-            {`Root cause: ${label(done.category)}. ${lasted ? `${lasted}. ` : ''}`}
-            {seconds > 0
-              ? `Posting to Chat and email in ${seconds} s — nothing is sent until then`
-              : postedAt
-                ? `Posted to Chat and email at ${formatTimeWithSeconds(new Date(postedAt))}`
-                : POST_WAIT_WORDS[postOverdue]}
-          </p>
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+          <div className="flex items-start gap-3">
+            <span
+              className="flex size-11 shrink-0 items-center justify-center rounded-aura-full bg-alert-success-bg text-fg-positive"
+              aria-hidden
+            >
+              <IconCircleCheck className="size-5" />
+            </span>
+            <div className="flex min-w-0 flex-col gap-1">
+              <p ref={doneTitle} tabIndex={-1} className={`m-0 text-base font-semibold ${FOCUS_TARGET}`}>
+                {`Resolved at ${formatTime(done.at)} by ${viewerName}`}
+              </p>
+              <p className="m-0 text-sm text-fg-secondary">
+                {`Root cause: ${label(done.category)}. ${lasted ? `${lasted}. ` : ''}`}
+                {seconds > 0
+                  ? `Posting to Chat and email in ${seconds} s — nothing is sent until then.`
+                  : postedAt
+                    ? `Posted to Chat and email ${formatTimeWithSeconds(new Date(postedAt))}.`
+                    : POST_WAIT_WORDS[postOverdue]}
+              </p>
+            </div>
+          </div>
+          <ul className="m-0 flex list-none flex-col divide-y divide-border-subtle rounded-aura-md border border-border-default p-0 text-sm">
             {[
               ['Resolved reply to the Chat thread', 'Resolved reply posted in the Chat thread'],
-              ['Resolved email to everyone emailed about it', 'Resolved email sent in the incident thread'],
+              [
+                incident.severity === 'down'
+                  ? 'Resolved email to the DOWN recipients'
+                  : 'Resolved email to everyone emailed about it',
+                'Resolved email sent in the incident thread',
+              ],
             ].map(([held, sent]) => (
-              <li key={held} className="flex items-start gap-2">
+              <li key={held} className="flex items-start gap-2 px-aura-3 py-2">
                 <span
                   className={`flex pt-0.5 ${postedAt ? 'text-fg-positive' : 'text-fg-secondary'}`}
                   aria-hidden
@@ -521,16 +563,24 @@ export function ResolveDialog({
           </ul>
         </div>
       ) : done?.kind === 'kept' ? (
-        <div className="flex flex-col gap-2">
-          <p
-            ref={doneTitle}
-            tabIndex={-1}
-            role="status"
-            className={`m-0 text-base font-semibold ${FOCUS_TARGET}`}
-          >{`Saved at ${formatTime(done.at)} by ${viewerName} — still open`}</p>
-          <p className="m-0 text-sm text-fg-secondary">
-            It stays in “Needs root cause”. Notes are saved; pick a category when you know more.
-          </p>
+        <div className="flex items-start gap-3">
+          <span
+            className="flex size-11 shrink-0 items-center justify-center rounded-aura-full bg-alert-warning-bg text-alert-warning-fg"
+            aria-hidden
+          >
+            <IconPencil className="size-5" />
+          </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <p
+              ref={doneTitle}
+              tabIndex={-1}
+              role="status"
+              className={`m-0 text-base font-semibold ${FOCUS_TARGET}`}
+            >{`Saved at ${formatTime(done.at)} by ${viewerName} — still open`}</p>
+            <p className="m-0 text-sm text-fg-secondary">
+              {`${incident.label} stays in “Needs root cause”. Notes are saved; pick a category when you know more.`}
+            </p>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col gap-5">

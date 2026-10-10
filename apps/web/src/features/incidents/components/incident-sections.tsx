@@ -55,7 +55,7 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
     {
       label: d.severity === 'down' ? 'CONFIRMED DOWN' : 'DETECTED',
       value: formatTimeWithSeconds(confirmedAt),
-      caption: `MTTD ${formatDurationSeconds(d.detectSeconds)}`,
+      caption: `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
     },
     {
       label: 'DURATION',
@@ -72,7 +72,9 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
     },
     {
       label: 'ACKNOWLEDGED',
-      value: d.acked ? d.acked.by : '—',
+      value: d.acked
+        ? `${d.acked.by}${d.view.ack.kind === 'acked' && d.view.ack.byViewer ? ' (you)' : ''}`
+        : '—',
       caption: d.acked
         ? `${formatTimeWithSeconds(new Date(d.acked.at))} · ${formatDuration(
             Math.max(1, Math.round((Date.parse(d.acked.at) - confirmedAt.getTime()) / 60_000)),
@@ -116,7 +118,7 @@ function CheckText({ cell, location }: { cell: CheckCell | null; location: strin
 function GlyphLegend() {
   return (
     <ul className="m-0 mt-3 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-fg-secondary">
-      {GLYPH_LEGEND.filter((k) => k !== 'slow' && k !== 'none').map((k) => (
+      {GLYPH_LEGEND.map((k) => (
         <li key={k} className="flex items-center gap-1">
           <span className={`flex [&_svg]:size-3.5 ${GLYPHS[k].tone}`} aria-hidden>
             {GLYPHS[k].icon}
@@ -131,12 +133,12 @@ function GlyphLegend() {
 export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
   const latest = d.locations.filter((l) => l.latest);
   if (!latest.length) return null;
-  const fails = latest.filter((l) => l.latest!.glyph !== 'pass').length;
+  const at = latestRoundAt(d);
   return (
     <Card
-      title="Latest round"
+      title={at ? `Latest round · ${formatTimeWithSeconds(new Date(at))}` : 'Latest round'}
       headingLevel={2}
-      description={fails ? `${fails}/${latest.length} failing` : `${latest.length}/${latest.length} pass`}
+      description={roundVerdict(latest.map((l) => l.latest!.glyph))}
     >
       <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
         {latest.map((l) => (
@@ -185,13 +187,15 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
             <Th>Location</Th>
             <Th>{`First check · ${formatTimeWithSeconds(new Date(d.startedAt))}`}</Th>
             <Th>{`Recheck · ${formatTimeWithSeconds(new Date(d.detectedAt))}`}</Th>
-            <Th>Latest</Th>
+            <Th>
+              {latestRoundAt(d) ? `Latest · ${formatTimeWithSeconds(new Date(latestRoundAt(d)!))}` : 'Latest'}
+            </Th>
           </Tr>
         </THead>
         <TBody>
           {d.locations.map((l) => (
             <Tr key={l.location}>
-              <Td className="font-medium">{l.location}</Td>
+              <Td className="font-medium">{LOCATION_LABELS[l.location]}</Td>
               {[l.first, l.recheck, l.latest].map((c, n) => (
                 <Td key={n}>
                   <CheckText cell={c} location={l.location} />
@@ -206,6 +210,43 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
   );
 }
 
+/** Where each location checks from, as the Incident board labels its rows. */
+const LOCATION_LABELS: Record<string, string> = {
+  BKK: 'BKK · Thai VPS',
+  SIN: 'SIN · sin1',
+  TYO: 'TYO · hnd1',
+};
+
+/** The newest of the locations' latest checks. */
+function latestRoundAt(d: Pick<IncidentDetail, 'locations'>): string | null {
+  const times = d.locations.flatMap((l) => (l.latest?.at ? [l.latest.at] : [])).sort();
+  return times.at(-1) ?? null;
+}
+
+/** "3/3 pass → OK", "3/3 hard fail → DOWN", else how many fail (MIncident Latest round). */
+export function roundVerdict(glyphs: readonly string[]): string {
+  const n = glyphs.length;
+  const pass = glyphs.filter((g) => g === 'pass').length;
+  const hard = glyphs.filter((g) => g === 'fail').length;
+  if (pass === n) return `${n}/${n} pass → OK`;
+  if (hard >= 2) return `${hard}/${n} hard fail → DOWN`;
+  return `${n - pass}/${n} failing`;
+}
+
+/**
+ * "3 of 3 locations hard fail on 2 checks in a row → DOWN (2 of 3 needed)" — how the DOWN was decided
+ * (Incident board, Evidence card), from the first check and the recheck. Null when it wasn't a hard fail.
+ */
+export function evidenceSummary(
+  d: Pick<IncidentDetail, 'locations' | 'severity' | 'trigger'>,
+): string | null {
+  if (d.severity !== 'down' || d.trigger !== 'hard_fail' || d.locations.length === 0) return null;
+  const both = d.locations.filter(
+    (l) => l.first?.glyph === 'fail' && (l.recheck ?? l.first)?.glyph === 'fail',
+  ).length;
+  return `${both} of ${d.locations.length} locations hard fail on 2 checks in a row → DOWN (2 of ${d.locations.length} needed)`;
+}
+
 /** "Thu 24 Sep" for an incident that started before today (Bangkok), else null: today's times stand alone. */
 export function startedOn(d: Pick<IncidentDetail, 'startedAt'>, now: Date): string | null {
   const started = new Date(d.startedAt);
@@ -215,6 +256,10 @@ export function startedOn(d: Pick<IncidentDetail, 'startedAt'>, now: Date): stri
 export interface IncidentSections {
   /** The start day when it isn't today (`startedOn`), for the phone's summary line. */
   startedOn: string | null;
+  /** How the DOWN was decided, under the Evidence card's title (`evidenceSummary`). */
+  evidenceSummary: string | null;
+  /** "18 min unacked" beside the badge while nobody acknowledged it (Incident header). */
+  unackedFor: string | null;
   facts: React.ReactNode;
   evidenceTable: React.ReactNode;
   latestRound: React.ReactNode;
@@ -226,6 +271,11 @@ export interface IncidentSections {
 export function incidentSections(d: IncidentDetail, now: Date): IncidentSections {
   return {
     startedOn: startedOn(d, now),
+    evidenceSummary: evidenceSummary(d),
+    unackedFor:
+      d.state === 'unacked' || d.state === 'escalated'
+        ? `${formatDuration(Math.max(1, Math.floor((now.getTime() - Date.parse(d.detectedAt)) / 60_000)))} unacked`
+        : null,
     facts: <FactsStrip detail={d} now={now} />,
     evidenceTable: <EvidenceTable detail={d} />,
     latestRound: <LatestRoundCard detail={d} />,

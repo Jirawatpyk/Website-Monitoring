@@ -26,6 +26,18 @@ export const INCIDENT_STATES = [
 ] as const;
 export type IncidentState = (typeof INCIDENT_STATES)[number];
 
+/** The words each state's badge shows (spec §11); the CSV export uses them too. */
+export const INCIDENT_STATE_LABELS: Record<IncidentState, string> = {
+  unacked: 'Unacked',
+  escalated: 'Escalated',
+  acknowledged: 'Acknowledged',
+  monitoring: 'Monitoring',
+  needs_root_cause: 'Needs root cause',
+  resolved: 'Resolved',
+  in_review: 'In review',
+  closed: 'Closed',
+};
+
 /** States after which an incident is no longer open (spec §19: open = any state before Resolved). */
 export const CLOSED_INCIDENT_STATES = [
   'resolved',

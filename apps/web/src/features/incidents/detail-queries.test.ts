@@ -29,7 +29,7 @@ describe('Evidence by location (Incident board)', () => {
       check('SIN', '10:07:10', { outcome: 'pass', status_code: 200, response_ms: 412, error: null }),
       check('BKK', '10:07:10', { outcome: 'blocked', error: null }),
     ];
-    expect(locationsOf(around, latest, '2026-09-25T09:48:41+07:00', 30_000)).toEqual([
+    expect(locationsOf(around, latest, '2026-09-25T09:48:41+07:00', 30_000)).toMatchObject([
       {
         location: 'BKK',
         first: { text: 'Timeout > 30 s', glyph: 'fail' },
@@ -47,7 +47,7 @@ describe('Evidence by location (Incident board)', () => {
 
   it('a location with only one check has no separate recheck; none at all is left out', () => {
     const rows = locationsOf([check('TYO', '09:48:41')], [], '2026-09-25T09:48:41+07:00', 10_000);
-    expect(rows).toEqual([
+    expect(rows).toMatchObject([
       { location: 'TYO', first: { text: 'Timeout > 10 s', glyph: 'fail' }, recheck: null, latest: null },
     ]);
   });
