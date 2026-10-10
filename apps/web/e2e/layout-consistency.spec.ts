@@ -231,6 +231,9 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
     // every live page at three widths: well past the 30 s default once the focus-ring walk joined (S07)
     test.setTimeout(120_000);
     await ensureUser(ADMIN.email);
+    // the longest copy the pages must fit: an incident left unacked for a day ("1 d 2 h unacked",
+    // "since Thu 9 Oct 05:10") — the Overview's Live issues scrolled at 820 with one
+    await openTestIncident(ADMIN.email, { ageMinutes: 26 * 60 });
     // The sidebar (and so the nav links) is only visible from lg.
     const desktop = await signedInAt(browser, baseURL!, 1440);
     const pages = await livePages(desktop);
