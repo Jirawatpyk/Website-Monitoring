@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Escalation policies</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.aura-input,.aura-input__control,.aura-select__trigger{min-height:44px;box-sizing:border-box}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.me-step{position:relative;display:flex;gap:12px;padding:0 0 14px 0}
+.me-step:last-child{padding-bottom:0}
+.me-rail{position:relative;width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center}
+.me-rail::after{content:"";position:absolute;top:36px;bottom:-14px;width:2px;background:var(--aura-border-default)}
+.me-step:last-child .me-rail::after{display:none}
+.me-dot{width:36px;height:36px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-weight:600;background:var(--aura-bg-surface);border:1px solid var(--aura-border-control);color:var(--aura-fg-primary);position:relative;z-index:1}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 12px 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<a href="MProfile.dc.html" aria-label="Back to my profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<span style="flex-grow: 1; font-size: 17px; font-weight: 600">Escalation</span>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import></a>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span style="display: flex; padding-top: 1px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="eye" size="sm"></x-import></span>
+<span><b style="font-weight: 600">View only on phones.</b> <span style="color: var(--aura-fg-secondary)">Admins change policies on a larger screen.</span></span>
+</div>
+
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Policy" options="{{pols}}" value="{{pol}}" on-change="{{setPol}}" full-width="{{yes}}" size="sm"></x-import>
+
+<div style="display: flex; flex-direction: column; gap: 2px; padding: 0 2px">
+<span style="font-size: 15px; font-weight: 600">{{title}}</span>
+<span style="font-size: 13px; line-height: 1.45; color: var(--aura-fg-secondary)">{{sub}}</span>
+</div>
+
+<x-import component-from-global-scope="Aura.Select" label="Show names for" options="{{siteOpts}}" value="{{site}}" on-change="{{setSite}}"></x-import>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); padding: 14px 14px 14px 12px">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+<div class="me-step">
+<div class="me-rail"><span class="me-dot">{{s.level}}</span></div>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; line-height: 1.4; padding-top: 2px">
+<span style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px"><span style="font-weight: 600">{{s.when}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary); text-align: right">{{s.cond}}</span></span>
+<span style="font-size: 14px">{{s.names}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{s.roles}}</span>
+<span style="display: flex; flex-wrap: wrap; gap: 4px; padding-top: 2px">
+<sc-for list="{{s.ch}}" as="c" hint-placeholder-count="3"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="{{c.icon}}">{{c.label}}</x-import></sc-for>
+</span>
+<sc-if value="{{s.hasNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.45; color: {{s.noteColor}}">{{s.note}}</span></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.45">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">EXAMPLE · NOBODY ACKNOWLEDGES</span>
+<span style="color: var(--aura-fg-secondary)">{{exCase}}</span>
+<sc-for list="{{example}}" as="e" hint-placeholder-count="5">
+<div style="display: flex; gap: 10px"><span style="width: 64px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">{{e.at}}</span><span style="color: {{e.color}}">{{e.what}}</span></div>
+</sc-for>
+</div>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ALWAYS TRUE</span>
+<span>Acknowledge stops the steps above{{ackExtra}}. It doesn’t stop the client-update track.</span>
+<span>Reminders in the thread: DOWN every 15 min · PROBLEM every 60 min.</span>
+<span>{{hoursLine}}</span>
+</div>
+
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Mobile Escalation is read-only for every role (spec §22): same policies and steps as the desktop Escalation board, one vertical ladder per policy, names resolved for the picked site (role tokens shown underneath), the example shows when each step fires if nobody acknowledges. No edit, reorder, delete or Save controls — the banner at the top says why; there is no “Open on desktop” link. Opened from My profile (“Where I sit in escalation”) and from the incident’s escalation card; back returns to whichever screen opened it, and from an incident “Show names for” starts on that incident’s site. L2 CEO is approved (D-009), so no “Proposal” tag; voice stays off until the call provider is approved. Sample: viewer Arm; names, sites and times are mock data — compute them.</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="" label="Sections"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pol: 'Tier 1 DOWN', site: 'MuvMi' };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var CH = { chat: { label: 'Chat @mention', icon: 'bell' }, space: { label: 'Alerts Space', icon: 'users' }, email: { label: 'Email', icon: 'mail' }, voice: { label: 'Voice · off', icon: 'lock' } };
+    // site: owner, backup, AM, tier — same as the Sites board
+    var SITES = {
+      'MuvMi': ['Arm', 'Ploy', 'Bua', 1], 'Bangkok Airways – Taiwan': ['Arm', 'Ploy', 'Bua', 1], 'ENEOS Industrial': ['Ploy', 'Arm', 'Thee', 1], 'realme.link': ['Nok', 'Arm', 'Thee', 1],
+      'Fuji Links': ['Ploy', 'Nok', 'Thee', 2], 'Tubtong': ['Ploy', 'Nok', 'Bua', 2], 'ORCA Thailand': ['Tao', 'Nok', 'Thee', 2], 'DxT Games': ['Tao', 'Nok', '', 3]
+    };
+    var POL = {
+      'Tier 1 DOWN': { tiers: [1], title: 'Tier 1 DOWN · 5 sites', sub: '24/7. Owner by day (Mon–Fri 09:00–18:00), the person on call otherwise.' },
+      'Tier 2–3 DOWN': { tiers: [2, 3], title: 'Tier 2–3 DOWN · 12 sites', sub: 'Posted at any hour; outside Mon–Fri 09:00–18:00 the timers wait until 09:00. No on-call, no CEO page.' },
+      'PROBLEM': { tiers: [1, 2, 3], title: 'PROBLEM · all 17 sites', sub: 'Tier 1 at night goes to on-call. Tier 2–3 outside response hours are held until 09:00.' }
+    };
+    var P = POL[st.pol];
+    var siteNames = Object.keys(SITES).filter(function (n) { return P.tiers.indexOf(SITES[n][3]) >= 0; });
+    var site = siteNames.indexOf(st.site) >= 0 ? st.site : siteNames[0];
+    var S = SITES[site], t1 = S[3] === 1;
+    var ON = 'Ploy'; // on call this week
+    function S1(level, delay, cond, names, roles, ch, note, noteColor) { return { level: level, when: delay === 0 ? 'Immediately' : '+' + delay + ' min', delay: delay, cond: cond, names: names, roles: roles, ch: ch.map(function (c) { return CH[c]; }), hasNote: !!note, note: note || '', noteColor: noteColor || 'var(--aura-fg-secondary)' }; }
+    var owner = t1 ? S[0] + ' (day) · ' + ON + ' (night)' : S[0];
+    var steps;
+    if (st.pol === 'Tier 1 DOWN') steps = [
+      S1('L0', 0, 'DOWN confirmed', owner + ' + Alerts Space', 'Owner / on-call', ['chat', 'space', 'email'], 'Only this person is @mentioned; the backup is named in plain text.'),
+      S1('L1', 15, 'No acknowledgement', S[1] + ' + Tao', 'Backup + Admin (Tao)', ['chat', 'email'], 'Anyone already paged is left out (at night the backup may be the on-call person).'),
+      S1('L2', 30, 'No acknowledgement', 'CEO', 'CEO', ['chat', 'email', 'voice']),
+      S1('L3', 60, 'Still DOWN — even if acknowledged', 'CEO + ' + (S[2] || 'Site AM'), 'CEO + Site AM', ['chat', 'email'], 'FYI only, never a call. Recovered by then → nothing is sent.', 'var(--aura-alert-warning-fg)')
+    ];
+    else if (st.pol === 'Tier 2–3 DOWN') steps = [
+      S1('L0', 0, 'DOWN confirmed · any hour', S[0] + ' + Alerts Space', 'Owner', ['chat', 'space', 'email'], 'Outside response hours it still posts; the timers below wait until 09:00.'),
+      S1('L1', 15, 'No acknowledgement', S[1] + ' + Tao', 'Backup + Admin (Tao)', ['chat', 'email']),
+      S1('L2', 30, 'Still no acknowledgement', 'Tao', 'Admin (Tao) · reminder', ['chat', 'email'], 'No CEO page — the CEO sees it in the digest.')
+    ];
+    else steps = [
+      S1('L0', 0, 'PROBLEM confirmed', owner + ' + Alerts Space', 'Owner / on-call', ['chat', 'space']),
+      S1('L1', 60, 'No acknowledgement', S[1], 'Backup', ['chat', 'email'])
+    ];
+    function hm(h, m) { h += Math.floor(m / 60); m = m % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
+    var example, exCase;
+    if (st.pol === 'Tier 1 DOWN') {
+      exCase = site + ' DOWN confirmed 09:48 on a weekday:';
+      example = steps.map(function (s) { return { at: hm(9, 48 + s.delay), what: s.level + ' → ' + s.names.replace(' (day) · ' + ON + ' (night)', ''), color: 'var(--aura-fg-primary)' }; });
+      example.splice(2, 0, { at: '10:03', what: 'Client update → ' + (S[2] || 'Site AM') + ' gets a draft message (acked or not)', color: 'var(--aura-fg-secondary)' });
+    } else if (st.pol === 'Tier 2–3 DOWN') {
+      exCase = site + ' DOWN at Thu 22:14 (outside response hours):';
+      example = [{ at: 'Thu 22:14', what: 'L0 → ' + S[0] + ' · timers paused', color: 'var(--aura-fg-primary)' }, { at: 'Fri 09:00', what: 'Response hours start · timers run', color: 'var(--aura-fg-secondary)' }, { at: 'Fri 09:15', what: 'L1 → ' + S[1] + ' + Tao', color: 'var(--aura-fg-primary)' }, { at: 'Fri 09:30', what: 'L2 → Tao (reminder)', color: 'var(--aura-fg-primary)' }];
+      if (S[3] === 2 && S[2]) example.push({ at: 'Fri 10:00', what: 'Client update → ' + S[2] + ' (60 min down in hours)', color: 'var(--aura-fg-secondary)' });
+    } else {
+      exCase = site + ' PROBLEM (Slow) at Fri 16:00:';
+      example = [{ at: '16:00', what: 'L0 → ' + S[0], color: 'var(--aura-fg-primary)' }, { at: '17:00', what: 'L1 → ' + S[1] + ' · reminder in the thread', color: 'var(--aura-fg-primary)' }, { at: '18:00', what: t1 ? 'On-call (' + ON + ') takes over' : 'Outside hours → held until Mon 09:00', color: 'var(--aura-fg-secondary)' }];
+    }
+    return {
+      yes: true,
+      pols: ['Tier 1 DOWN', 'Tier 2–3 DOWN', 'PROBLEM'], pol: st.pol,
+      setPol: function (v) { self.setState({ pol: v }); },
+      title: P.title, sub: P.sub,
+      siteOpts: siteNames.map(function (n) { return { value: n, label: n + ' · Tier ' + SITES[n][3] }; }), site: site,
+      setSite: function (e) { self.setState({ site: e && e.target ? e.target.value : e }); },
+      steps: steps, example: example, exCase: exCase,
+      ackExtra: st.pol === 'Tier 1 DOWN' ? ' up to L2 (L3 is the FYI)' : '',
+      hoursLine: st.pol === 'Tier 1 DOWN' ? 'On call this week: Ploy, Mon 21 Sep → Mon 28 Sep.' : 'Response hours Tier 2–3: Mon–Fri 09:00–18:00 (Settings › Organisation).',
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

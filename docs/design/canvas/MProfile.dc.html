@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — My profile</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+.aura-btn,.aura-button{min-height:44px;box-sizing:border-box}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.mp-card{background:var(--aura-bg-surface);border:1px solid var(--aura-border-default);border-radius:var(--aura-radius-lg);overflow:hidden}
+.mp-head{padding:12px 16px 4px;display:flex;flex-direction:column;line-height:1.4}
+.mp-row{min-height:56px;box-sizing:border-box;padding:8px 16px;display:flex;align-items:center;gap:12px;border-top:1px solid var(--aura-border-subtle);color:inherit;text-decoration:none}
+.mp-kv{display:flex;justify-content:space-between;gap:12px;font-size:13px;line-height:1.45}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 12px 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<a href="MOverview4.dc.html" aria-label="Back to Overview" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<span style="flex-grow: 1; font-size: 17px; font-weight: 600">My profile</span>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: center; gap: 14px; padding: 4px 2px">
+<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="lg"></x-import>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.3">
+<span style="font-family: var(--font-display); font-size: 24px; font-weight: 600">Arm</span>
+<span style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="solid">Responder</x-import>Google Workspace · 2-step on</span>
+</div>
+</div>
+
+<!-- How alerts reach me -->
+<div class="mp-card">
+<div class="mp-head">
+<span style="font-size: 15px; font-weight: 600">How alerts reach me</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">At least one must work before you can own a site or be on call.</span>
+</div>
+<sc-for list="{{channels}}" as="c" hint-placeholder-count="3">
+<div class="mp-row">
+<span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--aura-radius-sm); background: var(--aura-bg-canvas); display: flex; align-items: center; justify-content: center; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35">
+<span style="font-weight: 500">{{c.name}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.detail}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Badge" tone="{{c.tone}}" icon="{{c.bicon}}">{{c.status}}</x-import>
+</div>
+</sc-for>
+<div style="padding: 12px 16px 14px; border-top: 1px solid var(--aura-border-subtle); display: flex; flex-direction: column; gap: 10px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="bell" full-width="{{yes}}" on-click="{{test}}">{{testLabel}}</x-import>
+<sc-if value="{{tested}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="success" title="Test sent at 10:08">Own “TEST — no action” thread, mentioning only you. Chat 1.3 s, email 2.2 s. No buzz? Allow the Alerts Space through Do Not Disturb.</x-import>
+</sc-if>
+</div>
+</div>
+
+<!-- On call -->
+<div class="mp-card">
+<div class="mp-head" style="padding-bottom: 10px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">MY NEXT ON-CALL SHIFT</span>
+<span style="font-size: 15px; font-weight: 600">Mon 5 Oct → Mon 12 Oct</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Tier 1 nights and weekends</span>
+<span style="display: flex; align-items: center; gap: 6px; padding-top: 6px"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="arrow-up-down">Swap requested</x-import><span style="font-size: 12px; color: var(--aura-fg-secondary)">with Nok · not accepted yet</span></span>
+<span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary); padding-top: 4px">You stay on call for this shift until Nok accepts.</span>
+</div>
+<a href="MOnCall.dc.html" class="mp-row" style="min-height: 48px; justify-content: space-between"><span style="font-size: 14px">Rotation and phone readiness</span><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a>
+</div>
+
+<!-- Sites -->
+<div class="mp-card">
+<div class="mp-head" style="padding-bottom: 8px">
+<span style="font-size: 15px; font-weight: 600">Sites I’m responsible for</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Owner of {{ownCount}} · backup for {{backCount}}</span>
+</div>
+<sc-for list="{{sites}}" as="s" hint-placeholder-count="5">
+<a href="{{s.href}}" class="mp-row" aria-label="{{s.aria}}">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35">
+<span style="font-weight: 500">{{s.name}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Tier {{s.tier}} · {{s.role}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.st}}</x-import>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span>
+</a>
+</sc-for>
+</div>
+
+<!-- Escalation -->
+<div class="mp-card">
+<div class="mp-head" style="padding-bottom: 10px; gap: 8px">
+<span style="font-size: 15px; font-weight: 600">Where I sit in escalation</span>
+<div class="mp-kv"><span style="color: var(--aura-fg-secondary)">My 3 sites</span><span style="font-weight: 500; text-align: right">L0 — first to be @mentioned</span></div>
+<div class="mp-kv"><span style="color: var(--aura-fg-secondary)">Backup for 2 sites</span><span style="font-weight: 500; text-align: right">L1 at +15 min, with Tao</span></div>
+<div class="mp-kv"><span style="color: var(--aura-fg-secondary)">On call (nights, weekends)</span><span style="font-weight: 500; text-align: right">L0 for every Tier 1 site</span></div>
+</div>
+<a href="MEscalation.dc.html" class="mp-row" style="min-height: 48px; justify-content: space-between"><span style="font-size: 14px">See every step</span><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a>
+</div>
+
+<!-- Devices -->
+<div class="mp-card">
+<div class="mp-head" style="padding-bottom: 8px">
+<span style="font-size: 15px; font-weight: 600">Signed-in devices</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Sessions last 30 days so the Ack link opens straight to the incident. Signing a device out takes effect now.</span>
+</div>
+<sc-for list="{{devices}}" as="d" hint-placeholder-count="2">
+<div class="mp-row">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{d.icon}}" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35"><span style="font-weight: 500">{{d.name}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{d.when}}</span></div>
+<sc-if value="{{d.current}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral">This device</x-import></sc-if>
+<sc-if value="{{d.other}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" on-click="{{d.out}}">Sign out</x-import></sc-if>
+<sc-if value="{{d.gone}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Signed out · now</span></sc-if>
+</div>
+</sc-for>
+</div>
+
+<!-- Same for everyone -->
+<div class="mp-card">
+<div class="mp-head" style="padding-bottom: 12px; gap: 6px">
+<span style="font-size: 15px; font-weight: 600">Same for everyone</span>
+<div class="mp-kv"><span style="color: var(--aura-fg-secondary)">Response hours · Tier 1</span><span style="font-weight: 500">24/7</span></div>
+<div class="mp-kv"><span style="color: var(--aura-fg-secondary)">Response hours · Tier 2–3</span><span style="font-weight: 500">Mon–Fri 09:00–18:00</span></div>
+<div class="mp-kv"><span style="color: var(--aura-fg-secondary)">Time zone</span><span style="font-weight: 500">Thailand (UTC+7)</span></div>
+<div class="mp-kv"><span style="color: var(--aura-fg-secondary)">Language</span><span style="font-weight: 500">English in v1</span></div>
+<span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary); padding-top: 2px">No personal do-not-disturb — DOWN always reaches whoever is expected to act. Admins set these in Organisation.</span>
+</div>
+</div>
+
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="log-out" full-width="{{yes}}" href="MLogin.dc.html">Sign out</x-import>
+
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Phone version of My profile (spec §22). Opened from the avatar in the phone top bar. Same content as the desktop Profile, one column: alert channels + test alert, next on-call shift (→ On-call), sites as tappable rows (→ the site, or its incident when it has one open), escalation summary (→ read-only Escalation), devices, org-wide settings (read-only for everyone on phones), Sign out. Targets ≥ 44 px. Sample: viewer Arm (Responder) — owner of MuvMi and both Bangkok Airways sites, backup for ENEOS and realme.link, on call Mon 5 → 12 Oct with a swap pending; statuses match MOverview4 “1 banner”. Other roles: AM — no on-call card, sites = “My clients’ sites”, escalation = client update + Tier 1 L3 FYI; Viewer — channels, devices and org values only. “Rotation and phone readiness” opens On-call for the signed-in person (the MOnCall sample is Ploy). Mock data — compute it.</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="" label="Sections"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tested: false, out: [] };
+  }
+  renderVals() {
+    var self = this;
+    var ST = {
+      down: { st: 'Down', tone: 'danger', variant: 'solid', icon: 'ban' },
+      ok: { st: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check' }
+    };
+    // name, tier, my role, status — same sample as MOverview4 (“1 banner”)
+    var raw = [
+      ['MuvMi', 1, 'Owner', 'down'],
+      ['Bangkok Airways – Taiwan', 1, 'Owner', 'ok'],
+      ['Bangkok Airways – China', 1, 'Owner', 'ok'],
+      ['ENEOS Industrial', 1, 'Backup', 'ok'],
+      ['realme.link', 1, 'Backup', 'ok']
+    ];
+    var sites = raw.map(function (r) {
+      var S = ST[r[3]];
+      return Object.assign({ name: r[0], tier: r[1], role: r[2], href: r[3] === 'down' ? 'MIncident.dc.html' : 'MSite.dc.html', aria: r[0] + ', Tier ' + r[1] + ', ' + r[2].toLowerCase() + ', ' + S.st }, S);
+    });
+    var devices = [
+      { icon: 'monitor', name: 'Safari · iPhone', when: 'Bangkok · active now', current: true },
+      { icon: 'monitor', name: 'Chrome · macOS', when: 'Bangkok · last used today 09:12', current: false }
+    ].map(function (d) {
+      if (d.current) return Object.assign({ other: false, gone: false }, d);
+      var gone = self.state.out.indexOf(d.name) >= 0;
+      return Object.assign({}, d, { other: !gone, gone: gone, out: function () { self.setState({ out: self.state.out.concat([d.name]) }); } });
+    });
+    return {
+      yes: true,
+      tested: this.state.tested,
+      testLabel: this.state.tested ? 'Send again' : 'Send me a test alert',
+      test: function () { self.setState({ tested: true }); },
+      channels: [
+        { icon: 'bell', name: 'Google Chat @mention', detail: 'DxT Website Alerts · primary', tone: 'success', bicon: 'circle-check', status: 'Working' },
+        { icon: 'mail', name: 'Email', detail: 'Workspace address · record + fallback', tone: 'success', bicon: 'circle-check', status: 'Working' },
+        { icon: 'lock', name: 'Phone call', detail: 'Only if the CEO approves voice calls', tone: 'neutral', bicon: 'clock', status: 'Not available' }
+      ],
+      sites: sites,
+      ownCount: raw.filter(function (r) { return r[2] === 'Owner'; }).length,
+      backCount: raw.filter(function (r) { return r[2] === 'Backup'; }).length,
+      devices: devices,
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
