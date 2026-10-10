@@ -11,7 +11,11 @@ export default function Loading() {
           <CardSkeleton lines={2} />
         </div>
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*88)]">
-          <CardSkeleton lines={6} />
+          <div className="flex min-w-0 flex-col gap-6">
+            {/* Evidence by location (table + the screenshot preview), then the Timeline */}
+            <CardSkeleton lines={7} />
+            <CardSkeleton lines={5} />
+          </div>
           <CardSkeleton lines={4} />
         </div>
       </PageSkeleton>

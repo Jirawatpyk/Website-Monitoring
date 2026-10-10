@@ -315,7 +315,12 @@ export function IncidentDetailView({
             <Card
               title="Timeline"
               headingLevel={2}
-              description="All times UTC+7 · every event is in the audit log"
+              // the boards put the note on the title's line, at the end
+              actions={
+                <span className="text-sm text-fg-secondary">
+                  All times UTC+7 · every event is in the audit log
+                </span>
+              }
             >
               {sections.timelineDesktop}
             </Card>
@@ -427,7 +432,11 @@ export function IncidentDetailView({
             ) : undefined
           }
         >
-          <Card title="Timeline" headingLevel={2} description="Newest first · UTC+7">
+          <Card
+            title="Timeline"
+            headingLevel={2}
+            actions={<span className="text-xs text-fg-secondary">Newest first · UTC+7</span>}
+          >
             <ShowAllLines count={d.timeline.length}>{sections.timelinePhone}</ShowAllLines>
           </Card>
           <p className="m-0 text-xs text-fg-secondary">
@@ -509,22 +518,34 @@ function EvidenceCard({
   return (
     <Card title="Evidence by location" headingLevel={2} description={summary ?? undefined}>
       {table}
-      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border-subtle pt-4">
+      <div className="mt-4 flex flex-wrap items-start gap-4 border-t border-border-subtle pt-4">
         {d.evidence ? (
           <>
-            <span className="flex grow flex-col text-sm leading-snug">
+            {/* The board's 280 px preview; a click opens it full size. Pointer-only: "Open full size" is the
+                keyboard way in, so the preview is no second tab stop. */}
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-hidden
+              onClick={onOpenShot}
+              className="aspect-video w-70 shrink-0 cursor-zoom-in overflow-hidden rounded-aura-md border border-border-default bg-bg-canvas"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage URL */}
+              <img src={d.evidence.url} alt="" className="size-full object-cover object-top" />
+            </button>
+            <span className="flex min-w-0 flex-1 basis-64 flex-col items-start gap-1.5 text-sm leading-snug">
               <span className="font-medium">Screenshot evidence</span>
               <span className="text-fg-secondary">
                 {`Taken by the browser verifier in Bangkok at ${formatTimeWithSeconds(new Date(d.evidence.takenAt))}`}
                 {d.evidence.afterRecovery ? ' — after the site recovered.' : ', after DOWN was confirmed.'}{' '}
                 {d.trigger === 'hard_fail' &&
                   'Hard fails don’t wait for the browser verifier — it only takes a screenshot afterwards as evidence. '}
-                Kept for 30 days.
               </span>
+              <span className="text-fg-secondary">Kept for 30 days.</span>
+              <Button variant="ghost" size="sm" icon={<IconImage />} onClick={onOpenShot}>
+                Open full size
+              </Button>
             </span>
-            <Button variant="ghost" size="sm" icon={<IconImage />} onClick={onOpenShot}>
-              Open full size
-            </Button>
           </>
         ) : (
           <span className="text-sm text-fg-secondary">

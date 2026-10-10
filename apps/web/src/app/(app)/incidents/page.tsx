@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Container, PageHeader } from '@jirawatpyk/aura-react';
+import { Container } from '@jirawatpyk/aura-react';
 import { formatDay, formatTime } from '@dxt/shared';
 import { IncidentsList } from '@/features/incidents';
 import { listIncidents } from '@/features/incidents/server';
@@ -18,12 +18,8 @@ export default async function IncidentsPage({
   return (
     <Container>
       <div className="flex flex-col gap-6">
-        <PageHeader
-          eyebrow="INCIDENTS"
-          title="Incidents"
-          meta={`${formatDay(now, { weekday: true, year: true })} · ${formatTime(now)} (UTC+7)`}
-        />
         <IncidentsList
+          meta={`${formatDay(now, { weekday: true, year: true })} · ${formatTime(now)} (UTC+7)`}
           incidents={list?.incidents ?? []}
           sites={list?.sites ?? []}
           nowIso={now.toISOString()}

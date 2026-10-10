@@ -29,10 +29,16 @@ interface PageHeaderSkeletonProps {
   breadcrumb?: boolean;
   /** How many header buttons sit on the right (0 = none). */
   actions?: number;
+  /** The buttons show only from md (a desktop-only action, e.g. Incidents' Export CSV). */
+  actionsFromMd?: boolean;
 }
 
 /** The shape of AURA `PageHeader`: breadcrumb or eyebrow, h1, meta line, actions. */
-export function PageHeaderSkeleton({ breadcrumb = false, actions = 0 }: PageHeaderSkeletonProps) {
+export function PageHeaderSkeleton({
+  breadcrumb = false,
+  actions = 0,
+  actionsFromMd = false,
+}: PageHeaderSkeletonProps) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" aria-hidden>
       <div className="flex w-full max-w-xl flex-col gap-1">
@@ -42,7 +48,7 @@ export function PageHeaderSkeleton({ breadcrumb = false, actions = 0 }: PageHead
         <Skeleton variant="text" width="80%" />
       </div>
       {actions > 0 && (
-        <div className="flex gap-3">
+        <div className={actionsFromMd ? 'hidden gap-3 md:flex' : 'flex gap-3'}>
           {Array.from({ length: actions }, (_, i) => (
             <Skeleton key={i} variant="rect" height={44} width={120} />
           ))}
