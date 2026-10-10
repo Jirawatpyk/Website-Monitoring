@@ -114,6 +114,8 @@ select json_build_object(
 ) j;
 ```
 
+**Staging today has one person** (Tao: owner and the only Admin, no backup, no Chat id), and a second account can't sign up (company domain + allowlist, D-007). Then L1 has nobody new: the DOWN card has no "Next" row and no "acknowledge by" (nothing to promise), `step_fired` lands at +15 min with `"notified": []`, the level moves to 1, the state stays Unacked, nothing is posted; the `STILL DOWN … 30 min` reply still lands at +30 (S08 run, INC-0029: step 19:38:33 for due 19:38:32, reminder 19:53:35). The backup + "Tao FYI" message is covered by `pipeline.int.test.ts` and is checked on production with real owners.
+
 Response hours (Tier 2–3 timers paused, PROBLEM held until 09:00) can't be driven on staging, because the clock can't move. The engine tests (`escalation.test.ts`, `response-hours.test.ts`) and pgTAP (`escalation.test.sql`) cover them.
 
 - **Browser pane under width emulation** (`resize_window` 1440 / 820 / 390): clicks by coordinate can miss and screenshots can be stale or half-size (S06b `/verify`: "Acknowledge did nothing"). Check the control is on top with `document.elementFromPoint`, act with a DOM `.click()`, and read layout with `getBoundingClientRect`; screenshots at those widths come from Playwright locally (e2e helpers) or from the pane without emulation. A hidden (not fronted) tab pauses `requestAnimationFrame` and CSS transitions — front it before timing anything.
