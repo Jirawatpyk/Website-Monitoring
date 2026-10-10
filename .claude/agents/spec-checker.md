@@ -13,6 +13,11 @@ Input: a board name (e.g. `Incident`) and/or the route files that implement it.
 3. Read the implementation under `apps/web/src`.
 4. Check, citing spec section and file:line for each finding:
    - Every state the board shows exists (loading, empty, no-access, error, each interactive state).
+   - Layout against the board, element by element. These four were missed in S07 and Tao caught each one by eye:
+     - **Header and card-head placement:** what sits on the title's line, at its end (header actions, a card's note like "All times UTC+7"), versus under it as a description; which button is in the page header and which is in a toolbar; button size.
+     - **Every picture the board draws:** previews, thumbnails, screenshots, charts. Each one is on the page, or its absence is a finding.
+     - **Controls in one row are the same height:** a SegmentedControl beside FilterSelects or a Button beside a field. Compare the AURA sizes in use (`size`, `--aura-input-height`), not only the board's pixels.
+     - **Table text never wraps by accident:** work out each fixed column's width against its longest real value (e.g. "Yesterday 06:04", "Wed 7 Oct 06:04"), and say where the leftover space goes (the flexible column).
    - Status and workflow badges match spec §11 / §14.2 exactly (tone, variant, icon, word). Accent only for Maintenance.
    - Copy: English, no spec codes (FR-xx, P0, table names) in the UI, dates/durations/percent via `@dxt/shared` helpers and in spec §13 form.
    - Destructive or wide-reach actions have a confirm that names what happens and to whom (§13).
@@ -39,4 +44,10 @@ Input: a board name (e.g. `Incident`) and/or the route files that implement it.
      - Lists are bounded — paginated or limited — and still hold up at 200 monitors.
      - Realtime subscribes to a filtered channel, patches the affected rows instead of refetching everything, and unsubscribes on unmount.
      - `loading.tsx` / Suspense skeletons reserve the final size (no layout shift); `next/image` and `next/font`; heavy client pieces (charts) are lazy-loaded.
-5. Report: a short verdict, then findings ordered by severity (behaviour wrong → accessibility blocker → missing state → cross-page inconsistency → performance risk → copy/format → visual). You read code only, so name performance findings as risks with the file:line that causes them; measured numbers (load time, Lighthouse, axe) come from the slice's e2e evidence. Say what's correct too, briefly. Don't pad.
+5. Sort every difference from the board into one of two groups. Never pass a difference silently, and never copy the board where it is wrong.
+   - **Fix:** the board is right and the code differs. Name the change.
+   - **Board gap:** the board can't be followed, or doesn't say. Name the kind, give a recommendation with its reason, and leave the choice to Tao. A choice that settles a conflict becomes a new decision (D-xxx).
+     - **AURA can't draw it** (e.g. a 32 px FilterSelect; AURA's has no small size): recommend the nearest AURA way and say whether it's worth an AURA request (`docs/design/aura.md`).
+     - **Spec or a decision says otherwise:** the spec and `docs/decisions.md` win on behaviour. Say which one wins here.
+     - **The board doesn't draw it** (a state, a width, a detail such as baseline alignment): recommend what matches the other pages.
+6. Report: a short verdict, then the Fix findings ordered by severity (behaviour wrong → accessibility blocker → missing state → cross-page inconsistency → performance risk → copy/format → visual). You read code only, so name performance findings as risks with the file:line that causes them; measured numbers (load time, Lighthouse, axe) come from the slice's e2e evidence. Then list the Board gaps, each with its recommendation. Say what's correct too, briefly. Don't pad.
