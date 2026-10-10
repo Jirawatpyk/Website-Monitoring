@@ -380,7 +380,8 @@ export function tileState(
     markers.push({ icon: 'eye-off', label: `Muted until ${formatTime(new Date(site.mutedUntil))}` });
   }
   let state = '';
-  if (site.status === null) state = 'No data yet';
+  // no round yet: AURA's StatusTile already says "No data" (status="unknown", 5.35) — no second line for it
+  if (site.status === null) state = '';
   else if (site.status === 'down' && inc) {
     state =
       inc.state === 'escalated'
