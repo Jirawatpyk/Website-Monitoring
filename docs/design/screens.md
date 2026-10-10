@@ -1,6 +1,6 @@
 # Screen map — canvas board → route → rules
 
-The index `/implement-screen` reads. One row per canvas board (49). The board file is in `docs/design/canvas/`; open the [live canvas](https://claude.ai/artifact/Sqa6gYe5eGqTQtBFmjbyMW) in Play mode to click through flows.
+The index `/implement-screen` reads. One row per canvas board (51). The board file is in `docs/design/canvas/`; open the [live canvas](https://claude.ai/artifact/Sqa6gYe5eGqTQtBFmjbyMW) in Play mode to click through flows.
 
 - **Phase** follows PRD §6 priority: `P0` = MVP (Phase 1), `P1` = team go-live (Phase 2), `P2` = client-facing (Phase 3). **Slice** is the slice in [`../implementation-plan.md`](../implementation-plan.md) that builds the board; work in slice order.
 - **Spec** = sections of `docs/dxt-monitor-design-spec.md` that govern the screen. §11 (badges), §13 (copy & formats) and §14.15–17 (eyebrows, no dead controls, 44 px tap targets) apply to every screen and are not repeated below.
@@ -35,7 +35,8 @@ The index `/implement-screen` reads. One row per canvas board (49). The board fi
 | Resolve | Resolve incident + root cause | dialog on `/incidents/[incidentId]` | P0 | S07 | §15.4, §16.1–4 | FR-06 |
 | Maintenance | Maintenance / mute dialog | `/maintenance` + dialog | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1 | FR-10a, FR-14 |
 | MMaintenance | Mobile — Mute / maintenance sheet | sheet (390) | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1 | FR-10a, FR-14 |
-| Escalation | Escalation policies | `/escalation` | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §14.1, §14.7, §15.5, §16.9 | FR-09a, FR-09b |
+| Escalation | Escalation policies | `/escalation` | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §14.1, §14.7, §15.5, §22 | FR-09a, FR-09b |
+| MEscalation | Mobile — Escalation (view only) | `/escalation` (390) | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §22.5–6 | FR-09a, FR-09b |
 | OnCall | On-call rotation | `/oncall` | P1 | S10 | §2, §15.8 | FR-09b, §8 |
 | MOnCall | Mobile — On-call | `/oncall` (390) | P1 | S10 | §10 (checklist) | §8 |
 | Expiry | SSL & domain expiry | `/expiry` | P1 | S13 | §14.12, §15.8 | FR-11 |
@@ -46,6 +47,7 @@ The index `/implement-screen` reads. One row per canvas board (49). The board fi
 | AlertChannels | Settings — alert channels & routing | `/settings/alert-channels` | P1 | S17 | §14.8, §15.5, §15.8 | §7 |
 | Organisation | Settings — organisation: tiers, clients, data, cost | `/settings/organisation` | P1 | S17 | §7, §14.14 | §4, §10 |
 | Profile | My profile & notifications | `/profile` | P1 | S16 | §10 (on-call checklist) | §3 |
+| MProfile | Mobile — My profile | `/profile` (390) | P1 | S16 | §22.6 | §3 |
 | Guide | User guide | `/guide` | P1 | S18 | §18 | FR-22 |
 | MGuide | Mobile — User guide | `/guide` (390) | P1 | S18 | §18 | FR-22 |
 | EmptyStates | Empty, loading & no-access states | shared components | P0 | S01 | §15.8, §16.1 | — |

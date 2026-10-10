@@ -252,7 +252,7 @@ main > *{flex-shrink:0}
 <sc-if value="{{eNoCh}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-danger); line-height: 1.5"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import>No channel ticked — this step notifies nobody. You can apply it, but Save stays blocked.</span></sc-if>
 </div>
 <sc-if value="{{eIsProp}}" hint-placeholder-val="{{false}}">
-<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Tagged “Proposal · pending CEO” automatically because it pages the CEO — this step can’t move above L2.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">This step pages the CEO, so it can’t move above L2.</span>
 </sc-if>
 <div style="display: flex; gap: 10px; padding: 10px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap">{{ePrevAt}}</span><span style="color: {{ePrevColor}}">{{ePrev}}</span></div>
 <div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
@@ -286,7 +286,7 @@ class Component extends DCLogic {
       t1: [
         S(0, 'DOWN confirmed', ['Owner / on-call'], ['chat', 'space', 'email'], '', 'Chat @mention and Alerts Space are locked on. Owner by day (Mon–Fri 09:00–18:00), the person on call otherwise. Only they are @mentioned; the backup is named in plain text.'),
         S(15, 'No acknowledgement', ['Backup', 'Admin (Tao)'], ['chat', 'email'], '', 'Posts “@Ploy please acknowledge · Tao FYI” in the same thread.'),
-        S(30, 'No acknowledgement', ['CEO'], ['chat', 'email', 'voice'], 'Proposal · pending CEO'),
+        S(30, 'No acknowledgement', ['CEO'], ['chat', 'email', 'voice'], 'ceo'),
         S(60, 'Still DOWN — sent even after acknowledge', ['CEO', 'Site AM'], ['chat', 'email'], '', '', true)
       ],
       t2: t23(),
@@ -320,7 +320,7 @@ class Component extends DCLogic {
         if (!(sN.delay >= 15)) e.push('Must be at least +15 min.');
         else if (sN.delay <= list[i - 1].delay) e.push('Must be later than L' + (i - 1) + ' (+' + list[i - 1].delay + ' min).');
       }
-      if (sN.tag && i < 2) e.push('A proposal step can’t sit above L2.');
+      if (sN.tag && i < 2) e.push('A step that pages the CEO can’t sit above L2.');
       if (sN.who.indexOf('CEO') >= 0) {
         if (pk !== 't1') e.push('The CEO is paged only on Tier 1 DOWN — remove CEO from this step.');
         else if (i < 2) e.push('The CEO can be paged only from L2 onward.');
@@ -343,8 +343,8 @@ class Component extends DCLogic {
       var upOk = i > 0 && canSwap(steps, i - 1, i);
       var downOk = i < steps.length - 1 && canSwap(steps, i, i + 1);
       var fyiNear = s.fyi || (steps[i - 1] && steps[i - 1].fyi) || (steps[i + 1] && steps[i + 1].fyi);
-      var upWhy = i === 0 ? 'L0 is pinned' : (i === 1 ? 'L0 is pinned — nothing can move above it' : (!upOk ? (s.fyi || steps[i - 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'A proposal step can’t move above L2') : 'Move ' + L + ' earlier'));
-      var downWhy = i === 0 ? 'L0 is pinned' : (i === steps.length - 1 ? 'Already the last step' : (!downOk ? (s.fyi || steps[i + 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'L' + (i + 1) + ' is a proposal — it can’t move up to L' + i) : 'Move ' + L + ' later'));
+      var upWhy = i === 0 ? 'L0 is pinned' : (i === 1 ? 'L0 is pinned — nothing can move above it' : (!upOk ? (s.fyi || steps[i - 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'A step that pages the CEO can’t move above L2') : 'Move ' + L + ' earlier'));
+      var downWhy = i === 0 ? 'L0 is pinned' : (i === steps.length - 1 ? 'Already the last step' : (!downOk ? (s.fyi || steps[i + 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'L' + (i + 1) + ' pages the CEO — it can’t move up to L' + i) : 'Move ' + L + ' later'));
       var fyi = !!s.fyi;
       var errs = stepErrs(k, steps, i);
       var err = errs.join(' ');
@@ -352,7 +352,7 @@ class Component extends DCLogic {
         level: L, when: fmtDelay(s.delay), cond: s.cond, who: s.who,
         ch: s.ch.map(function (c) { return CH[c]; }), noCh: !s.ch.filter(function (c) { return c !== 'voice'; }).length, errs: errs,
         pinned: i === 0,
-        hasTag: !!s.tag, tag: s.tag, hasNote: !!s.note, note: s.note,
+        hasTag: false, tag: s.tag, hasNote: !!s.note, note: s.note,
         hasErr: !!err, err: err,
         hasAdmin: s.who.indexOf('Admin (Tao)') >= 0,
         hasFyi: fyi,
@@ -392,7 +392,7 @@ class Component extends DCLogic {
     var preview = [], previewCase;
     if (k === 't1') {
       previewCase = cur[0] + ' DOWN confirmed 09:48 today, nobody acknowledges:';
-      steps.forEach(function (s, i) { preview.push({ at: hm(9, 48 + s.delay), what: 'L' + i + ' → ' + tgt(s) + (s.tag && !nobody(s) ? ' (proposal)' : '') + (s.fyi && !nobody(s) ? ' · FYI even if acked' : ''), color: col(s) }); });
+      steps.forEach(function (s, i) { preview.push({ at: hm(9, 48 + s.delay), what: 'L' + i + ' → ' + tgt(s) + '' + (s.fyi && !nobody(s) ? ' · FYI even if acked' : ''), color: col(s) }); });
       preview.push({ at: hm(9, 63), what: 'Client update → ' + cur[3] + ' gets a draft message (even if acked)', color: 'var(--aura-fg-secondary)' });
       preview.sort(function (a, b) { return a.at < b.at ? -1 : a.at > b.at ? 1 : 0; });
     } else if (k === 't2') {
@@ -489,17 +489,17 @@ class Component extends DCLogic {
             w.sort(function (a, b) { return ROLES.indexOf(a) - ROLES.indexOf(b); });
             var patch = { who: w };
             if (r === 'CEO' && !ed.fyi) {
-              if (w.indexOf('CEO') >= 0) patch.tag = 'Proposal · pending CEO';
+              if (w.indexOf('CEO') >= 0) patch.tag = 'ceo';
               else { patch.tag = ''; patch.ch = ed.ch.filter(function (c) { return c !== 'voice'; }); }
             }
             setEd(patch);
           } };
         }),
-        eCeoNote: ed.fyi ? 'CEO + Site AM are fixed on this step: it’s the Tier 1 step that still sends an FYI after acknowledge (never a call). It can’t be removed.' : (k !== 't1' ? 'CEO isn’t available here — the CEO is paged only on Tier 1 DOWN, from L2 onward. On this policy the CEO sees incidents in the daily digest.' : (idx < 2 ? 'CEO is available from L2 onward.' : 'Adding CEO tags this step “Proposal · pending CEO” automatically.')),
+        eCeoNote: ed.fyi ? 'CEO + Site AM are fixed on this step: it’s the Tier 1 step that still sends an FYI after acknowledge (never a call). It can’t be removed.' : (k !== 't1' ? 'CEO isn’t available here — the CEO is paged only on Tier 1 DOWN, from L2 onward. On this policy the CEO sees incidents in the daily digest.' : (idx < 2 ? 'CEO is available from L2 onward.' : 'Adding CEO keeps this step at L2 or later.')),
         eLockDesc: pinned ? 'Locked on for L0' : '',
         eVoice: ed.ch.indexOf('voice') >= 0,
         eVoiceLabel: ed.ch.indexOf('voice') >= 0 ? 'Voice call · Configured · off until approved' : 'Voice call',
-        eVoiceDesc: ed.ch.indexOf('voice') >= 0 ? 'Set up on this step but stays off until the CEO approves the proposal and Twilio is set up (~$23–26 / month).' : (ed.fyi ? 'Never on this step — the FYI goes by Chat @mention + email only.' : 'Only the L2 CEO proposal step carries a voice call, and it stays off until approved.'),
+        eVoiceDesc: ed.ch.indexOf('voice') >= 0 ? 'Set up on this step but stays off until the CEO approves voice calls and Twilio is set up (~$23–26 / month).' : (ed.fyi ? 'Never on this step — the FYI goes by Chat @mention + email only.' : 'Only the L2 CEO step can carry a voice call, and it stays off until approved.'),
         eNoCh: !ed.ch.filter(function (c) { return c !== 'voice'; }).length,
         eWhoHint: whoErr ? (st.eTried ? 'Pick at least one person.' : 'Pick who this step notifies. Tokens resolve per site — see the preview.') : 'Tokens resolve per site. Admin (Tao) is the only active Admin until Second Admin joins.',
         eWhoColor: whoErr && st.eTried ? 'var(--aura-fg-danger)' : 'var(--aura-fg-secondary)',
@@ -544,8 +544,8 @@ class Component extends DCLogic {
       stepHint: 'L0 is pinned. Every step needs at least one channel. Each later step is at least +15 min and later than the one before; delays stay with the level when you reorder.',
       addStep: function () { var last = steps[steps.length - 1]; self.setState({ edit: { idx: steps.length, isNew: true, delay: String(last.delay + 30), who: [], ch: ['chat', 'email'], tag: '', fyi: false }, eTried: false }); },
       hasAckCase: k === 't1', ackCase: ackCase, ackCaseLabel: ackLabel,
-      propTitle: 'L' + propIdx + ' is a proposal, pending the CEO',
-      propBody: 'The CEO page at L' + propIdx + ' waits for the CEO’s OK. Its voice call is configured but off until approved (Twilio, ~$23–26 / month) — until then L' + propIdx + ' sends a Chat @mention and email only. It can’t move above L2.',
+      propTitle: 'Voice call on L' + propIdx + ' is off until approved',
+      propBody: 'The CEO step at L' + propIdx + ' is live (approved, D-009) and sends a Chat @mention and email. Its voice call is configured but stays off until the CEO approves voice calls (Twilio, ~$23–26 / month). It can’t move above L2.',
       hasErrors: errors.length > 0, errors: errors, hasWarns: warns.length > 0, warns: warns,
       remDownErr: rdErr, remProbErr: rpErr,
       hasPolMsg: !!(polErr(k, steps) || polWarn(k, steps)), polMsg: polErr(k, steps) || polWarn(k, steps),
@@ -577,9 +577,9 @@ class Component extends DCLogic {
       confirmSave: function () { if (errors.length) return; if (!st.note.trim()) { self.setState({ tried: true }); return; } self.setState({ saveOpen: false, saved: copy(st.p), sRemDown: st.remDown, sRemProb: st.remProb, note: '', tried: false }); },
       nav: [
         { items: [
-          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
           { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
-          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
           { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
         ] },
         { title: 'Operations', items: [

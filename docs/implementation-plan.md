@@ -397,7 +397,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S08 · Escalation L0–L1 & response hours
 
 - **Scope:** FR-09a. `escalation_policies`, `escalation_steps` seeded for Tier 1 DOWN, Tier 2–3 DOWN, PROBLEM. Organisation settings table for response hours (one value for Tier 2–3, spec §14.14) and a company holidays table, seeded (UI in S17). Engine ladder: L0 at confirm, L1 at +15 min to backup + Tao minus anyone already paged; Tier 2–3 timers pause outside response hours and on holidays, resume 09:00; PROBLEM outside hours held until 09:00; reminders every 15 min (DOWN) / 60 min (PROBLEM) in the thread; ack stops L1. Escalation page: policies with L0–L1 editing and the guardrails that apply (§14.7: L0 pinned, ≥ +15 min, ≥ 1 channel).
-- **Boards:** Escalation (L0–L1), MEscalation (requested from design, 10 Oct 2026) · **Tables:** escalation_policies, escalation_steps, organisation_settings, company_holidays · **Decisions:** D-034
+- **Boards:** Escalation (L0–L1), MEscalation (view only, §22) · **Tables:** escalation_policies, escalation_steps, organisation_settings, company_holidays · **Decisions:** D-034
 - **Depends on:** S07
 - **Carried from S04b review:**
   - DOWN AGAIN / PROBLEM AGAIN mention the L0 person. That is the owner until on-call exists, so for Tier 1 at night it moves to the on-call person in S10 (message-checker L3).
@@ -508,7 +508,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S16 · Users & access
 
 - **Scope:** Users & roles (invite = add to the allowlist with a role, change role, deactivate with the "Used in" check and reassignment, §14.9), Security (sessions, sign out everywhere, confirm dialogs), Profile (notification channels incl. the Google Chat user id that alerts mention, D-015; on-call checklist). No 2-step status, required date or lock — Google Workspace enforces 2-step (D-007); the invite dialog asks for the person's primary Google address (not a DxT alias) and reminds the Admin to have them confirm their 2-Step Verification page.
-- **Boards:** Users, Security, Profile
+- **Boards:** Users, Security, Profile, MProfile
 - **Depends on:** S10
 - **Done when:**
   1. Inviting an address adds it to the allowlist with the chosen role and that person can then sign in; deactivating removes the entry, bans the auth user and ends their sessions (test). Every change writes `audit_log`.
@@ -702,6 +702,7 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | MIncident | S07 |
 | Resolve | S07 |
 | Escalation | S08 |
+| MEscalation | S08 |
 | Maintenance | S09 |
 | MMaintenance | S09 |
 | OnCall | S10 |
@@ -714,6 +715,7 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | Users | S16 |
 | Security | S16 |
 | Profile | S16 |
+| MProfile | S16 |
 | AlertChannels | S17 |
 | Organisation | S17 |
 | Guide | S18 |
