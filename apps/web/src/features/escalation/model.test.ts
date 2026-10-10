@@ -124,7 +124,7 @@ describe('delayCheck — the edit dialog', () => {
     ['L0 is pinned', '0', 0, { error: null, hint: 'Pinned — fires immediately.' }],
     ['not a number', '4x', 1, { error: 'Enter whole minutes, e.g. 45', hint: null }],
     ['under 15', '10', 1, { error: 'At least +15 min — L0 covers the first 15 minutes', hint: null }],
-    ['fine', '20', 1, { error: null, hint: null }],
+    ['fine: the board’s standing hint', '20', 1, { error: null, hint: 'Must be later than L0 (+0 min).' }],
   ])('%s', (_case, value, i, want) => {
     expect(delayCheck(value, [l0, l1()], i)).toEqual(want);
   });

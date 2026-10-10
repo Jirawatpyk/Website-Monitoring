@@ -1,10 +1,10 @@
 'use client';
 
-import { Button, Card, SegmentedControl, Select, TextField } from '@jirawatpyk/aura-react';
+import { Alert, Button, Card, SegmentedControl, Select, TextField } from '@jirawatpyk/aura-react';
 import { IconCircleAlert, IconClock, IconPlus, IconTriangleAlert } from '@jirawatpyk/aura-react/icons';
 import type { EscalationStep } from '@dxt/shared';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { UnsavedBar } from '@/components/unsaved-bar';
 import { saveEscalation } from '../actions';
 import {
@@ -40,7 +40,8 @@ const draftOf = (d: EscalationPageData): EscalationDraft => ({
 /**
  * The Escalation board for an Admin (S08, D-034): the policy switch, its ladder (L0 pinned, L1
  * editable), Preview, the reminder intervals, the sticky unsaved bar and the save dialog. Changes stay
- * on the page until "Save and log".
+ * on the page until "Save and log". When the control that had focus goes away (Delete, Add, Discard,
+ * Save), focus moves to the ladder's heading (WCAG 2.4.3).
  */
 export function EscalationEditor({ data, now }: { data: EscalationPageData; now: string }) {
   const router = useRouter();
@@ -52,21 +53,35 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
   const [note, setNote] = useState('');
   const [noteError, setNoteError] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
   const [pending, start] = useTransition();
-
-  const policy = draft.policies.find((p) => p.key === key) ?? draft.policies[0]!;
-  const sites = sitesOf(policy, data.sites);
   const [siteId, setSiteId] = useState<string | null>(null);
-  const site = sites.find((s) => s.id === siteId) ?? sites[0];
+  const [refocus, setRefocus] = useState(0);
+  const ladderHeading = useRef<HTMLHeadingElement>(null);
   const hours = useMemo(() => hoursOf(data.hours), [data.hours]);
   const clock = useNow(now);
-  const preview = scenario(policy, site, data.admins, hours, clock);
+  useEffect(() => {
+    if (refocus) ladderHeading.current?.focus();
+  }, [refocus]);
+
+  const policy = draft.policies.find((p) => p.key === key) ?? draft.policies[0];
+  if (!policy) throw new Error('No escalation policies — the S08 migration seeds four');
+  const sites = sitesOf(policy, data.sites);
+  const site = sites.find((s) => s.id === siteId) ?? sites[0];
+  const reminderMin =
+    Number(policy.severity === 'down' ? draft.downReminder : draft.problemReminder) || undefined;
+  const preview = scenario(policy, site, data.admins, hours, clock, { reminderMin });
   const rows = diff(saved, draft);
   const summary = unsavedSummary(rows);
   const message = policyMessage(policy);
+  const hoursText = hoursLabel(data.hours);
 
+  const change = (next: (d: EscalationDraft) => EscalationDraft) => {
+    setJustSaved(false);
+    setDraft(next);
+  };
   const setSteps = (steps: EscalationStep[]) =>
-    setDraft((d) => ({
+    change((d) => ({
       ...d,
       policies: d.policies.map((p) =>
         p.id === policy.id ? { ...p, steps: steps.map((s, level) => ({ ...s, level })) } : p,
@@ -94,6 +109,8 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
       }
       setSaveOpen(false);
       setNote('');
+      setJustSaved(true);
+      setRefocus((n) => n + 1);
       router.refresh();
     });
   };
@@ -109,20 +126,34 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
         />
         <span className="flex items-center gap-2 text-sm text-fg-secondary">
           <IconClock size="sm" aria-hidden />
-          {timerBasis(key)}
+          {timerBasis(key, hoursText)}
         </span>
       </div>
 
+      {justSaved && (
+        <Alert tone="success" title="Saved" role="status">
+          New incidents use it straight away; open incidents keep their current timers. The change is in the
+          audit log.
+        </Alert>
+      )}
+
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col lg:col-span-2">
-          <ol className="m-0 list-none p-0" aria-label={`${POLICY_LABELS[key]} steps`}>
+        <section className="flex min-w-0 flex-col lg:col-span-2" aria-labelledby="escalation-ladder">
+          <h2 id="escalation-ladder" ref={ladderHeading} tabIndex={-1} className="sr-only">
+            {POLICY_LABELS[key]} steps
+          </h2>
+          <ol role="list" className="m-0 list-none p-0">
             {policy.steps.map((_, i) => (
               <StepRow
                 key={`${policy.id}-${i}`}
                 policy={policy}
                 index={i}
+                admins={data.admins}
                 onEdit={(index) => setEditing({ index, adding: false })}
-                onDelete={(index) => setSteps(policy.steps.filter((_s, j) => j !== index))}
+                onDelete={(index) => {
+                  setSteps(policy.steps.filter((_s, j) => j !== index));
+                  setRefocus((n) => n + 1);
+                }}
               />
             ))}
           </ol>
@@ -131,6 +162,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
               <Button
                 variant="ghost"
                 size="sm"
+                touchHeight
                 icon={<IconPlus />}
                 onClick={() => setEditing({ index: policy.steps.length, adding: true })}
               >
@@ -154,46 +186,60 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
               {message.text}
             </p>
           )}
-        </div>
+        </section>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Preview">
+          <Card title="Preview" headingLevel={2}>
             <div className="flex flex-col gap-3">
-              <Select
-                label="Resolve for site"
-                options={sites.map((s) => ({ value: s.id, label: s.name }))}
-                value={site?.id ?? ''}
-                onChange={(e) => setSiteId(e.target.value)}
-              />
-              <dl className="m-0 flex flex-col rounded-aura-md border border-border-default px-3 py-1 text-sm">
-                {tokenRows(site, data.admins).map((t, i) => (
-                  <div
-                    key={t.token}
-                    className={`flex justify-between gap-3 py-1.5 ${i ? 'border-t border-border-subtle' : ''}`}
-                  >
-                    <dt className="whitespace-nowrap text-fg-secondary">{t.token}</dt>
-                    <dd className="m-0 text-right font-medium">{t.name}</dd>
-                  </div>
-                ))}
-              </dl>
-              <p className="m-0 text-sm text-fg-secondary">{preview.caseLine}</p>
-              <ol className="m-0 flex list-none flex-col p-0">
-                {preview.rows.map((r) => (
-                  <li
-                    key={`${r.at}${r.what}`}
-                    className="flex gap-3 border-b border-border-subtle py-2 text-sm"
-                  >
-                    <span className="w-18 shrink-0 font-mono text-xs text-fg-secondary">{r.at}</span>
-                    <span className={r.danger ? 'text-fg-danger' : r.muted ? 'text-fg-secondary' : undefined}>
-                      {r.what}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              {site ? (
+                <>
+                  <Select
+                    label="Resolve for site"
+                    touchHeight
+                    options={sites.map((s) => ({ value: s.id, label: s.name }))}
+                    value={site.id}
+                    onChange={(e) => setSiteId(e.target.value)}
+                  />
+                  <dl className="m-0 flex flex-col rounded-aura-md border border-border-default px-3 py-1 text-sm">
+                    {tokenRows(site, data.admins, policy.steps).map((t, i) => (
+                      <div
+                        key={t.token}
+                        className={`flex justify-between gap-3 py-1.5 ${i ? 'border-t border-border-subtle' : ''}`}
+                      >
+                        <dt className="whitespace-nowrap text-fg-secondary">{t.token}</dt>
+                        <dd className="m-0 text-right font-medium">{t.name}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="m-0 text-sm text-fg-secondary">{preview.caseLine}</p>
+                  <ol role="list" className="m-0 flex list-none flex-col p-0">
+                    {preview.rows.map((r) => (
+                      <li
+                        key={`${r.at}${r.what}`}
+                        className="flex gap-3 border-b border-border-subtle py-2 text-sm"
+                      >
+                        <span className="w-20 shrink-0 font-mono text-xs whitespace-nowrap text-fg-secondary">
+                          {r.at}
+                        </span>
+                        <span
+                          className={r.danger ? 'text-fg-danger' : r.muted ? 'text-fg-secondary' : undefined}
+                        >
+                          {r.what}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              ) : (
+                <p className="m-0 text-sm text-fg-secondary">
+                  No live {policy.tier ? `Tier ${policy.tier} ` : ''}sites yet — the preview resolves names
+                  once one is monitored.
+                </p>
+              )}
             </div>
           </Card>
 
-          <Card title="Applies to every step">
+          <Card title="Applies to every step" headingLevel={2}>
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <TextField
@@ -201,7 +247,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
                   suffix="min"
                   inputMode="numeric"
                   value={draft.downReminder}
-                  onChange={(e) => setDraft((d) => ({ ...d, downReminder: e.target.value }))}
+                  onChange={(e) => change((d) => ({ ...d, downReminder: e.target.value }))}
                   error={reminderError(draft.downReminder) ?? undefined}
                 />
                 <TextField
@@ -209,7 +255,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
                   suffix="min"
                   inputMode="numeric"
                   value={draft.problemReminder}
-                  onChange={(e) => setDraft((d) => ({ ...d, problemReminder: e.target.value }))}
+                  onChange={(e) => change((d) => ({ ...d, problemReminder: e.target.value }))}
                   error={reminderError(draft.problemReminder) ?? undefined}
                 />
               </div>
@@ -218,7 +264,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
                   ['Thread', '1 per incident'],
                   ['Chat fails', 'Email fallback'],
                   ['Tier 1 hours', '24/7'],
-                  ['Tier 2–3 hours', hoursLabel(data.hours)],
+                  ['Tier 2–3 hours', hoursText],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-3">
                     <dt className="text-fg-secondary">{k}</dt>
@@ -235,7 +281,10 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
         <UnsavedBar
           label={summary.label}
           hint={summary.hint}
-          onDiscard={() => setDraft(saved)}
+          onDiscard={() => {
+            setDraft(saved);
+            setRefocus((n) => n + 1);
+          }}
           onSave={() => {
             setNoteError(null);
             setFailure(null);
@@ -250,11 +299,16 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
           index={editing.index}
           adding={editing.adding}
           admins={data.admins}
+          site={site}
+          hours={hours}
+          now={clock}
           onClose={() => setEditing(null)}
           onApply={(step) => {
             const steps = [...editingPolicy.steps];
             steps[editing.index] = step;
             setSteps(steps);
+            // "Add step" goes away once L1 exists (S08): its pencil is new, the heading is stable.
+            if (editing.adding) setRefocus((n) => n + 1);
             setEditing(null);
           }}
         />

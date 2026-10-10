@@ -7,6 +7,7 @@ import {
   IconPencil,
   IconPin,
   IconTrash2,
+  IconTriangleAlert,
   IconUser,
   IconUsers,
 } from '@jirawatpyk/aura-react/icons';
@@ -29,11 +30,14 @@ const CHANNEL_ORDER: readonly EscalationChannel[] = ['chat', 'space', 'email', '
 export function StepRow({
   policy,
   index,
+  admins,
   onEdit,
   onDelete,
 }: {
   policy: PolicyDraft;
   index: number;
+  /** Every active Admin: the token reads "Admin (Tao)" (D-034). */
+  admins: readonly string[];
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
 }) {
@@ -85,11 +89,17 @@ export function StepRow({
         <dl className="m-0 grid grid-cols-[calc(var(--spacing)*22)_minmax(0,1fr)] items-center gap-x-4 gap-y-2.5">
           <dt className="font-mono text-xs text-fg-tertiary">NOTIFY</dt>
           <dd className="m-0 flex flex-wrap gap-2">
-            {targetLabels(step).map((t) => (
+            {targetLabels(step, admins).map((t) => (
               <Tag key={t} icon={<IconUser />}>
                 {t}
               </Tag>
             ))}
+            {step.targets.includes('admins') && admins.length === 1 && (
+              <span className="flex items-center gap-1.5 text-xs text-fg-warning">
+                <IconTriangleAlert size="sm" aria-hidden />
+                {admins[0]} is the only active Admin
+              </span>
+            )}
           </dd>
           <dt className="font-mono text-xs text-fg-tertiary">CHANNELS</dt>
           <dd className="m-0 flex flex-wrap gap-2">

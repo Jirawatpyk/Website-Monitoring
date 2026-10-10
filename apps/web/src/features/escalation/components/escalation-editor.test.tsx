@@ -170,6 +170,35 @@ describe('Escalation editor — saving', () => {
     expect(screen.getByRole('button', { name: 'Edit L1' })).toBeInTheDocument();
   });
 
+  it('Delete moves focus to the ladder heading (the trash button is gone)', async () => {
+    render(<EscalationEditor data={data} now={NOW} />);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Delete L1' })));
+    expect(screen.getByRole('heading', { name: 'Tier 1 DOWN steps' })).toHaveFocus();
+  });
+
+  it('after a save: a "Saved" status and focus on the ladder heading', async () => {
+    actions.saveEscalation.mockResolvedValue({ ok: true });
+    render(<EscalationEditor data={data} now={NOW} />);
+    fireEvent.change(screen.getByLabelText('DOWN reminder'), { target: { value: '10' } });
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Unsaved changes' })).getByRole('button', { name: 'Save' }),
+    );
+    const save = dialog('Save escalation changes?');
+    expect(
+      within(save).getByText('Affects 1 site · 1 open incident (INC-0142) keeps its current timers'),
+    ).toBeInTheDocument();
+    fireEvent.change(within(save).getByLabelText(/Change note/), { target: { value: 'shorter' } });
+    await act(async () => fireEvent.click(within(save).getByRole('button', { name: 'Save and log' })));
+    expect(screen.getByText(/New incidents use it straight away/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tier 1 DOWN steps' })).toHaveFocus();
+  });
+
+  it('the Admin token names the Admin, with the one-Admin warning', () => {
+    render(<EscalationEditor data={data} now={NOW} />);
+    expect(screen.getByText('Admin (Tao)')).toBeInTheDocument();
+    expect(screen.getByText('Tao is the only active Admin')).toBeInTheDocument();
+  });
+
   it('closing the edit dialog returns focus to its pencil', async () => {
     render(<EscalationEditor data={data} now={NOW} />);
     const pencil = screen.getByRole('button', { name: 'Edit L1' });

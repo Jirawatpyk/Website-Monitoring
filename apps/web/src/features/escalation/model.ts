@@ -46,39 +46,48 @@ export const policyShort = (key: PolicyKey) => (key === 'problem' ? 'PROBLEM' : 
 export const policyKeyOf = (severity: 'down' | 'problem', tier: number | null): PolicyKey =>
   severity === 'problem' ? 'problem' : (`t${tier ?? 1}` as PolicyKey);
 
-/** The clock line beside the policy switch (Escalation board). */
-export function timerBasis(key: PolicyKey): string {
+/** The clock line beside the policy switch (Escalation board); `hours` = "Mon–Fri 09:00–18:00" from settings. */
+export function timerBasis(key: PolicyKey, hours: string): string {
   if (key === 't1') return 'Tier 1 · timers run 24/7 from “Confirmed down”';
-  if (key === 'problem') return 'Tier 1 runs 24/7 · Tier 2–3 wait for Mon–Fri 09:00–18:00';
-  return 'Tier 2 and 3 share hours: Mon–Fri 09:00–18:00';
+  if (key === 'problem') return `Tier 1 runs 24/7 · Tier 2–3 wait for ${hours}`;
+  return `Tier 2 and 3 share hours: ${hours}`;
 }
 
 /** "+0 · immediately" / "+15 min". */
 export const stepWhen = (s: EscalationStep) => (s.level === 0 ? '+0 · immediately' : `+${s.delayMin} min`);
 
-/** The row's condition line (Escalation board). */
-export function stepCondition(p: PolicyDraft, s: EscalationStep): string {
+/** The row's condition line (Escalation board; the phone's shorter "any hour", MEscalation). */
+export function stepCondition(p: PolicyDraft, s: EscalationStep, phone = false): string {
   if (s.level > 0) return 'No acknowledgement';
   if (p.severity === 'problem') return 'PROBLEM confirmed';
-  return p.key === 't1' ? 'DOWN confirmed' : 'DOWN confirmed · posted at any hour';
+  if (p.key === 't1') return 'DOWN confirmed';
+  return phone ? 'DOWN confirmed · any hour' : 'DOWN confirmed · posted at any hour';
 }
 
-/** The row's note (Escalation board L0 / L1 notes, on-call wording left for S10). */
-export function stepNote(p: PolicyDraft, s: EscalationStep): string | null {
-  if (s.level === 0 && p.severity === 'down') {
-    return p.key === 't1'
-      ? 'Chat @mention and Alerts Space are locked on. Only the owner is @mentioned; the backup is named in plain text.'
-      : 'Outside response hours it still posts, but the timers below wait until 09:00.';
+/**
+ * The row's note (Escalation board / MEscalation; on-call wording waits for S10). The phone has no
+ * locked checkboxes to talk about, and says the PROBLEM hold once, in its subtitle.
+ */
+export function stepNote(p: PolicyDraft, s: EscalationStep, phone = false): string | null {
+  if (s.level > 0) return 'Anyone already paged is left out.';
+  if (p.severity === 'down') {
+    if (p.key !== 't1')
+      return 'Outside response hours it still posts, but the timers below wait for the next opening.';
+    return phone
+      ? 'Only this person is @mentioned; the backup is named in plain text.'
+      : 'Chat @mention and Alerts Space are locked on. Only the owner is @mentioned; the backup is named in plain text.';
   }
-  if (s.level === 0) return 'Tier 2–3 outside response hours are held until 09:00.';
-  return null;
+  return phone ? null : 'Tier 2–3 outside response hours are held until the next opening.';
 }
 
 const ORDER: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'site_am', 'ceo'];
 const CHANNEL_ORDER: readonly EscalationChannel[] = ['chat', 'space', 'email', 'voice'];
 
-export const targetLabels = (s: EscalationStep) =>
-  ORDER.filter((t) => s.targets.includes(t)).map((t) => ESCALATION_TARGET_LABELS[t]);
+/** "Backup", "Admin (Tao)" — the Admin token names every active Admin (D-034). */
+export const targetLabels = (s: EscalationStep, admins: readonly string[] = []) =>
+  ORDER.filter((t) => s.targets.includes(t)).map((t) =>
+    t === 'admins' && admins.length ? `Admin (${admins.join(', ')})` : ESCALATION_TARGET_LABELS[t],
+  );
 export const channelLabels = (s: EscalationStep) =>
   CHANNEL_ORDER.filter((c) => s.channels.includes(c)).map((c) => ESCALATION_CHANNEL_LABELS[c]);
 
@@ -221,7 +230,8 @@ export function delayCheck(
       hint: `Later than L${i + 1} (+${next.delayMin} min). You can apply it, but Save stays blocked until each step is later than the one before.`,
     };
   }
-  return { error: null, hint: null };
+  // The board's standing hint for a valid delay.
+  return { error: null, hint: prev ? `Must be later than L${i - 1} (+${prev.delayMin} min).` : null };
 }
 
 /** "Affects 5 sites · 1 open incident (INC-0142) keeps its current timers" (the save dialog). */

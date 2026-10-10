@@ -1,9 +1,11 @@
-import { Button } from '@jirawatpyk/aura-react';
-import { IconCheck, IconPencil } from '@jirawatpyk/aura-react/icons';
+import { ActionBar, Button } from '@jirawatpyk/aura-react';
+import { IconCheck } from '@jirawatpyk/aura-react/icons';
 
 /**
  * The settings save model (spec §13): "N unsaved changes · Discard · Save" as a sticky bar, shown only
- * when something changed (Escalation board; Organisation, Alert channels and Security reuse it).
+ * when something changed (Escalation board; Organisation, Alert channels and Security reuse it). Built
+ * on AURA ActionBar: it sticks above a BottomNav, its status line is announced, its buttons are 44 px
+ * on touch. The board draws a pill with a pencil; ActionBar's own shape stands in (spec-check B1).
  */
 export function UnsavedBar({
   label,
@@ -17,22 +19,21 @@ export function UnsavedBar({
   onSave: () => void;
 }) {
   return (
-    <div
-      role="region"
-      aria-label="Unsaved changes"
-      className="sticky bottom-4 z-10 flex items-center gap-3 rounded-full border border-border-strong bg-bg-surface py-2.5 pr-2.5 pl-5 shadow-aura-overlay"
+    <ActionBar
+      label="Unsaved changes"
+      status={
+        <span>
+          <span className="font-semibold">{label}</span>
+          {hint ? <span className="text-fg-secondary"> · {hint}</span> : null}
+        </span>
+      }
     >
-      <span className="flex text-fg-secondary" aria-hidden>
-        <IconPencil size="sm" />
-      </span>
-      <span className="font-semibold whitespace-nowrap">{label}</span>
-      <span className="min-w-0 flex-1 truncate text-sm text-fg-secondary">{hint}</span>
-      <Button variant="ghost" size="sm" onClick={onDiscard}>
+      <Button variant="ghost" touchHeight onClick={onDiscard}>
         Discard
       </Button>
-      <Button variant="primary" size="sm" icon={<IconCheck />} onClick={onSave}>
+      <Button variant="primary" icon={<IconCheck />} touchHeight onClick={onSave}>
         Save
       </Button>
-    </div>
+    </ActionBar>
   );
 }

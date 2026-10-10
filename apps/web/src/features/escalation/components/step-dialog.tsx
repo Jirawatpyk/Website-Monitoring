@@ -5,9 +5,12 @@ import {
   type EscalationChannel,
   type EscalationStep,
   type EscalationTarget,
+  type ResponseHours,
 } from '@dxt/shared';
 import { useState } from 'react';
 import { delayCheck, policyShort, type PolicyDraft } from '../model';
+import { scenario } from '../preview';
+import type { PreviewSite } from '../types';
 
 /** S08 offers these tokens; the CEO is S10's (Tier 1 DOWN from L2, §15.5). */
 const TOKENS: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'site_am', 'ceo'];
@@ -22,6 +25,9 @@ export function StepDialog({
   index,
   adding,
   admins,
+  site,
+  hours,
+  now,
   onApply,
   onClose,
 }: {
@@ -29,6 +35,10 @@ export function StepDialog({
   index: number;
   adding: boolean;
   admins: readonly string[];
+  /** The Preview's site: the dialog's own preview line names its people (Escalation board). */
+  site: PreviewSite | undefined;
+  hours: ResponseHours;
+  now: Date;
   onApply: (step: EscalationStep) => void;
   onClose: () => void;
 }) {
@@ -49,6 +59,15 @@ export function StepDialog({
     onApply({ ...start, delayMin: Number(delay), targets, channels });
   };
   const adminNote = admins.length === 1 ? `${admins[0]} is the only active Admin.` : null;
+  // The step as it would be applied, previewed for the site (board: "10:03 · L1 → Ploy + Tao (MuvMi)").
+  const trial = {
+    ...policy,
+    steps: policy.steps.map((s, i) =>
+      i === index ? { ...s, delayMin: check.error ? s.delayMin : Number(delay), targets, channels } : s,
+    ),
+  };
+  const row = scenario(trial, site, admins, hours, now).rows.at(index === 0 ? 0 : -1)!;
+  const preview = { ...row, what: site ? `${row.what} (${site.name})` : row.what };
 
   return (
     <Dialog
@@ -104,7 +123,11 @@ export function StepDialog({
               ? 'Pick at least one person.'
               : 'Pick who this step notifies. Tokens resolve per site — see the preview.'}
           </span>
-          <span className="text-xs text-fg-secondary">CEO is available from L2 onward.</span>
+          <span className="text-xs text-fg-secondary">
+            {policy.key === 't1'
+              ? 'CEO is available from L2 onward.'
+              : 'CEO isn’t available here — the CEO is paged only on Tier 1 DOWN, from L2 onward.'}
+          </span>
         </fieldset>
         <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
           <legend className="mb-2 p-0 text-sm font-medium">Channels</legend>
@@ -117,13 +140,6 @@ export function StepDialog({
           <Checkbox checked={channels.includes('email')} onChange={channel('email')}>
             Email
           </Checkbox>
-          <Checkbox
-            checked={false}
-            disabled
-            description="Only the L2 CEO step can carry a voice call, and it stays off until approved."
-          >
-            Voice call
-          </Checkbox>
           {!channels.length && (
             <span className="flex items-center gap-1.5 text-xs text-fg-danger">
               <IconCircleAlert size="sm" aria-hidden />
@@ -131,6 +147,10 @@ export function StepDialog({
             </span>
           )}
         </fieldset>
+        <p className="m-0 flex gap-2.5 rounded-aura-md border border-border-default px-3.5 py-2.5 text-sm">
+          <span className="shrink-0 font-mono text-xs whitespace-nowrap text-fg-secondary">{preview.at}</span>
+          <span className={preview.danger ? 'text-fg-danger' : undefined}>{preview.what}</span>
+        </p>
       </div>
     </Dialog>
   );

@@ -24,13 +24,20 @@ export const sitesOf = (p: PolicyDraft, sites: readonly PreviewSite[]) =>
   p.tier === null ? [...sites] : sites.filter((s) => s.tier === p.tier);
 
 /** "Owner → Arm" … for the token table. */
-export function tokenRows(site: PreviewSite | undefined, admins: readonly string[]) {
-  return [
-    { token: 'Owner', name: site?.owner ?? '—' },
-    { token: 'Backup', name: site?.backup ?? '—' },
-    { token: 'Admin', name: admins.length ? admins.join(', ') : '—' },
-    { token: 'Site AM', name: site ? (site.am ?? '— (internal)') : '—' },
-  ];
+export function tokenRows(
+  site: PreviewSite | undefined,
+  admins: readonly string[],
+  /** Only the tokens the policy's steps use (spec-check B6: Site AM returns with S11's track). */
+  used?: readonly EscalationStep[],
+) {
+  const all = [
+    { key: 'owner', token: 'Owner', name: site?.owner ?? '—' },
+    { key: 'backup', token: 'Backup', name: site?.backup ?? '—' },
+    { key: 'admins', token: 'Admin', name: admins.length ? admins.join(', ') : '—' },
+    { key: 'site_am', token: 'Site AM', name: site ? (site.am ?? '— (internal)') : '—' },
+  ] as const;
+  const tokens = used ? new Set(used.flatMap((s) => s.targets)) : null;
+  return all.filter((t) => !tokens || tokens.has(t.key)).map(({ token, name }) => ({ token, name }));
 }
 
 /** The names a step reaches for the site, minus those an earlier step already told (PRD §8). */
@@ -74,44 +81,50 @@ export interface ScenarioRow {
   danger?: boolean;
 }
 
-/** "MuvMi DOWN confirmed now, nobody acknowledges:" and its rows (Escalation board Preview). */
+/**
+ * "MuvMi DOWN confirmed now, nobody acknowledges:" and its rows (Escalation board Preview; MEscalation
+ * drops ", nobody acknowledges" under its own heading). Outside response hours a Tier 2–3 DOWN posts L0
+ * and pauses; a Tier 2–3 PROBLEM is held, L0 included, until the next opening (spec §7, D-034).
+ */
 export function scenario(
   p: PolicyDraft,
   site: PreviewSite | undefined,
   admins: readonly string[],
   hours: ResponseHours,
   now: Date,
+  options: { phone?: boolean; reminderMin?: number } = {},
 ) {
   const tier = p.tier ?? site?.tier ?? 1;
-  const plan = { severity: p.severity, tier, reminderMin: 15, steps: p.steps };
+  const plan = { severity: p.severity, tier, reminderMin: options.reminderMin ?? 15, steps: p.steps };
   const schedule = scheduleOf({ plan, detectedAt: now, hours });
   const rows: ScenarioRow[] = [];
   const outside = tier !== 1 && !isInsideHours(now, hours);
+  const held = outside && p.severity === 'problem';
+  const opening = outside ? nextOpening(now, hours) : now;
   p.steps.forEach((s, i) => {
     const names = stepNames(p.steps, i, site, admins);
-    const due = schedule.find((x) => x.level === s.level)?.dueAt ?? now;
-    if (i === 1 && outside) {
-      rows.push({
-        at: at(nextOpening(now, hours), now),
-        what: 'Response hours start · timers run',
-        muted: true,
-      });
+    const due = held && i === 0 ? opening : (schedule.find((x) => x.level === s.level)?.dueAt ?? now);
+    if (i === 1 && outside && !held) {
+      rows.push({ at: at(opening, now), what: 'Response hours start · timers run', muted: true });
     }
     const nobody = !s.channels.length
       ? 'notifies nobody (no channel ticked)'
-      : !names.length
+      : !s.targets.length
         ? 'notifies nobody (no one picked)'
-        : null;
+        : !names.length
+          ? 'nobody new (already told)'
+          : null;
     const space = i === 0 && s.channels.includes('space') ? ' + Alerts Space' : '';
+    const suffix = i > 0 ? '' : held ? ' (held until response hours)' : outside ? ' · timers paused' : '';
     rows.push({
       at: at(due, now),
-      what: `L${i} → ${nobody ?? names.join(' + ') + space}${i === 0 && outside ? ' · timers paused' : ''}`,
-      danger: !!nobody,
+      what: `L${i} → ${nobody ?? names.join(' + ') + space}${suffix}`,
+      danger: !s.channels.length || !s.targets.length,
     });
   });
   const what = p.severity === 'down' ? 'DOWN confirmed' : 'PROBLEM';
   return {
-    caseLine: `${site?.name ?? 'A site'} ${what} now${outside ? ' (outside response hours)' : ''}, nobody acknowledges:`,
+    caseLine: `${site?.name ?? 'A site'} ${what} now${outside ? ' (outside response hours)' : ''}${options.phone ? ':' : ', nobody acknowledges:'}`,
     rows,
   };
 }

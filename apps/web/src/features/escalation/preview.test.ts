@@ -55,6 +55,23 @@ describe('preview (S08, D-034)', () => {
     ]);
   });
 
+  it('a Tier 2 PROBLEM at night is held, L0 included, until the opening (spec §7, D-034)', () => {
+    const problem: PolicyDraft = {
+      id: 'pp',
+      key: 'problem',
+      severity: 'problem',
+      tier: null,
+      steps: [
+        { level: 0, delayMin: 0, targets: ['owner'], channels: ['chat', 'space', 'email'] },
+        { level: 1, delayMin: 60, targets: ['backup'], channels: ['chat', 'email'] },
+      ],
+    };
+    expect(scenario(problem, orca, ['Tao'], hours, bkk('2026-09-24T22:14:00')).rows).toEqual([
+      { at: 'Fri 09:00', what: 'L0 → Tao + Alerts Space (held until response hours)', danger: false },
+      { at: 'Fri 10:00', what: 'L1 → Nok', danger: false },
+    ]);
+  });
+
   it('a step with no channel notifies nobody', () => {
     const p = down(1);
     p.steps[1] = { ...p.steps[1]!, channels: [] };

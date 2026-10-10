@@ -53,6 +53,21 @@ test.describe('escalation policies (local Supabase)', () => {
     await expect(bar).toBeHidden();
   });
 
+  test('Admin on a phone: view only (spec §22.5), no edit controls', async ({
+    page,
+    context,
+    baseURL,
+  }, info) => {
+    test.skip(info.project.name !== 'mobile', 'the phone layout');
+    await ensureUser('tao@example.test');
+    await signIn(context, baseURL!, 'tao@example.test');
+    await page.goto('/escalation');
+    await expect(page.getByText('View only on phones.')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Edit L1|Delete L1/ })).toBeHidden();
+    await page.getByRole('radio', { name: 'PROBLEM' }).click();
+    await expect(page.getByRole('heading', { name: /^PROBLEM · all \d+ sites?$/ })).toBeVisible();
+  });
+
   test('Responder: the policies read-only, no edit controls', async ({ page, context, baseURL }) => {
     await ensureUser('arm@example.test');
     await signIn(context, baseURL!, 'arm@example.test');
