@@ -421,7 +421,7 @@ export function eventLine(e: OverviewEvent): string | null {
     case 'escalated_to_down':
       return confirmed;
     case 'acknowledged':
-      return `${inc} acked by ${e.actorName ?? 'someone'} — escalation stopped`;
+      return `${inc} acked by ${e.actorName ?? 'someone'}${e.severity === 'down' ? ' — escalation stopped' : ''}`;
     case 'ack_undone':
       return `${inc} acknowledgement undone by ${e.actorName ?? 'someone'}`;
     case 'recovered':

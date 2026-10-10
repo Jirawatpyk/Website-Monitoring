@@ -249,13 +249,41 @@ export function newStep(p: PolicyDraft): EscalationStep {
   };
 }
 
-/** The input `save_escalation_policies` takes. */
-export function toSaveInput(d: EscalationDraft, note: string) {
+const sameSteps = (a: PolicyDraft | undefined, b: PolicyDraft) =>
+  !!a && a.steps.map(describeStep).join('|') === b.steps.map(describeStep).join('|');
+
+/**
+ * The policies a save changes for new incidents: those whose steps changed, and every policy of a
+ * severity whose reminder interval changed (the save dialog's "Affects …" line).
+ */
+export function affectedPolicies(saved: EscalationDraft, draft: EscalationDraft): PolicyDraft[] {
+  const downReminder = saved.downReminder.trim() !== draft.downReminder.trim();
+  const problemReminder = saved.problemReminder.trim() !== draft.problemReminder.trim();
+  return draft.policies.filter(
+    (p) =>
+      !sameSteps(
+        saved.policies.find((s) => s.id === p.id),
+        p,
+      ) || (p.severity === 'down' ? downReminder : problemReminder),
+  );
+}
+
+/** The input `save_escalation_policies` takes: only the policies whose steps changed. */
+export function toSaveInput(d: EscalationDraft, note: string, saved?: EscalationDraft) {
   return {
-    policies: d.policies.map((p) => ({
-      policyId: p.id,
-      steps: p.steps.map((s, level) => ({ ...s, level })),
-    })),
+    policies: d.policies
+      .filter(
+        (p) =>
+          !saved ||
+          !sameSteps(
+            saved.policies.find((s) => s.id === p.id),
+            p,
+          ),
+      )
+      .map((p) => ({
+        policyId: p.id,
+        steps: p.steps.map((s, level) => ({ ...s, level })),
+      })),
     downReminderMin: Number(d.downReminder),
     problemReminderMin: Number(d.problemReminder),
     note,

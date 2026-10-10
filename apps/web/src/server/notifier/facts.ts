@@ -133,8 +133,14 @@ export function contextOf(context: Json): Record<string, Json | undefined> {
   return context && typeof context === 'object' && !Array.isArray(context) ? context : {};
 }
 
-/** Every active Admin ("Admin" in a step) and the response hours: the ladder's words (S08, D-034). */
-async function loadLadderEnv(db: DbClient, now: Date): Promise<{ admins: Owner[]; hours: ResponseHours }> {
+/**
+ * Every active Admin ("Admin" in a step) and the response hours: the ladder's words (S08, D-034). A
+ * failed read renders the messages without the ladder (null) instead of holding every alert back.
+ */
+async function loadLadderEnv(
+  db: DbClient,
+  now: Date,
+): Promise<{ admins: Owner[]; hours: ResponseHours } | null> {
   const [admins, hours] = await Promise.all([
     db
       .from('profiles')
@@ -143,6 +149,9 @@ async function loadLadderEnv(db: DbClient, now: Date): Promise<{ admins: Owner[]
       .eq('is_active', true),
     loadResponseHours(db, now),
   ]);
-  if (admins.error) throw new Error(`profiles: ${admins.error.message}`);
+  if (admins.error) {
+    console.error(JSON.stringify({ event: 'ladder_people_unreadable', error: admins.error.message }));
+    return null;
+  }
   return { admins: (admins.data ?? []) as Owner[], hours };
 }

@@ -8,6 +8,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { UnsavedBar } from '@/components/unsaved-bar';
 import { saveEscalation } from '../actions';
 import {
+  affectedPolicies,
   affectsLine,
   canAdd,
   diff,
@@ -25,6 +26,7 @@ import {
 } from '../model';
 import { hoursLabel, hoursOf, scenario, sitesOf, tokenRows } from '../preview';
 import type { EscalationPageData } from '../types';
+import { useNow } from '../use-now';
 import { SaveDialog } from './save-dialog';
 import { StepDialog } from './step-dialog';
 import { StepRow } from './step-row';
@@ -57,7 +59,8 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
   const [siteId, setSiteId] = useState<string | null>(null);
   const site = sites.find((s) => s.id === siteId) ?? sites[0];
   const hours = useMemo(() => hoursOf(data.hours), [data.hours]);
-  const preview = scenario(policy, site, data.admins, hours, new Date(now));
+  const clock = useNow(now);
+  const preview = scenario(policy, site, data.admins, hours, clock);
   const rows = diff(saved, draft);
   const summary = unsavedSummary(rows);
   const message = policyMessage(policy);
@@ -71,10 +74,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
     }));
   const editingPolicy = editing?.adding ? { ...policy, steps: [...policy.steps, newStep(policy)] } : policy;
 
-  const touched = new Set(rows.map((r) => r.where.split(' · L')[0]));
-  const affected = draft.policies.filter((p) =>
-    touched.has(p.key === 'problem' ? 'PROBLEM' : POLICY_LABELS[p.key]),
-  );
+  const affected = affectedPolicies(saved, draft);
   const affectsSites = new Set(affected.flatMap((p) => sitesOf(p, data.sites).map((s) => s.id))).size;
   const affectsOpen = data.openIncidents
     .filter((i) => affected.some((p) => p.key === i.key))
@@ -87,7 +87,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
     }
     setFailure(null);
     start(async () => {
-      const r = await saveEscalation(toSaveInput(draft, note.trim()));
+      const r = await saveEscalation(toSaveInput(draft, note.trim(), saved));
       if (!r.ok) {
         setFailure(r.message);
         return;

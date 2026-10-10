@@ -1,6 +1,7 @@
 import type { EscalationStep } from '@dxt/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  affectedPolicies,
   affectsLine,
   canAdd,
   delayCheck,
@@ -151,6 +152,14 @@ describe('the rest', () => {
       targets: [],
       channels: ['chat', 'email'],
     });
+  });
+  it('a reminder change affects every policy of that severity; only changed steps are sent', () => {
+    const saved = draft([t1(), problem([l0, l1({ delayMin: 60 })])]);
+    const changed = { ...saved, downReminder: '10' };
+    expect(affectedPolicies(saved, changed).map((p) => p.key)).toEqual(['t1']);
+    expect(toSaveInput(changed, 'x', saved).policies).toEqual([]);
+    const edited = draft([t1([l0, l1({ delayMin: 20 })]), problem([l0, l1({ delayMin: 60 })])]);
+    expect(toSaveInput(edited, 'x', saved).policies.map((p) => p.policyId)).toEqual(['p1']);
   });
   it('builds the save input', () => {
     expect(toSaveInput(draft([t1()]), 'why')).toEqual({

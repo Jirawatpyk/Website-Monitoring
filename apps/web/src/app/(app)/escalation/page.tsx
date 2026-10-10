@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Container, PageHeader } from '@jirawatpyk/aura-react';
 import { EscalationEditor, EscalationView } from '@/features/escalation';
 import { getEscalationPage } from '@/features/escalation/server';
+import { NoAccess } from '@/components/states';
 import { getAccess } from '@/lib/auth/session';
 
 export const metadata: Metadata = { title: 'Escalation policies' };
@@ -11,8 +12,23 @@ export const metadata: Metadata = { title: 'Escalation policies' };
  * everyone else (spec §8, §14.7, §15.5, §22; D-034). "Change history" waits for the Audit log (S15).
  */
 export default async function EscalationPage() {
-  const [access, data] = await Promise.all([getAccess(), getEscalationPage()]);
-  const admin = access.status === 'active' && access.profile.role === 'admin';
+  const access = await getAccess();
+  // Staff read the policies (RLS); anyone else gets the no-access state, not an error page.
+  if (access.status !== 'active' || access.profile.role === 'client') {
+    return (
+      <Container>
+        <div className="flex flex-col gap-6">
+          <PageHeader eyebrow="OPERATIONS" title="Escalation policies" />
+          <NoAccess
+            title="Escalation policies are for the DxT team"
+            description="Ask an Admin if you need to see who is paged when a site goes down."
+          />
+        </div>
+      </Container>
+    );
+  }
+  const data = await getEscalationPage();
+  const admin = access.profile.role === 'admin';
   const now = new Date().toISOString();
   return (
     <Container>

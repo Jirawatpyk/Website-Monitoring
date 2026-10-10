@@ -48,8 +48,11 @@ export function useAckToast({ ack, undo }: { ack: AckAction; undo: UndoAction })
   }, []);
 
   const acknowledge = useCallback(
-    (incidentId: string, number: number) => {
+    (incidentId: string, number: number, severity?: 'down' | 'problem') => {
       const id = formatIncidentId(number);
+      // What the ack stops (D-034): DOWN's escalation, a PROBLEM's reminders; unknown → said nothing.
+      const stopped =
+        severity === 'down' ? ' · escalation stopped' : severity === 'problem' ? ' · reminders stopped' : '';
       const toastId = `ack-${incidentId}`;
       setAcked((prev) => new Set(prev).add(incidentId));
       startTransition(async () => {
@@ -74,7 +77,7 @@ export function useAckToast({ ack, undo }: { ack: AckAction; undo: UndoAction })
             router.refresh();
           });
         const left = new Date(result.postsAt).getTime() - Date.now();
-        toast.success(`Acknowledged ${id} · escalation stopped`, {
+        toast.success(`Acknowledged ${id}${stopped}`, {
           id: toastId,
           description: <UndoLine postsAt={result.postsAt} onUndo={onUndo} />,
           // the window, then a moment to read "Posted"

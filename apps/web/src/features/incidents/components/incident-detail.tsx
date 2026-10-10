@@ -292,7 +292,7 @@ export function IncidentDetailView({
               <Button
                 variant="primary"
                 icon={<IconCheck />}
-                onClick={() => acknowledge(v.incidentId, Number(v.id.slice(4)))}
+                onClick={() => acknowledge(v.incidentId, Number(v.id.slice(4)), d.severity)}
               >
                 Acknowledge
               </Button>

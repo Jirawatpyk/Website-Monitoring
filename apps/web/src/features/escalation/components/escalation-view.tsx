@@ -7,6 +7,7 @@ import { useMemo, useState, type ReactElement } from 'react';
 import { stepCondition, stepNote, targetLabels, type PolicyDraft } from '../model';
 import { hoursLabel, hoursOf, scenario, sitesOf, stepNames } from '../preview';
 import type { EscalationPageData } from '../types';
+import { useNow } from '../use-now';
 
 const CH: Record<EscalationChannel, { label: string; icon: ReactElement }> = {
   chat: { label: 'Chat @mention', icon: <IconBell /> },
@@ -41,6 +42,7 @@ export function EscalationView({
   const [view, setView] = useState<ViewKey>('t1');
   const [siteId, setSiteId] = useState<string | null>(null);
   const hours = useMemo(() => hoursOf(data.hours), [data.hours]);
+  const clock = useNow(now);
   const find = (k: PolicyDraft['key']) => data.policies.find((p) => p.key === k);
   // "Tier 2–3 DOWN" lists both tiers' sites; the ladder is the picked site's tier (Tier 2 and 3 are
   // stored apart, D-034).
@@ -54,7 +56,7 @@ export function EscalationView({
   const policy =
     view === 't1' ? find('t1') : view === 'problem' ? find('problem') : find(site?.tier === 3 ? 't3' : 't2');
   if (!policy) return null;
-  const example = scenario(policy, site, data.admins, hours, new Date(now));
+  const example = scenario(policy, site, data.admins, hours, clock);
   const title =
     view === 't1'
       ? `Tier 1 DOWN · ${candidates.length} site${candidates.length === 1 ? '' : 's'}`

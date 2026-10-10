@@ -5,7 +5,6 @@ import { z } from 'zod';
 export const saveEscalationInputSchema = z.object({
   policies: z
     .array(z.object({ policyId: z.uuid(), steps: z.array(escalationStepSchema).min(1).max(4) }))
-    .min(1)
     .max(4),
   downReminderMin: z.number().int().min(1).max(1440),
   problemReminderMin: z.number().int().min(1).max(1440),
