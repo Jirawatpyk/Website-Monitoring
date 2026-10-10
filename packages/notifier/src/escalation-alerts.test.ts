@@ -332,7 +332,9 @@ describe('emails', () => {
       asFyi: false,
     });
     expect(e.text).toContain('STILL PROBLEM — ORCA Thailand still has a problem — 1 h, no ack');
-    expect(e.text).toContain('Problem for: 1 h (detected Thu 24 Sep 22:14:00)');
+    // The fact row is how long it has been wrong (wall clock); the headline how long unacknowledged.
+    expect(e.text).toContain('Problem for: 11 h 46 min (detected Thu 24 Sep 22:14:00)');
+    expect(e.html).toContain('ORCA Thailand problem not acknowledged for 1 h');
     expect(e.text).toContain('Cause: Slow — 6.2 s (limit 5 s)');
     expect(e.text).toContain('Already told: Tao — Chat + email 09:00');
     expect(e.text).toContain('Please take it — you’re the next person for this incident.');
@@ -387,6 +389,18 @@ describe('emails', () => {
     });
     expect(e.text).toContain('Acknowledged by Arm → reminders stopped.');
     expect(e.text).toContain('Reminders: 60-min reminder and the Nok (backup) step are stopped');
+    // Acked the morning after: the detection carries its day.
+    const next = buildAcknowledgedEmail({
+      ...base,
+      recipientId: 'tao',
+      reason: 'emailed',
+      ackedBy: 'Tao',
+      ackedAt: bkk('2026-09-25T10:05:00'),
+      startedAt: bkk('2026-09-24T22:14:00'),
+      confirmedAt: bkk('2026-09-24T22:14:00'),
+      problem: { trigger: 'slow' },
+    });
+    expect(next.text).toContain('(detected Thu 24 Sep 22:14)');
   });
 
   it('Acknowledged email says L1 stopped', () => {

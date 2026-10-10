@@ -139,7 +139,11 @@ export function EscalationView({
                   {names.join(' + ') || 'Nobody new (already told)'}
                   {s.channels.includes('space') ? ' + Alerts Space' : ''}
                 </span>
-                <span className="text-xs text-fg-secondary">{targetLabels(s, data.admins).join(' + ')}</span>
+                {site && (
+                  <span className="text-xs text-fg-secondary">
+                    {targetLabels(s, data.admins).join(' + ')}
+                  </span>
+                )}
                 <span className="flex flex-wrap gap-1 pt-0.5">
                   {CH_ORDER.filter((c) => s.channels.includes(c)).map((c) => (
                     <Badge key={c} tone="neutral" variant="outline" icon={CH[c].icon}>

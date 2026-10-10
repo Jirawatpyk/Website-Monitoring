@@ -277,8 +277,8 @@ const sameSteps = (a: PolicyDraft | undefined, b: PolicyDraft) =>
  * severity whose reminder interval changed (the save dialog's "Affects …" line).
  */
 export function affectedPolicies(saved: EscalationDraft, draft: EscalationDraft): PolicyDraft[] {
-  const downReminder = saved.downReminder.trim() !== draft.downReminder.trim();
-  const problemReminder = saved.problemReminder.trim() !== draft.problemReminder.trim();
+  const downReminder = normalInterval(saved.downReminder) !== normalInterval(draft.downReminder);
+  const problemReminder = normalInterval(saved.problemReminder) !== normalInterval(draft.problemReminder);
   return draft.policies.filter(
     (p) =>
       !sameSteps(

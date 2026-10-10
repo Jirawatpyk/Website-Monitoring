@@ -338,6 +338,11 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
   });
 }
 
+/** "22:14" the same Bangkok day as `ref`, "Thu 24 Sep 22:14" otherwise. */
+function withDayIfNot(at: Date, ref: Date, time: (d: Date) => string): string {
+  return isSameBangkokDay(at, ref) ? time(at) : `${formatDay(at, { weekday: true })} ${time(at)}`;
+}
+
 export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMessage {
   const { site, ackedBy, problem } = input;
   const at = formatTime(input.ackedAt);
@@ -363,14 +368,17 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
           ['Acknowledged', `${ackedBy} at ${at}`],
           [
             `${slow ? 'Slow' : 'Problem'} for`,
-            `${duration} so far (detected ${formatTime(input.confirmedAt)})`,
+            `${duration} so far (detected ${withDayIfNot(input.confirmedAt, input.ackedAt, formatTime)})`,
           ],
           ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
           ...(stopped?.fact ? [stopped.fact] : []),
         ]
       : [
           ['Acknowledged', `${ackedBy} at ${at}`],
-          ['Down for', `${duration} so far (confirmed down ${formatTimeWithSeconds(input.confirmedAt)})`],
+          [
+            'Down for',
+            `${duration} so far (confirmed down ${withDayIfNot(input.confirmedAt, input.ackedAt, formatTimeWithSeconds)})`,
+          ],
         ],
     buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
@@ -785,7 +793,7 @@ function ladderFacts(
 export interface StepEmailInput extends EmailBaseInput {
   severity: 'down' | 'problem';
   level: number;
-  /** Minutes since "Confirmed down" / the PROBLEM flagged. */
+  /** Minutes unacknowledged since the owner was told: Confirmed down, or a held PROBLEM's opening (D-034). */
   elapsedMin: number;
   confirmedAt: Date;
   /** The L0 person and when they were told: "Arm — Chat + email 09:48". */
@@ -814,7 +822,12 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
   const owner = input.owner ?? 'The owner';
   // Sent `elapsedMin` after the owner was told: INC-0139's L1 at Fri 09:15 says "confirmed down Thu 24 Sep 22:14".
   const sentAt = new Date((input.toldAt ?? input.confirmedAt).getTime() + input.elapsedMin * 60_000);
-  const detected = `${isSameBangkokDay(input.confirmedAt, sentAt) ? '' : `${formatDay(input.confirmedAt, { weekday: true })} `}${formatTimeWithSeconds(input.confirmedAt)}`;
+  const detected = withDayIfNot(input.confirmedAt, sentAt, formatTimeWithSeconds);
+  // "Down for" / "Problem for" is how long it has been wrong, on the wall clock from detection — a held
+  // PROBLEM's L1 at 10:00 says "11 h 46 min", as its ACK email does 5 min later (message-check round 3).
+  const sinceDetected = formatDuration(
+    Math.max(0, Math.floor((sentAt.getTime() - input.confirmedAt.getTime()) / 60_000)),
+  );
   const ask = input.fallback
     ? `${owner} hasn’t acknowledged. The Google Chat reply couldn’t be delivered, so this email is the alert.`
     : input.asFyi
@@ -827,7 +840,9 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
     color: C.warning,
     bar: C.warning,
     label: down ? `ESCALATED · L${input.level}` : 'STILL PROBLEM',
-    pre: `${site} ${down ? 'down' : 'has had a problem for'} ${duration}, not acknowledged`,
+    pre: down
+      ? `${site} down ${duration}, not acknowledged`
+      : `${site} problem not acknowledged for ${duration}`,
     headline: down
       ? `${site} still down — ${duration}, no ack`
       : `${site} still has a problem — ${duration}, no ack`,
@@ -835,7 +850,7 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
     facts: [
       [
         down ? 'Down for' : 'Problem for',
-        `${duration} (${down ? 'confirmed down' : 'detected'} ${detected})`,
+        `${sinceDetected} (${down ? 'confirmed down' : 'detected'} ${detected})`,
       ],
       ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
       ...(input.owner

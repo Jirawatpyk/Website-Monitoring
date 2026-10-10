@@ -72,8 +72,11 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
   if (!policy) throw new Error('No escalation policies — the S08 migration seeds four');
   const sites = sitesOf(policy, data.sites);
   const site = sites.find((s) => s.id === siteId) ?? sites[0];
+  // While the field is empty or wrong, the Preview keeps the saved interval.
   const reminderMin =
-    Number(policy.severity === 'down' ? draft.downReminder : draft.problemReminder) || undefined;
+    policy.severity === 'down'
+      ? Number(draft.downReminder) || data.downReminder
+      : Number(draft.problemReminder) || data.problemReminder;
   const preview = scenario(policy, site, data.admins, hours, clock, { reminderMin });
   const rows = diff(saved, draft, data.admins);
   const summary = unsavedSummary(rows);
