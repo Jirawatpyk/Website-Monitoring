@@ -180,7 +180,7 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     expect(
       screen.getByText('+ 2 more: Regional 14 Sep (6 min), Regional 14 Sep (6 min)'),
     ).toBeInTheDocument();
-    expect(screen.getAllByText('Was a problem')).toHaveLength(5);
+    expect(screen.getAllByText('Was problem')).toHaveLength(5);
   });
 
   it('a range with no checks says so instead of an empty chart', () => {

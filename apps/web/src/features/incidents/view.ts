@@ -5,7 +5,6 @@ import {
   formatDuration,
   formatIncidentId,
   formatTier,
-  formatTime,
   formatTimeWithSeconds,
   ROLE_LABELS,
   TRIGGER_LABELS,
@@ -93,7 +92,6 @@ export interface IncidentView {
   cause: string;
   siteUrl: string | null;
   ack: AckState;
-  log: { at: string; text: string }[];
 }
 
 const ACKABLE: readonly IncidentState[] = ['unacked', 'escalated'];
@@ -108,13 +106,6 @@ export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
     backupOwnerId: i.sites.backup_owner_id,
   });
 }
-
-const TEMPLATE_WORDS: Record<string, string> = {
-  down: 'DOWN',
-  problem: 'PROBLEM',
-  acknowledged: 'ACKNOWLEDGED',
-  recovered: 'RECOVERED',
-};
 
 /**
  * Everything the MobileAck board shows, from stored rows only (spec §14.3, §15.6, §16.8; copy cut
@@ -241,71 +232,5 @@ export function buildIncidentView(
     cause: str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
     siteUrl: i.sites.monitors.find((m) => m.is_primary)?.url ?? null,
     ack,
-    log: logOf(events, nameOf, now),
   };
-}
-
-/** The LATEST log (MobileAck board), newest first, in words. */
-export function logOf(
-  events: readonly EventRow[],
-  nameOf: (id: string | null) => string,
-  now: Date,
-): { at: string; text: string }[] {
-  const sorted = [...events].sort((a, b) => b.at.localeCompare(a.at));
-  return sorted.flatMap((e, n): { at: string; text: string }[] => {
-    const at = formatTime(new Date(e.at));
-    switch (e.type) {
-      case 'detected':
-        // A PROBLEM is detected in one round; only a DOWN is confirmed by locations and a recheck.
-        return typeof e.payload.summary === 'string'
-          ? [{ at, text: `PROBLEM detected — ${e.payload.summary}` }]
-          : [
-              {
-                at,
-                text: confirmedByWafOf(e.payload)
-                  ? `Confirmed down from ${formatConfirmedBy(num(e.payload.confirmingLocations) ?? 2, confirmedByWafOf(e.payload))}`
-                  : `Confirmed down — ${formatConfirmedBy(num(e.payload.confirmingLocations) ?? 2)}`,
-              },
-            ];
-      case 'alerted': {
-        const word = TEMPLATE_WORDS[str(e.payload.template) ?? ''] ?? 'Alert';
-        return e.payload.channel === 'email'
-          ? [{ at, text: `${word} emailed to ${nameOf(str(e.payload.user_id))}` }]
-          : [{ at, text: `${word} posted in Chat` }];
-      }
-      case 'acknowledged': {
-        const postsAt = str(e.payload.posts_at);
-        // Newer events come first: an undo after this ack means it never posts.
-        const later = sorted.slice(0, n);
-        const undone = later.some((l) => l.type === 'ack_undone');
-        // An undone ack never posted: a later ack's post belongs to that one.
-        const posted = undone
-          ? undefined
-          : later
-              .filter((l) => l.type === 'alerted' && l.payload.template === 'acknowledged')
-              .map((l) => l.at)
-              .sort()[0];
-        const holding = postsAt && !undone && new Date(postsAt) > now && e.payload.notifies !== false;
-        const by = `Acknowledged by ${nameOf(e.actor_id)}`;
-        return [
-          {
-            at,
-            text: posted
-              ? `${by} (posted ${formatTimeWithSeconds(new Date(posted))})`
-              : holding
-                ? `${by} (posts ${formatTimeWithSeconds(new Date(postsAt))} unless undone)`
-                : by,
-          },
-        ];
-      }
-      case 'ack_undone':
-        return [{ at, text: `Acknowledgement undone by ${nameOf(e.actor_id)}` }];
-      case 'recovered':
-        return [{ at, text: `Recovered — OK from ${num(e.payload.okLocations) ?? 2} locations` }];
-      case 'ok_two_rounds':
-        return [{ at, text: 'OK two rounds in a row — needs a root cause' }];
-      default:
-        return [];
-    }
-  });
 }

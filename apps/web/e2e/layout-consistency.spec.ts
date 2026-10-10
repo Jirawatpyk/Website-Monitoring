@@ -1,5 +1,12 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { ensureUser, localSupabaseEnabled, signIn, anySiteId, busySiteId } from './support/local-supabase';
+import {
+  anySiteId,
+  busySiteId,
+  ensureUser,
+  localSupabaseEnabled,
+  openTestIncident,
+  signIn,
+} from './support/local-supabase';
 
 /**
  * Rules every signed-in page shares, measured in the browser at 390 / 820 / 1440 — the things a
@@ -130,6 +137,61 @@ function squeezedText(page: Page) {
   );
 }
 
+/**
+ * Controls whose focus ring would be cut off: the outline reaches past the nearest ancestor that clips
+ * (overflow hidden / clip on every side; auto / scroll across the axis it doesn't scroll — along it, a
+ * control half out of view is a scroll position, not a cut ring). Twice in S07 a ring lost a side to
+ * its box — a dialog's outcome line, DataTable's row link — and only Tao's eye caught it. Call after a
+ * key press, so the page is in keyboard mode and `:focus-visible` matches a programmatic focus.
+ */
+function clippedFocusRings(page: Page) {
+  return page.evaluate(() => {
+    const controls = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        'main a[href], main button:not([disabled]), main [role="radio"], main [tabindex]:not([tabindex="-1"])',
+      ),
+    )
+      .filter((el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden')
+      // table rows repeat one another: the first controls cover every kind on the page, and a long
+      // list stays fast
+      .slice(0, 60);
+    const out: string[] = [];
+    for (const el of controls) {
+      el.focus();
+      if (document.activeElement !== el) continue;
+      const style = getComputedStyle(el);
+      if (style.outlineStyle === 'none') continue;
+      const reach = (parseFloat(style.outlineWidth) || 0) + (parseFloat(style.outlineOffset) || 0);
+      if (reach <= 0) continue;
+      const box = el.getBoundingClientRect();
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        const ps = getComputedStyle(p);
+        if (!/(hidden|clip|auto|scroll)/.test(ps.overflowX + ps.overflowY)) continue;
+        const pb = p.getBoundingClientRect();
+        const scrolls = (o: string) => o === 'auto' || o === 'scroll';
+        // overflow: clip paints this far past the box (the table cells, globals.css)
+        const margin =
+          ps.overflowX === 'clip' ? parseFloat(ps.getPropertyValue('overflow-clip-margin')) || 0 : 0;
+        const room =
+          margin +
+          Math.min(
+            ...(scrolls(ps.overflowX) ? [] : [box.left - pb.left, pb.right - box.right]),
+            ...(scrolls(ps.overflowY) ? [] : [box.top - pb.top, pb.bottom - box.bottom]),
+          );
+        if (room < reach - 0.5) {
+          const name = (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 40);
+          out.push(
+            `${el.tagName.toLowerCase()} "${name}" ring ${reach}px, room ${Math.round(room)}px in .${String(p.className).split(' ')[0]} (overflow ${ps.overflowX}, clip margin ${margin}px)`,
+          );
+        }
+        break;
+      }
+    }
+    (document.activeElement as HTMLElement | null)?.blur();
+    return out;
+  });
+}
+
 /** Visible block-level controls whose tap area is shorter than a touch target. */
 function smallTargets(page: Page) {
   return page.evaluate((min) => {
@@ -166,19 +228,23 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
   test.skip(({ isMobile }) => isMobile, 'widths are set inside the test');
 
   test('header rhythm, phone shell, touch targets, no sideways scroll', async ({ browser, baseURL }) => {
+    // every live page at three widths: well past the 30 s default once the focus-ring walk joined (S07)
+    test.setTimeout(120_000);
     await ensureUser(ADMIN.email);
     // The sidebar (and so the nav links) is only visible from lg.
     const desktop = await signedInAt(browser, baseURL!, 1440);
     const pages = await livePages(desktop);
     await desktop.context().close();
     expect(pages).not.toHaveLength(0);
-    // Pages reached from a list, not the nav (S05 review): Add site, Edit site, Edit monitors.
+    // Pages reached from a list, not the nav (S05 review): Add site, Edit site, Edit monitors; and an
+    // open incident (S07).
     const site = await anySiteId();
     pages.push(
       `/sites/${await busySiteId()}`,
       '/sites/new',
       `/sites/${site}/edit`,
       `/sites/${site}/monitors`,
+      `/incidents/${await openTestIncident(ADMIN.email)}`,
     );
 
     for (const width of WIDTHS) {
@@ -194,6 +260,8 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
           expect(await sidewaysBoxes(page), 'no box inside the page scrolls sideways').toEqual([]);
           expect(await boxesPastEdge(page), 'no box reaches past the screen edge').toEqual([]);
           expect(await squeezedText(page), 'no text squeezed a character or two a line').toEqual([]);
+          await page.keyboard.press('Tab');
+          expect(await clippedFocusRings(page), 'no focus ring cut off by its box').toEqual([]);
 
           const gaps = await headerGaps(page);
           expect(gaps, 'the page starts with AURA PageHeader').not.toBeNull();

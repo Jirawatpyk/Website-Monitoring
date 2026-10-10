@@ -1,8 +1,21 @@
-// PreToolUse guard (retro S01, S02a, S04b, S05): a long script pasted into a shell heredoc breaks on
-// Windows Git Bash (quotes, `$$`, curly quotes). Refuse heredocs over MAX_LINES and say what to do
-// instead: write the script with the Write tool to a file (the scratchpad for throwaway ones) and
-// run it from there. Short heredocs (a commit message, a three-line snippet) pass.
+// PreToolUse guard (retro S01, S02a, S04b, S05, S07): a long script pasted into a shell heredoc — or
+// into an inline `node -e "…"` — breaks on Windows Git Bash (quotes, `$$`, curly quotes, backticks).
+// Refuse heredocs over MAX_LINES and inline node scripts over MAX_INLINE_LINES, and say what to do
+// instead: write the script with the Write tool to a file (the scratchpad for throwaway ones) and run
+// it from there. Short ones (a commit message, a three-line snippet) pass.
 const MAX_LINES = 15;
+const MAX_INLINE_LINES = 3;
+
+const deny = (what) =>
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: `${what}. Write the script with the Write tool to a file (scratchpad for throwaway ones) and run that file — root CLAUDE.md → Rules → Scripts.`,
+      },
+    }),
+  );
 
 let input = '';
 process.stdin.on('data', (chunk) => (input += chunk));
@@ -12,6 +25,13 @@ process.stdin.on('end', () => {
     command = JSON.parse(input)?.tool_input?.command ?? '';
   } catch {
     process.exit(0);
+  }
+  // An inline `node -e "…"` over a few lines breaks the same way: Bash runs its backticks and `$(…)`
+  // inside the double quotes (retro S07).
+  const inline = /\bnode\s+(?:-e|--eval|-p|--print)\s/.exec(command);
+  if (inline && command.slice(inline.index).split('\n').length > MAX_INLINE_LINES) {
+    deny(`An inline node script over ${MAX_INLINE_LINES} lines`);
+    return;
   }
   // `<<EOF`, `<<'EOF'`, `<<"EOF"`, `<<-EOF` — then count lines until the closing delimiter.
   const re = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/g;
@@ -24,15 +44,7 @@ process.stdin.on('end', () => {
     const end = rest.findIndex((line) => line.trim() === delimiter);
     const lines = end === -1 ? rest.length : end;
     if (lines > MAX_LINES) {
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: `A ${lines}-line heredoc (limit ${MAX_LINES}). Write the script with the Write tool to a file (scratchpad for throwaway ones) and run that file — root CLAUDE.md → Rules → Scripts.`,
-          },
-        }),
-      );
+      deny(`A ${lines}-line heredoc (limit ${MAX_LINES})`);
       return;
     }
   }

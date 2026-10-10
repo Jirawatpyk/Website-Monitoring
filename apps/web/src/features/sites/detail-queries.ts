@@ -2,7 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import {
   downEpisodesFromTimeline,
-  episodeMinutes,
+  settledOutageMinutes,
   episodesFromTimeline,
   siteUptimeOver,
   mttrMinutes,
@@ -20,7 +20,7 @@ import {
 import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { locationGlyph } from './components/site-list';
-import { fetchAllPages } from './csv';
+import { fetchAllPages } from '@/lib/csv';
 import {
   chartLines,
   incidentsCaption,
@@ -265,7 +265,11 @@ export async function loadSiteDetail(
       drops,
       open,
       endsAt: open ? now.getTime() : lastEnd,
-      minutes: open ? null : episodeMinutes(drops, now),
+      minutes: settledOutageMinutes(
+        drops,
+        (CLOSED_INCIDENT_STATES as readonly string[]).includes(i.state),
+        now,
+      ),
     };
   });
   const uptime = siteUptimeOver(downs.get(s.id) ?? [], {

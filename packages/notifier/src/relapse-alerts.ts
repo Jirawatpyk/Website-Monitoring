@@ -1,4 +1,5 @@
 import {
+  clockMinutes,
   formatDuration,
   formatIncidentId,
   formatTier,
@@ -21,7 +22,36 @@ import { downtime } from './downtime';
 export interface Drop {
   start: Date;
   end: Date;
+  /** A PROBLEM part of a mixed incident (D-021 before the outage, D-023 key page); DOWN when unset. */
+  severity?: 'down' | 'problem';
 }
+
+/**
+ * What a flapping summary counts (D-033): flips, span and "stable since" over every drop — a PROBLEM
+ * that ran straight into the outage (D-021) is one flip with it — and, for a DOWN summary, the DOWN
+ * parts only for "Down N times … X down in total", as uptime counts them (spec §5).
+ */
+export function flapCounts(drops: readonly Drop[], severity: 'down' | 'problem') {
+  const flips: Drop[] = [];
+  for (const d of drops) {
+    const prev = flips.at(-1);
+    if (prev && prev.end.getTime() === d.start.getTime()) flips[flips.length - 1] = { ...prev, end: d.end };
+    else flips.push({ ...d });
+  }
+  const counted = severity === 'down' ? drops.filter((d) => d.severity !== 'problem') : drops;
+  const { ranges, minutes } = dropsSummary(counted);
+  return {
+    flips: flips.length,
+    first: flips[0],
+    last: flips.at(-1),
+    counted: counted.length,
+    ranges,
+    minutes,
+  };
+}
+
+/** "Down once" for one drop (D-033), then "Down N times" as the boards. */
+export const timesWord = (n: number) => (n === 1 ? 'once' : `${n} times`);
 
 /** A key page's part of a PROBLEM: "/booking", "HTTP 404", "/booking → HTTP 404 (BKK, SIN, TYO)". */
 export interface KeyPageFacts {
@@ -147,10 +177,9 @@ export interface FlapSummaryInput {
 
 /** "03:12–03:19 · 03:24–03:35" and the total in whole clock minutes, as `downtime` counts one drop. */
 export function dropsSummary(drops: readonly Drop[]): { ranges: string; minutes: number } {
-  const minute = (d: Date) => Math.floor(d.getTime() / 60_000);
   return {
     ranges: drops.map((d) => downtime(d.start, d.end).range).join(' · '),
-    minutes: drops.reduce((sum, d) => sum + Math.max(1, minute(d.end) - minute(d.start)), 0),
+    minutes: drops.reduce((sum, d) => sum + clockMinutes(d.start, d.end), 0),
   };
 }
 
@@ -160,10 +189,7 @@ export function dropsSummary(drops: readonly Drop[]): { ranges: string; minutes:
  */
 export function buildFlapSummaryAlert(input: FlapSummaryInput): ChatMessage {
   const site = plainName(input.site);
-  const first = input.drops[0];
-  const last = input.drops.at(-1);
-  const n = input.drops.length;
-  const { ranges, minutes } = dropsSummary(input.drops);
+  const { flips: n, first, last, counted, ranges, minutes } = flapCounts(input.drops, input.severity);
   const total = formatDuration(minutes);
   const down = input.severity === 'down';
   const span = first && last ? downtime(first.start, last.end).range : '';
@@ -190,7 +216,7 @@ export function buildFlapSummaryAlert(input: FlapSummaryInput): ChatMessage {
                 {
                   textParagraph: {
                     text:
-                      `${down ? 'Down' : 'Had a problem'} ${n} times: ${ranges} — ${total} ${down ? 'down ' : ''}in total. ` +
+                      `${down ? 'Down' : 'Had a problem'} ${timesWord(counted)}: ${ranges} — ${total} ${down ? 'down ' : ''}in total. ` +
                       'Needs a root cause before it can be resolved.',
                   },
                 },

@@ -1,5 +1,5 @@
 import 'server-only';
-import { episodesFromTimeline, type Episode } from '@dxt/engine';
+import { episodesFromTimeline, outageMinutes, type Episode } from '@dxt/engine';
 import {
   buildAcknowledgedAlert,
   buildAcknowledgedEmail,
@@ -9,6 +9,9 @@ import {
   buildAutoResolvedEmail,
   buildFlapSummaryAlert,
   buildFlapSummaryEmail,
+  buildNoteAlert,
+  buildResolvedAlert,
+  buildResolvedEmail,
   buildDownAlert,
   buildDownEmail,
   buildProblemAlert,
@@ -25,7 +28,17 @@ import {
   type ProblemFacts,
   type VerifierDownReason,
 } from '@dxt/notifier';
-import { confirmedByWafOf, PROBE_LOCATIONS, TIER_CONFIG, type ProbeLocation, type Tier } from '@dxt/shared';
+import {
+  clockMinutes,
+  confirmedByWafOf,
+  PROBE_LOCATIONS,
+  ROOT_CAUSE_CATEGORIES,
+  ROOT_CAUSE_LABELS,
+  TIER_CONFIG,
+  type ProbeLocation,
+  type RootCauseCategory,
+  type Tier,
+} from '@dxt/shared';
 import {
   contextOf,
   type IncidentFacts,
@@ -56,37 +69,61 @@ const dateOf = (v: unknown): Date | null =>
   typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : null;
 
 /**
- * The incident's drops from its timeline (D-024): first failed check → recovery — as the messages
- * have worded them since S04b. Uptime splits a D-021 incident at its escalation (S06); the messages
- * keep the PROBLEM time before it as part of the outage until S07 reworks the summaries (plan S07
- * "Carried from S06 review"): drops before the first DOWN read as DOWN, and a PROBLEM drop that runs
- * straight into the outage joins it.
+ * The incident's drops from its timeline (D-024), each with its own severity — the same drops uptime
+ * reads (S06): a D-021 incident's PROBLEM before the outage is a PROBLEM drop, a D-023 key-page drop
+ * on a DOWN incident too. D-033: "down X" totals count the DOWN drops only.
  */
 function dropsOf(i: IncidentFacts): Episode[] {
-  const drops = episodesFromTimeline(i, i.incident_events ?? []);
-  if (!i.incident_events?.some((e) => e.type === 'escalated_to_down')) return drops;
-  const firstDown = drops.findIndex((d) => d.severity === 'down');
-  const out: Episode[] = [];
-  drops.forEach((d, n) => {
-    const asDown = firstDown >= 0 && n <= firstDown ? { ...d, severity: 'down' as const } : d;
-    const prev = out.at(-1);
-    if (prev && n <= firstDown && prev.end && prev.end.getTime() === d.start.getTime()) prev.end = d.end;
-    else out.push(asDown);
-  });
-  return out;
+  return episodesFromTimeline(i, i.incident_events ?? []);
 }
 
-/** "Down N times" only when every drop was a DOWN; a key-page PROBLEM drop (D-023) isn't downtime. */
-const summarySeverity = (i: IncidentFacts): 'down' | 'problem' =>
-  dropsOf(i).every((d) => d.severity === 'down') ? 'down' : 'problem';
+/** How long it had been down at `at` (D-033's one number: DOWN drops only), for ACKNOWLEDGED "so far". */
+function outageAt(i: IncidentFacts, at: Date): number | null {
+  const upTo = dropsOf(i)
+    .filter((d) => d.start <= at)
+    .map((d) => ({ ...d, end: d.end && d.end < at ? d.end : at }));
+  return outageMinutes(upTo, at);
+}
 
-/** The drop a RECOVERED row ends: its own recovery time, else the incident's latest. */
-function recoveryOf(i: IncidentFacts, ctx: Record<string, unknown>): { start: Date; end: Date } | null {
+const closedDrops = (i: IncidentFacts) =>
+  dropsOf(i).flatMap((d) => (d.end ? [{ start: d.start, end: d.end, severity: d.severity }] : []));
+
+/** A DOWN summary once any drop was an outage; a PROBLEM one only when nothing went down. */
+const summarySeverity = (i: IncidentFacts): 'down' | 'problem' =>
+  dropsOf(i).some((d) => d.severity === 'down') ? 'down' : 'problem';
+
+/**
+ * The drop a RECOVERED row ends (its own recovery time, else the incident's latest), with the severity
+ * and trigger of that drop (S06 review N3): a key page's PROBLEM recovering on a DOWN incident (D-023)
+ * reads "back to normal · problem for X", not "is back · down X".
+ */
+function recoveryOf(
+  i: IncidentFacts,
+  ctx: Record<string, unknown>,
+): { start: Date; end: Date; severity: 'down' | 'problem'; trigger: IncidentFacts['trigger'] } | null {
   const end = dateOf(ctx.recoveredAt) ?? dateOf(i.recovered_at);
   if (!end) return null;
   const drop = dropsOf(i).find((d) => d.end && d.end.getTime() === end.getTime());
-  return { start: drop?.start ?? new Date(i.started_at), end };
+  const start = drop?.start ?? new Date(i.started_at);
+  const relapse = i.incident_events?.find(
+    (e) => e.type === 'relapsed' && dateOf(contextOf(e.payload).startedAt)?.getTime() === start.getTime(),
+  );
+  const relapseTrigger = relapse ? contextOf(relapse.payload).trigger : undefined;
+  return {
+    start,
+    end,
+    severity: drop?.severity ?? i.severity,
+    trigger: (typeof relapseTrigger === 'string' ? relapseTrigger : i.trigger) as IncidentFacts['trigger'],
+  };
 }
+
+/** problemOf for the drop that recovered (N3). */
+const dropProblem = (
+  i: IncidentFacts,
+  drop: { severity: 'down' | 'problem'; trigger: IncidentFacts['trigger'] },
+  ctx: Record<string, unknown>,
+): ProblemFacts | null =>
+  drop.severity === 'problem' ? problemOf({ ...i, severity: 'problem', trigger: drop.trigger }, ctx) : null;
 
 function keyPageOf(v: unknown): KeyPageFacts | null {
   const k = (v ?? {}) as Record<string, unknown>;
@@ -103,12 +140,10 @@ const openedWith = (i: IncidentFacts) =>
 function againAlert(n: Notification, i: IncidentFacts): ChatMessage {
   const ctx = contextOf(n.context);
   const droppedAt = dateOf(ctx.startedAt) ?? new Date(n.created_at);
-  const before = dropsOf(i).filter((d) => d.end && d.end <= droppedAt);
-  const minutesSoFar = before.reduce(
-    (sum, d) =>
-      sum + Math.max(1, Math.floor(d.end!.getTime() / 60_000) - Math.floor(d.start.getTime() / 60_000)),
-    0,
-  );
+  const down = n.template === 'down_again';
+  // "Down 7 min so far" counts the DOWN drops only (D-033); "with a problem … so far" every drop.
+  const before = dropsOf(i).filter((d) => d.end && d.end <= droppedAt && (!down || d.severity === 'down'));
+  const minutesSoFar = before.reduce((sum, d) => sum + clockMinutes(d.start, d.end!), 0);
   const acked = !!i.acked_at && !!i.acker;
   return buildAgainAlert({
     incidentId: i.id,
@@ -131,6 +166,22 @@ function againAlert(n: Notification, i: IncidentFacts): ChatMessage {
     summary: typeof ctx.summary === 'string' ? ctx.summary : null,
     homeBack: ctx.homeBackAt ? keyPageOf(ctx.keyPage) : null,
   });
+}
+
+/** RESOLVED (D-033): who, when and the root cause, as `resolve_incident` stored them with the message. */
+function resolvedOf(n: Notification, i: IncidentFacts) {
+  const ctx = contextOf(n.context);
+  const category = str(ctx.category, '');
+  return {
+    resolvedBy: str(ctx.resolvedBy, 'someone'),
+    resolvedAt: dateOf(ctx.resolvedAt) ?? new Date(n.created_at),
+    rootCause: (ROOT_CAUSE_CATEGORIES as readonly string[]).includes(category)
+      ? ROOT_CAUSE_LABELS[category as RootCauseCategory]
+      : category || 'Not given',
+    whatHappened: str(ctx.what, ''),
+    whatFixedIt: typeof ctx.fix === 'string' && ctx.fix ? ctx.fix : null,
+    drops: closedDrops(i),
+  };
 }
 
 /** The cause line stored when the incident opened (its `detected` event). */
@@ -214,14 +265,18 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         recoveredAt: drop.end,
         okLocations: num(ctx.okLocations, 2),
         owner: person(i.sites.primary),
-        problem: problemOf(i, ctx),
+        problem: dropProblem(i, drop, ctx),
       });
     }
     case 'down_again':
     case 'problem_again':
       return againAlert(n, i);
+    case 'note':
+      return buildNoteAlert({ site: i.sites.name, by: str(ctx.by, 'someone'), text: str(ctx.text, '') });
+    case 'resolved':
+      return buildResolvedAlert({ incidentId: i.id, site: i.sites.name, ...resolvedOf(n, i) });
     case 'flap_summary': {
-      const drops = dropsOf(i).flatMap((d) => (d.end ? [{ start: d.start, end: d.end }] : []));
+      const drops = closedDrops(i);
       return drops.length
         ? buildFlapSummaryAlert({
             incidentId: i.id,
@@ -238,12 +293,14 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
 }
 
 /**
- * Why this person gets the email (the footer line): the one who acknowledged, the owner, or — for
- * everyone else in S02b — because a Chat alert of the incident couldn't be delivered (D-016).
+ * Why this person gets the email (the footer line): the one who acknowledged, the owner, everyone
+ * already emailed for RESOLVED (D-033), or — for everyone else — because a Chat alert of the incident
+ * couldn't be delivered (D-016).
  */
 export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   if (n.template === 'acknowledged' && contextOf(n.context).ackedById === n.user_id) return 'acked';
   if (i.sites.primary?.id === n.user_id) return 'owner';
+  if (n.template === 'resolved') return 'emailed';
   return 'fallback';
 }
 
@@ -294,6 +351,7 @@ export function renderEmail(
         ackedBy: str(ctx.ackedBy, 'someone'),
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
         startedAt: new Date(i.started_at),
+        downMinutes: outageAt(i, new Date(str(ctx.ackedAt, n.created_at))),
         confirmedAt: new Date(i.detected_at),
       });
     case 'recovered': {
@@ -316,11 +374,13 @@ export function renderEmail(
         okLocations: num(ctx.okLocations, 2),
         owner: i.sites.primary?.display_name ?? null,
         ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
-        problem: problemOf(i, ctx),
+        problem: dropProblem(i, drop, ctx),
       });
     }
+    case 'resolved':
+      return buildResolvedEmail({ ...base, ...resolvedOf(n, i) });
     case 'flap_summary': {
-      const drops = dropsOf(i).flatMap((d) => (d.end ? [{ start: d.start, end: d.end }] : []));
+      const drops = closedDrops(i);
       return drops.length
         ? buildFlapSummaryEmail({
             ...base,

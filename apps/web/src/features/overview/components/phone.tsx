@@ -56,18 +56,18 @@ export function PhoneBanners({ shown, more }: { shown: Banner[]; more: number })
         );
       })}
       {more > 0 && (
-        <a
-          href={`#${PHONE_LIVE_ID}`}
+        <Link
+          href="/incidents?view=unacked"
           className={`flex min-h-11 items-center justify-between rounded-aura-lg border border-alert-danger-border bg-bg-surface px-aura-4 text-sm font-semibold text-fg-danger no-underline hover:bg-alert-danger-bg ${FOCUS_RING}`}
         >
-          {`and ${more} more → Live issues`}
-        </a>
+          {`and ${more} more → Incidents`}
+        </Link>
       )}
     </section>
   );
 }
 
-/** Open · Unacked · the third card by role (§21.7–8); counts, not links, until the Incidents list (S07, D-032). */
+/** Open · Unacked · the third card by role (§21.7–8); Open and Unacked open the Incidents list (S07). */
 export function PhoneCounts({
   counts,
   viewer,
@@ -81,23 +81,42 @@ export function PhoneCounts({
 }) {
   const third = thirdCard(viewer, issues, uptime30d);
   const cards = [
-    { label: 'Open', value: String(counts.open), danger: false },
-    { label: 'Unacked', value: String(counts.unacked), danger: counts.unacked > 0 },
-    { label: third.label, value: third.value, danger: false },
+    { label: 'Open', value: String(counts.open), danger: false, href: '/incidents?view=open' },
+    {
+      label: 'Unacked',
+      value: String(counts.unacked),
+      danger: counts.unacked > 0,
+      href: '/incidents?view=unacked',
+    },
+    { label: third.label, value: third.value, danger: false, href: null },
   ];
   return (
     <dl className="m-0 grid grid-cols-3 gap-2">
-      {cards.map((c) => (
-        <div
-          key={c.label}
-          className="flex flex-col-reverse rounded-aura-md border border-border-default bg-bg-surface px-aura-3 py-aura-2"
-        >
-          <dt className="text-xs text-fg-secondary">{c.label}</dt>
-          <dd className={`m-0 text-xl font-semibold tabular-nums ${c.danger ? 'text-fg-danger' : ''}`}>
-            {c.value}
-          </dd>
-        </div>
-      ))}
+      {cards.map((c) => {
+        const body = (
+          <>
+            <dt className="text-xs text-fg-secondary">{c.label}</dt>
+            <dd className={`m-0 text-xl font-semibold tabular-nums ${c.danger ? 'text-fg-danger' : ''}`}>
+              {c.value}
+            </dd>
+          </>
+        );
+        const box =
+          'flex flex-col-reverse rounded-aura-md border border-border-default bg-bg-surface px-aura-3 py-aura-2';
+        return c.href ? (
+          <Link
+            key={c.label}
+            href={c.href}
+            className={`${box} text-fg-primary no-underline hover:bg-bg-surface-hover ${FOCUS_RING}`}
+          >
+            {body}
+          </Link>
+        ) : (
+          <div key={c.label} className={box}>
+            {body}
+          </div>
+        );
+      })}
     </dl>
   );
 }

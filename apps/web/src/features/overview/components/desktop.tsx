@@ -123,12 +123,12 @@ export function DesktopBanners({
         </Alert>
       ))}
       {more > 0 && (
-        <a
-          href={`#${LIVE_ISSUES_ID}`}
+        <Link
+          href="/incidents?view=needs_action"
           className={`self-start px-aura-5 text-sm font-semibold text-fg-danger underline underline-offset-2 ${TOUCH_HIT}`}
         >
-          {`and ${more} more → Live issues`}
-        </a>
+          {`and ${more} more → Incidents`}
+        </Link>
       )}
     </section>
   );
@@ -294,7 +294,10 @@ function NextStepCell({
       </Button>
     );
   }
-  const href = step.kind === 'incident' ? `/incidents/${step.incidentId}` : `/sites/${issue.site.id}`;
+  const href =
+    step.kind === 'incident'
+      ? `/incidents/${step.incidentId}${step.hash ? `#${step.hash}` : ''}`
+      : `/sites/${issue.site.id}`;
   return (
     <Link href={href} className={`relative z-10 ${buttonClass({ variant: 'ghost', size: 'sm' })}`}>
       {step.label}
@@ -559,10 +562,20 @@ export function SiteTiles({ sites, drafts, now }: { sites: OverviewSite[]; draft
   );
 }
 
-/** Recent events (§21.6, §16.11): newest first; the All incidents link waits for S07 (D-032). */
+/** Recent events (§21.6, §16.11): newest first, with the All incidents link (S07). */
 export function RecentEvents({ events }: { events: { id: string; time: string; text: string }[] }) {
   return (
-    <Card title="Recent events" headingLevel={3} className="self-start">
+    <Card
+      title="Recent events"
+      headingLevel={3}
+      className="self-start"
+      actions={
+        <Link href="/incidents?view=all" className={buttonClass({ variant: 'ghost', size: 'sm' })}>
+          All incidents
+          <IconArrowRight />
+        </Link>
+      }
+    >
       {events.length === 0 ? (
         <p className="m-0 text-sm text-fg-secondary">No incidents yet.</p>
       ) : (

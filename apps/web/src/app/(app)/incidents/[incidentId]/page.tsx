@@ -1,32 +1,42 @@
 import type { Metadata } from 'next';
-import { Button, EmptyState } from '@jirawatpyk/aura-react';
-import { IconInbox } from '@jirawatpyk/aura-react/icons';
-import { IncidentAckView } from '@/features/incidents';
-import { getIncidentForAck } from '@/features/incidents/server';
+import { notFound } from 'next/navigation';
+import { Container } from '@jirawatpyk/aura-react';
+import { formatIncidentId } from '@dxt/shared';
+import { IncidentDetailView, incidentSections } from '@/features/incidents';
+import { getIncident } from '@/features/incidents/server';
 import { getAccess } from '@/lib/auth/session';
 
-export const metadata: Metadata = { title: 'Incident' };
-// The ack action sends its held messages after the 10 s Undo window (`after()`): room for that.
+/** The tab names the incident and the site, as Site detail names its site. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ incidentId: string }>;
+}): Promise<Metadata> {
+  const detail = await getIncident((await params).incidentId);
+  return {
+    title: detail ? `${formatIncidentId(Number(detail.view.id.slice(4)))} · ${detail.siteName}` : 'Incident',
+  };
+}
+// Ack and resolve send their held messages after the 10 s Undo window (`after()`): room for that.
 export const maxDuration = 60;
 
 /**
- * Incident page — MobileAck / MobileAckDark (S02b, D-016); the Chat card and the email link here
- * (`?ack=1` is accepted and changes nothing). S07 grows it into the Incident board.
+ * Incident page — Incident / MIncident (S07, D-033), at the URL the Chat card and the emails link to
+ * since S02b (D-016); `?ack=1` and `#resolve` are accepted.
  */
 export default async function IncidentPage({ params }: { params: Promise<{ incidentId: string }> }) {
   const { incidentId } = await params;
-  const [view, access] = await Promise.all([getIncidentForAck(incidentId), getAccess()]);
-  if (!view || access.status !== 'active') {
-    return (
-      <EmptyState
-        icon={<IconInbox />}
-        title="Incident not found"
-        description="The link may be wrong, or the incident was removed."
-        action={<Button href="/">Go to Overview</Button>}
-      />
-    );
-  }
+  const now = new Date();
+  const [detail, access] = await Promise.all([getIncident(incidentId), getAccess()]);
+  if (!detail || access.status !== 'active') notFound();
   return (
-    <IncidentAckView view={view} viewerName={access.profile.displayName} viewerEmail={access.profile.email} />
+    <Container>
+      <IncidentDetailView
+        detail={detail}
+        sections={incidentSections(detail, now)}
+        viewerName={access.profile.displayName}
+        viewerEmail={access.profile.email}
+      />
+    </Container>
   );
 }

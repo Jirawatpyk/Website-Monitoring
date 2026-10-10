@@ -34,6 +34,7 @@ const row = (template: string, context: Notification['context'] = {}): Notificat
     created_at: '2026-09-25T02:52:01Z',
   }) as Notification;
 const appUrl = 'https://monitor.example.test';
+const ploy = { id: 'u-ploy', email: 'ploy@example.test', display_name: 'Ploy' };
 const now = new Date('2026-09-25T02:52:05Z');
 const problemContext = {
   cause: 'p50 5.8 s (BKK, SIN, TYO) · over the Tier 2 limit of 5 s for 3 checks in a row',
@@ -132,6 +133,17 @@ describe('render — relapse, flapping and auto-resolve rows (S04b, D-024)', () 
     ],
   };
 
+  it('ACKNOWLEDGED email after a relapse: "Down for" is the drops so far (7 + 6 min), as the incident page (D-033)', () => {
+    const ack = renderEmail(
+      row('acknowledged', { ackedBy: 'Ploy', ackedAt: '2026-09-20T20:30:10Z' }),
+      voca,
+      ploy,
+      appUrl,
+      { threadId: '<inc-inc-133@notify.example.test>', startsThread: false },
+    )!;
+    expect(ack.text).toContain('13 min so far');
+  });
+
   it('DOWN AGAIN: mentions the owner while nobody acked, counts the downtime before the drop', () => {
     const m = renderChat(
       row('down_again', {
@@ -185,9 +197,9 @@ describe('render — relapse, flapping and auto-resolve rows (S04b, D-024)', () 
     expect(e.text).toMatch(/^RECOVERED — VOCA is stable again/);
   });
 
-  it('a flapping incident raised from PROBLEM (D-021) keeps the S04b wording: its PROBLEM time is part of the outage', () => {
+  it('a flapping incident raised from PROBLEM (D-021): two flips, DOWN minutes only (D-033)', () => {
     // slow from 03:00, an outage from 03:10 (escalated while the PROBLEM drop was open), back 03:15,
-    // down again 03:20–03:25 — uptime counts 10 DOWN min (S06); the messages wait for S07
+    // down again 03:20–03:25 — uptime counts 10 DOWN min (S06), and so do the messages now
     const raised: IncidentFacts = {
       ...voca,
       severity: 'down',
@@ -209,7 +221,97 @@ describe('render — relapse, flapping and auto-resolve rows (S04b, D-024)', () 
       ],
     };
     const m = renderChat(row('flap_summary'), raised, appUrl, now)!;
-    expect(m.text).toContain('flapped ×2, down 20 min in total');
+    expect(m.text).toContain('flapped ×2, down 10 min in total');
+    expect(m.cardsV2[0]!.card.header.title).toBe(
+      'RECOVERED · VOCA stable since 03:25 · flapped ×2 (03:00–03:25)',
+    );
+    expect(JSON.stringify(m.cardsV2)).toContain(
+      'Down 2 times: 03:10–03:15 · 03:20–03:25 — 10 min down in total.',
+    );
+    const e = renderEmail(row('flap_summary'), raised, ploy, appUrl, {
+      threadId: '<t@x>',
+      startsThread: false,
+    })!;
+    expect(e.text).toContain('Down 2 times: 03:10–03:15 · 03:20–03:25');
+    expect(e.text).toContain('Down in total: 10 min');
+  });
+
+  it('one DOWN drop among PROBLEM ones reads "Down once" (D-033)', () => {
+    const mixed: IncidentFacts = {
+      ...voca,
+      severity: 'down',
+      started_at: '2026-09-20T20:00:00Z',
+      incident_events: [
+        { type: 'detected', payload: {}, at: '2026-09-20T20:00:30Z' },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:05:00Z' },
+        {
+          type: 'relapsed',
+          payload: { startedAt: '2026-09-20T20:10:00Z', severity: 'problem', trigger: 'key_page' },
+          at: '2026-09-20T20:10:30Z',
+        },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:12:00Z' },
+      ],
+    };
+    const m = renderChat(row('flap_summary'), mixed, appUrl, now)!;
+    expect(m.text).toContain('flapped ×2, down 5 min in total');
+    expect(JSON.stringify(m.cardsV2)).toContain('Down once: 03:00–03:05 — 5 min down in total.');
+  });
+
+  it('RECOVERED of a key page’s PROBLEM on a DOWN incident words it as a problem (S06 review N3)', () => {
+    const keyPage: IncidentFacts = {
+      ...voca,
+      severity: 'down',
+      incident_events: [
+        { type: 'detected', payload: {}, at: '2026-09-20T20:12:40Z' },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:19:00Z' },
+        {
+          type: 'relapsed',
+          payload: { startedAt: '2026-09-20T20:19:00Z', severity: 'problem', trigger: 'key_page' },
+          at: '2026-09-20T20:19:00Z',
+        },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:30:00Z' },
+      ],
+    };
+    const m = renderChat(
+      row('recovered', { okLocations: 3, recoveredAt: '2026-09-20T20:30:00Z' }),
+      keyPage,
+      appUrl,
+      now,
+    )!;
+    expect(m.cardsV2[0]!.card.header.title).toBe(
+      'RECOVERED · VOCA back to normal · problem for 11 min (03:19–03:30)',
+    );
+    const down = renderChat(
+      row('recovered', { okLocations: 3, recoveredAt: '2026-09-20T20:19:00Z' }),
+      keyPage,
+      appUrl,
+      now,
+    )!;
+    expect(down.cardsV2[0]!.card.header.title).toBe('RECOVERED · VOCA is back · down 7 min (03:12–03:19)');
+  });
+
+  it('DOWN AGAIN counts the DOWN drops only; PROBLEM AGAIN every drop', () => {
+    const mixed: IncidentFacts = {
+      ...voca,
+      incident_events: [
+        { type: 'detected', payload: {}, at: '2026-09-20T20:12:40Z' },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:19:00Z' },
+        {
+          type: 'relapsed',
+          payload: { startedAt: '2026-09-20T20:20:00Z', severity: 'problem', trigger: 'slow' },
+          at: '2026-09-20T20:20:30Z',
+        },
+        { type: 'recovered', payload: {}, at: '2026-09-20T20:30:00Z' },
+      ],
+    };
+    const ctx = {
+      startedAt: '2026-09-20T20:40:00Z',
+      backSince: '2026-09-20T20:30:00Z',
+      fromState: 'monitoring',
+    };
+    expect(JSON.stringify(renderChat(row('down_again', ctx), mixed, appUrl, now)!.cardsV2)).toContain(
+      'Down 7 min so far',
+    );
   });
 
   it('RECOVERED renders from its own recovery even after a relapse cleared the incident’s', () => {
@@ -247,5 +349,61 @@ describe('render — relapse, flapping and auto-resolve rows (S04b, D-024)', () 
     expect(m.text).toBe(
       'RECOVERED · Fuji Links · /contact back 3 min after it was flagged, before anyone acknowledged · resolved automatically',
     );
+  });
+});
+
+describe('render — NOTE and RESOLVED (S07, D-033)', () => {
+  const orca: IncidentFacts = {
+    ...incident,
+    id: 'inc-139',
+    number: 139,
+    state: 'resolved',
+    severity: 'down',
+    trigger: 'hard_fail',
+    started_at: '2026-09-24T15:14:00Z',
+    recovered_at: '2026-09-24T15:22:00Z',
+    incident_events: [
+      { type: 'detected', payload: {}, at: '2026-09-24T15:14:30Z' },
+      { type: 'recovered', payload: {}, at: '2026-09-24T15:22:00Z' },
+    ],
+    sites: { ...incident.sites, name: 'ORCA Thailand' },
+  };
+  const resolvedCtx = {
+    resolvedBy: 'Tao',
+    resolvedById: 'u-tao',
+    resolvedAt: '2026-09-25T03:08:00Z',
+    category: 'hosting',
+    what: 'Host rebooted the app server without notice',
+    fix: null,
+  };
+  it('NOTE: the board line, nobody mentioned', () => {
+    const m = renderChat(row('note', { text: 'restarting the app server', by: 'Arm' }), orca, appUrl, now)!;
+    expect(m).toEqual({ text: 'NOTE · ORCA Thailand · Arm: restarting the app server', cardsV2: [] });
+  });
+  it('RESOLVED: the board line and the root cause in words', () => {
+    const m = renderChat(row('resolved', resolvedCtx), orca, appUrl, now)!;
+    expect(m.text).toBe('RESOLVED · ORCA Thailand · by Tao 10:08');
+    expect(JSON.stringify(m.cardsV2)).toContain('Hosting / server');
+    expect(JSON.stringify(m.cardsV2)).toContain('8 min (22:14–22:22)');
+  });
+  it('the RESOLVED email: the owner as owner, anyone else as emailed', () => {
+    const thread = { threadId: '<t@x>', startsThread: false };
+    const owner = renderEmail(
+      { ...row('resolved', resolvedCtx), channel: 'email' },
+      orca,
+      ploy,
+      appUrl,
+      thread,
+    )!;
+    expect(owner.text).toContain('You got this because you own ORCA Thailand.');
+    const other = renderEmail(
+      { ...row('resolved', resolvedCtx), channel: 'email', user_id: 'u-nok' },
+      orca,
+      { ...ploy, id: 'u-nok' },
+      appUrl,
+      thread,
+    )!;
+    expect(other.text).toContain('You got this because you were emailed about this incident.');
+    expect(other.text).toContain('Root cause: Hosting / server');
   });
 });

@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
 import {
-  episodeMinutes,
+  outageMinutes,
+  settledOutageMinutes,
   episodesOf,
   FLAP_STABLE_MS,
   relapseState,
   transition,
   type EpisodeEvent,
 } from './lifecycle';
+
 import type { OpenIncident, StoredCheck } from './monitor';
 import { decideSite, NEW_MONITOR, type MonitorCarry, type SiteMonitor, type SiteSnapshot } from './site';
 
@@ -119,7 +121,7 @@ describe('lifecycle — relapse state, auto-resolve event, episodes (D-004, spec
       ['03:38', '03:52'],
       ['03:55', '04:04'],
     ]);
-    expect(episodeMinutes(episodes, T('04:19'))).toBe(41);
+    expect(outageMinutes(episodes, T('04:19'))).toBe(41);
   });
 
   it('D-023: the PROBLEM AGAIN at the recovery is its own drop, from the recovery on; a DOWN during it is a new DOWN drop', () => {
@@ -150,7 +152,8 @@ describe('lifecycle — relapse state, auto-resolve event, episodes (D-004, spec
       { start: T('10:02'), end: T('10:05'), severity: 'down' },
       { start: T('10:20'), end: null, severity: 'down' },
     ]);
-    expect(episodeMinutes(episodes, T('10:30'))).toBe(17);
+    // DOWN drops only (D-033): 10:02–10:05 + 10:20–now = 3 + 10; the PROBLEM's 4 min aren't an outage
+    expect(outageMinutes(episodes, T('10:30'))).toBe(13);
   });
 });
 
@@ -466,8 +469,57 @@ describe('INC-0133 VOCA end to end (D-004 with flapping, Done-when 1)', () => {
     expect(acks).toBe(1);
     const episodes = episodesOf(events);
     expect(episodes).toHaveLength(4); // "flapped ×4"
-    expect(episodeMinutes(episodes, T('04:19'))).toBe(41);
+    expect(outageMinutes(episodes, T('04:19'))).toBe(41);
     // Recovered at the first OK check (04:04:01): the summary goes 15 min later, at 04:19.
     expect(summaryAt).toEqual(plus(T('04:19'), 1));
+  });
+});
+
+describe('outageMinutes — how long an incident was down, on every page (D-033)', () => {
+  const drop = (start: string, end: string | null, severity: 'down' | 'problem') => ({
+    start: T(start),
+    end: end ? T(end) : null,
+    severity,
+  });
+  it.each([
+    ['one DOWN drop', [drop('03:12', '03:19', 'down')], 7],
+    [
+      'two DOWN drops (03:12–03:19 · 03:24–03:35): the OK between them is not an outage',
+      [drop('03:12', '03:19', 'down'), drop('03:24', '03:35', 'down')],
+      18,
+    ],
+    [
+      'a PROBLEM raised to DOWN (D-021): DOWN minutes only, as uptime (§5)',
+      [drop('09:58', '10:02', 'problem'), drop('10:02', '10:05', 'down')],
+      3,
+    ],
+    ['a PROBLEM-only incident counts its problem minutes', [drop('10:21', '10:29', 'problem')], 8],
+    ['the drop in progress counts to now', [drop('10:20', null, 'down')], 10],
+  ])('%s', (_, episodes, minutes) => {
+    expect(outageMinutes(episodes, T('10:30'))).toBe(minutes);
+  });
+  it('no drop: null', () => {
+    expect(outageMinutes([], T('10:30'))).toBeNull();
+  });
+});
+
+describe('settledOutageMinutes — what MTTR and history rows count, on Incidents and Site detail alike', () => {
+  const down = (start: string, end: string | null) => ({
+    start: T(start),
+    end: end ? T(end) : null,
+    severity: 'down' as const,
+  });
+  it.each([
+    ['open with a drop in progress: not yet', [down('10:00', null)], false, null],
+    ['Monitoring / Needs root cause: every drop over, counts', [down('10:00', '10:07')], false, 7],
+    [
+      'resolved with no recovered row: the drop ends at the resolve, counts',
+      [down('10:00', '10:20')],
+      true,
+      20,
+    ],
+    ['open with no drop read yet: not yet', [], false, null],
+  ])('%s', (_, episodes, closed, minutes) => {
+    expect(settledOutageMinutes(episodes, closed, T('10:30'))).toBe(minutes);
   });
 });

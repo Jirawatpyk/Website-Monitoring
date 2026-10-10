@@ -29,12 +29,12 @@ function UndoLine({ postsAt, onUndo }: { postsAt: string; onUndo: () => void }) 
 }
 
 /**
- * Acknowledge from a banner or a Live issues row (spec §21.1, §14.3): the banner goes at once (the
+ * Acknowledge from a banner, a Live issues row or the incident page (spec §21.1, §14.3): the banner goes at once (the
  * page draws the incident as acked by `viewerName`), a toast counts down the 10 s hold with Undo, and
  * a refusal (someone else acked, the window closed) puts it back and says why. The SQL functions
  * decide (D-016); Realtime and the actions' revalidation bring the page up to date afterwards.
  */
-export function useOverviewAck({ ack, undo }: { ack: AckAction; undo: UndoAction }) {
+export function useAckToast({ ack, undo }: { ack: AckAction; undo: UndoAction }) {
   const router = useRouter();
   const [acked, setAcked] = useState<ReadonlySet<string>>(new Set());
   const [, startTransition] = useTransition();

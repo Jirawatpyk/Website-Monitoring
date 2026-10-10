@@ -1,4 +1,4 @@
-import type { IncidentState, Severity, Tier } from '@dxt/shared';
+import { clockMinutes, type IncidentState, type Severity, type Tier } from '@dxt/shared';
 
 /**
  * Incident lifecycle (spec §15.4, §16; PRD §8).
@@ -270,8 +270,29 @@ export function downEpisodesFromTimeline(
   return episodesFromTimeline(incident, events).filter((d) => d.severity === 'down');
 }
 
-/** Minutes the episodes were down (or had a problem), the drop still in progress counted to `now`. */
-export function episodeMinutes(episodes: readonly Episode[], now: Date): number {
-  const ms = episodes.reduce((sum, e) => sum + Math.max(0, (e.end ?? now).getTime() - e.start.getTime()), 0);
-  return Math.round(ms / 60_000);
+/**
+ * How long an incident was down (D-033): the sum of its drops — for an incident that was ever DOWN its
+ * DOWN drops only, as uptime counts them (§5) — each in whole clock minutes (`clockMinutes`, as the
+ * messages word it), the drop still in progress counted to `now`. Every page uses it: Incidents,
+ * the incident page, Site detail, MTTR. Null with no drop.
+ */
+/**
+ * The outage once it is over — what MTTR and the history rows count (D-033): null while the incident is
+ * still open with a drop in progress (or none read yet); a closed one counts even if its last drop had
+ * no `recovered` row (it ends at the resolve). Incidents and Site detail both use it.
+ */
+export function settledOutageMinutes(
+  episodes: readonly Episode[],
+  closed: boolean,
+  now: Date,
+): number | null {
+  const open = !closed && (episodes.length === 0 || episodes.some((e) => !e.end));
+  return open ? null : outageMinutes(episodes, now);
+}
+
+export function outageMinutes(episodes: readonly Episode[], now: Date): number | null {
+  const down = episodes.some((e) => e.severity === 'down');
+  const counted = down ? episodes.filter((e) => e.severity === 'down') : episodes;
+  if (counted.length === 0) return null;
+  return counted.reduce((sum, e) => sum + clockMinutes(e.start, e.end ?? now), 0);
 }

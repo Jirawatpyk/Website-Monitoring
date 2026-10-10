@@ -74,7 +74,7 @@ const COLORS: Record<string, ChartSeries['color']> = {
 /** Rows the phone's "Incidents in range" shows before "+ N more". */
 const PHONE_INCIDENTS = 5;
 /** Rows Incident history shows — as many as the Check log beside it; Export has every one (the full list
- * of a site's incidents comes with the Incidents page, S07). */
+ * of the incidents is on the Incidents page, filtered by site). */
 const HISTORY_ROWS = 6;
 
 const ms = (v: number | null) => (v === null ? '—' : String(v));

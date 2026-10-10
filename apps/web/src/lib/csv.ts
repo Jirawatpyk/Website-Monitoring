@@ -1,4 +1,4 @@
-/** CSV for Site detail's downloads (today's check log, the 90-day incident history). */
+/** CSV downloads (Site detail's check log and incident history, the Incidents list) and paged reads. */
 
 /**
  * One CSV field: quoted when it holds a comma, quote or line break; a value a spreadsheet would run as

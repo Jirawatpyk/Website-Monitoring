@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IncidentView } from '../view';
-import { IncidentAckView } from './incident-ack-view';
+import { AckPanel } from './ack-panel';
 
 const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
@@ -26,10 +26,20 @@ const base: IncidentView = {
   cause: 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)',
   siteUrl: 'https://www.muvmi.example.test',
   ack: { kind: 'can-ack' },
-  log: [{ at: '09:48', text: 'Confirmed down — 3 locations, 2 checks' }],
 };
-const renderView = (over: Partial<IncidentView> = {}) =>
-  render(<IncidentAckView view={{ ...base, ...over }} viewerName="Arm" viewerEmail="arm@example.test" />);
+const panel = (v: IncidentView) => (
+  <AckPanel
+    incidentId={v.incidentId}
+    ack={v.ack}
+    viewerName="Arm"
+    viewerEmail="arm@example.test"
+    siteUrl={v.siteUrl}
+    barActions={<button type="button">Add note</button>}
+  >
+    <p>timeline</p>
+  </AckPanel>
+);
+const renderView = (over: Partial<IncidentView> = {}) => render(panel({ ...base, ...over }));
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'Date'] });
@@ -40,23 +50,22 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('IncidentAckView (MobileAck)', () => {
-  it('shows the board facts and one Acknowledge button for whoever may act', () => {
+describe('AckPanel (MobileAck parts of the phone incident page)', () => {
+  it('one Acknowledge for whoever may act, Visit site; the bar’s own actions wait until it is acknowledged', () => {
     renderView();
-    expect(screen.getByRole('heading', { level: 1, name: 'MuvMi is down' })).toBeInTheDocument();
-    expect(screen.getByText('Down')).toBeInTheDocument();
-    expect(screen.getByText('Unacked')).toBeInTheDocument();
-    expect(screen.getByText('INC-0142')).toBeInTheDocument();
-    expect(screen.getByText('You’re the owner.')).toBeInTheDocument();
-    expect(screen.getByText('Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)')).toBeInTheDocument();
     expect(screen.getByText('arm@example.test')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add note' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Visit site (opens in a new tab)' })).toHaveAttribute(
       'href',
       'https://www.muvmi.example.test',
     );
-    // D-016: no escalation, client update or note controls until their slices.
-    expect(screen.queryByText(/Escalation|Client update|Add note|Full incident/)).toBeNull();
+  });
+
+  it('after the ack the bar holds the page’s actions (Add note, Resolve)', () => {
+    renderView({ ack: { kind: 'closed' } });
+    expect(screen.getByRole('button', { name: 'Add note' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
   });
 
   it('acknowledges in one tap (the action re-renders the page itself)', async () => {
@@ -69,12 +78,10 @@ describe('IncidentAckView (MobileAck)', () => {
 
   it('moves focus to Undo after the ack, and back to Acknowledge after the undo (WCAG 2.4.3)', async () => {
     const { rerender } = renderView();
-    rerender(
-      <IncidentAckView view={{ ...base, ...acked() }} viewerName="Arm" viewerEmail="arm@example.test" />,
-    );
+    rerender(panel({ ...base, ...acked() }));
     await act(async () => vi.advanceTimersByTime(0));
     expect(screen.getByRole('button', { name: /Undo/ })).toHaveFocus();
-    rerender(<IncidentAckView view={base} viewerName="Arm" viewerEmail="arm@example.test" />);
+    rerender(panel(base));
     expect(screen.getByRole('button', { name: 'Acknowledge' })).toHaveFocus();
   });
 
@@ -166,23 +173,6 @@ describe('IncidentAckView (MobileAck)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Nothing to post');
   });
 
-  it('is read-only with who can act for roles that can’t acknowledge', () => {
-    renderView({
-      role: null,
-      ack: {
-        kind: 'read-only',
-        title: 'Your role can’t acknowledge (Viewer)',
-        description: 'mint@example.test can see this incident but not acknowledge it.',
-        people: [{ name: 'Arm', duty: 'owner', status: 'Not acked', urgent: true }],
-      },
-      siteUrl: null,
-    });
-    expect(screen.getByText('Your role can’t acknowledge (Viewer)')).toBeInTheDocument();
-    expect(screen.getByText('Arm — owner')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
-    expect(screen.queryByRole('link', { name: /Visit site/ })).toBeNull();
-  });
-
   it('keeps refreshing until the ack is posted, and says so when it takes longer', async () => {
     renderView(acked({ windowOpen: false, postsAt: '2026-09-25T03:07:40Z' }));
     await act(async () => vi.advanceTimersByTime(2_000));
@@ -198,18 +188,5 @@ describe('IncidentAckView (MobileAck)', () => {
     await act(async () => vi.advanceTimersByTime(0));
     expect(screen.getByRole('status')).toHaveTextContent('Not confirmed as posted');
     expect(refresh).not.toHaveBeenCalled();
-  });
-
-  it('shows a PROBLEM incident as Problem, and the escalation level', () => {
-    renderView({ severity: 'problem', state: 'escalated', escalationLevel: 1, title: 'MuvMi has a problem' });
-    expect(screen.getByText('Problem')).toBeInTheDocument();
-    expect(screen.getByText('Escalated · L1')).toBeInTheDocument();
-  });
-
-  it('shows "Was down" once recovered', () => {
-    renderView({ recovered: true, state: 'needs_root_cause', ack: { kind: 'closed' }, log: [] });
-    expect(screen.getByText('Was down')).toBeInTheDocument();
-    expect(screen.getByText('Needs root cause')).toBeInTheDocument();
-    expect(screen.queryByText('LATEST')).toBeNull();
   });
 });

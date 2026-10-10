@@ -69,7 +69,6 @@ describe('MobileAck view', () => {
       cause: 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)',
       siteUrl: 'https://www.muvmi.example.test',
       ack: { kind: 'can-ack' },
-      log: [{ at: '09:48', text: 'Confirmed down — 3 locations, 2 checks' }],
     });
   });
 
@@ -134,10 +133,6 @@ describe('MobileAck view', () => {
       notifies: true,
       posted: null,
     });
-    expect(holding.log[0]).toEqual({
-      at: '10:07',
-      text: 'Acknowledged by Arm (posts 10:07:50 unless undone)',
-    });
 
     const alerted = (channel: string, at: string): EventRow => ({
       type: 'alerted',
@@ -155,11 +150,6 @@ describe('MobileAck view', () => {
     expect(posted.ack).toMatchObject({
       posted: { at: '2026-09-25T03:07:51Z', to: 'the Chat thread + email' },
     });
-    expect(posted.log.slice(0, 3).map((l) => l.text)).toEqual([
-      'ACKNOWLEDGED emailed to Arm',
-      'ACKNOWLEDGED posted in Chat',
-      'Acknowledged by Arm (posted 10:07:51)',
-    ]);
     expect(view(acked, events.slice(0, 3), viewer(), now).ack).toMatchObject({
       posted: { to: 'the Chat thread' },
     });
@@ -177,12 +167,6 @@ describe('MobileAck view', () => {
     ];
     const v = view(acked, events, viewer({ id: 'u-tao', role: 'admin' }), new Date('2026-09-25T03:07:42Z'));
     expect(v.ack).toMatchObject({ byName: 'Arm', byViewer: false, postsAt: '2026-09-25T03:07:50.000Z' });
-    expect(v.log.map((l) => l.text)).toEqual([
-      'Acknowledged by Arm (posts 10:07:50 unless undone)',
-      'Acknowledgement undone by Arm',
-      'Acknowledged by Arm',
-      'Confirmed down — 3 locations, 2 checks',
-    ]);
   });
 
   it('never marks an undone ack as posted, even when a later ack posted', () => {
@@ -199,11 +183,7 @@ describe('MobileAck view', () => {
       },
     ];
     const v = view(acked, events, viewer(), new Date('2026-09-25T03:08:00Z'));
-    expect(v.log.map((l) => l.text)).toContain('Acknowledged by Arm (posted 10:07:51)');
-    expect(v.log.filter((l) => l.text.startsWith('Acknowledged by Arm'))).toEqual([
-      { at: '10:07', text: 'Acknowledged by Arm (posted 10:07:51)' },
-      { at: '10:07', text: 'Acknowledged by Arm' },
-    ]);
+    expect(v.ack).toMatchObject({ posted: { at: '2026-09-25T03:07:51Z' } });
   });
 
   it('falls back to the window when the ack event is missing, and knows a muted ack posts nothing', () => {
@@ -218,10 +198,9 @@ describe('MobileAck view', () => {
       now,
     );
     expect(muted.ack).toMatchObject({ notifies: false });
-    expect(muted.log[0]?.text).toBe('Acknowledged by Arm');
   });
 
-  it('is past acknowledging once recovered, and the log reads in words', () => {
+  it('is past acknowledging once recovered', () => {
     const events: EventRow[] = [
       detected,
       {
@@ -247,13 +226,6 @@ describe('MobileAck view', () => {
       recovered: true,
       ack: { kind: 'closed' },
     });
-    expect(v.log.map((l) => l.text)).toEqual([
-      'OK two rounds in a row — needs a root cause',
-      'Alert posted in Chat',
-      'Recovered — OK from 3 locations',
-      'DOWN posted in Chat',
-      'Confirmed down — 3 locations, 2 checks',
-    ]);
   });
 
   it('uses safe defaults when stored facts are missing', () => {
@@ -263,7 +235,7 @@ describe('MobileAck view', () => {
       confirmedBy: 'Confirmed by 2 locations, 2 checks',
       siteUrl: null,
     });
-    // Behind a WAF (D-027): who confirmed it and who the WAF blocked, on the card and in the log.
+    // Behind a WAF (D-027): who confirmed it and who the WAF blocked.
     const waf = view({}, [
       {
         ...detected,
@@ -276,9 +248,6 @@ describe('MobileAck view', () => {
       },
     ]);
     expect(waf.confirmedBy).toBe('Confirmed by BKK only, 2 checks — SIN, TYO blocked by bot protection');
-    expect(JSON.stringify(waf)).toContain(
-      'Confirmed down from BKK only, 2 checks — SIN, TYO blocked by bot protection',
-    );
     expect(view({}, [{ ...detected, payload: { confirmingLocations: 1 } }]).confirmedBy).toBe(
       'Confirmed by 1 location, 2 checks',
     );
@@ -316,7 +285,6 @@ describe('MobileAck view of a PROBLEM (spec §19, S04a)', () => {
       confirmedLabel: 'Detected',
       confirmedBy: 'Slow',
       cause: 'p50 5.8 s (BKK, SIN, TYO) · over the Tier 2 limit of 5 s for 3 checks in a row',
-      log: [{ at: '09:52', text: 'PROBLEM detected — slow, p50 5.8 s' }],
     });
     expect(view().confirmedLabel).toBe('Confirmed down');
   });

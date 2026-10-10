@@ -9,8 +9,8 @@ import { bannersOf, countsOf, liveIssues, recentEvents, withAck } from '../model
 import type { OverviewData, ProbeHealth } from '../types';
 import { DesktopBanners, Kpis, LIVE_ISSUES_ID, LiveIssuesTable, RecentEvents, SiteTiles } from './desktop';
 import { PhoneAllSites, PhoneBanners, PhoneCounts, PhoneLiveIssues } from './phone';
-import { useLiveRefresh } from './use-live-refresh';
-import { useOverviewAck, type AckAction, type UndoAction } from './use-overview-ack';
+import { useLiveRefresh } from '@/components/use-live-refresh';
+import { useAckToast, type AckAction, type UndoAction } from '@/components/use-ack-toast';
 
 /** "Probes 3/3 | BKK · SIN · TYO | Verifier idle" (D-032: no heartbeat age until S12). */
 function ProbePill({ probes, compact = false }: { probes: ProbeHealth; compact?: boolean }) {
@@ -65,7 +65,7 @@ export function OverviewView({
   undoAction: UndoAction;
 }) {
   const live = useLiveRefresh();
-  const { acked, acknowledge } = useOverviewAck({ ack: ackAction, undo: undoAction });
+  const { acked, acknowledge } = useAckToast({ ack: ackAction, undo: undoAction });
   // Acknowledge removes the button that had focus (its banner or row changes): put focus on the Live
   // issues heading once React has drawn the page without it (WCAG 2.4.3, apps/web/CLAUDE.md → Testing)
   const [ackFocus, setAckFocus] = useState(0);

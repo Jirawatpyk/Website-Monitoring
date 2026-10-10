@@ -1,4 +1,4 @@
-import { formatDay, formatDuration, formatTime, isSameBangkokDay } from '@dxt/shared';
+import { clockMinutes, formatDay, formatDuration, formatTime, isSameBangkokDay } from '@dxt/shared';
 
 /**
  * How long a site was down, for RECOVERED and ACKNOWLEDGED messages (spec §6: from the first failed
@@ -7,8 +7,7 @@ import { formatDay, formatDuration, formatTime, isSameBangkokDay } from '@dxt/sh
  * Past midnight in Bangkok the range names both days.
  */
 export function downtime(startedAt: Date, endedAt: Date): { duration: string; range: string } {
-  const minute = (d: Date) => Math.floor(d.getTime() / 60_000);
-  const duration = formatDuration(Math.max(1, minute(endedAt) - minute(startedAt)));
+  const duration = formatDuration(clockMinutes(startedAt, endedAt));
   const at = (d: Date) =>
     isSameBangkokDay(startedAt, endedAt)
       ? formatTime(d)

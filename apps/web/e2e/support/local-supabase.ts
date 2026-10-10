@@ -152,3 +152,43 @@ export async function siteAudit(siteId: string): Promise<{ action: string; actor
   )) as { action: string; actor: { email: string } | null }[];
   return rows.map((r) => ({ action: r.action, actor: r.actor?.email ?? null }));
 }
+
+/**
+ * Recovers the test incident and settles it (two OK rounds), as the engine would: it reaches Needs
+ * root cause (or stays in Monitoring when a root cause was written first) and Resolve opens (S07).
+ */
+export async function settleTestIncident(incidentId: string): Promise<void> {
+  const now = Date.now();
+  await admin('/rest/v1/rpc/engine_recover_incident', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_incident_id: incidentId,
+      p_from: 'unacked',
+      p_to: 'monitoring',
+      p_recovered_at: new Date(now - 60_000).toISOString(),
+      p_round_at: new Date(now - 60_000).toISOString(),
+      p_context: { okLocations: 3 },
+      p_notify: false,
+    }),
+  });
+  await admin('/rest/v1/rpc/engine_settle_incident', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_incident_id: incidentId,
+      p_from: 'monitoring',
+      p_to: 'needs_root_cause',
+      p_at: new Date(now - 30_000).toISOString(),
+      p_round_at: new Date(now - 30_000).toISOString(),
+    }),
+  });
+}
+
+/** The incident's messages of one template: channel and status (NOTE, RESOLVED — S07). */
+export async function incidentMessages(
+  incidentId: string,
+  template: string,
+): Promise<{ channel: string; status: string }[]> {
+  return (await admin(
+    `/rest/v1/notifications?select=channel,status&incident_id=eq.${incidentId}&template=eq.${template}&order=channel,created_at`,
+  )) as { channel: string; status: string }[];
+}

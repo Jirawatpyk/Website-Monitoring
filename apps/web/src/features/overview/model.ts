@@ -1,4 +1,5 @@
 import {
+  clockMinutes,
   formatDuration,
   formatIncidentId,
   formatPercent,
@@ -196,13 +197,14 @@ export function canAck(viewer: OverviewViewer, site: OverviewSite): boolean {
 
 export type NextStep =
   | { kind: 'ack'; incidentId: string; number: number }
-  | { kind: 'incident'; incidentId: string; label: string }
+  | { kind: 'incident'; incidentId: string; label: string; hash?: string }
   | { kind: 'site'; label: 'View checks' | 'View site' };
 
 /**
- * Next step (§21.4, D-032): an unacknowledged DOWN → Acknowledge for those who may, otherwise "Open
- * INC-…"; acked DOWN, PROBLEM and an incident waiting for its root cause → "Open INC-…" ("Add root
- * cause" waits for Resolve, S07); a location warning → "View checks"; a mute → "View site".
+ * Next step (§21.4, D-032, D-033): an unacknowledged DOWN → Acknowledge for those who may, otherwise
+ * "Open INC-…"; an incident waiting for its root cause → "Add root cause" (the Resolve card) for those
+ * who may write it, otherwise "Open INC-…"; acked DOWN and PROBLEM → "Open INC-…"; a location warning →
+ * "View checks"; a mute → "View site".
  */
 export function nextStep(viewer: OverviewViewer, issue: LiveIssue): NextStep {
   const { site, reason } = issue;
@@ -211,6 +213,9 @@ export function nextStep(viewer: OverviewViewer, issue: LiveIssue): NextStep {
   if (reason.kind === 'muted' || !inc) return { kind: 'site', label: 'View site' };
   if (reason.kind === 'down' && UNACKED.includes(inc.state) && canAck(viewer, site)) {
     return { kind: 'ack', incidentId: inc.id, number: inc.number };
+  }
+  if (reason.kind === 'root_cause' && canAck(viewer, site)) {
+    return { kind: 'incident', incidentId: inc.id, label: 'Add root cause', hash: 'resolve' };
   }
   return { kind: 'incident', incidentId: inc.id, label: `Open ${formatIncidentId(inc.number)}` };
 }
@@ -256,7 +261,9 @@ export function bannersOf(
           number: inc.number,
           escalated: inc.state === 'escalated',
           level: inc.level,
-          downMinutes: minutesBetween(inc.startedAt, now),
+          // The drop in progress (the Overview's Since), in whole clock minutes (D-033); the Incidents
+          // list and the incident page add up every drop
+          downMinutes: clockMinutes(new Date(inc.startedAt), now),
           unackedMinutes: minutesBetween(inc.detectedAt, now),
           cause: inc.cause,
         },

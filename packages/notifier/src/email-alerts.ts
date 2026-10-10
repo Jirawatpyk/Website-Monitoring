@@ -13,7 +13,8 @@ import {
 } from '@dxt/shared';
 import type { ProblemFacts } from './chat-alerts';
 import { downtime } from './downtime';
-import { dropsSummary, type Drop, type KeyPageFacts } from './relapse-alerts';
+import { flapCounts, timesWord, type Drop, type KeyPageFacts } from './relapse-alerts';
+import { resolvedLasted } from './resolve-alerts';
 
 /**
  * Alert emails — EmailAlert board, spec §10, PRD §7, cut to what exists today (D-013 / D-016: no
@@ -36,7 +37,7 @@ export interface EmailMessage {
 }
 
 /** Why the recipient got the email — one footer line each (EmailAlert board). */
-export type EmailReason = 'owner' | 'acked' | 'fallback';
+export type EmailReason = 'owner' | 'acked' | 'fallback' | 'emailed';
 
 export interface EmailBaseInput {
   incidentId: string;
@@ -82,6 +83,8 @@ export interface AcknowledgedEmailInput extends EmailBaseInput {
   problem?: ProblemFacts | null;
   /** The incident's cause line, shown under a PROBLEM's ACKNOWLEDGED (EmailAlert). */
   cause?: string | null;
+  /** Minutes down so far by the incident's drops (D-033); without it, first failed check → ack. */
+  downMinutes?: number | null;
 }
 
 export interface RecoveredEmailInput extends EmailBaseInput {
@@ -95,7 +98,25 @@ export interface RecoveredEmailInput extends EmailBaseInput {
 }
 
 type Template =
-  'down' | 'problem' | 'acknowledged' | 'recovered' | 'flap_summary' | 'down_again' | 'problem_again';
+  | 'down'
+  | 'problem'
+  | 'acknowledged'
+  | 'recovered'
+  | 'flap_summary'
+  | 'down_again'
+  | 'problem_again'
+  | 'resolved';
+
+export interface ResolvedEmailInput extends EmailBaseInput {
+  resolvedBy: string;
+  resolvedAt: Date;
+  /** The incident's closed drops: the "Down for" row counts the DOWN ones (D-033). */
+  drops: readonly Drop[];
+  /** The category's words ("Hosting / server"). */
+  rootCause: string;
+  whatHappened: string;
+  whatFixedIt: string | null;
+}
 
 export interface FlapSummaryEmailInput extends EmailBaseInput {
   severity: 'down' | 'problem';
@@ -165,6 +186,8 @@ const whyOf = (i: EmailBaseInput): string => {
       return 'You got this because you acknowledged this incident.';
     case 'fallback':
       return 'You got this because a Google Chat alert for this incident couldn’t be delivered.';
+    case 'emailed':
+      return 'You got this because you were emailed about this incident.';
   }
 };
 
@@ -280,7 +303,7 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
       ['Cause', input.cause],
       ['Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)],
     ],
-    // One page serves both until S07 builds the full incident: [Open incident] would repeat it.
+    // The board adds [Open incident], but Acknowledge opens that same page (one incident page, D-033).
     buttons: input.ackedBy
       ? [{ label: 'Open incident', href: input.incidentUrl, primary: true }]
       : [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
@@ -290,7 +313,10 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
 export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMessage {
   const { site, ackedBy, problem } = input;
   const at = formatTime(input.ackedAt);
-  const { duration } = downtime(input.startedAt, input.ackedAt);
+  const duration =
+    input.downMinutes != null
+      ? formatDuration(input.downMinutes)
+      : downtime(input.startedAt, input.ackedAt).duration;
   const slow = problem?.trigger === 'slow';
   const still = !problem ? 'still down' : slow ? 'still slow' : 'still has a problem';
   return render(input, {
@@ -351,8 +377,9 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
             ]
           : []),
       ],
-      // "Add root cause" waits for S07's root-cause form: until then the incident page.
-      buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: isOwner }],
+      buttons: isOwner
+        ? [{ label: 'Add root cause', href: `${input.incidentUrl}#resolve`, primary: true }]
+        : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
     });
   }
   return render(input, {
@@ -373,8 +400,13 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
       ...ackFact,
       ...(owner ? [['Still to do', `Root cause (${owner})`] as [string, string]] : []),
     ],
-    // Board: the owner's only button leads; for everyone else it's secondary (nothing to do).
-    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: isOwner }],
+    // Board: the owner gets "Add root cause" first; for everyone else one secondary button.
+    buttons: isOwner
+      ? [
+          { label: 'Add root cause', href: `${input.incidentUrl}#resolve`, primary: true },
+          { label: 'Open incident', href: input.incidentUrl, primary: false },
+        ]
+      : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
 }
 
@@ -580,14 +612,12 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
 /**
  * The flapping summary email (EmailAlert "VOCA · flapping", spec §19.4): to the owner in the
  * incident's thread at the same time as the Chat summary, replacing the RECOVERED emails held while
- * the site flapped. "Add root cause" waits for S07 (D-022): until then the incident page.
+ * the site flapped. The owner's one button is "Add root cause" (the Resolve card, S07).
  */
 export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessage {
   const { site, drops, owner, ack } = input;
-  const n = drops.length;
-  const last = drops.at(-1);
+  const { flips: n, last, counted, ranges, minutes } = flapCounts(drops, input.severity);
   const stable = last ? formatTime(last.end) : '';
-  const { ranges, minutes } = dropsSummary(drops);
   const total = formatDuration(minutes);
   const down = input.severity === 'down';
   const isOwner = input.reason === 'owner';
@@ -604,7 +634,7 @@ export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessag
         ? `${site} flapped ${n} times and has been stable for 15 min. Nothing needed from you. ${owner} adds the root cause.`
         : `${site} flapped ${n} times and has been stable for 15 min. Nothing needed from you.`,
     facts: [
-      [`${down ? 'Down' : 'Had a problem'} ${n} times`, ranges],
+      [`${down ? 'Down' : 'Had a problem'} ${timesWord(counted)}`, ranges],
       [down ? 'Down in total' : 'In total', total],
       ['Stable since', `${stable} — OK for 15 min`],
       ['Acknowledged', ack ? `${ack.by} at ${formatTime(ack.at)}` : 'Not yet'],
@@ -612,7 +642,9 @@ export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessag
         ? [['Still to do', `Root cause (${owner}) — needed before it can be resolved`] as [string, string]]
         : []),
     ],
-    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: isOwner }],
+    buttons: isOwner
+      ? [{ label: 'Add root cause', href: `${input.incidentUrl}#resolve`, primary: true }]
+      : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
 }
 
@@ -665,5 +697,32 @@ export function buildAgainEmail(input: AgainEmailInput): EmailMessage {
     lede: `${input.body} The Google Chat reply couldn’t be delivered, so this email is the alert.`,
     facts: [['Same incident', formatIncidentId(input.incidentNumber)]],
     buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
+  });
+}
+
+/**
+ * RESOLVED email (EmailAlert "Resolved email", spec §16.5, D-033): in the incident's thread to
+ * everyone emailed about it, after the 10 s Undo window. Says who resolved it and the root cause —
+ * people's own words, escaped like every value in the layout.
+ */
+export function buildResolvedEmail(input: ResolvedEmailInput): EmailMessage {
+  const { site, resolvedBy } = input;
+  const at = formatTime(input.resolvedAt);
+  const lasted = resolvedLasted(input.drops);
+  return render(input, {
+    template: 'resolved',
+    color: C.positive,
+    bar: C.positive,
+    label: 'RESOLVED',
+    pre: `${site} · by ${resolvedBy} ${at} · root cause: ${input.rootCause}`,
+    headline: `${site} is resolved`,
+    lede: `Resolved by ${resolvedBy} at ${at}. Nothing needed from you.`,
+    facts: [
+      ['Root cause', input.rootCause],
+      ['What happened', input.whatHappened],
+      ...(input.whatFixedIt ? [['What fixed it', input.whatFixedIt] as [string, string]] : []),
+      ...(lasted ? [lasted] : []),
+    ],
+    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
 }
