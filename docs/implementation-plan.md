@@ -23,7 +23,7 @@
 | S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 (merged) | 3 | Done |
 | S06 | Site detail & check rollups | 1 · P0 | L | FR-08 | S02a, S05 (merged) | 3 | Done |
 | S06b | Overview (option A) | 1 · P0 | L | FR-05 | S06, S02b | 3 | Done |
-| S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | In progress |
+| S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Done |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Todo |
 | S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06b, S08 | 3 | Todo |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
@@ -383,6 +383,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   3. A note appears on the timeline and as `NOTE · <site> · <name>: …` in the thread; RESOLVED goes to everyone who got the DOWN email, after the 10 s hold.
   4. spec-checker passes the five boards; nav "Incidents" live.
 - **Review:** spec-checker, engine-reviewer (resolve gate), message-checker.
+- **Notes (evidence):** Done 10 Oct 2026 — migration #62, runtime #63 (`migrate-production` on `main` applied `20261009150650`). Staging `/verify` (9–10 Oct): Resolve locked while down; NOTE in the Chat thread; Unknown → kept open; Resolve → Undo → Needs root cause; a fresh INC-0028 resolved → "Posted to Chat and email at 01:23:30" without a reload, RESOLVED email 01:23:31 in the incident thread (RECOVERED "down 9 min" = the page); 390 / 820 / 1440 light and dark, focus rings, evidence screenshot. Production `/incidents` checked after the deploy: 3 open, nav Incidents live, CSP `img-src` with the Supabase origin. Decisions in D-033 (amended: one outage rule — DOWN drops, clock minutes; Resolve's Uptime box with S09); AURA request 15 (table cells clip focus rings). Spec-checker Lows left for follow-up are listed in #63; the Overview Live issues table at 820 with long waits went to its own fix.
 - **Carried from S03 `/verify`:** an evidence job queued while the verifier was down is taken when it comes back (up to 15 min later), so its screenshot can show the recovered page. The Incident board's evidence card shows the capture time next to "Confirmed down"; skip or label a screenshot taken after `recovered_at`.
 - **Carried from S04b review:**
   - A resolve made by hand inside a flapping incident's 15-min hold must cancel its held summary (`engine_cancel_flap_summary`); otherwise the summary posts after RESOLVED (db-reviewer L-a, engine-reviewer L4).
