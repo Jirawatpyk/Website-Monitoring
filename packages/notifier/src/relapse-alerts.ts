@@ -10,6 +10,7 @@ import {
 import { plainName, type ChatMessage, type ChatPerson, type ProblemFacts } from './chat-alerts';
 import { buildChatTextLine } from './chat-text';
 import { downtime } from './downtime';
+import { formatResume } from './escalation-alerts';
 
 /**
  * Google Chat replies of S04b — ChatAlert "Fails again while the incident is open" (spec §19.3–19.7,
@@ -138,7 +139,10 @@ export function buildAgainAlert(input: AgainAlertInput): ChatMessage {
       `same incident ${inc}`,
       ...(still ? ['still flapping'] : []),
       ...(input.pausedUntil
-        ? ['outside response hours', `timers paused until ${formatTime(input.pausedUntil)}`]
+        ? [
+            'outside response hours',
+            `timers paused until ${formatResume(input.pausedUntil, input.droppedAt)}`,
+          ]
         : []),
     ];
     title = back

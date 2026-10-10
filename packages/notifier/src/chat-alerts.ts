@@ -280,7 +280,7 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
     `Detected ${formatTime(detectedAt)} (UTC+7)`,
   ].join(' · ');
   const ownerText = ownerRow(owner, backup, input.ladder);
-  const next = nextRow(input.ladder, now, 'problem');
+  const next = nextRow(input.ladder, now, 'problem', { owner: owner?.name ?? null });
   const slowNote = input.trigger === 'slow' ? ' — the site loads, just slowly' : '';
   const seen = input.seenFrom ? `${input.seenFrom.count} of ${input.seenFrom.of} locations${slowNote}` : null;
   const known = unverified

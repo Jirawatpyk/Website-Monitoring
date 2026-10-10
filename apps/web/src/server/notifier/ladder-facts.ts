@@ -1,5 +1,5 @@
 import 'server-only';
-import { isInsideHours, nextOpening, scheduleOf } from '@dxt/engine';
+import { isInsideHours, nextOpening, problemHoldUntil, scheduleOf } from '@dxt/engine';
 import type { ChatPerson, LadderFacts, LadderStopped } from '@dxt/notifier';
 import { escalationPlanSchema, TIER_CONFIG, type EscalationTarget, type Tier } from '@dxt/shared';
 import { contextOf, type IncidentFacts, type Owner } from './facts';
@@ -97,7 +97,16 @@ export function stoppedOf(i: IncidentFacts, ctx: Record<string, unknown>): Ladde
     severity: plan.severity,
     backup: i.sites.backup?.display_name ?? null,
     l1Fired: typeof ctx.escalationLevel === 'number' && ctx.escalationLevel >= 1,
+    reminderMin: plan.reminderMin,
   };
+}
+
+/** When the owner was told: at detection, or — a Tier 2–3 PROBLEM held overnight — at the opening. */
+export function toldAtOf(i: IncidentFacts): Date {
+  const detected = new Date(i.detected_at);
+  const hours = i.ladder?.hours;
+  if (i.severity !== 'problem' || !hours) return detected;
+  return problemHoldUntil(i.sites.tier as Tier, detected, hours) ?? detected;
 }
 
 /** Everyone the facts know by id: owner, backup, the client's AM, the Admins. */

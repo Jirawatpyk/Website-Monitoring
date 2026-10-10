@@ -183,11 +183,11 @@ describe('ACKNOWLEDGED says what stopped', () => {
       ackedBy: 'Ploy',
       ackedAt: bkk('2026-09-25T09:58:00'),
       problem: { trigger: 'slow', slowLimitMs: 5000 },
-      stopped: { severity: 'problem', backup: 'Nok', l1Fired: false },
+      stopped: { severity: 'problem', backup: 'Nok', l1Fired: false, reminderMin: 60 },
     });
     expect(msg.text).toBe('ACKNOWLEDGED · Fuji Links · by Ploy 09:58 · reminders stopped');
     expect(JSON.stringify(msg.cardsV2)).toContain(
-      'Acknowledged by Ploy → the reminders and the Nok (backup) step are stopped. The site is up; it’s only slow.',
+      'Acknowledged by Ploy → the 60-min reminder and the Nok (backup) step are stopped. The site is up; it’s only slow.',
     );
   });
 });
@@ -309,7 +309,7 @@ describe('ladderLine / formatResume', () => {
 });
 
 describe('PROBLEM first card with the ladder (ChatAlert Fuji Links)', () => {
-  it('Next: Reminder + Nok (backup) at 10:52', () => {
+  it('Next: "Reminder at 10:52 … — Ploy, Nok" (the email reads "Reminder + Nok (backup)")', () => {
     const msg = buildProblemAlert({
       incidentId: 'i141',
       incidentNumber: 141,
@@ -328,6 +328,6 @@ describe('PROBLEM first card with the ladder (ChatAlert Fuji Links)', () => {
     });
     const rows = JSON.stringify(msg.cardsV2);
     expect(rows).toContain('Ploy · backup Nok (not notified yet)');
-    expect(rows).toContain('Reminder + Nok (backup) at 10:52 if not acknowledged');
+    expect(rows).toContain('Reminder at 10:52 if not acknowledged — Ploy, Nok');
   });
 });

@@ -34,25 +34,52 @@ export function ladderLine(ladder: LadderFacts | null | undefined, now: Date): s
   return ladder.next ? [`acknowledge by ${formatResume(ladder.next.at, now)} or it escalates`] : [];
 }
 
-/** The card's "Next" row: "L1 at 10:03 if not acknowledged — Ploy, Tao". */
-export function nextRow(ladder: LadderFacts | null | undefined, now: Date, severity: 'down' | 'problem') {
+/**
+ * The "Next" row. DOWN, card and email: "L1 at 10:03 if not acknowledged — Ploy, Tao". PROBLEM card:
+ * "Reminder at 10:52 if not acknowledged — Ploy, Nok" (the owner reminded, the backup asked);
+ * PROBLEM email: "Reminder + Nok (backup) at 10:52 if not acknowledged" (ChatAlert / EmailAlert).
+ */
+export function nextRow(
+  ladder: LadderFacts | null | undefined,
+  now: Date,
+  severity: 'down' | 'problem',
+  form: { owner?: string | null; email?: boolean } = {},
+) {
   const next = ladder?.next;
   if (!next) return null;
   const people = [...next.ask, ...next.fyi].map(plainName);
   const at = formatResume(next.at, now);
-  return severity === 'problem'
-    ? `Reminder + ${people.map((p) => `${p} (backup)`).join(', ')} at ${at} if not acknowledged`
-    : `L${next.level} at ${at} if not acknowledged — ${people.join(', ')}`;
+  if (severity === 'down') return `L${next.level} at ${at} if not acknowledged — ${people.join(', ')}`;
+  if (form.email)
+    return `Reminder + ${people.map((p) => `${p} (backup)`).join(', ')} at ${at} if not acknowledged`;
+  const who = [...(form.owner ? [plainName(form.owner)] : []), ...people];
+  return `Reminder at ${at} if not acknowledged — ${who.join(', ')}`;
 }
 
 /** What an ACKNOWLEDGED reply says stopped: L1 for a DOWN, the reminders (and the backup step) for a PROBLEM. */
-export type LadderStopped = { severity: 'down' | 'problem'; backup: string | null; l1Fired: boolean };
+export type LadderStopped = {
+  severity: 'down' | 'problem';
+  backup: string | null;
+  l1Fired: boolean;
+  /** The PROBLEM reminder interval: "the 60-min reminder". */
+  reminderMin?: number;
+};
 
-export function stoppedWords(s: LadderStopped | null | undefined): { line: string; body: string } | null {
+export function stoppedWords(
+  s: LadderStopped | null | undefined,
+): { line: string; body: string; fact: [string, string] | null } | null {
   if (!s) return null;
-  if (s.severity === 'down') return { line: 'L1 stopped', body: 'L1 stopped.' };
-  const step = !s.l1Fired && s.backup ? ` and the ${plainName(s.backup)} (backup) step are` : ' are';
-  return { line: 'reminders stopped', body: `the reminders${step} stopped.` };
+  if (s.severity === 'down') return { line: 'L1 stopped', body: 'L1 stopped.', fact: null };
+  const reminder = `${s.reminderMin ?? 60}-min reminder`;
+  const what =
+    !s.l1Fired && s.backup
+      ? `${reminder} and the ${plainName(s.backup)} (backup) step are`
+      : `${reminder} is`;
+  return {
+    line: 'reminders stopped',
+    body: `the ${what} stopped.`,
+    fact: ['Reminders', `${what.charAt(0).toUpperCase()}${what.slice(1)} stopped`],
+  };
 }
 
 const mentions = (people: readonly (ChatPerson | null)[]) =>

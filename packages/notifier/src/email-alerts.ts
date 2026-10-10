@@ -356,7 +356,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
     headline: `${ackedBy} has ${site}`,
     lede: !problem
       ? `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.body}` : '.'}`
-      : `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.body}` : '.'} The site is still up${slow ? ' but slow' : ''}; you’ll get one more email when it clears.`,
+      : `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.line}.` : '.'} The site is still up${slow ? ' but slow' : ''}; you’ll get one more email when it clears.`,
     facts: problem
       ? [
           ['Acknowledged', `${ackedBy} at ${at}`],
@@ -365,6 +365,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
             `${duration} so far (detected ${formatTime(input.confirmedAt)})`,
           ],
           ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+          ...(stopped?.fact ? [stopped.fact] : []),
         ]
       : [
           ['Acknowledged', `${ackedBy} at ${at}`],
@@ -484,7 +485,7 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
       ['Trigger', TRIGGER_LABELS[trigger]],
       ['Cause', input.cause],
       ['Site', state],
-      ...ladderFacts(input.ladder, input.now ?? input.detectedAt, 'problem'),
+      ...ladderFacts(input.ladder, input.now ?? input.detectedAt, 'problem', true),
     ],
     buttons: [{ label: 'Open / acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
   });
@@ -671,7 +672,7 @@ export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessag
         ack
           ? `${ack.by} at ${formatTime(ack.at)}`
           : input.pausedUntil
-            ? `Not yet — outside response hours, timers paused until ${formatTime(input.pausedUntil)}`
+            ? `Not yet — outside response hours, timers paused until ${formatResume(input.pausedUntil, last?.end ?? input.pausedUntil)}`
             : 'Not yet',
       ],
       ...(owner
@@ -769,23 +770,15 @@ function ladderPre(ladder: LadderFacts | null | undefined, now: Date): string[] 
   return [`acknowledge by ${formatResume(ladder.next.at, now)}`];
 }
 
-/** The Next step row (EmailAlert Down / PROBLEM emails), or the paused timers. */
+/** The Next step row (EmailAlert Down / PROBLEM emails). */
 function ladderFacts(
   ladder: LadderFacts | null | undefined,
   now: Date,
   severity: 'down' | 'problem',
+  email = false,
 ): [string, string][] {
-  if (!ladder) return [];
-  const next = nextRow(ladder, now, severity);
-  const paused = ladder.pausedUntil
-    ? [
-        ['Timers', `Outside response hours — paused until ${formatResume(ladder.pausedUntil, now)}`] as [
-          string,
-          string,
-        ],
-      ]
-    : [];
-  return [...paused, ...(next ? [['Next step', next] as [string, string]] : [])];
+  const next = nextRow(ladder, now, severity, { email });
+  return next ? [['Next step', next]] : [];
 }
 
 export interface StepEmailInput extends EmailBaseInput {
@@ -800,6 +793,12 @@ export interface StepEmailInput extends EmailBaseInput {
   asFyi: boolean;
   /** Who was asked at this level, in words: "Ploy". */
   asked: string | null;
+  /** The incident's cause line (EmailAlert L1 facts). */
+  cause?: string | null;
+  /** When the owner was told (a PROBLEM held for response hours: the opening, not detection). */
+  toldAt?: Date;
+  /** The Chat reply couldn't be delivered: this email is the alert (D-016 fallback). */
+  fallback?: boolean;
 }
 
 /**
@@ -812,11 +811,13 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
   const duration = formatDuration(input.elapsedMin);
   const down = input.severity === 'down';
   const owner = input.owner ?? 'The owner';
-  const ask = input.asFyi
-    ? `For your information — ${input.asked ?? 'the next person'} has been asked to acknowledge. Nothing needed from you.`
-    : down
-      ? `${owner} hasn’t acknowledged. Please acknowledge — you’re the next person for this incident.`
-      : `${owner} hasn’t acknowledged. Please take it — you’re the next person for this incident.`;
+  const ask = input.fallback
+    ? `${owner} hasn’t acknowledged. The Google Chat reply couldn’t be delivered, so this email is the alert.`
+    : input.asFyi
+      ? `For your information — ${input.asked ?? 'the next person'} has been asked to acknowledge. Nothing needed from you.`
+      : down
+        ? `${owner} hasn’t acknowledged. Please acknowledge — you’re the next person for this incident.`
+        : `${owner} hasn’t acknowledged. Please take it — you’re the next person for this incident.`;
   return render(input, {
     template: down ? 'down' : 'problem',
     color: C.warning,
@@ -832,20 +833,22 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
         down ? 'Down for' : 'Problem for',
         `${duration} (${down ? 'confirmed down' : 'detected'} ${formatTimeWithSeconds(input.confirmedAt)})`,
       ],
+      ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
       ...(input.owner
         ? [
-            ['Already told', `${input.owner} — Chat + email ${formatTime(input.confirmedAt)}`] as [
-              string,
-              string,
-            ],
+            [
+              'Already told',
+              `${input.owner} — Chat + email ${formatResume(input.toldAt ?? input.confirmedAt, input.confirmedAt)}`,
+            ] as [string, string],
           ]
         : []),
     ],
-    buttons: input.asFyi
-      ? [{ label: 'Open incident', href: input.incidentUrl, primary: false }]
-      : [
-          { label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true },
-          { label: 'Open incident', href: input.incidentUrl, primary: false },
-        ],
+    buttons:
+      input.asFyi && !input.fallback
+        ? [{ label: 'Open incident', href: input.incidentUrl, primary: false }]
+        : [
+            { label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true },
+            { label: 'Open incident', href: input.incidentUrl, primary: false },
+          ],
   });
 }

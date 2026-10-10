@@ -49,7 +49,7 @@ import {
   type Recipient,
   type SystemAlertFacts,
 } from './facts';
-import { ladderFactsOf, namedIn, stepWhy, stoppedOf } from './ladder-facts';
+import { ladderFactsOf, namedIn, stepWhy, stoppedOf, toldAtOf } from './ladder-facts';
 
 const person = (p: IncidentFacts['sites']['primary']): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
@@ -332,7 +332,8 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
  */
 export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   if (n.template === 'acknowledged' && contextOf(n.context).ackedById === n.user_id) return 'acked';
-  if (n.template === 'step_fired') return 'step';
+  // A step's own email (its people); the Chat fallback goes to the backup and Admins (D-016).
+  if (n.template === 'step_fired') return contextOf(n.context).fallback === true ? 'fallback' : 'step';
   if (i.sites.primary?.id === n.user_id) return 'owner';
   if (n.template === 'resolved') return 'emailed';
   return 'fallback';
@@ -396,6 +397,9 @@ export function renderEmail(
         owner: i.sites.primary?.display_name ?? null,
         asFyi,
         asked: namedIn(i, n.context).askedNames.join(' and ') || null,
+        cause: causeOf(i),
+        toldAt: toldAtOf(i),
+        fallback: ctx.fallback === true,
       });
     }
     case 'acknowledged':
