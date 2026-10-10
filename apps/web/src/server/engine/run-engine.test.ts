@@ -427,6 +427,44 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
     });
   });
 
+  it('a Tier 2 PROBLEM outside response hours is held until the next opening (spec §7, D-034)', async () => {
+    const booking = page({ id: 'm2', url: 'https://tubtong.example.test/booking', is_primary: false });
+    const tier2 = (m: ReturnType<typeof page>) => ({ ...m, sites: { ...m.sites, tier: 2 } });
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [tier2(booking), tier2(monitor())] },
+      // Tue 6 Oct 17:01 Bangkok: outside hours set to 09:00–17:00 → Wed 09:00 (02:00 UTC).
+      'organisation_settings.select': {
+        data: { response_start: '09:00:00', response_end: '17:00:00', response_days: [1, 2, 3, 4, 5] },
+      },
+      'rpc.engine_checks': {
+        data: [
+          ...ok.map((r) => ({ ...r, checked_at: at(0) })),
+          ...down.map((r) => ({ ...r, monitor_id: 'm2' })),
+        ],
+      },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]?.args).toMatchObject({
+      p_severity: 'problem',
+      p_hold_until: '2026-10-07T02:00:00.000Z',
+    });
+  });
+
+  it('a Tier 1 PROBLEM is never held (24/7)', async () => {
+    const booking = page({ id: 'm2', url: 'https://tubtong.example.test/booking', is_primary: false });
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [booking, monitor()] },
+      'organisation_settings.select': {
+        data: { response_start: '09:00:00', response_end: '17:00:00', response_days: [1, 2, 3, 4, 5] },
+      },
+      'rpc.engine_checks': { data: [...ok, ...down.map((r) => ({ ...r, monitor_id: 'm2' }))] },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]?.args).not.toHaveProperty('p_hold_until');
+  });
+
   it('skips a site without a primary monitor (only the primary can judge DOWN)', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [page({ is_primary: false })] },

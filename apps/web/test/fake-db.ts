@@ -19,6 +19,13 @@ export interface FakeCall {
 /** Read-only RPCs: recorded in `readCalls`, not `rpcCalls`. */
 const READ_RPCS = new Set(['engine_checks', 'engine_monitor_status', 'engine_verify_jobs']);
 
+/** Rows every engine run reads, unless a test registers its own: the seeded response hours (D-034). */
+const DEFAULTS: Record<string, Result> = {
+  'organisation_settings.select': {
+    data: { response_start: '09:00:00', response_end: '18:00:00', response_days: [1, 2, 3, 4, 5] },
+  },
+};
+
 export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Result)> = {}) {
   const calls: FakeCall[] = [];
   const rpcCalls: { name: string; args: unknown }[] = [];
@@ -26,7 +33,7 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
   const storageCalls: { bucket: string; method: string; args: unknown[] }[] = [];
 
   const resolve = (key: string, call?: FakeCall): Result => {
-    const r = results[key];
+    const r = key in results ? results[key] : DEFAULTS[key];
     const value = typeof r === 'function' ? r(call as FakeCall) : r;
     return {
       data: value && 'data' in value ? value.data : [],
@@ -71,10 +78,11 @@ export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Res
         'range',
         'limit',
         'maybeSingle',
+        'single',
         'overrideTypes',
       ]) {
         builder[method] = (...args: unknown[]) => {
-          if (!['select', 'order', 'limit', 'maybeSingle', 'overrideTypes'].includes(method))
+          if (!['select', 'order', 'limit', 'maybeSingle', 'single', 'overrideTypes'].includes(method))
             call.filters.push([method, ...args]);
           return builder;
         };

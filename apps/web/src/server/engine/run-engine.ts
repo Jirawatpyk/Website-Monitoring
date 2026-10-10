@@ -2,6 +2,7 @@ import 'server-only';
 import type { DbClient, Json } from '@dxt/db';
 import {
   decideSite,
+  problemHoldUntil,
   bkkControlFailing,
   faultyByMinute,
   lookbackMs,
@@ -27,6 +28,7 @@ import {
   TIER_CONFIG,
   type ProbeLocation,
   type ProblemDetail,
+  type ResponseHours,
   type Tier,
   type Trigger,
   type WafVendor,
@@ -34,6 +36,8 @@ import {
 } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
+import { loadResponseHours } from '../escalation/response-hours';
+import { escalationTick } from './ladder';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
@@ -115,7 +119,11 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     alerts: 0,
     escalated: 0,
   };
-  const [sites, locations] = await Promise.all([loadSites(db, now), loadLocations(db, now)]);
+  const [sites, locations, hours] = await Promise.all([
+    loadSites(db, now),
+    loadLocations(db, now),
+    loadResponseHours(db, now),
+  ]);
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
     const verifier = await loadVerifierState(db, now, now);
@@ -199,6 +207,14 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         controlOk: c.control_ok === false || c.akamai_ok === false ? false : (c.control_ok ?? c.akamai_ok),
       })),
   );
+  // The escalation ladder (S08, D-034): after the sites, so an incident opened or acknowledged this
+  // run is seen as it is now.
+  try {
+    summary.notified += await escalationTick(db, now, hours);
+  } catch (err) {
+    failures.push(`escalation: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(JSON.stringify({ event: 'engine_escalation_failed', error: String(err) }));
+  }
   summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, {
     failing: control,
     sites: controlSites,
@@ -303,6 +319,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         now,
         alertQueued,
         locations.length,
+        hours,
         () => {
           summary.relapses += 1;
           summary.notified += 1;
@@ -623,6 +640,8 @@ async function apply(
   alertQueued: boolean,
   /** Locations voting this run: the card's "3 of 3 locations". */
   reporting: number,
+  /** Tier 2–3 response hours: a PROBLEM outside them waits for the next opening (spec §7, D-034). */
+  hours: ResponseHours,
   /** Counts the PROBLEM AGAIN a D-023 recovery queues in the same round. */
   relapsed: () => void = () => {},
 ): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | null> {
@@ -667,6 +686,7 @@ async function apply(
           ...(d.detail.kind === 'blocked' ? { verifier: d.detail.reason } : {}),
         },
         p_notify: !site.muted,
+        ...holdFor(site.tier, now, hours),
         ...judged,
       });
       if (error) throw new Error(`engine_open_incident: ${error.message}`);
@@ -727,6 +747,7 @@ async function apply(
         },
         p_flapping: d.flapping,
         p_notify: !site.muted,
+        ...(d.severity === 'problem' ? holdFor(site.tier, d.detectedAt, hours) : {}),
         ...judged,
       });
       if (error) throw new Error(`engine_relapse_incident: ${error.message}`);
@@ -802,6 +823,7 @@ async function apply(
             homeBackAt: d.recoveredAt.toISOString(),
           },
           p_flapping: false,
+          ...holdFor(site.tier, d.recoveredAt, hours),
           // With its RECOVERED or not at all: a muted alert gets no reply out of context (engine review L3).
           p_notify: !site.muted && alertQueued,
           ...judged,
@@ -851,4 +873,10 @@ function downContext(d: DownFacts, site: SiteRow): Record<string, Json> {
           ? { confirmingFrom: d.failing.map((c) => c.location), wafBlocked: [...d.wafBlocked] }
           : {}),
       };
+}
+
+/** A Tier 2–3 PROBLEM flagged outside response hours waits for the next opening (spec §7, §19.2). */
+function holdFor(tier: Tier, at: Date, hours: ResponseHours): { p_hold_until?: string } {
+  const until = problemHoldUntil(tier, at, hours);
+  return until ? { p_hold_until: until.toISOString() } : {};
 }
