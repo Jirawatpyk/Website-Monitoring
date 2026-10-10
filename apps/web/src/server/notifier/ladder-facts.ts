@@ -70,7 +70,8 @@ const alwaysOn = (tier: number) => TIER_CONFIG[tier as Tier]?.alwaysOn ?? false;
 export function ladderFactsOf(i: IncidentFacts, at: Date): LadderFacts | null {
   const plan = planOf(i);
   const hours = i.ladder?.hours;
-  if (!plan || !hours) return null;
+  // A card sent after the incident moved on (acknowledged, recovered) promises nothing.
+  if (!plan || !hours || !['unacked', 'escalated'].includes(i.state)) return null;
   const level = (i.escalation_level ?? 0) + 1;
   const due = scheduleOf({ plan, detectedAt: new Date(i.detected_at), hours }).find((s) => s.level === level);
   const people = stepPeople(i, level);

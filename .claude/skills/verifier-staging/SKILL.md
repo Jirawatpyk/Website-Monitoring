@@ -96,6 +96,26 @@ Incidents, notes and Resolve (S07, D-033), as Tao on https://monitor-staging.dxt
 select json_agg(x) from (select template, channel, status, hold_until, sent_at from notifications n join incidents i on i.id = n.incident_id join sites s on s.id = i.site_id where s.name = 'Test target' and n.created_at > now() - interval '30 min' order by n.created_at) x;
 ```
 
+Escalation L0–L1 (S08, D-034). The Test target is Tier 1, so its ladder runs 24/7. L1 needs a backup with a Google Chat id: the test site's backup must be a second linked person, re-run `staging/test-target.sql` with one if needed. If Tao owns the site, L1 asks the backup alone, because Tao was already told at L0. Start clean (`reset-test-incident.sql`), drive `error`, and **don't acknowledge**:
+
+| Do                                      | Expect                                                                                                                                                                                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wait for DOWN                           | DOWN text line ends "· acknowledge by HH:MM or it escalates"; card rows "backup … (not notified yet)" and "Next · L1 at HH:MM if not acknowledged — <backup>, Tao"                                                                                  |
+| Wait 15 min after "Confirmed down"      | `step_fired` event at +15 min; a Chat reply `<backup> ESCALATED · L1 · Test target DOWN 15 min, not acknowledged · please acknowledge · Tao FYI` (`provider_message_id` set); L1 emails to the backup (asked) and Tao (FYI); badge "Escalated · L1" |
+| Wait to +30 min                         | `STILL DOWN · Test target · 30 min, not acknowledged · please acknowledge`, @mentioning the owner and the backup (Chat only)                                                                                                                        |
+| Acknowledge                             | `ACKNOWLEDGED · Test target · by Tao HH:MM · L1 stopped`; no more reminders; a reminder still queued is `cancelled` (`Superseded: acknowledged first`)                                                                                              |
+| `/escalation` as Tao (1440 / 820 / 390) | the editor from md (Edit L1, the save dialog with a note writes one `escalation.update` audit row); below md "View only on phones."                                                                                                                 |
+
+```sql
+select json_build_object(
+  'inc', (select row_to_json(x) from (select number, state, escalation_level, detected_at, escalation_plan from incidents i join sites s on s.id = i.site_id where s.name = 'Test target' order by i.created_at desc limit 1) x),
+  'steps', (select json_agg(e) from (select type, at, payload from incident_events e join incidents i on i.id = e.incident_id join sites s on s.id = i.site_id where s.name = 'Test target' and e.type = 'step_fired' and e.at > now() - interval '1 hour') e),
+  'msgs', (select json_agg(n) from (select template, channel, status, sent_at, context->>'asFyi' as fyi from notifications n join incidents i on i.id = n.incident_id join sites s on s.id = i.site_id where s.name = 'Test target' and n.template in ('step_fired', 'reminder') and n.created_at > now() - interval '1 hour' order by n.created_at) n)
+) j;
+```
+
+Response hours (Tier 2–3 timers paused, PROBLEM held until 09:00) can't be driven on staging, because the clock can't move. The engine tests (`escalation.test.ts`, `response-hours.test.ts`) and pgTAP (`escalation.test.sql`) cover them.
+
 - **Browser pane under width emulation** (`resize_window` 1440 / 820 / 390): clicks by coordinate can miss and screenshots can be stale or half-size (S06b `/verify`: "Acknowledge did nothing"). Check the control is on top with `document.elementFromPoint`, act with a DOM `.click()`, and read layout with `getBoundingClientRect`; screenshots at those widths come from Playwright locally (e2e helpers) or from the pane without emulation. A hidden (not fronted) tab pauses `requestAnimationFrame` and CSS transitions — front it before timing anything.
 
 ## 4. Reset between runs
