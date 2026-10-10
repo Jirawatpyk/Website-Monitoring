@@ -11,11 +11,12 @@ import {
 } from '@dxt/shared';
 import { buildChatTextLine } from './chat-text';
 import { downtime } from './downtime';
+import { ladderLine, nextRow, stoppedWords, type LadderFacts, type LadderStopped } from './escalation-alerts';
 
 /**
  * Google Chat DOWN, PROBLEM, ACKNOWLEDGED and RECOVERED messages — ChatAlert board, spec §10 / §14.10 /
- * §16.4, with D-013 / D-016: no escalation promise ("Next" row, "reminders stopped", "(not notified
- * yet)") until S08 / S10.
+ * §16.4. The ladder's promise ("acknowledge by …", the "Next" row, "(not notified yet)", "L1 stopped")
+ * comes with S08 for L1 only (D-034); CEO / L2 / L3 / on-call wording waits for S10.
  * A message is a plain text line (the only place @mentions notify) followed by one Cards v2 card.
  */
 
@@ -60,6 +61,8 @@ export interface DownAlertInput {
   backup: ChatPerson | null;
   /** The incident page, where the ack happens (`?ack=1`, MobileAck). */
   incidentUrl: string;
+  /** The ladder (S08): the next level and who it asks, or the timers paused outside hours. */
+  ladder?: LadderFacts | null;
 }
 
 /** What a PROBLEM's replies need to word it as one (ChatAlert PROBLEM rows, D-022). */
@@ -89,6 +92,7 @@ export interface ProblemAlertInput {
   owner: ChatPerson | null;
   backup: ChatPerson | null;
   incidentUrl: string;
+  ladder?: LadderFacts | null;
 }
 
 export interface AcknowledgedAlertInput {
@@ -98,6 +102,8 @@ export interface AcknowledgedAlertInput {
   ackedAt: Date;
   /** Set for a PROBLEM incident: "still slow" / "still has a problem", not "still down". */
   problem?: ProblemFacts | null;
+  /** What the ack stopped (S08): "· L1 stopped" / "· reminders stopped". */
+  stopped?: LadderStopped | null;
 }
 
 export interface RecoveredAlertInput {
@@ -120,6 +126,15 @@ export const plainName = (name: string) => name.replace(/[<>]/g, '');
 
 const mentionOf = (owner: ChatPerson | null) => (owner?.chatUserId ? [owner.chatUserId] : []);
 
+/** "Arm · backup Ploy (not notified yet)" while the backup's step is still ahead (ChatAlert). */
+function ownerRow(owner: ChatPerson | null, backup: ChatPerson | null, ladder?: LadderFacts | null) {
+  const waiting = !!backup && !!ladder?.next?.ask.some((n) => n === backup.name);
+  return [
+    owner ? plainName(owner.name) : 'No owner set',
+    ...(backup ? [`backup ${plainName(backup.name)}${waiting ? ' (not notified yet)' : ''}`] : []),
+  ].join(' · ');
+}
+
 /**
  * Card rows are plain text: a cause carries text from probes and the VPS (errors, verifier detail),
  * and Chat renders tags in card text. `<` is escaped so no tag can start; "Timeout > 30 s" stays.
@@ -137,16 +152,15 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
     ...(isSameBangkokDay(confirmedAt, now) ? [] : [formatDay(confirmedAt, { weekday: true })]),
     `Confirmed down ${formatTimeWithSeconds(confirmedAt)} (UTC+7)`,
   ].join(' · ');
-  const ownerText = [
-    owner ? plainName(owner.name) : 'No owner set',
-    ...(backup ? [`backup ${plainName(backup.name)}`] : []),
-  ].join(' · ');
+  const ownerText = ownerRow(owner, backup, input.ladder);
+  const next = nextRow(input.ladder, now, 'down');
 
   return {
     text: buildChatTextLine({
       state: 'DOWN',
       site: `${site} (${formatTier(tier)})`,
       mention: mentionOf(owner),
+      detail: ladderLine(input.ladder, now),
     }),
     cardsV2: [
       {
@@ -159,6 +173,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
                 row('Cause', input.cause),
                 row('Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)),
                 row('Owner', ownerText),
+                ...(next ? [row('Next', next)] : []),
                 {
                   buttonList: {
                     buttons: [
@@ -191,9 +206,15 @@ export function buildAcknowledgedAlert(input: AcknowledgedAlertInput): ChatMessa
   const at = formatTime(input.ackedAt);
   const slow = input.problem?.trigger === 'slow';
   const still = !input.problem ? 'still down' : slow ? 'still slow' : 'still has a problem';
-  const body = slow ? `Acknowledged by ${by}. The site is up; it’s only slow.` : `Acknowledged by ${by}.`;
+  const stopped = stoppedWords(input.stopped);
+  const acked = `Acknowledged by ${by}${stopped ? ` → ${stopped.body}` : '.'}`;
+  const body = slow ? `${acked} The site is up; it’s only slow.` : acked;
   return {
-    text: buildChatTextLine({ state: 'ACKNOWLEDGED', site, detail: [`by ${by} ${at}`] }),
+    text: buildChatTextLine({
+      state: 'ACKNOWLEDGED',
+      site,
+      detail: [`by ${by} ${at}`, ...(stopped ? [stopped.line] : [])],
+    }),
     cardsV2: [
       {
         cardId: `acknowledged-${input.incidentId}`,
@@ -258,10 +279,8 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
     ...(isSameBangkokDay(detectedAt, now) ? [] : [formatDay(detectedAt, { weekday: true })]),
     `Detected ${formatTime(detectedAt)} (UTC+7)`,
   ].join(' · ');
-  const ownerText = [
-    owner ? plainName(owner.name) : 'No owner set',
-    ...(backup ? [`backup ${plainName(backup.name)}`] : []),
-  ].join(' · ');
+  const ownerText = ownerRow(owner, backup, input.ladder);
+  const next = nextRow(input.ladder, now, 'problem');
   const slowNote = input.trigger === 'slow' ? ' — the site loads, just slowly' : '';
   const seen = input.seenFrom ? `${input.seenFrom.count} of ${input.seenFrom.of} locations${slowNote}` : null;
   const known = unverified
@@ -303,6 +322,7 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
                 row('Cause', input.cause),
                 ...known,
                 row('Owner', ownerText),
+                ...(next ? [row('Next', next)] : []),
                 ...adminNote,
                 {
                   buttonList: {

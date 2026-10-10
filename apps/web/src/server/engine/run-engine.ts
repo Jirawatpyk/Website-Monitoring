@@ -210,7 +210,9 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   // The escalation ladder (S08, D-034): after the sites, so an incident opened or acknowledged this
   // run is seen as it is now.
   try {
-    summary.notified += await escalationTick(db, now, hours);
+    const ladder = await escalationTick(db, now, hours);
+    summary.notified += ladder.queued;
+    for (const f of ladder.failed) failures.push(`escalation ${f}`);
   } catch (err) {
     failures.push(`escalation: ${err instanceof Error ? err.message : String(err)}`);
     console.error(JSON.stringify({ event: 'engine_escalation_failed', error: String(err) }));

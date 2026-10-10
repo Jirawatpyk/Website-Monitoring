@@ -72,7 +72,9 @@ export function ladderDue(input: LadderInput): LadderDue {
   if (!alwaysOn(input.plan.tier) && !isInsideHours(input.now, input.hours)) {
     due.pausedUntil = nextOpening(input.now, input.hours);
   }
-  if (!WAITING.includes(input.state)) return due;
+  // Paused (Tier 2–3 outside response hours): nothing fires now, not even a level that came due
+  // earlier while the site was up — it waits for the next opening (engine review round 2, D-034).
+  if (!WAITING.includes(input.state) || due.pausedUntil) return due;
 
   const next = input.plan.steps.filter((s) => s.level > input.level).sort((a, b) => a.level - b.level)[0];
   if (next) {

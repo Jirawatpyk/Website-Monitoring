@@ -195,6 +195,10 @@ select ok(public.engine_recover_incident((select id from inc where name = 'voca'
   'recovers again');
 update public.incidents set acked_at = null, acked_by = null, escalation_level = 1
   where id = (select id from inc where name = 'voca');
+-- S08 (D-034): "a level had fired" = a step of this severity paged someone.
+insert into public.incident_events (incident_id, type, payload)
+select id, 'step_fired', jsonb_build_object('level', 1, 'severity', 'down', 'notified', jsonb_build_array(gen_random_uuid()))
+from inc where name = 'voca';
 select ok(public.engine_relapse_incident((select id from inc where name = 'voca'), 'down', 'hard_fail',
   '2026-09-21 04:55Z', '2026-09-21 04:55:40Z', '2026-09-21 04:55Z', '{}'::jsonb, false, true), 'relapses');
 select is(

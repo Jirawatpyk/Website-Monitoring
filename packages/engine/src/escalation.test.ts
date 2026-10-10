@@ -137,6 +137,26 @@ describe('ladderDue — paused', () => {
     expect(ladderDue(inc0139('2026-09-25T10:00:00')).pausedUntil).toBeUndefined();
     expect(ladderDue(inc0142('2026-09-26T03:00:00')).pausedUntil).toBeUndefined();
   });
+
+  // Engine review round 2: a paused Tier 2–3 timer fires nothing, even a level that came due earlier.
+  const fri = (now: string, over: Partial<LadderInput> = {}) =>
+    inc0139(now, { detectedAt: bkk('2026-09-25T09:00:00'), ...over });
+  it.each([
+    ['relapse Fri 22:00, L1 overdue since 09:15: nothing until Mon 09:00', fri('2026-09-25T22:00:00'), null],
+    ['… Mon 09:00: L1', fri('2026-09-28T09:00:00'), 1],
+  ])('%s', (_case, input, level) => {
+    expect(ladderDue(input).step?.level ?? null).toBe(level);
+  });
+
+  it('Tier 2 DOWN at 17:00, L1 fired, 18:00:30: no reminder (closed)', () => {
+    const late = inc0139('2026-09-25T18:00:30', {
+      detectedAt: bkk('2026-09-25T17:00:00'),
+      level: 1,
+      state: 'escalated',
+    });
+    expect(ladderDue(late).reminder).toBeUndefined();
+    expect(ladderDue(late).pausedUntil).toEqual(bkk('2026-09-28T09:00:00'));
+  });
 });
 
 describe('scheduleOf — when each step fires if nobody acknowledges', () => {

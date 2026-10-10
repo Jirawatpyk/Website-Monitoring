@@ -4,7 +4,7 @@
 -- (once per due time), D-021 restarting the ladder, and the PROBLEM held for response hours.
 begin;
 \ir _helpers.psql
-select plan(61);
+select plan(66);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -323,6 +323,38 @@ insert into inc values ('m', public.engine_open_incident('00000000-0000-0000-000
 select ok(not public.engine_fire_step((select id from inc where name = 'm'), 1::smallint, now(), '{}'),
   'no L1 for an incident whose first alert never went');
 select ok(not public.engine_remind((select id from inc where name = 'm'), now(), '{}'), 'and no reminder');
+
+-- A recovery sets a waiting reminder aside too; a failed reminder never falls back to email.
+insert into inc values ('v', public.engine_open_incident('00000000-0000-0000-0000-0000000000b1', null, 'hard_fail', 'down',
+  now() - interval '31 minutes', now() - interval '30 minutes', now(), '{}', true));
+select public.engine_remind((select id from inc where name = 'v'), date_trunc('minute', now()), '{}');
+select is(
+  public.queue_fallback_emails((select id from public.notifications
+    where incident_id = (select id from inc where name = 'v') and template = 'reminder')),
+  0, 'a reminder is Chat only: no fallback email');
+select public.engine_recover_incident((select id from inc where name = 'v'), 'unacked', 'monitoring',
+  now(), now(), '{}', true);
+select is(
+  (select status::text from public.notifications where incident_id = (select id from inc where name = 'v') and template = 'reminder'),
+  'cancelled', 'a recovery cancels a reminder that hasn''t gone');
+update public.incidents set state = 'resolved' where id = (select id from inc where name = 'v');
+
+-- A held PROBLEM card: no ladder until its hour.
+insert into inc values ('q', public.engine_open_incident('00000000-0000-0000-0000-0000000000d1', null, 'slow', 'problem',
+  now() - interval '3 hours', now() - interval '2 hours', now(), '{}', true, null, null, now() + interval '1 hour'));
+select ok(not public.engine_fire_step((select id from inc where name = 'q'), 1::smallint, now(), '{}'),
+  'no L1 while the PROBLEM card waits for response hours');
+update public.notifications set hold_until = now() - interval '1 minute'
+  where incident_id = (select id from inc where name = 'q') and template = 'problem';
+select ok(public.engine_fire_step((select id from inc where name = 'q'), 1::smallint, now(), '{}'),
+  'L1 once the card''s hour has come');
+-- D-021 sets the PROBLEM ladder aside.
+select public.engine_escalate_incident((select id from inc where name = 'q'), now(), now(), '{}', true);
+select is(
+  (select count(*)::int from public.notifications
+   where incident_id = (select id from inc where name = 'q') and template = 'step_fired' and status = 'queued'),
+  0, 'a PROBLEM raised to DOWN drops its L1 messages still waiting');
+update public.incidents set state = 'resolved' where id = (select id from inc where name = 'q');
 
 -- S08 limits on the save.
 select tests.authenticate_as((select id from ids where name = 'tao'));

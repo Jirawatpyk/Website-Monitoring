@@ -30,7 +30,7 @@ describe('escalationTick (S08, D-034)', () => {
       'incidents.select': { data: [inc0142()] },
       'rpc.engine_fire_step': { data: true },
     });
-    expect(await escalationTick(db, bkk('2026-09-25T10:03:41'), HOURS)).toBe(1);
+    expect((await escalationTick(db, bkk('2026-09-25T10:03:41'), HOURS)).queued).toBe(1);
     expect(rpcCalls).toEqual([
       {
         name: 'engine_fire_step',
@@ -46,7 +46,7 @@ describe('escalationTick (S08, D-034)', () => {
 
   it('does nothing a second early', async () => {
     const { db, rpcCalls } = fakeDb({ 'incidents.select': { data: [inc0142()] } });
-    expect(await escalationTick(db, bkk('2026-09-25T10:03:40'), HOURS)).toBe(0);
+    expect((await escalationTick(db, bkk('2026-09-25T10:03:40'), HOURS)).queued).toBe(0);
     expect(rpcCalls).toEqual([]);
   });
 
@@ -55,7 +55,7 @@ describe('escalationTick (S08, D-034)', () => {
       'incidents.select': { data: [inc0142({ state: 'escalated', escalation_level: 1 })] },
       'rpc.engine_remind': { data: true },
     });
-    expect(await escalationTick(db, bkk('2026-09-25T10:19:00'), HOURS)).toBe(1);
+    expect((await escalationTick(db, bkk('2026-09-25T10:19:00'), HOURS)).queued).toBe(1);
     expect(rpcCalls[0]).toEqual({
       name: 'engine_remind',
       args: {
@@ -71,7 +71,7 @@ describe('escalationTick (S08, D-034)', () => {
       'incidents.select': { data: [inc0142()] },
       'rpc.engine_fire_step': { data: false },
     });
-    expect(await escalationTick(db, bkk('2026-09-25T10:05:00'), HOURS)).toBe(0);
+    expect((await escalationTick(db, bkk('2026-09-25T10:05:00'), HOURS)).queued).toBe(0);
   });
 
   it('INC-0139 (Tier 2, Thu 22:14): waits through the night, L1 at Fri 09:15', async () => {
@@ -81,7 +81,7 @@ describe('escalationTick (S08, D-034)', () => {
       escalation_plan: plan(2),
     });
     const night = fakeDb({ 'incidents.select': { data: [orca] } });
-    expect(await escalationTick(night.db, bkk('2026-09-25T03:00:00'), HOURS)).toBe(0);
+    expect((await escalationTick(night.db, bkk('2026-09-25T03:00:00'), HOURS)).queued).toBe(0);
     const morning = fakeDb({ 'incidents.select': { data: [orca] }, 'rpc.engine_fire_step': { data: true } });
     await escalationTick(morning.db, bkk('2026-09-25T09:15:00'), HOURS);
     expect(morning.rpcCalls[0]?.args).toMatchObject({ p_level: 1, p_context: { elapsedMin: 661 } });
@@ -93,17 +93,35 @@ describe('escalationTick (S08, D-034)', () => {
         data: [inc0142({ escalation_plan: null }), inc0142({ escalation_plan: { steps: 'x' } })],
       },
     });
-    expect(await escalationTick(db, bkk('2026-09-25T11:00:00'), HOURS)).toBe(0);
+    expect((await escalationTick(db, bkk('2026-09-25T11:00:00'), HOURS)).queued).toBe(0);
     expect(rpcCalls).toEqual([]);
   });
 
-  it('throws when a guarded write fails, so the run reports it', async () => {
-    const { db } = fakeDb({
-      'incidents.select': { data: [inc0142()] },
-      'rpc.engine_fire_step': { error: { message: 'boom' } },
+  it('a failed write is reported and the other incidents still escalate', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'incidents.select': { data: [inc0142(), inc0142({ id: 'i2' })] },
+      'rpc.engine_fire_step': (call) =>
+        (call.values as { p_incident_id: string }).p_incident_id === 'i142'
+          ? { error: { message: 'boom' } }
+          : { data: true },
     });
-    await expect(escalationTick(db, bkk('2026-09-25T10:05:00'), HOURS)).rejects.toThrow(
-      'engine_fire_step: boom',
-    );
+    expect(await escalationTick(db, bkk('2026-09-25T10:05:00'), HOURS)).toEqual({
+      queued: 1,
+      failed: ['i142: engine_fire_step: boom'],
+    });
+    expect(rpcCalls).toHaveLength(2);
+  });
+
+  it('D-023: a DOWN incident whose home page is back (key page still failing) pauses its ladder', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'incidents.select': { data: [inc0142({ severity: 'down', episode_severity: 'problem' })] },
+    });
+    await escalationTick(db, bkk('2026-09-25T10:30:00'), HOURS);
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it('throws when the incidents can’t be read', async () => {
+    const { db } = fakeDb({ 'incidents.select': { error: { message: 'down' } } });
+    await expect(escalationTick(db, bkk('2026-09-25T10:05:00'), HOURS)).rejects.toThrow('incidents: down');
   });
 });

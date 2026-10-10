@@ -13,12 +13,19 @@ import {
 } from '@dxt/shared';
 import type { ProblemFacts } from './chat-alerts';
 import { downtime } from './downtime';
+import {
+  formatResume,
+  nextRow,
+  stoppedWords,
+  type LadderFacts,
+  type LadderStopped,
+} from './escalation-alerts';
 import { flapCounts, timesWord, type Drop, type KeyPageFacts } from './relapse-alerts';
 import { resolvedLasted } from './resolve-alerts';
 
 /**
  * Alert emails — EmailAlert board, spec §10, PRD §7, cut to what exists today (D-013 / D-016: no
- * escalation, client-update or root-cause buttons until their slices).
+ * client-update buttons until S11; escalation from S08 is L1 only, D-034).
  *
  * One email per event and per person, all under one subject per incident ("MuvMi · Tier 1 ·
  * INC-0142"), so a mail client stacks them like the Chat thread. The provider assigns each
@@ -37,7 +44,7 @@ export interface EmailMessage {
 }
 
 /** Why the recipient got the email — one footer line each (EmailAlert board). */
-export type EmailReason = 'owner' | 'acked' | 'fallback' | 'emailed';
+export type EmailReason = 'owner' | 'acked' | 'fallback' | 'emailed' | 'step';
 
 export interface EmailBaseInput {
   incidentId: string;
@@ -52,6 +59,8 @@ export interface EmailBaseInput {
   threadId: string;
   /** This is the recipient's first email of the incident: it starts their thread. */
   startsThread: boolean;
+  /** `step`: why this person got an escalation email (EmailAlert L1 footers). */
+  why?: string;
 }
 
 export interface DownEmailInput extends EmailBaseInput {
@@ -62,6 +71,10 @@ export interface DownEmailInput extends EmailBaseInput {
   confirmedByWaf?: { from: readonly string[]; blocked: readonly string[] } | null;
   /** A PROBLEM someone had acknowledged, now raised to DOWN (D-021): who has it. */
   ackedBy?: string | null;
+  /** The ladder (S08): "acknowledge by 10:03", the Next step row, or timers paused. */
+  ladder?: LadderFacts | null;
+  /** When it's sent: a time today or tomorrow reads as the time alone. */
+  now?: Date;
 }
 
 export interface ProblemEmailInput extends EmailBaseInput {
@@ -72,6 +85,9 @@ export interface ProblemEmailInput extends EmailBaseInput {
   summary: string;
   /** Blocked, not verified: why (the incident context's `verifier`). */
   verifier?: string | null;
+  /** The ladder (S08): "Reminder + Nok (backup) at 10:52". */
+  ladder?: LadderFacts | null;
+  now?: Date;
 }
 
 export interface AcknowledgedEmailInput extends EmailBaseInput {
@@ -85,6 +101,8 @@ export interface AcknowledgedEmailInput extends EmailBaseInput {
   cause?: string | null;
   /** Minutes down so far by the incident's drops (D-033); without it, first failed check → ack. */
   downMinutes?: number | null;
+  /** What the ack stopped (S08): L1 for a DOWN, the reminders for a PROBLEM. */
+  stopped?: LadderStopped | null;
 }
 
 export interface RecoveredEmailInput extends EmailBaseInput {
@@ -123,6 +141,8 @@ export interface FlapSummaryEmailInput extends EmailBaseInput {
   drops: readonly Drop[];
   owner: string | null;
   ack: { by: string; at: Date } | null;
+  /** Tier 2–3 outside response hours, not acknowledged: "Not yet — outside response hours …". */
+  pausedUntil?: Date | null;
 }
 
 export interface AutoResolvedEmailInput extends EmailBaseInput {
@@ -188,6 +208,8 @@ const whyOf = (i: EmailBaseInput): string => {
       return 'You got this because a Google Chat alert for this incident couldn’t be delivered.';
     case 'emailed':
       return 'You got this because you were emailed about this incident.';
+    case 'step':
+      return i.why ?? 'You got this because this incident wasn’t acknowledged in time.';
   }
 };
 
@@ -291,7 +313,11 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
     color: C.danger,
     bar: C.danger,
     label: 'DOWN',
-    pre: `${site} confirmed down ${formatTimeWithSeconds(input.confirmedAt)} · ${input.cause}`,
+    pre: [
+      `${site} confirmed down ${formatTimeWithSeconds(input.confirmedAt)}`,
+      input.cause,
+      ...ladderPre(input.ackedBy ? null : input.ladder, input.now ?? input.confirmedAt),
+    ].join(' · '),
     headline: `${site} is down`,
     lede: input.ackedBy
       ? `${input.ackedBy} acknowledged it while it was a problem; it is now down.`
@@ -302,6 +328,7 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
       ['Confirmed down', confirmedLabel(input.confirmedAt)],
       ['Cause', input.cause],
       ['Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)],
+      ...ladderFacts(input.ackedBy ? null : input.ladder, input.now ?? input.confirmedAt, 'down'),
     ],
     // The board adds [Open incident], but Acknowledge opens that same page (one incident page, D-033).
     buttons: input.ackedBy
@@ -319,16 +346,17 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
       : downtime(input.startedAt, input.ackedAt).duration;
   const slow = problem?.trigger === 'slow';
   const still = !problem ? 'still down' : slow ? 'still slow' : 'still has a problem';
+  const stopped = stoppedWords(input.stopped);
   return render(input, {
     template: 'acknowledged',
     color: C.secondary,
     bar: C.secondary,
     label: 'ACKNOWLEDGED',
-    pre: `by ${ackedBy} ${at} · ${site} ${still}`,
+    pre: [`by ${ackedBy} ${at}`, `${site} ${still}`, ...(stopped ? [stopped.line] : [])].join(' · '),
     headline: `${ackedBy} has ${site}`,
     lede: !problem
-      ? `Acknowledged by ${ackedBy}.`
-      : `Acknowledged by ${ackedBy}. The site is still up${slow ? ' but slow' : ''}; you’ll get one more email when it clears.`,
+      ? `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.body}` : '.'}`
+      : `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.body}` : '.'} The site is still up${slow ? ' but slow' : ''}; you’ll get one more email when it clears.`,
     facts: problem
       ? [
           ['Acknowledged', `${ackedBy} at ${at}`],
@@ -456,6 +484,7 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
       ['Trigger', TRIGGER_LABELS[trigger]],
       ['Cause', input.cause],
       ['Site', state],
+      ...ladderFacts(input.ladder, input.now ?? input.detectedAt, 'problem'),
     ],
     buttons: [{ label: 'Open / acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
   });
@@ -637,7 +666,14 @@ export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessag
       [`${down ? 'Down' : 'Had a problem'} ${timesWord(counted)}`, ranges],
       [down ? 'Down in total' : 'In total', total],
       ['Stable since', `${stable} — OK for 15 min`],
-      ['Acknowledged', ack ? `${ack.by} at ${formatTime(ack.at)}` : 'Not yet'],
+      [
+        'Acknowledged',
+        ack
+          ? `${ack.by} at ${formatTime(ack.at)}`
+          : input.pausedUntil
+            ? `Not yet — outside response hours, timers paused until ${formatTime(input.pausedUntil)}`
+            : 'Not yet',
+      ],
       ...(owner
         ? [['Still to do', `Root cause (${owner}) — needed before it can be resolved`] as [string, string]]
         : []),
@@ -724,5 +760,92 @@ export function buildResolvedEmail(input: ResolvedEmailInput): EmailMessage {
       ...(lasted ? [lasted] : []),
     ],
     buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
+  });
+}
+
+/** "acknowledge by 10:03" in the Down email's preheader (EmailAlert); nothing while timers are paused. */
+function ladderPre(ladder: LadderFacts | null | undefined, now: Date): string[] {
+  if (!ladder || ladder.pausedUntil || !ladder.next) return [];
+  return [`acknowledge by ${formatResume(ladder.next.at, now)}`];
+}
+
+/** The Next step row (EmailAlert Down / PROBLEM emails), or the paused timers. */
+function ladderFacts(
+  ladder: LadderFacts | null | undefined,
+  now: Date,
+  severity: 'down' | 'problem',
+): [string, string][] {
+  if (!ladder) return [];
+  const next = nextRow(ladder, now, severity);
+  const paused = ladder.pausedUntil
+    ? [
+        ['Timers', `Outside response hours — paused until ${formatResume(ladder.pausedUntil, now)}`] as [
+          string,
+          string,
+        ],
+      ]
+    : [];
+  return [...paused, ...(next ? [['Next step', next] as [string, string]] : [])];
+}
+
+export interface StepEmailInput extends EmailBaseInput {
+  severity: 'down' | 'problem';
+  level: number;
+  /** Minutes since "Confirmed down" / the PROBLEM flagged. */
+  elapsedMin: number;
+  confirmedAt: Date;
+  /** The L0 person and when they were told: "Arm — Chat + email 09:48". */
+  owner: string | null;
+  /** This person is told for information (the Admin at L1); otherwise asked to act. */
+  asFyi: boolean;
+  /** Who was asked at this level, in words: "Ploy". */
+  asked: string | null;
+}
+
+/**
+ * The L1 email (EmailAlert "ESCALATED · L1", sent 10:03 to Ploy and Tao, one each): the backup is
+ * asked to acknowledge, the Admin is told for information. A PROBLEM's L1 is the backup's first email
+ * (EmailAlert: "first emailed with the 60-min reminder"). No "Next step" until S10 builds L2.
+ */
+export function buildStepEmail(input: StepEmailInput): EmailMessage {
+  const { site } = input;
+  const duration = formatDuration(input.elapsedMin);
+  const down = input.severity === 'down';
+  const owner = input.owner ?? 'The owner';
+  const ask = input.asFyi
+    ? `For your information — ${input.asked ?? 'the next person'} has been asked to acknowledge. Nothing needed from you.`
+    : down
+      ? `${owner} hasn’t acknowledged. Please acknowledge — you’re the next person for this incident.`
+      : `${owner} hasn’t acknowledged. Please take it — you’re the next person for this incident.`;
+  return render(input, {
+    template: down ? 'down' : 'problem',
+    color: C.warning,
+    bar: C.warning,
+    label: down ? `ESCALATED · L${input.level}` : 'STILL PROBLEM',
+    pre: `${site} ${down ? 'down' : 'has had a problem for'} ${duration}, not acknowledged`,
+    headline: down
+      ? `${site} still down — ${duration}, no ack`
+      : `${site} still has a problem — ${duration}, no ack`,
+    lede: ask,
+    facts: [
+      [
+        down ? 'Down for' : 'Problem for',
+        `${duration} (${down ? 'confirmed down' : 'detected'} ${formatTimeWithSeconds(input.confirmedAt)})`,
+      ],
+      ...(input.owner
+        ? [
+            ['Already told', `${input.owner} — Chat + email ${formatTime(input.confirmedAt)}`] as [
+              string,
+              string,
+            ],
+          ]
+        : []),
+    ],
+    buttons: input.asFyi
+      ? [{ label: 'Open incident', href: input.incidentUrl, primary: false }]
+      : [
+          { label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true },
+          { label: 'Open incident', href: input.incidentUrl, primary: false },
+        ],
   });
 }

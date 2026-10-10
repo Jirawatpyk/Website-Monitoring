@@ -496,6 +496,8 @@ begin
   perform public.engine_record_flip(v_site_id, p_round_at, false);
   perform public.engine_cancel_flap_summary(p_incident_id);
   perform public.engine_cancel_held_problem(p_incident_id, 'Superseded: went down');
+  -- The PROBLEM ladder ends here: its step or reminder still waiting never goes before the DOWN card.
+  perform public.engine_cancel_ladder(p_incident_id, 'Superseded: went down');
 
   -- The browser's screenshot joins the timeline as evidence.
   if v_verify_job is not null then
@@ -581,7 +583,12 @@ begin
         recovered_at = null,
         is_flapping = is_flapping or coalesce(p_flapping, false),
         state = case when acked_at is not null then 'acknowledged'::public.incident_state
-                     when escalation_level > 0 then 'escalated'::public.incident_state
+                     -- Escalated only when a step of this severity really paged someone (D-034).
+                     when exists (select 1 from public.incident_events e
+                                  where e.incident_id = p_incident_id and e.type = 'step_fired'
+                                    and e.payload ->> 'severity' = severity::text
+                                    and jsonb_array_length(e.payload -> 'notified') > 0)
+                       then 'escalated'::public.incident_state
                      else 'unacked'::public.incident_state end
     where id = p_incident_id
     returning state, severity into v_to, v_after;
@@ -800,7 +807,8 @@ begin
   insert into public.audit_log (action, entity, entity_id, before, after)
   values ('incident.escalated', 'incident', p_incident_id,
           jsonb_build_object('state', v_inc.state, 'escalation_level', v_inc.escalation_level),
-          jsonb_build_object('state', 'escalated', 'escalation_level', p_level));
+          jsonb_build_object('state', case when cardinality(v_new) > 0 then 'escalated' else v_inc.state::text end,
+                             'escalation_level', p_level));
 
   if cardinality(v_new) > 0 and v_step -> 'channels' ?| array['chat', 'space'] then
     insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key)

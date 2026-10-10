@@ -14,8 +14,8 @@ import { downtime } from './downtime';
 /**
  * Google Chat replies of S04b — ChatAlert "Fails again while the incident is open" (spec §19.3–19.7,
  * D-024): DOWN AGAIN / PROBLEM AGAIN (Chat only), the flapping summary that replaces the held
- * RECOVERED replies, and RECOVERED for an auto-resolved PROBLEM. "Outside response hours · timers
- * paused until 09:00" waits for S08 (D-013).
+ * RECOVERED replies, and RECOVERED for an auto-resolved PROBLEM. A Tier 2–3 DOWN AGAIN outside
+ * response hours adds "outside response hours · timers paused until 09:00" (S08, D-034).
  */
 
 /** One drop of the incident, first failed check → recovery. */
@@ -86,6 +86,8 @@ export interface AgainAlertInput {
   summary?: string | null;
   /** D-023 / §19.7: the home page came back but this key page still fails (same round as RECOVERED). */
   homeBack?: KeyPageFacts | null;
+  /** Tier 2–3 outside response hours (S08): when the timers run again. */
+  pausedUntil?: Date | null;
 }
 
 const STATE_WORDS: Record<string, string> = {
@@ -132,7 +134,13 @@ export function buildAgainAlert(input: AgainAlertInput): ChatMessage {
       `Home page OK again (RECOVERED posted in the same round). ${k.cause} — the same incident ` +
       `continues as a PROBLEM (${TRIGGER_LABELS[input.trigger]}).`;
   } else if (down) {
-    detail = [`same incident ${inc}`, ...(still ? ['still flapping'] : [])];
+    detail = [
+      `same incident ${inc}`,
+      ...(still ? ['still flapping'] : []),
+      ...(input.pausedUntil
+        ? ['outside response hours', `timers paused until ${formatTime(input.pausedUntil)}`]
+        : []),
+    ];
     title = back
       ? `${state} · ${site} · was back for ${back.duration} (${back.range})`
       : `${state} · ${site}`;
