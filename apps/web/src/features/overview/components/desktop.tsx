@@ -413,11 +413,13 @@ export function LiveIssuesTable({
                       </span>
                     </span>
                   </Td>
-                  <Td className="whitespace-nowrap">
+                  {/* the duration stays on one line; "since yesterday 06:04" may wrap, or a day-old
+                      incident pushed the table 12 px past 820 */}
+                  <Td>
                     {since ? (
                       <span className="flex flex-col">
                         <span
-                          className={`text-sm tabular-nums ${down ? 'font-semibold text-fg-danger' : ''}`}
+                          className={`text-sm whitespace-nowrap tabular-nums ${down ? 'font-semibold text-fg-danger' : ''}`}
                         >
                           {since.duration}
                         </span>
