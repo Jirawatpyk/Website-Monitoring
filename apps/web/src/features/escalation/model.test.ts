@@ -115,6 +115,12 @@ describe('diff and the unsaved bar', () => {
   });
   it('a removed step reads "Removed"; nothing changed is no bar', () => {
     expect(diff(draft([problem([l0, l1()])]), draft([problem([l0])]))[0]?.after).toBe('Removed');
+    // The save dialog names the Admin as the ladder does (spec-check round 2).
+    expect(diff(draft([t1()]), draft([t1([l0, l1({ delayMin: 20 })])]), ['Tao'])[0]?.after).toBe(
+      '+20 min · Backup + Admin (Tao) · Chat @mention, Email',
+    );
+    // "015" is the saved 15, not a change.
+    expect(diff(draft([t1()]), draft([t1()], '015'))).toEqual([]);
     expect(unsavedSummary([])).toBeNull();
   });
 });

@@ -8,7 +8,7 @@ export default function Loading() {
         <PageHeaderSkeleton />
         {/* The policy switch and its clock line. */}
         <div className="flex flex-wrap items-center gap-4" aria-hidden>
-          <Skeleton variant="rect" height={36} width={520} />
+          <Skeleton variant="rect" height={36} width={520} className="max-w-full" />
           <Skeleton variant="text" width={280} />
         </div>
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">

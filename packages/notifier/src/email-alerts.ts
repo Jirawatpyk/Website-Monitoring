@@ -6,6 +6,7 @@ import {
   formatTime,
   formatConfirmedBy,
   formatTimeWithSeconds,
+  isSameBangkokDay,
   PROBE_LOCATIONS,
   TRIGGER_LABELS,
   type ProbeLocation,
@@ -831,7 +832,7 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
     facts: [
       [
         down ? 'Down for' : 'Problem for',
-        `${duration} (${down ? 'confirmed down' : 'detected'} ${formatTimeWithSeconds(input.confirmedAt)})`,
+        `${duration} (${down ? 'confirmed down' : 'detected'} ${isSameBangkokDay(input.confirmedAt, input.toldAt ?? input.confirmedAt) ? '' : `${formatDay(input.confirmedAt, { weekday: true })} `}${formatTimeWithSeconds(input.confirmedAt)})`,
       ],
       ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
       ...(input.owner

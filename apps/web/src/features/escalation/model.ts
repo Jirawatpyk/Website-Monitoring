@@ -69,7 +69,8 @@ export function stepCondition(p: PolicyDraft, s: EscalationStep, phone = false):
  * locked checkboxes to talk about, and says the PROBLEM hold once, in its subtitle.
  */
 export function stepNote(p: PolicyDraft, s: EscalationStep, phone = false): string | null {
-  if (s.level > 0) return 'Anyone already paged is left out.';
+  // Only where an earlier step may already have told someone (the Admin beside the backup, MEscalation).
+  if (s.level > 0) return s.targets.includes('admins') ? 'Anyone already paged is left out.' : null;
   if (p.severity === 'down') {
     if (p.key !== 't1')
       return 'Outside response hours it still posts, but the timers below wait for the next opening.';
@@ -92,10 +93,10 @@ export const channelLabels = (s: EscalationStep) =>
   CHANNEL_ORDER.filter((c) => s.channels.includes(c)).map((c) => ESCALATION_CHANNEL_LABELS[c]);
 
 /** "+15 min · Backup + Admin · Chat @mention, Email" (the save dialog's diff). */
-export function describeStep(s: EscalationStep): string {
+export function describeStep(s: EscalationStep, admins: readonly string[] = []): string {
   return [
     s.level === 0 ? '+0' : `+${s.delayMin} min`,
-    targetLabels(s).join(' + ') || 'nobody',
+    targetLabels(s, admins).join(' + ') || 'nobody',
     channelLabels(s).join(', ') || 'no channel',
   ].join(' · ');
 }
@@ -165,8 +166,15 @@ export interface DiffRow {
   after: string | null;
 }
 
+/** "015" → "15"; anything that isn't a whole number stays as typed (its error shows on the field). */
+export const normalInterval = (v: string) => (/^\d+$/.test(v.trim()) ? String(Number(v.trim())) : v.trim());
+
 /** What changed since the saved policies (the save dialog's rows and the unsaved count). */
-export function diff(saved: EscalationDraft, draft: EscalationDraft): DiffRow[] {
+export function diff(
+  saved: EscalationDraft,
+  draft: EscalationDraft,
+  admins: readonly string[] = [],
+): DiffRow[] {
   const rows: DiffRow[] = [];
   for (const p of draft.policies) {
     const was = saved.policies.find((s) => s.id === p.id);
@@ -174,8 +182,8 @@ export function diff(saved: EscalationDraft, draft: EscalationDraft): DiffRow[] 
     for (let i = 0; i < levels; i++) {
       const a = was?.steps[i];
       const b = p.steps[i];
-      const before = a ? describeStep(a) : null;
-      const after = b ? describeStep(b) : null;
+      const before = a ? describeStep(a, admins) : null;
+      const after = b ? describeStep(b, admins) : null;
       if (before !== after)
         rows.push({ where: `${policyShort(p.key)} · L${i}`, before, after: after ?? 'Removed' });
     }
@@ -184,7 +192,9 @@ export function diff(saved: EscalationDraft, draft: EscalationDraft): DiffRow[] 
     ['DOWN reminder', saved.downReminder, draft.downReminder],
     ['PROBLEM reminder', saved.problemReminder, draft.problemReminder],
   ] as const) {
-    if (a.trim() !== b.trim()) rows.push({ where: label, before: `every ${a} min`, after: `every ${b} min` });
+    // "015" saved comes back as "15": the same interval, not a change (spec-check round 2).
+    if (normalInterval(a) !== normalInterval(b))
+      rows.push({ where: label, before: `every ${a} min`, after: `every ${b} min` });
   }
   return rows;
 }
@@ -260,7 +270,7 @@ export function newStep(p: PolicyDraft): EscalationStep {
 }
 
 const sameSteps = (a: PolicyDraft | undefined, b: PolicyDraft) =>
-  !!a && a.steps.map(describeStep).join('|') === b.steps.map(describeStep).join('|');
+  !!a && a.steps.map((s) => describeStep(s)).join('|') === b.steps.map((s) => describeStep(s)).join('|');
 
 /**
  * The policies a save changes for new incidents: those whose steps changed, and every policy of a

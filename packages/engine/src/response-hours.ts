@@ -44,6 +44,12 @@ export function nextOpening(at: Date, hours: ResponseHours): Date {
   throw new Error('response hours never open');
 }
 
+/** When the response hours `at` falls in close (18:00 today); null when `at` is outside them. */
+export function closingOf(at: Date, hours: ResponseHours): Date | null {
+  const day = openOn(dayStart(at), hours);
+  return day && at.getTime() >= day.open && at.getTime() < day.close ? new Date(day.close) : null;
+}
+
 /**
  * The instant a timer started at `from` has run `minutes` inside response hours (INC-0139: Thu 22:14
  * + 15 → Fri 09:15). Landing exactly on closing time counts (17:45 + 15 = 18:00).

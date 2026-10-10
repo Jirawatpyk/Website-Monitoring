@@ -1,12 +1,13 @@
-import { isInsideHours, nextOpening, scheduleOf } from '@dxt/engine';
+import { closingOf, firstReminderOf, isInsideHours, nextOpening, scheduleOf } from '@dxt/engine';
 import {
   formatDay,
+  formatResponseHours,
   formatTime,
   isSameBangkokDay,
   type EscalationStep,
   type ResponseHours,
 } from '@dxt/shared';
-import type { PolicyDraft } from './model';
+import { targetLabels, type PolicyDraft } from './model';
 import type { EscalationPageData, PreviewSite } from './types';
 
 /**
@@ -76,6 +77,8 @@ const at = (d: Date, now: Date) =>
 
 export interface ScenarioRow {
   at: string;
+  /** The step this row is (none for the hours and reminder rows). */
+  level?: number;
   what: string;
   muted?: boolean;
   danger?: boolean;
@@ -84,7 +87,9 @@ export interface ScenarioRow {
 /**
  * "MuvMi DOWN confirmed now, nobody acknowledges:" and its rows (Escalation board Preview; MEscalation
  * drops ", nobody acknowledges" under its own heading). Outside response hours a Tier 2–3 DOWN posts L0
- * and pauses; a Tier 2–3 PROBLEM is held, L0 included, until the next opening (spec §7, D-034).
+ * and pauses; a Tier 2–3 PROBLEM is held, L0 included, until the next opening (spec §7, D-034). The first
+ * reminder (`firstReminderOf`) and, for Tier 2–3, the closing and opening the timeline runs across are
+ * muted rows, in time order.
  */
 export function scenario(
   p: PolicyDraft,
@@ -97,16 +102,29 @@ export function scenario(
   const tier = p.tier ?? site?.tier ?? 1;
   const plan = { severity: p.severity, tier, reminderMin: options.reminderMin ?? 15, steps: p.steps };
   const schedule = scheduleOf({ plan, detectedAt: now, hours });
-  const rows: ScenarioRow[] = [];
+  const timed: { t: number; row: ScenarioRow }[] = [];
+  const add = (d: Date, row: Omit<ScenarioRow, 'at'>) =>
+    timed.push({ t: d.getTime(), row: { at: at(d, now), ...row } });
   const outside = tier !== 1 && !isInsideHours(now, hours);
   const held = outside && p.severity === 'problem';
   const opening = outside ? nextOpening(now, hours) : now;
+  const reminder = p.steps.length ? firstReminderOf({ plan, detectedAt: now, hours }) : null;
+  const last = Math.max(...schedule.map((x) => x.dueAt.getTime()), reminder?.dueAt.getTime() ?? 0);
+  if (outside && !held && last > opening.getTime()) {
+    add(opening, { what: 'Response hours start · timers run', muted: true });
+  }
+  // Inside hours, a Tier 2–3 timeline that runs past closing pauses overnight (board: "Outside hours → held").
+  const closing = tier !== 1 && !outside ? closingOf(now, hours) : null;
+  if (closing && last > closing.getTime()) {
+    add(closing, { what: 'Response hours end · timers paused', muted: true });
+    add(nextOpening(closing, hours), { what: 'Response hours start · timers run', muted: true });
+  }
+  if (reminder)
+    add(reminder.dueAt, { what: `Reminder in the thread (every ${plan.reminderMin} min)`, muted: true });
   p.steps.forEach((s, i) => {
-    const names = stepNames(p.steps, i, site, admins);
+    // No site to resolve for: the role tokens stand in for names (spec-check round 2).
+    const names = site ? stepNames(p.steps, i, site, admins) : targetLabels(s, admins);
     const due = held && i === 0 ? opening : (schedule.find((x) => x.level === s.level)?.dueAt ?? now);
-    if (i === 1 && outside && !held) {
-      rows.push({ at: at(opening, now), what: 'Response hours start · timers run', muted: true });
-    }
     const nobody = !s.channels.length
       ? 'notifies nobody (no channel ticked)'
       : !s.targets.length
@@ -116,12 +134,16 @@ export function scenario(
           : null;
     const space = i === 0 && s.channels.includes('space') ? ' + Alerts Space' : '';
     const suffix = i > 0 ? '' : held ? ' (held until response hours)' : outside ? ' · timers paused' : '';
-    rows.push({
-      at: at(due, now),
+    add(due, {
+      level: s.level,
       what: `L${i} → ${nobody ?? names.join(' + ') + space}${suffix}`,
       danger: !s.channels.length || !s.targets.length,
     });
   });
+  // Steps before the muted row at the same minute; otherwise by time (a stable sort keeps the order added).
+  const rows = timed
+    .sort((a, b) => a.t - b.t || Number(a.row.level === undefined) - Number(b.row.level === undefined))
+    .map((x) => x.row);
   const what = p.severity === 'down' ? 'DOWN confirmed' : 'PROBLEM';
   return {
     caseLine: `${site?.name ?? 'A site'} ${what} now${outside ? ' (outside response hours)' : ''}${options.phone ? ':' : ', nobody acknowledges:'}`,
@@ -129,16 +151,5 @@ export function scenario(
   };
 }
 
-const DAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-
 /** "Mon–Fri 09:00–18:00" from the organisation's response hours. */
-export function hoursLabel(h: EscalationPageData['hours']): string {
-  const days = [...h.days].sort();
-  const run = days.every((d, i) => i === 0 || d === days[i - 1]! + 1);
-  const dayText =
-    run && days.length > 1
-      ? `${DAY[days[0]! - 1]}–${DAY[days.at(-1)! - 1]}`
-      : days.map((d) => DAY[d - 1]).join(', ');
-  return `${dayText} ${hm(h.startMin)}–${hm(h.endMin)}`;
-}
+export const hoursLabel = (h: EscalationPageData['hours']): string => formatResponseHours(h);

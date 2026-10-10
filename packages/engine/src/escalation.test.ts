@@ -1,6 +1,6 @@
 import type { EscalationPlan } from '@dxt/shared';
 import { describe, expect, it } from 'vitest';
-import { ladderDue, problemHoldUntil, scheduleOf, type LadderInput } from './escalation';
+import { firstReminderOf, ladderDue, problemHoldUntil, scheduleOf, type LadderInput } from './escalation';
 
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
 
@@ -181,5 +181,37 @@ describe('problemHoldUntil — a PROBLEM outside response hours waits until 09:0
     ['Tier 1 PROBLEM at night → now (24/7)', 1, '2026-09-24T22:14:00', null],
   ])('%s', (_case, tier, at, want) => {
     expect(problemHoldUntil(tier as 1 | 2 | 3, bkk(at), HOURS)).toEqual(want ? bkk(want) : null);
+  });
+});
+
+describe('firstReminderOf — the preview’s first reminder, skipped on a step minute (D-034)', () => {
+  it.each([
+    ['Tier 1 DOWN (L1 +15, every 15) → +30', down(1), '2026-09-25T09:48:41', 30, '2026-09-25T10:18:41'],
+    ['PROBLEM (L1 +60, every 60) → +120', problem(1), '2026-09-25T09:48:41', 120, '2026-09-25T11:48:41'],
+    [
+      'PROBLEM without L1 → +60',
+      { ...problem(1), steps: problem(1).steps.slice(0, 1) },
+      '2026-09-25T09:48:41',
+      60,
+      '2026-09-25T10:48:41',
+    ],
+    [
+      'Tier 2 DOWN Thu 22:14 → Fri 09:30 (response-hours minutes)',
+      down(2),
+      '2026-09-24T22:14:00',
+      30,
+      '2026-09-25T09:30:00',
+    ],
+  ])('%s', (_case, plan, at, afterMin, dueAt) => {
+    expect(firstReminderOf({ plan, detectedAt: bkk(at), hours: HOURS })).toEqual({
+      afterMin,
+      dueAt: bkk(dueAt),
+    });
+  });
+  it('agrees with ladderDue: the reminder ladderDue sends first is the one the preview shows', () => {
+    const first = firstReminderOf(inc0142('2026-09-25T10:00:00'))!;
+    expect(ladderDue(inc0142('2026-09-25T10:19:00', { level: 1, state: 'escalated' })).reminder).toEqual(
+      first,
+    );
   });
 });

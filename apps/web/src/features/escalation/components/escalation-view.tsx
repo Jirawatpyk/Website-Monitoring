@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, SegmentedControl, Select } from '@jirawatpyk/aura-react';
+import { Alert, Badge, SegmentedControl, Select } from '@jirawatpyk/aura-react';
 import { IconBell, IconEye, IconLock, IconMail, IconUsers } from '@jirawatpyk/aura-react/icons';
 import type { EscalationChannel } from '@dxt/shared';
 import { useMemo, useState, type ReactElement } from 'react';
@@ -56,7 +56,10 @@ export function EscalationView({
   const policy =
     view === 't1' ? find('t1') : view === 'problem' ? find('problem') : find(site?.tier === 3 ? 't3' : 't2');
   if (!policy) throw new Error('No escalation policies — the S08 migration seeds four');
-  const example = scenario(policy, site, data.admins, hours, clock, { phone: true });
+  const example = scenario(policy, site, data.admins, hours, clock, {
+    phone: true,
+    reminderMin: policy.severity === 'down' ? data.downReminder : data.problemReminder,
+  });
   const title =
     view === 't1'
       ? `Tier 1 DOWN · ${candidates.length} site${candidates.length === 1 ? '' : 's'}`
@@ -72,19 +75,11 @@ export function EscalationView({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="m-0 flex items-start gap-2.5 rounded-aura-md border border-border-default bg-bg-surface px-3 py-2.5 text-sm">
-        <span className="flex pt-0.5 text-fg-secondary" aria-hidden>
-          <IconEye size="sm" />
-        </span>
-        <span>
-          <b className="font-semibold">{admin ? 'View only on phones.' : 'View only.'}</b>{' '}
-          <span className="text-fg-secondary">
-            {admin
-              ? 'Admins change policies on a larger screen.'
-              : 'Only an Admin can change escalation policies.'}
-          </span>
-        </span>
-      </p>
+      <Alert tone="info" role="note" icon={<IconEye />} title={admin ? 'View only on phones.' : 'View only.'}>
+        {admin
+          ? 'Admins change policies on a larger screen.'
+          : 'Only an Admin can change escalation policies.'}
+      </Alert>
 
       <SegmentedControl
         label="Policy"
@@ -120,7 +115,7 @@ export function EscalationView({
         className="m-0 flex list-none flex-col rounded-aura-lg border border-border-default bg-bg-surface p-3.5 pl-3"
       >
         {policy.steps.map((s, i) => {
-          const names = stepNames(policy.steps, i, site, data.admins);
+          const names = site ? stepNames(policy.steps, i, site, data.admins) : targetLabels(s, data.admins);
           const note = stepNote(policy, s, true);
           return (
             <li key={s.level} className="group relative flex gap-3">

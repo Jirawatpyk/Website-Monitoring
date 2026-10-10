@@ -37,8 +37,9 @@ describe('preview (S08, D-034)', () => {
     expect(scenario(down(1), muvmi, ['Tao'], hours, bkk('2026-09-25T09:48:00'))).toEqual({
       caseLine: 'MuvMi DOWN confirmed now, nobody acknowledges:',
       rows: [
-        { at: '09:48', what: 'L0 → Arm + Alerts Space', danger: false },
-        { at: '10:03', what: 'L1 → Ploy + Tao', danger: false },
+        { at: '09:48', level: 0, what: 'L0 → Arm + Alerts Space', danger: false },
+        { at: '10:03', level: 1, what: 'L1 → Ploy + Tao', danger: false },
+        { at: '10:18', what: 'Reminder in the thread (every 15 min)', muted: true },
       ],
     });
   });
@@ -49,9 +50,10 @@ describe('preview (S08, D-034)', () => {
       'ORCA Thailand DOWN confirmed now (outside response hours), nobody acknowledges:',
     );
     expect(s.rows).toEqual([
-      { at: '22:14', what: 'L0 → Tao + Alerts Space · timers paused', danger: false },
+      { at: '22:14', level: 0, what: 'L0 → Tao + Alerts Space · timers paused', danger: false },
       { at: 'Fri 09:00', what: 'Response hours start · timers run', muted: true },
-      { at: 'Fri 09:15', what: 'L1 → Nok', danger: false },
+      { at: 'Fri 09:15', level: 1, what: 'L1 → Nok', danger: false },
+      { at: 'Fri 09:30', what: 'Reminder in the thread (every 15 min)', muted: true },
     ]);
   });
 
@@ -66,9 +68,18 @@ describe('preview (S08, D-034)', () => {
         { level: 1, delayMin: 60, targets: ['backup'], channels: ['chat', 'email'] },
       ],
     };
-    expect(scenario(problem, orca, ['Tao'], hours, bkk('2026-09-24T22:14:00')).rows).toEqual([
-      { at: 'Fri 09:00', what: 'L0 → Tao + Alerts Space (held until response hours)', danger: false },
-      { at: 'Fri 10:00', what: 'L1 → Nok', danger: false },
+    expect(
+      scenario(problem, orca, ['Tao'], hours, bkk('2026-09-24T22:14:00'), { reminderMin: 60 }).rows,
+    ).toEqual([
+      {
+        at: 'Fri 09:00',
+        level: 0,
+        what: 'L0 → Tao + Alerts Space (held until response hours)',
+        danger: false,
+      },
+      { at: 'Fri 10:00', level: 1, what: 'L1 → Nok', danger: false },
+      // The +60 reminder is L1's minute, so the first one is +120 (D-034 over the board's +60).
+      { at: 'Fri 11:00', what: 'Reminder in the thread (every 60 min)', muted: true },
     ]);
   });
 
@@ -77,9 +88,40 @@ describe('preview (S08, D-034)', () => {
     p.steps[1] = { ...p.steps[1]!, channels: [] };
     expect(scenario(p, muvmi, ['Tao'], hours, bkk('2026-09-25T09:48:00')).rows[1]).toEqual({
       at: '10:03',
+      level: 1,
       what: 'L1 → notifies nobody (no channel ticked)',
       danger: true,
     });
+  });
+
+  it('a Tier 2 DOWN at Fri 17:50: the timers pause at 18:00 and L1 comes Mon 09:05', () => {
+    expect(scenario(down(2), orca, ['Tao'], hours, bkk('2026-09-25T17:50:00')).rows).toEqual([
+      { at: '17:50', level: 0, what: 'L0 → Tao + Alerts Space', danger: false },
+      { at: '18:00', what: 'Response hours end · timers paused', muted: true },
+      { at: 'Mon 09:00', what: 'Response hours start · timers run', muted: true },
+      { at: 'Mon 09:05', level: 1, what: 'L1 → Nok', danger: false },
+      { at: 'Mon 09:20', what: 'Reminder in the thread (every 15 min)', muted: true },
+    ]);
+  });
+
+  it('with no site to resolve for, the steps name their role tokens', () => {
+    const s = scenario(down(1), undefined, ['Tao'], hours, bkk('2026-09-25T09:48:00'));
+    expect(s.caseLine).toBe('A site DOWN confirmed now, nobody acknowledges:');
+    expect(s.rows.map((r) => r.what)).toEqual([
+      'L0 → Owner + Alerts Space',
+      'L1 → Backup + Admin (Tao)',
+      'Reminder in the thread (every 15 min)',
+    ]);
+  });
+
+  it('a reminder due before a late L1 comes first', () => {
+    const p = down(1);
+    p.steps[1] = { ...p.steps[1]!, delayMin: 45 };
+    expect(scenario(p, muvmi, ['Tao'], hours, bkk('2026-09-25T09:48:00')).rows.map((r) => r.at)).toEqual([
+      '09:48',
+      '10:03',
+      '10:33',
+    ]);
   });
 
   it('a policy covers its tier; PROBLEM covers all', () => {

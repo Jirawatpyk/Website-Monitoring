@@ -76,9 +76,15 @@ export function StepRow({
           </div>
           {!pinned && (
             <div className="flex items-center gap-0.5">
-              <IconButton icon={<IconPencil />} label={`Edit ${label}`} onClick={() => onEdit(index)} />
+              <IconButton
+                icon={<IconPencil />}
+                label={`Edit ${label}`}
+                touchHeight
+                onClick={() => onEdit(index)}
+              />
               <IconButton
                 icon={<IconTrash2 />}
+                touchHeight
                 tone="danger"
                 label={`Delete ${label}`}
                 onClick={() => onDelete(index)}

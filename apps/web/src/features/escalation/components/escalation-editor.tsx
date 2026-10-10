@@ -13,6 +13,7 @@ import {
   canAdd,
   diff,
   newStep,
+  normalInterval,
   POLICY_LABELS,
   policyMessage,
   reminderError,
@@ -71,7 +72,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
   const reminderMin =
     Number(policy.severity === 'down' ? draft.downReminder : draft.problemReminder) || undefined;
   const preview = scenario(policy, site, data.admins, hours, clock, { reminderMin });
-  const rows = diff(saved, draft);
+  const rows = diff(saved, draft, data.admins);
   const summary = unsavedSummary(rows);
   const message = policyMessage(policy);
   const hoursText = hoursLabel(data.hours);
@@ -109,6 +110,12 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
       }
       setSaveOpen(false);
       setNote('');
+      // The draft as the server keeps it, so the unsaved bar doesn't come back over "Saved".
+      setDraft((d) => ({
+        ...d,
+        downReminder: normalInterval(d.downReminder),
+        problemReminder: normalInterval(d.problemReminder),
+      }));
       setJustSaved(true);
       setRefocus((n) => n + 1);
       router.refresh();

@@ -1,7 +1,7 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { ladderDue } from '@dxt/engine';
-import { escalationPlanSchema, type IncidentState, type ResponseHours } from '@dxt/shared';
+import { ladderDue, problemHoldUntil } from '@dxt/engine';
+import { escalationPlanSchema, type IncidentState, type ResponseHours, type Tier } from '@dxt/shared';
 
 /**
  * The escalation ladder's tick (S08, D-034), once per engine run after the sites are judged: every
@@ -57,8 +57,14 @@ async function tick(
   input: Parameters<typeof ladderDue>[0],
 ): Promise<number> {
   const due = ladderDue(input);
-  // The text says how long it has really been ("DOWN 15 min" by day, "11 h" after a night).
-  const elapsedMin = Math.floor((input.now.getTime() - input.detectedAt.getTime()) / 60_000);
+  // How long it has gone unacknowledged since the owner was told: a DOWN at confirm ("11 h" after a
+  // night — L0 posted at 22:14), a Tier 2–3 PROBLEM held overnight at the opening ("60 min" at 10:00,
+  // not "11 h 46 min"; message-check round 2).
+  const toldAt =
+    input.plan.severity === 'problem'
+      ? (problemHoldUntil(input.plan.tier as Tier, input.detectedAt, input.hours) ?? input.detectedAt)
+      : input.detectedAt;
+  const elapsedMin = Math.max(0, Math.floor((input.now.getTime() - toldAt.getTime()) / 60_000));
   let queued = 0;
   if (due.step) {
     const fired = await db.rpc('engine_fire_step', {

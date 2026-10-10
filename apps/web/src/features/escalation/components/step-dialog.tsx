@@ -66,7 +66,9 @@ export function StepDialog({
       i === index ? { ...s, delayMin: check.error ? s.delayMin : Number(delay), targets, channels } : s,
     ),
   };
-  const row = scenario(trial, site, admins, hours, now).rows.at(index === 0 ? 0 : -1)!;
+  const row = scenario(trial, site, admins, hours, now).rows.find(
+    (r) => r.level === trial.steps[index]?.level,
+  )!;
   const preview = { ...row, what: site ? `${row.what} (${site.name})` : row.what };
 
   return (
@@ -121,7 +123,9 @@ export function StepDialog({
           <span className={`text-xs ${tried && nobody ? 'text-fg-danger' : 'text-fg-secondary'}`}>
             {tried && nobody
               ? 'Pick at least one person.'
-              : 'Pick who this step notifies. Tokens resolve per site — see the preview.'}
+              : targets.length
+                ? `Tokens resolve per site.${targets.includes('admins') && adminNote ? ` ${adminNote}` : ''}`
+                : 'Pick who this step notifies. Tokens resolve per site — see the preview.'}
           </span>
           <span className="text-xs text-fg-secondary">
             {policy.key === 't1'

@@ -67,6 +67,24 @@ export function scheduleOf(input: Pick<LadderInput, 'plan' | 'detectedAt' | 'hou
   );
 }
 
+/** The reminder minutes are every `reminderMin` on the clock, skipped where a step fires (D-034). */
+const stepMinutesOf = (plan: EscalationPlan) => new Set(plan.steps.map((s) => s.delayMin));
+
+/**
+ * The first reminder if nobody acknowledges (the preview's "Reminder in the thread" row): the same skip
+ * rule as `ladderDue` — DOWN L1 +15, every 15 → +30; PROBLEM L1 +60, every 60 → +120.
+ */
+export function firstReminderOf(
+  input: Pick<LadderInput, 'plan' | 'detectedAt' | 'hours'>,
+): { afterMin: number; dueAt: Date } | null {
+  const every = input.plan.reminderMin;
+  if (!(every > 0)) return null;
+  const steps = stepMinutesOf(input.plan);
+  let k = 1;
+  while (steps.has(k * every)) k++;
+  return { afterMin: k * every, dueAt: clockAt(input, k * every) };
+}
+
 export function ladderDue(input: LadderInput): LadderDue {
   const due: LadderDue = {};
   if (!alwaysOn(input.plan.tier) && !isInsideHours(input.now, input.hours)) {
@@ -83,7 +101,7 @@ export function ladderDue(input: LadderInput): LadderDue {
   }
 
   const every = input.plan.reminderMin;
-  const stepMinutes = new Set(input.plan.steps.map((s) => s.delayMin));
+  const stepMinutes = stepMinutesOf(input.plan);
   let k = Math.floor(clockMinutesAt(input) / every + 1e-9);
   while (k > 0 && stepMinutes.has(k * every)) k--;
   // A step firing now is the reminder for this tick.

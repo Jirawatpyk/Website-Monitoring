@@ -17,7 +17,7 @@ export interface LadderFacts {
   pausedUntil?: Date | null;
 }
 
-/** "09:00" today or tomorrow, "Mon 09:00" further off. */
+/** "09:00" today or tomorrow, "Mon 28 Sep 09:00" further off. */
 export function formatResume(at: Date, now: Date): string {
   const tomorrow = new Date(now.getTime() + 86_400_000);
   return isSameBangkokDay(at, now) || isSameBangkokDay(at, tomorrow)
@@ -92,7 +92,7 @@ export interface StepAlertInput {
   site: string;
   severity: 'down' | 'problem';
   level: number;
-  /** Minutes since "Confirmed down" (or the PROBLEM flagged), wall clock. */
+  /** Minutes unacknowledged since the owner was told: Confirmed down, or a held PROBLEM's opening. */
   elapsedMin: number;
   /** The L0 person: "Arm hasn't acknowledged". */
   owner: ChatPerson | null;

@@ -34,7 +34,7 @@ test.describe('escalation policies (local Supabase)', () => {
     await expect(bar).toContainText('1 unsaved change');
     await bar.getByRole('button', { name: 'Save' }).click();
     const save = page.getByRole('dialog', { name: 'Save escalation changes?' });
-    await expect(save).toContainText('+20 min · Backup + Admin · Chat @mention, Email');
+    await expect(save).toContainText(/\+20 min · Backup \+ Admin \(.+\) · Chat @mention, Email/);
     await save.getByRole('button', { name: 'Save and log' }).click();
     await expect(save.getByText('Add a short note — it goes in the audit log with the change')).toBeVisible();
     await save.getByLabel(/Change note/).fill('E2E: L1 a little later');

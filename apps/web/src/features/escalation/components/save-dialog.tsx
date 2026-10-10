@@ -1,5 +1,5 @@
 import { Alert, Button, Dialog, Textarea } from '@jirawatpyk/aura-react';
-import { IconCheck, IconCircleAlert, IconInfo, IconTriangleAlert } from '@jirawatpyk/aura-react/icons';
+import { IconCheck, IconInfo } from '@jirawatpyk/aura-react/icons';
 import type { DiffRow } from '../model';
 
 /**
@@ -56,35 +56,29 @@ export function SaveDialog({
     >
       <div className="flex flex-col gap-3.5">
         {problems.length > 0 && (
-          <div
-            role="alert"
-            className="flex flex-col gap-1.5 rounded-aura-md border border-fg-danger px-3.5 py-3 text-sm"
-          >
-            <span className="flex items-center gap-2 font-semibold text-fg-danger">
-              <IconCircleAlert size="sm" aria-hidden />
-              {problems.length === 1
+          <Alert
+            tone="danger"
+            title={
+              problems.length === 1
                 ? 'Fix 1 problem before saving'
-                : `Fix ${problems.length} problems before saving`}
-            </span>
-            {problems.map((p) => (
-              <span key={p} className="pl-6">
-                {p}
-              </span>
-            ))}
-          </div>
+                : `Fix ${problems.length} problems before saving`
+            }
+          >
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </Alert>
         )}
         {warnings.length > 0 && (
-          <div className="flex flex-col gap-1.5 rounded-aura-md border border-border-strong px-3.5 py-3 text-sm">
-            <span className="flex items-center gap-2 font-semibold text-fg-warning">
-              <IconTriangleAlert size="sm" aria-hidden />
-              Allowed, but check
-            </span>
-            {warnings.map((w) => (
-              <span key={w} className="pl-6">
-                {w}
-              </span>
-            ))}
-          </div>
+          <Alert tone="warning" role="note" title="Allowed, but check">
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          </Alert>
         )}
         <dl className="m-0 flex flex-col rounded-aura-md border border-border-default">
           {rows.map((r, i) => (

@@ -58,6 +58,20 @@ export interface ResponseHours {
   holidays: ReadonlySet<string>;
 }
 
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+const hhmm = (m: number) =>
+  `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+/** "Mon–Fri 09:00–18:00" (a run of days) or "Mon, Wed 09:00–18:00" — the Escalation and Organisation pages. */
+export function formatResponseHours(h: Pick<ResponseHours, 'startMin' | 'endMin' | 'days'>): string {
+  const days = [...h.days].sort((a, b) => a - b);
+  const run = days.length > 1 && days.every((d, i) => i === 0 || d === days[i - 1]! + 1);
+  const dayText = run
+    ? `${WEEKDAYS[days[0]! - 1]}–${WEEKDAYS[days.at(-1)! - 1]}`
+    : days.map((d) => WEEKDAYS[d - 1]).join(', ');
+  return `${dayText} ${hhmm(h.startMin)}–${hhmm(h.endMin)}`;
+}
+
 /** "09:00" / "09:00:00" (a Postgres `time`) → minutes of the day. */
 export function timeToMinutes(value: string): number {
   const [h = '0', m = '0'] = value.split(':');

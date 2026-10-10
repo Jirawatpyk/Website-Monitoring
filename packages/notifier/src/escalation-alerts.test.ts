@@ -215,6 +215,27 @@ describe('DOWN AGAIN outside response hours (ChatAlert VOCA)', () => {
       '<users/PLOY> DOWN AGAIN · VOCA (Tier 2) · same incident INC-0133 · outside response hours · timers paused until 09:00',
     );
   });
+
+  it('on a Friday night the resume carries its day', () => {
+    const msg = buildAgainAlert({
+      incidentId: 'i133',
+      incidentNumber: 133,
+      site: 'VOCA',
+      tier: 2,
+      severity: 'down',
+      trigger: 'hard_fail',
+      mention: ploy,
+      ackedBy: null,
+      fromState: 'monitoring',
+      droppedAt: bkk('2026-09-25T22:00:00'),
+      backSince: bkk('2026-09-25T21:50:00'),
+      minutesSoFar: 7,
+      nowFlapping: false,
+      flapping: false,
+      pausedUntil: bkk('2026-09-28T09:00:00'),
+    });
+    expect(msg.text).toContain('timers paused until Mon 28 Sep 09:00');
+  });
 });
 
 describe('emails', () => {
@@ -268,6 +289,86 @@ describe('emails', () => {
     );
     expect(toTao.text).not.toContain('Acknowledge:');
     expect(toTao.text).not.toContain('CEO');
+  });
+
+  it('the D-016 fallback: the L1 Chat reply failed, so this email is the alert — with Acknowledge', () => {
+    const e = buildStepEmail({
+      ...base,
+      recipientId: 'tao',
+      reason: 'fallback',
+      severity: 'down',
+      level: 1,
+      elapsedMin: 15,
+      confirmedAt: bkk('2026-09-25T09:48:41'),
+      owner: 'Arm',
+      asked: 'Ploy',
+      asFyi: true,
+      fallback: true,
+    });
+    expect(e.text).toContain(
+      'Arm hasn’t acknowledged. The Google Chat reply couldn’t be delivered, so this email is the alert.',
+    );
+    expect(e.text).toContain(`Acknowledge: ${url}?ack=1`);
+    expect(e.text).not.toContain('For your information');
+  });
+
+  it('a held Tier 2 PROBLEM: the Cause row, detection with its day, told at the opening', () => {
+    const e = buildStepEmail({
+      ...base,
+      site: 'ORCA Thailand',
+      tier: 2,
+      recipientId: 'nok',
+      reason: 'step',
+      why: 'You got this because you’re backup for ORCA Thailand.',
+      severity: 'problem',
+      level: 1,
+      elapsedMin: 60,
+      // Flagged Thu 22:14, held until Fri 09:00 (spec §7); L1 at +60 response-hours minutes.
+      confirmedAt: bkk('2026-09-24T22:14:00'),
+      toldAt: bkk('2026-09-25T09:00:00'),
+      cause: 'Slow — 6.2 s (limit 5 s)',
+      owner: 'Tao',
+      asked: 'Nok',
+      asFyi: false,
+    });
+    expect(e.text).toContain('STILL PROBLEM — ORCA Thailand still has a problem — 1 h, no ack');
+    expect(e.text).toContain('Problem for: 1 h (detected Thu 24 Sep 22:14:00)');
+    expect(e.text).toContain('Cause: Slow — 6.2 s (limit 5 s)');
+    expect(e.text).toContain('Already told: Tao — Chat + email 09:00');
+    expect(e.text).toContain('Please take it — you’re the next person for this incident.');
+  });
+
+  it('an L1 email the same day shows the time alone', () => {
+    const e = buildStepEmail({
+      ...base,
+      recipientId: 'ploy',
+      reason: 'step',
+      severity: 'down',
+      level: 1,
+      elapsedMin: 15,
+      confirmedAt: bkk('2026-09-25T09:48:41'),
+      owner: 'Arm',
+      asked: 'Ploy',
+      asFyi: false,
+    });
+    expect(e.text).toContain('Down for: 15 min (confirmed down 09:48:41)');
+  });
+
+  it('Acknowledged email, PROBLEM: the reminders and the backup step stopped', () => {
+    const e = buildAcknowledgedEmail({
+      ...base,
+      site: 'Fuji Links',
+      recipientId: 'arm',
+      reason: 'emailed',
+      ackedBy: 'Arm',
+      ackedAt: bkk('2026-09-25T09:58:00'),
+      startedAt: bkk('2026-09-25T09:52:00'),
+      confirmedAt: bkk('2026-09-25T09:52:00'),
+      problem: { trigger: 'slow' },
+      stopped: { severity: 'problem', backup: 'Nok', l1Fired: false, reminderMin: 60 },
+    });
+    expect(e.text).toContain('Acknowledged by Arm → reminders stopped.');
+    expect(e.text).toContain('Reminders: 60-min reminder and the Nok (backup) step are stopped');
   });
 
   it('Acknowledged email says L1 stopped', () => {

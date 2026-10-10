@@ -193,6 +193,29 @@ describe('Escalation editor — saving', () => {
     expect(screen.getByRole('heading', { name: 'Tier 1 DOWN steps' })).toHaveFocus();
   });
 
+  it('a save of "010" leaves no unsaved bar once the page comes back with 10', async () => {
+    actions.saveEscalation.mockResolvedValue({ ok: true });
+    const { rerender } = render(<EscalationEditor data={data} now={NOW} />);
+    fireEvent.change(screen.getByLabelText('DOWN reminder'), { target: { value: '010' } });
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Unsaved changes' })).getByRole('button', { name: 'Save' }),
+    );
+    const save = dialog('Save escalation changes?');
+    fireEvent.change(within(save).getByLabelText(/Change note/), { target: { value: 'shorter' } });
+    await act(async () => fireEvent.click(within(save).getByRole('button', { name: 'Save and log' })));
+    rerender(<EscalationEditor data={{ ...data, downReminder: 10 }} now={NOW} />);
+    expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull();
+    expect(screen.getByText(/New incidents use it straight away/)).toBeInTheDocument();
+  });
+
+  it('the edit dialog: the picking hint goes once someone is picked', () => {
+    render(<EscalationEditor data={data} now={NOW} />);
+    openL1();
+    const d = dialog(/L1/);
+    expect(within(d).getByText('Tokens resolve per site. Tao is the only active Admin.')).toBeInTheDocument();
+    expect(within(d).queryByText(/Pick who this step notifies/)).toBeNull();
+  });
+
   it('the Admin token names the Admin, with the one-Admin warning', () => {
     render(<EscalationEditor data={data} now={NOW} />);
     expect(screen.getByText('Admin (Tao)')).toBeInTheDocument();

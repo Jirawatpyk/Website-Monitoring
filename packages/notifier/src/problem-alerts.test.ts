@@ -141,7 +141,7 @@ describe('PROBLEM first card (ChatAlert)', () => {
 });
 
 describe('PROBLEM replies (ChatAlert)', () => {
-  it('ACKNOWLEDGED: "still slow", the site is up — no "reminders stopped" until S08', () => {
+  it('ACKNOWLEDGED: "still slow", the site is up — no "reminders stopped" without a ladder (pre-S08 incident)', () => {
     const m = buildAcknowledgedAlert({
       incidentId: 'inc-141',
       site: 'Fuji Links',

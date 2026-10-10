@@ -84,7 +84,29 @@ describe('escalationTick (S08, D-034)', () => {
     expect((await escalationTick(night.db, bkk('2026-09-25T03:00:00'), HOURS)).queued).toBe(0);
     const morning = fakeDb({ 'incidents.select': { data: [orca] }, 'rpc.engine_fire_step': { data: true } });
     await escalationTick(morning.db, bkk('2026-09-25T09:15:00'), HOURS);
+    // L0 went out at 22:14: by 09:15 it has gone 11 h unacknowledged.
     expect(morning.rpcCalls[0]?.args).toMatchObject({ p_level: 1, p_context: { elapsedMin: 661 } });
+  });
+
+  it('a Tier 2 PROBLEM held overnight counts from the 09:00 opening: STILL PROBLEM at 10:00 says 60 min', async () => {
+    const steps = plan(2).steps;
+    const held = inc0142({
+      id: 'i141',
+      severity: 'problem',
+      detected_at: bkk('2026-09-24T22:14:00').toISOString(),
+      escalation_plan: {
+        ...plan(2),
+        severity: 'problem',
+        reminderMin: 60,
+        steps: [steps[0], { ...steps[1], delayMin: 60, targets: ['backup'] }],
+      },
+    });
+    const { db, rpcCalls } = fakeDb({
+      'incidents.select': { data: [held] },
+      'rpc.engine_fire_step': { data: true },
+    });
+    await escalationTick(db, bkk('2026-09-25T10:00:00'), HOURS);
+    expect(rpcCalls[0]?.args).toMatchObject({ p_level: 1, p_context: { elapsedMin: 60 } });
   });
 
   it('skips an incident opened before S08 (no plan) and one whose plan is broken', async () => {

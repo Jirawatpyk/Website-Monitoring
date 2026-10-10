@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { addInsideMinutes, isInsideHours, minutesInsideHours, nextOpening } from './response-hours';
+import {
+  addInsideMinutes,
+  closingOf,
+  isInsideHours,
+  minutesInsideHours,
+  nextOpening,
+} from './response-hours';
 
 /** Bangkok wall time → the instant (UTC+7). */
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
@@ -78,5 +84,17 @@ describe('minutesInsideHours — how long a paused timer has run', () => {
     for (const n of [1, 15, 60, 545, 600, 1200]) {
       expect(minutesInsideHours(from, addInsideMinutes(from, n, FRIDAY_OFF), FRIDAY_OFF)).toBeCloseTo(n, 6);
     }
+  });
+});
+
+describe('closingOf — when the hours `at` falls in close', () => {
+  it.each([
+    ['Fri 25 Sep 17:50 → 18:00', '2026-09-25T17:50:00', HOURS, '2026-09-25T18:00:00'],
+    ['Fri 25 Sep 09:00 → 18:00', '2026-09-25T09:00:00', HOURS, '2026-09-25T18:00:00'],
+    ['Fri 25 Sep 18:00 → closed', '2026-09-25T18:00:00', HOURS, null],
+    ['Thu 24 Sep 22:14 → closed', '2026-09-24T22:14:00', HOURS, null],
+    ['Fri 25 Sep 10:00 on a holiday → closed', '2026-09-25T10:00:00', FRIDAY_OFF, null],
+  ])('%s', (_case, at, hours, want) => {
+    expect(closingOf(bkk(at), hours)).toEqual(want ? bkk(want) : null);
   });
 });
