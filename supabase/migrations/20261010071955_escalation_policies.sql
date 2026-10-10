@@ -670,6 +670,10 @@ end;
 $$;
 
 -- ── The ladder's writes ─────────────────────────────────────────────────────
+-- An incident's messages by template, cancelled ones included (engine_thread_live, the RECOVERED
+-- check, the runner's notifications(template) embed): the once-per-incident index leaves those out.
+create index notifications_incident_idx on public.notifications (incident_id, channel, template);
+
 -- Whether the incident's thread has its first alert out (or going now): a Chat DOWN / PROBLEM /
 -- AGAIN that isn't cancelled — or was tried — and isn't waiting for response hours.
 create function public.engine_thread_live(p_incident_id uuid)
@@ -845,7 +849,20 @@ declare
   v_inc public.incidents%rowtype;
   v_mention uuid[];
   v_id uuid;
+  v_key text;
 begin
+  -- Most calls find the reminder already queued (every engine run asks): answer from the index
+  -- before taking the incident's lock (db review).
+  select i.severity || ':' || to_char(p_due_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI"Z"') into v_key
+  from public.incidents i where i.id = p_incident_id;
+  if v_key is null or exists (
+    select 1 from public.notifications
+    where incident_id = p_incident_id and channel = 'google_chat' and template = 'reminder'
+      and dedupe_key = v_key and status <> 'cancelled'
+  ) then
+    return false;
+  end if;
+
   select * into v_inc from public.incidents where id = p_incident_id for update;
   if not found or v_inc.state not in ('unacked', 'escalated') or v_inc.escalation_plan is null
      or not public.engine_thread_live(p_incident_id) then
