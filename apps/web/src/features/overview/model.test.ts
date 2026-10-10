@@ -378,7 +378,7 @@ describe('Tiles (§21.6)', () => {
     [games, 'Muted', ['eye-off']],
     [baChina, 'Blocked by bot protection · verified', []],
     [voca, '', []],
-    [site('New', { status: null }), 'No data yet', []],
+    [site('New', { status: null }), '', []],
   ])('%#', (s, state, icons) => {
     const t = tileState(s, NOW);
     expect(t.state).toBe(state);

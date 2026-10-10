@@ -30,6 +30,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <AppShell
       // Top bar on phones only, as the phone boards draw it (D-018; AURA 5.33 `headerHideFrom`).
       headerHideFrom="lg"
+      // …and slides away while scrolling down, back on the way up (AURA 5.35, request 13)
+      headerHideOnScroll
       header={<MobileBar displayName={profile.displayName} />}
       nav={
         <AppNav

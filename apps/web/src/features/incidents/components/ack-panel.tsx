@@ -144,10 +144,10 @@ export function AckPanel({
       {children}
 
       {/* Flush with the screen's bottom edge: the negative margin cancels AppShell's own padding.
-          `data-hides-bottomnav` keeps the phone BottomNav away while this bar is on the page (Tao, S06b
-          on staging: it covered Acknowledge) — globals.css; the offset stays for a safe-area inset. */}
+          `data-aura-hide-bottomnav` keeps the phone BottomNav and its spacer away while this bar is on the
+          page (Tao, S06b on staging: it covered Acknowledge; AURA 5.35); the offset stays for a safe-area inset. */}
       <div
-        data-hides-bottomnav
+        data-aura-hide-bottomnav
         className="sticky -mx-4 -mb-aura-6 mt-auto flex flex-col gap-2 border-t border-border-default bg-bg-surface px-4 pt-2.5 pb-6 lg:-mb-aura-8"
         style={{ bottom: 'var(--aura-bottomnav-offset, 0)' }}
       >
