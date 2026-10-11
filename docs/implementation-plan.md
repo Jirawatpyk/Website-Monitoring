@@ -25,7 +25,7 @@
 | S06b | Overview (option A) | 1 · P0 | L | FR-05 | S06, S02b | 3 | Done |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Done |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Done |
-| S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06b, S08 | 3 | Todo |
+| S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06b, S08 | 3 | In progress |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
@@ -413,7 +413,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S09 · Maintenance windows & mute
 
 - **Scope:** FR-10a and FR-14 (pulled forward from P1: the Maintenance dialog's guard offers Mute, so both ship together). One-off windows: schedule, suppress alerts, excluded from uptime, reason required, > 24 h needs Admin approval (Admins approve their own), can't start on a DOWN site or one with an open incident (§14.5). Mute: reason required, max 24 h, auto-expires, stops new alerts only and never counts as an ack (§15.1). End early / edit / cancel from the Overview "Maintenance & mutes" card, all logged.
-- **Boards:** Maintenance, MMaintenance · **Tables:** maintenance_windows · **Test plan:** T09
+- **Boards:** Maintenance, MMaintenance · **Tables:** maintenance_windows · **Test plan:** T09 · **Decisions:** D-036
 - **Depends on:** S06b, S08
 - **Done when:**
   1. **T09:** muting a site with an open incident keeps its escalation running (test); the L3 FYI and client-update parts are re-checked in S10 / S11.
