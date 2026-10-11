@@ -133,6 +133,9 @@ export function SiteDetailView({
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <PageHeader
+            // Phones: AURA's actions box hugs its content, so the Mute / Maintenance / Edit grid would
+            // stop short of the edge — let it take the row (MSite: the buttons span the page).
+            className="max-md:[&>:last-child]:w-full"
             breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />}
             title={detail.name}
             meta={
