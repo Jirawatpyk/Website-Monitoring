@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Maintenance &amp; mutes</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:hover{color:#5b21b6}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.aura-dialog__close.aura-icon-btn{width:44px;height:44px;margin:-12px -14px 0 0}
+.aura-input,.aura-input__control,.aura-select__trigger{min-height:44px;box-sizing:border-box}
+.aura-btn{min-height:44px;box-sizing:border-box}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.mm-row{width:100%;min-height:64px;box-sizing:border-box;padding:10px 8px 10px 14px;display:flex;align-items:center;gap:10px;border:0;border-bottom:1px solid var(--aura-border-subtle);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.mm-row:focus-visible{outline:2px solid var(--aura-focus-ring);outline-offset:-2px}
+.mm-kv{display:flex;justify-content:space-between;gap:12px;font-size:13px;line-height:1.45}
+.mm-kv>span:first-child{color:var(--aura-fg-secondary);flex-shrink:0}
+.mm-kv>span:last-child{text-align:right}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<a href="MOverview4.dc.html" aria-label="Back" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<span style="flex-grow: 1; font-size: 17px; font-weight: 600">Maintenance</span>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="sm"></x-import></a>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" full-width="{{yes}}" size="sm"></x-import></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.4">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">FRI 25 SEP 10:07 · UTC+7</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{meta}}</span>
+</div>
+
+<sc-if value="{{canSchedule}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="plus" full-width="{{yes}}" href="MMaintenance.dc.html#maintenance">Schedule maintenance or mute</x-import>
+</sc-if>
+
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-surface-hover); color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="calendar" size="md"></x-import></span>
+<span style="font-size: 15px; font-weight: 600">Nothing active or scheduled</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Finished ones stay under Recent for 30 days.</span>
+</div>
+</sc-if>
+
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary); padding-left: 2px">{{g.title}}</span>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="2">
+<button type="button" class="mm-row" aria-label="{{r.aria}}" onClick="{{r.open}}">
+<span style="width: 118px; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px"><x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.label}}</x-import><sc-if value="{{r.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">{{r.mutedShort}}</x-import></sc-if></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; gap: 2px">
+<span style="font-size: 14px; font-weight: 500">{{r.site}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{r.line}}</span>
+</span>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-for>
+
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Phone version of /maintenance (spec §22, §23). Same sections and rules as the desktop page: Active now · Waiting for approval · Scheduled · Recent. Each row = status badge + site + one line; tapping it opens a sheet with the details and only the actions this person may take (End now · Edit / cancel · Approve / Decline) — End, cancel and Decline ask for a reason inside the sheet. Entry: the “Maintenance & mutes” row on the phone Overview (MOverview4) and the success screen of the Maintenance sheet. “Schedule maintenance or mute” opens the phone sheet (MMaintenance). A running window or mute offers only End now and Change end; Cancel exists only before it starts. Every action adds a log line. STATE: Admin (Tao) · Responder (Arm, acts only on sites he owns or backs up and on his own request) · Viewer (read only, no Schedule button) · Empty. Mock data — compute it.</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="" label="Sections"></x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{sheetOpen}}" on-close="{{close}}" title="{{s.title}}" description="{{s.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<sc-if value="{{modeView}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import><sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">{{s.mutedLabel}}</x-import></sc-if></div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<sc-for list="{{s.kv}}" as="x" hint-placeholder-count="5"><div class="mm-kv"><span>{{x.k}}</span><span>{{x.v}}</span></div></sc-for>
+</div>
+<sc-for list="{{s.logs}}" as="l" hint-placeholder-count="0"><span style="display: flex; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="file-text" size="sm"></x-import></span><span>{{l.t}}</span></span></sc-for>
+<sc-if value="{{s.canApprove}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" full-width="{{yes}}" on-click="{{goApprove}}">Approve</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{goDecline}}">Decline</x-import>
+</sc-if>
+<sc-if value="{{s.canEnd}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{goEnd}}">{{s.endCta}}</x-import></sc-if>
+<sc-if value="{{s.canEdit}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="pencil" full-width="{{yes}}" on-click="{{goEdit}}">{{s.editLabel}}</x-import></sc-if>
+<sc-if value="{{s.hasNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; line-height: 1.45; color: var(--aura-fg-secondary); text-align: center">{{s.note}}</span></sc-if>
+</sc-if>
+
+<sc-if value="{{modeApprove}}" hint-placeholder-val="{{false}}">
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<sc-for list="{{apEffects}}" as="x" hint-placeholder-count="4"><li>{{x.t}}</li></sc-for>
+</ul>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" full-width="{{yes}}" on-click="{{doApprove}}">{{apCta}}</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{back}}">Back</x-import>
+</sc-if>
+
+<sc-if value="{{modeReason}}" hint-placeholder-val="{{false}}">
+<sc-if value="{{modeEdit}}" hint-placeholder-val="{{false}}">
+<sc-if value="{{showKinds}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.SegmentedControl" label="Change" options="{{editKinds}}" value="{{editKind}}" on-change="{{setEditKind}}" full-width="{{yes}}" size="sm"></x-import></sc-if>
+<sc-if value="{{editEndMode}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Select" label="Ends" options="{{s.ends}}" value="{{editEnd}}" on-change="{{setEditEnd}}"></x-import></sc-if>
+</sc-if>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{s.effect}}</span>
+<x-import component-from-global-scope="Aura.TextField" label="{{s.reasonLabel}}" required="{{yes}}" placeholder="{{s.reasonPh}}" value="{{reason}}" on-change="{{setReason}}" hint="Required · shown in the digest and the audit log"></x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" full-width="{{yes}}" disabled="{{reasonBlocked}}" on-click="{{doReason}}">{{s.reasonCta}}</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{back}}">Back</x-import>
+</sc-if>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: 'Admin', ov: {}, open: '', mode: 'view', reason: '', editKind: 'Change end', editEnd: '' };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var ROLE = st.view === 'Responder' ? 'resp' : (st.view === 'Viewer' ? 'ro' : 'admin');
+    var ADMIN = ROLE === 'admin';
+    var ME = ADMIN ? 'Tao' : (ROLE === 'resp' ? 'Arm' : 'Mint');
+    var NOWABS = 10 * 60 + 7;
+    function mins(hm) { var p = hm.split(':'); return +p[0] * 60 + +p[1]; }
+    function dur(m) { var h = Math.floor(m / 60), r = m % 60; return (h ? h + ' h' : '') + (h && r ? ' ' : '') + (r ? r + ' min' : ''); }
+    function inFmt(m) { var h = Math.round(m / 60), d = Math.floor(h / 24), r = h % 24; return d ? d + ' d' + (r ? ' ' + r + ' h' : '') : dur(m); }
+    // Same mock data as the desktop Maintenance page (Fri 25 Sep 10:07) — compute in the app
+    var DEF = {
+      wecare: { kind: 'maint', site: 'WeCare Studio', tier: 2, owner: 'Nok', backup: 'Ploy', start: '09:30', end: '14:00', ends: ['12:00', '14:00', '16:00', '18:00'], why: 'CMS upgrade', by: 'Nok', running: true,
+        endEffect: 'Alerts resume now for Nok and the Alerts Space. 09:30–10:07 stays excluded from uptime.' },
+      games: { kind: 'mute', site: 'DxT Games', tier: 3, owner: 'Tao', backup: 'Nok', start: '08:40', end: '18:00', ends: ['11:00', '14:00', '18:00'], why: 'Redeploying build', by: 'Tao', running: true,
+        endEffect: 'Alerts resume now for Tao and the Alerts Space. Uptime is unaffected — muted time was already counted.' },
+      bac: { kind: 'maint', site: 'Bangkok Airways – China', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Sat 26 Sep 22:00', short: 'Sat 26', fromAbs: 1440 + 22 * 60, end: 'Tue 29 Sep 22:00', ends: ['Mon 28 Sep 22:00', 'Tue 29 Sep 22:00'], why: 'Move to a new hosting provider', by: 'Arm', asked: 'today 09:20', request: true },
+      tub: { kind: 'maint', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', from: 'Tue 29 Sep 01:00', fromAbs: 4 * 1440 + 60, end: '03:00', ends: ['02:00', '03:00', '04:00'], why: 'WordPress plugin updates', by: 'Ploy' }
+    };
+    var BACLEN = { 'Mon 28 Sep 22:00': '2 days', 'Tue 29 Sep 22:00': '3 days' };
+    var ov = st.view === 'Empty' ? { wecare: { st: 'gone' }, games: { st: 'gone' }, bac: { st: 'gone' }, tub: { st: 'gone' } } : st.ov;
+    function S(k) { var o = ov[k] || {}; return { st: o.st || 'on', approved: !!o.approved, end: o.end || DEF[k].end, logs: o.logs || [] }; }
+    function can(d) { return ADMIN || (ROLE === 'resp' && (d.owner === ME || d.backup === ME)); }
+    function who(d) { var n = [d.owner, d.backup].filter(function (x) { return x !== 'Tao'; }); return 'Only ' + n.join(', ') + ' or an Admin can change this.'; }
+    function nb(icon, label) { return { tone: 'neutral', variant: 'outline', icon: icon, label: label }; }
+    function L(a) { return a.map(function (t) { return { t: t }; }); }
+    function lenOf(k, s) { return k === 'bac' ? BACLEN[s.end] : dur(mins(s.end) - mins(DEF[k].from.slice(-5))); }
+    var rows = {};
+    var G = { active: [], wait: [], sched: [], recent: [] };
+    Object.keys(DEF).forEach(function (k) {
+      var d = DEF[k], s = S(k); if (s.st === 'gone') return;
+      var mute = d.kind === 'mute', pending = d.request && !s.approved;
+      var r = { k: k, site: d.site, muted: false, mutedShort: '', mutedLabel: '', logs: L(s.logs), canApprove: false, canEnd: false, canEdit: false, hasNote: false, note: '', ends: d.ends, endEffect: d.endEffect || '', mute: mute, running: !!d.running, pending: pending,
+        editLabel: d.running ? 'Change end' : (pending ? 'Edit / withdraw' : 'Edit / cancel') };
+      var whenTxt = d.running ? 'Today ' + d.start + ' → ' + s.end : d.from + ' → ' + s.end;
+      var lenTxt = d.running ? (mute ? 'until ' + s.end + ' (max 24 h) · ' : dur(mins(s.end) - mins(d.start)) + ' · ') + dur(NOWABS - mins(d.start)) + ' in' : lenOf(k, s) + ' · starts in ' + inFmt(d.fromAbs - NOWABS);
+      var shortWhen = d.running ? (mute ? 'Until ' + s.end : d.start + ' → ' + s.end) : (k === 'bac' ? d.short + ' → ' + s.end.slice(0, 6) + ' · ' + lenOf(k, s) : d.from + ' → ' + s.end);
+      r.kv = [{ k: 'When', v: whenTxt }, { k: 'Length', v: lenTxt }, { k: 'Reason', v: d.why }, { k: d.request ? 'Asked by' : 'By', v: d.request ? 'Arm · ' + d.asked : d.by }, { k: 'Uptime', v: mute ? 'Still counted' : 'Not counted' }, { k: 'Site', v: 'Tier ' + d.tier + ' · ' + d.owner + ' · backup ' + d.backup }];
+      var sec;
+      if (s.st !== 'on') {
+        var lab = { ended: 'Ended early', cancelled: 'Cancelled', declined: 'Declined', withdrawn: 'Withdrawn' }[s.st];
+        var pw = d.running ? 'Today ' + d.start + ' → 10:07' : d.from + ' → ' + s.end;
+        var pl = d.running ? (mute ? 'Mute' : 'Maintenance') + ' · ' + dur(NOWABS - mins(d.start)) : (mute ? 'Mute' : 'Maintenance') + ' · ' + lenOf(k, s) + ' · didn’t start';
+        Object.assign(r, nb(mute ? 'eye-off' : 'calendar', lab), { line: lab + ' 10:07 · ' + d.why });
+        r.kv[0].v = pw; r.kv[1].v = pl;
+        sec = 'recent';
+      } else if (d.running) {
+        if (mute) Object.assign(r, { tone: 'success', variant: 'soft', icon: 'circle-check', label: 'OK', muted: true, mutedShort: 'Muted', mutedLabel: 'Muted · until ' + s.end });
+        else Object.assign(r, { tone: 'accent', variant: 'soft', icon: 'calendar', label: 'Maintenance' });
+        r.line = shortWhen + ' · ' + d.why;
+        if (can(d)) { r.canEnd = true; r.canEdit = true; } else if (ROLE !== 'ro') { r.hasNote = true; r.note = who(d); }
+        r.sortKey = mins(s.end); sec = 'active';
+      } else if (pending) {
+        Object.assign(r, nb('clock', 'Needs approval'), { line: shortWhen + ' · Arm' });
+        if (ADMIN) r.canApprove = true; else { r.hasNote = true; r.note = 'Waiting for an Admin to approve.'; if (can(d)) r.canEdit = true; }
+        sec = 'wait';
+      } else {
+        Object.assign(r, nb('calendar', 'Scheduled'), { line: shortWhen + ' · ' + d.why });
+        if (can(d)) r.canEdit = true; else if (ROLE !== 'ro') { r.hasNote = true; r.note = who(d); }
+        r.sortKey = d.fromAbs; sec = 'sched';
+      }
+      r.aria = d.site + ', ' + r.label + (r.muted ? ', ' + r.mutedLabel : '') + ', ' + r.line;
+      r.open = function () { self.setState({ open: k, mode: 'view', reason: '', editKind: 'Change end', editEnd: '' }); };
+      rows[k] = r; G[sec].push(r);
+    });
+    G.active.sort(function (a, b) { return a.sortKey - b.sortKey; });
+    G.sched.sort(function (a, b) { return a.sortKey - b.sortKey; });
+    function P(icon, label, site, line, kv, log) { return Object.assign(nb(icon, label), { site: site, line: line, kv: kv, logs: [{ t: log }], muted: false, canApprove: false, canEnd: false, canEdit: false, hasNote: false, aria: site + ', ' + label + ', ' + line, open: function () { self.setState({ open: 'p:' + site, mode: 'view' }); } }); }
+    var PAST = [
+      P('calendar', 'Ended', 'ORCA Thailand', 'Tue 22 Sep 20:00 → 22:00 · 2 h', [{ k: 'Reason', v: 'Hosting plan upgrade' }, { k: 'By', v: 'Tao' }], 'Ended on time 22:00'),
+      P('eye-off', 'Ended early', 'Cando Asia', 'Mon 21 Sep 10:15 → 11:40 · mute', [{ k: 'Reason', v: 'Client changing DNS' }, { k: 'By', v: 'Nok' }], 'Ended early 11:40 by Nok · “DNS change confirmed”'),
+      P('calendar', 'Cancelled', 'EQHO', 'Sat 19 Sep 09:00 → 12:00 · didn’t start', [{ k: 'Reason', v: 'Theme update' }, { k: 'By', v: 'Tao' }], 'Cancelled Fri 18 Sep 16:20 by Tao · “Client moved the launch”'),
+      P('calendar', 'Not approved', 'Fuji Links', 'Sat 12 → Mon 14 Sep · 2 days · didn’t start', [{ k: 'Reason', v: 'Server OS upgrade' }, { k: 'Asked by', v: 'Ploy' }], 'Not approved — didn’t start · nobody approved before Sat 12 Sep 22:00')
+    ];
+    PAST.forEach(function (p) { rows['p:' + p.site] = p; G.recent.push(p); });
+    var groups = [];
+    if (G.active.length) groups.push({ title: 'ACTIVE NOW · ' + G.active.length, rows: G.active });
+    if (G.wait.length) groups.push({ title: 'WAITING FOR APPROVAL · ' + G.wait.length, rows: G.wait });
+    if (G.sched.length) groups.push({ title: 'SCHEDULED · ' + G.sched.length, rows: G.sched });
+    groups.push({ title: 'RECENT · LAST 30 DAYS · ' + G.recent.length, rows: G.recent });
+    var mp = []; if (G.active.length) mp.push(G.active.length + ' active'); if (G.sched.length) mp.push(G.sched.length + ' scheduled'); if (G.wait.length) mp.push(G.wait.length + ' waiting for approval');
+    var cur = rows[st.open] || G.recent[0];
+    var key = cur.k;
+    var D = key ? DEF[key] : null;
+    var mode = st.mode;
+    var curEnd = key ? S(key).end : '';
+    var noun = cur.mute ? 'mute' : 'maintenance';
+    function push(v, line) { var n = Object.assign({}, self.state.ov); var c = n[key] || {}; n[key] = Object.assign({}, c, v, { logs: (c.logs || []).concat([line]) }); return n; }
+    var cancelMode = mode === 'edit' && !cur.running && st.editKind !== 'Change end';
+    var cancelWord = cur.pending ? 'Withdraw' : 'Cancel';
+    var baEnd = S('bac').end, baLen = BACLEN[baEnd];
+    var s = Object.assign({}, cur, {
+      title: cur.site,
+      desc: mode === 'view' ? (key ? (cur.mute ? 'Mute' : 'Maintenance') + ' · Tier ' + D.tier : 'Recent') : ({ end: 'End now?', approve: 'Approve ' + baLen + ' of maintenance?', decline: 'Decline Arm’s request?', edit: cur.running ? 'Change end' : (cur.pending ? 'Edit or withdraw' : 'Edit or cancel') })[mode],
+      endCta: cur.mute ? 'End mute now' : 'End maintenance now',
+      ends: (cur.ends || []).map(function (e) { return { value: e, label: e + (e === curEnd ? ' (current)' : '') }; }),
+      effect: mode === 'end' ? cur.endEffect : mode === 'decline' ? 'Arm gets your reason in a Chat message. The request moves to Recent as Declined.' : cancelMode ? (cur.pending ? 'Withdraws the request — nothing is scheduled.' : 'It hasn’t started, so cancelling removes it. The owner and backup get a Chat message.') : 'Change when it ends. Everyone sees the new end time.',
+      reasonLabel: mode === 'end' ? 'Reason for ending early' : mode === 'decline' ? 'Reason' : 'Reason for the change',
+      reasonPh: mode === 'decline' ? 'e.g. Split it into two nights' : 'e.g. Upgrade finished early',
+      reasonCta: mode === 'end' ? (cur.mute ? 'End mute now' : 'End maintenance now') : mode === 'decline' ? 'Decline request' : cancelMode ? (cur.pending ? 'Withdraw request' : 'Cancel ' + noun) : 'Save end time'
+    });
+    var rOk = !!(st.reason || '').trim();
+    return {
+      yes: true, no: false,
+      views: ['Admin', 'Responder', 'Viewer', 'Empty'], view: st.view,
+      setView: function (v) { self.setState({ view: v, ov: {}, open: '' }); },
+      me: ME,
+      meta: mp.length ? mp.join(' · ') : 'Nothing active, scheduled or waiting',
+      canSchedule: ROLE !== 'ro',
+      empty: !G.active.length && !G.wait.length && !G.sched.length,
+      groups: groups,
+      sheetOpen: !!st.open,
+      close: function () { self.setState({ open: '', mode: 'view' }); },
+      s: s,
+      modeView: mode === 'view', modeApprove: mode === 'approve', modeReason: mode === 'end' || mode === 'decline' || mode === 'edit', modeEdit: mode === 'edit',
+      apEffects: L(['Starts Sat 26 Sep 22:00, ends ' + baEnd + ' (' + baLen + '). Tier 1.', 'No alerts for this site during the window; checks still run.', 'Not counted in uptime; the client status page shows “Planned maintenance”.', 'If the site is DOWN or has an open incident at the start, it doesn’t start — Arm and Tao are told.', 'Arm gets a Chat message. Logged as Tao.']),
+      apCta: 'Approve ' + baLen,
+      goApprove: function () { self.setState({ mode: 'approve' }); },
+      goDecline: function () { self.setState({ mode: 'decline', reason: '' }); },
+      goEnd: function () { self.setState({ mode: 'end', reason: '' }); },
+      goEdit: function () { self.setState({ mode: 'edit', reason: '', editKind: 'Change end', editEnd: curEnd }); },
+      back: function () { self.setState({ mode: 'view' }); },
+      doApprove: function () { self.setState({ ov: push({ approved: true }, 'Approved 10:07 by Tao · Arm told in Chat'), open: '', mode: 'view' }); },
+      showKinds: !cur.running,
+      editKinds: ['Change end', cancelWord + ' it'], editKind: st.editKind,
+      setEditKind: function (v) { self.setState({ editKind: v }); },
+      editEndMode: !cancelMode,
+      editEnd: st.editEnd || curEnd,
+      setEditEnd: function (e) { self.setState({ editEnd: e && e.target ? e.target.value : e }); },
+      reason: st.reason,
+      setReason: function (e) { self.setState({ reason: e && e.target ? e.target.value : e }); },
+      reasonBlocked: !rOk || (mode === 'edit' && !cancelMode && (st.editEnd || curEnd) === curEnd),
+      doReason: function () {
+        var r = (self.state.reason || '').trim(); if (!r) return;
+        var v, line;
+        if (mode === 'end') { v = { st: 'ended' }; line = 'Ended early 10:07 by ' + ME + ' · “' + r + '”'; }
+        else if (mode === 'decline') { v = { st: 'declined' }; line = 'Declined 10:07 by Tao · “' + r + '” · Arm told in Chat'; }
+        else if (cancelMode) { v = { st: cur.pending ? 'withdrawn' : 'cancelled' }; line = (cur.pending ? 'Withdrawn' : 'Cancelled') + ' 10:07 by ' + ME + ' · “' + r + '”'; }
+        else { v = { end: self.state.editEnd }; line = 'End ' + curEnd + ' → ' + self.state.editEnd + ' · 10:07 by ' + ME + ' · “' + r + '”'; }
+        self.setState({ ov: push(v, line), open: '', mode: 'view' });
+      },
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

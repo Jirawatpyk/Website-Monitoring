@@ -42,7 +42,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
 <div style="display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
-<a href="Main.dc.html" style="text-decoration: none">Sites</a>
+<a href="Sites.dc.html" style="text-decoration: none">Sites</a>
 <x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
 <span>{{site}}</span>
 </div>
@@ -91,6 +91,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <div style="display: flex; flex-direction: column; gap: 20px; padding-top: 4px">
 <x-import component-from-global-scope="Aura.Select" label="Site" options="{{sites}}" value="{{site}}" on-change="{{setSite}}" required="{{yes}}"></x-import>
 <x-import component-from-global-scope="Aura.RadioGroup" label="Type" options="{{types}}" value="{{kind}}" on-change="{{setKind}}"></x-import>
+<sc-if value="{{isMaint}}" hint-placeholder-val="{{true}}">
 <div style="display: flex; flex-direction: column; gap: 8px">
 <span style="font-size: 13px; font-weight: 500">Start</span>
 <div style="display: flex; align-items: center; gap: 16px">
@@ -98,6 +99,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <span style="font-size: 13px; color: var(--aura-fg-secondary)">{{startText}}</span>
 </div>
 </div>
+</sc-if>
 <sc-if value="{{later}}" hint-placeholder-val="{{true}}">
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
 <x-import component-from-global-scope="Aura.Select" label="Start date" options="{{days}}" default-value="sat"></x-import>
@@ -127,6 +129,9 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </div>
 </div>
 </sc-if>
+<sc-if value="{{longResp}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Needs an Admin’s approval">Windows over 24 h asked for by a Responder wait for an Admin. Tao gets a request now. It starts only if approved before Sat 26 Sep 22:00 — otherwise it doesn’t start. Follow it under Waiting for approval on Maintenance &amp; mutes.</x-import>
+</sc-if>
 <sc-if value="{{longAdmin}}" hint-placeholder-val="{{false}}">
 <x-import component-from-global-scope="Aura.Alert" tone="info" title="You’re an Admin — no approval needed">Windows over 24 h normally need an Admin’s approval. Yours starts as scheduled and shows in every daily digest until it ends.</x-import>
 </sc-if>
@@ -148,12 +153,13 @@ class Component extends DCLogic {
   constructor(props) {
     super(props);
     var h = (typeof location !== 'undefined' && location.hash) || '';
-    this.state = { kind: h.indexOf('mute') >= 0 ? 'mute' : 'maint', dur: '4 h', start: h.indexOf('mute') >= 0 ? 'Now' : 'Later', site: 'Bangkok Airways – Taiwan', open: true, done: null, reason: '' };
+    this.state = { kind: h.indexOf('mute') >= 0 ? 'mute' : 'maint', dur: '4 h', start: h.indexOf('mute') >= 0 ? 'Now' : 'Later', site: h.indexOf('new') >= 0 ? '' : 'Bangkok Airways – Taiwan', role: 'admin', open: true, done: null, reason: '' };
   }
   renderVals() {
     var self = this;
     var isMaint = this.state.kind === 'maint';
-    var later = this.state.start === 'Later';
+    var later = isMaint && this.state.start === 'Later';
+    var RESP = this.state.role === 'resp', WHO = RESP ? 'Arm' : 'Tao';
     var maintDur = ['1 h', '4 h', '8 h', '24 h', '3 days'];
     var muteDur = ['1 h', '4 h', '8 h', '24 h'];
     var dur = this.state.dur;
@@ -165,13 +171,15 @@ class Component extends DCLogic {
       ['Fuji Links', 2, 'Ploy'], ['WeCare Studio', 2, 'Nok'], ['Tubtong', 2, 'Ploy'], ['Cando Asia', 2, 'Nok'], ['ORCA Thailand', 2, 'Tao'], ['WeCare Asia', 2, 'Nok'],
       ['VOCA', 2, 'Ploy'], ['EQHO', 2, 'Tao'], ['DxT', 2, 'Tao'], ['DxT Solutions', 3, 'Tao'], ['DxT AI', 3, 'Tao'], ['DxT Games', 3, 'Tao']
     ];
+    if (RESP) SITES = SITES.filter(function (x) { return ['Bangkok Airways – Taiwan', 'Bangkok Airways – China', 'MuvMi', 'ENEOS Industrial', 'realme.link'].indexOf(x[0]) >= 0; });
     var site = this.state.site;
-    var cur = SITES.filter(function (x) { return x[0] === site; })[0] || SITES[0];
+    var picked = SITES.filter(function (x) { return x[0] === site; })[0] || null;
+    var cur = picked || SITES[0];
     // Sites that are DOWN or have an open incident right now (Fri 25 Sep 10:07)
     var OPEN = { 'MuvMi': ['is DOWN now', 'INC-0142'], 'Fuji Links': ['has an open PROBLEM', 'INC-0141'] };
     var guard = OPEN[cur[0]];
     var blocked = isMaint && !later && !!guard;
-    var P = { 'Default': { kind: 'maint', dur: '4 h', start: 'Later', site: 'Bangkok Airways – Taiwan' }, 'Guard · MuvMi down': { kind: 'maint', dur: '4 h', start: 'Now', site: 'MuvMi' }, 'Mute · open incident': { kind: 'mute', dur: '4 h', start: 'Now', site: 'MuvMi' }, 'Admin · 3 days': { kind: 'maint', dur: '3 days', start: 'Later', site: 'Bangkok Airways – Taiwan' } };
+    var P = { 'New · site empty': { kind: 'maint', dur: '4 h', start: 'Later', site: '', role: 'admin' }, 'Default': { kind: 'maint', dur: '4 h', start: 'Later', site: 'Bangkok Airways – Taiwan', role: 'admin' }, 'Guard · MuvMi down': { kind: 'maint', dur: '4 h', start: 'Now', site: 'MuvMi', role: 'admin' }, 'Mute · open incident': { kind: 'mute', dur: '4 h', start: 'Now', site: 'MuvMi', role: 'admin' }, 'Admin · 3 days': { kind: 'maint', dur: '3 days', start: 'Later', site: 'Bangkok Airways – Taiwan', role: 'admin' }, 'Responder · 3 days': { kind: 'maint', dur: '3 days', start: 'Later', site: 'Bangkok Airways – China', role: 'resp' } };
     var noReason = !(this.state.reason || '').trim();
     var muteOnInc = !isMaint && !!guard;
     var PEOPLE = { 'Bangkok Airways – Taiwan': ['Bangkok Airways · Bua', 'Arm · Ploy'], 'Bangkok Airways – China': ['Bangkok Airways · Bua', 'Arm · Ploy'], 'ENEOS Industrial': ['ENEOS · Thee', 'Ploy · Arm'], 'MuvMi': ['MuvMi · Bua', 'Arm · Ploy'], 'realme.link': ['realme · Thee', 'Nok · Arm'], 'Fuji Links': ['Fuji Links · Thee', 'Ploy · Nok'], 'WeCare Studio': ['WeCare · Bua', 'Nok · Ploy'], 'Tubtong': ['Tubtong · Bua', 'Ploy · Nok'], 'Cando Asia': ['Cando Asia · Bua', 'Nok · Ploy'], 'ORCA Thailand': ['ORCA · Thee', 'Tao · Nok'], 'WeCare Asia': ['WeCare · Bua', 'Nok · Ploy'], 'VOCA': ['Internal', 'Ploy · Tao'] };
@@ -179,9 +187,10 @@ class Component extends DCLogic {
     var BADGE = { 'MuvMi': ['Down', 'danger', 'solid', 'ban', 'Down since 09:48 · 19 min'], 'Fuji Links': ['Problem', 'warning', 'soft', 'triangle-alert', 'Problem since 09:52 · Slow'] };
     var bb = BADGE[cur[0]] || ['OK', 'success', 'soft', 'circle-check', cur[0] === 'Bangkok Airways – Taiwan' ? 'OK since Mon 14 Sep 21:18 · 10 d 13 h' : 'OK · last checked Today 10:07'];
     var INC = { 'MuvMi': 'INC-0142 · Escalated · L1, 18 min unacked', 'Fuji Links': 'INC-0141 · Acknowledged by Ploy 09:58' };
-    var preset = Object.keys(P).filter(function (k) { var p = P[k]; return p.kind === self.state.kind && p.dur === self.state.dur && p.start === self.state.start && p.site === self.state.site; })[0] || '';
+    var preset = Object.keys(P).filter(function (k) { var p = P[k]; return p.kind === self.state.kind && p.dur === self.state.dur && p.start === self.state.start && p.site === self.state.site && p.role === self.state.role; })[0] || '';
     var endText = (later ? ENDS_LATER : ENDS_NOW)[dur];
-    var submitLabel = isMaint ? (later ? 'Schedule' : 'Start now') : 'Mute for ' + dur;
+    var needsOk = RESP && isMaint && dur === '3 days';
+    var submitLabel = needsOk ? 'Ask for approval' : (isMaint ? (later ? 'Schedule' : 'Start now') : 'Mute for ' + dur);
     return {
       bd: { label: bb[0], tone: bb[1], variant: bb[2], icon: bb[3], since: bb[4], tier: 'Tier ' + cur[1], every: cur[1] === 1 ? 'Every 1 min' : (cur[1] === 2 ? 'Every 3 min' : 'Every 5 min'), hours: cur[1] === 1 ? '24/7 response' : 'Mon–Fri 09:00–18:00', client: ppl[0], people: ppl[1], inc: INC[cur[0]] || 'None', mw: this.state.mw || 'None scheduled' },
       openMute: function () { self.setState({ open: true, done: null, kind: 'mute', start: 'Now' }); },
@@ -189,7 +198,7 @@ class Component extends DCLogic {
       reason: this.state.reason,
       setReason: function (e) { self.setState({ reason: e && e.target ? e.target.value : e }); },
       reasonNote: noReason ? 'Required — type a reason to enable “' + submitLabel + '”. Shown on the dashboard, in the digest and in the audit log.' : 'Shown on the dashboard, in the digest and in the audit log.',
-      cantSubmit: blocked || noReason,
+      cantSubmit: blocked || noReason || !picked,
       muteOnInc: muteOnInc,
       muteRuleTitle: guard ? 'Mute stops new alerts only — ' + guard[1] + (cur[0] === 'MuvMi' ? ' keeps escalating until someone acknowledges.' : ' stays open until it is resolved.') : '',
       muteRuleText: cur[0] === 'MuvMi' ? 'Its escalation ladder (CEO at 10:18), the L3 FYI and the client-update track all continue. Muting is not an acknowledgement.' : 'Already acknowledged by Ploy 09:58. Muting is not an acknowledgement and doesn’t resolve it.',
@@ -206,14 +215,16 @@ class Component extends DCLogic {
       blockTitle: guard ? cur[0] + ' ' + guard[0] + ' (' + guard[1] + ').' : '',
       blockText: 'A window started now won’t hide this incident — it stays open and keeps counting. Mute the alerts instead, or schedule the window for later.',
       muteInstead: function () { self.setState({ kind: 'mute', dur: '4 h', start: 'Now' }); },
-      longAdmin: isMaint && dur === '3 days',
+      longAdmin: !RESP && isMaint && dur === '3 days',
+      longResp: needsOk,
       hasDone: !!this.state.done,
       doneTitle: this.state.done ? this.state.done[0] : '',
       doneText: this.state.done ? this.state.done[1] : '',
       submitFn: function () {
-        if (blocked || noReason) return;
-        var why = ' Reason: “' + self.state.reason.trim() + '”. End early, edit or cancel it from Overview › Maintenance & mutes.';
-        var d = isMaint ? [(later ? 'Maintenance scheduled' : 'Maintenance started') + ' · ' + cur[0], (later ? 'Sat 26 Sep 22:00 → ' : 'Fri 25 Sep 10:07 → ') + endText.replace('Ends ', '') + ' · alerts suppressed, not counted in uptime · recorded in the audit log as Tao.' + why] : ['Muted · ' + cur[0], (later ? 'From Sat 26 Sep 22:00 · ' : 'Now · ') + endText + ' · new alerts suppressed, still counted in uptime · recorded in the audit log as Tao.' + (guard ? ' ' + guard[1] + (cur[0] === 'MuvMi' ? ' is still escalating — acknowledge it to stop L1–L2.' : ' stays open.') : '') + why];
+        if (blocked || noReason || !picked) return;
+        var why = ' Reason: “' + self.state.reason.trim() + '”. End early, edit or cancel it on Maintenance & mutes (sidebar › Maintenance).';
+        if (needsOk) { self.setState({ open: false, done: ['Request sent to Tao · ' + cur[0], 'Sat 26 Sep 22:00 → Tue 29 Sep 22:00 (3 days) · waiting for an Admin — it doesn’t start unless approved before Sat 26 Sep 22:00. Recorded in the audit log as Arm. Reason: “' + self.state.reason.trim() + '”. Follow it under Waiting for approval on Maintenance & mutes.'], mw: 'Waiting for approval · Sat 26 Sep 22:00 → Tue 29 Sep 22:00' }); return; }
+        var d = isMaint ? [(later ? 'Maintenance scheduled' : 'Maintenance started') + ' · ' + cur[0], (later ? 'Sat 26 Sep 22:00 → ' : 'Fri 25 Sep 10:07 → ') + endText.replace('Ends ', '') + ' · alerts suppressed, not counted in uptime · recorded in the audit log as ' + WHO + '.' + why] : ['Muted · ' + cur[0], (later ? 'From Sat 26 Sep 22:00 · ' : 'Now · ') + endText + ' · new alerts suppressed, still counted in uptime · recorded in the audit log as Tao.' + (guard ? ' ' + guard[1] + (cur[0] === 'MuvMi' ? ' is still escalating — acknowledge it to stop L1–L2.' : ' stays open.') : '') + why];
         var mutedUntil = (!isMaint && !later) ? 'Muted · until ' + endText.replace('Ends Fri 25 Sep ', '').replace('Ends ', '') : null;
         self.setState({ open: false, done: d, mutedHdr: mutedUntil, mw: isMaint ? 'Maintenance · ' + (later ? 'Sat 26 Sep 22:00 → ' : 'now → ') + endText.replace('Ends ', '') : 'Muted · until ' + endText.replace('Ends Fri 25 Sep ', '').replace('Ends ', '') });
       },
@@ -222,10 +233,10 @@ class Component extends DCLogic {
       step: 15,
       noop: function () {},
       kind: this.state.kind,
-      sites: SITES.map(function (x) { return { value: x[0], label: x[0] + ' · Tier ' + x[1] }; }),
-      site: cur[0],
+      sites: [{ value: '', label: 'Choose a site' }].concat(SITES.map(function (x) { return { value: x[0], label: x[0] + ' · Tier ' + x[1] }; })),
+      site: picked ? picked[0] : '',
       setSite: function (v) { self.setState({ site: v && v.target ? v.target.value : v, mutedHdr: null }); },
-      desc: cur[0] + ' · Tier ' + cur[1] + ' · owner ' + cur[2],
+      desc: picked ? cur[0] + ' · Tier ' + cur[1] + ' · owner ' + cur[2] + (RESP ? ' · you’re a Responder' : '') : 'Choose a site first — the list shows the sites you can act on',
       days: [{ value: 'fri', label: 'Fri 25 Sep (today)' }, { value: 'sat', label: 'Sat 26 Sep' }, { value: 'sun', label: 'Sun 27 Sep' }, { value: 'mon', label: 'Mon 28 Sep' }, { value: 'tue', label: 'Tue 29 Sep' }],
       starts: ['Now', 'Later'],
       start: this.state.start,
@@ -252,14 +263,14 @@ class Component extends DCLogic {
       submitIcon: isMaint ? 'calendar' : 'eye-off',
       nav: [
         { items: [
-          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
           { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
-          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
           { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
         ] },
         { title: 'Operations', items: [
           { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
-          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
           { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
         ] },
         { title: 'Reports', items: [

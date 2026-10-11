@@ -230,8 +230,8 @@ update public.sites set primary_owner_id = (select id from ids where name = 'arm
   backup_owner_id = (select id from ids where name = 'nok')
   where id = (select id from made where name = 'internal');  -- a script: not limited
 select tests.authenticate_as((select id from ids where name = 'arm'));
-select lives_ok($$ update public.sites set muted_until = now() + interval '1 hour', mute_reason = 'Deploy'
-                   where id = (select id from made where name = 'internal') $$,
+select lives_ok($$ select public.mute_site((select id from made where name = 'internal'),
+                     now() + interval '1 hour', 'Deploy') $$,
   'an owner can still mute a live site whose backup has no Chat id');
 reset role;
 
