@@ -120,6 +120,22 @@ In the SQL editor, read the editor's text back before every `ctrl+Return` — `w
 
 Response hours (Tier 2–3 timers paused, PROBLEM held until 09:00) can't be driven on staging, because the clock can't move. The engine tests (`escalation.test.ts`, `response-hours.test.ts`) and pgTAP (`escalation.test.sql`) cover them.
 
+Maintenance and mute (S09, D-036, spec §23), as Tao on https://monitor-staging.dxtspace.com — start clean (`reset-test-incident.sql`, target `ok`):
+
+| Do                                                                   | Expect                                                                                                                                                                                |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Test target `error` → DOWN; Site detail → Schedule maintenance → Now | the guard "Test target is DOWN now (INC-…)…", Start now disabled; Mute instead → the mute sheet with "Mute stops new alerts only — INC-… keeps escalating until someone acknowledges" |
+| Mute for 1 h with a reason                                           | Muted overlay on Sites / Site detail / Overview; Overview card "Test target — muted"; the incident keeps its ladder (L1 at +15, T09)                                                  |
+| Back to `ok`, acknowledge / resolve; Mute again; then `error`        | DOWN opens with **no** Chat post (muted); End now on /maintenance → the DOWN card posts at once and L1 counts from then (`incidents.alerted_at`)                                      |
+| /maintenance → Schedule maintenance or mute → Test target, Now, 1 h  | site status Maintenance; `error` → no incident; End now (or wait for the end) while still `error` → an incident opens, starting at the window's end                                   |
+| Schedule a window 15 min ahead, then drive `error` before it starts  | at its start: Recent "Didn't start — site was DOWN (INC-…)"                                                                                                                           |
+| /maintenance at 1440 / 820 / 390                                     | table from lg, row cards + sheet below lg; Admin Approve / Decline on a request (a Responder's request can't be made on one-person staging — the e2e `maintenance.spec.ts` covers it) |
+
+```sql
+select json_agg(w) from (select kind, starts_at, ends_at, approved_at, ended_at, cancelled_at, outcome, outcome_detail, log
+  from maintenance_windows mw join sites s on s.id = mw.site_id where s.name = 'Test target' order by mw.created_at desc limit 5) w;
+```
+
 - **Browser pane under width emulation** (`resize_window` 1440 / 820 / 390): clicks by coordinate can miss and screenshots can be stale or half-size (S06b `/verify`: "Acknowledge did nothing"). Check the control is on top with `document.elementFromPoint`, act with a DOM `.click()`, and read layout with `getBoundingClientRect`; screenshots at those widths come from Playwright locally (e2e helpers) or from the pane without emulation. A hidden (not fronted) tab pauses `requestAnimationFrame` and CSS transitions — front it before timing anything.
 
 ## 4. Reset between runs
