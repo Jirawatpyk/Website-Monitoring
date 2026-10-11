@@ -23,7 +23,7 @@ import {
   IconPlus,
 } from '@jirawatpyk/aura-react/icons';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLiveRefresh } from '@/components/use-live-refresh';
 import { useNow } from '@/components/use-now';
 import { SiteStatusBadge } from '@/components/status-badges';
@@ -228,8 +228,24 @@ export function MaintenancePageView({
           : { ...o, shown: false }
         : o,
     );
-  /** After an action went through: everything closes (the page refreshes). */
-  const done = () => setOpen((o) => (o ? { ...o, shown: false } : o));
+  /**
+   * After an action went through: everything closes and the page refreshes. The row moves (Recent, or
+   * Scheduled once approved) and its button with it, so focus goes to that section's heading once the
+   * new rows arrive, not to the page body (spec-check).
+   */
+  const landing = useRef<{ key: Section['key']; before: WindowRow[] } | null>(null);
+  const done = () => {
+    const key = open?.kind === 'approve' ? 'scheduled' : open?.kind === 'edit' ? null : 'recent';
+    landing.current = key ? { key, before: rows } : null;
+    setOpen((o) => (o ? { ...o, shown: false } : o));
+  };
+  useEffect(() => {
+    // Only once the refreshed rows are in (the closing dialog has handed focus back by then).
+    const l = landing.current;
+    if (!l || rows === l.before) return;
+    landing.current = null;
+    document.getElementById(`mt-${l.key}`)?.focus();
+  }, [rows]);
   const shown = (k: Kind) => !!open?.shown && open.kind === k;
   const openSchedule = () => setSchedule((s) => ({ open: true, n: s.n + 1 }));
 
@@ -352,6 +368,7 @@ function SectionView({ s, open }: { s: Section; open: Show }) {
       <div className="flex flex-wrap items-baseline gap-3">
         <h2
           id={`mt-${s.key}`}
+          tabIndex={-1}
           className="m-0 text-xl font-semibold max-md:font-mono max-md:text-xs max-md:font-normal max-md:uppercase max-md:text-fg-tertiary"
         >
           {s.title}

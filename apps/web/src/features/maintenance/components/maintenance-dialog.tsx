@@ -125,7 +125,7 @@ export function MaintenanceDialog({
   const rule = incident ? muteRule(incident) : null;
   // Already muted: alerts are held already, so the guard offers no second mute (verify).
   const mutedUntil =
-    current.mutedUntil && new Date(current.mutedUntil) > now ? new Date(current.mutedUntil) : null;
+    picked && current.mutedUntil && new Date(current.mutedUntil) > now ? new Date(current.mutedUntil) : null;
   const timeProblem = plan.problems.find((p) => p === 'starts_in_past' || p === 'ends_before_start');
 
   const switchKind = (v: string) => {
@@ -376,7 +376,11 @@ export function MaintenanceDialog({
             placeholder={reasonPlaceholder(kind, !!incident)}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            hint={reasonHint(reason, plan.submit)}
+            hint={
+              picked
+                ? reasonHint(reason, plan.submit)
+                : `Choose a site and type a reason to enable “${plan.submit}”.`
+            }
           />
           {error && (
             <Alert tone="danger" role="alert">

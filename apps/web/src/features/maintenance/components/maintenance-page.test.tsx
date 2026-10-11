@@ -108,6 +108,29 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
     );
   });
 
+  it('after End now the row moves to Recent and focus lands on that heading (spec-check)', async () => {
+    const user = userEvent.setup();
+    const props = {
+      sites: [],
+      viewer: { id: 'u-tao', name: 'Tao', role: 'admin' as const },
+      viewerEmail: 'x@example.test',
+      nowIso: NOW,
+    };
+    const { rerender } = render(<MaintenancePageView rows={[base, request]} {...props} />);
+    await user.click(
+      within(screen.getByRole('region', { name: 'Active now' })).getAllByRole('button', {
+        name: 'End now',
+      })[0]!,
+    );
+    const end = await screen.findByRole('dialog', { name: /End .* now\?/ });
+    await user.type(within(end).getByLabelText(/Reason/), 'Done early');
+    await user.click(within(end).getByRole('button', { name: /^End .* now$/ }));
+    await waitFor(() => expect(actions.endWindowEarly).toHaveBeenCalled());
+    // the refresh brings the row back as ended early
+    rerender(<MaintenancePageView rows={[{ ...base, endedAt: NOW }, request]} {...props} />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Recent/ })).toHaveFocus());
+  });
+
   it('Decline and End now need a reason', async () => {
     const user = userEvent.setup();
     view('admin');

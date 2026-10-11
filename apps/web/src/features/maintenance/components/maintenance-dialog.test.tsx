@@ -119,10 +119,13 @@ describe('MaintenanceDialog (boards Maintenance, MMaintenance)', () => {
 
   it('opened with no site picked, no other site’s incident shows (spec-check)', async () => {
     const user = userEvent.setup();
-    dialog({ siteId: '', sites: [muvmi, taiwan] });
+    const until = new Date(Date.now() + 3_600_000).toISOString();
+    dialog({ siteId: '', sites: [{ ...muvmi, mutedUntil: until }, taiwan] });
     const box = screen.getByRole('dialog', { name: 'Schedule maintenance' });
     await user.click(within(box).getByRole('radio', { name: 'Now' }));
     expect(within(box).queryByText(/MuvMi is DOWN now/)).not.toBeInTheDocument();
+    expect(within(box).queryByText('Starting this window ends the mute.')).not.toBeInTheDocument();
+    expect(within(box).getByText(/^Choose a site and type a reason/)).toBeInTheDocument();
   });
 
   it('a mute on a site in maintenance is refused before the round trip (§23.10)', async () => {
