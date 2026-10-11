@@ -57,6 +57,7 @@ alter table public.maintenance_windows enable row level security;
 create policy maintenance_windows_select_staff on public.maintenance_windows
   for select to authenticated using ((select public.is_staff()));
 -- No insert / update / delete policies: writes go through the RPCs (security definer).
+revoke all on public.maintenance_windows from public, anon, authenticated;
 grant select on public.maintenance_windows to authenticated;
 grant select, insert, update on public.maintenance_windows to service_role;
 
@@ -97,6 +98,25 @@ begin
 end;
 $$;
 
+-- …and a new site can't arrive muted (a window row and its audit row would be missing).
+create function private.sites_guard_insert_mute()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user = 'authenticated'
+     and (new.muted_until is not null or new.mute_reason is not null or new.muted_at is not null) then
+    raise exception 'Mute and unmute from the Mute dialog'
+      using errcode = '42501', hint = 'mute_via_dialog';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger sites_guard_insert_mute before insert on public.sites
+  for each row execute function private.sites_guard_insert_mute();
+
 -- A mute-only change on a live site needs no readiness check (now with muted_at).
 create or replace function private.sites_check_ready()
 returns trigger
@@ -118,8 +138,10 @@ begin
 end;
 $$;
 
--- One audit row per changed row (S05) — except a site change that touches only the mute fields:
--- the mute RPC writes its own `site.mute` / `site.unmute` row with the reason, so it logs once.
+-- One audit row per changed row (S05) — except a mute-only site change made by the window RPCs or the
+-- engine's expiry (they set `dxt.window_write` for their transaction and write their own row with
+-- the reason, so it logs once). A script that writes the mute fields still gets its `site.update`.
+-- People can't set the flag: `set_config` isn't reachable through the API.
 create or replace function private.audit_row_change()
 returns trigger
 language plpgsql
@@ -141,7 +163,7 @@ begin
     if (v_before - 'updated_at') = (v_after - 'updated_at') then
       return null;
     end if;
-    if v_entity = 'site'
+    if v_entity = 'site' and current_setting('dxt.window_write', true) = 'on'
        and (v_before - 'muted_until' - 'mute_reason' - 'muted_at' - 'updated_at')
            = (v_after - 'muted_until' - 'mute_reason' - 'muted_at' - 'updated_at') then
       return null;
@@ -227,6 +249,27 @@ as $$
     (select 'down' from public.site_status st where st.site_id = p_site_id and st.status = 'down'));
 $$;
 
+-- How long maintenance runs back to back on a site if [p_start, p_end) is added (or an existing window
+-- is changed to it): its own length plus every live window that overlaps or sits within an hour of it,
+-- so chaining 24 h windows end to end still needs an Admin (security review M1).
+create function private.chained_minutes(p_site_id uuid, p_start timestamptz, p_end timestamptz, p_except uuid)
+returns numeric
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select extract(epoch from (greatest(p_end, max(coalesce(w.ended_at, w.ends_at)))
+                             - least(p_start, min(w.starts_at)))) / 60
+  from (select p_start as starts_at, p_end as ends_at, null::timestamptz as ended_at
+        union all
+        select w.starts_at, w.ends_at, w.ended_at from public.maintenance_windows w
+        where w.site_id = p_site_id and w.kind = 'maintenance' and w.cancelled_at is null
+          and w.id is distinct from p_except
+          and tstzrange(w.starts_at, coalesce(w.ended_at, w.ends_at))
+              && tstzrange(p_start - interval '1 hour', p_end + interval '1 hour')) w;
+$$;
+
 -- ── RPCs (signed-in people) ──────────────────────────────────────────────
 -- Schedule a maintenance window, or start one now. Refusals: 42501 (role), 22023 + hint.
 create function public.create_maintenance(
@@ -247,6 +290,7 @@ declare
   v_admin boolean := coalesce(public.current_app_role() = 'admin', false);
   v_busy text;
   v_id uuid;
+  v_auto boolean;
 begin
   if not exists (select 1 from public.sites where id = p_site_id) then
     raise exception 'site not found' using errcode = 'P0002';
@@ -276,13 +320,13 @@ begin
     end if;
   end if;
 
+  -- Over 24 h (back to back with its neighbours) waits for an Admin; an Admin approves their own (§14.5).
+  v_auto := v_admin or private.chained_minutes(p_site_id, v_start, p_ends_at, null) <= 24 * 60;
   begin
     insert into public.maintenance_windows
       (site_id, kind, starts_at, ends_at, reason, created_by, approved_by, approved_at)
     values (p_site_id, 'maintenance', v_start, p_ends_at, v_reason, auth.uid(),
-            -- Over 24 h waits for an Admin; an Admin approves their own (§14.5).
-            case when v_admin or p_ends_at - v_start <= interval '24 hours' then auth.uid() end,
-            case when v_admin or p_ends_at - v_start <= interval '24 hours' then v_now end)
+            case when v_auto then auth.uid() end, case when v_auto then v_now end)
     returning id into v_id;
   exception when exclusion_violation then
     raise exception 'Another maintenance window on this site overlaps that time'
@@ -340,6 +384,7 @@ begin
           auth.uid(), auth.uid(), v_now, true)
   returning id into v_id;
 
+  perform set_config('dxt.window_write', 'on', true);
   update public.sites
     set muted_until = least(p_ends_at, v_now + interval '24 hours'), mute_reason = v_reason, muted_at = v_now
     where id = p_site_id;
@@ -360,6 +405,7 @@ language sql
 security definer
 set search_path = ''
 as $$
+  select set_config('dxt.window_write', 'on', true);
   update public.sites set muted_until = null, mute_reason = null, muted_at = null
   where id = p_site_id and muted_until is not null;
 $$;
@@ -417,6 +463,7 @@ declare
   v_state text;
   v_admin boolean := coalesce(public.current_app_role() = 'admin', false);
   v_long boolean;
+  v_approved boolean;
   w public.maintenance_windows%rowtype;
 begin
   select * into w from public.maintenance_windows where id = p_window_id for update;
@@ -445,7 +492,8 @@ begin
   if w.kind = 'maintenance' and p_ends_at - w.starts_at > interval '31 days' then
     raise exception 'A window lasts at most 31 days' using errcode = '22023', hint = 'too_long';
   end if;
-  v_long := w.kind = 'maintenance' and p_ends_at - w.starts_at > interval '24 hours';
+  v_long := w.kind = 'maintenance'
+            and private.chained_minutes(w.site_id, w.starts_at, p_ends_at, w.id) > 24 * 60;
   -- Making a window longer than 24 h needs an Admin: before it starts it waits again; a running one
   -- can't be stretched past 24 h by a Responder.
   if v_long and not v_admin and v_state = 'active' then
@@ -463,12 +511,14 @@ begin
           approved_at = case when v_long and not v_admin then null
                              when approved_at is null and (v_admin or not v_long) then v_now
                              else approved_at end
-      where id = p_window_id;
+      where id = p_window_id
+      returning approved_at is not null into v_approved;
   exception when exclusion_violation then
     raise exception 'Another window on this site overlaps that time'
       using errcode = '22023', hint = 'overlap';
   end;
   if w.kind = 'mute' and v_state = 'active' then
+    perform set_config('dxt.window_write', 'on', true);
     update public.sites set muted_until = p_ends_at where id = w.site_id;
   end if;
 
@@ -476,8 +526,9 @@ begin
   values (auth.uid(), case w.kind when 'mute' then 'site.mute.edit' else 'maintenance.edit' end,
           case w.kind when 'mute' then 'site' else 'maintenance_window' end,
           case w.kind when 'mute' then w.site_id else w.id end,
-          jsonb_build_object('ends_at', w.ends_at),
-          jsonb_build_object('ends_at', p_ends_at, 'reason', v_reason, 'window_id', w.id));
+          jsonb_build_object('ends_at', w.ends_at, 'approved', w.approved_at is not null),
+          jsonb_build_object('ends_at', p_ends_at, 'approved', v_approved, 'reason', v_reason,
+                             'window_id', w.id));
 end;
 $$;
 
@@ -576,7 +627,8 @@ revoke execute on function public.window_state(public.maintenance_windows, times
 grant execute on function public.window_state(public.maintenance_windows, timestamptz)
   to authenticated, service_role;
 revoke execute on function private.can_pause(uuid), private.require_reason(text),
-  private.site_busy(uuid), private.clear_site_mute(uuid) from public, anon, authenticated;
+  private.site_busy(uuid), private.clear_site_mute(uuid),
+  private.chained_minutes(uuid, timestamptz, timestamptz, uuid) from public, anon, authenticated;
 
 -- ── Engine (service role) ────────────────────────────────────────────────
 -- Logs each window's start and end once (System rows, AuditLog board) and clears the site row of a
@@ -613,6 +665,7 @@ begin
   from ended e;
 
   -- A mute that ran out leaves the site row (readers already compare with now()).
+  perform set_config('dxt.window_write', 'on', true);
   update public.sites s set muted_until = null, mute_reason = null, muted_at = null
   where s.muted_until is not null and s.muted_until <= p_now;
 end;

@@ -3,7 +3,7 @@
 -- engine's window log, T09 (a mute never stops an open incident's ladder) and the late alert after a mute.
 begin;
 \ir _helpers.psql
-select plan(53);
+select plan(56);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -162,6 +162,24 @@ update public.maintenance_windows set approved_at = null, approved_by = null
 select is(public.window_state(w, now() + interval '3 days'), 'not_approved',
   'a window nobody approved before its start doesn''t start')
   from public.maintenance_windows w where w.id = (select id from win where name = 'long');
+
+-- Chaining 24 h windows end to end still needs an Admin (security review M1).
+select tests.authenticate_as((select id from ids where name = 'arm'));
+insert into win values ('chain1', public.create_maintenance('00000000-0000-0000-0000-0000000000d1',
+  now() + interval '10 days', now() + interval '11 days', 'Part 1'));
+insert into win values ('chain2', public.create_maintenance('00000000-0000-0000-0000-0000000000d1',
+  now() + interval '11 days', now() + interval '12 days', 'Part 2'));
+reset role;
+select is(public.window_state(w), 'scheduled', 'the first 24 h window is approved on its own')
+  from public.maintenance_windows w where w.id = (select id from win where name = 'chain1');
+select is(public.window_state(w), 'waiting', 'a second one back to back waits for an Admin')
+  from public.maintenance_windows w where w.id = (select id from win where name = 'chain2');
+
+-- A new site can't arrive muted.
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok($$ insert into public.sites (name, tier, muted_until) values ('Muted at birth', 3, now() + interval '9 days') $$,
+  '42501', null, 'a site can''t be created muted');
+reset role;
 
 -- ── Cancel ───────────────────────────────────────────────────────────────
 select tests.authenticate_as((select id from ids where name = 'nok'));
