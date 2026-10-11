@@ -139,6 +139,8 @@ export async function maintenanceSpansBySite(
     .select('site_id, starts_at, ends_at, approved_at, ended_at, cancelled_at')
     .eq('kind', 'maintenance')
     .not('approved_at', 'is', null)
+    // As the engine reads them (windows.ts): a window counts once its start was checked.
+    .eq('start_logged', true)
     .gte('ends_at', from.toISOString());
   if (siteIds) q = q.in('site_id', [...siteIds]);
   const { data: rows, error } = await q;

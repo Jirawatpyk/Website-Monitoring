@@ -686,6 +686,95 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     expect(rpcCalls[0]).toMatchObject({ name: 'engine_relapse_incident', args: { p_notify: true } });
   });
 
+  // A recovered PROBLEM incident (slow, as INC-0139) whose site goes DOWN: D-021 escalate.
+  const recoveredProblem = {
+    ...incident('needs_root_cause'),
+    severity: 'problem',
+    episode_severity: 'problem',
+    notifications: [{ template: 'problem' }],
+  };
+
+  it('a DOWN on a recovered PROBLEM incident inside a window is hidden too: no DOWN card (round 3 H1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [recoveredProblem] },
+      'maintenance_windows.select': { data: [window()] },
+      'rpc.engine_escalate_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+    expect(rpcCalls[0]?.args).toMatchObject({ p_status: 'maintenance' });
+  });
+
+  it('without a window, or after it, that DOWN escalates — its outage starting at the window’s end', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [recoveredProblem] },
+      'maintenance_windows.select': { data: [window({ ends_at: at(20) })] },
+      'rpc.engine_escalate_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_escalate_incident',
+      args: { p_notify: true, p_context: { downStartedAt: at(20) } },
+    });
+  });
+
+  it('still DOWN after the window: DOWN AGAIN starts at the window’s end, in the event and the card (round 3 M3)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [incident('monitoring')] },
+      'maintenance_windows.select': { data: [window({ ends_at: at(20) })] },
+      'rpc.engine_relapse_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_relapse_incident',
+      args: { p_started_at: at(20), p_context: { startedAt: at(20) } },
+    });
+  });
+
+  it('a DOWN AGAIN confirmed after a window started mid-round is hidden, as a new DOWN is (round 3 M2)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      // The round starts at :00, the window at :20, the recheck confirms at :32.
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [incident('monitoring')] },
+      'maintenance_windows.select': { data: [window({ starts_at: at(20) })] },
+      'rpc.engine_relapse_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+  });
+
+  it('a settle inside a window keeps the site on Maintenance (round 3 M1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: ok },
+      'incidents.select': { data: [incident('monitoring')] },
+      'site_status.select': {
+        data: [
+          {
+            site_id: 's1',
+            status: 'maintenance',
+            last_round_at: at(-60),
+            ok_rounds: 1,
+            note: null,
+            flips: [],
+            flip_ok: null,
+          },
+        ],
+      },
+      'maintenance_windows.select': { data: [window()] },
+      'rpc.engine_settle_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_settle_incident', args: { p_status: 'maintenance' } });
+  });
+
   it('a mute after the alert still lets RECOVERED close the thread (§15.1: new alerts only)', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor({ muted_until: '2026-10-06T12:00:00Z' })] },

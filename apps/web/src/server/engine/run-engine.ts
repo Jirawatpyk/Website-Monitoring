@@ -29,6 +29,7 @@ import {
   type ProbeLocation,
   type ProblemDetail,
   type ResponseHours,
+  type SiteStatus,
   type Tier,
   type Trigger,
   type WafVendor,
@@ -678,11 +679,21 @@ async function apply(
   // Judged by when the failure was confirmed (a DOWN's last recheck), not by when this run happens.
   // An incident that had recovered (Monitoring / Needs root cause) doesn't stop a window (D-036): a new
   // drop inside it is hidden like a new incident, not a DOWN AGAIN.
-  const decidedAt = d.kind === 'open' ? d.confirmedAt : d.roundAt;
+  // A DOWN on a recovered PROBLEM incident (D-021 escalate) is hidden too (engine review round 3 H1).
+  const decidedAt =
+    d.kind === 'open' || d.kind === 'escalate'
+      ? d.confirmedAt
+      : d.kind === 'relapse' && d.severity === 'down'
+        ? d.detectedAt
+        : d.roundAt;
+  const hidden = windowHides(open) && inWindow(site.windows, decidedAt);
   if (
-    windowHides(open) &&
-    inWindow(site.windows, decidedAt) &&
-    (d.kind === 'none' || d.kind === 'open' || d.kind === 'problem' || d.kind === 'relapse')
+    hidden &&
+    (d.kind === 'none' ||
+      d.kind === 'open' ||
+      d.kind === 'problem' ||
+      d.kind === 'relapse' ||
+      d.kind === 'escalate')
   ) {
     const { error } = await db.rpc('engine_record_round', {
       p_site_id: site.id,
@@ -702,15 +713,17 @@ async function apply(
     (notBefore && notBefore > startedAt ? notBefore : startedAt).toISOString();
   // The first round after a window that can't judge the status (too few locations) still ends
   // "Maintenance" (engine review L1).
-  const status =
-    d.status ??
-    (site.wasMaintenance
-      ? d.monitors.some((m) => m.status === 'down')
-        ? 'down'
-        : d.monitors.some((m) => m.status === 'problem')
-          ? 'problem'
-          : 'ok'
-      : undefined);
+  // A settle inside the window (Monitoring → Needs root cause) keeps the site on Maintenance (M1).
+  const status: SiteStatus | undefined = hidden
+    ? 'maintenance'
+    : (d.status ??
+      (site.wasMaintenance
+        ? d.monitors.some((m) => m.status === 'down')
+          ? 'down'
+          : d.monitors.some((m) => m.status === 'problem')
+            ? 'problem'
+            : 'ok'
+        : undefined));
   const judged = { p_monitors: monitorsJson(d, site), ...(status ? { p_status: status } : {}) };
   switch (d.kind) {
     case 'none': {
@@ -767,7 +780,7 @@ async function apply(
         // When the outage started, apart from the PROBLEM before it (uptime, D-002 count from here).
         p_context: {
           ...downContext(d, site),
-          downStartedAt: d.downStartedAt.toISOString(),
+          downStartedAt: startOf(d.downStartedAt),
           escalated: true,
         },
         p_notify: !site.muted,
@@ -800,7 +813,7 @@ async function apply(
         p_round_at: d.roundAt.toISOString(),
         p_context: {
           ...(d.down ? downContext({ ...d.down, monitorId: d.monitorId }, site) : problem),
-          startedAt: d.startedAt.toISOString(),
+          startedAt: startOf(d.startedAt),
           trigger: d.trigger,
           ...(open ? { fromState: open.state } : {}),
           ...(open?.recoveredAt ? { backSince: open.recoveredAt } : {}),
