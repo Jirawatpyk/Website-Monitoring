@@ -25,22 +25,26 @@ test.describe('escalation policies (local Supabase)', () => {
     const editor = page.locator('div.hidden.md\\:block');
     await editor.getByRole('button', { name: 'Edit L1' }).click();
     const dialog = page.getByRole('dialog', { name: /Edit L1 · Tier 1 DOWN/ });
+    // A run stopped half way leaves L1 at +20 (a CI retry would meet it): change it to something new.
+    const target = (await dialog.getByLabel('Notify after').inputValue()) === '20' ? '25' : '20';
     await dialog.getByLabel('Notify after').fill('10');
     await expect(dialog.getByText('At least +15 min — L0 covers the first 15 minutes')).toBeVisible();
-    await dialog.getByLabel('Notify after').fill('20');
+    await dialog.getByLabel('Notify after').fill(target);
     await dialog.getByRole('button', { name: 'Apply to L1' }).click();
 
     const bar = page.getByRole('region', { name: 'Unsaved changes' });
     await expect(bar).toContainText('1 unsaved change');
     await bar.getByRole('button', { name: 'Save' }).click();
     const save = page.getByRole('dialog', { name: 'Save escalation changes?' });
-    await expect(save).toContainText(/\+20 min · Backup \+ Admin \(.+\) · Chat @mention, Email/);
+    await expect(save).toContainText(
+      new RegExp(`\\+${target} min · Backup \\+ Admin \\(.+\\) · Chat @mention, Email`),
+    );
     await save.getByRole('button', { name: 'Save and log' }).click();
     await expect(save.getByText('Add a short note — it goes in the audit log with the change')).toBeVisible();
     await save.getByLabel(/Change note/).fill('E2E: L1 a little later');
     await save.getByRole('button', { name: 'Save and log' }).click();
     await expect(bar).toBeHidden();
-    await expect(editor.getByText('+20 min')).toBeVisible();
+    await expect(editor.getByText(`+${target} min`)).toBeVisible();
     await expect.poll(escalationAudit).toBe(before + 1);
 
     // Back to the seed, so other runs start from it.

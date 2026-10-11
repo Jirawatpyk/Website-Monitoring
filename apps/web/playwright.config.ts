@@ -14,7 +14,8 @@ export default defineConfig({
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
   // Fail the run instead of hanging a CI runner.
-  globalTimeout: isCI ? 5 * 60_000 : 0,
+  // Under the db step's 10 min: every signed-in spec now runs there (S09 review), with a retry.
+  globalTimeout: isCI ? 9 * 60_000 : 0,
   reporter: isCI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${PORT}`,

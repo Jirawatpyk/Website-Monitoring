@@ -165,13 +165,15 @@ export function MonitorsEditor({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
+        // Phones: Cancel / Save side by side across the row, as Site detail (layout-consistency).
+        className="max-md:[&>:last-child]:w-full"
         breadcrumb={breadcrumb}
         title="Edit monitors"
         meta={meta}
         actions={
-          <span className="flex flex-wrap items-center justify-end gap-3">
+          <span className="flex flex-wrap items-center justify-end gap-3 max-md:grid max-md:w-full max-md:grid-cols-2">
             {dirty && (
-              <span className="text-sm text-alert-warning-fg">
+              <span className="text-sm text-alert-warning-fg max-md:col-span-2">
                 {changes.length} unsaved {changes.length === 1 ? 'change' : 'changes'}
               </span>
             )}
