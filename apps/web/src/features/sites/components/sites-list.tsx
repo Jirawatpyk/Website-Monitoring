@@ -1,5 +1,8 @@
 'use client';
 
+import type { WindowKind } from '@dxt/engine';
+import { MaintenanceDialog, type PausableSite } from '@/features/maintenance';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactElement } from 'react';
@@ -75,6 +78,8 @@ interface SitesListProps {
   meId: string;
   /** Server time of the render (ISO), so server and client agree on mutes and "18 min unacked". */
   nowIso: string;
+  /** The signed-in person: the mute dialog's "recorded as" and phone "Signed in as" lines. */
+  viewer?: { name: string; email: string };
 }
 
 const STATUS_CHIPS: { value: StatusFilter; label: string; icon?: ReactElement }[] = [
@@ -116,8 +121,6 @@ const GROUPS: { key: RowKey; title: string }[] = [
   { key: 'draft', title: 'DRAFT' },
 ];
 
-const NOT_YET = 'Comes with maintenance windows';
-
 function labelOf(options: { value: string; label: string }[], value: string): string {
   return options.find((o) => o.value === value)?.label ?? value;
 }
@@ -126,8 +129,20 @@ function labelOf(options: { value: string; label: string }[], value: string): st
  * `/sites` — the management list (spec §20, boards Sites and MSites). A table from md up, a list grouped
  * by status on phones; one set of filters drives both.
  */
-export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
+export function SitesList({
+  sites,
+  isAdmin,
+  meId,
+  nowIso,
+  viewer = { name: '', email: '' },
+}: SitesListProps) {
   const router = useRouter();
+  const [pause, setPause] = useState<{ siteId: string; kind: WindowKind; open: boolean; n: number }>({
+    siteId: '',
+    kind: 'mute',
+    open: false,
+    n: 0,
+  });
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const [f, setF] = useState<SiteListFilters>(NO_FILTERS);
   const [sort, setSort] = useState<SortKey>('status');
@@ -197,22 +212,41 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
   /** A row opens Site detail for everyone (spec §20); a Draft opens Add site's form to finish setup, for Admins only. */
   const hrefOf = (r: SiteListRow) => (r.live ? `/sites/${r.id}` : isAdmin ? `/sites/${r.id}/edit` : null);
 
+  const mayPause = (r: SiteListRow) => isAdmin || r.owner?.id === meId || r.backup?.id === meId;
+  const pausable: PausableSite[] = sites
+    .filter((r) => r.live && mayPause(r))
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      tier: r.tier,
+      owner: r.owner?.name ?? null,
+      status: r.status,
+      mutedUntil: r.mutedUntil,
+      openIncident: r.openIncident,
+    }));
+  const openPause = (siteId: string, kind: WindowKind) =>
+    setPause((p) => ({ siteId, kind, open: true, n: p.n + 1 }));
+
   const menuItems = (r: SiteListRow): MenuItem[] => [
     ...(r.live ? [{ label: 'Open', icon: <IconMonitor />, href: `/sites/${r.id}` }] : []),
     ...(isAdmin ? [{ label: 'Edit site', icon: <IconPencil />, href: `/sites/${r.id}/edit` }] : []),
     ...(r.live || isAdmin ? [{ separator: true as const }] : []),
-    {
-      label: isMuted(r, now) ? 'End or edit mute…' : 'Mute…',
-      icon: <IconEyeOff />,
-      disabled: true,
-      disabledReason: NOT_YET,
-    },
-    {
-      label: r.status === 'maintenance' ? 'End or edit maintenance…' : 'Schedule maintenance',
-      icon: <IconCalendar />,
-      disabled: true,
-      disabledReason: NOT_YET,
-    },
+    // Mute and maintenance (spec §11, D-012, D-036): an Admin, or the site's owner or backup, on a live
+    // site. A running one is ended or edited from Overview › Maintenance & mutes.
+    ...(r.live && mayPause(r)
+      ? [
+          isMuted(r, now)
+            ? { label: 'End or edit mute…', icon: <IconEyeOff />, href: '/#maintenance' }
+            : { label: 'Mute…', icon: <IconEyeOff />, onSelect: () => openPause(r.id, 'mute') },
+          r.status === 'maintenance'
+            ? { label: 'End or edit maintenance…', icon: <IconCalendar />, href: '/#maintenance' }
+            : {
+                label: 'Schedule maintenance',
+                icon: <IconCalendar />,
+                onSelect: () => openPause(r.id, 'maintenance'),
+              },
+        ]
+      : []),
   ];
 
   // Widths and the table widths the optional columns appear at: site-table-layout.ts (tested to fit).
@@ -387,6 +421,19 @@ export function SitesList({ sites, isAdmin, meId, nowIso }: SitesListProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {pausable.length > 0 && (
+        <MaintenanceDialog
+          key={pause.n}
+          open={pause.open}
+          onClose={() => setPause((p) => ({ ...p, open: false }))}
+          sites={pausable}
+          siteId={pause.siteId || pausable[0]!.id}
+          kind={pause.kind}
+          isAdmin={isAdmin}
+          viewerName={viewer.name}
+          viewerEmail={viewer.email}
+        />
+      )}
       {/* ── desktop and tablet ── */}
       <div className="hidden flex-col gap-3 md:flex">
         <div role="group" aria-label="Sites by status" className="flex flex-wrap items-center gap-2">

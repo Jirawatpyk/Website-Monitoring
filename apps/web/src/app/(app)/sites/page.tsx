@@ -35,6 +35,7 @@ export default async function SitesPage() {
             sites={sites}
             isAdmin={isAdmin}
             meId={active?.profile.id ?? ''}
+            viewer={{ name: active?.profile.displayName ?? '', email: active?.profile.email ?? '' }}
             nowIso={new Date().toISOString()}
           />
         )}
