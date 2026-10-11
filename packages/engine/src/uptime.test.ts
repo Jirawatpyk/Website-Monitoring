@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { formatPercent } from '@dxt/shared';
 import { downEpisodesFromTimeline, episodesFromTimeline, type Episode } from './lifecycle';
-import { aggregateUptime, downMinutesIn, siteUptime, siteUptimeOver } from './uptime';
+import { maintenanceSpans, type MaintenanceWindow } from './maintenance';
+import { aggregateUptime, downMinutesIn, siteUptime, siteUptimeOver, spanMinutesIn } from './uptime';
 
 const WINDOW_30D = 43_200;
 
@@ -254,5 +255,79 @@ describe('aggregateUptime', () => {
 
   it('is 100% with no sites', () => {
     expect(aggregateUptime([])).toBe(1);
+  });
+});
+
+describe('maintenance leaves both sides (spec §5, S09 Done-when 3, D-036)', () => {
+  const MONITORED = at('2026-01-01T00:00:00');
+  // A 2 h window, Sat 19 Sep 22:00 → Sun 20 Sep 00:00, approved.
+  const window2h: MaintenanceWindow = {
+    kind: 'maintenance',
+    startsAt: at('2026-09-19T22:00:00'),
+    endsAt: at('2026-09-20T00:00:00'),
+    approvedAt: at('2026-09-18T10:00:00'),
+    endedAt: null,
+    cancelledAt: null,
+  };
+  const spans = maintenanceSpans([window2h], []);
+  const over = (episodes: Episode[], maintenance = spans) =>
+    siteUptimeOver(episodes, {
+      now: NOW,
+      rangeMinutes: WINDOW_30D,
+      monitoringStartedAt: MONITORED,
+      maintenance,
+    })!;
+
+  it('a 2 h window takes 120 minutes out of the 30-day window', () => {
+    const r = over([]);
+    expect(r.maintenanceMinutes).toBe(120);
+    expect(r.uptime).toBe(1);
+  });
+
+  it.each<[string, Episode[], number, string]>([
+    [
+      'DOWN for the whole window counts nothing',
+      [down('2026-09-19T22:00:00', '2026-09-20T00:00:00')],
+      0,
+      '100.00%',
+    ],
+    [
+      'DOWN half inside counts only the half outside',
+      [down('2026-09-19T21:30:00', '2026-09-19T22:30:00')],
+      30,
+      '99.93%',
+    ],
+    [
+      'DOWN outside the window counts in full',
+      [down('2026-09-21T10:00:00', '2026-09-21T10:30:00')],
+      30,
+      '99.93%',
+    ],
+  ])('%s', (_, episodes, downMinutes, pct) => {
+    const r = over(episodes);
+    expect(r.downMinutes).toBe(downMinutes);
+    expect(r.windowMinutes - r.maintenanceMinutes).toBe(WINDOW_30D - 120);
+    expect(formatPercent(r.uptime)).toBe(pct);
+  });
+
+  it('a window that started while an incident was open hides nothing (whole-window outage → the true figure)', () => {
+    const outage = down('2026-09-19T21:00:00', '2026-09-20T00:00:00');
+    const r = over([outage], maintenanceSpans([window2h], [{ start: outage.start, end: null }]));
+    expect(r.maintenanceMinutes).toBe(0);
+    expect(r.downMinutes).toBe(180);
+    expect(formatPercent(r.uptime)).toBe('99.58%');
+  });
+
+  it('mute is counted: no span, DOWN counts', () => {
+    const mute = { ...window2h, kind: 'mute' as const };
+    const r = over([down('2026-09-19T22:00:00', '2026-09-20T00:00:00')], maintenanceSpans([mute], []));
+    expect(r.maintenanceMinutes).toBe(0);
+    expect(r.downMinutes).toBe(120);
+  });
+
+  it('overlapping spans count once, clipped to the range', () => {
+    const a = { start: at('2026-09-19T22:00:00'), end: at('2026-09-20T00:00:00') };
+    const b = { start: at('2026-09-19T23:00:00'), end: at('2026-09-20T01:00:00') };
+    expect(spanMinutesIn([a, b], at('2026-09-19T23:30:00'), at('2026-09-20T03:00:00'))).toBe(90);
   });
 });

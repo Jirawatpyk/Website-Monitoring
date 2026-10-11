@@ -13,7 +13,14 @@ import {
 import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { getAccess } from '@/lib/auth/session';
-import { downEpisodesBySite, locationGlyph, slowMsOf, watchedSince } from '@/features/sites/server';
+import { loadWindowRows, overviewOf, phoneLine, windowEvents } from '@/features/maintenance/server';
+import {
+  downEpisodesBySite,
+  locationGlyph,
+  maintenanceSpansBySite,
+  slowMsOf,
+  watchedSince,
+} from '@/features/sites/server';
 import { chainStreakStart, currentDrop, lastRoundP50, probeHealth, seriesOf, viewerKindOf } from './assemble';
 import { EVENT_TYPES, reasonOf } from './model';
 import {
@@ -46,12 +53,24 @@ export async function loadOverview(
 ): Promise<OverviewData> {
   const from30d = new Date(now.getTime() - THIRTY_DAYS_MIN * 60_000);
   const from60d = new Date(now.getTime() - 60 * DAY_MS);
-  const [sites, checks, series, drops, kpiRows, events, probes, verifier, openJobs, managed] =
-    await Promise.all([
-      db
-        .from('sites')
-        .select(
-          `id, name, tier, is_active, muted_until, mute_reason, monitoring_started_at, created_at,
+  const [
+    sites,
+    checks,
+    series,
+    drops,
+    spans,
+    windowRows,
+    kpiRows,
+    events,
+    probes,
+    verifier,
+    openJobs,
+    managed,
+  ] = await Promise.all([
+    db
+      .from('sites')
+      .select(
+        `id, name, tier, is_active, muted_until, mute_reason, monitoring_started_at, created_at,
          primary_owner_id, backup_owner_id,
          clients!inner(am_user_id),
          owner:profiles!sites_primary_owner_id_fkey(display_name),
@@ -60,42 +79,44 @@ export async function loadOverview(
          incidents(id, number, state, severity, trigger, escalation_level, started_at, detected_at, recovered_at,
                    acker:profiles!incidents_acked_by_fkey(display_name),
                    incident_events(type, at, payload))`,
-        )
-        .eq('monitors.is_primary', true)
-        .not('incidents.state', 'in', CLOSED_INCIDENT_STATES_IN)
-        .in('incidents.incident_events.type', ['detected', 'escalated_to_down', 'relapsed'])
-        .order('name'),
-      db.rpc('site_list_locations'),
-      db.rpc('overview_response_24h'),
-      downEpisodesBySite(db, null, from30d),
-      db
-        .from('incidents')
-        .select(
-          'severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier), incident_events(type, payload)',
-        )
-        .eq('severity', 'down')
-        .eq('incident_events.type', 'escalated_to_down')
-        // a PROBLEM raised to DOWN may have started before the window its outage falls in
-        .gte('started_at', new Date(now.getTime() - 90 * DAY_MS).toISOString()),
-      db
-        .from('incident_events')
-        .select(
-          `id, type, at, payload, actor:profiles(display_name),
+      )
+      .eq('monitors.is_primary', true)
+      .not('incidents.state', 'in', CLOSED_INCIDENT_STATES_IN)
+      .in('incidents.incident_events.type', ['detected', 'escalated_to_down', 'relapsed'])
+      .order('name'),
+    db.rpc('site_list_locations'),
+    db.rpc('overview_response_24h'),
+    downEpisodesBySite(db, null, from30d),
+    maintenanceSpansBySite(db, null, from30d),
+    loadWindowRows(db, now),
+    db
+      .from('incidents')
+      .select(
+        'severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier), incident_events(type, payload)',
+      )
+      .eq('severity', 'down')
+      .eq('incident_events.type', 'escalated_to_down')
+      // a PROBLEM raised to DOWN may have started before the window its outage falls in
+      .gte('started_at', new Date(now.getTime() - 90 * DAY_MS).toISOString()),
+    db
+      .from('incident_events')
+      .select(
+        `id, type, at, payload, actor:profiles(display_name),
          incidents!inner(number, severity, trigger, auto_resolved, sites!inner(name))`,
-        )
-        .in('type', [...EVENT_TYPES])
-        .order('at', { ascending: false })
-        .limit(EVENT_ROWS),
-      db.from('probe_locations').select('code, is_active, last_heartbeat_at'),
-      db.from('agent_heartbeats').select('last_seen_at').eq('name', 'verifier').maybeSingle(),
-      db
-        .from('verification_jobs')
-        .select('id', { count: 'exact', head: true })
-        .in('status', ['queued', 'leased']),
-      person.role === 'stakeholder'
-        ? db.from('clients').select('id', { count: 'exact', head: true }).eq('am_user_id', person.id)
-        : Promise.resolve({ count: 0, error: null }),
-    ]);
+      )
+      .in('type', [...EVENT_TYPES])
+      .order('at', { ascending: false })
+      .limit(EVENT_ROWS),
+    db.from('probe_locations').select('code, is_active, last_heartbeat_at'),
+    db.from('agent_heartbeats').select('last_seen_at').eq('name', 'verifier').maybeSingle(),
+    db
+      .from('verification_jobs')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['queued', 'leased']),
+    person.role === 'stakeholder'
+      ? db.from('clients').select('id', { count: 'exact', head: true }).eq('am_user_id', person.id)
+      : Promise.resolve({ count: 0, error: null }),
+  ]);
   for (const [name, r] of Object.entries({
     sites,
     checks,
@@ -168,6 +189,7 @@ export async function loadOverview(
       now,
       rangeMinutes: THIRTY_DAYS_MIN,
       monitoringStartedAt: watchedSince(s),
+      maintenance: spans.get(s.id) ?? [],
     });
     return {
       id: s.id,
@@ -239,6 +261,7 @@ export async function loadOverview(
     // a Draft has never been started; a stopped site is neither monitored nor a draft
     drafts: (sites.data ?? []).filter((s) => !s.is_active && !s.monitoring_started_at).length,
     events: eventRows,
+    ...maintenanceOf(windowRows, person.role === 'admin', now),
     kpis: {
       enough: current.enough,
       mttaSeconds: current.mttaSeconds,
@@ -254,7 +277,7 @@ export async function loadOverview(
                 {
                   windowMinutes: r.uptime.windowMinutes,
                   downMinutes: r.uptime.downMinutes,
-                  maintenanceMinutes: 0,
+                  maintenanceMinutes: r.uptime.maintenanceMinutes,
                 },
               ]
             : [],
@@ -335,4 +358,13 @@ export async function getOverview(now = new Date()): Promise<OverviewData> {
     { id: access.profile.id, name: access.profile.displayName, role: access.profile.role },
     now,
   );
+}
+
+/** The Overview card, its phone row and the Recent events lines (§23.8, D-036). */
+function maintenanceOf(rows: Awaited<ReturnType<typeof loadWindowRows>>, isAdmin: boolean, now: Date) {
+  const card = overviewOf(rows, isAdmin, now);
+  return {
+    maintenance: card ? { ...card, phoneLine: phoneLine(card) } : null,
+    windowEvents: windowEvents(rows, now),
+  };
 }

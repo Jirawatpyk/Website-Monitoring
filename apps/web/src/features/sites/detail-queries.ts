@@ -6,6 +6,9 @@ import {
   episodesFromTimeline,
   siteUptimeOver,
   mttrMinutes,
+  maintenanceSpans,
+  type MaintenanceWindow,
+  type Span,
 } from '@dxt/engine';
 import {
   bangkokDayStart,
@@ -120,6 +123,65 @@ export async function downEpisodesBySite(supabase: DbClient, siteIds: readonly s
 }
 
 /**
+ * The spans maintenance removes from each site's uptime since `from` (spec §5, D-036): approved windows
+ * that ran — minus any that started while an incident hadn't recovered, which hide nothing. Most sites have
+ * none, so the incident read only covers sites that do.
+ */
+export async function maintenanceSpansBySite(
+  supabase: DbClient,
+  siteIds: readonly string[] | null,
+  from: Date,
+): Promise<Map<string, Span[]>> {
+  const out = new Map<string, Span[]>();
+  if (siteIds?.length === 0) return out;
+  let q = supabase
+    .from('maintenance_windows')
+    .select('site_id, starts_at, ends_at, approved_at, ended_at, cancelled_at')
+    .eq('kind', 'maintenance')
+    .not('approved_at', 'is', null)
+    // As the engine reads them (windows.ts): a window counts once its start was checked.
+    .eq('start_logged', true)
+    .gte('ends_at', from.toISOString());
+  if (siteIds) q = q.in('site_id', [...siteIds]);
+  const { data: rows, error } = await q;
+  if (error) throw new Error(`maintenance_windows: ${error.message}`);
+  if (!rows?.length) return out;
+  const withWindows = [...new Set(rows.map((r) => r.site_id))];
+  const earliest = rows.reduce((m, r) => (r.starts_at < m ? r.starts_at : m), rows[0]!.starts_at);
+  const { data: incidents, error: incError } = await supabase
+    .from('incidents')
+    .select('site_id, started_at, severity, resolved_at, incident_events(type, at, payload)')
+    .in('incident_events.type', ['detected', 'relapsed', 'escalated_to_down', 'recovered'])
+    .in('site_id', withWindows)
+    .or(`resolved_at.is.null,resolved_at.gte.${earliest}`);
+  if (incError) throw new Error(`incidents: ${incError.message}`);
+  for (const siteId of withWindows) {
+    const windows: MaintenanceWindow[] = rows
+      .filter((r) => r.site_id === siteId)
+      .map((r) => ({
+        kind: 'maintenance',
+        startsAt: new Date(r.starts_at),
+        endsAt: new Date(r.ends_at),
+        approvedAt: r.approved_at ? new Date(r.approved_at) : null,
+        endedAt: r.ended_at ? new Date(r.ended_at) : null,
+        cancelledAt: r.cancelled_at ? new Date(r.cancelled_at) : null,
+      }));
+    const open = (incidents ?? [])
+      .filter((i) => i.site_id === siteId)
+      // Each drop, failing until its recovery: a window that starts after one (Needs root cause) counts
+      // as usual, and a later relapse (which clears `recovered_at`) never changes that after the fact.
+      .flatMap((i) =>
+        episodesFromTimeline({ ...i, severity: i.severity as Severity }, i.incident_events).map((d) => ({
+          start: d.start,
+          end: d.end,
+        })),
+      );
+    out.set(siteId, maintenanceSpans(windows, open));
+  }
+  return out;
+}
+
+/**
  * When monitoring of a site started, for its uptime window (D-031). A live site created before S05
  * added `monitoring_started_at` (a script-made test site) has none: its creation time stands in.
  * Null for a site that isn't monitored now (a Draft, or stopped).
@@ -192,7 +254,7 @@ export async function loadSiteDetail(
   const primary = monitors.find((m) => m.is_primary);
   const ids = monitors.map((m) => m.id);
 
-  const [incidents, series, latest, log, today, downs, counted] = await Promise.all([
+  const [incidents, series, latest, log, today, downs, spans, counted] = await Promise.all([
     supabase
       .from('incidents')
       .select(
@@ -238,6 +300,7 @@ export async function loadSiteDetail(
       : Promise.resolve({ count: 0, error: null }),
     // uptime counts every DOWN drop in the range, whatever the row cap above
     downEpisodesBySite(supabase, [s.id], from),
+    maintenanceSpansBySite(supabase, [s.id], from),
     supabase
       .from('incidents')
       .select('id', { count: 'exact', head: true })
@@ -276,6 +339,7 @@ export async function loadSiteDetail(
     now,
     rangeMinutes: spec.minutes,
     monitoringStartedAt: watchedSince(s),
+    maintenance: spans.get(s.id) ?? [],
   });
   // In range = overlapping it, the same window the uptime counts (spec-checker: a 99.9% next to "none")
   const inRange = rows.filter((r) => r.endsAt >= from.getTime());

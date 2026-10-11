@@ -17,14 +17,12 @@ import {
 } from '@jirawatpyk/aura-react';
 import {
   IconBell,
-  IconCalendar,
   IconChartColumn,
   IconChevronRight,
   IconCircleDotDashed,
   IconClock,
   IconDownload,
   IconExternalLink,
-  IconEyeOff,
   IconPencil,
   IconTrendingUp,
 } from '@jirawatpyk/aura-react/icons';
@@ -63,8 +61,8 @@ import {
 } from '../../types';
 import { GLYPHS, IncidentLink, MutedBadge, RowStatusBadge, TOUCH_HIT } from '../site-cells';
 import { RangeControl, RangeDependent, RangeProvider } from './range-control';
+import { PauseActions } from '@/features/maintenance';
 
-const NOT_YET = 'Mute and maintenance come with maintenance windows.';
 const WHERE: Record<string, string> = { BKK: 'Thai VPS', SIN: 'sin1', TYO: 'hnd1' };
 const COLORS: Record<string, ChartSeries['color']> = {
   BKK: '--aura-chart-1',
@@ -98,10 +96,7 @@ function statusLine(detail: SiteDetail, now: Date): string | null {
   return `${word} since ${formatWhen(new Date(detail.statusSince), now, { midSentence: true })} · ${since}`;
 }
 
-/**
- * Who sees Mute / maintenance (spec §11, D-012): an Admin, or a Responder on a site they own or back
- * up. Disabled with the reason until S09 builds them.
- */
+/** Who sees Mute / maintenance (spec §11, D-012, D-036): an Admin, or a Responder on a site they own or back up. */
 function canMute(detail: SiteDetail, role: Role | null, meId: string): boolean {
   return role === 'admin' || (role === 'responder' && detail.ownerIds.includes(meId));
 }
@@ -112,12 +107,15 @@ export function SiteDetailView({
   range,
   role,
   meId,
+  viewer = { name: '', email: '' },
   nowIso,
 }: {
   detail: SiteDetail;
   range: SiteRange;
   role: Role | null;
   meId: string;
+  /** The signed-in person: the mute dialog's "recorded as" and phone "Signed in as" lines. */
+  viewer?: { name: string; email: string };
   nowIso: string;
 }) {
   const now = new Date(nowIso);
@@ -135,6 +133,9 @@ export function SiteDetailView({
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <PageHeader
+            // Phones: AURA's actions box hugs its content, so the Mute / Maintenance / Edit grid would
+            // stop short of the edge — let it take the row (MSite: the buttons span the page).
+            className="max-md:[&>:last-child]:w-full"
             breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />}
             title={detail.name}
             meta={
@@ -172,25 +173,20 @@ export function SiteDetailView({
               muting || isAdmin ? (
                 <span className="flex flex-wrap items-center gap-3 max-md:grid max-md:w-full max-md:grid-cols-2">
                   {muting && (
-                    <>
-                      <Button
-                        variant="secondary"
-                        icon={<IconEyeOff />}
-                        disabled
-                        aria-describedby="site-not-yet"
-                      >
-                        Mute
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        icon={<IconCalendar />}
-                        disabled
-                        aria-describedby="site-not-yet"
-                      >
-                        <span className="max-md:hidden">Schedule maintenance</span>
-                        <span className="md:hidden">Maintenance</span>
-                      </Button>
-                    </>
+                    <PauseActions
+                      site={{
+                        id: detail.id,
+                        name: detail.name,
+                        tier: detail.tier,
+                        owner: detail.owner,
+                        status: detail.status,
+                        mutedUntil: detail.mutedUntil,
+                        openIncident: detail.openIncident,
+                      }}
+                      isAdmin={isAdmin}
+                      viewerName={viewer.name}
+                      viewerEmail={viewer.email}
+                    />
                   )}
                   {isAdmin && (
                     <Button
@@ -206,11 +202,6 @@ export function SiteDetailView({
               ) : undefined
             }
           />
-          {muting && (
-            <p id="site-not-yet" className="m-0 text-xs text-fg-secondary">
-              {NOT_YET}
-            </p>
-          )}
           {detail.openIncident && (
             <span className="flex">
               <IncidentLink incident={detail.openIncident} now={now} />

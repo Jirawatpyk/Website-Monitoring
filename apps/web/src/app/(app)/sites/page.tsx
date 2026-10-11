@@ -22,12 +22,22 @@ export default async function SitesPage() {
           meta={listMeta(sites)}
           actions={
             isAdmin && sites.length > 0 ? (
-              <Button icon={<IconPlus />} href="/sites/new">
-                Add site
-              </Button>
+              <span className="max-md:hidden">
+                <Button icon={<IconPlus />} href="/sites/new">
+                  Add site
+                </Button>
+              </span>
             ) : undefined
           }
         />
+        {/* Phones: full width under the header, as /maintenance's Schedule button. */}
+        {isAdmin && sites.length > 0 && (
+          <span className="md:hidden">
+            <Button icon={<IconPlus />} href="/sites/new" fullWidth>
+              Add site
+            </Button>
+          </span>
+        )}
         {sites.length === 0 ? (
           <SitesEmpty isAdmin={isAdmin} chatConnected={chatConnected()} />
         ) : (
@@ -35,6 +45,7 @@ export default async function SitesPage() {
             sites={sites}
             isAdmin={isAdmin}
             meId={active?.profile.id ?? ''}
+            viewer={{ name: active?.profile.displayName ?? '', email: active?.profile.email ?? '' }}
             nowIso={new Date().toISOString()}
           />
         )}

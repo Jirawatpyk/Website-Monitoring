@@ -6,6 +6,8 @@ import {
   formatConfirmedBy,
   formatCount,
   formatDay,
+  formatMonth,
+  bangkokMonthStart,
   formatDuration,
   formatDurationSeconds,
   formatIncidentId,
@@ -200,5 +202,15 @@ describe('clockMinutes (D-033: one minute rule for pages and messages)', () => {
     ['across an hour', '12:58:30', '13:03:00', 5],
   ])('%s', (_, start, end, minutes) => {
     expect(clockMinutes(t(start), t(end))).toBe(minutes);
+  });
+});
+
+describe('formatMonth / bangkokMonthStart', () => {
+  it('names the Bangkok month and finds its first midnight', () => {
+    // Wed 30 Sep 2026 23:30 UTC is Thu 1 Oct 06:30 in Bangkok.
+    const late = new Date('2026-09-30T23:30:00Z');
+    expect(formatMonth(late)).toBe('October');
+    expect(bangkokMonthStart(late).toISOString()).toBe('2026-09-30T17:00:00.000Z');
+    expect(formatMonth(new Date('2026-09-25T03:07:00Z'))).toBe('September');
   });
 });

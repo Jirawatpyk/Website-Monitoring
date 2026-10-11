@@ -2,7 +2,7 @@ import 'server-only';
 import { CLOSED_INCIDENT_STATES_IN, defaultSlowMs, toMonitorHeaders, type SiteStatus } from '@dxt/shared';
 import { siteUptimeOver } from '@dxt/engine';
 import { createClient } from '@/lib/supabase/server';
-import { downEpisodesBySite, slowMsOf, watchedSince } from './detail-queries';
+import { downEpisodesBySite, maintenanceSpansBySite, slowMsOf, watchedSince } from './detail-queries';
 import { locationGlyph } from './components/site-list';
 import { siteIdSchema } from './schemas';
 import type {
@@ -29,7 +29,7 @@ const THIRTY_DAYS_MIN = 30 * 1440;
 export async function listSites(now = new Date()): Promise<SiteListRow[]> {
   const supabase = await createClient();
   const from30d = new Date(now.getTime() - THIRTY_DAYS_MIN * 60_000);
-  const [sites, checks, response, drops] = await Promise.all([
+  const [sites, checks, response, drops, spans] = await Promise.all([
     supabase
       .from('sites')
       .select(
@@ -48,6 +48,7 @@ export async function listSites(now = new Date()): Promise<SiteListRow[]> {
     supabase.rpc('site_list_locations'),
     supabase.rpc('site_list_response_24h'),
     downEpisodesBySite(supabase, null, from30d),
+    maintenanceSpansBySite(supabase, null, from30d),
   ]);
   if (sites.error) throw new Error(`sites: ${sites.error.message}`);
   if (checks.error) throw new Error(`site_list_locations: ${checks.error.message}`);
@@ -106,6 +107,7 @@ export async function listSites(now = new Date()): Promise<SiteListRow[]> {
           now,
           rangeMinutes: THIRTY_DAYS_MIN,
           monitoringStartedAt: watchedSince(s),
+          maintenance: spans.get(s.id) ?? [],
         })?.uptime ?? null,
       expiryDays: null,
     };

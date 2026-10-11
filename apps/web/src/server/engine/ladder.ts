@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { ladderDue, problemHoldUntil } from '@dxt/engine';
+import { ladderClockStart, ladderDue, problemHoldUntil } from '@dxt/engine';
 import { escalationPlanSchema, type IncidentState, type ResponseHours, type Tier } from '@dxt/shared';
 
 /**
@@ -18,7 +18,9 @@ export async function escalationTick(
 ): Promise<{ queued: number; failed: string[] }> {
   const { data, error } = await db
     .from('incidents')
-    .select('id, state, severity, episode_severity, detected_at, escalation_level, escalation_plan')
+    .select(
+      'id, state, severity, episode_severity, detected_at, alerted_at, escalation_level, escalation_plan',
+    )
     .in('state', ['unacked', 'escalated'])
     .not('escalation_plan', 'is', null);
   if (error) throw new Error(`incidents: ${error.message}`);
@@ -38,7 +40,11 @@ export async function escalationTick(
     try {
       queued += await tick(db, inc.id, {
         plan: plan.data,
-        detectedAt: new Date(inc.detected_at),
+        // Confirmed down — or when a mute that silenced it was over and its first alert went (D-036).
+        detectedAt: ladderClockStart({
+          detectedAt: new Date(inc.detected_at),
+          alertedAt: inc.alerted_at ? new Date(inc.alerted_at) : null,
+        }),
         level: inc.escalation_level,
         state: inc.state as IncidentState,
         hours,

@@ -254,7 +254,8 @@ describe('Next step by role (§21.4, §21.8, D-016, D-031, D-032)', () => {
     ['a root cause to write → "Add root cause" (S07)', tao, orca, 'Add root cause'],
     ['a Viewer can only open it', mint, orca, 'Open INC-0139'],
     ['a location warning → View checks', mint, eneos, 'View checks'],
-    ['a mute → View site', tao, games, 'View site'],
+    ['a mute → Manage mute (Admin), on Maintenance & mutes (§23.8)', tao, games, 'Manage mute'],
+    ['a mute → View mute for everyone who can’t change it', mint, games, 'View mute'],
   ])('%s', (_name, v, s, expected) => {
     expect(step(v, s)).toBe(expected);
   });

@@ -36,6 +36,7 @@ export default async function SiteDetailPage({
         range={range}
         role={active?.profile.role ?? null}
         meId={active?.profile.id ?? ''}
+        viewer={{ name: active?.profile.displayName ?? '', email: active?.profile.email ?? '' }}
         nowIso={now.toISOString()}
       />
     </Container>

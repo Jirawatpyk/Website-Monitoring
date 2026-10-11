@@ -1,5 +1,5 @@
 import 'server-only';
-import { isInsideHours, nextOpening, problemHoldUntil, scheduleOf } from '@dxt/engine';
+import { isInsideHours, ladderClockStart, nextOpening, problemHoldUntil, scheduleOf } from '@dxt/engine';
 import type { ChatPerson, LadderFacts, LadderStopped } from '@dxt/notifier';
 import { escalationPlanSchema, TIER_CONFIG, type EscalationTarget, type Tier } from '@dxt/shared';
 import { contextOf, type IncidentFacts, type Owner } from './facts';
@@ -73,7 +73,7 @@ export function ladderFactsOf(i: IncidentFacts, at: Date): LadderFacts | null {
   // A card sent after the incident moved on (acknowledged, recovered) promises nothing.
   if (!plan || !hours || !['unacked', 'escalated'].includes(i.state)) return null;
   const level = (i.escalation_level ?? 0) + 1;
-  const due = scheduleOf({ plan, detectedAt: new Date(i.detected_at), hours }).find((s) => s.level === level);
+  const due = scheduleOf({ plan, detectedAt: clockOf(i), hours }).find((s) => s.level === level);
   const people = stepPeople(i, level);
   const paused = !alwaysOn(plan.tier) && !isInsideHours(at, hours) ? nextOpening(at, hours) : null;
   return {
@@ -102,9 +102,20 @@ export function stoppedOf(i: IncidentFacts, ctx: Record<string, unknown>): Ladde
   };
 }
 
-/** When the owner was told: at detection, or — a Tier 2–3 PROBLEM held overnight — at the opening. */
+/** Where the ladder's clock starts: Confirmed down, or the late alert after a mute (D-036). */
+function clockOf(i: IncidentFacts): Date {
+  return ladderClockStart({
+    detectedAt: new Date(i.detected_at),
+    alertedAt: i.alerted_at ? new Date(i.alerted_at) : null,
+  });
+}
+
+/**
+ * When the owner was told: at detection, or when a mute that held the alert back was over, or — a
+ * Tier 2–3 PROBLEM held overnight — at the opening.
+ */
 export function toldAtOf(i: IncidentFacts): Date {
-  const detected = new Date(i.detected_at);
+  const detected = clockOf(i);
   const hours = i.ladder?.hours;
   if (i.severity !== 'problem' || !hours) return detected;
   return problemHoldUntil(i.sites.tier as Tier, detected, hours) ?? detected;

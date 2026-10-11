@@ -29,6 +29,7 @@ import {
   type ProbeLocation,
   type ProblemDetail,
   type ResponseHours,
+  type SiteStatus,
   type Tier,
   type Trigger,
   type WafVendor,
@@ -38,6 +39,7 @@ import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { loadResponseHours } from '../escalation/response-hours';
 import { escalationTick } from './ladder';
+import { endedBefore, inWindow, loadWindows, windowHides, type SiteWindows } from './windows';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
@@ -68,6 +70,10 @@ interface SiteRow {
   /** Flagged behind a WAF: WAF-signed blocks sit the round out (D-027). */
   behindWaf: boolean;
   monitors: MonitorRow[];
+  /** Its maintenance windows that ran in the last day or are running (D-036). */
+  windows?: SiteWindows;
+  /** Its status was Maintenance at the last round: the first round after a window puts it back. */
+  wasMaintenance?: boolean;
 }
 
 export interface EngineSummary extends CronJobResult {
@@ -119,6 +125,11 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     alerts: 0,
     escalated: 0,
   };
+  // First, before the sites are read: windows that started or ended are logged, and a mute that ran out leaves the site row (D-036).
+  // Never holds the run back: the log and the site row's expiry catch up next run.
+  const logged = await db.rpc('engine_log_windows', { p_now: now.toISOString() });
+  if (logged.error)
+    console.error(JSON.stringify({ event: 'engine_log_windows_failed', error: logged.error.message }));
   const [sites, locations, hours] = await Promise.all([
     loadSites(db, now),
     loadLocations(db, now),
@@ -141,11 +152,13 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     now.getTime() - Math.max(...sites.map((s) => lookbackMs(TIER_CONFIG[s.tier].intervalSec))),
   );
   const siteIds = sites.map((s) => s.id);
+  const windows = await loadWindows(db, siteIds, now);
+  for (const s of sites) s.windows = windows.get(s.id);
   const [checks, statuses, carries, incidents, verifier] = await Promise.all([
     loadChecks(db, since),
     db
       .from('site_status')
-      .select('site_id, last_round_at, ok_rounds, note, flips, flip_ok')
+      .select('site_id, status, last_round_at, ok_rounds, note, flips, flip_ok')
       .in('site_id', siteIds),
     // Server-side reads (S04b): no monitor ids in a GET query string (8 KB limit at 200 monitors).
     db.rpc('engine_monitor_status'),
@@ -207,6 +220,14 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         controlOk: c.control_ok === false || c.akamai_ok === false ? false : (c.control_ok ?? c.akamai_ok),
       })),
   );
+  // An incident a mute silenced gets its first alert once the mute is over (D-036), before the ladder,
+  // which then counts from that alert.
+  try {
+    summary.notified += await lateAlerts(db, now, hours);
+  } catch (err) {
+    failures.push(`late alerts: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(JSON.stringify({ event: 'engine_late_alerts_failed', error: String(err) }));
+  }
   // The escalation ladder (S08, D-034): after the sites, so an incident opened or acknowledged this
   // run is seen as it is now.
   try {
@@ -246,6 +267,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       if (c && siteRound !== null && Date.parse(c.last_round_at) < siteRound) carryByMonitor.delete(m.id);
     }
     const open = incidents.data?.find((inc) => inc.site_id === site.id);
+    site.wasMaintenance = status?.status === 'maintenance';
     const snapshot: SiteSnapshot = {
       now,
       intervalSec: TIER_CONFIG[site.tier].intervalSec,
@@ -301,6 +323,8 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         if (u.reason === 'not_picked_up') await expireUnpicked(db, u.monitorId, decision.roundAt);
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
         // The browser blocked too (D-020) or the VPS's control check down (D-027): not the verifier's fault.
+        // Inside a maintenance window with nothing open, no Admin alert either (engine review L2).
+        if (windowHides(open) && inWindow(site.windows, decision.roundAt)) continue;
         if (u.reason === 'control_failed') controlSites.add(`${site.name} (Tier ${site.tier})`);
         else if (u.reason !== 'browser_blocked')
           unverifiedSites.set(`${site.name} (Tier ${site.tier})`, u.reason);
@@ -649,7 +673,58 @@ async function apply(
 ): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | null> {
   const at = now.toISOString();
   const incidentId = open?.id ?? null;
-  const judged = { p_monitors: monitorsJson(d, site), ...(d.status ? { p_status: d.status } : {}) };
+  // Inside a maintenance window with nothing open (D-036): the round is recorded, nothing opens and
+  // the site shows Maintenance; the monitors keep their real state. An incident already open when the
+  // window started carries on as usual (a window never hides an open incident, §14.5).
+  // Judged by when the failure was confirmed (a DOWN's last recheck), not by when this run happens.
+  // An incident that had recovered (Monitoring / Needs root cause) doesn't stop a window (D-036): a new
+  // drop inside it is hidden like a new incident, not a DOWN AGAIN.
+  // A DOWN on a recovered PROBLEM incident (D-021 escalate) is hidden too (engine review round 3 H1).
+  const decidedAt =
+    d.kind === 'open' || d.kind === 'escalate'
+      ? d.confirmedAt
+      : d.kind === 'relapse' && d.severity === 'down'
+        ? d.detectedAt
+        : d.roundAt;
+  const hidden = windowHides(open) && inWindow(site.windows, decidedAt);
+  if (
+    hidden &&
+    (d.kind === 'none' ||
+      d.kind === 'open' ||
+      d.kind === 'problem' ||
+      d.kind === 'relapse' ||
+      d.kind === 'escalate')
+  ) {
+    const { error } = await db.rpc('engine_record_round', {
+      p_site_id: site.id,
+      p_round_at: d.roundAt.toISOString(),
+      p_evaluated_at: at,
+      p_ok_rounds: d.kind === 'none' ? d.okRounds : 0,
+      p_monitors: monitorsJson(d, site),
+      p_status: 'maintenance',
+    });
+    if (error) throw new Error(`engine_record_round: ${error.message}`);
+    return null;
+  }
+  // Still failing when a window ended: the incident starts at the window's end, never backdated into
+  // it — and never after its own confirmation (the window ended before `decidedAt`).
+  const notBefore = endedBefore(site.windows, decidedAt);
+  const startOf = (startedAt: Date) =>
+    (notBefore && notBefore > startedAt ? notBefore : startedAt).toISOString();
+  // The first round after a window that can't judge the status (too few locations) still ends
+  // "Maintenance" (engine review L1).
+  // A settle inside the window (Monitoring → Needs root cause) keeps the site on Maintenance (M1).
+  const status: SiteStatus | undefined = hidden
+    ? 'maintenance'
+    : (d.status ??
+      (site.wasMaintenance
+        ? d.monitors.some((m) => m.status === 'down')
+          ? 'down'
+          : d.monitors.some((m) => m.status === 'problem')
+            ? 'problem'
+            : 'ok'
+        : undefined));
+  const judged = { p_monitors: monitorsJson(d, site), ...(status ? { p_status: status } : {}) };
   switch (d.kind) {
     case 'none': {
       // Never moves the round back when another engine run (probe trigger, cron) got further.
@@ -673,7 +748,7 @@ async function apply(
         p_monitor_id: d.monitorId,
         p_trigger: d.trigger,
         p_severity: 'problem',
-        p_started_at: d.startedAt.toISOString(),
+        p_started_at: startOf(d.startedAt),
         p_detected_at: at,
         p_round_at: d.roundAt.toISOString(),
         p_context: {
@@ -705,7 +780,7 @@ async function apply(
         // When the outage started, apart from the PROBLEM before it (uptime, D-002 count from here).
         p_context: {
           ...downContext(d, site),
-          downStartedAt: d.downStartedAt.toISOString(),
+          downStartedAt: startOf(d.downStartedAt),
           escalated: true,
         },
         p_notify: !site.muted,
@@ -733,12 +808,12 @@ async function apply(
         p_incident_id: incidentId,
         p_severity: d.severity,
         p_trigger: d.trigger,
-        p_started_at: d.startedAt.toISOString(),
+        p_started_at: startOf(d.startedAt),
         p_detected_at: d.detectedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
         p_context: {
           ...(d.down ? downContext({ ...d.down, monitorId: d.monitorId }, site) : problem),
-          startedAt: d.startedAt.toISOString(),
+          startedAt: startOf(d.startedAt),
           trigger: d.trigger,
           ...(open ? { fromState: open.state } : {}),
           ...(open?.recoveredAt ? { backSince: open.recoveredAt } : {}),
@@ -748,7 +823,9 @@ async function apply(
           ...(d.flapping ? { flapping: true } : {}),
         },
         p_flapping: d.flapping,
-        p_notify: !site.muted,
+        // A thread whose first alert a mute held back gets that alert (the late card) instead of a
+        // DOWN AGAIN out of context (engine review M2): lateAlerts runs after the sites.
+        p_notify: !site.muted && alertQueued,
         ...(d.severity === 'problem' ? holdFor(site.tier, d.detectedAt, hours) : {}),
         ...judged,
       });
@@ -762,7 +839,7 @@ async function apply(
         p_monitor_id: d.monitorId,
         p_trigger: 'hard_fail',
         p_severity: 'down',
-        p_started_at: d.startedAt.toISOString(),
+        p_started_at: startOf(d.startedAt),
         // When the last recheck confirmed it, not when this run noticed (PRD §9: alert within 30 s).
         p_detected_at: d.confirmedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
@@ -793,7 +870,8 @@ async function apply(
           recoveredAt: d.recoveredAt.toISOString(),
           ...(d.autoResolve ? { autoResolved: true } : {}),
         },
-        p_notify: !site.muted && alertQueued,
+        // A mute stops new alerts only (§15.1, D-036): RECOVERED still closes a thread that alerted.
+        p_notify: alertQueued,
         // Not-OK → OK only when every monitor is OK: D-023's partial recovery is no flip (D-024).
         p_flip_ok: d.allOk,
         p_auto_resolve: d.autoResolve,
@@ -875,6 +953,27 @@ function downContext(d: DownFacts, site: SiteRow): Record<string, Json> {
           ? { confirmingFrom: d.failing.map((c) => c.location), wafBlocked: [...d.wafBlocked] }
           : {}),
       };
+}
+
+/**
+ * The first alert of every open incident a mute silenced, once the mute is over (D-036): the card for
+ * its severity and the owner email; a Tier 2–3 PROBLEM outside response hours waits for the opening.
+ * Guarded in SQL (once, still waiting for an ack, not muted). Returns how many were queued.
+ */
+async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promise<number> {
+  const { data, error } = await db.rpc('engine_silent_incidents', { p_now: now.toISOString() });
+  if (error) throw new Error(`engine_silent_incidents: ${error.message}`);
+  let queued = 0;
+  for (const inc of data ?? []) {
+    const posted = await db.rpc('engine_post_late_alert', {
+      p_incident_id: inc.incident_id,
+      p_at: now.toISOString(),
+      ...(inc.severity === 'problem' ? holdFor(inc.tier as Tier, now, hours) : {}),
+    });
+    if (posted.error) throw new Error(`engine_post_late_alert: ${posted.error.message}`);
+    if (posted.data) queued += 1;
+  }
+  return queued;
 }
 
 /** A Tier 2–3 PROBLEM flagged outside response hours waits for the next opening (spec §7, §19.2). */

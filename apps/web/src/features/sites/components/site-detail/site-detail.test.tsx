@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { SiteDetail } from '../../types';
 import { SiteDetailView } from './site-detail';
@@ -105,18 +106,21 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     expect(screen.getByText('1/2 pass')).toBeInTheDocument();
   });
 
-  it('Mute and maintenance are disabled with the reason until S09 (no dead controls, §14.16)', () => {
+  it('Mute opens the mute dialog for this site; Schedule maintenance the maintenance one (S09)', async () => {
+    const user = userEvent.setup();
     render(<SiteDetailView detail={detail()} range="30d" role="admin" meId="tao" nowIso={NOW} />);
-    const mute = screen.getByRole('button', { name: 'Mute' });
-    expect(mute).toBeDisabled();
-    expect(mute).toHaveAccessibleDescription('Mute and maintenance come with maintenance windows.');
+    await user.click(screen.getByRole('button', { name: 'Mute' }));
+    expect(await screen.findByRole('dialog', { name: 'Mute site' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: /Schedule maintenance/ }));
+    expect(await screen.findByRole('dialog', { name: 'Schedule maintenance' })).toBeInTheDocument();
   });
 
   it("Mute shows for an Admin and the site's owner or backup, not for a Viewer or another Responder", () => {
     const { unmount } = render(
       <SiteDetailView detail={detail()} range="30d" role="responder" meId="ploy" nowIso={NOW} />,
     );
-    expect(screen.getByRole('button', { name: 'Mute' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Mute' })).toBeEnabled();
     unmount();
     const r2 = render(
       <SiteDetailView detail={detail()} range="30d" role="responder" meId="nok" nowIso={NOW} />,
@@ -125,7 +129,6 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     r2.unmount();
     render(<SiteDetailView detail={detail()} range="30d" role="viewer" meId="mint" nowIso={NOW} />);
     expect(screen.queryByRole('button', { name: 'Mute' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Mute and maintenance come with maintenance windows.')).not.toBeInTheDocument();
   });
 
   it('a TLS chain check is a warning in the check log, not a fail (D-029); counts read with separators', () => {

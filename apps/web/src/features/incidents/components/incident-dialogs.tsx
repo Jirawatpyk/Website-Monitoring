@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Button, Dialog, Select, Textarea, TextField, type DialogProps } from '@jirawatpyk/aura-react';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Dialog,
+  Select,
+  Textarea,
+  TextField,
+  type DialogProps,
+} from '@jirawatpyk/aura-react';
 import {
   IconCircle,
   IconCircleCheck,
@@ -306,6 +315,7 @@ export function ResolveDialog({
   conditions,
   summary,
   lasted,
+  uptime,
   postedAt,
   postOverdue = 'no',
   viewerName,
@@ -322,6 +332,8 @@ export function ResolveDialog({
   summary: { label: string; value: string }[];
   /** "Down 8 min" / "Problem lasted 12 min" for the outcome sentence (Resolve board). */
   lasted?: string;
+  /** The Uptime box (Resolve board, D-033 → S09): "8 min counts as downtime → ORCA September uptime 99.98%". */
+  uptime?: { text: string; inWindow: boolean } | null;
   /** When the RESOLVED messages went out, once the page knows (after a refresh). */
   postedAt?: string | null;
   /** How late they are while unposted (`usePostWait` on the page). */
@@ -612,6 +624,22 @@ export function ResolveDialog({
             errors={errors}
             stillDown={incident.stillDown}
           />
+          {uptime && (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">Uptime</span>
+              <div className="flex flex-col gap-2.5 rounded-aura-md border border-border-default px-3.5 py-3 text-sm">
+                <span>{uptime.text}</span>
+                <Checkbox checked={uptime.inWindow} disabled>
+                  Inside a maintenance window
+                </Checkbox>
+              </div>
+              <span className="text-xs text-fg-secondary">
+                {uptime.inWindow
+                  ? 'A maintenance window covered it — those minutes are left out of uptime on both sides.'
+                  : 'No maintenance window was active, so it counts.'}
+              </span>
+            </div>
+          )}
           {unknown && (
             <Alert tone="warning" title="Unknown keeps the incident open">
               It stays in “Needs root cause” until someone picks a real category. Your notes are saved.

@@ -621,3 +621,285 @@ describe('runEngine — overlapping runs (engine review M2)', () => {
     expect(rpcCalls.filter((c) => c.name.startsWith('engine_'))).toEqual([]);
   });
 });
+
+describe('runEngine — maintenance and mute (S09, D-036)', () => {
+  const window = (over: Record<string, unknown> = {}) => ({
+    site_id: 's1',
+    kind: 'maintenance',
+    starts_at: at(-3600),
+    ends_at: at(3600),
+    approved_at: at(-7200),
+    ended_at: null,
+    cancelled_at: null,
+    ...over,
+  });
+
+  it('inside a window with nothing open, a DOWN opens nothing and the site shows Maintenance', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'maintenance_windows.select': { data: [window()] },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+    expect(rpcCalls[0]?.args).toMatchObject({ p_status: 'maintenance', p_ok_rounds: 0 });
+  });
+
+  it('still DOWN when the window ended: the incident opens, starting at the window’s end', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'maintenance_windows.select': { data: [window({ ends_at: at(20) })] },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_open_incident',
+      args: { p_started_at: at(20), p_notify: true },
+    });
+  });
+
+  it.each(['monitoring', 'needs_root_cause'])(
+    'a window hides a new drop on an incident that had recovered (%s): no DOWN AGAIN (D-036)',
+    async (state) => {
+      const { db, rpcCalls } = fakeDb({
+        'monitors.select': { data: [monitor()] },
+        'rpc.engine_checks': { data: down },
+        'incidents.select': { data: [incident(state)] },
+        'maintenance_windows.select': { data: [window()] },
+        'rpc.engine_relapse_incident': { data: true },
+      });
+      await runEngine(db, now);
+      expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+      expect(rpcCalls[0]?.args).toMatchObject({ p_status: 'maintenance' });
+    },
+  );
+
+  it('without a window that drop is a DOWN AGAIN as usual', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [incident('monitoring')] },
+      'rpc.engine_relapse_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_relapse_incident', args: { p_notify: true } });
+  });
+
+  // A recovered PROBLEM incident (slow, as INC-0139) whose site goes DOWN: D-021 escalate.
+  const recoveredProblem = {
+    ...incident('needs_root_cause'),
+    severity: 'problem',
+    episode_severity: 'problem',
+    notifications: [{ template: 'problem' }],
+  };
+
+  it('a DOWN on a recovered PROBLEM incident inside a window is hidden too: no DOWN card (round 3 H1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [recoveredProblem] },
+      'maintenance_windows.select': { data: [window()] },
+      'rpc.engine_escalate_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+    expect(rpcCalls[0]?.args).toMatchObject({ p_status: 'maintenance' });
+  });
+
+  it('without a window, or after it, that DOWN escalates — its outage starting at the window’s end', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [recoveredProblem] },
+      'maintenance_windows.select': { data: [window({ ends_at: at(20) })] },
+      'rpc.engine_escalate_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_escalate_incident',
+      args: { p_notify: true, p_context: { downStartedAt: at(20) } },
+    });
+  });
+
+  it('still DOWN after the window: DOWN AGAIN starts at the window’s end, in the event and the card (round 3 M3)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [incident('monitoring')] },
+      'maintenance_windows.select': { data: [window({ ends_at: at(20) })] },
+      'rpc.engine_relapse_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_relapse_incident',
+      args: { p_started_at: at(20), p_context: { startedAt: at(20) } },
+    });
+  });
+
+  it('a DOWN AGAIN confirmed after a window started mid-round is hidden, as a new DOWN is (round 3 M2)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      // The round starts at :00, the window at :20, the recheck confirms at :32.
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [incident('monitoring')] },
+      'maintenance_windows.select': { data: [window({ starts_at: at(20) })] },
+      'rpc.engine_relapse_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+  });
+
+  it('a settle inside a window keeps the site on Maintenance (round 3 M1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: ok },
+      'incidents.select': { data: [incident('monitoring')] },
+      'site_status.select': {
+        data: [
+          {
+            site_id: 's1',
+            status: 'maintenance',
+            last_round_at: at(-60),
+            ok_rounds: 1,
+            note: null,
+            flips: [],
+            flip_ok: null,
+          },
+        ],
+      },
+      'maintenance_windows.select': { data: [window()] },
+      'rpc.engine_settle_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_settle_incident', args: { p_status: 'maintenance' } });
+  });
+
+  it('a mute after the alert still lets RECOVERED close the thread (§15.1: new alerts only)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor({ muted_until: '2026-10-06T12:00:00Z' })] },
+      'rpc.engine_checks': { data: ok },
+      'incidents.select': { data: [incident('unacked')] },
+      'rpc.engine_recover_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_recover_incident', args: { p_notify: true } });
+  });
+
+  it('a DOWN confirmed inside a window that ended before this run stays inside it (engine review H1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      // Confirmed at :32, the window ended at :40, the run is at 10:01:05.
+      'maintenance_windows.select': { data: [window({ ends_at: at(40) })] },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+    expect(rpcCalls[0]?.args).toMatchObject({ p_status: 'maintenance' });
+  });
+
+  it('a DOWN confirmed a moment before a window starts isn’t hidden by it (engine review M1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'maintenance_windows.select': { data: [window({ starts_at: at(40) })] },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_open_incident', args: { p_started_at: at(0) } });
+  });
+
+  it('a relapse of an incident whose first alert a mute held back sends no DOWN AGAIN (the late card goes instead)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [incident('monitoring', false)] },
+      'rpc.engine_relapse_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_relapse_incident', args: { p_notify: false } });
+  });
+
+  it('the first round after a window that can’t judge the status puts it back to OK', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: ok },
+      'site_status.select': {
+        data: [
+          {
+            site_id: 's1',
+            status: 'maintenance',
+            last_round_at: null,
+            ok_rounds: 0,
+            note: null,
+            flips: [],
+            flip_ok: null,
+          },
+        ],
+      },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_record_round')?.args).toMatchObject({ p_status: 'ok' });
+  });
+
+  it('the first round after a window that can’t judge it keeps a monitor that is down DOWN, not OK', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      // One location reported a round past its deadline: too few to judge the status.
+      'rpc.engine_checks': { data: [row('SIN', 'pass', -120, 1, 200)] },
+      'rpc.engine_monitor_status': {
+        data: [
+          { monitor_id: 'm1', status: 'down', trigger: null, cause: null, slow_rounds: 0, failing_since: {} },
+        ],
+      },
+      'site_status.select': {
+        data: [
+          {
+            site_id: 's1',
+            status: 'maintenance',
+            last_round_at: null,
+            ok_rounds: 0,
+            note: null,
+            flips: [],
+            flip_ok: null,
+          },
+        ],
+      },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_record_round')?.args).toMatchObject({ p_status: 'down' });
+  });
+
+  it('a mute that ended with a silent incident open: its first alert posts now', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: [] },
+      'rpc.engine_silent_incidents': {
+        data: [{ incident_id: 'i9', site_id: 's1', tier: 1, severity: 'down', detected_at: at(-900) }],
+      },
+      'rpc.engine_post_late_alert': { data: true },
+    });
+    const summary = await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_post_late_alert')?.args).toEqual({
+      p_incident_id: 'i9',
+      p_at: now.toISOString(),
+    });
+    expect(summary.notified).toBe(1);
+  });
+
+  it('a Tier 2 PROBLEM alerted late outside response hours waits for the opening', async () => {
+    const night = new Date('2026-10-06T15:00:00Z'); // Tue 22:00 Bangkok
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: [] },
+      'rpc.engine_silent_incidents': {
+        data: [{ incident_id: 'i9', site_id: 's1', tier: 2, severity: 'problem', detected_at: at(-900) }],
+      },
+      'rpc.engine_post_late_alert': { data: true },
+    });
+    await runEngine(db, night);
+    expect(rpcCalls.find((c) => c.name === 'engine_post_late_alert')?.args).toMatchObject({
+      p_hold_until: '2026-10-07T02:00:00.000Z',
+    });
+  });
+});

@@ -94,6 +94,32 @@ export function bangkokDayStart(now: Date): Date {
   return new Date(Date.UTC(p.year, p.month, p.day) - BANGKOK_OFFSET_MS);
 }
 
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+/** "September" — the Bangkok month a moment falls in (Resolve's "September uptime 99.98%"). */
+export function formatMonth(date: Date): string {
+  return MONTH_NAMES[bangkokParts(date).month]!;
+}
+
+/** Midnight in Bangkok on the 1st of `now`'s Bangkok month (month-to-date uptime). */
+export function bangkokMonthStart(now: Date): Date {
+  const p = bangkokParts(now);
+  return new Date(Date.UTC(p.year, p.month, 1) - BANGKOK_OFFSET_MS);
+}
+
 /** "2,007" — counts with thousands separators. */
 export function formatCount(n: number): string {
   return n.toLocaleString('en-US');

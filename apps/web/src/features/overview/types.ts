@@ -67,7 +67,7 @@ export interface OverviewSite {
   /** Same index as `series`: the bucket had a hard fail. */
   failed: boolean[];
   /** The 30-day uptime window (spec §5, D-031); null for a site never monitored. */
-  uptime: { uptime: number; windowMinutes: number; downMinutes: number } | null;
+  uptime: { uptime: number; windowMinutes: number; downMinutes: number; maintenanceMinutes: number } | null;
 }
 
 /** An incident event for Recent events (§21.6), joined to its incident and site. */
@@ -113,4 +113,15 @@ export interface OverviewData {
   probes: ProbeHealth;
   /** The latest complete round across sites, for "last full round 10:07:10". */
   lastRoundAt: string | null;
+  /** The "Maintenance & mutes" card (§23.8); null = nothing active, waiting or scheduled. */
+  maintenance?: (OverviewMaintenanceCard & { phoneLine: string | null }) | null;
+  /** Recent events lines from windows and mutes (Main3). */
+  windowEvents?: { id: string; at: string; text: string }[];
+}
+
+export interface OverviewMaintenanceCard {
+  active: { id: string; kind: 'maintenance' | 'mute'; title: string; detail: string }[];
+  waiting: number;
+  scheduled: number;
+  nextScheduled: string | null;
 }
