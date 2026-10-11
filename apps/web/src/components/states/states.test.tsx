@@ -90,8 +90,9 @@ describe('Page skeletons', () => {
 
   it('a phone-wide action: the button from md, a full-width bar below it', () => {
     const { container } = render(<PageHeaderSkeleton actions={1} actionFullOnPhone />);
-    const [, desktop, phone] = Array.from(container.querySelector('[aria-hidden]')!.children);
-    expect(desktop).toHaveClass('hidden', 'md:flex');
+    const [header, phone] = Array.from(container.children);
+    expect(header!.lastElementChild).toHaveClass('hidden', 'md:flex');
+    // its own row under the header, as on the page (not inside the header box)
     expect(phone).toHaveClass('md:hidden');
   });
 });

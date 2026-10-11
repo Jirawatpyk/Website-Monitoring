@@ -1,7 +1,7 @@
 'use client';
 
 import type { WindowKind } from '@dxt/engine';
-import { formatDay, formatIncidentId, formatTier, formatTime } from '@dxt/shared';
+import { formatDay, formatIncidentId, formatTier, formatTime, formatWhen } from '@dxt/shared';
 import {
   Alert,
   Button,
@@ -15,13 +15,14 @@ import {
 } from '@jirawatpyk/aura-react';
 import { IconCalendar, IconCheck, IconEyeOff, IconInfo } from '@jirawatpyk/aura-react/icons';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useNow } from '@/components/use-now';
 import { muteSite, scheduleMaintenance } from '../actions';
 import {
   DURATIONS,
   EFFECT,
   GUARD_TEXT,
+  GUARD_TEXT_MUTED,
   PROBLEM_WORDS,
   doneOf,
   escalating,
@@ -31,7 +32,6 @@ import {
   reasonHint,
   reasonPlaceholder,
   startDays,
-  whenText,
   type PausableSite,
 } from '../model';
 
@@ -97,6 +97,11 @@ export function MaintenanceDialog({
   const [pending, start] = useTransition();
   // "Starts / Ends" follow the clock while the dialog is open: Save uses the time it is pressed (verify).
   const now = useNow(openedAt, 15_000, open && !done);
+  // After Save the form (and its focused button) gives way to the success line: focus moves to Done.
+  const doneRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (done) doneRef.current?.focus();
+  }, [done]);
 
   // Opened from /maintenance the site starts empty (§23.1): nothing submits until one is picked.
   const picked = sites.find((s) => s.id === site) ?? null;
@@ -115,7 +120,8 @@ export function MaintenanceDialog({
     isAdmin,
   });
   const isLater = kind === 'maintenance' && later;
-  const incident = current.openIncident;
+  // Nothing picked yet (opened from /maintenance): no site's incident speaks for it (spec-check).
+  const incident = picked ? current.openIncident : null;
   const rule = incident ? muteRule(incident) : null;
   // Already muted: alerts are held already, so the guard offers no second mute (verify).
   const mutedUntil =
@@ -186,7 +192,6 @@ export function MaintenanceDialog({
       open={open}
       onClose={onClose}
       size="md"
-      autoFocus={false}
       title={title}
       description={
         picked
@@ -196,7 +201,7 @@ export function MaintenanceDialog({
       footer={
         done ? (
           <>
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="secondary" onClick={onClose} ref={doneRef}>
               Done
             </Button>
             {!fromPage && (
@@ -212,6 +217,8 @@ export function MaintenanceDialog({
             </Button>
             <Button
               variant="primary"
+              // Phones: Mute instead is the one primary while the guard blocks (MMaintenance, §13).
+              className={plan.blocked && picked && !mutedUntil ? 'max-md:hidden' : undefined}
               icon={kind === 'mute' ? <IconEyeOff /> : <IconCalendar />}
               disabled={plan.problems.length > 0 || !picked}
               loading={pending}
@@ -255,14 +262,14 @@ export function MaintenanceDialog({
             />
           </span>
 
-          {plan.blocked && (
+          {plan.blocked && picked && (
             <Alert
               tone="danger"
               role="alert"
               title={guardTitle(current)}
               action={
                 mutedUntil ? (
-                  <span className="text-xs text-fg-secondary">{`Already muted until ${formatTime(mutedUntil)} — new alerts are held.`}</span>
+                  <span className="text-xs text-fg-secondary">{`Already muted until ${formatWhen(mutedUntil, now, { midSentence: true })} — new alerts are held.`}</span>
                 ) : (
                   <span className="flex w-full flex-wrap items-center gap-2.5">
                     <span className="max-md:hidden">
@@ -281,7 +288,7 @@ export function MaintenanceDialog({
                 )
               }
             >
-              {GUARD_TEXT}
+              {mutedUntil ? GUARD_TEXT_MUTED : GUARD_TEXT}
             </Alert>
           )}
 
@@ -326,14 +333,26 @@ export function MaintenanceDialog({
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">Duration</span>
             <span className="flex flex-wrap items-center gap-4">
-              <SegmentedControl
-                label="Duration"
-                size="sm"
-                options={durations.map((d) => d.label)}
-                value={dur}
-                onChange={setDuration}
-              />
-              <span className="text-sm text-fg-secondary">{`Ends ${whenText(plan.endsAt, now)} (UTC+7)`}</span>
+              <span className="max-md:hidden">
+                <SegmentedControl
+                  label="Duration"
+                  size="sm"
+                  options={durations.map((d) => d.label)}
+                  value={dur}
+                  onChange={setDuration}
+                />
+              </span>
+              {/* phones: full width, as Type (MMaintenance) */}
+              <span className="w-full md:hidden">
+                <SegmentedControl
+                  label="Duration"
+                  options={durations.map((d) => d.label)}
+                  value={dur}
+                  onChange={setDuration}
+                  fullWidth
+                />
+              </span>
+              <span className="text-sm text-fg-secondary">{`Ends ${formatWhen(plan.endsAt, now, { midSentence: true })} (UTC+7)`}</span>
             </span>
           </div>
 
@@ -364,10 +383,19 @@ export function MaintenanceDialog({
               {error}
             </Alert>
           )}
+          {plan.notice && picked && !error && (
+            <Alert tone="warning" role="status">
+              {plan.notice}
+            </Alert>
+          )}
+          {/* §23.10: starting maintenance ends the site's running mute (D-036). */}
+          {kind === 'maintenance' && mutedUntil && plan.startsAt < mutedUntil && (
+            <p className="m-0 text-sm text-fg-secondary">Starting this window ends the mute.</p>
+          )}
 
-          {kind === 'maintenance' && plan.needsApproval && (
+          {kind === 'maintenance' && plan.needsApproval && !plan.problems.includes('needs_approval_now') && (
             <Alert tone="warning" title="Needs an Admin’s approval">
-              {`Windows over 24 h asked for by a Responder wait for an Admin. It starts only if approved before ${whenText(plan.startsAt, now)} — otherwise it doesn’t start. Follow it under Waiting for approval on Maintenance & mutes.`}
+              {`Windows over 24 h asked for by a Responder wait for an Admin. It starts only if approved before ${formatWhen(plan.startsAt, now, { midSentence: true })} — otherwise it doesn’t start. Follow it under Waiting for approval on Maintenance & mutes.`}
             </Alert>
           )}
           {kind === 'maintenance' &&

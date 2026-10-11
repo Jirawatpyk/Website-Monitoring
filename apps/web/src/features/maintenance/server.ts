@@ -12,8 +12,12 @@ export {
 } from './page-model';
 
 /** `/maintenance`: every window and mute to show, and the live sites the dialog can offer. */
-export async function getMaintenancePage(now = new Date()) {
+export async function getMaintenancePage(now = new Date(), withSites = true) {
   const db = await createClient();
-  const [rows, sites] = await Promise.all([loadWindowRows(db, now), loadPausableSites(db)]);
+  // A read-only viewer never opens the dialog: skip the sites read (it joins every open incident).
+  const [rows, sites] = await Promise.all([
+    loadWindowRows(db, now),
+    withSites ? loadPausableSites(db) : Promise.resolve([]),
+  ]);
   return { rows, sites };
 }

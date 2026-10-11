@@ -160,7 +160,7 @@ describe('/maintenance sections and rows (spec §23, board MaintenancePage)', ()
       'Edit / withdraw',
       'Waiting for an Admin',
     ]);
-    expect(pageRow(bac, mint, NOW).note).toBeNull();
+    expect(pageRow(bac, mint, NOW).note).toBe('Waiting for an Admin'); // told, not offered an action (§23.7)
   });
 
   it('scheduled: Edit / cancel for those who may; who can act for the others', () => {

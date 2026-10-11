@@ -16,6 +16,7 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock('../actions', () => actions);
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock('@/components/use-live-refresh', () => ({ useLiveRefresh: () => true }));
 
 const NOW = '2026-09-25T03:07:00.000Z';
 const bkk = (iso: string) => new Date(`${iso}+07:00`).toISOString();

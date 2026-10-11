@@ -152,8 +152,11 @@ describe('SitesList (spec §20, Sites board)', () => {
     expect(push).toHaveBeenCalledWith('/sites/dxt');
     expect(within(table()).queryByRole('link', { name: 'Finish setup' })).not.toBeInTheDocument();
     expect(within(table()).getByText('Only an Admin can finish setup')).toBeInTheDocument();
-    // the ⋯ menu stays Admin-only (its other items are Admin actions); the row itself opens the site
-    expect(screen.queryByRole('button', { name: 'Actions for DxT' })).not.toBeInTheDocument();
+    // the site's owner gets the ⋯ menu for Mute / Schedule maintenance (§11, §20, D-036) — no Edit site
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions for DxT' })[0]!);
+    expect(screen.getByRole('menuitem', { name: 'Mute…' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Edit site' })).not.toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     // phone rows open Site detail too (spec §17)
     expect(within(phone()).getAllByRole('link', { name: /MuvMi/ })[0]).toHaveAttribute(
       'href',

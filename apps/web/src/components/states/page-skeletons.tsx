@@ -43,26 +43,28 @@ export function PageHeaderSkeleton({
   actionFullOnPhone = false,
 }: PageHeaderSkeletonProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" aria-hidden>
-      <div className="flex w-full max-w-xl flex-col gap-1">
-        <Skeleton variant="text" width={breadcrumb ? '40%' : '15%'} />
-        {/* The h1's line box (display serif), so the meta line and cards don't shift on arrival. */}
-        <Skeleton variant="rect" height={40} width="50%" />
-        <Skeleton variant="text" width="80%" />
-      </div>
-      {actions > 0 && (
-        <div className={actionsFromMd || actionFullOnPhone ? 'hidden gap-3 md:flex' : 'flex gap-3'}>
-          {Array.from({ length: actions }, (_, i) => (
-            <Skeleton key={i} variant="rect" height={44} width={120} />
-          ))}
+    <>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" aria-hidden>
+        <div className="flex w-full max-w-xl flex-col gap-1">
+          <Skeleton variant="text" width={breadcrumb ? '40%' : '15%'} />
+          {/* The h1's line box (display serif), so the meta line and cards don't shift on arrival. */}
+          <Skeleton variant="rect" height={40} width="50%" />
+          <Skeleton variant="text" width="80%" />
         </div>
-      )}
+        {actions > 0 && (
+          <div className={actionsFromMd || actionFullOnPhone ? 'hidden gap-3 md:flex' : 'flex gap-3'}>
+            {Array.from({ length: actions }, (_, i) => (
+              <Skeleton key={i} variant="rect" height={44} width={120} />
+            ))}
+          </div>
+        )}
+      </div>
       {actionFullOnPhone && (
-        <div className="md:hidden">
+        <div className="md:hidden" aria-hidden>
           <Skeleton variant="rect" height={44} width="100%" />
         </div>
       )}
-    </div>
+    </>
   );
 }
 

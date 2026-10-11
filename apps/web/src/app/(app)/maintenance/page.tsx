@@ -28,7 +28,8 @@ export default async function MaintenancePage() {
   }
   const { profile } = access;
   const now = new Date();
-  const { rows, sites } = await getMaintenancePage(now);
+  const editor = profile.role === 'admin' || profile.role === 'responder';
+  const { rows, sites } = await getMaintenancePage(now, editor);
   const viewer: Viewer = {
     id: profile.id,
     name: profile.displayName,

@@ -36,16 +36,19 @@ export function PauseActions({
     <>
       {muted ? (
         <Button variant="secondary" icon={<IconEyeOff />} href="/maintenance">
-          End or edit mute…
+          <span className="max-md:hidden">End or edit mute</span>
+          <span className="md:hidden">Edit mute</span>
         </Button>
-      ) : (
+      ) : site.status === 'maintenance' ? null : (
+        // In maintenance alerts are already off: no mute to offer (§23.10).
         <Button variant="secondary" icon={<IconEyeOff />} onClick={() => show('mute')}>
           Mute
         </Button>
       )}
       {site.status === 'maintenance' ? (
         <Button variant="secondary" icon={<IconCalendar />} href="/maintenance">
-          End or edit maintenance…
+          <span className="max-md:hidden">End or edit maintenance</span>
+          <span className="md:hidden">Edit maintenance</span>
         </Button>
       ) : (
         <Button variant="secondary" icon={<IconCalendar />} onClick={() => show('maintenance')}>

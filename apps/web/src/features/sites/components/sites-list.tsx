@@ -232,16 +232,18 @@ export function SitesList({
     ...(isAdmin ? [{ label: 'Edit site', icon: <IconPencil />, href: `/sites/${r.id}/edit` }] : []),
     ...(r.live || isAdmin ? [{ separator: true as const }] : []),
     // Mute and maintenance (spec §11, D-012, D-036): an Admin, or the site's owner or backup, on a live
-    // site. A running one is ended or edited from Overview › Maintenance & mutes.
+    // site. A running one is ended or edited on /maintenance.
     ...(r.live && mayPause(r)
       ? [
-          isMuted(r, now)
-            ? { label: 'End or edit mute…', icon: <IconEyeOff />, href: '/maintenance' }
-            : { label: 'Mute…', icon: <IconEyeOff />, onSelect: () => openPause(r.id, 'mute') },
+          ...(isMuted(r, now)
+            ? [{ label: 'End or edit mute', icon: <IconEyeOff />, href: '/maintenance' }]
+            : r.status === 'maintenance'
+              ? [] // alerts are already off (§23.10)
+              : [{ label: 'Mute…', icon: <IconEyeOff />, onSelect: () => openPause(r.id, 'mute') }]),
           r.status === 'maintenance'
-            ? { label: 'End or edit maintenance…', icon: <IconCalendar />, href: '/maintenance' }
+            ? { label: 'End or edit maintenance', icon: <IconCalendar />, href: '/maintenance' }
             : {
-                label: 'Schedule maintenance',
+                label: 'Schedule maintenance…',
                 icon: <IconCalendar />,
                 onSelect: () => openPause(r.id, 'maintenance'),
               },
@@ -383,7 +385,8 @@ export function SitesList({
                 Visit site
               </Button>
             )}
-            {isAdmin && (
+            {/* Owners and backups mute and schedule too (§11, D-036), not only Admins. */}
+            {(isAdmin || mayPause(r)) && (
               <DropdownMenu
                 label={`Actions for ${r.name}`}
                 trigger={<IconButton icon={<IconEllipsis />} label={`Actions for ${r.name}`} />}

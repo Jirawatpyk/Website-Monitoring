@@ -29,7 +29,10 @@ test.describe('maintenance & mutes (local Supabase)', () => {
       'A window started now won’t hide this incident — it stays open and keeps counting.',
     );
     await dialog.getByLabel(/Reason/).fill('Hotfix');
-    await expect(dialog.getByRole('button', { name: 'Start now' })).toBeDisabled();
+    // Phones: Mute instead is the one primary, so Start now steps aside (§13); desktop shows it off.
+    const startNow = dialog.getByRole('button', { name: 'Start now' });
+    if (info.project.name === 'mobile') await expect(startNow).toBeHidden();
+    else await expect(startNow).toBeDisabled();
     await page.screenshot({ path: `test-results/s09-guard-${info.project.name}.png` });
 
     await guard.getByRole('button', { name: 'Mute instead' }).click();

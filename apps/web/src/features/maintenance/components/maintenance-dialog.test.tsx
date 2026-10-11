@@ -91,27 +91,68 @@ describe('MaintenanceDialog (boards Maintenance, MMaintenance)', () => {
     const box = screen.getByRole('dialog', { name: 'Schedule maintenance' });
     await user.click(within(box).getByRole('radio', { name: 'Now' }));
     const alert = within(box).getByRole('alert');
-    expect(alert).toHaveTextContent(/Already muted until \d\d:\d\d — new alerts are held\./);
+    expect(alert).toHaveTextContent(/Already muted until (today )?\d\d:\d\d — new alerts are held\./);
     expect(within(alert).queryByRole('button', { name: 'Mute instead' })).not.toBeInTheDocument();
+  });
+
+  it('focus moves into the dialog when it opens, and to Done after a save (spec-check)', async () => {
+    const user = userEvent.setup();
+    dialog({ siteId: 's-tw', kind: 'mute' });
+    const box = screen.getByRole('dialog', { name: 'Mute site' });
+    await waitFor(() => expect(box.contains(document.activeElement)).toBe(true));
+    await user.type(within(box).getByLabelText(/Reason/), 'Deploy');
+    await user.click(within(box).getByRole('button', { name: /Mute for/ }));
+    await waitFor(() => expect(within(box).getByRole('button', { name: 'Done' })).toHaveFocus());
+  });
+
+  it('a Responder’s 3-day window starting now says why Submit is off (§14.16)', async () => {
+    const user = userEvent.setup();
+    dialog({ siteId: 's-tw' });
+    const box = screen.getByRole('dialog', { name: 'Schedule maintenance' });
+    await user.click(within(box).getByRole('radio', { name: 'Now' }));
+    await user.click(within(box).getAllByRole('radio', { name: '3 days' })[0]!);
+    expect(
+      within(box).getByText('Over 24 h needs an Admin’s approval first — pick a later start.'),
+    ).toBeInTheDocument();
+    expect(within(box).queryByText('Needs an Admin’s approval')).not.toBeInTheDocument();
+  });
+
+  it('opened with no site picked, no other site’s incident shows (spec-check)', async () => {
+    const user = userEvent.setup();
+    dialog({ siteId: '', sites: [muvmi, taiwan] });
+    const box = screen.getByRole('dialog', { name: 'Schedule maintenance' });
+    await user.click(within(box).getByRole('radio', { name: 'Now' }));
+    expect(within(box).queryByText(/MuvMi is DOWN now/)).not.toBeInTheDocument();
+  });
+
+  it('a mute on a site in maintenance is refused before the round trip (§23.10)', async () => {
+    const user = userEvent.setup();
+    dialog({ siteId: 's-tw', kind: 'mute', sites: [{ ...taiwan, status: 'maintenance' }] });
+    const box = screen.getByRole('dialog', { name: 'Mute site' });
+    await user.type(within(box).getByLabelText(/Reason/), 'Deploy');
+    expect(
+      within(box).getByText('The site is in maintenance — its alerts are already off.'),
+    ).toBeInTheDocument();
+    expect(within(box).getByRole('button', { name: /Mute for/ })).toBeDisabled();
   });
 
   it('Done-when 4: a Responder’s 3-day window says it waits for an Admin; an Admin is told no approval is needed', async () => {
     const user = userEvent.setup();
     const { unmount } = dialog({ siteId: 's-tw' });
     await user.click(screen.getByRole('radio', { name: 'Later' }));
-    await user.click(screen.getByRole('radio', { name: '3 days' }));
+    await user.click(screen.getAllByRole('radio', { name: '3 days' })[0]!);
     expect(screen.getByText('Needs an Admin’s approval')).toBeInTheDocument();
     unmount();
     dialog({ siteId: 's-tw', isAdmin: true });
     await user.click(screen.getByRole('radio', { name: 'Later' }));
-    await user.click(screen.getByRole('radio', { name: '3 days' }));
+    await user.click(screen.getAllByRole('radio', { name: '3 days' })[0]!);
     expect(screen.getByText('You’re an Admin — no approval needed')).toBeInTheDocument();
     expect(screen.queryByText('Needs an Admin’s approval')).not.toBeInTheDocument();
   });
 
   it('a mute offers at most 24 h', () => {
     dialog({ siteId: 's-tw', kind: 'mute' });
-    expect(screen.getByRole('radio', { name: '24 h' })).toBeInTheDocument();
+    expect(screen.getAllByRole('radio', { name: '24 h' })[0]).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: '3 days' })).not.toBeInTheDocument();
   });
 

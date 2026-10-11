@@ -1,10 +1,11 @@
 'use client';
 
 import type { WindowKind } from '@dxt/engine';
-import type { SiteStatus } from '@dxt/shared';
+import { formatDay, formatTime, type SiteStatus } from '@dxt/shared';
 import {
   Badge,
   Button,
+  Card,
   DataTable,
   Dialog,
   EmptyState,
@@ -22,7 +23,9 @@ import {
   IconPlus,
 } from '@jirawatpyk/aura-react/icons';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { useLiveRefresh } from '@/components/use-live-refresh';
+import { useNow } from '@/components/use-now';
 import { SiteStatusBadge } from '@/components/status-badges';
 import type { PausableSite } from '../model';
 import { metaOf, sectionsOf, type PageRow, type Section, type Viewer, type WindowRow } from '../page-model';
@@ -123,7 +126,7 @@ function Actions({ p, open }: { p: PageRow; open: Show }) {
 
 function columns(recent: boolean, open: Show): DataTableColumn<PageRow & { id: string }>[] {
   return [
-    { key: 'status', label: 'Status', width: 170, render: (p) => <StatusCell p={p} /> },
+    { key: 'status', label: 'Status', width: 170, render: (p) => <StatusCell p={p} short /> },
     {
       key: 'site',
       label: 'Site',
@@ -174,7 +177,7 @@ function columns(recent: boolean, open: Show): DataTableColumn<PageRow & { id: s
         }
       : {
           key: 'actions',
-          label: 'Actions',
+          label: '',
           width: 260,
           actions: true,
           render: (p) => <Actions p={p} open={open} />,
@@ -201,7 +204,11 @@ export function MaintenancePageView({
   viewerEmail: string;
   nowIso: string;
 }) {
-  const now = useMemo(() => new Date(nowIso), [nowIso]);
+  // Rows move between sections, "37 min in" and "starts in" count on while the page stays open, and
+  // the dialogs' end choices start from now (spec-check). A window starting or ending changes
+  // site_status, so a round re-renders the page; other people's edits show on the next one.
+  const now = useNow(nowIso, 60_000);
+  useLiveRefresh();
   const sections = sectionsOf(rows, viewer, now);
   const notEmpty = sections.some((s) => s.key !== 'recent');
   const canSchedule = viewer.role !== 'readonly' && sites.length > 0;
@@ -227,9 +234,15 @@ export function MaintenancePageView({
   const openSchedule = () => setSchedule((s) => ({ open: true, n: s.n + 1 }));
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="OPERATIONS"
+        // Phones: the time in Bangkok as on the Overview (MMaintenanceList, §23.10 UTC+7); desktop OPERATIONS.
+        eyebrow={
+          <>
+            <span className="max-md:hidden">OPERATIONS</span>
+            <span className="uppercase md:hidden">{`${formatDay(now, { weekday: true })} ${formatTime(now)} · UTC+7`}</span>
+          </>
+        }
         title="Maintenance & mutes"
         meta={metaOf(sections)}
         actions={
@@ -251,20 +264,22 @@ export function MaintenancePageView({
       )}
 
       {!notEmpty && (
-        <EmptyState
-          icon={<IconCalendar />}
-          title="Nothing active or scheduled"
-          description="Maintenance windows and mutes show here while they run, before they start and while they wait for approval. Finished ones stay under Recent for 30 days."
-          action={
-            canSchedule ? (
-              <span className="max-md:hidden">
-                <Button variant="primary" icon={<IconPlus />} onClick={openSchedule}>
-                  Schedule maintenance or mute
-                </Button>
-              </span>
-            ) : undefined
-          }
-        />
+        <Card>
+          <EmptyState
+            icon={<IconCalendar />}
+            title="Nothing active or scheduled"
+            description="Maintenance windows and mutes show here while they run, before they start and while they wait for approval. Finished ones stay under Recent for 30 days."
+            action={
+              canSchedule ? (
+                <span className="max-md:hidden">
+                  <Button variant="primary" icon={<IconPlus />} onClick={openSchedule}>
+                    Schedule maintenance or mute
+                  </Button>
+                </span>
+              ) : undefined
+            }
+          />
+        </Card>
       )}
 
       {sections.map((s) => (
@@ -402,7 +417,7 @@ function RowSheet({
       open={open}
       onClose={onClose}
       size="sm"
-      autoFocus={false}
+
       title={r.siteName}
       description={`${kindWord(r.kind)} · Tier ${r.tier}`}
     >

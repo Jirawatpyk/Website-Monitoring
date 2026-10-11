@@ -280,7 +280,8 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
       line: `${shortDay(start)} → ${shortDay(end)} · ${lengthText(lengthMin)} · ${by}`,
     });
     if (v.role === 'admin') base.canApprove = true;
-    else if (v.role === 'responder') {
+    else {
+      // Everyone but an Admin is told who it waits for (boards; §23.7 limits actions only).
       base.note = 'Waiting for an Admin';
       // The asker who no longer owns the site may still withdraw it, but not edit it (edit_window_end).
       if (can) base.editLabel = 'Edit / withdraw';
@@ -400,6 +401,8 @@ export function dialogDescription(r: WindowRow, now: Date): string {
   const span = r.kind === 'mute' ? `Muted ${spanText(start, end, now)}` : spanText(start, end, now);
   return `${span} · ${r.reason} · ${wasRequest(r) && r.kind === 'maintenance' ? 'asked by' : 'by'} ${r.byName ?? 'someone'}`;
 }
+
+export const PROBLEM_WORDS_UNCHANGED = 'Pick a different end time.';
 
 /** The Ends choices: the current end and nearby hours that keep it valid (≥ 5 min away; a mute ≤ 24 h). */
 export function endChoices(r: WindowRow, now: Date): { value: string; label: string }[] {

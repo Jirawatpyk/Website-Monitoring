@@ -20,6 +20,7 @@ import {
   endChoices,
   endEffects,
   noun,
+  PROBLEM_WORDS_UNCHANGED,
   WITHDRAW_ONLY,
   type PageRow,
 } from '../page-model';
@@ -84,7 +85,7 @@ export function EndDialog({
       open={open}
       onClose={onClose}
       size="sm"
-      autoFocus={false}
+      dismissOnScrim={false}
       title={`End ${r.siteName} ${noun(r.kind)} now?`}
       description={dialogDescription(r, now)}
       footer={
@@ -171,7 +172,7 @@ export function EditDialog({
       open={open}
       onClose={onClose}
       size="md"
-      autoFocus={false}
+      dismissOnScrim={false}
       title={title}
       description={dialogDescription(r, now)}
       footer={
@@ -203,6 +204,8 @@ export function EditDialog({
             options={choices}
             value={end}
             onChange={(e) => setEnd(e.target.value)}
+            // Why "Save end time" is off once a reason is typed (§14.16).
+            hint={end === current && reason.trim() ? PROBLEM_WORDS_UNCHANGED : undefined}
           />
         )}
         <TextField
@@ -242,7 +245,7 @@ export function ApproveDialog({
       open={open}
       onClose={onClose}
       size="sm"
-      autoFocus={false}
+      dismissOnScrim={false}
       title={approveTitle(r)}
       description={dialogDescription(r, now)}
       footer={
@@ -284,7 +287,7 @@ export function DeclineDialog({ p, now, open, onClose, onDone = onClose }: Dialo
       open={open}
       onClose={onClose}
       size="sm"
-      autoFocus={false}
+      dismissOnScrim={false}
       title={`Decline ${r.byName ? `${r.byName}’s` : 'this'} request?`}
       description={dialogDescription(r, now)}
       footer={

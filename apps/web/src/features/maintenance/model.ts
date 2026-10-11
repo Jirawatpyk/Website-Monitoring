@@ -96,6 +96,9 @@ export function guardTitle(site: Pick<PausableSite, 'name' | 'status' | 'openInc
 
 export const GUARD_TEXT =
   'A window started now won’t hide this incident — it stays open and keeps counting. Mute the alerts instead, or schedule the window for later.';
+/** The guard on a site already muted: no second mute to offer (spec-check). */
+export const GUARD_TEXT_MUTED =
+  'A window started now won’t hide this incident — it stays open and keeps counting. Schedule the window for later.';
 
 /** "Mute stops new alerts only — INC-0142 keeps escalating until someone acknowledges." (§15.1) */
 export function muteRule(i: IncidentLinkData): { title: string; text: string } {
@@ -142,11 +145,23 @@ export function reasonPlaceholder(kind: WindowKind, busy: boolean): string {
   return busy ? 'e.g. Known outage, host restarting' : 'e.g. Investigating slow booking page';
 }
 
+export type DialogProblem = WindowProblem | 'already_muted' | 'in_maintenance';
+
+/** Shown by their own field or alert: the reason hint, the start time, the guard. */
+const SHOWN_ELSEWHERE: readonly DialogProblem[] = [
+  'reason_required',
+  'starts_in_past',
+  'ends_before_start',
+  'maintenance_open_incident',
+];
+
 export interface DialogPlan {
   kind: WindowKind;
   startsAt: Date;
   endsAt: Date;
-  problems: WindowProblem[];
+  problems: DialogProblem[];
+  /** Why Submit is off, in words, when the field itself doesn't say (§14.16); null otherwise. */
+  notice: string | null;
   needsApproval: boolean;
   /** Maintenance now on a busy site: the guard alert with Mute instead. */
   blocked: boolean;
@@ -178,11 +193,23 @@ export function planOf(input: {
     siteBusy: busyOf(input.site),
     isAdmin: input.isAdmin,
   });
+  // A mute the server would refuse anyway: say so before the round trip (§23.10, spec-check).
+  const extra: DialogProblem[] = [];
+  if (input.kind === 'mute' && input.site.status === 'maintenance') extra.push('in_maintenance');
+  else if (
+    input.kind === 'mute' &&
+    input.site.mutedUntil &&
+    Date.parse(input.site.mutedUntil) > input.now.getTime()
+  )
+    extra.push('already_muted');
+  const problems: DialogProblem[] = [...check.problems, ...extra];
+  const shown = problems.find((p) => !SHOWN_ELSEWHERE.includes(p));
   return {
     kind: input.kind,
     startsAt,
     endsAt,
-    problems: check.problems,
+    problems,
+    notice: shown ? PROBLEM_WORDS[shown] : null,
     needsApproval: check.needsApproval,
     blocked: check.problems.includes('maintenance_open_incident'),
     submit: submitLabel(input.kind, later, d.label, check.needsApproval),
@@ -248,13 +275,15 @@ export function doneOf(p: {
   viewer: string;
   now: Date;
 }): { title: string; text: string } {
-  const why = ` Reason: “${p.reason.trim()}”. End early, edit or cancel it on Maintenance & mutes.`;
+  // A running one has no Cancel (§23.5): it is ended early or edited.
+  const running = p.kind === 'mute' || !p.later;
+  const why = ` Reason: “${p.reason.trim()}”. ${running ? 'End early or edit it' : 'Edit or cancel it'} on Maintenance & mutes.`;
   const span = `${whenText(p.startsAt, p.now)} → ${whenText(p.endsAt, p.now)}`;
   if (p.kind === 'mute') {
     const inc = p.site.openIncident;
     const still = inc
       ? escalating(inc)
-        ? ` ${formatIncidentId(inc.number)} is still escalating — acknowledge it to stop it.`
+        ? ` ${formatIncidentId(inc.number)} is still escalating — acknowledge it to stop the escalation.`
         : ` ${formatIncidentId(inc.number)} stays open.`
       : '';
     return {

@@ -72,6 +72,11 @@ AURA 5.36 (requests 15–16, 10 Oct 2026; DxT took it in `chore/aura-5.36`):
 - Request 16 — already in AURA (5.36 adds tests and docs): `DataTableColumn align: 'end'` right-aligns the header and cells with tabular figures; stacked cards keep values start-aligned → the Incidents Duration column.
 - Side effect of 15: content wider than its cell (a pill, a button) can show up to 4 px into the next column.
 
+Open (S09, 11 Oct 2026):
+
+- Request 17 — `PageHeader` actions full width below md (a prop): Site detail's phone Mute / Maintenance / Edit monitors grid reaches past AURA's actions box with `max-md:[&>:last-child]:w-full` until then.
+- Request 18 — `SegmentedControl touchHeight` by viewport, as Button: today it grows to 44 px only on `pointer: coarse`, so the phone e2e (mouse) can't check it.
+
 AURA 5.35 (requests 11–14, 10 Oct 2026; DxT took it in `chore/aura-5.35`):
 
 - Request 11 — crumb links get a 44 px tall touch area on coarse pointers, built in → the `.aura-crumbs a::after` rule left `globals.css`.
