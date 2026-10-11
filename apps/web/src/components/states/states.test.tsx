@@ -87,6 +87,13 @@ describe('Page skeletons', () => {
     const actions = container.querySelector('[aria-hidden] > div:last-child')!;
     expect(actions).toHaveClass('hidden', 'md:flex');
   });
+
+  it('a phone-wide action: the button from md, a full-width bar below it', () => {
+    const { container } = render(<PageHeaderSkeleton actions={1} actionFullOnPhone />);
+    const [, desktop, phone] = Array.from(container.querySelector('[aria-hidden]')!.children);
+    expect(desktop).toHaveClass('hidden', 'md:flex');
+    expect(phone).toHaveClass('md:hidden');
+  });
 });
 
 describe('OfflineStrip', () => {

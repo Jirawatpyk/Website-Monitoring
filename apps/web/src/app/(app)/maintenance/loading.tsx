@@ -5,7 +5,7 @@ export default function Loading() {
   return (
     <Container>
       <PageSkeleton label="Loading maintenance and mutes">
-        <PageHeaderSkeleton />
+        <PageHeaderSkeleton actions={1} actionFullOnPhone />
         <CardSkeleton lines={3} />
         <CardSkeleton lines={4} />
       </PageSkeleton>
