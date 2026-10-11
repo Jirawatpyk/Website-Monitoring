@@ -471,6 +471,7 @@ export function IncidentDetailView({
             conditions={d.gate.conditions}
             summary={summary}
             lasted={`${d.severity === 'down' ? 'Down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`}
+            uptime={d.uptime}
             postedAt={d.resolved?.posted ?? null}
             postOverdue={postOverdue}
             viewerName={viewerName}

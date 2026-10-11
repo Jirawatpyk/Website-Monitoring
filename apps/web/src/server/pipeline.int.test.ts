@@ -1135,14 +1135,38 @@ describe('escalation ladder (S08, D-034, Done-when 1)', () => {
 describe('mute and maintenance (S09, D-036)', () => {
   const profileId = async (address: string) =>
     (await must(db.from('profiles').select('id').eq('email', address).single())).id;
-  const mute = (siteId: string, until: Date | null) =>
-    must(
+  // A mute as mute_site leaves it: the window row and the site row (the engine clears a site-row mute
+  // with no running mute window behind it, D-036). Ending it sets the window aside and clears the row.
+  const mute = async (siteId: string, until: Date | null) => {
+    await db
+      .from('maintenance_windows')
+      .update({ cancelled_at: new Date().toISOString() })
+      .eq('site_id', siteId)
+      .eq('kind', 'mute')
+      .is('cancelled_at', null);
+    if (until)
+      await must(
+        db
+          .from('maintenance_windows')
+          .insert({
+            site_id: siteId,
+            kind: 'mute',
+            starts_at: new Date(until.getTime() - 24 * 3_600_000 + 60_000).toISOString(),
+            ends_at: until.toISOString(),
+            reason: 'Integration test',
+            approved_at: new Date(0).toISOString(),
+            start_logged: true,
+          })
+          .select('id'),
+      );
+    return must(
       db
         .from('sites')
         .update({ muted_until: until?.toISOString() ?? null })
         .eq('id', siteId)
         .select('id'),
     );
+  };
   const chat = (incidentId: string) =>
     must(
       db

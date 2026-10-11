@@ -1,11 +1,15 @@
 import 'server-only';
 import { cache } from 'react';
 import type { DbClient } from '@dxt/db';
-import { episodesFromTimeline, outageMinutes } from '@dxt/engine';
+import { episodesFromTimeline, outageMinutes, siteUptimeOver } from '@dxt/engine';
 import { describeFailure } from '@dxt/notifier';
 import type { LocationGlyph } from '@/components/site-cells';
 import {
+  bangkokMonthStart,
   CLOSED_INCIDENT_STATES_IN,
+  formatDuration,
+  formatMonth,
+  formatPercent,
   isTlsChainError,
   PROBE_LOCATIONS,
   TRIGGER_LABELS,
@@ -17,6 +21,7 @@ import {
   type Trigger,
 } from '@dxt/shared';
 import { getAccess } from '@/lib/auth/session';
+import { downEpisodesBySite, maintenanceSpansBySite } from '@/features/sites/server';
 import { fetchAllPages } from '@/lib/csv';
 import { createClient } from '@/lib/supabase/server';
 import { serviceDb } from '@/server/db';
@@ -89,6 +94,8 @@ export interface IncidentDetail {
   timeline: TimelineItem[];
   locations: LocationEvidence[];
   evidence: { url: string; takenAt: string; afterRecovery: boolean } | null;
+  /** Resolve's Uptime box (D-033, S09): this month's uptime with this incident, and whether a window covered it. */
+  uptime?: { text: string; inWindow: boolean } | null;
 }
 
 interface DetailRow extends IncidentRow {
@@ -352,6 +359,7 @@ export async function loadIncident(
       i.detected_at,
       primary?.timeout_ms ?? 30_000,
     ),
+    uptime: await uptimeBox(db, i, events, now),
     evidence:
       url && evidenceEvent
         ? {
@@ -514,5 +522,49 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
       drops: dropsOf(r),
     })),
     sites: sites.data ?? [],
+  };
+}
+
+/**
+ * Resolve's Uptime box (Resolve board; D-033 left it for S09): the site's uptime this month with this
+ * incident counted (spec §5: DOWN minutes only, maintenance left out of both sides), and whether a
+ * maintenance window covered the incident.
+ */
+async function uptimeBox(
+  db: DbClient,
+  i: {
+    site_id: string;
+    severity: string;
+    started_at: string;
+    recovered_at: string | null;
+    sites: { name: string };
+  },
+  events: Parameters<typeof episodesFromTimeline>[1],
+  now: Date,
+): Promise<{ text: string; inWindow: boolean } | null> {
+  const from = bangkokMonthStart(now);
+  const [downs, spans] = await Promise.all([
+    downEpisodesBySite(db, [i.site_id], from),
+    maintenanceSpansBySite(db, [i.site_id], from),
+  ]);
+  const site = spans.get(i.site_id) ?? [];
+  const r = siteUptimeOver(downs.get(i.site_id) ?? [], {
+    now,
+    rangeMinutes: (now.getTime() - from.getTime()) / 60_000,
+    monitoringStartedAt: from,
+    maintenance: site,
+  });
+  if (!r) return null;
+  const start = Date.parse(i.started_at);
+  const end = i.recovered_at ? Date.parse(i.recovered_at) : now.getTime();
+  const inWindow = site.some((w) => w.start.getTime() < end && w.end.getTime() > start);
+  const month = `${i.sites.name} ${formatMonth(now)} uptime ${formatPercent(r.uptime)}`;
+  const minutes = outageMinutes(episodesFromTimeline(i as never, events), now);
+  if (i.severity !== 'down') return { text: `A PROBLEM counts as up → ${month}`, inWindow };
+  return {
+    text: inWindow
+      ? `Not counted — inside a maintenance window → ${month}`
+      : `${formatDuration(minutes ?? 0)} counts as downtime → ${month}`,
+    inWindow,
   };
 }
