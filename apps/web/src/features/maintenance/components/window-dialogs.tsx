@@ -20,6 +20,7 @@ import {
   endChoices,
   endEffects,
   noun,
+  WITHDRAW_ONLY,
   type PageRow,
 } from '../page-model';
 
@@ -140,10 +141,12 @@ export function EditDialog({
   const current = choices.find((c) => c.label.endsWith('(current)'))?.value ?? r.endsAt;
   const [end, setEnd] = useState(current);
   const [reason, setReason] = useState('');
-  const [cancelling, setCancelling] = useState(false);
+  const request = p.state === 'waiting';
+  // The asker who no longer owns the site: straight to the withdraw step, no end to edit.
+  const withdrawOnly = request && p.editLabel === WITHDRAW_ONLY;
+  const [cancelling, setCancelling] = useState(withdrawOnly);
   const { error, pending, run } = useSubmit(onDone);
   const running = p.state === 'active';
-  const request = p.state === 'waiting';
   const cancelWord = request ? 'Withdraw request' : 'Cancel maintenance';
   const title = running
     ? `Change end · ${r.siteName} ${noun(r.kind)}`
@@ -175,8 +178,11 @@ export function EditDialog({
         <span className="flex w-full flex-wrap items-center gap-3">
           {!cancelling && !running && <span className="max-md:hidden">{cancelButton(false)}</span>}
           <span className="grow" />
-          <Button variant="secondary" onClick={() => (cancelling ? setCancelling(false) : onClose())}>
-            {cancelling ? 'Back' : 'Close'}
+          <Button
+            variant="secondary"
+            onClick={() => (cancelling && !withdrawOnly ? setCancelling(false) : onClose())}
+          >
+            {cancelling && !withdrawOnly ? 'Back' : 'Close'}
           </Button>
           <Button
             variant="primary"

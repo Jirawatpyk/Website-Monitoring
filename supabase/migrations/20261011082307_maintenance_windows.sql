@@ -610,7 +610,8 @@ begin
   if p_ends_at = w.ends_at then
     raise exception 'Pick a different end time' using errcode = '22023', hint = 'unchanged';
   end if;
-  if w.kind = 'mute' and p_ends_at - w.starts_at > interval '24 hours' then
+  -- The same minute of slack as mute_site: "24 h" picked in the dialog counts from the moment it opened.
+  if w.kind = 'mute' and p_ends_at - w.starts_at > interval '24 hours 1 minute' then
     raise exception 'A mute lasts at most 24 h — schedule maintenance for longer'
       using errcode = '22023', hint = 'mute_too_long';
   end if;

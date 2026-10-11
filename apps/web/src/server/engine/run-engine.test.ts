@@ -659,12 +659,27 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     });
   });
 
-  it('a window never hides an incident already open: its relapse alerts as usual (§14.5)', async () => {
+  it.each(['monitoring', 'needs_root_cause'])(
+    'a window hides a new drop on an incident that had recovered (%s): no DOWN AGAIN (D-036)',
+    async (state) => {
+      const { db, rpcCalls } = fakeDb({
+        'monitors.select': { data: [monitor()] },
+        'rpc.engine_checks': { data: down },
+        'incidents.select': { data: [incident(state)] },
+        'maintenance_windows.select': { data: [window()] },
+        'rpc.engine_relapse_incident': { data: true },
+      });
+      await runEngine(db, now);
+      expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+      expect(rpcCalls[0]?.args).toMatchObject({ p_status: 'maintenance' });
+    },
+  );
+
+  it('without a window that drop is a DOWN AGAIN as usual', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
       'rpc.engine_checks': { data: down },
       'incidents.select': { data: [incident('monitoring')] },
-      'maintenance_windows.select': { data: [window()] },
       'rpc.engine_relapse_incident': { data: true },
     });
     await runEngine(db, now);
@@ -736,6 +751,34 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     });
     await runEngine(db, now);
     expect(rpcCalls.find((c) => c.name === 'engine_record_round')?.args).toMatchObject({ p_status: 'ok' });
+  });
+
+  it('the first round after a window that can’t judge it keeps a monitor that is down DOWN, not OK', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      // One location reported a round past its deadline: too few to judge the status.
+      'rpc.engine_checks': { data: [row('SIN', 'pass', -120, 1, 200)] },
+      'rpc.engine_monitor_status': {
+        data: [
+          { monitor_id: 'm1', status: 'down', trigger: null, cause: null, slow_rounds: 0, failing_since: {} },
+        ],
+      },
+      'site_status.select': {
+        data: [
+          {
+            site_id: 's1',
+            status: 'maintenance',
+            last_round_at: null,
+            ok_rounds: 0,
+            note: null,
+            flips: [],
+            flip_ok: null,
+          },
+        ],
+      },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_record_round')?.args).toMatchObject({ p_status: 'down' });
   });
 
   it('a mute that ended with a silent incident open: its first alert posts now', async () => {

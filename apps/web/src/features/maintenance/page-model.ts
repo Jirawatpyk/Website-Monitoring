@@ -195,6 +195,9 @@ const RECENT_LABEL: Record<string, string> = {
   didnt_start: 'Didn’t start',
 };
 
+/** The request's action for an asker who can withdraw it but not edit it. */
+export const WITHDRAW_ONLY = 'Withdraw request…';
+
 /** May this person act on the row's site: an Admin, or its owner or backup (D-012). */
 const mayAct = (r: WindowRow, v: Viewer) =>
   v.role === 'admin' || (v.role === 'responder' && r.ownerIds.includes(v.id));
@@ -279,7 +282,9 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
     if (v.role === 'admin') base.canApprove = true;
     else if (v.role === 'responder') {
       base.note = 'Waiting for an Admin';
-      if (can || r.createdById === v.id) base.editLabel = 'Edit / withdraw';
+      // The asker who no longer owns the site may still withdraw it, but not edit it (edit_window_end).
+      if (can) base.editLabel = 'Edit / withdraw';
+      else if (r.createdById === v.id) base.editLabel = WITHDRAW_ONLY;
     }
     return base;
   }

@@ -19,6 +19,15 @@ export function inWindow(w: SiteWindows | undefined, at: Date): boolean {
   return !!w?.spans.some((s) => s.start <= at && at < s.end);
 }
 
+/**
+ * Whether a window hides a site's new problems given its open incident: none, or one that recovered
+ * (Monitoring / Needs root cause don't stop a window starting, D-036). One still failing is never
+ * hidden (§14.5).
+ */
+export function windowHides(open: { state: string } | null | undefined): boolean {
+  return !open || open.state === 'monitoring' || open.state === 'needs_root_cause';
+}
+
 /** When the latest window that ended at or before `at` ended: an incident it held back starts there. */
 export function endedBefore(w: SiteWindows | undefined, at: Date): Date | null {
   let last: Date | null = null;
@@ -43,6 +52,9 @@ export async function loadWindows(
     .in('site_id', siteIds)
     .eq('kind', 'maintenance')
     .not('approved_at', 'is', null)
+    // Only a start engine_log_windows checked: if that call failed this run, the window hides nothing
+    // yet (alerts go) rather than one that should have been "didn't start".
+    .eq('start_logged', true)
     .lte('starts_at', now.toISOString())
     .gte('ends_at', new Date(now.getTime() - LOOKBACK_MS).toISOString());
   if (error) throw new Error(`maintenance_windows: ${error.message}`);

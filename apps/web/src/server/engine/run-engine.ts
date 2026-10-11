@@ -38,7 +38,7 @@ import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { loadResponseHours } from '../escalation/response-hours';
 import { escalationTick } from './ladder';
-import { endedBefore, inWindow, loadWindows, type SiteWindows } from './windows';
+import { endedBefore, inWindow, loadWindows, windowHides, type SiteWindows } from './windows';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
@@ -323,7 +323,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
         // The browser blocked too (D-020) or the VPS's control check down (D-027): not the verifier's fault.
         // Inside a maintenance window with nothing open, no Admin alert either (engine review L2).
-        if (!open && inWindow(site.windows, decision.roundAt)) continue;
+        if (windowHides(open) && inWindow(site.windows, decision.roundAt)) continue;
         if (u.reason === 'control_failed') controlSites.add(`${site.name} (Tier ${site.tier})`);
         else if (u.reason !== 'browser_blocked')
           unverifiedSites.set(`${site.name} (Tier ${site.tier})`, u.reason);
@@ -676,11 +676,13 @@ async function apply(
   // the site shows Maintenance; the monitors keep their real state. An incident already open when the
   // window started carries on as usual (a window never hides an open incident, §14.5).
   // Judged by when the failure was confirmed (a DOWN's last recheck), not by when this run happens.
+  // An incident that had recovered (Monitoring / Needs root cause) doesn't stop a window (D-036): a new
+  // drop inside it is hidden like a new incident, not a DOWN AGAIN.
   const decidedAt = d.kind === 'open' ? d.confirmedAt : d.roundAt;
   if (
-    !open &&
+    windowHides(open) &&
     inWindow(site.windows, decidedAt) &&
-    (d.kind === 'none' || d.kind === 'open' || d.kind === 'problem')
+    (d.kind === 'none' || d.kind === 'open' || d.kind === 'problem' || d.kind === 'relapse')
   ) {
     const { error } = await db.rpc('engine_record_round', {
       p_site_id: site.id,
@@ -702,7 +704,13 @@ async function apply(
   // "Maintenance" (engine review L1).
   const status =
     d.status ??
-    (site.wasMaintenance ? (d.monitors.some((m) => m.status === 'problem') ? 'problem' : 'ok') : undefined);
+    (site.wasMaintenance
+      ? d.monitors.some((m) => m.status === 'down')
+        ? 'down'
+        : d.monitors.some((m) => m.status === 'problem')
+          ? 'problem'
+          : 'ok'
+      : undefined);
   const judged = { p_monitors: monitorsJson(d, site), ...(status ? { p_status: status } : {}) };
   switch (d.kind) {
     case 'none': {
@@ -787,7 +795,7 @@ async function apply(
         p_incident_id: incidentId,
         p_severity: d.severity,
         p_trigger: d.trigger,
-        p_started_at: d.startedAt.toISOString(),
+        p_started_at: startOf(d.startedAt),
         p_detected_at: d.detectedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
         p_context: {

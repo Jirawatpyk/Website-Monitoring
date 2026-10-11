@@ -148,9 +148,10 @@ export async function maintenanceSpansBySite(
   const earliest = rows.reduce((m, r) => (r.starts_at < m ? r.starts_at : m), rows[0]!.starts_at);
   const { data: incidents, error: incError } = await supabase
     .from('incidents')
-    .select('site_id, started_at, recovered_at')
+    .select('site_id, started_at, severity, resolved_at, incident_events(type, at, payload)')
+    .in('incident_events.type', ['detected', 'relapsed', 'escalated_to_down', 'recovered'])
     .in('site_id', withWindows)
-    .or(`recovered_at.is.null,recovered_at.gte.${earliest}`);
+    .or(`resolved_at.is.null,resolved_at.gte.${earliest}`);
   if (incError) throw new Error(`incidents: ${incError.message}`);
   for (const siteId of withWindows) {
     const windows: MaintenanceWindow[] = rows
@@ -165,8 +166,14 @@ export async function maintenanceSpansBySite(
       }));
     const open = (incidents ?? [])
       .filter((i) => i.site_id === siteId)
-      // Failing until it recovered: a window that starts after that (Needs root cause) counts as usual.
-      .map((i) => ({ start: new Date(i.started_at), end: i.recovered_at ? new Date(i.recovered_at) : null }));
+      // Each drop, failing until its recovery: a window that starts after one (Needs root cause) counts
+      // as usual, and a later relapse (which clears `recovered_at`) never changes that after the fact.
+      .flatMap((i) =>
+        episodesFromTimeline({ ...i, severity: i.severity as Severity }, i.incident_events).map((d) => ({
+          start: d.start,
+          end: d.end,
+        })),
+      );
     out.set(siteId, maintenanceSpans(windows, open));
   }
   return out;

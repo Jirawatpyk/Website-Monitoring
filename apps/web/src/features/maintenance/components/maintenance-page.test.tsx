@@ -143,13 +143,12 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
   it('the asker withdraws a request; a running window has no Cancel', async () => {
     const user = userEvent.setup();
     view('responder', [{ ...base, ownerIds: ['u-arm'] }, request]);
-    await user.click(
-      within(screen.getByRole('region', { name: 'Waiting for approval' })).getAllByRole('button', {
-        name: 'Edit / withdraw',
-      })[0]!,
-    );
+    // Arm asked but no longer owns the site: withdraw only, no end to edit (edit_window_end refuses).
+    const waiting = within(screen.getByRole('region', { name: 'Waiting for approval' }));
+    expect(waiting.queryByRole('button', { name: 'Edit / withdraw' })).not.toBeInTheDocument();
+    await user.click(waiting.getAllByRole('button', { name: 'Withdraw request…' })[0]!);
     const edit = await screen.findByRole('dialog', { name: /Edit or withdraw/ });
-    await user.click(within(edit).getAllByRole('button', { name: 'Withdraw request…' })[0]!);
+    expect(within(edit).queryByLabelText('Ends')).not.toBeInTheDocument();
     await user.type(within(edit).getByLabelText(/Reason for the change/), 'Not needed');
     await user.click(within(edit).getByRole('button', { name: 'Withdraw request' }));
     await waitFor(() =>

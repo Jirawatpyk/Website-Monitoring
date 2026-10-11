@@ -110,8 +110,8 @@ export interface Span {
 /**
  * The spans a site's windows remove from uptime (spec §5): approved maintenance windows that ran, from
  * their start to their real end. A mute, a window nobody approved, one cancelled before it started and
- * one that started while an incident hadn't recovered (`openSpans`: each incident from its start to its
- * recovery, null while still failing) remove nothing (D-036 as amended).
+ * one that started while an incident hadn't recovered (`openSpans`: each incident drop from its start to
+ * its recovery, null while still failing — the drops, not `recovered_at`, which a relapse clears) remove nothing (D-036 as amended).
  */
 export function maintenanceSpans(
   windows: readonly MaintenanceWindow[],
