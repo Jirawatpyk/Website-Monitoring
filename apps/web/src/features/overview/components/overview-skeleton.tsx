@@ -5,7 +5,7 @@ import { CardSkeleton, PageHeaderSkeleton, PageSkeleton } from '@/components/sta
 export function OverviewSkeleton() {
   return (
     <PageSkeleton label="Loading overview">
-      <PageHeaderSkeleton actions={1} />
+      <PageHeaderSkeleton actions={1} actionsFromMd />
       <div className="grid grid-cols-3 gap-2 md:hidden" aria-hidden>
         {Array.from({ length: 3 }, (_, i) => (
           <Skeleton key={i} variant="rect" height={60} />

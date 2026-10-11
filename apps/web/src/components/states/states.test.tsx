@@ -88,6 +88,13 @@ describe('Page skeletons', () => {
     expect(actions).toHaveClass('hidden', 'md:flex');
   });
 
+  it('header actions span the row below md, side by side (layout-consistency)', () => {
+    const { container } = render(<PageHeaderSkeleton breadcrumb actions={2} />);
+    const actions = container.querySelector('[aria-hidden]')!.lastElementChild!;
+    expect(actions).toHaveClass('grid', 'w-full', 'grid-cols-2', 'md:flex', 'md:w-auto');
+    for (const item of Array.from(actions.children)) expect(item).toHaveClass('md:w-30');
+  });
+
   it('a phone-wide action: the button from md, a full-width bar below it', () => {
     const { container } = render(<PageHeaderSkeleton actions={1} actionFullOnPhone />);
     const [header, phone] = Array.from(container.children);

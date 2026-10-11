@@ -52,9 +52,18 @@ export function PageHeaderSkeleton({
           <Skeleton variant="text" width="80%" />
         </div>
         {actions > 0 && (
-          <div className={actionsFromMd || actionFullOnPhone ? 'hidden gap-3 md:flex' : 'flex gap-3'}>
+          // Below md header actions span the row, side by side (layout-consistency `shortPhoneActions`).
+          <div
+            className={
+              actionsFromMd || actionFullOnPhone
+                ? 'hidden gap-3 md:flex'
+                : `grid w-full gap-3 md:flex md:w-auto ${actions > 1 ? 'grid-cols-2' : 'grid-cols-1'}`
+            }
+          >
             {Array.from({ length: actions }, (_, i) => (
-              <Skeleton key={i} variant="rect" height={44} width={120} />
+              <div key={i} className="md:w-30">
+                <Skeleton variant="rect" height={44} width="100%" />
+              </div>
             ))}
           </div>
         )}
