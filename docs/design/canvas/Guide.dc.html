@@ -188,7 +188,8 @@ main > *{flex-shrink:0}
 <div style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px dashed var(--aura-border-default); border-radius: var(--aura-radius-md)">
 <span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">THE LIFECYCLE</span>
 <div style="display: flex; gap: 12px; align-items: flex-start"><span style="width: 72px; flex-shrink: 0; padding-top: 2px; font-size: 12px; font-weight: 600">DOWN</span><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 10px; line-height: 1"><sc-for list="{{lifeDown}}" as="w" hint-placeholder-count="8"><span style="display: flex; align-items: center; gap: 8px"><sc-if value="{{w.arrow}}" hint-placeholder-val="{{true}}"><span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span></sc-if><x-import component-from-global-scope="Aura.Badge" tone="{{w.tone}}" variant="{{w.variant}}" icon="{{w.icon}}">{{w.label}}</x-import></span></sc-for></div></div>
-<div style="display: flex; gap: 12px; align-items: flex-start"><span style="width: 72px; flex-shrink: 0; padding-top: 2px; font-size: 12px; font-weight: 600">PROBLEM</span><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; line-height: 1"><sc-for list="{{lifeProblem}}" as="w" hint-placeholder-count="4"><span style="display: flex; align-items: center; gap: 8px"><sc-if value="{{w.arrow}}" hint-placeholder-val="{{true}}"><span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span></sc-if><x-import component-from-global-scope="Aura.Badge" tone="{{w.tone}}" variant="{{w.variant}}" icon="{{w.icon}}">{{w.label}}</x-import></span></sc-for><span style="font-size: 12px; color: var(--aura-fg-secondary)">ends here — no review</span></div></div>
+<div style="display: flex; gap: 12px; align-items: flex-start"><span style="width: 72px; flex-shrink: 0; padding-top: 2px; font-size: 12px; font-weight: 600">PROBLEM</span><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 10px; line-height: 1"><sc-for list="{{lifeProblem}}" as="w" hint-placeholder-count="6"><span style="display: flex; align-items: center; gap: 8px"><sc-if value="{{w.arrow}}" hint-placeholder-val="{{true}}"><span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-right" size="sm"></x-import></span></sc-if><x-import component-from-global-scope="Aura.Badge" tone="{{w.tone}}" variant="{{w.variant}}" icon="{{w.icon}}">{{w.label}}</x-import></span></sc-for><span style="font-size: 12px; color: var(--aura-fg-secondary)">ends here — no review</span></div></div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Fails again before Resolved → joins the same incident and thread; back to Acknowledged if someone acked, otherwise Unacked.</span>
 </div>
 
 <sc-for list="{{resolveSteps}}" as="s" hint-placeholder-count="5">
@@ -213,7 +214,7 @@ main > *{flex-shrink:0}
 </div>
 </sc-for>
 
-<x-import component-from-global-scope="Aura.Alert" tone="info" title="DOWN never resolves itself">Resolve is always a manual action once the 3 conditions are met. The only exception: a PROBLEM that recovers within 5 min and was never acknowledged auto-resolves — no root cause needed — and is hidden from Incidents by default.</x-import>
+<x-import component-from-global-scope="Aura.Alert" tone="info" title="DOWN never resolves itself">Resolve is always a manual action once the 3 conditions are met. The only exception: a PROBLEM that recovers within 5 min of being flagged and was never acknowledged auto-resolves on its first OK round — no root cause needed — and is hidden from Incidents by default.</x-import>
 
 </div>
 </sc-if>
@@ -268,8 +269,8 @@ main > *{flex-shrink:0}
 <div style="display: flex; gap: 14px">
 <span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px">3</span>
 <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; line-height: 1.55">
-<span style="font-weight: 600">End early, edit or cancel from Overview</span>
-<span style="font-size: 13px; color: var(--aura-fg-secondary)">The “Maintenance &amp; mutes” card on Overview lists what’s active and scheduled, with <strong style="color: var(--aura-fg-primary); font-weight: 600">End now</strong> and <strong style="color: var(--aura-fg-primary); font-weight: 600">Edit / cancel</strong>. Each asks you to confirm and is logged.</span>
+<span style="font-weight: 600">End early, edit or cancel on Maintenance &amp; mutes</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Sidebar › Maintenance lists what’s active, waiting for approval and scheduled, with <strong style="color: var(--aura-fg-primary); font-weight: 600">End now</strong> and <strong style="color: var(--aura-fg-primary); font-weight: 600">Edit / cancel</strong>. Each asks for a reason and is logged. The Overview card only shows what’s on and opens this page.</span>
 </div>
 </div>
 
@@ -402,7 +403,7 @@ class Component extends DCLogic {
       review: { label: 'Incident review', href: 'PostIncident.dc.html', icon: 'file-text' },
       maint: { label: 'Schedule maintenance', href: 'Maintenance.dc.html', icon: 'calendar' },
       mute: { label: 'Mute a site', href: 'Maintenance.dc.html#mute', icon: 'eye-off' },
-      overview: { label: 'Overview · Maintenance & mutes', href: 'Main.dc.html', icon: 'layout-dashboard' },
+      overview: { label: 'Maintenance & mutes', href: 'MaintenancePage.dc.html', icon: 'calendar' },
       audit: { label: 'Audit log', href: 'AuditLog.dc.html', icon: 'file-text' },
       model: { label: 'How status is decided', href: 'StatusModel.dc.html', icon: 'info' },
       site: { label: 'Site detail', href: 'SiteDetail.dc.html', icon: 'monitor' },
@@ -506,7 +507,7 @@ class Component extends DCLogic {
         bullets: [
           B('L0 is pinned', 'on every DOWN policy — owner/on-call with Chat @mention and Alerts Space, both locked on.'),
           B('Later steps:', 'at least +15 min and later than the one before; every step needs a channel; each DOWN policy needs at least one step after L0.'),
-          B('CEO only on Tier 1 DOWN, from L2 on,', 'auto-tagged “Proposal · pending CEO”. Voice shows “Configured · off until approved”. The Tier 1 CEO + AM step (the FYI after ack) can’t be removed or carry voice.'),
+          B('CEO only on Tier 1 DOWN, from L2 on', '(approved). Voice shows “Configured · off until approved”. The Tier 1 CEO + AM step (the FYI after ack) can’t be removed or carry voice.'),
           B('Used-in check:', 'before changing a role or deactivating, the dialog lists where the person is used — escalation levels, Site AM, owner/backup, on-call shifts — and you reassign each first.')
         ],
         hasMatrix: true,
@@ -549,7 +550,7 @@ class Component extends DCLogic {
     var ladder = [
       { level: 'L0', when: '0 min', who: 'Owner by day, on-call at night · @mention + Alerts Space', ack: 'Sent at once', ackColor: 'var(--aura-fg-secondary)', proposal: false },
       { level: 'L1', when: '+15 min', who: 'Backup + Tao, minus anyone already paged', ack: 'Stopped by ack', ackColor: 'var(--aura-fg-secondary)', proposal: false },
-      { level: 'L2', when: '+30 min', who: 'CEO @mention + email (+ call if approved)', ack: 'Stopped by ack', ackColor: 'var(--aura-fg-secondary)', proposal: true },
+      { level: 'L2', when: '+30 min', who: 'CEO @mention + email (call off until approved)', ack: 'Stopped by ack', ackColor: 'var(--aura-fg-secondary)', proposal: false },
       { level: 'L3', when: '+60 min', who: 'CEO + Site AM @mention + email, if still down', ack: 'After ack: FYI, no call', ackColor: 'var(--aura-alert-warning-fg)', proposal: false }
     ].map(function (l, i, arr) { return Object.assign({ line: i === arr.length - 1 ? 'none' : '1px solid var(--aura-border-subtle)' }, l); });
     var S = {
@@ -605,7 +606,7 @@ class Component extends DCLogic {
       },
       ladder: ladder,
       lifeDown: flow(['un', 'esc', 'ack', 'mon', 'nrc', 'res', 'rev', 'clo']),
-      lifeProblem: flow(['un', 'esc', 'ack', 'res']),
+      lifeProblem: flow(['un', 'esc', 'ack', 'mon', 'nrc', 'res']),
       resolveSteps: [
         { n: '1', title: 'The site recovers', hasBadge: true, badge: 'Monitoring', tone: 'neutral', icon: 'eye', gate: false, text: 'On the first OK round the state becomes Monitoring and the RECOVERED reply + email go out: “Needs a root cause before it can be resolved.”' },
         { n: '2', title: 'Two OK rounds', hasBadge: true, badge: 'Needs root cause', tone: 'warning', icon: 'pencil', gate: false, text: 'After 2 OK rounds it moves to Needs root cause — unless a root cause is already written.' },
@@ -659,14 +660,14 @@ class Component extends DCLogic {
       }),
       nav: [
         { items: [
-          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
           { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
-          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
           { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
         ] },
         { title: 'Operations', items: [
           { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
-          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
           { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
         ] },
         { title: 'Reports', items: [

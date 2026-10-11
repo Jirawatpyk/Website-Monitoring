@@ -372,9 +372,9 @@ class Component extends DCLogic {
         menuOpen: open && r.live, menuLabel: 'Actions for ' + r.name,
         menuTop: up ? 'auto' : '60px', menuBottom: up ? '60px' : 'auto',
         toggle: function () { self.setState({ menu: open ? null : r.name }); },
-        muteLabel: r.muted ? 'End or edit mute (until 18:00)…' : 'Mute…', muteHref: r.muted ? 'Main.dc.html' : 'Maintenance.dc.html#mute',
+        muteLabel: r.muted ? 'End or edit mute (until 18:00)…' : 'Mute…', muteHref: r.muted ? 'MaintenancePage.dc.html' : 'Maintenance.dc.html#mute',
         hasMuteHint: r.hasInc && !r.muted, muteHint: 'Mute stops new alerts only — ' + r.incId + (r.incOpenAck ? ' stays open' : ' keeps escalating until someone acknowledges'),
-        maintLabel: r.key === 'maint' ? 'End or edit maintenance…' : 'Schedule maintenance', maintHref: r.key === 'maint' ? 'Main.dc.html' : 'Maintenance.dc.html#schedule',
+        maintLabel: r.key === 'maint' ? 'End or edit maintenance…' : 'Schedule maintenance', maintHref: r.key === 'maint' ? 'MaintenancePage.dc.html' : 'Maintenance.dc.html#schedule',
         hasMaintHint: r.key === 'down' || r.hasInc, maintHint: 'Can’t start maintenance now — ' + r.name + (r.key === 'down' ? ' is DOWN (' + r.incId + ')' : ' has an open incident (' + r.incId + ')') + '. Mute instead, or schedule a later window.'
       });
     });
@@ -432,7 +432,7 @@ class Component extends DCLogic {
         ] },
         { title: 'Operations', items: [
           { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
-          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
           { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
         ] },
         { title: 'Reports', items: [

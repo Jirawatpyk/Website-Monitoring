@@ -82,7 +82,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </div>
 <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
 <span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — recipients &amp; build</span>
-<span>Recipients follow the escalation step: L0 owner by day / on-call at night · L1 backup + Tao · L2 CEO (proposal · pending CEO) · L3 FYI to CEO + AM (Tier 1, even after an ack). The client-update track emails the AM. Each email is sent per person with its own footer.</span>
+<span>Recipients follow the escalation step: L0 owner by day / on-call at night · L1 backup + Tao · L2 CEO · L3 FYI to CEO + AM (Tier 1, even after an ack). The client-update track emails the AM. Each email is sent per person with its own footer.</span>
 <span>Tier 2–3 L2 (+30 min, no ack) is a reminder email to Tao only — no CEO. Ack and resolve emails are held until the 10 s Undo window closes.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">PROBLEM:</b> amber, never red. L0 emails the owner only; the backup is first emailed with the 60-min reminder (+60 min, no ack). A Tier 2–3 PROBLEM outside response hours is held until 09:00. No client-update email — that track is for DOWN.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Admin system emails</b> (browser verifier unavailable, fewer than 2 probe locations) go to every active Admin — today only Tao.</span>
@@ -149,8 +149,8 @@ class Component extends DCLogic {
           'Bua': { to: 'Bua <bua@[domain]>', lede: ACKS + ' The client update is still yours to send.', btns: [P('Open draft', 'Incident.dc.html'), OPEN], why: 'You got this because you were emailed about the client update at 10:03.' }
         }
       },
-      'L2 (CEO) — Proposal': {
-        sentTo: 'Proposal · pending CEO — not live until the CEO approves it. If approved, it goes to the CEO at +30 min when nobody has acknowledged (for INC-0142: 10:18). Arm acknowledged at 10:07, so this was never sent.',
+      'L2 (CEO)': {
+        sentTo: 'Goes to the CEO at +30 min when nobody has acknowledged (for INC-0142: 10:18). Arm acknowledged at 10:07, so this was never sent.',
         bar: AMBER, labelColor: AMBER, label: 'ESCALATED · L2', preStatus: 'ESCALATED · L2 —', pre: 'MuvMi down 30 min, not acknowledged · Arm, Ploy, Tao informed',
         headline: 'MuvMi down 30 min — nobody has acknowledged',
         facts: [{ k: 'Down for', v: '30 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Already told', v: 'Arm 09:48 · Ploy + Tao 10:03 · Bua (client update) 10:03' }, { k: 'Voice call', v: 'Configured · off until approved' }, { k: 'Next step', v: 'L3 (CEO + Bua, no call) at 10:48' }],
@@ -254,7 +254,7 @@ class Component extends DCLogic {
       }
     };
     var TH = {
-      'MuvMi · DOWN': { subject: 'MuvMi · Tier 1 · INC-0142', E: E, events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (CEO) — Proposal', 'L3 FYI (CEO + Bua)', 'Recovered'], first: 'Down', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
+      'MuvMi · DOWN': { subject: 'MuvMi · Tier 1 · INC-0142', E: E, events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (CEO)', 'L3 FYI (CEO + Bua)', 'Recovered'], first: 'Down', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · PROBLEM': { subject: 'Fuji Links · Tier 2 · INC-0141', E: F, events: ['PROBLEM', 'Acknowledged', 'Recovered'], first: 'PROBLEM', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · auto-resolved': { subject: 'Fuji Links · Tier 2 · INC-0151', E: FA, events: ['Recovered (auto-resolved)'], first: 'Recovered (auto-resolved)', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'VOCA · flapping': { subject: 'VOCA · Tier 2 · INC-0133', E: V, events: ['Flapping summary'], first: 'Flapping summary', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },

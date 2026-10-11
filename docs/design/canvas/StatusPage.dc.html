@@ -235,7 +235,7 @@ class Component extends DCLogic {
       : { out: 'Counted in uptime', deg: 'Site stayed up · not counted in uptime', ok: 'No downtime', no: 'No fresh results since 02:17' };
     function live(site) {
       if (st === 'Stale data') return { k: 'no' };
-      if (st === 'Maintenance' && site === 't') return { k: 'mnt', span: '22:00–02:00', short: th ? 'กำลังปิดปรับปรุงตามแผน' : 'Planned maintenance in progress' };
+      if (st === 'Maintenance' && site === 'c') return { k: 'mnt', span: th ? 'ตั้งแต่ 22:00' : 'from 22:00', short: th ? 'กำลังปิดปรับปรุงตามแผน' : 'Planned maintenance in progress' };
       if (st === 'Outage' && site === 't') return { k: 'out', min: 7, live: true, short: th ? 'ทีมงานกำลังตรวจสอบ' : 'Our team is investigating' };
       return null;
     }
@@ -302,7 +302,7 @@ class Component extends DCLogic {
     var OKB = { tone: 'success', variant: 'soft', icon: 'circle-check', label: LBL.ok };
     function badge(site) {
       if (st === 'Stale data') return { tone: 'neutral', variant: 'outline', icon: 'circle-dot-dashed', label: th ? 'ไม่มีข้อมูลล่าสุด' : 'No live data' };
-      if (st === 'Maintenance' && site === 't') return { tone: 'neutral', variant: 'soft', icon: 'calendar', label: LBL.mnt };
+      if (st === 'Maintenance' && site === 'c') return { tone: 'neutral', variant: 'soft', icon: 'calendar', label: LBL.mnt };
       if (st === 'Outage' && site === 't') return { tone: 'danger', variant: 'solid', icon: 'ban', label: LBL.out };
       return OKB;
     }
@@ -331,7 +331,7 @@ class Component extends DCLogic {
         sub: th ? 'ยืนยันสถานะล่าสุด ส. 26 ก.ย. 02:17 น. (UTC+7) · ระบบตรวจสอบยังไม่ได้รับผลล่าสุด หน้านี้แสดงสถานะที่ยืนยันล่าสุดจนกว่าการตรวจจะกลับมา' : 'Last confirmed Sat 26 Sep 02:17 (UTC+7) · Our monitoring isn’t receiving fresh results. This page shows the last confirmed status until checks resume.' },
       'Maintenance': { bg: 'var(--aura-status-neutral-bg)', border: 'var(--aura-border-default)', icon: 'calendar', iconBg: 'var(--aura-bg-surface)', iconFg: 'var(--aura-fg-secondary)',
         title: th ? 'กำลังปิดปรับปรุงตามแผน' : 'Planned maintenance in progress',
-        sub: (th ? TW + ' · ส. 26 ก.ย. 22:00 – อา. 27 ก.ย. 02:00 น. (UTC+7) · เว็บไซต์อาจใช้งานไม่ได้ในช่วงนี้ ' + CN + ' ไม่ได้รับผลกระทบ · ' : TW + ' · Sat 26 Sep 22:00 – Sun 27 Sep 02:00 (UTC+7) · The site may be unavailable during this work. ' + CN + ' is not affected. ') + lastChecked },
+        sub: (th ? CN + ' · ส. 26 ก.ย. 22:00 – อ. 29 ก.ย. 22:00 น. (UTC+7) · ย้ายผู้ให้บริการโฮสติ้ง เว็บไซต์อาจใช้งานไม่ได้ในช่วงนี้ ' + TW + ' ไม่ได้รับผลกระทบ · ' : CN + ' · Sat 26 Sep 22:00 – Tue 29 Sep 22:00 (UTC+7) · Moving to a new hosting provider; the site may be unavailable during this work. ' + TW + ' is not affected. ') + lastChecked },
       'Outage': { bg: 'var(--aura-alert-danger-bg)', border: 'var(--aura-alert-danger-border)', icon: 'ban', iconBg: 'var(--aura-status-blocked-bg)', iconFg: 'var(--aura-status-blocked-fg)',
         title: th ? 'ใช้งานไม่ได้ · ' + TW : 'Outage · ' + TW,
         sub: (th ? 'เริ่ม พ. 2 ก.ย. 03:40 น. · ผ่านมา 7 นาที · ' : 'Started Wed 2 Sep 03:40 · 7 min so far · ') + lastChecked,

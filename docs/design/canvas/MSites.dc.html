@@ -31,7 +31,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
 <span style="flex-grow: 1; font-size: 17px; font-weight: 600">Sites</span>
 <button type="button" class="ms-icon" aria-label="{{searchBtn}}" aria-expanded="{{searchOpen}}" onClick="{{toggleSearch}}"><x-import component-from-global-scope="Aura.Icon" name="{{searchIcon}}" size="md"></x-import></button>
-<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import></a>
 </header>
 
 <sc-if value="{{searchOpen}}" hint-placeholder-val="{{false}}">

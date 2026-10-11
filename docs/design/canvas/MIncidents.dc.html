@@ -22,7 +22,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 
 <header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
 <span style="font-size: 17px; font-weight: 600">Incidents</span>
-<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import></a>
 </header>
 
 <div style="flex-grow: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 16px 16px 88px; display: flex; flex-direction: column; gap: 12px">
@@ -126,9 +126,9 @@ class Component extends DCLogic {
       rows: rows,
       countLabel: LABEL[view],
       bottom: [
-        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview.dc.html' },
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
         { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
-        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSite.dc.html' },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
         { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
       ]
     };

@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Maintenance &amp; mutes</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}a.aura-btn--secondary:hover,a.aura-btn--ghost:hover{color:var(--aura-fg-primary)}
+.mt-row{height:auto!important;min-height:72px}
+.mt-row>.aura-table__td{height:auto;align-self:stretch;padding-top:12px;padding-bottom:12px;white-space:normal;overflow:visible}
+.mt-col>*{white-space:normal;overflow-wrap:anywhere}
+.mt-th{white-space:nowrap}
+.mt-col{display:flex;flex-direction:column;justify-content:center;line-height:1.45;min-width:0}
+.mt-sub{font-size:12px;color:var(--aura-fg-secondary)}
+.mt-sec > *{flex-shrink:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1700px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="maintenance" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">{{me}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{meLine}}</span>
+</div>
+</a>
+</aside>
+
+<main class="mt-sec" style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px 56px; display: flex; flex-direction: column; gap: 28px; position: relative">
+
+<div style="position: absolute; top: 10px; right: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas); z-index: 5">
+<span style="font-family: var(--font-mono)">STATE</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import>
+</div>
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-top: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">OPERATIONS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Maintenance &amp; mutes</h1>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{meta}}</span>
+</div>
+<sc-if value="{{headerBtn}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="plus" href="Maintenance.dc.html#new">Schedule maintenance or mute</x-import></sc-if>
+</div>
+
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div class="aura-card" style="padding: 32px 24px; align-items: center">
+<div class="aura-empty is-sm">
+<span class="aura-empty__icon"><x-import component-from-global-scope="Aura.Icon" name="calendar" size="md"></x-import></span>
+<h3 class="aura-empty__title">Nothing active or scheduled</h3>
+<p class="aura-empty__text">Maintenance windows and mutes show here while they run, before they start and while they wait for approval. Finished ones stay under Recent for 30 days.</p>
+</div>
+<sc-if value="{{canSchedule}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="plus" href="Maintenance.dc.html#new">Schedule maintenance or mute</x-import></sc-if>
+</div>
+</sc-if>
+
+<sc-for list="{{sections}}" as="g" hint-placeholder-count="3">
+<section style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600">{{g.title}}</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{g.hint}}</span>
+</div>
+<div class="aura-table">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th mt-th" style="width: 170px">Status</div>
+<div class="aura-table__th mt-th" style="flex: 1 1 0; min-width: 0">Site</div>
+<div class="aura-table__th mt-th" style="width: 250px">When</div>
+<div class="aura-table__th mt-th" style="flex: 1.2 1 0; min-width: 0">Reason</div>
+<div class="aura-table__th mt-th" style="width: 260px">{{g.actLabel}}</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="2">
+<div class="aura-table__row mt-row">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="width: 170px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px">
+<x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.label}}</x-import>
+<sc-if value="{{r.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">{{r.mutedLabel}}</x-import></sc-if>
+</div>
+<div class="aura-table__td mt-col" style="flex: 1 1 0">
+<a href="SiteDetail.dc.html" style="font-weight: 500; color: inherit; text-decoration: none">{{r.site}}</a>
+<span class="mt-sub">{{r.siteSub}}</span>
+</div>
+<div class="aura-table__td mt-col" style="width: 250px">
+<span style="font-variant-numeric: tabular-nums">{{r.when}}</span>
+<span class="mt-sub">{{r.whenSub}}</span>
+</div>
+<div class="aura-table__td mt-col" style="flex: 1.2 1 0">
+<span>{{r.why}}</span>
+<span class="mt-sub">{{r.whySub}}</span>
+<sc-for list="{{r.logs}}" as="l" hint-placeholder-count="0"><span class="mt-sub" style="display: flex; align-items: flex-start; gap: 6px; padding-top: 2px"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="file-text" size="sm"></x-import></span><span>{{l.t}}</span></span></sc-for>
+</div>
+<div class="aura-table__td" style="width: 260px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap">
+<sc-if value="{{r.canApprove}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="check" on-click="{{r.approve}}">Approve</x-import><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" on-click="{{r.decline}}">Decline</x-import></sc-if>
+<sc-if value="{{r.canEnd}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" on-click="{{r.end}}">End now</x-import></sc-if>
+<sc-if value="{{r.canEdit}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="pencil" on-click="{{r.edit}}">{{r.editLabel}}</x-import></sc-if>
+<sc-if value="{{r.hasNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.4; color: var(--aura-fg-secondary); text-align: right">{{r.note}}</span></sc-if>
+<sc-if value="{{r.logCol}}" hint-placeholder-val="{{false}}"><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary); white-space: normal"><sc-for list="{{r.colLogs}}" as="l" hint-placeholder-count="1"><span style="display: flex; align-items: flex-start; gap: 6px"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="file-text" size="sm"></x-import></span><span>{{l.t}}</span></span></sc-for></span></sc-if>
+</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+</section>
+</sc-for>
+
+<div style="padding: 16px 20px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.55; color: var(--aura-fg-secondary); display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · MAINTENANCE &amp; MUTES · ROUTE /maintenance</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Where it sits.</b> Sidebar Operations › “Maintenance”. Overview has the short “Maintenance &amp; mutes” card and a header “Maintenance” button that open this page. “Schedule maintenance or mute” opens the existing Maintenance dialog with Site empty; End now and Edit / cancel are the same dialogs as before (reason required, logged).</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Sections.</b> Active now (maintenance windows and mutes together, ending soonest first) · Waiting for approval (starting soonest first) · Scheduled (starting soonest first) · Recent · last 30 days (newest first). A section with nothing in it is left out; with nothing active, waiting or scheduled the page shows the empty card and Recent.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Badges (§11).</b> Active maintenance = the site status badge, accent soft calendar — the only accent badge. Active mute = the real status badge plus the overlay “Muted · until 18:00” (neutral outline eye-off). Needs approval, Scheduled and every Recent state are neutral outline; the icon says the kind (calendar = maintenance, eye-off = mute).</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Approval.</b> Asked for in the Maintenance dialog (Responder, over 24 h → “Ask for approval”). Maintenance longer than 24 h asked for by a Responder waits for an Admin (an Admin’s own starts as scheduled). Approve → moves to Scheduled, the asker gets a Chat message. Decline needs a reason → Recent “Declined”, the asker gets the reason. Nobody approves before the start → it doesn’t start; Recent “Not approved — didn’t start”. Mutes never need approval (max 24 h, start now, stop new alerts only — an open incident keeps escalating).</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Roles.</b> Admin: every action on every site; on a request only Approve or Decline (to ask for changes, decline with a reason). Responder: End now and Edit on sites they own or back up, and Edit / withdraw on their own requests; other rows say who can act. AM, CEO and Viewer: read only — no row actions, no Schedule button (STATE › Read only). A running window or mute is changed with “Edit end” or stopped with End now; “Cancel” exists only before it starts. Every action adds a log line; lines are never replaced.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Uptime line.</b> Maintenance: “Not counted in uptime” (removed from the window, client status page shows “Planned maintenance”). Mute: “Still counted in uptime”. Times are site-local Thailand time; past rows keep their log line (who, when, reason).</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Sample data.</b> Fri 25 Sep 10:07; sites, people, times and reasons are mock data — compute them; never copy.</span>
+</div>
+
+</main>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{endOpen}}" on-close="{{closeDlg}}" title="{{d.endTitle}}" description="{{d.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<sc-for list="{{d.endEffects}}" as="x" hint-placeholder-count="3"><li>{{x.t}}</li></sc-for>
+</ul>
+<x-import component-from-global-scope="Aura.TextField" label="Reason for ending early" required="{{yes}}" placeholder="e.g. Upgrade finished early" value="{{endReason}}" on-change="{{setEndReason}}" hint="{{endHint}}"></x-import>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeDlg}}">Keep it</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" disabled="{{endBlocked}}" on-click="{{confirmEnd}}">{{d.endCta}}</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{editOpen}}" on-close="{{closeDlg}}" title="{{d.editTitle}}" description="{{d.desc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 18px; padding-top: 4px">
+<sc-if value="{{notCancelling}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Select" label="Ends" options="{{d.ends}}" value="{{editEnd}}" on-change="{{setEditEnd}}"></x-import>
+</sc-if>
+<x-import component-from-global-scope="Aura.TextField" label="Reason for the change" required="{{yes}}" placeholder="e.g. Client moved the launch" value="{{editReason}}" on-change="{{setEditReason}}" hint="{{editHint}}"></x-import>
+<sc-if value="{{cancelling}}" hint-placeholder-val="{{false}}">
+<div role="alert" style="display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span>
+<span><span style="font-weight: 600; color: var(--aura-alert-warning-fg)">{{d.cancelTitle}}</span> {{d.cancelText}}</span>
+</div>
+</sc-if>
+<div style="display: flex; align-items: center; gap: 12px">
+<sc-if value="{{showCancelBtn}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="ghost" icon="trash-2" on-click="{{askCancel}}">{{d.cancelCta}}</x-import>
+</sc-if>
+<span style="flex-grow: 1"></span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{editBack}}">{{editBackLabel}}</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" disabled="{{editBlocked}}" on-click="{{editSubmit}}">{{editCta}}</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{approveOpen}}" on-close="{{closeDlg}}" title="{{d.approveTitle}}" description="{{d.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<sc-for list="{{d.approveEffects}}" as="x" hint-placeholder-count="4"><li>{{x.t}}</li></sc-for>
+</ul>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeDlg}}">Not now</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{confirmApprove}}">{{d.approveCta}}</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{declineOpen}}" on-close="{{closeDlg}}" title="{{d.declineTitle}}" description="{{d.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<x-import component-from-global-scope="Aura.TextField" label="Reason" required="{{yes}}" placeholder="e.g. Split it into two nights" value="{{declineReason}}" on-change="{{setDeclineReason}}" hint="{{declineHint}}"></x-import>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeDlg}}">Keep it</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" disabled="{{declineBlocked}}" on-click="{{confirmDecline}}">Decline request</x-import>
+</div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: 'Default', ov: {}, dlg: '', dlgKind: '', endReason: '', editEnd: '', editReason: '', cancelling: false, declineReason: '' };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var view = st.view;
+    var ROLE = view === 'Responder' ? 'resp' : (view === 'Read only' ? 'ro' : 'admin');
+    var ADMIN = ROLE === 'admin';
+    var ME = ADMIN ? 'Tao' : (ROLE === 'resp' ? 'Arm' : 'Mint');
+    var NOWABS = 10 * 60 + 7; // minutes from Fri 25 Sep 00:00 → 10:07
+    function mins(hm) { var p = hm.split(':'); return +p[0] * 60 + +p[1]; }
+    function dur(m) { var h = Math.floor(m / 60), r = m % 60; return (h ? h + ' h' : '') + (h && r ? ' ' : '') + (r ? r + ' min' : ''); }
+    function inFmt(m) { var h = Math.round(m / 60), d = Math.floor(h / 24), r = h % 24; return d ? d + ' d' + (r ? ' ' + r + ' h' : '') : dur(m); }
+    // Mock data: Fri 25 Sep 10:07 — compute in the app
+    var DEF = {
+      wecare: { kind: 'maint', site: 'WeCare Studio', tier: 2, owner: 'Nok', backup: 'Ploy', start: '09:30', end: '14:00', day: 'Today ', why: 'CMS upgrade', by: 'Nok', ends: ['12:00', '14:00', '16:00', '18:00'], running: true,
+        endEffects: ['Alerts resume now for Nok (owner) and the Alerts Space.', 'Checks from 10:07 count in uptime again; 09:30–10:07 stays excluded.', 'Nok sees it in the Alerts Space; logged in the audit log as ' + ME + '.'] },
+      games: { kind: 'mute', site: 'DxT Games', tier: 3, owner: 'Tao', backup: 'Nok', start: '08:40', end: '18:00', day: 'Today ', why: 'Redeploying build', by: 'Tao', ends: ['11:00', '14:00', '18:00'], running: true,
+        endEffects: ['Alerts resume now for Tao (owner) and the Alerts Space.', 'Uptime is unaffected — muted time was already counted.', 'Logged in the audit log as ' + ME + '.'] },
+      bac: { kind: 'maint', site: 'Bangkok Airways – China', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Sat 26 Sep 22:00', fromAbs: 1440 + 22 * 60, end: 'Tue 29 Sep 22:00', day: '', why: 'Move to a new hosting provider', by: 'Arm', asked: 'today 09:20', ends: ['Mon 28 Sep 22:00', 'Tue 29 Sep 22:00'], request: true },
+      tub: { kind: 'maint', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', from: 'Tue 29 Sep 01:00', fromAbs: 4 * 1440 + 60, end: '03:00', day: 'Tue 29 Sep ', why: 'WordPress plugin updates', by: 'Ploy', ends: ['02:00', '03:00', '04:00'] }
+    };
+    var BACLEN = { 'Mon 28 Sep 22:00': '2 days', 'Tue 29 Sep 22:00': '3 days' };
+    var ov = view === 'Empty' ? { wecare: { st: 'gone' }, games: { st: 'gone' }, bac: { st: 'gone' }, tub: { st: 'gone' } } : st.ov;
+    function S(k) { var o = ov[k] || {}; return { st: o.st || 'on', approved: !!o.approved, end: o.end || DEF[k].end, logs: o.logs || [] }; }
+    function can(d) { return ADMIN || (ROLE === 'resp' && (d.owner === ME || d.backup === ME)); }
+    function who(d) { var n = [d.owner, d.backup].filter(function (x) { return x !== 'Tao'; }); return ROLE === 'ro' ? '' : 'Only ' + n.join(', ') + ' or an Admin'; }
+    function past(icon, label) { return { tone: 'neutral', variant: 'outline', icon: icon, label: label }; }
+    function L(arr) { return arr.map(function (t) { return { t: t }; }); }
+    function lenOf(k, s) { var d = DEF[k]; return k === 'bac' ? BACLEN[s.end] : dur(mins(s.end) - mins(d.from.slice(-5))); }
+    var active = [], wait = [], sched = [], recentNew = [];
+    Object.keys(DEF).forEach(function (k) {
+      var d = DEF[k], s = S(k);
+      if (s.st === 'gone') return;
+      var pending = d.request && !s.approved;
+      var r = { k: k, site: d.site, siteSub: 'Tier ' + d.tier + ' · ' + d.owner + ' · backup ' + d.backup, muted: false, mutedLabel: '', logs: L(s.logs), colLogs: L(s.logs), canApprove: false, canEnd: false, canEdit: false, hasNote: false, note: '', why: d.why,
+        editLabel: d.running ? 'Edit end' : (pending ? 'Edit / withdraw' : 'Edit / cancel'),
+        end: function () { self.setState({ dlg: k, dlgKind: 'end', endReason: '' }); },
+        edit: function () { self.setState({ dlg: k, dlgKind: 'edit', editEnd: S(k).end, editReason: '', cancelling: false }); },
+        approve: function () { self.setState({ dlg: k, dlgKind: 'approve' }); },
+        decline: function () { self.setState({ dlg: k, dlgKind: 'decline', declineReason: '' }); } };
+      var noun = d.kind === 'mute' ? 'Mute' : 'Maintenance';
+      var icon = d.kind === 'mute' ? 'eye-off' : 'calendar';
+      if (s.st !== 'on') {
+        var LBL = { ended: 'Ended early', cancelled: 'Cancelled', declined: 'Declined', withdrawn: 'Withdrawn' }[s.st];
+        if (d.running) Object.assign(r, past(icon, LBL), { when: 'Today ' + d.start + ' → 10:07', whenSub: noun + ' · ' + dur(NOWABS - mins(d.start)), whySub: 'by ' + d.by });
+        else Object.assign(r, past(icon, LBL), { when: d.from + ' → ' + s.end, whenSub: noun + ' · ' + lenOf(k, s) + ' · didn’t start', whySub: d.request ? 'asked by Arm · ' + d.asked : 'by ' + d.by });
+        r.sortKey = 0; recentNew.push(r); return;
+      }
+      if (d.running) {
+        if (d.kind === 'maint') Object.assign(r, { tone: 'accent', variant: 'soft', icon: 'calendar', label: 'Maintenance', when: 'Today ' + d.start + ' → ' + s.end, whenSub: dur(mins(s.end) - mins(d.start)) + ' · ' + dur(NOWABS - mins(d.start)) + ' in', whySub: 'by ' + d.by + ' · not counted in uptime' });
+        else Object.assign(r, { tone: 'success', variant: 'soft', icon: 'circle-check', label: 'OK', muted: true, mutedLabel: 'Muted · until ' + s.end, when: 'Today ' + d.start + ' → ' + s.end, whenSub: 'until ' + s.end + ' (max 24 h) · ' + dur(NOWABS - mins(d.start)) + ' in', whySub: 'by ' + d.by + ' · still counted in uptime' });
+        if (can(d)) { r.canEnd = true; r.canEdit = true; } else if (ROLE !== 'ro') { r.hasNote = true; r.note = who(d); }
+        r.sortKey = mins(s.end); active.push(r); return;
+      }
+      Object.assign(r, { when: d.from + ' → ' + s.end, whenSub: lenOf(k, s) + ' · starts in ' + inFmt(d.fromAbs - NOWABS) });
+      if (pending) {
+        Object.assign(r, past('clock', 'Needs approval'), { whySub: 'asked by Arm · ' + d.asked });
+        if (ADMIN) r.canApprove = true;
+        else { r.hasNote = true; r.note = 'Waiting for an Admin'; if (can(d)) r.canEdit = true; }
+        wait.push(r); return;
+      }
+      Object.assign(r, past('calendar', 'Scheduled'), { whySub: (d.request ? 'asked by Arm' : 'by ' + d.by) + ' · not counted in uptime' });
+      if (can(d)) r.canEdit = true; else if (ROLE !== 'ro') { r.hasNote = true; r.note = who(d); }
+      r.sortKey = d.fromAbs; sched.push(r);
+    });
+    active.sort(function (a, b) { return a.sortKey - b.sortKey; });
+    sched.sort(function (a, b) { return a.sortKey - b.sortKey; });
+    function R(icon, label, site, sub, when, whenSub, why, whySub, log) { return { tone: 'neutral', variant: 'outline', icon: icon, label: label, site: site, siteSub: sub, when: when, whenSub: whenSub, why: why, whySub: whySub, logs: [], colLogs: [{ t: log }], muted: false, canApprove: false, canEnd: false, canEdit: false, hasNote: false }; }
+    var recent = recentNew.concat([
+      R('calendar', 'Ended', 'ORCA Thailand', 'Tier 2 · Tao · backup Nok', 'Tue 22 Sep 20:00 → 22:00', 'Maintenance · 2 h', 'Hosting plan upgrade', 'by Tao', 'Ended on time 22:00'),
+      R('eye-off', 'Ended early', 'Cando Asia', 'Tier 2 · Nok · backup Ploy', 'Mon 21 Sep 10:15 → 11:40', 'Mute · 1 h 25 min', 'Client changing DNS', 'by Nok', 'Ended early 11:40 by Nok · “DNS change confirmed”'),
+      R('calendar', 'Cancelled', 'EQHO', 'Tier 2 · Tao · backup Nok', 'Sat 19 Sep 09:00 → 12:00', 'Maintenance · 3 h · didn’t start', 'Theme update', 'by Tao', 'Cancelled Fri 18 Sep 16:20 by Tao · “Client moved the launch”'),
+      R('calendar', 'Not approved', 'Fuji Links', 'Tier 2 · Ploy · backup Nok', 'Sat 12 Sep 22:00 → Mon 14 Sep 22:00', 'Maintenance · 2 days · didn’t start', 'Server OS upgrade', 'asked by Ploy', 'Not approved — didn’t start · nobody approved before Sat 12 Sep 22:00')
+    ]);
+    var kinds = []; recent.forEach(function (x) { var l = x.label.toLowerCase(); if (kinds.indexOf(l) < 0) kinds.push(l); });
+    function A(rows, v) { rows.forEach(function (x) { x.logCol = !v; if (!v) x.logs = []; }); return rows; }
+    var sections = [];
+    if (active.length) sections.push({ title: 'Active now', hint: active.length + ' · alerts off or muted, checks still run', rows: A(active, true), actLabel: '' });
+    if (wait.length) sections.push({ title: 'Waiting for approval', hint: wait.length + ' · over 24 h, asked by a Responder — doesn’t start unless an Admin approves', rows: A(wait, true), actLabel: '' });
+    if (sched.length) sections.push({ title: 'Scheduled', hint: sched.length + ' · approved, starts on its own', rows: A(sched, true), actLabel: '' });
+    sections.push({ title: 'Recent · last 30 days', hint: recent.length + ' · ' + kinds.join(', '), rows: A(recent, false), actLabel: 'What happened' });
+    var mp = []; if (active.length) mp.push(active.length + ' active'); if (sched.length) mp.push(sched.length + ' scheduled'); if (wait.length) mp.push(wait.length + ' waiting for approval');
+    var notEmpty = !!(active.length || wait.length || sched.length);
+    // Dialogs
+    var dk = st.dlg && DEF[st.dlg] ? st.dlg : 'wecare';
+    var D = DEF[dk], DS = S(dk);
+    var pendingD = D.request && !DS.approved;
+    var noun = D.kind === 'mute' ? 'mute' : 'maintenance';
+    var curEnd = DS.end;
+    function push(k, v, line) { var n = Object.assign({}, self.state.ov); var cur = n[k] || {}; n[k] = Object.assign({}, cur, v, { logs: (cur.logs || []).concat([line]) }); return n; }
+    var reasonOk = !!(st.editReason || '').trim();
+    var endChanged = st.editEnd && st.editEnd !== curEnd;
+    var desc = D.running ? (D.kind === 'mute' ? 'Muted ' + D.start + ' → ' + curEnd : D.start + ' → ' + curEnd) + ' · ' + D.why + ' · by ' + D.by : D.from + ' → ' + curEnd + ' · ' + D.why + ' · ' + (D.request ? 'asked by Arm' : 'by ' + D.by);
+    var baLen = BACLEN[S('bac').end];
+    var approveOpen = st.dlgKind === 'approve';
+    var cancelCta = pendingD ? 'Withdraw request' : 'Cancel maintenance';
+    var cancelText = pendingD ? 'Withdraws the request — Admins stop seeing it and nothing is scheduled. Logged as ' + ME + '.' : (dk === 'bac' ? 'It hasn’t started, so cancelling removes it. Arm and Ploy get a Chat message. Logged as ' + ME + '.' : 'It hasn’t started, so cancelling removes it. Ploy gets a Chat message. Logged as ' + ME + '.');
+    return {
+      views: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm'], view: view,
+      setView: function (v) { self.setState({ view: v, ov: {}, dlg: v === 'Approve confirm' ? 'bac' : '', dlgKind: v === 'Approve confirm' ? 'approve' : '', cancelling: false }); },
+      me: ME, meLine: ADMIN ? 'Jirawat Piyakit · Admin' : (ROLE === 'resp' ? 'Responder' : 'Viewer · read only'),
+      meta: mp.length ? mp.join(' · ') : 'Nothing active, scheduled or waiting',
+      empty: !notEmpty, notEmpty: notEmpty, canSchedule: ROLE !== 'ro', headerBtn: notEmpty && ROLE !== 'ro',
+      sections: sections,
+      yes: true, no: false,
+      d: {
+        desc: desc,
+        endTitle: 'End ' + D.site + ' ' + noun + ' now?',
+        endEffects: L(D.endEffects || []),
+        endCta: D.kind === 'mute' ? 'End mute now' : 'End maintenance now',
+        editTitle: D.running ? 'Change end · ' + D.site + ' ' + noun : (pendingD ? 'Edit or withdraw · ' + D.site + ' request' : 'Edit or cancel · ' + D.site + ' maintenance'),
+        ends: D.ends.map(function (e) { return { value: e, label: (D.day || '') + e + (e === curEnd ? ' (current)' : '') }; }),
+        cancelCta: cancelCta + '…', cancelTitle: cancelCta + '?', cancelText: cancelText,
+        approveTitle: 'Approve ' + baLen + ' of maintenance?',
+        approveEffects: L([
+          'Starts Sat 26 Sep 22:00, ends ' + S('bac').end + ' (' + baLen + '). Bangkok Airways – China is Tier 1.',
+          'No alerts for this site during the window. Checks still run and are logged.',
+          'Not counted in uptime; the client status page shows “Planned maintenance”.',
+          'If the site is DOWN or has an open incident at the start, the window doesn’t start — Arm and Tao are told.',
+          'Arm gets a Chat message. Logged in the audit log as Tao.'
+        ]),
+        approveCta: 'Approve',
+        declineTitle: 'Decline Arm’s request?'
+      },
+      endOpen: st.dlgKind === 'end',
+      editOpen: st.dlgKind === 'edit',
+      approveOpen: approveOpen,
+      declineOpen: st.dlgKind === 'decline',
+      closeDlg: function () { self.setState({ dlgKind: '', cancelling: false, view: self.state.view === 'Approve confirm' ? 'Default' : self.state.view }); },
+      endReason: st.endReason,
+      setEndReason: function (e) { self.setState({ endReason: e && e.target ? e.target.value : e }); },
+      endBlocked: !(st.endReason || '').trim(),
+      endHint: (st.endReason || '').trim() ? 'Shown in the digest and the audit log.' : 'Required — type a reason to continue. Shown in the digest and the audit log.',
+      confirmEnd: function () { var r = (self.state.endReason || '').trim(); if (!r) return; self.setState({ ov: push(dk, { st: 'ended' }, 'Ended early 10:07 by ' + ME + ' · “' + r + '”'), dlgKind: '' }); },
+      editEnd: st.editEnd || curEnd,
+      setEditEnd: function (e) { self.setState({ editEnd: e && e.target ? e.target.value : e }); },
+      editReason: st.editReason,
+      setEditReason: function (e) { self.setState({ editReason: e && e.target ? e.target.value : e }); },
+      editHint: reasonOk ? 'Shown in the digest and the audit log.' : 'Required — type a reason to continue. Shown in the digest and the audit log.',
+      cancelling: st.cancelling, notCancelling: !st.cancelling,
+      showCancelBtn: !st.cancelling && !D.running,
+      askCancel: function () { self.setState({ cancelling: true }); },
+      editBackLabel: st.cancelling ? 'Back' : 'Close',
+      editBack: function () { if (self.state.cancelling) self.setState({ cancelling: false }); else self.setState({ dlgKind: '' }); },
+      editCta: st.cancelling ? cancelCta : 'Save end time',
+      editBlocked: st.cancelling ? !reasonOk : !(reasonOk && endChanged),
+      editSubmit: function () {
+        var r = self.state.editReason.trim();
+        if (self.state.cancelling) self.setState({ ov: push(dk, { st: pendingD ? 'withdrawn' : 'cancelled' }, (pendingD ? 'Withdrawn' : 'Cancelled') + ' 10:07 by ' + ME + ' · “' + r + '”'), dlgKind: '', cancelling: false });
+        else self.setState({ ov: push(dk, { end: self.state.editEnd }, 'End ' + curEnd + ' → ' + self.state.editEnd + ' · 10:07 by ' + ME + ' · “' + r + '”'), dlgKind: '' });
+      },
+      confirmApprove: function () { self.setState({ ov: push('bac', { approved: true }, 'Approved 10:07 by Tao · Arm told in Chat'), dlgKind: '', view: self.state.view === 'Approve confirm' ? 'Default' : self.state.view }); },
+      declineReason: st.declineReason,
+      setDeclineReason: function (e) { self.setState({ declineReason: e && e.target ? e.target.value : e }); },
+      declineBlocked: !(st.declineReason || '').trim(),
+      declineHint: 'Required. Arm gets it in a Chat message; the request moves to Recent as Declined.',
+      confirmDecline: function () { var r = (self.state.declineReason || '').trim(); if (!r) return; self.setState({ ov: push('bac', { st: 'declined' }, 'Declined 10:07 by Tao · “' + r + '” · Arm told in Chat'), dlgKind: '' }); },
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

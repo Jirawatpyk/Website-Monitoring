@@ -19,26 +19,6 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </helmet>
 <div style="width: 1440px; height: 1660px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
-<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
-<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
-<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
-<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
-<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
-</div>
-<span style="font-size: 14px; font-weight: 600">Monitor</span>
-</div>
-<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
-<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="incidents" label="Main navigation" style="height: 100%"></x-import>
-</div>
-<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
-<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
-<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
-<span style="font-size: 13px; font-weight: 500">Tao</span>
-<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
-</div>
-</a>
-</aside>
-
 <main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
 
 <div style="position: absolute; top: 10px; right: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">
@@ -231,7 +211,27 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 
 </div>
 </div>
-</main>
+</main><aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="incidents" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+
 
 <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
 <div role="status" aria-live="polite" style="position: absolute; left: 280px; bottom: 24px; width: 520px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 12px 12px 12px 18px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); line-height: 1.45">
@@ -311,7 +311,7 @@ class Component extends DCLogic {
     var steps = [
       { level: 'L0', offset: '0 min', at: '09:48:43', hhmm: '09:48', who: 'Arm (owner, business hours) @mention + Alerts Space', short: '@Arm + Alerts Space · Chat + email', sent: true },
       { level: 'L1', offset: '+15 min', at: '10:03:43', hhmm: '10:03', who: 'Ploy (backup) + Tao', short: '“@Ploy please acknowledge · Tao FYI” in the thread + email', sent: true },
-      { level: 'L2', offset: '+30 min', at: '10:18:43', hhmm: '10:18', who: 'CEO @mention + email (+ voice call if Twilio approved)', short: 'CEO @mention + email', sent: false, proposal: true, stopOnAck: true },
+      { level: 'L2', offset: '+30 min', at: '10:18:43', hhmm: '10:18', who: 'CEO @mention + email (voice call off until approved)', short: 'CEO @mention + email', sent: false, proposal: false, stopOnAck: true },
       { level: 'L3', offset: '+60 min', at: '10:48:43', hhmm: '10:48', who: acked ? 'CEO + Bua (AM) · FYI @mention + email, no call' : 'CEO + Bua (AM) @mention + email', short: acked ? 'FYI to CEO + Bua (@mention + email, no call) if MuvMi is still down' : 'CEO + Bua (AM) @mention + email if MuvMi is still down', sent: false, fyi: true }
     ];
     var ladder = steps.map(function (s) {
@@ -477,14 +477,14 @@ class Component extends DCLogic {
       ladder: ladder,
       nav: [
         { items: [
-          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
           { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
-          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
           { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
         ] },
         { title: 'Operations', items: [
           { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
-          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
           { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
         ] },
         { title: 'Reports', items: [

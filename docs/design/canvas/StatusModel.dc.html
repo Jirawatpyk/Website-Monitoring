@@ -105,7 +105,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <div style="display: flex; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--aura-border-subtle)"><span style="color: var(--aura-fg-secondary)">{{t.k}}</span><span style="font-weight: 600; text-align: right">{{t.v}}</span></div>
 </sc-for>
 </div>
-<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">After recovery a DOWN shows Monitoring for 2 OK rounds, then Needs root cause until all 3 resolve conditions are met.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">After recovery a DOWN or PROBLEM shows Monitoring for 2 OK rounds, then Needs root cause until all 3 resolve conditions are met.</span>
 </div>
 
 <div class="aura-card" style="gap: 12px">
@@ -136,7 +136,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <li>Alerts suppressed. Still counted in uptime.</li>
 <li>Max 24 h, then it ends itself.</li>
 <li>Responders can mute their own sites; Admins any site. A reason is required.</li>
-<li>Ended early, edited or cancelled from Overview › Maintenance &amp; mutes (confirm, logged).</li>
+<li>Ended early, edited or cancelled on Maintenance &amp; mutes — sidebar › Maintenance (reason required, logged).</li>
 </ul>
 <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="font-weight: 600; color: var(--aura-alert-warning-fg)">Site with an open incident</span><span>Mute stops new alerts only. The open incident keeps its escalation ladder, the L3 FYI and the client-update track. Mute never counts as an acknowledgement — the sheet says: “Mute stops new alerts only — INC-0142 keeps escalating until someone acknowledges.”</span></div>
 </div>
@@ -221,8 +221,9 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Lifecycle rules · recovery and resolve</h3>
 <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">
 <li><span style="color: var(--aura-fg-primary); font-weight: 500">Resolve is always manual</span> once the 3 conditions are met. A DOWN never auto-resolves.</li>
-<li><span style="color: var(--aura-fg-primary); font-weight: 500">Only exception:</span> a PROBLEM never acknowledged that recovers within 5 min auto-resolves (no root cause) and is hidden: “N short PROBLEMs auto-resolved in &lt; 5 min — never acknowledged — are hidden”.</li>
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">Only exception:</span> a PROBLEM never acknowledged that recovers within 5 min of being flagged auto-resolves on its first OK round (no root cause) and is hidden: “N short PROBLEMs auto-resolved in &lt; 5 min — never acknowledged — are hidden”.</li>
 <li><span style="color: var(--aura-fg-primary); font-weight: 500">RECOVERED</span> reply + email go out on the first OK round (→ Monitoring); after 2 OK rounds → Needs root cause unless written. Copy: “Needs a root cause before it can be resolved.”</li>
+<li><span style="color: var(--aura-fg-primary); font-weight: 500">Fails again before Resolved</span> → joins the same incident and thread (no time window); back to Acknowledged if someone acked, otherwise Unacked.</li>
 <li><span style="color: var(--aura-fg-primary); font-weight: 500">Root cause “Unknown — keep investigating”</span> does not meet the gate — “Unknown keeps the incident open”.</li>
 </ul>
 </div>
@@ -326,8 +327,8 @@ class Component extends DCLogic {
       un: { label: 'Unacked', tone: 'danger', variant: 'outline', icon: 'clock', applies: 'DOWN · PROBLEM', when: 'Not acknowledged, before L1 fires.', extra: '“Unacked · 12 min”' },
       esc: { label: 'Escalated · L1', tone: 'warning', variant: 'outline', icon: 'arrow-up-right', applies: 'DOWN · PROBLEM', when: 'L1 (or L2) has fired and nobody has acknowledged. Replaces Unacked — never both.', extra: 'Wait as text: “18 min unacked”' },
       ack: { label: 'Acknowledged', tone: 'neutral', variant: 'outline', icon: 'check', applies: 'DOWN · PROBLEM', when: 'Someone acked; the site is still failing. Stops L1–L2 (Tier 1 DOWN keeps the L3 FYI).', extra: '“by Arm 10:07”' },
-      mon: { label: 'Monitoring', tone: 'neutral', variant: 'outline', icon: 'eye', applies: 'DOWN', when: 'First OK round after recovery — RECOVERED reply + email sent. Lasts until the 2nd OK round.', extra: '“OK since 10:31”' },
-      nrc: { label: 'Needs root cause', tone: 'warning', variant: 'outline', icon: 'pencil', applies: 'DOWN', when: '2 OK rounds done; root cause not written (or Unknown), or client update still required.', extra: 'Stays in “Needs action”' },
+      mon: { label: 'Monitoring', tone: 'neutral', variant: 'outline', icon: 'eye', applies: 'DOWN · PROBLEM', when: 'First OK round after recovery — RECOVERED reply + email sent. Lasts until the 2nd OK round.', extra: '“OK since 10:31”' },
+      nrc: { label: 'Needs root cause', tone: 'warning', variant: 'outline', icon: 'pencil', applies: 'DOWN · PROBLEM', when: '2 OK rounds done; root cause not written (or Unknown), or client update still required.', extra: 'Stays in “Needs action”' },
       res: { label: 'Resolved', tone: 'success', variant: 'outline', icon: 'circle-check', applies: 'DOWN · PROBLEM', when: 'All 3 conditions met and someone pressed Resolve (always manual). A PROBLEM ends here. For DOWN a review draft is created.', extra: 'PROBLEM: final state' },
       rev: { label: 'In review', tone: 'neutral', variant: 'outline', icon: 'file-text', applies: 'DOWN', when: 'Review draft submitted for sign-off.', extra: '“Waiting for Tao”' },
       clo: { label: 'Closed', tone: 'neutral', variant: 'soft', icon: 'check', applies: 'DOWN', when: 'Review signed off. Never used for a PROBLEM.', extra: '“Signed off by Tao”' }
@@ -386,7 +387,7 @@ class Component extends DCLogic {
       ],
       lanes: [
         { eyebrow: 'DOWN', title: 'Outage lifecycle', end: '', steps: [W.un, W.esc, W.ack, W.mon, W.nrc, W.res, W.rev, W.clo].map(function (w, i) { return Object.assign({}, w, { arrow: i > 0 }); }) },
-        { eyebrow: 'PROBLEM', title: 'Issue lifecycle', end: 'Ends at Resolved — no review, no Closed.', steps: [W.un, W.esc, W.ack, W.res].map(function (w, i) { return Object.assign({}, w, { arrow: i > 0 }); }) }
+        { eyebrow: 'PROBLEM', title: 'Issue lifecycle', end: 'Ends at Resolved — no review, no Closed.', steps: [W.un, W.esc, W.ack, W.mon, W.nrc, W.res].map(function (w, i) { return Object.assign({}, w, { arrow: i > 0 }); }) }
       ],
       gate: [
         { n: '1', title: 'OK for 2 rounds', detail: 'the site passed two scheduled checks in a row after recovery.' },

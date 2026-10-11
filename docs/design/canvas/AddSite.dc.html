@@ -43,7 +43,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 
 <div style="display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
-<a href="Main.dc.html" style="text-decoration: none">Sites</a>
+<a href="Sites.dc.html" style="text-decoration: none">Sites</a>
 <x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
 <span>Add site</span>
 </div>
@@ -285,20 +285,20 @@ class Component extends DCLogic {
       people: [{ value: 'arm', label: 'Arm' }, { value: 'ploy', label: 'Ploy' }, { value: 'nok', label: 'Nok' }, { value: 'tao', label: 'Tao' }],
       methods: ['GET', 'HEAD'],
       tiers: [
-        { value: 't1', label: 'Tier 1 — 24/7 · every 1 min', description: 'Enterprise / transactions · owner responds by day, on-call at night · CEO step at +30 min (Proposal · pending CEO)' },
+        { value: 't1', label: 'Tier 1 — 24/7 · every 1 min', description: 'Enterprise / transactions · owner responds by day, on-call at night · CEO step at +30 min' },
         { value: 't2', label: 'Tier 2 — business hours · every 3 min', description: 'Client sites · Mon–Fri 09:00–18:00 · DOWN still posts at night, escalation waits until 09:00' },
         { value: 't3', label: 'Tier 3 — business hours · every 5 min', description: 'Internal / DxT group · Mon–Fri 09:00–18:00 · no client updates' }
       ],
       nav: [
         { items: [
-          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
           { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
-          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
           { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
         ] },
         { title: 'Operations', items: [
           { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
-          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
           { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
         ] },
         { title: 'Reports', items: [
