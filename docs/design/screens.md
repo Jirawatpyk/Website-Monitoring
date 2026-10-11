@@ -33,8 +33,10 @@ The index `/implement-screen` reads. One row per canvas board (51). The board fi
 | MobileAck | Mobile — acknowledge from alert | `/incidents/[incidentId]?ack=1` (390) | P0 | S02b | §14.3, §16.8, §17 | FR-07 |
 | MobileAckDark | Mobile ack — dark (night on-call) | same, dark theme | P0 | S02b | §15.7 | FR-07 |
 | Resolve | Resolve incident + root cause | dialog on `/incidents/[incidentId]` | P0 | S07 | §15.4, §16.1–4 | FR-06 |
-| Maintenance | Maintenance / mute dialog | `/maintenance` + dialog | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1 | FR-10a, FR-14 |
-| MMaintenance | Mobile — Mute / maintenance sheet | sheet (390) | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1 | FR-10a, FR-14 |
+| Maintenance | Maintenance / mute dialog | dialog (Site detail, Sites ⋯, `/maintenance`) | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1, §23.6 | FR-10a, FR-14 |
+| MMaintenance | Mobile — Mute / maintenance sheet | sheet (390) | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1, §23.6 | FR-10a, FR-14 |
+| MaintenancePage | Maintenance & mutes — /maintenance | `/maintenance` | P0 (mute pulled into the MVP) | S09 | §23 | FR-10a, FR-14 |
+| MMaintenanceList | Mobile — Maintenance & mutes | `/maintenance` (390) | P0 (mute pulled into the MVP) | S09 | §22, §23.9 | FR-10a, FR-14 |
 | Escalation | Escalation policies | `/escalation` | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §14.1, §14.7, §15.5, §22 | FR-09a, FR-09b |
 | MEscalation | Mobile — Escalation (view only) | `/escalation` (390) | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §22.5–6 | FR-09a, FR-09b |
 | OnCall | On-call rotation | `/oncall` | P1 | S10 | §2, §15.8 | FR-09b, §8 |

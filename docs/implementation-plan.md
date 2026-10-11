@@ -25,7 +25,8 @@
 | S06b | Overview (option A) | 1 · P0 | L | FR-05 | S06, S02b | 3 | Done |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Done |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Done |
-| S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06b, S08 | 3 | Todo |
+| S09 | Maintenance windows & mute | 1 · P0 | L | FR-10a, FR-14 | S06b, S08 | 3 | In progress |
+| S09b | Maintenance messages | 1 · P0 | S | — (FR-10a, FR-14 messages, §23.10) | S09 + ChatAlert / EmailAlert boards | 3 | Todo |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
@@ -413,7 +414,8 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S09 · Maintenance windows & mute
 
 - **Scope:** FR-10a and FR-14 (pulled forward from P1: the Maintenance dialog's guard offers Mute, so both ship together). One-off windows: schedule, suppress alerts, excluded from uptime, reason required, > 24 h needs Admin approval (Admins approve their own), can't start on a DOWN site or one with an open incident (§14.5). Mute: reason required, max 24 h, auto-expires, stops new alerts only and never counts as an ack (§15.1). End early / edit / cancel from the Overview "Maintenance & mutes" card, all logged.
-- **Boards:** Maintenance, MMaintenance · **Tables:** maintenance_windows · **Test plan:** T09
+- **Boards:** Maintenance, MMaintenance, MaintenancePage, MMaintenanceList (spec §23, 11 Oct) · the Overview card and phone row (Main3 / MOverview4 "+ Maint.", §23.8) · **Tables:** maintenance_windows · **Test plan:** T09 · **Decisions:** D-036
+- **Not in S09 → S09b:** every maintenance message (§23.6, §23.10 "Who is told": the request to the Admin, the 12 h / 1 h reminders, the Alerts Space line and owner / backup messages, approve / decline to the asker); status-page subscriber emails go with the status page (Phase 3).
 - **Depends on:** S06b, S08
 - **Done when:**
   1. **T09:** muting a site with an open incident keeps its escalation running (test); the L3 FYI and client-update parts are re-checked in S10 / S11.
@@ -422,6 +424,16 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   4. A Responder's 30 h window waits for Admin approval; a 25 h mute is refused.
   5. spec-checker passes Maintenance and MMaintenance; nav "Maintenance" live.
 - **Review:** spec-checker, engine-reviewer, security-reviewer, db-reviewer.
+
+### S09b · Maintenance messages
+
+- **Scope:** the messages spec §23.6 and §23.10 add (split from S09 on 11 Oct 2026, D-036): the approval request to the Admin when a Responder asks for maintenance over 24 h, the reminders 12 h and 1 h before a pending request's start, one line in the site's Alerts Space thread plus a message to the owner and backup on every create / approve / decline / edit / cancel / end early, approve / decline to the asker in Chat, and "Didn't start — site was DOWN" to the owner, backup and approver. Status-page subscriber emails ("Include planned maintenance notices") go with the status page (Phase 3).
+- **Boards:** ChatAlert and EmailAlert rows for these messages (to be drawn by Claude Design first).
+- **Depends on:** S09
+- **Done when:**
+  1. A Responder's request over 24 h reaches every active Admin in Chat and email; the reminders go 12 h and 1 h before its start while it still waits (tests).
+  2. Each maintenance action posts its one line in the site's Alerts Space thread and messages the owner and backup (tests); message-checker passes the new ChatAlert / EmailAlert rows.
+- **Review:** message-checker, engine-reviewer.
 
 ### G1 · MVP gate (PRD §12 Phase 1 exit)
 
@@ -705,6 +717,8 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | MEscalation | S08 |
 | Maintenance | S09 |
 | MMaintenance | S09 |
+| MaintenancePage | S09 |
+| MMaintenanceList | S09 |
 | OnCall | S10 |
 | MOnCall | S10 |
 | MainFault | S12 |

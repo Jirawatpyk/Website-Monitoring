@@ -29,13 +29,13 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 
 <header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
 <sc-if value="{{isList}}" hint-placeholder-val="{{true}}">
-<a href="MOverview.dc.html" aria-label="Back to overview" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<a href="MOverview4.dc.html" aria-label="Back to overview" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
 </sc-if>
 <sc-if value="{{isArticle}}" hint-placeholder-val="{{false}}">
 <button type="button" onClick="{{backToList}}" aria-label="Back to all topics" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; background: transparent; border: 0; color: var(--aura-fg-primary); cursor: pointer"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></button>
 </sc-if>
 <span style="flex-grow: 1; font-size: 17px; font-weight: 600">User guide</span>
-<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import></a>
 </header>
 
 <div id="mg-scroll" class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 14px 16px 32px; display: flex; flex-direction: column; gap: 12px">
@@ -306,6 +306,7 @@ class Component extends DCLogic {
         summary: 'Monitoring, the 3 conditions, undo, review',
         bullets: [
           'On the first OK round the RECOVERED reply and email go out and the incident moves to Monitoring. After 2 OK rounds it needs a root cause.',
+          'Fails again before Resolved? It joins the same incident and thread — back to Acknowledged if someone acked, otherwise Unacked.',
           'Resolve is always a manual step and needs 3 conditions: OK for 2 rounds, client update marked (or not required / not needed), root cause written.',
           '“Unknown — keep investigating” saves your notes but keeps the incident open.',
           'After Resolve nothing is sent for 10 s — “Posting to Chat, email and webhooks in N s — nothing is sent until then” — tap “Undo · N s” if needed.',
@@ -323,7 +324,7 @@ class Component extends DCLogic {
       { id: 'escalation', group: 'Admin', icon: 'arrow-up-right', title: 'Escalation rules', roles: [A],
         summary: 'Levels, timing and the guardrails when you edit them',
         bullets: [
-          'Tier 1 DOWN: L0 owner or on-call + Alerts Space · L1 +15 min backup + Tao · L2 +30 min CEO (Proposal · pending CEO) · L3 +60 min CEO + account manager.',
+          'Tier 1 DOWN: L0 owner or on-call + Alerts Space · L1 +15 min backup + Tao · L2 +30 min CEO · L3 +60 min CEO + account manager.',
           'Tier 2–3 DOWN: L0, L1 +15 min, L2 +30 min reminder to Tao. No CEO page — the CEO sees it in the digest.',
           'L0 is pinned. Later steps are at least +15 min apart and each needs at least one channel.',
           'Saving asks you to confirm who is affected. Edit policies on desktop.'
@@ -395,7 +396,7 @@ class Component extends DCLogic {
         ladder: [
           { level: 'L0', when: '0 min', who: 'Owner (day) or on-call (night) @mention + Alerts Space', proposal: false },
           { level: 'L1', when: '+15 min', who: 'Backup + Tao — “@backup please acknowledge · Tao FYI”', proposal: false },
-          { level: 'L2', when: '+30 min', who: 'CEO @mention + email (+ voice call if approved)', proposal: true },
+          { level: 'L2', when: '+30 min', who: 'CEO @mention + email (voice call off until approved)', proposal: false },
           { level: 'L3', when: '+60 min', who: 'CEO + account manager · after an ack: FYI if still down (no call)', proposal: false }
         ],
         hasRule: !!cur.ruleTitle, ruleTitle: cur.ruleTitle || '', ruleText: cur.ruleText || '',

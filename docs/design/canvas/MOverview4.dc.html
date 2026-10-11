@@ -35,7 +35,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </div>
 <span style="font-size: 14px; font-weight: 600">Monitor</span>
 </div>
-<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--aura-fg-secondary)">{{me}}<x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="sm"></x-import></span>
+<a href="MProfile.dc.html" aria-label="My profile" style="min-height: 44px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--aura-fg-secondary); text-decoration: none">{{me}}<x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="sm"></x-import></a>
 </header>
 
 <div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
@@ -106,7 +106,8 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </section>
 
 <a href="MSites.dc.html" class="mo-all"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="monitor" size="sm"></x-import></span><span style="flex-grow: 1">All {{monitored}} sites <span style="color: var(--aura-fg-secondary)">· {{okCount}} OK</span></span><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a>
-<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Phone Overview answers three things, in order: anything to do now (banners — same rules as desktop), what is wrong and is it mine (Live issues), and is the rest fine (“x/y OK” in the header, “All N sites” row → Sites). Live issues: same inclusion and sort as desktop; each row = status + one reason + Since; a neutral outline chip with the user icon shows when you own the site (“Yours”) or are its backup (“Backup”) — never accent/violet, which status badges reserve for Maintenance (spec §11). Third count by role: Responder / Admin → “Yours” (Live issues you own or back up; chips “Yours” / “Backup”, user icon) · AM (Stakeholder) → “Your clients” (Live issues on sites of clients you manage; chip “Your client”, users icon) — they act on client updates · CEO (Stakeholder, no clients) and Viewer → “Uptime 30 d”, no chips. Chips are neutral outline, never accent/violet (status badges reserve it for Maintenance, spec §11). Viewer is read-only: banners and rows open the incident without Acknowledge; AM and CEO can acknowledge but don’t need to (spec §18). Use VIEW AS to compare. Not on phones: site tiles, KPIs MTTA / MTTD / uptime, Recent events (Incidents tab), legend, sparklines. All OK → one line “Nothing needs you”. The User guide icon comes back to the top bar with the guide. Sample viewers: Arm (Responder), Bua (AM: MuvMi, Bangkok Airways, Tubtong, Cando Asia), Mint (Viewer); values are mock data — compute them; never copy.</div>
+<a href="MMaintenanceList.dc.html" class="mo-all"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="calendar" size="sm"></x-import></span><span style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.3; padding: 6px 0"><span>Maintenance &amp; mutes</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{mxLine}}</span></span><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Phone Overview answers three things, in order: anything to do now (banners — same rules as desktop), what is wrong and is it mine (Live issues), and is the rest fine (“x/y OK” in the header, “All N sites” row → Sites). Live issues: same inclusion and sort as desktop; each row = status + one reason + Since; a neutral outline chip with the user icon shows when you own the site (“Yours”) or are its backup (“Backup”) — never accent/violet, which status badges reserve for Maintenance (spec §11). Third count by role: Responder / Admin → “Yours” (Live issues you own or back up; chips “Yours” / “Backup”, user icon) · AM (Stakeholder) → “Your clients” (Live issues on sites of clients you manage; chip “Your client”, users icon) — they act on client updates · CEO (Stakeholder, no clients) and Viewer → “Uptime 30 d”, no chips. Chips are neutral outline, never accent/violet (status badges reserve it for Maintenance, spec §11). Viewer is read-only: banners and rows open the incident without Acknowledge; AM and CEO can acknowledge but don’t need to (spec §18). Use VIEW AS to compare. Not on phones: site tiles, KPIs MTTA / MTTD / uptime, Recent events (Incidents tab), legend, sparklines. All OK → one line “Nothing needs you”. The User guide icon comes back to the top bar with the guide. “Maintenance &amp; mutes · N active · N scheduled ›” under “All N sites” comes with the maintenance slice (§23) and opens the phone Maintenance list; left out when nothing is active or scheduled. Sample viewers: Arm (Responder), Bua (AM: MuvMi, Bangkok Airways, Tubtong, Cando Asia), Mint (Viewer); values are mock data — compute them; never copy.</div>
 </div>
 
 
@@ -178,7 +179,7 @@ class Component extends DCLogic {
     var q = attn.filter(function (r) { return r.key === 'down' && r.ackRank < 2; });
     var banners = q.slice(0, 2).map(function (r) {
       var sub = r.esc ? 'Escalated · L1 · ' + r.un + ' min unacked · CEO at 10:18' : r.un + ' min unacked · ' + downs[r.name].cause;
-      return { title: r.name + ' is DOWN — ' + r.durMin + ' min', sub: sub, aria: r.name + ' is DOWN, ' + r.durMin + ' minutes. ' + sub + '. Open ' + r.id };
+    return { title: r.name + ' is DOWN — ' + r.durMin + ' min', sub: sub, aria: r.name + ' is DOWN, ' + r.durMin + ' minutes. ' + sub + '. Open ' + r.id };
     });
     var more = q.length - banners.length;
     var nEsc = q.filter(function (r) { return r.esc; }).length;
@@ -197,6 +198,7 @@ class Component extends DCLogic {
     });
     var nOpen = all.filter(function (r) { return r.open; }).length;
     return {
+      mxLine: (allOk ? '' : '1 active · ') + '1 scheduled',
       yes: true,
       views: ['2 + more', '1 banner', 'None', 'All OK'], view: V,
       setView: function (v) { self.setState({ view: v }); },

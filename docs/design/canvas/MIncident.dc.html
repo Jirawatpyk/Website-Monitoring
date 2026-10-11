@@ -29,7 +29,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 6px 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
 <a href="MIncidents.dc.html" aria-label="Back to incidents" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
 <span style="flex-grow: 1; font-family: var(--font-mono); font-size: 15px; font-weight: 600">INC-0142</span>
-<x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import></a>
 <x-import component-from-global-scope="Aura.IconButton" icon="ellipsis" label="More actions" on-click="{{openMore}}"></x-import>
 </header>
 
@@ -109,6 +109,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </div>
 </sc-for>
 <span style="padding-top: 6px; font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{escFoot}}</span>
+<a href="MEscalation.dc.html" style="min-height: 44px; text-decoration: none; display: flex; align-items: center; justify-content: space-between; font-size: 13px">Escalation policy · all steps<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a>
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
@@ -271,7 +272,7 @@ class Component extends DCLogic {
     var ladder = [
       Object.assign({ level: 'L0', when: '0 min · 09:48', status: 'Sent 09:48', who: 'Arm (owner, business hours) @mention + Alerts Space', proposal: false }, done),
       Object.assign({ level: 'L1', when: '+15 min · 10:03', status: 'Sent 10:03', who: 'Ploy (backup) + Tao · “@Ploy please acknowledge · Tao FYI”', proposal: false }, done),
-      Object.assign({ level: 'L2', when: '+30 min · 10:18', status: 'Cancelled · acked', who: 'CEO @mention + email (+ voice call if Twilio approved)', proposal: true }, off),
+      Object.assign({ level: 'L2', when: '+30 min · 10:18', status: 'Cancelled · acked', who: 'CEO @mention + email (voice call off until approved)', proposal: false }, off),
       Object.assign({ level: 'L3', when: '+60 min · 10:48', status: later ? 'Not sent · recovered 10:31' : 'If still down', who: 'FYI to CEO + Bua at 10:48 if still down (no call)', proposal: false }, off)
     ];
     var escFoot = later

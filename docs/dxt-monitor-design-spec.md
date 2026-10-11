@@ -1,11 +1,11 @@
 # DxT Monitor — Design spec for developer handoff
 
-Version: 10 Oct 2026 (rev 2) · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
-Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (51 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
+Version: 11 Oct 2026 (rev 2) · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
+Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (53 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
 
 ## 0. How to use this spec
 - **What this is:** the rules every screen follows — statuses, escalation, lifecycle, messages, copy and formats. The canvas shows how it looks; this file says how it behaves.
-- **Precedence:** on screen behaviour, UI copy and formats this spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. Inside this spec, later sections refine earlier ones: §14 → §15 → §16 → §17–22 override anything above them that conflicts.
+- **Precedence:** on screen behaviour, UI copy and formats this spec wins over the PRD; on scope, priority, architecture and budget the PRD wins. Inside this spec, later sections refine earlier ones: §14 → §15 → §16 → §17–23 override anything above them that conflicts.
 - **Sample data:** names of owners, backups, AMs and on-call people, the rotation, incident IDs, times and uptime figures (§1–§5) are realistic sample data used consistently across the mockups — not production values. Real owners and tiers come from the Site Registration Checklist (PRD Phase 0). The L2 CEO step is approved (D-009) — no "Proposal · pending CEO" tag anywhere; only the voice call stays "Configured · off until approved".
 - **Build from AURA:** use AURA components and tokens as drawn; don't restyle. Known AURA gaps are listed in the orange note on the canvas.
 - **Icons available in AURA (canvas copy):** arrow-down arrow-left arrow-right arrow-up arrow-up-down arrow-up-right ban bell calendar chart-column check chevron-down chevron-left chevron-right chevron-up circle circle-alert circle-check circle-dot-dashed clock cloud-upload columns-3 copy download ellipsis external-link eye eye-off file file-text filter folder house image inbox info layout-dashboard loader-circle lock log-out mail menu minus monitor moon panel-left-close panel-left-open paperclip pencil pin pin-off plus rotate-ccw search settings sun trash-2 trending-down trending-up triangle-alert upload user users x. AURA 5.1+ (use in code) also has server, globe, activity, shield-alert, phone, wrench, and 5.34 adds StatusTile + TileGrid and Sparkline — the canvas still carries an older AURA copy, so boards draw look-alikes of these.
@@ -14,7 +14,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 ### Screen index ("board" in this spec = one screen on the canvas)
 | Screen (file) | Canvas title | Size | Canvas row |
 |---|---|---|---|
-| Main3 | Overview — option A (Live issues + All sites tiles) · **S06, build this** | 1440×2575 | Web app — desktop 1440 + mobile 390 |
+| Main3 | Overview — option A (Live issues + All sites tiles) · **S06, build this** · SLICE › + Maint. / + On-call shows §23.8 | 1440×3010 | Web app — desktop 1440 + mobile 390 |
 | MainDark3 | Overview — option A · dark (NOC wall) · **S06** | 1440×2575 | Web app — desktop 1440 + mobile 390 |
 | MOverview4 | Mobile — Overview · **S06, build this** | 390×844 | Web app — desktop 1440 + mobile 390 |
 | Main | Overview dashboard (pre-S06 reference — superseded by Main3, §21) | 1440×1840 | Web app — desktop 1440 + mobile 390 |
@@ -30,16 +30,18 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | ChatAlert | Google Chat alert thread (content spec) | 600×8448 | Status logic · Mobile ack · Alert channel |
 | Incidents | Incidents list | 1440×1100 | Core flows · incidents · maintenance · onboarding |
 | Maintenance | Maintenance / mute dialog | 1440×1240 | Core flows · incidents · maintenance · onboarding |
+| MaintenancePage | Maintenance & mutes — /maintenance (§23) | 1440×1700 | Core flows · incidents · maintenance · onboarding |
 | AddSite | Add site + registration checklist | 1440×1680 | Core flows · incidents · maintenance · onboarding |
 | Escalation | Escalation policies | 1440×1528 | Operations & governance · web |
 | OnCall | On-call rotation | 1440×1464 | Operations & governance · web |
 | Probes | Probes & heartbeat | 1440×1496 | Operations & governance · web |
-| AuditLog | Audit log | 1440×1913 | Operations & governance · web |
+| AuditLog | Audit log | 1440×2000 | Operations & governance · web |
 | MIncidents | Mobile — Incidents | 390×844 | Mobile app · 390 |
 | MOnCall | Mobile — On-call | 390×844 | Mobile app · 390 |
 | MMaintenance | Mobile — Mute / maintenance sheet | 390×844 | Mobile app · 390 |
 | MEscalation | Mobile — Escalation (view only, §22) | 390×844 | Mobile app · 390 |
 | MProfile | Mobile — My profile (§22) | 390×844 | Mobile app · 390 |
+| MMaintenanceList | Mobile — Maintenance & mutes (§23) | 390×844 | Mobile app · 390 |
 | Reports | Uptime reports | 1440×1220 | Reports · client-facing · admin |
 | ReportPDF | Monthly client report PDF (A4) | 794×1123 | Reports · client-facing · admin |
 | StatusPage | Client status page | 1280×1380 | Reports · client-facing · admin |
@@ -55,7 +57,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | Resolve | Resolve incident + root cause | 1440×1100 | Access · monitor config · resolve · when the monitor itself fails |
 | MainFault | Overview — monitoring degraded (heartbeat missed) | 1440×1228 | Access · monitor config · resolve · when the monitor itself fails |
 | Expiry | SSL & domain expiry | 1440×1340 | Expiry · summaries · email · account & security · empty states |
-| WeeklySummary | Weekly summary — Chat card spec | 600×2397 | Expiry · summaries · email · account & security · empty states |
+| WeeklySummary | Weekly summary — Chat card spec | 600×2575 | Expiry · summaries · email · account & security · empty states |
 | EmailAlert | Alert email template | 720×1888 | Expiry · summaries · email · account & security · empty states |
 | Profile | My profile & notifications | 1440×1136 | Expiry · summaries · email · account & security · empty states |
 | Security | Settings — sign-in & security | 1440×1540 | Expiry · summaries · email · account & security · empty states |
@@ -272,7 +274,7 @@ Boards: **Main3** (desktop), **MainDark3** (NOC wall, same rules), **MOverview4*
 | Viewer | none | Uptime 30 d | — (banners and rows open the incident read-only) | — | — |
 
    Chips are Badge neutral outline (§11), never accent.
-9. **Not in S06** (draw the page without them): On-call card — comes back with on-call; Maintenance & mutes card and the header "Maintenance" button — come back with maintenance; the User guide icon in the phone top bar — comes back with the guide.
+9. **Not in S06** (draw the page without them): On-call card — comes back with on-call; Maintenance & mutes card and the header "Maintenance" button — come back with maintenance; the On-call card comes back with on-call (both drawn in §23.8); the User guide icon in the phone top bar — comes back with the guide.
 10. **AURA components (5.34):** tiles = `Aura.TileGrid` (`columns` 3 on desktop) + `Aura.StatusTile` (`status`, `title`, `value` = p50 or the DOWN duration, `meta` = tier + short state, `markers` = shield-alert / bell / eye-off with labels, `href`); Response 24h = `Aura.Sparkline` (`failures="none"`, `failed` from the checks, `label` summarising range). TLS glyph = `Aura.Icon name="shield-alert"`. **Open:** StatusTile draws down with circle-alert and maintenance with wrench, while status badges (§11) use ban and calendar, and it has no prop to change the icon — accept the difference on tiles or ask AURA for an icon override; until decided, build with AURA as is.
 11. Sample data on these boards (names, times, incident IDs INC-0140…0144, counts, viewer Tao / Arm / Bua / Mint) is mock data — compute it; never copy.
 
@@ -290,3 +292,34 @@ Not every page has its own mobile board. A page without one still works at 390 p
    - Back arrows on MEscalation and MProfile return to the screen that opened them (the boards link one fixed screen).
 7. Monitor faults on a phone (MainFault) use the MOverview4 layout with the fault banner above the incident banners.
 
+## 23. Maintenance & mutes page (/maintenance) — added 11 Oct 2026
+Boards: **MaintenancePage** (desktop; STATE Default · Responder · Read only · Empty · Approve confirm) and **MMaintenanceList** (phone; STATE Admin · Responder · Viewer · Empty). New / edit uses the Maintenance dialog (desktop) and the MMaintenance sheet (phone).
+
+1. **Entry.** Sidebar Operations › "Maintenance" opens this page (all desktop boards link MaintenancePage). Header: eyebrow OPERATIONS, title "Maintenance & mutes", meta counts ("2 active · 1 scheduled · 1 waiting for approval"; zero parts are left out; nothing at all → "Nothing active, scheduled or waiting"), one primary button "Schedule maintenance or mute" → the Maintenance dialog with Site empty (STATE "New · site empty"; submit stays disabled until a site is picked; Responders only see sites they own or back up). Phone: Overview row "Maintenance & mutes" (item 8) and the sheet's success screen "Open Maintenance & mutes".
+2. **Sections, in this order:** Active now (ending soonest first) · Waiting for approval (starting soonest first) · Scheduled (starting soonest first) · Recent · last 30 days (newest first: ended, ended early, cancelled, withdrawn, declined, not approved). An empty section is left out. Nothing active, waiting or scheduled → empty card "Nothing active or scheduled" + the primary button (the header button hides so there is one), and Recent stays.
+3. **Row.** Status · Site (name; tier · owner · backup) · When ("Today 09:30 → 14:00"; second line = length + "37 min in" or "starts in 1 d 12 h"; mutes "until 18:00 (max 24 h)") · Reason ("by Nok · not counted in uptime" / "still counted in uptime") · Actions. Recent replaces Actions with "What happened". Countdown format: "N d N h" (hours rounded), under a day "N h N min" (§13).
+4. **Badges (§11).** Active maintenance = site status Maintenance (accent soft calendar). Active mute = real status badge + overlay "Muted · until 18:00" (neutral outline eye-off). Needs approval (clock), Scheduled and every Recent state are neutral outline with calendar (maintenance) or eye-off (mute). On the page only the header button is primary; row buttons are secondary / ghost.
+5. **Actions by state.**
+   - Running window or mute: **End now** (reason) and **Edit end** (new end + reason). No Cancel — ending a running window is End now.
+   - Scheduled (not started): **Edit / cancel** — change the end, or "Cancel maintenance…" (reason) → Recent "Cancelled".
+   - Waiting for approval: Admin → **Approve** (confirm dialog) / **Decline** (reason → Recent "Declined", reason sent to the asker). The asker (and the site's owner / backup) → **Edit / withdraw** ("Withdraw request…", reason → Recent "Withdrawn"). Admins don't edit a request; to ask for changes they decline with a reason.
+   - After approval the request is an ordinary scheduled window: "Edit / cancel", "Cancel maintenance", Recent "Cancelled". Editing never undoes the approval.
+   - Every action **adds** a log line under the row (who, when, old → new, reason); lines are never replaced (§16.11).
+6. **Asking for approval.** Maintenance longer than 24 h set up by a Responder: the dialog / phone sheet shows "Needs an Admin's approval — Tao gets a request now; it starts only if approved", the button reads "Ask for approval", success = "Request sent to Tao". An Admin's own long window starts as scheduled ("You're an Admin — no approval needed"). Mutes never need approval: max 24 h, start now only (the Start control is hidden for Mute), stop new alerts only (§15.1).
+7. **Roles.** Admin: everything on every site (requests: approve / decline only). Responder: actions only on sites they own or back up and on their own requests; other rows show "Only Nok, Ploy or an Admin" (the Admin isn't named twice). AM, CEO, Viewer: read only — no row actions, no Schedule button.
+8. **Overview.**
+   - **Desktop (Main3 › SLICE).** "+ Maint." = maintenance slice; "+ On-call" = maintenance + on-call. Both cards sit in **one band between Live issues and All sites**: On call (left) · Maintenance & mutes (right); with only one, it takes the full width. They answer "right now" questions, so they sit next to Live issues; the All sites + Recent events row keeps its S06 layout. Header: secondary "Maintenance" (calendar) left of "Add site", Admin only.
+   - **On call card:** who responds now (site owners until 18:00 / the on-call person), the next shift ("Ploy · Tier 1 on call 18:00 → Mon 09:00"), next week ("Nok · from Mon 28 Sep"), the Tier 2–3 hours line, "Rotation →" On-call.
+   - **Maintenance & mutes card:** active rows, then "N waiting for approval" (Admin only) and "N scheduled · next …"; no buttons — every line opens /maintenance; nothing active → "Nothing active right now."; nothing at all → card left out. The muted Live-issues row's next step becomes "Manage mute" (Admin) / "View mute" → /maintenance.
+   - **Phone (MOverview4):** one row "Maintenance & mutes / 1 active · 1 scheduled ›" under "All N sites" → MMaintenanceList; left out when nothing is active or scheduled. MainDark3 (NOC wall) gets neither card.
+9. **Phone (MMaintenanceList).** §22 layout (back, title, avatar → MProfile, bottom nav with nothing selected). Row cards; tap → sheet with When / Length / Reason / By / Uptime / Site, all computed from the current state, the log lines, and only the allowed actions as full-width 44 px buttons. Reasons are typed inside the sheet.
+10. **Rules decided 11 Oct (defaults — Tao to confirm):**
+    - **Site DOWN at start time:** an approved or scheduled window does not start if the site is DOWN or has an open incident at its start time (same guard as §14.5). The window moves to Recent "Didn't start — site was DOWN (INC-…)", and owner, backup and the approver get a Chat message.
+    - **Approval after the start time:** not possible — at the start time an unapproved request becomes Recent "Not approved — didn't start". Tao (the only active Admin) gets a reminder 12 h before and 1 h before the start of any pending request.
+    - **Overlaps:** one maintenance window per site at a time — the dialog blocks a window that overlaps another on the same site ("Overlaps WeCare Studio 09:30 → 14:00 — edit that one instead"). A mute can't start during that site's maintenance (alerts are already off); a maintenance window that starts during a mute ends the mute.
+    - **Limits:** a mute's 24 h cap is measured from when it started; editing can't push it past that. A new end time must be at least 5 min after now (checked by the API too). A request edited down to 24 h or less still waits for the Admin's answer.
+    - **Who is told:** every create / approve / decline / edit / cancel / end-early posts one line in the Alerts Space thread for that site and messages the owner and backup; the asker gets approve / decline in Chat. Status page subscribers who chose "Include planned maintenance notices" get an email when a window is approved or scheduled, and again when it starts.
+    - **Ending while DOWN:** if the site is still DOWN when a window ends, an incident opens at the end time (StatusModel); its "since" is the window end, not the first failed check inside the window.
+    - **Time zone:** all times show in the organisation's time zone (UTC+7) and say so where a date is entered or sent to clients ("(UTC+7)"), including sites hosted in Taiwan or China.
+11. **Audit log.** maintenance.request / create / approve / decline / withdraw / edit / cancel / start / end / end_early, site.mute / mute_end — each with the reason. AuditLog sample rows cover Arm's request (Fri 09:20), Ploy's Tubtong window (Wed 16:30), ORCA's window (Tue 20:00–22:00), Cando Asia's mute (Mon 10:15, ended early 11:40) and the EQHO cancel (Fri 18 Sep 16:20).
+12. **Sample data** (WeCare Studio 09:30 → 14:00, DxT Games mute until 18:00, Bangkok Airways – China 3 days asked by Arm, Tubtong Tue 29 Sep 01:00 → 03:00, Recent rows; WeeklySummary and StatusPage assume the BA–China request was approved on Fri 25 Sep) is mock data — compute it; never copy. Main3's sample has 11 of the 17 sites, so its card shows 1 active.

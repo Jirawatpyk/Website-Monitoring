@@ -141,7 +141,7 @@ main > *{flex-shrink:0}
 <x-import component-from-global-scope="Aura.TextField" label="Status changes" value="{{flap}}" on-change="{{setFlap}}" hint="{{flapHint}}" error="{{flapErr}}"></x-import>
 <x-import component-from-global-scope="Aura.TextField" label="Stable before summary" value="{{stable}}" on-change="{{setStable}}" suffix="min" error="{{stableErr}}"></x-import>
 </div>
-<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">3 or more status changes within 30 min → one flapping summary instead of single alerts, until the site is stable for the set time.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">3 or more status changes within 30 min → only RECOVERED replies are held; one summary once the site is stable for the set time.</span>
 </div>
 <div class="aura-card" style="gap: 12px">
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Response hours</h3><a href="Organisation.dc.html" style="font-size: 13px">Edit in Organisation</a></div>
@@ -276,7 +276,7 @@ class Component extends DCLogic {
       ppl.forEach(function (n) { hits[n].push(r[1] + ' ' + ({ owner: '@mention', space: 'Alerts Space post', email: 'email' })[k] + (b2 ? ' on' : ' off')); });
     }); });
     if (st.flap !== st.sFlap || st.stable !== st.sStable) {
-      diff.push({ where: 'Flapping', before: st.sFlap + ' changes / 30 min · ' + st.sStable + ' min stable', after: st.flap + ' changes / 30 min · ' + st.stable + ' min stable', who: 'All 17 sites — changes when a flapping summary replaces single alerts for everyone who gets them.' });
+      diff.push({ where: 'Flapping', before: st.sFlap + ' changes / 30 min · ' + st.sStable + ' min stable', after: st.flap + ' changes / 30 min · ' + st.stable + ' min stable', who: 'All 17 sites — changes when RECOVERED replies are held for one summary, for everyone who gets them.' });
       PEOPLE.forEach(function (n) { if (n !== 'CEO') hits[n].push('flapping summary rule'); });
     }
     diff.forEach(function (d, i) { d.border = i ? '1px solid var(--aura-border-subtle)' : 'none'; });
@@ -346,7 +346,7 @@ class Component extends DCLogic {
         { icon: 'mail', name: 'Email · Resend', role: 'Record + fallback when Chat fails', status: 'Connected', tone: 'ready', pill: true, phase: false,
           facts: [{ k: 'From', v: 'alerts@[domain]' }, { k: 'SPF / DKIM', v: 'Verified' }, { k: '24 h', v: '9 sent · 0 bounced' }], action: T.email ? 'Send another test email' : 'Send test email', actionIcon: 'mail', actionOff: false, run: tester('email'), hasResult: !!T.email, result: 'Sent to you 10:08 · delivered in 2.1 s · “TEST — no action”', hasReason: false },
         { icon: 'triangle-alert', name: 'Voice call · Twilio', role: 'Tier 1 DOWN with no ack at L2', status: 'Waiting approval', tone: 'neutral', pill: true, phase: false,
-          facts: [{ k: 'Cost', v: '~$23–26 / month' }, { k: 'Decision', v: 'CEO' }, { k: 'Until then', v: 'Chat + email only' }], action: 'Not enabled', actionIcon: 'lock', actionOff: true, hasResult: false, hasReason: true, reason: 'Can’t test yet — waiting for the CEO’s OK on the L2 proposal.' },
+          facts: [{ k: 'Cost', v: '~$23–26 / month' }, { k: 'Decision', v: 'CEO' }, { k: 'Until then', v: 'Chat + email only' }], action: 'Not enabled', actionIcon: 'lock', actionOff: true, hasResult: false, hasReason: true, reason: 'Can’t test yet — waiting for the CEO’s OK on voice calls.' },
         { icon: 'users', name: 'Google Chat app', role: 'DM owners · ack inside Chat', status: '', tone: 'neutral', pill: false, phase: true,
           facts: [{ k: 'Needs', v: 'Chat app + service account' }, { k: 'Until then', v: 'Ack via link' }, { k: 'Owner', v: 'Tao' }], action: 'Not started', actionIcon: 'clock', actionOff: true, hasResult: false, hasReason: true, reason: 'Phase 3 — nothing to test until the Chat app exists.' }
       ],
@@ -370,14 +370,14 @@ class Component extends DCLogic {
       log: LOG,
       nav: [
         { items: [
-          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
           { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
-          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
           { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
         ] },
         { title: 'Operations', items: [
           { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
-          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
           { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
         ] },
         { title: 'Reports', items: [

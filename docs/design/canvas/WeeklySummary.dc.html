@@ -19,7 +19,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 a.aura-btn--secondary:hover{color:var(--aura-fg-primary)}
 </style>
 </helmet>
-<div class="r3-col" style="width: 600px; height: 2397px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+<div class="r3-col" style="width: 600px; height: 2575px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
 
 <div style="display: flex; flex-direction: column; gap: 4px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SPACE · DxT WEBSITE REPORTS · + EMAIL TO CEO</span>
@@ -84,12 +84,16 @@ a.aura-btn--secondary:hover{color:var(--aura-fg-primary)}
 <div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px; line-height: 1.5">
 <span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">PLANNED &amp; QUIET</span>
 <div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="accent" icon="calendar">Maintenance</x-import><span>WeCare Studio · Fri 25 Sep 09:30–14:00 · CMS upgrade · not counted</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="accent" icon="calendar">Maintenance</x-import><span>Bangkok Airways – China · Sat 26 Sep 22:00 → Tue 29 Sep 22:00 · new hosting provider · running now · not counted</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="accent" icon="calendar">Maintenance</x-import><span>ORCA Thailand · Tue 22 Sep 20:00–22:00 · hosting plan upgrade · not counted</span></div>
 <div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted</x-import><span>DxT Games · Fri 25 Sep until 18:00 · redeploying build · still counted</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted</x-import><span>Cando Asia · Mon 21 Sep 10:15–11:40 (ended early) · client changing DNS · still counted</span></div>
 </div>
 
 <div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px; line-height: 1.5">
 <span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary)">COMING UP</span>
 <div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="users" size="sm"></x-import></span><span>On call this week (Tier 1 nights and weekends): Nok, Mon 28 Sep → Mon 5 Oct. Next: Arm, 5 → 12 Oct — swap with Nok asked, not accepted yet.</span></div>
+<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="calendar" size="sm"></x-import></span><span>Maintenance: Tubtong Tue 29 Sep 01:00–03:00 · WordPress plugin updates · Ploy</span></div>
 <div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="clock" size="sm"></x-import></span><span>Cando Asia domain in 38 days · SSL in 52 — client renews, AM to remind</span></div>
 <div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="clock" size="sm"></x-import></span><span>WeCare Studio domain in 47 days — Nok renews</span></div>
 </div>
@@ -111,7 +115,7 @@ a.aura-btn--secondary:hover{color:var(--aura-fg-primary)}
 <span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — rules for both cards (FR-12)</span>
 <span>• Weekly email to the CEO: subject <span style="font-family: var(--font-mono)">DxT Monitor · Weekly summary · 21–27 Sep</span>; the email body is this card (same sections, plain-text part too).</span>
 <span>• Posts to the DxT Website Reports Space, not the alerts Space. The only @mentions are named follow-ups, in the text line as <span style="font-family: var(--font-mono)">&lt;users/{id}&gt;</span> — names inside the card don’t notify. The CEO is mentioned as their own account, never a role alias.</span>
-<span>• “Needs someone” lists DOWN without a root cause, reviews waiting sign-off, pending CEO decisions and unanswered on-call swaps. Empty → the section is left out, not shown as “none”.</span>
+<span>• “Needs someone” lists DOWN without a root cause, reviews waiting sign-off, pending CEO decisions, maintenance requests waiting for an Admin and unanswered on-call swaps. “Planned &amp; quiet” = every window and mute in the week; “Coming up” = windows in the next 7 days. Empty → the section is left out, not shown as “none”.</span>
 <span>• A DOWN counts once however many times it flapped. Durations are down time, not incident length. Past incidents show severity in outline.</span>
 <span>• The daily digest shows what is true at 09:00: a maintenance window later that day is “Planned today”, not current.</span>
 <span>• If the digest or summary hasn’t posted by 09:05, Healthchecks.io alerts Tao — a missing report means the monitor needs checking.</span>
@@ -119,7 +123,7 @@ a.aura-btn--secondary:hover{color:var(--aura-fg-primary)}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":2397}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":2575}}'>
 class Component extends DCLogic {
   renderVals() {
     var DOWN = { tone: 'danger', icon: 'ban', sev: 'Was down' };
@@ -129,7 +133,7 @@ class Component extends DCLogic {
       todo: [
         { icon: 'pencil', text: 'MuvMi DOWN Fri 25 Sep (43 min) — no root cause yet', who: 'Arm' },
         { icon: 'file-text', text: 'VOCA review (Mon 21 Sep) — waiting for sign-off', who: 'Tao' },
-        { icon: 'arrow-up-right', text: 'Tier 1 escalation to the CEO at +30 min (email, voice call if Twilio is approved) — proposal waiting for your decision', who: 'CEO' },
+        { icon: 'arrow-up-right', text: 'Voice call on the Tier 1 CEO step at +30 min (Twilio, ~$23–26 / month) — waiting for your decision', who: 'CEO' },
         { icon: 'arrow-up-down', text: 'On-call swap 5–12 Oct — Arm asked, not accepted yet', who: 'Nok' }
       ],
       incidents: [

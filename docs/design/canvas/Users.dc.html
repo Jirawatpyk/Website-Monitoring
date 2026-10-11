@@ -294,7 +294,7 @@ class Component extends DCLogic {
       Bua: { sub: '[email] · AM', role: 'Stakeholder', ch: 'both', sv: 'On', owns: '—', oc: '—', last: 'Today 09:30', sites: [],
         am: ['Bangkok Airways', 'MuvMi', 'Tubtong', 'Cando Asia', 'WeCare'], amEsc: 'Tier 1 DOWN L3 FYI + client-update pings for Bangkok Airways and MuvMi (incl. INC-0142 now)' },
       CEO: { sub: '[email]', role: 'Stakeholder', ch: 'both', sv: 'On', owns: '—', oc: '—', last: 'Mon 21 Sep', sites: [],
-        esc: 'Tier 1 DOWN · L2 (+30 min, proposal) and L3 (+60 min, FYI after ack)' },
+        esc: 'Tier 1 DOWN · L2 (+30 min) and L3 (+60 min, FYI after ack)' },
       Mint: { sub: '[email]', role: 'Viewer', ch: 'viewer', sv: 'Off5', owns: '—', oc: '—', last: 'Wed 23 Sep', sites: [] }
     };
     if (st.handedTo) { P.Ploy.oc = 'Handed to ' + st.handedTo; P[st.handedTo].oc = 'Covering Ploy'; }
@@ -496,14 +496,14 @@ class Component extends DCLogic {
       confirmRole: function () { if (missing) { self.setState({ tried: true }); return; } self.setState({ role: null, invited: '', done: deact ? who + ' deactivated · reassignments applied · logged' : who + ' is now ' + nr + ' · reassignments applied · logged' }); },
       nav: [
         { items: [
-          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main.dc.html' },
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
           { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
-          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'SiteDetail.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
           { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
         ] },
         { title: 'Operations', items: [
           { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
-          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
           { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
         ] },
         { title: 'Reports', items: [

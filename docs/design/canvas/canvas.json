@@ -27,7 +27,7 @@
       "y": 27358
     },
     "AuditLog.dc.html": {
-      "h": 1913,
+      "h": 2000,
       "is_interactive": true,
       "title": "Audit log",
       "w": 1440,
@@ -200,7 +200,7 @@
       "y": 0
     },
     "Main3.dc.html": {
-      "h": 2575,
+      "h": 3010,
       "is_interactive": true,
       "title": "Overview — option A (Live issues + All sites tiles)",
       "w": 1440,
@@ -374,7 +374,7 @@
       "y": 17973
     },
     "WeeklySummary.dc.html": {
-      "h": 2397,
+      "h": 2575,
       "title": "Weekly summary — Chat card spec",
       "w": 600,
       "x": 1520,
@@ -387,6 +387,38 @@
       "w": 390,
       "x": 11000,
       "y": 0
+    },
+    "MEscalation.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Escalation (view only)",
+      "w": 390,
+      "x": 1410,
+      "y": 16629
+    },
+    "MProfile.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — My profile",
+      "w": 390,
+      "x": 1880,
+      "y": 16629
+    },
+    "MaintenancePage.dc.html": {
+      "h": 1700,
+      "is_interactive": true,
+      "title": "Maintenance & mutes — /maintenance",
+      "w": 1440,
+      "x": 4560,
+      "y": 12036
+    },
+    "MMaintenanceList.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Maintenance & mutes",
+      "w": 390,
+      "x": 2350,
+      "y": 16629
     }
   },
   "createdOnFiles": {
@@ -448,7 +480,7 @@
     },
     "row3": {
       "kind": "title1",
-      "maxW": 4480,
+      "maxW": 6000,
       "text": "Core flows · incidents · maintenance · onboarding",
       "w": 240,
       "x": 0,
@@ -464,7 +496,7 @@
     },
     "row5": {
       "kind": "title1",
-      "maxW": 1330,
+      "maxW": 2740,
       "text": "Mobile app · 390",
       "w": 240,
       "x": 0,
@@ -518,6 +550,7 @@
     "ChatAlert.dc.html",
     "Incidents.dc.html",
     "Maintenance.dc.html",
+    "MaintenancePage.dc.html",
     "AddSite.dc.html",
     "Escalation.dc.html",
     "OnCall.dc.html",
@@ -528,6 +561,9 @@
     "MSite.dc.html",
     "MOnCall.dc.html",
     "MMaintenance.dc.html",
+    "MEscalation.dc.html",
+    "MProfile.dc.html",
+    "MMaintenanceList.dc.html",
     "Reports.dc.html",
     "ReportPDF.dc.html",
     "StatusPage.dc.html",

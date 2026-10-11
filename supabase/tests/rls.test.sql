@@ -1,7 +1,7 @@
 -- RLS per role (PRD §3, D-007, D-012) and the append-only audit_log.
 begin;
 \ir _helpers.psql
-select plan(40);
+select plan(41);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 -- Start from no sites or clients, whatever the dev seed loaded (rolled back at the end).
@@ -75,19 +75,21 @@ select is_empty($$ update public.sites set muted_until = now() returning id $$,
   'stakeholder cannot mute sites');
 reset role;
 
--- ── responder: mute fields on own sites only (D-012) ─────────────────────
+-- ── responder: mutes own sites through mute_site only (D-012 as amended by D-036) ──
 select tests.authenticate_as((select id from ids where name = 'arm'));
-select isnt_empty(
+select throws_ok(
   $$ update public.sites set muted_until = now() + interval '1 hour', mute_reason = 'deploy'
-     where id = '00000000-0000-0000-0000-0000000000a1' returning id $$,
+     where id = '00000000-0000-0000-0000-0000000000a1' $$,
+  '42501', null, 'a direct write of the mute fields is refused (D-036)');
+select lives_ok(
+  $$ select public.mute_site('00000000-0000-0000-0000-0000000000a1', now() + interval '1 hour', 'deploy') $$,
   'responder can mute a site they own');
 select throws_ok(
   $$ update public.sites set name = 'Renamed' where id = '00000000-0000-0000-0000-0000000000a1' $$,
   '42501', null, 'responder cannot change other fields of their own site');
-select is_empty(
-  $$ update public.sites set muted_until = now()
-     where id = '00000000-0000-0000-0000-0000000000b1' returning id $$,
-  'responder cannot mute a site they do not own');
+select throws_ok(
+  $$ select public.mute_site('00000000-0000-0000-0000-0000000000b1', now() + interval '1 hour', 'deploy') $$,
+  '42501', null, 'responder cannot mute a site they do not own');
 select is_empty($$ update public.monitors set timeout_ms = 5000 returning id $$,
   'responder cannot update monitors');
 select throws_ok(
@@ -117,7 +119,7 @@ select isnt_empty(
   $$ update public.sites set name = 'Site A2'
      where id = '00000000-0000-0000-0000-0000000000a1' returning id $$,
   'admin can change any site field');
-select is((select actor_id from public.audit_log where action = 'site.mute'),
+select is((select actor_id from public.audit_log where action = 'site.mute' and after is null),
   (select id from ids where name = 'arm'), 'write_audit records the signed-in actor');
 
 -- ── audit_log is append-only ─────────────────────────────────────────────

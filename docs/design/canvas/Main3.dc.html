@@ -35,7 +35,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 .ov-tile:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px}
 </style>
 </helmet>
-<div style="width: 1440px; height: 2575px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 3010px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -80,6 +80,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span style="color: var(--aura-border-default)">|</span>
 <span style="color: var(--aura-fg-secondary)">Verifier idle · Heartbeat 12 s ago</span>
 </div>
+<sc-if value="{{mxBtn}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="calendar" href="MaintenancePage.dc.html">Maintenance</x-import></sc-if>
 <sc-if value="{{isAdmin}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="plus" href="AddSite.dc.html">Add site</x-import></sc-if>
 </div>
 </div>
@@ -200,6 +201,46 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </sc-if>
 </section>
 
+<sc-if value="{{mx}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; gap: 16px; align-items: stretch">
+<sc-if value="{{oc}}" hint-placeholder-val="{{false}}">
+<div class="aura-card" style="gap: 12px; flex: 1 1 0; min-width: 0">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">On call</h3>
+<a href="OnCall.dc.html" style="font-size: 13px; white-space: nowrap">Rotation →</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.4">
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import><span style="flex-grow: 1">Site owners respond</span><span style="color: var(--aura-fg-secondary); white-space: nowrap">until 18:00</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Ploy" size="sm"></x-import><span style="flex-grow: 1">Ploy · Tier 1 on call</span><span style="color: var(--aura-fg-secondary); white-space: nowrap">18:00 → Mon 09:00</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Nok" size="sm"></x-import><span style="flex-grow: 1">Nok · next week</span><span style="color: var(--aura-fg-secondary); white-space: nowrap">from Mon 28 Sep</span></div>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">Tier 2–3: Mon–Fri 09:00–18:00 — outside those hours escalation waits until 09:00.</span>
+</div>
+</sc-if>
+<sc-if value="{{mxCard}}" hint-placeholder-val="{{false}}">
+<div class="aura-card" style="gap: 12px; flex: 1 1 0; min-width: 0">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; line-height: 1.5">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Maintenance &amp; mutes</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Alerts off or muted, checks still run</span>
+</div>
+<a href="MaintenancePage.dc.html" style="font-size: 13px; white-space: nowrap">Open →</a>
+</div>
+<sc-for list="{{mxRows}}" as="m" hint-placeholder-count="1">
+<a href="MaintenancePage.dc.html" style="display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.5; color: inherit; text-decoration: none">
+<span style="display: flex; padding-top: 2px; color: {{m.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{m.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500">{{m.title}}</span><span style="color: var(--aura-fg-secondary)">{{m.detail}}</span></span>
+</a>
+</sc-for>
+<sc-if value="{{mxNone}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--aura-fg-secondary)">Nothing active right now.</span></sc-if>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-top: 10px; border-top: 1px solid var(--aura-border-subtle); font-size: 13px">
+<sc-for list="{{mxLinks}}" as="l" hint-placeholder-count="2"><a href="MaintenancePage.dc.html" style="display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{l.icon}}" size="sm"></x-import></span><span style="flex-grow: 1">{{l.text}}</span><span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span></a></sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
 <div style="display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start">
 <section style="display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
@@ -233,6 +274,11 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span style="font-size: 13px; color: var(--aura-fg-secondary)">{{footText}}</span>
 </section>
 
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<div style="padding: 4px 4px 4px 12px; display: flex; align-items: center; gap: 10px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); flex-shrink: 0">SLICE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview slice" options="{{slices}}" value="{{slice}}" on-change="{{setSlice}}" full-width="{{yes}}" size="sm"></x-import></div>
+</div>
 <div class="aura-card">
 <div style="display: flex; align-items: center; justify-content: space-between">
 <h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Recent events</h3>
@@ -240,6 +286,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </div>
 <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px">
 <sc-for list="{{events}}" as="e" hint-placeholder-count="6"><div style="display: flex; gap: 12px"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); width: 40px; flex-shrink: 0">{{e.t}}</span><span>{{e.text}}</span></div></sc-for>
+</div>
 </div>
 </div>
 </div>
@@ -255,7 +302,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Response 24h.</b> 96 points = p50 per 15-minute bucket over the last 24 h. A bucket where checks failed has no point, so the line breaks and the rest stays empty — the row already says Down, the red duration and “since HH:MM”, so no extra marker. (Uses the AURA Sparkline with “show failures: none”; see the AURA note, item 16.) The line gains a point when a bucket closes — no animation in between. p50 next to it = last completed round; “—” while down.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">All sites.</b> One tile per monitored site for a glance (NOC wall). Status icon + name (wraps to 2 lines, never cut to “…” that hides which site) + p50, or the DOWN duration in red. Second line: tier and a short state (ack state for DOWN, “Slow · 15 min” for Problem). Small markers on the second line: amber shield = TLS chain error, amber bell = open incident, eye-off = muted. Icons carry status, colour only repeats it. The Tier control filters the tiles only — KPIs and Live issues always show every tier. The ⓘ legend sits on Live issues because that is where location icons appear. <b style="color: var(--aura-fg-primary); font-weight: 600">From AURA 5.34:</b> build the tiles with Aura.TileGrid (columns 3) + Aura.StatusTile (status, title, value = p50 or the DOWN duration, meta = tier + short state, markers shield-alert / bell / eye-off, href) and the Response 24h line with Aura.Sparkline (failures “none”). This canvas still carries an older AURA copy, so the board draws look-alikes; in code use the components. AURA’s tile icons are circle-alert (down) and wrench (maintenance) — different from the status badges (ban, calendar); see spec §21.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">By role (VIEW AS).</b> Same page for everyone; only these change. Admin / Responder: chip “Yours” or “Backup” (sites you own or back up), all actions. AM (Stakeholder): chip “Your client” on sites of clients you manage; can acknowledge (not expected to, spec §18), no “Add root cause” (→ Open INC-…), no Add site. CEO: as AM without chips. Viewer: read-only — no Acknowledge in banners or Next step (→ Open INC-…), no Add site, no chips. Chips are neutral outline with a user / users icon — never accent/violet (reserved for Maintenance among status badges, spec §11). Add site is Admin-only (spec §20). KPIs stay organisation-wide for every role.</span>
-<span><b style="color: var(--aura-fg-primary); font-weight: 600">Not on this page yet.</b> On-call card — comes back with on-call. Maintenance &amp; mutes card and the header “Maintenance” button — come back with maintenance. Until then Recent events sits beside All sites.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Later slices (SLICE).</b> “+ Maint.” = the maintenance slice; “+ On-call” = maintenance + on-call. They sit in one band between Live issues and All sites: On call (left) · Maintenance &amp; mutes (right); with only one of them it takes the full width. Reason: both answer “right now” questions (who answers an alert, what is deliberately quiet), so they sit next to Live issues, above the NOC glance and history — and the All sites + Recent events row keeps its S06 layout. On call: three lines — who responds now (site owners in hours / the on-call person), who takes the next shift and when, who is next week — plus the Tier 2–3 hours line; “Rotation →” opens On-call. Maintenance &amp; mutes: active rows, then “N waiting for approval” (Admin only) and “N scheduled · next …”; no buttons, every line opens /maintenance; nothing active → “Nothing active right now.”; nothing at all → card left out. Header: secondary “Maintenance” (calendar) left of “Add site”, Admin only. The muted Live-issues row’s next step becomes “Manage mute” (Admin) / “View mute” → /maintenance. This sample has 11 of the 17 sites (no WeCare Studio), so the card shows 1 active; the Maintenance board uses all 17.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Sample data.</b> Names, times, incident IDs and counts are mock data — compute them; never copy.</span>
 </div>
 
@@ -270,11 +317,11 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2575}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3010}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { view: '2 banners + more', tier: 'All', acked: {}, toast: null, left: 10, legendOpen: false, role: 'Admin' };
+    this.state = { view: '2 banners + more', tier: 'All', acked: {}, toast: null, left: 10, legendOpen: false, role: 'Admin', slice: 'S06' };
   }
   spark(seed, base, jitter, failFrom) {
     // 25 sample buckets (spec: 96 × 15 min). Failed buckets = no point, the line breaks (gap).
@@ -335,6 +382,7 @@ class Component extends DCLogic {
     var DRAFTS = 1; // EQHO Academy — a draft, not monitored, not shown on Overview
     var acked = st.acked;
     // Viewer roles. Admin = Tao (desktop default). AM = Bua (Stakeholder). Viewer = Mint (read-only).
+    var SLICE = st.slice || 'S06';
     var ROLE = st.role, ME = ROLE === 'AM' ? 'Bua' : (ROLE === 'Viewer' ? 'Mint' : 'Tao');
     var canAck = ROLE !== 'Viewer', canResolve = ROLE === 'Admin';
     // backup and AM per site — same as the Sites board
@@ -396,7 +444,7 @@ class Component extends DCLogic {
       } else if (o.muted) {
         o.reason = 'muted'; o.note = 'Muted by Tao · redeploying build';
         o.dur = '1 h 27 min'; o.durMin = 87; o.since = 'since 08:40';
-        o.actLink = true; o.actHref = 'SiteDetail.dc.html'; o.actLabel = 'View site';
+        o.actLink = true; o.actHref = SLICE !== 'S06' ? 'MaintenancePage.dc.html' : 'SiteDetail.dc.html'; o.actLabel = SLICE !== 'S06' ? (ROLE === 'Admin' ? 'Manage mute' : 'View mute') : 'View site';
         o.tileLine = 'Muted';
       } else {
         o.tileLine = name === 'Bangkok Airways – China' ? 'Blocked by bot protection · verified' : '';
@@ -469,6 +517,12 @@ class Component extends DCLogic {
       attnMeta: attn.length + ' of ' + monitored + ' monitored sites' + (unackedText ? ' · ' + unackedText : '') + (ROLE === 'Viewer' ? '' : ' · ' + attn.filter(function (r) { return r.yours; }).length + (ROLE === 'AM' ? ' your clients' : ' yours')),
       me: ME, meLine: ROLE === 'AM' ? 'Account manager · Stakeholder' : (ROLE === 'Viewer' ? 'Viewer · read only' : 'Jirawat Piyakit · Admin'),
       roles: ['Admin', 'AM', 'Viewer'], role: ROLE, isAdmin: ROLE === 'Admin', canAck: canAck,
+      slices: ['S06', '+ Maint.', '+ On-call'], slice: SLICE,
+      setSlice: function (v) { self.setState({ slice: v }); },
+      mx: SLICE !== 'S06', mxBtn: SLICE !== 'S06' && ROLE === 'Admin', oc: SLICE === '+ On-call', mxCard: SLICE !== 'S06',
+      mxRows: allOk ? [] : [{ icon: 'eye-off', color: SEC, title: 'DxT Games — muted', detail: 'until 18:00 · Redeploying build · by Tao · still counted in uptime' }],
+      mxNone: allOk,
+      mxLinks: (ROLE === 'Admin' ? [{ icon: 'clock', text: '1 waiting for approval' }] : []).concat([{ icon: 'calendar', text: '1 scheduled · next Tue 29 Sep 01:00' }]),
       setRole: function (v) { clearInterval(self._iv); self.setState({ role: v, acked: {}, toast: null }); },
       legendOpen: st.legendOpen, legendBtn: st.legendOpen ? 'Hide legend' : 'Show legend',
       toggleLegend: function () { self.setState({ legendOpen: !self.state.legendOpen }); },
@@ -495,7 +549,7 @@ class Component extends DCLogic {
         ] },
         { title: 'Operations', items: [
           { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
-          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'Maintenance.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
           { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
         ] },
         { title: 'Reports', items: [
