@@ -175,9 +175,9 @@ export function EditDialog({
       title={title}
       description={dialogDescription(r, now)}
       footer={
-        <span className="flex w-full flex-wrap items-center gap-3">
-          {!cancelling && !running && <span className="max-md:hidden">{cancelButton(false)}</span>}
-          <span className="grow" />
+        // Plain footer children, as the other dialogs: AURA stacks them full width on phones.
+        <>
+          {!cancelling && !running && <span className="mr-auto max-md:hidden">{cancelButton(false)}</span>}
           <Button
             variant="secondary"
             onClick={() => (cancelling && !withdrawOnly ? setCancelling(false) : onClose())}
@@ -192,7 +192,7 @@ export function EditDialog({
           >
             {cancelling ? cancelWord : 'Save end time'}
           </Button>
-        </span>
+        </>
       }
     >
       <div className="flex flex-col gap-4">
