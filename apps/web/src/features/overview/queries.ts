@@ -13,7 +13,13 @@ import {
 import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { getAccess } from '@/lib/auth/session';
-import { downEpisodesBySite, locationGlyph, slowMsOf, watchedSince } from '@/features/sites/server';
+import {
+  downEpisodesBySite,
+  locationGlyph,
+  maintenanceSpansBySite,
+  slowMsOf,
+  watchedSince,
+} from '@/features/sites/server';
 import { chainStreakStart, currentDrop, lastRoundP50, probeHealth, seriesOf, viewerKindOf } from './assemble';
 import { EVENT_TYPES, reasonOf } from './model';
 import {
@@ -46,7 +52,7 @@ export async function loadOverview(
 ): Promise<OverviewData> {
   const from30d = new Date(now.getTime() - THIRTY_DAYS_MIN * 60_000);
   const from60d = new Date(now.getTime() - 60 * DAY_MS);
-  const [sites, checks, series, drops, kpiRows, events, probes, verifier, openJobs, managed] =
+  const [sites, checks, series, drops, spans, kpiRows, events, probes, verifier, openJobs, managed] =
     await Promise.all([
       db
         .from('sites')
@@ -68,6 +74,7 @@ export async function loadOverview(
       db.rpc('site_list_locations'),
       db.rpc('overview_response_24h'),
       downEpisodesBySite(db, null, from30d),
+      maintenanceSpansBySite(db, null, from30d),
       db
         .from('incidents')
         .select(
@@ -168,6 +175,7 @@ export async function loadOverview(
       now,
       rangeMinutes: THIRTY_DAYS_MIN,
       monitoringStartedAt: watchedSince(s),
+      maintenance: spans.get(s.id) ?? [],
     });
     return {
       id: s.id,
@@ -254,7 +262,7 @@ export async function loadOverview(
                 {
                   windowMinutes: r.uptime.windowMinutes,
                   downMinutes: r.uptime.downMinutes,
-                  maintenanceMinutes: 0,
+                  maintenanceMinutes: r.uptime.maintenanceMinutes,
                 },
               ]
             : [],

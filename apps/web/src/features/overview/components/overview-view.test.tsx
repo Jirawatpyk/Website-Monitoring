@@ -33,7 +33,7 @@ const site = (name: string, over: Partial<OverviewSite> = {}): OverviewSite => (
   p50Ms: 412,
   series: Array.from({ length: 96 }, () => 400),
   failed: Array.from({ length: 96 }, () => false),
-  uptime: { uptime: 0.9998, windowMinutes: 43_200, downMinutes: 8 },
+  uptime: { uptime: 0.9998, windowMinutes: 43_200, downMinutes: 8, maintenanceMinutes: 0 },
   ...over,
 });
 

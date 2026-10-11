@@ -67,7 +67,7 @@ export interface OverviewSite {
   /** Same index as `series`: the bucket had a hard fail. */
   failed: boolean[];
   /** The 30-day uptime window (spec §5, D-031); null for a site never monitored. */
-  uptime: { uptime: number; windowMinutes: number; downMinutes: number } | null;
+  uptime: { uptime: number; windowMinutes: number; downMinutes: number; maintenanceMinutes: number } | null;
 }
 
 /** An incident event for Recent events (§21.6), joined to its incident and site. */
