@@ -26,6 +26,7 @@ import {
 const ADMIN = { email: 'tao@example.test', name: 'Tao' };
 const WIDTHS = [390, 820, 1440] as const;
 const LG = 1024;
+const MD = 768;
 const GAP = 4;
 const TOUCH = 44;
 
@@ -222,6 +223,35 @@ function smallTargets(page: Page) {
   }, TOUCH);
 }
 
+/**
+ * Phone header actions that stop short of the row: below md a page's header buttons span the content
+ * width, as /maintenance's Schedule button does (S09 retro — Site detail's grid fell 22 px short inside
+ * AURA's actions box, and Sites' Add site hugged its label).
+ */
+function shortPhoneActions(page: Page) {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    for (const header of document.querySelectorAll<HTMLElement>('main .aura-page-header')) {
+      const actions = header.querySelector<HTMLElement>(':scope > .aura-page-header__actions');
+      if (!actions) continue;
+      const controls = Array.from(actions.querySelectorAll<HTMLElement>('a[href], button')).filter((el) => {
+        const box = el.getBoundingClientRect();
+        return box.width > 0 && box.height > 0;
+      });
+      if (!controls.length) continue;
+      const row = header.getBoundingClientRect();
+      const boxes = controls.map((el) => el.getBoundingClientRect());
+      const left = Math.min(...boxes.map((b) => b.left));
+      const right = Math.max(...boxes.map((b) => b.right));
+      if (left - row.left > 2 || row.right - right > 2) {
+        const names = controls.map((el) => (el.textContent ?? '').trim().slice(0, 24)).join(' / ');
+        out.push(`"${names}" spans ${Math.round(right - left)} of ${Math.round(row.width)} px`);
+      }
+    }
+    return out;
+  });
+}
+
 test.describe('layout consistency on every live page (local Supabase)', () => {
   test.skip(!localSupabaseEnabled, 'needs the local Supabase stack: E2E_LOCAL_SUPABASE=1');
   // One run covers all three widths itself; the phone project would only repeat it.
@@ -276,6 +306,8 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
             await expect(bar.getByText('DxT')).toBeVisible();
             await expect(bar.getByLabel(ADMIN.name)).toBeVisible();
             expect(await smallTargets(page), 'touch targets ≥ 44 px').toEqual([]);
+            if (width < MD)
+              expect(await shortPhoneActions(page), 'phone header actions span the page').toEqual([]);
           } else {
             await expect(bar, 'no top bar where the sidebar shows').toBeHidden();
           }

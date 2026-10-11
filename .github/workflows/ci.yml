@@ -62,7 +62,7 @@ jobs:
   # local stack only) run against it.
   db:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
       ALLOWED_EMAIL_DOMAIN: example.test
@@ -98,9 +98,11 @@ jobs:
       - run: pnpm --filter @dxt/web test:int
       - run: pnpm --filter @dxt/web build
       - run: pnpm --filter @dxt/web exec playwright install --with-deps chromium
+      # Every spec: the signed-in flows (sites, ack, incident, escalation, maintenance…) skip without
+      # E2E_LOCAL_SUPABASE, so before they never ran anywhere but a developer's machine (S09 review).
       - name: Signed-in e2e (local Supabase)
-        run: pnpm --filter @dxt/web exec playwright test e2e/auth.spec.ts e2e/layout-consistency.spec.ts
-        timeout-minutes: 6
+        run: pnpm --filter @dxt/web exec playwright test
+        timeout-minutes: 10
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
