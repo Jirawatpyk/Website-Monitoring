@@ -28,6 +28,7 @@ async function run<T>(
   if (result.ok) {
     revalidatePath('/');
     revalidatePath('/sites');
+    revalidatePath('/maintenance');
     if (siteId) revalidatePath(`/sites/${siteId}`);
   }
   return result;
@@ -47,6 +48,12 @@ export async function editWindowEnd(input: EditWindowInput) {
 }
 export async function cancelWindow(input: WindowReasonInput) {
   return run(input, m.cancelWindow);
+}
+export async function withdrawRequest(input: WindowReasonInput) {
+  return run(input, m.withdrawRequest);
+}
+export async function declineMaintenance(input: WindowReasonInput) {
+  return run(input, m.declineMaintenance);
 }
 export async function approveMaintenance(input: ApproveInput) {
   return run(input, m.approveMaintenance);

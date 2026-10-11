@@ -29,6 +29,12 @@ create table public.maintenance_windows (
   ended_by uuid references public.profiles (id) on delete set null,
   end_reason text check (end_reason is null or length(end_reason) <= 500),
   cancelled_at timestamptz,
+  -- Why a window that never ran or was set aside ended (§23.2 Recent): withdrawn, declined, not approved
+  -- in time, or didn't start because the site was DOWN (`outcome_detail` = the incident).
+  outcome text check (outcome in ('withdrawn', 'declined', 'not_approved', 'didnt_start')),
+  outcome_detail text,
+  -- One line per action (who, when, old → new, reason); lines are never replaced (§23.5).
+  log jsonb not null default '[]'::jsonb,
   -- The engine logs a window's start and end once each (System rows in the audit log); a window ended
   -- or cancelled by a person is logged by its RPC and marked logged there.
   start_logged boolean not null default false,
@@ -222,7 +228,6 @@ begin
 end;
 $$;
 
--- A window's state at a moment (D-036): the same words as `windowState` in @dxt/engine.
 create function public.window_state(w public.maintenance_windows, p_at timestamptz default now())
 returns text
 language sql
@@ -230,9 +235,9 @@ stable
 set search_path = ''
 as $$
   select case
-    when w.approved_at is null and (w.cancelled_at >= w.starts_at or (w.cancelled_at is null and p_at >= w.starts_at))
-      then 'not_approved'
+    when w.outcome is not null then w.outcome
     when w.cancelled_at is not null then 'cancelled'
+    when w.approved_at is null and p_at >= w.starts_at then 'not_approved'
     when w.approved_at is null then 'waiting'
     when p_at < w.starts_at then 'scheduled'
     when p_at < coalesce(w.ended_at, w.ends_at) then 'active'
@@ -240,7 +245,8 @@ as $$
   end;
 $$;
 
--- §14.5: the site is DOWN now or has an open incident (any state before Resolved).
+-- §14.5 / §23.10 (D-036 as amended): the site is DOWN now, or has an incident that hasn't recovered
+-- (Unacked, Escalated, Acknowledged). An incident waiting only for its root cause doesn't count.
 create function private.site_busy(p_site_id uuid)
 returns text
 language sql
@@ -250,8 +256,24 @@ set search_path = ''
 as $$
   select coalesce(
     (select 'INC-' || lpad(i.number::text, 4, '0') from public.incidents i
-      where i.site_id = p_site_id and i.state not in ('resolved', 'in_review', 'closed') limit 1),
+      where i.site_id = p_site_id and i.state in ('unacked', 'escalated', 'acknowledged') limit 1),
     (select 'down' from public.site_status st where st.site_id = p_site_id and st.status = 'down'));
+$$;
+
+-- Adds one line to a window's log (§23.5: every action adds a line; lines are never replaced).
+create function private.window_log(p_window_id uuid, p_action text, p_reason text, p_extra jsonb default '{}'::jsonb)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.maintenance_windows
+    set log = log || jsonb_build_array(
+      jsonb_build_object('at', now(), 'action', p_action,
+                         'by', (select display_name from public.profiles where id = auth.uid()))
+      || case when p_reason is null then '{}'::jsonb else jsonb_build_object('reason', p_reason) end
+      || p_extra)
+    where id = p_window_id;
 $$;
 
 -- How long maintenance runs back to back on a site if [p_start, p_end) is added (or an existing window
@@ -275,8 +297,88 @@ as $$
               && tstzrange(p_start - interval '1 hour', p_end + interval '1 hour')) w;
 $$;
 
+-- One maintenance window per site at a time (§23.10): refused with the window it overlaps, as
+-- detail "<site>|<starts_at>|<ends_at>" for the dialog's "Overlaps WeCare Studio 09:30 → 14:00".
+create function private.assert_no_overlap(p_site_id uuid, p_kind text, p_start timestamptz, p_end timestamptz, p_except uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_detail text;
+begin
+  select s.name || '|' || w.starts_at || '|' || coalesce(w.ended_at, w.ends_at) into v_detail
+  from public.maintenance_windows w join public.sites s on s.id = w.site_id
+  where w.site_id = p_site_id and w.kind = p_kind and w.cancelled_at is null and w.outcome is null
+    and w.id is distinct from p_except
+    and tstzrange(w.starts_at, coalesce(w.ended_at, w.ends_at)) && tstzrange(p_start, p_end)
+  order by w.starts_at limit 1;
+  if v_detail is not null then
+    raise exception 'Another window on this site overlaps that time'
+      using errcode = '22023', hint = 'overlap', detail = v_detail;
+  end if;
+end;
+$$;
+
+-- A new end is at least 5 min away (§23.10), checked by the API as well as the dialog.
+create function private.assert_end(p_ends_at timestamptz)
+returns void
+language plpgsql
+stable
+set search_path = ''
+as $$
+begin
+  if p_ends_at is null or p_ends_at < now() + interval '5 minutes' then
+    raise exception 'The end must be at least 5 min from now' using errcode = '22023', hint = 'ends_too_soon';
+  end if;
+end;
+$$;
+
+-- Clears the site row's mute when the mute it mirrors ends (the RPCs below, and the engine).
+create function private.clear_site_mute(p_site_id uuid)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  select set_config('dxt.window_write', 'on', true);
+  update public.sites set muted_until = null, mute_reason = null, muted_at = null
+  where id = p_site_id and muted_until is not null;
+$$;
+
+-- Ends the site's running mute because maintenance started (§23.10: the window ends the mute).
+create function private.end_mute_for_maintenance(p_site_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m public.maintenance_windows%rowtype;
+begin
+  select * into m from public.maintenance_windows w
+  where w.site_id = p_site_id and w.kind = 'mute' and public.window_state(w, now()) = 'active'
+  for update;
+  if not found then
+    return;
+  end if;
+  update public.maintenance_windows
+    set ended_at = now(), end_reason = 'Maintenance started', start_logged = true, end_logged = true
+    where id = m.id;
+  perform private.window_log(m.id, 'ended_by_maintenance', null);
+  perform private.clear_site_mute(p_site_id);
+  insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
+  values ((select id from public.profiles where id = auth.uid()), 'site.mute_end', 'site', p_site_id,
+          jsonb_build_object('muted_until', m.ends_at),
+          jsonb_build_object('ended_at', now(), 'reason', 'Maintenance started', 'window_id', m.id));
+end;
+$$;
+
 -- ── RPCs (signed-in people) ──────────────────────────────────────────────
--- Schedule a maintenance window, or start one now. Refusals: 42501 (role), 22023 + hint.
+-- Schedule a maintenance window, start one now, or ask for one over 24 h (a Responder's waits for an
+-- Admin). Refusals: 42501 (role), 22023 + hint.
 create function public.create_maintenance(
   p_site_id uuid,
   p_starts_at timestamptz,
@@ -310,13 +412,14 @@ begin
       using errcode = '22023', hint = 'starts_in_past';
   end if;
   v_start := greatest(p_starts_at, v_now);
-  if p_ends_at is null or p_ends_at <= v_start then
+  perform private.assert_end(p_ends_at);
+  if p_ends_at <= v_start then
     raise exception 'The end must be after the start' using errcode = '22023', hint = 'ends_before_start';
   end if;
   if p_ends_at - v_start > interval '31 days' then
     raise exception 'A window lasts at most 31 days' using errcode = '22023', hint = 'too_long';
   end if;
-  -- §14.5: never start now (or overlap now) on a site that is DOWN or has an open incident.
+  -- §14.5: never start now on a site that is DOWN or has an incident that hasn't recovered.
   if v_start <= v_now then
     v_busy := private.site_busy(p_site_id);
     if v_busy is not null then
@@ -324,6 +427,7 @@ begin
         using errcode = '22023', hint = 'maintenance_open_incident', detail = v_busy;
     end if;
   end if;
+  perform private.assert_no_overlap(p_site_id, 'maintenance', v_start, p_ends_at, null);
 
   -- Over 24 h (back to back with its neighbours) waits for an Admin; an Admin approves their own (§14.5).
   v_auto := v_admin or private.chained_minutes(p_site_id, v_start, p_ends_at, null) <= 24 * 60;
@@ -334,21 +438,28 @@ begin
             case when v_auto then auth.uid() end, case when v_auto then v_now end)
     returning id into v_id;
   exception when exclusion_violation then
-    raise exception 'Another maintenance window on this site overlaps that time'
+    raise exception 'Another window on this site overlaps that time'
       using errcode = '22023', hint = 'overlap';
   end;
+  perform private.window_log(v_id, case when v_auto then 'created' else 'requested' end, v_reason);
 
   insert into public.audit_log (actor_id, action, entity, entity_id, after)
-  select auth.uid(), 'maintenance.create', 'maintenance_window', v_id,
+  select auth.uid(), case when v_auto then 'maintenance.create' else 'maintenance.request' end,
+         'maintenance_window', v_id,
          jsonb_build_object('site_id', w.site_id, 'starts_at', w.starts_at, 'ends_at', w.ends_at,
                             'reason', w.reason, 'approved', w.approved_at is not null)
   from public.maintenance_windows w where w.id = v_id;
+
+  -- Started now: a running mute on the site ends (§23.10).
+  if v_start <= v_now then
+    perform private.end_mute_for_maintenance(p_site_id);
+  end if;
   return v_id;
 end;
 $$;
 
 -- Mute a site now until p_ends_at (at most 24 h, spec §11). One mute at a time: change it with
--- edit_window_end. A mute stops new alerts only (§15.1) — the engine reads `sites.muted_until`.
+-- edit_window_end. Not during the site's maintenance (alerts are already off, §23.10).
 create function public.mute_site(p_site_id uuid, p_ends_at timestamptz, p_reason text)
 returns uuid
 language plpgsql
@@ -359,6 +470,7 @@ declare
   v_now timestamptz := now();
   v_reason text;
   v_site public.sites%rowtype;
+  v_end timestamptz;
   v_id uuid;
 begin
   select * into v_site from public.sites where id = p_site_id for update;
@@ -369,9 +481,7 @@ begin
     raise exception 'This role can''t mute this site' using errcode = '42501';
   end if;
   v_reason := private.require_reason(p_reason);
-  if p_ends_at is null or p_ends_at <= v_now then
-    raise exception 'The end must be after now' using errcode = '22023', hint = 'ends_before_start';
-  end if;
+  perform private.assert_end(p_ends_at);
   -- A minute of slack for the time the request took.
   if p_ends_at - v_now > interval '24 hours 1 minute' then
     raise exception 'A mute lasts at most 24 h — schedule maintenance for longer'
@@ -382,40 +492,31 @@ begin
     raise exception 'This site is already muted — end or edit that mute'
       using errcode = '22023', hint = 'already_muted';
   end if;
+  if exists (select 1 from public.maintenance_windows w
+             where w.site_id = p_site_id and w.kind = 'maintenance' and public.window_state(w, v_now) = 'active') then
+    raise exception 'The site is in maintenance — its alerts are already off'
+      using errcode = '22023', hint = 'in_maintenance';
+  end if;
+  v_end := least(p_ends_at, v_now + interval '24 hours');
 
   insert into public.maintenance_windows
     (site_id, kind, starts_at, ends_at, reason, created_by, approved_by, approved_at, start_logged)
-  values (p_site_id, 'mute', v_now, least(p_ends_at, v_now + interval '24 hours'), v_reason,
-          auth.uid(), auth.uid(), v_now, true)
+  values (p_site_id, 'mute', v_now, v_end, v_reason, auth.uid(), auth.uid(), v_now, true)
   returning id into v_id;
+  perform private.window_log(v_id, 'muted', v_reason);
 
   perform set_config('dxt.window_write', 'on', true);
-  update public.sites
-    set muted_until = least(p_ends_at, v_now + interval '24 hours'), mute_reason = v_reason, muted_at = v_now
-    where id = p_site_id;
+  update public.sites set muted_until = v_end, mute_reason = v_reason, muted_at = v_now where id = p_site_id;
 
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), 'site.mute', 'site', p_site_id,
           jsonb_build_object('muted_until', case when v_site.muted_until > v_now then v_site.muted_until end),
-          jsonb_build_object('muted_until', least(p_ends_at, v_now + interval '24 hours'),
-                             'reason', v_reason, 'window_id', v_id));
+          jsonb_build_object('muted_until', v_end, 'reason', v_reason, 'window_id', v_id));
   return v_id;
 end;
 $$;
 
--- Clears the site row's mute when the mute it mirrors ends (the RPCs below, and the engine on expiry).
-create function private.clear_site_mute(p_site_id uuid)
-returns void
-language sql
-security definer
-set search_path = ''
-as $$
-  select set_config('dxt.window_write', 'on', true);
-  update public.sites set muted_until = null, mute_reason = null, muted_at = null
-  where id = p_site_id and muted_until is not null;
-$$;
-
--- End a running window or mute now (Overview "End now"): a reason, a confirm in the UI, one audit row.
+-- End a running window or mute now (End now): a reason, a confirm in the UI, one audit row.
 create function public.end_window_early(p_window_id uuid, p_reason text)
 returns void
 language plpgsql
@@ -442,12 +543,13 @@ begin
   update public.maintenance_windows
     set ended_at = v_now, ended_by = auth.uid(), end_reason = v_reason, start_logged = true, end_logged = true
     where id = p_window_id;
+  perform private.window_log(p_window_id, 'ended_early', v_reason);
   if w.kind = 'mute' then
     perform private.clear_site_mute(w.site_id);
   end if;
 
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
-  values (auth.uid(), case w.kind when 'mute' then 'site.unmute' else 'maintenance.end' end,
+  values (auth.uid(), case w.kind when 'mute' then 'site.mute_end' else 'maintenance.end_early' end,
           case w.kind when 'mute' then 'site' else 'maintenance_window' end,
           case w.kind when 'mute' then w.site_id else w.id end,
           jsonb_build_object('ends_at', w.ends_at),
@@ -455,7 +557,9 @@ begin
 end;
 $$;
 
--- Move a window's or mute's end (Overview "Edit / cancel" → Save end time).
+-- Move a window's, mute's or request's end (Edit end · Edit / cancel · Edit / withdraw, §23.5).
+-- Editing never undoes an approval and a request stays a request; Admins don't edit a request (they
+-- decline it with a reason); a Responder can't stretch an approved window past 24 h.
 create function public.edit_window_end(p_window_id uuid, p_ends_at timestamptz, p_reason text)
 returns void
 language plpgsql
@@ -467,8 +571,6 @@ declare
   v_reason text;
   v_state text;
   v_admin boolean := coalesce(public.current_app_role() = 'admin', false);
-  v_long boolean;
-  v_approved boolean;
   w public.maintenance_windows%rowtype;
 begin
   select * into w from public.maintenance_windows where id = p_window_id for update;
@@ -483,9 +585,13 @@ begin
   if v_state not in ('active', 'scheduled', 'waiting') then
     raise exception 'It has already ended' using errcode = '22023', hint = 'not_open';
   end if;
-  if p_ends_at is null or p_ends_at <= greatest(v_now, w.starts_at) then
-    raise exception 'The end must be after now and after the start'
-      using errcode = '22023', hint = 'ends_before_start';
+  if v_state = 'waiting' and v_admin then
+    raise exception 'Admins answer a request — decline it with a reason to ask for changes'
+      using errcode = '22023', hint = 'decline_instead';
+  end if;
+  perform private.assert_end(p_ends_at);
+  if p_ends_at <= w.starts_at then
+    raise exception 'The end must be after the start' using errcode = '22023', hint = 'ends_before_start';
   end if;
   if p_ends_at = w.ends_at then
     raise exception 'Pick a different end time' using errcode = '22023', hint = 'unchanged';
@@ -497,49 +603,37 @@ begin
   if w.kind = 'maintenance' and p_ends_at - w.starts_at > interval '31 days' then
     raise exception 'A window lasts at most 31 days' using errcode = '22023', hint = 'too_long';
   end if;
-  v_long := w.kind = 'maintenance'
-            and private.chained_minutes(w.site_id, w.starts_at, p_ends_at, w.id) > 24 * 60;
-  -- Making a window longer than 24 h needs an Admin: before it starts it waits again; a running one
-  -- can't be stretched past 24 h by a Responder.
-  if v_long and not v_admin and v_state = 'active' then
+  if w.kind = 'maintenance' and v_state in ('active', 'scheduled') and not v_admin
+     and private.chained_minutes(w.site_id, w.starts_at, p_ends_at, w.id) > 24 * 60 then
     raise exception 'Over 24 h needs an Admin — ask one to extend it'
       using errcode = '22023', hint = 'needs_admin';
   end if;
+  perform private.assert_no_overlap(w.site_id, w.kind, w.starts_at, p_ends_at, w.id);
 
   begin
-    update public.maintenance_windows
-      set ends_at = p_ends_at,
-          approved_by = case when v_long and not v_admin then null
-                             when approved_at is null and v_admin then auth.uid()
-                             when approved_at is null and not v_long then auth.uid()
-                             else approved_by end,
-          approved_at = case when v_long and not v_admin then null
-                             when approved_at is null and (v_admin or not v_long) then v_now
-                             else approved_at end
-      where id = p_window_id
-      returning approved_at is not null into v_approved;
+    update public.maintenance_windows set ends_at = p_ends_at where id = p_window_id;
   exception when exclusion_violation then
     raise exception 'Another window on this site overlaps that time'
       using errcode = '22023', hint = 'overlap';
   end;
+  perform private.window_log(p_window_id, 'edited', v_reason, jsonb_build_object('from', w.ends_at, 'to', p_ends_at));
   if w.kind = 'mute' and v_state = 'active' then
     perform set_config('dxt.window_write', 'on', true);
     update public.sites set muted_until = p_ends_at where id = w.site_id;
   end if;
 
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
-  values (auth.uid(), case w.kind when 'mute' then 'site.mute.edit' else 'maintenance.edit' end,
+  values (auth.uid(), case w.kind when 'mute' then 'site.mute' else 'maintenance.edit' end,
           case w.kind when 'mute' then 'site' else 'maintenance_window' end,
           case w.kind when 'mute' then w.site_id else w.id end,
           jsonb_build_object('ends_at', w.ends_at, 'approved', w.approved_at is not null),
-          jsonb_build_object('ends_at', p_ends_at, 'approved', v_approved, 'reason', v_reason,
-                             'window_id', w.id));
+          jsonb_build_object('ends_at', p_ends_at, 'approved', w.approved_at is not null,
+                             'reason', v_reason, 'window_id', w.id));
 end;
 $$;
 
--- Cancel a window or mute (Overview "Edit / cancel" → Cancel …). A running one ends now and is marked
--- Cancelled — the time it already ran stays excluded from uptime (Main board); a scheduled or waiting
--- one never happens. An Admin declining a request uses this too.
+-- Cancel a scheduled window before it starts (§23.5: a running one is ended with End now; a request
+-- is withdrawn or declined).
 create function public.cancel_window(p_window_id uuid, p_reason text)
 returns void
 language plpgsql
@@ -561,28 +655,61 @@ begin
   end if;
   v_reason := private.require_reason(p_reason);
   v_state := public.window_state(w, v_now);
-  if v_state not in ('active', 'scheduled', 'waiting') then
+  if v_state = 'active' then
+    raise exception 'It is running — end it now instead' using errcode = '22023', hint = 'end_instead';
+  end if;
+  if v_state = 'waiting' then
+    raise exception 'It is a request — withdraw it instead' using errcode = '22023', hint = 'withdraw_instead';
+  end if;
+  if v_state <> 'scheduled' then
     raise exception 'It has already ended' using errcode = '22023', hint = 'not_open';
   end if;
 
   update public.maintenance_windows
-    set cancelled_at = v_now, end_reason = v_reason, ended_by = auth.uid(),
-        ended_at = case when v_state = 'active' then v_now end, end_logged = true
+    set cancelled_at = v_now, end_reason = v_reason, ended_by = auth.uid(), end_logged = true
     where id = p_window_id;
-  if w.kind = 'mute' and v_state = 'active' then
-    perform private.clear_site_mute(w.site_id);
-  end if;
-
+  perform private.window_log(p_window_id, 'cancelled', v_reason);
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
-  values (auth.uid(), case w.kind when 'mute' then 'site.mute.cancel' else 'maintenance.cancel' end,
-          case w.kind when 'mute' then 'site' else 'maintenance_window' end,
-          case w.kind when 'mute' then w.site_id else w.id end,
-          jsonb_build_object('state', v_state, 'ends_at', w.ends_at),
-          jsonb_build_object('state', 'cancelled', 'reason', v_reason, 'window_id', w.id));
+  values (auth.uid(), 'maintenance.cancel', 'maintenance_window', w.id,
+          jsonb_build_object('state', v_state, 'starts_at', w.starts_at, 'ends_at', w.ends_at),
+          jsonb_build_object('state', 'cancelled', 'reason', v_reason));
 end;
 $$;
 
--- Approve a window over 24 h that a Responder asked for (Admin only, before it starts, §14.5).
+-- Withdraw a request (the asker, or the site's owner / backup; §23.5).
+create function public.withdraw_request(p_window_id uuid, p_reason text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_reason text;
+  w public.maintenance_windows%rowtype;
+begin
+  select * into w from public.maintenance_windows where id = p_window_id for update;
+  if not found then
+    raise exception 'window not found' using errcode = 'P0002';
+  end if;
+  if coalesce(public.current_app_role() = 'admin', false)
+     or not (private.can_pause(w.site_id) or w.created_by = auth.uid()) then
+    raise exception 'Only the asker or the site''s owner or backup can withdraw it' using errcode = '42501';
+  end if;
+  v_reason := private.require_reason(p_reason);
+  if public.window_state(w, now()) <> 'waiting' then
+    raise exception 'It isn''t waiting for approval' using errcode = '22023', hint = 'not_waiting';
+  end if;
+  update public.maintenance_windows
+    set cancelled_at = now(), outcome = 'withdrawn', end_reason = v_reason, ended_by = auth.uid(), end_logged = true
+    where id = p_window_id;
+  perform private.window_log(p_window_id, 'withdrawn', v_reason);
+  insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
+  values (auth.uid(), 'maintenance.withdraw', 'maintenance_window', w.id,
+          jsonb_build_object('state', 'waiting'), jsonb_build_object('state', 'withdrawn', 'reason', v_reason));
+end;
+$$;
+
+-- Approve a request (Admin only, before it starts, §14.5).
 create function public.approve_maintenance(p_window_id uuid)
 returns void
 language plpgsql
@@ -603,12 +730,44 @@ begin
   if public.window_state(w, v_now) <> 'waiting' then
     raise exception 'It isn''t waiting for approval' using errcode = '22023', hint = 'not_waiting';
   end if;
-  update public.maintenance_windows set approved_by = auth.uid(), approved_at = v_now
-    where id = p_window_id;
+  update public.maintenance_windows set approved_by = auth.uid(), approved_at = v_now where id = p_window_id;
+  perform private.window_log(p_window_id, 'approved', null);
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), 'maintenance.approve', 'maintenance_window', w.id,
           jsonb_build_object('approved', false),
           jsonb_build_object('approved', true, 'starts_at', w.starts_at, 'ends_at', w.ends_at));
+end;
+$$;
+
+-- Decline a request with a reason (Admin only; §23.5).
+create function public.decline_maintenance(p_window_id uuid, p_reason text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_reason text;
+  w public.maintenance_windows%rowtype;
+begin
+  if coalesce(public.current_app_role() = 'admin', false) is not true then
+    raise exception 'Only an Admin can decline maintenance' using errcode = '42501';
+  end if;
+  v_reason := private.require_reason(p_reason);
+  select * into w from public.maintenance_windows where id = p_window_id for update;
+  if not found then
+    raise exception 'window not found' using errcode = 'P0002';
+  end if;
+  if public.window_state(w, now()) <> 'waiting' then
+    raise exception 'It isn''t waiting for approval' using errcode = '22023', hint = 'not_waiting';
+  end if;
+  update public.maintenance_windows
+    set cancelled_at = now(), outcome = 'declined', end_reason = v_reason, ended_by = auth.uid(), end_logged = true
+    where id = p_window_id;
+  perform private.window_log(p_window_id, 'declined', v_reason);
+  insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
+  values (auth.uid(), 'maintenance.decline', 'maintenance_window', w.id,
+          jsonb_build_object('state', 'waiting'), jsonb_build_object('state', 'declined', 'reason', v_reason));
 end;
 $$;
 
@@ -618,7 +777,9 @@ revoke execute on function
   public.end_window_early(uuid, text),
   public.edit_window_end(uuid, timestamptz, text),
   public.cancel_window(uuid, text),
-  public.approve_maintenance(uuid)
+  public.withdraw_request(uuid, text),
+  public.approve_maintenance(uuid),
+  public.decline_maintenance(uuid, text)
   from public, anon;
 grant execute on function
   public.create_maintenance(uuid, timestamptz, timestamptz, text),
@@ -626,14 +787,19 @@ grant execute on function
   public.end_window_early(uuid, text),
   public.edit_window_end(uuid, timestamptz, text),
   public.cancel_window(uuid, text),
-  public.approve_maintenance(uuid)
+  public.withdraw_request(uuid, text),
+  public.approve_maintenance(uuid),
+  public.decline_maintenance(uuid, text)
   to authenticated;
 revoke execute on function public.window_state(public.maintenance_windows, timestamptz) from public, anon;
 grant execute on function public.window_state(public.maintenance_windows, timestamptz)
   to authenticated, service_role;
 revoke execute on function private.can_pause(uuid), private.require_reason(text),
-  private.site_busy(uuid), private.clear_site_mute(uuid),
-  private.chained_minutes(uuid, timestamptz, timestamptz, uuid) from public, anon, authenticated;
+  private.site_busy(uuid), private.clear_site_mute(uuid), private.window_log(uuid, text, text, jsonb),
+  private.chained_minutes(uuid, timestamptz, timestamptz, uuid),
+  private.assert_no_overlap(uuid, text, timestamptz, timestamptz, uuid), private.assert_end(timestamptz),
+  private.end_mute_for_maintenance(uuid)
+  from public, anon, authenticated;
 
 -- ── Engine (service role) ────────────────────────────────────────────────
 -- Logs each window's start and end once (System rows, AuditLog board) and clears the site row of a
@@ -643,40 +809,88 @@ returns void
 language plpgsql
 set search_path = ''
 as $$
+declare
+  w public.maintenance_windows%rowtype;
+  v_busy text;
+  m public.maintenance_windows%rowtype;
 begin
-  -- Nobody approved it before its start: it never starts, and stops holding its time (D-036).
-  update public.maintenance_windows w set cancelled_at = w.starts_at, end_logged = true
-  where w.approved_at is null and w.cancelled_at is null and w.starts_at <= p_now;
+  -- Nobody approved it before its start: it never starts, and stops holding its time (D-036, §23.10).
+  update public.maintenance_windows mw
+    set cancelled_at = mw.starts_at, outcome = 'not_approved', end_logged = true,
+        log = mw.log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'not_approved'))
+  where mw.approved_at is null and mw.cancelled_at is null and mw.outcome is null and mw.starts_at <= p_now;
 
-  with started as (
-    update public.maintenance_windows w set start_logged = true
-    where w.kind = 'maintenance' and not w.start_logged and w.cancelled_at is null
-      and w.approved_at is not null and w.starts_at <= p_now
-    returning w.*
-  )
-  insert into public.audit_log (action, entity, entity_id, before, after)
-  select 'maintenance.start', 'maintenance_window', s.id, jsonb_build_object('state', 'scheduled'),
-         jsonb_build_object('state', 'active', 'site_id', s.site_id, 'ends_at', s.ends_at)
-  from started s;
+  -- A window's start: it doesn't start on a site that is DOWN or has an incident that hasn't recovered
+  -- (§23.10); otherwise it starts, and a running mute on the site ends (alerts are off anyway).
+  for w in
+    select * from public.maintenance_windows mw
+    where mw.kind = 'maintenance' and not mw.start_logged and mw.cancelled_at is null and mw.outcome is null
+      and mw.approved_at is not null and mw.starts_at <= p_now
+    for update skip locked
+  loop
+    select coalesce(
+      (select 'INC-' || lpad(i.number::text, 4, '0') from public.incidents i
+        where i.site_id = w.site_id and i.state in ('unacked', 'escalated', 'acknowledged') limit 1),
+      (select 'down' from public.site_status st where st.site_id = w.site_id and st.status = 'down'))
+    into v_busy;
+    if v_busy is not null then
+      update public.maintenance_windows
+        set cancelled_at = w.starts_at, outcome = 'didnt_start', outcome_detail = v_busy,
+            start_logged = true, end_logged = true,
+            log = log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'didnt_start', 'incident', v_busy))
+        where id = w.id;
+      insert into public.audit_log (action, entity, entity_id, before, after)
+      values ('maintenance.start', 'maintenance_window', w.id, jsonb_build_object('state', 'scheduled'),
+              jsonb_build_object('state', 'didnt_start', 'site_id', w.site_id, 'incident', v_busy));
+      continue;
+    end if;
+    update public.maintenance_windows
+      set start_logged = true,
+          log = log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'started'))
+      where id = w.id;
+    insert into public.audit_log (action, entity, entity_id, before, after)
+    values ('maintenance.start', 'maintenance_window', w.id, jsonb_build_object('state', 'scheduled'),
+            jsonb_build_object('state', 'active', 'site_id', w.site_id, 'ends_at', w.ends_at));
+    for m in
+      select * from public.maintenance_windows mm
+      where mm.site_id = w.site_id and mm.kind = 'mute' and mm.cancelled_at is null and mm.ended_at is null
+        and mm.starts_at <= p_now and mm.ends_at > p_now
+    loop
+      update public.maintenance_windows
+        set ended_at = p_now, end_reason = 'Maintenance started', end_logged = true,
+            log = log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'ended_by_maintenance'))
+        where id = m.id;
+      insert into public.audit_log (action, entity, entity_id, before, after)
+      values ('site.mute_end', 'site', m.site_id, jsonb_build_object('muted_until', m.ends_at),
+              jsonb_build_object('ended_at', p_now, 'reason', 'Maintenance started', 'window_id', m.id));
+    end loop;
+  end loop;
 
+  -- Windows and mutes that ran their course: logged once (System).
   with ended as (
-    update public.maintenance_windows w set end_logged = true
-    where not w.end_logged and w.start_logged and w.cancelled_at is null and w.ended_at is null
-      and w.ends_at <= p_now
-    returning w.*
+    update public.maintenance_windows mw
+      set end_logged = true,
+          log = mw.log || jsonb_build_array(jsonb_build_object('at', mw.ends_at, 'action', 'ended'))
+    where not mw.end_logged and mw.start_logged and mw.cancelled_at is null and mw.ended_at is null
+      and mw.outcome is null and mw.ends_at <= p_now
+    returning mw.*
   )
   insert into public.audit_log (action, entity, entity_id, before, after)
-  select case e.kind when 'mute' then 'site.mute.expire' else 'maintenance.finish' end,
+  select case e.kind when 'mute' then 'site.mute_end' else 'maintenance.end' end,
          case e.kind when 'mute' then 'site' else 'maintenance_window' end,
          case e.kind when 'mute' then e.site_id else e.id end,
          jsonb_build_object('state', 'active'),
          jsonb_build_object('state', 'ended', 'ended_at', e.ends_at, 'window_id', e.id)
   from ended e;
 
-  -- A mute that ran out leaves the site row (readers already compare with now()).
+  -- A mute that ran out, or that maintenance ended, leaves the site row.
   perform set_config('dxt.window_write', 'on', true);
   update public.sites s set muted_until = null, mute_reason = null, muted_at = null
-  where s.muted_until is not null and s.muted_until <= p_now;
+  where s.muted_until is not null
+    and (s.muted_until <= p_now
+         or not exists (select 1 from public.maintenance_windows mm
+                        where mm.site_id = s.id and mm.kind = 'mute' and mm.cancelled_at is null
+                          and mm.ended_at is null and mm.starts_at <= p_now and mm.ends_at > p_now));
 end;
 $$;
 

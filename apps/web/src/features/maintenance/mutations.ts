@@ -1,6 +1,6 @@
 import 'server-only';
 import type { ServerClient } from '@/lib/supabase/server';
-import { PROBLEM_WORDS } from './model';
+import { PROBLEM_WORDS, whenText } from './model';
 import {
   approveSchema,
   createMaintenanceSchema,
@@ -23,13 +23,27 @@ export type WindowResult = { ok: true; id?: string } | { ok: false; message: str
 const FAILED = 'Couldn’t save. Check your connection and try again.';
 const NOT_ALLOWED = 'Only an Admin, or the site’s owner or backup, can do that.';
 
+/** "Overlaps WeCare Studio 09:30 → 14:00 — edit that one instead" from the RPC's detail (§23.10). */
+export function overlapWords(detail: string | null | undefined, now = new Date()): string | null {
+  const [site, start, end] = (detail ?? '').split('|');
+  if (!site || !start || !end) return null;
+  const s = new Date(start);
+  const e = new Date(end);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null;
+  return `Overlaps ${site} ${whenText(s, now)} → ${whenText(e, now)} — edit that one instead.`;
+}
+
 /** A refusal from the window RPCs in words (D-036: 42501 role, 22023 + hint). */
 function refusal(
-  error: { code?: string; hint?: string | null; message: string },
+  error: { code?: string; hint?: string | null; details?: string | null; message: string },
   notAllowed = NOT_ALLOWED,
 ): WindowResult {
   if (error.code === '42501') return { ok: false, message: notAllowed };
   if (error.code === 'P0002') return { ok: false, message: 'It no longer exists — reload the page.' };
+  if (error.hint === 'overlap') {
+    const words = overlapWords(error.details);
+    if (words) return { ok: false, message: words };
+  }
   const words = error.hint ? PROBLEM_WORDS[error.hint as keyof typeof PROBLEM_WORDS] : undefined;
   return { ok: false, message: words ?? FAILED };
 }
@@ -94,6 +108,34 @@ export async function cancelWindow(input: WindowReasonInput, { db }: Maintenance
   if (!p.success) return first(p.error.issues);
   const { error } = await db.rpc('cancel_window', { p_window_id: p.data.windowId, p_reason: p.data.reason });
   return error ? refusal(error) : { ok: true };
+}
+
+export async function withdrawRequest(
+  input: WindowReasonInput,
+  { db }: MaintenanceDeps,
+): Promise<WindowResult> {
+  const p = windowReasonSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { error } = await db.rpc('withdraw_request', {
+    p_window_id: p.data.windowId,
+    p_reason: p.data.reason,
+  });
+  return error
+    ? refusal(error, 'Only the asker or the site’s owner or backup can withdraw it.')
+    : { ok: true };
+}
+
+export async function declineMaintenance(
+  input: WindowReasonInput,
+  { db }: MaintenanceDeps,
+): Promise<WindowResult> {
+  const p = windowReasonSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { error } = await db.rpc('decline_maintenance', {
+    p_window_id: p.data.windowId,
+    p_reason: p.data.reason,
+  });
+  return error ? refusal(error, 'Only an Admin can decline maintenance.') : { ok: true };
 }
 
 export async function approveMaintenance(

@@ -20,9 +20,12 @@ export interface MaintenanceWindow {
   /** Ended early (End now), or the moment a running window was cancelled. */
   endedAt: Date | null;
   cancelledAt: Date | null;
+  /** Why one that never ran ended (§23.2 Recent): withdrawn, declined, not approved, didn't start. */
+  outcome?: WindowOutcome | null;
 }
 
-export type WindowState = 'waiting' | 'not_approved' | 'scheduled' | 'active' | 'ended' | 'cancelled';
+export type WindowOutcome = 'withdrawn' | 'declined' | 'not_approved' | 'didnt_start';
+export type WindowState = 'waiting' | 'scheduled' | 'active' | 'ended' | 'cancelled' | WindowOutcome;
 
 const MINUTE = 60_000;
 export const MUTE_MAX_MIN = 24 * 60;
@@ -30,6 +33,8 @@ export const APPROVAL_OVER_MIN = 24 * 60;
 export const WINDOW_MAX_MIN = 31 * 24 * 60;
 /** "Now" from the dialog lands a moment later; a start this far back still counts as now. */
 const NOW_SLACK_MS = 5 * MINUTE;
+/** A new end is at least this far away (§23.10). */
+export const MIN_END_AHEAD_MS = 5 * MINUTE;
 
 /** The window's real end: when it was ended early or cancelled while running, else as planned. */
 export function windowEnd(w: Pick<MaintenanceWindow, 'endsAt' | 'endedAt'>): Date {
@@ -38,11 +43,9 @@ export function windowEnd(w: Pick<MaintenanceWindow, 'endsAt' | 'endedAt'>): Dat
 
 /** Same words and order as SQL `window_state(w, at)`. */
 export function windowState(w: MaintenanceWindow, at: Date): WindowState {
-  // The engine sets an unapproved window aside at its start (cancelledAt = startsAt): still "not approved".
-  if (!w.approvedAt && (w.cancelledAt ? w.cancelledAt >= w.startsAt : at >= w.startsAt))
-    return 'not_approved';
+  if (w.outcome) return w.outcome;
   if (w.cancelledAt) return 'cancelled';
-  if (!w.approvedAt) return 'waiting';
+  if (!w.approvedAt) return at < w.startsAt ? 'waiting' : 'not_approved';
   if (at < w.startsAt) return 'scheduled';
   return at < windowEnd(w) ? 'active' : 'ended';
 }
@@ -59,6 +62,7 @@ export function activeWindow<W extends MaintenanceWindow>(
 export type WindowProblem =
   | 'reason_required'
   | 'ends_before_start'
+  | 'ends_too_soon'
   | 'starts_in_past'
   | 'mute_too_long'
   | 'too_long'
@@ -75,7 +79,10 @@ export interface WindowDraft {
   isAdmin: boolean;
 }
 
-/** The guardrails a new window or mute must pass, and whether it will wait for an Admin. */
+/**
+ * The guardrails a new window or mute must pass, and whether it will wait for an Admin. `siteBusy` is
+ * the site DOWN or an incident that hasn't recovered (Monitoring / Needs root cause don't block, D-036).
+ */
 export function checkWindow(d: WindowDraft): { problems: WindowProblem[]; needsApproval: boolean } {
   const problems: WindowProblem[] = [];
   if (!d.reason.trim()) problems.push('reason_required');
@@ -83,6 +90,7 @@ export function checkWindow(d: WindowDraft): { problems: WindowProblem[]; needsA
   const lengthMin = (d.endsAt.getTime() - start) / MINUTE;
   if (d.startsAt.getTime() < d.now.getTime() - NOW_SLACK_MS) problems.push('starts_in_past');
   else if (lengthMin <= 0) problems.push('ends_before_start');
+  else if (d.endsAt.getTime() < d.now.getTime() + MIN_END_AHEAD_MS) problems.push('ends_too_soon');
   else if (d.kind === 'mute' && lengthMin > MUTE_MAX_MIN) problems.push('mute_too_long');
   else if (d.kind === 'maintenance' && lengthMin > WINDOW_MAX_MIN) problems.push('too_long');
   if (d.kind === 'maintenance' && start <= d.now.getTime() && d.siteBusy)

@@ -42,13 +42,19 @@ describe('windowState (D-036, mirrors SQL window_state)', () => {
     ['cancelled', { cancelledAt: at('2026-09-25T09:00:00') }, 'cancelled'],
     [
       'set aside by the engine at its start, unapproved',
-      { approvedAt: null, cancelledAt: at('2026-09-25T09:30:00') },
+      { approvedAt: null, cancelledAt: at('2026-09-25T09:30:00'), outcome: 'not_approved' },
       'not_approved',
     ],
     [
       'a request withdrawn before its start',
-      { approvedAt: null, cancelledAt: at('2026-09-25T09:00:00') },
-      'cancelled',
+      { approvedAt: null, cancelledAt: at('2026-09-25T09:00:00'), outcome: 'withdrawn' },
+      'withdrawn',
+    ],
+    ['a request declined', { approvedAt: null, cancelledAt: NOW, outcome: 'declined' }, 'declined'],
+    [
+      'didn’t start — the site was DOWN',
+      { cancelledAt: at('2026-09-25T09:30:00'), outcome: 'didnt_start' },
+      'didnt_start',
     ],
     ['the start minute itself is active', { startsAt: NOW }, 'active'],
     ['the end minute itself has ended', { endsAt: NOW }, 'ended'],

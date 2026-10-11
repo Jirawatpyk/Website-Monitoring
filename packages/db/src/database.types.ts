@@ -239,13 +239,13 @@ isOneToOne: false
                   ]
                 },"maintenance_windows": {
                   Row: {
-                    "approved_at": string | null,"approved_by": string | null,"cancelled_at": string | null,"created_at": string,"created_by": string | null,"end_logged": boolean,"end_reason": string | null,"ended_at": string | null,"ended_by": string | null,"ends_at": string,"id": string,"kind": string,"reason": string,"rrule": string | null,"site_id": string,"start_logged": boolean,"starts_at": string,"updated_at": string
+                    "approved_at": string | null,"approved_by": string | null,"cancelled_at": string | null,"created_at": string,"created_by": string | null,"end_logged": boolean,"end_reason": string | null,"ended_at": string | null,"ended_by": string | null,"ends_at": string,"id": string,"kind": string,"log": NonNullable<Json>,"outcome": string | null,"outcome_detail": string | null,"reason": string,"rrule": string | null,"site_id": string,"start_logged": boolean,"starts_at": string,"updated_at": string
                   }
                   Insert: {
-                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_logged"?: boolean,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"ends_at": string,"id"?: string,"kind": string,"reason": string,"rrule"?: string | null,"site_id": string,"start_logged"?: boolean,"starts_at": string,"updated_at"?: string
+                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_logged"?: boolean,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"ends_at": string,"id"?: string,"kind": string,"log"?: NonNullable<Json>,"outcome"?: string | null,"outcome_detail"?: string | null,"reason": string,"rrule"?: string | null,"site_id": string,"start_logged"?: boolean,"starts_at": string,"updated_at"?: string
                   }
                   Update: {
-                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_logged"?: boolean,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"ends_at"?: string,"id"?: string,"kind"?: string,"reason"?: string,"rrule"?: string | null,"site_id"?: string,"start_logged"?: boolean,"starts_at"?: string,"updated_at"?: string
+                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_logged"?: boolean,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"ends_at"?: string,"id"?: string,"kind"?: string,"log"?: NonNullable<Json>,"outcome"?: string | null,"outcome_detail"?: string | null,"reason"?: string,"rrule"?: string | null,"site_id"?: string,"start_logged"?: boolean,"starts_at"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -612,6 +612,9 @@ isOneToOne: false
 "current_app_role":
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
                            },
+"decline_maintenance":
+{ Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
+                           },
 "delete_site":
 { Args: { "p_site_id": string }; Returns: undefined
                            },
@@ -830,6 +833,9 @@ isOneToOne: false
                            },
 "window_state":
 { Args: { "p_at"?: string,"w": Database["public"]['Tables']["maintenance_windows"]['Row'] }; Returns: string
+                           },
+"withdraw_request":
+{ Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
                            },
 "write_audit":
 { Args: { "p_action": string,"p_after"?: Json,"p_before"?: Json,"p_entity": string,"p_entity_id"?: string }; Returns: string

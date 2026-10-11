@@ -3,7 +3,7 @@
 -- engine's window log, T09 (a mute never stops an open incident's ladder) and the late alert after a mute.
 begin;
 \ir _helpers.psql
-select plan(62);
+select plan(83);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -111,7 +111,7 @@ select is(public.window_state(w), 'ended', 'the mute has ended') from public.mai
   where w.id = (select id from win where name = 'mute_a');
 select is((select array_agg(action order by at, action) from public.audit_log
             where entity_id = '00000000-0000-0000-0000-0000000000a1' and action like 'site.%mute%'),
-  array['site.mute', 'site.mute.edit', 'site.unmute'], 'mute, edit and end each log one row');
+  array['site.mute', 'site.mute', 'site.mute_end'], 'mute, edit and end each log one row (§23.11 names)');
 
 -- ── Maintenance: the §14.5 guard (Done-when 2) ───────────────────────────
 select tests.authenticate_as((select id from ids where name = 'arm'));
@@ -216,7 +216,7 @@ select public.engine_log_windows(now());
 reset role;
 select is((select array_agg(action order by action) from public.audit_log
             where entity_id = '00000000-0000-0000-0000-0000000000e1'),
-  array['maintenance.finish', 'maintenance.start'], 'start and end logged once each, as System');
+  array['maintenance.end', 'maintenance.start'], 'start and end logged once each, as System');
 
 -- ── T09: a mute after the first alert never stops the ladder (Done-when 1) ─
 -- Site D's incident alerted at open; it was muted above (Mute instead).
@@ -277,6 +277,100 @@ select is((select severity::text from public.engine_silent_incidents(now())
            where incident_id = (select id from inc where name = 'b')), 'down',
   'once the mute is over it is listed as a silent DOWN');
 reset role;
+
+-- ── Spec §23 (D-036 amended) ─────────────────────────────────────────────
+insert into public.sites (id, client_id, name, tier, primary_owner_id, backup_owner_id) values
+  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1', 'Site F', 2,
+   (select id from ids where name = 'arm'), (select id from ids where name = 'ploy'));
+
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select throws_like($$ select public.mute_site('00000000-0000-0000-0000-0000000000f1', now() + interval '2 minutes', 'x') $$,
+  '%at least 5 min%', 'a new end is at least 5 min away');
+-- A request (3 days), withdrawn by its asker.
+insert into win values ('req', public.create_maintenance('00000000-0000-0000-0000-0000000000f1',
+  now() + interval '5 days', now() + interval '8 days', 'Server move'));
+select throws_like(format('select public.cancel_window(%L, ''no'')', (select id from win where name = 'req')),
+  '%withdraw it instead%', 'a request is withdrawn, not cancelled');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_like(format('select public.edit_window_end(%L, now() + interval ''7 days'', ''shorter'')', (select id from win where name = 'req')),
+  '%decline it%', 'Admins don''t edit a request');
+select throws_ok(format('select public.withdraw_request(%L, ''no'')', (select id from win where name = 'req')),
+  '42501', null, 'an Admin declines rather than withdraws');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok(format('select public.edit_window_end(%L, now() + interval ''5 days 20 hours'', ''one night'')', (select id from win where name = 'req')),
+  'the asker edits the request down to 20 h');
+reset role;
+select is(public.window_state(w), 'waiting', 'a request edited down to 24 h or less still waits')
+  from public.maintenance_windows w where w.id = (select id from win where name = 'req');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok(format('select public.withdraw_request(%L, ''Not needed'')', (select id from win where name = 'req')),
+  'the asker withdraws it');
+reset role;
+select is(public.window_state(w), 'withdrawn', 'Recent: Withdrawn')
+  from public.maintenance_windows w where w.id = (select id from win where name = 'req');
+select is((select array_agg(l ->> 'action' order by ord) from public.maintenance_windows w,
+           jsonb_array_elements(w.log) with ordinality as x(l, ord) where w.id = (select id from win where name = 'req')),
+  array['requested', 'edited', 'withdrawn'], 'every action adds a log line');
+
+-- Another request, declined by the Admin.
+select tests.authenticate_as((select id from ids where name = 'arm'));
+insert into win values ('req2', public.create_maintenance('00000000-0000-0000-0000-0000000000f1',
+  now() + interval '5 days', now() + interval '8 days', 'Server move'));
+reset role;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_like(format('select public.decline_maintenance(%L, '' '')', (select id from win where name = 'req2')),
+  '%reason%', 'declining needs a reason');
+select lives_ok(format('select public.decline_maintenance(%L, ''Split it into two nights'')', (select id from win where name = 'req2')),
+  'the Admin declines it with a reason');
+reset role;
+select is(public.window_state(w), 'declined', 'Recent: Declined')
+  from public.maintenance_windows w where w.id = (select id from win where name = 'req2');
+select is((select count(*)::int from public.audit_log where action in ('maintenance.request', 'maintenance.withdraw', 'maintenance.decline') and entity_id in (select id from win where name in ('req', 'req2'))),
+  4, 'request ×2, withdraw and decline are logged with §23.11 names');
+
+-- A running window is ended, not cancelled; a mute can't start during maintenance; maintenance now ends a mute.
+select tests.authenticate_as((select id from ids where name = 'arm'));
+insert into win values ('mute_f', public.mute_site('00000000-0000-0000-0000-0000000000f1', now() + interval '2 hours', 'Noisy'));
+insert into win values ('now_f', public.create_maintenance('00000000-0000-0000-0000-0000000000f1',
+  now(), now() + interval '1 hour', 'Hotfix deploy'));
+reset role;
+select is(public.window_state(w), 'ended', 'maintenance starting now ends the running mute')
+  from public.maintenance_windows w where w.id = (select id from win where name = 'mute_f');
+select is((select muted_until from public.sites where id = '00000000-0000-0000-0000-0000000000f1'), null,
+  'and the site is no longer muted');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select throws_like($$ select public.mute_site('00000000-0000-0000-0000-0000000000f1', now() + interval '1 hour', 'again') $$,
+  '%in maintenance%', 'no mute during the site''s maintenance');
+select throws_like(format('select public.cancel_window(%L, ''no'')', (select id from win where name = 'now_f')),
+  '%end it now instead%', 'a running window is ended with End now, never cancelled');
+select throws_like($$ select public.create_maintenance('00000000-0000-0000-0000-0000000000f1',
+  now() + interval '30 minutes', now() + interval '2 hours', 'overlap') $$, '%overlaps%',
+  'one maintenance window per site at a time');
+reset role;
+
+-- An incident waiting only for its root cause doesn't block maintenance (D-036 as amended).
+update public.incidents set state = 'needs_root_cause' where id = (select id from inc where name = 'd');
+update public.site_status set status = 'ok' where site_id = '00000000-0000-0000-0000-0000000000d1';
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok($$ select public.create_maintenance('00000000-0000-0000-0000-0000000000d1', now(), now() + interval '1 hour', 'Night work') $$,
+  'needs root cause doesn''t block a window now');
+reset role;
+
+-- A scheduled window whose start comes while the site is DOWN doesn't start (§23.10).
+insert into public.maintenance_windows (id, site_id, kind, starts_at, ends_at, reason, approved_at)
+values ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000b1', 'maintenance',
+        now() - interval '1 minute', now() + interval '2 hours', 'Planned', now() - interval '1 day');
+insert into inc values ('b2', public.engine_open_incident('00000000-0000-0000-0000-0000000000b1', null,
+  'hard_fail', 'down', now() - interval '3 minutes', now() - interval '2 minutes', now(), '{}', true));
+set local role service_role;
+select public.engine_log_windows(now());
+reset role;
+select is(public.window_state(w), 'didnt_start', 'the window didn''t start — the site was DOWN')
+  from public.maintenance_windows w where w.id = '00000000-0000-0000-0000-0000000000e2';
+select alike((select outcome_detail from public.maintenance_windows where id = '00000000-0000-0000-0000-0000000000e2'),
+  'INC-%', 'it names the incident');
 
 select * from finish();
 rollback;

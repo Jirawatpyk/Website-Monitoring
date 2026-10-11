@@ -188,9 +188,18 @@ export const PROBLEM_WORDS: Record<
   | 'not_open'
   | 'not_waiting'
   | 'unchanged'
-  | 'reason_too_long',
+  | 'reason_too_long'
+  | 'in_maintenance'
+  | 'decline_instead'
+  | 'end_instead'
+  | 'withdraw_instead',
   string
 > = {
+  ends_too_soon: 'The end must be at least 5 min from now.',
+  in_maintenance: 'The site is in maintenance — its alerts are already off.',
+  decline_instead: 'Admins answer a request — decline it with a reason to ask for changes.',
+  end_instead: 'It is running — end it now instead.',
+  withdraw_instead: 'It is a request — withdraw it instead.',
   reason_required: 'Type a reason — it goes in the audit log with the change.',
   reason_too_long: 'The reason is too long (500 characters at most).',
   ends_before_start: 'The end must be after the start.',
