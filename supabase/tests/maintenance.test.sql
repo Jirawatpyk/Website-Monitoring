@@ -3,7 +3,7 @@
 -- engine's window log, T09 (a mute never stops an open incident's ladder) and the late alert after a mute.
 begin;
 \ir _helpers.psql
-select plan(58);
+select plan(62);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -258,6 +258,25 @@ select is((select array_agg(channel::text || ':' || template order by channel::t
   array['email:down', 'google_chat:down'], 'the DOWN card and the owner email');
 select is((select alerted_at from public.incidents where id = (select id from inc where name = 'a')), now(),
   'the ladder counts from now');
+
+-- A run that read the incident before the late alert was stamped can't fire L1 early (engine review M5).
+set local role service_role;
+select ok(not public.engine_fire_step((select id from inc where name = 'a'), 1::smallint, now() - interval '1 minute', '{}'),
+  'a level due before the late alert doesn''t fire');
+reset role;
+
+-- A PROBLEM that alerted, raised to DOWN while muted (D-021): its DOWN card is still owed (engine review M3).
+insert into inc values ('b', public.engine_open_incident('00000000-0000-0000-0000-0000000000b1', null,
+  'slow', 'problem', now() - interval '30 minutes', now() - interval '29 minutes', now(), '{}', true));
+set local role service_role;
+select ok(public.engine_escalate_incident((select id from inc where name = 'b'), now(), now(), '{}', false),
+  'raised to DOWN with its card held back by a mute');
+select ok(not public.engine_thread_live((select id from inc where name = 'b')),
+  'the PROBLEM card doesn''t make the DOWN ladder live');
+select is((select severity::text from public.engine_silent_incidents(now())
+           where incident_id = (select id from inc where name = 'b')), 'down',
+  'once the mute is over it is listed as a silent DOWN');
+reset role;
 
 select * from finish();
 rollback;

@@ -38,7 +38,7 @@ import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { loadResponseHours } from '../escalation/response-hours';
 import { escalationTick } from './ladder';
-import { loadWindows, type SiteWindows } from './windows';
+import { endedBefore, inWindow, loadWindows, type SiteWindows } from './windows';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
@@ -69,8 +69,10 @@ interface SiteRow {
   /** Flagged behind a WAF: WAF-signed blocks sit the round out (D-027). */
   behindWaf: boolean;
   monitors: MonitorRow[];
-  /** Its maintenance windows now (D-036): the running one, and when the last one ended. */
+  /** Its maintenance windows that ran in the last day or are running (D-036). */
   windows?: SiteWindows;
+  /** Its status was Maintenance at the last round: the first round after a window puts it back. */
+  wasMaintenance?: boolean;
 }
 
 export interface EngineSummary extends CronJobResult {
@@ -155,7 +157,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     loadChecks(db, since),
     db
       .from('site_status')
-      .select('site_id, last_round_at, ok_rounds, note, flips, flip_ok')
+      .select('site_id, status, last_round_at, ok_rounds, note, flips, flip_ok')
       .in('site_id', siteIds),
     // Server-side reads (S04b): no monitor ids in a GET query string (8 KB limit at 200 monitors).
     db.rpc('engine_monitor_status'),
@@ -264,6 +266,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       if (c && siteRound !== null && Date.parse(c.last_round_at) < siteRound) carryByMonitor.delete(m.id);
     }
     const open = incidents.data?.find((inc) => inc.site_id === site.id);
+    site.wasMaintenance = status?.status === 'maintenance';
     const snapshot: SiteSnapshot = {
       now,
       intervalSec: TIER_CONFIG[site.tier].intervalSec,
@@ -319,6 +322,8 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         if (u.reason === 'not_picked_up') await expireUnpicked(db, u.monitorId, decision.roundAt);
         // A browser that was blocked too is the site's WAF, not the verifier: no Admin alert (D-020).
         // The browser blocked too (D-020) or the VPS's control check down (D-027): not the verifier's fault.
+        // Inside a maintenance window with nothing open, no Admin alert either (engine review L2).
+        if (!open && inWindow(site.windows, decision.roundAt)) continue;
         if (u.reason === 'control_failed') controlSites.add(`${site.name} (Tier ${site.tier})`);
         else if (u.reason !== 'browser_blocked')
           unverifiedSites.set(`${site.name} (Tier ${site.tier})`, u.reason);
@@ -670,7 +675,13 @@ async function apply(
   // Inside a maintenance window with nothing open (D-036): the round is recorded, nothing opens and
   // the site shows Maintenance; the monitors keep their real state. An incident already open when the
   // window started carries on as usual (a window never hides an open incident, §14.5).
-  if (site.windows?.active && !open && (d.kind === 'none' || d.kind === 'open' || d.kind === 'problem')) {
+  // Judged by when the failure was confirmed (a DOWN's last recheck), not by when this run happens.
+  const decidedAt = d.kind === 'open' ? d.confirmedAt : d.roundAt;
+  if (
+    !open &&
+    inWindow(site.windows, decidedAt) &&
+    (d.kind === 'none' || d.kind === 'open' || d.kind === 'problem')
+  ) {
     const { error } = await db.rpc('engine_record_round', {
       p_site_id: site.id,
       p_round_at: d.roundAt.toISOString(),
@@ -682,11 +693,15 @@ async function apply(
     if (error) throw new Error(`engine_record_round: ${error.message}`);
     return null;
   }
-  // Still failing when a window ended: the incident opens now, never backdated into the window.
-  const notBefore = site.windows?.lastEnd ?? null;
+  // Still failing when a window ended: the incident starts at the window's end, never backdated into
+  // it — and never after its own confirmation (the window ended before `decidedAt`).
+  const notBefore = endedBefore(site.windows, decidedAt);
   const startOf = (startedAt: Date) =>
-    (notBefore && notBefore > startedAt && notBefore <= now ? notBefore : startedAt).toISOString();
-  const judged = { p_monitors: monitorsJson(d, site), ...(d.status ? { p_status: d.status } : {}) };
+    (notBefore && notBefore > startedAt ? notBefore : startedAt).toISOString();
+  // The first round after a window that can't judge the status (too few locations) still ends
+  // "Maintenance" (engine review L1).
+  const status = d.status ?? (site.wasMaintenance ? 'ok' : undefined);
+  const judged = { p_monitors: monitorsJson(d, site), ...(status ? { p_status: status } : {}) };
   switch (d.kind) {
     case 'none': {
       // Never moves the round back when another engine run (probe trigger, cron) got further.
@@ -785,7 +800,9 @@ async function apply(
           ...(d.flapping ? { flapping: true } : {}),
         },
         p_flapping: d.flapping,
-        p_notify: !site.muted,
+        // A thread whose first alert a mute held back gets that alert (the late card) instead of a
+        // DOWN AGAIN out of context (engine review M2): lateAlerts runs after the sites.
+        p_notify: !site.muted && alertQueued,
         ...(d.severity === 'problem' ? holdFor(site.tier, d.detectedAt, hours) : {}),
         ...judged,
       });

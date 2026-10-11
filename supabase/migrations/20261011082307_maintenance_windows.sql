@@ -688,7 +688,7 @@ language sql
 stable
 set search_path = ''
 as $$
-  select i.id, i.site_id, s.tier, i.severity, i.detected_at
+  select i.id, i.site_id, s.tier, coalesce(i.episode_severity, i.severity), i.detected_at
   from public.incidents i
   join public.sites s on s.id = i.site_id
   where i.state in ('unacked', 'escalated')
@@ -697,7 +697,8 @@ as $$
     and not exists (
       select 1 from public.notifications n
       where n.incident_id = i.id and n.channel = 'google_chat'
-        and n.template in ('down', 'problem', 'down_again', 'problem_again')
+        and n.template in (coalesce(i.episode_severity, i.severity)::text,
+                           coalesce(i.episode_severity, i.severity)::text || '_again')
         and (n.status <> 'cancelled' or n.attempts > 0));
 $$;
 
@@ -713,6 +714,7 @@ declare
   v_inc public.incidents%rowtype;
   v_context jsonb;
   v_hold timestamptz;
+  v_sev text;
 begin
   select * into v_inc from public.incidents where id = p_incident_id for update;
   if not found or v_inc.state not in ('unacked', 'escalated') then
@@ -721,9 +723,11 @@ begin
   if exists (select 1 from public.sites s where s.id = v_inc.site_id and s.muted_until > p_at) then
     return false;
   end if;
+  -- The drop in progress (D-023: a DOWN whose home page is back is a PROBLEM now).
+  v_sev := coalesce(v_inc.episode_severity, v_inc.severity)::text;
   if exists (select 1 from public.notifications n
              where n.incident_id = p_incident_id and n.channel = 'google_chat'
-               and n.template in ('down', 'problem', 'down_again', 'problem_again')
+               and n.template in (v_sev, v_sev || '_again')
                and (n.status <> 'cancelled' or n.attempts > 0)) then
     return false;
   end if;
@@ -733,12 +737,12 @@ begin
   where e.incident_id = p_incident_id and e.type in ('detected', 'relapsed', 'escalated_to_down')
   order by e.at desc limit 1;
   v_context := coalesce(v_context, '{}'::jsonb) || jsonb_build_object('afterMute', true);
-  v_hold := case when v_inc.severity = 'problem' and p_hold_until > p_at then p_hold_until end;
+  v_hold := case when v_sev = 'problem' and p_hold_until > p_at then p_hold_until end;
 
   insert into public.notifications (incident_id, channel, template, thread_key, context, hold_until)
-  values (p_incident_id, 'google_chat', v_inc.severity::text, p_incident_id::text, v_context, v_hold);
+  values (p_incident_id, 'google_chat', v_sev, p_incident_id::text, v_context, v_hold);
   insert into public.notifications (incident_id, user_id, channel, template, thread_key, context, hold_until)
-  select p_incident_id, s.primary_owner_id, 'email', v_inc.severity::text, p_incident_id::text, v_context, v_hold
+  select p_incident_id, s.primary_owner_id, 'email', v_sev, p_incident_id::text, v_context, v_hold
   from public.sites s
   join public.profiles p on p.id = s.primary_owner_id and p.is_active
   where s.id = v_inc.site_id;
@@ -758,3 +762,192 @@ grant execute on function
   public.engine_silent_incidents(timestamptz),
   public.engine_post_late_alert(uuid, timestamptz, timestamptz)
   to service_role;
+
+-- ── The ladder after a late alert, and the live thread per severity (engine review M3, M5) ───────────
+-- A thread is live for the ladder only once an alert of the incident's current drop went: a PROBLEM
+-- card doesn't make a DOWN raised from it (D-021) live while a mute held its DOWN card back — the owner
+-- gets that card when the mute is over, and the DOWN ladder counts from then.
+create or replace function public.engine_thread_live(p_incident_id uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.notifications n
+    join public.incidents i on i.id = n.incident_id
+    where n.incident_id = p_incident_id and n.channel = 'google_chat'
+      and n.template in (coalesce(i.episode_severity, i.severity)::text,
+                         coalesce(i.episode_severity, i.severity)::text || '_again')
+      and (n.status <> 'cancelled' or n.attempts > 0)
+      and (n.hold_until is null or n.hold_until <= now()));
+$$;
+
+create or replace function public.engine_fire_step(
+  p_incident_id uuid,
+  p_level smallint,
+  p_due_at timestamptz,
+  p_context jsonb default '{}'::jsonb
+)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_inc public.incidents%rowtype;
+  v_step jsonb;
+  v_told uuid[];
+  v_new uuid[];
+  v_mention uuid[];
+  v_fyi uuid[];
+  v_others boolean;
+  v_payload jsonb;
+begin
+  select * into v_inc from public.incidents where id = p_incident_id for update;
+  if not found or v_inc.state not in ('unacked', 'escalated') or v_inc.escalation_level >= p_level
+     or p_level < 1 then
+    return false;
+  end if;
+  -- A level due before the incident's first alert went (a run that read it before a late alert after a
+  -- mute was stamped, D-036): the ladder counts from that alert, so this one isn't due yet.
+  if v_inc.alerted_at is not null and p_due_at < v_inc.alerted_at then
+    return false;
+  end if;
+
+  -- The thread needs its first alert: none for an incident opened while muted (mute stops new
+  -- alerts, §15.1), and none yet while a PROBLEM card waits for response hours (§19.2).
+  if not public.engine_thread_live(p_incident_id) then
+    return false;
+  end if;
+
+  select s into v_step
+  from jsonb_array_elements(v_inc.escalation_plan -> 'steps') s
+  where (s ->> 'level')::smallint = p_level;
+  if v_step is null then
+    return false;
+  end if;
+
+  -- Told already: everyone the earlier steps name (L0 = the owner) and every person a fired step told.
+  select coalesce(array_agg(distinct u), '{}') into v_told
+  from (
+    select pe.user_id as u
+    from jsonb_array_elements(v_inc.escalation_plan -> 'steps') s,
+         public.escalation_people(p_incident_id, s -> 'targets') pe
+    where (s ->> 'level')::smallint = 0
+    union
+    select (jsonb_array_elements_text(e.payload -> 'notified'))::uuid
+    from public.incident_events e
+    where e.incident_id = p_incident_id and e.type = 'step_fired'
+      and e.payload ->> 'severity' = v_inc.severity::text
+  ) t;
+
+  select coalesce(array_agg(pe.user_id), '{}'),
+         coalesce(bool_or(pe.token <> 'admins'), false)
+    into v_new, v_others
+  from public.escalation_people(p_incident_id, v_step -> 'targets') pe
+  where pe.user_id <> all (v_told);
+
+  select coalesce(array_agg(pe.user_id) filter (where not (v_others and pe.token = 'admins')), '{}'),
+         coalesce(array_agg(pe.user_id) filter (where v_others and pe.token = 'admins'), '{}')
+    into v_mention, v_fyi
+  from public.escalation_people(p_incident_id, v_step -> 'targets') pe
+  where pe.user_id = any (v_new);
+
+  -- Nobody new to tell (all told already, or not active): the level is passed, but nothing is posted
+  -- and the incident doesn't read "Escalated" (spec §14.3) for a step that paged no one.
+  update public.incidents
+    set state = case when cardinality(v_new) > 0 then 'escalated'::public.incident_state else state end,
+        escalation_level = p_level
+    where id = p_incident_id;
+
+  v_payload := jsonb_build_object(
+    'level', p_level, 'severity', v_inc.severity, 'dueAt', p_due_at,
+    'notified', to_jsonb(v_new), 'mentioned', to_jsonb(v_mention), 'fyi', to_jsonb(v_fyi),
+    'channels', v_step -> 'channels');
+
+  insert into public.incident_events (incident_id, type, payload, at)
+  values (p_incident_id, 'step_fired', v_payload, now());
+
+  insert into public.audit_log (action, entity, entity_id, before, after)
+  values ('incident.escalated', 'incident', p_incident_id,
+          jsonb_build_object('state', v_inc.state, 'escalation_level', v_inc.escalation_level),
+          jsonb_build_object('state', case when cardinality(v_new) > 0 then 'escalated' else v_inc.state::text end,
+                             'escalation_level', p_level));
+
+  if cardinality(v_new) > 0 and v_step -> 'channels' ?| array['chat', 'space'] then
+    insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key)
+    values (p_incident_id, 'google_chat', 'step_fired', p_incident_id::text,
+            p_context || v_payload, v_inc.severity || ':L' || p_level)
+    on conflict do nothing;
+  end if;
+
+  if v_step -> 'channels' ? 'email' then
+    insert into public.notifications (incident_id, user_id, channel, template, thread_key, context, dedupe_key)
+    select p_incident_id, u, 'email', 'step_fired', p_incident_id::text,
+           p_context || v_payload || jsonb_build_object('asFyi', u = any (v_fyi)), v_inc.severity || ':L' || p_level
+    from unnest(v_new) u
+    on conflict do nothing;
+  end if;
+
+  return true;
+end;
+$$;
+
+create or replace function public.engine_remind(
+  p_incident_id uuid,
+  p_due_at timestamptz,
+  p_context jsonb default '{}'::jsonb
+)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_inc public.incidents%rowtype;
+  v_mention uuid[];
+  v_id uuid;
+  v_key text;
+begin
+  -- Most calls find the reminder already queued (every engine run asks): answer from the index
+  -- before taking the incident's lock (db review).
+  select i.severity || ':' || to_char(p_due_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI"Z"') into v_key
+  from public.incidents i where i.id = p_incident_id;
+  if v_key is null or exists (
+    select 1 from public.notifications
+    where incident_id = p_incident_id and channel = 'google_chat' and template = 'reminder'
+      and dedupe_key = v_key and status <> 'cancelled'
+  ) then
+    return false;
+  end if;
+
+  select * into v_inc from public.incidents where id = p_incident_id for update;
+  if not found or v_inc.state not in ('unacked', 'escalated') or v_inc.escalation_plan is null
+     or not public.engine_thread_live(p_incident_id)
+     or (v_inc.alerted_at is not null and p_due_at < v_inc.alerted_at) then
+    return false;
+  end if;
+
+  select coalesce(array_agg(distinct u), '{}') into v_mention
+  from (
+    select pe.user_id as u
+    from jsonb_array_elements(v_inc.escalation_plan -> 'steps') s,
+         public.escalation_people(p_incident_id, s -> 'targets') pe
+    where (s ->> 'level')::smallint = 0 and pe.token <> 'admins'
+    union
+    select (jsonb_array_elements_text(e.payload -> 'mentioned'))::uuid
+    from public.incident_events e
+    where e.incident_id = p_incident_id and e.type = 'step_fired'
+      and e.payload ->> 'severity' = v_inc.severity::text
+  ) t;
+
+  insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key)
+  values (p_incident_id, 'google_chat', 'reminder', p_incident_id::text,
+          p_context || jsonb_build_object('dueAt', p_due_at, 'severity', v_inc.severity,
+                                          'mentioned', to_jsonb(v_mention)),
+          v_inc.severity || ':' || to_char(p_due_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI"Z"'))
+  on conflict do nothing
+  returning id into v_id;
+
+  return v_id is not null;
+end;
+$$;

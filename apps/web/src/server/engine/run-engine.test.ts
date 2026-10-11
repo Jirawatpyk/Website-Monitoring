@@ -682,6 +682,62 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     expect(rpcCalls[0]).toMatchObject({ name: 'engine_recover_incident', args: { p_notify: true } });
   });
 
+  it('a DOWN confirmed inside a window that ended before this run stays inside it (engine review H1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      // Confirmed at :32, the window ended at :40, the run is at 10:01:05.
+      'maintenance_windows.select': { data: [window({ ends_at: at(40) })] },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+    expect(rpcCalls[0]?.args).toMatchObject({ p_status: 'maintenance' });
+  });
+
+  it('a DOWN confirmed a moment before a window starts isn’t hidden by it (engine review M1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'maintenance_windows.select': { data: [window({ starts_at: at(40) })] },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_open_incident', args: { p_started_at: at(0) } });
+  });
+
+  it('a relapse of an incident whose first alert a mute held back sends no DOWN AGAIN (the late card goes instead)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [incident('monitoring', false)] },
+      'rpc.engine_relapse_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_relapse_incident', args: { p_notify: false } });
+  });
+
+  it('the first round after a window that can’t judge the status puts it back to OK', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: ok },
+      'site_status.select': {
+        data: [
+          {
+            site_id: 's1',
+            status: 'maintenance',
+            last_round_at: null,
+            ok_rounds: 0,
+            note: null,
+            flips: [],
+            flip_ok: null,
+          },
+        ],
+      },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_record_round')?.args).toMatchObject({ p_status: 'ok' });
+  });
+
   it('a mute that ended with a silent incident open: its first alert posts now', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
