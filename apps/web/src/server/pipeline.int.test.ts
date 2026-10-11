@@ -1131,3 +1131,72 @@ describe('escalation ladder (S08, D-034, Done-when 1)', () => {
     expect((await stepRows(inc!.id)).filter((n) => n.template === 'reminder')).toHaveLength(1);
   });
 });
+
+describe('mute and maintenance (S09, D-036)', () => {
+  const profileId = async (address: string) =>
+    (await must(db.from('profiles').select('id').eq('email', address).single())).id;
+  const mute = (siteId: string, until: Date | null) =>
+    must(
+      db
+        .from('sites')
+        .update({ muted_until: until?.toISOString() ?? null })
+        .eq('id', siteId)
+        .select('id'),
+    );
+  const chat = (incidentId: string) =>
+    must(
+      db
+        .from('notifications')
+        .select('template')
+        .eq('incident_id', incidentId)
+        .eq('channel', 'google_chat')
+        .order('created_at'),
+    );
+
+  it('T09: muting a site whose incident already alerted keeps its escalation running (Done-when 1)', async () => {
+    const arm = await profileId('arm@example.test');
+    const ploy = await profileId('ploy@example.test');
+    const { siteId, monitorId } = await newSite('Muted ladder', {
+      primary_owner_id: arm,
+      backup_owner_id: ploy,
+    });
+    await results(monitorId, downRound());
+    await runEngine(db, t(65));
+    const [inc] = await must(db.from('incidents').select('id, detected_at').eq('site_id', siteId));
+    const confirmed = new Date(inc!.detected_at).getTime();
+    await mute(siteId, new Date(confirmed + 4 * 3_600_000));
+
+    await runEngine(db, new Date(confirmed + 15 * 60_000));
+    await runEngine(db, new Date(confirmed + 30 * 60_000));
+    expect((await chat(inc!.id)).map((n) => n.template)).toEqual(['down', 'step_fired', 'reminder']);
+    const [state] = await must(db.from('incidents').select('state').eq('id', inc!.id));
+    expect(state!.state).toBe('escalated'); // muting is not an acknowledgement
+  });
+
+  it('a DOWN while muted is silent; when the mute is over its first alert posts and the ladder counts from then', async () => {
+    const arm = await profileId('arm@example.test');
+    const ploy = await profileId('ploy@example.test');
+    const { siteId, monitorId } = await newSite('Muted at the drop', {
+      primary_owner_id: arm,
+      backup_owner_id: ploy,
+    });
+    await mute(siteId, t(600));
+    await results(monitorId, downRound());
+    await runEngine(db, t(65));
+    const [inc] = await must(db.from('incidents').select('id').eq('site_id', siteId));
+    expect(await chat(inc!.id)).toEqual([]);
+
+    await mute(siteId, null);
+    const over = new Date(Date.parse(t(65).toISOString()) + 20 * 60_000);
+    await runEngine(db, over);
+    expect((await chat(inc!.id)).map((n) => n.template)).toEqual(['down']);
+    const [row] = await must(db.from('incidents').select('alerted_at').eq('id', inc!.id));
+    expect(new Date(row!.alerted_at!).getTime()).toBe(over.getTime());
+
+    // L1 comes 15 min after that alert, not 15 min after the drop.
+    await runEngine(db, new Date(over.getTime() + 14 * 60_000));
+    expect((await chat(inc!.id)).map((n) => n.template)).toEqual(['down']);
+    await runEngine(db, new Date(over.getTime() + 15 * 60_000));
+    expect((await chat(inc!.id)).map((n) => n.template)).toEqual(['down', 'step_fired']);
+  });
+});

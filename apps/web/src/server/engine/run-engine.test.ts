@@ -621,3 +621,97 @@ describe('runEngine — overlapping runs (engine review M2)', () => {
     expect(rpcCalls.filter((c) => c.name.startsWith('engine_'))).toEqual([]);
   });
 });
+
+describe('runEngine — maintenance and mute (S09, D-036)', () => {
+  const window = (over: Record<string, unknown> = {}) => ({
+    site_id: 's1',
+    kind: 'maintenance',
+    starts_at: at(-3600),
+    ends_at: at(3600),
+    approved_at: at(-7200),
+    ended_at: null,
+    cancelled_at: null,
+    ...over,
+  });
+
+  it('inside a window with nothing open, a DOWN opens nothing and the site shows Maintenance', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'maintenance_windows.select': { data: [window()] },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.map((c) => c.name)).toEqual(['engine_record_round']);
+    expect(rpcCalls[0]?.args).toMatchObject({ p_status: 'maintenance', p_ok_rounds: 0 });
+  });
+
+  it('still DOWN when the window ended: the incident opens, starting at the window’s end', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'maintenance_windows.select': { data: [window({ ends_at: at(20) })] },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_open_incident',
+      args: { p_started_at: at(20), p_notify: true },
+    });
+  });
+
+  it('a window never hides an incident already open: its relapse alerts as usual (§14.5)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'incidents.select': { data: [incident('monitoring')] },
+      'maintenance_windows.select': { data: [window()] },
+      'rpc.engine_relapse_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_relapse_incident', args: { p_notify: true } });
+  });
+
+  it('a mute after the alert still lets RECOVERED close the thread (§15.1: new alerts only)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor({ muted_until: '2026-10-06T12:00:00Z' })] },
+      'rpc.engine_checks': { data: ok },
+      'incidents.select': { data: [incident('unacked')] },
+      'rpc.engine_recover_incident': { data: true },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls[0]).toMatchObject({ name: 'engine_recover_incident', args: { p_notify: true } });
+  });
+
+  it('a mute that ended with a silent incident open: its first alert posts now', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: [] },
+      'rpc.engine_silent_incidents': {
+        data: [{ incident_id: 'i9', site_id: 's1', tier: 1, severity: 'down', detected_at: at(-900) }],
+      },
+      'rpc.engine_post_late_alert': { data: true },
+    });
+    const summary = await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_post_late_alert')?.args).toEqual({
+      p_incident_id: 'i9',
+      p_at: now.toISOString(),
+    });
+    expect(summary.notified).toBe(1);
+  });
+
+  it('a Tier 2 PROBLEM alerted late outside response hours waits for the opening', async () => {
+    const night = new Date('2026-10-06T15:00:00Z'); // Tue 22:00 Bangkok
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: [] },
+      'rpc.engine_silent_incidents': {
+        data: [{ incident_id: 'i9', site_id: 's1', tier: 2, severity: 'problem', detected_at: at(-900) }],
+      },
+      'rpc.engine_post_late_alert': { data: true },
+    });
+    await runEngine(db, night);
+    expect(rpcCalls.find((c) => c.name === 'engine_post_late_alert')?.args).toMatchObject({
+      p_hold_until: '2026-10-07T02:00:00.000Z',
+    });
+  });
+});

@@ -21,6 +21,8 @@ export interface IncidentFacts {
   trigger: Trigger;
   started_at: string;
   detected_at: string;
+  /** When its first alert went, if a mute held it back (D-036): the ladder counts from here. */
+  alerted_at?: string | null;
   acked_at: string | null;
   recovered_at: string | null;
   acker: { display_name: string; google_chat_user_id?: string | null } | null;
@@ -80,7 +82,7 @@ export async function loadFacts(
     db
       .from('incidents')
       .select(
-        `id, number, state, severity, trigger, started_at, detected_at, acked_at, recovered_at,
+        `id, number, state, severity, trigger, started_at, detected_at, alerted_at, acked_at, recovered_at,
          escalation_plan, escalation_level,
          acker:profiles!incidents_acked_by_fkey(display_name, google_chat_user_id),
          incident_events(type, payload, at),

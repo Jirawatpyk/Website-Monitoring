@@ -16,8 +16,17 @@ export interface FakeCall {
  * result gets the arguments as `values`). Calls are
  * recorded so tests can assert what was written. Integration tests use the real local stack instead.
  */
-/** Read-only RPCs: recorded in `readCalls`, not `rpcCalls`. */
-const READ_RPCS = new Set(['engine_checks', 'engine_monitor_status', 'engine_verify_jobs']);
+/**
+ * Read-only RPCs, and the engine's per-run housekeeping (the window log, S09): recorded in `readCalls`,
+ * not `rpcCalls`, so `rpcCalls` lists what a decision wrote.
+ */
+const READ_RPCS = new Set([
+  'engine_checks',
+  'engine_monitor_status',
+  'engine_verify_jobs',
+  'engine_log_windows',
+  'engine_silent_incidents',
+]);
 
 /** Rows every engine run reads, unless a test registers its own: the seeded response hours (D-034). */
 const DEFAULTS: Record<string, Result> = {

@@ -5,6 +5,7 @@ import {
   problemHoldUntil,
   bkkControlFailing,
   faultyByMinute,
+  ladderClockStart,
   lookbackMs,
   NEW_MONITOR,
   UNKNOWN_ROOT_CAUSE,
@@ -38,6 +39,7 @@ import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { loadResponseHours } from '../escalation/response-hours';
 import { escalationTick } from './ladder';
+import { loadWindows, type SiteWindows } from './windows';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
@@ -68,6 +70,8 @@ interface SiteRow {
   /** Flagged behind a WAF: WAF-signed blocks sit the round out (D-027). */
   behindWaf: boolean;
   monitors: MonitorRow[];
+  /** Its maintenance windows now (D-036): the running one, and when the last one ended. */
+  windows?: SiteWindows;
 }
 
 export interface EngineSummary extends CronJobResult {
@@ -124,6 +128,11 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     loadLocations(db, now),
     loadResponseHours(db, now),
   ]);
+  // Windows that started or ended are logged, and a mute that ran out leaves the site row (D-036).
+  // Never holds the run back: the log and the site row's expiry catch up next run.
+  const logged = await db.rpc('engine_log_windows', { p_now: now.toISOString() });
+  if (logged.error)
+    console.error(JSON.stringify({ event: 'engine_log_windows_failed', error: logged.error.message }));
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
     const verifier = await loadVerifierState(db, now, now);
@@ -141,6 +150,8 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     now.getTime() - Math.max(...sites.map((s) => lookbackMs(TIER_CONFIG[s.tier].intervalSec))),
   );
   const siteIds = sites.map((s) => s.id);
+  const windows = await loadWindows(db, siteIds, now);
+  for (const s of sites) s.windows = windows.get(s.id);
   const [checks, statuses, carries, incidents, verifier] = await Promise.all([
     loadChecks(db, since),
     db
@@ -207,6 +218,14 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         controlOk: c.control_ok === false || c.akamai_ok === false ? false : (c.control_ok ?? c.akamai_ok),
       })),
   );
+  // An incident a mute silenced gets its first alert once the mute is over (D-036), before the ladder,
+  // which then counts from that alert.
+  try {
+    summary.notified += await lateAlerts(db, now, hours);
+  } catch (err) {
+    failures.push(`late alerts: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(JSON.stringify({ event: 'engine_late_alerts_failed', error: String(err) }));
+  }
   // The escalation ladder (S08, D-034): after the sites, so an incident opened or acknowledged this
   // run is seen as it is now.
   try {
@@ -649,6 +668,25 @@ async function apply(
 ): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | null> {
   const at = now.toISOString();
   const incidentId = open?.id ?? null;
+  // Inside a maintenance window with nothing open (D-036): the round is recorded, nothing opens and
+  // the site shows Maintenance; the monitors keep their real state. An incident already open when the
+  // window started carries on as usual (a window never hides an open incident, §14.5).
+  if (site.windows?.active && !open && (d.kind === 'none' || d.kind === 'open' || d.kind === 'problem')) {
+    const { error } = await db.rpc('engine_record_round', {
+      p_site_id: site.id,
+      p_round_at: d.roundAt.toISOString(),
+      p_evaluated_at: at,
+      p_ok_rounds: d.kind === 'none' ? d.okRounds : 0,
+      p_monitors: monitorsJson(d, site),
+      p_status: 'maintenance',
+    });
+    if (error) throw new Error(`engine_record_round: ${error.message}`);
+    return null;
+  }
+  // Still failing when a window ended: the incident opens now, never backdated into the window.
+  const notBefore = site.windows?.lastEnd ?? null;
+  const startOf = (startedAt: Date) =>
+    (notBefore && notBefore > startedAt && notBefore <= now ? notBefore : startedAt).toISOString();
   const judged = { p_monitors: monitorsJson(d, site), ...(d.status ? { p_status: d.status } : {}) };
   switch (d.kind) {
     case 'none': {
@@ -673,7 +711,7 @@ async function apply(
         p_monitor_id: d.monitorId,
         p_trigger: d.trigger,
         p_severity: 'problem',
-        p_started_at: d.startedAt.toISOString(),
+        p_started_at: startOf(d.startedAt),
         p_detected_at: at,
         p_round_at: d.roundAt.toISOString(),
         p_context: {
@@ -762,7 +800,7 @@ async function apply(
         p_monitor_id: d.monitorId,
         p_trigger: 'hard_fail',
         p_severity: 'down',
-        p_started_at: d.startedAt.toISOString(),
+        p_started_at: startOf(d.startedAt),
         // When the last recheck confirmed it, not when this run noticed (PRD §9: alert within 30 s).
         p_detected_at: d.confirmedAt.toISOString(),
         p_round_at: d.roundAt.toISOString(),
@@ -793,7 +831,8 @@ async function apply(
           recoveredAt: d.recoveredAt.toISOString(),
           ...(d.autoResolve ? { autoResolved: true } : {}),
         },
-        p_notify: !site.muted && alertQueued,
+        // A mute stops new alerts only (§15.1, D-036): RECOVERED still closes a thread that alerted.
+        p_notify: alertQueued,
         // Not-OK → OK only when every monitor is OK: D-023's partial recovery is no flip (D-024).
         p_flip_ok: d.allOk,
         p_auto_resolve: d.autoResolve,
@@ -875,6 +914,27 @@ function downContext(d: DownFacts, site: SiteRow): Record<string, Json> {
           ? { confirmingFrom: d.failing.map((c) => c.location), wafBlocked: [...d.wafBlocked] }
           : {}),
       };
+}
+
+/**
+ * The first alert of every open incident a mute silenced, once the mute is over (D-036): the card for
+ * its severity and the owner email; a Tier 2–3 PROBLEM outside response hours waits for the opening.
+ * Guarded in SQL (once, still waiting for an ack, not muted). Returns how many were queued.
+ */
+async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promise<number> {
+  const { data, error } = await db.rpc('engine_silent_incidents', { p_now: now.toISOString() });
+  if (error) throw new Error(`engine_silent_incidents: ${error.message}`);
+  let queued = 0;
+  for (const inc of data ?? []) {
+    const posted = await db.rpc('engine_post_late_alert', {
+      p_incident_id: inc.incident_id,
+      p_at: now.toISOString(),
+      ...(inc.severity === 'problem' ? holdFor(inc.tier as Tier, now, hours) : {}),
+    });
+    if (posted.error) throw new Error(`engine_post_late_alert: ${posted.error.message}`);
+    if (posted.data) queued += 1;
+  }
+  return queued;
 }
 
 /** A Tier 2–3 PROBLEM flagged outside response hours waits for the next opening (spec §7, §19.2). */
