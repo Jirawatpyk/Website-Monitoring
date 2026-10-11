@@ -200,3 +200,12 @@ export async function incidentMessages(
     `/rest/v1/notifications?select=channel,status&incident_id=eq.${incidentId}&template=eq.${template}&order=channel,created_at`,
   )) as { channel: string; status: string }[];
 }
+
+/** The site an incident is on: its id and name (S09 maintenance flows). */
+export async function siteOf(incidentId: string): Promise<{ id: string; name: string }> {
+  const [i] = (await admin(`/rest/v1/incidents?select=site_id,sites(name)&id=eq.${incidentId}`)) as {
+    site_id: string;
+    sites: { name: string };
+  }[];
+  return { id: i!.site_id, name: i!.sites.name };
+}

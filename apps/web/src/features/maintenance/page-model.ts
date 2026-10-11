@@ -6,7 +6,14 @@ import {
   type WindowOutcome,
   type WindowState,
 } from '@dxt/engine';
-import { formatDuration, formatTime, isSameBangkokDay, type SiteStatus, type Tier } from '@dxt/shared';
+import {
+  formatDuration,
+  formatTime,
+  formatWhen,
+  isSameBangkokDay,
+  type SiteStatus,
+  type Tier,
+} from '@dxt/shared';
 import { whenText } from './model';
 
 /**
@@ -239,7 +246,7 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
     Object.assign(base, {
       badge: { tone: 'neutral', variant: 'outline', icon: 'clock', label: 'Needs approval' },
       whenSub: `${lengthText(lengthMin)} · ${startsIn}`,
-      whySub: `asked by ${by} · ${whenText(new Date(r.createdAt), now).replace(/^(\d)/, '$1')}`,
+      whySub: `asked by ${by} · ${formatWhen(new Date(r.createdAt), now, { midSentence: true })}`,
       line: `${spanText(start, end, now)} · ${by}`,
     });
     if (v.role === 'admin') base.canApprove = true;
@@ -316,12 +323,13 @@ export function sectionsOf(rows: readonly WindowRow[], v: Viewer, now: Date): Se
       rows: scheduled,
     });
   const kinds = [...new Set(recent.map((p) => p.badge!.label.toLowerCase()))];
-  out.push({
-    key: 'recent',
-    title: 'Recent · last 30 days',
-    hint: recent.length ? `${recent.length} · ${kinds.join(', ')}` : 'Nothing finished in the last 30 days',
-    rows: recent,
-  });
+  if (recent.length)
+    out.push({
+      key: 'recent',
+      title: 'Recent · last 30 days',
+      hint: `${recent.length} · ${kinds.join(', ')}`,
+      rows: recent,
+    });
   return out;
 }
 

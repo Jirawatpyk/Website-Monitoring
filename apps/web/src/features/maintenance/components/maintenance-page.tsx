@@ -296,7 +296,7 @@ function SectionView({
         </h2>
         <span className="text-sm text-fg-secondary max-md:hidden">{s.hint}</span>
       </div>
-      <div className="max-md:hidden">
+      <div className="max-lg:hidden">
         {rows.length ? (
           <DataTable
             label={s.title}
@@ -309,8 +309,8 @@ function SectionView({
           <p className="m-0 text-sm text-fg-secondary">{s.hint}</p>
         )}
       </div>
-      {/* phones: MMaintenanceList row cards, a tap opens the row's sheet */}
-      <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface md:hidden">
+      {/* phones and tablets (below lg, where the table would scroll sideways): MMaintenanceList row cards, a tap opens the row’s sheet */}
+      <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface lg:hidden">
         {rows.length === 0 && <p className="m-0 p-4 text-sm text-fg-secondary">{s.hint}</p>}
         {rows.map((p) => (
           <button

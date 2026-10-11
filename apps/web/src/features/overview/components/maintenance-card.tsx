@@ -31,7 +31,10 @@ export function MaintenanceCard({ card }: { card: OverviewMaintenanceCard }) {
       description="Alerts off or muted, checks still run"
       headingLevel={3}
       actions={
-        <Link href="/maintenance" className={`flex items-center gap-1 text-sm whitespace-nowrap ${FOCUS}`}>
+        <Link
+          href="/maintenance"
+          className={`flex min-h-11 items-center gap-1 text-sm whitespace-nowrap ${FOCUS}`}
+        >
           Open
           <IconArrowRight size="sm" />
         </Link>
@@ -42,7 +45,7 @@ export function MaintenanceCard({ card }: { card: OverviewMaintenanceCard }) {
           <Link
             key={m.id}
             href="/maintenance"
-            className={`flex items-start gap-2.5 text-sm text-fg-primary no-underline ${FOCUS}`}
+            className={`flex min-h-11 items-start gap-2.5 text-sm text-fg-primary no-underline ${FOCUS}`}
           >
             <span className={`flex pt-0.5 ${m.kind === 'mute' ? 'text-fg-secondary' : 'text-fg-accent'}`}>
               {m.kind === 'mute' ? <IconEyeOff size="sm" /> : <IconCalendar size="sm" />}
@@ -62,7 +65,7 @@ export function MaintenanceCard({ card }: { card: OverviewMaintenanceCard }) {
               <Link
                 key={l.text}
                 href="/maintenance"
-                className={`flex min-h-8 items-center gap-2 text-fg-primary no-underline ${FOCUS}`}
+                className={`flex min-h-11 items-center gap-2 text-fg-primary no-underline ${FOCUS}`}
               >
                 <span className="flex text-fg-secondary">{l.icon}</span>
                 <span className="grow">{l.text}</span>
