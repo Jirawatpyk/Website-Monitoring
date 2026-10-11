@@ -43,6 +43,16 @@ export interface LadderDue {
 
 const alwaysOn = (tier: number) => TIER_CONFIG[tier as Tier]?.alwaysOn ?? false;
 
+/**
+ * Where the ladder's clock starts (D-036): "Confirmed down" — or, for an incident a mute silenced,
+ * the moment its first alert went out once the mute was over (`incidents.alerted_at`). Pass it as
+ * `detectedAt` to `ladderDue` / `scheduleOf` / `problemHoldUntil`; "Confirmed down" and "Down for"
+ * stay counted from detection.
+ */
+export function ladderClockStart(i: { detectedAt: Date; alertedAt?: Date | null }): Date {
+  return i.alertedAt && i.alertedAt > i.detectedAt ? i.alertedAt : i.detectedAt;
+}
+
 /** When `minutes` on the incident's escalation clock have passed. */
 function clockAt(input: Pick<LadderInput, 'plan' | 'detectedAt' | 'hours'>, minutes: number): Date {
   return alwaysOn(input.plan.tier)

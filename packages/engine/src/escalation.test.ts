@@ -1,6 +1,13 @@
 import type { EscalationPlan } from '@dxt/shared';
 import { describe, expect, it } from 'vitest';
-import { firstReminderOf, ladderDue, problemHoldUntil, scheduleOf, type LadderInput } from './escalation';
+import {
+  firstReminderOf,
+  ladderClockStart,
+  ladderDue,
+  problemHoldUntil,
+  scheduleOf,
+  type LadderInput,
+} from './escalation';
 
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
 
@@ -213,5 +220,32 @@ describe('firstReminderOf — the preview’s first reminder, skipped on a step 
     expect(ladderDue(inc0142('2026-09-25T10:19:00', { level: 1, state: 'escalated' })).reminder).toEqual(
       first,
     );
+  });
+});
+
+describe('ladderClockStart — an incident a mute silenced (D-036)', () => {
+  const detectedAt = bkk('2026-09-25T09:48:41');
+  it('counts from Confirmed down when the first alert went at once', () => {
+    expect(ladderClockStart({ detectedAt, alertedAt: null })).toEqual(detectedAt);
+    expect(ladderClockStart({ detectedAt })).toEqual(detectedAt);
+  });
+
+  it('counts from the late alert when a mute held it back: L1 15 min after the mute ended', () => {
+    const alertedAt = bkk('2026-09-25T10:30:00');
+    const start = ladderClockStart({ detectedAt, alertedAt });
+    expect(start).toEqual(alertedAt);
+    expect(ladderDue(inc0142('2026-09-25T10:44:59', { detectedAt: start })).step).toBeUndefined();
+    expect(ladderDue(inc0142('2026-09-25T10:45:00', { detectedAt: start })).step).toEqual({
+      level: 1,
+      dueAt: bkk('2026-09-25T10:45:00'),
+    });
+  });
+
+  it('a Tier 2 PROBLEM alerted late outside response hours is held to the next opening from then', () => {
+    const start = ladderClockStart({
+      detectedAt: bkk('2026-09-24T17:00:00'),
+      alertedAt: bkk('2026-09-24T19:00:00'),
+    });
+    expect(problemHoldUntil(2, start, HOURS)).toEqual(bkk('2026-09-25T09:00:00'));
   });
 });

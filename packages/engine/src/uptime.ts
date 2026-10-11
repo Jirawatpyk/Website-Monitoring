@@ -1,4 +1,5 @@
 import type { Episode } from './lifecycle';
+import type { Span } from './maintenance';
 
 /**
  * Uptime (spec §5, PRD §5): only DOWN minutes count against it; PROBLEM counts as up; mute is counted;
@@ -32,10 +33,56 @@ export function downMinutesIn(episodes: readonly Episode[], from: Date, to: Date
   return ms / 60_000;
 }
 
+/** Minutes of `spans` inside [from, to), overlapping spans counted once. */
+export function spanMinutesIn(spans: readonly Span[], from: Date, to: Date): number {
+  return clipped(spans, from, to).reduce((sum, [a, b]) => sum + (b - a), 0) / 60_000;
+}
+
+/** DOWN minutes inside [from, to) that fall inside `spans` (maintenance): they leave the numerator. */
+export function downMinutesInside(
+  episodes: readonly Episode[],
+  spans: readonly Span[],
+  from: Date,
+  to: Date,
+): number {
+  const parts = clipped(spans, from, to);
+  let ms = 0;
+  for (const e of episodes) {
+    if (e.severity !== 'down') continue;
+    const es = e.start.getTime();
+    const ee = (e.end ?? to).getTime();
+    for (const [a, b] of parts) {
+      const start = Math.max(es, a);
+      const end = Math.min(ee, b);
+      if (end > start) ms += end - start;
+    }
+  }
+  return ms / 60_000;
+}
+
+/** Spans clipped to [from, to), sorted and merged, as [start, end) in ms. */
+function clipped(spans: readonly Span[], from: Date, to: Date): [number, number][] {
+  const out: [number, number][] = [];
+  const parts = spans
+    .map((x): [number, number] => [
+      Math.max(x.start.getTime(), from.getTime()),
+      Math.min(x.end.getTime(), to.getTime()),
+    ])
+    .filter(([a, b]) => b > a)
+    .sort((x, y) => x[0] - y[0]);
+  for (const [a, b] of parts) {
+    const last = out[out.length - 1];
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+    else out.push([a, b]);
+  }
+  return out;
+}
+
 /**
  * A site's uptime over the last `rangeMinutes` (D-031): the window starts no earlier than monitoring
  * started, so a site watched for 3 days isn't credited with 27 unwatched ones. Null for a site that was
- * never monitored. Maintenance is 0 until windows exist (S09).
+ * never monitored. Maintenance (`maintenanceSpans`, D-036) leaves both sides: its minutes leave the
+ * window and the DOWN minutes inside it leave the count.
  */
 export function siteUptimeOver(
   episodes: readonly Episode[],
@@ -43,16 +90,20 @@ export function siteUptimeOver(
     now,
     rangeMinutes,
     monitoringStartedAt,
-  }: { now: Date; rangeMinutes: number; monitoringStartedAt: Date | null },
-): { uptime: number; downMinutes: number; windowMinutes: number } | null {
+    maintenance = [],
+  }: { now: Date; rangeMinutes: number; monitoringStartedAt: Date | null; maintenance?: readonly Span[] },
+): { uptime: number; downMinutes: number; windowMinutes: number; maintenanceMinutes: number } | null {
   if (!monitoringStartedAt || monitoringStartedAt >= now) return null;
   const from = new Date(Math.max(now.getTime() - rangeMinutes * 60_000, monitoringStartedAt.getTime()));
   const windowMinutes = (now.getTime() - from.getTime()) / 60_000;
-  const downMinutes = downMinutesIn(episodes, from, now);
+  const maintenanceMinutes = spanMinutesIn(maintenance, from, now);
+  const downMinutes =
+    downMinutesIn(episodes, from, now) - downMinutesInside(episodes, maintenance, from, now);
   return {
-    uptime: siteUptime({ windowMinutes, downMinutes, maintenanceMinutes: 0 }),
+    uptime: siteUptime({ windowMinutes, downMinutes, maintenanceMinutes }),
     downMinutes,
     windowMinutes,
+    maintenanceMinutes,
   };
 }
 
