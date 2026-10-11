@@ -24,7 +24,7 @@
 | S06 | Site detail & check rollups | 1 · P0 | L | FR-08 | S02a, S05 (merged) | 3 | Done |
 | S06b | Overview (option A) | 1 · P0 | L | FR-05 | S06, S02b | 3 | Done |
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Done |
-| S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | In review |
+| S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Done |
 | S09 | Maintenance windows & mute | 1 · P0 | M | FR-10a, FR-14 | S06b, S08 | 3 | Todo |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
@@ -405,7 +405,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   - Add "outside response hours · timers paused until 09:00" to DOWN AGAIN, and "Not yet — outside response hours" to the summary email's Acknowledged row (D-013).
 - **Done when:**
   1. Engine tests: INC-0142 → L1 at 10:03:41 (15 min after confirmed 09:48:41); a Tier 2 DOWN confirmed Thu 22:14 (like INC-0139) that stays down → L0 posted at once, L1 at Fri 09:15; the same on a company holiday → L1 on the next working day; ack at 10:07 → no L1.
-  2. On production after the merge (D-035; staging has one person), an unacknowledged DOWN posts `ESCALATED · L1` mentioning the backup with "Tao FYI" 15 min after confirm. Staging shows the ladder running (`step_fired` at +15, STILL DOWN at +30).
+  2. On staging (with the fixture people of D-035), an unacknowledged DOWN posts `ESCALATED · L1` mentioning the backup with "Tao FYI" 15 min after confirm.
   3. Saving a step < +15 min or with no channel is refused with the spec's message (UI test).
   4. spec-checker passes Escalation for L0–L1; nav "Escalation policies" live.
 - **Review:** engine-reviewer, message-checker, spec-checker, security-reviewer, db-reviewer.

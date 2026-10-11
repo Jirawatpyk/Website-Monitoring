@@ -114,7 +114,9 @@ select json_build_object(
 ) j;
 ```
 
-**Staging today has one person** (Tao: owner and the only Admin, no backup, no Chat id), and a second account can't sign up (company domain + allowlist, D-007). Then L1 has nobody new: the DOWN card has no "Next" row and no "acknowledge by" (nothing to promise), `step_fired` lands at +15 min with `"notified": []`, the level moves to 1, the state stays Unacked, nothing is posted; the `STILL DOWN … 30 min` reply still lands at +30 (S08 run, INC-0029: step 19:38:33 for due 19:38:32, reminder 19:53:35). The backup + "Tao FYI" message is covered by `pipeline.int.test.ts` and is checked on production with real owners.
+**Staging has one real person** (Tao, the only Admin) and nobody else can sign up (company domain + allowlist, D-007). For an L1 run Tao runs `supabase/staging/escalation-people.sql` (Claude can't: it inserts `auth.users` rows on a hosted project) — two fixture profiles, "Staging Owner" (no Chat id) and "Staging Backup" (Tao's own Chat id, **digits only**, so the @mention reaches Tao) as the Test target's owner and backup; its Undo puts Tao back. Then the DOWN card reads "acknowledge by HH:MM or it escalates" and "Next · L1 at HH:MM … — Staging Backup, Tao", L1 @mentions the backup with "Tao FYI", and the L1 emails go to Resend's test inbox (asked) and Tao (FYI) (S08 D-035 run, INC-0032). Without the fixtures L1 has nobody new: no "Next" row, `step_fired` with `"notified": []`, nothing posted, the state stays Unacked; STILL DOWN still lands at +30.
+
+In the SQL editor, read the editor's text back before every `ctrl+Return` — `window.monaco.editor.getModels().map(m => m.getValue())` (the visible lines are virtualised): when the tab isn't fronted (`tabs_select` it first) or the pane's width changed, typed keys go nowhere and the **previous** query runs again (S08 run: the reset re-ran instead of a read).
 
 Response hours (Tier 2–3 timers paused, PROBLEM held until 09:00) can't be driven on staging, because the clock can't move. The engine tests (`escalation.test.ts`, `response-hours.test.ts`) and pgTAP (`escalation.test.sql`) cover them.
 
