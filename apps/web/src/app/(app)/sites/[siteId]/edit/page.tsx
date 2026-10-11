@@ -34,14 +34,13 @@ export default async function EditSitePage({
   const header = (
     <PageHeader
       // Phones: Visit site spans the row, as every page's header actions (layout-consistency).
-      className="max-md:[&>:last-child]:w-full"
+      actionsFullWidthBelow="md"
       breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: site.name }]} />}
       title="Edit site"
       actions={
         primaryUrl ? (
           <Button
             variant="secondary"
-            className="max-md:w-full"
             href={primaryUrl}
             target="_blank"
             rel="noopener noreferrer"

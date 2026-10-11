@@ -1,5 +1,5 @@
 import { Skeleton } from '@jirawatpyk/aura-react';
-import { CardSkeleton, PageHeaderSkeleton, PageSkeleton } from '@/components/states';
+import { CardSkeleton, PageHeaderSkeleton, PageSkeleton, PhoneRowsSkeleton } from '@/components/states';
 
 /** While `/` loads: the Overview's shape — header, KPIs, Live issues, tiles + events; phones a short list. */
 export function OverviewSkeleton() {
@@ -16,10 +16,13 @@ export function OverviewSkeleton() {
           <Skeleton key={i} variant="rect" height={144} />
         ))}
       </div>
-      <CardSkeleton lines={6} />
-      {/* the phone's "All N sites" row */}
-      <div className="md:hidden" aria-hidden>
-        <Skeleton variant="rect" height={48} />
+      <div className="max-md:hidden">
+        <CardSkeleton lines={6} />
+      </div>
+      {/* phones: "Live issues" and its rows, then the "All N sites" row */}
+      <div className="flex flex-col gap-6 md:hidden">
+        <PhoneRowsSkeleton rows={5} heading />
+        <Skeleton variant="rect" height={48} width="100%" />
       </div>
       <div
         className="grid grid-cols-1 gap-4 max-md:hidden xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*90)]"
