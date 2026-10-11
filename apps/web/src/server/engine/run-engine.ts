@@ -5,7 +5,6 @@ import {
   problemHoldUntil,
   bkkControlFailing,
   faultyByMinute,
-  ladderClockStart,
   lookbackMs,
   NEW_MONITOR,
   UNKNOWN_ROOT_CAUSE,
