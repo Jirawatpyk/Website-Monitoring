@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buttonClass, PageHeader } from '@jirawatpyk/aura-react';
-import { IconPlus } from '@jirawatpyk/aura-react/icons';
+import { IconCalendar, IconPlus } from '@jirawatpyk/aura-react/icons';
 import { formatDay, formatTime, formatTimeWithSeconds } from '@dxt/shared';
 import { bannersOf, countsOf, liveIssues, recentEvents, withAck } from '../model';
 import type { OverviewData, ProbeHealth } from '../types';
 import { DesktopBanners, Kpis, LIVE_ISSUES_ID, LiveIssuesTable, RecentEvents, SiteTiles } from './desktop';
 import { PhoneAllSites, PhoneBanners, PhoneCounts, PhoneLiveIssues } from './phone';
+import { MaintenanceCard, PhoneMaintenance } from './maintenance-card';
 import { useLiveRefresh } from '@/components/use-live-refresh';
 import { useAckToast, type AckAction, type UndoAction } from '@/components/use-ack-toast';
 
@@ -89,7 +90,7 @@ export function OverviewView({
   const counts = countsOf(sites);
   const issues = liveIssues(sites, now);
   const banners = bannersOf(sites, now);
-  const events = recentEvents(data.events, now);
+  const events = recentEvents(data.events, now, 7, data.windowEvents);
   const isAdmin = data.viewer.kind === 'admin';
   const meta = `${formatDay(now, { weekday: true, year: true })} · ${formatTimeWithSeconds(now)} (UTC+7)${live ? ' · live' : ''}`;
 
@@ -123,6 +124,12 @@ export function OverviewView({
               <ProbePill probes={data.probes} compact />
             </span>
             {isAdmin && (
+              <Link href="/maintenance" className={`max-md:hidden ${buttonClass({ variant: 'secondary' })}`}>
+                <IconCalendar />
+                Maintenance
+              </Link>
+            )}
+            {isAdmin && (
               <Link href="/sites/new" className={`max-md:hidden ${buttonClass({ variant: 'secondary' })}`}>
                 <IconPlus />
                 Add site
@@ -144,6 +151,7 @@ export function OverviewView({
           lastRoundAt={data.lastRoundAt}
           onAck={onAck}
         />
+        {data.maintenance && <MaintenanceCard card={data.maintenance} />}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*90)]">
           <SiteTiles sites={sites} drafts={data.drafts} now={now} />
           <RecentEvents events={events} />
@@ -162,6 +170,7 @@ export function OverviewView({
           lastRoundAt={data.lastRoundAt}
         />
         <PhoneAllSites monitored={counts.monitored} ok={counts.ok} />
+        {data.maintenance?.phoneLine && <PhoneMaintenance line={data.maintenance.phoneLine} />}
       </div>
     </div>
   );

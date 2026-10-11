@@ -92,7 +92,9 @@ export function MaintenanceDialog({
   const [done, setDone] = useState<{ title: string; text: string } | null>(null);
   const [pending, start] = useTransition();
 
-  const current = sites.find((s) => s.id === site) ?? sites[0]!;
+  // Opened from /maintenance the site starts empty (§23.1): nothing submits until one is picked.
+  const picked = sites.find((s) => s.id === site) ?? null;
+  const current = picked ?? sites[0]!;
   const durations = DURATIONS[kind];
   const dur = durations.some((d) => d.label === duration) ? duration : durations[durations.length - 1]!.label;
   const plan = planOf({
@@ -177,12 +179,21 @@ export function MaintenanceDialog({
       size="md"
       autoFocus={false}
       title={title}
-      description={`${current.name} · ${formatTier(current.tier)}${owner}`}
+      description={
+        picked
+          ? `${current.name} · ${formatTier(current.tier)}${owner}${isAdmin ? '' : ' · you’re a Responder'}`
+          : 'Choose a site first — the list shows the sites you can act on'
+      }
       footer={
         done ? (
-          <Button variant="primary" onClick={onClose}>
-            Done
-          </Button>
+          <>
+            <Button variant="secondary" onClick={onClose}>
+              Done
+            </Button>
+            <Button variant="primary" icon={<IconCalendar />} href="/maintenance">
+              Open Maintenance &amp; mutes
+            </Button>
+          </>
         ) : (
           <>
             <Button variant="secondary" onClick={onClose}>
@@ -191,7 +202,7 @@ export function MaintenanceDialog({
             <Button
               variant="primary"
               icon={kind === 'mute' ? <IconEyeOff /> : <IconCalendar />}
-              disabled={plan.problems.length > 0}
+              disabled={plan.problems.length > 0 || !picked}
               loading={pending}
               onClick={submit}
             >
@@ -207,13 +218,16 @@ export function MaintenanceDialog({
         </Alert>
       ) : (
         <div className="flex flex-col gap-5">
-          {sites.length > 1 && (
+          {(sites.length > 1 || !picked) && (
             <Select
               touchHeight
               label="Site"
               required
-              options={sites.map((s) => ({ value: s.id, label: `${s.name} · ${formatTier(s.tier)}` }))}
-              value={current.id}
+              options={[
+                ...(picked ? [] : [{ value: '', label: 'Choose a site' }]),
+                ...sites.map((s) => ({ value: s.id, label: `${s.name} · ${formatTier(s.tier)}` })),
+              ]}
+              value={picked?.id ?? ''}
               onChange={(e) => setSite(e.target.value)}
             />
           )}
@@ -325,8 +339,8 @@ export function MaintenanceDialog({
           />
 
           {kind === 'maintenance' && plan.needsApproval && (
-            <Alert tone="info" title="Waits for an Admin’s approval">
-              {`Windows over 24 h need an Admin’s approval. It starts only if an Admin approves it before ${whenText(plan.startsAt, now)}; until then alerts carry on.`}
+            <Alert tone="warning" title="Needs an Admin’s approval">
+              {`Windows over 24 h asked for by a Responder wait for an Admin. It starts only if approved before ${whenText(plan.startsAt, now)} — otherwise it doesn’t start. Follow it under Waiting for approval on Maintenance & mutes.`}
             </Alert>
           )}
           {kind === 'maintenance' &&

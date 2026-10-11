@@ -2,6 +2,7 @@ import { checkWindow, type WindowKind, type WindowProblem } from '@dxt/engine';
 import {
   BANGKOK_OFFSET_MS,
   formatDay,
+  formatDuration,
   formatIncidentId,
   formatTime,
   isSameBangkokDay,
@@ -106,8 +107,14 @@ export function muteRule(i: IncidentLinkData): { title: string; text: string } {
   };
 }
 
-export function submitLabel(kind: WindowKind, later: boolean, duration: string): string {
+export function submitLabel(
+  kind: WindowKind,
+  later: boolean,
+  duration: string,
+  needsApproval = false,
+): string {
   if (kind === 'mute') return `Mute for ${duration}`;
+  if (needsApproval) return 'Ask for approval';
   return later ? 'Schedule' : 'Start now';
 }
 
@@ -174,7 +181,7 @@ export function planOf(input: {
     problems: check.problems,
     needsApproval: check.needsApproval,
     blocked: check.problems.includes('maintenance_open_incident'),
-    submit: submitLabel(input.kind, later, d.label),
+    submit: submitLabel(input.kind, later, d.label, check.needsApproval),
   };
 }
 
@@ -217,6 +224,11 @@ export const PROBLEM_WORDS: Record<
   unchanged: 'Pick a different end time.',
 };
 
+const lengthOf = (a: Date, b: Date) => {
+  const m = Math.round((b.getTime() - a.getTime()) / 60_000);
+  return m >= 1440 && m % 1440 === 0 && m > 1440 ? `${m / 1440} days` : formatDuration(m);
+};
+
 /** The success line after Save (boards Maintenance, MMaintenance). */
 export function doneOf(p: {
   kind: WindowKind;
@@ -229,7 +241,7 @@ export function doneOf(p: {
   viewer: string;
   now: Date;
 }): { title: string; text: string } {
-  const why = ` Reason: “${p.reason.trim()}”. End early, edit or cancel it from Overview › Maintenance & mutes.`;
+  const why = ` Reason: “${p.reason.trim()}”. End early, edit or cancel it on Maintenance & mutes (sidebar › Maintenance).`;
   const span = `${whenText(p.startsAt, p.now)} → ${whenText(p.endsAt, p.now)}`;
   if (p.kind === 'mute') {
     const inc = p.site.openIncident;
@@ -245,8 +257,8 @@ export function doneOf(p: {
   }
   if (p.needsApproval)
     return {
-      title: `Waiting for approval · ${p.site.name}`,
-      text: `${span} · an Admin must approve it before it starts; until then alerts carry on · recorded in the audit log as ${p.viewer}.${why}`,
+      title: `Waiting for an Admin · ${p.site.name}`,
+      text: `${span} (${lengthOf(p.startsAt, p.endsAt)}) · waiting for an Admin — it doesn’t start unless approved before ${whenText(p.startsAt, p.now)}. Recorded in the audit log as ${p.viewer}. Reason: “${p.reason.trim()}”. Follow it under Waiting for approval on Maintenance & mutes.`,
     };
   return {
     title: `${p.later ? 'Maintenance scheduled' : 'Maintenance started'} · ${p.site.name}`,

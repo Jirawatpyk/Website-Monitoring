@@ -301,7 +301,9 @@ function NextStepCell({
   const href =
     step.kind === 'incident'
       ? `/incidents/${step.incidentId}${step.hash ? `#${step.hash}` : ''}`
-      : `/sites/${issue.site.id}`;
+      : step.kind === 'maintenance'
+        ? '/maintenance'
+        : `/sites/${issue.site.id}`;
   return (
     <Link href={href} className={`relative z-10 ${buttonClass({ variant: 'ghost', size: 'sm' })}`}>
       {step.label}

@@ -198,19 +198,23 @@ export function canAck(viewer: OverviewViewer, site: OverviewSite): boolean {
 export type NextStep =
   | { kind: 'ack'; incidentId: string; number: number }
   | { kind: 'incident'; incidentId: string; label: string; hash?: string }
-  | { kind: 'site'; label: 'View checks' | 'View site' };
+  | { kind: 'site'; label: 'View checks' | 'View site' }
+  | { kind: 'maintenance'; label: 'Manage mute' | 'View mute' };
 
 /**
  * Next step (§21.4, D-032, D-033): an unacknowledged DOWN → Acknowledge for those who may, otherwise
  * "Open INC-…"; an incident waiting for its root cause → "Add root cause" (the Resolve card) for those
  * who may write it, otherwise "Open INC-…"; acked DOWN and PROBLEM → "Open INC-…"; a location warning →
- * "View checks"; a mute → "View site".
+ * "View checks"; a mute → "Manage mute" (Admin) / "View mute" → Maintenance & mutes (§23.8).
  */
 export function nextStep(viewer: OverviewViewer, issue: LiveIssue): NextStep {
   const { site, reason } = issue;
   const inc = site.incident;
   if (reason.kind === 'location') return { kind: 'site', label: 'View checks' };
-  if (reason.kind === 'muted' || !inc) return { kind: 'site', label: 'View site' };
+  // A mute is managed on Maintenance & mutes (§23.8).
+  if (reason.kind === 'muted')
+    return { kind: 'maintenance', label: viewer.kind === 'admin' ? 'Manage mute' : 'View mute' };
+  if (!inc) return { kind: 'site', label: 'View site' };
   if (reason.kind === 'down' && UNACKED.includes(inc.state) && canAck(viewer, site)) {
     return { kind: 'ack', incidentId: inc.id, number: inc.number };
   }
@@ -462,15 +466,25 @@ export function recentEvents(
   events: readonly OverviewEvent[],
   now: Date,
   max = 7,
+  /** Lines from windows and mutes (Main3: "DxT Games muted until 18:00 — Tao"). */
+  extra: readonly { id: string; at: string; text: string }[] = [],
 ): { id: string; time: string; text: string }[] {
-  return [...events]
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .flatMap((e) => {
+  const lines = [
+    ...events.flatMap((e) => {
       const text = eventLine(e);
-      const at = new Date(e.at);
-      return text
-        ? [{ id: e.id, time: isSameBangkokDay(at, now) ? formatTime(at) : formatWhen(at, now), text }]
-        : [];
+      return text ? [{ id: e.id, at: e.at, text }] : [];
+    }),
+    ...extra,
+  ];
+  return lines
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .map((l) => {
+      const at = new Date(l.at);
+      return {
+        id: l.id,
+        time: isSameBangkokDay(at, now) ? formatTime(at) : formatWhen(at, now),
+        text: l.text,
+      };
     })
     .slice(0, max);
 }

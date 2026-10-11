@@ -73,7 +73,7 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         icon: <IconCalendar />,
         href: '/maintenance',
         slice: 'S09',
-        live: false,
+        live: true,
       },
       {
         id: 'escalation',

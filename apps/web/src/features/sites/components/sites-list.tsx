@@ -236,10 +236,10 @@ export function SitesList({
     ...(r.live && mayPause(r)
       ? [
           isMuted(r, now)
-            ? { label: 'End or edit mute…', icon: <IconEyeOff />, href: '/#maintenance' }
+            ? { label: 'End or edit mute…', icon: <IconEyeOff />, href: '/maintenance' }
             : { label: 'Mute…', icon: <IconEyeOff />, onSelect: () => openPause(r.id, 'mute') },
           r.status === 'maintenance'
-            ? { label: 'End or edit maintenance…', icon: <IconCalendar />, href: '/#maintenance' }
+            ? { label: 'End or edit maintenance…', icon: <IconCalendar />, href: '/maintenance' }
             : {
                 label: 'Schedule maintenance',
                 icon: <IconCalendar />,

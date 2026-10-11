@@ -146,7 +146,7 @@ describe('maintenance dialog model (boards Maintenance, MMaintenance; §14.5, §
       viewer: 'Arm',
       now: NOW,
     });
-    expect(waiting.title).toBe('Waiting for approval · Bangkok Airways – Taiwan');
+    expect(waiting.title).toBe('Waiting for an Admin · Bangkok Airways – Taiwan');
     const scheduled = doneOf({
       ...{
         kind: 'maintenance' as const,

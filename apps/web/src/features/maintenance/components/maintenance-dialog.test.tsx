@@ -88,13 +88,13 @@ describe('MaintenanceDialog (boards Maintenance, MMaintenance)', () => {
     const { unmount } = dialog({ siteId: 's-tw' });
     await user.click(screen.getByRole('radio', { name: 'Later' }));
     await user.click(screen.getByRole('radio', { name: '3 days' }));
-    expect(screen.getByText('Waits for an Admin’s approval')).toBeInTheDocument();
+    expect(screen.getByText('Needs an Admin’s approval')).toBeInTheDocument();
     unmount();
     dialog({ siteId: 's-tw', isAdmin: true });
     await user.click(screen.getByRole('radio', { name: 'Later' }));
     await user.click(screen.getByRole('radio', { name: '3 days' }));
     expect(screen.getByText('You’re an Admin — no approval needed')).toBeInTheDocument();
-    expect(screen.queryByText('Waits for an Admin’s approval')).not.toBeInTheDocument();
+    expect(screen.queryByText('Needs an Admin’s approval')).not.toBeInTheDocument();
   });
 
   it('a mute offers at most 24 h', () => {
