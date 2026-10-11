@@ -35,14 +35,25 @@ test.describe('acknowledge from the alert link (local Supabase)', () => {
   }, info) => {
     test.skip(info.project.name !== 'mobile', 'BottomNav shows below lg');
     await page.goto('/sites');
+    // Hydrated (AURA's scroll listener attached) before the first wheel — a wheel before it was lost
+    // and failed CI's first attempt (#77). The list's length depends on what other specs created, so
+    // the page gets room to scroll; the behaviour under test is the bar, not the list.
+    await page.waitForLoadState('networkidle');
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('main')!.style.paddingBottom = '200vh';
+    });
     const nav = page.locator('.aura-bottomnav');
     const height = page.viewportSize()!.height;
     const top = async () => (await nav.boundingBox())!.y;
     await expect.poll(top).toBeLessThan(height - 1);
-    await page.mouse.wheel(0, 600);
-    await expect.poll(top).toBeGreaterThanOrEqual(height - 1);
-    await page.mouse.wheel(0, -300);
-    await expect.poll(top).toBeLessThan(height - 1);
+    await expect(async () => {
+      await page.mouse.wheel(0, 600);
+      expect(await top()).toBeGreaterThanOrEqual(height - 1);
+    }).toPass({ timeout: 10_000 });
+    await expect(async () => {
+      await page.mouse.wheel(0, -300);
+      expect(await top()).toBeLessThan(height - 1);
+    }).toPass({ timeout: 10_000 });
   });
 
   test('T08: Ack → Undo within 10 s → nothing is sent, the rows end cancelled', async ({ page }, info) => {
