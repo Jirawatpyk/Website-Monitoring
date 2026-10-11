@@ -16,6 +16,7 @@ import {
 import { IconCalendar, IconCheck, IconEyeOff, IconInfo } from '@jirawatpyk/aura-react/icons';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
+import { useNow } from '@/components/use-now';
 import { muteSite, scheduleMaintenance } from '../actions';
 import {
   DURATIONS,
@@ -82,8 +83,8 @@ export function MaintenanceDialog({
   fromPage?: boolean;
 }) {
   const router = useRouter();
-  const [now] = useState(() => new Date());
-  const days = useMemo(() => startDays(now), [now]);
+  const [openedAt] = useState(() => new Date().toISOString());
+  const days = useMemo(() => startDays(new Date(openedAt)), [openedAt]);
   const [site, setSite] = useState(siteId);
   const [kind, setKind] = useState<WindowKind>(initialKind);
   const [later, setLater] = useState(initialKind === 'maintenance');
@@ -94,6 +95,8 @@ export function MaintenanceDialog({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ title: string; text: string } | null>(null);
   const [pending, start] = useTransition();
+  // "Starts / Ends" follow the clock while the dialog is open: Save uses the time it is pressed (verify).
+  const now = useNow(openedAt, 15_000, open && !done);
 
   // Opened from /maintenance the site starts empty (§23.1): nothing submits until one is picked.
   const picked = sites.find((s) => s.id === site) ?? null;
@@ -114,6 +117,9 @@ export function MaintenanceDialog({
   const isLater = kind === 'maintenance' && later;
   const incident = current.openIncident;
   const rule = incident ? muteRule(incident) : null;
+  // Already muted: alerts are held already, so the guard offers no second mute (verify).
+  const mutedUntil =
+    current.mutedUntil && new Date(current.mutedUntil) > now ? new Date(current.mutedUntil) : null;
   const timeProblem = plan.problems.find((p) => p === 'starts_in_past' || p === 'ends_before_start');
 
   const switchKind = (v: string) => {
@@ -255,20 +261,24 @@ export function MaintenanceDialog({
               role="alert"
               title={guardTitle(current)}
               action={
-                <span className="flex w-full flex-wrap items-center gap-2.5">
-                  <span className="max-md:hidden">
-                    <Button variant="secondary" size="sm" icon={<IconEyeOff />} onClick={muteInstead}>
-                      Mute instead
-                    </Button>
+                mutedUntil ? (
+                  <span className="text-xs text-fg-secondary">{`Already muted until ${formatTime(mutedUntil)} — new alerts are held.`}</span>
+                ) : (
+                  <span className="flex w-full flex-wrap items-center gap-2.5">
+                    <span className="max-md:hidden">
+                      <Button variant="secondary" size="sm" icon={<IconEyeOff />} onClick={muteInstead}>
+                        Mute instead
+                      </Button>
+                    </span>
+                    {/* phones: the only way on, full width (MMaintenance) */}
+                    <span className="w-full md:hidden">
+                      <Button variant="primary" icon={<IconEyeOff />} fullWidth onClick={muteInstead}>
+                        Mute instead
+                      </Button>
+                    </span>
+                    {rule && <span className="text-xs text-fg-secondary">{rule.title}</span>}
                   </span>
-                  {/* phones: the only way on, full width (MMaintenance) */}
-                  <span className="w-full md:hidden">
-                    <Button variant="primary" icon={<IconEyeOff />} fullWidth onClick={muteInstead}>
-                      Mute instead
-                    </Button>
-                  </span>
-                  {rule && <span className="text-xs text-fg-secondary">{rule.title}</span>}
-                </span>
+                )
               }
             >
               {GUARD_TEXT}

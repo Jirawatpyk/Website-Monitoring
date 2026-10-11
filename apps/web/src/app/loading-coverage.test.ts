@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -23,5 +23,21 @@ describe('loading skeletons', () => {
       .filter((dir) => !existsSync(join(dir, 'loading.tsx')))
       .map((dir) => relative(APP, dir).replaceAll('\\', '/') || '(app) root');
     expect(missing).toEqual([]);
+  });
+
+  // AURA Skeleton without a variant draws a small rounded blob: Site detail's phone buttons and stats
+  // came out as pills and circles (S09 /verify). Every one names its shape.
+  it('every AURA Skeleton names its variant', () => {
+    const SRC = join(__dirname, '..');
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? files(join(dir, e.name)) : e.name.endsWith('.tsx') ? [join(dir, e.name)] : [],
+      );
+    const bare = files(SRC).flatMap((f) =>
+      [...readFileSync(f, 'utf8').matchAll(/<Skeleton\b[^>]*>/g)]
+        .filter((m) => !m[0].includes('variant='))
+        .map(() => relative(SRC, f).replaceAll('\\', '/')),
+    );
+    expect(bare).toEqual([]);
   });
 });

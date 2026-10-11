@@ -84,6 +84,17 @@ describe('MaintenanceDialog (boards Maintenance, MMaintenance)', () => {
     expect(await within(mute).findByText('Muted · MuvMi')).toBeInTheDocument();
   });
 
+  it('a site already muted: the guard says so and offers no second mute (staging verify)', async () => {
+    const user = userEvent.setup();
+    const until = new Date(Date.now() + 3_600_000);
+    dialog({ sites: [{ ...muvmi, mutedUntil: until.toISOString() }] });
+    const box = screen.getByRole('dialog', { name: 'Schedule maintenance' });
+    await user.click(within(box).getByRole('radio', { name: 'Now' }));
+    const alert = within(box).getByRole('alert');
+    expect(alert).toHaveTextContent(/Already muted until \d\d:\d\d — new alerts are held\./);
+    expect(within(alert).queryByRole('button', { name: 'Mute instead' })).not.toBeInTheDocument();
+  });
+
   it('Done-when 4: a Responder’s 3-day window says it waits for an Admin; an Admin is told no approval is needed', async () => {
     const user = userEvent.setup();
     const { unmount } = dialog({ siteId: 's-tw' });
