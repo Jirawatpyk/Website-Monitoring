@@ -135,7 +135,7 @@ export function SiteDetailView({
           <PageHeader
             // Phones: AURA's actions box hugs its content, so the Mute / Maintenance / Edit grid would
             // stop short of the edge — let it take the row (MSite: the buttons span the page).
-            className="max-md:[&>:last-child]:w-full"
+            actionsFullWidthBelow="md"
             breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />}
             title={detail.name}
             meta={
@@ -171,7 +171,7 @@ export function SiteDetailView({
             }
             actions={
               muting || isAdmin ? (
-                <span className="flex flex-wrap items-center gap-3 max-md:grid max-md:w-full max-md:grid-cols-2">
+                <>
                   {muting && (
                     <PauseActions
                       site={{
@@ -193,12 +193,11 @@ export function SiteDetailView({
                       variant="primary"
                       icon={<IconPencil />}
                       href={detail.live ? `/sites/${detail.id}/monitors` : `/sites/${detail.id}/edit`}
-                      className="max-md:col-span-2"
                     >
                       {detail.live ? 'Edit monitors' : 'Finish setup'}
                     </Button>
                   )}
-                </span>
+                </>
               ) : undefined
             }
           />

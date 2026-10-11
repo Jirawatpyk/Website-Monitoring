@@ -72,10 +72,11 @@ AURA 5.36 (requests 15–16, 10 Oct 2026; DxT took it in `chore/aura-5.36`):
 - Request 16 — already in AURA (5.36 adds tests and docs): `DataTableColumn align: 'end'` right-aligns the header and cells with tabular figures; stacked cards keep values start-aligned → the Incidents Duration column.
 - Side effect of 15: content wider than its cell (a pill, a button) can show up to 4 px into the next column.
 
-Open (S09, 11 Oct 2026):
+AURA 5.37 (requests 17–18, 11 Oct 2026; DxT took it in `chore/aura-5.37`):
 
-- Request 17 — `PageHeader` actions full width below md (a prop): Site detail's phone Mute / Maintenance / Edit monitors grid reaches past AURA's actions box with `max-md:[&>:last-child]:w-full` until then.
-- Request 18 — `SegmentedControl touchHeight` by viewport, as Button: today it grows to 44 px only on `pointer: coarse`, so the phone e2e (mouse) can't check it.
+- Request 17 — `PageHeader actionsFullWidthBelow="md"`: below md the header actions take the row and share it in equal widths (three buttons wrap to two halves, then one across). Site detail, Edit site and Edit monitors pass it; the `max-md:[&>:last-child]:w-full` selector and Site detail's own grid are gone. Pass the buttons as direct children (a fragment): a wrapping `span` is one child and its buttons don't stretch. Edit monitors keeps its span (the "N unsaved changes" line sits in it).
+- Request 18 — `SegmentedControl touchHeight` (44 px below 640 px or on a coarse pointer, as Button / TextField; `'always'` every width): the Maintenance dialog's Type, Start and Duration.
+- After an AURA upgrade restart `pnpm dev`: the running dev server kept 5.36's CSS (the new classes were in the markup, their rules missing).
 
 AURA 5.35 (requests 11–14, 10 Oct 2026; DxT took it in `chore/aura-5.35`):
 

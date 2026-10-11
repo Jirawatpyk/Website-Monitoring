@@ -1,4 +1,4 @@
-import { Container } from '@jirawatpyk/aura-react';
+import { Container, Skeleton } from '@jirawatpyk/aura-react';
 import { CardSkeleton, PageHeaderSkeleton, PageSkeleton } from '@/components/states';
 
 /** While `/incidents` loads: the header, the KPI row and the table (S07). */
@@ -12,8 +12,17 @@ export default function Loading() {
             <CardSkeleton key={n} lines={2} />
           ))}
         </div>
-        <CardSkeleton lines={1} />
-        <CardSkeleton lines={8} />
+        <div className="flex flex-col gap-6 max-md:hidden">
+          <CardSkeleton lines={1} />
+          <CardSkeleton lines={8} />
+        </div>
+        <div className="flex flex-col gap-4 md:hidden" aria-hidden>
+          <Skeleton variant="rect" height={44} width="100%" />
+          <Skeleton variant="text" width="55%" />
+          <CardSkeleton lines={3} />
+          <CardSkeleton lines={3} />
+          <CardSkeleton lines={3} />
+        </div>
       </PageSkeleton>
     </Container>
   );

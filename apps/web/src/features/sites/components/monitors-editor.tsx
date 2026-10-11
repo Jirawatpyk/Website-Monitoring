@@ -166,7 +166,7 @@ export function MonitorsEditor({
     <div className="flex flex-col gap-6">
       <PageHeader
         // Phones: Cancel / Save side by side across the row, as Site detail (layout-consistency).
-        className="max-md:[&>:last-child]:w-full"
+        actionsFullWidthBelow="md"
         breadcrumb={breadcrumb}
         title="Edit monitors"
         meta={meta}

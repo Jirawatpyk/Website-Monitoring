@@ -1,4 +1,5 @@
 import { Skeleton } from '@jirawatpyk/aura-react';
+import { PhoneRowsSkeleton } from '@/components/states';
 
 const ROWS = 6;
 const CHIPS = [56, 80, 96, 120, 64, 80, 80] as const;
@@ -59,23 +60,7 @@ export function SitesListSkeleton() {
             <Skeleton key={i} variant="rect" height={44} width={w + 8} className="shrink-0 rounded-full" />
           ))}
         </div>
-        <Skeleton variant="text" width={96} />
-        <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
-          {Array.from({ length: ROWS }, (_, i) => (
-            <div
-              key={i}
-              className="flex h-15 items-center gap-2.5 border-b border-border-subtle px-3.5 last:border-b-0"
-            >
-              <span className="flex w-30 shrink-0">
-                <Skeleton variant="badge" />
-              </span>
-              <div className="flex grow flex-col gap-1.5">
-                <Skeleton variant="text" width="70%" />
-                <Skeleton variant="text" width="45%" />
-              </div>
-            </div>
-          ))}
-        </div>
+        <PhoneRowsSkeleton rows={ROWS} heading />
       </div>
     </div>
   );

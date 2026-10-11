@@ -77,6 +77,34 @@ export function PageHeaderSkeleton({
   );
 }
 
+/**
+ * A phone list card: rows of a status badge and two lines (Sites, the Overview's Live issues), with an
+ * optional heading line above it ("Live issues").
+ */
+export function PhoneRowsSkeleton({ rows = 5, heading = false }: { rows?: number; heading?: boolean }) {
+  return (
+    <div className="flex flex-col gap-3" aria-hidden>
+      {heading && <Skeleton variant="text" width="35%" />}
+      <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
+        {Array.from({ length: rows }, (_, i) => (
+          <div
+            key={i}
+            className="flex h-15 items-center gap-2.5 border-b border-border-subtle px-3.5 last:border-b-0"
+          >
+            <span className="flex w-30 shrink-0">
+              <Skeleton variant="badge" />
+            </span>
+            <div className="flex grow flex-col gap-1.5">
+              <Skeleton variant="text" width="70%" />
+              <Skeleton variant="text" width="45%" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface CardSkeletonProps {
   /** Form fields (label + input) in the card body. */
   fields?: number;

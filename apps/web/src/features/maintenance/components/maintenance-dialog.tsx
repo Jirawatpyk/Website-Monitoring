@@ -254,6 +254,7 @@ export function MaintenanceDialog({
           </span>
           <span className="md:hidden">
             <SegmentedControl
+              touchHeight
               label="Type"
               options={PHONE_TYPES}
               value={kind}
@@ -297,6 +298,7 @@ export function MaintenanceDialog({
               <span className="text-sm font-medium">Start</span>
               <span className="flex flex-wrap items-center gap-4">
                 <SegmentedControl
+                  touchHeight
                   label="Start"
                   size="sm"
                   options={['Now', 'Later']}
@@ -335,6 +337,7 @@ export function MaintenanceDialog({
             <span className="flex flex-wrap items-center gap-4">
               <span className="max-md:hidden">
                 <SegmentedControl
+                  touchHeight
                   label="Duration"
                   size="sm"
                   options={durations.map((d) => d.label)}
@@ -345,6 +348,7 @@ export function MaintenanceDialog({
               {/* phones: full width, as Type (MMaintenance) */}
               <span className="w-full md:hidden">
                 <SegmentedControl
+                  touchHeight
                   label="Duration"
                   options={durations.map((d) => d.label)}
                   value={dur}
