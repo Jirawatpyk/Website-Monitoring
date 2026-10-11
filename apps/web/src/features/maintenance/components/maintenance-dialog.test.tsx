@@ -91,7 +91,10 @@ describe('MaintenanceDialog (boards Maintenance, MMaintenance)', () => {
     const box = screen.getByRole('dialog', { name: 'Schedule maintenance' });
     await user.click(within(box).getByRole('radio', { name: 'Now' }));
     const alert = within(box).getByRole('alert');
-    expect(alert).toHaveTextContent(/Already muted until (today )?\d\d:\d\d — new alerts are held\./);
+    // "today 18:00", or "Mon 12 Oct 00:02" when now + 1 h crosses Bangkok midnight (CI at 23:02).
+    expect(alert).toHaveTextContent(
+      /Already muted until (today |[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2} )?\d\d:\d\d — new alerts are held\./,
+    );
     expect(within(alert).queryByRole('button', { name: 'Mute instead' })).not.toBeInTheDocument();
   });
 
