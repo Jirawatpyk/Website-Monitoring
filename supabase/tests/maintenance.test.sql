@@ -3,7 +3,7 @@
 -- engine's window log, T09 (a mute never stops an open incident's ladder) and the late alert after a mute.
 begin;
 \ir _helpers.psql
-select plan(56);
+select plan(58);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -179,6 +179,19 @@ select is(public.window_state(w), 'waiting', 'a second one back to back waits fo
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select throws_ok($$ insert into public.sites (name, tier, muted_until) values ('Muted at birth', 3, now() + interval '9 days') $$,
   '42501', null, 'a site can''t be created muted');
+reset role;
+
+-- The engine sets an unapproved window aside at its start, so its time is free again (db review H1).
+update public.maintenance_windows set starts_at = now() - interval '1 minute', ends_at = now() + interval '29 hours'
+  where id = (select id from win where name = 'long');
+set local role service_role;
+select public.engine_log_windows(now());
+reset role;
+select is(public.window_state(w), 'not_approved', 'still reads "not approved"')
+  from public.maintenance_windows w where w.id = (select id from win where name = 'long');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok($$ select public.create_maintenance('00000000-0000-0000-0000-0000000000a1',
+  now() + interval '1 hour', now() + interval '3 hours', 'Smaller job') $$, 'and its time can be booked again');
 reset role;
 
 -- ── Cancel ───────────────────────────────────────────────────────────────

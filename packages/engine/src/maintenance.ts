@@ -38,8 +38,11 @@ export function windowEnd(w: Pick<MaintenanceWindow, 'endsAt' | 'endedAt'>): Dat
 
 /** Same words and order as SQL `window_state(w, at)`. */
 export function windowState(w: MaintenanceWindow, at: Date): WindowState {
+  // The engine sets an unapproved window aside at its start (cancelledAt = startsAt): still "not approved".
+  if (!w.approvedAt && (w.cancelledAt ? w.cancelledAt >= w.startsAt : at >= w.startsAt))
+    return 'not_approved';
   if (w.cancelledAt) return 'cancelled';
-  if (!w.approvedAt) return at < w.startsAt ? 'waiting' : 'not_approved';
+  if (!w.approvedAt) return 'waiting';
   if (at < w.startsAt) return 'scheduled';
   return at < windowEnd(w) ? 'active' : 'ended';
 }

@@ -5,6 +5,8 @@
 -- below — each writes its audit row in the same transaction (the S01 deferral) — and a signed-in
 -- session can no longer write the mute fields directly (D-012 amended).
 
+set local lock_timeout = '5s';
+
 -- btree_gist: the per-site "no overlap" exclusion constraint compares a uuid with `=`.
 create extension if not exists btree_gist with schema extensions;
 
@@ -27,13 +29,15 @@ create table public.maintenance_windows (
   ended_by uuid references public.profiles (id) on delete set null,
   end_reason text check (end_reason is null or length(end_reason) <= 500),
   cancelled_at timestamptz,
-  -- The engine logs a window's start and end once each (System rows in the audit log).
+  -- The engine logs a window's start and end once each (System rows in the audit log); a window ended
+  -- or cancelled by a person is logged by its RPC and marked logged there.
   start_logged boolean not null default false,
   end_logged boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (ends_at > starts_at),
-  check (ended_at is null or ended_at >= starts_at),
+  check (ended_at is null or (ended_at >= starts_at and ended_at <= ends_at)),
+  check (ends_at - starts_at <= interval '31 days'),
   -- Spec §11 / FR-14: a mute lasts at most 24 h.
   check (kind = 'maintenance' or ends_at - starts_at <= interval '24 hours'),
   -- Two windows of one kind never overlap on a site (a cancelled one no longer counts).
@@ -47,8 +51,8 @@ comment on table public.maintenance_windows is
 
 -- The engine's "active now" read and the pages' per-site lists.
 create index maintenance_windows_site_idx on public.maintenance_windows (site_id, starts_at desc);
-create index maintenance_windows_open_idx on public.maintenance_windows (ends_at)
-  where cancelled_at is null and ended_at is null;
+create index maintenance_windows_open_idx on public.maintenance_windows (starts_at)
+  where not end_logged and cancelled_at is null;
 
 create trigger maintenance_windows_set_updated_at before update on public.maintenance_windows
   for each row execute function private.set_updated_at();
@@ -226,9 +230,10 @@ stable
 set search_path = ''
 as $$
   select case
+    when w.approved_at is null and (w.cancelled_at >= w.starts_at or (w.cancelled_at is null and p_at >= w.starts_at))
+      then 'not_approved'
     when w.cancelled_at is not null then 'cancelled'
-    when w.approved_at is null and p_at < w.starts_at then 'waiting'
-    when w.approved_at is null then 'not_approved'
+    when w.approved_at is null then 'waiting'
     when p_at < w.starts_at then 'scheduled'
     when p_at < coalesce(w.ended_at, w.ends_at) then 'active'
     else 'ended'
@@ -435,7 +440,7 @@ begin
   end if;
 
   update public.maintenance_windows
-    set ended_at = v_now, ended_by = auth.uid(), end_reason = v_reason
+    set ended_at = v_now, ended_by = auth.uid(), end_reason = v_reason, start_logged = true, end_logged = true
     where id = p_window_id;
   if w.kind = 'mute' then
     perform private.clear_site_mute(w.site_id);
@@ -562,7 +567,7 @@ begin
 
   update public.maintenance_windows
     set cancelled_at = v_now, end_reason = v_reason, ended_by = auth.uid(),
-        ended_at = case when v_state = 'active' then v_now end
+        ended_at = case when v_state = 'active' then v_now end, end_logged = true
     where id = p_window_id;
   if w.kind = 'mute' and v_state = 'active' then
     perform private.clear_site_mute(w.site_id);
@@ -639,6 +644,10 @@ language plpgsql
 set search_path = ''
 as $$
 begin
+  -- Nobody approved it before its start: it never starts, and stops holding its time (D-036).
+  update public.maintenance_windows w set cancelled_at = w.starts_at, end_logged = true
+  where w.approved_at is null and w.cancelled_at is null and w.starts_at <= p_now;
+
   with started as (
     update public.maintenance_windows w set start_logged = true
     where w.kind = 'maintenance' and not w.start_logged and w.cancelled_at is null

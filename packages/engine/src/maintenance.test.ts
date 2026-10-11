@@ -40,6 +40,16 @@ describe('windowState (D-036, mirrors SQL window_state)', () => {
     ['ended early at 10:00', { endedAt: at('2026-09-25T10:00:00') }, 'ended'],
     ['ran its course', { endsAt: at('2026-09-25T10:00:00') }, 'ended'],
     ['cancelled', { cancelledAt: at('2026-09-25T09:00:00') }, 'cancelled'],
+    [
+      'set aside by the engine at its start, unapproved',
+      { approvedAt: null, cancelledAt: at('2026-09-25T09:30:00') },
+      'not_approved',
+    ],
+    [
+      'a request withdrawn before its start',
+      { approvedAt: null, cancelledAt: at('2026-09-25T09:00:00') },
+      'cancelled',
+    ],
     ['the start minute itself is active', { startsAt: NOW }, 'active'],
     ['the end minute itself has ended', { endsAt: NOW }, 'ended'],
   ])('%s → %s', (_, over, state) => {
