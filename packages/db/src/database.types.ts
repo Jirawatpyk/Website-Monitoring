@@ -514,7 +514,7 @@ isOneToOne: false
 { Args: { "p_incident_id": string,"p_text": string }; Returns: string
                            },
 "approve_maintenance":
-{ Args: { "p_window_id": string }; Returns: undefined
+{ Args: { "p_ends_at": string,"p_window_id": string }; Returns: undefined
                            },
 "cancel_window":
 { Args: { "p_reason": string,"p_window_id": string }; Returns: undefined

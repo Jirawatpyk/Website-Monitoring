@@ -22,6 +22,7 @@ test.describe('maintenance & mutes (local Supabase)', () => {
       .click();
 
     const dialog = page.getByRole('dialog', { name: 'Schedule maintenance' });
+    await dialog.getByRole('radio', { name: 'Now' }).click();
     const guard = dialog.getByRole('alert');
     await expect(guard).toContainText(`${site.name} is DOWN now (INC-`);
     await expect(guard).toContainText(

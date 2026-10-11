@@ -7,6 +7,7 @@ import {
   type WindowState,
 } from '@dxt/engine';
 import {
+  formatDay,
   formatDuration,
   formatTime,
   formatWhen,
@@ -56,6 +57,9 @@ export interface WindowRow {
   backupName: string | null;
   /** The site's owner and backup: who may act besides an Admin. */
   ownerIds: string[];
+  /** An owner who is an Admin isn't named in "Only Nok, Ploy or an Admin" (§23.7). */
+  ownerIsAdmin?: boolean;
+  backupIsAdmin?: boolean;
   log: LogEntry[];
 }
 
@@ -107,8 +111,14 @@ const at = (d: Date, now: Date) => (isSameBangkokDay(d, now) ? `Today ${formatTi
 
 /** "Today 09:30 → 14:00", "Sat 26 Sep 22:00 → Tue 29 Sep 22:00" (the end's day only when it differs). */
 export function spanText(start: Date, end: Date, now: Date): string {
-  return `${at(start, now)} → ${isSameBangkokDay(start, end) ? formatTime(end) : whenText(end, now)}`;
+  return `${at(start, now)} → ${isSameBangkokDay(start, end) ? formatTime(end) : at(end, now)}`;
 }
+
+/** "Sat 26", "Tue 29" — the phone row's short days (MMaintenanceList). */
+const shortDay = (d: Date) => formatDay(d, { weekday: true }).replace(/ [A-Z][a-z]{2}$/, '');
+
+/** When it ended or was set aside. */
+const settled = (r: WindowRow) => new Date(r.endedAt ?? r.cancelledAt ?? r.endsAt);
 
 /** A log line in words (board: "Ended early 10:07 by Tao · “reason”"); the create lines are left out. */
 export function logLine(e: LogEntry, now: Date): string | null {
@@ -154,6 +164,12 @@ export interface PageRow {
   /** null = the site's real status badge (an active mute), with `mutedLabel` beside it. */
   badge: Badge | null;
   mutedLabel: string | null;
+  /** The phone row's short overlay word ("Muted", MMaintenanceList). */
+  mutedShort: string | null;
+  /** The sheet: "By" / "Asked by" and the name (with when it was asked). */
+  by: { label: string; value: string };
+  /** The sheet's Uptime fact: counted, not counted, or not affected (it never ran). */
+  uptime: string;
   siteSub: string;
   when: string;
   whenSub: string;
@@ -185,7 +201,9 @@ const mayAct = (r: WindowRow, v: Viewer) =>
 
 function whoNote(r: WindowRow, v: Viewer): string | null {
   if (v.role === 'readonly') return null;
-  const names = [r.ownerName, r.backupName].filter((n): n is string => !!n && n !== v.name);
+  const names = [!r.ownerIsAdmin && r.ownerName, !r.backupIsAdmin && r.backupName].filter(
+    (n): n is string => !!n && n !== v.name,
+  );
   return names.length ? `Only ${names.join(', ')} or an Admin` : 'Only an Admin';
 }
 
@@ -215,6 +233,14 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
     editLabel: null,
     note: null,
     line: '',
+    mutedShort: null,
+    by: asked
+      ? {
+          label: 'Asked by',
+          value: `${by} · ${formatWhen(new Date(r.createdAt), now, { midSentence: true })}`,
+        }
+      : { label: 'By', value: by },
+    uptime: r.kind === 'mute' ? 'Still counted' : 'Not counted',
   };
   const lengthMin = (end.getTime() - start.getTime()) / MINUTE;
   const can = mayAct(r, v);
@@ -226,14 +252,15 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
         badge: { tone: 'accent', variant: 'soft', icon: 'calendar', label: 'Maintenance' },
         whenSub: `${lengthText(lengthMin)} · ${inFor} in`,
         whySub: `by ${by} · not counted in uptime`,
-        line: `until ${whenText(end, now)} · ${r.reason}`,
+        line: `${spanText(start, end, now).replace(/^Today /, '')} · ${r.reason}`,
       });
     } else {
       Object.assign(base, {
         mutedLabel: `Muted · until ${whenText(end, now)}`,
         whenSub: `until ${whenText(end, now)} (max 24 h) · ${inFor} in`,
         whySub: `by ${by} · still counted in uptime`,
-        line: `until ${whenText(end, now)} · ${r.reason}`,
+        line: `Until ${whenText(end, now)} · ${r.reason}`,
+        mutedShort: 'Muted',
       });
     }
     if (can) Object.assign(base, { canEnd: true, editLabel: 'Edit end' });
@@ -247,7 +274,7 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
       badge: { tone: 'neutral', variant: 'outline', icon: 'clock', label: 'Needs approval' },
       whenSub: `${lengthText(lengthMin)} · ${startsIn}`,
       whySub: `asked by ${by} · ${formatWhen(new Date(r.createdAt), now, { midSentence: true })}`,
-      line: `${spanText(start, end, now)} · ${by}`,
+      line: `${shortDay(start)} → ${shortDay(end)} · ${lengthText(lengthMin)} · ${by}`,
     });
     if (v.role === 'admin') base.canApprove = true;
     else if (v.role === 'responder') {
@@ -277,7 +304,8 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
     when: ran ? spanText(start, realEnd, now) : spanText(start, end, now),
     whenSub: `${Noun(r.kind)} · ${lengthText(ran ? ranMin : lengthMin)}${ran ? '' : ' · didn’t start'}`,
     whySub: asked ? `asked by ${by}` : `by ${by}`,
-    line: `${RECENT_LABEL[key] ?? key} · ${r.reason}`,
+    line: `${RECENT_LABEL[key] ?? key} ${whenText(settled(r), now)} · ${r.reason}`,
+    uptime: ran ? base.uptime : 'Not affected — it never ran',
   });
   return base;
 }
@@ -297,9 +325,9 @@ export function sectionsOf(rows: readonly WindowRow[], v: Viewer, now: Date): Se
   const waiting = of(['waiting']).sort((a, b) => Date.parse(a.row.startsAt) - Date.parse(b.row.startsAt));
   const scheduled = of(['scheduled']).sort((a, b) => Date.parse(a.row.startsAt) - Date.parse(b.row.startsAt));
   const settledAt = (p: PageRow) => Date.parse(p.row.endedAt ?? p.row.cancelledAt ?? p.row.endsAt);
-  const recent = of(['ended', 'cancelled', 'declined', 'withdrawn', 'not_approved', 'didnt_start']).sort(
-    (a, b) => settledAt(b) - settledAt(a),
-  );
+  const recent = of(['ended', 'cancelled', 'declined', 'withdrawn', 'not_approved', 'didnt_start'])
+    .filter((p) => settledAt(p) >= now.getTime() - 30 * DAY * MINUTE)
+    .sort((a, b) => settledAt(b) - settledAt(a));
   const out: Section[] = [];
   if (active.length)
     out.push({
@@ -444,7 +472,7 @@ export function overviewOf(
         detail:
           r.kind === 'mute'
             ? `until ${whenText(end, now)} · ${r.reason} · by ${r.byName ?? 'someone'} · still counted in uptime`
-            : `${formatTime(new Date(r.startsAt))} → ${whenText(end, now)} · ${r.reason} · by ${r.byName ?? 'someone'} · not counted in uptime`,
+            : `${whenText(new Date(r.startsAt), now)} → ${whenText(end, now)} · ${r.reason} · by ${r.byName ?? 'someone'} · not counted in uptime`,
       };
     }),
     waiting: isAdmin ? waiting : 0,

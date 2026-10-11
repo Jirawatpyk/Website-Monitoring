@@ -8,6 +8,7 @@ import { BrandMark } from './brand';
 
 /** Detail pages whose phone board draws a back arrow, and where it leads (D-018). */
 const BACK: { match: RegExp; href: string; label: string }[] = [
+  { match: /^\/maintenance$/, href: '/', label: 'Back to overview' },
   // MobileAck, MIncident → Incidents (S07)
   { match: /^\/incidents\/[^/]+$/, href: '/incidents', label: 'Back to incidents' },
 ];

@@ -67,6 +67,7 @@ export function MaintenanceDialog({
   isAdmin,
   viewerName,
   viewerEmail,
+  fromPage = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -77,13 +78,15 @@ export function MaintenanceDialog({
   isAdmin: boolean;
   viewerName: string;
   viewerEmail: string;
+  /** Opened from /maintenance: the done state needs no "Open Maintenance & mutes". */
+  fromPage?: boolean;
 }) {
   const router = useRouter();
   const [now] = useState(() => new Date());
   const days = useMemo(() => startDays(now), [now]);
   const [site, setSite] = useState(siteId);
   const [kind, setKind] = useState<WindowKind>(initialKind);
-  const [later, setLater] = useState(false);
+  const [later, setLater] = useState(initialKind === 'maintenance');
   const [startDate, setStartDate] = useState(days[1]!.value);
   const [startTime, setStartTime] = useState('22:00');
   const [duration, setDuration] = useState('4 h');
@@ -160,7 +163,7 @@ export function MaintenanceDialog({
           startsAt: p.startsAt,
           endsAt: p.endsAt,
           later: isLater,
-          needsApproval: p.needsApproval,
+          needsApproval: 'waiting' in r && typeof r.waiting === 'boolean' ? r.waiting : p.needsApproval,
           reason,
           viewer: viewerName,
           now: at,
@@ -190,9 +193,11 @@ export function MaintenanceDialog({
             <Button variant="secondary" onClick={onClose}>
               Done
             </Button>
-            <Button variant="primary" icon={<IconCalendar />} href="/maintenance">
-              Open Maintenance &amp; mutes
-            </Button>
+            {!fromPage && (
+              <Button variant="primary" icon={<IconCalendar />} href="/maintenance">
+                Open Maintenance &amp; mutes
+              </Button>
+            )}
           </>
         ) : (
           <>
@@ -250,10 +255,18 @@ export function MaintenanceDialog({
               role="alert"
               title={guardTitle(current)}
               action={
-                <span className="flex flex-wrap items-center gap-2.5">
-                  <Button variant="secondary" size="sm" icon={<IconEyeOff />} onClick={muteInstead}>
-                    Mute instead
-                  </Button>
+                <span className="flex w-full flex-wrap items-center gap-2.5">
+                  <span className="max-md:hidden">
+                    <Button variant="secondary" size="sm" icon={<IconEyeOff />} onClick={muteInstead}>
+                      Mute instead
+                    </Button>
+                  </span>
+                  {/* phones: the only way on, full width (MMaintenance) */}
+                  <span className="w-full md:hidden">
+                    <Button variant="primary" icon={<IconEyeOff />} fullWidth onClick={muteInstead}>
+                      Mute instead
+                    </Button>
+                  </span>
                   {rule && <span className="text-xs text-fg-secondary">{rule.title}</span>}
                 </span>
               }
@@ -335,8 +348,12 @@ export function MaintenanceDialog({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             hint={reasonHint(reason, plan.submit)}
-            error={error ?? undefined}
           />
+          {error && (
+            <Alert tone="danger" role="alert">
+              {error}
+            </Alert>
+          )}
 
           {kind === 'maintenance' && plan.needsApproval && (
             <Alert tone="warning" title="Needs an Admin’s approval">

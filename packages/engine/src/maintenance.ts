@@ -63,6 +63,7 @@ export type WindowProblem =
   | 'reason_required'
   | 'ends_before_start'
   | 'ends_too_soon'
+  | 'needs_approval_now'
   | 'starts_in_past'
   | 'mute_too_long'
   | 'too_long'
@@ -96,6 +97,8 @@ export function checkWindow(d: WindowDraft): { problems: WindowProblem[]; needsA
   if (d.kind === 'maintenance' && start <= d.now.getTime() && d.siteBusy)
     problems.push('maintenance_open_incident');
   const needsApproval = d.kind === 'maintenance' && !d.isAdmin && lengthMin > APPROVAL_OVER_MIN;
+  // It would be "not approved — didn't start" at once: a request needs a start an Admin can come before.
+  if (needsApproval && start <= d.now.getTime()) problems.push('needs_approval_now');
   return { problems, needsApproval };
 }
 
@@ -107,8 +110,8 @@ export interface Span {
 /**
  * The spans a site's windows remove from uptime (spec §5): approved maintenance windows that ran, from
  * their start to their real end. A mute, a window nobody approved, one cancelled before it started and
- * one that started while an incident was open (`openSpans`: each incident from its start to when it
- * was resolved, null while open) remove nothing (D-036).
+ * one that started while an incident hadn't recovered (`openSpans`: each incident from its start to its
+ * recovery, null while still failing) remove nothing (D-036 as amended).
  */
 export function maintenanceSpans(
   windows: readonly MaintenanceWindow[],

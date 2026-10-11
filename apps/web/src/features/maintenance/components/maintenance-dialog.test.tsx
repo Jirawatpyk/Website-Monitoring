@@ -63,6 +63,7 @@ describe('MaintenanceDialog (boards Maintenance, MMaintenance)', () => {
     const user = userEvent.setup();
     dialog();
     const box = screen.getByRole('dialog', { name: 'Schedule maintenance' });
+    await user.click(within(box).getByRole('radio', { name: 'Now' }));
     const alert = within(box).getByRole('alert');
     expect(alert).toHaveTextContent('MuvMi is DOWN now (INC-0142).');
     expect(alert).toHaveTextContent(
@@ -71,7 +72,7 @@ describe('MaintenanceDialog (boards Maintenance, MMaintenance)', () => {
     await user.type(within(box).getByLabelText(/Reason/), 'Hotfix');
     expect(within(box).getByRole('button', { name: 'Start now' })).toBeDisabled();
 
-    await user.click(within(alert).getByRole('button', { name: 'Mute instead' }));
+    await user.click(within(alert).getAllByRole('button', { name: 'Mute instead' })[0]!);
     const mute = screen.getByRole('dialog', { name: 'Mute site' });
     expect(within(mute).getByRole('status')).toHaveTextContent(
       'Mute stops new alerts only — INC-0142 keeps escalating until someone acknowledges.',

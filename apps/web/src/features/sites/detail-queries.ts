@@ -124,7 +124,7 @@ export async function downEpisodesBySite(supabase: DbClient, siteIds: readonly s
 
 /**
  * The spans maintenance removes from each site's uptime since `from` (spec §5, D-036): approved windows
- * that ran — minus any that started while an incident was open, which hide nothing. Most sites have
+ * that ran — minus any that started while an incident hadn't recovered, which hide nothing. Most sites have
  * none, so the incident read only covers sites that do.
  */
 export async function maintenanceSpansBySite(
@@ -148,9 +148,9 @@ export async function maintenanceSpansBySite(
   const earliest = rows.reduce((m, r) => (r.starts_at < m ? r.starts_at : m), rows[0]!.starts_at);
   const { data: incidents, error: incError } = await supabase
     .from('incidents')
-    .select('site_id, started_at, resolved_at')
+    .select('site_id, started_at, recovered_at')
     .in('site_id', withWindows)
-    .or(`resolved_at.is.null,resolved_at.gte.${earliest}`);
+    .or(`recovered_at.is.null,recovered_at.gte.${earliest}`);
   if (incError) throw new Error(`incidents: ${incError.message}`);
   for (const siteId of withWindows) {
     const windows: MaintenanceWindow[] = rows
@@ -165,7 +165,8 @@ export async function maintenanceSpansBySite(
       }));
     const open = (incidents ?? [])
       .filter((i) => i.site_id === siteId)
-      .map((i) => ({ start: new Date(i.started_at), end: i.resolved_at ? new Date(i.resolved_at) : null }));
+      // Failing until it recovered: a window that starts after that (Needs root cause) counts as usual.
+      .map((i) => ({ start: new Date(i.started_at), end: i.recovered_at ? new Date(i.recovered_at) : null }));
     out.set(siteId, maintenanceSpans(windows, open));
   }
   return out;

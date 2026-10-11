@@ -213,7 +213,7 @@ export function nextStep(viewer: OverviewViewer, issue: LiveIssue): NextStep {
   if (reason.kind === 'location') return { kind: 'site', label: 'View checks' };
   // A mute is managed on Maintenance & mutes (§23.8).
   if (reason.kind === 'muted')
-    return { kind: 'maintenance', label: viewer.kind === 'admin' ? 'Manage mute' : 'View mute' };
+    return { kind: 'maintenance', label: canAck(viewer, site) ? 'Manage mute' : 'View mute' };
   if (!inc) return { kind: 'site', label: 'View site' };
   if (reason.kind === 'down' && UNACKED.includes(inc.state) && canAck(viewer, site)) {
     return { kind: 'ack', incidentId: inc.id, number: inc.number };

@@ -124,16 +124,16 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     alerts: 0,
     escalated: 0,
   };
+  // First, before the sites are read: windows that started or ended are logged, and a mute that ran out leaves the site row (D-036).
+  // Never holds the run back: the log and the site row's expiry catch up next run.
+  const logged = await db.rpc('engine_log_windows', { p_now: now.toISOString() });
+  if (logged.error)
+    console.error(JSON.stringify({ event: 'engine_log_windows_failed', error: logged.error.message }));
   const [sites, locations, hours] = await Promise.all([
     loadSites(db, now),
     loadLocations(db, now),
     loadResponseHours(db, now),
   ]);
-  // Windows that started or ended are logged, and a mute that ran out leaves the site row (D-036).
-  // Never holds the run back: the log and the site row's expiry catch up next run.
-  const logged = await db.rpc('engine_log_windows', { p_now: now.toISOString() });
-  if (logged.error)
-    console.error(JSON.stringify({ event: 'engine_log_windows_failed', error: logged.error.message }));
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
     const verifier = await loadVerifierState(db, now, now);
@@ -700,7 +700,9 @@ async function apply(
     (notBefore && notBefore > startedAt ? notBefore : startedAt).toISOString();
   // The first round after a window that can't judge the status (too few locations) still ends
   // "Maintenance" (engine review L1).
-  const status = d.status ?? (site.wasMaintenance ? 'ok' : undefined);
+  const status =
+    d.status ??
+    (site.wasMaintenance ? (d.monitors.some((m) => m.status === 'problem') ? 'problem' : 'ok') : undefined);
   const judged = { p_monitors: monitorsJson(d, site), ...(status ? { p_status: status } : {}) };
   switch (d.kind) {
     case 'none': {

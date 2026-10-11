@@ -147,6 +147,20 @@ describe('checkWindow (§14.5, §15.1, FR-10a, FR-14)', () => {
     expect(r).toEqual({ problems: [], needsApproval });
   });
 
+  it('a Responder’s window over 24 h can’t start now — it needs a start an Admin can approve before', () => {
+    const r = checkWindow({ ...base, kind: 'maintenance', startsAt: NOW, endsAt: new Date(+NOW + 30 * H) });
+    expect(r).toEqual({ problems: ['needs_approval_now'], needsApproval: true });
+    expect(
+      checkWindow({
+        ...base,
+        isAdmin: true,
+        kind: 'maintenance',
+        startsAt: NOW,
+        endsAt: new Date(+NOW + 30 * H),
+      }).problems,
+    ).toEqual([]);
+  });
+
   it('the end must be after the start; a start in the past is refused; 31 days at most', () => {
     expect(checkWindow({ ...base, kind: 'maintenance', startsAt: NOW, endsAt: NOW }).problems).toEqual([
       'ends_before_start',

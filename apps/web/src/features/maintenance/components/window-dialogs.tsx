@@ -29,7 +29,17 @@ const hintFor = (reason: string) => (reason.trim() ? HINT : `Required — type a
 
 type Result = { ok: true } | { ok: false; message: string };
 
-/** Runs an action, refreshes the page and closes; a refusal stays on the dialog's reason field. */
+interface DialogProps {
+  p: PageRow;
+  now: Date;
+  open: boolean;
+  /** Back / Keep it / Close: to the phone sheet it came from, or closed. */
+  onClose: () => void;
+  /** After the action went through (the page refreshes). Defaults to onClose. */
+  onDone?: () => void;
+}
+
+/** Runs an action, refreshes the page and closes; a refusal shows as the dialog's alert (not a field error). */
 function useSubmit(onDone: () => void) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +58,14 @@ function useSubmit(onDone: () => void) {
   return { error, pending, run };
 }
 
+function Refusal({ error }: { error: string | null }) {
+  return error ? (
+    <Alert tone="danger" role="alert">
+      {error}
+    </Alert>
+  ) : null;
+}
+
 /** End now (board MaintenancePage): its effects, a required reason, "End mute now" / "End maintenance now". */
 export function EndDialog({
   p,
@@ -55,17 +73,11 @@ export function EndDialog({
   now,
   open,
   onClose,
-}: {
-  p: PageRow;
-  viewer: string;
-  now: Date;
-  open: boolean;
-  onClose: () => void;
-}) {
+  onDone = onClose,
+}: DialogProps & { viewer: string }) {
   const [reason, setReason] = useState('');
-  const { error, pending, run } = useSubmit(onClose);
+  const { error, pending, run } = useSubmit(onDone);
   const r = p.row;
-  const cta = r.kind === 'mute' ? 'End mute now' : 'End maintenance now';
   return (
     <Dialog
       open={open}
@@ -85,7 +97,7 @@ export function EndDialog({
             loading={pending}
             onClick={() => run(() => endWindowEarly({ windowId: r.id, reason }))}
           >
-            {cta}
+            {r.kind === 'mute' ? 'End mute now' : 'End maintenance now'}
           </Button>
         </>
       }
@@ -104,8 +116,8 @@ export function EndDialog({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           hint={hintFor(reason)}
-          error={error ?? undefined}
         />
+        <Refusal error={error} />
       </div>
     </Dialog>
   );
@@ -113,7 +125,7 @@ export function EndDialog({
 
 /**
  * Edit end (running), Edit / cancel (scheduled), Edit / withdraw (a request) — one dialog: a new end and a
- * reason, or the cancel / withdraw step (§23.5).
+ * reason, or the cancel / withdraw step (§23.5). On phones the cancel step has its own full-width row.
  */
 export function EditDialog({
   p,
@@ -121,20 +133,15 @@ export function EditDialog({
   now,
   open,
   onClose,
-}: {
-  p: PageRow;
-  viewer: string;
-  now: Date;
-  open: boolean;
-  onClose: () => void;
-}) {
+  onDone = onClose,
+}: DialogProps & { viewer: string }) {
   const r = p.row;
   const choices = endChoices(r, now);
   const current = choices.find((c) => c.label.endsWith('(current)'))?.value ?? r.endsAt;
   const [end, setEnd] = useState(current);
   const [reason, setReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
-  const { error, pending, run } = useSubmit(onClose);
+  const { error, pending, run } = useSubmit(onDone);
   const running = p.state === 'active';
   const request = p.state === 'waiting';
   const cancelWord = request ? 'Withdraw request' : 'Cancel maintenance';
@@ -151,6 +158,11 @@ export function EditDialog({
           : cancelWindow({ windowId: r.id, reason })
         : editWindowEnd({ windowId: r.id, endsAt: end, reason }),
     );
+  const cancelButton = (fullWidth: boolean) => (
+    <Button variant="ghost" icon={<IconTrash2 />} fullWidth={fullWidth} onClick={() => setCancelling(true)}>
+      {`${cancelWord}…`}
+    </Button>
+  );
   return (
     <Dialog
       open={open}
@@ -161,11 +173,7 @@ export function EditDialog({
       description={dialogDescription(r, now)}
       footer={
         <span className="flex w-full flex-wrap items-center gap-3">
-          {!cancelling && !running && (
-            <Button variant="ghost" icon={<IconTrash2 />} onClick={() => setCancelling(true)}>
-              {`${cancelWord}…`}
-            </Button>
-          )}
+          {!cancelling && !running && <span className="max-md:hidden">{cancelButton(false)}</span>}
           <span className="grow" />
           <Button variant="secondary" onClick={() => (cancelling ? setCancelling(false) : onClose())}>
             {cancelling ? 'Back' : 'Close'}
@@ -199,13 +207,14 @@ export function EditDialog({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           hint={hintFor(reason)}
-          error={error ?? undefined}
         />
+        {!cancelling && !running && <span className="md:hidden">{cancelButton(true)}</span>}
         {cancelling && (
           <Alert tone="warning" role="alert" title={`${cancelWord}?`}>
             {cancelText(p.state, viewer)}
           </Alert>
         )}
+        <Refusal error={error} />
       </div>
     </Dialog>
   );
@@ -218,14 +227,9 @@ export function ApproveDialog({
   now,
   open,
   onClose,
-}: {
-  p: PageRow;
-  viewer: string;
-  now: Date;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { error, pending, run } = useSubmit(onClose);
+  onDone = onClose,
+}: DialogProps & { viewer: string }) {
+  const { error, pending, run } = useSubmit(onDone);
   const r = p.row;
   return (
     <Dialog
@@ -244,7 +248,8 @@ export function ApproveDialog({
             variant="primary"
             icon={<IconCheck />}
             loading={pending}
-            onClick={() => run(() => approveMaintenance({ windowId: r.id }))}
+            // The end the Admin is looking at: a request changed meanwhile is refused (security review M2).
+            onClick={() => run(() => approveMaintenance({ windowId: r.id, endsAt: r.endsAt }))}
           >
             Approve
           </Button>
@@ -257,30 +262,16 @@ export function ApproveDialog({
             <li key={t}>{t}</li>
           ))}
         </ul>
-        {error && (
-          <Alert tone="danger" role="alert">
-            {error}
-          </Alert>
-        )}
+        <Refusal error={error} />
       </div>
     </Dialog>
   );
 }
 
 /** Decline a request with a reason (Admin) → Recent "Declined". */
-export function DeclineDialog({
-  p,
-  now,
-  open,
-  onClose,
-}: {
-  p: PageRow;
-  now: Date;
-  open: boolean;
-  onClose: () => void;
-}) {
+export function DeclineDialog({ p, now, open, onClose, onDone = onClose }: DialogProps) {
   const [reason, setReason] = useState('');
-  const { error, pending, run } = useSubmit(onClose);
+  const { error, pending, run } = useSubmit(onDone);
   const r = p.row;
   return (
     <Dialog
@@ -306,16 +297,18 @@ export function DeclineDialog({
         </>
       }
     >
-      <TextField
-        touchHeight
-        label="Reason"
-        required
-        placeholder="e.g. Split it into two nights"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        hint="Required. The request moves to Recent as Declined."
-        error={error ?? undefined}
-      />
+      <div className="flex flex-col gap-4">
+        <TextField
+          touchHeight
+          label="Reason"
+          required
+          placeholder="e.g. Split it into two nights"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          hint="Required. The request moves to Recent as Declined."
+        />
+        <Refusal error={error} />
+      </div>
     </Dialog>
   );
 }

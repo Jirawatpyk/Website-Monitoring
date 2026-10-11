@@ -75,9 +75,13 @@ export function bangkokInstant(date: string, time: string): Date {
 
 /** The open incident or DOWN status that blocks maintenance now (§14.5); null when the site is free. */
 export function busyOf(site: Pick<PausableSite, 'status' | 'openIncident'>): string | null {
-  if (site.openIncident) return formatIncidentId(site.openIncident.number);
+  // An incident back up (Monitoring / Needs root cause) doesn't block (D-036 as amended).
+  if (site.openIncident && NOT_RECOVERED.includes(site.openIncident.state))
+    return formatIncidentId(site.openIncident.number);
   return site.status === 'down' ? 'down' : null;
 }
+
+const NOT_RECOVERED: readonly string[] = ['unacked', 'escalated', 'acknowledged'];
 
 /** Still waiting for an acknowledgement: its ladder runs (D-034). */
 export const escalating = (i: IncidentLinkData | null) => i?.state === 'unacked' || i?.state === 'escalated';
@@ -199,7 +203,8 @@ export const PROBLEM_WORDS: Record<
   | 'in_maintenance'
   | 'decline_instead'
   | 'end_instead'
-  | 'withdraw_instead',
+  | 'withdraw_instead'
+  | 'changed',
   string
 > = {
   ends_too_soon: 'The end must be at least 5 min from now.',
@@ -216,7 +221,9 @@ export const PROBLEM_WORDS: Record<
   maintenance_open_incident:
     'A window started now won’t hide this incident — mute instead, or schedule it for later.',
   overlap: 'Another window on this site overlaps that time.',
-  already_muted: 'This site is already muted — end or edit that mute from Overview › Maintenance & mutes.',
+  already_muted: 'This site is already muted — end or edit that mute on Maintenance & mutes.',
+  needs_approval_now: 'Over 24 h needs an Admin’s approval first — pick a later start.',
+  changed: 'The request changed since you opened it — reload and check it again.',
   needs_admin: 'Over 24 h needs an Admin — ask one to extend it.',
   not_active: 'It isn’t running — cancel it instead.',
   not_open: 'It has already ended.',
@@ -241,7 +248,7 @@ export function doneOf(p: {
   viewer: string;
   now: Date;
 }): { title: string; text: string } {
-  const why = ` Reason: “${p.reason.trim()}”. End early, edit or cancel it on Maintenance & mutes (sidebar › Maintenance).`;
+  const why = ` Reason: “${p.reason.trim()}”. End early, edit or cancel it on Maintenance & mutes.`;
   const span = `${whenText(p.startsAt, p.now)} → ${whenText(p.endsAt, p.now)}`;
   if (p.kind === 'mute') {
     const inc = p.site.openIncident;

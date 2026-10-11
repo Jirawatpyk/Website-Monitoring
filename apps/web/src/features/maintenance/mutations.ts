@@ -15,10 +15,10 @@ import {
 } from './schemas';
 
 export interface MaintenanceDeps {
-  db: Pick<ServerClient, 'rpc'>;
+  db: Pick<ServerClient, 'rpc' | 'from'>;
 }
 
-export type WindowResult = { ok: true; id?: string } | { ok: false; message: string };
+export type WindowResult = { ok: true; id?: string; waiting?: boolean } | { ok: false; message: string };
 
 const FAILED = 'Couldn’t save. Check your connection and try again.';
 const NOT_ALLOWED = 'Only an Admin, or the site’s owner or backup, can do that.';
@@ -65,7 +65,14 @@ export async function createMaintenance(
     p_ends_at: p.data.endsAt,
     p_reason: p.data.reason,
   });
-  return error ? refusal(error) : { ok: true, id: data ?? undefined };
+  if (error) return refusal(error);
+  // Whether it waits for an Admin: back to back with its neighbours it can, where the draft alone didn't.
+  const { data: row } = await db
+    .from('maintenance_windows')
+    .select('approved_at')
+    .eq('id', data)
+    .maybeSingle();
+  return { ok: true, id: data ?? undefined, waiting: row ? !row.approved_at : undefined };
 }
 
 export async function muteSite(input: MuteSiteInput, { db }: MaintenanceDeps): Promise<WindowResult> {
@@ -144,6 +151,9 @@ export async function approveMaintenance(
 ): Promise<WindowResult> {
   const p = approveSchema.safeParse(input);
   if (!p.success) return first(p.error.issues);
-  const { error } = await db.rpc('approve_maintenance', { p_window_id: p.data.windowId });
+  const { error } = await db.rpc('approve_maintenance', {
+    p_window_id: p.data.windowId,
+    p_ends_at: p.data.endsAt,
+  });
   return error ? refusal(error, 'Only an Admin can approve maintenance.') : { ok: true };
 }

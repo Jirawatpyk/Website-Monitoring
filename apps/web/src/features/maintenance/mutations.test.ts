@@ -8,7 +8,10 @@ const db = (result: {
   error?: { code?: string; hint?: string | null; message: string } | null;
 }) => {
   const rpc = vi.fn(async () => ({ data: result.data ?? null, error: result.error ?? null }));
-  return { db: { rpc } as never, rpc };
+  // create_maintenance reads back whether the window waits for an Admin.
+  const row = { maybeSingle: async () => ({ data: { approved_at: null }, error: null }) };
+  const from = () => ({ select: () => ({ eq: () => row }) });
+  return { db: { rpc, from } as never, rpc };
 };
 const at = '2026-09-25T07:07:00.000Z';
 
@@ -22,7 +25,7 @@ describe('maintenance mutations (D-036)', () => {
       { p_site_id: SITE, p_reason: 'x' },
     ]);
     for (const [run, name, args] of cases) {
-      expect(await run()).toEqual({ ok: true, id: WIN });
+      expect(await run()).toEqual({ ok: true, id: WIN, waiting: true });
       expect(a.rpc).toHaveBeenCalledWith(name, expect.objectContaining(args));
     }
     const b = db({});
@@ -30,7 +33,7 @@ describe('maintenance mutations (D-036)', () => {
     await m.endWindowEarly({ windowId: WIN, reason: 'done' }, b);
     await m.editWindowEnd({ windowId: WIN, endsAt: at, reason: 'later' }, b);
     await m.cancelWindow({ windowId: WIN, reason: 'off' }, b);
-    await m.approveMaintenance({ windowId: WIN }, b);
+    await m.approveMaintenance({ windowId: WIN, endsAt: at }, b);
     expect(b.rpc.mock.calls.map((c) => (c as unknown as [string])[0])).toEqual([
       'mute_site',
       'end_window_early',
@@ -57,7 +60,10 @@ describe('maintenance mutations (D-036)', () => {
       await m.cancelWindow({ windowId: WIN, reason: 'x' }, db({ error: { code: '42501', message: '' } })),
     ).toEqual({ ok: false, message: 'Only an Admin, or the site’s owner or backup, can do that.' });
     expect(
-      await m.approveMaintenance({ windowId: WIN }, db({ error: { code: '42501', message: '' } })),
+      await m.approveMaintenance(
+        { windowId: WIN, endsAt: at },
+        db({ error: { code: '42501', message: '' } }),
+      ),
     ).toEqual({
       ok: false,
       message: 'Only an Admin can approve maintenance.',

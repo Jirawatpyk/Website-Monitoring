@@ -19,8 +19,8 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
        reason, end_reason, outcome, outcome_detail, log,
        creator:profiles!maintenance_windows_created_by_fkey(display_name),
        sites!inner(name, tier, primary_owner_id, backup_owner_id, muted_until,
-                   owner:profiles!sites_primary_owner_id_fkey(display_name),
-                   backup:profiles!sites_backup_owner_id_fkey(display_name),
+                   owner:profiles!sites_primary_owner_id_fkey(display_name, role),
+                   backup:profiles!sites_backup_owner_id_fkey(display_name, role),
                    site_status(status))`,
     )
     .or(`ends_at.gte.${since},cancelled_at.gte.${since}`)
@@ -51,6 +51,8 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
       ownerName: w.sites.owner?.display_name ?? null,
       backupName: w.sites.backup?.display_name ?? null,
       ownerIds: [w.sites.primary_owner_id, w.sites.backup_owner_id].filter((x): x is string => !!x),
+      ownerIsAdmin: w.sites.owner?.role === 'admin',
+      backupIsAdmin: w.sites.backup?.role === 'admin',
       log: (Array.isArray(w.log) ? w.log : []) as unknown as LogEntry[],
     };
   });
@@ -67,7 +69,7 @@ export async function loadPausableSites(db: DbClient): Promise<(PausableSite & {
        incidents(id, number, state, escalation_level, detected_at, acker:profiles!incidents_acked_by_fkey(display_name))`,
     )
     .eq('is_active', true)
-    .not('incidents.state', 'in', '(resolved,in_review,closed)')
+    .in('incidents.state', ['unacked', 'escalated', 'acknowledged'])
     .order('name');
   if (error) throw new Error(`sites: ${error.message}`);
   return (data ?? []).map((s) => {

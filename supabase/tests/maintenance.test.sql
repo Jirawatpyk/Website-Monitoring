@@ -3,7 +3,7 @@
 -- engine's window log, T09 (a mute never stops an open incident's ladder) and the late alert after a mute.
 begin;
 \ir _helpers.psql
-select plan(83);
+select plan(94);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -135,16 +135,16 @@ reset role;
 select is(public.window_state(w), 'waiting', 'a Responder''s 30 h window waits for approval')
   from public.maintenance_windows w where w.id = (select id from win where name = 'long');
 select tests.authenticate_as((select id from ids where name = 'arm'));
-select throws_ok(format('select public.approve_maintenance(%L)', (select id from win where name = 'long')),
+select throws_ok(format('select public.approve_maintenance(%L, (select ends_at from public.maintenance_windows where id = %1$L))', (select id from win where name = 'long')),
   '42501', null, 'a Responder can''t approve');
 select throws_like($$ select public.create_maintenance('00000000-0000-0000-0000-0000000000a1',
   now() + interval '2 days 1 hour', now() + interval '2 days 3 hours', 'overlap') $$,
   '%overlaps%', 'windows on one site don''t overlap');
 reset role;
 select tests.authenticate_as((select id from ids where name = 'tao'));
-select lives_ok(format('select public.approve_maintenance(%L)', (select id from win where name = 'long')),
+select lives_ok(format('select public.approve_maintenance(%L, (select ends_at from public.maintenance_windows where id = %1$L))', (select id from win where name = 'long')),
   'an Admin approves it');
-select throws_like(format('select public.approve_maintenance(%L)', (select id from win where name = 'long')),
+select throws_like(format('select public.approve_maintenance(%L, (select ends_at from public.maintenance_windows where id = %1$L))', (select id from win where name = 'long')),
   '%isn''t waiting%', 'once');
 insert into win values ('admin_long', public.create_maintenance('00000000-0000-0000-0000-0000000000b1',
   now() + interval '1 hour', now() + interval '3 days', 'Server replacement'));
@@ -153,7 +153,8 @@ select is(public.window_state(w), 'scheduled', 'the approved window is scheduled
   from public.maintenance_windows w where w.id = (select id from win where name = 'long');
 select is(public.window_state(w), 'scheduled', 'an Admin''s own 3-day window needs no approval')
   from public.maintenance_windows w where w.id = (select id from win where name = 'admin_long');
-select is((select count(*)::int from public.audit_log where action = 'maintenance.approve'), 1,
+select is((select count(*)::int from public.audit_log where action = 'maintenance.approve'
+            and entity_id = (select id from win where name = 'long')), 1,
   'the approval is logged');
 
 -- Unapproved by its start → it never starts.
@@ -359,10 +360,12 @@ select lives_ok($$ select public.create_maintenance('00000000-0000-0000-0000-000
 reset role;
 
 -- A scheduled window whose start comes while the site is DOWN doesn't start (§23.10).
+insert into public.sites (id, client_id, name, tier, primary_owner_id) values
+  ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c1', 'Site G', 2, (select id from ids where name = 'arm'));
 insert into public.maintenance_windows (id, site_id, kind, starts_at, ends_at, reason, approved_at)
-values ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000b1', 'maintenance',
+values ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000f2', 'maintenance',
         now() - interval '1 minute', now() + interval '2 hours', 'Planned', now() - interval '1 day');
-insert into inc values ('b2', public.engine_open_incident('00000000-0000-0000-0000-0000000000b1', null,
+insert into inc values ('g', public.engine_open_incident('00000000-0000-0000-0000-0000000000f2', null,
   'hard_fail', 'down', now() - interval '3 minutes', now() - interval '2 minutes', now(), '{}', true));
 set local role service_role;
 select public.engine_log_windows(now());
@@ -371,6 +374,87 @@ select is(public.window_state(w), 'didnt_start', 'the window didn''t start — t
   from public.maintenance_windows w where w.id = '00000000-0000-0000-0000-0000000000e2';
 select alike((select outcome_detail from public.maintenance_windows where id = '00000000-0000-0000-0000-0000000000e2'),
   'INC-%', 'it names the incident');
+
+-- ── Review round 2 ───────────────────────────────────────────────────────
+-- Security M1: a short bridge between two long windows still chains them — the third waits.
+insert into public.sites (id, client_id, name, tier, primary_owner_id, backup_owner_id) values
+  ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000c1', 'Site H', 2,
+   (select id from ids where name = 'arm'), null);
+select tests.authenticate_as((select id from ids where name = 'arm'));
+insert into win values ('h1', public.create_maintenance('00000000-0000-0000-0000-0000000000f3',
+  now() + interval '20 days', now() + interval '20 days 22 hours', 'A'));
+insert into win values ('h2', public.create_maintenance('00000000-0000-0000-0000-0000000000f3',
+  now() + interval '20 days 22 hours', now() + interval '21 days', 'B'));
+insert into win values ('h3', public.create_maintenance('00000000-0000-0000-0000-0000000000f3',
+  now() + interval '21 days', now() + interval '21 days 22 hours', 'C'));
+select throws_like($$ select public.create_maintenance('00000000-0000-0000-0000-0000000000f3',
+  now(), now() + interval '30 hours', 'now and long') $$, '%later start%',
+  'a Responder''s window over 24 h can''t start now');
+reset role;
+select is(public.window_state(w), 'waiting', 'the window after a bridge still waits for an Admin')
+  from public.maintenance_windows w where w.id = (select id from win where name = 'h3');
+
+-- Security M2: the Admin approves the request they saw.
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_like(format('select public.approve_maintenance(%L, now())', (select id from win where name = 'h3')),
+  '%changed%', 'a request changed since the Admin looked is refused');
+reset role;
+
+-- Security L1 / L4: only the asker or the site's owner / backup withdraws; nobody but an Admin declines.
+select tests.authenticate_as((select id from ids where name = 'nok'));
+select throws_ok(format('select public.withdraw_request(%L, ''x'')', (select id from win where name = 'h3')),
+  '42501', null, 'a Responder of another site can''t withdraw it');
+select throws_ok(format('select public.decline_maintenance(%L, ''x'')', (select id from win where name = 'h3')),
+  '42501', null, 'a Responder can''t decline');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'mint'));
+select throws_ok(format('select public.withdraw_request(%L, ''x'')', (select id from win where name = 'h3')),
+  '42501', null, 'a Viewer can''t withdraw');
+reset role;
+
+-- Engine review: a Responder may shorten an approved window (only lengthening past 24 h needs an Admin).
+select tests.authenticate_as((select id from ids where name = 'tao'));
+insert into win values ('h4', public.create_maintenance('00000000-0000-0000-0000-0000000000f3',
+  now() + interval '25 days', now() + interval '28 days', 'Long, Admin''s own'));
+reset role;
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok(format('select public.edit_window_end(%L, now() + interval ''27 days'', ''shorter'')', (select id from win where name = 'h4')),
+  'the owner shortens an approved 3-day window');
+reset role;
+
+-- Engine review L-J: the scheduled start goes ahead on a site whose incident only needs its root cause,
+-- and ends a running mute there.
+insert into public.sites (id, client_id, name, tier, primary_owner_id) values
+  ('00000000-0000-0000-0000-0000000000f4', '00000000-0000-0000-0000-0000000000c1', 'Site J', 2, (select id from ids where name = 'arm'));
+insert into inc values ('j', public.engine_open_incident('00000000-0000-0000-0000-0000000000f4', null,
+  'hard_fail', 'down', now() - interval '3 hours', now() - interval '3 hours', now(), '{}', true));
+update public.incidents set state = 'needs_root_cause' where id = (select id from inc where name = 'j');
+update public.site_status set status = 'ok' where site_id = '00000000-0000-0000-0000-0000000000f4';
+select tests.authenticate_as((select id from ids where name = 'arm'));
+insert into win values ('mute_j', public.mute_site('00000000-0000-0000-0000-0000000000f4', now() + interval '3 hours', 'Noisy'));
+reset role;
+insert into public.maintenance_windows (id, site_id, kind, starts_at, ends_at, reason, approved_at)
+values ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000f4', 'maintenance',
+        now() - interval '1 minute', now() + interval '1 hour', 'Night work', now() - interval '1 day');
+set local role service_role;
+select public.engine_log_windows(now());
+reset role;
+select is(public.window_state(w), 'active', 'a scheduled window starts on a site whose incident only needs its root cause')
+  from public.maintenance_windows w where w.id = '00000000-0000-0000-0000-0000000000e3';
+select is(public.window_state(w), 'ended', 'and the running mute there ends')
+  from public.maintenance_windows w where w.id = (select id from win where name = 'mute_j');
+
+-- Engine review M-A: a PROBLEM AGAIN held back by a mute on an incident that already alerted DOWN
+-- isn't a silent incident — no new card, the ladder keeps its clock.
+select is((select count(*)::int from public.engine_silent_incidents(now())
+           where incident_id = (select id from inc where name = 'j')), 0,
+  'an incident that alerted DOWN is never "silent"');
+
+-- Engine review L-J: a reminder due before the late alert doesn't go.
+set local role service_role;
+select ok(not public.engine_remind((select id from inc where name = 'a'), now() - interval '1 minute', '{}'),
+  'a reminder due before the late alert doesn''t go');
+reset role;
 
 select * from finish();
 rollback;

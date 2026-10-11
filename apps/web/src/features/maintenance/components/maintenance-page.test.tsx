@@ -102,7 +102,9 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
         name: 'Approve',
       }),
     );
-    await waitFor(() => expect(actions.approveMaintenance).toHaveBeenCalledWith({ windowId: 'w3' }));
+    await waitFor(() =>
+      expect(actions.approveMaintenance).toHaveBeenCalledWith({ windowId: 'w3', endsAt: request.endsAt }),
+    );
   });
 
   it('Decline and End now need a reason', async () => {
@@ -147,7 +149,7 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
       })[0]!,
     );
     const edit = await screen.findByRole('dialog', { name: /Edit or withdraw/ });
-    await user.click(within(edit).getByRole('button', { name: 'Withdraw request…' }));
+    await user.click(within(edit).getAllByRole('button', { name: 'Withdraw request…' })[0]!);
     await user.type(within(edit).getByLabelText(/Reason for the change/), 'Not needed');
     await user.click(within(edit).getByRole('button', { name: 'Withdraw request' }));
     await waitFor(() =>
@@ -171,6 +173,17 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
     view('admin', []);
     expect(screen.getByText('Nothing active or scheduled')).toBeInTheDocument();
     expect(screen.getByText('Nothing active, scheduled or waiting')).toBeInTheDocument();
+  });
+
+  it('from the phone sheet, Keep it goes back to the sheet (MMaintenanceList Back)', async () => {
+    const user = userEvent.setup();
+    view('admin');
+    await user.click(screen.getByRole('button', { name: /WeCare Studio, Maintenance/ }));
+    const sheet = await screen.findByRole('dialog', { name: 'WeCare Studio' });
+    await user.click(within(sheet).getByRole('button', { name: 'End maintenance now' }));
+    const end = await screen.findByRole('dialog', { name: 'End WeCare Studio maintenance now?' });
+    await user.click(within(end).getByRole('button', { name: 'Keep it' }));
+    expect(await screen.findByRole('dialog', { name: 'WeCare Studio' })).toBeInTheDocument();
   });
 
   it('a phone row opens its sheet with the facts and the allowed actions', async () => {

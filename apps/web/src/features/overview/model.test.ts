@@ -255,7 +255,7 @@ describe('Next step by role (§21.4, §21.8, D-016, D-031, D-032)', () => {
     ['a Viewer can only open it', mint, orca, 'Open INC-0139'],
     ['a location warning → View checks', mint, eneos, 'View checks'],
     ['a mute → Manage mute (Admin), on Maintenance & mutes (§23.8)', tao, games, 'Manage mute'],
-    ['a mute → View mute for everyone else', arm, games, 'View mute'],
+    ['a mute → View mute for everyone who can’t change it', mint, games, 'View mute'],
   ])('%s', (_name, v, s, expected) => {
     expect(step(v, s)).toBe(expected);
   });

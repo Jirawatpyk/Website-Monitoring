@@ -28,5 +28,6 @@ export type WindowReasonInput = z.infer<typeof windowReasonSchema>;
 export const editWindowSchema = z.object({ windowId: z.uuid(), endsAt: instant, reason });
 export type EditWindowInput = z.infer<typeof editWindowSchema>;
 
-export const approveSchema = z.object({ windowId: z.uuid() });
+/** `endsAt` = the end the Admin saw: a request changed meanwhile is refused (security review M2). */
+export const approveSchema = z.object({ windowId: z.uuid(), endsAt: instant });
 export type ApproveInput = z.infer<typeof approveSchema>;
