@@ -3,7 +3,7 @@
 -- engine's window log, T09 (a mute never stops an open incident's ladder) and the late alert after a mute.
 begin;
 \ir _helpers.psql
-select plan(94);
+select plan(95);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -158,7 +158,8 @@ select is((select count(*)::int from public.audit_log where action = 'maintenanc
   'the approval is logged');
 
 -- Unapproved by its start → it never starts.
-update public.maintenance_windows set approved_at = null, approved_by = null
+-- (its approval's 10 s Undo long over, S09b)
+update public.maintenance_windows set approved_at = null, approved_by = null, undo_until = null
   where id = (select id from win where name = 'long');
 select is(public.window_state(w, now() + interval '3 days'), 'not_approved',
   'a window nobody approved before its start doesn''t start')
@@ -249,7 +250,10 @@ select tests.authenticate_as((select id from ids where name = 'arm'));
 select public.end_window_early((select id from win where name = 'mute_a2'), 'Done');
 reset role;
 set local role service_role;
+-- S09b (§24.8): a mute a person ended waits out its 10 s Undo before its incident posts.
 select is((select count(*)::int from public.engine_silent_incidents(now())
+           where incident_id = (select id from inc where name = 'a')), 0, 'mute ended: not listed inside its Undo');
+select is((select count(*)::int from public.engine_silent_incidents(now() + interval '11 seconds')
            where incident_id = (select id from inc where name = 'a')), 1, 'mute over: the silent incident is listed');
 select ok(public.engine_post_late_alert((select id from inc where name = 'a'), now()), 'its first alert posts');
 select ok(not public.engine_post_late_alert((select id from inc where name = 'a'), now()), 'once');
