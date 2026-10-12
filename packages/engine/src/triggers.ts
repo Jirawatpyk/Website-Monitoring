@@ -207,12 +207,14 @@ export interface TimedCheck {
 }
 
 /**
- * Per probe minute, the locations whose response times say more about the probe than the sites:
- * slow (over each site's own limit) on more than half of the 3+ sites it timed that minute, while
- * another location timed 3+ sites that minute and was slow on at most half. Their times that minute
- * are no evidence for the slow rule — on a site behind a WAF, the Bangkok VPS's own network slowing
- * down made every one-location round slow (production, 12 Oct 2026). Everyone slow everywhere is
- * left alone: the sites may really be slow.
+ * Per probe minute, the location whose response times say more about the probe than the sites: the
+ * only one slow (over each site's own limit) on more than half of the 3+ sites it timed that minute,
+ * and — on the 3+ sites another location also timed (the same sites, so a site only it can reach
+ * behind a WAF accuses nobody) — slow on more than half where that other location was slow on at
+ * most half. Its times that minute are no evidence for the slow rule — on a site behind a WAF, the
+ * Bangkok VPS's own network slowing down made every one-location round slow (production, 12 Oct
+ * 2026). Two locations slow, or everyone, is left alone: the sites may really be slow (the sole
+ * outlier, as spec §15.3's faulty location).
  */
 export function slowLocationsByMinute(checks: readonly TimedCheck[]): Map<number, Set<ProbeLocation>> {
   const tally = new Map<number, Map<ProbeLocation, Map<string, boolean>>>();
@@ -226,10 +228,22 @@ export function slowLocationsByMinute(checks: readonly TimedCheck[]): Map<number
   const out = new Map<number, Set<ProbeLocation>>();
   for (const [minute, locs] of tally) {
     const judged = [...locs].filter(([, sites]) => sites.size >= FAULTY_MIN_SITES);
-    const slowAt = (sites: Map<string, boolean>) =>
-      [...sites.values()].filter(Boolean).length * 2 > sites.size;
-    const slow = judged.filter(([, sites]) => slowAt(sites)).map(([l]) => l);
-    if (slow.length && slow.length < judged.length) out.set(minute, new Set(slow));
+    const overHalf = (slow: number, of: number) => slow * 2 > of;
+    const slowOn = (sites: Map<string, boolean>, ids: readonly string[]) =>
+      ids.filter((id) => sites.get(id)).length;
+    const slow = judged.filter(([, sites]) => overHalf(slowOn(sites, [...sites.keys()]), sites.size));
+    if (slow.length !== 1) continue;
+    const [loc, sites] = slow[0]!;
+    const outlier = judged.some(([other, theirs]) => {
+      if (other === loc) return false;
+      const shared = [...sites.keys()].filter((id) => theirs.has(id));
+      return (
+        shared.length >= FAULTY_MIN_SITES &&
+        overHalf(slowOn(sites, shared), shared.length) &&
+        !overHalf(slowOn(theirs, shared), shared.length)
+      );
+    });
+    if (outlier) out.set(minute, new Set([loc]));
   }
   return out;
 }

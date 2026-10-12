@@ -233,6 +233,37 @@ describe('slow location (D-039): one location slow on most sites in a minute tim
     for (const m of minutes) expect(out.get(m)).toEqual(new Set(['BKK']));
   });
 
+  const timed = (siteId: string, location: ProbeLocation, responseMs: number) => ({
+    siteId,
+    location,
+    outcome: 'pass' as CheckOutcome,
+    checkedAt: at(1),
+    responseMs,
+    slowThresholdMs: 3000,
+  });
+
+  it('only the sites both timed are compared: slow only where SIN can’t reach (behind a WAF) accuses nobody', () => {
+    const waf = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'].map((id) => timed(id, 'BKK', 4000));
+    const open = ['o1', 'o2', 'o3', 'o4', 'o5'].flatMap((id) => [
+      timed(id, 'BKK', 900),
+      timed(id, 'SIN', 600),
+    ]);
+    expect(slowLocationsByMinute([...waf, ...open]).size).toBe(0);
+  });
+
+  it('two locations slow is left alone — the sole outlier only, as spec §15.3', () => {
+    const checks = ['a', 'b', 'c', 'd'].flatMap((id) => [
+      timed(id, 'BKK', 4000),
+      timed(id, 'TYO', 4000),
+      timed(id, 'SIN', 600),
+    ]);
+    expect(slowLocationsByMinute(checks).size).toBe(0);
+  });
+
+  it('exactly half is not over half (a tie never flags)', () => {
+    expect(slowLocationsByMinute(rows(5, 10)).size).toBe(0);
+  });
+
   it('each site is held to its own limit; failed checks don’t count', () => {
     const own = rows(10, 10).map((c) => (c.location === 'BKK' ? { ...c, slowThresholdMs: 5000 } : c));
     expect(slowLocationsByMinute(own).size).toBe(0);

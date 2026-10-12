@@ -746,6 +746,12 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         next,
       };
     }
+    // D-039 (engine review H1): a slow PROBLEM whose only evidence this round was left out isn't over —
+    // no evidence, so its state holds, as the streak does; otherwise it would recover (and auto-resolve).
+    const slowOpen = m.carry.status === 'problem' && m.carry.slowRounds >= SLOW_ROUNDS;
+    if (slowOpen && p50 === null && timed.length < counted.length) {
+      return { verdict: { kind: 'insufficient' }, next };
+    }
     // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
     const note =
       m.isPrimary && wafBlocked.length

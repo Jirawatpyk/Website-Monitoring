@@ -343,6 +343,30 @@ describe('D-027 — sites behind a WAF (decideSite)', () => {
     expect(d.kind !== 'wait' && d.kind !== 'verify' && d.monitors[0]).toMatchObject({ slowRounds: 2 });
   });
 
+  it('D-039: an open slow PROBLEM holds while BKK times itself — no RECOVERED, no auto-resolve (engine review H1)', () => {
+    const slowCarry = { ...NEW_MONITOR, status: 'problem' as const, trigger: 'slow' as const, slowRounds: 4 };
+    const open = {
+      id: 'inc-10',
+      state: 'unacked' as const,
+      severity: 'problem' as const,
+      hasRootCause: false,
+      episodeSeverity: 'problem' as const,
+      acked: false,
+      startedAt: at(-240),
+      detectedAt: at(-120),
+    };
+    const rows = [check('BKK', 'pass', 1, { responseMs: 6_200 }), ...akamaiAbroad()];
+    const slowBkk = new Map([[minuteOf(at(1)), new Set<ProbeLocation>(['BKK'])]]);
+    const held = decideSite(site([home(rows, { carry: slowCarry })], { open, slowLocations: slowBkk }));
+    expect(held.kind).not.toBe('recover');
+    expect(held.kind !== 'wait' && held.kind !== 'verify' && held.monitors[0]).toMatchObject({
+      slowRounds: 4,
+    });
+    // Back under the limit with real evidence: it recovers as usual.
+    const fast = [check('BKK', 'pass', 1, { responseMs: 900 }), ...akamaiAbroad()];
+    expect(decideSite(site([home(fast, { carry: slowCarry })], { open }))).toMatchObject({ kind: 'recover' });
+  });
+
   it('a key page behind the WAF failing at BKK twice is a key-page PROBLEM, never DOWN', () => {
     const okHome = [check('BKK', 'pass', 1), ...akamaiAbroad()];
     const broken = [check('BKK', 'fail', 1), ...akamaiAbroad(), recheck('BKK', 'fail', 31)];
