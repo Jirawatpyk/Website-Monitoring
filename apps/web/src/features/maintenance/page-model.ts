@@ -142,8 +142,9 @@ function postedText(e: LogEntry, now: Date, opts: LogOptions): string {
   const answer = (e.action === 'approved' || e.action === 'declined') && opts.asker;
   if (!e.posts_at) return '';
   const at = new Date(e.posts_at);
-  // Waiting, or undone: no posting time (an undone answer keeps who it was for).
-  if (opts.undone || at.getTime() > now.getTime()) return answer ? ` · ${opts.asker} told in Chat` : '';
+  // Undone: no posting time, the answer keeps who it was for (board). Still waiting: nothing yet.
+  if (opts.undone) return answer ? ` · ${opts.asker} told in Chat` : '';
+  if (at.getTime() > now.getTime()) return '';
   const time = formatTimeWithSeconds(at);
   return answer ? ` · ${opts.asker} told in Chat (posted ${time})` : ` · posted ${time}`;
 }

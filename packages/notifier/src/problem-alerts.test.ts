@@ -234,6 +234,27 @@ describe('PROBLEM emails (EmailAlert PROBLEM thread)', () => {
     expect(m.headers).toEqual({ References: '<inc-inc-141@notify.example.test>' });
   });
 
+  it('the first PROBLEM email after a mute: the held row first, the held preheader, the late lede (§24.17)', () => {
+    const heldUntil = new Date('2026-09-25T08:00:00Z'); // 15:00
+    const m = buildProblemEmail({
+      ...base,
+      trigger: 'slow',
+      detectedAt,
+      cause: CAUSE,
+      summary: 'slow, p50 5.8 s',
+      heldUntil,
+      now: heldUntil,
+      ladder: { next: { level: 1, at: new Date('2026-09-25T09:00:00Z'), ask: ['Nok'], fyi: [] } },
+    });
+    expect(m.html).toContain('PROBLEM — Fuji Links · slow, p50 5.8 s · held by a mute until 15:00');
+    expect(m.text.split('\n').find((l) => l.includes(': '))).toBe(
+      'Held by a mute: until 15:00 — escalation starts now',
+    );
+    expect(m.text).toContain(
+      'The site is up but slow. This started while the site was muted, so nobody was told until now.',
+    );
+  });
+
   it('words a misconfigured certificate chain (D-029)', () => {
     const m = buildProblemEmail({
       ...base,

@@ -252,7 +252,7 @@ describe('words', () => {
       'Approved 10:07 by Tao · Arm told in Chat (posted 10:07:10)',
     );
     expect(logLine(approved, new Date(bkk('2026-09-25T10:07:05')), { asker: 'Arm' })).toBe(
-      'Approved 10:07 by Tao · Arm told in Chat', // no posting time while it waits (§24.12)
+      'Approved 10:07 by Tao', // nothing yet while it waits (§24.12)
     );
     expect(logLine({ ...approved, action: 'cancelled', reason: 'x' }, later)).toBe(
       'Cancelled 10:07 by Tao · “x” · posted 10:07:10',

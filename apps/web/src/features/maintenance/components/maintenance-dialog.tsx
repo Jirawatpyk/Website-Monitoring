@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useNow } from '@/components/use-now';
 import { loadAdminNames, muteSite, scheduleMaintenance } from '../actions';
+import { postPendingNow } from './window-dialogs';
 import {
   DURATIONS,
   EFFECT,
@@ -152,6 +153,8 @@ export function MaintenanceDialog({
   const submit = () =>
     start(async () => {
       setError(null);
+      // Starting another action posts a pending one at once (§24.12).
+      await postPendingNow();
       // "Now" is when Save is pressed, not when the dialog opened.
       const at = new Date();
       const p = planOf({
