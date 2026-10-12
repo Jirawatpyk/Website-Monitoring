@@ -95,6 +95,13 @@ export interface SiteSnapshot {
   verifierAvailable?: boolean;
   /** The site is flagged `behind_waf`: WAF-signed blocks abstain (D-027). */
   behindWaf?: boolean;
+  /**
+   * The BKK control check has failed in `CONTROL_FAILING_ROUNDS` probe minutes in a row
+   * (`bkkControlDown`: any batch of the minute; the open Admin alert only when the window can't
+   * tell). Until then a round with nobody left to vote on a WAF site is no data, not PROBLEM (unverified): one VPS
+   * hiccup flipped a WAF site between PROBLEM and RECOVERED all day (D-038).
+   */
+  bkkControlDown?: boolean;
   /** Per probe minute, locations treated as no data (spec §15.3, `faultyByMinute`). */
   faulty?: ReadonlyMap<number, ReadonlySet<ProbeLocation>>;
   /** OK ↔ not-OK changes at incident steps in the last 30 min, and the last one's direction (D-024). */
@@ -586,8 +593,11 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     next: reset,
   });
 
-  // Behind a WAF with nobody left to vote and the VPS's control check down (D-027).
+  // Behind a WAF with nobody left to vote and the VPS's control check down (D-027). A single failing
+  // minute is no data — the current status holds — until the check has failed long enough to alert
+  // the Admin (D-028, D-038).
   if (first.kind === 'untrusted') {
+    if (!s.bkkControlDown) return { verdict: { kind: 'insufficient' }, next: carried };
     return unverified(
       'control_failed',
       earliest(round.scheduled.filter((c) => c.outcome !== 'pass')) ?? roundAt,
@@ -609,7 +619,10 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       akamaiSite,
       ...(wafSite && counted.length === 1 ? { minReporting: 1 } : {}),
     });
-    if (second.kind === 'untrusted') return unverified('control_failed', firstFail ?? roundAt);
+    if (second.kind === 'untrusted') {
+      if (!s.bkkControlDown) return { verdict: { kind: 'insufficient' }, next: carried };
+      return unverified('control_failed', firstFail ?? roundAt);
+    }
     if (!(confirmsDown(first, second) && second.kind === 'hard_fail')) {
       return { verdict: { kind: 'blip' }, next: reset };
     }

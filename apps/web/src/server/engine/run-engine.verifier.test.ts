@@ -213,12 +213,66 @@ describe('runEngine — blocked rounds (S03)', () => {
       });
     });
 
-    it('the VPS’s control check down → PROBLEM (unverified) with that cause, and no verifier Admin alert', async () => {
+    it('one failing BKK control minute is no data: no PROBLEM, nothing queued (D-038)', async () => {
       const { db, rpcCalls } = fakeDb({
         ...verifierUp,
         'probe_locations.select': { data: withBkk },
         'monitors.select': { data: [wafMonitor] },
         'rpc.engine_checks': { data: [bkk({ control_ok: false }), ...akamai] },
+      });
+      expect(await runEngine(db, now)).toMatchObject({ unverified: 0, opened: 0 });
+      expect(rpcCalls.some((c) => c.name === 'engine_open_incident')).toBe(false);
+    });
+
+    // Earlier BKK minutes of another monitor: the VPS's control result per probe minute (D-028).
+    const minute = (sec: number, control_ok: boolean, attempt = 1) =>
+      bkk({ monitor_id: 'm-other', checked_at: at(sec), control_ok, attempt });
+
+    it('alert still open, but the control passed a minute ago: one failing minute stays no data (D-038)', async () => {
+      const { db, rpcCalls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': { data: [minute(-57, true), bkk({ control_ok: false }), ...akamai] },
+        'system_alerts.select': {
+          data: [{ kind: 'bkk_control_failing', context: {}, opened_at: '2026-10-06T09:40:00Z' }],
+        },
+      });
+      expect(await runEngine(db, now)).toMatchObject({ unverified: 0 });
+      expect(rpcCalls.some((c) => c.name === 'engine_open_incident')).toBe(false);
+    });
+
+    it('scheduled control failing every minute is not hidden by rechecks that pass it (D-038)', async () => {
+      const { db } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': {
+          data: [
+            minute(-117, false),
+            minute(-87, true, 2),
+            minute(-57, false),
+            minute(-27, true, 2),
+            bkk({ control_ok: false }),
+            minute(33, true, 2),
+            ...akamai,
+          ],
+        },
+      });
+      expect(await runEngine(db, now)).toMatchObject({ unverified: 1 });
+    });
+
+    it('the VPS’s control check down 3 minutes → PROBLEM (unverified) with that cause, and no verifier Admin alert', async () => {
+      const { db, rpcCalls } = fakeDb({
+        ...verifierUp,
+        'probe_locations.select': { data: withBkk },
+        'monitors.select': { data: [wafMonitor] },
+        'rpc.engine_checks': {
+          data: [minute(-117, false), minute(-57, false), bkk({ control_ok: false }), ...akamai],
+        },
+        'system_alerts.select': {
+          data: [{ kind: 'bkk_control_failing', context: {}, opened_at: '2026-10-06T09:40:00Z' }],
+        },
       });
       expect(await runEngine(db, now)).toMatchObject({ unverified: 1, alerts: 0 });
       expect(rpcCalls[0]?.args).toMatchObject({

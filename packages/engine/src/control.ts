@@ -31,3 +31,31 @@ export function bkkControlFailing(
   const recent = latest.slice(0, rounds);
   return recent.length === rounds && recent.every(([, ok]) => !ok) ? true : null;
 }
+
+/**
+ * D-038: may a WAF round with nobody left to vote be PROBLEM (unverified)? Only once the control
+ * check failed in `rounds` probe minutes in a row; a minute where every batch passed ends it. Unlike
+ * the Admin alert (`bkkControlFailing`), a minute counts as failing when **any** of its batches failed
+ * the control — the scheduled check or the recheck — so a passing batch can't hide a control that
+ * fails every minute in the other one (a round is judged untrusted on either). While the alert is
+ * open and the window holds no passing minute (sparse batches), it is still down; with no control
+ * reported at all, the alert decides.
+ */
+export function bkkControlDown(
+  facts: readonly ControlFact[],
+  alertOpen: boolean,
+  rounds = CONTROL_FAILING_ROUNDS,
+): boolean {
+  const byMinute = new Map<number, boolean>();
+  for (const f of facts) {
+    if (f.controlOk == null) continue;
+    const minute = minuteOf(f.checkedAt);
+    byMinute.set(minute, (byMinute.get(minute) ?? true) && f.controlOk);
+  }
+  const latest = [...byMinute.entries()].sort(([a], [b]) => b - a);
+  if (!latest.length) return alertOpen;
+  if (latest[0]![1]) return false;
+  const recent = latest.slice(0, rounds);
+  if (recent.length === rounds && recent.every(([, ok]) => !ok)) return true;
+  return alertOpen && latest.every(([, ok]) => !ok);
+}
