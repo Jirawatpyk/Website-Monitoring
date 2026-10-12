@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { mergeBlockers, WORKFLOW_FLAG, SCHEMA_FLAG } from './pr-merge.mjs';
+import {
+  deployVerdict,
+  mergeBlockers,
+  DEPLOY_TIMEOUT_MS,
+  NO_DEPLOY_AFTER_MS,
+  WORKFLOW_FLAG,
+  SCHEMA_FLAG,
+} from './pr-merge.mjs';
 
 const green = {
   state: 'OPEN',
@@ -107,5 +114,38 @@ test('refuses migrations and runtime code together unless the schema lag was rev
       files: [{ path: 'supabase/migrations/x.sql' }, { path: 'packages/db/src/database.types.ts' }],
     }),
     [],
+  );
+});
+
+// GitHub's statuses for #89's production deployment (12 Oct 2026), newest first.
+const failed = {
+  state: 'failure',
+  description: 'Deployment has failed — run this Vercel CLI command: npx vercel inspect dpl_2Wng --logs',
+};
+const redeployed = { state: 'success', environment_url: 'https://dxt-monitor-f46aw29sb.vercel.app' };
+const minute = 60_000;
+
+test('deployVerdict: production ready, failed, redeployed, skipped, timed out', () => {
+  assert.equal(deployVerdict({ statuses: [{ state: 'in_progress' }], elapsedMs: minute }).kind, 'waiting');
+  assert.match(deployVerdict({ statuses: [failed], elapsedMs: minute }).why, /dpl_2Wng/);
+  assert.deepEqual(deployVerdict({ statuses: [redeployed, failed], elapsedMs: 13 * minute }), {
+    kind: 'ready',
+    url: redeployed.environment_url,
+  });
+  assert.equal(deployVerdict({ statuses: [], elapsedMs: NO_DEPLOY_AFTER_MS - 1 }).kind, 'waiting');
+  assert.equal(deployVerdict({ statuses: [], elapsedMs: NO_DEPLOY_AFTER_MS }).kind, 'none');
+  assert.equal(
+    deployVerdict({ statuses: [{ state: 'queued' }], elapsedMs: DEPLOY_TIMEOUT_MS }).kind,
+    'failed',
+  );
+});
+
+test('deployVerdict: a failed migrate-production fails the merge; skipped or running does not', () => {
+  const migrate = (status, conclusion = null) => ({ status, conclusion });
+  assert.equal(deployVerdict({ migrate: migrate('completed', 'failure'), elapsedMs: 0 }).kind, 'failed');
+  assert.equal(deployVerdict({ migrate: migrate('completed', 'skipped'), elapsedMs: 0 }).kind, 'waiting');
+  assert.equal(
+    deployVerdict({ migrate: migrate('in_progress'), statuses: [redeployed], elapsedMs: 0 }).kind,
+    'ready',
   );
 });

@@ -11,6 +11,11 @@
 // A PR that changes migrations and runtime code together also needs --schema-lag-reviewed: the new
 // deployment's crons start before `migrate-production` ends (docs/workflow.md, 8 Oct 2026), so that
 // code must work on the old schema — or the migration merges alone first.
+// After the merge it waits for production: the merge commit's `migrate-production` and its Vercel
+// production deployment (GitHub Deployments, environment "Production – dxt-monitor"), and exits 1 if
+// either failed — on 12 Oct a production build failed (`git_info_fail`) and nobody saw it for 10 min.
+// No deployment within a few minutes is a warning, not a failure: Vercel's Ignored Build Step skips
+// agent- and docs-only commits without posting anything. --no-wait skips the wait.
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
@@ -19,6 +24,33 @@ const FAILED = new Set(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 
 
 export const WORKFLOW_FLAG = '--workflow-changes-reviewed';
 export const SCHEMA_FLAG = '--schema-lag-reviewed';
+export const NO_WAIT_FLAG = '--no-wait';
+
+/** The GitHub Deployments environment Vercel reports production builds of `main` under. */
+export const PRODUCTION_ENV = 'Production – dxt-monitor';
+/** No production deployment by then: Vercel skipped the build (Ignored Build Step). */
+export const NO_DEPLOY_AFTER_MS = 4 * 60_000;
+/** Give up waiting for a deployment that started but never finished. */
+export const DEPLOY_TIMEOUT_MS = 15 * 60_000;
+
+/**
+ * Where production stands for the merge commit. `statuses` are the newest production deployment's
+ * statuses, newest first (as GitHub returns them); `migrate` is the `migrate-production` check-run,
+ * if any. A later redeploy adds a status to the same deployment, so the newest one counts.
+ */
+export function deployVerdict({ statuses = [], migrate = null, elapsedMs }) {
+  if (migrate?.status === 'completed' && !['success', 'skipped', 'neutral'].includes(migrate.conclusion)) {
+    return { kind: 'failed', why: `migrate-production ended ${migrate.conclusion}` };
+  }
+  const latest = statuses[0];
+  if (latest?.state === 'success') return { kind: 'ready', url: latest.environment_url ?? '' };
+  if (latest && ['failure', 'error'].includes(latest.state)) {
+    return { kind: 'failed', why: latest.description || `deployment ${latest.state}` };
+  }
+  if (!latest && elapsedMs >= NO_DEPLOY_AFTER_MS) return { kind: 'none' };
+  if (elapsedMs >= DEPLOY_TIMEOUT_MS) return { kind: 'failed', why: 'still not ready after 15 min' };
+  return { kind: 'waiting' };
+}
 
 /** Runtime code (not tests) that a deploy starts before its migrations are applied. */
 export function migrationWithCode(pr) {
@@ -82,12 +114,55 @@ function gh(args, options = {}) {
   return execFileSync('gh', args, { encoding: 'utf8', ...options });
 }
 
-function main() {
+const json = (args) => JSON.parse(gh(args));
+
+/** Polls until production is ready, failed, or (no deployment at all) skipped. */
+async function waitForProduction(number) {
+  const sha = json(['pr', 'view', number, '--json', 'mergeCommit']).mergeCommit?.oid;
+  if (!sha) {
+    console.error('pr:merge — merged, but GitHub has no merge commit yet; check production by hand.');
+    process.exit(1);
+  }
+  console.info(`pr:merge — waiting for migrate-production and the production deploy of ${sha.slice(0, 7)}…`);
+  const started = Date.now();
+  for (;;) {
+    const env = encodeURIComponent(PRODUCTION_ENV);
+    const [deployment] = json(['api', `repos/{owner}/{repo}/deployments?sha=${sha}&environment=${env}`]);
+    const statuses = deployment
+      ? json(['api', `repos/{owner}/{repo}/deployments/${deployment.id}/statuses`])
+      : [];
+    const runs = json([
+      'api',
+      `repos/{owner}/{repo}/commits/${sha}/check-runs?check_name=migrate-production`,
+    ]);
+    const v = deployVerdict({
+      statuses,
+      migrate: runs.check_runs?.[0] ?? null,
+      elapsedMs: Date.now() - started,
+    });
+    if (v.kind === 'ready') return console.info(`pr:merge — production is live: ${v.url}`);
+    if (v.kind === 'none') {
+      return console.warn(
+        'pr:merge — no production deployment appeared: Vercel skipped the build (agent- or docs-only?). Check the Vercel dashboard if this commit changes the web app.',
+      );
+    }
+    if (v.kind === 'failed') {
+      console.error(`pr:merge — merged, but production did NOT deploy: ${v.why}`);
+      console.error('  Redeploy: vercel --scope <team> redeploy <deployment url> --target production');
+      process.exit(1);
+    }
+    await new Promise((r) => setTimeout(r, 15_000));
+  }
+}
+
+async function main() {
   // pnpm forwards a `--` separator (`pnpm pr:merge 9 -- --flag`); ignore it.
   const [number, ...flags] = process.argv.slice(2).filter((a) => a !== '--');
-  const unknown = flags.filter((f) => f !== WORKFLOW_FLAG && f !== SCHEMA_FLAG);
+  const unknown = flags.filter((f) => ![WORKFLOW_FLAG, SCHEMA_FLAG, NO_WAIT_FLAG].includes(f));
   if (!/^\d+$/.test(number ?? '') || unknown.length) {
-    console.error(`Usage: pnpm pr:merge <pull request number> [${WORKFLOW_FLAG}] [${SCHEMA_FLAG}]`);
+    console.error(
+      `Usage: pnpm pr:merge <pull request number> [${WORKFLOW_FLAG}] [${SCHEMA_FLAG}] [${NO_WAIT_FLAG}]`,
+    );
     process.exit(2);
   }
 
@@ -106,6 +181,7 @@ function main() {
 
   console.info(`pr:merge — squash-merging #${pr.number} "${pr.title}" at ${pr.headRefOid.slice(0, 7)}`);
   gh(['pr', 'merge', number, '--squash', '--match-head-commit', pr.headRefOid], { stdio: 'inherit' });
+  if (!flags.includes(NO_WAIT_FLAG)) await waitForProduction(number);
 }
 
-if (process.argv[1] && path.basename(process.argv[1]) === 'pr-merge.mjs') main();
+if (process.argv[1] && path.basename(process.argv[1]) === 'pr-merge.mjs') await main();
