@@ -27,7 +27,8 @@
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Done |
 | S09 | Maintenance windows & mute | 1 · P0 | L | FR-10a, FR-14 | S06b, S08 | 3 | Done |
 | S09b | Maintenance messages | 1 · P0 | M | — (FR-10a, FR-14 messages, §24) | S09 + ChatAlert / EmailAlert boards | 3 | Done |
-| G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
+| S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | S | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Todo |
+| G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b, S09c) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
 | S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06b, S10, S11 | 4 | Todo |
@@ -446,6 +447,26 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
 ## Phase 2 — Team go-live, P1
 
+### S09c · Defacement: shared forbidden words & crawler view
+
+- **Scope:** PRD §2 / §5 "content-change/defacement detection" (D-041). Today a defaced page is caught only by a missing `must_contain` or a site's own `must_not_contain` ("Index of /, Database error"). This slice adds:
+  - **Shared forbidden list (all sites):** gambling, slot-spam, adult and pharma words in Thai and English, and injected-link markers. It is a reviewed list in `@dxt/shared`, applied to every monitor on top of its own `must_not_contain` and read in the same 256 KB sample (D-026). The list is versioned in code; the Admin-editable list stays with S17.
+  - **Crawler view:** a cloaked SEO-spam hack serves its spam only to search engines. Each live site's primary monitor is fetched as Googlebot every 30 min, from SIN only, and gets the same keyword checks.
+  - **What fires and how it reads:** a hit is PROBLEM `keyword` (D-022). The cause names the word, where it was found, and "(as Googlebot)" for the crawler view. One location is enough for the crawler view, because it is a single fetch.
+- **Boards:** none new (ChatAlert / EmailAlert PROBLEM · Keyword rows)
+- **Depends on:** S04a
+- **Done when:**
+  1. Table-driven tests (packages/probe / engine) cover these cases:
+     - a body with a shared-list word → PROBLEM `keyword` naming the word;
+     - a clean body → OK;
+     - a word only in the crawler view → PROBLEM "(as Googlebot)";
+     - the list is case- and spacing-tolerant where the words need it.
+  2. On staging, the test target's new `defaced` and `cloaked` modes raise PROBLEM · Keyword with the right cause, and recover on `ok`.
+  3. A week of production checks through the list gives no false positive on the 17 sites. Before go-live, replay every site's current home page through the list.
+  4. message-checker passes the PROBLEM · Keyword card / email with the new cause wording.
+- **Review:** engine-reviewer, message-checker, security-reviewer (the Googlebot fetch, a fixed UA only).
+- **Not in this slice (P2, after G2):** "the page changed from its last version" (hash / diff against a baseline). Pages change all the time, so it raises false alarms easily (D-041).
+
 ### S10 · Escalation L2–L3 & on-call
 
 - **Scope:** FR-09b. L2 CEO step on (approved 5 Oct 2026, D-009 — no "pending CEO" tag); voice "Configured · off" (Twilio not used for now); Tier 1 L3 FYI to CEO + AM at +60 min even after ack, never a call; Tier 2–3 L2 reminder to Tao. Full editor guardrails (§14.7, §15.5). `oncall_shifts`, rotation page, swap request / accept, hand over shift with reason, reminder a day before, on-call phone checklist with test alert; Tier 1 nights, weekends and holidays page the on-call person.
@@ -532,7 +553,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
 ### S17 · Alert channels & organisation settings
 
-- **Scope:** Alert channels & routing ("who gets what" with DOWN / PROBLEM rows read-only, delivery log, test alert in its own thread). Organisation: tiers, clients & AMs, response hours for Tier 2–3 (confirm with before / after, "Affects N sites"), company holidays, data retention, cost.
+- **Scope:** Alert channels & routing ("who gets what" with DOWN / PROBLEM rows read-only, delivery log, test alert in its own thread). Organisation: tiers, clients & AMs, response hours for Tier 2–3 (confirm with before / after, "Affects N sites"), company holidays, data retention, cost. The shared forbidden-word list becomes Admin-editable here; S09c ships it as a reviewed list in code (D-025, D-041).
 - **Boards:** AlertChannels, Organisation
 - **Depends on:** S10, S11
 - **Done when:**

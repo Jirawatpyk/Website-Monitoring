@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-041 | 13 Oct 2026 | v1 defacement detection = keywords (a missing `must_contain`, a forbidden word) and the redirect allowlist, as built in S04a, plus slice **S09c** before G1: a shared forbidden-word list (gambling, spam, adult, pharma; TH + EN) on every monitor, and a Googlebot view of each home page every 30 min against cloaked SEO spam. "The page changed from its last version" (hash / diff) is P2, after G2 | D-025 "no shared spam list until S17" (the list ships in code now; S17 makes it editable) |
 | D-040 | 13 Oct 2026 | The probe's SSRF guard runs inside the connection: one DNS lookup per hop, every address checked, and the connection goes to that address (no rebinding gap); `fetch` and `Agent` from `undici@7.30.0`; the process's DNS order kept (IPv4 first on the VPS); `assertPublicTarget` stays for saving a site and the verifier | `target.ts` "pinning the connection to the checked address is a follow-up" |
 | D-039 | 12 Oct 2026 | A location that alone is slow on most sites in a minute (compared on the sites another location also timed) is no evidence for slow that minute — the Bangkok VPS slowing down no longer makes a behind-WAF site slow; an open slow PROBLEM holds meanwhile. D-038 amended: a no-data round ends a slow streak, the control check is judged at the round's time and the Akamai control only for Akamai sites, the flapping summary emails the owner who was emailed about the incident | D-022 "slow = p50 over the threshold 3 rounds in a row" (one location's times); D-038 "flapping summary only to whoever was emailed about that drop" |
 | D-038 | 12 Oct 2026 | Production hotfix: on a behind-WAF site a round with nobody left to vote is PROBLEM (unverified, control failed) only once the BKK control check has failed in 3 probe minutes in a row (any batch of the minute); before that it is no data and the status holds. A PROBLEM drop after a relapse emails its recovery (RECOVERED, the flapping summary) only to whoever was emailed about that drop, so normally Chat only; the first drop and any DOWN drop still email | D-027 "nothing left and the control down → PROBLEM at once"; S02b "RECOVERED to everyone already emailed" for PROBLEM relapses |
@@ -44,6 +45,18 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-041 — Defacement detection in v1: shared forbidden words and a crawler view before G1; page-change detection is P2
+
+**Gap.** PRD §2 promises "content-change/defacement detection" in v1. §5 defines it as a missing must-contain keyword, a forbidden keyword ("Database error", "Index of /", gambling or spam words) and a redirect off the site's allowlist. S04a built all three per monitor (D-022), but D-025 moved the shared gambling / spam list to S17, which is after G1. Until then a site defaced with gambling links is caught only if an Admin typed those words into that site's `must_not_contain`. A cloaked SEO-spam hack, which serves spam only to search engines, isn't seen at all: the probe's User-Agent is `DxT-Monitor/1.0`. "Content-change" can also be read as "the page differs from before", which no slice covered.
+
+**Decision (Tao, 13 Oct 2026).**
+
+- **S09c (size S, before G1):** a reviewed shared forbidden-word list in `@dxt/shared`. It holds gambling, slot-spam, adult and pharma words in Thai and English, plus injected-link markers, and applies to every monitor on top of its own `must_not_contain`, in the same 256 KB sample. Each live site's home page is also fetched as Googlebot every 30 min from SIN, with the same checks. A hit is PROBLEM · Keyword (D-022), and the cause names the word and "(as Googlebot)" when only that view had it.
+- **S17** makes the list Admin-editable. Until then it changes by PR.
+- **P2, after G2:** "the page changed from its last version" (hash / diff against a baseline). Most pages change on their own (news, prices, banners), so it would mostly raise false alarms without per-site tuning.
+
+**Impact.** Plan: new slice S09c (G1 depends on it); S17's scope names the editable list. Supersedes D-025 item 3's "no shared list until S17" for the list itself.
 
 ## D-040 — The probe connects to the address its SSRF guard checked
 
