@@ -69,7 +69,8 @@ test.describe('maintenance & mutes (local Supabase)', () => {
     await expect(dialog.getByText('Needs an Admin’s approval')).toBeVisible();
     await dialog.getByLabel(/Reason/).fill('E2E: move hosting');
     await dialog.getByRole('button', { name: 'Ask for approval' }).click();
-    await expect(dialog.getByText(`Waiting for an Admin · ${site.name}`)).toBeVisible();
+    // §24.9: the request names the Admins it went to.
+    await expect(dialog.getByText(/^Request sent to /)).toBeVisible();
     await dialog.getByRole('button', { name: 'Done' }).click();
 
     const waiting = page.getByRole('region', { name: 'Waiting for approval' });
@@ -90,6 +91,12 @@ test.describe('maintenance & mutes (local Supabase)', () => {
     await row.getByRole('button', { name: 'Approve' }).click();
     const confirm = admin.getByRole('dialog', { name: /Approve 3 days of maintenance\?/ });
     await confirm.getByRole('button', { name: 'Approve' }).click();
+    // §24.8: held 10 s with Undo — undone, it waits again; approved again, it is scheduled.
+    await admin.getByRole('button', { name: /^Undo · \d+ s$/ }).click();
+    await expect(row.getByRole('button', { name: 'Approve' })).toBeVisible();
+    await row.getByRole('button', { name: 'Approve' }).click();
+    await confirm.getByRole('button', { name: 'Approve' }).click();
+    await expect(admin.getByText(/^Posting to Chat and email in \d+ s/)).toBeVisible();
     await expect(
       admin.getByRole('region', { name: 'Scheduled' }).getByRole('link', { name: site.name }),
     ).toBeVisible();

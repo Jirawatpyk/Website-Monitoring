@@ -31,3 +31,7 @@ export type EditWindowInput = z.infer<typeof editWindowSchema>;
 /** `endsAt` = the end the Admin saw: a request changed meanwhile is refused (security review M2). */
 export const approveSchema = z.object({ windowId: z.uuid(), endsAt: instant });
 export type ApproveInput = z.infer<typeof approveSchema>;
+
+/** Undo the last held action on a window (§24.8). */
+export const windowIdSchema = z.object({ windowId: z.uuid() });
+export type WindowIdInput = z.infer<typeof windowIdSchema>;

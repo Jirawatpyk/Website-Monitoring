@@ -8,9 +8,17 @@ const db = (result: {
   error?: { code?: string; hint?: string | null; message: string } | null;
 }) => {
   const rpc = vi.fn(async () => ({ data: result.data ?? null, error: result.error ?? null }));
-  // create_maintenance reads back whether the window waits for an Admin.
-  const row = { maybeSingle: async () => ({ data: { approved_at: null }, error: null }) };
-  const from = () => ({ select: () => ({ eq: () => row }) });
+  // create_maintenance reads back whether the window waits for an Admin (and names the Admins); a
+  // held action reads when its messages go.
+  const chain = {
+    eq: () => chain,
+    order: async () => ({ data: [{ display_name: 'Tao' }], error: null }),
+    maybeSingle: async () => ({
+      data: { approved_at: null, undo_until: '2026-09-25T07:07:10.000Z' },
+      error: null,
+    }),
+  };
+  const from = () => ({ select: () => chain });
   return { db: { rpc, from } as never, rpc };
 };
 const at = '2026-09-25T07:07:00.000Z';
@@ -25,7 +33,7 @@ describe('maintenance mutations (D-036)', () => {
       { p_site_id: SITE, p_reason: 'x' },
     ]);
     for (const [run, name, args] of cases) {
-      expect(await run()).toEqual({ ok: true, id: WIN, waiting: true });
+      expect(await run()).toEqual({ ok: true, id: WIN, waiting: true, admins: ['Tao'] });
       expect(a.rpc).toHaveBeenCalledWith(name, expect.objectContaining(args));
     }
     const b = db({});
@@ -33,13 +41,19 @@ describe('maintenance mutations (D-036)', () => {
     await m.endWindowEarly({ windowId: WIN, reason: 'done' }, b);
     await m.editWindowEnd({ windowId: WIN, endsAt: at, reason: 'later' }, b);
     await m.cancelWindow({ windowId: WIN, reason: 'off' }, b);
-    await m.approveMaintenance({ windowId: WIN, endsAt: at }, b);
+    // A held action says when its messages go (the toast's countdown, §24.8).
+    expect(await m.approveMaintenance({ windowId: WIN, endsAt: at }, b)).toEqual({
+      ok: true,
+      postsAt: '2026-09-25T07:07:10.000Z',
+    });
+    expect(await m.undoWindowAction({ windowId: WIN }, b)).toEqual({ ok: true });
     expect(b.rpc.mock.calls.map((c) => (c as unknown as [string])[0])).toEqual([
       'mute_site',
       'end_window_early',
       'edit_window_end',
       'cancel_window',
       'approve_maintenance',
+      'undo_window_action',
     ]);
   });
 

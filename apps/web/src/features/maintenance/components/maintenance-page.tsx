@@ -208,7 +208,8 @@ export function MaintenancePageView({
   // the dialogs' end choices start from now (spec-check). A window starting or ending changes
   // site_status, so a round re-renders the page; other people's edits show on the next one.
   const now = useNow(nowIso, 60_000);
-  useLiveRefresh();
+  // Other people's actions show at once (maintenance_windows joins Realtime with S09b).
+  useLiveRefresh(['site_status', 'maintenance_windows']);
   const sections = sectionsOf(rows, viewer, now);
   const notEmpty = sections.some((s) => s.key !== 'recent');
   const canSchedule = viewer.role !== 'readonly' && sites.length > 0;
@@ -238,6 +239,16 @@ export function MaintenancePageView({
     const key = open?.kind === 'approve' ? 'scheduled' : open?.kind === 'edit' ? null : 'recent';
     landing.current = key ? { key, before: rows } : null;
     setOpen((o) => (o ? { ...o, shown: false } : o));
+  };
+  // An Undo puts the row back where it was: focus goes to that section once it is there (spec-check).
+  const latest = useRef(rows);
+  useEffect(() => {
+    latest.current = rows;
+  }, [rows]);
+  const undone = (p: PageRow) => {
+    const key: Section['key'] =
+      p.state === 'active' ? 'active' : p.state === 'waiting' ? 'waiting' : 'scheduled';
+    landing.current = { key, before: latest.current };
   };
   useEffect(() => {
     // Only once the refreshed rows are in (the closing dialog has handed focus back by then).
@@ -326,6 +337,7 @@ export function MaintenancePageView({
             open={shown('end')}
             onClose={back}
             onDone={done}
+            onUndone={undone}
           />
           <EditDialog
             key={`d${open.n}`}
@@ -335,6 +347,7 @@ export function MaintenancePageView({
             open={shown('edit')}
             onClose={back}
             onDone={done}
+            onUndone={undone}
           />
           <ApproveDialog
             key={`a${open.n}`}
@@ -344,6 +357,7 @@ export function MaintenancePageView({
             open={shown('approve')}
             onClose={back}
             onDone={done}
+            onUndone={undone}
           />
           <DeclineDialog
             key={`x${open.n}`}
@@ -352,6 +366,7 @@ export function MaintenancePageView({
             open={shown('decline')}
             onClose={back}
             onDone={done}
+            onUndone={undone}
           />
           <RowSheet p={open.p} open={shown('view')} onClose={back} act={(k, p) => show(k, p, true)} />
         </>

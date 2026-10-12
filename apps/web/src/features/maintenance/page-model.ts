@@ -9,8 +9,12 @@ import {
 import {
   formatDay,
   formatDuration,
+  formatIncidentId,
+  formatNameList,
   formatTime,
+  formatTimeWithSeconds,
   formatWhen,
+  formatWindowLength,
   isSameBangkokDay,
   type SiteStatus,
   type Tier,
@@ -31,6 +35,10 @@ export interface LogEntry {
   from?: string;
   to?: string;
   incident?: string;
+  /** An undoable action's held messages go then (§24.8, S09b). */
+  posts_at?: string;
+  /** `undone`: the action it took back. */
+  undid?: string;
 }
 
 export interface WindowRow {
@@ -61,6 +69,8 @@ export interface WindowRow {
   ownerIsAdmin?: boolean;
   backupIsAdmin?: boolean;
   log: LogEntry[];
+  /** A mute: the incident it silenced, if any — ending it posts that alert (§24.9). */
+  silenced?: { number: number; l1DelayMin: number | null } | null;
 }
 
 export interface Viewer {
@@ -90,12 +100,8 @@ const Noun = (kind: WindowKind) => (kind === 'mute' ? 'Mute' : 'Maintenance');
 /** A request: asked for by a Responder (over 24 h) — approved by someone else, or not yet. */
 const wasRequest = (r: WindowRow) => !r.approvedAt || (!!r.approvedById && r.approvedById !== r.createdById);
 
-/** "3 days", "2 days", else "4 h 30 min" / "1 d 2 h" (§13). */
-export function lengthText(minutes: number): string {
-  const m = Math.round(minutes);
-  if (m >= DAY && m % DAY === 0) return m === DAY ? '24 h' : `${m / DAY} days`;
-  return formatDuration(m);
-}
+/** "3 days", "2 days", else "4 h 30 min" / "1 d 2 h" (§13) — shared with the maintenance messages. */
+export const lengthText = formatWindowLength;
 
 /** "starts in 1 d 12 h" — hours rounded; under a day "N h N min" (§23.3). */
 export function countdown(minutes: number): string {
@@ -120,24 +126,47 @@ const shortDay = (d: Date) => formatDay(d, { weekday: true }).replace(/ [A-Z][a-
 /** When it ended or was set aside. */
 const settled = (r: WindowRow) => new Date(r.endedAt ?? r.cancelledAt ?? r.endsAt);
 
+/**
+ * When an undoable action's messages went (§24.8): "Arm told in Chat (posted 10:07:10)" for an answer,
+ * "posted 10:07:10" otherwise — "posts …" inside the 10 s, nothing once it was undone.
+ */
+function postedText(e: LogEntry, now: Date, opts: LogOptions): string {
+  if (!e.posts_at || opts.undone) return '';
+  const at = new Date(e.posts_at);
+  const time = formatTimeWithSeconds(at);
+  const word = at.getTime() > now.getTime() ? 'posts' : 'posted';
+  const answer = (e.action === 'approved' || e.action === 'declined') && opts.asker;
+  return answer ? ` · ${opts.asker} told in Chat (${word} ${time})` : ` · ${word} ${time}`;
+}
+
+export interface LogOptions {
+  /** Who asked for it: the answer tells them (approve / decline). */
+  asker?: string | null;
+  /** The next line undid this action: nothing was posted. */
+  undone?: boolean;
+}
+
 /** A log line in words (board: "Ended early 10:07 by Tao · “reason”"); the create lines are left out. */
-export function logLine(e: LogEntry, now: Date): string | null {
+export function logLine(e: LogEntry, now: Date, opts: LogOptions = {}): string | null {
   const when = whenText(new Date(e.at), now);
   const by = e.by ? ` by ${e.by}` : '';
   const why = e.reason ? ` · “${e.reason}”` : '';
+  const posted = postedText(e, now, opts);
   switch (e.action) {
     case 'ended_early':
-      return `Ended early ${when}${by}${why}`;
+      return `Ended early ${when}${by}${why}${posted}`;
     case 'edited':
-      return `End ${e.from ? whenText(new Date(e.from), now) : '—'} → ${e.to ? whenText(new Date(e.to), now) : '—'} · ${when}${by}${why}`;
+      return `End ${e.from ? whenText(new Date(e.from), now) : '—'} → ${e.to ? whenText(new Date(e.to), now) : '—'} · ${when}${by}${why}${posted}`;
     case 'approved':
-      return `Approved ${when}${by}`;
+      return `Approved ${when}${by}${posted}`;
     case 'declined':
-      return `Declined ${when}${by}${why}`;
+      return `Declined ${when}${by}${why}${posted}`;
     case 'withdrawn':
-      return `Withdrawn ${when}${by}${why}`;
+      return `Withdrawn ${when}${by}${why}${posted}`;
     case 'cancelled':
-      return `Cancelled ${when}${by}${why}`;
+      return `Cancelled ${when}${by}${why}${posted}`;
+    case 'undone':
+      return `Undone ${when}${by} — nothing was posted`;
     case 'ended':
       return `Ended on time ${formatTime(new Date(e.at))}`;
     case 'ended_by_maintenance':
@@ -230,7 +259,9 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
     whenSub: '',
     why: r.reason,
     whySub: '',
-    logs: r.log.map((e) => logLine(e, now)).filter((x): x is string => !!x),
+    logs: r.log
+      .map((e, i) => logLine(e, now, { asker: r.byName, undone: r.log[i + 1]?.action === 'undone' }))
+      .filter((x): x is string => !!x),
     canApprove: false,
     canEnd: false,
     editLabel: null,
@@ -308,7 +339,7 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
   Object.assign(base, {
     badge: { tone: 'neutral', variant: 'outline', icon, label: RECENT_LABEL[key] ?? key },
     when: ran ? spanText(start, realEnd, now) : spanText(start, end, now),
-    whenSub: `${Noun(r.kind)} · ${lengthText(ran ? ranMin : lengthMin)}${ran ? '' : ' · didn’t start'}`,
+    whenSub: `${Noun(r.kind)} · ${lengthText(ran ? ranMin : lengthMin)}${ran || state === 'cancelled' ? '' : ' · didn’t start'}`,
     whySub: asked ? `asked by ${by}` : `by ${by}`,
     line: `${RECENT_LABEL[key] ?? key} ${whenText(settled(r), now)} · ${r.reason}`,
     uptime: ran ? base.uptime : 'Not affected — it never ran',
@@ -381,12 +412,23 @@ export function metaOf(sections: readonly Section[]): string {
 /** End now's effects (board MaintenancePage); the Alerts Space line comes with S09b's messages. */
 export function endEffects(r: WindowRow, viewer: string, now: Date): string[] {
   const resume = `Alerts resume now${r.ownerName ? ` for ${r.ownerName} (owner)` : ''} and the Alerts Space.`;
-  if (r.kind === 'mute')
+  if (r.kind === 'mute') {
+    // §24.9: a silenced incident posts its first alert now and starts escalating.
+    const s = r.silenced;
+    // The card posts on the next engine run, up to a minute after the mute ends, and L1 counts from it
+    // (D-036): "about" and a minute's margin, so the promise is never early (S09b /verify).
+    const l1 = s?.l1DelayMin != null ? new Date(now.getTime() + (s.l1DelayMin + 1) * MINUTE) : null;
     return [
       resume,
+      ...(s
+        ? [
+            `${formatIncidentId(s.number)} posts its first alert now and starts escalating${l1 ? ` — L1 at about ${formatTime(l1)} if nobody acknowledges` : ''}.`,
+          ]
+        : []),
       'Uptime is unaffected — muted time was already counted.',
       `Logged in the audit log as ${viewer}.`,
     ];
+  }
   return [
     resume,
     `Checks from ${formatTime(now)} count in uptime again; ${formatTime(new Date(r.startsAt))}–${formatTime(now)} stays excluded.`,
@@ -430,9 +472,16 @@ export function approveEffects(r: WindowRow, viewer: string, now: Date): string[
     `Starts ${whenText(start, now)}, ends ${whenText(end, now)} (${len}). ${r.siteName} is Tier ${r.tier}.`,
     'No alerts for this site during the window. Checks still run and are logged.',
     'Not counted in uptime.',
-    'If the site is DOWN or has an incident that hasn’t recovered at the start, the window doesn’t start.',
+    `If the site is DOWN or has an incident that hasn’t recovered at the start, the window doesn’t start — ${toldText(r, viewer)} are told.`,
+    ...(r.byName && r.byName !== viewer ? [`${r.byName} gets a Chat message.`] : []),
     `Logged in the audit log as ${viewer}.`,
   ];
+}
+
+/** Who hears it when an approved window can't start (§24.6, §24.9): the asker, the owner and backup, the approver. */
+function toldText(r: WindowRow, viewer: string): string {
+  const names = [...new Set([r.byName, r.ownerName, r.backupName, viewer].filter((n): n is string => !!n))];
+  return formatNameList(names);
 }
 
 export const approveTitle = (r: WindowRow) =>
@@ -515,8 +564,9 @@ export function windowEvents(rows: readonly WindowRow[], now: Date): WindowEvent
           : `${r.siteName} maintenance ${whenText(new Date(r.startsAt), now)} → ${whenText(new Date(r.endsAt), now)}`;
       out.push({ id: `${r.id}:c`, at: r.createdAt, text: `${what}${r.byName ? ` — ${r.byName}` : ''}` });
     }
-    for (const e of r.log) {
-      if (Date.parse(e.at) < since) continue;
+    for (const [i, e] of r.log.entries()) {
+      // An action taken back with Undo never happened as far as Recent events go (§24.8).
+      if (Date.parse(e.at) < since || r.log[i + 1]?.action === 'undone') continue;
       const by = e.by ? ` — ${e.by}` : '';
       const n = noun(r.kind);
       const text =

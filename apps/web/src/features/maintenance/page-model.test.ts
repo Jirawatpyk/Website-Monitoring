@@ -186,6 +186,18 @@ describe('/maintenance sections and rows (spec §23, board MaintenancePage)', ()
     );
     expect(declined.badge?.label).toBe('Declined');
     expect(declined.whenSub).toBe('Maintenance · 4 h 30 min · didn’t start');
+    // A window cancelled before its start: the badge says Cancelled, no "didn't start" (S09b /verify).
+    const cancelled = pageRow(
+      row({
+        startsAt: bkk('2026-09-26T09:30:00'),
+        endsAt: bkk('2026-09-26T14:00:00'),
+        cancelledAt: bkk('2026-09-25T09:00:00'),
+      }),
+      tao,
+      NOW,
+    );
+    expect(cancelled.badge?.label).toBe('Cancelled');
+    expect(cancelled.whenSub).toBe('Maintenance · 4 h 30 min');
   });
 });
 
@@ -227,6 +239,29 @@ describe('words', () => {
     expect(logLine(e, NOW)).toBe(line);
   });
 
+  it('log lines show when a held action posted (§24.8), and an Undo', () => {
+    const approved = {
+      at: bkk('2026-09-25T10:07:00'),
+      action: 'approved',
+      by: 'Tao',
+      posts_at: bkk('2026-09-25T10:07:10'),
+    };
+    const later = new Date(bkk('2026-09-25T10:08:00'));
+    expect(logLine(approved, later, { asker: 'Arm' })).toBe(
+      'Approved 10:07 by Tao · Arm told in Chat (posted 10:07:10)',
+    );
+    expect(logLine(approved, new Date(bkk('2026-09-25T10:07:05')), { asker: 'Arm' })).toBe(
+      'Approved 10:07 by Tao · Arm told in Chat (posts 10:07:10)',
+    );
+    expect(logLine({ ...approved, action: 'cancelled', reason: 'x' }, later)).toBe(
+      'Cancelled 10:07 by Tao · “x” · posted 10:07:10',
+    );
+    expect(logLine(approved, later, { asker: 'Arm', undone: true })).toBe('Approved 10:07 by Tao');
+    expect(logLine({ at: bkk('2026-09-25T10:07:05'), action: 'undone', by: 'Tao' }, later)).toBe(
+      'Undone 10:07 by Tao — nothing was posted',
+    );
+  });
+
   it('lengths, countdowns and spans', () => {
     expect([lengthText(4320), lengthText(1440), lengthText(270), lengthText(1500)]).toEqual([
       '3 days',
@@ -250,6 +285,17 @@ describe('words', () => {
     expect(approveTitle(bac)).toBe('Approve 3 days of maintenance?');
     expect(approveEffects(bac, 'Tao', NOW)[0]).toBe(
       'Starts Sat 26 Sep 22:00, ends Tue 29 Sep 22:00 (3 days). Bangkok Airways – China is Tier 1.',
+    );
+    // §24.9: who hears it when an approved window can't start.
+    expect(approveEffects(bac, 'Tao', NOW)[3]).toBe(
+      'If the site is DOWN or has an incident that hasn’t recovered at the start, the window doesn’t start — Arm, Ploy and Tao are told.',
+    );
+    // §24.9: ending a mute that silenced an incident posts it now (Tier 1: L1 15 min later).
+    expect(endEffects({ ...games, silenced: { number: 154, l1DelayMin: 15 } }, 'Tao', NOW)[1]).toBe(
+      'INC-0154 posts its first alert now and starts escalating — L1 at about 10:23 if nobody acknowledges.',
+    );
+    expect(endEffects({ ...games, silenced: { number: 154, l1DelayMin: null } }, 'Tao', NOW)[1]).toBe(
+      'INC-0154 posts its first alert now and starts escalating.',
     );
     expect(cancelText('waiting', 'Arm')).toContain('Withdraws the request');
     expect(cancelText('scheduled', 'Arm')).toContain('cancelling removes it');

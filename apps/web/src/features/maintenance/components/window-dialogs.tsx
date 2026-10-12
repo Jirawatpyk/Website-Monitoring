@@ -1,15 +1,17 @@
 'use client';
 
-import { Alert, Button, Dialog, Select, TextField } from '@jirawatpyk/aura-react';
+import { Alert, Button, Dialog, Select, TextField, toast } from '@jirawatpyk/aura-react';
 import { IconCheck, IconTrash2 } from '@jirawatpyk/aura-react/icons';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { UndoLine } from '@/components/undo-line';
 import {
   approveMaintenance,
   cancelWindow,
   declineMaintenance,
   editWindowEnd,
   endWindowEarly,
+  undoWindowAction,
   withdrawRequest,
 } from '../actions';
 import {
@@ -26,10 +28,11 @@ import {
 } from '../page-model';
 
 const FAILED = 'Couldn’t save. Check your connection and try again.';
+const UNDO_FAILED = 'Couldn’t reach the server. Check your connection and try again.';
 const HINT = 'Shown in the audit log.';
 const hintFor = (reason: string) => (reason.trim() ? HINT : `Required — type a reason to continue. ${HINT}`);
 
-type Result = { ok: true } | { ok: false; message: string };
+type Result = { ok: true; postsAt?: string } | { ok: false; message: string };
 
 interface DialogProps {
   p: PageRow;
@@ -39,14 +42,22 @@ interface DialogProps {
   onClose: () => void;
   /** After the action went through (the page refreshes). Defaults to onClose. */
   onDone?: () => void;
+  /** After its Undo went through: where focus goes once the row is back (spec-check). */
+  onUndone?: (p: PageRow) => void;
 }
 
-/** Runs an action, refreshes the page and closes; a refusal shows as the dialog's alert (not a field error). */
-function useSubmit(onDone: () => void) {
+/**
+ * Runs an action, refreshes the page and closes; a refusal shows as the dialog's alert (not a field
+ * error). A held action (§24.8) then counts down its 10 s in a toast with Undo, like Acknowledge.
+ */
+function useSubmit(onDone: () => void, onUndone?: () => void) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const run = (fn: () => Promise<Result>) =>
+  const run = (
+    fn: () => Promise<Result>,
+    held?: { windowId: string; title: string; site: string; chatOnly?: boolean },
+  ) =>
     start(async () => {
       setError(null);
       const r = await fn().catch(() => ({ ok: false as const, message: FAILED }));
@@ -56,8 +67,45 @@ function useSubmit(onDone: () => void) {
       }
       onDone();
       router.refresh();
+      if (held && r.postsAt)
+        showUndo(held, r.postsAt, () => {
+          onUndone?.();
+          router.refresh();
+        });
     });
   return { error, pending, run };
+}
+
+/**
+ * The toast of a held maintenance action: "Posting to Chat and email in N s" with Undo (§24.8) — Chat
+ * only for a mute (D-037).
+ */
+function showUndo(
+  { windowId, title, site, chatOnly }: { windowId: string; title: string; site: string; chatOnly?: boolean },
+  postsAt: string,
+  undone: () => void,
+) {
+  const id = `window-${windowId}`;
+  const onUndo = async () => {
+    const r = await undoWindowAction({ windowId }).catch(() => ({
+      ok: false as const,
+      message: UNDO_FAILED,
+    }));
+    if (r.ok) {
+      toast({ id, title: `${title} — undone`, duration: 4000 });
+      undone();
+    } else {
+      toast.error(`Couldn’t undo · ${site}`, { id, description: r.message });
+    }
+  };
+  toast.success(title, {
+    id,
+    description: (
+      <UndoLine postsAt={postsAt} onUndo={onUndo} channels={chatOnly ? 'Chat' : 'Chat and email'} />
+    ),
+    // the window, then a moment to read "Posted"
+    duration: Math.max(Date.parse(postsAt) - Date.now(), 0) + 2000,
+  });
 }
 
 function Refusal({ error }: { error: string | null }) {
@@ -76,9 +124,10 @@ export function EndDialog({
   open,
   onClose,
   onDone = onClose,
+  onUndone,
 }: DialogProps & { viewer: string }) {
   const [reason, setReason] = useState('');
-  const { error, pending, run } = useSubmit(onDone);
+  const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
   const r = p.row;
   return (
     <Dialog
@@ -97,7 +146,14 @@ export function EndDialog({
             variant="primary"
             disabled={!reason.trim()}
             loading={pending}
-            onClick={() => run(() => endWindowEarly({ windowId: r.id, reason }))}
+            onClick={() =>
+              run(() => endWindowEarly({ windowId: r.id, reason }), {
+                windowId: r.id,
+                title: `${r.siteName} ${noun(r.kind)} ended`,
+                site: r.siteName,
+                chatOnly: r.kind === 'mute' && !r.silenced,
+              })
+            }
           >
             {r.kind === 'mute' ? 'End mute now' : 'End maintenance now'}
           </Button>
@@ -136,6 +192,7 @@ export function EditDialog({
   open,
   onClose,
   onDone = onClose,
+  onUndone,
 }: DialogProps & { viewer: string }) {
   const r = p.row;
   const choices = endChoices(r, now);
@@ -146,7 +203,7 @@ export function EditDialog({
   // The asker who no longer owns the site: straight to the withdraw step, no end to edit.
   const withdrawOnly = request && p.editLabel === WITHDRAW_ONLY;
   const [cancelling, setCancelling] = useState(withdrawOnly);
-  const { error, pending, run } = useSubmit(onDone);
+  const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
   const running = p.state === 'active';
   const cancelWord = request ? 'Withdraw request' : 'Cancel maintenance';
   const title = running
@@ -155,12 +212,21 @@ export function EditDialog({
       ? `Edit or withdraw · ${r.siteName} request`
       : `Edit or cancel · ${r.siteName} maintenance`;
   const submit = () =>
-    run(() =>
-      cancelling
-        ? request
-          ? withdrawRequest({ windowId: r.id, reason })
-          : cancelWindow({ windowId: r.id, reason })
-        : editWindowEnd({ windowId: r.id, endsAt: end, reason }),
+    run(
+      () =>
+        cancelling
+          ? request
+            ? withdrawRequest({ windowId: r.id, reason })
+            : cancelWindow({ windowId: r.id, reason })
+          : editWindowEnd({ windowId: r.id, endsAt: end, reason }),
+      {
+        windowId: r.id,
+        site: r.siteName,
+        chatOnly: r.kind === 'mute',
+        title: cancelling
+          ? `${r.siteName} ${request ? 'request withdrawn' : 'maintenance cancelled'}`
+          : `${r.siteName} ${noun(r.kind)} end changed`,
+      },
     );
   const cancelButton = (fullWidth: boolean) => (
     <Button variant="ghost" icon={<IconTrash2 />} fullWidth={fullWidth} onClick={() => setCancelling(true)}>
@@ -237,8 +303,9 @@ export function ApproveDialog({
   open,
   onClose,
   onDone = onClose,
+  onUndone,
 }: DialogProps & { viewer: string }) {
-  const { error, pending, run } = useSubmit(onDone);
+  const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
   const r = p.row;
   return (
     <Dialog
@@ -258,7 +325,13 @@ export function ApproveDialog({
             icon={<IconCheck />}
             loading={pending}
             // The end the Admin is looking at: a request changed meanwhile is refused (security review M2).
-            onClick={() => run(() => approveMaintenance({ windowId: r.id, endsAt: r.endsAt }))}
+            onClick={() =>
+              run(() => approveMaintenance({ windowId: r.id, endsAt: r.endsAt }), {
+                windowId: r.id,
+                title: `${r.siteName} maintenance approved`,
+                site: r.siteName,
+              })
+            }
           >
             Approve
           </Button>
@@ -278,9 +351,9 @@ export function ApproveDialog({
 }
 
 /** Decline a request with a reason (Admin) → Recent "Declined". */
-export function DeclineDialog({ p, now, open, onClose, onDone = onClose }: DialogProps) {
+export function DeclineDialog({ p, now, open, onClose, onDone = onClose, onUndone }: DialogProps) {
   const [reason, setReason] = useState('');
-  const { error, pending, run } = useSubmit(onDone);
+  const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
   const r = p.row;
   return (
     <Dialog
@@ -299,7 +372,13 @@ export function DeclineDialog({ p, now, open, onClose, onDone = onClose }: Dialo
             variant="primary"
             disabled={!reason.trim()}
             loading={pending}
-            onClick={() => run(() => declineMaintenance({ windowId: r.id, reason }))}
+            onClick={() =>
+              run(() => declineMaintenance({ windowId: r.id, reason }), {
+                windowId: r.id,
+                title: `${r.siteName} request declined`,
+                site: r.siteName,
+              })
+            }
           >
             Decline request
           </Button>
@@ -314,7 +393,7 @@ export function DeclineDialog({ p, now, open, onClose, onDone = onClose }: Dialo
           placeholder="e.g. Split it into two nights"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          hint="Required. The request moves to Recent as Declined."
+          hint={`Required. ${r.byName ?? 'The asker'} gets it in a Chat message; the request moves to Recent as Declined.`}
         />
         <Refusal error={error} />
       </div>

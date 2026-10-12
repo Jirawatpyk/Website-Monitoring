@@ -2,9 +2,10 @@ import { checkWindow, type WindowKind, type WindowProblem } from '@dxt/engine';
 import {
   BANGKOK_OFFSET_MS,
   formatDay,
-  formatDuration,
   formatIncidentId,
   formatTime,
+  formatNameList,
+  formatWindowLength,
   isSameBangkokDay,
   type SiteStatus,
   type Tier,
@@ -231,7 +232,11 @@ export const PROBLEM_WORDS: Record<
   | 'decline_instead'
   | 'end_instead'
   | 'withdraw_instead'
-  | 'changed',
+  | 'changed'
+  | 'undo_expired'
+  | 'undo_overlap'
+  | 'undo_needs_admin'
+  | 'site_not_live',
   string
 > = {
   ends_too_soon: 'The end must be at least 5 min from now.',
@@ -256,12 +261,34 @@ export const PROBLEM_WORDS: Record<
   not_open: 'It has already ended.',
   not_waiting: 'It isn’t waiting for approval.',
   unchanged: 'Pick a different end time.',
+  undo_expired: 'Too late to undo — it has been posted.',
+  undo_overlap: 'Another window now overlaps that time — it can’t be undone.',
+  site_not_live: 'Maintenance and mutes are for live sites — start monitoring first.',
+  undo_needs_admin: 'Over 24 h with the windows next to it — it can’t be undone; ask an Admin.',
 };
 
-const lengthOf = (a: Date, b: Date) => {
-  const m = Math.round((b.getTime() - a.getTime()) / 60_000);
-  return m >= 1440 && m % 1440 === 0 && m > 1440 ? `${m / 1440} days` : formatDuration(m);
-};
+const lengthOf = (a: Date, b: Date) => formatWindowLength((b.getTime() - a.getTime()) / 60_000);
+
+/** "Tao", "Ann and Tao", "Ann, Bee and Tao"; "every Admin" while the names aren't known. */
+export function adminsText(names: readonly string[] | null | undefined): string {
+  return names?.length ? formatNameList(names) : 'every Admin';
+}
+
+/** The Responder's long-window alert (§24.9): "Needs an Admin's approval — Tao gets a request now; …". */
+export function approvalNotice(
+  names: readonly string[] | null | undefined,
+  startsAt: Date,
+  now: Date,
+): string {
+  const who = adminsText(names);
+  const verb = names && names.length === 1 ? 'gets' : 'get';
+  return `${who === 'every Admin' ? 'Every Admin gets' : `${who} ${verb}`} a request now; it starts only if approved before ${whenText(startsAt, now)}.`;
+}
+
+/** The Responder's long window under Duration (§24.9): "Starts … if approved before then · ends … (3 days)". */
+export function approvalSpan(startsAt: Date, endsAt: Date, now: Date): string {
+  return `Starts ${whenText(startsAt, now)} if approved before then · ends ${whenText(endsAt, now)} (${lengthOf(startsAt, endsAt)})`;
+}
 
 /** The success line after Save (boards Maintenance, MMaintenance). */
 export function doneOf(p: {
@@ -274,6 +301,8 @@ export function doneOf(p: {
   reason: string;
   viewer: string;
   now: Date;
+  /** Who a request went to (§24.9: "Request sent to Tao"). */
+  admins?: readonly string[] | null;
 }): { title: string; text: string } {
   // A running one has no Cancel (§23.5): it is ended early or edited.
   const running = p.kind === 'mute' || !p.later;
@@ -293,7 +322,7 @@ export function doneOf(p: {
   }
   if (p.needsApproval)
     return {
-      title: `Waiting for an Admin · ${p.site.name}`,
+      title: `Request sent to ${adminsText(p.admins)}`,
       text: `${span} (${lengthOf(p.startsAt, p.endsAt)}) · waiting for an Admin — it doesn’t start unless approved before ${whenText(p.startsAt, p.now)}. Recorded in the audit log as ${p.viewer}. Reason: “${p.reason.trim()}”. Follow it under Waiting for approval on Maintenance & mutes.`,
     };
   return {

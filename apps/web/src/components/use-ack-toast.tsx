@@ -2,10 +2,9 @@
 
 import { useCallback, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, toast } from '@jirawatpyk/aura-react';
-import { IconRotateCcw } from '@jirawatpyk/aura-react/icons';
+import { toast } from '@jirawatpyk/aura-react';
 import { formatIncidentId } from '@dxt/shared';
-import { useSecondsLeft } from '@/components/use-seconds-left';
+import { UndoLine } from '@/components/undo-line';
 
 export type AckAction = (
   incidentId: string,
@@ -13,20 +12,6 @@ export type AckAction = (
 export type UndoAction = (incidentId: string) => Promise<{ ok: true } | { ok: false; message: string }>;
 
 const FAILED = 'Couldn’t reach the server. Check your connection and try again.';
-
-/** The toast's body: the hold line and "Undo · N s" while the window is open (spec §16.8, D-016 copy). */
-function UndoLine({ postsAt, onUndo }: { postsAt: string; onUndo: () => void }) {
-  const seconds = useSecondsLeft(postsAt);
-  if (seconds <= 0) return <span>Posted to Chat and email.</span>;
-  return (
-    <span className="flex flex-wrap items-center gap-3">
-      <span>{`Posting to Chat and email in ${seconds} s — nothing is sent until then`}</span>
-      <Button variant="secondary" size="sm" icon={<IconRotateCcw />} onClick={onUndo}>
-        {`Undo · ${seconds} s`}
-      </Button>
-    </span>
-  );
-}
 
 /**
  * Acknowledge from a banner, a Live issues row or the incident page (spec §21.1, §14.3): the banner goes at once (the

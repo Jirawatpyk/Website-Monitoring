@@ -13,5 +13,8 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.int.test.ts'],
     testTimeout: 30_000,
+    // One queue for every file: a dispatch claims, and `onlyMine` cancels, other files' messages, so
+    // the files run one after another (S09b: window messages share the queue with incidents).
+    fileParallelism: false,
   },
 });

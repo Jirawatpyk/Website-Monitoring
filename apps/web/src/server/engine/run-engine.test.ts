@@ -887,6 +887,30 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     expect(summary.notified).toBe(1);
   });
 
+  it('one late alert that fails never holds back the next site’s (engine review H1)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: [] },
+      'rpc.engine_silent_incidents': {
+        data: [
+          { incident_id: 'i8', site_id: 's1', tier: 1, severity: 'down', detected_at: at(-900) },
+          { incident_id: 'i9', site_id: 's2', tier: 1, severity: 'down', detected_at: at(-900) },
+        ],
+      },
+      'rpc.engine_post_late_alert': (c) =>
+        (c.values as { p_incident_id: string }).p_incident_id === 'i8'
+          ? { data: null, error: { message: 'boom' } }
+          : { data: true },
+    });
+    const summary = await runEngine(db, now);
+    expect(
+      rpcCalls
+        .filter((c) => c.name === 'engine_post_late_alert')
+        .map((c) => (c.args as { p_incident_id: string }).p_incident_id),
+    ).toEqual(['i8', 'i9']);
+    expect(summary.ok).toBe(false);
+  });
+
   it('a Tier 2 PROBLEM alerted late outside response hours waits for the opening', async () => {
     const night = new Date('2026-10-06T15:00:00Z'); // Tue 22:00 Bangkok
     const { db, rpcCalls } = fakeDb({

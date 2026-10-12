@@ -96,6 +96,21 @@ Incidents, notes and Resolve (S07, D-033), as Tao on https://monitor-staging.dxt
 select json_agg(x) from (select template, channel, status, hold_until, sent_at from notifications n join incidents i on i.id = n.incident_id join sites s on s.id = i.site_id where s.name = 'Test target' and n.created_at > now() - interval '30 min' order by n.created_at) x;
 ```
 
+Maintenance messages (S09b, D-037, spec §24), as Tao on https://monitor-staging.dxtspace.com/maintenance with the Test target. Tao is an Admin, so his windows are approved on create (the Responder's request → Admins path is proved locally, D-007); with no Chat id on his profile, a mention shows as his plain name:
+
+| Do                                                                                                      | Expect                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Schedule maintenance for later (1 h — the dialog offers 1 h, 4 h, 8 h, 24 h, 3 days) on the Test target | a new Space thread: `MAINTENANCE SCHEDULED · Test target · … (1 h) · “reason” · by Tao`; the owner / backup email (subject `Test target · Maintenance · <start>`) unless Tao is the only one (actor skipped) |
+| Edit end, then cancel → **Undo** inside 10 s                                                            | toast "Posting to Chat and email in N s" with "Undo · N s"; after Undo the window is back, nothing more posts (the rows end `cancelled`, `error = 'Undone'`), the log says "Undone … — nothing was posted"   |
+| Cancel again and wait                                                                                   | `MAINTENANCE CANCELLED · …` replies in the same thread ~12 s later                                                                                                                                           |
+| Mute 1 h → mode `error` → DOWN (no card) → End now                                                      | `MUTED · …` line; at End now (after its 10 s) `MUTE ENDED EARLY · … · INC-00nn posted (DOWN since HH:MM)` and the DOWN card with "Held by a mute until HH:MM · escalation starts now"                        |
+
+```sql
+select json_agg(x) from (select n.template, n.channel, n.status, n.user_id is not null as to_person, n.hold_until, n.context->>'kind' kind, n.context->>'dm' dm, n.sent_at
+  from notifications n join maintenance_windows w on w.id = n.maintenance_window_id join sites s on s.id = w.site_id
+  where s.name = 'Test target' and n.created_at > now() - interval '1 hour' order by n.created_at) x;
+```
+
 Escalation L0–L1 (S08, D-034). The Test target is Tier 1, so its ladder runs 24/7. L1 needs a backup with a Google Chat id: the test site's backup must be a second linked person, re-run `staging/test-target.sql` with one if needed. If Tao owns the site, L1 asks the backup alone, because Tao was already told at L0. Start clean (`reset-test-incident.sql`), drive `error`, and **don't acknowledge**:
 
 | Do                                      | Expect                                                                                                                                                                                                                                              |

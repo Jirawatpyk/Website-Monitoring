@@ -145,8 +145,9 @@ describe('maintenance dialog model (boards Maintenance, MMaintenance; §14.5, §
       reason: 'Data-centre move',
       viewer: 'Arm',
       now: NOW,
+      admins: ['Tao'],
     });
-    expect(waiting.title).toBe('Waiting for an Admin · Bangkok Airways – Taiwan');
+    expect(waiting.title).toBe('Request sent to Tao'); // §24.9
     const scheduled = doneOf({
       ...{
         kind: 'maintenance' as const,

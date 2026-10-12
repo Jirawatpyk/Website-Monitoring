@@ -6,8 +6,8 @@ import { createClient } from '@/lib/supabase/client';
 
 /** Events inside this window become one refresh (D-032): a round updates every site at once. */
 export const COALESCE_MS = 1500;
-/** Tables in the Realtime publication (the S06b migration publishes exactly these). */
-export const LIVE_TABLES = ['site_status', 'incidents'] as const;
+/** Tables in the Realtime publication (S06b's two, and maintenance_windows since S09b). */
+export const LIVE_TABLES = ['site_status', 'incidents', 'maintenance_windows'] as const;
 export type LiveTable = (typeof LIVE_TABLES)[number];
 
 /**
