@@ -274,6 +274,10 @@ export function adminsText(names: readonly string[] | null | undefined): string 
   return names?.length ? formatNameList(names) : 'every Admin';
 }
 
+/** Why a Responder's window over 24 h offers only Later (§24.14, MaintenancePage board). */
+export const FORCED_LATER_HINT =
+  'Over 24 h needs an Admin’s approval first, so it can’t start now — pick a date below';
+
 /** The Responder's long-window alert (§24.9): "Needs an Admin's approval — Tao gets a request now; …". */
 export function approvalNotice(
   names: readonly string[] | null | undefined,
@@ -322,7 +326,7 @@ export function doneOf(p: {
   }
   if (p.needsApproval)
     return {
-      title: `Request sent to ${adminsText(p.admins)}`,
+      title: `Request sent to ${adminsText(p.admins)} · ${p.site.name}`,
       text: `${span} (${lengthOf(p.startsAt, p.endsAt)}) · waiting for an Admin — it doesn’t start unless approved before ${whenText(p.startsAt, p.now)}. Recorded in the audit log as ${p.viewer}. Reason: “${p.reason.trim()}”. Follow it under Waiting for approval on Maintenance & mutes.`,
     };
   return {
