@@ -301,5 +301,7 @@ describe('the first DOWN email after a mute', () => {
       }).text,
     ).toContain('Held by a mute: until 15:00 — outside response hours — escalation starts Mon 28 Sep 09:00');
     expect(held(null).text).toContain('Held by a mute: until 15:00\n');
+    // A plan with no level left (staging /verify: no L1 person): nobody to escalate to either.
+    expect(held({ next: null }).text).toContain('Held by a mute: until 15:00\n');
   });
 });

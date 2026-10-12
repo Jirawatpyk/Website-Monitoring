@@ -369,11 +369,13 @@ function heldRow(heldUntil: Date | null | undefined, ladder: LadderFacts | null 
   if (!heldUntil) return null;
   const until = isSameBangkokDay(heldUntil, now) ? formatTime(heldUntil) : formatResume(heldUntil, now);
   const paused = ladder?.pausedUntil ? formatResume(ladder.pausedUntil, now) : null;
-  const value = !ladder
-    ? `until ${until}`
-    : paused
-      ? `until ${until} — outside response hours — escalation starts ${paused}`
-      : `until ${until} — escalation starts now`;
+  // Nobody to escalate to (no plan, or no level left): only why it is late (§24.16, staging /verify).
+  const value =
+    !ladder || (!ladder.next && !ladder.pausedUntil)
+      ? `until ${until}`
+      : paused
+        ? `until ${until} — outside response hours — escalation starts ${paused}`
+        : `until ${until} — escalation starts now`;
   return { pre: `held by a mute until ${until}`, row: ['Held by a mute', value] as [string, string] };
 }
 

@@ -551,6 +551,13 @@ describe('first alert after a mute (ChatAlert "First alert after a mute", §24.7
     expect(JSON.stringify(widgets)).toContain('Down 40 min so far — the time while muted counts in uptime.');
   });
 
+  it('nobody left to escalate to: only why it is late (§24.16, staging /verify)', () => {
+    const m = buildDownAlert({ ...base, heldUntil: bkk('2026-09-25T15:00'), ladder: { next: null } });
+    expect(m.cardsV2[0]!.card.sections[0]!.widgets[0]).toEqual({
+      textParagraph: { text: 'Held by a mute until 15:00' },
+    });
+  });
+
   it('outside response hours: escalation starts when the timers run again', () => {
     const m = buildDownAlert({
       ...base,
@@ -593,7 +600,8 @@ describe('first alert after a mute (ChatAlert "First alert after a mute", §24.7
       '<users/ARM> PROBLEM · Fuji Links (Tier 2) · slow · 6.2 s · held by a mute until 15:00 · please take a look',
     );
     expect(m.cardsV2[0]!.card.sections[0]!.widgets[0]).toEqual({
-      textParagraph: { text: 'Held by a mute until 15:00 · escalation starts now' },
+      // No level left to escalate to: only why it is late (§24.16, staging /verify).
+      textParagraph: { text: 'Held by a mute until 15:00' },
     });
   });
 
