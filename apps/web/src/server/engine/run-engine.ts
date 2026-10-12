@@ -48,6 +48,8 @@ import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 const MAX_ROUNDS_PER_RUN = 5;
 /** The control minutes a round is judged by: its BKK check and the recheck that follows (D-039). */
 const CONTROL_ROUND_SPAN_MS = 2 * 60_000;
+/** How far back a run reports slow-location minutes in its summary (D-039). */
+const SLOW_LOG_WINDOW_MS = 3 * 60_000;
 /** Messages that told someone the site failed: RECOVERED replies only to these (spec §15.1). */
 const ALERT_TEMPLATES = ['down', 'problem', 'down_again', 'problem_again'];
 /**
@@ -104,6 +106,8 @@ export interface EngineSummary extends CronJobResult {
   notified: number;
   /** Sites whose write failed this run (the rest were judged); the run reports `ok: false`. */
   failures?: string[];
+  /** Recent minutes a location's times were left out of the slow rule, e.g. "2026-10-12T14:03Z BKK" (D-039). */
+  slowLocations?: string[];
 }
 
 /**
@@ -215,6 +219,16 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         slowThresholdMs: primaryOf.get(c.monitor_id)!.monitors.find((m) => m.isPrimary)!.slowThresholdMs,
       })),
   );
+  // Logged with the run (D-039 L3): which recent minutes a location's times were left out, so a
+  // recurrence shows in the logs without rebuilding it from checks.csv. Runs overlap, so a minute can
+  // repeat across lines.
+  const recentSlow = [...slowLocations]
+    .filter(([minute]) => minute >= now.getTime() - SLOW_LOG_WINDOW_MS)
+    .sort(([a], [b]) => a - b)
+    .flatMap(([minute, locs]) =>
+      [...locs].map((l) => `${new Date(minute).toISOString().slice(0, 16)}Z ${l}`),
+    );
+  if (recentSlow.length) summary.slowLocations = recentSlow;
 
   // D-028: the BKK probe's control check (D-027) over the window's Bangkok checks.
   // Either VPS check failing counts: both control URLs, or the Akamai control (D-027 rule 2b) —

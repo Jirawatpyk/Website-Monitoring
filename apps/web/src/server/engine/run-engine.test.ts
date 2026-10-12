@@ -927,3 +927,28 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     });
   });
 });
+
+describe('runEngine — slow locations in the summary (D-039)', () => {
+  // Three sites; BKK over 3 s on all of them while SIN answers in 0.3 s (production 12 Oct).
+  const sites = ['s1', 's2', 's3'];
+  const monitors = sites.map((s, i) => ({ ...monitor({ name: `Site ${i}` }), id: `m${i}`, site_id: s }));
+  const timed = (bkkMs: number) =>
+    sites.flatMap((_, i) => [
+      { ...row('BKK', 'pass', 1, 1, 200), monitor_id: `m${i}`, response_ms: bkkMs },
+      { ...row('SIN', 'pass', 2, 1, 200), monitor_id: `m${i}`, response_ms: 300 },
+    ]);
+  const withBkk = {
+    'probe_locations.select': { data: [...beating, { code: 'BKK', last_heartbeat_at: at(50) }] },
+    'monitors.select': { data: monitors },
+  };
+
+  it('names the minute and the location left out', async () => {
+    const { db } = fakeDb({ ...withBkk, 'rpc.engine_checks': { data: timed(4000) } });
+    expect((await runEngine(db, now)).slowLocations).toEqual(['2026-10-06T10:00Z BKK']);
+  });
+
+  it('a quiet minute adds no field', async () => {
+    const { db } = fakeDb({ ...withBkk, 'rpc.engine_checks': { data: timed(900) } });
+    expect(await runEngine(db, now)).not.toHaveProperty('slowLocations');
+  });
+});
