@@ -53,7 +53,7 @@ AmbientCapabilities=
 # Keep the probe and the browser off the VPS's own network and cloud metadata (SSRF).
 # The same ranges the probe's SSRF guard refuses (packages/probe/src/target.ts) — this also covers
 # the browser's redirects and page requests. DNS goes through systemd-resolved's stub on 127.0.0.53.
-IPAddressDeny=127.0.0.0/8 ::1/128 169.254.0.0/16 fe80::/10 224.0.0.0/4 ff00::/8 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 172.16.0.0/12 192.168.0.0/16 198.18.0.0/15 240.0.0.0/4 fc00::/7
+IPAddressDeny=127.0.0.0/8 ::1/128 169.254.0.0/16 fe80::/10 224.0.0.0/4 ff00::/8 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 172.16.0.0/12 192.168.0.0/16 198.18.0.0/15 240.0.0.0/4 fc00::/7 ::/96 2002::/16
 IPAddressAllow=127.0.0.53/32
 
 [Install]

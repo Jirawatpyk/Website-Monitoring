@@ -23,6 +23,8 @@ export interface HttpCheckRequest {
   allowPrivateTargets?: boolean;
   /** DNS lookup for the SSRF guard (tests). */
   lookup?: Lookup;
+  /** Tests only, with `lookup`: a CA to trust, for a local https server. */
+  tlsCa?: string;
   /** Text the page must contain / must not contain (PROBLEM · Keyword, D-022). Case-sensitive. */
   mustContain?: readonly string[];
   mustNotContain?: readonly string[];
@@ -120,21 +122,25 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
   }
 }
 
-// One connection pool each, shared by every check of the process: the SSRF guard runs inside the
-// connection's DNS lookup (`publicOnlyLookup`, D-040), so a hop resolves once and connects to the
-// address that passed. `fetch` and `Agent` come from the same undici so the dispatcher fits.
-const publicAgent = new Agent({ connect: { lookup: publicOnlyLookup() } });
-const privateAgent = new Agent({ connect: { lookup: publicOnlyLookup(defaultLookup, true) } });
+// The SSRF guard runs inside the connection's DNS lookup (`publicOnlyLookup`, D-040), so a hop
+// resolves once and connects to the address that passed. `fetch` and `Agent` come from the same undici
+// so the dispatcher fits. The connect phase (DNS included) gets no timeout of its own — undici's 10 s
+// default would cut a slow lookup short of the check's own timeout, which the request's signal enforces.
+const agentFor = (lookup: Lookup, allowPrivate: boolean, ca?: string) =>
+  new Agent({
+    connect: { lookup: publicOnlyLookup(lookup, allowPrivate), timeout: 0, ...(ca ? { ca } : {}) },
+  });
+
+/** One pool each, shared by every check of the process; made on first use. */
+const shared = new Map<boolean, Agent>();
 
 /** The check's dispatcher; an injected `lookup` (tests) gets its own, closed when the check ends. */
 function dispatcherFor(req: HttpCheckRequest): { agent: Agent; owned: boolean } {
   const allowPrivate = !!req.allowPrivateTargets;
-  if (req.lookup)
-    return {
-      agent: new Agent({ connect: { lookup: publicOnlyLookup(req.lookup, allowPrivate) } }),
-      owned: true,
-    };
-  return { agent: allowPrivate ? privateAgent : publicAgent, owned: false };
+  if (req.lookup) return { agent: agentFor(req.lookup, allowPrivate, req.tlsCa), owned: true };
+  let agent = shared.get(allowPrivate);
+  if (!agent) shared.set(allowPrivate, (agent = agentFor(defaultLookup, allowPrivate)));
+  return { agent, owned: false };
 }
 
 /**

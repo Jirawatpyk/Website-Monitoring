@@ -33,7 +33,9 @@ for (const [net, prefix] of [
 for (const [net, prefix] of [
   ['::', 128],
   ['::1', 128],
+  ['::', 96], // IPv4-compatible (deprecated) — ::7f00:1 is 127.0.0.1
   ['64:ff9b::', 96], // NAT64 — may map to private IPv4
+  ['2002::', 16], // 6to4 — embeds an IPv4, private ones included
   ['fc00::', 7], // unique local
   ['fe80::', 10], // link-local
   ['ff00::', 8], // multicast
@@ -91,7 +93,16 @@ export async function assertPublicTarget(
   if (host === null) return;
   // The DNS lookup counts against the check's timeout like the request itself.
   const addresses = await withSignal(lookup(host), signal);
-  if (!addresses.length || addresses.some((a) => isBlockedAddress(a.address))) throw refusedAddress();
+  if (refused(addresses)) throw refusedAddress();
+}
+
+/**
+ * The one rule both guards apply to a lookup's answer: no address, anything that isn't one, or any
+ * private / reserved address refuses the whole host (`allowPrivate`: local development and tests).
+ */
+function refused(addresses: readonly { address: string }[], allowPrivate = false): boolean {
+  if (!addresses.length || addresses.some((a) => !isIP(a.address))) return true;
+  return !allowPrivate && addresses.some((a) => isBlockedAddress(a.address));
 }
 
 type LookupAddress = { address: string; family: number };
@@ -101,17 +112,27 @@ type LookupCallback = (err: Error | null, address: string | LookupAddress[], fam
  * A `net.connect` lookup that resolves once and refuses the connection unless every address is public
  * (`allowPrivate`: local development and tests only). Handed to the HTTP client's connector, so the
  * request goes to exactly the address checked. Answers both forms Node asks for: one address, or all
- * of them (`options.all`, family autoselection).
+ * of them (`options.all`, family autoselection) — of the family asked for, when one is.
  */
 export function publicOnlyLookup(lookup: Lookup = defaultLookup, allowPrivate = false) {
-  return (hostname: string, options: { all?: boolean }, callback: LookupCallback): void => {
+  return (
+    hostname: string,
+    options: { all?: boolean; family?: number | string },
+    callback: LookupCallback,
+  ): void => {
     lookup(hostname).then(
       (found) => {
-        const addresses = found.map((a) => ({ address: a.address, family: isIP(a.address) }));
-        // As `assertPublicTarget`: no address, or anything that isn't one, is refused.
-        if (!addresses.length || addresses.some((a) => a.family === 0)) return callback(refusedAddress(), '');
-        if (!allowPrivate && addresses.some((a) => isBlockedAddress(a.address))) {
-          return callback(refusedAddress(), '');
+        if (refused(found, allowPrivate)) return callback(refusedAddress(), '');
+        // Every address was checked above; a family filter only narrows the answer.
+        const all = found.map((a) => ({ address: a.address, family: isIP(a.address) }));
+        const f = options.family;
+        const wanted = f === 4 || f === 'IPv4' ? 4 : f === 6 || f === 'IPv6' ? 6 : 0;
+        const addresses = wanted ? all.filter((a) => a.family === wanted) : all;
+        if (!addresses.length) {
+          return callback(
+            Object.assign(new Error(`No IPv${wanted} address for ${hostname}`), { code: 'ENOTFOUND' }),
+            '',
+          );
         }
         if (options.all) return callback(null, addresses);
         callback(null, addresses[0]!.address, addresses[0]!.family);

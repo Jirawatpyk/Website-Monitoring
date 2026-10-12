@@ -36,6 +36,26 @@ describe('publicOnlyLookup (the connection resolves once and checks, D-040)', ()
     expect((await ask(lookup, false)).err).toBeInstanceOf(TargetNotAllowedError);
   });
 
+  it('answers in the family asked for, after checking every address', async () => {
+    const answer = (family: number | string, all = false) =>
+      new Promise<{ address: unknown; family?: number; err: Error | null }>((resolve) =>
+        publicOnlyLookup(async () => [{ address: '2606:2800:220:1::' }, { address: '93.184.216.34' }])(
+          'host.example.test',
+          { all, family },
+          (err, address, fam) => resolve({ err, address, family: fam }),
+        ),
+      );
+    expect(await answer(4)).toMatchObject({ address: '93.184.216.34', family: 4 });
+    expect(await answer('IPv6')).toMatchObject({ address: '2606:2800:220:1::', family: 6 });
+    expect((await answer(4, true)).address).toEqual([{ address: '93.184.216.34', family: 4 }]);
+    const none = await new Promise<Error | null>((resolve) =>
+      publicOnlyLookup(async () => [{ address: '93.184.216.34' }])('v4only.test', { family: 6 }, (err) =>
+        resolve(err),
+      ),
+    );
+    expect(none).toMatchObject({ code: 'ENOTFOUND' });
+  });
+
   it('lets a private address through only when allowed (local development), and passes DNS errors on', async () => {
     expect((await ask(async () => [{ address: '127.0.0.1' }], false, true)).address).toBe('127.0.0.1');
     const failed = await ask(
@@ -66,6 +86,8 @@ describe('isBlockedAddress (SSRF guard)', () => {
     ['0.0.0.0', true],
     ['224.0.0.1', true],
     ['::1', true],
+    ['::7f00:1', true], // IPv4-compatible 127.0.0.1
+    ['2002:7f00:1::', true], // 6to4 of 127.0.0.1
     ['fd00::1', true],
     ['fe80::1', true],
     ['::ffff:10.0.0.1', true],

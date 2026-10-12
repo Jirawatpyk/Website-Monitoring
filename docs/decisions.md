@@ -56,6 +56,15 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - The lookup keeps the process's DNS order (no `verbatim`): the VPS runs with `--dns-result-order=ipv4first` — it has no IPv6 route — and the connection now goes to the address the lookup returns.
 - `assertPublicTarget` (resolve and check, no connection) stays for saving a site and for the browser verifier, whose page requests systemd's `IPAddressDeny` already confines.
 - `UV_THREADPOOL_SIZE=16` stays.
+- **Reviews (13 Oct).**
+  - The connect phase (DNS included) has no timeout of its own (`connect.timeout: 0`). The check's signal bounds it, so a slow lookup ends as 'Timeout' at the monitor's timeout, as before, not at undici's 10 s default.
+  - The lookup answers in the family Node asks for, after checking every address.
+  - Both guards share one rule (`refused`).
+  - The shared Agents are made on first use.
+  - A DNS failure now reads as its code (`ENOTFOUND`), which the messages word as "DNS error". Before, it was raw "getaddrinfo ENOTFOUND host" text.
+  - An https test pins `pinned.test` to 127.0.0.1 with a test CA and shows the certificate is still checked against the hostname.
+  - Security: the agent's ESM bundle inlines undici (CommonJS), which crashed on start without a real `require`. `tsup.config.ts` gives it one (`createRequire` banner), and `apps/vps-agent/src/bundle.test.ts` builds and starts the bundle.
+  - `::/96` (IPv4-compatible) and `2002::/16` (6to4) are blocked too, in the guard and the unit's `IPAddressDeny`.
 
 **Impact.** `packages/probe` (`target.ts`, `http-check.ts`, tests); no API, schema or engine change. Both probes (Vercel SIN / TYO, the VPS) and the Add-site Test check.
 
