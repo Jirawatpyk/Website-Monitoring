@@ -207,8 +207,15 @@ export interface TimedCheck {
 }
 
 /**
+ * What "slow" means when a location is judged (not a site): over 3 s, the strictest tier limit, or a
+ * site's own lower one. With each site's own limit a Tier 2–3 site (5 s) at 3–5 s never counted, so a
+ * VPS slowing every page to ~3.5 s went unseen (production INC-0011 / INC-0012, 12 Oct 2026, D-039).
+ */
+export const SLOW_LOCATION_MS = 3_000;
+
+/**
  * Per probe minute, the location whose response times say more about the probe than the sites: the
- * only one slow (over each site's own limit) on more than half of the 3+ sites it timed that minute,
+ * only one slow (over `SLOW_LOCATION_MS`, or a site's own lower limit) on more than half of the 3+ sites it timed that minute,
  * and — on the 3+ sites another location also timed (the same sites, so a site only it can reach
  * behind a WAF accuses nobody) — slow on more than half where that other location was slow on at
  * most half. Its times that minute are no evidence for the slow rule — on a site behind a WAF, the
@@ -223,7 +230,8 @@ export function slowLocationsByMinute(checks: readonly TimedCheck[]): Map<number
     const minute = minuteOf(c.checkedAt);
     const locs = tally.get(minute) ?? tally.set(minute, new Map()).get(minute)!;
     const sites = locs.get(c.location) ?? locs.set(c.location, new Map()).get(c.location)!;
-    sites.set(c.siteId, (sites.get(c.siteId) ?? false) || c.responseMs > c.slowThresholdMs);
+    const limit = Math.min(c.slowThresholdMs, SLOW_LOCATION_MS);
+    sites.set(c.siteId, (sites.get(c.siteId) ?? false) || c.responseMs > limit);
   }
   const out = new Map<number, Set<ProbeLocation>>();
   for (const [minute, locs] of tally) {
