@@ -5,8 +5,10 @@ import { BlockList, isIP } from 'node:net';
  * SSRF guard (CLAUDE.md → Security): a probe only fetches public internet hosts on the standard web
  * ports. Checked before every request and every redirect hop, from every location — the same code
  * runs on Vercel and on the Thai VPS, where a LAN and the host itself would be reachable.
- * Residual risk: DNS can change between this check and the connection (rebinding); pinning the
- * connection to the checked address is a follow-up.
+ * A probe's request resolves its host once, inside the connection (`publicOnlyLookup`, D-040): the
+ * address that passed is the one it connects to, so DNS can't change in between (rebinding) and a
+ * hop costs one lookup, not two. `assertPublicTarget` (resolve and check, no connection) stays for
+ * saving a site and for the browser verifier.
  */
 
 const blocked = new BlockList();
@@ -59,7 +61,25 @@ export class TargetNotAllowedError extends Error {
 
 export type Lookup = (hostname: string) => Promise<{ address: string }[]>;
 
-const defaultLookup: Lookup = (hostname) => dnsLookup(hostname, { all: true, verbatim: true });
+// The process's default order (no `verbatim`): the VPS runs with --dns-result-order=ipv4first because
+// it has no IPv6 route, and a connection now goes to these addresses.
+export const defaultLookup: Lookup = (hostname) => dnsLookup(hostname, { all: true });
+
+const refusedAddress = () => new TargetNotAllowedError('private or reserved address');
+
+/**
+ * Scheme, port and an IP-literal host — everything but DNS. Throws TargetNotAllowedError unless `url`
+ * is http(s) on port 80/443 and, if its host is an address, a public one. Returns the host for a lookup,
+ * or null for an IP literal (a connection to it does no lookup).
+ */
+export function assertPublicUrl(url: URL): string | null {
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new TargetNotAllowedError('scheme');
+  if (url.port && url.port !== '80' && url.port !== '443') throw new TargetNotAllowedError('port');
+  const host = url.hostname.replace(/^\[(.*)\]$/, '$1');
+  if (!isIP(host)) return host;
+  if (isBlockedAddress(host)) throw refusedAddress();
+  return null;
+}
 
 /** Throws TargetNotAllowedError unless `url` is http(s) on port 80/443 and resolves only to public addresses. */
 export async function assertPublicTarget(
@@ -67,14 +87,38 @@ export async function assertPublicTarget(
   lookup: Lookup = defaultLookup,
   signal?: AbortSignal,
 ): Promise<void> {
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new TargetNotAllowedError('scheme');
-  if (url.port && url.port !== '80' && url.port !== '443') throw new TargetNotAllowedError('port');
-  const host = url.hostname.replace(/^\[(.*)\]$/, '$1');
+  const host = assertPublicUrl(url);
+  if (host === null) return;
   // The DNS lookup counts against the check's timeout like the request itself.
-  const addresses = isIP(host) ? [{ address: host }] : await withSignal(lookup(host), signal);
-  if (!addresses.length || addresses.some((a) => isBlockedAddress(a.address))) {
-    throw new TargetNotAllowedError('private or reserved address');
-  }
+  const addresses = await withSignal(lookup(host), signal);
+  if (!addresses.length || addresses.some((a) => isBlockedAddress(a.address))) throw refusedAddress();
+}
+
+type LookupAddress = { address: string; family: number };
+type LookupCallback = (err: Error | null, address: string | LookupAddress[], family?: number) => void;
+
+/**
+ * A `net.connect` lookup that resolves once and refuses the connection unless every address is public
+ * (`allowPrivate`: local development and tests only). Handed to the HTTP client's connector, so the
+ * request goes to exactly the address checked. Answers both forms Node asks for: one address, or all
+ * of them (`options.all`, family autoselection).
+ */
+export function publicOnlyLookup(lookup: Lookup = defaultLookup, allowPrivate = false) {
+  return (hostname: string, options: { all?: boolean }, callback: LookupCallback): void => {
+    lookup(hostname).then(
+      (found) => {
+        const addresses = found.map((a) => ({ address: a.address, family: isIP(a.address) }));
+        // As `assertPublicTarget`: no address, or anything that isn't one, is refused.
+        if (!addresses.length || addresses.some((a) => a.family === 0)) return callback(refusedAddress(), '');
+        if (!allowPrivate && addresses.some((a) => isBlockedAddress(a.address))) {
+          return callback(refusedAddress(), '');
+        }
+        if (options.all) return callback(null, addresses);
+        callback(null, addresses[0]!.address, addresses[0]!.family);
+      },
+      (err: unknown) => callback(err instanceof Error ? err : new Error(String(err)), ''),
+    );
+  };
 }
 
 function withSignal<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T> {

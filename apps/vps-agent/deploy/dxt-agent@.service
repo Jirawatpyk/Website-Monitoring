@@ -23,9 +23,10 @@ WorkingDirectory=/opt/dxt-agent/%i
 EnvironmentFile=/etc/dxt-agent/%i.env
 Environment=HOME=/var/lib/dxt-agent-%i
 Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/dxt-agent/browsers
-# Every check does two getaddrinfo (the SSRF guard's and fetch's), on libuv's thread pool — 4 threads
-# by default. 39 checks at once on a Tier 2 minute queued them and doubled BKK's measured TTFB
-# (production 12 Oct: BA TW 1.5 → 3.1 s, slow PROBLEMs from BKK alone; 16 threads: DNS 308 → 91 ms, D-039).
+# Every check's DNS lookup runs on libuv's thread pool — 4 threads by default. 39 checks at once on a
+# Tier 2 minute (two lookups each, until D-040 made it one per hop) queued them and doubled BKK's
+# measured TTFB (production 12 Oct: BA TW 1.5 → 3.1 s, slow PROBLEMs from BKK alone; 16 threads: DNS
+# 308 → 91 ms, D-039).
 Environment=UV_THREADPOOL_SIZE=16
 # The VPS has no IPv6 route: IPv4 first, without Node's 250 ms dual-stack race (hosts ~300 ms away,
 # such as hc-ping.com, timed out under it).

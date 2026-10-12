@@ -324,6 +324,36 @@ describe('runHttpCheck', () => {
     expect(rebound.error).toBe('Target not allowed: private or reserved address');
   });
 
+  it('connects to the address its own lookup returned, one lookup per hop (D-040)', async () => {
+    // `pinned.test` exists nowhere but this lookup: reaching the local server proves the connection
+    // used the address that was resolved (and checked), not a second resolution.
+    const asked: string[] = [];
+    const port = new URL(base).port;
+    const result = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `http://pinned.test:${port}/redirect-same`,
+      lookup: async (host) => (asked.push(host), [{ address: '127.0.0.1' }]),
+    });
+    expect(result).toMatchObject({
+      outcome: 'pass',
+      statusCode: 200,
+      finalUrl: `http://pinned.test:${port}/ok`,
+    });
+    // Two hops (the redirect and /ok), one lookup each — the guard and fetch used to resolve twice per hop.
+    expect(asked).toEqual(['pinned.test', 'pinned.test']);
+  });
+
+  it('refuses at the connection when the host resolves to a private address, whatever the URL says', async () => {
+    const result = await runHttpCheck({
+      url: 'https://rebinds.example.test/',
+      lookup: async () => [{ address: '93.184.216.34' }, { address: '127.0.0.1' }],
+    });
+    expect(result).toMatchObject({
+      outcome: 'fail',
+      error: 'Target not allowed: private or reserved address',
+    });
+  });
+
   it('reads no body for a HEAD check', async () => {
     const result = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok`, method: 'HEAD' });
     expect(result).toMatchObject({ outcome: 'pass', statusCode: 200, bodySample: '' });
