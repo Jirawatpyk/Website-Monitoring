@@ -80,6 +80,15 @@ describe('deploy/dxt-agent@.service', () => {
   });
 });
 
+describe('deploy/dxt-agent@.service thread pool (D-039)', () => {
+  it('gives libuv at least 16 threads, so a round of checks doesn’t queue its DNS lookups', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const unit = await readFile(new URL('../deploy/dxt-agent@.service', import.meta.url), 'utf8');
+    const size = Number(/^Environment=UV_THREADPOOL_SIZE=(\d+)$/m.exec(unit)?.[1]);
+    expect(size).toBeGreaterThanOrEqual(16);
+  });
+});
+
 describe('the bundle (tsup.config.ts)', () => {
   it('keeps external only what deploy/package.json installs on the VPS', async () => {
     const { readFile } = await import('node:fs/promises');
