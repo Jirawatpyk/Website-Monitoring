@@ -367,6 +367,7 @@ export function MaintenancePageView({
           <DeclineDialog
             key={`x${open.n}`}
             p={open.p}
+            viewer={viewer.name}
             now={now}
             open={shown('decline')}
             onClose={back}

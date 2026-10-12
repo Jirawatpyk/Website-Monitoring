@@ -1,5 +1,7 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
+import { isInsideHours, nextOpening } from '@dxt/engine';
+import { loadResponseHours } from '@/server/escalation/response-hours';
 import { escalationPlanSchema, TIER_CONFIG, type SiteStatus, type Tier } from '@dxt/shared';
 import type { PausableSite } from './model';
 import type { LogEntry, WindowRow } from './page-model';
@@ -22,13 +24,13 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
                    owner:profiles!sites_primary_owner_id_fkey(display_name, role),
                    backup:profiles!sites_backup_owner_id_fkey(display_name, role),
                    site_status(status),
-                   incidents(number, state, detected_at, alerted_at, escalation_plan))`,
+                   incidents(number, state, severity, started_at, detected_at, alerted_at, escalation_plan))`,
     )
     .in('sites.incidents.state', ['unacked', 'escalated'])
     .or(`ends_at.gte.${since},cancelled_at.gte.${since}`)
     .order('starts_at');
   if (error) throw new Error(`maintenance_windows: ${error.message}`);
-  return (data ?? []).map((w) => {
+  const rows = (data ?? []).map((w): WindowRow => {
     const status = Array.isArray(w.sites.site_status) ? w.sites.site_status[0] : w.sites.site_status;
     return {
       id: w.id,
@@ -59,6 +61,7 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
       silenced: w.kind === 'mute' ? silencedOf(w.sites.incidents, w.starts_at, w.sites.tier) : null,
     };
   });
+  return withPausedUntil(db, rows, now);
 }
 
 /**
@@ -70,6 +73,8 @@ function silencedOf(
   incidents: {
     number: number;
     state: string;
+    severity: string;
+    started_at: string;
     detected_at: string;
     alerted_at: string | null;
     escalation_plan: unknown;
@@ -82,7 +87,30 @@ function silencedOf(
   const plan = escalationPlanSchema.safeParse(i.escalation_plan);
   const l1 = plan.success ? plan.data.steps.find((s) => s.level === 1) : undefined;
   const alwaysOn = TIER_CONFIG[tier as Tier]?.alwaysOn ?? false;
-  return { number: i.number, l1DelayMin: l1 && alwaysOn ? l1.delayMin : null };
+  return {
+    number: i.number,
+    l1DelayMin: l1 && alwaysOn ? l1.delayMin : null,
+    severity: i.severity === 'problem' ? 'problem' : 'down',
+    since: i.started_at,
+    pausedUntil: null,
+  };
+}
+
+/**
+ * A held Tier 2–3 incident outside response hours escalates from the next opening (§24.13): the hours
+ * are read only when a mute holds such an incident.
+ */
+async function withPausedUntil(db: DbClient, rows: WindowRow[], now: Date): Promise<WindowRow[]> {
+  const waiting = rows.some((r) => r.silenced && !(TIER_CONFIG[r.tier]?.alwaysOn ?? false));
+  if (!waiting) return rows;
+  const hours = await loadResponseHours(db, now);
+  if (isInsideHours(now, hours)) return rows;
+  const opening = nextOpening(now, hours).toISOString();
+  return rows.map((r) =>
+    r.silenced && !(TIER_CONFIG[r.tier]?.alwaysOn ?? false)
+      ? { ...r, silenced: { ...r.silenced, pausedUntil: opening } }
+      : r,
+  );
 }
 
 /** The live sites, with what the dialog's guard needs; the page keeps the ones this person may act on. */

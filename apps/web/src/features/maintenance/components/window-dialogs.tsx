@@ -19,6 +19,7 @@ import {
   approveEffects,
   approveTitle,
   cancelText,
+  declineHint,
   dialogDescription,
   endChoices,
   endEffects,
@@ -322,7 +323,7 @@ export function EditDialog({
         {!cancelling && !running && <span className="md:hidden">{cancelButton(true)}</span>}
         {cancelling && (
           <Alert tone="warning" role="alert" title={`${cancelWord}?`}>
-            {cancelText(p.state, viewer)}
+            {cancelText(r, p.state, viewer)}
           </Alert>
         )}
         <Refusal error={error} />
@@ -388,7 +389,15 @@ export function ApproveDialog({
 }
 
 /** Decline a request with a reason (Admin) → Recent "Declined". */
-export function DeclineDialog({ p, now, open, onClose, onDone = onClose, onUndone }: DialogProps) {
+export function DeclineDialog({
+  p,
+  viewer,
+  now,
+  open,
+  onClose,
+  onDone = onClose,
+  onUndone,
+}: DialogProps & { viewer: string }) {
   const [reason, setReason] = useState('');
   const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
   usePostPendingOnOpen(open);
@@ -431,7 +440,7 @@ export function DeclineDialog({ p, now, open, onClose, onDone = onClose, onUndon
           placeholder="e.g. Split it into two nights"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          hint={`Required. ${r.byName ?? 'The asker'} gets it in a Chat message; the request moves to Recent as Declined.`}
+          hint={declineHint(r, viewer)}
         />
         <Refusal error={error} />
       </div>
