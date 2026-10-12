@@ -36,6 +36,7 @@ Modes (`apps/test-target/CLAUDE.md`) and the outcome to expect (StatusModel, D-0
 | `slow`              | PROBLEM `slow` on the **3rd** slow round (Tier 1: ~3–4 min)                                                                                                                                                                               |                            |
 | `waf-partial`       | with the site flagged Behind WAF: OK with "Verified from BKK; SIN, TYO blocked by bot protection"; `check_results.waf = 'cloudflare'` at SIN / TYO, `control_ok = true` at BKK. Flag off: the verifier path, as `challenge` (S05b, D-027) | next round                 |
 | `waf-partial-down`  | with the flag on: DOWN on the Bangkok probe alone (503 + its recheck), Chat + email                                                                                                                                                       | ~1–2 min                   |
+| `waf-partial-slow`  | with the flag on: PROBLEM · Slow on the 3rd slow BKK round ("p50 6.x s (BKK)"); back to `waf-partial` → RECOVERED "from 1 location". Staging has one site, so D-039's slow-location rule never applies there                              | Tier 1: ~3–4 min           |
 
 Relapse, flapping and auto-resolve (S04b, D-024), on one incident without a reset in between:
 
