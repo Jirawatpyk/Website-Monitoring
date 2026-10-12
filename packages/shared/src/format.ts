@@ -244,7 +244,12 @@ export function formatConfirmedBy(
         : `${waf.from.slice(0, -1).join(', ')} and ${waf.from.at(-1)}`;
     return `${from}, 2 checks — ${waf.blocked.join(', ')} blocked by bot protection`;
   }
-  return `${count} location${count === 1 ? '' : 's'}, 2 checks`;
+  return `${formatLocations(count)}, 2 checks`;
+}
+
+/** "1 location", "3 locations". */
+export function formatLocations(count: number): string {
+  return `${count} location${count === 1 ? '' : 's'}`;
 }
 
 /** Who confirmed a DOWN behind a WAF and who it blocked, read back from an incident's context (D-027). */

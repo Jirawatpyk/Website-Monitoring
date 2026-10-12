@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
 import {
   faultyByMinute,
+  slowLocationsByMinute,
   hostOf,
   isAllowedHost,
   keywordIssue,
@@ -203,5 +204,72 @@ describe('faulty location (spec §15.3): one location failing more than half the
     expect(faultyByMinute(rows(2, 4))).toEqual(new Map());
     const two = [...rows(3, 4), ...rows(0, 4, 61)];
     expect([...faultyByMinute(two).keys()]).toEqual([T]);
+  });
+});
+
+describe('slow location (D-039): one location slow on most sites in a minute times itself', () => {
+  // Production, Mon 12 Oct 2026 16:15 Bangkok: BKK over 3 s on 10 of 10 sites, SIN's median 0.6 s.
+  const rows = (slowAtBkk: number, total: number, sinMs = 600) =>
+    Array.from({ length: total }, (_, i) =>
+      (['BKK', 'SIN'] as const).map((location) => ({
+        siteId: `s${i}`,
+        location,
+        outcome: 'pass' as CheckOutcome,
+        checkedAt: at(1),
+        responseMs: location === 'BKK' ? (i < slowAtBkk ? 3993 : 1500) : sinMs,
+        slowThresholdMs: 3000,
+      })),
+    ).flat();
+
+  it.each([
+    ['BKK slow on 10 of 10, SIN fast → BKK is no evidence', rows(10, 10), [T]],
+    ['BKK slow on 3 of 5 (more than half) → BKK', rows(3, 5), [T]],
+    ['BKK slow on 2 of 5 (16:17) → judged as usual', rows(2, 5), []],
+    ['everyone slow everywhere → the sites may really be slow', rows(5, 5, 4000), []],
+    ['below 3 sites the rule doesn’t apply', rows(2, 2), []],
+  ])('%s', (_, checks, minutes) => {
+    const out = slowLocationsByMinute(checks);
+    expect([...out.keys()]).toEqual(minutes);
+    for (const m of minutes) expect(out.get(m)).toEqual(new Set(['BKK']));
+  });
+
+  const timed = (siteId: string, location: ProbeLocation, responseMs: number) => ({
+    siteId,
+    location,
+    outcome: 'pass' as CheckOutcome,
+    checkedAt: at(1),
+    responseMs,
+    slowThresholdMs: 3000,
+  });
+
+  it('only the sites both timed are compared: slow only where SIN can’t reach (behind a WAF) accuses nobody', () => {
+    const waf = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'].map((id) => timed(id, 'BKK', 4000));
+    const open = ['o1', 'o2', 'o3', 'o4', 'o5'].flatMap((id) => [
+      timed(id, 'BKK', 900),
+      timed(id, 'SIN', 600),
+    ]);
+    expect(slowLocationsByMinute([...waf, ...open]).size).toBe(0);
+  });
+
+  it('two locations slow is left alone — the sole outlier only, as spec §15.3', () => {
+    const checks = ['a', 'b', 'c', 'd'].flatMap((id) => [
+      timed(id, 'BKK', 4000),
+      timed(id, 'TYO', 4000),
+      timed(id, 'SIN', 600),
+    ]);
+    expect(slowLocationsByMinute(checks).size).toBe(0);
+  });
+
+  it('exactly half is not over half (a tie never flags)', () => {
+    expect(slowLocationsByMinute(rows(5, 10)).size).toBe(0);
+  });
+
+  it('each site is held to its own limit; failed checks don’t count', () => {
+    const own = rows(10, 10).map((c) => (c.location === 'BKK' ? { ...c, slowThresholdMs: 5000 } : c));
+    expect(slowLocationsByMinute(own).size).toBe(0);
+    const failed = rows(10, 10).map((c) =>
+      c.location === 'BKK' ? { ...c, outcome: 'fail' as CheckOutcome } : c,
+    );
+    expect(slowLocationsByMinute(failed).size).toBe(0);
   });
 });

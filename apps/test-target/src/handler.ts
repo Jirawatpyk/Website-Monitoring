@@ -12,6 +12,7 @@
  *   waf-partial    → a WAF blocks every request from outside Thailand (403 + cf-mitigated); Thailand gets the
  *                    page — SIN / TYO blocked, the Bangkok VPS passes (S05b, D-027: OK with the note)
  *   waf-partial-down → the same block abroad, and a 503 in Thailand (D-027: DOWN on the Bangkok probe alone)
+ *   waf-partial-slow → the same block abroad, and a probe in Thailand waits 6 s (D-039: slow on BKK alone)
  * Anything else (store missing, unknown value) counts as ok. Only a probe (User-Agent `DxT-Monitor/`)
  * is held or challenged differently, so nobody else can tie up the function.
  */
@@ -26,6 +27,7 @@ export const TARGET_MODES = [
   'slow',
   'waf-partial',
   'waf-partial-down',
+  'waf-partial-slow',
 ] as const;
 export type TargetMode = (typeof TARGET_MODES)[number];
 
@@ -79,7 +81,7 @@ export async function handle({
   }
   if (mode === 'challenge-down') return new Response('Service unavailable\n', { status: 503, headers: text });
   if (mode === 'timeout' && probe) await sleep(TIMEOUT_HOLD_MS);
-  if (mode === 'slow' && probe) await sleep(SLOW_HOLD_MS);
+  if ((mode === 'slow' || mode === 'waf-partial-slow') && probe) await sleep(SLOW_HOLD_MS);
   if (mode === 'keyword-missing') return new Response(BROKEN_PAGE, { status: 200, headers: html });
   return new Response(PAGE(mode), { status: 200, headers: html });
 }

@@ -22,6 +22,7 @@ describe('handle', () => {
     ['waf-partial', 'TH', 200, false],
     ['waf-partial-down', 'SG', 403, true],
     ['waf-partial-down', 'TH', 503, false],
+    ['waf-partial-slow', 'SG', 403, true],
   ])('%s from %s → %i (S05b, D-027)', async (mode, country, status, challenged) => {
     const res = await handle({ readMode: async () => mode, userAgent: 'DxT-Monitor/1.0', country });
     expect(res.status).toBe(status);
@@ -33,6 +34,18 @@ describe('handle', () => {
     const res = await handle({ readMode: async () => 'timeout', userAgent: 'DxT-Monitor/1.0', sleep });
     expect(sleep).toHaveBeenCalledWith(TIMEOUT_HOLD_MS);
     expect(TIMEOUT_HOLD_MS).toBeGreaterThan(30_000);
+    expect(res.status).toBe(200);
+  });
+
+  it('waf-partial-slow holds a probe in Thailand past the slow limit (D-039)', async () => {
+    const sleep = vi.fn(async () => {});
+    const res = await handle({
+      readMode: async () => 'waf-partial-slow',
+      userAgent: 'DxT-Monitor/1.0',
+      country: 'TH',
+      sleep,
+    });
+    expect(sleep).toHaveBeenCalledWith(SLOW_HOLD_MS);
     expect(res.status).toBe(200);
   });
 

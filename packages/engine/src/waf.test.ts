@@ -93,6 +93,32 @@ describe('D-038 — one failing BKK control minute is no data, not PROBLEM', () 
     });
   });
 
+  it('D-039: a no-data round ends a slow streak — "3 in a row" means 3 judged rounds', () => {
+    const rows = [check('BKK', 'pass', 1, { controlOk: false }), ...akamaiAbroad()];
+    const d = decideSite(
+      site([home(rows, { carry: { ...NEW_MONITOR, slowRounds: 2 } })], { bkkControlDown: false }),
+    );
+    expect(d.kind !== 'wait' && d.kind !== 'verify' && d.monitors[0]).toMatchObject({ slowRounds: 0 });
+  });
+
+  it('D-039: as a function it is asked at the round’s own time, with the Akamai control only for Akamai', () => {
+    const rows = [check('BKK', 'pass', 1, { controlOk: false }), ...akamaiAbroad()];
+    const asked: [number, boolean][] = [];
+    const down = (roundAt: Date, akamai: boolean) => (asked.push([roundAt.getTime(), akamai]), akamai);
+    expect(decideSite(site([home(rows)], { bkkControlDown: down }))).toMatchObject({
+      kind: 'problem',
+      detail: { kind: 'blocked', reason: 'control_failed' },
+    });
+    expect(asked).toEqual([[R, true]]);
+    // A Cloudflare site behind a WAF: the Akamai control doesn't count, so this round is no data.
+    const cf = [
+      check('BKK', 'pass', 1, { controlOk: false }),
+      check('SIN', 'blocked', 2, { waf: 'cloudflare' }),
+      check('TYO', 'blocked', 3, { waf: 'cloudflare' }),
+    ];
+    expect(decideSite(site([home(cf)], { bkkControlDown: down }))).toMatchObject({ kind: 'none' });
+  });
+
   it('once it has failed long enough the round is PROBLEM (unverified) as before (D-028)', () => {
     const rows = [check('BKK', 'pass', 1, { controlOk: false }), ...akamaiAbroad()];
     expect(decideSite(site([home(rows)], { bkkControlDown: true }))).toMatchObject({
@@ -305,6 +331,40 @@ describe('D-027 — sites behind a WAF (decideSite)', () => {
     });
     const hijacked = [check('BKK', 'pass', 1, { finalUrl: 'https://evil.example/' }), ...akamaiAbroad()];
     expect(decideSite(site([home(hijacked)]))).toMatchObject({ kind: 'problem', trigger: 'redirect' });
+  });
+
+  it('D-039: BKK slow on most sites that minute is no evidence — the streak holds, no PROBLEM (INC-0010)', () => {
+    const slow = [check('BKK', 'pass', 1, { responseMs: 6_200 }), ...akamaiAbroad()];
+    const slowBkk = new Map([[minuteOf(at(1)), new Set<ProbeLocation>(['BKK'])]]);
+    const d = decideSite(
+      site([home(slow, { carry: { ...NEW_MONITOR, slowRounds: 2 } })], { slowLocations: slowBkk }),
+    );
+    expect(d.kind).not.toBe('problem');
+    expect(d.kind !== 'wait' && d.kind !== 'verify' && d.monitors[0]).toMatchObject({ slowRounds: 2 });
+  });
+
+  it('D-039: an open slow PROBLEM holds while BKK times itself — no RECOVERED, no auto-resolve (engine review H1)', () => {
+    const slowCarry = { ...NEW_MONITOR, status: 'problem' as const, trigger: 'slow' as const, slowRounds: 4 };
+    const open = {
+      id: 'inc-10',
+      state: 'unacked' as const,
+      severity: 'problem' as const,
+      hasRootCause: false,
+      episodeSeverity: 'problem' as const,
+      acked: false,
+      startedAt: at(-240),
+      detectedAt: at(-120),
+    };
+    const rows = [check('BKK', 'pass', 1, { responseMs: 6_200 }), ...akamaiAbroad()];
+    const slowBkk = new Map([[minuteOf(at(1)), new Set<ProbeLocation>(['BKK'])]]);
+    const held = decideSite(site([home(rows, { carry: slowCarry })], { open, slowLocations: slowBkk }));
+    expect(held.kind).not.toBe('recover');
+    expect(held.kind !== 'wait' && held.kind !== 'verify' && held.monitors[0]).toMatchObject({
+      slowRounds: 4,
+    });
+    // Back under the limit with real evidence: it recovers as usual.
+    const fast = [check('BKK', 'pass', 1, { responseMs: 900 }), ...akamaiAbroad()];
+    expect(decideSite(site([home(fast, { carry: slowCarry })], { open }))).toMatchObject({ kind: 'recover' });
   });
 
   it('a key page behind the WAF failing at BKK twice is a key-page PROBLEM, never DOWN', () => {
