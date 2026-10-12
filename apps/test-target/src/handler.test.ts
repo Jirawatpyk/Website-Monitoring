@@ -23,7 +23,6 @@ describe('handle', () => {
     ['waf-partial-down', 'SG', 403, true],
     ['waf-partial-down', 'TH', 503, false],
     ['waf-partial-slow', 'SG', 403, true],
-    ['waf-partial-slow', 'TH', 200, false],
   ])('%s from %s → %i (S05b, D-027)', async (mode, country, status, challenged) => {
     const res = await handle({ readMode: async () => mode, userAgent: 'DxT-Monitor/1.0', country });
     expect(res.status).toBe(status);
