@@ -808,6 +808,9 @@ isOneToOne: false
 "owns_site":
 { Args: { "p_site_id": string }; Returns: boolean
                            },
+"post_window_action_now":
+{ Args: { "p_window_id": string }; Returns: undefined
+                           },
 "queue_fallback_emails":
 { Args: { "p_notification_id": string }; Returns: number
                            },

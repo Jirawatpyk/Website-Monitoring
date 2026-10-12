@@ -3,7 +3,7 @@
 -- 10 s Undo, the engine's start / end / didn't start / not approved, the mute lines and the thread order.
 begin;
 \ir _helpers.psql
-select plan(56);
+select plan(66);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -110,7 +110,7 @@ reset role;
 select is(pg_temp.to_whom('req', 'mw_dm', (select undo_key from public.maintenance_windows where id = (select id from win where name = 'req'))),
   array['arm:approved'], 'the asker gets the answer');
 select is(pg_temp.to_whom('req', 'mw_email', (select undo_key from public.maintenance_windows where id = (select id from win where name = 'req'))),
-  array['ann:admin', 'arm:owner', 'ploy:backup'], 'the request thread hears it, minus the Admin who approved');
+  array['arm:owner', 'ploy:backup'], 'the approval reaches the owner and the backup (Admins hear only what changes a request)');
 select is((select bool_and(hold_until = now() + interval '10 seconds') from public.notifications n
            join public.maintenance_windows w on w.id = n.maintenance_window_id and n.dedupe_key = w.undo_key
            where w.id = (select id from win where name = 'req')), true, 'held 10 s for Undo');
@@ -129,7 +129,7 @@ select is((select approved_at is null and undo_key is null from public.maintenan
            where id = (select id from win where name = 'req')), true, 'the request waits again');
 select is((select count(*)::int from public.notifications
            where maintenance_window_id = (select id from win where name = 'req') and status = 'cancelled' and error = 'Undone'),
-  5, 'and the five held messages are cancelled');
+  4, 'and the four held messages are cancelled');
 select is((select log -> -1 ->> 'action' from public.maintenance_windows where id = (select id from win where name = 'req')),
   'undone', 'a log line says so (never rewritten)');
 select is((select count(*)::int from public.audit_log
@@ -183,8 +183,11 @@ insert into win values ('mute_a', public.mute_site('00000000-0000-0000-0000-0000
   now() + interval '4 hours', 'Redeploying build'));
 reset role;
 select is(pg_temp.to_whom('mute_a', 'mw_line'), array['space:muted'], 'MUTED in its own thread');
-select is(pg_temp.to_whom('mute_a', 'mw_dm'), array['arm:muted', 'ploy:muted'],
-  'Tao muted someone else''s site: the owner and the backup are told');
+select is((select array_agg(m ->> 'name' order by m ->> 'name') from public.notifications n,
+             jsonb_array_elements(n.context -> 'mention') m
+           where n.maintenance_window_id = (select id from win where name = 'mute_a') and n.template = 'mw_dm'
+             and n.user_id is null),
+  array['Arm', 'Ploy'], 'Tao muted someone else''s site: one reply @mentions the owner and the backup together');
 select is(pg_temp.to_whom('mute_a', 'mw_email'), '{}', 'mutes are Chat only');
 select is((select context ->> 'acked' from public.notifications
            where incident_id is not null and template = 'muted'), 'false',
@@ -219,6 +222,24 @@ select is((select context ->> 'incidentId' from public.notifications
              and template = 'mw_line'),
   (select id::text from silent),
   'DIDN''T START names the incident it couldn''t start over');
+-- A request Arm asked for and an Admin approved: its didn't-start email reaches the approver too.
+select tests.authenticate_as((select id from ids where name = 'tao'));
+insert into win values ('busy2', public.create_maintenance('00000000-0000-0000-0000-0000000000d1',
+  now() + interval '6 hours', now() + interval '7 hours', 'Second try'));
+-- An Admin's own window, approved on create: they aren't "the approver" (message-check L2).
+insert into win values ('busy3', public.create_maintenance('00000000-0000-0000-0000-0000000000d1',
+  now() + interval '8 hours', now() + interval '9 hours', 'Third try'));
+reset role;
+update public.maintenance_windows set created_by = (select id from ids where name = 'arm')
+  where id = (select id from win where name = 'busy2');
+set local role service_role;
+select public.engine_log_windows(now() + interval '6 hours 1 minute');
+select public.engine_log_windows(now() + interval '8 hours 1 minute');
+reset role;
+select is(pg_temp.to_whom('busy2', 'mw_email', 'didnt_start'), array['arm:owner', 'ploy:backup', 'tao:approver'],
+  'DIDN''T START emails the owner, the backup and whoever approved it');
+select is(pg_temp.to_whom('busy3', 'mw_email', 'didnt_start'), array['arm:owner', 'ploy:backup'],
+  'an Admin''s own window: no approver copy (they made it)');
 set local role service_role;
 select public.engine_log_windows(now() + interval '2 days 1 minute');
 reset role;
@@ -294,6 +315,59 @@ select lives_ok($$ select public.engine_post_late_alert((select id from mixed), 
   'a second run doesn''t trip the unique index');
 select ok(not public.engine_post_late_alert((select id from mixed), now() + interval '13 seconds'), 'and posts nothing');
 reset role;
+
+-- ── A held action posts at once when its actor moves on (§24.12) ───────
+select tests.authenticate_as((select id from ids where name = 'ploy'));
+insert into win values ('now_post', public.create_maintenance('00000000-0000-0000-0000-0000000000a1',
+  now() + interval '20 days', now() + interval '20 days 2 hours', 'Post now'));
+select public.cancel_window((select id from win where name = 'now_post'), 'Moved');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok($$ select public.post_window_action_now((select id from win where name = 'now_post')) $$,
+  '42501', null, 'only the person who did it can post it now');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'ploy'));
+select lives_ok($$ select public.post_window_action_now((select id from win where name = 'now_post')) $$,
+  'the actor posts it now');
+reset role;
+select is((select bool_and(hold_until = now()) from public.notifications
+           where maintenance_window_id = (select id from win where name = 'now_post') and context ->> 'kind' = 'cancelled'),
+  true, 'its messages are released at once');
+select is((select undo_until = now() and (log -> -1 ->> 'posts_at')::timestamptz = now() from public.maintenance_windows
+           where id = (select id from win where name = 'now_post')),
+  true, 'no Undo any more, and the log line shows it posted now');
+select tests.authenticate_as((select id from ids where name = 'ploy'));
+select throws_like($$ select public.undo_window_action((select id from win where name = 'now_post')) $$,
+  '%Too late to undo%', 'Undo is refused after it was posted — too late, not "not you"');
+select throws_ok($$ select public.post_window_action_now((select id from win where name = 'now_post')) $$,
+  '22023', null, 'posting it a second time is refused (nothing held any more)');
+reset role;
+
+-- Past its 10 s, or already claimed by the notifier: nothing changes (db review L2).
+select tests.authenticate_as((select id from ids where name = 'ploy'));
+insert into win values ('late_post', public.create_maintenance('00000000-0000-0000-0000-0000000000a1',
+  now() + interval '22 days', now() + interval '22 days 2 hours', 'Late post'));
+select public.cancel_window((select id from win where name = 'late_post'), 'Moved');
+reset role;
+-- One of its rows already went out; the window's 10 s ran out.
+update public.notifications set status = 'sent'
+  where id = (select id from public.notifications
+              where maintenance_window_id = (select id from win where name = 'late_post')
+                and context ->> 'kind' = 'cancelled' and status = 'queued' limit 1);
+create temp table late_before on commit drop as
+  select id, status, hold_until from public.notifications
+  where maintenance_window_id = (select id from win where name = 'late_post');
+update public.maintenance_windows set undo_until = now() - interval '1 second'
+  where id = (select id from win where name = 'late_post');
+select tests.authenticate_as((select id from ids where name = 'ploy'));
+select throws_ok($$ select public.post_window_action_now((select id from win where name = 'late_post')) $$,
+  '22023', null, 'past its 10 s it is refused, so the app doesn''t dispatch again (security review L1)');
+reset role;
+select results_eq(
+  $$select id, status, hold_until from public.notifications
+    where maintenance_window_id = (select id from win where name = 'late_post') order by id$$,
+  $$select id, status, hold_until from late_before order by id$$,
+  'and touches nothing — not the claimed row, not the held ones');
 
 -- ── Grants ───────────────────────────────────────────────────────────────
 select ok(not has_function_privilege('authenticated',
