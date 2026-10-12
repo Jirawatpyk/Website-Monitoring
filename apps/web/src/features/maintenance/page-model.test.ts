@@ -318,6 +318,22 @@ describe('words', () => {
     ).toBe(
       'INC-0154 (DOWN since 09:20, held by this mute) posts its first alert now. It’s outside response hours, so escalation starts Mon 28 Sep 09:00.',
     );
+    // A Tier 2–3 PROBLEM held for response hours posts at the opening, not now (spec-check M1, §24.16).
+    expect(
+      endEffects(
+        {
+          ...games,
+          silenced: {
+            ...held,
+            severity: 'problem',
+            l1DelayMin: null,
+            pausedUntil: bkk('2026-09-28T09:00:00'),
+          },
+        },
+        'Tao',
+        NOW,
+      )[0],
+    ).toBe('INC-0154 (PROBLEM since 09:20, held by this mute) posts its first alert Mon 28 Sep 09:00.');
     // End maintenance / cancel / withdraw / decline name who is emailed, minus the person acting.
     expect(endEffects(wecare, 'Tao', NOW)[2]).toBe(
       'Nok and Ploy get an email; the Alerts Space gets a line. Logged in the audit log as Tao.',

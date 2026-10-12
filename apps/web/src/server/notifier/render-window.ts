@@ -150,7 +150,7 @@ export function renderWindowChat(
 export function renderWindowEmail(
   n: Notification,
   w: WindowFactsRow,
-  facts: Pick<Facts, 'windowEnv' | 'recipients'>,
+  facts: Pick<Facts, 'windowEnv'>,
   appUrl: string,
   opts: { from: string; startsThread: boolean; now: Date },
 ): EmailMessage | null {
@@ -167,8 +167,9 @@ export function renderWindowEmail(
     facts: windowFacts(w, facts.windowEnv, appUrl),
     event,
     role,
-    // The asker reads "Your request …" (EmailAlert, redrawn 12 Oct).
-    toName: n.user_id ? (facts.recipients.get(n.user_id)?.display_name ?? null) : null,
+    // By id: the asker reads "Your request …"; an Admin reviews a request (EmailAlert, redrawn 12 Oct).
+    toIsAsker: !!n.user_id && n.user_id === w.created_by,
+    toIsAdmin: !!n.user_id && (facts.windowEnv?.admins ?? []).some((a) => a.id === n.user_id),
     request: ctx.request === true,
     from: opts.from,
     startsThread: opts.startsThread,

@@ -44,7 +44,7 @@ interface Held {
 }
 
 /** The one action still inside its 10 s on this page (§24.12). */
-let pending: (Held & { postsAt: string }) | null = null;
+let heldAction: (Held & { postsAt: string }) | null = null;
 const channelsOf = (h: Held) => (h.chatOnly ? 'Chat' : 'Chat and email');
 
 /**
@@ -52,8 +52,8 @@ const channelsOf = (h: Held) => (h.chatOnly ? 'Chat' : 'Chat and email');
  * one at once (§24.12): it gets its posting time and can no longer be undone.
  */
 export async function postPendingNow(): Promise<void> {
-  const p = pending;
-  pending = null;
+  const p = heldAction;
+  heldAction = null;
   if (!p || Date.parse(p.postsAt) <= Date.now()) return;
   const r = await postWindowActionNow({ windowId: p.windowId }).catch(() => null);
   if (r?.ok) {
@@ -78,8 +78,8 @@ interface DialogProps {
   open: boolean;
   /** Back / Keep it / Close: to the phone sheet it came from, or closed. */
   onClose: () => void;
-  /** After the action went through (the page refreshes). Defaults to onClose. */
-  onDone?: () => void;
+  /** After the action went through (the page refreshes), with where the row went. Defaults to onClose. */
+  onDone?: (landed?: 'recent') => void;
   /** After its Undo went through: where focus goes once the row is back (spec-check). */
   onUndone?: (p: PageRow) => void;
 }
@@ -119,14 +119,14 @@ function useSubmit(onDone: () => void, onUndone?: () => void) {
 function showUndo(held: Held, postsAt: string, undone: () => void) {
   const { windowId, title, site, chatOnly } = held;
   const id = `window-${windowId}`;
-  pending = { ...held, postsAt };
+  heldAction = { ...held, postsAt };
   const onUndo = async () => {
     const r = await undoWindowAction({ windowId }).catch(() => ({
       ok: false as const,
       message: UNDO_FAILED,
     }));
     if (r.ok) {
-      if (pending?.windowId === windowId) pending = null;
+      if (heldAction?.windowId === windowId) heldAction = null;
       toast({ id, title: `${title} — undone`, description: 'Nothing was posted.', duration: 4000 });
       undone();
     } else {
@@ -187,7 +187,10 @@ export function EndDialog({
                 windowId: r.id,
                 title: `${r.siteName} ${noun(r.kind)} ended`,
                 site: r.siteName,
-                chatOnly: r.kind === 'mute' && !r.silenced,
+                // The held incident's card and email go out too — unless it is a PROBLEM held for hours.
+                chatOnly:
+                  r.kind === 'mute' &&
+                  (!r.silenced || (r.silenced.severity === 'problem' && !!r.silenced.pausedUntil)),
               })
             }
           >
@@ -239,7 +242,11 @@ export function EditDialog({
   // The asker who no longer owns the site: straight to the withdraw step, no end to edit.
   const withdrawOnly = request && p.editLabel === WITHDRAW_ONLY;
   const [cancelling, setCancelling] = useState(withdrawOnly);
-  const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
+  // Cancelled or withdrawn, the row moves to Recent: focus goes there (spec-check M2).
+  const { error, pending, run } = useSubmit(
+    () => onDone(cancelling ? 'recent' : undefined),
+    onUndone && (() => onUndone(p)),
+  );
   usePostPendingOnOpen(open);
   const running = p.state === 'active';
   const cancelWord = request ? 'Withdraw request' : 'Cancel maintenance';

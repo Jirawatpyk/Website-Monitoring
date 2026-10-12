@@ -301,7 +301,7 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
       Object.assign(base, {
         mutedLabel: `Muted · until ${whenText(end, now)}`,
         whenSub: `until ${whenText(end, now)} (max 24 h) · ${inFor} in`,
-        whySub: `by ${by} · still counted in uptime${r.silenced ? ` · ${formatIncidentId(r.silenced.number)} held by this mute since ${formatTime(new Date(r.silenced.since))}` : ''}`,
+        whySub: `by ${by} · still counted in uptime${r.silenced ? ` · ${formatIncidentId(r.silenced.number)} held by this mute since ${whenText(new Date(r.silenced.since), now)}` : ''}`,
         line: `Until ${whenText(end, now)} · ${r.reason}`,
         mutedShort: 'Muted',
       });
@@ -437,7 +437,12 @@ function emailAndSpace(r: WindowRow, viewer: string): string {
  * after the mute ends, and L1 counts from it (D-036): "about" and a minute's margin, never early.
  */
 function heldLine(s: NonNullable<WindowRow['silenced']>, now: Date): string {
-  const head = `${formatIncidentId(s.number)} (${s.severity === 'problem' ? 'PROBLEM' : 'DOWN'} since ${formatTime(new Date(s.since))}, held by this mute) posts its first alert now`;
+  const what = `${formatIncidentId(s.number)} (${s.severity === 'problem' ? 'PROBLEM' : 'DOWN'} since ${whenText(new Date(s.since), now)}, held by this mute)`;
+  // A Tier 2–3 PROBLEM outside response hours is held until the opening itself (§24.16, the engine's
+  // holdFor): it doesn't post now.
+  if (s.pausedUntil && s.severity === 'problem')
+    return `${what} posts its first alert ${whenText(new Date(s.pausedUntil), now)}.`;
+  const head = `${what} posts its first alert now`;
   if (s.pausedUntil)
     return `${head}. It’s outside response hours, so escalation starts ${whenText(new Date(s.pausedUntil), now)}.`;
   const l1 = s.l1DelayMin != null ? new Date(now.getTime() + (s.l1DelayMin + 1) * MINUTE) : null;
@@ -510,9 +515,12 @@ function approveWho(r: WindowRow, viewer: string): string {
     ...(r.byName && r.byName !== viewer ? [`${r.byName} gets a Chat message`] : []),
     ...(to.length ? [`${formatNameList(to)} an email`] : []),
   ];
-  const head = parts.length
-    ? `${parts.join(', ')}, and the Alerts Space a line.`
-    : 'The Alerts Space gets a line.';
+  // Without the Chat part the email part needs its own verb (spec-check L9).
+  const head = !parts.length
+    ? 'The Alerts Space gets a line.'
+    : parts.length === 1 && to.length
+      ? `${formatNameList(to)} ${to.length === 1 ? 'gets' : 'get'} an email, and the Alerts Space a line.`
+      : `${parts.join(', ')}, and the Alerts Space a line.`;
   return `${head} Logged in the audit log as ${viewer}.`;
 }
 

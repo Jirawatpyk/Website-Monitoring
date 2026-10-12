@@ -171,6 +171,35 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: /Active now/ })).toHaveFocus());
   });
 
+  it('after Cancel, focus lands on Recent where the row went (spec-check M2)', async () => {
+    const user = userEvent.setup();
+    const scheduled: WindowRow = {
+      ...base,
+      id: 'w9',
+      startsAt: bkk('2026-09-29T01:00:00'),
+      endsAt: bkk('2026-09-29T03:00:00'),
+    };
+    const props = {
+      sites: [],
+      viewer: { id: 'u-tao', name: 'Tao', role: 'admin' as const },
+      viewerEmail: 'x@example.test',
+      nowIso: NOW,
+    };
+    const { rerender } = render(<MaintenancePageView rows={[scheduled, request]} {...props} />);
+    await user.click(
+      within(screen.getByRole('region', { name: 'Scheduled' })).getAllByRole('button', {
+        name: /Edit/,
+      })[0]!,
+    );
+    const edit = await screen.findByRole('dialog', { name: /Edit or cancel/ });
+    await user.click(within(edit).getAllByRole('button', { name: 'Cancel maintenance…' })[0]!);
+    await user.type(within(edit).getByLabelText(/Reason/), 'Client postponed');
+    await user.click(within(edit).getByRole('button', { name: 'Cancel maintenance' }));
+    await waitFor(() => expect(actions.cancelWindow).toHaveBeenCalled());
+    rerender(<MaintenancePageView rows={[{ ...scheduled, cancelledAt: NOW }, request]} {...props} />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Recent/ })).toHaveFocus());
+  });
+
   it('a pending action posts at once when another dialog opens (§24.12)', async () => {
     const user = userEvent.setup();
     actions.endWindowEarly.mockResolvedValueOnce({

@@ -18,6 +18,7 @@ const windowRow = {
   ends_at: '2026-10-06T20:00:00Z',
   reason: 'Plugin updates',
   created_at: '2026-10-06T02:00:00Z',
+  created_by: 'u-arm',
   approved_at: '2026-10-06T02:00:00Z',
   creator: { display_name: 'Arm' },
   approver: { display_name: 'Arm' },

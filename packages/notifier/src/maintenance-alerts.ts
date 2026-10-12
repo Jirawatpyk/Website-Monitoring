@@ -482,8 +482,10 @@ export interface WindowEmailInput {
   facts: WindowFacts;
   event: WindowEvent | { action: 'reminder_12h'; at: Date; by: null };
   role: WindowEmailRole;
-  /** The recipient's name: the person who asked reads "Your request …". */
-  toName?: string | null;
+  /** The recipient asked for the window: "Your request …". */
+  toIsAsker?: boolean;
+  /** The recipient is an Admin — also when they own or back up the site: they review a request. */
+  toIsAdmin?: boolean;
   /** The window began as a request: its request mail thread (§24.5). */
   request: boolean;
   /** Sender, for the window's thread id. */
@@ -569,6 +571,16 @@ export function buildWindowEmail(input: WindowEmailInput): EmailMessage {
   const deadline: [string, string] = ['Deadline', `It starts only if approved before ${start}`];
   const requestEffect = 'No alerts; checks still run; not counted in uptime';
 
+  // Who reads it: the asker first; an Admin reviews a request even when they also own or back up the
+  // site (only Admins get "Review request", spec §24.17); else their tie to the site.
+  const requestKind = ['requested', 'request_changed', 'withdrawn', 'not_approved'].includes(e.action);
+  const reader: Reader =
+    (role === 'owner' || role === 'backup') && input.toIsAsker
+      ? 'asker'
+      : input.toIsAdmin && role !== 'approver' && requestKind
+        ? 'admin'
+        : role;
+
   if (e.action === 'requested') {
     return emailLayout(envelope, {
       color: C.secondary,
@@ -577,7 +589,7 @@ export function buildWindowEmail(input: WindowEmailInput): EmailMessage {
       pre: `${asker} asks for ${len} on ${site} from ${start}`,
       headline: `${asker} asks for ${len} of maintenance`,
       lede:
-        role === 'admin'
+        reader === 'admin'
           ? `Windows over 24 h asked for by a Responder need an Admin. Approve or decline it on Maintenance & mutes — declining needs a reason, which ${asker} gets.`
           : `${asker} asked for maintenance on ${site}. An Admin approves or declines it on Maintenance & mutes.`,
       facts: [
@@ -587,7 +599,7 @@ export function buildWindowEmail(input: WindowEmailInput): EmailMessage {
         ['Effect', requestEffect],
         deadline,
       ],
-      buttons: [role === 'admin' ? page('Review request') : page()],
+      buttons: [reader === 'admin' ? page('Review request') : page()],
     });
   }
   if (e.action === 'reminder_12h') {
@@ -630,8 +642,6 @@ export function buildWindowEmail(input: WindowEmailInput): EmailMessage {
     });
   }
 
-  const reader: Reader =
-    (role === 'owner' || role === 'backup') && input.toName && input.toName === f.createdBy ? 'asker' : role;
   const later = laterEmail(f, e, {
     site,
     len,

@@ -116,7 +116,7 @@ begin
 
   -- 3. Email (§24.5): mutes and the 1 h reminder are Chat only; the 12 h reminder goes to the Admins;
   -- everything else to the owner and the backup — the Admins too while it is a request (requested,
-  -- changed, withdrawn, not approved), the approver when it didn't start — minus whoever did it. Each
+  -- request changed, withdrawn, not approved), the approver when it didn't start — minus whoever did it. Each
   -- person once, by the closest tie (owner, backup, approver, Admin) for the "why" line.
   if p_kind not in ('muted', 'mute_changed', 'mute_ended', 'mute_ended_early', 'reminder_1h') then
     insert into public.notifications
@@ -133,7 +133,8 @@ begin
         and ((v_request and p_kind in ('requested', 'request_changed', 'withdrawn', 'not_approved'))
              or p_kind = 'reminder_12h')
       union all
-      select w.approved_by, 'approver', 3 where p_kind = 'didnt_start'
+      select w.approved_by, 'approver', 3
+      where p_kind = 'didnt_start' and w.approved_by is distinct from w.created_by
     ) r
     join public.profiles p on p.id = r.id and p.is_active
     where r.id is distinct from p_actor
@@ -167,7 +168,8 @@ $$;
 
 -- A held action posts at once when its actor starts another, opens a row or a dialog (§24.12): its
 -- messages leave on the notifier's next claim, it can no longer be undone, and its log line gets the
--- real posting time. Only the actor; nothing to do once the 10 s are over.
+-- real posting time. Only the actor, and only while it is held: after the 10 s it is refused, so a
+-- repeated call can't make the app dispatch again (security review L1).
 create function public.post_window_action_now(p_window_id uuid)
 returns void
 language plpgsql
@@ -187,15 +189,18 @@ begin
     raise exception 'Only the person who did it can post it now' using errcode = '42501';
   end if;
   if w.undo_until is null or v_now >= w.undo_until then
-    return;
+    raise exception 'Already posted' using errcode = '22023', hint = 'undo_expired';
   end if;
   update public.notifications
     set hold_until = v_now
     where maintenance_window_id = w.id and dedupe_key = w.undo_key and status = 'queued';
-  v_last := jsonb_array_length(w.log) - 1;
+  -- The held action's line: the last one with a posting time (the engine may have added one of its own
+  -- since, which has none — db review L1).
+  select max(e.ord)::int - 1 into v_last
+    from jsonb_array_elements(w.log) with ordinality as e(v, ord) where e.v ? 'posts_at';
   update public.maintenance_windows
     set undo_until = null, undo_by = null, undo_action = null, undo_key = null, undo_before = null,
-        log = case when v_last >= 0 and w.log -> v_last ? 'posts_at'
+        log = case when v_last is not null
                    then jsonb_set(w.log, array[v_last::text, 'posts_at'], to_jsonb(v_now))
                    else w.log end
     where id = w.id;

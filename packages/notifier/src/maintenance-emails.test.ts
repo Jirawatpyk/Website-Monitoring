@@ -60,7 +60,8 @@ interface Case {
   facts: WindowFacts;
   event: WindowEvent;
   role: WindowEmailRole;
-  toName: string;
+  toIsAsker?: boolean;
+  toIsAdmin?: boolean;
   request: boolean;
   /** "LABEL — headline" (the text part's first line). */
   head: string;
@@ -80,7 +81,7 @@ const cases: Case[] = [
     facts: china,
     event: ev('approved', bkk('2026-09-25T10:07'), { by: 'Tao' }),
     role: 'owner',
-    toName: 'Arm',
+    toIsAsker: true,
     request: true,
     head: 'MAINTENANCE APPROVED — Maintenance approved',
     pre: 'Bangkok Airways – China · Sat 26 Sep 22:00 → Tue 29 Sep 22:00 · by Tao',
@@ -97,7 +98,6 @@ const cases: Case[] = [
     facts: china,
     event: ev('approved', bkk('2026-09-25T10:07'), { by: 'Tao' }),
     role: 'backup',
-    toName: 'Ploy',
     request: true,
     head: 'MAINTENANCE APPROVED — Maintenance approved',
     pre: 'Bangkok Airways – China · Sat 26 Sep 22:00 → Tue 29 Sep 22:00 · by Tao',
@@ -110,7 +110,7 @@ const cases: Case[] = [
     facts: china,
     event: ev('declined', bkk('2026-09-25T10:07'), { by: 'Tao', reason: 'Split it into two nights' }),
     role: 'owner',
-    toName: 'Arm',
+    toIsAsker: true,
     request: true,
     head: 'MAINTENANCE DECLINED — Maintenance declined',
     pre: 'Bangkok Airways – China · by Tao · “Split it into two nights”',
@@ -123,7 +123,6 @@ const cases: Case[] = [
     facts: china,
     event: ev('declined', bkk('2026-09-25T10:07'), { by: 'Tao', reason: 'Split it into two nights' }),
     role: 'backup',
-    toName: 'Ploy',
     request: true,
     head: 'MAINTENANCE DECLINED — Maintenance declined',
     pre: 'Bangkok Airways – China · by Tao · “Split it into two nights”',
@@ -140,7 +139,6 @@ const cases: Case[] = [
       to: bkk('2026-09-28T22:00'),
     }),
     role: 'admin',
-    toName: 'Tao',
     request: true,
     head: 'REQUEST CHANGED — Request changed — now 2 days',
     pre: 'Bangkok Airways – China · ends Mon 28 Sep 22:00 (was Tue 29 Sep) · now 2 days · still waiting',
@@ -163,7 +161,6 @@ const cases: Case[] = [
       to: bkk('2026-09-28T22:00'),
     }),
     role: 'backup',
-    toName: 'Ploy',
     request: true,
     head: 'REQUEST CHANGED — Request changed — now 2 days',
     pre: 'Bangkok Airways – China · ends Mon 28 Sep 22:00 (was Tue 29 Sep) · now 2 days · still waiting',
@@ -176,7 +173,6 @@ const cases: Case[] = [
     facts: china,
     event: ev('withdrawn', bkk('2026-09-25T11:30'), { by: 'Arm', reason: 'Provider moved the date' }),
     role: 'admin',
-    toName: 'Tao',
     request: true,
     head: 'REQUEST WITHDRAWN — Request withdrawn',
     pre: 'Bangkok Airways – China · by Arm · no more reminders',
@@ -189,7 +185,6 @@ const cases: Case[] = [
     facts: china,
     event: ev('withdrawn', bkk('2026-09-25T11:30'), { by: 'Arm', reason: 'Provider moved the date' }),
     role: 'backup',
-    toName: 'Ploy',
     request: true,
     head: 'REQUEST WITHDRAWN — Request withdrawn',
     pre: 'Bangkok Airways – China · by Arm · no more reminders',
@@ -201,7 +196,7 @@ const cases: Case[] = [
     facts: china,
     event: ev('not_approved', bkk('2026-09-26T22:00')),
     role: 'owner',
-    toName: 'Arm',
+    toIsAsker: true,
     request: true,
     head: 'NOT APPROVED — Not approved — it didn’t start',
     pre: 'Bangkok Airways – China · didn’t start · nobody approved before 22:00',
@@ -213,7 +208,6 @@ const cases: Case[] = [
     facts: china,
     event: ev('not_approved', bkk('2026-09-26T22:00')),
     role: 'backup',
-    toName: 'Ploy',
     request: true,
     head: 'NOT APPROVED — Not approved — it didn’t start',
     pre: 'Bangkok Airways – China · didn’t start · nobody approved before 22:00',
@@ -225,7 +219,6 @@ const cases: Case[] = [
     facts: china,
     event: ev('not_approved', bkk('2026-09-26T22:00')),
     role: 'admin',
-    toName: 'Tao',
     request: true,
     head: 'NOT APPROVED — Not approved — it didn’t start',
     pre: 'Bangkok Airways – China · didn’t start · nobody approved before 22:00',
@@ -237,7 +230,7 @@ const cases: Case[] = [
     facts: china,
     event: ev('started', bkk('2026-09-26T22:00')),
     role: 'owner',
-    toName: 'Arm',
+    toIsAsker: true,
     request: true,
     head: 'MAINTENANCE STARTED — Maintenance has started',
     pre: 'Bangkok Airways – China · until Tue 29 Sep 22:00 · no alerts, not counted in uptime',
@@ -251,7 +244,6 @@ const cases: Case[] = [
     facts: china,
     event: ev('started', bkk('2026-09-26T22:00')),
     role: 'backup',
-    toName: 'Ploy',
     request: true,
     head: 'MAINTENANCE STARTED — Maintenance has started',
     pre: 'Bangkok Airways – China · until Tue 29 Sep 22:00 · no alerts, not counted in uptime',
@@ -270,7 +262,7 @@ const cases: Case[] = [
       },
     }),
     role: 'owner',
-    toName: 'Arm',
+    toIsAsker: true,
     request: true,
     head: 'DIDN’T START — Maintenance didn’t start — site was down',
     pre: 'Bangkok Airways – China was DOWN at 22:00 (INC-0155) · reschedule on Maintenance & mutes',
@@ -291,7 +283,6 @@ const cases: Case[] = [
       },
     }),
     role: 'backup',
-    toName: 'Ploy',
     request: true,
     head: 'DIDN’T START — Maintenance didn’t start — site was down',
     pre: 'Bangkok Airways – China was DOWN at 22:00 (INC-0155) · reschedule on Maintenance & mutes',
@@ -310,7 +301,6 @@ const cases: Case[] = [
       },
     }),
     role: 'approver',
-    toName: 'Tao',
     request: true,
     head: 'DIDN’T START — Maintenance didn’t start — site was down',
     pre: 'Bangkok Airways – China was DOWN at 22:00 (INC-0155) · reschedule on Maintenance & mutes',
@@ -328,7 +318,6 @@ const cases: Case[] = [
       to: bkk('2026-09-29T04:00'),
     }),
     role: 'backup',
-    toName: 'Nok',
     request: false,
     head: 'MAINTENANCE CHANGED — Tubtong maintenance now ends 04:00',
     pre: 'Tubtong · ends Tue 29 Sep 04:00 (was 03:00) · by Ploy',
@@ -346,7 +335,6 @@ const cases: Case[] = [
     facts: { ...tubtong, endsAt: bkk('2026-09-29T04:00') },
     event: ev('cancelled', bkk('2026-09-28T16:00'), { by: 'Tao', reason: 'Client postponed' }),
     role: 'owner',
-    toName: 'Ploy',
     request: false,
     head: 'MAINTENANCE CANCELLED — Tubtong maintenance cancelled',
     pre: 'Tubtong · Tue 29 Sep 01:00 → 04:00 · by Tao · “Client postponed”',
@@ -359,7 +347,6 @@ const cases: Case[] = [
     facts: { ...tubtong, endsAt: bkk('2026-09-29T04:00') },
     event: ev('cancelled', bkk('2026-09-28T16:00'), { by: 'Tao', reason: 'Client postponed' }),
     role: 'backup',
-    toName: 'Nok',
     request: false,
     head: 'MAINTENANCE CANCELLED — Tubtong maintenance cancelled',
     pre: 'Tubtong · Tue 29 Sep 01:00 → 04:00 · by Tao · “Client postponed”',
@@ -371,7 +358,6 @@ const cases: Case[] = [
     facts: tubtong,
     event: ev('started', bkk('2026-09-29T01:00')),
     role: 'backup',
-    toName: 'Nok',
     request: false,
     head: 'MAINTENANCE STARTED — Tubtong maintenance has started',
     pre: 'Tubtong · until 03:00 · no alerts, not counted in uptime',
@@ -383,7 +369,6 @@ const cases: Case[] = [
     facts: tubtong,
     event: ev('ended', bkk('2026-09-29T03:00')),
     role: 'owner',
-    toName: 'Ploy',
     request: false,
     head: 'MAINTENANCE ENDED — Tubtong maintenance ended',
     pre: 'Tubtong · ended on time 03:00 · alerts back on',
@@ -399,7 +384,8 @@ describe('window emails per reader (EmailAlert, redrawn 12 Oct, §24.17)', () =>
       facts: c.facts,
       event: c.event,
       role: c.role,
-      toName: c.toName,
+      toIsAsker: c.toIsAsker,
+      toIsAdmin: c.toIsAdmin,
       request: c.request,
       from,
       startsThread: false,
@@ -427,7 +413,7 @@ describe('window emails per reader (EmailAlert, redrawn 12 Oct, §24.17)', () =>
           facts: china,
           event: ev(action, bkk('2026-09-26T22:00'), { by: 'Tao', ...extra }),
           role: 'owner',
-          toName: 'Arm',
+          toIsAsker: true,
           request: true,
           from,
           startsThread: false,
@@ -440,12 +426,28 @@ describe('window emails per reader (EmailAlert, redrawn 12 Oct, §24.17)', () =>
     expect(colour('declined', { reason: 'x' })).toBe('#52525b');
   });
 
+  it('an Admin who backs up the site still reviews the request (message-check M1)', () => {
+    const e = buildWindowEmail({
+      facts: china,
+      event: ev('requested', china.createdAt, { by: 'Arm' }),
+      role: 'backup',
+      toIsAdmin: true,
+      request: true,
+      from,
+      startsThread: true,
+      now: china.createdAt,
+    });
+    expect(e.text).toContain(`Review request: ${page}`);
+    expect(e.text).toContain('Windows over 24 h asked for by a Responder need an Admin.');
+    // The why line keeps the closest tie (D-037).
+    expect(e.text).toContain('You got this because you’re backup for Bangkok Airways – China.');
+  });
+
   it('the not-approved Admin copy has a secondary button only', () => {
     const e = buildWindowEmail({
       facts: china,
       event: ev('not_approved', bkk('2026-09-26T22:00')),
       role: 'admin',
-      toName: 'Tao',
       request: true,
       from,
       startsThread: false,

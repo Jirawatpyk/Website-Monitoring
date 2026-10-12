@@ -24,7 +24,7 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
                    owner:profiles!sites_primary_owner_id_fkey(display_name, role),
                    backup:profiles!sites_backup_owner_id_fkey(display_name, role),
                    site_status(status),
-                   incidents(number, state, severity, started_at, detected_at, alerted_at, escalation_plan))`,
+                   incidents(number, state, severity, episode_severity, detected_at, alerted_at, escalation_plan))`,
     )
     .in('sites.incidents.state', ['unacked', 'escalated'])
     .or(`ends_at.gte.${since},cancelled_at.gte.${since}`)
@@ -74,7 +74,7 @@ function silencedOf(
     number: number;
     state: string;
     severity: string;
-    started_at: string;
+    episode_severity: string | null;
     detected_at: string;
     alerted_at: string | null;
     escalation_plan: unknown;
@@ -90,8 +90,9 @@ function silencedOf(
   return {
     number: i.number,
     l1DelayMin: l1 && alwaysOn ? l1.delayMin : null,
-    severity: i.severity === 'problem' ? 'problem' : 'down',
-    since: i.started_at,
+    // As the Chat line words it: the drop in progress, since it was detected (spec-check L1).
+    severity: (i.episode_severity ?? i.severity) === 'problem' ? 'problem' : 'down',
+    since: i.detected_at,
     pausedUntil: null,
   };
 }

@@ -237,8 +237,8 @@ export function MaintenancePageView({
    * new rows arrive, not to the page body (spec-check).
    */
   const landing = useRef<{ key: Section['key']; before: WindowRow[] } | null>(null);
-  const done = () => {
-    const key = open?.kind === 'approve' ? 'scheduled' : open?.kind === 'edit' ? null : 'recent';
+  const done = (landed?: 'recent') => {
+    const key = landed ?? (open?.kind === 'approve' ? 'scheduled' : open?.kind === 'edit' ? null : 'recent');
     landing.current = key ? { key, before: rows } : null;
     setOpen((o) => (o ? { ...o, shown: false } : o));
   };
