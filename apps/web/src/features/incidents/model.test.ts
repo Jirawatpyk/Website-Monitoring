@@ -689,3 +689,110 @@ describe('durationMinutes — from the drops, the same number as Site detail and
     expect(durationMinutes(i, new Date('2026-09-21T04:00:00Z'))).toBe(18);
   });
 });
+// Production 12 Oct 2026 (D-038): one flapping incident had 471 timeline lines.
+describe('timelineOf — flapping runs fold into one line', () => {
+  const i = {
+    severity: 'problem' as const,
+    trigger: 'blocked_unverified' as const,
+    startedAt: at('25T13:00:00'),
+    recoveredAt: at('25T13:42:00'),
+  };
+  /** A PROBLEM AGAIN at minute `m`, its Chat card, its recovery 3 min later and the RECOVERED card. */
+  const cycle = (m: number): EventRow[] => {
+    const t = (min: number, sec = 0) =>
+      `25T${String(13 + Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    return [
+      ev('relapsed', t(m), {
+        severity: 'problem',
+        cause: 'BKK network check failed',
+        flapping: true,
+      }),
+      ev('alerted', t(m, 5), {
+        channel: 'google_chat',
+        template: 'problem_again',
+      }),
+      ev('recovered', t(m + 3), { okLocations: 1 }),
+      ev('alerted', t(m + 3, 5), {
+        channel: 'google_chat',
+        template: 'recovered',
+      }),
+    ];
+  };
+  const head: EventRow[] = [
+    ev('detected', '25T13:00:40', { cause: 'BKK network check failed' }),
+    ev('recovered', '25T13:03:00', { okLocations: 1 }),
+  ];
+  const now = new Date(at('25T14:00:00'));
+
+  it('3+ cycles in a row become "Flapped ×n between … and …", every line kept in the run', () => {
+    const events = [
+      ...head,
+      ...cycle(6),
+      ...cycle(12),
+      ...cycle(18),
+      ev('note', '25T13:30:00', { text: 'x' }, 'u-arm'),
+    ];
+    const t = timelineOf(i, events, nameOf, now);
+    const flap = t.find((l) => l.kind === 'flapping');
+    expect(flap).toMatchObject({
+      time: '13:06:00',
+      title: 'Flapped ×3 between 13:06 and 13:21',
+      detail: 'PROBLEM again ×3 · each recovered · 12 events',
+    });
+    expect(flap?.run).toHaveLength(12);
+    expect(t.map((l) => l.title)).toEqual([
+      'First failed check',
+      'PROBLEM detected 13:00:40',
+      'Recovered → Monitoring',
+      'Flapped ×3 between 13:06 and 13:21',
+      'Note by Arm',
+    ]);
+  });
+
+  it('two cycles stay as they are', () => {
+    const t = timelineOf(i, [...head, ...cycle(6), ...cycle(12)], nameOf, now);
+    expect(t.some((l) => l.kind === 'flapping')).toBe(false);
+    expect(t.filter((l) => l.title.startsWith('Problem again'))).toHaveLength(2);
+  });
+
+  it('the drop still open after a run stays its own line', () => {
+    const open = cycle(24).slice(0, 2);
+    const t = timelineOf(i, [...head, ...cycle(6), ...cycle(12), ...cycle(18), ...open], nameOf, now);
+    expect(t.slice(-3).map((l) => l.title)).toEqual([
+      'Flapped ×3 between 13:06 and 13:21',
+      'Problem again · flapping',
+      'PROBLEM AGAIN posted in Chat',
+    ]);
+  });
+
+  it('a note in the middle splits the run (only drops, recoveries and their messages fold)', () => {
+    const t = timelineOf(
+      i,
+      [
+        ...head,
+        ...cycle(6),
+        ...cycle(12),
+        ev('note', '25T13:17:00', { text: 'x' }, 'u-arm'),
+        ...cycle(18),
+        ...cycle(24),
+      ],
+      nameOf,
+      now,
+    );
+    expect(t.some((l) => l.kind === 'flapping')).toBe(false);
+  });
+
+  it('a run over days names the days', () => {
+    const events = [
+      ...head,
+      ...cycle(6),
+      ...cycle(12),
+      ev('relapsed', '26T09:00:00', { severity: 'down', cause: 'HTTP 503' }),
+      ev('recovered', '26T09:05:00', { okLocations: 2 }),
+    ];
+    expect(timelineOf(i, events, nameOf, now).find((l) => l.kind === 'flapping')).toMatchObject({
+      title: 'Flapped ×3 between Fri 25 Sep 13:06 and Sat 26 Sep 09:05',
+      detail: 'PROBLEM again ×2, DOWN again ×1 · each recovered · 10 events',
+    });
+  });
+});
