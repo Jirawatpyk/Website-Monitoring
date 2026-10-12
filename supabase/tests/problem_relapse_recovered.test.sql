@@ -69,14 +69,14 @@ select public.engine_recover_incident((select id from inc), 'unacked', 'monitori
 select results_eq($$values (pg_temp.n('recovered', 'google_chat'), pg_temp.n('recovered', 'email'))$$,
   $$values (3, 1)$$, 'a muted PROBLEM relapse: still no RECOVERED email');
 
--- Flapping: the held summary is Chat only as well.
+-- Flapping: the held summary also emails the owner, who was emailed about the first PROBLEM (D-039).
 select pg_temp.earlier();
 select public.engine_relapse_incident((select id from inc), 'problem', 'blocked_unverified',
   '2026-09-12 06:18Z', '2026-09-12 06:18:40Z', '2026-09-12 06:18Z', '{}'::jsonb, true, true);
 select public.engine_recover_incident((select id from inc), 'unacked', 'monitoring',
   '2026-09-12 06:21Z', '2026-09-12 06:21Z', '{}'::jsonb, true, null, null, true, false, true);
-select results_eq($$values (pg_temp.n('flap_summary', 'google_chat'), pg_temp.n('flap_summary', 'email'))$$,
-  $$values (1, 0)$$, 'a flapping PROBLEM relapse: the summary in Chat only');
+select results_eq($$values (pg_temp.n('flap_summary', 'google_chat'), pg_temp.n('flap_summary', 'email', 'ploy'))$$,
+  $$values (1, 1)$$, 'a flapping PROBLEM relapse: the summary in Chat and to the owner emailed earlier');
 
 -- The PROBLEM AGAIN card failed and fell back to email: whoever got that email hears it recovered.
 select pg_temp.earlier();

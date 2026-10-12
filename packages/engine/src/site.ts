@@ -99,9 +99,10 @@ export interface SiteSnapshot {
    * The BKK control check has failed in `CONTROL_FAILING_ROUNDS` probe minutes in a row
    * (`bkkControlDown`: any batch of the minute; the open Admin alert only when the window can't
    * tell). Until then a round with nobody left to vote on a WAF site is no data, not PROBLEM (unverified): one VPS
-   * hiccup flipped a WAF site between PROBLEM and RECOVERED all day (D-038).
+   * hiccup flipped a WAF site between PROBLEM and RECOVERED all day (D-038). As a function, judged
+   * at the round's own time and with the Akamai control only for an Akamai site (D-039).
    */
-  bkkControlDown?: boolean;
+  bkkControlDown?: boolean | ((roundAt: Date, akamaiSite: boolean) => boolean);
   /** Per probe minute, locations treated as no data (spec §15.3, `faultyByMinute`). */
   faulty?: ReadonlyMap<number, ReadonlySet<ProbeLocation>>;
   /** Per probe minute, locations whose response times are no evidence for slow (D-039, `slowLocationsByMinute`). */
@@ -597,9 +598,13 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
 
   // Behind a WAF with nobody left to vote and the VPS's control check down (D-027). A single failing
   // minute is no data — the current status holds — until the check has failed long enough to alert
-  // the Admin (D-028, D-038).
+  // the Admin (D-028, D-038). Nobody measured that round, so a slow streak doesn't run across it:
+  // "3 in a row" means 3 judged rounds (D-039).
+  const controlDown =
+    typeof s.bkkControlDown === 'function' ? s.bkkControlDown(roundAt, akamaiSite) : !!s.bkkControlDown;
+  const noData: Judgement = { verdict: { kind: 'insufficient' }, next: reset };
   if (first.kind === 'untrusted') {
-    if (!s.bkkControlDown) return { verdict: { kind: 'insufficient' }, next: carried };
+    if (!controlDown) return noData;
     return unverified(
       'control_failed',
       earliest(round.scheduled.filter((c) => c.outcome !== 'pass')) ?? roundAt,
@@ -622,7 +627,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       ...(wafSite && counted.length === 1 ? { minReporting: 1 } : {}),
     });
     if (second.kind === 'untrusted') {
-      if (!s.bkkControlDown) return { verdict: { kind: 'insufficient' }, next: carried };
+      if (!controlDown) return noData;
       return unverified('control_failed', firstFail ?? roundAt);
     }
     if (!(confirmsDown(first, second) && second.kind === 'hard_fail')) {

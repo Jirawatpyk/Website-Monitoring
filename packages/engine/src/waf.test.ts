@@ -93,6 +93,32 @@ describe('D-038 — one failing BKK control minute is no data, not PROBLEM', () 
     });
   });
 
+  it('D-039: a no-data round ends a slow streak — "3 in a row" means 3 judged rounds', () => {
+    const rows = [check('BKK', 'pass', 1, { controlOk: false }), ...akamaiAbroad()];
+    const d = decideSite(
+      site([home(rows, { carry: { ...NEW_MONITOR, slowRounds: 2 } })], { bkkControlDown: false }),
+    );
+    expect(d.kind !== 'wait' && d.kind !== 'verify' && d.monitors[0]).toMatchObject({ slowRounds: 0 });
+  });
+
+  it('D-039: as a function it is asked at the round’s own time, with the Akamai control only for Akamai', () => {
+    const rows = [check('BKK', 'pass', 1, { controlOk: false }), ...akamaiAbroad()];
+    const asked: [number, boolean][] = [];
+    const down = (roundAt: Date, akamai: boolean) => (asked.push([roundAt.getTime(), akamai]), akamai);
+    expect(decideSite(site([home(rows)], { bkkControlDown: down }))).toMatchObject({
+      kind: 'problem',
+      detail: { kind: 'blocked', reason: 'control_failed' },
+    });
+    expect(asked).toEqual([[R, true]]);
+    // A Cloudflare site behind a WAF: the Akamai control doesn't count, so this round is no data.
+    const cf = [
+      check('BKK', 'pass', 1, { controlOk: false }),
+      check('SIN', 'blocked', 2, { waf: 'cloudflare' }),
+      check('TYO', 'blocked', 3, { waf: 'cloudflare' }),
+    ];
+    expect(decideSite(site([home(cf)], { bkkControlDown: down }))).toMatchObject({ kind: 'none' });
+  });
+
   it('once it has failed long enough the round is PROBLEM (unverified) as before (D-028)', () => {
     const rows = [check('BKK', 'pass', 1, { controlOk: false }), ...akamaiAbroad()];
     expect(decideSite(site([home(rows)], { bkkControlDown: true }))).toMatchObject({

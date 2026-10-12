@@ -52,10 +52,14 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - Per probe minute, a location is **slow** when it timed 3 or more sites (primary scheduled checks that passed) and more than half were over each site's own slow limit, **while another location timed 3 or more sites that minute and was slow on at most half** (`slowLocationsByMinute`). Its response times that minute are no evidence for the slow rule: the round's p50 leaves them out, and a round with nothing left keeps the slow streak unchanged (`nextSlowRounds` with no evidence). Everyone slow everywhere is left alone — the sites may really be slow. The same thresholds as the faulty-location rule (spec §15.3, 3 sites, more than half).
 - Only the slow rule reads it: the page still answered, so keyword, redirect, key-page status, regional and DOWN are judged as before.
 - Replayed on 12 Oct's production checks (home pages, BKK): the old rule opens 7 slow PROBLEMs on BA TW / CN, this one none.
-- **Kept from D-038 (code review of #83, 12 Oct):** a no-data round keeps the slow streak — the data showed the 7 PROBLEMs came from consecutive slow rounds, not across no-data rounds, and "no evidence → unchanged" is the rule everywhere. `bkkControlDown` is judged at run time, not per round's minute; the Akamai control failing counts for every WAF site (all are on Akamai today); the flapping summary of a relapse is Chat only, as D-038 says — accepted.
+- **D-038 amended (code review of #83, 12 Oct; Tao: apply every finding):**
+  - A D-038 no-data round (nobody left to vote, control not yet down) **ends a slow streak**: nobody measured that round, and "3 in a row" means 3 judged rounds. A round whose times are only left out by the slow-location rule above keeps the streak, since other evidence that round was judged.
+  - The control check is judged **at the round's own time**: its check and the recheck after it, up to 2 min from the round's start (`CONTROL_ROUND_SPAN_MS`). A round caught up late isn't judged by later minutes.
+  - The Akamai control counts **only for a site behind Akamai**; another WAF site reads the generic control alone, as its rounds do.
+  - **The flapping summary emails the owner whenever they were emailed about the incident** (migration `flap_summary_owner_email`), not only since the latest relapse. One summary per flapping run, so the owner's email thread doesn't end on the first PROBLEM. RECOVERED after a PROBLEM relapse stays Chat only.
 - Copy: "from 1 location" (was "from 1 locations") on RECOVERED cards and emails (`formatLocations`).
 
-**Impact.** `packages/engine` `slowLocationsByMinute` (`triggers.ts`), `SiteSnapshot.slowLocations` read by `judgeMonitor`; the engine runner passes it; `@dxt/shared` `formatLocations`; notifier RECOVERED copy.
+**Impact.** `packages/engine` `slowLocationsByMinute` (`triggers.ts`), `SiteSnapshot.slowLocations` read by `judgeMonitor`, `SiteSnapshot.bkkControlDown` as a function of the round; the engine runner passes both; migration `flap_summary_owner_email`; `@dxt/shared` `formatLocations`; notifier RECOVERED copy.
 
 ## D-038 — A BKK control hiccup is no data; a PROBLEM relapse recovers in Chat only
 

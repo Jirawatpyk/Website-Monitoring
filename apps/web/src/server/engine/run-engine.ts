@@ -46,6 +46,8 @@ import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
 
 /** Rounds judged per site per run: catches up after a missed run without running unbounded. */
 const MAX_ROUNDS_PER_RUN = 5;
+/** The control minutes a round is judged by: its BKK check and the recheck that follows (D-039). */
+const CONTROL_ROUND_SPAN_MS = 2 * 60_000;
 /** Messages that told someone the site failed: RECOVERED replies only to these (spec §15.1). */
 const ALERT_TEMPLATES = ['down', 'problem', 'down_again', 'problem_again'];
 /**
@@ -225,8 +227,18 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     }));
   const control = bkkControlFailing(controlFacts);
   // D-038: a WAF site goes PROBLEM (unverified) for the control check only once it failed in 3 probe
-  // minutes in a row (any batch of the minute); a minute where every batch passed ends it.
-  const controlDown = bkkControlDown(controlFacts, verifier.openAlerts.has('bkk_control_failing'));
+  // minutes in a row (any batch of the minute); a minute where every batch passed ends it. D-039:
+  // judged up to the round's own check and recheck (a round caught up late isn't judged by later
+  // minutes), and with the Akamai control only for a site behind Akamai.
+  const genericFacts = checks
+    .filter((c) => c.location === 'BKK')
+    .map((c) => ({ checkedAt: new Date(c.checked_at), controlOk: c.control_ok }));
+  const alertOpen = verifier.openAlerts.has('bkk_control_failing');
+  const controlDown = (roundAt: Date, akamaiSite: boolean) => {
+    const until = roundAt.getTime() + CONTROL_ROUND_SPAN_MS;
+    const facts = (akamaiSite ? controlFacts : genericFacts).filter((f) => f.checkedAt.getTime() < until);
+    return bkkControlDown(facts, alertOpen);
+  };
 
   /** Sites the verifier couldn't decide this run, with the reason it saw (D-019). */
   const unverifiedSites = new Map<string, string>();
