@@ -5,6 +5,7 @@ import {
   confirmedByWafOf,
   formatConfirmedBy,
   formatCount,
+  formatLocations,
   formatDay,
   formatMonth,
   bangkokMonthStart,
@@ -39,6 +40,11 @@ describe('formatConfirmedBy (ChatAlert "Confirmed by", D-027)', () => {
     [2, { from: ['BKK', 'SIN'], blocked: [] }, '2 locations, 2 checks'],
   ] as const)('%i, %o → %s', (count, waf, expected) => {
     expect(formatConfirmedBy(count, waf)).toBe(expected);
+  });
+
+  it('formatLocations: "1 location", "3 locations"', () => {
+    expect(formatLocations(1)).toBe('1 location');
+    expect(formatLocations(3)).toBe('3 locations');
   });
 });
 

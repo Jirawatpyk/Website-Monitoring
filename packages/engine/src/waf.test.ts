@@ -307,6 +307,16 @@ describe('D-027 — sites behind a WAF (decideSite)', () => {
     expect(decideSite(site([home(hijacked)]))).toMatchObject({ kind: 'problem', trigger: 'redirect' });
   });
 
+  it('D-039: BKK slow on most sites that minute is no evidence — the streak holds, no PROBLEM (INC-0010)', () => {
+    const slow = [check('BKK', 'pass', 1, { responseMs: 6_200 }), ...akamaiAbroad()];
+    const slowBkk = new Map([[minuteOf(at(1)), new Set<ProbeLocation>(['BKK'])]]);
+    const d = decideSite(
+      site([home(slow, { carry: { ...NEW_MONITOR, slowRounds: 2 } })], { slowLocations: slowBkk }),
+    );
+    expect(d.kind).not.toBe('problem');
+    expect(d.kind !== 'wait' && d.kind !== 'verify' && d.monitors[0]).toMatchObject({ slowRounds: 2 });
+  });
+
   it('a key page behind the WAF failing at BKK twice is a key-page PROBLEM, never DOWN', () => {
     const okHome = [check('BKK', 'pass', 1), ...akamaiAbroad()];
     const broken = [check('BKK', 'fail', 1), ...akamaiAbroad(), recheck('BKK', 'fail', 31)];

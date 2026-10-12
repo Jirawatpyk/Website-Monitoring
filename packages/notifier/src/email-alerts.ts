@@ -11,6 +11,7 @@ import {
   TRIGGER_LABELS,
   type ProbeLocation,
   type Trigger,
+  formatLocations,
 } from '@dxt/shared';
 import type { ProblemFacts } from './chat-alerts';
 import { downtime } from './downtime';
@@ -445,7 +446,7 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
           : 'The problem cleared. Nothing needed from you.',
       facts: [
         ['Problem lasted', `${duration} (${range})`],
-        ['Confirmed by', `First OK round from ${input.okLocations} locations`],
+        ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)}`],
         ...ackFact,
         ...(owner
           ? [
@@ -475,7 +476,7 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
         : 'Nothing needed from you.',
     facts: [
       ['Down for', `${duration} (${range})`],
-      ['Confirmed by', `First OK round from ${input.okLocations} locations → Monitoring`],
+      ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)} → Monitoring`],
       ...ackFact,
       ...(owner ? [['Still to do', `Root cause (${owner})`] as [string, string]] : []),
     ],

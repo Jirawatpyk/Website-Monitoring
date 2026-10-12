@@ -43,6 +43,20 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
 
+## D-039 — A location slow on most sites in a minute is no evidence for slow
+
+**Conflict.** Production, 12 Oct 2026, after D-038: Bangkok Airways TW / CN opened 7 slow PROBLEMs in a few hours (INC-0004 … INC-0010), p50 3.1–3.4 s from BKK alone against the Tier 1 limit of 3 s, each auto-resolved 1–2 min later after @mentioning and emailing the owner. Behind the WAF only BKK votes (D-027), so one Bangkok time is the round's p50. At every minute those PROBLEMs counted, BKK was over the limit on most of the 11 live sites (medians 3–18 s; 10 of 10 at 16:15 Bangkok) while SIN's median stayed ~0.6 s: the VPS's own network was slow, not the sites. On a site every location votes on, the median of 3 already hid it. Before D-038 these sites sat in PROBLEM (unverified) half the time, which hid the slow rule too.
+
+**Decision (Tao, 12 Oct 2026 — "fix the rule", not a per-site limit or a held alert).**
+
+- Per probe minute, a location is **slow** when it timed 3 or more sites (primary scheduled checks that passed) and more than half were over each site's own slow limit, **while another location timed 3 or more sites that minute and was slow on at most half** (`slowLocationsByMinute`). Its response times that minute are no evidence for the slow rule: the round's p50 leaves them out, and a round with nothing left keeps the slow streak unchanged (`nextSlowRounds` with no evidence). Everyone slow everywhere is left alone — the sites may really be slow. The same thresholds as the faulty-location rule (spec §15.3, 3 sites, more than half).
+- Only the slow rule reads it: the page still answered, so keyword, redirect, key-page status, regional and DOWN are judged as before.
+- Replayed on 12 Oct's production checks (home pages, BKK): the old rule opens 7 slow PROBLEMs on BA TW / CN, this one none.
+- **Kept from D-038 (code review of #83, 12 Oct):** a no-data round keeps the slow streak — the data showed the 7 PROBLEMs came from consecutive slow rounds, not across no-data rounds, and "no evidence → unchanged" is the rule everywhere. `bkkControlDown` is judged at run time, not per round's minute; the Akamai control failing counts for every WAF site (all are on Akamai today); the flapping summary of a relapse is Chat only, as D-038 says — accepted.
+- Copy: "from 1 location" (was "from 1 locations") on RECOVERED cards and emails (`formatLocations`).
+
+**Impact.** `packages/engine` `slowLocationsByMinute` (`triggers.ts`), `SiteSnapshot.slowLocations` read by `judgeMonitor`; the engine runner passes it; `@dxt/shared` `formatLocations`; notifier RECOVERED copy.
+
 ## D-038 — A BKK control hiccup is no data; a PROBLEM relapse recovers in Chat only
 
 **Conflict.** Production, 12 Oct 2026: two behind-WAF sites (Akamai blocks SIN and TYO, D-027) flipped between PROBLEM AGAIN and RECOVERED all day — one incident had ~100 cycles since 8 Oct, ~80 of them "BKK network check failed, not verified". D-027 makes a round with nobody left to vote and the VPS's control check down PROBLEM (unverified) at once, so every one-minute network hiccup on the VPS opened a drop and the next good round closed it. The PROBLEM AGAIN was a Chat reply, but each recovery emailed RECOVERED to everyone ever emailed about the incident (S02b), and the flapping summary went to the owner too: an owner got 26 RECOVERED and 24 summary emails for one incident. D-028 already treats the control check as broken only after 3 failing probe minutes (the Admin alert).

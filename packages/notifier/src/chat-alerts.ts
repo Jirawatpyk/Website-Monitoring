@@ -10,6 +10,7 @@ import {
   isSameBangkokDay,
   TRIGGER_LABELS,
   type Trigger,
+  formatLocations,
 } from '@dxt/shared';
 import { buildChatTextLine } from './chat-text';
 import { downtime } from './downtime';
@@ -287,8 +288,8 @@ export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
     : `RECOVERED · ${site} back to normal · ${slow ? 'slow' : 'problem'} for ${duration} (${range})`;
   const back =
     slow && problem?.slowLimitMs
-      ? `Response time back under ${seconds(problem.slowLimitMs)} from ${input.okLocations} locations.`
-      : `OK from ${input.okLocations} locations.`;
+      ? `Response time back under ${seconds(problem.slowLimitMs)} from ${formatLocations(input.okLocations)}.`
+      : `OK from ${formatLocations(input.okLocations)}.`;
 
   return {
     text: buildChatTextLine({

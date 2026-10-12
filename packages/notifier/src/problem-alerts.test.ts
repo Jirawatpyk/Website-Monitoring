@@ -194,6 +194,17 @@ describe('PROBLEM replies (ChatAlert)', () => {
       'RECOVERED · X back to normal · problem for 22 min (09:52–10:14)',
     );
     expect(JSON.stringify(other.cardsV2)).toContain('OK from 2 locations.');
+    // Behind a WAF only BKK votes (production BA – Taiwan, 12 Oct): "1 location", not "1 locations".
+    const one = buildRecoveredAlert({
+      incidentId: 'i',
+      site: 'X',
+      startedAt: detectedAt,
+      recoveredAt: new Date('2026-09-25T03:14:00Z'),
+      okLocations: 1,
+      owner: null,
+      problem: { trigger: 'slow', slowLimitMs: 3_000 },
+    });
+    expect(JSON.stringify(one.cardsV2)).toContain('Response time back under 3 s from 1 location.');
   });
 });
 

@@ -194,6 +194,46 @@ export function faultyByMinute(
   return out;
 }
 
+// ── Slow location (D-039) ───────────────────────────────────────────────────
+
+/** One site's primary scheduled check, with the limit the slow rule holds it to. */
+export interface TimedCheck {
+  siteId: string;
+  location: ProbeLocation;
+  outcome: CheckOutcome;
+  checkedAt: Date;
+  responseMs?: number | null;
+  slowThresholdMs: number;
+}
+
+/**
+ * Per probe minute, the locations whose response times say more about the probe than the sites:
+ * slow (over each site's own limit) on more than half of the 3+ sites it timed that minute, while
+ * another location timed 3+ sites that minute and was slow on at most half. Their times that minute
+ * are no evidence for the slow rule — on a site behind a WAF, the Bangkok VPS's own network slowing
+ * down made every one-location round slow (production, 12 Oct 2026). Everyone slow everywhere is
+ * left alone: the sites may really be slow.
+ */
+export function slowLocationsByMinute(checks: readonly TimedCheck[]): Map<number, Set<ProbeLocation>> {
+  const tally = new Map<number, Map<ProbeLocation, Map<string, boolean>>>();
+  for (const c of checks) {
+    if (c.outcome !== 'pass' || typeof c.responseMs !== 'number') continue;
+    const minute = minuteOf(c.checkedAt);
+    const locs = tally.get(minute) ?? tally.set(minute, new Map()).get(minute)!;
+    const sites = locs.get(c.location) ?? locs.set(c.location, new Map()).get(c.location)!;
+    sites.set(c.siteId, (sites.get(c.siteId) ?? false) || c.responseMs > c.slowThresholdMs);
+  }
+  const out = new Map<number, Set<ProbeLocation>>();
+  for (const [minute, locs] of tally) {
+    const judged = [...locs].filter(([, sites]) => sites.size >= FAULTY_MIN_SITES);
+    const slowAt = (sites: Map<string, boolean>) =>
+      [...sites.values()].filter(Boolean).length * 2 > sites.size;
+    const slow = judged.filter(([, sites]) => slowAt(sites)).map(([l]) => l);
+    if (slow.length && slow.length < judged.length) out.set(minute, new Set(slow));
+  }
+  return out;
+}
+
 export const minuteOf = (at: Date): number => Math.floor(at.getTime() / 60_000) * 60_000;
 
 /** The host of an absolute URL, lower-case (the engine has no URL global: no DOM, no Node types). */

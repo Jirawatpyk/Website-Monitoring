@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
 import {
   faultyByMinute,
+  slowLocationsByMinute,
   hostOf,
   isAllowedHost,
   keywordIssue,
@@ -203,5 +204,41 @@ describe('faulty location (spec §15.3): one location failing more than half the
     expect(faultyByMinute(rows(2, 4))).toEqual(new Map());
     const two = [...rows(3, 4), ...rows(0, 4, 61)];
     expect([...faultyByMinute(two).keys()]).toEqual([T]);
+  });
+});
+
+describe('slow location (D-039): one location slow on most sites in a minute times itself', () => {
+  // Production, Mon 12 Oct 2026 16:15 Bangkok: BKK over 3 s on 10 of 10 sites, SIN's median 0.6 s.
+  const rows = (slowAtBkk: number, total: number, sinMs = 600) =>
+    Array.from({ length: total }, (_, i) =>
+      (['BKK', 'SIN'] as const).map((location) => ({
+        siteId: `s${i}`,
+        location,
+        outcome: 'pass' as CheckOutcome,
+        checkedAt: at(1),
+        responseMs: location === 'BKK' ? (i < slowAtBkk ? 3993 : 1500) : sinMs,
+        slowThresholdMs: 3000,
+      })),
+    ).flat();
+
+  it.each([
+    ['BKK slow on 10 of 10, SIN fast → BKK is no evidence', rows(10, 10), [T]],
+    ['BKK slow on 3 of 5 (more than half) → BKK', rows(3, 5), [T]],
+    ['BKK slow on 2 of 5 (16:17) → judged as usual', rows(2, 5), []],
+    ['everyone slow everywhere → the sites may really be slow', rows(5, 5, 4000), []],
+    ['below 3 sites the rule doesn’t apply', rows(2, 2), []],
+  ])('%s', (_, checks, minutes) => {
+    const out = slowLocationsByMinute(checks);
+    expect([...out.keys()]).toEqual(minutes);
+    for (const m of minutes) expect(out.get(m)).toEqual(new Set(['BKK']));
+  });
+
+  it('each site is held to its own limit; failed checks don’t count', () => {
+    const own = rows(10, 10).map((c) => (c.location === 'BKK' ? { ...c, slowThresholdMs: 5000 } : c));
+    expect(slowLocationsByMinute(own).size).toBe(0);
+    const failed = rows(10, 10).map((c) =>
+      c.location === 'BKK' ? { ...c, outcome: 'fail' as CheckOutcome } : c,
+    );
+    expect(slowLocationsByMinute(failed).size).toBe(0);
   });
 });

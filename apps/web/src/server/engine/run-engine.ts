@@ -6,6 +6,7 @@ import {
   bkkControlDown,
   bkkControlFailing,
   faultyByMinute,
+  slowLocationsByMinute,
   lookbackMs,
   NEW_MONITOR,
   UNKNOWN_ROOT_CAUSE,
@@ -198,21 +199,34 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       })),
   );
 
+  // D-039: a location slow on most sites in a minute (while another isn't) times itself, not them.
+  const primaryOf = new Map(sites.map((s) => [s.monitors.find((m) => m.isPrimary)!.id, s]));
+  const slowLocations = slowLocationsByMinute(
+    checks
+      .filter((c) => c.attempt !== 2 && primaryOf.has(c.monitor_id))
+      .map((c) => ({
+        siteId: primaryOf.get(c.monitor_id)!.id,
+        location: c.location as ProbeLocation,
+        outcome: c.outcome,
+        checkedAt: new Date(c.checked_at),
+        responseMs: c.response_ms,
+        slowThresholdMs: primaryOf.get(c.monitor_id)!.monitors.find((m) => m.isPrimary)!.slowThresholdMs,
+      })),
+  );
+
   // D-028: the BKK probe's control check (D-027) over the window's Bangkok checks.
-  const bkkChecks = checks.filter((c) => c.location === 'BKK');
   // Either VPS check failing counts: both control URLs, or the Akamai control (D-027 rule 2b) —
   // a broken Akamai control would otherwise silently turn every Akamai DOWN into a PROBLEM.
-  const controlFact = (c: (typeof checks)[number]) => ({
-    checkedAt: new Date(c.checked_at),
-    controlOk: c.control_ok === false || c.akamai_ok === false ? false : (c.control_ok ?? c.akamai_ok),
-  });
-  const control = bkkControlFailing(bkkChecks.map(controlFact));
+  const controlFacts = checks
+    .filter((c) => c.location === 'BKK')
+    .map((c) => ({
+      checkedAt: new Date(c.checked_at),
+      controlOk: c.control_ok === false || c.akamai_ok === false ? false : (c.control_ok ?? c.akamai_ok),
+    }));
+  const control = bkkControlFailing(controlFacts);
   // D-038: a WAF site goes PROBLEM (unverified) for the control check only once it failed in 3 probe
   // minutes in a row (any batch of the minute); a minute where every batch passed ends it.
-  const controlDown = bkkControlDown(
-    bkkChecks.map(controlFact),
-    verifier.openAlerts.has('bkk_control_failing'),
-  );
+  const controlDown = bkkControlDown(controlFacts, verifier.openAlerts.has('bkk_control_failing'));
 
   /** Sites the verifier couldn't decide this run, with the reason it saw (D-019). */
   const unverifiedSites = new Map<string, string>();
@@ -316,6 +330,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       verifierAvailable: verifier.available,
       behindWaf: site.behindWaf,
       faulty,
+      slowLocations,
     };
     let note = status?.note ?? null;
     // RECOVERED only replies to an alert that was queued (not one held back by a mute, spec §15.1).

@@ -6,6 +6,7 @@ import {
   formatTime,
   TRIGGER_LABELS,
   type Trigger,
+  formatLocations,
 } from '@dxt/shared';
 import { plainName, type ChatMessage, type ChatPerson, type ProblemFacts } from './chat-alerts';
 import { buildChatTextLine } from './chat-text';
@@ -264,10 +265,10 @@ export function buildAutoResolvedAlert(input: AutoResolvedAlertInput): ChatMessa
   const what = k ? `${site} ${k.path}` : site;
   const slow = input.problem.trigger === 'slow' && input.problem.slowLimitMs;
   const back = k
-    ? `${k.path} loads again from ${input.okLocations} locations (it returned ${k.failure} while the home page stayed OK).`
+    ? `${k.path} loads again from ${formatLocations(input.okLocations)} (it returned ${k.failure} while the home page stayed OK).`
     : slow
-      ? `Response time back under ${Number((input.problem.slowLimitMs! / 1000).toFixed(1))} s from ${input.okLocations} locations.`
-      : `OK from ${input.okLocations} locations.`;
+      ? `Response time back under ${Number((input.problem.slowLimitMs! / 1000).toFixed(1))} s from ${formatLocations(input.okLocations)}.`
+      : `OK from ${formatLocations(input.okLocations)}.`;
   return {
     text: buildChatTextLine({
       state: 'RECOVERED',

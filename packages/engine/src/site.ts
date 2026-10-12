@@ -104,6 +104,8 @@ export interface SiteSnapshot {
   bkkControlDown?: boolean;
   /** Per probe minute, locations treated as no data (spec §15.3, `faultyByMinute`). */
   faulty?: ReadonlyMap<number, ReadonlySet<ProbeLocation>>;
+  /** Per probe minute, locations whose response times are no evidence for slow (D-039, `slowLocationsByMinute`). */
+  slowLocations?: ReadonlyMap<number, ReadonlySet<ProbeLocation>>;
   /** OK ↔ not-OK changes at incident steps in the last 30 min, and the last one's direction (D-024). */
   flips?: readonly Date[];
   flipOk?: boolean | null;
@@ -722,7 +724,9 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   if (first.kind === 'pass' && okRound) {
     // Behind a WAF a round one location decided is evidence enough for the triggers too (D-027).
     const minLocations = wafRound ? 1 : 2;
-    const p50 = roundP50(counted, minLocations);
+    // D-039: a location slow on most sites this minute times itself, not the site — no evidence.
+    const timed = counted.filter((c) => !s.slowLocations?.get(minuteOf(c.checkedAt))?.has(c.location));
+    const p50 = roundP50(timed, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
     const next = { slowRounds, failingSince };
     const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound);
