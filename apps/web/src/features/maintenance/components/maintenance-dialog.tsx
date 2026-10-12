@@ -16,6 +16,7 @@ import {
 import { IconCalendar, IconCheck, IconEyeOff, IconInfo } from '@jirawatpyk/aura-react/icons';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { APPROVAL_OVER_MIN } from '@dxt/engine';
 import { useNow } from '@/components/use-now';
 import { loadAdminNames, muteSite, scheduleMaintenance } from '../actions';
 import { postPendingNow } from './window-dialogs';
@@ -29,6 +30,7 @@ import {
   approvalNotice,
   approvalSpan,
   doneOf,
+  durationOf,
   escalating,
   guardTitle,
   muteRule,
@@ -114,8 +116,7 @@ export function MaintenanceDialog({
   const dur = durations.some((d) => d.label === duration) ? duration : durations[durations.length - 1]!.label;
   const planInput = { kind, site: current, startDate, startTime, duration: dur, reason, now, isAdmin };
   // A Responder's window over 24 h waits for an Admin, so it can't start now: Start is Later (§24.14).
-  const forcedLater =
-    !isAdmin && kind === 'maintenance' && planOf({ ...planInput, later: true }).needsApproval;
+  const forcedLater = !isAdmin && kind === 'maintenance' && durationOf(kind, dur).minutes > APPROVAL_OVER_MIN;
   const later = laterChoice || forcedLater;
   const plan = planOf({ ...planInput, later });
   // A Responder's long request names the Admins it goes to before it is sent (§24.9).

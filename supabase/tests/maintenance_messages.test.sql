@@ -333,14 +333,14 @@ reset role;
 select is((select bool_and(hold_until = now()) from public.notifications
            where maintenance_window_id = (select id from win where name = 'now_post') and context ->> 'kind' = 'cancelled'),
   true, 'its messages are released at once');
-select is((select undo_key is null and (log -> -1 ->> 'posts_at')::timestamptz = now() from public.maintenance_windows
+select is((select undo_until = now() and (log -> -1 ->> 'posts_at')::timestamptz = now() from public.maintenance_windows
            where id = (select id from win where name = 'now_post')),
   true, 'no Undo any more, and the log line shows it posted now');
 select tests.authenticate_as((select id from ids where name = 'ploy'));
 select throws_like($$ select public.undo_window_action((select id from win where name = 'now_post')) $$,
-  '%Only the person%', 'Undo is refused after it was posted');
+  '%Too late to undo%', 'Undo is refused after it was posted — too late, not "not you"');
 select throws_ok($$ select public.post_window_action_now((select id from win where name = 'now_post')) $$,
-  '42501', null, 'posting it a second time is refused (nothing held any more)');
+  '22023', null, 'posting it a second time is refused (nothing held any more)');
 reset role;
 
 -- Past its 10 s, or already claimed by the notifier: nothing changes (db review L2).

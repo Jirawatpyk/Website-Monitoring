@@ -652,6 +652,7 @@ export function buildWindowEmail(input: WindowEmailInput): EmailMessage {
     request: input.request,
     reader,
     page,
+    now,
   });
   return emailLayout(envelope, {
     color: later.color,
@@ -678,6 +679,7 @@ function laterEmail(
     request: boolean;
     reader: Reader;
     page: (label?: string, primary?: boolean) => Button;
+    now: Date;
   },
 ): Later {
   const { site, start, asker, whenRow, reader, page } = c;
@@ -731,7 +733,7 @@ function laterEmail(
         ...base,
         headline: `Request changed — now ${c.len}`,
         pre: `${site} · ends ${full(to)}${e.from ? ` (was ${was(e.from, to)})` : ''} · now ${c.len} · still waiting`,
-        changed: `Ends ${full(to)}${e.from ? ` (was ${full(e.from)})` : ''} · by ${by} ${formatTime(e.at)}${why}`,
+        changed: `Ends ${full(to)}${e.from ? ` (was ${full(e.from)})` : ''} · by ${by} ${at(e.at, c.now)}${why}`,
         lede:
           reader === 'admin'
             ? `${by} changed the request while it waits. Review it as it stands now.`

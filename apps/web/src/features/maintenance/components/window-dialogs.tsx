@@ -46,6 +46,18 @@ interface Held {
 /** The one action still inside its 10 s on this page (§24.12). */
 let heldAction: (Held & { postsAt: string }) | null = null;
 const channelsOf = (h: Held) => (h.chatOnly ? 'Chat' : 'Chat and email');
+/** Toasts still on screen: one the person dismissed with × doesn't come back as "Posted" (code review). */
+const shown = new Set<string>();
+
+function HeldBody({ id, ...line }: { id: string } & React.ComponentProps<typeof UndoLine>) {
+  useEffect(() => {
+    shown.add(id);
+    return () => {
+      shown.delete(id);
+    };
+  }, [id]);
+  return <UndoLine {...line} />;
+}
 
 /**
  * Starting another action, or opening a row or a dialog, while one is still pending posts the pending
@@ -56,7 +68,7 @@ export async function postPendingNow(): Promise<void> {
   heldAction = null;
   if (!p || Date.parse(p.postsAt) <= Date.now()) return;
   const r = await postWindowActionNow({ windowId: p.windowId }).catch(() => null);
-  if (r?.ok) {
+  if (r?.ok && shown.has(`window-${p.windowId}`)) {
     toast.success(p.title, {
       id: `window-${p.windowId}`,
       description: `Posted to ${channelsOf(p)}.`,
@@ -136,7 +148,7 @@ function showUndo(held: Held, postsAt: string, undone: () => void) {
   toast.success(title, {
     id,
     description: (
-      <UndoLine postsAt={postsAt} onUndo={onUndo} channels={chatOnly ? 'Chat' : 'Chat and email'} />
+      <HeldBody id={id} postsAt={postsAt} onUndo={onUndo} channels={chatOnly ? 'Chat' : 'Chat and email'} />
     ),
     // "Posted to …" stays until dismissed; × only hides the toast — the action still posts (§24.12).
     duration: Infinity,
