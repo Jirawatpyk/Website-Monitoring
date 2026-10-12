@@ -493,9 +493,7 @@ describe('maintenance emails (EmailAlert "Maintenance · approval", "owner & bac
     });
     expect(e.subject).toBe('Tubtong · Maintenance · Tue 29 Sep 01:00');
     expect(e.text).toContain('MAINTENANCE ENDED EARLY — Tubtong maintenance ended early');
-    expect(e.text).toContain(
-      'What changed: Ended early 02:10 by Ploy · “Updates finished” · alerts back on',
-    );
+    expect(e.text).toContain('What changed: Ended early 02:10 by Ploy · “Updates finished” · alerts back on');
     expect(e.text).toContain('When: Tue 29 Sep 01:00 → 02:10 (1 h 10 min)');
     expect(e.text).toContain('Alerts for Tubtong are back on.');
     // Over: its effect and "if it's down" no longer apply.
