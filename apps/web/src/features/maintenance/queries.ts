@@ -2,7 +2,13 @@ import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { isInsideHours, nextOpening } from '@dxt/engine';
 import { loadResponseHours } from '@/server/escalation/response-hours';
-import { escalationPlanSchema, TIER_CONFIG, type SiteStatus, type Tier } from '@dxt/shared';
+import {
+  escalationPlanSchema,
+  TIER_CONFIG,
+  type EscalationPlan,
+  type SiteStatus,
+  type Tier,
+} from '@dxt/shared';
 import type { PausableSite } from './model';
 import type { LogEntry, WindowRow } from './page-model';
 
@@ -24,6 +30,7 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
                    owner:profiles!sites_primary_owner_id_fkey(display_name, role),
                    backup:profiles!sites_backup_owner_id_fkey(display_name, role),
                    site_status(status),
+                   client:clients(am_user_id),
                    incidents(number, state, severity, episode_severity, detected_at, alerted_at, escalation_plan))`,
     )
     .in('sites.incidents.state', ['unacked', 'escalated'])
@@ -61,7 +68,71 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
       silenced: w.kind === 'mute' ? silencedOf(w.sites.incidents, w.starts_at, w.sites.tier) : null,
     };
   });
-  return withPausedUntil(db, rows, now);
+  const people = new Map(
+    (data ?? []).map((w) => [
+      w.id,
+      {
+        owner: w.sites.primary_owner_id,
+        backup: w.sites.backup_owner_id,
+        am: (Array.isArray(w.sites.client) ? w.sites.client[0] : w.sites.client)?.am_user_id ?? null,
+        plan: w.kind === 'mute' ? heldPlan(w.sites.incidents, w.starts_at) : null,
+      },
+    ]),
+  );
+  return withPausedUntil(db, await withL1People(db, rows, people), now);
+}
+
+/** The escalation plan of the incident a mute holds (`silencedOf`'s incident). */
+function heldPlan(
+  incidents: { detected_at: string; alerted_at: string | null; escalation_plan: unknown }[],
+  mutedFrom: string,
+) {
+  const i = incidents.find((x) => !x.alerted_at && Date.parse(x.detected_at) >= Date.parse(mutedFrom));
+  const plan = i ? escalationPlanSchema.safeParse(i.escalation_plan) : null;
+  return plan?.success ? plan.data : null;
+}
+
+/**
+ * Whether L1 tells anyone new — the notifier's rule (the step's people minus those L0 told). With
+ * nobody (no backup, the Admins already told), End mute promises no L1 and no escalation (§24.16,
+ * staging /verify). The Admins are read only when a mute holds an incident.
+ */
+async function withL1People(
+  db: DbClient,
+  rows: WindowRow[],
+  people: Map<
+    string,
+    { owner: string | null; backup: string | null; am: string | null; plan: EscalationPlan | null }
+  >,
+): Promise<WindowRow[]> {
+  if (!rows.some((r) => r.silenced)) return rows;
+  const { data, error } = await db.from('profiles').select('id').eq('role', 'admin').eq('is_active', true);
+  if (error) return rows;
+  const admins = (data ?? []).map((p) => p.id);
+  return rows.map((r) => {
+    const p = people.get(r.id);
+    if (!r.silenced || !p?.plan) return r;
+    const of = (token: string): string[] =>
+      token === 'owner'
+        ? p.owner
+          ? [p.owner]
+          : []
+        : token === 'backup'
+          ? p.backup
+            ? [p.backup]
+            : []
+          : token === 'site_am'
+            ? p.am
+              ? [p.am]
+              : []
+            : token === 'admins'
+              ? admins
+              : [];
+    const told = new Set(p.plan.steps.filter((s) => s.level < 1).flatMap((s) => s.targets.flatMap(of)));
+    const l1 = p.plan.steps.find((s) => s.level === 1);
+    const anyoneNew = !!l1 && l1.targets.flatMap(of).some((id) => !told.has(id));
+    return anyoneNew ? r : { ...r, silenced: { ...r.silenced, l1DelayMin: null, escalates: false } };
+  });
 }
 
 /**
@@ -94,6 +165,7 @@ function silencedOf(
     severity: (i.episode_severity ?? i.severity) === 'problem' ? 'problem' : 'down',
     since: i.detected_at,
     pausedUntil: null,
+    escalates: true,
   };
 }
 
