@@ -8,6 +8,7 @@ import { PauseActions } from './pause-actions';
 const actions = vi.hoisted(() => ({
   muteSite: vi.fn(async (_: unknown) => ({ ok: true as const })),
   scheduleMaintenance: vi.fn(async (_: unknown) => ({ ok: true as const })),
+  loadAdminNames: vi.fn(async () => ['Tao']),
 }));
 vi.mock('../actions', () => actions);
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -148,6 +149,10 @@ describe('MaintenanceDialog (boards Maintenance, MMaintenance)', () => {
     await user.click(screen.getByRole('radio', { name: 'Later' }));
     await user.click(screen.getAllByRole('radio', { name: '3 days' })[0]!);
     expect(screen.getByText('Needs an Admin’s approval')).toBeInTheDocument();
+    // §24.9: the Admins it goes to are named before it is sent.
+    expect(
+      await screen.findByText(/^Tao gets a request now; it starts only if approved before /),
+    ).toBeInTheDocument();
     unmount();
     dialog({ siteId: 's-tw', isAdmin: true });
     await user.click(screen.getByRole('radio', { name: 'Later' }));

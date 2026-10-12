@@ -10,6 +10,8 @@ import {
   bangkokMonthStart,
   formatDuration,
   formatDurationSeconds,
+  formatWindowLength,
+  formatNameList,
   formatIncidentId,
   formatMs,
   formatIncidentLine,
@@ -49,6 +51,31 @@ describe('confirmedByWafOf', () => {
     expect(confirmedByWafOf({ confirmingFrom: ['BKK'] })).toBeNull();
     expect(confirmedByWafOf({ confirmingFrom: 'BKK', wafBlocked: [1] })).toBeNull();
     expect(confirmedByWafOf(undefined)).toBeNull();
+  });
+});
+
+describe('formatNameList', () => {
+  it.each([
+    [[], ''],
+    [['Tao'], 'Tao'],
+    [['Arm', 'Tao'], 'Arm and Tao'],
+    [['you', 'Ploy', 'Tao'], 'you, Ploy and Tao'],
+  ])('%j → %s', (names, text) => {
+    expect(formatNameList(names)).toBe(text);
+  });
+});
+
+describe('formatWindowLength (MaintenancePage, ChatAlert maintenance rows)', () => {
+  it.each([
+    [120, '2 h'],
+    [560, '9 h 20 min'],
+    [1440, '24 h'],
+    [1560, '1 d 2 h'],
+    [2880, '2 days'],
+    [4320, '3 days'],
+    [4319.6, '3 days'],
+  ])('%s min → %s', (minutes, text) => {
+    expect(formatWindowLength(minutes)).toBe(text);
   });
 });
 

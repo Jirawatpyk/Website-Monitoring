@@ -1,5 +1,7 @@
 import {
+  clockMinutes,
   formatDay,
+  formatDuration,
   formatIncidentId,
   formatTier,
   formatTime,
@@ -11,7 +13,14 @@ import {
 } from '@dxt/shared';
 import { buildChatTextLine } from './chat-text';
 import { downtime } from './downtime';
-import { ladderLine, nextRow, stoppedWords, type LadderFacts, type LadderStopped } from './escalation-alerts';
+import {
+  formatResume,
+  ladderLine,
+  nextRow,
+  stoppedWords,
+  type LadderFacts,
+  type LadderStopped,
+} from './escalation-alerts';
 
 /**
  * Google Chat DOWN, PROBLEM, ACKNOWLEDGED and RECOVERED messages — ChatAlert board, spec §10 / §14.10 /
@@ -63,6 +72,8 @@ export interface DownAlertInput {
   incidentUrl: string;
   /** The ladder (S08): the next level and who it asks, or the timers paused outside hours. */
   ladder?: LadderFacts | null;
+  /** A mute held this first alert back until then (§24.7, D-036): the card says why it's late. */
+  heldUntil?: Date | null;
 }
 
 /** What a PROBLEM's replies need to word it as one (ChatAlert PROBLEM rows, D-022). */
@@ -93,6 +104,8 @@ export interface ProblemAlertInput {
   backup: ChatPerson | null;
   incidentUrl: string;
   ladder?: LadderFacts | null;
+  /** A mute held this first alert back until then (§24.7, D-036). */
+  heldUntil?: Date | null;
 }
 
 export interface AcknowledgedAlertInput {
@@ -154,13 +167,14 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
   ].join(' · ');
   const ownerText = ownerRow(owner, backup, input.ladder);
   const next = nextRow(input.ladder, now, 'down');
+  const held = heldWords(input.heldUntil, input.ladder, now, 'down');
 
   return {
     text: buildChatTextLine({
       state: 'DOWN',
       site: `${site} (${formatTier(tier)})`,
       mention: mentionOf(owner),
-      detail: ladderLine(input.ladder, now),
+      detail: held?.line ?? ladderLine(input.ladder, now),
     }),
     cardsV2: [
       {
@@ -170,6 +184,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
           sections: [
             {
               widgets: [
+                ...(held ? [{ textParagraph: { text: held.card } }] : []),
                 row('Cause', input.cause),
                 row('Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)),
                 row('Owner', ownerText),
@@ -181,13 +196,47 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
                     ],
                   },
                 },
-                { textParagraph: { text: FIRST_CARD_FOOTER } },
+                {
+                  textParagraph: {
+                    text: held
+                      ? `${FIRST_CARD_FOOTER} Down ${formatDuration(clockMinutes(confirmedAt, now))} so far — the time while muted counts in uptime.`
+                      : FIRST_CARD_FOOTER,
+                  },
+                },
               ],
             },
           ],
         },
       },
     ],
+  };
+}
+
+/**
+ * The first alert after a mute (ChatAlert "First alert after a mute", §24.7): the text line says
+ * "held by a mute until 15:00" before the ladder's promise (outside response hours only "timers paused
+ * until …"), and one amber line sits under the title. Every timer counts from the mute's end.
+ */
+function heldWords(
+  heldUntil: Date | null | undefined,
+  ladder: LadderFacts | null | undefined,
+  now: Date,
+  severity: 'down' | 'problem',
+) {
+  if (!heldUntil) return null;
+  // A held PROBLEM can post the next working morning: the mute's end then carries its day (reviews).
+  const until = isSameBangkokDay(heldUntil, now) ? formatTime(heldUntil) : formatResume(heldUntil, now);
+  const paused = ladder?.pausedUntil ? formatResume(ladder.pausedUntil, now) : null;
+  // A PROBLEM's next step is a reminder, not an escalation: it keeps "please take a look".
+  const ask = severity === 'problem' ? ['please take a look'] : ladderLine(ladder, now);
+  return {
+    line: [`held by a mute until ${until}`, ...(paused ? [`timers paused until ${paused}`] : ask)],
+    // No ladder (acknowledged meanwhile, or no plan): it says only why it is late.
+    card: !ladder
+      ? `Held by a mute until ${until}`
+      : paused
+        ? `Held by a mute until ${until} · outside response hours — escalation starts ${paused}`
+        : `Held by a mute until ${until} · escalation starts now`,
   };
 }
 
@@ -281,6 +330,7 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
   ].join(' · ');
   const ownerText = ownerRow(owner, backup, input.ladder);
   const next = nextRow(input.ladder, now, 'problem', { owner: owner?.name ?? null });
+  const held = heldWords(input.heldUntil, input.ladder, now, 'problem');
   const slowNote = input.trigger === 'slow' ? ' — the site loads, just slowly' : '';
   const seen = input.seenFrom ? `${input.seenFrom.count} of ${input.seenFrom.of} locations${slowNote}` : null;
   const known = unverified
@@ -308,7 +358,7 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
       state: 'PROBLEM',
       site: `${site} (${formatTier(tier)})`,
       mention: mentionOf(owner),
-      detail: [input.summary, 'please take a look'],
+      detail: held ? [input.summary, ...held.line] : [input.summary, 'please take a look'],
     }),
     cardsV2: [
       {
@@ -318,6 +368,7 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
           sections: [
             {
               widgets: [
+                ...(held ? [{ textParagraph: { text: held.card } }] : []),
                 row('Trigger', TRIGGER_LABELS[input.trigger]),
                 row('Cause', input.cause),
                 ...known,

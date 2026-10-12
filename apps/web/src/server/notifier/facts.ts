@@ -57,14 +57,33 @@ export interface Recipient {
   id: string;
   email: string;
   display_name: string;
+  /** For a mention reply about a window (D-037). */
+  google_chat_user_id?: string | null;
+}
+
+/** A maintenance window or mute and its people, for its messages (S09b, D-037). */
+export interface WindowFactsRow {
+  id: string;
+  kind: 'maintenance' | 'mute';
+  starts_at: string;
+  ends_at: string;
+  reason: string;
+  created_at: string;
+  approved_at: string | null;
+  creator: { display_name: string } | null;
+  approver: { display_name: string } | null;
+  sites: { name: string; tier: number; primary: Owner | null; backup: Owner | null };
 }
 
 export interface Facts {
   incidents: Map<string, IncidentFacts>;
   systemAlerts: Map<string, SystemAlertFacts>;
+  /** Maintenance windows and mutes (S09b), with every active Admin and the response hours. */
+  windows: Map<string, WindowFactsRow>;
+  windowEnv: { admins: Owner[]; hours: ResponseHours } | null;
   /** Active people only: a deactivated account gets no email. */
   recipients: Map<string, Recipient>;
-  /** `incident:user` → the first email that person was really sent (the thread root). */
+  /** `incident:user` (or `window:user`) → the first email that person was really sent (the thread root). */
   firstEmail: Map<string, { id: string }>;
 }
 
@@ -76,9 +95,12 @@ export async function loadFacts(
 ): Promise<Facts> {
   const incidentIds = [...new Set(rows.flatMap((n) => (n.incident_id ? [n.incident_id] : [])))];
   const alertIds = [...new Set(rows.flatMap((n) => (n.system_alert_id ? [n.system_alert_id] : [])))];
+  const windowIds = [
+    ...new Set(rows.flatMap((n) => (n.maintenance_window_id ? [n.maintenance_window_id] : []))),
+  ];
   const userIds = [...new Set(rows.flatMap((n) => (n.user_id ? [n.user_id] : [])))];
   const none = Promise.resolve({ data: [], error: null });
-  const [incidents, alerts, people, emails, ladder] = await Promise.all([
+  const [incidents, alerts, people, emails, ladder, windows, windowEmails] = await Promise.all([
     db
       .from('incidents')
       .select(
@@ -97,7 +119,11 @@ export async function loadFacts(
       ? db.from('system_alerts').select('id, kind, opened_at, context').in('id', alertIds)
       : none,
     userIds.length
-      ? db.from('profiles').select('id, email, display_name').in('id', userIds).eq('is_active', true)
+      ? db
+          .from('profiles')
+          .select('id, email, display_name, google_chat_user_id')
+          .in('id', userIds)
+          .eq('is_active', true)
       : none,
     userIds.length && incidentIds.length
       ? db
@@ -109,12 +135,38 @@ export async function loadFacts(
           .in('user_id', userIds)
           .order('created_at')
       : none,
-    incidentIds.length ? loadLadderEnv(db, now) : Promise.resolve(null),
+    incidentIds.length || windowIds.length ? loadLadderEnv(db, now) : Promise.resolve(null),
+    windowIds.length
+      ? db
+          .from('maintenance_windows')
+          .select(
+            `id, kind, starts_at, ends_at, reason, created_at, approved_at,
+             creator:profiles!maintenance_windows_created_by_fkey(display_name),
+             approver:profiles!maintenance_windows_approved_by_fkey(display_name),
+             sites!inner(name, tier,
+               primary:profiles!sites_primary_owner_id_fkey(id, display_name, google_chat_user_id),
+               backup:profiles!sites_backup_owner_id_fkey(id, display_name, google_chat_user_id))`,
+          )
+          .in('id', windowIds)
+          .overrideTypes<WindowFactsRow[], { merge: false }>()
+      : none,
+    userIds.length && windowIds.length
+      ? db
+          .from('notifications')
+          .select('id, maintenance_window_id, user_id')
+          .eq('channel', 'email')
+          .eq('status', 'sent')
+          .in('maintenance_window_id', windowIds)
+          .in('user_id', userIds)
+          .order('created_at')
+      : none,
   ]);
   if (incidents.error) throw new Error(`incidents: ${incidents.error.message}`);
   if (alerts.error) throw new Error(`system_alerts: ${alerts.error.message}`);
   if (people.error) throw new Error(`profiles: ${people.error.message}`);
   if (emails.error) throw new Error(`notifications: ${emails.error.message}`);
+  if (windows.error) throw new Error(`maintenance_windows: ${windows.error.message}`);
+  if (windowEmails.error) throw new Error(`notifications: ${windowEmails.error.message}`);
 
   type Sent = { id: string; incident_id: string; user_id: string | null };
   const firstEmail = new Map<string, { id: string }>();
@@ -122,9 +174,16 @@ export async function loadFacts(
     const key = `${e.incident_id}:${e.user_id}`;
     if (!firstEmail.has(key)) firstEmail.set(key, { id: e.id });
   }
+  type WindowSent = { id: string; maintenance_window_id: string; user_id: string | null };
+  for (const e of (windowEmails.data ?? []) as WindowSent[]) {
+    const key = `${e.maintenance_window_id}:${e.user_id}`;
+    if (!firstEmail.has(key)) firstEmail.set(key, { id: e.id });
+  }
   return {
     incidents: new Map(incidents.data.map((i) => [i.id, ladder ? { ...i, ladder } : i])),
     systemAlerts: new Map(((alerts.data ?? []) as SystemAlertFacts[]).map((a) => [a.id, a])),
+    windows: new Map(((windows.data ?? []) as WindowFactsRow[]).map((w) => [w.id, w])),
+    windowEnv: windowIds.length ? ladder : null,
     recipients: new Map(((people.data ?? []) as Recipient[]).map((p) => [p.id, p])),
     firstEmail,
   };

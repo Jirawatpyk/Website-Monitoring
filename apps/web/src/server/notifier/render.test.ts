@@ -110,6 +110,42 @@ describe('render — PROBLEM rows', () => {
   });
 });
 
+describe('render — mutes (S09b, §24.4, §24.7)', () => {
+  it('a late first alert says the mute held it', () => {
+    const m = renderChat(
+      row('problem', { ...problemContext, afterMute: true, heldUntil: '2026-09-25T08:00:00Z' }),
+      incident,
+      appUrl,
+      new Date('2026-09-25T08:00:05Z'),
+    )!;
+    expect(m.text).toContain('held by a mute until 15:00');
+    expect(JSON.stringify(m.cardsV2)).toContain('Held by a mute until 15:00');
+  });
+
+  it('a card that isn’t after a mute keeps its words', () => {
+    const m = renderChat(
+      row('problem', { ...problemContext, heldUntil: '2026-09-25T08:00:00Z' }),
+      incident,
+      appUrl,
+      now,
+    )!;
+    expect(m.text).not.toContain('held by a mute');
+  });
+
+  it('a mute on a site with an open incident adds its line to the thread', () => {
+    const m = renderChat(
+      row('muted', { until: '2026-09-25T11:00:00Z', by: 'Tao', acked: false }),
+      incident,
+      appUrl,
+      now,
+    )!;
+    expect(m.text).toBe(
+      'MUTED · Fuji Links · until 18:00 · by Tao · INC-0141 keeps escalating until someone acknowledges',
+    );
+    expect(renderChat(row('muted', {}), incident, appUrl, now)).toBeNull();
+  });
+});
+
 describe('render — relapse, flapping and auto-resolve rows (S04b, D-024)', () => {
   const voca: IncidentFacts = {
     ...incident,

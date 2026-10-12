@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { Toaster } from '@jirawatpyk/aura-react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WindowRow } from '../page-model';
@@ -13,6 +14,7 @@ const actions = vi.hoisted(() => ({
   withdrawRequest: vi.fn(async (_: unknown) => ({ ok: true as const })),
   muteSite: vi.fn(async (_: unknown) => ({ ok: true as const })),
   scheduleMaintenance: vi.fn(async (_: unknown) => ({ ok: true as const })),
+  undoWindowAction: vi.fn(async (_: unknown) => ({ ok: true as const })),
 }));
 vi.mock('../actions', () => actions);
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -129,6 +131,42 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
     // the refresh brings the row back as ended early
     rerender(<MaintenancePageView rows={[{ ...base, endedAt: NOW }, request]} {...props} />);
     await waitFor(() => expect(screen.getByRole('heading', { name: /Recent/ })).toHaveFocus());
+  });
+
+  it('End now is held 10 s with Undo; after Undo focus lands on Active now (§24.8, spec-check)', async () => {
+    const user = userEvent.setup();
+    actions.endWindowEarly.mockResolvedValueOnce({
+      ok: true as const,
+      postsAt: new Date(Date.now() + 10_000).toISOString(),
+    } as never);
+    const props = {
+      sites: [],
+      viewer: { id: 'u-tao', name: 'Tao', role: 'admin' as const },
+      viewerEmail: 'x@example.test',
+      nowIso: NOW,
+    };
+    const page = (rows: WindowRow[]) => (
+      <>
+        <MaintenancePageView rows={rows} {...props} />
+        <Toaster />
+      </>
+    );
+    const { rerender } = render(page([base, request]));
+    await user.click(
+      within(screen.getByRole('region', { name: 'Active now' })).getAllByRole('button', {
+        name: 'End now',
+      })[0]!,
+    );
+    const end = await screen.findByRole('dialog', { name: /End .* now\?/ });
+    await user.type(within(end).getByLabelText(/Reason/), 'Done early');
+    await user.click(within(end).getByRole('button', { name: /^End .* now$/ }));
+    rerender(page([{ ...base, endedAt: NOW }, request]));
+    expect(await screen.findByText(/^Posting to Chat and email in \d+ s/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Undo · \d+ s$/ }));
+    await waitFor(() => expect(actions.undoWindowAction).toHaveBeenCalledWith({ windowId: 'w1' }));
+    // the refresh brings the row back as running
+    rerender(page([base, request]));
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Active now/ })).toHaveFocus());
   });
 
   it('Decline and End now need a reason', async () => {

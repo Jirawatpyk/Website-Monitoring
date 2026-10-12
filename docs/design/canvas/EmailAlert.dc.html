@@ -24,11 +24,11 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <div style="display: flex; flex-direction: column; gap: 4px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">EMAIL · RESEND · RECORD COPY + FALLBACK WHEN CHAT FAILS</span>
 <h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Alert email</h2>
-<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Same facts as the Chat thread. One email per event, all under one subject per incident, so a mail client stacks them the way Chat stacks the thread. Pick a thread (DOWN, PROBLEM or Admin system email), then an event and a recipient — the footer says why that person got it.</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Same facts as the Chat thread. One email per event, all under one subject per incident, so a mail client stacks them the way Chat stacks the thread. Pick a thread (DOWN, PROBLEM, maintenance or Admin system email), then an event and a recipient — the footer says why that person got it.</span>
 </div>
 
 <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 10px">
-<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Thread</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Thread" options="{{threads}}" value="{{th}}" on-change="{{pickTh}}" size="sm"></x-import></div>
+<div style="display: flex; flex-direction: column; gap: 4px; width: 360px"><x-import component-from-global-scope="Aura.Select" label="Thread" options="{{threads}}" value="{{th}}" on-change="{{pickTh}}"></x-import></div>
 <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Event</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Event" options="{{events}}" value="{{ev}}" on-change="{{pick}}" size="sm"></x-import></div>
 <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Recipient</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Recipient" options="{{whoOptions}}" value="{{who}}" on-change="{{pickWho}}" size="sm"></x-import></div>
 </div>
@@ -86,6 +86,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <span>Tier 2–3 L2 (+30 min, no ack) is a reminder email to Tao only — no CEO. Ack and resolve emails are held until the 10 s Undo window closes.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">PROBLEM:</b> amber, never red. L0 emails the owner only; the backup is first emailed with the 60-min reminder (+60 min, no ack). A Tier 2–3 PROBLEM outside response hours is held until 09:00. No client-update email — that track is for DOWN.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Admin system emails</b> (browser verifier unavailable, fewer than 2 probe locations) go to every active Admin — today only Tao.</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Maintenance emails (§24):</b> one mail thread per window — subject <span style="font-family: var(--font-mono); font-size: 11px">site · Maintenance · start</span> (requests: <span style="font-family: var(--font-mono); font-size: 11px">DxT Monitor · Maintenance request · site · start</span>). Owner and backup get every action (approve and decline included), except the one who did it; every active Admin gets the request and the 12 h reminder. Only the asker’s answer DM and the 1 h reminder are Chat-only. Mutes are Chat only (≤ 24 h; owner and backup get a DM when someone else mutes their site). One link, always to Maintenance &amp; mutes — never an approve link in an email. No status-page emails yet (D-013).</span>
 <span>Table layout, inline styles, 600 px max, system fonts. Status in words and colour. Plain-text part with the same facts and links. No tracking pixels.</span>
 </div>
 </div>
@@ -253,11 +254,42 @@ class Component extends DCLogic {
         people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'A status needs at least 2 locations to vote, so statuses are frozen at the last complete round until a second location reports again.', btns: [P('Open Probes & heartbeat', 'Probes.dc.html')], why: ADMWHY } }
       }
     };
+    var MXF = 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Everything about this window is on Maintenance & mutes.';
+    var MR = {
+      'Approval request': {
+        sentTo: 'Sent Fri 25 Sep 09:20 to every active Admin — today only Tao — together with the Chat DM. Ploy (backup) gets the same email with “You got this because you’re backup for Bangkok Airways – China”; Arm asked, so he gets no copy. Everything later about this window — reminders, APPROVED / DECLINED, changes, start — continues in this mail thread. No Approve link: approving happens on the page.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE REQUESTED', preStatus: 'MAINTENANCE REQUESTED —', pre: 'Arm asks for 3 days of maintenance on Bangkok Airways – China from Sat 26 Sep 22:00',
+        headline: 'Arm asks for 3 days of maintenance',
+        facts: [{ k: 'Site', v: 'Bangkok Airways – China · Tier 1 · owner Arm, backup Ploy' }, { k: 'When', v: 'Sat 26 Sep 22:00 → Tue 29 Sep 22:00 (3 days)' }, { k: 'Reason', v: '“Move to a new hosting provider”' }, { k: 'Effect', v: 'No alerts for 3 days; checks still run; not counted in uptime; the client status page shows “Planned maintenance”' }, { k: 'Deadline', v: 'It starts only if approved before Sat 26 Sep 22:00' }],
+        people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'Windows over 24 h asked for by a Responder need an Admin. Approve or decline it on Maintenance & mutes — declining needs a reason, which Arm gets.', btns: [P('Review request', 'MaintenancePage.dc.html')], why: 'You got this because you’re an Admin.' } }
+      },
+      'Reminder 12 h': {
+        sentTo: 'Sent Sat 26 Sep 10:00 — 12 h before the start, only if the request is still waiting — to every active Admin, in the same mail thread as the request. The 1 h reminder (21:00) is Chat only.',
+        bar: AMBER, labelColor: AMBER, label: 'WAITING FOR APPROVAL', preStatus: 'WAITING FOR APPROVAL —', pre: 'Bangkok Airways – China starts in 12 h (Sat 26 Sep 22:00) · asked by Arm',
+        headline: 'Still waiting — starts in 12 h',
+        facts: [{ k: 'Site', v: 'Bangkok Airways – China · Tier 1' }, { k: 'When', v: 'Sat 26 Sep 22:00 → Tue 29 Sep 22:00 (3 days)' }, { k: 'Asked by', v: 'Arm · Fri 25 Sep 09:20 · “Move to a new hosting provider”' }, { k: 'If nobody answers', v: 'At 22:00 it doesn’t start; Arm is told and has to ask again' }],
+        people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'Nobody has approved or declined Arm’s request yet. A last reminder comes by Chat at 21:00.', btns: [P('Review request', 'MaintenancePage.dc.html')], why: 'You got this because you’re an Admin.' } }
+      }
+    };
+    var MO = {
+      'Scheduled': {
+        sentTo: 'Sent Wed 23 Sep 16:30 to the owner and the backup, one email each (they may not read the Alerts Space). The person who did the action is skipped — Ploy scheduled it, so in production only Nok gets this one; Ploy’s copy is drawn to show the owner wording. Later actions on this window — started, changed, ended early, cancelled, didn’t start — reply in the same mail thread with the same layout; only the label, headline and preheader change, plus a “What changed” row.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE SCHEDULED', preStatus: 'MAINTENANCE SCHEDULED —', pre: 'Tubtong · Tue 29 Sep 01:00 → 03:00 (2 h) · by Ploy',
+        headline: 'Tubtong maintenance on Tue 29 Sep',
+        facts: [{ k: 'When', v: 'Tue 29 Sep 01:00 → 03:00 (2 h)' }, { k: 'Reason', v: '“WordPress plugin updates”' }, { k: 'Scheduled by', v: 'Ploy · Wed 23 Sep 16:30' }, { k: 'Effect', v: 'No alerts while it runs; checks still run; not counted in uptime' }, { k: 'If it’s down', v: 'At 01:00 it won’t start, and you’ll be told' }],
+        people: {
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'You scheduled this. End it early, change the end or cancel it on Maintenance & mutes.', btns: [P('Open Maintenance & mutes', 'MaintenancePage.dc.html')], why: 'You got this because you own Tubtong.' },
+          'Nok': { to: 'Nok <nok@[domain]>', lede: 'Ploy scheduled maintenance on Tubtong. Nothing to do — there will be no alerts for Tubtong during the window.', btns: [P('Open Maintenance & mutes', 'MaintenancePage.dc.html')], why: 'You got this because you’re backup for Tubtong.' }
+        }
+      }
+    };
     var TH = {
       'MuvMi · DOWN': { subject: 'MuvMi · Tier 1 · INC-0142', E: E, events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (CEO)', 'L3 FYI (CEO + Bua)', 'Recovered'], first: 'Down', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · PROBLEM': { subject: 'Fuji Links · Tier 2 · INC-0141', E: F, events: ['PROBLEM', 'Acknowledged', 'Recovered'], first: 'PROBLEM', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · auto-resolved': { subject: 'Fuji Links · Tier 2 · INC-0151', E: FA, events: ['Recovered (auto-resolved)'], first: 'Recovered (auto-resolved)', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'VOCA · flapping': { subject: 'VOCA · Tier 2 · INC-0133', E: V, events: ['Flapping summary'], first: 'Flapping summary', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
+      'Maintenance · approval': { subject: 'DxT Monitor · Maintenance request · Bangkok Airways – China · Sat 26 Sep 22:00', E: MR, events: ['Approval request', 'Reminder 12 h'], first: 'Approval request', foot: MXF },
+      'Maintenance · owner & backup': { subject: 'Tubtong · Maintenance · Tue 29 Sep 01:00', E: MO, events: ['Scheduled'], first: 'Scheduled', foot: MXF },
       'Admin · system': { subject: '', E: A, events: ['Verifier unavailable', 'Fewer than 2 locations'], first: 'Verifier unavailable', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read.' }
     };
     var th = TH[this.state.th] ? this.state.th : 'MuvMi · DOWN';
@@ -269,7 +301,7 @@ class Component extends DCLogic {
     return {
       threads: Object.keys(TH),
       th: th,
-      pickTh: function (v) { self.setState({ th: v, ev: TH[v].first }); },
+      pickTh: function (v) { v = v && v.target ? v.target.value : v; self.setState({ th: v, ev: TH[v].first }); },
       subject: e.subject || T.subject,
       footNote: T.foot,
       events: T.events,

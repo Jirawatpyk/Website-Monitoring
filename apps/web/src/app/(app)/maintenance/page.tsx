@@ -6,6 +6,8 @@ import { NoAccess } from '@/components/states';
 import { getAccess } from '@/lib/auth/session';
 
 export const metadata: Metadata = { title: 'Maintenance & mutes' };
+// Maintenance actions send their messages after the 10 s Undo window (`after()`, §24.8): room for that.
+export const maxDuration = 60;
 
 /**
  * `/maintenance` — Maintenance & mutes (spec §23, boards MaintenancePage and MMaintenanceList; D-036).

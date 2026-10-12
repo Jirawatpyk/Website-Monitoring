@@ -23,7 +23,29 @@ export type ChatState =
   | 'RESOLVED'
   | 'NOTE'
   | 'MONITOR FAULT'
-  | 'TEST — no action';
+  | 'TEST — no action'
+  // Maintenance and mutes (S09b, spec §24, D-037).
+  | 'MAINTENANCE REQUESTED'
+  | 'MAINTENANCE SCHEDULED'
+  | 'MAINTENANCE APPROVED'
+  | 'MAINTENANCE DECLINED'
+  | 'REQUEST WITHDRAWN'
+  | 'REQUEST CHANGED'
+  | 'MAINTENANCE CHANGED'
+  | 'MAINTENANCE CANCELLED'
+  | 'MAINTENANCE STARTED'
+  | 'MAINTENANCE ENDED'
+  | 'MAINTENANCE ENDED EARLY'
+  | 'DIDN’T START'
+  | 'NOT APPROVED'
+  | 'MUTED'
+  | 'MUTE CHANGED'
+  | 'MUTE ENDED'
+  | 'MUTE ENDED EARLY'
+  | 'WAITING FOR APPROVAL'
+  | 'STILL WAITING'
+  | 'APPROVED'
+  | 'DECLINED';
 
 export interface ChatTextLine {
   state: ChatState;

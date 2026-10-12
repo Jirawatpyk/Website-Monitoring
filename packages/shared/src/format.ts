@@ -146,6 +146,23 @@ export function formatDuration(totalMinutes: number): string {
   return `${m} min`;
 }
 
+/** "Tao", "Arm and Tao", "you, Ploy and Tao": people named in a sentence (no serial comma). */
+export function formatNameList(names: readonly string[]): string {
+  return names.length < 2
+    ? names.join('')
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * A maintenance window's or mute's length (MaintenancePage, ChatAlert maintenance rows): whole days
+ * past one as "3 days", a day as "24 h", else `formatDuration` ("2 h", "9 h 20 min", "1 d 2 h").
+ */
+export function formatWindowLength(totalMinutes: number): string {
+  const m = Math.round(totalMinutes);
+  if (m >= 1440 && m % 1440 === 0) return m === 1440 ? '24 h' : `${m / 1440} days`;
+  return formatDuration(m);
+}
+
 /**
  * A short duration with seconds, for KPIs like MTTA (Main3): "18 s", "1 min 52 s", "6 min 40 s",
  * "15 min"; from an hour on it reads as `formatDuration` ("1 h 2 min").

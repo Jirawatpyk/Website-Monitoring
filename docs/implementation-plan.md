@@ -26,7 +26,7 @@
 | S07 | Incidents, timeline & resolve | 1 · P0 | L | FR-06 | S04b | 3 | Done |
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Done |
 | S09 | Maintenance windows & mute | 1 · P0 | L | FR-10a, FR-14 | S06b, S08 | 3 | Done |
-| S09b | Maintenance messages | 1 · P0 | S | — (FR-10a, FR-14 messages, §23.10) | S09 + ChatAlert / EmailAlert boards | 3 | Todo |
+| S09b | Maintenance messages | 1 · P0 | M | — (FR-10a, FR-14 messages, §24) | S09 + ChatAlert / EmailAlert boards | 3 | In review |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
@@ -428,10 +428,11 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S09b · Maintenance messages
 
 - **Scope:** the messages spec §23.6 and §23.10 add (split from S09 on 11 Oct 2026, D-036): the approval request to the Admin when a Responder asks for maintenance over 24 h, the reminders 12 h and 1 h before a pending request's start, one line in the site's Alerts Space thread plus a message to the owner and backup on every create / approve / decline / edit / cancel / end early, approve / decline to the asker in Chat, and "Didn't start — site was DOWN" to the owner, backup and approver. Status-page subscriber emails ("Include planned maintenance notices") go with the status page (Phase 3).
-- **Boards:** ChatAlert and EmailAlert rows for these messages (to be drawn by Claude Design first).
+- **Also (spec §24, rev 4):** 10 s Undo for approve / decline / end now / change end / cancel / withdraw (§24.8), the "Held by a mute until …" line on an incident's first alert after a mute and "INC-… posted" on MUTE ENDED (§24.7), the incident-thread line when a mute starts on a site with an open incident (§24.4), and the confirmed dialog copy (§24.9). No Chat DMs yet: DM texts are Space replies that @mention the person (D-037).
+- **Boards:** ChatAlert (STATE: approval request · reminders · approved / declined · Alerts Space thread · didn't start · first alert after a mute) and EmailAlert ('Maintenance · approval', 'Maintenance · owner & backup'), drawn 11 Oct 2026 · **Decisions:** D-037
 - **Depends on:** S09
 - **Done when:**
-  1. A Responder's request over 24 h reaches every active Admin in Chat and email; the reminders go 12 h and 1 h before its start while it still waits (tests).
+  1. A Responder's request over 24 h reaches every active Admin in Chat (a line @mentioning each, D-037) and email; the reminders go 12 h and 1 h before its start while it still waits (tests; staging can't sign in a Responder, D-007).
   2. Each maintenance action posts its one line in the site's Alerts Space thread and messages the owner and backup (tests); message-checker passes the new ChatAlert / EmailAlert rows.
 - **Review:** message-checker, engine-reviewer.
 

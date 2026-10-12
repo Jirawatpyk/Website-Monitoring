@@ -17,13 +17,15 @@ import { IconCalendar, IconCheck, IconEyeOff, IconInfo } from '@jirawatpyk/aura-
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useNow } from '@/components/use-now';
-import { muteSite, scheduleMaintenance } from '../actions';
+import { loadAdminNames, muteSite, scheduleMaintenance } from '../actions';
 import {
   DURATIONS,
   EFFECT,
   GUARD_TEXT,
   GUARD_TEXT_MUTED,
   PROBLEM_WORDS,
+  approvalNotice,
+  approvalSpan,
   doneOf,
   escalating,
   guardTitle,
@@ -119,6 +121,19 @@ export function MaintenanceDialog({
     now,
     isAdmin,
   });
+  // A Responder's long request names the Admins it goes to before it is sent (§24.9).
+  const [admins, setAdmins] = useState<string[] | null>(null);
+  const asksAdmin = !isAdmin && kind === 'maintenance' && plan.needsApproval;
+  useEffect(() => {
+    if (!asksAdmin || admins) return;
+    let live = true;
+    loadAdminNames()
+      .then((names) => live && setAdmins(names))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [asksAdmin, admins]);
   const isLater = kind === 'maintenance' && later;
   // Nothing picked yet (opened from /maintenance): no site's incident speaks for it (spec-check).
   const incident = picked ? current.openIncident : null;
@@ -179,6 +194,7 @@ export function MaintenanceDialog({
           reason,
           viewer: viewerName,
           now: at,
+          admins: 'admins' in r ? r.admins : admins,
         }),
       );
       router.refresh();
@@ -356,7 +372,11 @@ export function MaintenanceDialog({
                   fullWidth
                 />
               </span>
-              <span className="text-sm text-fg-secondary">{`Ends ${formatWhen(plan.endsAt, now, { midSentence: true })} (UTC+7)`}</span>
+              <span className="text-sm text-fg-secondary">
+                {asksAdmin
+                  ? approvalSpan(plan.startsAt, plan.endsAt, now)
+                  : `Ends ${formatWhen(plan.endsAt, now, { midSentence: true })} (UTC+7)`}
+              </span>
             </span>
           </div>
 
@@ -403,7 +423,7 @@ export function MaintenanceDialog({
 
           {kind === 'maintenance' && plan.needsApproval && !plan.problems.includes('needs_approval_now') && (
             <Alert tone="warning" title="Needs an Admin’s approval">
-              {`Windows over 24 h asked for by a Responder wait for an Admin. It starts only if approved before ${formatWhen(plan.startsAt, now, { midSentence: true })} — otherwise it doesn’t start. Follow it under Waiting for approval on Maintenance & mutes.`}
+              {approvalNotice(admins, plan.startsAt, now)}
             </Alert>
           )}
           {kind === 'maintenance' &&

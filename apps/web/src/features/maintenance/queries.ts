@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import type { SiteStatus, Tier } from '@dxt/shared';
+import { escalationPlanSchema, TIER_CONFIG, type SiteStatus, type Tier } from '@dxt/shared';
 import type { PausableSite } from './model';
 import type { LogEntry, WindowRow } from './page-model';
 
@@ -21,8 +21,10 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
        sites!inner(name, tier, primary_owner_id, backup_owner_id, muted_until,
                    owner:profiles!sites_primary_owner_id_fkey(display_name, role),
                    backup:profiles!sites_backup_owner_id_fkey(display_name, role),
-                   site_status(status))`,
+                   site_status(status),
+                   incidents(number, state, detected_at, alerted_at, escalation_plan))`,
     )
+    .in('sites.incidents.state', ['unacked', 'escalated'])
     .or(`ends_at.gte.${since},cancelled_at.gte.${since}`)
     .order('starts_at');
   if (error) throw new Error(`maintenance_windows: ${error.message}`);
@@ -54,8 +56,33 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
       ownerIsAdmin: w.sites.owner?.role === 'admin',
       backupIsAdmin: w.sites.backup?.role === 'admin',
       log: (Array.isArray(w.log) ? w.log : []) as unknown as LogEntry[],
+      silenced: w.kind === 'mute' ? silencedOf(w.sites.incidents, w.starts_at, w.sites.tier) : null,
     };
   });
+}
+
+/**
+ * An incident this mute kept quiet: opened while it ran, never alerted, nobody on it yet. Ending the
+ * mute posts its first alert and starts its ladder (§24.9, D-036) — L1's delay when its timers run at
+ * every hour (Tier 1), else unknown here (Tier 2–3 count inside response hours).
+ */
+function silencedOf(
+  incidents: {
+    number: number;
+    state: string;
+    detected_at: string;
+    alerted_at: string | null;
+    escalation_plan: unknown;
+  }[],
+  mutedFrom: string,
+  tier: number,
+): WindowRow['silenced'] {
+  const i = incidents.find((x) => !x.alerted_at && Date.parse(x.detected_at) >= Date.parse(mutedFrom));
+  if (!i) return null;
+  const plan = escalationPlanSchema.safeParse(i.escalation_plan);
+  const l1 = plan.success ? plan.data.steps.find((s) => s.level === 1) : undefined;
+  const alwaysOn = TIER_CONFIG[tier as Tier]?.alwaysOn ?? false;
+  return { number: i.number, l1DelayMin: l1 && alwaysOn ? l1.delayMin : null };
 }
 
 /** The live sites, with what the dialog's guard needs; the page keeps the ones this person may act on. */

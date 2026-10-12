@@ -5,6 +5,7 @@ import { UNDO_WINDOW_SEC } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { contextOf, loadFacts, type Facts, type Notification } from './facts';
 import { renderChat, renderEmail, renderSystemAlertEmail } from './render';
+import { renderWindowChat, renderWindowEmail } from './render-window';
 
 export interface EmailConfig {
   apiKey: string;
@@ -239,7 +240,9 @@ async function dispatchChannel(
         error: outcome.error,
       }),
     );
-    if (update.status === 'failed' && channel === 'google_chat') {
+    // A window's Chat line has no email fallback: the owner and backup already get its email (D-037).
+    // Nor does an incident's MUTED line (mutes are Chat only, §24.5).
+    if (update.status === 'failed' && channel === 'google_chat' && n.incident_id && n.template !== 'muted') {
       const fallback = await db.rpc('queue_fallback_emails', { p_notification_id: n.id });
       if (fallback.error) throw new Error(`queue_fallback_emails: ${fallback.error.message}`);
       console.warn(
@@ -269,6 +272,7 @@ async function release(db: DbClient, rows: readonly Notification[]): Promise<num
 
 async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: Date): Promise<Outcome> {
   if (n.system_alert_id) return deliverSystemAlert(deps, n, facts);
+  if (n.maintenance_window_id) return deliverWindow(deps, n, facts, now);
   const incident = n.incident_id ? facts.incidents.get(n.incident_id) : undefined;
   if (!n.incident_id || !incident) return { ok: false, error: 'Incident not found', retryable: false };
 
@@ -295,6 +299,40 @@ async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: D
   const message = renderEmail(n, incident, to, deps.appUrl, {
     threadId: incidentThreadId(n.incident_id, from),
     startsThread: !first || first.id === n.id,
+  });
+  if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
+  const send = deps.send ?? sendEmail;
+  const result = await send(message, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });
+  return result.ok ? { ok: true, providerId: result.id } : result;
+}
+
+/**
+ * A maintenance window's message (S09b, D-037): its line or a mention reply in the window's own Space
+ * thread (`mw-<id>`), or an email in its own mail thread.
+ */
+async function deliverWindow(deps: DispatchDeps, n: Notification, facts: Facts, now: Date): Promise<Outcome> {
+  const w = facts.windows.get(n.maintenance_window_id!);
+  if (!w) return { ok: false, error: 'Maintenance window not found', retryable: false };
+  if (n.channel === 'google_chat') {
+    const message = renderWindowChat(n, w, facts, deps.appUrl, now);
+    if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
+    const post = deps.post ?? postChatMessage;
+    const result = await post(deps.webhookUrl!, message, {
+      threadKey: n.thread_key ?? `mw-${w.id}`,
+      messageId: `client-${n.id}`,
+    });
+    return result.ok
+      ? { ok: true, providerId: result.messageName }
+      : { ok: false, error: result.error, retryable: true };
+  }
+  const to = n.user_id ? facts.recipients.get(n.user_id) : undefined;
+  if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
+  const { apiKey, from } = deps.email!;
+  const first = facts.firstEmail.get(`${w.id}:${to.id}`);
+  const message = renderWindowEmail(n, w, facts, deps.appUrl, {
+    from,
+    startsThread: !first || first.id === n.id,
+    now,
   });
   if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
   const send = deps.send ?? sendEmail;

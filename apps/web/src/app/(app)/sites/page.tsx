@@ -6,6 +6,8 @@ import { chatConnected, listSites } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
 
 export const metadata: Metadata = { title: 'Sites' };
+// Maintenance actions send their messages after the 10 s Undo window (`after()`, §24.8): room for that.
+export const maxDuration = 60;
 
 /** `/sites` — the Sites list (spec §20, boards Sites and MSites). */
 export default async function SitesPage() {

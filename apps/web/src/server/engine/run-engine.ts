@@ -130,6 +130,11 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   const logged = await db.rpc('engine_log_windows', { p_now: now.toISOString() });
   if (logged.error)
     console.error(JSON.stringify({ event: 'engine_log_windows_failed', error: logged.error.message }));
+  // A waiting request's reminders, 12 h and 1 h before its start (S09b, §24.2); a failure retries next run.
+  const reminded = await db.rpc('engine_window_reminders', { p_now: now.toISOString() });
+  if (reminded.error)
+    console.error(JSON.stringify({ event: 'engine_window_reminders_failed', error: reminded.error.message }));
+  else if (typeof reminded.data === 'number') summary.notified += reminded.data;
   const [sites, locations, hours] = await Promise.all([
     loadSites(db, now),
     loadLocations(db, now),
@@ -964,15 +969,18 @@ async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promis
   const { data, error } = await db.rpc('engine_silent_incidents', { p_now: now.toISOString() });
   if (error) throw new Error(`engine_silent_incidents: ${error.message}`);
   let queued = 0;
+  const failed: string[] = [];
+  // One incident that can't post never holds back another site's first alert (engine review H1).
   for (const inc of data ?? []) {
     const posted = await db.rpc('engine_post_late_alert', {
       p_incident_id: inc.incident_id,
       p_at: now.toISOString(),
       ...(inc.severity === 'problem' ? holdFor(inc.tier as Tier, now, hours) : {}),
     });
-    if (posted.error) throw new Error(`engine_post_late_alert: ${posted.error.message}`);
-    if (posted.data) queued += 1;
+    if (posted.error) failed.push(`${inc.incident_id}: ${posted.error.message}`);
+    else if (posted.data) queued += 1;
   }
+  if (failed.length) throw new Error(`engine_post_late_alert: ${failed.join('; ')} (${queued} posted)`);
   return queued;
 }
 

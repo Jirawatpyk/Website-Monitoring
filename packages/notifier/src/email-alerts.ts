@@ -166,7 +166,7 @@ export interface AgainEmailInput extends EmailBaseInput {
  * AURA light tokens (aura-tokens 5.31) resolved to hex: email clients don't support CSS variables.
  * The board's colours: danger / positive / secondary label, zinc surfaces.
  */
-const C = {
+export const EMAIL_COLORS = {
   danger: '#b91c1c',
   /** PROBLEM: amber, never red (spec §11, §19). */
   warning: '#b45309',
@@ -181,6 +181,7 @@ const C = {
   inverted: '#ffffff',
   accentDot: '#d9f99d',
 } as const;
+const C = EMAIL_COLORS;
 
 const FONT = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 export const EMAIL_FOOTER =
@@ -189,7 +190,7 @@ export const EMAIL_FOOTER =
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-const senderDomain = (from: string) => /@([^>\s]+)>?\s*$/.exec(from)?.[1] ?? 'localhost';
+export const senderDomain = (from: string) => /@([^>\s]+)>?\s*$/.exec(from)?.[1] ?? 'localhost';
 
 /** `<inc-<id>@notify.example>`: the id every email of one incident refers to. */
 export function incidentThreadId(incidentId: string, from: string): string {
@@ -237,10 +238,10 @@ function render(input: EmailBaseInput, b: Body): EmailMessage {
   const headers: Record<string, string> = input.startsThread
     ? { References: input.threadId }
     : { 'In-Reply-To': input.threadId, References: input.threadId };
-  return layout({ subject: subjectOf(input), why: whyOf(input), footer: EMAIL_FOOTER, headers }, b);
+  return emailLayout({ subject: subjectOf(input), why: whyOf(input), footer: EMAIL_FOOTER, headers }, b);
 }
 
-interface Envelope {
+export interface Envelope {
   subject: string;
   /** The footer's bold line: why this person got it. */
   why: string;
@@ -248,8 +249,11 @@ interface Envelope {
   headers: Record<string, string>;
 }
 
+/** The body every EmailAlert email fills in (shared with the maintenance emails). */
+export type EmailBody = Omit<Body, 'template'>;
+
 /** The EmailAlert layout: status bar, label, headline, lede, facts table, buttons, footer. */
-function layout({ subject, why, footer, headers }: Envelope, b: Omit<Body, 'template'>): EmailMessage {
+export function emailLayout({ subject, why, footer, headers }: Envelope, b: EmailBody): EmailMessage {
   const preheader = `${b.label} — ${b.pre}`;
   const facts = b.facts
     .map(
@@ -566,7 +570,7 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
   };
   if (input.kind === 'verifier_unavailable') {
     const waiting = input.sites.length;
-    return layout(envelope, {
+    return emailLayout(envelope, {
       color: C.warning,
       bar: C.warning,
       label: 'VERIFIER UNAVAILABLE',
@@ -588,7 +592,7 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
   }
   if (input.kind === 'bkk_control_failing') {
     const waiting = input.sites.length;
-    return layout(envelope, {
+    return emailLayout(envelope, {
       color: C.warning,
       bar: C.warning,
       label: 'BKK NETWORK SUSPECT',
@@ -611,7 +615,7 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
   if (input.kind === 'probe_locations_low') {
     const active = PROBE_LOCATIONS.filter((l) => input.active?.includes(l));
     const missing = PROBE_LOCATIONS.filter((l) => !active.includes(l));
-    return layout(envelope, {
+    return emailLayout(envelope, {
       color: C.warning,
       bar: C.warning,
       label: 'STATUSES FROZEN',
@@ -632,7 +636,7 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
     });
   }
   const queued = input.queued ?? 0;
-  return layout(envelope, {
+  return emailLayout(envelope, {
     color: C.warning,
     bar: C.warning,
     label: 'VERIFIER BEHIND',

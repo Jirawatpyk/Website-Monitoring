@@ -15,6 +15,9 @@ export async function generateMetadata({
   return { title: name ?? 'Site not found' };
 }
 
+// Maintenance actions send their messages after the 10 s Undo window (`after()`, §24.8): room for that.
+export const maxDuration = 60;
+
 /** `/sites/[siteId]` — Site detail (spec §20, boards SiteDetail and MSite). */
 export default async function SiteDetailPage({
   params,

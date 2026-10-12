@@ -9,6 +9,7 @@ import {
   buildAutoResolvedEmail,
   buildFlapSummaryAlert,
   buildFlapSummaryEmail,
+  buildIncidentMutedLine,
   buildNoteAlert,
   buildResolvedAlert,
   buildResolvedEmail,
@@ -205,6 +206,9 @@ function seenFrom(ctx: Record<string, unknown>): { count: number; of: number } |
   return count && of >= count ? { count, of } : null;
 }
 
+/** The mute's end on an incident's first alert after a mute (§24.7): "Held by a mute until 15:00". */
+const heldUntilOf = (ctx: Record<string, unknown>) => (ctx.afterMute === true ? dateOf(ctx.heldUntil) : null);
+
 /** The Google Chat message for a claimed row, or null when its template has nothing to say. */
 export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, now: Date): ChatMessage | null {
   const ctx = contextOf(n.context);
@@ -226,6 +230,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
         // A PROBLEM someone acknowledged, raised to DOWN (D-021), isn't waiting on the ladder.
         ladder: i.state === 'acknowledged' ? null : ladderFactsOf(i, now),
+        heldUntil: heldUntilOf(ctx),
       });
     case 'problem':
       return buildProblemAlert({
@@ -244,7 +249,21 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         backup: person(i.sites.backup),
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
         ladder: ladderFactsOf(i, now),
+        heldUntil: heldUntilOf(ctx),
       });
+    case 'muted': {
+      const until = dateOf(ctx.until);
+      return until
+        ? buildIncidentMutedLine({
+            site: i.sites.name,
+            incidentNumber: i.number,
+            until,
+            by: str(ctx.by, 'someone'),
+            acked: ctx.acked === true,
+            now,
+          })
+        : null;
+    }
     case 'acknowledged':
       return buildAcknowledgedAlert({
         incidentId: i.id,

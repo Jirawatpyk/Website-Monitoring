@@ -1,16 +1,19 @@
 import 'server-only';
 import type { ServerClient } from '@/lib/supabase/server';
+import { UNDO_WINDOW_SEC } from '@dxt/shared';
 import { PROBLEM_WORDS, whenText } from './model';
 import {
   approveSchema,
   createMaintenanceSchema,
   editWindowSchema,
   muteSiteSchema,
+  windowIdSchema,
   windowReasonSchema,
   type ApproveInput,
   type CreateMaintenanceInput,
   type EditWindowInput,
   type MuteSiteInput,
+  type WindowIdInput,
   type WindowReasonInput,
 } from './schemas';
 
@@ -18,7 +21,23 @@ export interface MaintenanceDeps {
   db: Pick<ServerClient, 'rpc' | 'from'>;
 }
 
-export type WindowResult = { ok: true; id?: string; waiting?: boolean } | { ok: false; message: string };
+/**
+ * `postsAt`: an undoable action's messages are held until then (§24.8, D-037) — the toast counts down
+ * to it and offers Undo; create and mute post at once.
+ */
+export type WindowResult =
+  | { ok: true; id?: string; waiting?: boolean; postsAt?: string; admins?: string[] }
+  | { ok: false; message: string };
+
+/** When an undoable action's held messages go: the window's `undo_until`, set by the RPC. */
+async function held(db: MaintenanceDeps['db'], windowId: string): Promise<WindowResult> {
+  const { data } = await db.from('maintenance_windows').select('undo_until').eq('id', windowId).maybeSingle();
+  // The rows are held either way: if the read fails, the toast still counts down (the RPC held 10 s).
+  return {
+    ok: true,
+    postsAt: data?.undo_until ?? new Date(Date.now() + UNDO_WINDOW_SEC * 1000).toISOString(),
+  };
+}
 
 const FAILED = 'Couldn’t save. Check your connection and try again.';
 const NOT_ALLOWED = 'Only an Admin, or the site’s owner or backup, can do that.';
@@ -72,7 +91,24 @@ export async function createMaintenance(
     .select('approved_at')
     .eq('id', data)
     .maybeSingle();
-  return { ok: true, id: data ?? undefined, waiting: row ? !row.approved_at : undefined };
+  const waiting = row ? !row.approved_at : undefined;
+  return {
+    ok: true,
+    id: data ?? undefined,
+    waiting,
+    ...(waiting ? { admins: await activeAdminNames({ db }) } : {}),
+  };
+}
+
+/** Every active Admin's name, for "Tao gets a request now" / "Request sent to Tao" (§24.9). */
+export async function activeAdminNames({ db }: MaintenanceDeps): Promise<string[]> {
+  const { data } = await db
+    .from('profiles')
+    .select('display_name')
+    .eq('role', 'admin')
+    .eq('is_active', true)
+    .order('display_name');
+  return (data ?? []).map((p) => p.display_name);
 }
 
 export async function muteSite(input: MuteSiteInput, { db }: MaintenanceDeps): Promise<WindowResult> {
@@ -96,7 +132,7 @@ export async function endWindowEarly(
     p_window_id: p.data.windowId,
     p_reason: p.data.reason,
   });
-  return error ? refusal(error) : { ok: true };
+  return error ? refusal(error) : held(db, p.data.windowId);
 }
 
 export async function editWindowEnd(input: EditWindowInput, { db }: MaintenanceDeps): Promise<WindowResult> {
@@ -107,14 +143,14 @@ export async function editWindowEnd(input: EditWindowInput, { db }: MaintenanceD
     p_ends_at: p.data.endsAt,
     p_reason: p.data.reason,
   });
-  return error ? refusal(error) : { ok: true };
+  return error ? refusal(error) : held(db, p.data.windowId);
 }
 
 export async function cancelWindow(input: WindowReasonInput, { db }: MaintenanceDeps): Promise<WindowResult> {
   const p = windowReasonSchema.safeParse(input);
   if (!p.success) return first(p.error.issues);
   const { error } = await db.rpc('cancel_window', { p_window_id: p.data.windowId, p_reason: p.data.reason });
-  return error ? refusal(error) : { ok: true };
+  return error ? refusal(error) : held(db, p.data.windowId);
 }
 
 export async function withdrawRequest(
@@ -129,7 +165,7 @@ export async function withdrawRequest(
   });
   return error
     ? refusal(error, 'Only the asker or the site’s owner or backup can withdraw it.')
-    : { ok: true };
+    : held(db, p.data.windowId);
 }
 
 export async function declineMaintenance(
@@ -142,7 +178,7 @@ export async function declineMaintenance(
     p_window_id: p.data.windowId,
     p_reason: p.data.reason,
   });
-  return error ? refusal(error, 'Only an Admin can decline maintenance.') : { ok: true };
+  return error ? refusal(error, 'Only an Admin can decline maintenance.') : held(db, p.data.windowId);
 }
 
 export async function approveMaintenance(
@@ -155,5 +191,13 @@ export async function approveMaintenance(
     p_window_id: p.data.windowId,
     p_ends_at: p.data.endsAt,
   });
-  return error ? refusal(error, 'Only an Admin can approve maintenance.') : { ok: true };
+  return error ? refusal(error, 'Only an Admin can approve maintenance.') : held(db, p.data.windowId);
+}
+
+/** Undo the last held action on a window (§24.8): the person who did it, inside its 10 s. */
+export async function undoWindowAction(input: WindowIdInput, { db }: MaintenanceDeps): Promise<WindowResult> {
+  const p = windowIdSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { error } = await db.rpc('undo_window_action', { p_window_id: p.data.windowId });
+  return error ? refusal(error, 'Only the person who did it can undo it.') : { ok: true };
 }

@@ -17,7 +17,7 @@ export interface FakeCall {
  * recorded so tests can assert what was written. Integration tests use the real local stack instead.
  */
 /**
- * Read-only RPCs, and the engine's per-run housekeeping (the window log, S09): recorded in `readCalls`,
+ * Read-only RPCs, and the engine's per-run housekeeping (the window log, S09; reminders, S09b): recorded in `readCalls`,
  * not `rpcCalls`, so `rpcCalls` lists what a decision wrote.
  */
 const READ_RPCS = new Set([
@@ -25,6 +25,7 @@ const READ_RPCS = new Set([
   'engine_monitor_status',
   'engine_verify_jobs',
   'engine_log_windows',
+  'engine_window_reminders',
   'engine_silent_incidents',
 ]);
 
