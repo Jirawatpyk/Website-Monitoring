@@ -264,9 +264,15 @@ describe('slow location (D-039): one location slow on most sites in a minute tim
     expect(slowLocationsByMinute(rows(5, 10)).size).toBe(0);
   });
 
-  it('each site is held to its own limit; failed checks don’t count', () => {
-    const own = rows(10, 10).map((c) => (c.location === 'BKK' ? { ...c, slowThresholdMs: 5000 } : c));
-    expect(slowLocationsByMinute(own).size).toBe(0);
+  it('a location is judged at 3 s whatever the sites’ own limits; failed checks don’t count', () => {
+    // INC-0011 / INC-0012 (20:09): Tier 2–3 sites (5 s) at 3.1–4.2 s from BKK still say BKK is slow.
+    const tier2 = rows(10, 10).map((c) => ({ ...c, slowThresholdMs: 5000 }));
+    expect(slowLocationsByMinute(tier2)).toEqual(new Map([[T, new Set(['BKK'])]]));
+    // A site's own lower limit is kept: 2.5 s against a 2 s limit is slow.
+    const strict = rows(0, 10).map((c) =>
+      c.location === 'BKK' ? { ...c, responseMs: 2500, slowThresholdMs: 2000 } : c,
+    );
+    expect(slowLocationsByMinute(strict)).toEqual(new Map([[T, new Set(['BKK'])]]));
     const failed = rows(10, 10).map((c) =>
       c.location === 'BKK' ? { ...c, outcome: 'fail' as CheckOutcome } : c,
     );
