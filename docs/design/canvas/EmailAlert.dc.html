@@ -19,7 +19,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 .aura-segmented--sm .aura-segmented__option{padding:0 9px}
 </style>
 </helmet>
-<div class="r3-col" style="width: 720px; height: 1888px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+<div class="r3-col" style="width: 720px; height: 1980px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
 
 <div style="display: flex; flex-direction: column; gap: 4px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">EMAIL · RESEND · RECORD COPY + FALLBACK WHEN CHAT FAILS</span>
@@ -28,8 +28,8 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </div>
 
 <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 10px">
-<div style="display: flex; flex-direction: column; gap: 4px; width: 360px"><x-import component-from-global-scope="Aura.Select" label="Thread" options="{{threads}}" value="{{th}}" on-change="{{pickTh}}"></x-import></div>
-<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Event</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Event" options="{{events}}" value="{{ev}}" on-change="{{pick}}" size="sm"></x-import></div>
+<div style="display: flex; flex-direction: column; gap: 4px; width: 480px"><x-import component-from-global-scope="Aura.Select" label="Thread" options="{{threads}}" value="{{th}}" on-change="{{pickTh}}"></x-import></div>
+<div style="display: flex; flex-direction: column; gap: 4px; width: 360px"><x-import component-from-global-scope="Aura.Select" label="Event" options="{{events}}" value="{{ev}}" on-change="{{pick}}"></x-import></div>
 <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Recipient</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Recipient" options="{{whoOptions}}" value="{{who}}" on-change="{{pickWho}}" size="sm"></x-import></div>
 </div>
 <span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5; margin-top: -6px">{{e.sentTo}}</span>
@@ -86,14 +86,14 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <span>Tier 2–3 L2 (+30 min, no ack) is a reminder email to Tao only — no CEO. Ack and resolve emails are held until the 10 s Undo window closes.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">PROBLEM:</b> amber, never red. L0 emails the owner only; the backup is first emailed with the 60-min reminder (+60 min, no ack). A Tier 2–3 PROBLEM outside response hours is held until 09:00. No client-update email — that track is for DOWN.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Admin system emails</b> (browser verifier unavailable, fewer than 2 probe locations) go to every active Admin — today only Tao.</span>
-<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Maintenance emails (§24):</b> one mail thread per window — subject <span style="font-family: var(--font-mono); font-size: 11px">site · Maintenance · start</span> (requests: <span style="font-family: var(--font-mono); font-size: 11px">DxT Monitor · Maintenance request · site · start</span>). Owner and backup get every action (approve and decline included), except the one who did it; every active Admin gets the request and the 12 h reminder. Only the asker’s answer DM and the 1 h reminder are Chat-only. Mutes are Chat only (≤ 24 h; owner and backup get a DM when someone else mutes their site). One link, always to Maintenance &amp; mutes — never an approve link in an email. No status-page emails yet (D-013).</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Maintenance emails (§24):</b> one mail thread per window — subject <span style="font-family: var(--font-mono); font-size: 11px">site · Maintenance · start</span> (requests: <span style="font-family: var(--font-mono); font-size: 11px">DxT Monitor · Maintenance request · site · start</span>). Owner and backup get every action (approve and decline included), except the one who did it; every active Admin gets the request and the 12 h reminder. Only the asker’s answer DM and the 1 h reminder are Chat-only. Mutes are Chat only (≤ 24 h; owner and backup get a DM when someone else mutes their site). Every later action continues in the window’s thread with a “What changed” row; windows that are over or will never run (declined, withdrawn, cancelled, ended, ended early, didn’t start, not approved) drop the Effect and “If it’s down” rows. Only Admins get “Review request”; everyone else gets “Open Maintenance &amp; mutes” — never an approve link in an email. The first DOWN / PROBLEM email after a mute carries a “Held by a mute” row, like the Chat card. No status-page emails yet (D-013).</span>
 <span>Table layout, inline styles, 600 px max, system fonts. Status in words and colour. Plain-text part with the same facts and links. No tracking pixels.</span>
 </div>
 </div>
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":1888}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":1980}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -255,32 +255,137 @@ class Component extends DCLogic {
       }
     };
     var MXF = 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Everything about this window is on Maintenance & mutes.';
+    var MX = Sd('Open Maintenance & mutes', 'MaintenancePage.dc.html');
+    var MXP = P('Open Maintenance & mutes', 'MaintenancePage.dc.html');
+    var REVIEW = P('Review request', 'MaintenancePage.dc.html');
+    var GREENC = 'var(--aura-fg-positive)';
+    function W(when, len) { return [{ k: 'When', v: when + ' (' + len + ')' }]; }
+    var BAC = 'Bangkok Airways – China', BACW = 'Sat 26 Sep 22:00 → Tue 29 Sep 22:00';
+    var LIVE = [{ k: 'Effect', v: 'No alerts; checks still run; not counted in uptime; the client status page shows “Planned maintenance”' }, { k: 'If it’s down', v: 'At the start it won’t start, and you’ll be told' }];
+    var WHYA = 'You got this because you’re an Admin.', WHYO = 'You got this because you own ' + BAC + '.', WHYB = 'You got this because you’re backup for ' + BAC + '.';
+    function ev(o) { return o; }
     var MR = {
-      'Approval request': {
-        sentTo: 'Sent Fri 25 Sep 09:20 to every active Admin — today only Tao — together with the Chat DM. Ploy (backup) gets the same email with “You got this because you’re backup for Bangkok Airways – China”; Arm asked, so he gets no copy. Everything later about this window — reminders, APPROVED / DECLINED, changes, start — continues in this mail thread. No Approve link: approving happens on the page.',
-        bar: GREY, labelColor: GREY, label: 'MAINTENANCE REQUESTED', preStatus: 'MAINTENANCE REQUESTED —', pre: 'Arm asks for 3 days of maintenance on Bangkok Airways – China from Sat 26 Sep 22:00',
+      'Request': ev({
+        sentTo: 'Sent Fri 25 Sep 09:20 to every active Admin (today only Tao) and to the backup, Ploy. Arm asked, so he gets no copy. Everything later about this window continues in this mail thread. Only Admins get “Review request”.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE REQUESTED', preStatus: 'MAINTENANCE REQUESTED —', pre: 'Arm asks for 3 days on ' + BAC + ' from Sat 26 Sep 22:00',
         headline: 'Arm asks for 3 days of maintenance',
-        facts: [{ k: 'Site', v: 'Bangkok Airways – China · Tier 1 · owner Arm, backup Ploy' }, { k: 'When', v: 'Sat 26 Sep 22:00 → Tue 29 Sep 22:00 (3 days)' }, { k: 'Reason', v: '“Move to a new hosting provider”' }, { k: 'Effect', v: 'No alerts for 3 days; checks still run; not counted in uptime; the client status page shows “Planned maintenance”' }, { k: 'Deadline', v: 'It starts only if approved before Sat 26 Sep 22:00' }],
-        people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'Windows over 24 h asked for by a Responder need an Admin. Approve or decline it on Maintenance & mutes — declining needs a reason, which Arm gets.', btns: [P('Review request', 'MaintenancePage.dc.html')], why: 'You got this because you’re an Admin.' } }
-      },
-      'Reminder 12 h': {
-        sentTo: 'Sent Sat 26 Sep 10:00 — 12 h before the start, only if the request is still waiting — to every active Admin, in the same mail thread as the request. The 1 h reminder (21:00) is Chat only.',
-        bar: AMBER, labelColor: AMBER, label: 'WAITING FOR APPROVAL', preStatus: 'WAITING FOR APPROVAL —', pre: 'Bangkok Airways – China starts in 12 h (Sat 26 Sep 22:00) · asked by Arm',
+        facts: [{ k: 'Site', v: BAC + ' · Tier 1 · owner Arm, backup Ploy' }].concat(W(BACW, '3 days'), [{ k: 'Reason', v: '“Move to a new hosting provider”' }], LIVE.slice(0, 1), [{ k: 'Deadline', v: 'It starts only if approved before Sat 26 Sep 22:00' }]),
+        people: {
+          'Tao': { to: 'Tao <tao@[domain]>', lede: 'Windows over 24 h asked for by a Responder need an Admin. Approve or decline it on Maintenance & mutes — declining needs a reason, which Arm gets.', btns: [REVIEW], why: WHYA },
+          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Arm asked for maintenance on ' + BAC + '. An Admin approves or declines it on Maintenance & mutes.', btns: [MXP], why: WHYB }
+        }
+      }),
+      'Reminder 12 h': ev({
+        sentTo: 'Sent Sat 26 Sep 10:00 — 12 h before the start, only while still waiting — to every active Admin. The 1 h reminder (21:00) is Chat only.',
+        bar: AMBER, labelColor: AMBER, label: 'WAITING FOR APPROVAL', preStatus: 'WAITING FOR APPROVAL —', pre: BAC + ' starts in 12 h (Sat 26 Sep 22:00) · asked by Arm',
         headline: 'Still waiting — starts in 12 h',
-        facts: [{ k: 'Site', v: 'Bangkok Airways – China · Tier 1' }, { k: 'When', v: 'Sat 26 Sep 22:00 → Tue 29 Sep 22:00 (3 days)' }, { k: 'Asked by', v: 'Arm · Fri 25 Sep 09:20 · “Move to a new hosting provider”' }, { k: 'If nobody answers', v: 'At 22:00 it doesn’t start; Arm is told and has to ask again' }],
-        people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'Nobody has approved or declined Arm’s request yet. A last reminder comes by Chat at 21:00.', btns: [P('Review request', 'MaintenancePage.dc.html')], why: 'You got this because you’re an Admin.' } }
-      }
+        facts: W(BACW, '3 days').concat([{ k: 'Asked by', v: 'Arm · Fri 25 Sep 09:20 · “Move to a new hosting provider”' }, { k: 'If nobody answers', v: 'At 22:00 it doesn’t start; Arm is told and has to ask again' }]),
+        people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'Nobody has approved or declined Arm’s request yet. A last reminder comes by Chat at 21:00.', btns: [REVIEW], why: WHYA } }
+      }),
+      'Approved': ev({
+        sentTo: 'Sent Fri 25 Sep 10:07:10 (after Tao’s 10 s Undo) to the owner and backup. Tao approved, so he gets no copy; Arm also gets the Chat answer.',
+        bar: GREENC, labelColor: GREENC, label: 'MAINTENANCE APPROVED', preStatus: 'MAINTENANCE APPROVED —', pre: BAC + ' · ' + BACW + ' · by Tao',
+        headline: 'Maintenance approved',
+        facts: [{ k: 'What changed', v: 'Approved by Tao · Fri 25 Sep 10:07' }].concat(W(BACW, '3 days'), LIVE),
+        people: { 'Arm': { to: 'Arm <arm@[domain]>', lede: 'Your request was approved. It starts on its own at Sat 26 Sep 22:00.', btns: [MXP], why: WHYO }, 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Arm’s request was approved. Nothing to do — there will be no alerts for ' + BAC + ' during the window.', btns: [MXP], why: WHYB } }
+      }),
+      'Declined': ev({
+        sentTo: 'Sent Fri 25 Sep 10:07:10 to the owner and backup. A window that will never run drops the Effect and “If it’s down” rows.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE DECLINED', preStatus: 'MAINTENANCE DECLINED —', pre: BAC + ' · by Tao · “Split it into two nights”',
+        headline: 'Maintenance declined',
+        facts: [{ k: 'What changed', v: 'Declined by Tao · Fri 25 Sep 10:07 · “Split it into two nights”' }].concat(W(BACW, '3 days')),
+        people: { 'Arm': { to: 'Arm <arm@[domain]>', lede: 'Your request was declined. Ask again with a shorter window — under 24 h needs no approval.', btns: [MXP], why: WHYO }, 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Arm’s request was declined. Nothing changes for ' + BAC + '.', btns: [MXP], why: WHYB } }
+      }),
+      'Request changed': ev({
+        sentTo: 'Sent Fri 25 Sep 11:30 to every active Admin and the backup. Arm changed it, so he gets no copy.',
+        bar: GREY, labelColor: GREY, label: 'REQUEST CHANGED', preStatus: 'REQUEST CHANGED —', pre: BAC + ' · ends Mon 28 Sep 22:00 (was Tue 29 Sep) · now 2 days · still waiting',
+        headline: 'Request changed — now 2 days',
+        facts: [{ k: 'What changed', v: 'Ends Mon 28 Sep 22:00 (was Tue 29 Sep 22:00) · by Arm 11:30 · “Provider needs one day less”' }].concat(W('Sat 26 Sep 22:00 → Mon 28 Sep 22:00', '2 days'), LIVE.slice(0, 1), [{ k: 'Deadline', v: 'It starts only if approved before Sat 26 Sep 22:00' }]),
+        people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'Arm changed the request while it waits. Review it as it stands now.', btns: [REVIEW], why: WHYA }, 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Arm changed the request. An Admin still has to approve it.', btns: [MXP], why: WHYB } }
+      }),
+      'Request withdrawn': ev({
+        sentTo: 'Sent Fri 25 Sep 11:30 to every active Admin and the backup. No more reminders go out.',
+        bar: GREY, labelColor: GREY, label: 'REQUEST WITHDRAWN', preStatus: 'REQUEST WITHDRAWN —', pre: BAC + ' · by Arm · no more reminders',
+        headline: 'Request withdrawn',
+        facts: [{ k: 'What changed', v: 'Withdrawn by Arm · Fri 25 Sep 11:30 · “Provider moved the date”' }].concat(W(BACW, '3 days')),
+        people: { 'Tao': { to: 'Tao <tao@[domain]>', lede: 'Nothing to approve any more.', btns: [MXP], why: WHYA }, 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Arm withdrew the request. Nothing changes for ' + BAC + '.', btns: [MXP], why: WHYB } }
+      }),
+      'Not approved': ev({
+        sentTo: 'Sent Sat 26 Sep 22:00 to the owner, backup and every active Admin — nobody approved before the start.',
+        bar: GREY, labelColor: GREY, label: 'NOT APPROVED', preStatus: 'NOT APPROVED —', pre: BAC + ' · didn’t start · nobody approved before 22:00',
+        headline: 'Not approved — it didn’t start',
+        facts: [{ k: 'What changed', v: 'Nobody approved before Sat 26 Sep 22:00' }].concat(W(BACW, '3 days')),
+        people: { 'Arm': { to: 'Arm <arm@[domain]>', lede: 'Your request wasn’t approved in time, so it didn’t start. Alerts stay on as usual. Ask again if you still need it.', btns: [MXP], why: WHYO }, 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'The window didn’t start. Alerts for ' + BAC + ' stay on as usual.', btns: [MXP], why: WHYB }, 'Tao': { to: 'Tao <tao@[domain]>', lede: 'The request lapsed without an answer.', btns: [MX], why: WHYA } }
+      }),
+      'Started': ev({
+        sentTo: 'Sent Sat 26 Sep 22:00 to the owner and backup when an approved window starts.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE STARTED', preStatus: 'MAINTENANCE STARTED —', pre: BAC + ' · until Tue 29 Sep 22:00 · no alerts, not counted in uptime',
+        headline: 'Maintenance has started',
+        facts: [{ k: 'What changed', v: 'Started Sat 26 Sep 22:00' }].concat(W(BACW, '3 days'), LIVE.slice(0, 1)),
+        people: { 'Arm': { to: 'Arm <arm@[domain]>', lede: 'End it early or change the end on Maintenance & mutes.', btns: [MXP], why: WHYO }, 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Nothing to do — no alerts until Tue 29 Sep 22:00.', btns: [MXP], why: WHYB } }
+      }),
+      'Didn’t start': ev({
+        sentTo: 'Sent Sat 26 Sep 22:00 to the owner, backup and approver: the site was DOWN at the start.',
+        bar: RED, labelColor: RED, label: 'DIDN’T START', preStatus: 'DIDN’T START —', pre: BAC + ' was DOWN at 22:00 (INC-0155) · reschedule on Maintenance & mutes',
+        headline: 'Maintenance didn’t start — site was down',
+        facts: [{ k: 'What changed', v: 'Didn’t start Sat 26 Sep 22:00 — DOWN since 21:52 (INC-0155)' }].concat(W(BACW, '3 days'), [{ k: 'Incident', v: 'INC-0155 stays open and keeps escalating — nothing was hidden' }]),
+        people: { 'Arm': { to: 'Arm <arm@[domain]>', lede: 'Your window didn’t start because the site was down. Deal with INC-0155 first, then schedule a new window.', btns: [P('Open incident', 'Incident.dc.html'), MX], why: WHYO }, 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'The window didn’t start because the site was down.', btns: [P('Open incident', 'Incident.dc.html'), MX], why: WHYB }, 'Tao': { to: 'Tao <tao@[domain]>', lede: 'The window you approved didn’t start because the site was down.', btns: [P('Open incident', 'Incident.dc.html'), MX], why: 'You got this because you approved this window.' } }
+      })
     };
+    var TUB = 'Tubtong', TUBW = 'Tue 29 Sep 01:00 → 03:00';
+    var WHYT = 'You got this because you own Tubtong.', WHYN = 'You got this because you’re backup for Tubtong.';
+    var TLIVE = [{ k: 'Effect', v: 'No alerts while it runs; checks still run; not counted in uptime' }, { k: 'If it’s down', v: 'At 01:00 it won’t start, and you’ll be told' }];
     var MO = {
       'Scheduled': {
-        sentTo: 'Sent Wed 23 Sep 16:30 to the owner and the backup, one email each (they may not read the Alerts Space). The person who did the action is skipped — Ploy scheduled it, so in production only Nok gets this one; Ploy’s copy is drawn to show the owner wording. Later actions on this window — started, changed, ended early, cancelled, didn’t start — reply in the same mail thread with the same layout; only the label, headline and preheader change, plus a “What changed” row.',
-        bar: GREY, labelColor: GREY, label: 'MAINTENANCE SCHEDULED', preStatus: 'MAINTENANCE SCHEDULED —', pre: 'Tubtong · Tue 29 Sep 01:00 → 03:00 (2 h) · by Ploy',
+        sentTo: 'Sent Wed 23 Sep 16:30 to Nok. Ploy scheduled it, so she gets no copy.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE SCHEDULED', preStatus: 'MAINTENANCE SCHEDULED —', pre: 'Tubtong · ' + TUBW + ' (2 h) · by Ploy',
         headline: 'Tubtong maintenance on Tue 29 Sep',
-        facts: [{ k: 'When', v: 'Tue 29 Sep 01:00 → 03:00 (2 h)' }, { k: 'Reason', v: '“WordPress plugin updates”' }, { k: 'Scheduled by', v: 'Ploy · Wed 23 Sep 16:30' }, { k: 'Effect', v: 'No alerts while it runs; checks still run; not counted in uptime' }, { k: 'If it’s down', v: 'At 01:00 it won’t start, and you’ll be told' }],
-        people: {
-          'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'You scheduled this. End it early, change the end or cancel it on Maintenance & mutes.', btns: [P('Open Maintenance & mutes', 'MaintenancePage.dc.html')], why: 'You got this because you own Tubtong.' },
-          'Nok': { to: 'Nok <nok@[domain]>', lede: 'Ploy scheduled maintenance on Tubtong. Nothing to do — there will be no alerts for Tubtong during the window.', btns: [P('Open Maintenance & mutes', 'MaintenancePage.dc.html')], why: 'You got this because you’re backup for Tubtong.' }
-        }
+        facts: W(TUBW, '2 h').concat([{ k: 'Reason', v: '“WordPress plugin updates”' }, { k: 'Scheduled by', v: 'Ploy · Wed 23 Sep 16:30' }], TLIVE),
+        people: { 'Nok': { to: 'Nok <nok@[domain]>', lede: 'Ploy scheduled maintenance on Tubtong. Nothing to do — there will be no alerts for Tubtong during the window.', btns: [MXP], why: WHYN } }
+      },
+      'Changed': {
+        sentTo: 'Sent Mon 28 Sep 15:10 to Nok (Ploy changed it).',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE CHANGED', preStatus: 'MAINTENANCE CHANGED —', pre: 'Tubtong · ends Tue 29 Sep 04:00 (was 03:00) · by Ploy',
+        headline: 'Tubtong maintenance now ends 04:00',
+        facts: [{ k: 'What changed', v: 'Ends Tue 29 Sep 04:00 (was 03:00) · by Ploy Mon 28 Sep 15:10 · “Plugin conflict”' }].concat(W('Tue 29 Sep 01:00 → 04:00', '3 h'), TLIVE),
+        people: { 'Nok': { to: 'Nok <nok@[domain]>', lede: 'Ploy changed the end time. Nothing to do.', btns: [MXP], why: WHYN } }
+      },
+      'Cancelled': {
+        sentTo: 'Sent Mon 28 Sep 16:00 to the owner and backup (Tao cancelled it). Over before it ran, so no Effect / “If it’s down” rows.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE CANCELLED', preStatus: 'MAINTENANCE CANCELLED —', pre: 'Tubtong · Tue 29 Sep 01:00 → 04:00 · by Tao · “Client postponed”',
+        headline: 'Tubtong maintenance cancelled',
+        facts: [{ k: 'What changed', v: 'Cancelled by Tao · Mon 28 Sep 16:00 · “Client postponed”' }].concat(W('Tue 29 Sep 01:00 → 04:00', '3 h')),
+        people: { 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Tao cancelled your window. Alerts for Tubtong stay on as usual.', btns: [MXP], why: WHYT }, 'Nok': { to: 'Nok <nok@[domain]>', lede: 'The window was cancelled. Nothing to do.', btns: [MXP], why: WHYN } }
+      },
+      'Started': {
+        sentTo: 'Sent Tue 29 Sep 01:00 to the owner and backup.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE STARTED', preStatus: 'MAINTENANCE STARTED —', pre: 'Tubtong · until 03:00 · no alerts, not counted in uptime',
+        headline: 'Tubtong maintenance has started',
+        facts: [{ k: 'What changed', v: 'Started 01:00' }].concat(W(TUBW, '2 h'), TLIVE.slice(0, 1)),
+        people: { 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'End it early or change the end on Maintenance & mutes.', btns: [MXP], why: WHYT }, 'Nok': { to: 'Nok <nok@[domain]>', lede: 'Nothing to do — no alerts until 03:00.', btns: [MXP], why: WHYN } }
+      },
+      'Ended': {
+        sentTo: 'Sent Tue 29 Sep 03:00 to the owner and backup. Over, so no Effect / “If it’s down” rows.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE ENDED', preStatus: 'MAINTENANCE ENDED —', pre: 'Tubtong · ended on time 03:00 · alerts back on',
+        headline: 'Tubtong maintenance ended',
+        facts: [{ k: 'What changed', v: 'Ended on time 03:00 · alerts back on' }].concat(W(TUBW, '2 h')),
+        people: { 'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Alerts for Tubtong are back on.', btns: [MXP], why: WHYT }, 'Nok': { to: 'Nok <nok@[domain]>', lede: 'Alerts for Tubtong are back on.', btns: [MXP], why: WHYN } }
+      },
+      'Ended early': {
+        sentTo: 'Sent Tue 29 Sep 02:10:10 (after Ploy’s 10 s Undo) to Nok — Ploy ended it.',
+        bar: GREY, labelColor: GREY, label: 'MAINTENANCE ENDED EARLY', preStatus: 'MAINTENANCE ENDED EARLY —', pre: 'Tubtong · 02:10 by Ploy · “Updates finished” · alerts back on',
+        headline: 'Tubtong maintenance ended early',
+        facts: [{ k: 'What changed', v: 'Ended early 02:10 by Ploy · “Updates finished” · alerts back on' }].concat(W('Tue 29 Sep 01:00 → 02:10', '1 h 10 min')),
+        people: { 'Nok': { to: 'Nok <nok@[domain]>', lede: 'Alerts for Tubtong are back on.', btns: [MXP], why: WHYN } }
+      }
+    };
+    var HELD = {
+      'Down (held by a mute)': {
+        sentTo: 'Sent Fri 25 Sep 15:00 to Arm (owner, by day) when the mute ended with INC-0154 still open. Same template as any first DOWN email, plus a “Held by a mute” row.',
+        bar: RED, labelColor: RED, label: 'DOWN', preStatus: 'DOWN —', pre: 'Bangkok Airways – Taiwan · held by a mute until 15:00 · acknowledge by 15:15',
+        headline: 'Bangkok Airways – Taiwan is down',
+        facts: [{ k: 'Held by a mute', v: 'until 15:00 — escalation starts now' }, { k: 'Confirmed down', v: 'Fri 25 Sep 14:20:36' }, { k: 'Cause', v: 'HTTP 503 (BKK, SIN, TYO)' }, { k: 'Next step', v: 'L1 at 15:15 if not acknowledged — Ploy, Tao' }],
+        people: { 'Arm': { to: 'Arm <arm@[domain]>', lede: 'This went down while the site was muted, so nobody was told until now. Please acknowledge or hand it over in the Chat thread.', btns: [P('Acknowledge', 'MLogin.dc.html'), OPEN], why: 'You got this because you own Bangkok Airways – Taiwan.' } }
       }
     };
     var TH = {
@@ -288,8 +393,9 @@ class Component extends DCLogic {
       'Fuji Links · PROBLEM': { subject: 'Fuji Links · Tier 2 · INC-0141', E: F, events: ['PROBLEM', 'Acknowledged', 'Recovered'], first: 'PROBLEM', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · auto-resolved': { subject: 'Fuji Links · Tier 2 · INC-0151', E: FA, events: ['Recovered (auto-resolved)'], first: 'Recovered (auto-resolved)', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'VOCA · flapping': { subject: 'VOCA · Tier 2 · INC-0133', E: V, events: ['Flapping summary'], first: 'Flapping summary', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
-      'Maintenance · approval': { subject: 'DxT Monitor · Maintenance request · Bangkok Airways – China · Sat 26 Sep 22:00', E: MR, events: ['Approval request', 'Reminder 12 h'], first: 'Approval request', foot: MXF },
-      'Maintenance · owner & backup': { subject: 'Tubtong · Maintenance · Tue 29 Sep 01:00', E: MO, events: ['Scheduled'], first: 'Scheduled', foot: MXF },
+      'Maintenance · request (Bangkok Airways – China)': { subject: 'DxT Monitor · Maintenance request · Bangkok Airways – China · Sat 26 Sep 22:00', E: MR, events: Object.keys(MR), first: 'Request', foot: MXF },
+      'Maintenance · window (Tubtong)': { subject: 'Tubtong · Maintenance · Tue 29 Sep 01:00', E: MO, events: Object.keys(MO), first: 'Scheduled', foot: MXF },
+      'First DOWN after a mute': { subject: 'Bangkok Airways – Taiwan · Tier 1 · INC-0154', E: HELD, events: Object.keys(HELD), first: 'Down (held by a mute)', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Admin · system': { subject: '', E: A, events: ['Verifier unavailable', 'Fewer than 2 locations'], first: 'Verifier unavailable', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read.' }
     };
     var th = TH[this.state.th] ? this.state.th : 'MuvMi · DOWN';
@@ -306,7 +412,7 @@ class Component extends DCLogic {
       footNote: T.foot,
       events: T.events,
       ev: ev,
-      pick: function (v) { self.setState({ ev: v }); },
+      pick: function (v) { v = v && v.target ? v.target.value : v; self.setState({ ev: v }); },
       whoOptions: names,
       who: who,
       pickWho: function (v) { self.setState({ who: v }); },
