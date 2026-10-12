@@ -67,7 +67,7 @@ function ShowAllLines({ count, children }: { count: number; children: React.Reac
   const [all, setAll] = useState(false);
   return (
     <>
-      <div className={all ? undefined : '[&_li:nth-child(n+21)]:hidden'}>{children}</div>
+      <div className={all ? undefined : '[&>ol>li:nth-child(n+21)]:hidden'}>{children}</div>
       {!all && count > PHONE_LINES && (
         <Button variant="secondary" fullWidth className="mt-3" onClick={() => setAll(true)}>
           {`Show all ${count}`}

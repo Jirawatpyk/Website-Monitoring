@@ -18,10 +18,12 @@ import {
   CLOSED_INCIDENT_STATES,
   formatConfirmedBy,
   confirmedByWafOf,
+  formatDay,
   formatDuration,
   formatTime,
   formatTimeWithSeconds,
   formatWhen,
+  isSameBangkokDay,
   ROOT_CAUSE_CATEGORIES,
   ROOT_CAUSE_LABELS,
   TRIGGER_LABELS,
@@ -531,10 +533,19 @@ export interface TimelineItem {
     | 'root_cause'
     | 'resolved'
     | 'escalated'
-    | 'undone';
+    | 'undone'
+    | 'flapping';
   title: string;
   detail: string | null;
+  /** A collapsed flapping run (`kind: 'flapping'`): its lines, oldest first — kept, never dropped (§16.11). */
+  run?: TimelineItem[];
 }
+
+/** Relapses in a row before the timeline folds them into one "Flapped ×n" line. */
+export const FLAP_RUN_MIN = 3;
+
+/** What a line is to a flapping run: a drop again, its recovery, or a message / OK round between them. */
+type CycleTag = 'relapse' | 'recover' | 'between';
 
 /** Same `at`: RECOVERED before PROBLEM AGAIN (§19.7, D-023). */
 const TIE: Record<string, number> = { recovered: 0, ok_two_rounds: 1, relapsed: 2 };
@@ -573,8 +584,18 @@ export function timelineOf(
   );
   const detected = sorted.find((e) => e.type === 'detected');
   const items: TimelineItem[] = [];
-  const item = (e: { at: string }, kind: TimelineItem['kind'], title: string, detail: string | null = null) =>
-    items.push({ at: e.at, time: formatTimeWithSeconds(new Date(e.at)), kind, title, detail });
+  const tags = new Map<TimelineItem, CycleTag>();
+  const item = (
+    e: { at: string },
+    kind: TimelineItem['kind'],
+    title: string,
+    detail: string | null = null,
+    tag?: CycleTag,
+  ) => {
+    const line: TimelineItem = { at: e.at, time: formatTimeWithSeconds(new Date(e.at)), kind, title, detail };
+    items.push(line);
+    if (tag) tags.set(line, tag);
+  };
 
   // The first failed check comes from the incident itself (no event of its own).
   item(
@@ -614,6 +635,8 @@ export function timelineOf(
           e.payload.channel === 'email'
             ? `${word} emailed to ${nameOf(str(e.payload.user_id))}`
             : `${word} posted in Chat`,
+          null,
+          CYCLE_TEMPLATES.has(str(e.payload.template) ?? '') ? 'between' : undefined,
         );
         return;
       }
@@ -665,6 +688,7 @@ export function timelineOf(
           'recovered',
           auto ? 'Recovered' : 'Recovered → Monitoring',
           `First OK round · OK from ${num(e.payload.okLocations) ?? 2} locations`,
+          'recover',
         );
         return;
       }
@@ -677,6 +701,7 @@ export function timelineOf(
           e.payload.state === 'monitoring'
             ? 'Root cause already written — ready to resolve'
             : 'Needs a root cause before it can be resolved',
+          'between',
         );
         return;
       case 'auto_resolved':
@@ -694,6 +719,7 @@ export function timelineOf(
           down ? 'down' : 'problem',
           `${down ? 'Down' : 'Problem'} again${e.payload.flapping === true ? ' · flapping' : ''}`,
           str(e.payload.summary) ?? str(e.payload.cause),
+          'relapse',
         );
         return;
       }
@@ -761,5 +787,71 @@ export function timelineOf(
         return;
     }
   });
-  return items;
+  return collapseFlapping(items, tags);
+}
+
+/** The messages a flapping cycle posts: they fold into the run with it. */
+const CYCLE_TEMPLATES = new Set(['down_again', 'problem_again', 'recovered', 'flap_summary']);
+
+/**
+ * Folds each run of `FLAP_RUN_MIN`+ drops-and-recoveries in a row (relapse, its messages, recovery,
+ * OK rounds — nothing else in between) into one "Flapped ×n between … and …" line that keeps every
+ * line in `run` (§16.11). A drop still open at the end of a run stays outside, so the current state
+ * is always a line of its own. Production 12 Oct 2026: one flapping incident had 471 lines (D-038).
+ */
+function collapseFlapping(items: TimelineItem[], tags: ReadonlyMap<TimelineItem, CycleTag>): TimelineItem[] {
+  const out: TimelineItem[] = [];
+  let n = 0;
+  while (n < items.length) {
+    const first = items[n]!;
+    if (tags.get(first) !== 'relapse') {
+      out.push(first);
+      n += 1;
+      continue;
+    }
+    // The longest stretch of cycle lines from this relapse, cut after its last recovery's lines.
+    let end = n;
+    while (end < items.length && tags.has(items[end]!)) end += 1;
+    let cut = n;
+    for (let k = n; k < end; k += 1) {
+      if (tags.get(items[k]!) === 'recover') {
+        cut = k + 1;
+        while (cut < end && tags.get(items[cut]!) === 'between') cut += 1;
+      }
+    }
+    const run = items.slice(n, cut);
+    const relapses = run.filter((t) => tags.get(t) === 'relapse');
+    if (relapses.length < FLAP_RUN_MIN) {
+      out.push(first);
+      n += 1;
+      continue;
+    }
+    out.push(flapLine(run, relapses, tags));
+    n = cut;
+  }
+  return out;
+}
+
+function flapLine(
+  run: TimelineItem[],
+  relapses: TimelineItem[],
+  tags: ReadonlyMap<TimelineItem, CycleTag>,
+): TimelineItem {
+  const from = new Date(relapses[0]!.at);
+  const to = new Date([...run].reverse().find((t) => tags.get(t) === 'recover')!.at);
+  const sameDay = isSameBangkokDay(from, to);
+  const when = (d: Date) => (sameDay ? formatTime(d) : `${formatDay(d, { weekday: true })} ${formatTime(d)}`);
+  const downs = relapses.filter((t) => t.kind === 'down').length;
+  const problems = relapses.length - downs;
+  const kinds = [problems ? `PROBLEM again ×${problems}` : null, downs ? `DOWN again ×${downs}` : null]
+    .filter(Boolean)
+    .join(', ');
+  return {
+    at: relapses[0]!.at,
+    time: relapses[0]!.time,
+    kind: 'flapping',
+    title: `Flapped ×${relapses.length} between ${when(from)} and ${when(to)}`,
+    detail: `${kinds} · each recovered · ${run.length} events`,
+    run,
+  };
 }

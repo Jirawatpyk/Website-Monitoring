@@ -1,5 +1,6 @@
 import { Card, Table, TBody, Td, Th, THead, Tr } from '@jirawatpyk/aura-react';
 import {
+  IconActivity,
   IconArrowUpRight,
   IconBan,
   IconBell,
@@ -23,6 +24,7 @@ import {
 import { GLYPH_LEGEND, GLYPHS } from '@/components/site-cells';
 import type { CheckCell, IncidentDetail } from '../detail-queries';
 import type { TimelineItem } from '../model';
+import { FlapRun } from './flap-run';
 
 /**
  * The incident page's display-only parts (Incident / MIncident boards): no state, no handlers, so the
@@ -44,6 +46,7 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   resolved: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
   escalated: { icon: <IconArrowUpRight />, tone: 'text-fg-warning' },
   undone: { icon: <IconRotateCcw />, tone: 'text-fg-secondary' },
+  flapping: { icon: <IconActivity />, tone: 'text-fg-warning' },
 };
 
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {
@@ -155,21 +158,32 @@ export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
   );
 }
 
-/** A timeline's lines: oldest first on desktop, newest first on a phone (D-033). */
+/**
+ * A timeline's lines: oldest first on desktop, newest first on a phone (D-033). A flapping run is
+ * one line whose own lines open under it ("Show n").
+ */
 export function TimelineLines({ items, newestFirst }: { items: TimelineItem[]; newestFirst: boolean }) {
   const ordered = newestFirst ? [...items].reverse() : items;
   return (
     <ol className="m-0 flex list-none flex-col p-0">
       {ordered.map((t, n) => (
-        <li key={`${t.at}-${n}`} className="flex gap-3 border-b border-border-subtle py-2.5 last:border-b-0">
+        <li
+          key={`${t.at}-${n}`}
+          className="flex flex-wrap gap-x-3 gap-y-1 border-b border-border-subtle py-2.5 last:border-b-0"
+        >
           <span className="w-16 shrink-0 pt-px font-mono text-xs text-fg-secondary">{t.time}</span>
           <span className={`flex shrink-0 pt-0.5 [&_svg]:size-4 ${KIND_ICON[t.kind].tone}`} aria-hidden>
             {KIND_ICON[t.kind].icon}
           </span>
-          <span className="flex min-w-0 flex-col leading-snug">
+          <span className="flex min-w-0 flex-1 flex-col leading-snug">
             <span className="text-sm font-medium">{t.title}</span>
             {t.detail && <span className="text-sm break-words text-fg-secondary">{t.detail}</span>}
           </span>
+          {t.run && (
+            <FlapRun count={t.run.length}>
+              <TimelineLines items={t.run} newestFirst={newestFirst} />
+            </FlapRun>
+          )}
         </li>
       ))}
     </ol>
