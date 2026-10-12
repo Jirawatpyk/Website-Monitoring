@@ -3,6 +3,7 @@ import type { DbClient, Json } from '@dxt/db';
 import {
   decideSite,
   problemHoldUntil,
+  bkkControlDown,
   bkkControlFailing,
   faultyByMinute,
   lookbackMs,
@@ -197,6 +198,22 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       })),
   );
 
+  // D-028: the BKK probe's control check (D-027) over the window's Bangkok checks.
+  const bkkChecks = checks.filter((c) => c.location === 'BKK');
+  // Either VPS check failing counts: both control URLs, or the Akamai control (D-027 rule 2b) —
+  // a broken Akamai control would otherwise silently turn every Akamai DOWN into a PROBLEM.
+  const controlFact = (c: (typeof checks)[number]) => ({
+    checkedAt: new Date(c.checked_at),
+    controlOk: c.control_ok === false || c.akamai_ok === false ? false : (c.control_ok ?? c.akamai_ok),
+  });
+  const control = bkkControlFailing(bkkChecks.map(controlFact));
+  // D-038: a WAF site goes PROBLEM (unverified) for the control check only once it failed in 3 probe
+  // minutes in a row (any batch of the minute); a minute where every batch passed ends it.
+  const controlDown = bkkControlDown(
+    bkkChecks.map(controlFact),
+    verifier.openAlerts.has('bkk_control_failing'),
+  );
+
   /** Sites the verifier couldn't decide this run, with the reason it saw (D-019). */
   const unverifiedSites = new Map<string, string>();
   /** Sites left unverified by the BKK probe's failed control check (D-027, D-028). */
@@ -214,17 +231,6 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   }
 
   summary.unverified = unverifiedMonitors.size;
-  // D-028: the BKK probe's control check (D-027) over the window's Bangkok checks.
-  const control = bkkControlFailing(
-    checks
-      .filter((c) => c.location === 'BKK')
-      // Either VPS check failing counts: both control URLs, or the Akamai control (D-027 rule 2b) —
-      // a broken Akamai control would otherwise silently turn every Akamai DOWN into a PROBLEM.
-      .map((c) => ({
-        checkedAt: new Date(c.checked_at),
-        controlOk: c.control_ok === false || c.akamai_ok === false ? false : (c.control_ok ?? c.akamai_ok),
-      })),
-  );
   // An incident a mute silenced gets its first alert once the mute is over (D-036), before the ladder,
   // which then counts from that alert.
   try {
@@ -296,6 +302,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       // OK ↔ not-OK changes at incident steps (D-024): the 3rd in 30 min tags flapping.
       flips: (status?.flips ?? []).map((f) => new Date(f)),
       flipOk: status?.flip_ok ?? null,
+      bkkControlDown: controlDown,
       monitors: site.monitors.map((m): SiteMonitor => ({
         id: m.id,
         isPrimary: m.isPrimary,

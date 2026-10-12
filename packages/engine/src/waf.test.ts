@@ -68,7 +68,38 @@ const site = (monitors: SiteMonitor[], over: Partial<SiteSnapshot> = {}): SiteSn
   monitors,
   behindWaf: true,
   verifierAvailable: true,
+  // The control-check cases below describe a check that has been failing long enough (D-028, D-038).
+  bkkControlDown: true,
   ...over,
+});
+
+describe('D-038 — one failing BKK control minute is no data, not PROBLEM', () => {
+  it('a round with nobody left to vote keeps the current status while the control check has only just failed', () => {
+    const rows = [
+      check('BKK', 'fail', 1, { controlOk: false }),
+      ...akamaiAbroad(),
+      recheck('BKK', 'fail', 31, { controlOk: false }),
+    ];
+    const d = decideSite(site([home(rows)], { bkkControlDown: false, okRounds: 4 }));
+    expect(d).toMatchObject({ kind: 'none', status: null, okRounds: 4, unverified: [] });
+  });
+
+  it('a pass during that minute is no data either (an OK site stays OK, a recovering incident keeps counting)', () => {
+    const rows = [check('BKK', 'pass', 1, { controlOk: false }), ...akamaiAbroad()];
+    expect(decideSite(site([home(rows)], { bkkControlDown: false, okRounds: 1 }))).toMatchObject({
+      kind: 'none',
+      status: null,
+      okRounds: 1,
+    });
+  });
+
+  it('once it has failed long enough the round is PROBLEM (unverified) as before (D-028)', () => {
+    const rows = [check('BKK', 'pass', 1, { controlOk: false }), ...akamaiAbroad()];
+    expect(decideSite(site([home(rows)], { bkkControlDown: true }))).toMatchObject({
+      kind: 'problem',
+      detail: { kind: 'blocked', reason: 'control_failed' },
+    });
+  });
 });
 
 describe('D-027 — sites behind a WAF (decideSite)', () => {
