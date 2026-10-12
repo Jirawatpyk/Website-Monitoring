@@ -69,6 +69,7 @@ export interface WindowFactsRow {
   ends_at: string;
   reason: string;
   created_at: string;
+  created_by: string | null;
   approved_at: string | null;
   creator: { display_name: string } | null;
   approver: { display_name: string } | null;
@@ -140,7 +141,7 @@ export async function loadFacts(
       ? db
           .from('maintenance_windows')
           .select(
-            `id, kind, starts_at, ends_at, reason, created_at, approved_at,
+            `id, kind, starts_at, ends_at, reason, created_at, created_by, approved_at,
              creator:profiles!maintenance_windows_created_by_fkey(display_name),
              approver:profiles!maintenance_windows_approved_by_fkey(display_name),
              sites!inner(name, tier,

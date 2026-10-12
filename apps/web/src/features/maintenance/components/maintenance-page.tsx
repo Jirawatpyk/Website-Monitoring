@@ -30,7 +30,7 @@ import { SiteStatusBadge } from '@/components/status-badges';
 import type { PausableSite } from '../model';
 import { metaOf, sectionsOf, type PageRow, type Section, type Viewer, type WindowRow } from '../page-model';
 import { MaintenanceDialog } from './maintenance-dialog';
-import { ApproveDialog, DeclineDialog, EditDialog, EndDialog } from './window-dialogs';
+import { ApproveDialog, DeclineDialog, EditDialog, EndDialog, postPendingNow } from './window-dialogs';
 
 const ICONS = { calendar: <IconCalendar />, 'eye-off': <IconEyeOff />, clock: <IconClock /> };
 const STATUS_WORD: Record<SiteStatus, string> = {
@@ -217,6 +217,8 @@ export function MaintenancePageView({
   const [n, setN] = useState(0);
   const [schedule, setSchedule] = useState({ open: false, n: 0 });
   const show: Show = (kind, p, fromSheet = false) => {
+    // Opening a row or a dialog posts a pending action at once (§24.12).
+    void postPendingNow();
     setN((x) => x + 1);
     setOpen({ kind, p, n: n + 1, shown: true, fromSheet });
   };
@@ -235,8 +237,8 @@ export function MaintenancePageView({
    * new rows arrive, not to the page body (spec-check).
    */
   const landing = useRef<{ key: Section['key']; before: WindowRow[] } | null>(null);
-  const done = () => {
-    const key = open?.kind === 'approve' ? 'scheduled' : open?.kind === 'edit' ? null : 'recent';
+  const done = (landed?: 'recent') => {
+    const key = landed ?? (open?.kind === 'approve' ? 'scheduled' : open?.kind === 'edit' ? null : 'recent');
     landing.current = key ? { key, before: rows } : null;
     setOpen((o) => (o ? { ...o, shown: false } : o));
   };
@@ -258,7 +260,10 @@ export function MaintenancePageView({
     document.getElementById(`mt-${l.key}`)?.focus();
   }, [rows]);
   const shown = (k: Kind) => !!open?.shown && open.kind === k;
-  const openSchedule = () => setSchedule((s) => ({ open: true, n: s.n + 1 }));
+  const openSchedule = () => {
+    void postPendingNow();
+    setSchedule((s) => ({ open: true, n: s.n + 1 }));
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -362,6 +367,7 @@ export function MaintenancePageView({
           <DeclineDialog
             key={`x${open.n}`}
             p={open.p}
+            viewer={viewer.name}
             now={now}
             open={shown('decline')}
             onClose={back}

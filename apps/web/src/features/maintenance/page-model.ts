@@ -70,7 +70,15 @@ export interface WindowRow {
   backupIsAdmin?: boolean;
   log: LogEntry[];
   /** A mute: the incident it silenced, if any — ending it posts that alert (§24.9). */
-  silenced?: { number: number; l1DelayMin: number | null } | null;
+  silenced?: {
+    number: number;
+    l1DelayMin: number | null;
+    severity: 'down' | 'problem';
+    /** Its first failed check ("DOWN since 14:20"). */
+    since: string;
+    /** Tier 2–3 outside response hours: when escalation starts. */
+    pausedUntil: string | null;
+  } | null;
 }
 
 export interface Viewer {
@@ -131,12 +139,14 @@ const settled = (r: WindowRow) => new Date(r.endedAt ?? r.cancelledAt ?? r.endsA
  * "posted 10:07:10" otherwise — "posts …" inside the 10 s, nothing once it was undone.
  */
 function postedText(e: LogEntry, now: Date, opts: LogOptions): string {
-  if (!e.posts_at || opts.undone) return '';
-  const at = new Date(e.posts_at);
-  const time = formatTimeWithSeconds(at);
-  const word = at.getTime() > now.getTime() ? 'posts' : 'posted';
   const answer = (e.action === 'approved' || e.action === 'declined') && opts.asker;
-  return answer ? ` · ${opts.asker} told in Chat (${word} ${time})` : ` · ${word} ${time}`;
+  if (!e.posts_at) return '';
+  const at = new Date(e.posts_at);
+  // Undone: no posting time, the answer keeps who it was for (board). Still waiting: nothing yet.
+  if (opts.undone) return answer ? ` · ${opts.asker} told in Chat` : '';
+  if (at.getTime() > now.getTime()) return '';
+  const time = formatTimeWithSeconds(at);
+  return answer ? ` · ${opts.asker} told in Chat (posted ${time})` : ` · posted ${time}`;
 }
 
 export interface LogOptions {
@@ -156,7 +166,7 @@ export function logLine(e: LogEntry, now: Date, opts: LogOptions = {}): string |
     case 'ended_early':
       return `Ended early ${when}${by}${why}${posted}`;
     case 'edited':
-      return `End ${e.from ? whenText(new Date(e.from), now) : '—'} → ${e.to ? whenText(new Date(e.to), now) : '—'} · ${when}${by}${why}${posted}`;
+      return `End changed ${when}${by} · ${e.from ? whenText(new Date(e.from), now) : '—'} → ${e.to ? whenText(new Date(e.to), now) : '—'}${why}${posted}`;
     case 'approved':
       return `Approved ${when}${by}${posted}`;
     case 'declined':
@@ -292,7 +302,7 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
       Object.assign(base, {
         mutedLabel: `Muted · until ${whenText(end, now)}`,
         whenSub: `until ${whenText(end, now)} (max 24 h) · ${inFor} in`,
-        whySub: `by ${by} · still counted in uptime`,
+        whySub: `by ${by} · still counted in uptime${r.silenced ? ` · ${formatIncidentId(r.silenced.number)} held by this mute since ${whenText(new Date(r.silenced.since), now)}` : ''}`,
         line: `Until ${whenText(end, now)} · ${r.reason}`,
         mutedShort: 'Muted',
       });
@@ -409,22 +419,44 @@ export function metaOf(sections: readonly Section[]): string {
   return parts.length ? parts.join(' · ') : 'Nothing active, scheduled or waiting';
 }
 
-/** End now's effects (board MaintenancePage); the Alerts Space line comes with S09b's messages. */
+/** The owner and backup, minus the person acting (they get no copy of their own action, §24.5). */
+const emailedOf = (r: WindowRow, viewer: string) => [
+  ...new Set([r.ownerName, r.backupName].filter((n): n is string => !!n && n !== viewer)),
+];
+/** "Nok and Ploy get an email; the Alerts Space gets a line." */
+function emailAndSpace(r: WindowRow, viewer: string): string {
+  const to = emailedOf(r, viewer);
+  return to.length
+    ? `${formatNameList(to)} ${to.length === 1 ? 'gets' : 'get'} an email; the Alerts Space gets a line.`
+    : 'The Alerts Space gets a line.';
+}
+
+/**
+ * The incident a mute held, as End mute says it (MaintenancePage "End mute · open incident", §24.13):
+ * "INC-0154 (DOWN since 14:20, held by this mute) posts its first alert now and starts escalating —
+ * L1 at about 14:56 if nobody acknowledges." The card posts on the next engine run, up to a minute
+ * after the mute ends, and L1 counts from it (D-036): "about" and a minute's margin, never early.
+ */
+function heldLine(s: NonNullable<WindowRow['silenced']>, now: Date): string {
+  const what = `${formatIncidentId(s.number)} (${s.severity === 'problem' ? 'PROBLEM' : 'DOWN'} since ${whenText(new Date(s.since), now)}, held by this mute)`;
+  // A Tier 2–3 PROBLEM outside response hours is held until the opening itself (§24.16, the engine's
+  // holdFor): it doesn't post now.
+  if (s.pausedUntil && s.severity === 'problem')
+    return `${what} posts its first alert ${whenText(new Date(s.pausedUntil), now)}.`;
+  const head = `${what} posts its first alert now`;
+  if (s.pausedUntil)
+    return `${head}. It’s outside response hours, so escalation starts ${whenText(new Date(s.pausedUntil), now)}.`;
+  const l1 = s.l1DelayMin != null ? new Date(now.getTime() + (s.l1DelayMin + 1) * MINUTE) : null;
+  return `${head} and starts escalating${l1 ? ` — L1 at about ${formatTime(l1)} if nobody acknowledges` : ''}.`;
+}
+
+/** End now's effects (board MaintenancePage): the held incident first, then what resumes and who hears. */
 export function endEffects(r: WindowRow, viewer: string, now: Date): string[] {
   const resume = `Alerts resume now${r.ownerName ? ` for ${r.ownerName} (owner)` : ''} and the Alerts Space.`;
   if (r.kind === 'mute') {
-    // §24.9: a silenced incident posts its first alert now and starts escalating.
-    const s = r.silenced;
-    // The card posts on the next engine run, up to a minute after the mute ends, and L1 counts from it
-    // (D-036): "about" and a minute's margin, so the promise is never early (S09b /verify).
-    const l1 = s?.l1DelayMin != null ? new Date(now.getTime() + (s.l1DelayMin + 1) * MINUTE) : null;
     return [
+      ...(r.silenced ? [heldLine(r.silenced, now)] : []),
       resume,
-      ...(s
-        ? [
-            `${formatIncidentId(s.number)} posts its first alert now and starts escalating${l1 ? ` — L1 at about ${formatTime(l1)} if nobody acknowledges` : ''}.`,
-          ]
-        : []),
       'Uptime is unaffected — muted time was already counted.',
       `Logged in the audit log as ${viewer}.`,
     ];
@@ -432,7 +464,7 @@ export function endEffects(r: WindowRow, viewer: string, now: Date): string[] {
   return [
     resume,
     `Checks from ${formatTime(now)} count in uptime again; ${formatTime(new Date(r.startsAt))}–${formatTime(now)} stays excluded.`,
-    `Logged in the audit log as ${viewer}.`,
+    `${emailAndSpace(r, viewer)} Logged in the audit log as ${viewer}.`,
   ];
 }
 
@@ -472,10 +504,32 @@ export function approveEffects(r: WindowRow, viewer: string, now: Date): string[
     `Starts ${whenText(start, now)}, ends ${whenText(end, now)} (${len}). ${r.siteName} is Tier ${r.tier}.`,
     'No alerts for this site during the window. Checks still run and are logged.',
     'Not counted in uptime.',
-    `If the site is DOWN or has an incident that hasn’t recovered at the start, the window doesn’t start — ${toldText(r, viewer)} are told.`,
-    ...(r.byName && r.byName !== viewer ? [`${r.byName} gets a Chat message.`] : []),
-    `Logged in the audit log as ${viewer}.`,
+    `If the site is DOWN or has an open incident at the start, the window doesn’t start — ${toldText(r, viewer)} are told.`,
+    approveWho(r, viewer),
   ];
+}
+
+/** "Arm gets a Chat message, Arm and Ploy an email, and the Alerts Space a line. Logged in the audit log as Tao." */
+function approveWho(r: WindowRow, viewer: string): string {
+  const to = emailedOf(r, viewer);
+  const parts = [
+    ...(r.byName && r.byName !== viewer ? [`${r.byName} gets a Chat message`] : []),
+    ...(to.length ? [`${formatNameList(to)} an email`] : []),
+  ];
+  // Without the Chat part the email part needs its own verb (spec-check L9).
+  const head = !parts.length
+    ? 'The Alerts Space gets a line.'
+    : parts.length === 1 && to.length
+      ? `${formatNameList(to)} ${to.length === 1 ? 'gets' : 'get'} an email, and the Alerts Space a line.`
+      : `${parts.join(', ')}, and the Alerts Space a line.`;
+  return `${head} Logged in the audit log as ${viewer}.`;
+}
+
+/** Decline's reason hint (board): "Required. Arm gets it in a Chat message; Arm and Ploy get an email; …". */
+export function declineHint(r: WindowRow, viewer: string): string {
+  const to = emailedOf(r, viewer);
+  const email = to.length ? ` ${formatNameList(to)} ${to.length === 1 ? 'gets' : 'get'} an email;` : '';
+  return `Required. ${r.byName ?? 'The asker'} gets it in a Chat message;${email} the request moves to Recent as Declined.`;
 }
 
 /** Who hears it when an approved window can't start (§24.6, §24.9): the asker, the owner and backup, the approver. */
@@ -487,11 +541,14 @@ function toldText(r: WindowRow, viewer: string): string {
 export const approveTitle = (r: WindowRow) =>
   `Approve ${lengthText((Date.parse(r.endsAt) - Date.parse(r.startsAt)) / MINUTE)} of maintenance?`;
 
-/** What cancelling / withdrawing does. */
-export function cancelText(state: WindowState, viewer: string): string {
-  if (state === 'waiting')
-    return `Withdraws the request — Admins stop seeing it and nothing is scheduled. Logged as ${viewer}.`;
-  return `It hasn’t started, so cancelling removes it. Logged as ${viewer}.`;
+/** What cancelling / withdrawing does, and who hears it (board MaintenancePage). */
+export function cancelText(r: WindowRow, state: WindowState, viewer: string): string {
+  if (state === 'waiting') {
+    const to = emailedOf(r, viewer);
+    const told = to.length ? ` ${formatNameList(to)} ${to.length === 1 ? 'is' : 'are'} told by email,` : '';
+    return `Withdraws the request — nothing is scheduled; the Admins’ request thread gets REQUEST WITHDRAWN in Chat and email,${told} and the reminders stop. Logged as ${viewer}.`;
+  }
+  return `It hasn’t started, so cancelling removes it. ${emailAndSpace(r, viewer)} Logged as ${viewer}.`;
 }
 
 // ── Overview (§23.8) ─────────────────────────────────────────────────────

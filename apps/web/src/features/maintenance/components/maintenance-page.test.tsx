@@ -15,6 +15,7 @@ const actions = vi.hoisted(() => ({
   muteSite: vi.fn(async (_: unknown) => ({ ok: true as const })),
   scheduleMaintenance: vi.fn(async (_: unknown) => ({ ok: true as const })),
   undoWindowAction: vi.fn(async (_: unknown) => ({ ok: true as const })),
+  postWindowActionNow: vi.fn(async (_: unknown) => ({ ok: true as const })),
 }));
 vi.mock('../actions', () => actions);
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -164,9 +165,78 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
     expect(await screen.findByText(/^Posting to Chat and email in \d+ s/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^Undo · \d+ s$/ }));
     await waitFor(() => expect(actions.undoWindowAction).toHaveBeenCalledWith({ windowId: 'w1' }));
+    expect(await screen.findByText('Nothing was posted.')).toBeInTheDocument();
     // the refresh brings the row back as running
     rerender(page([base, request]));
     await waitFor(() => expect(screen.getByRole('heading', { name: /Active now/ })).toHaveFocus());
+  });
+
+  it('after Cancel, focus lands on Recent where the row went (spec-check M2)', async () => {
+    const user = userEvent.setup();
+    const scheduled: WindowRow = {
+      ...base,
+      id: 'w9',
+      startsAt: bkk('2026-09-29T01:00:00'),
+      endsAt: bkk('2026-09-29T03:00:00'),
+    };
+    const props = {
+      sites: [],
+      viewer: { id: 'u-tao', name: 'Tao', role: 'admin' as const },
+      viewerEmail: 'x@example.test',
+      nowIso: NOW,
+    };
+    const { rerender } = render(<MaintenancePageView rows={[scheduled, request]} {...props} />);
+    await user.click(
+      within(screen.getByRole('region', { name: 'Scheduled' })).getAllByRole('button', {
+        name: /Edit/,
+      })[0]!,
+    );
+    const edit = await screen.findByRole('dialog', { name: /Edit or cancel/ });
+    await user.click(within(edit).getAllByRole('button', { name: 'Cancel maintenance…' })[0]!);
+    await user.type(within(edit).getByLabelText(/Reason/), 'Client postponed');
+    await user.click(within(edit).getByRole('button', { name: 'Cancel maintenance' }));
+    await waitFor(() => expect(actions.cancelWindow).toHaveBeenCalled());
+    rerender(<MaintenancePageView rows={[{ ...scheduled, cancelledAt: NOW }, request]} {...props} />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Recent/ })).toHaveFocus());
+  });
+
+  it('a pending action posts at once when another dialog opens (§24.12)', async () => {
+    const user = userEvent.setup();
+    actions.endWindowEarly.mockResolvedValueOnce({
+      ok: true as const,
+      postsAt: new Date(Date.now() + 10_000).toISOString(),
+    } as never);
+    actions.postWindowActionNow.mockClear();
+    const props = {
+      sites: [],
+      viewer: { id: 'u-tao', name: 'Tao', role: 'admin' as const },
+      viewerEmail: 'x@example.test',
+      nowIso: NOW,
+    };
+    render(
+      <>
+        <MaintenancePageView rows={[base, request]} {...props} />
+        <Toaster />
+      </>,
+    );
+    await user.click(
+      within(screen.getByRole('region', { name: 'Active now' })).getAllByRole('button', {
+        name: 'End now',
+      })[0]!,
+    );
+    const end = await screen.findByRole('dialog', { name: /End .* now\?/ });
+    await user.type(within(end).getByLabelText(/Reason/), 'Done early');
+    await user.click(within(end).getByRole('button', { name: /^End .* now$/ }));
+    expect(await screen.findByText(/^Posting to Chat and email in \d+ s/)).toBeInTheDocument();
+    expect(actions.postWindowActionNow).not.toHaveBeenCalled();
+    // Opening the next dialog while End now is still pending posts it now.
+    await user.click(
+      within(screen.getByRole('region', { name: 'Waiting for approval' })).getAllByRole('button', {
+        name: 'Approve',
+      })[0]!,
+    );
+    await waitFor(() => expect(actions.postWindowActionNow).toHaveBeenCalledWith({ windowId: 'w1' }));
+    expect(await screen.findByText('Posted to Chat and email.')).toBeInTheDocument();
   });
 
   it('Decline and End now need a reason', async () => {

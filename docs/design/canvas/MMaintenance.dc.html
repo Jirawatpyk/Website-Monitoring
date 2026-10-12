@@ -47,12 +47,15 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <x-import component-from-global-scope="Aura.SegmentedControl" label="Duration" options="{{durations}}" value="{{dur}}" on-change="{{setDur}}" full-width="{{yes}}" size="sm"></x-import>
 <span style="font-size: 12px; color: var(--aura-fg-secondary)">{{ends}}</span>
 </div>
+<sc-if value="{{needsOk}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Select" label="Starts" options="{{startOpts}}" value="{{startAt}}" on-change="{{setStartAt}}"></x-import>
+</sc-if>
 <sc-if value="{{muteOnIncident}}" hint-placeholder-val="{{false}}">
 <x-import component-from-global-scope="Aura.Alert" tone="warning" title="Mute stops new alerts only — INC-0142 keeps escalating until someone acknowledges">The open incident keeps its escalation ladder, the L3 FYI to CEO + Bua and the client update. Muting is not an acknowledgement.</x-import>
 <x-import component-from-global-scope="Aura.Button" variant="secondary" icon="check" full-width="{{yes}}" href="MobileAck.dc.html">Acknowledge INC-0142 instead</x-import>
 </sc-if>
 <sc-if value="{{needsOk}}" hint-placeholder-val="{{false}}">
-<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Needs an Admin’s approval">Over 24 h needs an Admin. Tao gets a request now; the window starts only once approved. Follow it on Maintenance &amp; mutes.</x-import>
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Needs an Admin’s approval">{{okText}}</x-import>
 </sc-if>
 <x-import component-from-global-scope="Aura.TextField" label="Reason" required="{{yes}}" placeholder="{{reasonHint}}" value="{{reason}}" on-change="{{setReason}}" hint="{{reasonNote}}"></x-import>
 <span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{effect}}</span>
@@ -73,7 +76,7 @@ class Component extends DCLogic {
   constructor(props) {
     super(props);
     var h = (typeof location !== 'undefined' && location.hash) || '';
-    this.state = { kind: h.indexOf('maintenance') >= 0 ? 'Maintenance' : 'Mute', dur: '1 h', site: 'Bangkok Airways – Taiwan', reason: '', done: false };
+    this.state = { startAt: 'Sat 26 Sep 22:00', kind: h.indexOf('maintenance') >= 0 ? 'Maintenance' : 'Mute', dur: '1 h', site: 'Bangkok Airways – Taiwan', reason: '', done: false };
   }
   renderVals() {
     var self = this;
@@ -87,7 +90,7 @@ class Component extends DCLogic {
     var ENDT = { '1 h': '11:07', '4 h': '14:07', '8 h': '18:07', '24 h': 'Sat 26 Sep 10:07', '3 days': 'Mon 28 Sep 10:07' };
     var END = mute
       ? { '1 h': 'Unmutes itself at 11:07 today', '4 h': 'Unmutes itself at 14:07 today', '8 h': 'Unmutes itself at 18:07 today', '24 h': 'Unmutes itself Sat 26 Sep 10:07 (max 24 h)' }
-      : { '1 h': 'Starts now · ends 11:07', '4 h': 'Starts now · ends 14:07', '8 h': 'Starts now · ends 18:07', '24 h': 'Starts now · ends Sat 26 Sep 10:07', '3 days': 'Starts once an Admin approves · then 3 days' };
+      : { '1 h': 'Starts now · ends 11:07', '4 h': 'Starts now · ends 14:07', '8 h': 'Starts now · ends 18:07', '24 h': 'Starts now · ends Sat 26 Sep 10:07', '3 days': '' };
     var noReason = !st.reason.trim();
     var BACK = { 'MuvMi': { href: 'MobileAck.dc.html', label: 'Back to incident' }, 'Bangkok Airways \u2013 Taiwan': { href: 'MSite.dc.html', label: 'Back to site' }, 'Bangkok Airways \u2013 China': { href: 'MOverview4.dc.html', label: 'Back to overview' } };
     var back = BACK[st.site];
@@ -110,9 +113,12 @@ class Component extends DCLogic {
       durLabel: mute ? 'Mute for' : 'Window length',
       durations: mute ? ['1 h', '4 h', '8 h', '24 h'] : ['1 h', '4 h', '8 h', '24 h', '3 days'],
       needsOk: needsOk && !blocked && !st.done,
+      startOpts: ['Sat 26 Sep 22:00', 'Sun 27 Sep 22:00'], startAt: st.startAt,
+      setStartAt: function (e) { self.setState({ startAt: e && e.target ? e.target.value : e }); },
+      okText: 'Tao gets a request now; it starts only if approved before ' + st.startAt + '.',
       dur: dur,
       setDur: function (v) { self.setState({ dur: v }); },
-      ends: END[dur],
+      ends: needsOk ? 'Starts ' + st.startAt + ' if approved before then · ends ' + (st.startAt === 'Sat 26 Sep 22:00' ? 'Tue 29 Sep 22:00' : 'Wed 30 Sep 22:00') + ' (3 days)' : END[dur],
       reason: st.reason,
       setReason: function (e) { self.setState({ reason: e && e.target ? e.target.value : e }); },
       reasonHint: mute ? (down ? 'e.g. Known outage, host restarting' : 'e.g. Investigating slow booking page') : 'e.g. Emergency hotfix deploy',
@@ -122,11 +128,11 @@ class Component extends DCLogic {
         ? (down
           ? 'New alerts for MuvMi stop until ' + ENDT[dur] + '. INC-0142 stays open and keeps escalating. The site keeps its real status with a “Muted” tag and still counts toward uptime.'
           : 'New alerts stop until ' + ENDT[dur] + ', including DOWN alerts to on-call. The site keeps its real status with a “Muted” tag and still counts toward uptime.')
-        : 'Alerts are held and this window is not counted in uptime. Checks keep running. The status page shows “Planned maintenance”.',
+        : 'No alerts during the window, and it isn’t counted in uptime. Checks keep running. The status page shows “Planned maintenance”.',
       submit: mute ? 'Mute for ' + dur : (needsOk ? 'Ask for approval' : 'Start maintenance'),
       submitIcon: mute ? 'eye-off' : 'calendar',
       submitIt: function () { self.setState({ done: true }); },
-      doneTitle: mute ? st.site + ' muted until ' + ENDT[dur] : (needsOk ? 'Request sent to Tao' : 'Maintenance started · ends ' + ENDT[dur]),
+      doneTitle: mute ? st.site + ' muted until ' + ENDT[dur] : (needsOk ? 'Request sent to Tao · ' + st.site : 'Maintenance started · ' + st.site + ' · ends ' + ENDT[dur]),
       doneText: (needsOk ? 'Waiting for an Admin — nothing changes until it’s approved. Recorded as Arm: “' : 'Takes effect now. Recorded as Arm: “') + st.reason.trim() + '”.' + (mute && down ? ' INC-0142 is still escalating — acknowledge it to stop L1–L2.' : '') + (needsOk ? ' Withdraw it any time from Maintenance & mutes.' : ' End or change it from Maintenance & mutes.'),
       back: back
     };

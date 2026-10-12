@@ -195,6 +195,17 @@ export async function approveMaintenance(
 }
 
 /** Undo the last held action on a window (§24.8): the person who did it, inside its 10 s. */
+/** Posts a held action at once (§24.12): its actor moved on to the next one. */
+export async function postWindowActionNow(
+  input: WindowIdInput,
+  { db }: MaintenanceDeps,
+): Promise<WindowResult> {
+  const p = windowIdSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { error } = await db.rpc('post_window_action_now', { p_window_id: p.data.windowId });
+  return error ? refusal(error, 'Only the person who did it can post it now.') : { ok: true };
+}
+
 export async function undoWindowAction(input: WindowIdInput, { db }: MaintenanceDeps): Promise<WindowResult> {
   const p = windowIdSchema.safeParse(input);
   if (!p.success) return first(p.error.issues);

@@ -109,16 +109,20 @@ describe('MaintenanceDialog (boards Maintenance, MMaintenance)', () => {
     await waitFor(() => expect(within(box).getByRole('button', { name: 'Done' })).toHaveFocus());
   });
 
-  it('a Responder’s 3-day window starting now says why Submit is off (§14.16)', async () => {
+  it('a Responder’s window over 24 h offers only Later, and says why (§24.14)', async () => {
     const user = userEvent.setup();
     dialog({ siteId: 's-tw' });
     const box = screen.getByRole('dialog', { name: 'Schedule maintenance' });
     await user.click(within(box).getByRole('radio', { name: 'Now' }));
     await user.click(within(box).getAllByRole('radio', { name: '3 days' })[0]!);
+    expect(within(box).queryByRole('radio', { name: 'Now' })).not.toBeInTheDocument();
+    expect(within(box).getByRole('radio', { name: 'Later' })).toBeChecked();
     expect(
-      within(box).getByText('Over 24 h needs an Admin’s approval first — pick a later start.'),
+      within(box).getByText(
+        'Over 24 h needs an Admin’s approval first, so it can’t start now — pick a date below',
+      ),
     ).toBeInTheDocument();
-    expect(within(box).queryByText('Needs an Admin’s approval')).not.toBeInTheDocument();
+    expect(within(box).getByLabelText('Start date')).toBeInTheDocument();
   });
 
   it('opened with no site picked, no other site’s incident shows (spec-check)', async () => {

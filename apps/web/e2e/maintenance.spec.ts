@@ -66,7 +66,9 @@ test.describe('maintenance & mutes (local Supabase)', () => {
     await page.getByRole('option', { name: `${site.name} · Tier 1`, exact: true }).click();
     await dialog.getByRole('radio', { name: 'Later' }).click();
     await dialog.getByRole('radio', { name: '3 days' }).click();
-    await expect(dialog.getByText('Needs an Admin’s approval')).toBeVisible();
+    await expect(dialog.getByText('Needs an Admin’s approval', { exact: true })).toBeVisible();
+    // §24.14: over 24 h a Responder can only start later.
+    await expect(dialog.getByRole('radio', { name: 'Now' })).toHaveCount(0);
     await dialog.getByLabel(/Reason/).fill('E2E: move hosting');
     await dialog.getByRole('button', { name: 'Ask for approval' }).click();
     // §24.9: the request names the Admins it went to.

@@ -18,6 +18,7 @@ const windowRow = {
   ends_at: '2026-10-06T20:00:00Z',
   reason: 'Plugin updates',
   created_at: '2026-10-06T02:00:00Z',
+  created_by: 'u-arm',
   approved_at: '2026-10-06T02:00:00Z',
   creator: { display_name: 'Arm' },
   approver: { display_name: 'Arm' },
@@ -130,6 +131,57 @@ describe('maintenance window messages', () => {
     expect(message.headers).toEqual({ References: '<mw-w1@notify.dxt.example>' });
     expect(message.text).toContain('You got this because you own Tubtong.');
     expect(options.to).toBe('tao@example.test');
+  });
+
+  it('MUTED: one reply @mentioning the owner and the backup together (context.mention)', async () => {
+    const post = okPost();
+    const reply = row({
+      id: 'n-muted',
+      template: 'mw_dm',
+      context: {
+        kind: 'muted',
+        dm: 'muted',
+        by: 'Nok',
+        at: created,
+        mention: [
+          { name: 'Tao', chat: 'TAO' },
+          { name: 'Arm', chat: 'ARM' },
+        ],
+      },
+    });
+    const { db } = fakeDb(queue([reply], [], [{ ...windowRow, kind: 'mute' }]));
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, now, post });
+    const [, message] = post.mock.calls[0] as unknown as [string, { text: string }];
+    expect(message.text).toBe(
+      '<users/TAO> <users/ARM> MUTED · Tubtong · until Wed 7 Oct 03:00 · “Plugin updates” · by Nok · still counted in uptime',
+    );
+  });
+
+  it('the asker reads "Your request …"; the approver gets the didn’t-start email (redrawn EmailAlert)', async () => {
+    const send = okSend();
+    const asker = row({
+      id: 'e-asker',
+      channel: 'email',
+      template: 'mw_email',
+      user_id: 'u-arm',
+      context: { kind: 'approved', role: 'backup', by: 'Tao', at: created, request: true },
+    });
+    const approver = row({
+      id: 'e-approver',
+      channel: 'email',
+      template: 'mw_email',
+      user_id: 'u-tao',
+      context: { kind: 'didnt_start', role: 'approver', at: created, request: true },
+    });
+    const { db } = fakeDb(queue([], [asker, approver]));
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, now, send });
+    const texts = send.mock.calls.map((c) => (c as unknown as [{ text: string }])[0].text);
+    expect(texts.find((t) => t.startsWith('MAINTENANCE APPROVED'))).toContain(
+      'Your request was approved. It starts on its own at Wed 7 Oct 01:00.',
+    );
+    expect(texts.find((t) => t.startsWith('DIDN’T START'))).toContain(
+      'You got this because you approved this window.',
+    );
   });
 
   it('a failed window line gets no email fallback (the owner and backup are emailed anyway)', async () => {

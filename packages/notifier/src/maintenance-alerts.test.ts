@@ -117,21 +117,21 @@ describe('Alerts Space lines — one per action, no mention, no card (§24.4)', 
     [
       'changed',
       { ...tubtong, endsAt: bkk('2026-09-29T04:00') },
-      ev('changed', bkk('2026-09-29T02:00'), {
+      ev('changed', bkk('2026-09-28T15:10'), {
         by: 'Ploy',
         reason: 'Plugin conflict',
         from: bkk('2026-09-29T03:00'),
         to: bkk('2026-09-29T04:00'),
       }),
-      bkk('2026-09-29T02:00'),
-      'MAINTENANCE CHANGED · Tubtong · ends 04:00 (was 03:00) · “Plugin conflict” · by Ploy',
+      bkk('2026-09-28T15:10'),
+      'MAINTENANCE CHANGED · Tubtong · ends Tue 29 Sep 04:00 (was 03:00) · “Plugin conflict” · by Ploy Mon 28 Sep 15:10',
     ],
     [
       'cancelled',
-      tubtong,
-      ev('cancelled', bkk('2026-09-24T10:00'), { by: 'Ploy', reason: 'Client postponed' }),
-      bkk('2026-09-24T10:00'),
-      'MAINTENANCE CANCELLED · Tubtong · Tue 29 Sep 01:00 · “Client postponed” · by Ploy',
+      { ...tubtong, endsAt: bkk('2026-09-29T04:00') },
+      ev('cancelled', bkk('2026-09-28T16:00'), { by: 'Ploy', reason: 'Client postponed' }),
+      bkk('2026-09-28T16:00'),
+      'MAINTENANCE CANCELLED · Tubtong · Tue 29 Sep 01:00 → 04:00 (3 h) · “Client postponed” · by Ploy',
     ],
     [
       'started',
@@ -419,8 +419,10 @@ describe('maintenance emails (EmailAlert "Maintenance · approval", "owner & bac
     expect(e.text).toContain(`Review request: ${page}`);
     expect(e.text).toContain('You got this because you’re an Admin.');
     expect(e.html).toContain(
-      'Arm asks for 3 days of maintenance on Bangkok Airways – China from Sat 26 Sep 22:00',
+      'MAINTENANCE REQUESTED — Arm asks for 3 days on Bangkok Airways – China from Sat 26 Sep 22:00',
     );
+    // No status page yet (D-013): the effect stops at uptime.
+    expect(e.text).toContain('Effect: No alerts; checks still run; not counted in uptime');
   });
 
   it('the backup gets the same request, told why', () => {
@@ -454,6 +456,7 @@ describe('maintenance emails (EmailAlert "Maintenance · approval", "owner & bac
     });
     expect(e.text).toContain('WAITING FOR APPROVAL — Still waiting — starts in 12 h');
     expect(e.text).toContain('A last reminder comes by Chat at 21:00.');
+    expect(e.text).not.toContain('Site:');
     expect(e.text).toContain(
       'If nobody answers: At 22:00 it doesn’t start; Arm is told and has to ask again',
     );
@@ -490,9 +493,9 @@ describe('maintenance emails (EmailAlert "Maintenance · approval", "owner & bac
     });
     expect(e.subject).toBe('Tubtong · Maintenance · Tue 29 Sep 01:00');
     expect(e.text).toContain('MAINTENANCE ENDED EARLY — Tubtong maintenance ended early');
-    expect(e.text).toContain(
-      'What changed: Ended Tue 29 Sep 02:10 by Ploy · “Updates finished” · alerts back on',
-    );
+    expect(e.text).toContain('What changed: Ended early 02:10 by Ploy · “Updates finished” · alerts back on');
+    expect(e.text).toContain('When: Tue 29 Sep 01:00 → 02:10 (1 h 10 min)');
+    expect(e.text).toContain('Alerts for Tubtong are back on.');
     // Over: its effect and "if it's down" no longer apply.
     expect(e.text).not.toContain('If it’s down');
     expect(e.text).not.toContain('Effect:');
@@ -548,6 +551,13 @@ describe('first alert after a mute (ChatAlert "First alert after a mute", §24.7
     expect(JSON.stringify(widgets)).toContain('Down 40 min so far — the time while muted counts in uptime.');
   });
 
+  it('nobody left to escalate to: only why it is late (§24.16, staging /verify)', () => {
+    const m = buildDownAlert({ ...base, heldUntil: bkk('2026-09-25T15:00'), ladder: { next: null } });
+    expect(m.cardsV2[0]!.card.sections[0]!.widgets[0]).toEqual({
+      textParagraph: { text: 'Held by a mute until 15:00' },
+    });
+  });
+
   it('outside response hours: escalation starts when the timers run again', () => {
     const m = buildDownAlert({
       ...base,
@@ -590,7 +600,8 @@ describe('first alert after a mute (ChatAlert "First alert after a mute", §24.7
       '<users/ARM> PROBLEM · Fuji Links (Tier 2) · slow · 6.2 s · held by a mute until 15:00 · please take a look',
     );
     expect(m.cardsV2[0]!.card.sections[0]!.widgets[0]).toEqual({
-      textParagraph: { text: 'Held by a mute until 15:00 · escalation starts now' },
+      // No level left to escalate to: only why it is late (§24.16, staging /verify).
+      textParagraph: { text: 'Held by a mute until 15:00' },
     });
   });
 

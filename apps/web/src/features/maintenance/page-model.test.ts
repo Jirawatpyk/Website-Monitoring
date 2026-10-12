@@ -3,6 +3,7 @@ import {
   approveEffects,
   approveTitle,
   cancelText,
+  declineHint,
   countdown,
   dialogDescription,
   endChoices,
@@ -213,7 +214,7 @@ describe('words', () => {
         to: bkk('2026-09-25T16:00:00'),
         reason: 'more time',
       },
-      'End 14:00 → 16:00 · 10:07 by Tao · “more time”',
+      'End changed 10:07 by Tao · 14:00 → 16:00 · “more time”',
     ],
     [{ at: bkk('2026-09-22T22:00:00'), action: 'ended' }, 'Ended on time 22:00'],
     [
@@ -251,12 +252,14 @@ describe('words', () => {
       'Approved 10:07 by Tao · Arm told in Chat (posted 10:07:10)',
     );
     expect(logLine(approved, new Date(bkk('2026-09-25T10:07:05')), { asker: 'Arm' })).toBe(
-      'Approved 10:07 by Tao · Arm told in Chat (posts 10:07:10)',
+      'Approved 10:07 by Tao', // nothing yet while it waits (§24.12)
     );
     expect(logLine({ ...approved, action: 'cancelled', reason: 'x' }, later)).toBe(
       'Cancelled 10:07 by Tao · “x” · posted 10:07:10',
     );
-    expect(logLine(approved, later, { asker: 'Arm', undone: true })).toBe('Approved 10:07 by Tao');
+    expect(logLine(approved, later, { asker: 'Arm', undone: true })).toBe(
+      'Approved 10:07 by Tao · Arm told in Chat',
+    );
     expect(logLine({ at: bkk('2026-09-25T10:07:05'), action: 'undone', by: 'Tao' }, later)).toBe(
       'Undone 10:07 by Tao — nothing was posted',
     );
@@ -286,19 +289,64 @@ describe('words', () => {
     expect(approveEffects(bac, 'Tao', NOW)[0]).toBe(
       'Starts Sat 26 Sep 22:00, ends Tue 29 Sep 22:00 (3 days). Bangkok Airways – China is Tier 1.',
     );
-    // §24.9: who hears it when an approved window can't start.
+    // §24.9: who hears it when an approved window can't start; who hears the approval (board).
     expect(approveEffects(bac, 'Tao', NOW)[3]).toBe(
-      'If the site is DOWN or has an incident that hasn’t recovered at the start, the window doesn’t start — Arm, Ploy and Tao are told.',
+      'If the site is DOWN or has an open incident at the start, the window doesn’t start — Arm, Ploy and Tao are told.',
     );
-    // §24.9: ending a mute that silenced an incident posts it now (Tier 1: L1 15 min later).
-    expect(endEffects({ ...games, silenced: { number: 154, l1DelayMin: 15 } }, 'Tao', NOW)[1]).toBe(
-      'INC-0154 posts its first alert now and starts escalating — L1 at about 10:23 if nobody acknowledges.',
+    expect(approveEffects(bac, 'Tao', NOW)[4]).toBe(
+      'Arm gets a Chat message, Arm and Ploy an email, and the Alerts Space a line. Logged in the audit log as Tao.',
     );
-    expect(endEffects({ ...games, silenced: { number: 154, l1DelayMin: null } }, 'Tao', NOW)[1]).toBe(
-      'INC-0154 posts its first alert now and starts escalating.',
+    // §24.13: ending a mute that held an incident — the held line first, by tier and hours.
+    const held = {
+      number: 154,
+      severity: 'down' as const,
+      since: bkk('2026-09-25T09:20:00'),
+      pausedUntil: null,
+    };
+    expect(endEffects({ ...games, silenced: { ...held, l1DelayMin: 15 } }, 'Tao', NOW)[0]).toBe(
+      'INC-0154 (DOWN since 09:20, held by this mute) posts its first alert now and starts escalating — L1 at about 10:23 if nobody acknowledges.',
     );
-    expect(cancelText('waiting', 'Arm')).toContain('Withdraws the request');
-    expect(cancelText('scheduled', 'Arm')).toContain('cancelling removes it');
+    expect(endEffects({ ...games, silenced: { ...held, l1DelayMin: null } }, 'Tao', NOW)[0]).toBe(
+      'INC-0154 (DOWN since 09:20, held by this mute) posts its first alert now and starts escalating.',
+    );
+    expect(
+      endEffects(
+        { ...games, silenced: { ...held, l1DelayMin: null, pausedUntil: bkk('2026-09-28T09:00:00') } },
+        'Tao',
+        NOW,
+      )[0],
+    ).toBe(
+      'INC-0154 (DOWN since 09:20, held by this mute) posts its first alert now. It’s outside response hours, so escalation starts Mon 28 Sep 09:00.',
+    );
+    // A Tier 2–3 PROBLEM held for response hours posts at the opening, not now (spec-check M1, §24.16).
+    expect(
+      endEffects(
+        {
+          ...games,
+          silenced: {
+            ...held,
+            severity: 'problem',
+            l1DelayMin: null,
+            pausedUntil: bkk('2026-09-28T09:00:00'),
+          },
+        },
+        'Tao',
+        NOW,
+      )[0],
+    ).toBe('INC-0154 (PROBLEM since 09:20, held by this mute) posts its first alert Mon 28 Sep 09:00.');
+    // End maintenance / cancel / withdraw / decline name who is emailed, minus the person acting.
+    expect(endEffects(wecare, 'Tao', NOW)[2]).toBe(
+      'Nok and Ploy get an email; the Alerts Space gets a line. Logged in the audit log as Tao.',
+    );
+    expect(cancelText(bac, 'waiting', 'Arm')).toBe(
+      'Withdraws the request — nothing is scheduled; the Admins’ request thread gets REQUEST WITHDRAWN in Chat and email, Ploy is told by email, and the reminders stop. Logged as Arm.',
+    );
+    expect(cancelText(wecare, 'scheduled', 'Tao')).toBe(
+      'It hasn’t started, so cancelling removes it. Nok and Ploy get an email; the Alerts Space gets a line. Logged as Tao.',
+    );
+    expect(declineHint(bac, 'Tao')).toBe(
+      'Required. Arm gets it in a Chat message; Arm and Ploy get an email; the request moves to Recent as Declined.',
+    );
     const ends = endChoices(games, NOW);
     expect(ends.find((e) => e.label.endsWith('(current)'))?.label).toBe('18:00 (current)');
     expect(ends.every((e) => Date.parse(e.value) <= Date.parse(games.startsAt) + 24 * 3_600_000)).toBe(true);

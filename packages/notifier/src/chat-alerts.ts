@@ -232,11 +232,12 @@ function heldWords(
   return {
     line: [`held by a mute until ${until}`, ...(paused ? [`timers paused until ${paused}`] : ask)],
     // No ladder (acknowledged meanwhile, or no plan): it says only why it is late.
-    card: !ladder
-      ? `Held by a mute until ${until}`
-      : paused
-        ? `Held by a mute until ${until} · outside response hours — escalation starts ${paused}`
-        : `Held by a mute until ${until} · escalation starts now`,
+    card:
+      !ladder || (!ladder.next && !ladder.pausedUntil)
+        ? `Held by a mute until ${until}`
+        : paused
+          ? `Held by a mute until ${until} · outside response hours — escalation starts ${paused}`
+          : `Held by a mute until ${until} · escalation starts now`,
   };
 }
 

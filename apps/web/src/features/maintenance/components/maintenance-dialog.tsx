@@ -14,19 +14,22 @@ import {
   TimePicker,
 } from '@jirawatpyk/aura-react';
 import { IconCalendar, IconCheck, IconEyeOff, IconInfo } from '@jirawatpyk/aura-react/icons';
-import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { APPROVAL_OVER_MIN } from '@dxt/engine';
 import { useNow } from '@/components/use-now';
 import { loadAdminNames, muteSite, scheduleMaintenance } from '../actions';
+import { postPendingNow } from './window-dialogs';
 import {
   DURATIONS,
   EFFECT,
   GUARD_TEXT,
+  FORCED_LATER_HINT,
   GUARD_TEXT_MUTED,
   PROBLEM_WORDS,
   approvalNotice,
   approvalSpan,
   doneOf,
+  durationOf,
   escalating,
   guardTitle,
   muteRule,
@@ -84,12 +87,11 @@ export function MaintenanceDialog({
   /** Opened from /maintenance: the done state needs no "Open Maintenance & mutes". */
   fromPage?: boolean;
 }) {
-  const router = useRouter();
   const [openedAt] = useState(() => new Date().toISOString());
   const days = useMemo(() => startDays(new Date(openedAt)), [openedAt]);
   const [site, setSite] = useState(siteId);
   const [kind, setKind] = useState<WindowKind>(initialKind);
-  const [later, setLater] = useState(initialKind === 'maintenance');
+  const [laterChoice, setLater] = useState(initialKind === 'maintenance');
   const [startDate, setStartDate] = useState(days[1]!.value);
   const [startTime, setStartTime] = useState('22:00');
   const [duration, setDuration] = useState('4 h');
@@ -110,17 +112,11 @@ export function MaintenanceDialog({
   const current = picked ?? sites[0]!;
   const durations = DURATIONS[kind];
   const dur = durations.some((d) => d.label === duration) ? duration : durations[durations.length - 1]!.label;
-  const plan = planOf({
-    kind,
-    site: current,
-    later,
-    startDate,
-    startTime,
-    duration: dur,
-    reason,
-    now,
-    isAdmin,
-  });
+  const planInput = { kind, site: current, startDate, startTime, duration: dur, reason, now, isAdmin };
+  // A Responder's window over 24 h waits for an Admin, so it can't start now: Start is Later (§24.14).
+  const forcedLater = !isAdmin && kind === 'maintenance' && durationOf(kind, dur).minutes > APPROVAL_OVER_MIN;
+  const later = laterChoice || forcedLater;
+  const plan = planOf({ ...planInput, later });
   // A Responder's long request names the Admins it goes to before it is sent (§24.9).
   const [admins, setAdmins] = useState<string[] | null>(null);
   const asksAdmin = !isAdmin && kind === 'maintenance' && plan.needsApproval;
@@ -156,6 +152,8 @@ export function MaintenanceDialog({
   const submit = () =>
     start(async () => {
       setError(null);
+      // Starting another action posts a pending one at once (§24.12).
+      await postPendingNow();
       // "Now" is when Save is pressed, not when the dialog opened.
       const at = new Date();
       const p = planOf({
@@ -197,7 +195,7 @@ export function MaintenanceDialog({
           admins: 'admins' in r ? r.admins : admins,
         }),
       );
-      router.refresh();
+      // The action revalidated the page (no router.refresh(): it would queue the next action, §24.12).
     });
 
   const owner = current.owner ? ` · owner ${current.owner}` : '';
@@ -317,14 +315,16 @@ export function MaintenanceDialog({
                   touchHeight
                   label="Start"
                   size="sm"
-                  options={['Now', 'Later']}
+                  options={forcedLater ? ['Later'] : ['Now', 'Later']}
                   value={later ? 'Later' : 'Now'}
                   onChange={(v) => setLater(v === 'Later')}
                 />
                 <span className="text-sm text-fg-secondary">
-                  {later
-                    ? 'Pick a date and time below'
-                    : `Starts ${formatDay(now, { weekday: true })} ${formatTime(now)} (UTC+7)`}
+                  {forcedLater
+                    ? FORCED_LATER_HINT
+                    : later
+                      ? 'Pick a date and time below'
+                      : `Starts ${formatDay(now, { weekday: true })} ${formatTime(now)} (UTC+7)`}
                 </span>
               </span>
             </div>

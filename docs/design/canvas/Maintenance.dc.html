@@ -102,7 +102,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </sc-if>
 <sc-if value="{{later}}" hint-placeholder-val="{{true}}">
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
-<x-import component-from-global-scope="Aura.Select" label="Start date" options="{{days}}" default-value="sat"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="Start date" options="{{days}}" value="{{day}}" on-change="{{setDay}}"></x-import>
 <x-import component-from-global-scope="Aura.TimePicker" label="Start time" default-value="22:00" step="{{step}}"></x-import>
 </div>
 </sc-if>
@@ -130,7 +130,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </div>
 </sc-if>
 <sc-if value="{{longResp}}" hint-placeholder-val="{{false}}">
-<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Needs an Admin’s approval">Windows over 24 h asked for by a Responder wait for an Admin. Tao gets a request now. It starts only if approved before Sat 26 Sep 22:00 — otherwise it doesn’t start. Follow it under Waiting for approval on Maintenance &amp; mutes.</x-import>
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Needs an Admin’s approval">{{longRespText}}</x-import>
 </sc-if>
 <sc-if value="{{longAdmin}}" hint-placeholder-val="{{false}}">
 <x-import component-from-global-scope="Aura.Alert" tone="info" title="You’re an Admin — no approval needed">Windows over 24 h normally need an Admin’s approval. Yours starts as scheduled and shows in every daily digest until it ends.</x-import>
@@ -158,13 +158,23 @@ class Component extends DCLogic {
   renderVals() {
     var self = this;
     var isMaint = this.state.kind === 'maint';
-    var later = isMaint && this.state.start === 'Later';
     var RESP = this.state.role === 'resp', WHO = RESP ? 'Arm' : 'Tao';
+    // A Responder's window over 24 h needs an Admin's approval first, so it can't start now
+    var forceLater = RESP && isMaint && this.state.dur === '3 days';
+    var later = isMaint && (this.state.start === 'Later' || forceLater);
+    var DAYN = ['Fri 25 Sep', 'Sat 26 Sep', 'Sun 27 Sep', 'Mon 28 Sep', 'Tue 29 Sep', 'Wed 30 Sep', 'Thu 1 Oct', 'Fri 2 Oct'];
+    var DAYK = ['fri', 'sat', 'sun', 'mon', 'tue'];
+    var day = this.state.day || 'sat';
+    if (forceLater && day !== 'sat' && day !== 'sun') day = 'sat';
+    var dIdx = DAYK.indexOf(day);
+    var START = DAYN[dIdx] + ' 22:00';
+    var DURM = { '1 h': 60, '4 h': 240, '8 h': 480, '24 h': 1440, '3 days': 4320 };
+    function at(m) { var d = Math.floor(m / 1440), r = m % 1440; return DAYN[d] + ' ' + ('0' + Math.floor(r / 60)).slice(-2) + ':' + ('0' + r % 60).slice(-2); }
     var maintDur = ['1 h', '4 h', '8 h', '24 h', '3 days'];
     var muteDur = ['1 h', '4 h', '8 h', '24 h'];
     var dur = this.state.dur;
     if (!isMaint && muteDur.indexOf(dur) < 0) dur = '24 h';
-    var ENDS_LATER = { '1 h': 'Ends Sat 26 Sep 23:00', '4 h': 'Ends Sun 27 Sep 02:00', '8 h': 'Ends Sun 27 Sep 06:00', '24 h': 'Ends Sun 27 Sep 22:00', '3 days': 'Ends Tue 29 Sep 22:00' };
+    var ENDS_LATER = {}; Object.keys(DURM).forEach(function (k) { ENDS_LATER[k] = 'Ends ' + at(dIdx * 1440 + 22 * 60 + DURM[k]); });
     var ENDS_NOW = { '1 h': 'Ends Fri 25 Sep 11:07', '4 h': 'Ends Fri 25 Sep 14:07', '8 h': 'Ends Fri 25 Sep 18:07', '24 h': 'Ends Sat 26 Sep 10:07', '3 days': 'Ends Mon 28 Sep 10:07' };
     var SITES = [
       ['Bangkok Airways – Taiwan', 1, 'Arm'], ['Bangkok Airways – China', 1, 'Arm'], ['ENEOS Industrial', 1, 'Ploy'], ['MuvMi', 1, 'Arm'], ['realme.link', 1, 'Nok'],
@@ -205,7 +215,7 @@ class Component extends DCLogic {
       muteInsteadNote: guard ? 'Mute stops new alerts only — ' + guard[1] + ' keeps escalating until someone acknowledges.' : '',
       presets: Object.keys(P),
       preset: preset,
-      pickPreset: function (k) { self.setState(Object.assign({ open: true, done: null, reason: '' }, P[k], { mw: null, mutedHdr: null })); },
+      pickPreset: function (k) { self.setState(Object.assign({ open: true, done: null, reason: '', day: 'sat' }, P[k], { mw: null, mutedHdr: null })); },
       hasMutedHdr: !!this.state.mutedHdr,
       mutedHdr: this.state.mutedHdr || '',
       open: this.state.open,
@@ -223,10 +233,10 @@ class Component extends DCLogic {
       submitFn: function () {
         if (blocked || noReason || !picked) return;
         var why = ' Reason: “' + self.state.reason.trim() + '”. End early, edit or cancel it on Maintenance & mutes (sidebar › Maintenance).';
-        if (needsOk) { self.setState({ open: false, done: ['Request sent to Tao · ' + cur[0], 'Sat 26 Sep 22:00 → Tue 29 Sep 22:00 (3 days) · waiting for an Admin — it doesn’t start unless approved before Sat 26 Sep 22:00. Recorded in the audit log as Arm. Reason: “' + self.state.reason.trim() + '”. Follow it under Waiting for approval on Maintenance & mutes.'], mw: 'Waiting for approval · Sat 26 Sep 22:00 → Tue 29 Sep 22:00' }); return; }
-        var d = isMaint ? [(later ? 'Maintenance scheduled' : 'Maintenance started') + ' · ' + cur[0], (later ? 'Sat 26 Sep 22:00 → ' : 'Fri 25 Sep 10:07 → ') + endText.replace('Ends ', '') + ' · alerts suppressed, not counted in uptime · recorded in the audit log as ' + WHO + '.' + why] : ['Muted · ' + cur[0], (later ? 'From Sat 26 Sep 22:00 · ' : 'Now · ') + endText + ' · new alerts suppressed, still counted in uptime · recorded in the audit log as Tao.' + (guard ? ' ' + guard[1] + (cur[0] === 'MuvMi' ? ' is still escalating — acknowledge it to stop L1–L2.' : ' stays open.') : '') + why];
+        if (needsOk) { self.setState({ open: false, done: ['Request sent to Tao · ' + cur[0], START + ' → ' + endText.replace('Ends ', '') + ' (3 days) · waiting for an Admin — it doesn’t start unless approved before ' + START + '. Recorded in the audit log as Arm. Reason: “' + self.state.reason.trim() + '”. Follow it under Waiting for approval on Maintenance & mutes.'], mw: 'Waiting for approval · ' + START + ' → ' + endText.replace('Ends ', '') }); return; }
+        var d = isMaint ? [(later ? 'Maintenance scheduled' : 'Maintenance started') + ' · ' + cur[0], (later ? START + ' → ' : 'Fri 25 Sep 10:07 → ') + endText.replace('Ends ', '') + ' · alerts suppressed, not counted in uptime · recorded in the audit log as ' + WHO + '.' + why] : ['Muted · ' + cur[0], (later ? 'From ' + START + ' · ' : 'Now · ') + endText + ' · new alerts suppressed, still counted in uptime · recorded in the audit log as ' + WHO + '.' + (guard ? ' ' + guard[1] + (cur[0] === 'MuvMi' ? ' is still escalating — acknowledge it to stop L1–L2.' : ' stays open.') : '') + why];
         var mutedUntil = (!isMaint && !later) ? 'Muted · until ' + endText.replace('Ends Fri 25 Sep ', '').replace('Ends ', '') : null;
-        self.setState({ open: false, done: d, mutedHdr: mutedUntil, mw: isMaint ? 'Maintenance · ' + (later ? 'Sat 26 Sep 22:00 → ' : 'now → ') + endText.replace('Ends ', '') : 'Muted · until ' + endText.replace('Ends Fri 25 Sep ', '').replace('Ends ', '') });
+        self.setState({ open: false, done: d, mutedHdr: mutedUntil, mw: isMaint ? 'Maintenance · ' + (later ? START + ' → ' : 'now → ') + endText.replace('Ends ', '') : 'Muted · until ' + endText.replace('Ends Fri 25 Sep ', '').replace('Ends ', '') });
       },
       yes: true,
       no: false,
@@ -237,12 +247,15 @@ class Component extends DCLogic {
       site: picked ? picked[0] : '',
       setSite: function (v) { self.setState({ site: v && v.target ? v.target.value : v, mutedHdr: null }); },
       desc: picked ? cur[0] + ' · Tier ' + cur[1] + ' · owner ' + cur[2] + (RESP ? ' · you’re a Responder' : '') : 'Choose a site first — the list shows the sites you can act on',
-      days: [{ value: 'fri', label: 'Fri 25 Sep (today)' }, { value: 'sat', label: 'Sat 26 Sep' }, { value: 'sun', label: 'Sun 27 Sep' }, { value: 'mon', label: 'Mon 28 Sep' }, { value: 'tue', label: 'Tue 29 Sep' }],
-      starts: ['Now', 'Later'],
-      start: this.state.start,
+      days: (forceLater ? [{ value: 'sat', label: 'Sat 26 Sep' }, { value: 'sun', label: 'Sun 27 Sep' }] : [{ value: 'fri', label: 'Fri 25 Sep (today)' }, { value: 'sat', label: 'Sat 26 Sep' }, { value: 'sun', label: 'Sun 27 Sep' }, { value: 'mon', label: 'Mon 28 Sep' }, { value: 'tue', label: 'Tue 29 Sep' }]),
+      day: day,
+      setDay: function (e) { self.setState({ day: e && e.target ? e.target.value : e }); },
+      longRespText: 'Tao gets a request now; it starts only if approved before ' + START + '.',
+      starts: forceLater ? ['Later'] : ['Now', 'Later'],
+      start: later ? 'Later' : 'Now',
       setStart: function (v) { self.setState({ start: v }); },
       later: later,
-      startText: later ? 'Pick a date and time below' : 'Starts Fri 25 Sep 10:07 (UTC+7)',
+      startText: forceLater ? 'Over 24 h needs an Admin’s approval first, so it can’t start now — pick a date below' : (later ? 'Pick a date and time below' : 'Starts Fri 25 Sep 10:07 (UTC+7)'),
       isMaint: isMaint,
       setKind: function (v) { self.setState({ kind: v }); },
       types: [
@@ -253,7 +266,7 @@ class Component extends DCLogic {
       durations: isMaint ? maintDur : muteDur,
       dur: dur,
       setDur: function (v) { self.setState({ dur: v }); },
-      ends: (later ? ENDS_LATER : ENDS_NOW)[dur] + ' (UTC+7)',
+      ends: needsOk ? 'Starts ' + START + ' if approved before then · ends ' + endText.replace('Ends ', '') + ' (3 days)' : (later ? ENDS_LATER : ENDS_NOW)[dur] + ' (UTC+7)',
       reasonHint: isMaint ? 'e.g. Server migration with hosting provider' : (guard ? 'e.g. Known outage, host restarting' : 'e.g. Investigating slow booking page'),
       effectTitle: isMaint ? 'Checks keep running' : 'Mute only suppresses new alerts',
       effect: isMaint

@@ -1,6 +1,7 @@
 import 'server-only';
 import { isInsideHours, nextOpening } from '@dxt/engine';
 import {
+  buildMutedMention,
   buildWindowDm,
   buildWindowEmail,
   buildWindowLine,
@@ -13,6 +14,7 @@ import {
   type WindowEvent,
   type WindowFacts,
 } from '@dxt/notifier';
+import type { Json } from '@dxt/db';
 import { TIER_CONFIG, type Tier } from '@dxt/shared';
 import {
   contextOf,
@@ -112,6 +114,18 @@ export function renderWindowChat(
     return e ? buildWindowLine(f, e, now) : null;
   }
   if (n.template === 'mw_dm') {
+    // Someone else muted the site: one reply @mentioning the owner and the backup together
+    // (`context.mention`, D-037 as amended 12 Oct).
+    if (ctx.dm === 'muted' && Array.isArray(ctx.mention)) {
+      const e = eventOf(n, w, facts.windowEnv, appUrl, now);
+      const people = ctx.mention.flatMap((p): ChatPerson[] => {
+        const m = contextOf(p as Json);
+        return typeof m.name === 'string'
+          ? [{ name: m.name, chatUserId: typeof m.chat === 'string' ? m.chat : null }]
+          : [];
+      });
+      return e ? buildMutedMention(f, e, people, now) : null;
+    }
     const dm = pick(ctx.dm, WINDOW_DMS);
     const to: Recipient | undefined = n.user_id ? facts.recipients.get(n.user_id) : undefined;
     if (!dm || !to) return null;
@@ -153,6 +167,9 @@ export function renderWindowEmail(
     facts: windowFacts(w, facts.windowEnv, appUrl),
     event,
     role,
+    // By id: the asker reads "Your request …"; an Admin reviews a request (EmailAlert, redrawn 12 Oct).
+    toIsAsker: !!n.user_id && n.user_id === w.created_by,
+    toIsAdmin: !!n.user_id && (facts.windowEnv?.admins ?? []).some((a) => a.id === n.user_id),
     request: ctx.request === true,
     from: opts.from,
     startsThread: opts.startsThread,

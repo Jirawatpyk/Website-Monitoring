@@ -95,6 +95,10 @@ export async function loadAdminNames(): Promise<string[]> {
   if (access.status !== 'active') return [];
   return m.activeAdminNames({ db: await createClient() });
 }
+/** The pending action posts now: its messages leave at once (no postsAt → flush now). */
+export async function postWindowActionNow(input: WindowIdInput) {
+  return run(input, m.postWindowActionNow);
+}
 export async function undoWindowAction(input: WindowIdInput) {
   return run(input, m.undoWindowAction, undefined, { send: false });
 }

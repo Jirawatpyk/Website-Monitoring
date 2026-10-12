@@ -23,9 +23,12 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 .mt-col{display:flex;flex-direction:column;justify-content:center;line-height:1.45;min-width:0}
 .mt-sub{font-size:12px;color:var(--aura-fg-secondary)}
 .mt-sec > *{flex-shrink:0}
+.mp-var .aura-segmented{width:100%;display:flex;box-sizing:border-box}
+.mp-var .aura-segmented__option{flex:1 1 0}
+.mt-h2:focus{outline:2px solid var(--aura-focus-ring, var(--aura-border-strong));outline-offset:4px;border-radius:4px}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1700px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 1790px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -77,7 +80,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <sc-for list="{{sections}}" as="g" hint-placeholder-count="3">
 <section style="display: flex; flex-direction: column; gap: 10px">
 <div style="display: flex; align-items: baseline; gap: 12px">
-<h2 style="margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600">{{g.title}}</h2>
+<h2 id="{{g.id}}" tabindex="-1" class="mt-h2" style="margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600">{{g.title}}</h2>
 <span style="font-size: 13px; color: var(--aura-fg-secondary)">{{g.hint}}</span>
 </div>
 <div class="aura-table">
@@ -132,13 +135,21 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Approval.</b> Asked for in the Maintenance dialog (Responder, over 24 h → “Ask for approval”). Maintenance longer than 24 h asked for by a Responder waits for an Admin (an Admin’s own starts as scheduled). Approve → moves to Scheduled, the asker gets a Chat message. Decline needs a reason → Recent “Declined”, the asker gets the reason. Nobody approves before the start → it doesn’t start; Recent “Not approved — didn’t start”. Mutes never need approval (max 24 h, start now, stop new alerts only — an open incident keeps escalating).</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Roles.</b> Admin: every action on every site; on a request only Approve or Decline (to ask for changes, decline with a reason). Responder: End now and Edit on sites they own or back up, and Edit / withdraw on their own requests; other rows say who can act. AM, CEO and Viewer: read only — no row actions, no Schedule button (STATE › Read only). A running window or mute is changed with “Edit end” or stopped with End now; “Cancel” exists only before it starts. Every action adds a log line; lines are never replaced.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Uptime line.</b> Maintenance: “Not counted in uptime” (removed from the window, client status page shows “Planned maintenance”). Mute: “Still counted in uptime”. Times are site-local Thailand time; past rows keep their log line (who, when, reason).</span>
-<span><b style="color: var(--aura-fg-primary); font-weight: 600">Sample data.</b> Fri 25 Sep 10:07; sites, people, times and reasons are mock data — compute them; never copy.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Sample data.</b> Fri 25 Sep 10:07 (14:40 in STATE › End mute · open incident); sites, people, times and reasons are mock data — compute them; never copy.</span>
 </div>
 
+<sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+<div role="status" aria-live="polite" style="position: absolute; left: 50%; bottom: 32px; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 16px; padding: 10px 10px 10px 18px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-md); box-shadow: var(--aura-shadow-enterprise); font-size: 13px; white-space: nowrap">
+<span style="display: flex; flex-direction: column; line-height: 1.35"><b style="font-weight: 600">{{t.title}}</b><span style="opacity: 0.85">{{t.line}}</span></span>
+<sc-if value="{{t.pending}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{undo}}" style="height: 32px; padding: 0 14px; border: 1px solid rgba(255,255,255,0.4); border-radius: 9999px; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums">Undo · {{t.left}} s</button></sc-if>
+<button type="button" aria-label="Dismiss" onClick="{{dismiss}}" style="width: 32px; height: 32px; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 16px">×</button>
+</div>
+</sc-if>
 </main>
 
 <x-import component-from-global-scope="Aura.Dialog" open="{{endOpen}}" on-close="{{closeDlg}}" title="{{d.endTitle}}" description="{{d.desc}}" size="sm" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<sc-if value="{{d.isHeld}}" hint-placeholder-val="{{false}}"><div class="mp-var" style="display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 8px 10px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 11px; color: var(--aura-fg-secondary)"><span style="font-family: var(--font-mono)">BOARD ONLY · IF THE SITE IS</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Variant" options="{{heldVars}}" value="{{heldVar}}" on-change="{{setHeldVar}}" size="sm"></x-import></div></sc-if>
 <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
 <sc-for list="{{d.endEffects}}" as="x" hint-placeholder-count="3"><li>{{x.t}}</li></sc-for>
 </ul>
@@ -196,7 +207,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </x-import>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1790}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -209,16 +220,21 @@ class Component extends DCLogic {
     var ROLE = view === 'Responder' ? 'resp' : (view === 'Read only' ? 'ro' : 'admin');
     var ADMIN = ROLE === 'admin';
     var ME = ADMIN ? 'Tao' : (ROLE === 'resp' ? 'Arm' : 'Mint');
-    var NOWABS = 10 * 60 + 7; // minutes from Fri 25 Sep 00:00 → 10:07
+    var EM = view === 'End mute · open incident';
+    var NOWABS = EM ? 14 * 60 + 40 : 10 * 60 + 7; // minutes from Fri 25 Sep 00:00 → 10:07 (14:40 in the End-mute view)
+    var TS = EM ? '14:40' : '10:07';
+    function post(l) { return l + (/told in Chat$/.test(l) ? ' (posted ' + TS + ':10)' : ' · posted ' + TS + ':10'); }
     function mins(hm) { var p = hm.split(':'); return +p[0] * 60 + +p[1]; }
     function dur(m) { var h = Math.floor(m / 60), r = m % 60; return (h ? h + ' h' : '') + (h && r ? ' ' : '') + (r ? r + ' min' : ''); }
     function inFmt(m) { var h = Math.round(m / 60), d = Math.floor(h / 24), r = h % 24; return d ? d + ' d' + (r ? ' ' + r + ' h' : '') : dur(m); }
     // Mock data: Fri 25 Sep 10:07 — compute in the app
     var DEF = {
       wecare: { kind: 'maint', site: 'WeCare Studio', tier: 2, owner: 'Nok', backup: 'Ploy', start: '09:30', end: '14:00', day: 'Today ', why: 'CMS upgrade', by: 'Nok', ends: ['12:00', '14:00', '16:00', '18:00'], running: true,
-        endEffects: ['Alerts resume now for Nok (owner) and the Alerts Space.', 'Checks from 10:07 count in uptime again; 09:30–10:07 stays excluded.', 'Nok sees it in the Alerts Space; logged in the audit log as ' + ME + '.'] },
+        endEffects: ['Alerts resume now for Nok (owner) and the Alerts Space.', 'Checks from 10:07 count in uptime again; 09:30–10:07 stays excluded.', 'Nok and Ploy get an email; the Alerts Space gets a line. Logged in the audit log as ' + ME + '.'] },
       games: { kind: 'mute', site: 'DxT Games', tier: 3, owner: 'Tao', backup: 'Nok', start: '08:40', end: '18:00', day: 'Today ', why: 'Redeploying build', by: 'Tao', ends: ['11:00', '14:00', '18:00'], running: true,
         endEffects: ['Alerts resume now for Tao (owner) and the Alerts Space.', 'Uptime is unaffected — muted time was already counted.', 'Logged in the audit log as ' + ME + '.'] },
+      bat: { kind: 'mute', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', start: '13:00', end: '15:00', day: 'Today ', why: 'Investigating slow booking page', by: 'Arm', ends: ['15:00', '16:00'], running: true, only: 'End mute · open incident', now: 14 * 60 + 40, realDown: true,
+        endEffects: ['INC-0154 (DOWN since 14:20, held by this mute) posts its first alert now and starts escalating — L1 at about 14:56 if nobody acknowledges.', 'Alerts resume now for Arm (owner) and the Alerts Space.', 'Uptime is unaffected — muted time was already counted.', 'Logged in the audit log as ' + ME + '.'] },
       bac: { kind: 'maint', site: 'Bangkok Airways – China', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Sat 26 Sep 22:00', fromAbs: 1440 + 22 * 60, end: 'Tue 29 Sep 22:00', day: '', why: 'Move to a new hosting provider', by: 'Arm', asked: 'today 09:20', ends: ['Mon 28 Sep 22:00', 'Tue 29 Sep 22:00'], request: true },
       tub: { kind: 'maint', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', from: 'Tue 29 Sep 01:00', fromAbs: 4 * 1440 + 60, end: '03:00', day: 'Tue 29 Sep ', why: 'WordPress plugin updates', by: 'Ploy', ends: ['02:00', '03:00', '04:00'] }
     };
@@ -233,7 +249,9 @@ class Component extends DCLogic {
     var active = [], wait = [], sched = [], recentNew = [];
     Object.keys(DEF).forEach(function (k) {
       var d = DEF[k], s = S(k);
-      if (s.st === 'gone') return;
+      if (s.st === 'gone' || (d.only && d.only !== view)) return;
+      if (EM && k === 'wecare') return; // ended on time at 14:00 — shown under Recent
+      var NOWD = d.now || NOWABS;
       var pending = d.request && !s.approved;
       var r = { k: k, site: d.site, siteSub: 'Tier ' + d.tier + ' · ' + d.owner + ' · backup ' + d.backup, muted: false, mutedLabel: '', logs: L(s.logs), colLogs: L(s.logs), canApprove: false, canEnd: false, canEdit: false, hasNote: false, note: '', why: d.why,
         editLabel: d.running ? 'Edit end' : (pending ? 'Edit / withdraw' : 'Edit / cancel'),
@@ -245,13 +263,13 @@ class Component extends DCLogic {
       var icon = d.kind === 'mute' ? 'eye-off' : 'calendar';
       if (s.st !== 'on') {
         var LBL = { ended: 'Ended early', cancelled: 'Cancelled', declined: 'Declined', withdrawn: 'Withdrawn' }[s.st];
-        if (d.running) Object.assign(r, past(icon, LBL), { when: 'Today ' + d.start + ' → 10:07', whenSub: noun + ' · ' + dur(NOWABS - mins(d.start)), whySub: 'by ' + d.by });
+        if (d.running) Object.assign(r, past(icon, LBL), { when: 'Today ' + d.start + ' → ' + TS, whenSub: noun + ' · ' + dur(NOWD - mins(d.start)), whySub: 'by ' + d.by });
         else Object.assign(r, past(icon, LBL), { when: d.from + ' → ' + s.end, whenSub: noun + ' · ' + lenOf(k, s) + ' · didn’t start', whySub: d.request ? 'asked by Arm · ' + d.asked : 'by ' + d.by });
         r.sortKey = 0; recentNew.push(r); return;
       }
       if (d.running) {
-        if (d.kind === 'maint') Object.assign(r, { tone: 'accent', variant: 'soft', icon: 'calendar', label: 'Maintenance', when: 'Today ' + d.start + ' → ' + s.end, whenSub: dur(mins(s.end) - mins(d.start)) + ' · ' + dur(NOWABS - mins(d.start)) + ' in', whySub: 'by ' + d.by + ' · not counted in uptime' });
-        else Object.assign(r, { tone: 'success', variant: 'soft', icon: 'circle-check', label: 'OK', muted: true, mutedLabel: 'Muted · until ' + s.end, when: 'Today ' + d.start + ' → ' + s.end, whenSub: 'until ' + s.end + ' (max 24 h) · ' + dur(NOWABS - mins(d.start)) + ' in', whySub: 'by ' + d.by + ' · still counted in uptime' });
+        if (d.kind === 'maint') Object.assign(r, { tone: 'accent', variant: 'soft', icon: 'calendar', label: 'Maintenance', when: 'Today ' + d.start + ' → ' + s.end, whenSub: dur(mins(s.end) - mins(d.start)) + ' · ' + dur(NOWD - mins(d.start)) + ' in', whySub: 'by ' + d.by + ' · not counted in uptime' });
+        else Object.assign(r, d.realDown ? { tone: 'danger', variant: 'solid', icon: 'ban', label: 'Down' } : { tone: 'success', variant: 'soft', icon: 'circle-check', label: 'OK' }, { muted: true, mutedLabel: 'Muted · until ' + s.end, when: 'Today ' + d.start + ' → ' + s.end, whenSub: 'until ' + s.end + ' (max 24 h) · ' + dur(NOWD - mins(d.start)) + ' in', whySub: 'by ' + d.by + ' · still counted in uptime' + (d.realDown ? ' · INC-0154 held by this mute since 14:20' : '') });
         if (can(d)) { r.canEnd = true; r.canEdit = true; } else if (ROLE !== 'ro') { r.hasNote = true; r.note = who(d); }
         r.sortKey = mins(s.end); active.push(r); return;
       }
@@ -270,18 +288,21 @@ class Component extends DCLogic {
     sched.sort(function (a, b) { return a.sortKey - b.sortKey; });
     function R(icon, label, site, sub, when, whenSub, why, whySub, log) { return { tone: 'neutral', variant: 'outline', icon: icon, label: label, site: site, siteSub: sub, when: when, whenSub: whenSub, why: why, whySub: whySub, logs: [], colLogs: [{ t: log }], muted: false, canApprove: false, canEnd: false, canEdit: false, hasNote: false }; }
     var recent = recentNew.concat([
+      EM ? R('calendar', 'Ended', 'WeCare Studio', 'Tier 2 · Nok · backup Ploy', 'Today 09:30 → 14:00', 'Maintenance · 4 h 30 min', 'CMS upgrade', 'by Nok', 'Ended on time 14:00') : null,
       R('calendar', 'Ended', 'ORCA Thailand', 'Tier 2 · Tao · backup Nok', 'Tue 22 Sep 20:00 → 22:00', 'Maintenance · 2 h', 'Hosting plan upgrade', 'by Tao', 'Ended on time 22:00'),
       R('eye-off', 'Ended early', 'Cando Asia', 'Tier 2 · Nok · backup Ploy', 'Mon 21 Sep 10:15 → 11:40', 'Mute · 1 h 25 min', 'Client changing DNS', 'by Nok', 'Ended early 11:40 by Nok · “DNS change confirmed”'),
       R('calendar', 'Cancelled', 'EQHO', 'Tier 2 · Tao · backup Nok', 'Sat 19 Sep 09:00 → 12:00', 'Maintenance · 3 h · didn’t start', 'Theme update', 'by Tao', 'Cancelled Fri 18 Sep 16:20 by Tao · “Client moved the launch”'),
       R('calendar', 'Not approved', 'Fuji Links', 'Tier 2 · Ploy · backup Nok', 'Sat 12 Sep 22:00 → Mon 14 Sep 22:00', 'Maintenance · 2 days · didn’t start', 'Server OS upgrade', 'asked by Ploy', 'Not approved — didn’t start · nobody approved before Sat 12 Sep 22:00')
-    ]);
+    ].filter(Boolean));
     var kinds = []; recent.forEach(function (x) { var l = x.label.toLowerCase(); if (kinds.indexOf(l) < 0) kinds.push(l); });
     function A(rows, v) { rows.forEach(function (x) { x.logCol = !v; if (!v) x.logs = []; }); return rows; }
-    var sections = [];
-    if (active.length) sections.push({ title: 'Active now', hint: active.length + ' · alerts off or muted, checks still run', rows: A(active, true), actLabel: '' });
-    if (wait.length) sections.push({ title: 'Waiting for approval', hint: wait.length + ' · over 24 h, asked by a Responder — doesn’t start unless an Admin approves', rows: A(wait, true), actLabel: '' });
-    if (sched.length) sections.push({ title: 'Scheduled', hint: sched.length + ' · approved, starts on its own', rows: A(sched, true), actLabel: '' });
-    sections.push({ title: 'Recent · last 30 days', hint: recent.length + ' · ' + kinds.join(', '), rows: A(recent, false), actLabel: 'What happened' });
+    var sections = []; self._secOf = {};
+    function mark(rows, id) { rows.forEach(function (x) { if (x.k) self._secOf[x.k] = id; }); }
+    mark(active, 'mt-active'); mark(wait, 'mt-wait'); mark(sched, 'mt-sched'); mark(recentNew, 'mt-recent');
+    if (active.length) sections.push({ id: 'mt-active', title: 'Active now', hint: active.length + ' · alerts off or muted, checks still run', rows: A(active, true), actLabel: '' });
+    if (wait.length) sections.push({ id: 'mt-wait', title: 'Waiting for approval', hint: wait.length + ' · over 24 h, asked by a Responder — doesn’t start unless an Admin approves', rows: A(wait, true), actLabel: '' });
+    if (sched.length) sections.push({ id: 'mt-sched', title: 'Scheduled', hint: sched.length + ' · approved, starts on its own', rows: A(sched, true), actLabel: '' });
+    sections.push({ id: 'mt-recent', title: 'Recent · last 30 days', hint: recent.length + ' · ' + kinds.join(', '), rows: A(recent, false), actLabel: 'What happened' });
     var mp = []; if (active.length) mp.push(active.length + ' active'); if (sched.length) mp.push(sched.length + ' scheduled'); if (wait.length) mp.push(wait.length + ' waiting for approval');
     var notEmpty = !!(active.length || wait.length || sched.length);
     // Dialogs
@@ -290,17 +311,36 @@ class Component extends DCLogic {
     var pendingD = D.request && !DS.approved;
     var noun = D.kind === 'mute' ? 'mute' : 'maintenance';
     var curEnd = DS.end;
-    function push(k, v, line) { var n = Object.assign({}, self.state.ov); var cur = n[k] || {}; n[k] = Object.assign({}, cur, v, { logs: (cur.logs || []).concat([line]) }); return n; }
+    function act(k, v, line, title, chan, extra) {
+      clearInterval(self._iv);
+      var prev = flushOv(); // a still-pending earlier action posts now; it can no longer be undone
+      self.setState(Object.assign({ prevOv: prev, ov: push(prev, k, v, line), toast: { k: k, line: line, title: title, chan: chan, phase: 'pending', left: 10 }, toastHidden: false, dlgKind: '', cancelling: false }, extra || {}));
+      self._iv = setInterval(function () {
+        var t = self.state.toast; if (!t || t.phase !== 'pending') { clearInterval(self._iv); return; }
+        if (t.left > 1) { self.setState({ toast: Object.assign({}, t, { left: t.left - 1 }) }); return; }
+        clearInterval(self._iv);
+        self.setState({ ov: flushOv(), toast: Object.assign({}, t, { phase: 'posted' }) });
+      }, 1000);
+    }
+    function flushOv() {
+      var t = self.state.toast, n = Object.assign({}, self.state.ov);
+      if (!t || t.phase !== 'pending') return n;
+      var c = n[t.k] || {}, Lg = (c.logs || []).slice();
+      if (Lg.length) Lg[Lg.length - 1] = post(Lg[Lg.length - 1]);
+      n[t.k] = Object.assign({}, c, { logs: Lg });
+      return n;
+    }
+    function push(base, k, v, line) { var n = Object.assign({}, base); var cur = n[k] || {}; n[k] = Object.assign({}, cur, v, { logs: (cur.logs || []).concat([line]) }); return n; }
     var reasonOk = !!(st.editReason || '').trim();
     var endChanged = st.editEnd && st.editEnd !== curEnd;
     var desc = D.running ? (D.kind === 'mute' ? 'Muted ' + D.start + ' → ' + curEnd : D.start + ' → ' + curEnd) + ' · ' + D.why + ' · by ' + D.by : D.from + ' → ' + curEnd + ' · ' + D.why + ' · ' + (D.request ? 'asked by Arm' : 'by ' + D.by);
     var baLen = BACLEN[S('bac').end];
     var approveOpen = st.dlgKind === 'approve';
     var cancelCta = pendingD ? 'Withdraw request' : 'Cancel maintenance';
-    var cancelText = pendingD ? 'Withdraws the request — Admins stop seeing it and nothing is scheduled. Logged as ' + ME + '.' : (dk === 'bac' ? 'It hasn’t started, so cancelling removes it. Arm and Ploy get a Chat message. Logged as ' + ME + '.' : 'It hasn’t started, so cancelling removes it. Ploy gets a Chat message. Logged as ' + ME + '.');
+    var cancelText = pendingD ? 'Withdraws the request — nothing is scheduled; Tao’s request thread gets REQUEST WITHDRAWN in Chat and email, Ploy is told by email, and the reminders stop. Logged as ' + ME + '.' : (dk === 'bac' ? 'It hasn’t started, so cancelling removes it. Arm and Ploy get an email; the Alerts Space gets a line. Logged as ' + ME + '.' : 'It hasn’t started, so cancelling removes it. Ploy and Nok get an email; the Alerts Space gets a line. Logged as ' + ME + '.');
     return {
-      views: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm'], view: view,
-      setView: function (v) { self.setState({ view: v, ov: {}, dlg: v === 'Approve confirm' ? 'bac' : '', dlgKind: v === 'Approve confirm' ? 'approve' : '', cancelling: false }); },
+      views: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm', 'End mute · open incident'], view: view,
+      setView: function (v) { clearInterval(self._iv); self.setState({ toast: false, toastHidden: false, view: v, ov: {}, dlg: v === 'Approve confirm' ? 'bac' : (v === 'End mute · open incident' ? 'bat' : ''), dlgKind: v === 'Approve confirm' ? 'approve' : (v === 'End mute · open incident' ? 'end' : ''), endReason: '', cancelling: false }); },
       me: ME, meLine: ADMIN ? 'Jirawat Piyakit · Admin' : (ROLE === 'resp' ? 'Responder' : 'Viewer · read only'),
       meta: mp.length ? mp.join(' · ') : 'Nothing active, scheduled or waiting',
       empty: !notEmpty, notEmpty: notEmpty, canSchedule: ROLE !== 'ro', headerBtn: notEmpty && ROLE !== 'ro',
@@ -309,7 +349,8 @@ class Component extends DCLogic {
       d: {
         desc: desc,
         endTitle: 'End ' + D.site + ' ' + noun + ' now?',
-        endEffects: L(D.endEffects || []),
+        endEffects: L((D.endEffects || []).map(function (t, i) { if (dk !== 'bat' || i > 0) return t; var hv = st.heldVar || 'Tier 1'; return hv === 'Tier 1' ? t : (hv === 'Tier 2–3' ? 'INC-0154 (DOWN since 14:20, held by this mute) posts its first alert now and starts escalating.' : 'INC-0154 (DOWN since 14:20, held by this mute) posts its first alert now. It’s outside response hours, so escalation starts Mon 09:00.'); })),
+        isHeld: dk === 'bat',
         endCta: D.kind === 'mute' ? 'End mute now' : 'End maintenance now',
         editTitle: D.running ? 'Change end · ' + D.site + ' ' + noun : (pendingD ? 'Edit or withdraw · ' + D.site + ' request' : 'Edit or cancel · ' + D.site + ' maintenance'),
         ends: D.ends.map(function (e) { return { value: e, label: (D.day || '') + e + (e === curEnd ? ' (current)' : '') }; }),
@@ -319,12 +360,26 @@ class Component extends DCLogic {
           'Starts Sat 26 Sep 22:00, ends ' + S('bac').end + ' (' + baLen + '). Bangkok Airways – China is Tier 1.',
           'No alerts for this site during the window. Checks still run and are logged.',
           'Not counted in uptime; the client status page shows “Planned maintenance”.',
-          'If the site is DOWN or has an open incident at the start, the window doesn’t start — Arm and Tao are told.',
-          'Arm gets a Chat message. Logged in the audit log as Tao.'
+          'If the site is DOWN or has an open incident at the start, the window doesn’t start — Arm, Ploy and Tao are told.',
+          'Arm gets a Chat message, Arm and Ploy an email, and the Alerts Space a line. Logged in the audit log as Tao.'
         ]),
         approveCta: 'Approve',
         declineTitle: 'Decline Arm’s request?'
       },
+      heldVars: ['Tier 1', 'Tier 2–3', 'Outside hours'], heldVar: st.heldVar || 'Tier 1',
+      setHeldVar: function (v) { self.setState({ heldVar: v }); },
+      toast: !!st.toast && !st.toastHidden && st.dlgKind === '',
+      t: st.toast ? { title: st.toast.phase === 'undone' ? st.toast.title + ' — undone' : st.toast.title, line: st.toast.phase === 'pending' ? 'Posting to ' + st.toast.chan + ' in ' + st.toast.left + ' s — nothing is sent until then' : (st.toast.phase === 'posted' ? 'Posted to ' + st.toast.chan + '.' : 'Nothing was posted.'), left: st.toast.left, pending: st.toast.phase === 'pending' } : { title: '', line: '', left: 10, pending: false },
+      undo: function () {
+        clearInterval(self._iv);
+        var t = self.state.toast; if (!t) return;
+        var n = Object.assign({}, self.state.prevOv || {}), c = n[t.k] || {};
+        n[t.k] = Object.assign({}, c, { logs: (c.logs || []).concat([t.line, 'Undone ' + TS + ' by ' + ME + ' — nothing was posted']) });
+        self.setState({ ov: n, toast: Object.assign({}, t, { phase: 'undone' }), toastHidden: false });
+        // the Undo button is gone now — move focus to the heading of the section the row went back to
+        setTimeout(function () { var id = self._secOf && self._secOf[t.k], el = id && document.getElementById(id); if (el) el.focus(); }, 60);
+      },
+      dismiss: function () { self.setState({ toastHidden: true }); }, // hides only — a pending action still posts when the timer runs out
       endOpen: st.dlgKind === 'end',
       editOpen: st.dlgKind === 'edit',
       approveOpen: approveOpen,
@@ -334,7 +389,7 @@ class Component extends DCLogic {
       setEndReason: function (e) { self.setState({ endReason: e && e.target ? e.target.value : e }); },
       endBlocked: !(st.endReason || '').trim(),
       endHint: (st.endReason || '').trim() ? 'Shown in the digest and the audit log.' : 'Required — type a reason to continue. Shown in the digest and the audit log.',
-      confirmEnd: function () { var r = (self.state.endReason || '').trim(); if (!r) return; self.setState({ ov: push(dk, { st: 'ended' }, 'Ended early 10:07 by ' + ME + ' · “' + r + '”'), dlgKind: '' }); },
+      confirmEnd: function () { var r = (self.state.endReason || '').trim(); if (!r) return; act(dk, { st: 'ended' }, 'Ended early ' + TS + ' by ' + ME + ' · “' + r + '”', D.site + (D.kind === 'mute' ? ' mute' : ' maintenance') + ' ended', (D.kind === 'mute' ? (D.realDown ? 'Chat and email' : 'Chat') : 'Chat and email')); },
       editEnd: st.editEnd || curEnd,
       setEditEnd: function (e) { self.setState({ editEnd: e && e.target ? e.target.value : e }); },
       editReason: st.editReason,
@@ -349,15 +404,15 @@ class Component extends DCLogic {
       editBlocked: st.cancelling ? !reasonOk : !(reasonOk && endChanged),
       editSubmit: function () {
         var r = self.state.editReason.trim();
-        if (self.state.cancelling) self.setState({ ov: push(dk, { st: pendingD ? 'withdrawn' : 'cancelled' }, (pendingD ? 'Withdrawn' : 'Cancelled') + ' 10:07 by ' + ME + ' · “' + r + '”'), dlgKind: '', cancelling: false });
-        else self.setState({ ov: push(dk, { end: self.state.editEnd }, 'End ' + curEnd + ' → ' + self.state.editEnd + ' · 10:07 by ' + ME + ' · “' + r + '”'), dlgKind: '' });
+        if (self.state.cancelling) act(dk, { st: pendingD ? 'withdrawn' : 'cancelled' }, (pendingD ? 'Withdrawn' : 'Cancelled') + ' ' + TS + ' by ' + ME + ' · “' + r + '”', D.site + (pendingD ? ' request withdrawn' : ' maintenance cancelled'), 'Chat and email');
+        else act(dk, { end: self.state.editEnd }, 'End changed ' + TS + ' by ' + ME + ' · ' + curEnd + ' → ' + self.state.editEnd + ' · “' + r + '”', D.site + (D.kind === 'mute' ? ' mute' : ' maintenance') + ' end changed', D.kind === 'mute' ? 'Chat' : 'Chat and email');
       },
-      confirmApprove: function () { self.setState({ ov: push('bac', { approved: true }, 'Approved 10:07 by Tao · Arm told in Chat'), dlgKind: '', view: self.state.view === 'Approve confirm' ? 'Default' : self.state.view }); },
+      confirmApprove: function () { act('bac', { approved: true }, 'Approved ' + TS + ' by Tao · Arm told in Chat', 'Bangkok Airways – China maintenance approved', 'Chat and email', { view: self.state.view === 'Approve confirm' ? 'Default' : self.state.view }); },
       declineReason: st.declineReason,
       setDeclineReason: function (e) { self.setState({ declineReason: e && e.target ? e.target.value : e }); },
       declineBlocked: !(st.declineReason || '').trim(),
-      declineHint: 'Required. Arm gets it in a Chat message; the request moves to Recent as Declined.',
-      confirmDecline: function () { var r = (self.state.declineReason || '').trim(); if (!r) return; self.setState({ ov: push('bac', { st: 'declined' }, 'Declined 10:07 by Tao · “' + r + '” · Arm told in Chat'), dlgKind: '' }); },
+      declineHint: 'Required. Arm gets it in a Chat message; Arm and Ploy get an email; the request moves to Recent as Declined.',
+      confirmDecline: function () { var r = (self.state.declineReason || '').trim(); if (!r) return; act('bac', { st: 'declined' }, 'Declined ' + TS + ' by Tao · “' + r + '” · Arm told in Chat', 'Bangkok Airways – China request declined', 'Chat and email'); },
       nav: [
         { items: [
           { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
