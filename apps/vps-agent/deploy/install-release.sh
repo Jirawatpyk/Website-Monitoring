@@ -19,7 +19,10 @@ cp "$stage/package.json" "$next/package.json"
 cd "$next"
 # deploy/package.json: only the npm dependency the bundle keeps external; exact version, no scripts.
 npm install --omit=dev --no-package-lock --ignore-scripts --no-audit --no-fund --loglevel=error
-PLAYWRIGHT_BROWSERS_PATH=/opt/dxt-agent/browsers npx playwright install --with-deps chromium >/dev/null
+# --with-deps runs apt, whose needrestart hook restarted the OTHER instance too (12 Oct: a staging
+# release restarted production): suspend it — only this instance restarts, below.
+NEEDRESTART_SUSPEND=1 PLAYWRIGHT_BROWSERS_PATH=/opt/dxt-agent/browsers \
+  npx playwright install --with-deps chromium >/dev/null
 chown -R root:root "$next"
 cd /
 rm -rf "$dir.previous"
