@@ -30,7 +30,7 @@ import { SiteStatusBadge } from '@/components/status-badges';
 import type { PausableSite } from '../model';
 import { metaOf, sectionsOf, type PageRow, type Section, type Viewer, type WindowRow } from '../page-model';
 import { MaintenanceDialog } from './maintenance-dialog';
-import { ApproveDialog, DeclineDialog, EditDialog, EndDialog } from './window-dialogs';
+import { ApproveDialog, DeclineDialog, EditDialog, EndDialog, postPendingNow } from './window-dialogs';
 
 const ICONS = { calendar: <IconCalendar />, 'eye-off': <IconEyeOff />, clock: <IconClock /> };
 const STATUS_WORD: Record<SiteStatus, string> = {
@@ -217,6 +217,8 @@ export function MaintenancePageView({
   const [n, setN] = useState(0);
   const [schedule, setSchedule] = useState({ open: false, n: 0 });
   const show: Show = (kind, p, fromSheet = false) => {
+    // Opening a row or a dialog posts a pending action at once (§24.12).
+    void postPendingNow();
     setN((x) => x + 1);
     setOpen({ kind, p, n: n + 1, shown: true, fromSheet });
   };
@@ -258,7 +260,10 @@ export function MaintenancePageView({
     document.getElementById(`mt-${l.key}`)?.focus();
   }, [rows]);
   const shown = (k: Kind) => !!open?.shown && open.kind === k;
-  const openSchedule = () => setSchedule((s) => ({ open: true, n: s.n + 1 }));
+  const openSchedule = () => {
+    void postPendingNow();
+    setSchedule((s) => ({ open: true, n: s.n + 1 }));
+  };
 
   return (
     <div className="flex flex-col gap-6">

@@ -3,7 +3,7 @@
 import { Alert, Button, Dialog, Select, TextField, toast } from '@jirawatpyk/aura-react';
 import { IconCheck, IconTrash2 } from '@jirawatpyk/aura-react/icons';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { UndoLine } from '@/components/undo-line';
 import {
   approveMaintenance,
@@ -11,6 +11,7 @@ import {
   declineMaintenance,
   editWindowEnd,
   endWindowEarly,
+  postWindowActionNow,
   undoWindowAction,
   withdrawRequest,
 } from '../actions';
@@ -34,6 +35,42 @@ const hintFor = (reason: string) => (reason.trim() ? HINT : `Required — type a
 
 type Result = { ok: true; postsAt?: string } | { ok: false; message: string };
 
+interface Held {
+  windowId: string;
+  title: string;
+  site: string;
+  chatOnly?: boolean;
+}
+
+/** The one action still inside its 10 s on this page (§24.12). */
+let pending: (Held & { postsAt: string }) | null = null;
+const channelsOf = (h: Held) => (h.chatOnly ? 'Chat' : 'Chat and email');
+
+/**
+ * Starting another action, or opening a row or a dialog, while one is still pending posts the pending
+ * one at once (§24.12): it gets its posting time and can no longer be undone.
+ */
+export async function postPendingNow(): Promise<void> {
+  const p = pending;
+  pending = null;
+  if (!p || Date.parse(p.postsAt) <= Date.now()) return;
+  const r = await postWindowActionNow({ windowId: p.windowId }).catch(() => null);
+  if (r?.ok) {
+    toast.success(p.title, {
+      id: `window-${p.windowId}`,
+      description: `Posted to ${channelsOf(p)}.`,
+      duration: Infinity,
+    });
+  }
+}
+
+/** A dialog that opens posts the pending action first (§24.12). */
+function usePostPendingOnOpen(open: boolean) {
+  useEffect(() => {
+    if (open) void postPendingNow();
+  }, [open]);
+}
+
 interface DialogProps {
   p: PageRow;
   now: Date;
@@ -54,12 +91,10 @@ function useSubmit(onDone: () => void, onUndone?: () => void) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const run = (
-    fn: () => Promise<Result>,
-    held?: { windowId: string; title: string; site: string; chatOnly?: boolean },
-  ) =>
+  const run = (fn: () => Promise<Result>, held?: Held) =>
     start(async () => {
       setError(null);
+      await postPendingNow();
       const r = await fn().catch(() => ({ ok: false as const, message: FAILED }));
       if (!r.ok) {
         setError(r.message);
@@ -80,19 +115,18 @@ function useSubmit(onDone: () => void, onUndone?: () => void) {
  * The toast of a held maintenance action: "Posting to Chat and email in N s" with Undo (§24.8) — Chat
  * only for a mute (D-037).
  */
-function showUndo(
-  { windowId, title, site, chatOnly }: { windowId: string; title: string; site: string; chatOnly?: boolean },
-  postsAt: string,
-  undone: () => void,
-) {
+function showUndo(held: Held, postsAt: string, undone: () => void) {
+  const { windowId, title, site, chatOnly } = held;
   const id = `window-${windowId}`;
+  pending = { ...held, postsAt };
   const onUndo = async () => {
     const r = await undoWindowAction({ windowId }).catch(() => ({
       ok: false as const,
       message: UNDO_FAILED,
     }));
     if (r.ok) {
-      toast({ id, title: `${title} — undone`, duration: 4000 });
+      if (pending?.windowId === windowId) pending = null;
+      toast({ id, title: `${title} — undone`, description: 'Nothing was posted.', duration: 4000 });
       undone();
     } else {
       toast.error(`Couldn’t undo · ${site}`, { id, description: r.message });
@@ -103,8 +137,8 @@ function showUndo(
     description: (
       <UndoLine postsAt={postsAt} onUndo={onUndo} channels={chatOnly ? 'Chat' : 'Chat and email'} />
     ),
-    // the window, then a moment to read "Posted"
-    duration: Math.max(Date.parse(postsAt) - Date.now(), 0) + 2000,
+    // "Posted to …" stays until dismissed; × only hides the toast — the action still posts (§24.12).
+    duration: Infinity,
   });
 }
 
@@ -128,6 +162,7 @@ export function EndDialog({
 }: DialogProps & { viewer: string }) {
   const [reason, setReason] = useState('');
   const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
+  usePostPendingOnOpen(open);
   const r = p.row;
   return (
     <Dialog
@@ -204,6 +239,7 @@ export function EditDialog({
   const withdrawOnly = request && p.editLabel === WITHDRAW_ONLY;
   const [cancelling, setCancelling] = useState(withdrawOnly);
   const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
+  usePostPendingOnOpen(open);
   const running = p.state === 'active';
   const cancelWord = request ? 'Withdraw request' : 'Cancel maintenance';
   const title = running
@@ -306,6 +342,7 @@ export function ApproveDialog({
   onUndone,
 }: DialogProps & { viewer: string }) {
   const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
+  usePostPendingOnOpen(open);
   const r = p.row;
   return (
     <Dialog
@@ -354,6 +391,7 @@ export function ApproveDialog({
 export function DeclineDialog({ p, now, open, onClose, onDone = onClose, onUndone }: DialogProps) {
   const [reason, setReason] = useState('');
   const { error, pending, run } = useSubmit(onDone, onUndone && (() => onUndone(p)));
+  usePostPendingOnOpen(open);
   const r = p.row;
   return (
     <Dialog
