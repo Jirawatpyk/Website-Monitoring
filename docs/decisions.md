@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-040 | 13 Oct 2026 | The probe's SSRF guard runs inside the connection: one DNS lookup per hop, every address checked, and the connection goes to that address (no rebinding gap); `fetch` and `Agent` from `undici@7.30.0`; the process's DNS order kept (IPv4 first on the VPS); `assertPublicTarget` stays for saving a site and the verifier | `target.ts` "pinning the connection to the checked address is a follow-up" |
 | D-039 | 12 Oct 2026 | A location that alone is slow on most sites in a minute (compared on the sites another location also timed) is no evidence for slow that minute — the Bangkok VPS slowing down no longer makes a behind-WAF site slow; an open slow PROBLEM holds meanwhile. D-038 amended: a no-data round ends a slow streak, the control check is judged at the round's time and the Akamai control only for Akamai sites, the flapping summary emails the owner who was emailed about the incident | D-022 "slow = p50 over the threshold 3 rounds in a row" (one location's times); D-038 "flapping summary only to whoever was emailed about that drop" |
 | D-038 | 12 Oct 2026 | Production hotfix: on a behind-WAF site a round with nobody left to vote is PROBLEM (unverified, control failed) only once the BKK control check has failed in 3 probe minutes in a row (any batch of the minute); before that it is no data and the status holds. A PROBLEM drop after a relapse emails its recovery (RECOVERED, the flapping summary) only to whoever was emailed about that drop, so normally Chat only; the first drop and any DOWN drop still email | D-027 "nothing left and the control down → PROBLEM at once"; S02b "RECOVERED to everyone already emailed" for PROBLEM relapses |
 | D-037 | 12 Oct 2026 (amended 12 Oct) | S09b maintenance messages (spec §24; amended to the redrawn boards, §24.12–17 — Admins emailed only while it is a request, the approver on didn’t start, one MUTED reply naming owner and backup, one pending action at a time): no Chat DMs until the Chat app exists — each "direct message" is a reply in the window's own Alerts Space thread that @mentions the person, with the board's DM card; action lines stay without mentions; notifications get a third subject (`maintenance_window_id`, thread `mw-<id>`, one mail thread per window); window Chat rows get no email fallback; every maintenance action except create / mute is held 10 s with Undo (the action applies at once, Undo restores the window from a snapshot and appends a log line); the engine waits out that Undo before a mute's late alert; reminders 12 h (Chat + email) and 1 h (Chat) before a waiting request's start, stamped once each; where the board's kind-word table and its drawn lines differ, the drawn lines win | D-036 "no message announces a pending approval"; plan S09b size S |
@@ -43,6 +44,29 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-040 — The probe connects to the address its SSRF guard checked
+
+**Gap.** The probe's SSRF guard (`assertPublicTarget`) resolved a host and checked every address, then `fetch` resolved it again to connect: DNS could answer differently in between (rebinding — a public address for the check, a private one for the connection), and each hop cost two `getaddrinfo`, which queued on the VPS's thread pool (D-039 root cause). `target.ts` named pinning as the follow-up.
+
+**Decision (Tao, 13 Oct 2026).**
+
+- The guard runs inside the connection: `runHttpCheck` fetches through an undici `Agent` whose connect `lookup` (`publicOnlyLookup`) resolves once, refuses unless every address is public (`TargetNotAllowedError`, the same words as before), and hands that address to the socket. Scheme, port and an IP-literal host are still checked before each hop (`assertPublicUrl`); redirects stay manual, each hop checked. One lookup per hop instead of two. TLS and SNI still use the hostname.
+- `fetch` and `Agent` come from the same undici (`undici@7.30.0`, a dependency of `@dxt/probe`): Node 22's built-in fetch is undici 6, and a newer Agent doesn't fit it. The VPS bundle inlines it; Vercel transpiles `@dxt/probe`.
+- The lookup keeps the process's DNS order (no `verbatim`): the VPS runs with `--dns-result-order=ipv4first` — it has no IPv6 route — and the connection now goes to the address the lookup returns.
+- `assertPublicTarget` (resolve and check, no connection) stays for saving a site and for the browser verifier, whose page requests systemd's `IPAddressDeny` already confines.
+- `UV_THREADPOOL_SIZE=16` stays.
+- **Reviews (13 Oct).**
+  - The connect phase (DNS included) has no timeout of its own (`connect.timeout: 0`). The check's signal bounds it, so a slow lookup ends as 'Timeout' at the monitor's timeout, as before, not at undici's 10 s default.
+  - The lookup answers in the family Node asks for, after checking every address.
+  - Both guards share one rule (`refused`).
+  - The shared Agents are made on first use.
+  - A DNS failure now reads as its code (`ENOTFOUND`), which the messages word as "DNS error". Before, it was raw "getaddrinfo ENOTFOUND host" text.
+  - An https test pins `pinned.test` to 127.0.0.1 with a test CA and shows the certificate is still checked against the hostname.
+  - Security: the agent's ESM bundle inlines undici (CommonJS), which crashed on start without a real `require`. `tsup.config.ts` gives it one (`createRequire` banner), and `apps/vps-agent/src/bundle.test.ts` builds and starts the bundle.
+  - `::/96` (IPv4-compatible) and `2002::/16` (6to4) are blocked too, in the guard and the unit's `IPAddressDeny`.
+
+**Impact.** `packages/probe` (`target.ts`, `http-check.ts`, tests); no API, schema or engine change. Both probes (Vercel SIN / TYO, the VPS) and the Add-site Test check.
 
 ## D-039 — A location slow on most sites in a minute is no evidence for slow
 

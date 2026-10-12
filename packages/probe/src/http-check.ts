@@ -1,6 +1,13 @@
 import { PROBE_USER_AGENT, type CheckOutcome, type WafVendor } from '@dxt/shared';
 import { classifyResponse, wafSignature } from './classify';
-import { assertPublicTarget, TargetNotAllowedError, type Lookup } from './target';
+import { Agent, fetch, type Response } from 'undici';
+import {
+  assertPublicUrl,
+  defaultLookup,
+  publicOnlyLookup,
+  TargetNotAllowedError,
+  type Lookup,
+} from './target';
 
 export interface HttpCheckRequest {
   url: string;
@@ -16,6 +23,8 @@ export interface HttpCheckRequest {
   allowPrivateTargets?: boolean;
   /** DNS lookup for the SSRF guard (tests). */
   lookup?: Lookup;
+  /** Tests only, with `lookup`: a CA to trust, for a local https server. */
+  tlsCa?: string;
   /** Text the page must contain / must not contain (PROBLEM · Keyword, D-022). Case-sensitive. */
   mustContain?: readonly string[];
   mustNotContain?: readonly string[];
@@ -69,8 +78,9 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
   const mustContain = req.mustContain ?? [];
   const mustNotContain = req.mustNotContain ?? [];
   const keywords = (req.method ?? 'GET') === 'GET' && mustContain.length + mustNotContain.length > 0;
+  const { agent, owned } = dispatcherFor(req);
   try {
-    const { res, url } = await fetchFollowing(req);
+    const { res, url } = await fetchFollowing(req, agent);
     const ttfbMs = Math.round(performance.now() - started);
     const { bodySample, missing, sampleAt } = await readBody(
       res,
@@ -107,25 +117,53 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       keywordForbidden: null,
       waf: null,
     };
+  } finally {
+    if (owned) await agent.destroy().catch(() => {});
   }
 }
 
+// The SSRF guard runs inside the connection's DNS lookup (`publicOnlyLookup`, D-040), so a hop
+// resolves once and connects to the address that passed. `fetch` and `Agent` come from the same undici
+// so the dispatcher fits. The connect phase (DNS included) gets no timeout of its own — undici's 10 s
+// default would cut a slow lookup short of the check's own timeout, which the request's signal enforces.
+const agentFor = (lookup: Lookup, allowPrivate: boolean, ca?: string) =>
+  new Agent({
+    connect: { lookup: publicOnlyLookup(lookup, allowPrivate), timeout: 0, ...(ca ? { ca } : {}) },
+  });
+
+/** One pool each, shared by every check of the process; made on first use. */
+const shared = new Map<boolean, Agent>();
+
+/** The check's dispatcher; an injected `lookup` (tests) gets its own, closed when the check ends. */
+function dispatcherFor(req: HttpCheckRequest): { agent: Agent; owned: boolean } {
+  const allowPrivate = !!req.allowPrivateTargets;
+  if (req.lookup) return { agent: agentFor(req.lookup, allowPrivate, req.tlsCa), owned: true };
+  let agent = shared.get(allowPrivate);
+  if (!agent) shared.set(allowPrivate, (agent = agentFor(defaultLookup, allowPrivate)));
+  return { agent, owned: false };
+}
+
 /**
- * Follows redirects by hand (at most MAX_REDIRECTS): every hop passes the SSRF guard, and the extra
- * headers go only to the monitor's own origin.
+ * Follows redirects by hand (at most MAX_REDIRECTS): every hop passes the SSRF guard — scheme, port
+ * and an IP-literal host here, the resolved addresses in the connection — and the extra headers go
+ * only to the monitor's own origin.
  */
-async function fetchFollowing(req: HttpCheckRequest): Promise<{ res: Response; url: URL }> {
+async function fetchFollowing(
+  req: HttpCheckRequest,
+  dispatcher: Agent,
+): Promise<{ res: Response; url: URL }> {
   const first = new URL(req.url);
   const signal = AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let url = first;
   let method = req.method ?? 'GET';
   for (let hop = 0; ; hop += 1) {
-    if (!req.allowPrivateTargets) await assertPublicTarget(url, req.lookup, signal);
+    if (!req.allowPrivateTargets) assertPublicUrl(url);
     const res = await fetch(url, {
       method,
       redirect: 'manual',
       headers: { 'user-agent': PROBE_USER_AGENT, ...(sameSite(url, first) ? req.headers : {}) },
       signal,
+      dispatcher,
     });
     const location = res.headers.get('location');
     if (res.status < 300 || res.status >= 400 || res.status === 304 || !location) return { res, url };
@@ -214,6 +252,9 @@ async function readBody(
 
 function describeError(err: unknown): string {
   if (err instanceof TargetNotAllowedError) return err.message;
+  // A refusal inside the connection's lookup arrives as fetch's TypeError with it as the cause.
+  const inner = (err as { cause?: unknown } | null)?.cause;
+  if (inner instanceof TargetNotAllowedError) return inner.message;
   if (err instanceof DOMException && err.name === 'TimeoutError') return 'Timeout';
   if (err instanceof Error) {
     const cause = (err as Error & { cause?: { code?: string } }).cause;

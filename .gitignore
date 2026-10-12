@@ -43,3 +43,4 @@ client_secret*.json
 
 # Files the Claude desktop app attaches to a conversation (read them, move what belongs into docs/)
 Claude outputs/
+.bundle-test-*/

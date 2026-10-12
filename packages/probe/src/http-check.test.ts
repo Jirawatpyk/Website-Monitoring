@@ -1,4 +1,6 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
+import { readFileSync } from 'node:fs';
+import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PROBE_USER_AGENT } from '@dxt/shared';
@@ -322,6 +324,73 @@ describe('runHttpCheck', () => {
       lookup: async () => [{ address: '10.0.0.5' }],
     });
     expect(rebound.error).toBe('Target not allowed: private or reserved address');
+  });
+
+  it('connects to the address its own lookup returned, one lookup per hop (D-040)', async () => {
+    // `pinned.test` exists nowhere but this lookup: reaching the local server proves the connection
+    // used the address that was resolved (and checked), not a second resolution.
+    const asked: string[] = [];
+    const port = new URL(base).port;
+    const result = await runHttpCheck({
+      allowPrivateTargets: true,
+      url: `http://pinned.test:${port}/redirect-same`,
+      lookup: async (host) => (asked.push(host), [{ address: '127.0.0.1' }]),
+    });
+    expect(result).toMatchObject({
+      outcome: 'pass',
+      statusCode: 200,
+      finalUrl: `http://pinned.test:${port}/ok`,
+    });
+    // Two hops (the redirect and /ok), one lookup each — the guard and fetch used to resolve twice per hop.
+    expect(asked).toEqual(['pinned.test', 'pinned.test']);
+  });
+
+  it('over https, a pinned connection still verifies the certificate against the hostname, not the address', async () => {
+    // A self-signed certificate for `pinned.test` only (test fixture). The lookup pins 127.0.0.1;
+    // TLS must still send SNI and check the name, so the same server is refused under another name.
+    const fixtures = new URL('../test-fixtures/', import.meta.url);
+    const cert = readFileSync(new URL('pinned.test.crt', fixtures), 'utf8');
+    const tls = createHttpsServer(
+      { key: readFileSync(new URL('pinned.test.key', fixtures)), cert },
+      (_, res) => res.writeHead(200, { 'content-type': 'text/plain' }).end('ok'),
+    );
+    await new Promise<void>((r) => tls.listen(0, '127.0.0.1', r));
+    const port = (tls.address() as AddressInfo).port;
+    const check = (host: string) =>
+      runHttpCheck({
+        allowPrivateTargets: true,
+        url: `https://${host}:${port}/`,
+        lookup: async () => [{ address: '127.0.0.1' }],
+        tlsCa: cert,
+      });
+    try {
+      expect(await check('pinned.test')).toMatchObject({ outcome: 'pass', statusCode: 200 });
+      expect((await check('other.test')).error).toBe('ERR_TLS_CERT_ALTNAME_INVALID');
+    } finally {
+      await new Promise((r) => tls.close(r));
+    }
+  });
+
+  it('a DNS failure reads as its code, which the messages word as "DNS error"', async () => {
+    const result = await runHttpCheck({
+      url: 'https://gone.example.test/',
+      lookup: () =>
+        Promise.reject(
+          Object.assign(new Error('getaddrinfo ENOTFOUND gone.example.test'), { code: 'ENOTFOUND' }),
+        ),
+    });
+    expect(result).toMatchObject({ outcome: 'fail', error: 'ENOTFOUND' });
+  });
+
+  it('refuses at the connection when the host resolves to a private address, whatever the URL says', async () => {
+    const result = await runHttpCheck({
+      url: 'https://rebinds.example.test/',
+      lookup: async () => [{ address: '93.184.216.34' }, { address: '127.0.0.1' }],
+    });
+    expect(result).toMatchObject({
+      outcome: 'fail',
+      error: 'Target not allowed: private or reserved address',
+    });
   });
 
   it('reads no body for a HEAD check', async () => {
