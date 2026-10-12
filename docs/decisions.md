@@ -4,7 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
-| D-041 | 13 Oct 2026 | v1 defacement detection = keywords (a missing `must_contain`, a forbidden word) and the redirect allowlist, as built in S04a, plus slice **S09c** before G1: a shared forbidden-word list (gambling, spam, adult, pharma; TH + EN) on every monitor, and a Googlebot view of each home page every 30 min against cloaked SEO spam. "The page changed from its last version" (hash / diff) is P2, after G2 | D-025 "no shared spam list until S17" (the list ships in code now; S17 makes it editable) |
+| D-041 | 13 Oct 2026 | v1 defacement detection = keywords (a missing `must_contain`, a forbidden word) and the redirect allowlist, as built in S04a, plus slice **S09c** before G1 (a shared forbidden-word list on every monitor, and a Googlebot view of each home page every 30 min against cloaked SEO spam) and **S09d** (a fingerprint of title, description, h1, canonical and external script / link domains against an accepted baseline; records 2 weeks before it alerts) | D-025 "no shared spam list until S17" (the list ships in code now; S17 makes it editable) |
 | D-040 | 13 Oct 2026 | The probe's SSRF guard runs inside the connection: one DNS lookup per hop, every address checked, and the connection goes to that address (no rebinding gap); `fetch` and `Agent` from `undici@7.30.0`; the process's DNS order kept (IPv4 first on the VPS); `assertPublicTarget` stays for saving a site and the verifier | `target.ts` "pinning the connection to the checked address is a follow-up" |
 | D-039 | 12 Oct 2026 | A location that alone is slow on most sites in a minute (compared on the sites another location also timed) is no evidence for slow that minute — the Bangkok VPS slowing down no longer makes a behind-WAF site slow; an open slow PROBLEM holds meanwhile. D-038 amended: a no-data round ends a slow streak, the control check is judged at the round's time and the Akamai control only for Akamai sites, the flapping summary emails the owner who was emailed about the incident | D-022 "slow = p50 over the threshold 3 rounds in a row" (one location's times); D-038 "flapping summary only to whoever was emailed about that drop" |
 | D-038 | 12 Oct 2026 | Production hotfix: on a behind-WAF site a round with nobody left to vote is PROBLEM (unverified, control failed) only once the BKK control check has failed in 3 probe minutes in a row (any batch of the minute); before that it is no data and the status holds. A PROBLEM drop after a relapse emails its recovery (RECOVERED, the flapping summary) only to whoever was emailed about that drop, so normally Chat only; the first drop and any DOWN drop still email | D-027 "nothing left and the control down → PROBLEM at once"; S02b "RECOVERED to everyone already emailed" for PROBLEM relapses |
@@ -54,9 +54,18 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 - **S09c (size S, before G1):** a reviewed shared forbidden-word list in `@dxt/shared`. It holds gambling, slot-spam, adult and pharma words in Thai and English, plus injected-link markers, and applies to every monitor on top of its own `must_not_contain`, in the same 256 KB sample. Each live site's home page is also fetched as Googlebot every 30 min from SIN, with the same checks. A hit is PROBLEM · Keyword (D-022), and the cause names the word and "(as Googlebot)" when only that view had it.
 - **S17** makes the list Admin-editable. Until then it changes by PR.
-- **P2, after G2:** "the page changed from its last version" (hash / diff against a baseline). Most pages change on their own (news, prices, banners), so it would mostly raise false alarms without per-site tuning.
+- **S09d (size M, Phase 1 · P1, Tao: "include 2 and 3"):** "the page changed from its last version". To avoid false alarms, it checks a fingerprint of what a defacer changes rather than the whole page. The fingerprint holds:
+  - title, meta description and robots;
+  - the canonical URL;
+  - the first h1;
+  - the external domains the page links to or loads scripts / iframes from.
 
-**Impact.** Plan: new slice S09c (G1 depends on it); S17's scope names the editable list. Supersedes D-025 item 3's "no shared list until S17" for the list itself.
+  It is compared with an accepted baseline. A new script or iframe domain is PROBLEM `content_change` at once; any other change is PROBLEM after holding 3 rounds. An Admin accepts a new baseline, which is audited.
+  - Whole-page diffs stay out: most pages change on their own (news, prices, banners).
+  - It records for two weeks before it alerts, so it doesn't block G1.
+  - Its rows on the incident and site pages need a board or Tao's OK first.
+
+**Impact.** Plan: new slices S09c (G1 depends on it) and S09d; S17's scope names the editable list. Supersedes D-025 item 3's "no shared list until S17" for the list itself.
 
 ## D-040 — The probe connects to the address its SSRF guard checked
 

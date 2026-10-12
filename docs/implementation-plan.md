@@ -28,6 +28,7 @@
 | S09 | Maintenance windows & mute | 1 · P0 | L | FR-10a, FR-14 | S06b, S08 | 3 | Done |
 | S09b | Maintenance messages | 1 · P0 | M | — (FR-10a, FR-14 messages, §24) | S09 + ChatAlert / EmailAlert boards | 3 | Done |
 | S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | S | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Todo |
+| S09d | Defacement: page-change detection | 1 · P1 | M | — (PRD §2 content-change, D-041) | S09c, S07 | 3–4 (alert on after a 2-week record) | Todo |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b, S09c) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
@@ -465,7 +466,31 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   3. A week of production checks through the list gives no false positive on the 17 sites. Before go-live, replay every site's current home page through the list.
   4. message-checker passes the PROBLEM · Keyword card / email with the new cause wording.
 - **Review:** engine-reviewer, message-checker, security-reviewer (the Googlebot fetch, a fixed UA only).
-- **Not in this slice (P2, after G2):** "the page changed from its last version" (hash / diff against a baseline). Pages change all the time, so it raises false alarms easily (D-041).
+- **Not in this slice:** "the page changed from its last version" is S09d.
+
+### S09d · Defacement: page-change detection
+
+- **Scope:** D-041, the other half of PRD §2 "content-change". To keep false alarms out, the slice does not compare the whole page. It compares a small **fingerprint of what a defacer changes** on each live site's home page against an accepted baseline. The fingerprint holds:
+  - `<title>`, meta description and robots;
+  - the canonical URL;
+  - the first `<h1>`;
+  - the set of domains the page links to or loads scripts / iframes from.
+
+  It is stored per monitor, from the probe's 256 KB sample.
+- **What fires:**
+  - a new external script or iframe domain → PROBLEM `content_change` at once (the common injected-malware sign);
+  - a changed title / description / h1 / canonical, or new link domains, holding for 3 rounds → PROBLEM `content_change`.
+
+  The cause shows before → after.
+- **Baseline:** set on the first round after monitoring starts, or with "Accept as new baseline" on the incident or site page (Admin, audited). A Resolve with root cause "Expected change" also accepts it.
+- **Boards:** none drawn. The incident and site-page rows need a board or Tao's OK first (memory: no board → ask Tao).
+- **Depends on:** S09c, S07
+- **Done when:**
+  1. Table-driven tests: an injected `<script src="evil.example">` → PROBLEM at once; a title change → PROBLEM on the 3rd round; a rotating banner, prices or a news list (text outside the fingerprint) → no PROBLEM; tracking domains on an allowlist (Google Analytics, Tag Manager, Meta pixel …) → no PROBLEM.
+  2. Staging: the test target's `defaced-title` and `injected-script` modes fire with before → after; "Accept as new baseline" clears it and writes `audit_log`.
+  3. Two weeks of fingerprints from the 17 production sites (recorded, not alerting) show no false positive before the alert is switched on.
+- **Review:** engine-reviewer, db-reviewer (fingerprint table), security-reviewer, message-checker, spec-checker if a board comes.
+- **Phase:** Phase 1 · P1. It doesn't block G1: its alert switches on only after the two-week record (Done when 3).
 
 ### S10 · Escalation L2–L3 & on-call
 
