@@ -9,14 +9,7 @@ import {
 } from '@dxt/shared';
 import { plainName, type ChatMessage, type ChatPerson, type ChatWidget } from './chat-alerts';
 import { buildChatTextLine, type ChatState } from './chat-text';
-import {
-  EMAIL_COLORS,
-  emailLayout,
-  senderDomain,
-  type EmailBody,
-  type EmailMessage,
-  type Envelope,
-} from './email-alerts';
+import { EMAIL_COLORS, emailLayout, senderDomain, type EmailMessage, type Envelope } from './email-alerts';
 import { formatResume } from './escalation-alerts';
 
 /**
@@ -185,9 +178,10 @@ function lineDetail(f: WindowFacts, e: WindowEvent, now: Date): string[] {
     case 'request_changed':
       return [...endChange(f, e, now), `now ${len}`, by, 'still waiting'];
     case 'changed':
-      return [...endChange(f, e, now), quoted(e.reason), by];
+      // As drawn: who, then when they changed it ("by Ploy Mon 28 Sep 15:10").
+      return [...endChange(f, e, now), quoted(e.reason), `${by} ${full(e.at)}`];
     case 'cancelled':
-      return [at(f.startsAt, now), quoted(e.reason), by];
+      return [`${when} (${len})`, quoted(e.reason), by];
     case 'started':
       return [`until ${at(f.endsAt, now)}`, 'no alerts, not counted in uptime'];
     case 'ended':
@@ -459,14 +453,37 @@ export function buildIncidentMutedLine(input: {
   };
 }
 
+/**
+ * The MUTED reply when someone else muted a site: one line @mentioning the owner and the backup
+ * together, without the length (ChatAlert "No Chat app yet", D-037 as amended 12 Oct).
+ */
+export function buildMutedMention(
+  f: WindowFacts,
+  e: WindowEvent,
+  people: readonly ChatPerson[],
+  now: Date,
+): ChatMessage {
+  return {
+    text: buildChatTextLine({
+      state: 'MUTED',
+      site: plainName(f.site),
+      mention: [...new Set(people.flatMap(mention))],
+      detail: [`until ${at(f.endsAt, now)}`, quoted(f.reason), `by ${who(e.by)}`, 'still counted in uptime'],
+    }),
+    cardsV2: [],
+  };
+}
+
 // ── Email ──────────────────────────────────────────────────────────────
-export const WINDOW_EMAIL_ROLES = ['owner', 'backup', 'admin'] as const;
+export const WINDOW_EMAIL_ROLES = ['owner', 'backup', 'admin', 'approver'] as const;
 export type WindowEmailRole = (typeof WINDOW_EMAIL_ROLES)[number];
 
 export interface WindowEmailInput {
   facts: WindowFacts;
   event: WindowEvent | { action: 'reminder_12h'; at: Date; by: null };
   role: WindowEmailRole;
+  /** The recipient's name: the person who asked reads "Your request …". */
+  toName?: string | null;
   /** The window began as a request: its request mail thread (§24.5). */
   request: boolean;
   /** Sender, for the window's thread id. */
@@ -489,76 +506,44 @@ const WHY: Record<WindowEmailRole, (site: string) => string> = {
   owner: (site) => `You got this because you own ${site}.`,
   backup: (site) => `You got this because you’re backup for ${site}.`,
   admin: () => 'You got this because you’re an Admin.',
+  approver: () => 'You got this because you approved this window.',
 };
 
-/** The headline and "What changed" row of a later action in the window's mail thread (§24.5). */
-function laterAction(f: WindowFacts, e: WindowEvent, site: string): { headline: string; changed: string } {
-  const by = who(e.by);
-  const to = e.to ?? f.endsAt;
-  const ends = e.from ? `Ends ${full(to)} (was ${was(e.from, to)})` : `Ends ${full(to)}`;
-  switch (e.action) {
-    case 'approved':
-      return { headline: `${site} maintenance approved`, changed: `Approved by ${by} · ${full(e.at)}` };
-    case 'declined':
-      return { headline: `${site} maintenance declined`, changed: `Declined by ${by} · ${quoted(e.reason)}` };
-    case 'withdrawn':
-      return { headline: `${site} request withdrawn`, changed: `Withdrawn by ${by} · ${quoted(e.reason)}` };
-    case 'request_changed':
-      return {
-        headline: `${site} request changed`,
-        changed: `${ends} · now ${lengthOf(f.startsAt, f.endsAt)} · by ${by} · still waiting`,
-      };
-    case 'changed':
-      return { headline: `${site} maintenance changed`, changed: `${ends} · by ${by} · ${quoted(e.reason)}` };
-    case 'cancelled':
-      return {
-        headline: `${site} maintenance cancelled`,
-        changed: `Cancelled by ${by} · ${quoted(e.reason)}`,
-      };
-    case 'started':
-      return {
-        headline: `${site} maintenance started`,
-        changed: `Started ${full(e.at)} · no alerts until ${full(f.endsAt)}`,
-      };
-    case 'ended':
-      return {
-        headline: `${site} maintenance ended`,
-        changed: `Ended on time ${full(f.endsAt)} · alerts back on`,
-      };
-    case 'ended_early':
-      return {
-        headline: `${site} maintenance ended early`,
-        changed: `Ended ${full(e.at)} by ${by} · ${quoted(e.reason)} · alerts back on`,
-      };
-    case 'didnt_start': {
-      const label = incidentLabel(e.incident);
-      return {
-        headline: `${site} maintenance didn’t start`,
-        changed: `The site was DOWN at ${formatTime(f.startsAt)}${label ? ` (${label})` : ''} · reschedule on Maintenance & mutes`,
-      };
-    }
-    case 'not_approved':
-      return {
-        headline: `${site} request not approved`,
-        changed: `Nobody approved it before ${full(f.startsAt)}, so it didn’t start`,
-      };
-    default:
-      return { headline: `${site} maintenance`, changed: '' };
-  }
+/** Who reads it: the asker gets "Your request …", the others by their tie to the site. */
+type Reader = 'asker' | WindowEmailRole;
+
+interface Button {
+  label: string;
+  href: string;
+  primary: boolean;
+}
+
+/** One later action in the window's mail thread (EmailAlert, both threads). */
+interface Later {
+  color: string;
+  headline: string;
+  /** The preheader after "LABEL —". */
+  pre: string;
+  /** The "What changed" row. */
+  changed: string;
+  lede: string;
+  /** Rows after "What changed". */
+  rows: [string, string][];
+  buttons: Button[];
 }
 
 /**
- * The window's emails (EmailAlert "Maintenance · approval", "Maintenance · owner & backup"): the
- * request and the 12 h reminder to the Admins (the owner and backup get the request too), and every
- * later action in the same mail thread with the same layout — label, headline, preheader and a
- * "What changed" row change. Mutes never email (Chat only, ≤ 24 h).
+ * The window's emails (EmailAlert "Maintenance · request" / "Maintenance · window", redrawn 12 Oct):
+ * the request and the 12 h reminder, and every later action in the same mail thread — label,
+ * headline, preheader, a "What changed" row and a lede for each reader. Mutes never email (Chat
+ * only, ≤ 24 h); the client status page isn't built yet (D-013), so no "Planned maintenance".
  */
 export function buildWindowEmail(input: WindowEmailInput): EmailMessage {
   const { facts: f, event: e, role, now } = input;
   const site = plainName(f.site);
   const len = lengthOf(f.startsAt, f.endsAt);
   const start = full(f.startsAt);
-  const when = `${span(f.startsAt, f.endsAt, start)} (${len})`;
+  const whenRow: [string, string] = ['When', `${span(f.startsAt, f.endsAt, start)} (${len})`];
   const asker = who(f.createdBy);
   const threadId = windowThreadId(f.windowId, input.from);
   const subject = input.request
@@ -572,18 +557,24 @@ export function buildWindowEmail(input: WindowEmailInput): EmailMessage {
       ? { References: threadId }
       : { 'In-Reply-To': threadId, References: threadId },
   };
-  const review = (label: string) => [{ label, href: f.pageUrl, primary: true }];
+  const page = (label = 'Open Maintenance & mutes', primary = true): Button => ({
+    label,
+    href: f.pageUrl,
+    primary,
+  });
   const people = [
     `owner ${f.owner ? plainName(f.owner.name) : '—'}`,
     ...(f.backup ? [`backup ${plainName(f.backup.name)}`] : []),
   ].join(', ');
+  const deadline: [string, string] = ['Deadline', `It starts only if approved before ${start}`];
+  const requestEffect = 'No alerts; checks still run; not counted in uptime';
 
   if (e.action === 'requested') {
-    const body: EmailBody = {
+    return emailLayout(envelope, {
       color: C.secondary,
       bar: C.secondary,
       label: 'MAINTENANCE REQUESTED',
-      pre: `${asker} asks for ${len} of maintenance on ${site} from ${start}`,
+      pre: `${asker} asks for ${len} on ${site} from ${start}`,
       headline: `${asker} asks for ${len} of maintenance`,
       lede:
         role === 'admin'
@@ -591,14 +582,13 @@ export function buildWindowEmail(input: WindowEmailInput): EmailMessage {
           : `${asker} asked for maintenance on ${site}. An Admin approves or declines it on Maintenance & mutes.`,
       facts: [
         ['Site', `${site} · ${formatTier(f.tier)} · ${people}`],
-        ['When', when],
+        whenRow,
         ['Reason', quoted(f.reason)],
-        ['Effect', effect(len)],
-        ['Deadline', `It starts only if approved before ${start}`],
+        ['Effect', requestEffect],
+        deadline,
       ],
-      buttons: review(role === 'admin' ? 'Review request' : 'Open Maintenance & mutes'),
-    };
-    return emailLayout(envelope, body);
+      buttons: [role === 'admin' ? page('Review request') : page()],
+    });
   }
   if (e.action === 'reminder_12h') {
     const h = hoursTo(f.startsAt, now);
@@ -611,59 +601,257 @@ export function buildWindowEmail(input: WindowEmailInput): EmailMessage {
       headline: `Still waiting — starts in ${h} h`,
       lede: `Nobody has approved or declined ${asker}’s request yet. A last reminder comes by Chat at ${lastAt}.`,
       facts: [
-        ['Site', `${site} · ${formatTier(f.tier)}`],
-        ['When', when],
+        whenRow,
         ['Asked by', `${asker} · ${full(f.createdAt)} · ${quoted(f.reason)}`],
         [
           'If nobody answers',
           `At ${formatTime(f.startsAt)} it doesn’t start; ${asker} is told and has to ask again`,
         ],
       ],
-      buttons: review('Review request'),
+      buttons: [page('Review request')],
     });
   }
-
-  // Scheduled, and every later action: the owner & backup layout (EmailAlert "Tubtong · Scheduled").
-  const base: [string, string][] = [
-    ['When', when],
-    ['Reason', quoted(f.reason)],
-    [input.request ? 'Asked by' : 'Scheduled by', `${asker} · ${full(f.createdAt)}`],
-    ['Effect', 'No alerts while it runs; checks still run; not counted in uptime'],
-    ['If it’s down', `At ${formatTime(f.startsAt)} it won’t start, and you’ll be told`],
-  ];
   if (e.action === 'scheduled') {
     return emailLayout(envelope, {
       color: C.secondary,
       bar: C.secondary,
       label: 'MAINTENANCE SCHEDULED',
-      pre: `${site} · ${when} · by ${asker}`,
+      pre: `${site} · ${whenRow[1]} · by ${asker}`,
       headline: `${site} maintenance on ${formatDay(f.startsAt, { weekday: true })}`,
       lede: `${asker} scheduled maintenance on ${site}. Nothing to do — there will be no alerts for ${site} during the window.`,
-      facts: base,
-      buttons: review('Open Maintenance & mutes'),
+      facts: [
+        whenRow,
+        ['Reason', quoted(f.reason)],
+        ['Scheduled by', `${asker} · ${full(f.createdAt)}`],
+        ['Effect', 'No alerts while it runs; checks still run; not counted in uptime'],
+        ['If it’s down', `At ${formatTime(f.startsAt)} it won’t start, and you’ll be told`],
+      ],
+      buttons: [page()],
     });
   }
-  const later = laterAction(f, e, site);
-  const warn = e.action === 'didnt_start' || e.action === 'not_approved';
-  // Once the window is over or will never run, its effect and "if it's down" no longer apply.
-  const over = [
-    'declined',
-    'withdrawn',
-    'cancelled',
-    'ended',
-    'ended_early',
-    'didnt_start',
-    'not_approved',
-  ].includes(e.action);
-  const facts = over ? base.filter(([k]) => k !== 'Effect' && k !== 'If it’s down') : base;
-  return emailLayout(envelope, {
-    color: warn ? C.warning : C.secondary,
-    bar: warn ? C.warning : C.secondary,
-    label: KIND[e.action],
-    pre: `${site} · ${lineDetail(f, e, now).join(' · ')}`,
-    headline: later.headline,
-    lede: `${later.changed}.`,
-    facts: [['What changed', later.changed], ...facts],
-    buttons: review('Open Maintenance & mutes'),
+
+  const reader: Reader =
+    (role === 'owner' || role === 'backup') && input.toName && input.toName === f.createdBy ? 'asker' : role;
+  const later = laterEmail(f, e, {
+    site,
+    len,
+    start,
+    asker,
+    whenRow,
+    deadline,
+    request: input.request,
+    reader,
+    page,
   });
+  return emailLayout(envelope, {
+    color: later.color,
+    bar: later.color,
+    label: KIND[e.action],
+    pre: later.pre,
+    headline: later.headline,
+    lede: later.lede,
+    facts: [['What changed', later.changed], ...later.rows],
+    buttons: later.buttons,
+  });
+}
+
+function laterEmail(
+  f: WindowFacts,
+  e: WindowEvent,
+  c: {
+    site: string;
+    len: string;
+    start: string;
+    asker: string;
+    whenRow: [string, string];
+    deadline: [string, string];
+    request: boolean;
+    reader: Reader;
+    page: (label?: string, primary?: boolean) => Button;
+  },
+): Later {
+  const { site, start, asker, whenRow, reader, page } = c;
+  const by = who(e.by);
+  const why = e.reason ? ` · ${quoted(e.reason)}` : '';
+  // A window inside one day reads in times ("until 03:00"), a longer one with the day (as drawn).
+  const t = (d: Date) => (isSameBangkokDay(f.startsAt, f.endsAt) ? formatTime(d) : full(d));
+  const title = c.request ? 'Maintenance' : `${site} maintenance`;
+  // While the window is ahead: what it does, and what happens if the site is down at its start.
+  const live: [string, string][] = c.request
+    ? [
+        ['Effect', 'No alerts; checks still run; not counted in uptime'],
+        ['If it’s down', 'At the start it won’t start, and you’ll be told'],
+      ]
+    : [
+        ['Effect', 'No alerts while it runs; checks still run; not counted in uptime'],
+        ['If it’s down', `At ${formatTime(f.startsAt)} it won’t start, and you’ll be told`],
+      ];
+  const to = e.to ?? f.endsAt;
+  const grey = C.secondary;
+  const base = { color: grey, buttons: [page()] };
+
+  switch (e.action) {
+    case 'approved':
+      return {
+        ...base,
+        color: C.positive,
+        headline: `${title} approved`,
+        pre: `${site} · ${span(f.startsAt, f.endsAt, start)} · by ${by}`,
+        changed: `Approved by ${by} · ${full(e.at)}`,
+        lede:
+          reader === 'asker'
+            ? `Your request was approved. It starts on its own at ${start}.`
+            : `${asker}’s request was approved. Nothing to do — there will be no alerts for ${site} during the window.`,
+        rows: [whenRow, ...live],
+      };
+    case 'declined':
+      return {
+        ...base,
+        headline: `${title} declined`,
+        pre: `${site} · by ${by}${why}`,
+        changed: `Declined by ${by} · ${full(e.at)}${why}`,
+        lede:
+          reader === 'asker'
+            ? 'Your request was declined. Ask again with a shorter window — under 24 h needs no approval.'
+            : `${asker}’s request was declined. Nothing changes for ${site}.`,
+        rows: [whenRow],
+      };
+    case 'request_changed':
+      return {
+        ...base,
+        headline: `Request changed — now ${c.len}`,
+        pre: `${site} · ends ${full(to)}${e.from ? ` (was ${was(e.from, to)})` : ''} · now ${c.len} · still waiting`,
+        changed: `Ends ${full(to)}${e.from ? ` (was ${full(e.from)})` : ''} · by ${by} ${formatTime(e.at)}${why}`,
+        lede:
+          reader === 'admin'
+            ? `${by} changed the request while it waits. Review it as it stands now.`
+            : `${by} changed the request. An Admin still has to approve it.`,
+        rows: [whenRow, live[0]!, c.deadline],
+        buttons: [reader === 'admin' ? page('Review request') : page()],
+      };
+    case 'withdrawn':
+      return {
+        ...base,
+        headline: 'Request withdrawn',
+        pre: `${site} · by ${by} · no more reminders`,
+        changed: `Withdrawn by ${by} · ${full(e.at)}${why}`,
+        lede:
+          reader === 'admin'
+            ? 'Nothing to approve any more.'
+            : `${by} withdrew the request. Nothing changes for ${site}.`,
+        rows: [whenRow],
+      };
+    case 'not_approved':
+      return {
+        ...base,
+        headline: 'Not approved — it didn’t start',
+        pre: `${site} · didn’t start · nobody approved before ${formatTime(f.startsAt)}`,
+        changed: `Nobody approved before ${start}`,
+        lede:
+          reader === 'asker'
+            ? 'Your request wasn’t approved in time, so it didn’t start. Alerts stay on as usual. Ask again if you still need it.'
+            : reader === 'admin'
+              ? 'The request lapsed without an answer.'
+              : `The window didn’t start. Alerts for ${site} stay on as usual.`,
+        rows: [whenRow],
+        buttons: [page(undefined, reader !== 'admin')],
+      };
+    case 'started':
+      return {
+        ...base,
+        headline: `${title} has started`,
+        pre: `${site} · until ${t(f.endsAt)} · no alerts, not counted in uptime`,
+        changed: `Started ${t(e.at)}`,
+        lede:
+          reader === 'owner' || reader === 'asker'
+            ? 'End it early or change the end on Maintenance & mutes.'
+            : `Nothing to do — no alerts until ${t(f.endsAt)}.`,
+        rows: [whenRow, live[0]!],
+      };
+    case 'ended':
+      return {
+        ...base,
+        headline: `${title} ended`,
+        pre: `${site} · ended on time ${t(f.endsAt)} · alerts back on`,
+        changed: `Ended on time ${t(f.endsAt)} · alerts back on`,
+        lede: `Alerts for ${site} are back on.`,
+        rows: [whenRow],
+      };
+    case 'ended_early':
+      return {
+        ...base,
+        headline: `${title} ended early`,
+        pre: `${site} · ${t(e.at)} by ${by}${why} · alerts back on`,
+        changed: `Ended early ${t(e.at)} by ${by}${why} · alerts back on`,
+        lede: `Alerts for ${site} are back on.`,
+        // The span it really ran.
+        rows: [['When', `${span(f.startsAt, e.at, start)} (${lengthOf(f.startsAt, e.at)})`]],
+      };
+    case 'changed':
+      return {
+        ...base,
+        headline: `${title} now ends ${formatTime(to)}`,
+        pre: `${site} · ends ${full(to)}${e.from ? ` (was ${was(e.from, to)})` : ''} · by ${by}`,
+        changed: `Ends ${full(to)}${e.from ? ` (was ${was(e.from, to)})` : ''} · by ${by} ${full(e.at)}${why}`,
+        lede: `${by} changed the end time. Nothing to do.`,
+        rows: [whenRow, ...live],
+      };
+    case 'cancelled':
+      return {
+        ...base,
+        headline: `${title} cancelled`,
+        pre: `${site} · ${span(f.startsAt, f.endsAt, start)} · by ${by}${why}`,
+        changed: `Cancelled by ${by} · ${full(e.at)}${why}`,
+        lede:
+          reader === 'owner' || reader === 'asker'
+            ? `${by} cancelled your window. Alerts for ${site} stay on as usual.`
+            : 'The window was cancelled. Nothing to do.',
+        rows: [whenRow],
+      };
+    case 'didnt_start': {
+      const i = e.incident;
+      const label = incidentLabel(i);
+      const down = i?.severity === 'problem' ? 'had a problem' : 'was down';
+      const since = i?.since ? `${severityWord(i)} since ${formatTime(i.since)}` : `the site ${siteWas(i)}`;
+      const incidentRow: [string, string][] = label
+        ? [
+            [
+              'Incident',
+              i?.acked
+                ? `${label} stays open — it is acknowledged; nothing was hidden`
+                : i?.pausedUntil
+                  ? `${label} stays open; timers paused until ${formatResume(i.pausedUntil, e.at)} — nothing was hidden`
+                  : `${label} stays open and keeps escalating — nothing was hidden`,
+            ],
+          ]
+        : [];
+      const buttons: Button[] =
+        label && i?.url
+          ? [{ label: 'Open incident', href: i.url, primary: true }, page(undefined, false)]
+          : [page()];
+      return {
+        color: C.danger,
+        headline: `${title} didn’t start — site ${down}`,
+        pre: `${site} ${siteWas(i)} at ${formatTime(f.startsAt)}${label ? ` (${label})` : ''} · reschedule on Maintenance & mutes`,
+        changed: `Didn’t start ${start} — ${since}${label ? ` (${label})` : ''}`,
+        lede:
+          reader === 'approver'
+            ? `The window you approved didn’t start because the site ${down}.`
+            : reader === 'owner' || reader === 'asker'
+              ? `Your window didn’t start because the site ${down}. ${label ? `Deal with ${label} first, then schedule a new window.` : 'Schedule a new window once it’s back.'}`
+              : `The window didn’t start because the site ${down}.`,
+        rows: [whenRow, ...incidentRow],
+        buttons,
+      };
+    }
+    default:
+      return {
+        ...base,
+        headline: title,
+        pre: site,
+        changed: '',
+        lede: '',
+        rows: [whenRow],
+      };
+  }
 }

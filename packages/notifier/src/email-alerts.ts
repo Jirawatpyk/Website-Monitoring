@@ -76,6 +76,8 @@ export interface DownEmailInput extends EmailBaseInput {
   ladder?: LadderFacts | null;
   /** When it's sent: a time today or tomorrow reads as the time alone. */
   now?: Date;
+  /** The first alert after a mute (§24.7, §24.17): when the mute that held it ended. */
+  heldUntil?: Date | null;
 }
 
 export interface ProblemEmailInput extends EmailBaseInput {
@@ -89,6 +91,8 @@ export interface ProblemEmailInput extends EmailBaseInput {
   /** The ladder (S08): "Reminder + Nok (backup) at 10:52". */
   ladder?: LadderFacts | null;
   now?: Date;
+  /** The first alert after a mute (§24.7, §24.17): when the mute that held it ended. */
+  heldUntil?: Date | null;
 }
 
 export interface AcknowledgedEmailInput extends EmailBaseInput {
@@ -313,23 +317,31 @@ const confirmedLabel = (d: Date) => `${formatDay(d, { weekday: true })} ${format
 
 export function buildDownEmail(input: DownEmailInput): EmailMessage {
   const { site } = input;
+  const now = input.now ?? input.confirmedAt;
+  const held = input.ackedBy ? null : heldRow(input.heldUntil, input.ladder, now);
   return render(input, {
     template: 'down',
     color: C.danger,
     bar: C.danger,
     label: 'DOWN',
-    pre: [
-      `${site} confirmed down ${formatTimeWithSeconds(input.confirmedAt)}`,
-      input.cause,
-      ...ladderPre(input.ackedBy ? null : input.ladder, input.now ?? input.confirmedAt),
-    ].join(' · '),
+    pre: (held
+      ? [site, held.pre, ...ladderPre(input.ladder, now)]
+      : [
+          `${site} confirmed down ${formatTimeWithSeconds(input.confirmedAt)}`,
+          input.cause,
+          ...ladderPre(input.ackedBy ? null : input.ladder, now),
+        ]
+    ).join(' · '),
     headline: `${site} is down`,
     lede: input.ackedBy
       ? `${input.ackedBy} acknowledged it while it was a problem; it is now down.`
-      : input.reason === 'owner'
-        ? `Nobody has acknowledged yet. You own ${site} — please acknowledge or hand it over in the Chat thread.`
-        : 'Nobody has acknowledged yet. The Google Chat alert couldn’t be delivered, so this email is the alert.',
+      : held && input.reason === 'owner'
+        ? 'This went down while the site was muted, so nobody was told until now. Please acknowledge or hand it over in the Chat thread.'
+        : input.reason === 'owner'
+          ? `Nobody has acknowledged yet. You own ${site} — please acknowledge or hand it over in the Chat thread.`
+          : 'Nobody has acknowledged yet. The Google Chat alert couldn’t be delivered, so this email is the alert.',
     facts: [
+      ...(held ? [held.row] : []),
       ['Confirmed down', confirmedLabel(input.confirmedAt)],
       ['Cause', input.cause],
       ['Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)],
@@ -338,8 +350,31 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
     // The board adds [Open incident], but Acknowledge opens that same page (one incident page, D-033).
     buttons: input.ackedBy
       ? [{ label: 'Open incident', href: input.incidentUrl, primary: true }]
-      : [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
+      : held
+        ? [
+            { label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true },
+            { label: 'Open incident', href: input.incidentUrl, primary: false },
+          ]
+        : [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
   });
+}
+
+/**
+ * The first DOWN / PROBLEM email after a mute (EmailAlert "Down (held by a mute)", §24.17): a first
+ * facts row "Held by a mute — until 15:00 — escalation starts now" and the preheader's "held by a mute
+ * until 15:00" — the same words as the Chat card's held line (§24.7). No ladder (acknowledged
+ * meanwhile, or no plan): only why it is late.
+ */
+function heldRow(heldUntil: Date | null | undefined, ladder: LadderFacts | null | undefined, now: Date) {
+  if (!heldUntil) return null;
+  const until = isSameBangkokDay(heldUntil, now) ? formatTime(heldUntil) : formatResume(heldUntil, now);
+  const paused = ladder?.pausedUntil ? formatResume(ladder.pausedUntil, now) : null;
+  const value = !ladder
+    ? `until ${until}`
+    : paused
+      ? `until ${until} — outside response hours — escalation starts ${paused}`
+      : `until ${until} — escalation starts now`;
+  return { pre: `held by a mute until ${until}`, row: ['Held by a mute', value] as [string, string] };
 }
 
 /** "22:14" the same Bangkok day as `ref`, "Thu 24 Sep 22:14" otherwise. */
@@ -482,18 +517,24 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
       : chain
         ? 'The site opens in most browsers, but its certificate chain is misconfigured: install the right intermediate certificate.'
         : 'The site is up, with a problem.';
+  const held = heldRow(input.heldUntil, input.ladder, input.now ?? input.detectedAt);
   return render(input, {
     template: 'problem',
     color: C.warning,
     bar: C.warning,
     label: 'PROBLEM',
-    pre: `${site} · ${input.summary} · detected ${formatTime(input.detectedAt)}`,
+    pre: held
+      ? `${site} · ${input.summary} · ${held.pre}`
+      : `${site} · ${input.summary} · detected ${formatTime(input.detectedAt)}`,
     headline,
     lede:
-      input.reason === 'owner'
-        ? `${opening} You own ${site} — please take a look and acknowledge, or hand it over in the Chat thread.`
-        : `${opening} The Google Chat alert couldn’t be delivered, so this email is the alert.`,
+      held && input.reason === 'owner'
+        ? `${opening} This started while the site was muted, so nobody was told until now. Please take a look and acknowledge, or hand it over in the Chat thread.`
+        : input.reason === 'owner'
+          ? `${opening} You own ${site} — please take a look and acknowledge, or hand it over in the Chat thread.`
+          : `${opening} The Google Chat alert couldn’t be delivered, so this email is the alert.`,
     facts: [
+      ...(held ? [held.row] : []),
       ['Detected', `${formatDay(input.detectedAt, { weekday: true })} ${formatTime(input.detectedAt)}`],
       ['Trigger', TRIGGER_LABELS[trigger]],
       ['Cause', input.cause],

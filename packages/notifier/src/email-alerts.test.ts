@@ -256,3 +256,50 @@ describe('DOWN raised from an acknowledged PROBLEM (D-021)', () => {
     expect(m.text).toContain('Open incident: https://monitor.example.test/incidents/inc-1');
   });
 });
+// EmailAlert "Down (held by a mute)" (spec §24.17): held by the owner's mute until 15:00.
+describe('the first DOWN email after a mute', () => {
+  const bkk = (iso: string) => new Date(`${iso}+07:00`);
+  const now = bkk('2026-09-25T15:00:00');
+  const held = (ladder: Parameters<typeof buildDownEmail>[0]['ladder']) =>
+    buildDownEmail({
+      ...base,
+      confirmedAt,
+      cause: CAUSE,
+      confirmingLocations: 3,
+      heldUntil: now,
+      now,
+      ladder,
+    });
+  it('adds the held row first, the held preheader, the late lede, Acknowledge + Open incident', () => {
+    const m = held({
+      next: {
+        level: 1,
+        at: bkk('2026-09-25T15:15:00'),
+        ask: ['Ploy'],
+        fyi: ['Tao'],
+      },
+    });
+    expect(m.html).toContain('DOWN — MuvMi · held by a mute until 15:00 · acknowledge by 15:15');
+    expect(m.text.split('\n').find((l) => l.includes(': '))).toBe(
+      'Held by a mute: until 15:00 — escalation starts now',
+    );
+    expect(m.text).toContain(
+      'This went down while the site was muted, so nobody was told until now. Please acknowledge or hand it over in the Chat thread.',
+    );
+    expect(m.text.indexOf('Acknowledge: ')).toBeLessThan(m.text.indexOf('Open incident: '));
+  });
+  it('outside response hours, and with no ladder', () => {
+    expect(
+      held({
+        pausedUntil: bkk('2026-09-28T09:00:00'),
+        next: {
+          level: 1,
+          at: bkk('2026-09-28T09:15:00'),
+          ask: ['Ploy'],
+          fyi: [],
+        },
+      }).text,
+    ).toContain('Held by a mute: until 15:00 — outside response hours — escalation starts Mon 28 Sep 09:00');
+    expect(held(null).text).toContain('Held by a mute: until 15:00\n');
+  });
+});

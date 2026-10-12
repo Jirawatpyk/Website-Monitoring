@@ -391,6 +391,8 @@ export function renderEmail(
         ackedBy: i.state === 'acknowledged' && i.acker ? i.acker.display_name : null,
         ladder: ladderFactsOf(i, sentAt),
         now: sentAt,
+        // The first alert after a mute (§24.17): "Held by a mute — until 15:00 — …".
+        heldUntil: heldUntilOf(ctx),
       });
     case 'problem':
       return buildProblemEmail({
@@ -402,6 +404,7 @@ export function renderEmail(
         verifier: typeof ctx.verifier === 'string' ? ctx.verifier : null,
         ladder: ladderFactsOf(i, sentAt),
         now: sentAt,
+        heldUntil: heldUntilOf(ctx),
       });
     case 'step_fired': {
       const asFyi = ctx.asFyi === true;
