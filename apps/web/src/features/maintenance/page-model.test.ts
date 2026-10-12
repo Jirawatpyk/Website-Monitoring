@@ -302,6 +302,7 @@ describe('words', () => {
       severity: 'down' as const,
       since: bkk('2026-09-25T09:20:00'),
       pausedUntil: null,
+      escalates: true,
     };
     expect(endEffects({ ...games, silenced: { ...held, l1DelayMin: 15 } }, 'Tao', NOW)[0]).toBe(
       'INC-0154 (DOWN since 09:20, held by this mute) posts its first alert now and starts escalating — L1 at about 10:23 if nobody acknowledges.',
@@ -318,6 +319,10 @@ describe('words', () => {
     ).toBe(
       'INC-0154 (DOWN since 09:20, held by this mute) posts its first alert now. It’s outside response hours, so escalation starts Mon 28 Sep 09:00.',
     );
+    // Nobody new at L1 (no backup, the Admins already told): no escalation promised (staging /verify).
+    expect(
+      endEffects({ ...games, silenced: { ...held, l1DelayMin: null, escalates: false } }, 'Tao', NOW)[0],
+    ).toBe('INC-0154 (DOWN since 09:20, held by this mute) posts its first alert now.');
     // A Tier 2–3 PROBLEM held for response hours posts at the opening, not now (spec-check M1, §24.16).
     expect(
       endEffects(

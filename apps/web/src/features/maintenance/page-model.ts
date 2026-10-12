@@ -78,6 +78,8 @@ export interface WindowRow {
     since: string;
     /** Tier 2–3 outside response hours: when escalation starts. */
     pausedUntil: string | null;
+    /** L1 tells someone new (no backup and the Admins already told: nobody to escalate to). */
+    escalates: boolean;
   } | null;
 }
 
@@ -444,6 +446,8 @@ function heldLine(s: NonNullable<WindowRow['silenced']>, now: Date): string {
   if (s.pausedUntil && s.severity === 'problem')
     return `${what} posts its first alert ${whenText(new Date(s.pausedUntil), now)}.`;
   const head = `${what} posts its first alert now`;
+  // Nobody new at L1: no promise of escalation (the card and the email say only why it is late).
+  if (!s.escalates) return `${head}.`;
   if (s.pausedUntil)
     return `${head}. It’s outside response hours, so escalation starts ${whenText(new Date(s.pausedUntil), now)}.`;
   const l1 = s.l1DelayMin != null ? new Date(now.getTime() + (s.l1DelayMin + 1) * MINUTE) : null;
