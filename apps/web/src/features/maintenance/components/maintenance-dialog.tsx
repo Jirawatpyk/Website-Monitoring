@@ -14,7 +14,6 @@ import {
   TimePicker,
 } from '@jirawatpyk/aura-react';
 import { IconCalendar, IconCheck, IconEyeOff, IconInfo } from '@jirawatpyk/aura-react/icons';
-import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { APPROVAL_OVER_MIN } from '@dxt/engine';
 import { useNow } from '@/components/use-now';
@@ -88,7 +87,6 @@ export function MaintenanceDialog({
   /** Opened from /maintenance: the done state needs no "Open Maintenance & mutes". */
   fromPage?: boolean;
 }) {
-  const router = useRouter();
   const [openedAt] = useState(() => new Date().toISOString());
   const days = useMemo(() => startDays(new Date(openedAt)), [openedAt]);
   const [site, setSite] = useState(siteId);
@@ -197,7 +195,7 @@ export function MaintenanceDialog({
           admins: 'admins' in r ? r.admins : admins,
         }),
       );
-      router.refresh();
+      // The action revalidated the page (no router.refresh(): it would queue the next action, §24.12).
     });
 
   const owner = current.owner ? ` · owner ${current.owner}` : '';

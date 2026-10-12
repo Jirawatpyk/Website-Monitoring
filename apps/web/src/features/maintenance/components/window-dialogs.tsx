@@ -2,7 +2,6 @@
 
 import { Alert, Button, Dialog, Select, TextField, toast } from '@jirawatpyk/aura-react';
 import { IconCheck, IconTrash2 } from '@jirawatpyk/aura-react/icons';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { UndoLine } from '@/components/undo-line';
 import {
@@ -97,11 +96,13 @@ interface DialogProps {
 }
 
 /**
- * Runs an action, refreshes the page and closes; a refusal shows as the dialog's alert (not a field
- * error). A held action (§24.8) then counts down its 10 s in a toast with Undo, like Acknowledge.
+ * Runs an action and closes; a refusal shows as the dialog's alert (not a field error). A held action
+ * (§24.8) then counts down its 10 s in a toast with Undo, like Acknowledge. No `router.refresh()`:
+ * the action revalidates the page, so its response carries the new rows — and a refresh would hold the
+ * next server action (posting a pending one now, §24.12) in Next's action queue until it finished
+ * (S09b follow-up /verify: post-now landed ~10 s after the save).
  */
 function useSubmit(onDone: () => void, onUndone?: () => void) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const run = (fn: () => Promise<Result>, held?: Held) =>
@@ -114,12 +115,7 @@ function useSubmit(onDone: () => void, onUndone?: () => void) {
         return;
       }
       onDone();
-      router.refresh();
-      if (held && r.postsAt)
-        showUndo(held, r.postsAt, () => {
-          onUndone?.();
-          router.refresh();
-        });
+      if (held && r.postsAt) showUndo(held, r.postsAt, () => onUndone?.());
     });
   return { error, pending, run };
 }
