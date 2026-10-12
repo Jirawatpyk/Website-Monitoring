@@ -4,16 +4,18 @@ begin;
 \ir _helpers.psql
 select plan(15);
 
--- Realtime publication: exactly these two public tables, so adding another (monitor_status,
--- notifications, incident_events, profiles …) has to be a reviewed change.
+-- Realtime publication: exactly these public tables, so adding another (monitor_status,
+-- notifications, incident_events, profiles …) has to be a reviewed change. S09b adds
+-- maintenance_windows (/maintenance, D-037).
 select set_eq(
   $$select tablename::text from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public'$$,
-  array['site_status', 'incidents'],
-  'supabase_realtime publishes exactly site_status and incidents'
+  array['site_status', 'incidents', 'maintenance_windows'],
+  'supabase_realtime publishes exactly site_status, incidents and maintenance_windows'
 );
 select is(
   (select bool_and(c.relrowsecurity) from pg_class c
-   where c.oid in ('public.site_status'::regclass, 'public.incidents'::regclass)),
+   where c.oid in ('public.site_status'::regclass, 'public.incidents'::regclass,
+                   'public.maintenance_windows'::regclass)),
   true,
   'the published tables keep RLS on (Realtime filters events by it)'
 );
