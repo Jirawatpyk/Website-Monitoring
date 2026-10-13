@@ -18,6 +18,7 @@ import {
 } from './monitor';
 import { abstainsOnWafSite, bkkUntrusted, BLOCKED_NOTE, confirmsDown, evaluateRound, wafNote } from './round';
 import {
+  crawlerIssue,
   keywordIssue,
   minuteOf,
   nextFailingSince,
@@ -27,6 +28,7 @@ import {
   roundP50,
   SLOW_ROUNDS,
   statusIssue,
+  type CrawlerFact,
   type FailingSince,
   type ProblemDetail,
 } from './triggers';
@@ -77,6 +79,11 @@ export interface SiteMonitor {
   carry: MonitorCarry;
   /** This monitor's verify job of each blocked round, by round start (epoch ms). */
   verifications?: ReadonlyMap<number, Verification>;
+  /**
+   * The primary monitor's latest usable crawler fetch per view (D-041, D-042), already inside the
+   * freshness window. A round counts a fetch made before the round ended.
+   */
+  crawler?: readonly CrawlerFact[];
 }
 
 export interface SiteSnapshot {
@@ -734,13 +741,17 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     const p50 = roundP50(timed, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
     const next = { slowRounds, failingSince };
-    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound);
+    // D-042: a crawler fetch counts for the rounds that end after it.
+    const roundEnd = roundAt.getTime() + s.intervalSec * 1000;
+    const crawler = m.isPrimary ? (m.crawler ?? []).filter((f) => f.checkedAt.getTime() < roundEnd) : [];
+    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound, crawler);
     if (issue) {
       return {
         verdict: {
           kind: 'problem',
-          ...issue,
-          startedAt: issueStart(issue.detail, counted, roundAt, s, slowRounds),
+          trigger: issue.trigger,
+          detail: issue.detail,
+          startedAt: issue.at ?? issueStart(issue.detail, counted, roundAt, s, slowRounds),
           reachable: passing,
         },
         next,
@@ -829,13 +840,18 @@ function problemOf(
   p50: number | null,
   minLocations = 2,
   wafSite = false,
-): { trigger: Trigger; detail: ProblemDetail } | null {
+  crawler: readonly CrawlerFact[] = [],
+): { trigger: Trigger; detail: ProblemDetail; at?: Date } | null {
   const as = (trigger: Trigger, detail: ProblemDetail | null) =>
     detail ? { trigger: m.isPrimary ? trigger : ('key_page' as const), detail } : null;
+  // What only a crawler view saw (primary only, D-042): after the round's own keyword and redirect,
+  // which win and carry no view.
+  const viewed = crawlerIssue(crawler, m.url, m.allowedRedirectDomains);
   return (
     (m.isPrimary ? null : as('key_page', statusIssue(counted, minLocations))) ??
     as('keyword', keywordIssue(counted, minLocations)) ??
     as('redirect', redirectIssue(counted, m.url, m.allowedRedirectDomains, minLocations)) ??
+    (viewed ? { trigger: viewed.detail.kind, detail: viewed.detail, at: viewed.at } : null) ??
     (slowRounds >= SLOW_ROUNDS && p50 !== null
       ? as('slow', {
           kind: 'slow',
