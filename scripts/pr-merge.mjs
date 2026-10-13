@@ -12,11 +12,12 @@
 // deployment's crons start before `migrate-production` ends (docs/workflow.md, 8 Oct 2026), so that
 // code must work on the old schema — or the migration merges alone first.
 // After the merge it waits for production: the merge commit's `migrate-production` and its Vercel
-// production deployment (GitHub Deployments, environment "Production – dxt-monitor"), and exits 1 if
-// either failed — on 12 Oct a production build failed (`git_info_fail`) and nobody saw it for 10 min.
-// No deployment within a few minutes is a warning, not a failure: Vercel's Ignored Build Step skips
-// agent- and docs-only commits without posting anything. --no-wait skips the wait.
-import { execFileSync } from 'node:child_process';
+// production deployment, and exits 1 if either failed — on 12 Oct a production build failed
+// (`git_info_fail`) and nobody saw it for 10 min. The deployment comes from Vercel's API through the
+// signed-in `vercel` CLI: GitHub Deployments aren't posted for every commit (#93 had none and the
+// first version of this wait called its live deploy "skipped"). A build Vercel skipped or cancelled,
+// or no deployment within a few minutes, is a warning, not a failure. --no-wait skips the wait.
+import { execFileSync, execSync } from 'node:child_process';
 import path from 'node:path';
 
 export const REQUIRED_CHECKS = ['check', 'db'];
@@ -26,27 +27,29 @@ export const WORKFLOW_FLAG = '--workflow-changes-reviewed';
 export const SCHEMA_FLAG = '--schema-lag-reviewed';
 export const NO_WAIT_FLAG = '--no-wait';
 
-/** The GitHub Deployments environment Vercel reports production builds of `main` under. */
-export const PRODUCTION_ENV = 'Production – dxt-monitor';
+/** The Vercel project that deploys `main` to production, and its team (docs/workflow.md). */
+export const VERCEL_PROJECT = 'dxt-monitor';
+export const VERCEL_TEAM = 'team_KLEKhF6PuSAbJSmgDpyEXES4';
 /** No production deployment by then: Vercel skipped the build (Ignored Build Step). */
 export const NO_DEPLOY_AFTER_MS = 4 * 60_000;
 /** Give up waiting for a deployment that started but never finished. */
 export const DEPLOY_TIMEOUT_MS = 15 * 60_000;
 
 /**
- * Where production stands for the merge commit. `statuses` are the newest production deployment's
- * statuses, newest first (as GitHub returns them); `migrate` is the `migrate-production` check-run,
- * if any. A later redeploy adds a status to the same deployment, so the newest one counts.
+ * Where production stands for the merge commit. `deployments` are Vercel's production deployments of
+ * that commit, newest first (a redeploy after a failure is newer); `migrate` is the
+ * `migrate-production` check-run, if any.
  */
-export function deployVerdict({ statuses = [], migrate = null, elapsedMs }) {
+export function deployVerdict({ deployments = [], migrate = null, elapsedMs }) {
   if (migrate?.status === 'completed' && !['success', 'skipped', 'neutral'].includes(migrate.conclusion)) {
     return { kind: 'failed', why: `migrate-production ended ${migrate.conclusion}` };
   }
-  const latest = statuses[0];
-  if (latest?.state === 'success') return { kind: 'ready', url: latest.environment_url ?? '' };
-  if (latest && ['failure', 'error'].includes(latest.state)) {
-    return { kind: 'failed', why: latest.description || `deployment ${latest.state}` };
+  const latest = deployments[0];
+  if (latest?.state === 'READY') return { kind: 'ready', url: `https://${latest.url}` };
+  if (latest?.state === 'ERROR') {
+    return { kind: 'failed', why: `deployment ${latest.uid} failed — vercel inspect ${latest.url} --logs` };
   }
+  if (latest?.state === 'CANCELED') return { kind: 'none' };
   if (!latest && elapsedMs >= NO_DEPLOY_AFTER_MS) return { kind: 'none' };
   if (elapsedMs >= DEPLOY_TIMEOUT_MS) return { kind: 'failed', why: 'still not ready after 15 min' };
   return { kind: 'waiting' };
@@ -116,6 +119,19 @@ function gh(args, options = {}) {
 
 const json = (args) => JSON.parse(gh(args));
 
+/**
+ * Vercel's production deployments of `sha`, newest first, through the signed-in CLI (`vercel api`).
+ * The CLI is a .cmd shim on Windows, so it runs through a shell; every argument is a constant or a
+ * hex SHA checked here.
+ */
+export function vercelDeployments(sha) {
+  if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`unexpected merge SHA ${sha}`);
+  const query = `/v6/deployments?teamId=${VERCEL_TEAM}&app=${VERCEL_PROJECT}&target=production&limit=20`;
+  const out = execSync(`vercel api "${query}"`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const { deployments = [] } = JSON.parse(out.slice(out.indexOf('{')));
+  return deployments.filter((d) => d.meta?.githubCommitSha === sha).sort((a, b) => b.created - a.created);
+}
+
 /** Polls until production is ready, failed, or (no deployment at all) skipped. */
 async function waitForProduction(number) {
   const sha = json(['pr', 'view', number, '--json', 'mergeCommit']).mergeCommit?.oid;
@@ -126,24 +142,20 @@ async function waitForProduction(number) {
   console.info(`pr:merge — waiting for migrate-production and the production deploy of ${sha.slice(0, 7)}…`);
   const started = Date.now();
   for (;;) {
-    const env = encodeURIComponent(PRODUCTION_ENV);
-    const [deployment] = json(['api', `repos/{owner}/{repo}/deployments?sha=${sha}&environment=${env}`]);
-    const statuses = deployment
-      ? json(['api', `repos/{owner}/{repo}/deployments/${deployment.id}/statuses`])
-      : [];
+    const deployments = vercelDeployments(sha);
     const runs = json([
       'api',
       `repos/{owner}/{repo}/commits/${sha}/check-runs?check_name=migrate-production`,
     ]);
     const v = deployVerdict({
-      statuses,
+      deployments,
       migrate: runs.check_runs?.[0] ?? null,
       elapsedMs: Date.now() - started,
     });
     if (v.kind === 'ready') return console.info(`pr:merge — production is live: ${v.url}`);
     if (v.kind === 'none') {
       return console.warn(
-        'pr:merge — no production deployment appeared: Vercel skipped the build (agent- or docs-only?). Check the Vercel dashboard if this commit changes the web app.',
+        'pr:merge — no production deployment: Vercel skipped or cancelled the build (agent- or docs-only?). Check the Vercel dashboard if this commit changes the web app.',
       );
     }
     if (v.kind === 'failed') {
