@@ -1,7 +1,6 @@
 import { failsHere, isHardFail, isTlsChainFail } from './hard-fail';
 import {
   CRAWLER_FRESH_MS,
-  CRAWLER_VIEWS,
   type IncidentState,
   type ProbeLocation,
   type Severity,
@@ -28,6 +27,7 @@ import { abstainsOnWafSite, bkkUntrusted, BLOCKED_NOTE, confirmsDown, evaluateRo
 import {
   crawlerIssue,
   keywordIssue,
+  latestPerView,
   minuteOf,
   nextFailingSince,
   nextSlowRounds,
@@ -774,11 +774,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     // D-042: an open keyword / redirect PROBLEM whose view hasn't had a usable fetch since its hit (the
     // site now refuses the fake Googlebot, or the crawler stopped) isn't over — no evidence either way,
     // so it holds until a clean usable fetch replaces the hit.
-    const crawlerOpen =
-      m.carry.status === 'problem' && (m.carry.trigger === 'keyword' || m.carry.trigger === 'redirect');
-    if (crawlerOpen && crawlerIssue(crawler.stale, m.url, m.allowedRedirectDomains)) {
-      return { verdict: { kind: 'insufficient' }, next };
-    }
+    if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next };
     // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
     const note =
       m.isPrimary && wafBlocked.length
@@ -810,7 +806,8 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         // The browser saw the page: the blocked locations count as reachable this round.
         const reachable = round.scheduled.filter((c) => !isHardFail(c));
         // D-042: what a crawler view saw still counts — the probes were only blocked, not answered.
-        const viewed = crawlerIssue(crawlerFacts(m, s, roundAt).fresh, m.url, m.allowedRedirectDomains);
+        const crawler = crawlerFacts(m, s, roundAt);
+        const viewed = crawlerIssue(crawler.fresh, m.url, m.allowedRedirectDomains);
         if (viewed) {
           return {
             verdict: {
@@ -823,6 +820,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
             next: reset,
           };
         }
+        if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next: reset };
         return { verdict: { kind: 'ok', reachable, note: BLOCKED_NOTE }, next: reset };
       }
       case 'failed':
@@ -869,15 +867,24 @@ function crawlerFacts(
   if (!m.isPrimary || !m.crawler?.length) return { fresh: [], stale: [] };
   const roundEnd = roundAt.getTime() + s.intervalSec * 1000;
   const freshFrom = s.now.getTime() - CRAWLER_FRESH_MS;
-  const latest = CRAWLER_VIEWS.flatMap((view) => {
-    const before = m.crawler!.filter((f) => f.view === view && f.checkedAt.getTime() < roundEnd);
-    const last = before.reduce<CrawlerFact | null>((a, f) => (!a || f.checkedAt > a.checkedAt ? f : a), null);
-    return last ? [last] : [];
-  });
+  const latest = latestPerView(m.crawler, roundEnd);
   return {
     fresh: latest.filter((f) => f.checkedAt.getTime() >= freshFrom),
     stale: latest.filter((f) => f.checkedAt.getTime() < freshFrom),
   };
+}
+
+/**
+ * D-042: an open PROBLEM incident that hasn't recovered doesn't recover while a view's latest usable
+ * fetch is a stale hit (the site now refuses the fake Googlebot, or the crawler stopped) — no data is no
+ * evidence the page is clean, whatever trigger the incident shows now (slow may have taken over). A
+ * DOWN drop recovers as before: the home page answering is the evidence (D-023).
+ */
+function crawlerHolds(m: SiteMonitor, s: SiteSnapshot, stale: readonly CrawlerFact[]): boolean {
+  const open = s.open;
+  if (!m.isPrimary || !open || RECOVERED_STATES.includes(open.state)) return false;
+  if ((open.episodeSeverity ?? open.severity) !== 'problem') return false;
+  return crawlerIssue(stale, m.url, m.allowedRedirectDomains) !== null;
 }
 
 /**

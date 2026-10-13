@@ -8,6 +8,7 @@ import {
   toMonitorHeaders,
   type MonitorHeader,
 } from '@dxt/shared';
+import { isAllowedHost } from '@dxt/engine';
 import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 
@@ -28,6 +29,7 @@ export interface CrawlerMonitor {
   siteName: string;
   url: string;
   mustNotContain: string[];
+  allowedRedirectDomains: string[];
   headers: MonitorHeader[];
 }
 
@@ -49,19 +51,17 @@ export interface CrawlerDeps {
  * Cloudflare refuse a "Googlebot" from Vercel's IPs. One exception: a fetch the site sent to another
  * host counts whatever that host answered — the redirect itself is the evidence.
  */
-export function isUsable(r: HttpCheckResult, url: string): boolean {
+export function isUsable(r: HttpCheckResult, url: string, allowlist: readonly string[] = []): boolean {
   if (r.statusCode === null) return false;
-  if (endedOffSite(r, url)) return true;
+  if (endedOffSite(r, url, allowlist)) return true;
   const answered = r.outcome === 'pass' && r.statusCode >= 200 && r.statusCode < 400;
   return answered && (r.scanComplete !== false || (r.keywordForbidden?.length ?? 0) > 0);
 }
 
-const bareHost = (u: string) => new URL(u).hostname.toLowerCase().replace(/^www\./, '');
-
-/** The redirects ended on another host than the monitor's own (with or without `www.`). */
-function endedOffSite(r: HttpCheckResult, url: string): boolean {
+/** The redirects ended outside the site's allowlist — the engine's own rule (`isAllowedHost`). */
+function endedOffSite(r: HttpCheckResult, url: string, allowlist: readonly string[]): boolean {
   try {
-    return !!r.finalUrl && bareHost(r.finalUrl) !== bareHost(url);
+    return !!r.finalUrl && !isAllowedHost(new URL(r.finalUrl).hostname, url, allowlist);
   } catch {
     return false;
   }
@@ -71,7 +71,7 @@ function endedOffSite(r: HttpCheckResult, url: string): boolean {
 export async function loadCrawlerMonitors(db: DbClient): Promise<CrawlerMonitor[]> {
   const { data, error } = await db
     .from('monitors')
-    .select('id, url, must_not_contain, headers, sites!inner(name, is_active)')
+    .select('id, url, must_not_contain, allowed_redirect_domains, headers, sites!inner(name, is_active)')
     .eq('sites.is_active', true)
     .eq('is_primary', true)
     .eq('enabled', true)
@@ -83,6 +83,7 @@ export async function loadCrawlerMonitors(db: DbClient): Promise<CrawlerMonitor[
     siteName: m.sites.name,
     url: m.url,
     mustNotContain: m.must_not_contain,
+    allowedRedirectDomains: m.allowed_redirect_domains,
     headers: toMonitorHeaders(m.headers),
   }));
 }
@@ -124,7 +125,7 @@ export async function runCrawler({
       view,
       checked_at: checkedAt.toISOString(),
       outcome: result.outcome,
-      usable: isUsable(result, m.url),
+      usable: isUsable(result, m.url, m.allowedRedirectDomains),
       status_code: result.statusCode,
       response_ms: result.responseMs,
       final_url: result.finalUrl,
@@ -140,12 +141,15 @@ export async function runCrawler({
 
   // What the log keeps: the words or the final URL per site and view, never page content.
   const hits = done
-    .filter(({ m, result }) => isUsable(result, m.url) && (result.keywordForbidden?.length ?? 0) > 0)
+    .filter(
+      ({ m, result }) =>
+        isUsable(result, m.url, m.allowedRedirectDomains) && (result.keywordForbidden?.length ?? 0) > 0,
+    )
     .map(({ m, view, result }) => ({ site: m.siteName, view, forbidden: result.keywordForbidden }));
   return {
     ok: true,
     fetched: done.length,
-    unusable: done.filter(({ m, result }) => !isUsable(result, m.url)).length,
+    unusable: done.filter(({ m, result }) => !isUsable(result, m.url, m.allowedRedirectDomains)).length,
     ...(ran.length > done.length ? { skipped: ran.length - done.length } : {}),
     ...(hits.length ? { hits } : {}),
   };

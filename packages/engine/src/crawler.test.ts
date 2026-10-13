@@ -201,6 +201,43 @@ describe('decideSite — crawler views', () => {
     ).toMatchObject({ kind: 'recover' });
   });
 
+  describe('an unrefuted older hit holds an open PROBLEM, whatever its trigger now (engine re-review)', () => {
+    const oldHit = fact({ forbidden: ['บาคาร่า'], checkedAt: new Date(at(260).getTime() - 70 * 60_000) });
+    const blocked = LOCATIONS.map((l, i) => ({ ...check(l, 'blocked', 1 + i), statusCode: 403 }));
+    const loaded = new Map([[R, { state: 'loaded', jobId: 'j1' } as Verification]]);
+    it.each<[string, Partial<SiteMonitor>, Partial<SiteSnapshot>]>([
+      [
+        'the browser loaded the blocked round',
+        { checks: blocked, verifications: loaded, carry: held },
+        { open },
+      ],
+      ['slow took over the trigger', { carry: { ...held, trigger: 'slow', slowRounds: 3 } }, { open }],
+      ['blocked (unverified) took over', { carry: { ...held, trigger: 'blocked_unverified' } }, { open }],
+      [
+        'one view stale with a hit, the other fresh and clean',
+        { carry: held, crawler: [oldHit, fact({ view: 'google_referer' })] },
+        { open },
+      ],
+    ])('%s → no recovery', (_name, over, snap) => {
+      const d = decideSite(site([monitor('home', clean, { crawler: [oldHit], ...over })], snap));
+      expect(d).toMatchObject({ kind: 'none', status: null });
+    });
+
+    it('without an open incident nothing is held (no PROBLEM without an incident)', () => {
+      expect(decideSite(site([monitor('home', clean, { carry: held, crawler: [oldHit] })]))).toMatchObject({
+        kind: 'none',
+        status: 'ok',
+      });
+    });
+
+    it('a DOWN drop still recovers when the home page answers (D-023)', () => {
+      const down: OpenIncident = { ...open, severity: 'down', episodeSeverity: 'down' };
+      expect(decideSite(site([monitor('home', clean, { crawler: [oldHit] })], { open: down }))).toMatchObject(
+        { kind: 'recover' },
+      );
+    });
+  });
+
   it('a blocked round the browser loaded still raises what a crawler view saw', () => {
     const blocked = LOCATIONS.map((l, i) => ({ ...check(l, 'blocked', 1 + i), statusCode: 403 }));
     const loaded = new Map([[R, { state: 'loaded', jobId: 'j1' } as Verification]]);

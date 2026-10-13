@@ -2,6 +2,7 @@ import 'server-only';
 import type { DbClient, Json } from '@dxt/db';
 import {
   crawlerIssue,
+  latestPerView,
   decideSite,
   problemHoldUntil,
   bkkControlDown,
@@ -284,7 +285,7 @@ export async function runEngine(
     if (!m.isPrimary) return undefined;
     const facts = crawler.get(m.id) ?? [];
     if (defacementAlerts) return facts;
-    const issue = crawlerIssue(facts, m.url, m.allowedRedirectDomains);
+    const issue = crawlerIssue(latestPerView(facts), m.url, m.allowedRedirectDomains);
     // Logged for the runs just after the fetch, not for its whole 65-min window.
     if (issue && issue.at.getTime() < now.getTime() - CRAWLER_LOG_WINDOW_MS) return undefined;
     if (issue?.detail.kind === 'keyword') {

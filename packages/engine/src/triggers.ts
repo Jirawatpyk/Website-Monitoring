@@ -124,6 +124,16 @@ export interface CrawlerFact {
   forbidden: readonly string[];
 }
 
+/** Per view, the latest fetch made before `before` (epoch ms), Googlebot first. */
+export function latestPerView(facts: readonly CrawlerFact[], before = Infinity): CrawlerFact[] {
+  return CRAWLER_VIEWS.flatMap((view) => {
+    const last = facts
+      .filter((f) => f.view === view && f.checkedAt.getTime() < before)
+      .reduce<CrawlerFact | null>((a, f) => (!a || f.checkedAt > a.checkedAt ? f : a), null);
+    return last ? [last] : [];
+  });
+}
+
 /**
  * What only a crawler view saw: a forbidden word (keyword) first, then a final host off the
  * allowlist (redirect), Googlebot before the Google-search view. The detail names the view; it has

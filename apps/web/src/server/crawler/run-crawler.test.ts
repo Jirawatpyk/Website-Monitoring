@@ -24,6 +24,7 @@ const monitor = {
   id: 'm1',
   url: 'https://a.example.test/',
   must_not_contain: ['Index of /'],
+  allowed_redirect_domains: [],
   headers: [{ name: 'Accept-Language', value: 'th' }],
   sites: { name: 'Site A', is_active: true },
 };
@@ -56,6 +57,16 @@ describe('isUsable (D-041, D-042: not a 2xx / 3xx answer read to the end → no 
       false,
     ],
     [
+      'a subdomain (m.) refusing the bot is the site, so no data',
+      result({ finalUrl: 'https://m.a.example.test/', outcome: 'blocked', statusCode: 403 }),
+      false,
+    ],
+    [
+      'an allowlisted host failing is no data',
+      result({ finalUrl: 'https://pay.partner.example/', outcome: 'fail', statusCode: 503 }),
+      false,
+    ],
+    [
       'a timeout after an off-site hop never answered',
       result({ ...offSite, outcome: 'fail', statusCode: null }),
       false,
@@ -67,7 +78,7 @@ describe('isUsable (D-041, D-042: not a 2xx / 3xx answer read to the end → no 
     ['a timeout', result({ outcome: 'fail', statusCode: null, error: 'Timeout' }), false],
     ['a 5xx', result({ outcome: 'fail', statusCode: 503 }), false],
   ])('%s', (_name, r, usable) => {
-    expect(isUsable(r, 'https://a.example.test/')).toBe(usable);
+    expect(isUsable(r, 'https://a.example.test/', ['partner.example'])).toBe(usable);
   });
 });
 
