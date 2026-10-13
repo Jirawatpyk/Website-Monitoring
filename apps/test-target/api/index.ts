@@ -8,6 +8,7 @@ const respond = (request: Request) =>
     readMode: () => readEdgeConfigItem(process.env.GLOBAL_CONFIG ?? process.env.EDGE_CONFIG, 'mode'),
     userAgent: request.headers.get('user-agent'),
     country: request.headers.get('x-vercel-ip-country'),
+    referer: request.headers.get('referer'),
   });
 
 export const GET = respond;
