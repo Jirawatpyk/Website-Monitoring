@@ -106,7 +106,10 @@ export async function runCrawler({
   }
   const started = clock();
   const monitors = await loadCrawlerMonitors(db);
-  const jobs = monitors.flatMap((m) => CRAWLER_VIEWS.map((view) => ({ m, view })));
+  const all = monitors.flatMap((m) => CRAWLER_VIEWS.map((view) => ({ m, view })));
+  // Start each run further down the list, so a run cut by its budget never skips the same sites twice.
+  const shift = all.length ? Math.floor(started / (30 * 60_000)) % all.length : 0;
+  const jobs = [...all.slice(shift), ...all.slice(0, shift)];
   const ran = await inBatches(jobs, crawlerConcurrency(jobs.length), async ({ m, view }) => {
     if (clock() - started > CRAWLER_BUDGET_MS) return null;
     const checkedAt = new Date(clock());

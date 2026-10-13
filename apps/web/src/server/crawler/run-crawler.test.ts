@@ -142,7 +142,7 @@ describe('runCrawler', () => {
         ? result({ outcome: 'blocked', statusCode: 403, keywordForbidden: null })
         : result({ outcome: 'fail', statusCode: null, error: 'Timeout', keywordForbidden: null }),
     );
-    const summary = await runCrawler({ db: fake.db, check });
+    const summary = await runCrawler({ db: fake.db, check, clock: () => 0 });
     const inserts = fake.calls.filter((c) => c.table === 'crawler_checks');
     expect(inserts.map((c) => c.values)).toEqual([
       expect.objectContaining({ usable: false, outcome: 'blocked', status_code: 403 }),
@@ -161,6 +161,16 @@ describe('runCrawler', () => {
     expect(check).toHaveBeenCalledTimes(1);
     expect(fake.calls.filter((c) => c.table === 'crawler_checks')).toHaveLength(1);
     expect(summary).toMatchObject({ fetched: 1, skipped: 1 });
+  });
+
+  it('starts each run further down the list, so a cut run never skips the same sites twice', async () => {
+    const order = async (at: number) => {
+      const { fake, check } = setup(() => result());
+      await runCrawler({ db: fake.db, check, clock: () => at });
+      return check.mock.calls.map((c) => c[0].client);
+    };
+    expect(await order(0)).toEqual([CRAWLER_CLIENTS.googlebot, CRAWLER_CLIENTS.google_referer]);
+    expect(await order(30 * 60_000)).toEqual([CRAWLER_CLIENTS.google_referer, CRAWLER_CLIENTS.googlebot]);
   });
 
   it('adds lanes as sites are added', () => {
