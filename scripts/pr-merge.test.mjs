@@ -117,27 +117,24 @@ test('refuses migrations and runtime code together unless the schema lag was rev
   );
 });
 
-// GitHub's statuses for #89's production deployment (12 Oct 2026), newest first.
-const failed = {
-  state: 'failure',
-  description: 'Deployment has failed — run this Vercel CLI command: npx vercel inspect dpl_2Wng --logs',
-};
-const redeployed = { state: 'success', environment_url: 'https://dxt-monitor-f46aw29sb.vercel.app' };
+// Vercel's production deployments of #89's merge (12 Oct 2026), newest first: the build failed
+// (`git_info_fail`) and a redeploy 12 min later went live.
+const failed = { uid: 'dpl_2Wng', state: 'ERROR', url: 'dxt-monitor-5zvphanjy.vercel.app' };
+const redeployed = { uid: 'dpl_9dP7', state: 'READY', url: 'dxt-monitor-f46aw29sb.vercel.app' };
 const minute = 60_000;
 
 test('deployVerdict: production ready, failed, redeployed, skipped, timed out', () => {
-  assert.equal(deployVerdict({ statuses: [{ state: 'in_progress' }], elapsedMs: minute }).kind, 'waiting');
-  assert.match(deployVerdict({ statuses: [failed], elapsedMs: minute }).why, /dpl_2Wng/);
-  assert.deepEqual(deployVerdict({ statuses: [redeployed, failed], elapsedMs: 13 * minute }), {
+  const building = { state: 'BUILDING' };
+  assert.equal(deployVerdict({ deployments: [building], elapsedMs: minute }).kind, 'waiting');
+  assert.match(deployVerdict({ deployments: [failed], elapsedMs: minute }).why, /dpl_2Wng.*--logs/);
+  assert.deepEqual(deployVerdict({ deployments: [redeployed, failed], elapsedMs: 13 * minute }), {
     kind: 'ready',
-    url: redeployed.environment_url,
+    url: 'https://dxt-monitor-f46aw29sb.vercel.app',
   });
-  assert.equal(deployVerdict({ statuses: [], elapsedMs: NO_DEPLOY_AFTER_MS - 1 }).kind, 'waiting');
-  assert.equal(deployVerdict({ statuses: [], elapsedMs: NO_DEPLOY_AFTER_MS }).kind, 'none');
-  assert.equal(
-    deployVerdict({ statuses: [{ state: 'queued' }], elapsedMs: DEPLOY_TIMEOUT_MS }).kind,
-    'failed',
-  );
+  assert.equal(deployVerdict({ deployments: [{ state: 'CANCELED' }], elapsedMs: minute }).kind, 'none');
+  assert.equal(deployVerdict({ deployments: [], elapsedMs: NO_DEPLOY_AFTER_MS - 1 }).kind, 'waiting');
+  assert.equal(deployVerdict({ deployments: [], elapsedMs: NO_DEPLOY_AFTER_MS }).kind, 'none');
+  assert.equal(deployVerdict({ deployments: [building], elapsedMs: DEPLOY_TIMEOUT_MS }).kind, 'failed');
 });
 
 test('deployVerdict: a failed migrate-production fails the merge; skipped or running does not', () => {
@@ -145,7 +142,7 @@ test('deployVerdict: a failed migrate-production fails the merge; skipped or run
   assert.equal(deployVerdict({ migrate: migrate('completed', 'failure'), elapsedMs: 0 }).kind, 'failed');
   assert.equal(deployVerdict({ migrate: migrate('completed', 'skipped'), elapsedMs: 0 }).kind, 'waiting');
   assert.equal(
-    deployVerdict({ migrate: migrate('in_progress'), statuses: [redeployed], elapsedMs: 0 }).kind,
+    deployVerdict({ migrate: migrate('in_progress'), deployments: [redeployed], elapsedMs: 0 }).kind,
     'ready',
   );
 });
