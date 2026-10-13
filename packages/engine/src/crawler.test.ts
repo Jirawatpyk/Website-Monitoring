@@ -137,6 +137,33 @@ describe('decideSite — crawler views', () => {
     ).toMatchObject({ kind: 'recover', from: 'unacked' });
   });
 
+  it('a fetch from before a recovery starts the PROBLEM AGAIN at the round after it, never before', () => {
+    // 09:41 fetch while the site was down; it recovered at the 09:48 round; this 09:51 round raises it.
+    const recovered: OpenIncident = {
+      ...open,
+      state: 'monitoring',
+      severity: 'down',
+      episodeSeverity: 'down',
+    };
+    const d = decideSite(
+      site([monitor('home', clean, { crawler: [fact({ forbidden: ['บาคาร่า'] })] })], {
+        open: recovered,
+        lastRoundAt: at(-180),
+        okRounds: 1,
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'relapse', severity: 'problem', startedAt: at(0) });
+  });
+
+  it('a first PROBLEM starts at the fetch when the rounds since were judged without it', () => {
+    const d = decideSite(
+      site([monitor('home', clean, { crawler: [fact({ forbidden: ['บาคาร่า'] })] })], {
+        lastRoundAt: at(-900),
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'problem', startedAt: at(-600) });
+  });
+
   it('a DOWN round still wins over a crawler hit', () => {
     const d = decideSite(site([monitor('home', failed(), { crawler: [fact({ forbidden: ['บาคาร่า'] })] })]));
     expect(d).toMatchObject({ kind: 'open', status: 'down' });

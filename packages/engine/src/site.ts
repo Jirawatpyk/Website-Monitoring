@@ -746,12 +746,18 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     const crawler = m.isPrimary ? (m.crawler ?? []).filter((f) => f.checkedAt.getTime() < roundEnd) : [];
     const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound, crawler);
     if (issue) {
+      // A crawler problem starts at its fetch — but never before the round after the last one judged:
+      // a fetch made while the site was down or recovering would otherwise start a PROBLEM AGAIN
+      // before the recovery it follows.
+      const afterJudged = s.lastRoundAt ? s.lastRoundAt.getTime() + s.intervalSec * 1000 : 0;
       return {
         verdict: {
           kind: 'problem',
           trigger: issue.trigger,
           detail: issue.detail,
-          startedAt: issue.at ?? issueStart(issue.detail, counted, roundAt, s, slowRounds),
+          startedAt: issue.at
+            ? new Date(Math.max(issue.at.getTime(), afterJudged))
+            : issueStart(issue.detail, counted, roundAt, s, slowRounds),
           reachable: passing,
         },
         next,

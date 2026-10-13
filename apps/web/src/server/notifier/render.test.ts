@@ -51,6 +51,26 @@ describe('render — PROBLEM rows', () => {
     expect(JSON.stringify(m.cardsV2)).toContain('https://monitor.example.test/incidents/inc-141?ack=1');
   });
 
+  it('a crawler-view PROBLEM names the view and shows no "Seen from" locations row (S09c, D-042)', () => {
+    const m = renderChat(
+      row('problem', {
+        cause: 'Found “บาคาร่า” on / (as Googlebot)',
+        summary: '“บาคาร่า” found on the page (as Googlebot)',
+        detail: { kind: 'keyword', missing: [], forbidden: ['บาคาร่า'], locations: [], view: 'googlebot' },
+        reporting: 3,
+      }),
+      { ...incident, trigger: 'keyword' },
+      appUrl,
+      now,
+    )!;
+    expect(m.text).toBe(
+      '<users/PLOY> PROBLEM · Fuji Links (Tier 2) · “บาคาร่า” found on the page (as Googlebot) · please take a look',
+    );
+    const card = JSON.stringify(m.cardsV2);
+    expect(card).toContain('Found “บาคาร่า” on / (as Googlebot)');
+    expect(card).not.toContain('Seen from');
+  });
+
   it('words ACKNOWLEDGED and RECOVERED of a PROBLEM as one, and keeps DOWN as it was', () => {
     const ack = renderChat(
       row('acknowledged', { ackedBy: 'Ploy', ackedAt: '2026-09-25T02:58:12Z' }),
