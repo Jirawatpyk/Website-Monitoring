@@ -101,12 +101,16 @@ const STATE_WORDS: Record<string, string> = {
   acknowledged: 'Acknowledged',
 };
 
-/** "slow, p50 5.4 s" → "slow again, p50 5.4 s"; the head alone for a title. */
+/**
+ * "slow, p50 5.4 s" → "slow again, p50 5.4 s"; the head alone for a title. Found words are one head
+ * ("“a”, “b” found on the page again"), and a bracket stays last ("… again (as Googlebot)").
+ */
 function again(summary: string): { line: string; head: string } {
-  const i = summary.indexOf(', ');
-  return i < 0
-    ? { line: `${summary} again`, head: summary }
-    : { line: `${summary.slice(0, i)} again${summary.slice(i)}`, head: summary.slice(0, i) };
+  const i = summary.startsWith('“') ? -1 : summary.indexOf(', ');
+  if (i >= 0) return { line: `${summary.slice(0, i)} again${summary.slice(i)}`, head: summary.slice(0, i) };
+  const bracket = / \([^()]*\)$/.exec(summary)?.[0] ?? '';
+  const head = summary.slice(0, summary.length - bracket.length);
+  return { line: `${head} again${bracket}`, head };
 }
 
 /**

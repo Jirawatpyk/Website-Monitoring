@@ -1,6 +1,7 @@
 import 'server-only';
 import type { DbClient, Json } from '@dxt/db';
 import {
+  crawlerIssue,
   decideSite,
   problemHoldUntil,
   bkkControlDown,
@@ -10,6 +11,7 @@ import {
   lookbackMs,
   NEW_MONITOR,
   UNKNOWN_ROOT_CAUSE,
+  type CrawlerFact,
   type DownFacts,
   type MonitorCarry,
   type MonitorState,
@@ -27,7 +29,11 @@ import {
   type ProblemCauseContext,
 } from '@dxt/notifier';
 import {
+  CRAWLER_FRESH_MS,
+  CRAWLER_LABELS,
+  isForbiddenPhrase,
   TIER_CONFIG,
+  type CrawlerView,
   type ProbeLocation,
   type ProblemDetail,
   type ResponseHours,
@@ -50,6 +56,8 @@ const MAX_ROUNDS_PER_RUN = 5;
 const CONTROL_ROUND_SPAN_MS = 2 * 60_000;
 /** How far back a run reports slow-location minutes in its summary (D-039). */
 const SLOW_LOG_WINDOW_MS = 3 * 60_000;
+/** How far back a run reports the shared-list hits it held back (D-042), as the slow log. */
+const HELD_LOG_WINDOW_MS = SLOW_LOG_WINDOW_MS;
 /** Messages that told someone the site failed: RECOVERED replies only to these (spec §15.1). */
 const ALERT_TEMPLATES = ['down', 'problem', 'down_again', 'problem_again'];
 /**
@@ -63,6 +71,8 @@ interface MonitorRow {
   url: string;
   isPrimary: boolean;
   mustContain: string[];
+  /** The site's own forbidden words: they alert whatever DEFACEMENT_ALERTS says (D-042). */
+  mustNotContain: string[];
   timeoutMs: number;
   slowThresholdMs: number;
   allowedRedirectDomains: string[];
@@ -108,6 +118,16 @@ export interface EngineSummary extends CronJobResult {
   failures?: string[];
   /** Recent minutes a location's times were left out of the slow rule, e.g. "2026-10-12T14:03Z BKK" (D-039). */
   slowLocations?: string[];
+  /**
+   * D-042: with DEFACEMENT_ALERTS off, what the shared list and the crawler views found and the engine
+   * didn't act on, e.g. `Site A · “บาคาร่า” (BKK, SIN)` or `Site A · → casino.example (from Google search)`.
+   */
+  defacementHeld?: string[];
+}
+
+export interface EngineOptions {
+  /** D-042 (env DEFACEMENT_ALERTS): shared-list hits and crawler views raise PROBLEM; off logs them. */
+  defacementAlerts?: boolean;
 }
 
 /**
@@ -117,7 +137,11 @@ export interface EngineSummary extends CronJobResult {
  * each, the monitors' verdicts and the site status included); repeated runs are harmless (one open
  * incident per site, one message per incident).
  */
-export async function runEngine(db: DbClient, now: Date = new Date()): Promise<EngineSummary> {
+export async function runEngine(
+  db: DbClient,
+  now: Date = new Date(),
+  { defacementAlerts = false }: EngineOptions = {},
+): Promise<EngineSummary> {
   const summary: EngineSummary = {
     ok: true,
     sites: 0,
@@ -167,7 +191,7 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
   const siteIds = sites.map((s) => s.id);
   const windows = await loadWindows(db, siteIds, now);
   for (const s of sites) s.windows = windows.get(s.id);
-  const [checks, statuses, carries, incidents, verifier] = await Promise.all([
+  const [checks, statuses, carries, incidents, verifier, crawler] = await Promise.all([
     loadChecks(db, since),
     db
       .from('site_status')
@@ -183,8 +207,13 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       .in('site_id', siteIds)
       .not('state', 'in', CLOSED_INCIDENT_STATES_IN),
     loadVerifierState(db, since, now),
+    loadCrawler(db, now),
   ]);
   for (const r of [statuses, carries, incidents]) if (r.error) throw new Error(r.error.message);
+  /** D-042: with alerts off, what the shared list and the crawler found, logged instead of acted on. */
+  const held = new Map<string, Set<string>>();
+  const hold = (line: string, where: string) =>
+    (held.get(line) ?? held.set(line, new Set()).get(line)!).add(where);
 
   const checksByMonitor = new Map<string, typeof checks>();
   for (const c of checks)
@@ -229,6 +258,36 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
       [...locs].map((l) => `${new Date(minute).toISOString().slice(0, 16)}Z ${l}`),
     );
   if (recentSlow.length) summary.slowLocations = recentSlow;
+
+  /**
+   * A check as the engine sees it. With DEFACEMENT_ALERTS off (D-042), a shared-list entry the probe
+   * found — one that isn't also the site's own word — is taken out and logged, so it opens nothing.
+   */
+  const storedFor = (site: SiteRow, m: MonitorRow) => (c: CheckRow) => {
+    const stored = toStoredCheck(c);
+    if (defacementAlerts || !c.keyword_forbidden?.length) return stored;
+    const shared = (w: string) => isForbiddenPhrase(w) && !m.mustNotContain.includes(w);
+    if (Date.parse(c.checked_at) >= now.getTime() - HELD_LOG_WINDOW_MS) {
+      for (const w of c.keyword_forbidden.filter(shared)) hold(`${site.name} · “${w}”`, c.location);
+    }
+    return { ...stored, keywordForbidden: c.keyword_forbidden.filter((w) => !shared(w)) };
+  };
+  /** The primary's crawler facts (D-042): passed to the engine when alerts are on, else logged. */
+  const crawlerFor = (site: SiteRow, m: MonitorRow): readonly CrawlerFact[] | undefined => {
+    if (!m.isPrimary) return undefined;
+    const facts = crawler.get(m.id) ?? [];
+    if (defacementAlerts) return facts;
+    const issue = crawlerIssue(facts, m.url, m.allowedRedirectDomains);
+    if (issue?.detail.kind === 'keyword') {
+      hold(
+        `${site.name} · ${issue.detail.forbidden.map((w) => `“${w}”`).join(', ')}`,
+        viewLabel(issue.detail.view),
+      );
+    } else if (issue?.detail.kind === 'redirect') {
+      hold(`${site.name} · → ${issue.detail.host}`, viewLabel(issue.detail.view));
+    }
+    return undefined;
+  };
 
   // D-028: the BKK probe's control check (D-027) over the window's Bangkok checks.
   // Either VPS check failing counts: both control URLs, or the Akamai control (D-027 rule 2b) —
@@ -293,6 +352,9 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
     failing: control,
     sites: controlSites,
   });
+  if (held.size) {
+    summary.defacementHeld = [...held].map(([line, where]) => `${line} (${[...where].sort().join(', ')})`);
+  }
   // `ok: false` fails the Healthchecks ping (cron-job.ts), while what the other sites queued is
   // still sent at once (engine-and-deliver.ts reads the counts).
   if (failures.length) return { ...summary, ok: false, failures };
@@ -349,9 +411,10 @@ export async function runEngine(db: DbClient, now: Date = new Date()): Promise<E
         url: m.url,
         slowThresholdMs: m.slowThresholdMs,
         allowedRedirectDomains: m.allowedRedirectDomains,
-        checks: (checksByMonitor.get(m.id) ?? []).map(toStoredCheck),
+        checks: (checksByMonitor.get(m.id) ?? []).map(storedFor(site, m)),
         carry: carryOf(carryByMonitor.get(m.id)),
         ...(verifier.jobs.get(m.id) ? { verifications: verifier.jobs.get(m.id)! } : {}),
+        ...withCrawler(crawlerFor(site, m)),
       })),
       verifierAvailable: verifier.available,
       behindWaf: site.behindWaf,
@@ -447,7 +510,37 @@ async function loadLocations(db: DbClient, now: Date): Promise<ProbeLocation[]> 
     .map((l) => l.code as ProbeLocation);
 }
 
-const toStoredCheck = (c: Awaited<ReturnType<typeof loadChecks>>[number]): StoredCheck => ({
+type CheckRow = Awaited<ReturnType<typeof loadChecks>>[number];
+
+const withCrawler = (crawler: readonly CrawlerFact[] | undefined) => (crawler?.length ? { crawler } : {});
+const viewLabel = (view: CrawlerView | undefined) => (view ? CRAWLER_LABELS[view] : 'crawler');
+
+/**
+ * Each live primary monitor's latest usable crawler fetch per view inside the freshness window
+ * (D-042). A failed read never holds the run back: the round is judged without the crawler.
+ */
+async function loadCrawler(db: DbClient, now: Date): Promise<Map<string, CrawlerFact[]>> {
+  const byMonitor = new Map<string, CrawlerFact[]>();
+  const { data, error } = await db.rpc('engine_crawler_checks', {
+    p_since: new Date(now.getTime() - CRAWLER_FRESH_MS).toISOString(),
+  });
+  if (error) {
+    console.error(JSON.stringify({ event: 'engine_crawler_checks_failed', error: error.message }));
+    return byMonitor;
+  }
+  for (const r of data ?? []) {
+    const fact: CrawlerFact = {
+      view: r.view as CrawlerView,
+      checkedAt: new Date(r.checked_at),
+      finalUrl: r.final_url,
+      forbidden: r.forbidden ?? [],
+    };
+    (byMonitor.get(r.monitor_id) ?? byMonitor.set(r.monitor_id, []).get(r.monitor_id)!).push(fact);
+  }
+  return byMonitor;
+}
+
+const toStoredCheck = (c: CheckRow): StoredCheck => ({
   location: c.location as ProbeLocation,
   outcome: c.outcome,
   checkedAt: new Date(c.checked_at),
@@ -658,7 +751,7 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
   const { data, error } = await db
     .from('monitors')
     .select(
-      'id, url, is_primary, must_contain, timeout_ms, thresholds, allowed_redirect_domains, site_id, sites!inner(name, tier, is_active, muted_until, behind_waf)',
+      'id, url, is_primary, must_contain, must_not_contain, timeout_ms, thresholds, allowed_redirect_domains, site_id, sites!inner(name, tier, is_active, muted_until, behind_waf)',
     )
     .eq('sites.is_active', true)
     // A monitor switched off or removed (S05, D-025) no longer counts towards the site.
@@ -682,6 +775,7 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
       url: m.url,
       isPrimary: m.is_primary,
       mustContain: m.must_contain,
+      mustNotContain: m.must_not_contain ?? [],
       timeoutMs: m.timeout_ms,
       slowThresholdMs: slowThreshold(m.thresholds, tier),
       allowedRedirectDomains: m.allowed_redirect_domains,

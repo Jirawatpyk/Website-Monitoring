@@ -3,7 +3,7 @@ import type { DbClient } from '@dxt/db';
 import type { ServerEnv } from '@/lib/env';
 import { notifierDeps } from '../notifier/deps';
 import { dispatchNotifications } from '../notifier/dispatch';
-import { runEngine, type EngineSummary } from './run-engine';
+import { runEngine, type EngineOptions, type EngineSummary } from './run-engine';
 
 /**
  * Judge the rounds, then send right away what that queued (PRD §9: an alert leaves within 30 s of
@@ -15,9 +15,9 @@ export async function engineAndDeliver(
   db: DbClient,
   env: ServerEnv,
   deadline: number,
-  engine: (db: DbClient) => Promise<EngineSummary> = runEngine,
+  engine: (db: DbClient, now: Date, options: EngineOptions) => Promise<EngineSummary> = runEngine,
 ): Promise<EngineSummary & { delivery?: unknown }> {
-  const summary = await engine(db);
+  const summary = await engine(db, new Date(), { defacementAlerts: env.DEFACEMENT_ALERTS === 'on' });
   // Any incident change that queued messages (one count from the runner, whatever the kind), or an
   // Admin alert (D-019, D-022, D-024): send them now.
   if ((summary.notified ?? 0) + (summary.alerts ?? 0) === 0) return summary;

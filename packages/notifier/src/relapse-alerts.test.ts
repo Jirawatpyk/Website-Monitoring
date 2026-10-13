@@ -97,6 +97,27 @@ describe('PROBLEM AGAIN (ChatAlert INC-0150, INC-0152)', () => {
     );
   });
 
+  it.each([
+    // S09c: several found words are one head; the crawler view's bracket stays last.
+    ['“a”, “b” found on the page', '“a”, “b” found on the page again', '“a”, “b” found on the page'],
+    [
+      '“บาคาร่า” found on the page (as Googlebot)',
+      '“บาคาร่า” found on the page again (as Googlebot)',
+      '“บาคาร่า” found on the page',
+    ],
+    [
+      'redirects to casino.example.net (from Google search)',
+      'redirects to casino.example.net again (from Google search)',
+      'redirects to casino.example.net',
+    ],
+  ])('PROBLEM AGAIN reads "%s" as "%s"', (summary, line, head) => {
+    const m = buildAgainAlert(
+      voca({ severity: 'problem', trigger: 'keyword', summary, nowFlapping: false, flapping: false }),
+    );
+    expect(m.text).toContain(` · ${line} · same incident`);
+    expect(title(m)).toContain(`PROBLEM AGAIN · VOCA · ${head} again after`);
+  });
+
   it('INC-0152 VOCA: /booking still failing after the home page came back (same round as RECOVERED)', () => {
     const m = buildAgainAlert(
       voca({
