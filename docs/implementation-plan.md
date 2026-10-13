@@ -27,7 +27,7 @@
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Done |
 | S09 | Maintenance windows & mute | 1 · P0 | L | FR-10a, FR-14 | S06b, S08 | 3 | Done |
 | S09b | Maintenance messages | 1 · P0 | M | — (FR-10a, FR-14 messages, §24) | S09 + ChatAlert / EmailAlert boards | 3 | Done |
-| S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | S | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Todo |
+| S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | M | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Todo |
 | S09d | Defacement: page-change detection | 1 · P1 | M | — (PRD §2 content-change, D-041) | S09c, S07 | 3–4 (alert on after a 2-week record) | Todo |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
@@ -464,6 +464,8 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   - **What fires and how it reads.**
     - A forbidden phrase, or a redirect off the allowlist, is PROBLEM `keyword` / `redirect` (D-022). The cause names the phrase or the host, where it was seen, and "(as Googlebot)" or "(from Google search)" for a crawler fetch.
     - One crawler fetch is enough: it is a single location by design.
+  - **Not a round.** Crawler fetches are not a fourth location and don't go through `decideSite`'s round logic. A 30-min cron (sin1) stores each one in its own table, `crawler_checks`: monitor, view (`googlebot` / `google_referer` / `plain` for S09d), checked_at, outcome, status, final URL, the keywords found and the S09d fingerprint. It has RLS like `check_results`, 30-day retention and no partitions (~3 rows × live sites × 48 a day). The engine reads each monitor's latest crawler result beside its round, and opens or clears the PROBLEM on it.
+  - **Size:** M, not S. It needs a cron, the table, probe User-Agent / Referer plumbing, an engine case, notifier wording and four test-target modes. Against G1 (16–21 Oct), Done-when 1, 2 and 4 must land first.
     - **A crawler fetch that isn't a 2xx/3xx answer — a WAF 403, a challenge, a timeout — is no data, never PROBLEM.** Akamai and Cloudflare check that "Googlebot" is real, and a fake one from Vercel's IPs is usually refused (Bangkok Airways sits behind Akamai).
 - **Boards:** none new (the ChatAlert / EmailAlert PROBLEM · Keyword and Redirect rows).
 - **Depends on:** S04a
@@ -488,7 +490,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   3. **(After G1, as S05's production line):** replay every live site's current home page, both crawler views included, through the list before the alert goes on. Then a week of production checks with no false positive.
   4. message-checker passes the PROBLEM · Keyword / Redirect card and email with the new cause wording.
 - **G1 needs Done-when 1, 2 and 4.** Done-when 3 is collected after G1. Until it passes, the slice is In review and the shared list's alerts stay off on production: findings are logged, not posted.
-- **Review:** engine-reviewer, message-checker, security-reviewer (the crawler fetches: fixed User-Agents and Referer, the same SSRF guard).
+- **Review:** engine-reviewer, db-reviewer (`crawler_checks`), message-checker, security-reviewer (the crawler fetches: fixed User-Agents and Referer, the same SSRF guard).
 - **Not in this slice:** "the page changed from its last version" is S09d.
 
 ### S09d · Defacement: page-change detection
@@ -499,11 +501,11 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   - the first `<h1>`;
   - the set of domains the page links to or loads scripts / iframes from.
 
-  It is built from the **head and tail of the body** (first 128 KB + last 128 KB): injected scripts usually sit at the end of `<body>`, past a 256 KB sample. It is stored per monitor.
+  It is built from a **whole-body fetch in S09c's 30-min crawler run** (the probe's own User-Agent, up to 3 MB). It is not built from the per-minute probe: reading a page's tail means downloading all of it, and D-026 keeps the per-minute probe to its sample. Injected scripts usually sit at the end of `<body>`. The fingerprint is stored per monitor.
 
 - **What fires:**
-  - a new external script or iframe domain → PROBLEM `content_change` at once (the common injected-malware sign);
-  - a changed title / description / h1 / canonical, or new link domains, holding for 3 rounds → PROBLEM `content_change`.
+  - a new external script or iframe domain → PROBLEM `content_change` on the next 30-min fetch (the common injected-malware sign);
+  - a changed title / description / h1 / canonical, or new link domains, holding for 3 fetches (~1 h) → PROBLEM `content_change`.
 
   The cause shows before → after.
 
@@ -512,8 +514,8 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - **Depends on:** S09c, S07
 - **Done when:**
   1. Table-driven tests cover:
-     - an injected `<script src="evil.example">` at the end of a 400 KB page → PROBLEM at once;
-     - a title change → PROBLEM on the 3rd round;
+     - an injected `<script src="evil.example">` at the end of a 400 KB page → PROBLEM on that fetch;
+     - a title change → PROBLEM on the 3rd fetch;
      - a rotating banner, prices or a news list (text outside the fingerprint) → no PROBLEM;
      - tracking domains on an allowlist (Google Analytics, Tag Manager, Meta pixel …) → no PROBLEM.
   2. Staging: the test target's `defaced-title` and `injected-script` modes fire with before → after; "Accept as new baseline" clears it and writes `audit_log`.

@@ -52,7 +52,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 **Decision (Tao, 13 Oct 2026).**
 
-- **S09c (size S, before G1):** a reviewed shared forbidden-word list in `@dxt/shared`. It holds gambling, slot-spam, adult and pharma words in Thai and English, plus injected-link markers, and applies to every monitor on top of its own `must_not_contain`, in the same 256 KB sample. Each live site's home page is also fetched as Googlebot every 30 min from SIN, with the same checks. A hit is PROBLEM · Keyword (D-022), and the cause names the word and "(as Googlebot)" when only that view had it.
+- **S09c (size M — first S, revised after review — before G1):** a reviewed shared forbidden-word list in `@dxt/shared`. It holds gambling, slot-spam, adult and pharma words in Thai and English, plus injected-link markers, and applies to every monitor on top of its own `must_not_contain`, in the same 256 KB sample. Each live site's home page is also fetched as Googlebot every 30 min from SIN, with the same checks. A hit is PROBLEM · Keyword (D-022), and the cause names the word and "(as Googlebot)" when only that view had it.
 - **S17** makes the list Admin-editable. Until then it changes by PR.
 - **S09d (size M, Phase 1 · P1, Tao: "include 2 and 3"):** "the page changed from its last version". To avoid false alarms, it checks a fingerprint of what a defacer changes rather than the whole page. The fingerprint holds:
   - title, meta description and robots;
@@ -70,7 +70,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   2. **A crawler fetch that isn't a 2xx/3xx answer is no data, never PROBLEM.** Akamai and Cloudflare check that "Googlebot" is real and refuse a fake one from Vercel's IPs (Bangkok Airways sits behind Akamai).
   3. **Phrases, not single words.** "slot online", "สล็อต", "บาคาร่า", "แทงบอล" — never "slot", which matches "time slot" on booking pages. Thai has no spaces, so each Thai entry is checked against normal pages for substring hits. A test covers "time slot".
   4. **A second crawler fetch**, as a mobile browser with `Referer: https://www.google.com/`, with the keyword and redirect checks. Thai gambling hacks redirect visitors who come from Google search rather than looking at the User-Agent.
-  5. **Crawler fetches read the whole body** (up to 3 MB, as D-026), and S09d's fingerprint reads the first and last 128 KB. Injected links and scripts usually sit at the end of `<body>`, past the 256 KB sample.
+  5. **Crawler fetches read the whole body** (up to 3 MB, as D-026), and S09d's fingerprint comes from a whole-body fetch in the same 30-min run (the per-minute probe can't read a page's tail without downloading it all, so not "first and last 128 KB"). Injected links and scripts usually sit at the end of `<body>`, past the 256 KB sample.
   6. **S09d states its blind spot:** a script added by JavaScript at runtime isn't in the HTML. Only the browser verifier renders pages, and only for blocked rounds.
   7. **Not in v1 (P2 backlog), by decision:** a changed DNS / NS record, and blacklist status (Google Safe Browsing / Web Risk). Before using Safe Browsing, check its terms: the free API is for non-commercial use, and commercial use goes through Web Risk. Added to PRD §2's non-goals.
 
