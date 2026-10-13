@@ -137,6 +137,25 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"crawler_checks": {
+                  Row: {
+                    "checked_at": string,"created_at": string,"error": string | null,"final_url": string | null,"forbidden": (string)[] | null,"id": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms": number | null,"scan_complete": boolean | null,"status_code": number | null,"updated_at": string,"usable": boolean,"view": string
+                  }
+                  Insert: {
+                    "checked_at": string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable": boolean,"view": string
+                  }
+                  Update: {
+                    "checked_at"?: string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id"?: string,"outcome"?: Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable"?: boolean,"view"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "crawler_checks_monitor_id_fkey"
+      columns: ["monitor_id"]
+isOneToOne: false
+      referencedRelation: "monitors"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"escalation_policies": {
                   Row: {
                     "created_at": string,"id": string,"severity": Database["public"]['Enums']["severity"],"tier": number | null,"updated_at": string
@@ -670,6 +689,29 @@ isOneToOne: false
                           SetofOptions: {
         from: "*"
         to: "check_results"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
+"engine_crawler_checks":
+{ Args: { "p_since": string }; Returns: {
+              "checked_at": string,
+"created_at": string,
+"error": string | null,
+"final_url": string | null,
+"forbidden": (string)[] | null,
+"id": string,
+"monitor_id": string,
+"outcome": Database["public"]['Enums']["check_outcome"],
+"response_ms": number | null,
+"scan_complete": boolean | null,
+"status_code": number | null,
+"updated_at": string,
+"usable": boolean,
+"view": string
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "crawler_checks"
         isOneToOne: false
         isSetofReturn: true
       } },
