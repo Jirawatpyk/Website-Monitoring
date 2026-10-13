@@ -56,6 +56,18 @@ The workflow, the rules and the tooling improve every time something goes wrong,
 
 `/code-review` finds general code bugs; the agents check the domain (spec, engine rules, RLS, messages, schema) — they complement each other. `/verify` (built-in; only Tao can start it) produces runtime evidence by running the app at the change's surface, following the project's `verifier-staging` skill on staging; `slice-verifier` (through `/slice-review`) checks that the evidence covers every Done-when line. Docs-only changes have no runtime surface — `/verify` reports SKIP. Reviewers are read-only and report findings; the slice owner fixes them. Independent reviewers can run in parallel.
 
+### Advisor
+
+When Claude's session has the `advisor` tool (a stronger reviewer that sees the whole conversation), Claude calls it at three points:
+
+1. **Before committing to an approach.** After the context is read, and before presenting a slice plan, writing a decision (D-xxx) or starting a production hotfix.
+2. **When stuck or about to change course.** For example, a second fix for the same symptom, or results that don't fit.
+3. **Before calling work done.** After the work is committed, before Done or a PR.
+
+It doesn't replace the reviewers above: they check the domain, the advisor checks the approach.
+
+**Why (12–13 Oct 2026):** the D-039 work changed the slow rule three times before anyone measured the probe. One advisor call on 13 Oct found four gaps in the D-041 plan, among them an S09d design that couldn't work.
+
 ## Definition of Done
 
 Every slice, on top of its own "Done when" lines:
