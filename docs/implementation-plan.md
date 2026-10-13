@@ -29,7 +29,7 @@
 | S09b | Maintenance messages | 1 · P0 | M | — (FR-10a, FR-14 messages, §24) | S09 + ChatAlert / EmailAlert boards | 3 | Done |
 | S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | S | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Todo |
 | S09d | Defacement: page-change detection | 1 · P1 | M | — (PRD §2 content-change, D-041) | S09c, S07 | 3–4 (alert on after a 2-week record) | Todo |
-| G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b, S09c) | end 3 (≈ 16–21 Oct) | Todo |
+| G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
 | S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06b, S10, S11 | 4 | Todo |
@@ -450,48 +450,77 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
 ### S09c · Defacement: shared forbidden words & crawler view
 
-- **Scope:** PRD §2 / §5 "content-change/defacement detection" (D-041). Today a defaced page is caught only by a missing `must_contain` or a site's own `must_not_contain` ("Index of /, Database error"). This slice adds:
-  - **Shared forbidden list (all sites):** gambling, slot-spam, adult and pharma words in Thai and English, and injected-link markers. It is a reviewed list in `@dxt/shared`, applied to every monitor on top of its own `must_not_contain` and read in the same 256 KB sample (D-026). The list is versioned in code; the Admin-editable list stays with S17.
-  - **Crawler view:** a cloaked SEO-spam hack serves its spam only to search engines. Each live site's primary monitor is fetched as Googlebot every 30 min, from SIN only, and gets the same keyword checks.
-  - **What fires and how it reads:** a hit is PROBLEM `keyword` (D-022). The cause names the word, where it was found, and "(as Googlebot)" for the crawler view. One location is enough for the crawler view, because it is a single fetch.
-- **Boards:** none new (ChatAlert / EmailAlert PROBLEM · Keyword rows)
+- **Scope:** PRD §2 / §5 "content-change/defacement detection" (D-041). Today a defaced page is caught only by a missing `must_contain` or by a site's own `must_not_contain` ("Index of /, Database error"). This slice adds:
+  - **Shared forbidden list (all sites).** A reviewed list in `@dxt/shared`, applied to every monitor on top of its own `must_not_contain`. It is versioned in code; S17 makes it Admin-editable.
+    - It holds **phrases, never single ambiguous words**: "slot online", "สล็อต", "บาคาร่า", "แทงบอล", "เว็บพนัน" … — not "slot", which matches "time slot" on a booking page.
+    - Thai has no spaces between words, so every Thai entry is checked against normal Thai pages for substring hits before it joins the list.
+    - Matching is case-insensitive and treats runs of whitespace as one.
+  - **Crawler view, every 30 min from SIN.** Each live site's home page gets two extra fetches, each with the keyword and redirect-allowlist checks:
+    1. as Googlebot — catches spam cloaked by User-Agent;
+    2. as a mobile browser with `Referer: https://www.google.com/` — catches Thai gambling hacks that redirect visitors arriving from Google search without looking at the User-Agent.
+
+    Each crawler fetch reads the **whole body** up to `KEYWORD_SCAN_BYTES` (3 MB, D-026), not the 256 KB sample: injected links and scripts usually sit at the end of `<body>`. Every 30 min, that costs little.
+
+  - **What fires and how it reads.**
+    - A forbidden phrase, or a redirect off the allowlist, is PROBLEM `keyword` / `redirect` (D-022). The cause names the phrase or the host, where it was seen, and "(as Googlebot)" or "(from Google search)" for a crawler fetch.
+    - One crawler fetch is enough: it is a single location by design.
+    - **A crawler fetch that isn't a 2xx/3xx answer — a WAF 403, a challenge, a timeout — is no data, never PROBLEM.** Akamai and Cloudflare check that "Googlebot" is real, and a fake one from Vercel's IPs is usually refused (Bangkok Airways sits behind Akamai).
+- **Boards:** none new (the ChatAlert / EmailAlert PROBLEM · Keyword and Redirect rows).
 - **Depends on:** S04a
 - **Done when:**
-  1. Table-driven tests (packages/probe / engine) cover these cases:
-     - a body with a shared-list word → PROBLEM `keyword` naming the word;
+  1. Table-driven tests (packages/probe, engine) cover:
+     - a shared-list phrase in the body → PROBLEM `keyword` naming it;
+     - "time slot" / "Select a time slot" on a booking page → no PROBLEM (no single-word "slot" match);
      - a clean body → OK;
-     - a word only in the crawler view → PROBLEM "(as Googlebot)";
-     - the list is case- and spacing-tolerant where the words need it.
-  2. On staging, the test target's new `defaced` and `cloaked` modes raise PROBLEM · Keyword with the right cause, and recover on `ok`.
-  3. A week of production checks through the list gives no false positive on the 17 sites. Before go-live, replay every site's current home page through the list.
-  4. message-checker passes the PROBLEM · Keyword card / email with the new cause wording.
-- **Review:** engine-reviewer, message-checker, security-reviewer (the Googlebot fetch, a fixed UA only).
+     - a phrase only in the Googlebot view → PROBLEM "(as Googlebot)";
+     - a redirect only with the Google Referer → PROBLEM `redirect` "(from Google search)";
+     - a phrase past 256 KB → caught by the crawler fetch (whole body);
+     - **a crawler fetch answered 403 / challenge / timeout → no data, no PROBLEM**;
+     - case and spacing tolerance.
+  2. On staging, the test target's new modes each raise their PROBLEM with the right cause and recover on `ok`:
+     - `defaced`;
+     - `cloaked-ua`;
+     - `cloaked-referer`;
+     - `deep-spam` (the phrase after 300 KB).
+
+     `waf-partial` on a crawler fetch stays no data.
+
+  3. **(After G1, as S05's production line):** replay every live site's current home page, both crawler views included, through the list before the alert goes on. Then a week of production checks with no false positive.
+  4. message-checker passes the PROBLEM · Keyword / Redirect card and email with the new cause wording.
+- **G1 needs Done-when 1, 2 and 4.** Done-when 3 is collected after G1. Until it passes, the slice is In review and the shared list's alerts stay off on production: findings are logged, not posted.
+- **Review:** engine-reviewer, message-checker, security-reviewer (the crawler fetches: fixed User-Agents and Referer, the same SSRF guard).
 - **Not in this slice:** "the page changed from its last version" is S09d.
 
 ### S09d · Defacement: page-change detection
 
-- **Scope:** D-041, the other half of PRD §2 "content-change". To keep false alarms out, the slice does not compare the whole page. It compares a small **fingerprint of what a defacer changes** on each live site's home page against an accepted baseline. The fingerprint holds:
+- **Scope:** D-041, the other half of PRD §2 "content-change". To keep false alarms out, the slice compares a small **fingerprint of what a defacer changes** on each live site's home page against an accepted baseline, not the whole page. The fingerprint holds:
   - `<title>`, meta description and robots;
   - the canonical URL;
   - the first `<h1>`;
   - the set of domains the page links to or loads scripts / iframes from.
 
-  It is stored per monitor, from the probe's 256 KB sample.
+  It is built from the **head and tail of the body** (first 128 KB + last 128 KB): injected scripts usually sit at the end of `<body>`, past a 256 KB sample. It is stored per monitor.
+
 - **What fires:**
   - a new external script or iframe domain → PROBLEM `content_change` at once (the common injected-malware sign);
   - a changed title / description / h1 / canonical, or new link domains, holding for 3 rounds → PROBLEM `content_change`.
 
   The cause shows before → after.
+
 - **Baseline:** set on the first round after monitoring starts, or with "Accept as new baseline" on the incident or site page (Admin, audited). A Resolve with root cause "Expected change" also accepts it.
 - **Boards:** none drawn. The incident and site-page rows need a board or Tao's OK first (memory: no board → ask Tao).
 - **Depends on:** S09c, S07
 - **Done when:**
-  1. Table-driven tests: an injected `<script src="evil.example">` → PROBLEM at once; a title change → PROBLEM on the 3rd round; a rotating banner, prices or a news list (text outside the fingerprint) → no PROBLEM; tracking domains on an allowlist (Google Analytics, Tag Manager, Meta pixel …) → no PROBLEM.
+  1. Table-driven tests cover:
+     - an injected `<script src="evil.example">` at the end of a 400 KB page → PROBLEM at once;
+     - a title change → PROBLEM on the 3rd round;
+     - a rotating banner, prices or a news list (text outside the fingerprint) → no PROBLEM;
+     - tracking domains on an allowlist (Google Analytics, Tag Manager, Meta pixel …) → no PROBLEM.
   2. Staging: the test target's `defaced-title` and `injected-script` modes fire with before → after; "Accept as new baseline" clears it and writes `audit_log`.
   3. Two weeks of fingerprints from the 17 production sites (recorded, not alerting) show no false positive before the alert is switched on.
 - **Review:** engine-reviewer, db-reviewer (fingerprint table), security-reviewer, message-checker, spec-checker if a board comes.
-- **Phase:** Phase 1 · P1. It doesn't block G1: its alert switches on only after the two-week record (Done when 3).
-
+- **Phase:** Phase 1 · P1. It doesn't block G1: its alert switches on only after the two-week record (Done-when 3).
+- **Not in this slice:** a script that JavaScript adds at runtime isn't in the HTML, so the probes can't see it. Only the browser verifier (S03) renders the page, and it runs only for blocked rounds. This slice does not cover runtime-injected scripts.
 ### S10 · Escalation L2–L3 & on-call
 
 - **Scope:** FR-09b. L2 CEO step on (approved 5 Oct 2026, D-009 — no "pending CEO" tag); voice "Configured · off" (Twilio not used for now); Tier 1 L3 FYI to CEO + AM at +60 min even after ack, never a call; Tier 2–3 L2 reminder to Tao. Full editor guardrails (§14.7, §15.5). `oncall_shifts`, rotation page, swap request / accept, hand over shift with reason, reminder a day before, on-call phone checklist with test alert; Tier 1 nights, weekends and holidays page the on-call person.

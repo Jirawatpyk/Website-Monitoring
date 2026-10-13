@@ -65,7 +65,16 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   - It records for two weeks before it alerts, so it doesn't block G1.
   - Its rows on the incident and site pages need a board or Tao's OK first.
 
-**Impact.** Plan: new slices S09c (G1 depends on it) and S09d; S17's scope names the editable list. Supersedes D-025 item 3's "no shared list until S17" for the list itself.
+- **Tao's review, the same day:**
+  1. **G1 doesn't wait a week.** G1 depends on S09c's Done-when 1, 2 and 4. The production replay and the week without a false positive are collected after G1, as S05's production line was. Until then the shared list's alerts stay off on production; findings are logged.
+  2. **A crawler fetch that isn't a 2xx/3xx answer is no data, never PROBLEM.** Akamai and Cloudflare check that "Googlebot" is real and refuse a fake one from Vercel's IPs (Bangkok Airways sits behind Akamai).
+  3. **Phrases, not single words.** "slot online", "สล็อต", "บาคาร่า", "แทงบอล" — never "slot", which matches "time slot" on booking pages. Thai has no spaces, so each Thai entry is checked against normal pages for substring hits. A test covers "time slot".
+  4. **A second crawler fetch**, as a mobile browser with `Referer: https://www.google.com/`, with the keyword and redirect checks. Thai gambling hacks redirect visitors who come from Google search rather than looking at the User-Agent.
+  5. **Crawler fetches read the whole body** (up to 3 MB, as D-026), and S09d's fingerprint reads the first and last 128 KB. Injected links and scripts usually sit at the end of `<body>`, past the 256 KB sample.
+  6. **S09d states its blind spot:** a script added by JavaScript at runtime isn't in the HTML. Only the browser verifier renders pages, and only for blocked rounds.
+  7. **Not in v1 (P2 backlog), by decision:** a changed DNS / NS record, and blacklist status (Google Safe Browsing / Web Risk). Before using Safe Browsing, check its terms: the free API is for non-commercial use, and commercial use goes through Web Risk. Added to PRD §2's non-goals.
+
+**Impact.** Plan: new slices S09c (G1 depends on its Done-when 1, 2, 4) and S09d; S17's scope names the editable list. PRD §2 non-goals name the P2 items. Supersedes D-025 item 3's "no shared list until S17" for the list itself.
 
 ## D-040 — The probe connects to the address its SSRF guard checked
 

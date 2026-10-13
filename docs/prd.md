@@ -51,7 +51,8 @@ Precedence: on scope, priority, architecture and budget this PRD wins; on screen
 - APM / server metrics (CPU, RAM, log) — เราดูจากมุมผู้ใช้ภายนอกเท่านั้น
 - Auto-remediation (restart server อัตโนมัติ)
 - Real User Monitoring และ SEO/performance audit
-- Security scanning เต็มรูปแบบ (v1 ทำแค่ SSL/domain expiry และ content-change/defacement detection)
+- Security scanning เต็มรูปแบบ (v1 ทำแค่ SSL/domain expiry และ content-change/defacement detection — S09c, S09d, D-041)
+- การเฝ้าว่า DNS / NS record ถูกเปลี่ยน และการติด blacklist (Google Safe Browsing / Web Risk) — backlog P2 ตามการตัดสินใจ D-041 (Safe Browsing API ตัวฟรีใช้ได้เฉพาะงานที่ไม่ใช่เชิงพาณิชย์ ต้องตรวจเงื่อนไขก่อนใช้)
 
 ## 3. Users, Roles & Permissions
 
