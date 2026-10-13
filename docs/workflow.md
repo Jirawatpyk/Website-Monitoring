@@ -58,15 +58,16 @@ The workflow, the rules and the tooling improve every time something goes wrong,
 
 ### Advisor
 
-When Claude's session has the `advisor` tool (a stronger reviewer that sees the whole conversation), Claude calls it at three points:
+When Claude's session has the `advisor` tool (a stronger reviewer that sees the whole conversation), Claude calls it at four points:
 
 1. **Before committing to an approach.** After the context is read, and before presenting a slice plan, writing a decision (D-xxx) or starting a production hotfix.
-2. **When stuck or about to change course.** For example, a second fix for the same symptom, or results that don't fit.
-3. **Before calling work done.** After the work is committed, before Done or a PR.
+2. **Before recommending an answer to Tao.** This covers a question whose answer becomes a decision, changes how the system behaves, or is handed to someone else, such as a brief for Claude Design. Order, deploy and merge questions ("wait or start?", "merge now?") don't need it.
+3. **When stuck or about to change course.** For example, a second fix for the same symptom, or results that don't fit.
+4. **Before calling work done.** After the work is committed, before Done or a PR.
 
 It doesn't replace the reviewers above: they check the domain, the advisor checks the approach.
 
-**Why (12–13 Oct 2026):** the D-039 work changed the slow rule three times before anyone measured the probe. One advisor call on 13 Oct found four gaps in the D-041 plan, among them an S09d design that couldn't work.
+**Why (12–13 Oct 2026):** the D-039 work changed the slow rule three times before anyone measured the probe. One advisor call on 13 Oct found four gaps in the D-041 plan, among them an S09d design that couldn't work. Point 2 was added the same day: Claude recommended three S09d design answers without the advisor, and when Tao asked for it, the advisor found two problems in the brief (a "view page source" control that would store client pages, a per-site date drawn as fixed).
 
 ## Definition of Done
 
