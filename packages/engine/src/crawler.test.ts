@@ -252,6 +252,22 @@ describe('decideSite — crawler views', () => {
     ).toMatchObject({ kind: 'none', status: 'ok' });
   });
 
+  it('a crawler PROBLEM recovers at the clean fetch, never before it (S09c /verify)', () => {
+    const cleanAt30 = [fact({ checkedAt: at(30) })];
+    expect(
+      decideSite(site([monitor('home', clean, { carry: held, crawler: cleanAt30 })], { open })),
+    ).toMatchObject({ kind: 'recover', recoveredAt: at(30) });
+    // A clean fetch older than the round's checks: the checks are the evidence.
+    expect(
+      decideSite(site([monitor('home', clean, { carry: held, crawler: [fact()] })], { open })),
+    ).toMatchObject({ kind: 'recover', recoveredAt: at(1) });
+    // A slow PROBLEM's recovery doesn't wait for the crawler.
+    const slowHeld = { ...held, trigger: 'slow' as const };
+    expect(
+      decideSite(site([monitor('home', clean, { carry: slowHeld, crawler: cleanAt30 })], { open })),
+    ).toMatchObject({ kind: 'recover', recoveredAt: at(1) });
+  });
+
   it('a DOWN round still wins over a crawler hit', () => {
     const d = decideSite(site([monitor('home', failed(), { crawler: [fact({ forbidden: ['บาคาร่า'] })] })]));
     expect(d).toMatchObject({ kind: 'open', status: 'down' });

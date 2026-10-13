@@ -406,6 +406,8 @@ const num = (v: unknown) => (typeof v === 'number' ? v : null);
 /** The gate's view of the incident (the same facts `resolve_incident` reads). */
 export interface GateIncident {
   state: IncidentState;
+  /** A PROBLEM drop reads "still has a problem", not "still down" (as the notifier's ACKNOWLEDGED). */
+  severity?: Severity;
   recoveredAt: string | null;
   clientUpdateRequired: boolean;
   clientUpdatedAt: string | null;
@@ -470,7 +472,9 @@ export function resolveGate(
       ? `OK since ${formatTime(new Date(i.recoveredAt!))} · 2 rounds done ${formatTime(new Date(okAt))}`
       : recovered
         ? `OK since ${formatTime(new Date(i.recoveredAt!))} · waiting for the second OK round`
-        : 'Still down · needs 2 OK rounds once it recovers',
+        : i.severity === 'problem'
+          ? 'Still has a problem · needs 2 OK rounds once it clears'
+          : 'Still down · needs 2 OK rounds once it recovers',
   };
   const client: Condition = {
     key: 'client_update',
@@ -511,7 +515,7 @@ export function resolveGate(
       : !recovery.met
         ? recovered
           ? `Resolve locked · ${metCount} of 3 met — waiting for the second OK round`
-          : `Resolve locked · ${metCount} of 3 met — ${i.siteName} is still down`
+          : `Resolve locked · ${metCount} of 3 met — ${i.siteName} ${i.severity === 'problem' ? 'still has a problem' : 'is still down'}`
         : `Resolve locked · ${metCount} of 3 met — mark the client update first`,
   };
 }

@@ -338,6 +338,7 @@ export async function loadIncident(
       {
         siteName: i.sites.name,
         state: i.state,
+        severity: i.severity,
         recoveredAt: i.recovered_at,
         clientUpdateRequired: i.client_update_required,
         clientUpdatedAt: i.client_updated_at,

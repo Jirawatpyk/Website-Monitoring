@@ -485,7 +485,20 @@ function judgeSiteRound(
 
   // ── Every monitor OK (a key page with no data that was OK doesn't hold it back) ──
   const reachable = primaryVerdict.kind === 'ok' ? primaryVerdict.reachable : [];
-  return okRound(s, base, reachable);
+  return okRound(s, base, reachable, crawlerClearedAt(s, roundAt));
+}
+
+/**
+ * D-042: when the home page's keyword / redirect PROBLEM clears on a clean crawler fetch, that fetch is
+ * the evidence — RECOVERED never says it recovered before it (S09c /verify: the round's first check
+ * came 10–45 s earlier). Null otherwise: the round's own checks are the evidence.
+ */
+function crawlerClearedAt(s: SiteSnapshot, roundAt: Date): Date | null {
+  const m = s.monitors.find((x) => x.isPrimary);
+  if (!m || m.carry.status !== 'problem') return null;
+  if (m.carry.trigger !== 'keyword' && m.carry.trigger !== 'redirect') return null;
+  const fresh = crawlerFacts(m, s, roundAt).fresh;
+  return fresh.length ? new Date(Math.max(...fresh.map((f) => f.checkedAt.getTime()))) : null;
 }
 
 /** An OK round (a pass majority, or a blocked round the browser verified): recover, settle or count it. */
@@ -493,11 +506,20 @@ function okRound(
   s: SiteSnapshot,
   base: Omit<Judged, 'status'>,
   reachable: readonly StoredCheck[],
+  evidenceAt: Date | null = null,
 ): SiteDecision {
   const open = s.open;
   if (open && RECOVERABLE.includes(open.state)) {
     // PRD §5: the site shows OK only after the second OK round; until then, the drop's severity.
-    const d = recoverDecision(s, open, base, reachable, open.episodeSeverity ?? open.severity, true);
+    const d = recoverDecision(
+      s,
+      open,
+      base,
+      reachable,
+      open.episodeSeverity ?? open.severity,
+      true,
+      evidenceAt,
+    );
     if (d) return d;
   }
   if (open && open.state === 'monitoring' && s.okRounds === 1) {
@@ -519,8 +541,10 @@ function recoverDecision(
   reachable: readonly StoredCheck[],
   status: Exclude<SiteStatus, 'maintenance'>,
   allOk: boolean,
+  evidenceAt: Date | null = null,
 ): SiteDecision | null {
-  const recoveredAt = earliest(reachable);
+  const first = earliest(reachable);
+  const recoveredAt = evidenceAt && evidenceAt > first ? evidenceAt : first;
   const flaggedAt = open.detectedAt ?? open.startedAt;
   const autoResolve =
     allOk &&

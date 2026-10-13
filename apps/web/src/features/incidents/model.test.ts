@@ -353,6 +353,11 @@ describe('resolveGate (T10, D-033)', () => {
       lockedReason: 'Resolve locked · 1 of 3 met — MuvMi is still down',
     });
   });
+  it('a PROBLEM still open reads "still has a problem", not "still down" (S09c /verify)', () => {
+    const g = resolveGate({ ...gateBase, severity: 'problem' }, [], nameOf);
+    expect(g.conditions[0]!.detail).toBe('Still has a problem · needs 2 OK rounds once it clears');
+    expect(g.lockedReason).toBe('Resolve locked · 1 of 3 met — MuvMi still has a problem');
+  });
   it('one OK round: waiting for the second', () => {
     const g = resolveGate({ ...gateBase, state: 'monitoring', recoveredAt: at('25T10:31:00') }, [], nameOf);
     expect(g.conditions[0]!.detail).toBe('OK since 10:31 · waiting for the second OK round');
