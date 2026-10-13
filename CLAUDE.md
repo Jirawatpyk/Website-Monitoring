@@ -84,7 +84,7 @@ Skills:
 - `/engine-case <rule>` — add a table-driven engine test from a spec example.
 - `verifier-staging` — the recipe `/verify` uses on staging: deploy order, test-target modes, observing the outcome, reset.
 
-Built-in: `/code-review high` on every slice's diff (general bugs; the agents below check the domain) — Claude invokes it with the Skill tool, never a general-purpose agent standing in for it. `/verify` runs the app at the change's surface and captures runtime evidence; only Tao can start it (it can't be invoked by Claude), so `/slice-review` hands him a ready `/verify …` line and Claude doesn't do its job by hand; `/verify` follows the project's `verifier-staging` skill (deploy order, test-target modes, where to read the outcome, reset). `slice-verifier` checks the evidence covers every Done-when line.
+Built-in: `/code-review high` on every slice's diff (general bugs; the agents below check the domain) — Claude invokes it with the Skill tool, never a general-purpose agent standing in for it. `/verify` runs the app at the change's surface and captures runtime evidence; only Tao can start it (it can't be invoked by Claude), so `/slice-review` hands him a ready `/verify …` line and Claude doesn't do its job by hand; `/verify` follows the project's `verifier-staging` skill (deploy order, test-target modes, where to read the outcome, reset). `slice-verifier` checks the evidence covers every Done-when line. When the session has the `advisor` tool, Claude calls it before a plan, a decision or a production hotfix; when stuck; and before calling work done (`docs/workflow.md` → Advisor).
 
 Agents (read-only reviewers; which one runs when is in `docs/workflow.md`):
 
