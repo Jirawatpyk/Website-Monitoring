@@ -37,7 +37,7 @@ const pass = (location: string, sec: number, forbidden: string[] = []) => ({
 const googlebotHit = {
   monitor_id: 'm1',
   view: 'googlebot',
-  checked_at: at(-900),
+  checked_at: at(-120), // stored a minute ago: inside the 5-min log window,
   final_url: 'https://tubtong.example.test/',
   forbidden: ['บาคาร่า'],
 };
@@ -47,7 +47,7 @@ const setup = (checks: unknown[], crawler: unknown[] = []) =>
     'probe_locations.select': { data: beating },
     'monitors.select': { data: [monitor] },
     'rpc.engine_checks': { data: checks },
-    'rpc.engine_crawler_checks': { data: crawler },
+    'rpc.engine_crawler_checks': { data: crawler.length ? [{ monitor_id: 'm1', facts: crawler }] : [] },
     'rpc.engine_open_incident': { data: 'i1' },
   });
 const opened = (rpcCalls: { name: string; args: unknown }[]) =>
@@ -59,7 +59,7 @@ describe('runEngine — defacement alerts on (staging)', () => {
     const { db, rpcCalls, readCalls } = setup([pass('SIN', 0), pass('TYO', 1)], [googlebotHit]);
     expect(await runEngine(db, now, { defacementAlerts: true })).toMatchObject({ problems: 1 });
     expect(readCalls.find((c) => c.name === 'engine_crawler_checks')?.args).toEqual({
-      p_since: '2026-10-06T08:56:05.000Z', // 65 min back
+      p_since: '2026-10-05T10:01:05.000Z', // a day back: an unrefuted hit holds (the engine judges freshness)
     });
     expect(opened(rpcCalls)).toMatchObject({
       p_trigger: 'keyword',
@@ -137,6 +137,11 @@ describe('runEngine — defacement alerts off (production until Done-when 3)', (
     const summary = await runEngine(db, now);
     expect(opened(rpcCalls)?.p_context.cause).toBe('Found “Index of /” on / (SIN, TYO)');
     expect(summary.defacementHeld).toEqual(['Tubtong · “บาคาร่า” (SIN, TYO)']);
+  });
+
+  it('logs a crawler finding only in the runs just after its fetch, not for its whole window', async () => {
+    const { db } = setup([pass('SIN', 0), pass('TYO', 1)], [{ ...googlebotHit, checked_at: at(-600) }]);
+    expect('defacementHeld' in (await runEngine(db, now))).toBe(false);
   });
 
   it('a clean run adds no defacementHeld field', async () => {

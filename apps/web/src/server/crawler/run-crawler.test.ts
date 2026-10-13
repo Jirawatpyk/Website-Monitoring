@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { HttpCheckRequest, HttpCheckResult } from '@dxt/probe';
 import { CRAWLER_CLIENTS } from '@dxt/shared';
 import { fakeDb } from '../../../test/fake-db';
-import { isUsable, runCrawler } from './run-crawler';
+import { crawlerConcurrency, isUsable, runCrawler } from './run-crawler';
 
 const result = (over: Partial<HttpCheckResult> = {}): HttpCheckResult => ({
   outcome: 'pass',
@@ -34,9 +34,32 @@ function setup(answer: (req: HttpCheckRequest) => HttpCheckResult) {
   return { fake, check };
 }
 
-describe('isUsable (D-041: not a 2xx / 3xx answer → no data)', () => {
+describe('isUsable (D-041, D-042: not a 2xx / 3xx answer read to the end → no data)', () => {
+  const offSite = { finalUrl: 'https://casino.example.net/' };
   it.each([
     ['a 200', result(), true],
+    ['a tail that broke off clean (never says the page is clean)', result({ scanComplete: false }), false],
+    [
+      'a tail that broke off after a hit (the hit stands)',
+      result({ scanComplete: false, keywordForbidden: ['บาคาร่า'] }),
+      true,
+    ],
+    [
+      'sent off-site to a host that refuses the bot (the redirect is the evidence)',
+      result({ ...offSite, outcome: 'blocked', statusCode: 403 }),
+      true,
+    ],
+    ['sent off-site to a host that fails', result({ ...offSite, outcome: 'fail', statusCode: 503 }), true],
+    [
+      'the www host is the same site',
+      result({ finalUrl: 'https://www.a.example.test/', statusCode: 403 }),
+      false,
+    ],
+    [
+      'a timeout after an off-site hop never answered',
+      result({ ...offSite, outcome: 'fail', statusCode: null }),
+      false,
+    ],
     ['a 301 that ended there', result({ statusCode: 301 }), true],
     ['a plain 403 (a refused fake Googlebot)', result({ statusCode: 403 }), false],
     ['a 404', result({ statusCode: 404 }), false],
@@ -44,7 +67,7 @@ describe('isUsable (D-041: not a 2xx / 3xx answer → no data)', () => {
     ['a timeout', result({ outcome: 'fail', statusCode: null, error: 'Timeout' }), false],
     ['a 5xx', result({ outcome: 'fail', statusCode: 503 }), false],
   ])('%s', (_name, r, usable) => {
-    expect(isUsable(r)).toBe(usable);
+    expect(isUsable(r, 'https://a.example.test/')).toBe(usable);
   });
 });
 
@@ -81,8 +104,9 @@ describe('runCrawler', () => {
       ]),
     );
 
-    const insert = fake.calls.find((c) => c.table === 'crawler_checks' && c.op === 'insert');
-    expect(insert?.values).toEqual([
+    // One row per fetch, stored as it ends.
+    const inserts = fake.calls.filter((c) => c.table === 'crawler_checks' && c.op === 'insert');
+    expect(inserts.map((c) => c.values)).toEqual([
       expect.objectContaining({
         monitor_id: 'm1',
         view: 'googlebot',
@@ -108,12 +132,30 @@ describe('runCrawler', () => {
         : result({ outcome: 'fail', statusCode: null, error: 'Timeout', keywordForbidden: null }),
     );
     const summary = await runCrawler({ db: fake.db, check });
-    const insert = fake.calls.find((c) => c.table === 'crawler_checks');
-    expect(insert?.values).toEqual([
+    const inserts = fake.calls.filter((c) => c.table === 'crawler_checks');
+    expect(inserts.map((c) => c.values)).toEqual([
       expect.objectContaining({ usable: false, outcome: 'blocked', status_code: 403 }),
       expect.objectContaining({ usable: false, outcome: 'fail', error: 'Timeout' }),
     ]);
     expect(summary).toEqual({ ok: true, fetched: 2, unusable: 2 });
+  });
+
+  it('starts no fetch past its budget, keeping the rows it stored', async () => {
+    let t = 0;
+    const { fake, check } = setup(() => {
+      t += 100_000; // the first fetch takes 100 s
+      return result();
+    });
+    const summary = await runCrawler({ db: fake.db, check, clock: () => t });
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(fake.calls.filter((c) => c.table === 'crawler_checks')).toHaveLength(1);
+    expect(summary).toMatchObject({ fetched: 1, skipped: 1 });
+  });
+
+  it('adds lanes as sites are added', () => {
+    expect(crawlerConcurrency(34)).toBe(6);
+    expect(crawlerConcurrency(120)).toBe(20);
+    expect(crawlerConcurrency(400)).toBe(24);
   });
 
   it('runs only in sin1', async () => {

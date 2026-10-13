@@ -1,7 +1,7 @@
 -- S09c (D-041, D-042): crawler_checks — RLS, the engine's latest-usable read, retention job.
 begin;
 \ir _helpers.psql
-select plan(12);
+select plan(14);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -36,21 +36,32 @@ insert into public.crawler_checks (monitor_id, view, checked_at, outcome, usable
   ('00000000-0000-0000-0000-0000000000d1', 'googlebot', now() - interval '31 days', 'pass', true, 200, '{}');
 
 select throws_ok(
-  $$insert into public.crawler_checks (monitor_id, view, checked_at, outcome, usable)
-    values ('00000000-0000-0000-0000-0000000000d1', 'plain', now(), 'pass', true)$$,
+  $$insert into public.crawler_checks (monitor_id, view, checked_at, outcome, usable, status_code)
+    values ('00000000-0000-0000-0000-0000000000d1', 'plain', now(), 'pass', true, 200)$$,
   '23514', null, 'a view outside CRAWLER_VIEWS is refused'
+);
+select throws_ok(
+  $$insert into public.crawler_checks (monitor_id, view, checked_at, outcome, usable)
+    values ('00000000-0000-0000-0000-0000000000d1', 'googlebot', now(), 'fail', true)$$,
+  '23514', null, 'a fetch without an answer is never usable'
 );
 
 -- ── The engine's read ─────────────────────────────────────────────────────
 select results_eq(
-  $$select view, forbidden from public.engine_crawler_checks(now() - interval '65 min') order by view$$,
-  $$values ('google_referer'::text, '{}'::text[]), ('googlebot'::text, '{บาคาร่า}'::text[])$$,
-  'the newest usable row per view of live primary monitors; a later 403 never hides the hit'
+  $$select f->>'view', f->'forbidden'
+    from public.engine_crawler_checks(now() - interval '65 min'), jsonb_array_elements(facts) f$$,
+  $$values ('google_referer'::text, '[]'::jsonb), ('googlebot'::text, '["บาคาร่า"]'::jsonb)$$,
+  'usable rows per view of live primary monitors, newest first; a later 403 never hides the hit'
+);
+select results_eq(
+  $$select monitor_id, jsonb_array_length(facts) from public.engine_crawler_checks(now() - interval '1 day')$$,
+  $$values ('00000000-0000-0000-0000-0000000000d1'::uuid, 3)$$,
+  'one row per monitor: two google_referer fetches (the 3-hour-old one within a day), the one usable googlebot fetch'
 );
 select is(
   (select count(*)::int from public.engine_crawler_checks(now() - interval '5 min')),
   0,
-  'nothing older than the freshness window'
+  'nothing older than p_since'
 );
 
 -- ── Retention ─────────────────────────────────────────────────────────────

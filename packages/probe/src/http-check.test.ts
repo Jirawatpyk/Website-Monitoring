@@ -314,6 +314,15 @@ describe('runHttpCheck', () => {
       expect(crawler.bodySample).toHaveLength(262_144);
     });
 
+    it('a whole-body read whose tail breaks off says so, keeping what it found', async () => {
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/broken-tail`,
+        scanWholeBody: true,
+      });
+      expect(result).toMatchObject({ outcome: 'pass', keywordForbidden: [], scanComplete: false });
+    });
+
     it('finds a phrase split across two chunks in the whole-body read', async () => {
       const result = await runHttpCheck({
         allowPrivateTargets: true,
@@ -323,13 +332,13 @@ describe('runHttpCheck', () => {
       expect(result.keywordForbidden).toEqual(['slot online']);
     });
 
-    it('a whole-body read cut at about 3 MB says so', async () => {
+    it('a whole-body read stops at about 3 MB, which counts as read', async () => {
       const result = await runHttpCheck({
         allowPrivateTargets: true,
         url: `${base}/too-deep`,
         scanWholeBody: true,
       });
-      expect(result).toMatchObject({ keywordForbidden: [], scanComplete: false });
+      expect(result).toMatchObject({ keywordForbidden: [], scanComplete: true });
     });
 
     it('reads a TIS-620 Thai page in its own charset; an unknown charset falls back to UTF-8', async () => {

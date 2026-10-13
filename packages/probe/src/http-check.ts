@@ -64,7 +64,7 @@ export interface HttpCheckResult {
   keywordForbidden: string[] | null;
   /** A blocked response's header-level WAF signature (D-027); null otherwise. */
   waf: WafVendor | null;
-  /** With `scanWholeBody`: the whole body was read (not cut at KEYWORD_SCAN_BYTES or broken off). */
+  /** With `scanWholeBody`: the body was read to its end or to KEYWORD_SCAN_BYTES, not broken off. */
   scanComplete?: boolean;
 }
 
@@ -322,7 +322,9 @@ async function readBody(
         ...FORBIDDEN_PHRASES.filter((k) => found.has(k) && !scanForbidden.includes(k)),
       ]
     : null;
-  return { bodySample: sample, missing, sampleAt, forbidden, complete: done && !broke };
+  // Complete = read to the end or to the 3 MB cap (the scan's scope), not broken off by a stalled or
+  // dropped tail — a broken-off read has no say about the tail, where injected links sit.
+  return { bodySample: sample, missing, sampleAt, forbidden, complete: !broke };
 }
 
 function describeError(err: unknown): string {

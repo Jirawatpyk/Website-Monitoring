@@ -29,7 +29,6 @@ import {
   type ProblemCauseContext,
 } from '@dxt/notifier';
 import {
-  CRAWLER_FRESH_MS,
   CRAWLER_LABELS,
   isForbiddenPhrase,
   TIER_CONFIG,
@@ -58,6 +57,14 @@ const CONTROL_ROUND_SPAN_MS = 2 * 60_000;
 const SLOW_LOG_WINDOW_MS = 3 * 60_000;
 /** How far back a run reports the shared-list hits it held back (D-042), as the slow log. */
 const HELD_LOG_WINDOW_MS = SLOW_LOG_WINDOW_MS;
+/** A crawler fetch is stored up to ~2 min after it starts: its held finding is logged for 5 min. */
+const CRAWLER_LOG_WINDOW_MS = 5 * 60_000;
+/**
+ * How far back the latest usable crawler fetch per view is read (D-042): a hit raises a PROBLEM for
+ * 65 min (`CRAWLER_FRESH_MS`, the engine's), and an unrefuted older hit keeps an open one from
+ * recovering for up to a day — no usable fetch since is no evidence the page is clean.
+ */
+const CRAWLER_HOLD_MS = 24 * 60 * 60_000;
 /** Messages that told someone the site failed: RECOVERED replies only to these (spec §15.1). */
 const ALERT_TEMPLATES = ['down', 'problem', 'down_again', 'problem_again'];
 /**
@@ -278,6 +285,8 @@ export async function runEngine(
     const facts = crawler.get(m.id) ?? [];
     if (defacementAlerts) return facts;
     const issue = crawlerIssue(facts, m.url, m.allowedRedirectDomains);
+    // Logged for the runs just after the fetch, not for its whole 65-min window.
+    if (issue && issue.at.getTime() < now.getTime() - CRAWLER_LOG_WINDOW_MS) return undefined;
     if (issue?.detail.kind === 'keyword') {
       hold(
         `${site.name} · ${issue.detail.forbidden.map((w) => `“${w}”`).join(', ')}`,
@@ -516,26 +525,32 @@ const withCrawler = (crawler: readonly CrawlerFact[] | undefined) => (crawler?.l
 const viewLabel = (view: CrawlerView | undefined) => (view ? CRAWLER_LABELS[view] : 'crawler');
 
 /**
- * Each live primary monitor's latest usable crawler fetch per view inside the freshness window
- * (D-042). A failed read never holds the run back: the round is judged without the crawler.
+ * Each live primary monitor's latest usable crawler fetch per view in the last day (D-042); the
+ * engine judges freshness. A failed read never holds the run back: the round is judged without it.
  */
 async function loadCrawler(db: DbClient, now: Date): Promise<Map<string, CrawlerFact[]>> {
   const byMonitor = new Map<string, CrawlerFact[]>();
   const { data, error } = await db.rpc('engine_crawler_checks', {
-    p_since: new Date(now.getTime() - CRAWLER_FRESH_MS).toISOString(),
+    p_since: new Date(now.getTime() - CRAWLER_HOLD_MS).toISOString(),
   });
   if (error) {
     console.error(JSON.stringify({ event: 'engine_crawler_checks_failed', error: error.message }));
     return byMonitor;
   }
   for (const r of data ?? []) {
-    const fact: CrawlerFact = {
-      view: r.view as CrawlerView,
-      checkedAt: new Date(r.checked_at),
-      finalUrl: r.final_url,
-      forbidden: r.forbidden ?? [],
-    };
-    (byMonitor.get(r.monitor_id) ?? byMonitor.set(r.monitor_id, []).get(r.monitor_id)!).push(fact);
+    const facts = (Array.isArray(r.facts) ? r.facts : []).flatMap((f): CrawlerFact[] => {
+      const v = f as { view?: unknown; checked_at?: unknown; final_url?: unknown; forbidden?: unknown };
+      if (typeof v.view !== 'string' || typeof v.checked_at !== 'string') return [];
+      return [
+        {
+          view: v.view as CrawlerView,
+          checkedAt: new Date(v.checked_at),
+          finalUrl: typeof v.final_url === 'string' ? v.final_url : null,
+          forbidden: Array.isArray(v.forbidden) ? v.forbidden.filter((w) => typeof w === 'string') : [],
+        },
+      ];
+    });
+    byMonitor.set(r.monitor_id, facts);
   }
   return byMonitor;
 }

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { readEdgeConfigItem } from './edge-config';
 import {
@@ -149,6 +150,14 @@ describe('defacement modes (S09c, D-041)', () => {
     const r = await answer('cloaked-referer', userAgent, referer);
     expect(r.status).toBe(status);
     expect(r.location).toBe(status === 302 ? CLOAKED_REDIRECT : null);
+  });
+
+  it('the spam phrases are entries of the shared forbidden list (packages/shared forbidden.ts)', () => {
+    // The test target can't import @dxt/shared (its own Vercel project): read the list's source.
+    const list = readFileSync(new URL('../../../packages/shared/src/forbidden.ts', import.meta.url), 'utf8');
+    const phrases = [...SPAM.matchAll(/<a[^>]*>([^<]+)<\/a>/g)].map((m) => m[1]!);
+    expect(phrases).toEqual(['สล็อตออนไลน์', 'บาคาร่า']);
+    for (const p of phrases) expect(list).toContain(`'${p}',`);
   });
 
   it('deep-spam: the links sit past the probes’ 256 KB sample, for everyone', async () => {

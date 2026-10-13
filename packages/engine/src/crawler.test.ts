@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckOutcome, ProbeLocation } from '@dxt/shared';
-import type { OpenIncident, StoredCheck } from './monitor';
+import type { OpenIncident, StoredCheck, Verification } from './monitor';
 import { decideSite, NEW_MONITOR, type MonitorCarry, type SiteMonitor, type SiteSnapshot } from './site';
 import { crawlerIssue, type CrawlerFact } from './triggers';
 
@@ -162,6 +162,57 @@ describe('decideSite — crawler views', () => {
       }),
     );
     expect(d).toMatchObject({ kind: 'problem', startedAt: at(-600) });
+  });
+
+  it('a round judged after a newer fetch landed uses the fetch before it, never nothing', () => {
+    // F1 (hit, 10 min before) and F2 (hit, after the round ended): the late-judged round still sees F1.
+    const both = [fact({ forbidden: ['บาคาร่า'] }), fact({ forbidden: ['บาคาร่า'], checkedAt: at(200) })];
+    expect(
+      decideSite(site([monitor('home', clean, { carry: held, crawler: both })], { open })),
+    ).toMatchObject({
+      kind: 'none',
+      status: 'problem',
+    });
+    // A clean F1 and a bad F2 after the round: that round is clean.
+    const later = [fact(), fact({ forbidden: ['บาคาร่า'], checkedAt: at(200) })];
+    expect(decideSite(site([monitor('home', clean, { crawler: later })]))).toMatchObject({
+      kind: 'none',
+      status: 'ok',
+    });
+  });
+
+  it('a hit older than 65 min raises nothing, but keeps an open PROBLEM from recovering without a clean fetch', () => {
+    const old = [fact({ forbidden: ['บาคาร่า'], checkedAt: new Date(at(260).getTime() - 70 * 60_000) })];
+    expect(decideSite(site([monitor('home', clean, { crawler: old })]))).toMatchObject({
+      kind: 'none',
+      status: 'ok',
+    });
+    // No evidence either way: no recovery, the status and the monitor's PROBLEM hold (status null = unchanged).
+    const holding = decideSite(site([monitor('home', clean, { carry: held, crawler: old })], { open }));
+    expect(holding).toMatchObject({ kind: 'none', status: null });
+    expect(holding.kind === 'none' && holding.monitors[0]).toMatchObject({
+      status: 'problem',
+      trigger: 'keyword',
+    });
+    // A clean fetch since (the newest of its view) ends it.
+    const cleaned = [...old, fact()];
+    expect(
+      decideSite(site([monitor('home', clean, { carry: held, crawler: cleaned })], { open })),
+    ).toMatchObject({ kind: 'recover' });
+  });
+
+  it('a blocked round the browser loaded still raises what a crawler view saw', () => {
+    const blocked = LOCATIONS.map((l, i) => ({ ...check(l, 'blocked', 1 + i), statusCode: 403 }));
+    const loaded = new Map([[R, { state: 'loaded', jobId: 'j1' } as Verification]]);
+    const d = decideSite(
+      site([
+        monitor('home', blocked, { verifications: loaded, crawler: [fact({ forbidden: ['บาคาร่า'] })] }),
+      ]),
+    );
+    expect(d).toMatchObject({ kind: 'problem', trigger: 'keyword', detail: { view: 'googlebot' } });
+    expect(
+      decideSite(site([monitor('home', blocked, { verifications: loaded, crawler: [fact()] })])),
+    ).toMatchObject({ kind: 'none', status: 'ok' });
   });
 
   it('a DOWN round still wins over a crawler hit', () => {

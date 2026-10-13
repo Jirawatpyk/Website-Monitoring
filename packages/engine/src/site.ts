@@ -1,5 +1,13 @@
 import { failsHere, isHardFail, isTlsChainFail } from './hard-fail';
-import type { IncidentState, ProbeLocation, Severity, SiteStatus, Trigger } from '@dxt/shared';
+import {
+  CRAWLER_FRESH_MS,
+  CRAWLER_VIEWS,
+  type IncidentState,
+  type ProbeLocation,
+  type Severity,
+  type SiteStatus,
+  type Trigger,
+} from '@dxt/shared';
 import { autoResolves, isFlapping, RECOVERED_STATES, stillFlapping, transition } from './lifecycle';
 import {
   buildRound,
@@ -741,22 +749,16 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     const p50 = roundP50(timed, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
     const next = { slowRounds, failingSince };
-    // D-042: a crawler fetch counts for the rounds that end after it.
-    const roundEnd = roundAt.getTime() + s.intervalSec * 1000;
-    const crawler = m.isPrimary ? (m.crawler ?? []).filter((f) => f.checkedAt.getTime() < roundEnd) : [];
-    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound, crawler);
+    const crawler = crawlerFacts(m, s, roundAt);
+    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound, crawler.fresh);
     if (issue) {
-      // A crawler problem starts at its fetch — but never before the round after the last one judged:
-      // a fetch made while the site was down or recovering would otherwise start a PROBLEM AGAIN
-      // before the recovery it follows.
-      const afterJudged = s.lastRoundAt ? s.lastRoundAt.getTime() + s.intervalSec * 1000 : 0;
       return {
         verdict: {
           kind: 'problem',
           trigger: issue.trigger,
           detail: issue.detail,
           startedAt: issue.at
-            ? new Date(Math.max(issue.at.getTime(), afterJudged))
+            ? crawlerStart(issue.at, s)
             : issueStart(issue.detail, counted, roundAt, s, slowRounds),
           reachable: passing,
         },
@@ -767,6 +769,14 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     // no evidence, so its state holds, as the streak does; otherwise it would recover (and auto-resolve).
     const slowOpen = m.carry.status === 'problem' && m.carry.slowRounds >= SLOW_ROUNDS;
     if (slowOpen && p50 === null && timed.length < counted.length) {
+      return { verdict: { kind: 'insufficient' }, next };
+    }
+    // D-042: an open keyword / redirect PROBLEM whose view hasn't had a usable fetch since its hit (the
+    // site now refuses the fake Googlebot, or the crawler stopped) isn't over — no evidence either way,
+    // so it holds until a clean usable fetch replaces the hit.
+    const crawlerOpen =
+      m.carry.status === 'problem' && (m.carry.trigger === 'keyword' || m.carry.trigger === 'redirect');
+    if (crawlerOpen && crawlerIssue(crawler.stale, m.url, m.allowedRedirectDomains)) {
       return { verdict: { kind: 'insufficient' }, next };
     }
     // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
@@ -796,16 +806,25 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       case 'blocked':
         // PRD §5: a plain browser blocked too is a PROBLEM, never hidden — and never a DOWN (D-020).
         return unverified('browser_blocked', startedAt);
-      case 'loaded':
+      case 'loaded': {
         // The browser saw the page: the blocked locations count as reachable this round.
-        return {
-          verdict: {
-            kind: 'ok',
-            reachable: round.scheduled.filter((c) => !isHardFail(c)),
-            note: BLOCKED_NOTE,
-          },
-          next: reset,
-        };
+        const reachable = round.scheduled.filter((c) => !isHardFail(c));
+        // D-042: what a crawler view saw still counts — the probes were only blocked, not answered.
+        const viewed = crawlerIssue(crawlerFacts(m, s, roundAt).fresh, m.url, m.allowedRedirectDomains);
+        if (viewed) {
+          return {
+            verdict: {
+              kind: 'problem',
+              trigger: viewed.detail.kind,
+              detail: viewed.detail,
+              startedAt: crawlerStart(viewed.at, s),
+              reachable,
+            },
+            next: reset,
+          };
+        }
+        return { verdict: { kind: 'ok', reachable, note: BLOCKED_NOTE }, next: reset };
+      }
       case 'failed':
         if (!m.isPrimary) {
           return {
@@ -835,6 +854,40 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   // Too few locations reported: keep the monitor's state. Split or blocked: not an OK round.
   if (first.kind === 'insufficient_data') return { verdict: { kind: 'insufficient' }, next: carried };
   return { verdict: { kind: 'blip' }, next: reset };
+}
+
+/**
+ * D-042: the primary's crawler fetches as a round sees them — per view, the latest usable fetch made
+ * before the round ended (a round judged late still sees the one before a newer fetch), split into
+ * fresh (≤ 65 min old: raises a problem) and stale (only keeps an open one from recovering).
+ */
+function crawlerFacts(
+  m: SiteMonitor,
+  s: SiteSnapshot,
+  roundAt: Date,
+): { fresh: CrawlerFact[]; stale: CrawlerFact[] } {
+  if (!m.isPrimary || !m.crawler?.length) return { fresh: [], stale: [] };
+  const roundEnd = roundAt.getTime() + s.intervalSec * 1000;
+  const freshFrom = s.now.getTime() - CRAWLER_FRESH_MS;
+  const latest = CRAWLER_VIEWS.flatMap((view) => {
+    const before = m.crawler!.filter((f) => f.view === view && f.checkedAt.getTime() < roundEnd);
+    const last = before.reduce<CrawlerFact | null>((a, f) => (!a || f.checkedAt > a.checkedAt ? f : a), null);
+    return last ? [last] : [];
+  });
+  return {
+    fresh: latest.filter((f) => f.checkedAt.getTime() >= freshFrom),
+    stale: latest.filter((f) => f.checkedAt.getTime() < freshFrom),
+  };
+}
+
+/**
+ * A crawler problem starts at its fetch — but never before the round after the last one judged: a
+ * fetch made while the site was down or recovering would otherwise start a PROBLEM AGAIN before the
+ * recovery it follows.
+ */
+function crawlerStart(at: Date, s: SiteSnapshot): Date {
+  const afterJudged = s.lastRoundAt ? s.lastRoundAt.getTime() + s.intervalSec * 1000 : 0;
+  return new Date(Math.max(at.getTime(), afterJudged));
 }
 
 /** The first PROBLEM trigger of a passing round, in the order a person would fix them. */
