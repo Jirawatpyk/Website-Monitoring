@@ -1,5 +1,11 @@
 import { failsHere } from './hard-fail';
-import type { CheckOutcome, ProbeLocation, ProblemDetail } from '@dxt/shared';
+import {
+  CRAWLER_VIEWS,
+  type CheckOutcome,
+  type CrawlerView,
+  type ProbeLocation,
+  type ProblemDetail,
+} from '@dxt/shared';
 import { faultyLocations, isRegionalProblem, REGIONAL_AFTER_MIN } from './round';
 
 /**
@@ -101,6 +107,65 @@ export function redirectIssue(
   const off = ended.filter((c) => !isAllowedHost(hostOf(c.finalUrl!), monitorUrl, allowlist));
   if (ended.length < min || off.length * 2 <= ended.length) return null;
   return { kind: 'redirect', host: hostOf(off[0]!.finalUrl!), locations: off.map((c) => c.location) };
+}
+
+// ── Crawler views (D-041, D-042) ────────────────────────────────────────────
+
+/**
+ * A monitor's latest usable crawler fetch of one view (`crawler_checks`, inside the freshness
+ * window): Googlebot, or a mobile browser arriving from Google search. Not a location and not part
+ * of a round — one fetch is enough, as it is a single location by design.
+ */
+export interface CrawlerFact {
+  view: CrawlerView;
+  checkedAt: Date;
+  finalUrl: string | null;
+  /** The site's own must_not_contain words and the shared list's entries found in the whole body. */
+  forbidden: readonly string[];
+}
+
+/** Per view, the latest fetch made before `before` (epoch ms), Googlebot first. */
+export function latestPerView(facts: readonly CrawlerFact[], before = Infinity): CrawlerFact[] {
+  return CRAWLER_VIEWS.flatMap((view) => {
+    const last = facts
+      .filter((f) => f.view === view && f.checkedAt.getTime() < before)
+      .reduce<CrawlerFact | null>((a, f) => (!a || f.checkedAt > a.checkedAt ? f : a), null);
+    return last ? [last] : [];
+  });
+}
+
+/**
+ * What only a crawler view saw: a forbidden word (keyword) first, then a final host off the
+ * allowlist (redirect), Googlebot before the Google-search view. The detail names the view; it has
+ * no locations. Returns the fetch's time as the problem's start.
+ */
+export function crawlerIssue(
+  facts: readonly CrawlerFact[],
+  monitorUrl: string,
+  allowlist: readonly string[],
+): { detail: Extract<ProblemDetail, { kind: 'keyword' | 'redirect' }>; at: Date } | null {
+  const ordered = CRAWLER_VIEWS.flatMap((v) => facts.filter((f) => f.view === v));
+  const word = ordered.find((f) => f.forbidden.length > 0);
+  if (word) {
+    return {
+      detail: {
+        kind: 'keyword',
+        missing: [],
+        forbidden: unique(word.forbidden),
+        locations: [],
+        view: word.view,
+      },
+      at: word.checkedAt,
+    };
+  }
+  const off = ordered.find((f) => !!f.finalUrl && !isAllowedHost(hostOf(f.finalUrl), monitorUrl, allowlist));
+  if (off) {
+    return {
+      detail: { kind: 'redirect', host: hostOf(off.finalUrl!), locations: [], view: off.view },
+      at: off.checkedAt,
+    };
+  }
+  return null;
 }
 
 // ── Key page 4xx ────────────────────────────────────────────────────────────

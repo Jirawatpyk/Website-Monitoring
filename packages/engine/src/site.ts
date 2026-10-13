@@ -1,5 +1,12 @@
 import { failsHere, isHardFail, isTlsChainFail } from './hard-fail';
-import type { IncidentState, ProbeLocation, Severity, SiteStatus, Trigger } from '@dxt/shared';
+import {
+  CRAWLER_FRESH_MS,
+  type IncidentState,
+  type ProbeLocation,
+  type Severity,
+  type SiteStatus,
+  type Trigger,
+} from '@dxt/shared';
 import { autoResolves, isFlapping, RECOVERED_STATES, stillFlapping, transition } from './lifecycle';
 import {
   buildRound,
@@ -18,7 +25,9 @@ import {
 } from './monitor';
 import { abstainsOnWafSite, bkkUntrusted, BLOCKED_NOTE, confirmsDown, evaluateRound, wafNote } from './round';
 import {
+  crawlerIssue,
   keywordIssue,
+  latestPerView,
   minuteOf,
   nextFailingSince,
   nextSlowRounds,
@@ -27,6 +36,7 @@ import {
   roundP50,
   SLOW_ROUNDS,
   statusIssue,
+  type CrawlerFact,
   type FailingSince,
   type ProblemDetail,
 } from './triggers';
@@ -77,6 +87,11 @@ export interface SiteMonitor {
   carry: MonitorCarry;
   /** This monitor's verify job of each blocked round, by round start (epoch ms). */
   verifications?: ReadonlyMap<number, Verification>;
+  /**
+   * The primary monitor's latest usable crawler fetch per view (D-041, D-042), already inside the
+   * freshness window. A round counts a fetch made before the round ended.
+   */
+  crawler?: readonly CrawlerFact[];
 }
 
 export interface SiteSnapshot {
@@ -470,7 +485,20 @@ function judgeSiteRound(
 
   // ── Every monitor OK (a key page with no data that was OK doesn't hold it back) ──
   const reachable = primaryVerdict.kind === 'ok' ? primaryVerdict.reachable : [];
-  return okRound(s, base, reachable);
+  return okRound(s, base, reachable, crawlerClearedAt(s, roundAt));
+}
+
+/**
+ * D-042: when the home page's keyword / redirect PROBLEM clears on a clean crawler fetch, that fetch is
+ * the evidence — RECOVERED never says it recovered before it (S09c /verify: the round's first check
+ * came 10–45 s earlier). Null otherwise: the round's own checks are the evidence.
+ */
+function crawlerClearedAt(s: SiteSnapshot, roundAt: Date): Date | null {
+  const m = s.monitors.find((x) => x.isPrimary);
+  if (!m || m.carry.status !== 'problem') return null;
+  if (m.carry.trigger !== 'keyword' && m.carry.trigger !== 'redirect') return null;
+  const fresh = crawlerFacts(m, s, roundAt).fresh;
+  return fresh.length ? new Date(Math.max(...fresh.map((f) => f.checkedAt.getTime()))) : null;
 }
 
 /** An OK round (a pass majority, or a blocked round the browser verified): recover, settle or count it. */
@@ -478,11 +506,20 @@ function okRound(
   s: SiteSnapshot,
   base: Omit<Judged, 'status'>,
   reachable: readonly StoredCheck[],
+  evidenceAt: Date | null = null,
 ): SiteDecision {
   const open = s.open;
   if (open && RECOVERABLE.includes(open.state)) {
     // PRD §5: the site shows OK only after the second OK round; until then, the drop's severity.
-    const d = recoverDecision(s, open, base, reachable, open.episodeSeverity ?? open.severity, true);
+    const d = recoverDecision(
+      s,
+      open,
+      base,
+      reachable,
+      open.episodeSeverity ?? open.severity,
+      true,
+      evidenceAt,
+    );
     if (d) return d;
   }
   if (open && open.state === 'monitoring' && s.okRounds === 1) {
@@ -504,8 +541,10 @@ function recoverDecision(
   reachable: readonly StoredCheck[],
   status: Exclude<SiteStatus, 'maintenance'>,
   allOk: boolean,
+  evidenceAt: Date | null = null,
 ): SiteDecision | null {
-  const recoveredAt = earliest(reachable);
+  const first = earliest(reachable);
+  const recoveredAt = evidenceAt && evidenceAt > first ? evidenceAt : first;
   const flaggedAt = open.detectedAt ?? open.startedAt;
   const autoResolve =
     allOk &&
@@ -734,13 +773,17 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     const p50 = roundP50(timed, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
     const next = { slowRounds, failingSince };
-    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound);
+    const crawler = crawlerFacts(m, s, roundAt);
+    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound, crawler.fresh);
     if (issue) {
       return {
         verdict: {
           kind: 'problem',
-          ...issue,
-          startedAt: issueStart(issue.detail, counted, roundAt, s, slowRounds),
+          trigger: issue.trigger,
+          detail: issue.detail,
+          startedAt: issue.at
+            ? crawlerStart(issue.at, s)
+            : issueStart(issue.detail, counted, roundAt, s, slowRounds),
           reachable: passing,
         },
         next,
@@ -752,6 +795,10 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     if (slowOpen && p50 === null && timed.length < counted.length) {
       return { verdict: { kind: 'insufficient' }, next };
     }
+    // D-042: an open keyword / redirect PROBLEM whose view hasn't had a usable fetch since its hit (the
+    // site now refuses the fake Googlebot, or the crawler stopped) isn't over — no evidence either way,
+    // so it holds until a clean usable fetch replaces the hit.
+    if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next };
     // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
     const note =
       m.isPrimary && wafBlocked.length
@@ -779,16 +826,27 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       case 'blocked':
         // PRD §5: a plain browser blocked too is a PROBLEM, never hidden — and never a DOWN (D-020).
         return unverified('browser_blocked', startedAt);
-      case 'loaded':
+      case 'loaded': {
         // The browser saw the page: the blocked locations count as reachable this round.
-        return {
-          verdict: {
-            kind: 'ok',
-            reachable: round.scheduled.filter((c) => !isHardFail(c)),
-            note: BLOCKED_NOTE,
-          },
-          next: reset,
-        };
+        const reachable = round.scheduled.filter((c) => !isHardFail(c));
+        // D-042: what a crawler view saw still counts — the probes were only blocked, not answered.
+        const crawler = crawlerFacts(m, s, roundAt);
+        const viewed = crawlerIssue(crawler.fresh, m.url, m.allowedRedirectDomains);
+        if (viewed) {
+          return {
+            verdict: {
+              kind: 'problem',
+              trigger: viewed.detail.kind,
+              detail: viewed.detail,
+              startedAt: crawlerStart(viewed.at, s),
+              reachable,
+            },
+            next: reset,
+          };
+        }
+        if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next: reset };
+        return { verdict: { kind: 'ok', reachable, note: BLOCKED_NOTE }, next: reset };
+      }
       case 'failed':
         if (!m.isPrimary) {
           return {
@@ -820,6 +878,49 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   return { verdict: { kind: 'blip' }, next: reset };
 }
 
+/**
+ * D-042: the primary's crawler fetches as a round sees them — per view, the latest usable fetch made
+ * before the round ended (a round judged late still sees the one before a newer fetch), split into
+ * fresh (≤ 65 min old: raises a problem) and stale (only keeps an open one from recovering).
+ */
+function crawlerFacts(
+  m: SiteMonitor,
+  s: SiteSnapshot,
+  roundAt: Date,
+): { fresh: CrawlerFact[]; stale: CrawlerFact[] } {
+  if (!m.isPrimary || !m.crawler?.length) return { fresh: [], stale: [] };
+  const roundEnd = roundAt.getTime() + s.intervalSec * 1000;
+  const freshFrom = s.now.getTime() - CRAWLER_FRESH_MS;
+  const latest = latestPerView(m.crawler, roundEnd);
+  return {
+    fresh: latest.filter((f) => f.checkedAt.getTime() >= freshFrom),
+    stale: latest.filter((f) => f.checkedAt.getTime() < freshFrom),
+  };
+}
+
+/**
+ * D-042: an open PROBLEM incident that hasn't recovered doesn't recover while a view's latest usable
+ * fetch is a stale hit (the site now refuses the fake Googlebot, or the crawler stopped) — no data is no
+ * evidence the page is clean, whatever trigger the incident shows now (slow may have taken over). A
+ * DOWN drop recovers as before: the home page answering is the evidence (D-023).
+ */
+function crawlerHolds(m: SiteMonitor, s: SiteSnapshot, stale: readonly CrawlerFact[]): boolean {
+  const open = s.open;
+  if (!m.isPrimary || !open || RECOVERED_STATES.includes(open.state)) return false;
+  if ((open.episodeSeverity ?? open.severity) !== 'problem') return false;
+  return crawlerIssue(stale, m.url, m.allowedRedirectDomains) !== null;
+}
+
+/**
+ * A crawler problem starts at its fetch — but never before the round after the last one judged: a
+ * fetch made while the site was down or recovering would otherwise start a PROBLEM AGAIN before the
+ * recovery it follows.
+ */
+function crawlerStart(at: Date, s: SiteSnapshot): Date {
+  const afterJudged = s.lastRoundAt ? s.lastRoundAt.getTime() + s.intervalSec * 1000 : 0;
+  return new Date(Math.max(at.getTime(), afterJudged));
+}
+
 /** The first PROBLEM trigger of a passing round, in the order a person would fix them. */
 function problemOf(
   m: SiteMonitor,
@@ -829,13 +930,18 @@ function problemOf(
   p50: number | null,
   minLocations = 2,
   wafSite = false,
-): { trigger: Trigger; detail: ProblemDetail } | null {
+  crawler: readonly CrawlerFact[] = [],
+): { trigger: Trigger; detail: ProblemDetail; at?: Date } | null {
   const as = (trigger: Trigger, detail: ProblemDetail | null) =>
     detail ? { trigger: m.isPrimary ? trigger : ('key_page' as const), detail } : null;
+  // What only a crawler view saw (primary only, D-042): after the round's own keyword and redirect,
+  // which win and carry no view.
+  const viewed = crawlerIssue(crawler, m.url, m.allowedRedirectDomains);
   return (
     (m.isPrimary ? null : as('key_page', statusIssue(counted, minLocations))) ??
     as('keyword', keywordIssue(counted, minLocations)) ??
     as('redirect', redirectIssue(counted, m.url, m.allowedRedirectDomains, minLocations)) ??
+    (viewed ? { trigger: viewed.detail.kind, detail: viewed.detail, at: viewed.at } : null) ??
     (slowRounds >= SLOW_ROUNDS && p50 !== null
       ? as('slow', {
           kind: 'slow',

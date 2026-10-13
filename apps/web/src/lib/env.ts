@@ -27,6 +27,12 @@ const serverEnvSchema = z.object({
   HEALTHCHECKS_PING_URL_PROBE_SIN: z.url().optional(),
   HEALTHCHECKS_PING_URL_PROBE_TYO: z.url().optional(),
   HEALTHCHECKS_PING_URL_NOTIFIER: z.url().optional(),
+  HEALTHCHECKS_PING_URL_CRAWLER: z.url().optional(),
+  /**
+   * D-042: shared-list and crawler-view findings raise PROBLEM only when `on`; `off` logs them in
+   * the engine summary. Production stays off until S09c's week without a false positive.
+   */
+  DEFACEMENT_ALERTS: z.enum(['on', 'off']).default('off'),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

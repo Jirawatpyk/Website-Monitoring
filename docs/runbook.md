@@ -46,6 +46,16 @@ from verification_jobs where site_id = '<site id>' order by created_at desc limi
 
 **Fix:** bring a second location back. The alert clears by itself once 2 locations beat again, no sooner than 10 min after it opened; there's no "back" email.
 
+## Crawler (defacement views, S09c)
+
+**Alert:** the Healthchecks check `crawler` is down (Tao), or a PROBLEM · Keyword / Redirect whose cause ends "(as Googlebot)" or "(from Google search)".
+
+**What it means:** every 30 min `/api/cron/crawler` (sin1) fetches each live home page as Googlebot and as a phone arriving from Google search, and looks for the shared forbidden list and the site's own forbidden words in the whole page (D-041, D-042). A cause with "(as Googlebot)" means the hacked content is served only to search engines; "(from Google search)" means visitors from Google are sent to another site. Normal visitors and our per-minute probes see a clean page, so open it the same way: `curl -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" <url>` or `curl -e https://www.google.com/ -A "<phone UA>" -I <url>`. An open crawler PROBLEM recovers only after a clean usable fetch of that view; while the site refuses the fake Googlebot, or the crawler is dead (the Healthchecks alert), it holds for up to a day.
+
+**Check:** the cron's log line (`job: "crawler"`: `fetched`, `unusable`, `hits`) and `crawler_checks` (`usable = false` = the site refused the fake Googlebot or timed out — no data, never a PROBLEM). With `DEFACEMENT_ALERTS=off` (production until S09c's week without a false positive) findings appear only in the engine's log line as `defacementHeld`.
+
+**Fix:** a real hit is the site owner's to clean (hosting, CMS plugins). A false hit on the shared list (a normal page using a listed phrase) is fixed by a PR to `packages/shared/src/forbidden.ts` (until S17 makes the list editable).
+
 ## A site shows PROBLEM
 
 The cause line says which trigger and where (spec §19 cause table, D-022): slow (p50 over the limit 3 rounds in a row), keyword missing / forbidden text found, a key page failing while home is OK, one location failing ≥ 5 min (regional), a redirect off the allowlist, or blocked and not verified. Read the monitor's carry state:

@@ -193,7 +193,7 @@ export function defaultSlowMs(tier: Tier): number {
   return TIER_CONFIG[tier].slowThresholdMs;
 }
 
-/** What Must not contain starts with (PRD §5); the shared spam list comes with S17 (D-025). */
+/** What Must not contain starts with (PRD §5); the shared forbidden list applies on top of it (`forbidden.ts`, D-041). */
 export const DEFAULT_MUST_NOT_CONTAIN: readonly string[] = ['Index of /', 'Database error'];
 
 /** Key pages per site (AddSite: "max 3 per site"). */

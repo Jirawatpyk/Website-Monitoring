@@ -33,6 +33,22 @@ process.stdin.on('end', () => {
     deny(`An inline node script over ${MAX_INLINE_LINES} lines`);
     return;
   }
+  // `sed -i` with a backslash in it: Git Bash quoting dropped the backslashes of a regex three times in
+  // one slice (retro S09c) — `/ \(…\)$/` became `/ (…)$/`. Edit or a Write'd Node script keeps them.
+  const sed = /(?:^|[;&|(\s])sed\s+(?:-[A-Za-z]*\s+)*-[A-Za-z]*i/.exec(command);
+  if (sed && command.slice(sed.index).includes('\\')) {
+    process.stdout.write(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason:
+            "`sed -i` with a backslash: the shell can drop it (retro S09c). Use the Edit tool, or a Write'd Node script with split(a).join(b) — root CLAUDE.md → Rules → Scripts.",
+        },
+      }),
+    );
+    return;
+  }
   // `<<EOF`, `<<'EOF'`, `<<"EOF"`, `<<-EOF` — then count lines until the closing delimiter.
   const re = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/g;
   for (const match of command.matchAll(re)) {

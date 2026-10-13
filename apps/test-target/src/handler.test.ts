@@ -1,6 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { readEdgeConfigItem } from './edge-config';
-import { handle, parseMode, SLOW_HOLD_MS, TIMEOUT_HOLD_MS } from './handler';
+import {
+  CLOAKED_REDIRECT,
+  DEEP_SPAM_OFFSET,
+  handle,
+  parseMode,
+  SLOW_HOLD_MS,
+  SPAM,
+  TIMEOUT_HOLD_MS,
+} from './handler';
 
 describe('handle', () => {
   it.each([
@@ -103,6 +112,62 @@ describe('handle', () => {
     await vi.advanceTimersByTimeAsync(TIMEOUT_HOLD_MS);
     expect((await pending).status).toBe(200);
     vi.useRealTimers();
+  });
+});
+
+describe('defacement modes (S09c, D-041)', () => {
+  const PROBE = 'DxT-Monitor/1.0';
+  const GOOGLEBOT = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
+  const PHONE =
+    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36';
+  const GOOGLE = 'https://www.google.com/';
+  const answer = async (mode: string, userAgent: string, referer: string | null = null) => {
+    const res = await handle({ readMode: async () => mode, userAgent, referer });
+    return { status: res.status, location: res.headers.get('location'), body: await res.text() };
+  };
+
+  it.each([
+    ['defaced', PROBE, null, true],
+    ['defaced', GOOGLEBOT, null, true],
+    ['cloaked-ua', PROBE, null, false],
+    ['cloaked-ua', PHONE, GOOGLE, false],
+    ['cloaked-ua', GOOGLEBOT, null, true],
+  ])('%s: %s gets the gambling links: %s', async (mode, userAgent, referer, spam) => {
+    const r = await answer(mode, userAgent, referer);
+    expect(r.status).toBe(200);
+    // The brand stays, so must_contain passes and only the forbidden phrases fire.
+    expect(r.body).toContain('<h1>Test target</h1>');
+    expect(r.body.includes(SPAM)).toBe(spam);
+  });
+
+  it.each([
+    [PHONE, GOOGLE, 302],
+    [PHONE, null, 200],
+    [PHONE, 'https://duckduckgo.com/', 200],
+    [PROBE, GOOGLE, 200],
+    [GOOGLEBOT, null, 200],
+  ])('cloaked-referer: %s from %s → %i', async (userAgent, referer, status) => {
+    const r = await answer('cloaked-referer', userAgent, referer);
+    expect(r.status).toBe(status);
+    expect(r.location).toBe(status === 302 ? CLOAKED_REDIRECT : null);
+  });
+
+  it('the spam phrases are entries of the shared forbidden list (packages/shared forbidden.ts)', () => {
+    // The test target can't import @dxt/shared (its own Vercel project): read the list's source.
+    const list = readFileSync(new URL('../../../packages/shared/src/forbidden.ts', import.meta.url), 'utf8');
+    const phrases = [...SPAM.matchAll(/<a[^>]*>([^<]+)<\/a>/g)].map((m) => m[1]!);
+    expect(phrases).toEqual(['สล็อตออนไลน์', 'บาคาร่า']);
+    for (const p of phrases) expect(list).toContain(`'${p}',`);
+  });
+
+  it('deep-spam: the links sit past the probes’ 256 KB sample, for everyone', async () => {
+    for (const userAgent of [PROBE, GOOGLEBOT, PHONE]) {
+      const r = await answer('deep-spam', userAgent);
+      const at = Buffer.byteLength(r.body.slice(0, r.body.indexOf(SPAM)));
+      expect(at).toBeGreaterThan(262_144);
+      expect(at).toBeGreaterThanOrEqual(DEEP_SPAM_OFFSET);
+      expect(Buffer.byteLength(r.body)).toBeLessThan(3_145_728);
+    }
   });
 });
 

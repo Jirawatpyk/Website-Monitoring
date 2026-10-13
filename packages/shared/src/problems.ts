@@ -1,4 +1,5 @@
 import type { ProbeLocation } from './domain';
+import type { CrawlerView } from './forbidden';
 
 /**
  * Why a monitor shows PROBLEM in a round (PRD §5 triggers, D-022): the engine (`@dxt/engine`)
@@ -6,8 +7,15 @@ import type { ProbeLocation } from './domain';
  */
 export type ProblemDetail =
   | { kind: 'slow'; p50Ms: number; thresholdMs: number; locations: ProbeLocation[] }
-  | { kind: 'keyword'; missing: string[]; forbidden: string[]; locations: ProbeLocation[] }
-  | { kind: 'redirect'; host: string; locations: ProbeLocation[] }
+  /** `view`: seen only by a crawler fetch (D-041), not by the round's locations. */
+  | {
+      kind: 'keyword';
+      missing: string[];
+      forbidden: string[];
+      locations: ProbeLocation[];
+      view?: CrawlerView;
+    }
+  | { kind: 'redirect'; host: string; locations: ProbeLocation[]; view?: CrawlerView }
   | {
       kind: 'regional';
       location: ProbeLocation;

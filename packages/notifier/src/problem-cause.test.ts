@@ -68,6 +68,27 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
       'redirects to casino.example.net',
     ],
     [
+      // S09c (D-041): what only a crawler view saw names the view instead of the locations.
+      'a phrase only Googlebot was served',
+      {
+        kind: 'keyword',
+        missing: [],
+        forbidden: ['บาคาร่า', 'slot online'],
+        locations: [],
+        view: 'googlebot',
+      },
+      home,
+      'Found “บาคาร่า”, “slot online” on / (as Googlebot)',
+      '“บาคาร่า”, “slot online” found on the page (as Googlebot)',
+    ],
+    [
+      'a redirect only for visitors from Google search',
+      { kind: 'redirect', host: 'casino.example.net', locations: [], view: 'google_referer' },
+      home,
+      '/ → casino.example.net · not in this site’s allowlist (from Google search)',
+      'redirects to casino.example.net (from Google search)',
+    ],
+    [
       'INC-0138 Tubtong blocked, verifier unavailable',
       { kind: 'blocked', reason: 'not_picked_up', locations: [...ALL], statusCode: 403 },
       home,

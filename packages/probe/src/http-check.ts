@@ -1,4 +1,11 @@
-import { PROBE_USER_AGENT, type CheckOutcome, type WafVendor } from '@dxt/shared';
+import {
+  findForbiddenPhrases,
+  FORBIDDEN_PHRASES,
+  MAX_FORBIDDEN_PHRASE_LENGTH,
+  PROBE_USER_AGENT,
+  type CheckOutcome,
+  type WafVendor,
+} from '@dxt/shared';
 import { classifyResponse, wafSignature } from './classify';
 import { Agent, fetch, type Response } from 'undici';
 import {
@@ -28,6 +35,16 @@ export interface HttpCheckRequest {
   /** Text the page must contain / must not contain (PROBLEM · Keyword, D-022). Case-sensitive. */
   mustContain?: readonly string[];
   mustNotContain?: readonly string[];
+  /**
+   * The crawler's identity (D-041 / D-042): a fixed User-Agent and Referer from `CRAWLER_CLIENTS`,
+   * sent on every redirect hop (cloaking often sits behind an apex → www hop). `headers` stay same-site.
+   */
+  client?: { userAgent: string; referer?: string };
+  /**
+   * The crawler's whole-body read (D-041): look for `mustNotContain` and the shared forbidden list in
+   * everything up to KEYWORD_SCAN_BYTES, not only the sample — injected links sit at the end of <body>.
+   */
+  scanWholeBody?: boolean;
 }
 
 export interface HttpCheckResult {
@@ -47,13 +64,14 @@ export interface HttpCheckResult {
   keywordForbidden: string[] | null;
   /** A blocked response's header-level WAF signature (D-027); null otherwise. */
   waf: WafVendor | null;
+  /** With `scanWholeBody`: the body was read to its end or to KEYWORD_SCAN_BYTES, not broken off. */
+  scanComplete?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
-const BODY_SAMPLE_BYTES = 16_384;
 /**
- * The body sample when the monitor has keywords: classification and `must_not_contain` look here
- * (D-022) — the error pages those words catch are small.
+ * The body sample of a GET: classification, `must_not_contain` and the shared forbidden list look
+ * here (D-022, D-041) — the error pages and spam those words catch are usually near the top.
  */
 export const KEYWORD_BODY_BYTES = 262_144;
 /**
@@ -77,15 +95,17 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
   const started = performance.now();
   const mustContain = req.mustContain ?? [];
   const mustNotContain = req.mustNotContain ?? [];
-  const keywords = (req.method ?? 'GET') === 'GET' && mustContain.length + mustNotContain.length > 0;
+  // Every GET is keyword-checked: the shared forbidden list applies to every monitor (D-041).
+  const keywords = (req.method ?? 'GET') === 'GET';
   const { agent, owned } = dispatcherFor(req);
   try {
     const { res, url } = await fetchFollowing(req, agent);
     const ttfbMs = Math.round(performance.now() - started);
-    const { bodySample, missing, sampleAt } = await readBody(
+    const { bodySample, missing, sampleAt, forbidden, complete } = await readBody(
       res,
-      keywords ? KEYWORD_BODY_BYTES : BODY_SAMPLE_BYTES,
+      KEYWORD_BODY_BYTES,
       keywords ? mustContain : [],
+      keywords && req.scanWholeBody ? mustNotContain : null,
     );
     const snapshot = { status: res.status, headers: res.headers, bodySample };
     const outcome = classifyResponse(snapshot);
@@ -100,8 +120,9 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       bodySample,
       finalUrl: url.href.slice(0, MAX_FINAL_URL),
       keywordMissing: checked && missing ? capped(missing) : null,
-      keywordForbidden: checked ? capped(mustNotContain.filter((k) => bodySample.includes(k))) : null,
+      keywordForbidden: checked ? capped(forbidden ?? forbiddenIn(bodySample, mustNotContain)) : null,
       waf: outcome === 'blocked' ? wafSignature(snapshot) : null,
+      ...(req.scanWholeBody ? { scanComplete: complete } : {}),
     };
   } catch (err) {
     // DNS, TLS, refused connection and timeout all land here: a hard fail.
@@ -161,7 +182,11 @@ async function fetchFollowing(
     const res = await fetch(url, {
       method,
       redirect: 'manual',
-      headers: { 'user-agent': PROBE_USER_AGENT, ...(sameSite(url, first) ? req.headers : {}) },
+      headers: {
+        'user-agent': req.client?.userAgent ?? PROBE_USER_AGENT,
+        ...(req.client?.referer ? { referer: req.client.referer } : {}),
+        ...(sameSite(url, first) ? req.headers : {}),
+      },
       signal,
       dispatcher,
     });
@@ -186,26 +211,64 @@ export function sameSite(url: URL, first: URL): boolean {
   );
 }
 
+/** A site's own words (case-sensitive, D-022) then the shared list's entries (D-041), once each. */
+function forbiddenIn(text: string, mustNotContain: readonly string[]): string[] {
+  return [...new Set([...mustNotContain.filter((k) => text.includes(k)), ...findForbiddenPhrases(text)])];
+}
+
+/** The page's declared charset (a TIS-620 / windows-874 Thai page), else UTF-8. */
+export function decoderFor(contentType: string | null) {
+  const label = /charset\s*=\s*"?([\w.:-]+)/i.exec(contentType ?? '')?.[1];
+  try {
+    return new TextDecoder(label ?? 'utf-8');
+  } catch {
+    return new TextDecoder();
+  }
+}
+
 /**
  * Reads the first `sampleLimit` bytes as the body sample. While a `mustContain` keyword is still
  * unseen it keeps reading — up to KEYWORD_SCAN_BYTES — and stops the download as soon as every one
  * is found. Returns the sample, when it was complete (`sampleAt`, for the response time), and the
  * keywords never seen — or null when the scan past the sample broke off (a stalled or failed tail):
  * the page already answered, so that is "not checked", never a hard fail.
+ * With `scanForbidden` (the crawler, D-041) it reads on to KEYWORD_SCAN_BYTES whatever is pending and
+ * returns every forbidden word seen in all of it (`forbidden`); otherwise `forbidden` is null.
  */
 async function readBody(
   res: Response,
   sampleLimit: number,
   mustContain: readonly string[],
-): Promise<{ bodySample: string; missing: string[] | null; sampleAt: number }> {
+  scanForbidden: readonly string[] | null,
+): Promise<{
+  bodySample: string;
+  missing: string[] | null;
+  sampleAt: number;
+  forbidden: string[] | null;
+  complete: boolean;
+}> {
   let pending = [...new Set(mustContain)];
-  if (!res.body) return { bodySample: '', missing: pending, sampleAt: performance.now() };
+  if (!res.body) {
+    return {
+      bodySample: '',
+      missing: pending,
+      sampleAt: performance.now(),
+      forbidden: scanForbidden ? [] : null,
+      complete: true,
+    };
+  }
   const reader = res.body.getReader();
-  const decoder = new TextDecoder();
+  const decoder = decoderFor(res.headers.get('content-type'));
   // A keyword split across two chunks: keep the end of the text read so far.
   const overlap = Math.max(0, ...pending.map((k) => k.length)) - 1;
+  // The forbidden scan's own window: twice the longest word, as a run of spaces may stand for one.
+  const scanOverlap = scanForbidden
+    ? 2 * Math.max(MAX_FORBIDDEN_PHRASE_LENGTH, ...scanForbidden.map((k) => k.length))
+    : 0;
+  const found = new Set<string>();
   let sample = '';
   let tail = '';
+  let scanTail = '';
   let size = 0;
   let done = false;
   const take = (text: string) => {
@@ -214,6 +277,11 @@ async function readBody(
       const window = tail + text;
       pending = pending.filter((k) => !window.includes(k));
       tail = overlap > 0 ? window.slice(-overlap) : '';
+    }
+    if (scanForbidden) {
+      const window = scanTail + text;
+      for (const k of forbiddenIn(window, scanForbidden)) found.add(k);
+      scanTail = window.slice(-scanOverlap);
     }
   };
   // The sample: a read error here is the page failing to load, as before.
@@ -226,10 +294,10 @@ async function readBody(
     }
   }
   const sampleAt = performance.now();
-  // Past the sample, only while a keyword is still unseen.
+  // Past the sample, only while a keyword is still unseen — or to the end for the crawler.
   let broke = false;
   try {
-    while (!done && pending.length > 0 && size < KEYWORD_SCAN_BYTES) {
+    while (!done && (pending.length > 0 || scanForbidden) && size < KEYWORD_SCAN_BYTES) {
       const chunk = await reader.read();
       done = chunk.done;
       if (chunk.value) {
@@ -247,7 +315,16 @@ async function readBody(
     // Everything needed is read; a failed cancel only leaves the rest undownloaded.
   }
   const missing = broke && pending.length > 0 ? null : mustContain.filter((k) => pending.includes(k));
-  return { bodySample: sample, missing, sampleAt };
+  // Own words first, then the list, as `forbiddenIn` orders a single window.
+  const forbidden = scanForbidden
+    ? [
+        ...scanForbidden.filter((k) => found.has(k)),
+        ...FORBIDDEN_PHRASES.filter((k) => found.has(k) && !scanForbidden.includes(k)),
+      ]
+    : null;
+  // Complete = read to the end or to the 3 MB cap (the scan's scope), not broken off by a stalled or
+  // dropped tail — a broken-off read has no say about the tail, where injected links sit.
+  return { bodySample: sample, missing, sampleAt, forbidden, complete: !broke };
 }
 
 function describeError(err: unknown): string {

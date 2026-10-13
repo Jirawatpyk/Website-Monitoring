@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PROBE_USER_AGENT } from '@dxt/shared';
+import { CRAWLER_CLIENTS, PROBE_USER_AGENT } from '@dxt/shared';
 import { runHttpCheck, sameSite } from './http-check';
 
 // A local server that answers per path, so every outcome is tested over real HTTP.
@@ -55,6 +55,32 @@ beforeAll(async () => {
         break;
       case '/defaced':
         res.writeHead(200).end('<h1>Index of /</h1>');
+        break;
+      case '/spam':
+        // A hacked page: gambling links injected near the top (D-041).
+        res.writeHead(200).end('<h1>Welcome</h1><a href="//x">Best SLOT  online</a> บาคาร่า');
+        break;
+      case '/booking':
+        res.writeHead(200).end('<h1>Book</h1><p>Select a time slot</p>');
+        break;
+      case '/deep-spam':
+        // The spam past the 256 KB sample, at the end of <body>.
+        res.writeHead(200).end(`<h1>Welcome</h1>${'x'.repeat(300_000)}<a>บาคาร่า</a><p>Index of /</p>`);
+        break;
+      case '/split-spam':
+        // A phrase arriving in two chunks past the sample.
+        res.writeHead(200);
+        res.write(`${'x'.repeat(300_000)}<a>slot `);
+        setTimeout(() => res.end('online</a>'), 20);
+        break;
+      case '/tis-620':
+        // A Thai page in TIS-620 / windows-874: "บาคาร่า".
+        res
+          .writeHead(200, { 'content-type': 'text/html; charset=windows-874' })
+          .end(Buffer.from([0xba, 0xd2, 0xa4, 0xd2, 0xc3, 0xe8, 0xd2]));
+        break;
+      case '/bad-charset':
+        res.writeHead(200, { 'content-type': 'text/html; charset=nonsense' }).end('slot online');
         break;
       case '/down':
         res.writeHead(504).end('Gateway Timeout');
@@ -113,9 +139,9 @@ describe('runHttpCheck', () => {
     expect(lastHeaders['x-dxt-monitor']).toBe('secret');
   });
 
-  it('keeps only the first 16 KB of the body', async () => {
-    const result = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/big` });
-    expect(result.bodySample).toHaveLength(16_384);
+  it('keeps only the first 256 KB of the body', async () => {
+    const result = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/wix-deep` });
+    expect(result.bodySample).toHaveLength(262_144);
   });
 
   it('records the final URL after the redirects (PROBLEM · Redirect, D-022)', async () => {
@@ -175,10 +201,6 @@ describe('runHttpCheck', () => {
       mustContain: ['Welcome'],
     });
     expect(result.keywordMissing).toEqual([]);
-    // Without keywords the sample stays 16 KB.
-    expect(
-      (await runHttpCheck({ allowPrivateTargets: true, url: `${base}/deep-keyword` })).bodySample,
-    ).toHaveLength(16_384);
   });
 
   it('looks for a must-contain keyword past 256 KB, up to about 3 MB (D-026)', async () => {
@@ -228,9 +250,7 @@ describe('runHttpCheck', () => {
     expect(result.keywordMissing).toEqual(['Gone']);
   });
 
-  it("checks no keywords without any, on HEAD, or on a response that didn't pass", async () => {
-    const none = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok` });
-    expect(none).toMatchObject({ keywordMissing: null, keywordForbidden: null });
+  it("checks no keywords on HEAD or on a response that didn't pass", async () => {
     const head = await runHttpCheck({
       allowPrivateTargets: true,
       url: `${base}/ok`,
@@ -251,6 +271,104 @@ describe('runHttpCheck', () => {
       mustContain: ['Welcome'],
     });
     expect(down).toMatchObject({ outcome: 'fail', keywordMissing: null, finalUrl: `${base}/down` });
+  });
+
+  describe('the shared forbidden list (D-041, D-042)', () => {
+    it('checks every GET, even a monitor without keywords of its own', async () => {
+      const clean = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok` });
+      expect(clean).toMatchObject({ keywordMissing: [], keywordForbidden: [] });
+      const spam = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/spam` });
+      // Case and spacing don't matter; the list's own entry is reported.
+      expect(spam.keywordForbidden).toEqual(['บาคาร่า', 'slot online']);
+    });
+
+    it('reports a site’s own word first, once, and keeps it case-sensitive', async () => {
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/spam`,
+        mustNotContain: ['บาคาร่า', 'SLOT  online', 'slot online'],
+      });
+      expect(result.keywordForbidden).toEqual(['บาคาร่า', 'SLOT  online', 'slot online']);
+    });
+
+    it('"Select a time slot" on a booking page is no hit', async () => {
+      const result = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/booking` });
+      expect(result.keywordForbidden).toEqual([]);
+    });
+
+    it('a phrase past 256 KB: the probe misses it, the crawler’s whole-body read finds it', async () => {
+      const probe = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/deep-spam`,
+        mustNotContain: ['Index of /'],
+      });
+      expect(probe.keywordForbidden).toEqual([]);
+      expect(probe.scanComplete).toBeUndefined();
+      const crawler = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/deep-spam`,
+        mustNotContain: ['Index of /'],
+        scanWholeBody: true,
+      });
+      expect(crawler).toMatchObject({ keywordForbidden: ['Index of /', 'บาคาร่า'], scanComplete: true });
+      expect(crawler.bodySample).toHaveLength(262_144);
+    });
+
+    it('a whole-body read whose tail breaks off says so, keeping what it found', async () => {
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/broken-tail`,
+        scanWholeBody: true,
+      });
+      expect(result).toMatchObject({ outcome: 'pass', keywordForbidden: [], scanComplete: false });
+    });
+
+    it('finds a phrase split across two chunks in the whole-body read', async () => {
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/split-spam`,
+        scanWholeBody: true,
+      });
+      expect(result.keywordForbidden).toEqual(['slot online']);
+    });
+
+    it('a whole-body read stops at about 3 MB, which counts as read', async () => {
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/too-deep`,
+        scanWholeBody: true,
+      });
+      expect(result).toMatchObject({ keywordForbidden: [], scanComplete: true });
+    });
+
+    it('reads a TIS-620 Thai page in its own charset; an unknown charset falls back to UTF-8', async () => {
+      const thai = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/tis-620` });
+      expect(thai.keywordForbidden).toEqual(['บาคาร่า']);
+      const unknown = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/bad-charset` });
+      expect(unknown.keywordForbidden).toEqual(['slot online']);
+    });
+  });
+
+  describe('the crawler’s identity (D-042)', () => {
+    it('sends the Googlebot User-Agent instead of the probe’s', async () => {
+      await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok`, client: CRAWLER_CLIENTS.googlebot });
+      expect(lastHeaders['user-agent']).toBe(CRAWLER_CLIENTS.googlebot.userAgent);
+      expect(lastHeaders.referer).toBeUndefined();
+    });
+
+    it('keeps the User-Agent and Referer on every hop; the secret header stays on the own site', async () => {
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/redirect-other`,
+        headers: { 'x-dxt-monitor': 'secret' },
+        client: CRAWLER_CLIENTS.google_referer,
+      });
+      expect(result).toMatchObject({ outcome: 'pass', finalUrl: `${other}/seen` });
+      expect(lastHeaders['x-dxt-monitor']).toBe('secret');
+      expect(otherHeaders['user-agent']).toBe(CRAWLER_CLIENTS.google_referer.userAgent);
+      expect(otherHeaders.referer).toBe('https://www.google.com/');
+      expect(otherHeaders['x-dxt-monitor']).toBeUndefined();
+    });
   });
 
   it('fails on a 5xx (INC-0142: HTTP 504 at SIN)', async () => {

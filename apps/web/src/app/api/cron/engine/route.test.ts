@@ -29,11 +29,11 @@ describe('GET /api/cron/engine', () => {
     expect(mocks.runEngine).not.toHaveBeenCalled();
   });
 
-  it('runs the engine with the service client', async () => {
+  it('runs the engine with the service client, defacement alerts off unless the env says on (D-042)', async () => {
     const { GET } = await import('./route');
     const res = await GET(call(`Bearer ${TEST_ENV.CRON_SECRET}`));
     expect(res.status).toBe(200);
-    expect(mocks.runEngine).toHaveBeenCalledWith('db');
+    expect(mocks.runEngine).toHaveBeenCalledWith('db', expect.any(Date), { defacementAlerts: false });
     expect(await res.json()).toMatchObject({ job: 'engine', ok: true, monitors: 1 });
   });
 

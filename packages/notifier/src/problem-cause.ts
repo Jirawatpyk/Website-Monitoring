@@ -1,4 +1,12 @@
-import { PROBE_LOCATIONS, TIER_CONFIG, type ProbeLocation, type ProblemDetail, type Tier } from '@dxt/shared';
+import {
+  CRAWLER_LABELS,
+  PROBE_LOCATIONS,
+  TIER_CONFIG,
+  type CrawlerView,
+  type ProbeLocation,
+  type ProblemDetail,
+  type Tier,
+} from '@dxt/shared';
 import { describeFailure, formatCause } from './cause';
 
 /** Where the problem was seen: the monitor, its site's tier and the probe timeout for the wording. */
@@ -59,15 +67,18 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
       const limit = d.thresholdMs === tierLimit ? `the Tier ${ctx.tier} limit` : 'its limit';
       return `p50 ${seconds(d.p50Ms)} (${where(d.locations)}) · over ${limit} of ${seconds(d.thresholdMs)} for 3 checks in a row`;
     }
-    case 'keyword':
+    case 'keyword': {
+      // A crawler view names itself instead of the locations (D-041): "(as Googlebot)".
+      const seen = d.view ? CRAWLER_LABELS[d.view] : where(d.locations);
       return [
-        d.missing.length ? `Missing ${quoted(d.missing)} on ${path} (${where(d.locations)})` : null,
-        d.forbidden.length ? `Found ${quoted(d.forbidden)} on ${path} (${where(d.locations)})` : null,
+        d.missing.length ? `Missing ${quoted(d.missing)} on ${path} (${seen})` : null,
+        d.forbidden.length ? `Found ${quoted(d.forbidden)} on ${path} (${seen})` : null,
       ]
         .filter(Boolean)
         .join(' · ');
+    }
     case 'redirect':
-      return `${path} → ${plain(d.host)} · not in this site’s allowlist`;
+      return `${path} → ${plain(d.host)} · not in this site’s allowlist${viewed(d.view)}`;
     case 'regional': {
       const failure = lowerFirst(describeFailure({ location: d.location, ...d.failure }, ctx.timeoutMs));
       return `${d.location} failing ${d.minutes} min (${failure}) · ${where(d.okLocations)} OK`;
@@ -96,9 +107,11 @@ function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
     case 'slow':
       return `slow, p50 ${seconds(d.p50Ms)}`;
     case 'keyword':
-      return d.missing.length ? `${quoted(d.missing)} missing` : `${quoted(d.forbidden)} found on the page`;
+      return d.missing.length
+        ? `${quoted(d.missing)} missing${viewed(d.view)}`
+        : `${quoted(d.forbidden)} found on the page${viewed(d.view)}`;
     case 'redirect':
-      return `redirects to ${plain(d.host)}`;
+      return `redirects to ${plain(d.host)}${viewed(d.view)}`;
     case 'regional':
       return `${d.location} failing ${d.minutes} min`;
     case 'status':
@@ -131,6 +144,9 @@ function pathOf(url: string): string {
 
 /** Text from outside (a redirect host) can't open a Chat mention or link: `<…|…>` is stripped. */
 const plain = (text: string) => text.replace(/[<>|]/g, '');
+
+/** " (as Googlebot)" / " (from Google search)" for what only a crawler view saw; else nothing. */
+const viewed = (view: CrawlerView | undefined) => (view ? ` (${CRAWLER_LABELS[view]})` : '');
 
 /** Locations in BKK / SIN / TYO order. */
 function where(locations: readonly ProbeLocation[]): string {
