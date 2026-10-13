@@ -78,13 +78,13 @@ pnpm db:push:staging | db:reset:staging          # staging database only (refuse
 Skills:
 
 - `/slice <ID>` — start or continue a slice: check dependencies, branch, load its sources, plan, build.
-- `/slice-review <ID>` — run `/code-review`, the slice's reviewers, ask Tao for `/verify`, collect evidence per "Done when" line, update its status, then a short retro.
+- `/slice-review <ID>` — run `/code-review`, the slice's reviewers, `/verify`, collect evidence per "Done when" line, update its status, then a short retro.
 - `/implement-screen <Board>` — build one canvas board as a route, following screens.md, the spec and AURA.
 - `/new-migration <name>` — add a Supabase migration with RLS and regenerate types.
 - `/engine-case <rule>` — add a table-driven engine test from a spec example.
 - `verifier-staging` — the recipe `/verify` uses on staging: deploy order, test-target modes, observing the outcome, reset.
 
-Built-in: `/code-review high` on every slice's diff (general bugs; the agents below check the domain) — Claude invokes it with the Skill tool, never a general-purpose agent standing in for it. `/verify` runs the app at the change's surface and captures runtime evidence; only Tao can start it (it can't be invoked by Claude), so `/slice-review` hands him a ready `/verify …` line and Claude doesn't do its job by hand; `/verify` follows the project's `verifier-staging` skill (deploy order, test-target modes, where to read the outcome, reset). `slice-verifier` checks the evidence covers every Done-when line.
+Built-in: `/code-review high` on every slice's diff (general bugs; the agents below check the domain) — Claude invokes it with the Skill tool, never a general-purpose agent standing in for it. `/verify` runs the app at the change's surface and captures runtime evidence; Claude invokes it with the Skill tool in `/slice-review` (since Claude Code 2.1.288 it can; before, only Tao could) and never does its job by hand — a drive outside the skill isn't `/verify` evidence. Tao can still run it himself any time for an independent check. `/verify` follows the project's `verifier-staging` skill (deploy order, test-target modes, where to read the outcome, reset). `slice-verifier` checks the evidence covers every Done-when line.
 
 Advisor: when the session has the `advisor` tool, Claude calls it at four points — before a plan, a decision (D-xxx) or a production hotfix; before recommending Tao an answer that becomes a decision, changes behaviour or is handed on (a design brief); when stuck or about to change course; and before calling work done (`docs/workflow.md` → Advisor).
 
