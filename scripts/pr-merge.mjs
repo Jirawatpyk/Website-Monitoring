@@ -142,7 +142,16 @@ async function waitForProduction(number) {
   console.info(`pr:merge — waiting for migrate-production and the production deploy of ${sha.slice(0, 7)}…`);
   const started = Date.now();
   for (;;) {
-    const deployments = vercelDeployments(sha);
+    let deployments;
+    try {
+      deployments = vercelDeployments(sha);
+    } catch {
+      // The merge already happened: say what to check instead of dying with a stack trace.
+      console.error(
+        `pr:merge — merged, but couldn't read Vercel (is the vercel CLI installed and signed in?). Check the production deploy of ${sha.slice(0, 7)} in the Vercel dashboard.`,
+      );
+      process.exit(1);
+    }
     const runs = json([
       'api',
       `repos/{owner}/{repo}/commits/${sha}/check-runs?check_name=migrate-production`,
