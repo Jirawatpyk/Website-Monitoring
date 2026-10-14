@@ -45,7 +45,7 @@ export function SiteMoreMenu({
           <Button
             variant="secondary"
             icon={<IconEllipsis />}
-            title="More actions"
+            title={label}
             className="w-11 justify-center gap-0 px-0"
           >
             <span className="sr-only">{label}</span>

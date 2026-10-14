@@ -15,9 +15,14 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 done
 if [ "$pushes" = 1 ]; then
   echo "pre-push: running pnpm check…" >&2
-  pnpm check >/dev/null 2>&1 || {
-    echo "pre-push: pnpm check failed — fix it before pushing (run it to see why)." >&2
+  log=$(mktemp)
+  pnpm check >"$log" 2>&1 || {
+    # Show why: a failure that doesn't repeat when run by hand can't be diagnosed otherwise (retro 14 Oct).
+    tail -n 40 "$log" >&2
+    rm -f "$log"
+    echo "pre-push: pnpm check failed — fix it before pushing (output above)." >&2
     exit 1
   }
+  rm -f "$log"
 fi
 exit 0
