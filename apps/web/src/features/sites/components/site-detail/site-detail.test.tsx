@@ -208,7 +208,7 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
       .getAllByRole('menuitem')
       .map((i) => i.textContent);
 
-  it("⋯ (§25): an Admin's desktop menu has Edit site and Visit site in a new tab; the phone's Visit site only (D-043)", async () => {
+  it("⋯ (§25): an Admin's menu has Edit site and Visit site in a new tab, on phones too (D-043, D-044)", async () => {
     const user = userEvent.setup();
     render(<SiteDetailView detail={detail()} range="30d" role="admin" meId="tao" nowIso={NOW} />);
     const [phone, desktop] = more();
@@ -223,7 +223,7 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     await user.keyboard('{Escape}');
     expect(desktop).toHaveFocus();
     await user.click(phone!);
-    expect(menuLinks()).toEqual(['Visit site']);
+    expect(menuLinks()).toEqual(['Edit site', 'Visit site']);
     await user.keyboard('{Escape}');
     expect(phone).toHaveFocus();
   });

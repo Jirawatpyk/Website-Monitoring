@@ -4,9 +4,10 @@ import { Button, DropdownMenu, IconButton, type MenuItem } from '@jirawatpyk/aur
 import { IconEllipsis, IconExternalLink, IconPencil } from '@jirawatpyk/aura-react/icons';
 
 /**
- * Site detail's ⋯ (spec §25, D-043). From md: a 44 px secondary icon button last in the header actions, with
- * Edit site for an Admin and Visit site for everyone. Phones: a borderless 44 px ⋯ at the end of the breadcrumb
- * row with Visit site only, until Edit site is view only there (§22.5). Nothing to offer → no button.
+ * Site detail's ⋯ (spec §25, D-043, D-044): Edit site for an Admin and Visit site for everyone. From md a 44 px
+ * secondary icon button last in the header actions; phones a borderless 44 px ⋯ at the end of the breadcrumb row.
+ * Edit site stays editable on phones (D-044), so the phone menu has no "View only on phones" line. Nothing to
+ * offer → no button.
  */
 export function SiteMoreMenu({
   siteId,
@@ -22,9 +23,7 @@ export function SiteMoreMenu({
   phone?: boolean;
 }) {
   const items: MenuItem[] = [
-    ...(canEdit && !phone
-      ? [{ label: 'Edit site', icon: <IconPencil />, href: `/sites/${siteId}/edit` }]
-      : []),
+    ...(canEdit ? [{ label: 'Edit site', icon: <IconPencil />, href: `/sites/${siteId}/edit` }] : []),
     ...(url ? [{ label: 'Visit site', icon: <IconExternalLink />, href: url, target: '_blank' }] : []),
   ];
   if (!items.length) return null;

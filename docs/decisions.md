@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-044 | 14 Oct 2026 | Spec §22.5 "View only on phones" covers the policy and settings editors only (Escalation, Alert channels, Users & roles, Security, Organisation, API & webhooks, Synthetic checks). Add site, Edit site and Edit monitors stay editable on phones, and Site detail's phone ⋯ offers Edit site with no "View only on phones" line | Spec §22.5 list (Edit monitors, Add site, Edit site); §25.2 and the MSite caption; D-043 point 2 |
 | D-043 | 14 Oct 2026 | Site detail's ⋯ menu (spec §25): on phones the ⋯ sits at the end of the breadcrumb row above the title, not in the top bar, because the phone top bar is the shared brand + avatar bar (D-018) and doesn't carry the site name; on phones the menu shows Visit site only until Add site, Edit site and Edit monitors are view only on phones (§22.5), then Edit site joins it with "View only on phones" | MSite board: ⋯ in the top bar between the site name and the avatar; §25.2 Edit site on phones |
 | D-042 | 13 Oct 2026 | S09c's open rules: crawler views check forbidden words and the redirect allowlist, not `must_contain`; per view the latest usable fetch before the round's end raises a PROBLEM for 65 min, and an open one holds until a clean usable fetch (no data never clears it, for up to a day); a redirect off the site is usable whatever the target answers, a body read that broke off clean is not; the crawler's User-Agent and Referer are fixed and go on every hop, custom headers stay same-site; `DEFACEMENT_ALERTS` (default off) gates shared-list and crawler alerts in the runner, a site's own words always alert; the shared list matches case-insensitively with whitespace collapsed; the page's charset is honoured | — (fills gaps in D-041) |
 | D-041 | 13 Oct 2026 | v1 defacement detection = keywords (a missing `must_contain`, a forbidden word) and the redirect allowlist, as built in S04a, plus slice **S09c** before G1 (a shared forbidden-word list on every monitor, and a Googlebot view of each home page every 30 min against cloaked SEO spam) and **S09d** (a fingerprint of title, description, h1, canonical and external script / link domains against an accepted baseline; records 2 weeks before it alerts) | D-025 "no shared spam list until S17" (the list ships in code now; S17 makes it editable) |
@@ -47,6 +48,22 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-044 — The site editors stay editable on phones
+
+**Conflict.** Spec §22.5 makes "complex editors" view only on phones, with the line "View only on phones. Admins change policies on a larger screen." Its list includes Edit monitors and Add site, and since 14 Oct Edit site (§25.2). Add site and Edit monitors shipped in S05 on 8 Oct, before §22.5 existed (10 Oct), and work at 390 px: `layout-consistency` measures their 44 px targets and finds no sideways scroll.
+
+**Decision (14 Oct 2026, Tao).** §22.5 covers the policy and settings editors: Escalation, Alert channels & routing, Users & roles, Security, Organisation, API & webhooks and Synthetic checks. Add site, Edit site and Edit monitors stay full editors on every width. Site detail's phone ⋯ offers Edit site to an Admin, like the desktop menu, without the "View only on phones" line. This supersedes D-043 point 2. The §22.5 follow-up carried under S06 is dropped.
+
+**Why.**
+- The rule's own sentence is about policies. The site forms are in the list by analogy.
+- The phone uses are real: an Admin away from a desk changes an owner or presses Stop monitoring. Their destructive actions already confirm first (§13).
+- Mute and maintenance remain the phone's quick way to stop alerts.
+- A read-only view of each form would add three screens with no board.
+
+**Impact.**
+- `more-menu.tsx`: the phone menu gets Edit site.
+- The spec's §22.5 list, §25.2 and the MSite caption still say otherwise. This decision outranks them until Claude Design updates the wording.
 
 ## D-043 — Site detail's ⋯ menu on phones: beside the title, Visit site only for now
 
