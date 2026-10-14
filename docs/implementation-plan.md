@@ -360,7 +360,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   - Reviews: `/code-review high` (8, fixed), db-reviewer (no High; M1–M3 fixed), security-reviewer (H1 load-script guard fixed), engine-reviewer ×2 (no High; fixed; three items carried to S07), message-checker (flap summary — messages keep the S04b drop view, carried to S07), slice-verifier. Lows fixed: the tab title carries the site name, the phone header skeleton matches the page.
 - **Carried → built 14 Oct 2026 (`fix/S06-site-detail-menu`):** Site detail's ⋯ menu with Edit site (Admin) and Visit site (everyone), spec §25, boards SiteDetail / MSite drawn from brief `docs/design/briefs/site-detail-edit-menu.md`. Built before G1 rather than after: UI only, and the G1 items left wait on people. On phones ⋯ sits beside the title with Visit site only (D-043).
 - **Dropped 14 Oct 2026 (D-044):** the §22.5 view-only follow-up for Add site, Edit site and Edit monitors. The site editors stay editable on phones, and the phone ⋯ offers Edit site.
-- **Carried (after G1, D-045):** move the phone top bar to spec §22.1: a back arrow off the bottom-nav tabs, the page title and the page's own phone actions in the bar, and no `PageHeader` h1 or breadcrumb below it. Site detail's ⋯ moves into the bar (MSite), replacing D-043's breadcrumb-row placement. Update `layout-consistency` with it.
+- **Carried → built 14 Oct 2026 (D-045, before G1):** the phone top bar follows spec §22.1 — back arrow off the tabs, the page title, the page's own phone buttons (Site detail's ⋯), the avatar — from the `@bar` slot; page headers drop what the bar repeats below lg.
 
 ### S06b · Overview (option A)
 
