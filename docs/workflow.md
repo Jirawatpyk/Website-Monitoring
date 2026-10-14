@@ -93,6 +93,8 @@ The precedence is in the root `CLAUDE.md`: `decisions.md` → design spec (behav
 3. If it changes the PRD, update the Claude Doc and re-export `docs/prd.md` (keep its header comment and bump the rev).
 4. Cite the ID in the code comment and the test name.
 
+When a new spec version adds a rule that covers several screens (a list such as §22.5's view-only editors), check every screen it names that has already shipped. Each one that doesn't follow the rule yet gets a **Carried** line under its slice in the plan, in the same PR that brings in the spec.
+
 ## Environments
 
 | Env | Web | Database | Used for |

@@ -15,9 +15,11 @@
 <style>
 body{margin:0;background:#fafafa}
 a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+.sd-more{width:44px;padding:0;justify-content:center;flex-shrink:0}
+.sd-menu a.aura-menu__item,.sd-menu a.aura-menu__item:hover{color:var(--aura-fg-primary);text-decoration:none}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1680px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 1820px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -31,15 +33,20 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="sites" label="Main navigation" style="height: 100%"></x-import>
 </div>
 <a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
-<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="md"></x-import>
 <div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
-<span style="font-size: 13px; font-weight: 500">Tao</span>
-<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+<span style="font-size: 13px; font-weight: 500">{{me}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{meLine}}</span>
 </div>
 </a>
 </aside>
 
-<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px; position: relative">
+
+<div style="position: absolute; top: 6px; right: 40px; padding: 4px 4px 4px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas); z-index: 5">
+<span style="font-family: var(--font-mono)">STATE</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import>
+</div>
 
 <div style="display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
@@ -60,10 +67,17 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <span style="font-size: 13px; color: var(--aura-fg-secondary); margin-left: 8px">OK since Mon 14 Sep 21:18 · 10 d 13 h</span>
 </div>
 </div>
-<div style="display: flex; align-items: center; gap: 12px">
+<div style="display: flex; align-items: center; gap: 12px; position: relative">
 <x-import component-from-global-scope="Aura.Button" variant="secondary" icon="eye-off" href="Maintenance.dc.html#mute">Mute</x-import>
 <x-import component-from-global-scope="Aura.Button" variant="secondary" icon="calendar" href="Maintenance.dc.html#schedule">Schedule maintenance</x-import>
-<x-import component-from-global-scope="Aura.Button" variant="primary" icon="pencil" href="EditMonitors.dc.html">Edit monitors</x-import>
+<sc-if value="{{admin}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="pencil" href="EditMonitors.dc.html">Edit monitors</x-import></sc-if>
+<button type="button" class="aura-btn aura-btn--secondary sd-more" aria-label="More actions for Bangkok Airways – Taiwan" title="More actions" aria-haspopup="menu" aria-expanded="{{menuOpenStr}}" onClick="{{toggleMenu}}"><x-import component-from-global-scope="Aura.Icon" name="ellipsis" size="sm"></x-import></button>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}">
+<div class="aura-menu sd-menu" role="menu" aria-label="More actions for Bangkok Airways – Taiwan" style="position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 240px; line-height: 1.4">
+<sc-if value="{{admin}}" hint-placeholder-val="{{true}}"><a role="menuitem" class="aura-menu__item" href="AddSite.dc.html"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="sm"></x-import><span class="aura-menu__label">Edit site</span></a></sc-if>
+<a role="menuitem" class="aura-menu__item" href="https://[Taiwan site URL]/" target="_blank" rel="noopener noreferrer" aria-label="Visit site (opens in a new tab)"><x-import component-from-global-scope="Aura.Icon" name="external-link" size="sm"></x-import><span class="aura-menu__label">Visit site</span></a>
+</div>
+</sc-if>
 </div>
 </div>
 </div>
@@ -256,14 +270,20 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </section>
 </div>
 
+<div style="padding: 14px 18px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.55; color: var(--aura-fg-secondary); display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · HEADER ⋯ MENU (DECIDED 14 OCT 2026)</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">⋯ More actions</b> (secondary, icon only, 44 × 44 px, aria-label “More actions for &lt;site&gt;”) sits last in the header, after Edit monitors. Same menu as the Sites row menu: <b style="color: var(--aura-fg-primary); font-weight: 600">Edit site</b> (pencil) → /sites/[siteId]/edit — name, URL, client, Tier, owner / backup, behind-WAF, Stop monitoring, Delete site (drafts only); <b style="color: var(--aura-fg-primary); font-weight: 600">Visit site</b> (external-link) → the site URL in a new tab. Mute and Schedule maintenance stay buttons and aren’t repeated. Opening it moves focus to the first item; Esc or a click outside closes it and Esc returns focus to ⋯.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Roles.</b> Admin: Edit site + Visit site. Everyone else, owner and backup included: Visit site only — Edit site and Edit monitors are Admin-only (Users › “Edit sites, monitors and escalation”), so the non-Admin header has no Edit monitors button (STATE › Menu · not Admin, signed in as Arm, the owner). Phone: MSite. Edit site isn’t drawn as its own board; the link goes to the Add site form as a stand-in.</span>
+</div>
+
 </main>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1680}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1820}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { range: '24 h', exp: false, log: false };
+    this.state = { range: '24 h', exp: false, log: false, role: 'admin', menu: false };
   }
   line(seed, base, spread) {
     var v = seed;
@@ -287,7 +307,20 @@ class Component extends DCLogic {
       '90 d': { upLabel: 'Uptime · 90 d', uptime: '99.99%', p50: '410', p95: '760', incidents: '4', incCaption: '1 DOWN · 3 PROBLEM · MTTR 11 min (DOWN only · median)', ax: { a: '27 Jun', b: '20 Jul', c: '12 Aug', d: '4 Sep' }, words: 'the last 90 days (daily median)', k: 13 }
     };
     var cur = R[this.state.range] || R['24 h'];
+    var admin = this.state.role === 'admin';
+    var menuOpen = !!this.state.menu;
+    if (!self._kd && typeof document !== 'undefined') {
+      self._kd = true;
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && self.state.menu) { self.setState({ menu: false }); var b = document.querySelector('.sd-more'); if (b) b.focus(); } });
+      document.addEventListener('click', function (e) { if (self.state.menu && e.target.closest && !e.target.closest('.sd-menu, .sd-more, [role=radiogroup], .aura-segmented')) self.setState({ menu: false }); });
+    }
     return {
+      views: ['Closed', 'Menu · Admin', 'Menu · not Admin'], view: menuOpen ? (admin ? 'Menu · Admin' : 'Menu · not Admin') : 'Closed',
+      setView: function (v) { self.setState(v === 'Closed' ? { menu: false } : { role: v === 'Menu · Admin' ? 'admin' : 'resp', menu: true }); },
+      admin: admin,
+      me: admin ? 'Tao' : 'Arm', meLine: admin ? 'Jirawat Piyakit · Admin' : 'Responder',
+      menuOpen: menuOpen, menuOpenStr: menuOpen ? 'true' : 'false',
+      toggleMenu: function () { var o = !self.state.menu; self.setState({ menu: o }); if (o) setTimeout(function () { var f = document.querySelector('.sd-menu [role=menuitem]'); if (f) f.focus(); }, 30); },
       range: this.state.range,
       ranges: ['24 h', '7 d', '30 d', '90 d'],
       setRange: function (v) { self.setState({ range: v }); },

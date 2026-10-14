@@ -22,7 +22,7 @@ The index `/implement-screen` reads. One row per canvas board (51). The board fi
 | MainFault | Overview — monitoring degraded (heartbeat missed) | `/` fault state | P1 | S12 | §14.4, §14.6, §16.10 | FR-21, §9 |
 | Sites | Sites list | `/sites` | P0 | S05c | §5, §11, §14.5, §20 | FR-05 |
 | MSites | Mobile — Sites | `/sites` (390) | P0 | S05c | §17, §20 | FR-05 |
-| SiteDetail | Site detail — Bangkok Airways – Taiwan | `/sites/[siteId]` | P0 | S06 | §5, §11, §12, §20 | FR-08 |
+| SiteDetail | Site detail — Bangkok Airways – Taiwan | `/sites/[siteId]` | P0 | S06 | §5, §11, §12, §20, §25 | FR-08 |
 | MSite | Mobile — Site detail | `/sites/[siteId]` (390) | P0 | S06 | §17 | FR-08 |
 | AddSite | Add site + registration checklist | `/sites/new` | P0 | S05 | §3, §8 | FR-01, §4 |
 | EditMonitors | Edit monitors | `/sites/[siteId]/monitors` | P0 | S05 | §6 | FR-01 |
@@ -65,7 +65,7 @@ The index `/implement-screen` reads. One row per canvas board (51). The board fi
 
 | Route | What it is | Phase | Built from |
 |---|---|---|---|
-| `/sites/[siteId]/edit` | Edit site — the AddSite form with "Edit site", Save changes, Stop monitoring and Delete (Drafts only) (S05, D-025) | P0 | `AddSite` |
+| `/sites/[siteId]/edit` | Edit site — the AddSite form with "Edit site", Save changes, Stop monitoring and Delete (Drafts only) (S05, D-025); opened from the Sites row ⋯ and Site detail's ⋯ (§25). View only on phones (§22.5) is still to do (D-043) | P0 | `AddSite` |
 | `/api/monitor-test/sin`, `/api/monitor-test/tyo` | Test check from SIN / TYO for AddSite and EditMonitors — Admin only, nothing stored (S05, D-025) | P0 | `AddSite` Test check, `EditMonitors` Test before saving |
 | `/auth/callback` | OAuth code exchange after Google sign-in, then redirect to `safeNextPath(next)` — built (S01) | P0 | — |
 

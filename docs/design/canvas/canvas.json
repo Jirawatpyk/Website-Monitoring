@@ -35,7 +35,7 @@
       "y": 14216
     },
     "ChatAlert.dc.html": {
-      "h": 8000,
+      "h": 8500,
       "title": "Google Chat alert thread (content spec)",
       "w": 600,
       "x": 1990,
@@ -50,7 +50,7 @@
       "y": 22401
     },
     "EmailAlert.dc.html": {
-      "h": 1888,
+      "h": 1980,
       "is_interactive": true,
       "title": "Alert email template",
       "w": 720,
@@ -327,7 +327,7 @@
       "y": 24461
     },
     "SiteDetail.dc.html": {
-      "h": 1680,
+      "h": 1820,
       "is_interactive": true,
       "title": "Site detail — Bangkok Airways – Taiwan",
       "w": 1440,
@@ -405,7 +405,7 @@
       "y": 16629
     },
     "MaintenancePage.dc.html": {
-      "h": 1700,
+      "h": 1790,
       "is_interactive": true,
       "title": "Maintenance & mutes — /maintenance",
       "w": 1440,
