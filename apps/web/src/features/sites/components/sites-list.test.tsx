@@ -153,7 +153,7 @@ describe('SitesList (spec §20, Sites board)', () => {
     expect(within(table()).queryByRole('link', { name: 'Finish setup' })).not.toBeInTheDocument();
     expect(within(table()).getByText('Only an Admin can finish setup')).toBeInTheDocument();
     // the site's owner gets the ⋯ menu for Mute / Schedule maintenance (§11, §20, D-036) — no Edit site
-    fireEvent.click(screen.getAllByRole('button', { name: 'Actions for DxT' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'More actions for DxT' })[0]!);
     expect(screen.getByRole('menuitem', { name: 'Mute…' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Edit site' })).not.toBeInTheDocument();
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });

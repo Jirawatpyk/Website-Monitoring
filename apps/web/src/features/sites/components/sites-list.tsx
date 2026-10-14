@@ -388,8 +388,8 @@ export function SitesList({
             {/* Owners and backups mute and schedule too (§11, D-036), not only Admins. */}
             {(isAdmin || mayPause(r)) && (
               <DropdownMenu
-                label={`Actions for ${r.name}`}
-                trigger={<IconButton icon={<IconEllipsis />} label={`Actions for ${r.name}`} />}
+                label={`More actions for ${r.name}`}
+                trigger={<IconButton icon={<IconEllipsis />} label={`More actions for ${r.name}`} />}
                 items={menuItems(r)}
               />
             )}
