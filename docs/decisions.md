@@ -55,7 +55,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 **Decision (14 Oct 2026, Tao).**
 - On phones the ⋯ (44 × 44 px, borderless as MSite draws it) sits at the end of the breadcrumb row, right above the title and outside the heading, so the heading stays the site name. It is not in the header actions row, where it would land after Mute, Maintenance and Edit monitors, far from the title.
 - On phones the menu has **Visit site** only. Edit site stays out of it until one follow-up makes Add site, Edit site and Edit monitors view only on phones (§22.5). Then Edit site joins the phone menu with the line "View only on phones" (§25.2).
-- From md up the board is followed as drawn: ⋯ last in the header actions, Edit site (Admin) and Visit site.
+- From md up the board is followed as drawn: ⋯ last in the header actions, Edit site (Admin) and Visit site. Two cases the board doesn't draw: a Viewer (no Mute, no Edit monitors) has no header actions, so the breadcrumb row's ⋯ (Visit site) serves every width and no empty actions row is left on phones; a Draft's menu has no Edit site, because its Finish setup button already opens that page.
 
 **Why.** Putting a page's own button in the shared top bar needs a slot that each page fills. That is a change to the app shell for one button. Right above the title is where the board's spec note puts it ("next to the title"). A phone link to an editor that isn't view only would break §22.5 more than leaving the link out.
 

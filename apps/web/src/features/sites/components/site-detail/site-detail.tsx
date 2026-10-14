@@ -122,6 +122,9 @@ export function SiteDetailView({
   const now = new Date(nowIso);
   const isAdmin = role === 'admin';
   const muting = detail.live && canMute(detail, role, meId);
+  // Without Mute or Edit monitors there are no header actions: an empty actions row would still take a
+  // line on phones, so the breadcrumb row's ⋯ serves every width then.
+  const hasActions = muting || isAdmin;
   const line = statusLine(detail, now);
   const lines = series(detail);
   const xLabels = axisLabels(range, detail.chartFrom, detail.chartTo);
@@ -138,19 +141,22 @@ export function SiteDetailView({
             // stop short of the edge — let it take the row (MSite: the buttons span the page).
             actionsFullWidthBelow="md"
             breadcrumb={
-              // Phones: ⋯ at the end of the breadcrumb row, just above the title (D-043); -my keeps the row's height.
-              <span className="flex items-center justify-between gap-2">
-                <Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />
-                <span className="-my-3 md:hidden">
+              // Phones: ⋯ at the end of the breadcrumb row, just above the title (D-043); -my keeps the row's
+              // height. With no header actions (a Viewer) it is the only ⋯ at every width — Visit site either way.
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />
+                </div>
+                <div className={hasActions ? '-my-3 md:hidden' : '-my-3'}>
                   <SiteMoreMenu
                     siteId={detail.id}
                     name={detail.name}
                     url={detail.url}
-                    canEdit={isAdmin}
+                    canEdit={false}
                     phone
                   />
-                </span>
-              </span>
+                </div>
+              </div>
             }
             title={detail.name}
             meta={
@@ -185,37 +191,45 @@ export function SiteDetailView({
               </span>
             }
             actions={
-              <>
-                {muting && (
-                  <PauseActions
-                    site={{
-                      id: detail.id,
-                      name: detail.name,
-                      tier: detail.tier,
-                      owner: detail.owner,
-                      status: detail.status,
-                      mutedUntil: detail.mutedUntil,
-                      openIncident: detail.openIncident,
-                    }}
-                    isAdmin={isAdmin}
-                    viewerName={viewer.name}
-                    viewerEmail={viewer.email}
-                  />
-                )}
-                {isAdmin && (
-                  <Button
-                    variant="primary"
-                    icon={<IconPencil />}
-                    href={detail.live ? `/sites/${detail.id}/monitors` : `/sites/${detail.id}/edit`}
-                  >
-                    {detail.live ? 'Edit monitors' : 'Finish setup'}
-                  </Button>
-                )}
-                {/* §25: last in the actions from md; phones have their own ⋯ by the title (D-043). */}
-                <span className="max-md:hidden">
-                  <SiteMoreMenu siteId={detail.id} name={detail.name} url={detail.url} canEdit={isAdmin} />
-                </span>
-              </>
+              hasActions ? (
+                <>
+                  {muting && (
+                    <PauseActions
+                      site={{
+                        id: detail.id,
+                        name: detail.name,
+                        tier: detail.tier,
+                        owner: detail.owner,
+                        status: detail.status,
+                        mutedUntil: detail.mutedUntil,
+                        openIncident: detail.openIncident,
+                      }}
+                      isAdmin={isAdmin}
+                      viewerName={viewer.name}
+                      viewerEmail={viewer.email}
+                    />
+                  )}
+                  {isAdmin && (
+                    <Button
+                      variant="primary"
+                      icon={<IconPencil />}
+                      href={detail.live ? `/sites/${detail.id}/monitors` : `/sites/${detail.id}/edit`}
+                    >
+                      {detail.live ? 'Edit monitors' : 'Finish setup'}
+                    </Button>
+                  )}
+                  {/* §25: last in the actions from md; phones have their own ⋯ by the title (D-043). */}
+                  <span className="max-md:hidden">
+                    {/* A Draft's Edit site is the Finish setup button beside it. */}
+                    <SiteMoreMenu
+                      siteId={detail.id}
+                      name={detail.name}
+                      url={detail.url}
+                      canEdit={isAdmin && detail.live}
+                    />
+                  </span>
+                </>
+              ) : undefined
             }
           />
           {detail.openIncident && (

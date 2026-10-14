@@ -228,13 +228,26 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
 
   it('⋯ for everyone else is Visit site only, with no Edit monitors; no URL and no Edit → no ⋯', async () => {
     const user = userEvent.setup();
-    const { unmount } = render(
-      <SiteDetailView detail={detail()} range="30d" role="viewer" meId="mint" nowIso={NOW} />,
+    let view = render(
+      <SiteDetailView detail={detail()} range="30d" role="responder" meId="arm" nowIso={NOW} />,
     );
     await user.click(more()[1]!);
     expect(menuLinks()).toEqual(['Visit site']);
     expect(screen.queryByRole('link', { name: 'Edit monitors' })).not.toBeInTheDocument();
-    unmount();
+    view.unmount();
+    // A Viewer has no header actions, so no empty actions row: the breadcrumb row's ⋯ is the only one.
+    view = render(<SiteDetailView detail={detail()} range="30d" role="viewer" meId="mint" nowIso={NOW} />);
+    expect(more()).toHaveLength(1);
+    await user.click(more()[0]!);
+    expect(menuLinks()).toEqual(['Visit site']);
+    view.unmount();
+    // A Draft's Edit site is its Finish setup button, not a second entry in ⋯.
+    view = render(
+      <SiteDetailView detail={detail({ live: false })} range="30d" role="admin" meId="tao" nowIso={NOW} />,
+    );
+    await user.click(more()[1]!);
+    expect(menuLinks()).toEqual(['Visit site']);
+    view.unmount();
     render(
       <SiteDetailView detail={detail({ url: null })} range="30d" role="responder" meId="arm" nowIso={NOW} />,
     );
