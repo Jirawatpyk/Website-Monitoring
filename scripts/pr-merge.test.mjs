@@ -123,26 +123,50 @@ const failed = { uid: 'dpl_2Wng', state: 'ERROR', url: 'dxt-monitor-5zvphanjy.ve
 const redeployed = { uid: 'dpl_9dP7', state: 'READY', url: 'dxt-monitor-f46aw29sb.vercel.app' };
 const minute = 60_000;
 
+const migrated = { status: 'completed', conclusion: 'success' };
+
 test('deployVerdict: production ready, failed, redeployed, skipped, timed out', () => {
   const building = { state: 'BUILDING' };
-  assert.equal(deployVerdict({ deployments: [building], elapsedMs: minute }).kind, 'waiting');
-  assert.match(deployVerdict({ deployments: [failed], elapsedMs: minute }).why, /dpl_2Wng.*--logs/);
-  assert.deepEqual(deployVerdict({ deployments: [redeployed, failed], elapsedMs: 13 * minute }), {
+  const v = (deployments, elapsedMs) => deployVerdict({ deployments, migrate: migrated, elapsedMs });
+  assert.equal(v([building], minute).kind, 'waiting');
+  assert.match(v([failed], minute).why, /dpl_2Wng.*--logs/);
+  assert.deepEqual(v([redeployed, failed], 13 * minute), {
     kind: 'ready',
     url: 'https://dxt-monitor-f46aw29sb.vercel.app',
   });
-  assert.equal(deployVerdict({ deployments: [{ state: 'CANCELED' }], elapsedMs: minute }).kind, 'none');
-  assert.equal(deployVerdict({ deployments: [], elapsedMs: NO_DEPLOY_AFTER_MS - 1 }).kind, 'waiting');
-  assert.equal(deployVerdict({ deployments: [], elapsedMs: NO_DEPLOY_AFTER_MS }).kind, 'none');
-  assert.equal(deployVerdict({ deployments: [building], elapsedMs: DEPLOY_TIMEOUT_MS }).kind, 'failed');
+  assert.equal(v([{ state: 'CANCELED' }], minute).kind, 'none');
+  assert.equal(v([], NO_DEPLOY_AFTER_MS - 1).kind, 'waiting');
+  assert.equal(v([], NO_DEPLOY_AFTER_MS).kind, 'none');
+  assert.equal(v([building], DEPLOY_TIMEOUT_MS).kind, 'failed');
 });
 
-test('deployVerdict: a failed migrate-production fails the merge; skipped or running does not', () => {
+test('deployVerdict: production counts only once migrate-production succeeded (14 Oct: Actions billing)', () => {
   const migrate = (status, conclusion = null) => ({ status, conclusion });
   assert.equal(deployVerdict({ migrate: migrate('completed', 'failure'), elapsedMs: 0 }).kind, 'failed');
-  assert.equal(deployVerdict({ migrate: migrate('completed', 'skipped'), elapsedMs: 0 }).kind, 'waiting');
+  // check / db never started, so migrate-production was skipped while Vercel went live: not "live".
+  const skipped = deployVerdict({
+    migrate: migrate('completed', 'skipped'),
+    deployments: [redeployed],
+    elapsedMs: 0,
+  });
+  assert.equal(skipped.kind, 'failed');
+  assert.match(skipped.why, /didn't run.*billing/);
+  // Deployed but the migration is still running (or hasn't started): keep waiting, then fail at 15 min.
   assert.equal(
     deployVerdict({ migrate: migrate('in_progress'), deployments: [redeployed], elapsedMs: 0 }).kind,
+    'waiting',
+  );
+  assert.equal(
+    deployVerdict({ migrate: null, deployments: [redeployed], elapsedMs: minute }).kind,
+    'waiting',
+  );
+  assert.match(
+    deployVerdict({ migrate: null, deployments: [redeployed], elapsedMs: DEPLOY_TIMEOUT_MS }).why,
+    /never started/,
+  );
+  assert.equal(deployVerdict({ migrate: migrated, deployments: [redeployed], elapsedMs: 0 }).kind, 'ready');
+  assert.equal(
+    deployVerdict({ migrate: migrate('completed', 'neutral'), deployments: [redeployed], elapsedMs: 0 }).kind,
     'ready',
   );
 });

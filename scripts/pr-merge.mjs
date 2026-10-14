@@ -41,8 +41,25 @@ export const DEPLOY_TIMEOUT_MS = 15 * 60_000;
  * `migrate-production` check-run, if any.
  */
 export function deployVerdict({ deployments = [], migrate = null, elapsedMs }) {
-  if (migrate?.status === 'completed' && !['success', 'skipped', 'neutral'].includes(migrate.conclusion)) {
+  // migrate-production runs on every push to main (it needs `check` and `db`), so `skipped` means those
+  // never passed — on 14 Oct GitHub didn't start them (billing) while Vercel deployed anyway, and this
+  // said "production is live" with no migration run. Production counts only once the migration ran.
+  if (migrate?.status === 'completed' && migrate.conclusion === 'skipped') {
+    return {
+      kind: 'failed',
+      why: "migrate-production didn't run: check / db on main failed or never started (Actions billing?). Fix that, re-run the main workflow, and check migrate-production succeeds",
+    };
+  }
+  if (migrate?.status === 'completed' && !['success', 'neutral'].includes(migrate.conclusion)) {
     return { kind: 'failed', why: `migrate-production ended ${migrate.conclusion}` };
+  }
+  if (migrate?.status !== 'completed') {
+    if (elapsedMs >= DEPLOY_TIMEOUT_MS)
+      return {
+        kind: 'failed',
+        why: `migrate-production ${migrate ? 'still running' : 'never started'} after 15 min`,
+      };
+    return { kind: 'waiting' };
   }
   const latest = deployments[0];
   if (latest?.state === 'READY') return { kind: 'ready', url: `https://${latest.url}` };
