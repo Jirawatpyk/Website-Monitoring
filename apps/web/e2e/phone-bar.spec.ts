@@ -55,7 +55,11 @@ test.describe('phone top bar (local Supabase)', () => {
     const missing = '00000000-0000-4000-8000-000000000000';
     expect((await page.goto(`/sites/${missing}`))?.status()).toBe(404);
     await expect(page.getByText('No site at this address')).toBeVisible();
+    await expect(page).toHaveTitle('Site not found · DxT Monitor');
     expect((await page.goto(`/sites/${missing}/edit`))?.status()).toBe(404);
     expect((await page.goto(`/incidents/${missing}`))?.status()).toBe(404);
+    await expect(page.getByText('No incident at this address')).toBeVisible();
+    // The page's own metadata streams after the not-found page's, so its fallback names the tab.
+    await expect(page).toHaveTitle('Incident not found · DxT Monitor');
   });
 });
