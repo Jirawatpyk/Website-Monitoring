@@ -321,7 +321,12 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
           if (width < LG) {
             await expect(bar, 'phone top bar').toBeVisible();
             // §22.1, D-045: the brand on Overview; elsewhere the page's title, and a back arrow off the tabs.
-            const tab = ['/', '/incidents', '/sites'].includes(path);
+            // The tabs are whatever BottomNav links to, read from the page (S10 adds On-call there).
+            const tabs = await page
+              .getByRole('navigation', { name: 'Sections' })
+              .getByRole('link')
+              .evaluateAll((links) => links.map((a) => a.getAttribute('href')));
+            const tab = tabs.includes(path);
             if (path === '/') await expect(bar.getByText('DxT')).toBeVisible();
             else await expect(bar.locator('p').first(), 'the page title in the bar').not.toBeEmpty();
             await expect(bar.getByRole('link', { name: /^Back to / })).toHaveCount(tab ? 0 : 1);

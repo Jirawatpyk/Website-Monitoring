@@ -204,16 +204,10 @@ function causeOf(events: readonly { type: string; payload: unknown }[]): string 
   return typeof cause === 'string' && cause.trim() ? cause : null;
 }
 
-/** A site's name, for the page's tab title; null when unknown or unreadable. */
-export const getSiteName = cache(async (siteId: string): Promise<string | null> => {
-  if (!siteIdSchema.safeParse(siteId).success) return null;
-  const supabase = await createClient();
-  const { data, error } = await supabase.from('sites').select('name').eq('id', siteId).maybeSingle();
-  if (error) throw new Error(`site: ${error.message}`);
-  return data?.name ?? null;
-});
-
-/** What Site detail's phone top bar shows (D-045): name, primary URL, live; null when unknown. */
+/**
+ * What Site detail's tab title and phone top bar show (D-045): name, primary URL, live; null when unknown.
+ * One request-cached read serves both, so the bar adds no query to the page.
+ */
 export const getSiteBar = cache(
   async (siteId: string): Promise<{ name: string; url: string | null; live: boolean } | null> => {
     if (!siteIdSchema.safeParse(siteId).success) return null;
@@ -229,6 +223,10 @@ export const getSiteBar = cache(
     return { name: data.name, url: primary?.url ?? null, live: data.is_active };
   },
 );
+
+/** A site's name, for the page's tab title; null when unknown or unreadable. */
+export const getSiteName = async (siteId: string): Promise<string | null> =>
+  (await getSiteBar(siteId))?.name ?? null;
 
 /** `/sites/[siteId]` for the range asked; null when the site doesn't exist or isn't readable. */
 export async function getSiteDetail(

@@ -39,6 +39,24 @@ describe('loading skeletons', () => {
     expect(catchAll).toEqual([]);
   });
 
+  // A static `@bar` page passes its path to phoneBarFor as a literal: it must be its own folder's path,
+  // or a copy-paste slip shows another page's title (code review, D-045).
+  it("each @bar page's phoneBarFor path is its own route", () => {
+    const BAR = join(APP, '@bar');
+    const wrong = pageDirs(BAR).flatMap((dir) => {
+      const route = `/${relative(BAR, dir).replaceAll('\\', '/')}`.replace(/\/$/, '') || '/';
+      const pattern = route.replace(/\[([^\]]+)\]/g, (_m, name: string) => `\${${name}}`);
+      const calls = [
+        ...readFileSync(join(dir, 'page.tsx'), 'utf8').matchAll(/phoneBarFor\((['`])([^'`]+)\1/g),
+      ];
+      return calls
+        .map((m) => m[2])
+        .filter((p) => p !== pattern)
+        .map((p) => `${route}: ${p}`);
+    });
+    expect(wrong).toEqual([]);
+  });
+
   // Tailwind reads `_` inside an arbitrary variant as a space, so `[&_.aura-page-header__title]` compiles to
   // `.aura-page-header title` and matches nothing; a unit test that only checked the class string passed
   // (D-045 build, retro 14 Oct). Name AURA's `__` classes in globals.css instead.
