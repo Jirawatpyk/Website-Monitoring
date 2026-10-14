@@ -4,6 +4,7 @@ import { MaintenancePageView, type Viewer } from '@/features/maintenance';
 import { getMaintenancePage } from '@/features/maintenance/server';
 import { NoAccess } from '@/components/states';
 import { getAccess } from '@/lib/auth/session';
+import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 export const metadata: Metadata = { title: 'Maintenance & mutes' };
 // Maintenance actions send their messages after the 10 s Undo window (`after()`, §24.8): room for that.
@@ -19,7 +20,7 @@ export default async function MaintenancePage() {
     return (
       <Container>
         <div className="flex flex-col gap-6">
-          <PageHeader eyebrow="OPERATIONS" title="Maintenance & mutes" />
+          <PageHeader className={PHONE_BAR_HEADER} eyebrow="OPERATIONS" title="Maintenance & mutes" />
           <NoAccess
             title="Maintenance & mutes are for the DxT team"
             description="Ask an Admin if you need to know when a site has planned work."

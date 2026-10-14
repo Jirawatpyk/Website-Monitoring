@@ -10,7 +10,8 @@ function pageDirs(dir: string): string[] {
   return [
     ...here,
     ...readdirSync(dir, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
+      // `@bar` is the phone top bar's slot (D-045), not a page: its data pages carry their own loading bar.
+      .filter((e) => e.isDirectory() && !e.name.startsWith('@'))
       .flatMap((e) => pageDirs(join(dir, e.name))),
   ];
 }
@@ -23,6 +24,55 @@ describe('loading skeletons', () => {
       .filter((dir) => !existsSync(join(dir, 'loading.tsx')))
       .map((dir) => relative(APP, dir).replaceAll('\\', '/') || '(app) root');
     expect(missing).toEqual([]);
+  });
+
+  // A page without its own `@bar` page keeps the previous page's top bar after a client-side navigation
+  // (parallel routes keep an unmatched slot), and a catch-all slot turns unknown addresses into pages (D-045).
+  it('every signed-in page has a phone top bar in the @bar slot, and the slot has no catch-all', () => {
+    const BAR = join(APP, '@bar');
+    const missing = pageDirs(APP)
+      .map((dir) => relative(APP, dir))
+      .filter((rel) => !existsSync(join(BAR, rel, 'page.tsx')))
+      .map((rel) => rel.replaceAll('\\', '/') || '(app) root');
+    expect(missing).toEqual([]);
+    const catchAll = readdirSync(BAR, { recursive: true }).filter((p) => String(p).includes('[...'));
+    expect(catchAll).toEqual([]);
+    // Without its own loading the slot inherits (app)/loading.tsx: the Overview skeleton filled the top bar
+    // (600 px) while a page streamed on staging (/verify, D-045).
+    expect(existsSync(join(BAR, 'loading.tsx')), '@bar/loading.tsx').toBe(true);
+  });
+
+  // A static `@bar` page passes its path to phoneBarFor as a literal: it must be its own folder's path,
+  // or a copy-paste slip shows another page's title (code review, D-045).
+  it("each @bar page's phoneBarFor path is its own route", () => {
+    const BAR = join(APP, '@bar');
+    const wrong = pageDirs(BAR).flatMap((dir) => {
+      const route = `/${relative(BAR, dir).replaceAll('\\', '/')}`.replace(/\/$/, '') || '/';
+      const pattern = route.replace(/\[([^\]]+)\]/g, (_m, name: string) => `\${${name}}`);
+      const calls = [
+        ...readFileSync(join(dir, 'page.tsx'), 'utf8').matchAll(/phoneBarFor\((['`])([^'`]+)\1/g),
+      ];
+      return calls
+        .map((m) => m[2])
+        .filter((p) => p !== pattern)
+        .map((p) => `${route}: ${p}`);
+    });
+    expect(wrong).toEqual([]);
+  });
+
+  // Tailwind reads `_` inside an arbitrary variant as a space, so `[&_.aura-page-header__title]` compiles to
+  // `.aura-page-header title` and matches nothing; a unit test that only checked the class string passed
+  // (D-045 build, retro 14 Oct). Name AURA's `__` classes in globals.css instead.
+  it('no Tailwind arbitrary variant names a class with "__"', () => {
+    const SRC = join(__dirname, '..');
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? files(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : [],
+      );
+    const bad = files(SRC).filter(
+      (f) => !f.endsWith('loading-coverage.test.ts') && /\[&[^\]\s'"`]*__/.test(readFileSync(f, 'utf8')),
+    );
+    expect(bad.map((f) => relative(SRC, f).replaceAll('\\', '/'))).toEqual([]);
   });
 
   // AURA Skeleton without a variant draws a small rounded blob: Site detail's phone buttons and stats

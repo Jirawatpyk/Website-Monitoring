@@ -72,16 +72,16 @@ describe('AppLayout', () => {
     expect(within(sideNav).getByRole('link', { name: /Sites/ })).toHaveTextContent(/^Sites$/);
   });
 
-  it('puts the brand and the avatar in the phone top bar', async () => {
+  it("puts the page's bar (the @bar slot) and the avatar in the phone top bar", async () => {
     mocks.getAccess.mockResolvedValue({
       status: 'active',
       profile: { id: 'u1', email: 'arm@example.test', displayName: 'Arm', role: 'responder' },
     });
-    const { container } = render(await AppLayout({ children: page }));
+    const { container } = render(await AppLayout({ children: page, bar: <p>Sites</p> }));
 
     const bar = container.querySelector('.aura-shell__bar');
     expect(bar).not.toBeNull();
-    expect(within(bar as HTMLElement).getByText('DxT')).toBeInTheDocument();
+    expect(within(bar as HTMLElement).getByText('Sites')).toBeInTheDocument();
     expect(within(bar as HTMLElement).getByLabelText('Arm')).toBeInTheDocument();
     // AURA hides it from lg, like a menu-only bar (`headerHideFrom="lg"`).
     expect(bar).toHaveClass('aura-shell__bar--menu-only');

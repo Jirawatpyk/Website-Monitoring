@@ -5,7 +5,7 @@ export default function Loading() {
   return (
     <Container>
       <PageSkeleton label="Loading escalation policies">
-        <PageHeaderSkeleton />
+        <PageHeaderSkeleton phoneBar="all" />
         {/* The policy switch and its clock line. */}
         <div className="flex flex-wrap items-center gap-4" aria-hidden>
           <Skeleton variant="rect" height={36} width={520} className="max-w-full" />

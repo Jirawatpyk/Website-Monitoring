@@ -5,7 +5,7 @@ import { IconEllipsis, IconExternalLink, IconPencil } from '@jirawatpyk/aura-rea
 
 /**
  * Site detail's ⋯ (spec §25, D-043, D-044): Edit site for an Admin and Visit site for everyone. From md a 44 px
- * secondary icon button last in the header actions; phones a borderless 44 px ⋯ at the end of the breadcrumb row.
+ * secondary icon button last in the header actions; below lg a borderless 44 px ⋯ in the phone top bar (D-045).
  * Edit site stays editable on phones (D-044), so the phone menu has no "View only on phones" line. Nothing to
  * offer → no button.
  */

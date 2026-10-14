@@ -4,6 +4,7 @@ import { IconPlus } from '@jirawatpyk/aura-react/icons';
 import { listMeta, SitesEmpty, SitesList } from '@/features/sites';
 import { chatConnected, listSites } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
+import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 export const metadata: Metadata = { title: 'Sites' };
 // Maintenance actions send their messages after the 10 s Undo window (`after()`, §24.8): room for that.
@@ -19,6 +20,7 @@ export default async function SitesPage() {
     <Container>
       <div className="flex flex-col gap-6">
         <PageHeader
+          className={PHONE_BAR_HEADER}
           eyebrow="SITES"
           title="Sites"
           meta={listMeta(sites)}

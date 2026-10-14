@@ -61,6 +61,7 @@ import {
 } from '../../types';
 import { GLYPHS, IncidentLink, MutedBadge, RowStatusBadge, TOUCH_HIT } from '../site-cells';
 import { SiteMoreMenu } from './more-menu';
+import { PHONE_BAR_HEADER, phoneHeader } from '@/components/phone-header';
 import { RangeControl, RangeDependent, RangeProvider } from './range-control';
 import { PauseActions } from '@/features/maintenance';
 
@@ -122,9 +123,9 @@ export function SiteDetailView({
   const now = new Date(nowIso);
   const isAdmin = role === 'admin';
   const muting = detail.live && canMute(detail, role, meId);
-  // Without Mute or Edit monitors there are no header actions: an empty actions row would still take a
-  // line on phones, so the breadcrumb row's ⋯ serves every width then.
-  const hasActions = muting || isAdmin;
+  // Below lg the ⋯ lives in the phone top bar (D-045); with nothing else in the actions (a Viewer) the
+  // actions box goes there too, so no empty row is left.
+  const phoneActions = muting || isAdmin;
   const line = statusLine(detail, now);
   const lines = series(detail);
   const xLabels = axisLabels(range, detail.chartFrom, detail.chartTo);
@@ -140,24 +141,9 @@ export function SiteDetailView({
             // Phones: AURA's actions box hugs its content, so the Mute / Maintenance / Edit grid would
             // stop short of the edge — let it take the row (MSite: the buttons span the page).
             actionsFullWidthBelow="md"
-            breadcrumb={
-              // Phones: ⋯ at the end of the breadcrumb row, just above the title (D-043); -mt-3 keeps the row's
-              // height. With no header actions (a Viewer) it is the only ⋯ at every width — Visit site either way.
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />
-                </div>
-                <div className={hasActions ? '-mt-3 md:hidden' : '-mt-3'}>
-                  <SiteMoreMenu
-                    siteId={detail.id}
-                    name={detail.name}
-                    url={detail.url}
-                    canEdit={isAdmin && detail.live}
-                    phone
-                  />
-                </div>
-              </div>
-            }
+            // Below lg the top bar carries the name, back and ⋯ (MSite, D-045).
+            className={phoneActions ? PHONE_BAR_HEADER : `${PHONE_BAR_HEADER} ${phoneHeader.noActions}`}
+            breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />}
             title={detail.name}
             meta={
               <span className="flex flex-col gap-1">
@@ -191,45 +177,43 @@ export function SiteDetailView({
               </span>
             }
             actions={
-              hasActions ? (
-                <>
-                  {muting && (
-                    <PauseActions
-                      site={{
-                        id: detail.id,
-                        name: detail.name,
-                        tier: detail.tier,
-                        owner: detail.owner,
-                        status: detail.status,
-                        mutedUntil: detail.mutedUntil,
-                        openIncident: detail.openIncident,
-                      }}
-                      isAdmin={isAdmin}
-                      viewerName={viewer.name}
-                      viewerEmail={viewer.email}
-                    />
-                  )}
-                  {isAdmin && (
-                    <Button
-                      variant="primary"
-                      icon={<IconPencil />}
-                      href={detail.live ? `/sites/${detail.id}/monitors` : `/sites/${detail.id}/edit`}
-                    >
-                      {detail.live ? 'Edit monitors' : 'Finish setup'}
-                    </Button>
-                  )}
-                  {/* §25: last in the actions from md; phones have their own ⋯ by the title (D-043). */}
-                  <span className="max-md:hidden">
-                    {/* A Draft's Edit site is the Finish setup button beside it. */}
-                    <SiteMoreMenu
-                      siteId={detail.id}
-                      name={detail.name}
-                      url={detail.url}
-                      canEdit={isAdmin && detail.live}
-                    />
-                  </span>
-                </>
-              ) : undefined
+              <>
+                {muting && (
+                  <PauseActions
+                    site={{
+                      id: detail.id,
+                      name: detail.name,
+                      tier: detail.tier,
+                      owner: detail.owner,
+                      status: detail.status,
+                      mutedUntil: detail.mutedUntil,
+                      openIncident: detail.openIncident,
+                    }}
+                    isAdmin={isAdmin}
+                    viewerName={viewer.name}
+                    viewerEmail={viewer.email}
+                  />
+                )}
+                {isAdmin && (
+                  <Button
+                    variant="primary"
+                    icon={<IconPencil />}
+                    href={detail.live ? `/sites/${detail.id}/monitors` : `/sites/${detail.id}/edit`}
+                  >
+                    {detail.live ? 'Edit monitors' : 'Finish setup'}
+                  </Button>
+                )}
+                {/* §25: last in the actions from lg; below lg it is in the top bar (D-045). */}
+                <span className="max-lg:hidden">
+                  {/* A Draft's Edit site is the Finish setup button beside it. */}
+                  <SiteMoreMenu
+                    siteId={detail.id}
+                    name={detail.name}
+                    url={detail.url}
+                    canEdit={isAdmin && detail.live}
+                  />
+                </span>
+              </>
             }
           />
           {detail.openIncident && (

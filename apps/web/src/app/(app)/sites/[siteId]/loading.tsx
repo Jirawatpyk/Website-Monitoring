@@ -10,7 +10,7 @@ export default function Loading() {
     <Container>
       <PageSkeleton label="Loading site">
         {/* Desktop: Mute, Maintenance, Edit monitors on the right; phones draw them as rows below. */}
-        <PageHeaderSkeleton breadcrumb actions={3} actionsFromMd />
+        <PageHeaderSkeleton breadcrumb actions={3} actionsFromMd phoneBar="all" />
         <div className="flex flex-col gap-6 max-md:hidden">
           <CardSkeleton fields={5} columns={3} />
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">

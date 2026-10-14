@@ -54,6 +54,7 @@ import {
 } from '../model';
 import { mayAcknowledge } from '../ack-rule';
 import { INCIDENT_COLUMNS } from './incident-columns';
+import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 /** The phone's Past view shows the latest few until "Show all" (MIncidents). */
 const PAST_SHOWN = 4;
@@ -208,6 +209,7 @@ export function IncidentsList({ meta, incidents, sites, nowIso, viewer, initialV
       {/* The header lives here, not in the route: Export CSV follows the filters (Incidents board: in the
           header's actions; MIncidents has no export). */}
       <PageHeader
+        className={PHONE_BAR_HEADER}
         eyebrow="INCIDENTS"
         title="Incidents"
         meta={meta}

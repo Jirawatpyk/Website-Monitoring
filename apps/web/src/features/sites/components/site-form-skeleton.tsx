@@ -15,7 +15,7 @@ import {
 export function SiteFormSkeleton({ label, actions = 0 }: { label: string; actions?: number }) {
   return (
     <PageSkeleton label={label}>
-      <PageHeaderSkeleton breadcrumb actions={actions} />
+      <PageHeaderSkeleton breadcrumb actions={actions} phoneBar="all" />
       <div className={SITE_FORM_GRID}>
         <div className={SITE_FORM_MAIN}>
           {/* Site: two fields a row once the card is @md wide; Ownership: three once @xl (as SiteForm). */}
@@ -36,7 +36,7 @@ export function SiteFormSkeleton({ label, actions = 0 }: { label: string; action
 export function MonitorsEditorSkeleton() {
   return (
     <PageSkeleton label="Loading monitors">
-      <PageHeaderSkeleton breadcrumb actions={2} />
+      <PageHeaderSkeleton breadcrumb actions={2} phoneBar="all" />
       <div className={EDITOR_SPLIT}>
         <div className={EDITOR_LIST}>
           <CardSkeleton lines={4} />

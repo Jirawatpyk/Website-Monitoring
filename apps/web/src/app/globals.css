@@ -8,6 +8,24 @@
 @import '@jirawatpyk/aura-tokens/tailwind.css';
 @import '@jirawatpyk/aura-react/styles.layer.css';
 
+/*
+ * Below lg the phone top bar carries the page's title and a back arrow (spec §22.1, D-045), so a page's
+ * PageHeader drops what the bar repeats (`components/phone-header.ts`). Plain CSS, not Tailwind arbitrary
+ * variants: Tailwind reads `_` in `[&_.aura-page-header__title]` as a space. Until AURA request 20.
+ */
+@layer components {
+  @variant max-lg {
+    .dxt-phone-crumb .aura-page-header__breadcrumb,
+    .dxt-phone-eyebrow .aura-page-header__eyebrow,
+    .dxt-phone-no-actions .aura-page-header__actions {
+      display: none;
+    }
+    .dxt-phone-title .aura-page-header__title {
+      @apply sr-only;
+    }
+  }
+}
+
 html,
 body {
   margin: 0;

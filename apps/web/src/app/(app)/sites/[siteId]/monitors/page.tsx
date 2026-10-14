@@ -6,6 +6,7 @@ import { NoAccess } from '@/components/states';
 import { MonitorsEditor } from '@/features/sites';
 import { getSite } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
+import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 export const metadata: Metadata = { title: 'Edit monitors' };
 
@@ -31,9 +32,16 @@ export default async function EditMonitorsPage({
       ]}
     />
   );
-  const meta = site.live
+  const metaText = site.live
     ? `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO${site.ownerName ? ` · owner ${site.ownerName}` : ''} · site status is the worst of these monitors`
     : `${formatTier(site.tier)} · Draft · not monitored${site.ownerName ? ` · owner ${site.ownerName}` : ''}`;
+  // Below lg the bar says "Edit monitors" and the breadcrumb is hidden: the meta line names the site (D-045).
+  const meta = (
+    <>
+      <span className="lg:hidden">{site.name} · </span>
+      {metaText}
+    </>
+  );
   return (
     <Container>
       <div className="flex flex-col gap-6">
@@ -52,7 +60,12 @@ export default async function EditMonitorsPage({
           />
         ) : (
           <>
-            <PageHeader breadcrumb={breadcrumb} title="Edit monitors" meta={meta} />
+            <PageHeader
+              className={PHONE_BAR_HEADER}
+              breadcrumb={breadcrumb}
+              title="Edit monitors"
+              meta={meta}
+            />
             <NoAccess
               title="Only an Admin can change monitors"
               description="Monitors decide when people are alerted, so an Admin changes them. Ask one to make the change."

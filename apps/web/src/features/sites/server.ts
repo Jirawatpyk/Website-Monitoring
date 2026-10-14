@@ -3,6 +3,7 @@ import 'server-only';
 export { chatConnected, countMonitoredSites, getRegistrationOptions, getSite, listSites } from './queries';
 export {
   downEpisodesBySite,
+  getSiteBar,
   getSiteDetail,
   getSiteName,
   maintenanceSpansBySite,

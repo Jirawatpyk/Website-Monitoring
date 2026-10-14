@@ -8,6 +8,7 @@ import { SiteForm } from '@/features/sites';
 import { getRegistrationOptions, getSite } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
 import { probeAllowlistInfo } from '@/lib/env';
+import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 export const metadata: Metadata = { title: 'Edit site' };
 
@@ -33,6 +34,7 @@ export default async function EditSitePage({
   const primaryUrl = site.monitors.find((m) => m.isPrimary)?.url;
   const header = (
     <PageHeader
+      className={PHONE_BAR_HEADER}
       // Phones: Visit site spans the row, as every page's header actions (layout-consistency).
       actionsFullWidthBelow="md"
       breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: site.name }]} />}
@@ -52,9 +54,13 @@ export default async function EditSitePage({
         ) : undefined
       }
       meta={
-        site.live
-          ? `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO · monitoring`
-          : `${formatTier(site.tier)} · Draft · not monitored`
+        <>
+          {/* Below lg the bar says "Edit site" and the breadcrumb is hidden: name the site (D-045). */}
+          <span className="lg:hidden">{site.name} · </span>
+          {site.live
+            ? `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO · monitoring`
+            : `${formatTier(site.tier)} · Draft · not monitored`}
+        </>
       }
     />
   );

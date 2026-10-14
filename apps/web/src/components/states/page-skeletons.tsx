@@ -33,6 +33,12 @@ interface PageHeaderSkeletonProps {
   actionsFromMd?: boolean;
   /** Below md the one action is a full-width button under the header (Sites' Add site, /maintenance). */
   actionFullOnPhone?: boolean;
+  /**
+   * What the phone top bar carries below lg, so the skeleton leaves it out there too (D-045): `all` the
+   * breadcrumb / eyebrow line and the title, `crumb` the first line only (Incident), `title` the title only
+   * (Maintenance keeps its day line). Unset: Overview, which keeps both.
+   */
+  phoneBar?: 'all' | 'crumb' | 'title';
 }
 
 /** The shape of AURA `PageHeader`: breadcrumb or eyebrow, h1, meta line, actions. */
@@ -41,14 +47,19 @@ export function PageHeaderSkeleton({
   actions = 0,
   actionsFromMd = false,
   actionFullOnPhone = false,
+  phoneBar,
 }: PageHeaderSkeletonProps) {
   return (
     <>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" aria-hidden>
         <div className="flex w-full max-w-xl flex-col gap-1">
-          <Skeleton variant="text" width={breadcrumb ? '40%' : '15%'} />
+          <div className={phoneBar === 'all' || phoneBar === 'crumb' ? 'max-lg:hidden' : undefined}>
+            <Skeleton variant="text" width={breadcrumb ? '40%' : '15%'} />
+          </div>
           {/* The h1's line box (display serif), so the meta line and cards don't shift on arrival. */}
-          <Skeleton variant="rect" height={40} width="50%" />
+          <div className={phoneBar === 'all' || phoneBar === 'title' ? 'max-lg:hidden' : undefined}>
+            <Skeleton variant="rect" height={40} width="50%" />
+          </div>
           <Skeleton variant="text" width="80%" />
         </div>
         {actions > 0 && (

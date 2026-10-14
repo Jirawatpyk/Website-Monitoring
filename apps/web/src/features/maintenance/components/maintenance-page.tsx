@@ -31,6 +31,7 @@ import type { PausableSite } from '../model';
 import { metaOf, sectionsOf, type PageRow, type Section, type Viewer, type WindowRow } from '../page-model';
 import { MaintenanceDialog } from './maintenance-dialog';
 import { ApproveDialog, DeclineDialog, EditDialog, EndDialog, postPendingNow } from './window-dialogs';
+import { phoneHeader } from '@/components/phone-header';
 
 const ICONS = { calendar: <IconCalendar />, 'eye-off': <IconEyeOff />, clock: <IconClock /> };
 const STATUS_WORD: Record<SiteStatus, string> = {
@@ -268,11 +269,12 @@ export function MaintenancePageView({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
+        className={phoneHeader.title}
         // Phones: the time in Bangkok as on the Overview (MMaintenanceList, §23.10 UTC+7); desktop OPERATIONS.
         eyebrow={
           <>
-            <span className="max-md:hidden">OPERATIONS</span>
-            <span className="uppercase md:hidden">{`${formatDay(now, { weekday: true })} ${formatTime(now)} · UTC+7`}</span>
+            <span className="max-lg:hidden">OPERATIONS</span>
+            <span className="uppercase lg:hidden">{`${formatDay(now, { weekday: true })} ${formatTime(now)} · UTC+7`}</span>
           </>
         }
         title="Maintenance & mutes"
