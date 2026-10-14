@@ -13,7 +13,7 @@ import {
  * per-board review misses because they live across pages (docs/retro.md, 7 Oct 2026):
  * - page header rhythm (D-018): 4 px between breadcrumb or eyebrow, title and meta line (all inside
  *   AURA PageHeader's text block since 5.33's breadcrumb slot);
- * - phone shell (D-018): the top bar with brand + avatar below lg, no top bar from lg;
+ * - phone shell (D-018, D-045): the top bar below lg — back arrow off the tabs, the page title (the brand on Overview), avatar — no top bar from lg;
  * - touch targets ≥ 44 px below lg (spec §14.17), counting the hit area AURA adds around a compact
  *   control on a touch screen (`::after` under pointer: coarse);
  * - no sideways scroll at any width — the page, and any box inside it such as a table's scroll area
@@ -60,7 +60,15 @@ function headerGaps(page: Page) {
     if (!header) return null;
     const parts: Element[] = [];
     const text = header.querySelector('.aura-page-header__text');
-    if (text) parts.push(...Array.from(text.children));
+    // What shows: below lg the phone top bar carries the title (visually hidden, still the h1) and the
+    // breadcrumb / section eyebrow (gone) — D-045.
+    if (text)
+      parts.push(
+        ...Array.from(text.children).filter((el) => {
+          const css = getComputedStyle(el);
+          return css.display !== 'none' && css.position !== 'absolute';
+        }),
+      );
     const boxes = parts.map((el) => el.getBoundingClientRect());
     return boxes.slice(1).map((box, i) => Math.round((box.top - boxes[i]!.bottom) * 10) / 10);
   });
@@ -286,7 +294,9 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
       for (const path of pages) {
         await test.step(`${path} at ${width} px`, async () => {
           await page.goto(path);
-          await expect(page.locator('main h1')).toBeVisible();
+          // Every page keeps its h1; below lg most show their title in the top bar instead (D-045).
+          await expect(page.locator('main h1')).toBeAttached();
+          if (width >= LG) await expect(page.locator('main h1')).toBeVisible();
 
           const scroll = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
           expect(scroll, 'no sideways scroll').toBeLessThanOrEqual(0);
@@ -303,7 +313,11 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
           const bar = page.locator('.aura-shell__bar');
           if (width < LG) {
             await expect(bar, 'phone top bar').toBeVisible();
-            await expect(bar.getByText('DxT')).toBeVisible();
+            // §22.1, D-045: the brand on Overview; elsewhere the page's title, and a back arrow off the tabs.
+            const tab = ['/', '/incidents', '/sites'].includes(path);
+            if (path === '/') await expect(bar.getByText('DxT')).toBeVisible();
+            else await expect(bar.locator('p').first(), 'the page title in the bar').not.toBeEmpty();
+            await expect(bar.getByRole('link', { name: /^Back to / })).toHaveCount(tab ? 0 : 1);
             await expect(bar.getByLabel(ADMIN.name)).toBeVisible();
             expect(await smallTargets(page), 'touch targets ≥ 44 px').toEqual([]);
             if (width < MD)

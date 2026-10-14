@@ -26,6 +26,19 @@ describe('loading skeletons', () => {
     expect(missing).toEqual([]);
   });
 
+  // A page without its own `@bar` page keeps the previous page's top bar after a client-side navigation
+  // (parallel routes keep an unmatched slot), and a catch-all slot turns unknown addresses into pages (D-045).
+  it('every signed-in page has a phone top bar in the @bar slot, and the slot has no catch-all', () => {
+    const BAR = join(APP, '@bar');
+    const missing = pageDirs(APP)
+      .map((dir) => relative(APP, dir))
+      .filter((rel) => !existsSync(join(BAR, rel, 'page.tsx')))
+      .map((rel) => rel.replaceAll('\\', '/') || '(app) root');
+    expect(missing).toEqual([]);
+    const catchAll = readdirSync(BAR, { recursive: true }).filter((p) => String(p).includes('[...'));
+    expect(catchAll).toEqual([]);
+  });
+
   // AURA Skeleton without a variant draws a small rounded blob: Site detail's phone buttons and stats
   // came out as pills and circles (S09 /verify). Every one names its shape.
   it('every AURA Skeleton names its variant', () => {
