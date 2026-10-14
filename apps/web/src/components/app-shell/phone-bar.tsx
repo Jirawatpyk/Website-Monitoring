@@ -9,14 +9,19 @@ import type { PhoneBarSpec } from './phone-bar-routes';
  * page's title — or the brand on Overview — then the page's own phone buttons (Site detail's ⋯). Rendered
  * on the server by the `@bar` slot, so the title is there on first paint; `MobileBar` adds the avatar.
  */
-export function PhoneBar({ title, back, actions }: PhoneBarSpec & { actions?: ReactNode }) {
+export function PhoneBar({
+  title,
+  back,
+  actions,
+  mono = false,
+}: PhoneBarSpec & { actions?: ReactNode; mono?: boolean }) {
   return (
     <>
       {back && (
         <Link
           href={back.href}
           aria-label={back.label}
-          className="flex size-11 shrink-0 items-center justify-center rounded-aura-md text-fg-primary hover:bg-bg-surface-hover"
+          className="flex size-11 shrink-0 items-center justify-center rounded-aura-md text-fg-primary hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
           <IconArrowLeft aria-hidden className="size-5" />
         </Link>
@@ -25,7 +30,9 @@ export function PhoneBar({ title, back, actions }: PhoneBarSpec & { actions?: Re
         <BrandMark compact />
       ) : (
         // Not a heading: the page keeps its h1 in <main> (visually hidden below lg).
-        <p className="m-0 min-w-0 grow truncate text-base font-semibold">{title}</p>
+        <p className={`m-0 min-w-0 grow truncate text-base font-semibold ${mono ? 'font-mono' : ''}`}>
+          {title}
+        </p>
       )}
       {actions && <span className="flex shrink-0 items-center">{actions}</span>}
     </>

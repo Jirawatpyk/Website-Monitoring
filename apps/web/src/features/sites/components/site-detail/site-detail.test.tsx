@@ -236,9 +236,7 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     view = render(<SiteDetailView detail={detail()} range="30d" role="viewer" meId="mint" nowIso={NOW} />);
     await user.click(more());
     expect(menuLinks()).toEqual(['Visit site']);
-    expect(document.querySelector('.aura-page-header')?.className).toContain(
-      'aura-page-header__actions]:hidden',
-    );
+    expect(document.querySelector('.aura-page-header')?.className).toContain('dxt-phone-no-actions');
     view.unmount();
     // A Draft's Edit site is its Finish setup button, not a second entry in ⋯.
     view = render(

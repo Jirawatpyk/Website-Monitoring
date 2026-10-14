@@ -12,6 +12,10 @@ export default async function IncidentBar({ params }: { params: Promise<{ incide
   const fallback = phoneBarFor(`/incidents/${incidentId}`);
   const number = await getIncidentNumber(incidentId).catch(() => null);
   return (
-    <PhoneBar title={number === null ? fallback.title : formatIncidentId(number)} back={fallback.back} />
+    <PhoneBar
+      title={number === null ? fallback.title : formatIncidentId(number)}
+      back={fallback.back}
+      mono={number !== null}
+    />
   );
 }

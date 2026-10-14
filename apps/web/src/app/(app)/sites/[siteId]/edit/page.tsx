@@ -54,9 +54,13 @@ export default async function EditSitePage({
         ) : undefined
       }
       meta={
-        site.live
-          ? `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO · monitoring`
-          : `${formatTier(site.tier)} · Draft · not monitored`
+        <>
+          {/* Below lg the bar says "Edit site" and the breadcrumb is hidden: name the site (D-045). */}
+          <span className="lg:hidden">{site.name} · </span>
+          {site.live
+            ? `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO · monitoring`
+            : `${formatTier(site.tier)} · Draft · not monitored`}
+        </>
       }
     />
   );

@@ -10,7 +10,7 @@ function pageDirs(dir: string): string[] {
   return [
     ...here,
     ...readdirSync(dir, { withFileTypes: true })
-      // `@bar` is the phone top bar's slot (D-045), not a page: it waits inside the page's own loading.
+      // `@bar` is the phone top bar's slot (D-045), not a page: its data pages carry their own loading bar.
       .filter((e) => e.isDirectory() && !e.name.startsWith('@'))
       .flatMap((e) => pageDirs(join(dir, e.name))),
   ];
@@ -37,6 +37,21 @@ describe('loading skeletons', () => {
     expect(missing).toEqual([]);
     const catchAll = readdirSync(BAR, { recursive: true }).filter((p) => String(p).includes('[...'));
     expect(catchAll).toEqual([]);
+  });
+
+  // Tailwind reads `_` inside an arbitrary variant as a space, so `[&_.aura-page-header__title]` compiles to
+  // `.aura-page-header title` and matches nothing; a unit test that only checked the class string passed
+  // (D-045 build, retro 14 Oct). Name AURA's `__` classes in globals.css instead.
+  it('no Tailwind arbitrary variant names a class with "__"', () => {
+    const SRC = join(__dirname, '..');
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? files(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : [],
+      );
+    const bad = files(SRC).filter(
+      (f) => !f.endsWith('loading-coverage.test.ts') && /\[&[^\]\s'"`]*__/.test(readFileSync(f, 'utf8')),
+    );
+    expect(bad.map((f) => relative(SRC, f).replaceAll('\\', '/'))).toEqual([]);
   });
 
   // AURA Skeleton without a variant draws a small rounded blob: Site detail's phone buttons and stats

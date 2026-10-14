@@ -32,9 +32,16 @@ export default async function EditMonitorsPage({
       ]}
     />
   );
-  const meta = site.live
+  const metaText = site.live
     ? `${formatTier(site.tier)} · every ${every} min from BKK, SIN, TYO${site.ownerName ? ` · owner ${site.ownerName}` : ''} · site status is the worst of these monitors`
     : `${formatTier(site.tier)} · Draft · not monitored${site.ownerName ? ` · owner ${site.ownerName}` : ''}`;
+  // Below lg the bar says "Edit monitors" and the breadcrumb is hidden: the meta line names the site (D-045).
+  const meta = (
+    <>
+      <span className="lg:hidden">{site.name} · </span>
+      {metaText}
+    </>
+  );
   return (
     <Container>
       <div className="flex flex-col gap-6">

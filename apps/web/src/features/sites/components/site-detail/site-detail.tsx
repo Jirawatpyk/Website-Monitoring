@@ -61,12 +61,9 @@ import {
 } from '../../types';
 import { GLYPHS, IncidentLink, MutedBadge, RowStatusBadge, TOUCH_HIT } from '../site-cells';
 import { SiteMoreMenu } from './more-menu';
-import { PHONE_BAR_HEADER } from '@/components/phone-header';
+import { PHONE_BAR_HEADER, phoneHeader } from '@/components/phone-header';
 import { RangeControl, RangeDependent, RangeProvider } from './range-control';
 import { PauseActions } from '@/features/maintenance';
-
-/** A Viewer's actions hold only the ⋯, which is in the top bar below lg: hide the box there. */
-const PHONE_NO_ACTIONS = 'max-lg:[&_.aura-page-header__actions]:hidden';
 
 const WHERE: Record<string, string> = { BKK: 'Thai VPS', SIN: 'sin1', TYO: 'hnd1' };
 const COLORS: Record<string, ChartSeries['color']> = {
@@ -145,7 +142,7 @@ export function SiteDetailView({
             // stop short of the edge — let it take the row (MSite: the buttons span the page).
             actionsFullWidthBelow="md"
             // Below lg the top bar carries the name, back and ⋯ (MSite, D-045).
-            className={phoneActions ? PHONE_BAR_HEADER : `${PHONE_BAR_HEADER} ${PHONE_NO_ACTIONS}`}
+            className={phoneActions ? PHONE_BAR_HEADER : `${PHONE_BAR_HEADER} ${phoneHeader.noActions}`}
             breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />}
             title={detail.name}
             meta={

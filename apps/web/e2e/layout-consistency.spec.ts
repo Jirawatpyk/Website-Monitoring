@@ -296,7 +296,14 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
           await page.goto(path);
           // Every page keeps its h1; below lg most show their title in the top bar instead (D-045).
           await expect(page.locator('main h1')).toBeAttached();
-          if (width >= LG) await expect(page.locator('main h1')).toBeVisible();
+          // Overview (MOverview4) and the incident (MIncident) keep a visible title; the rest show it in the bar.
+          const keepsTitle = path === '/' || path.startsWith('/incidents/');
+          if (width >= LG || keepsTitle) await expect(page.locator('main h1')).toBeVisible();
+          else
+            expect(
+              await page.locator('main h1').evaluate((el) => el.getBoundingClientRect().width),
+              'title in the bar, not twice (the h1 is visually hidden)',
+            ).toBeLessThanOrEqual(1);
 
           const scroll = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
           expect(scroll, 'no sideways scroll').toBeLessThanOrEqual(0);

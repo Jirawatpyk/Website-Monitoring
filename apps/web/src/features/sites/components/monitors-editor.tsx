@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Alert,
@@ -48,7 +48,7 @@ interface MonitorsEditorProps {
   monitors: MonitorRecord[];
   /** The page header's breadcrumb and meta line; the editor adds its Save / Cancel actions. */
   breadcrumb: React.ReactNode;
-  meta: string;
+  meta: ReactNode;
   /** Just saved (`?saved=1`). */
   saved: boolean;
 }
