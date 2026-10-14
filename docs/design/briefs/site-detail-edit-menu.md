@@ -2,7 +2,7 @@
 
 **For:** the DxT Monitor design canvas. Please add one state to the existing **SiteDetail** board, and show the same header at phone width (390 px).
 **Design system:** AURA, as on every other board. Reuse the **⋯ menu** the **Sites** board already draws (row menu: Open, Edit site, Mute…, Schedule maintenance).
-**Decision:** Tao, 14 Oct 2026: Site detail gets a ⋯ menu with Edit site, not a fourth header button. Build after G1. **Visit site** in the same menu (below) is a proposal waiting for Tao's OK: a one-item menu reads as broken, and the Sites list has Visit site on every row.
+**Decision:** Tao, 14 Oct 2026: Site detail gets a ⋯ menu with Edit site and Visit site, not a fourth header button. Build after G1.
 
 ## The gap
 
@@ -43,7 +43,7 @@ We have no preference; keep tap targets at 44 px or more.
 | Owner / backup (not Admin) | ⋯ with Visit site only; Edit site is Admin-only (Users board role matrix) |
 | Everyone else | ⋯ with Visit site only |
 
-Please show the non-Admin menu as a second state, or note it on the board. If Tao declines Visit site, the ⋯ menu is Admin-only (Edit site) and non-Admins see no ⋯.
+Please show the non-Admin menu as a second state, or note it on the board.
 
 ## Not in scope
 
