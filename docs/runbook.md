@@ -41,7 +41,7 @@ Each job pings Healthchecks.io. A missed ping alerts by email and in Google Chat
 
 | Check | Expected | When it goes down | First look | Section |
 | --- | --- | --- | --- | --- |
-| `engine` | every minute | **Nothing is judged:** no new incidents, no recoveries. The most serious alert. | Vercel → `dxt-monitor` → Cron Jobs → `/api/cron/engine` → View Logs | [Vercel crons and logs](#vercel-crons-and-function-logs) |
+| `engine` | every minute | **The sweep stops:** no recoveries, no PROBLEMs, no rounds judged at their deadline. A DOWN can still open, because a probe whose recheck fails runs the engine itself, so a DOWN that arrives is real. The most serious alert. | Vercel → `dxt-monitor` → Cron Jobs → `/api/cron/engine` → View Logs | [Vercel crons and logs](#vercel-crons-and-function-logs) |
 | `notifier` | every minute | Incidents open but Chat and email don't go out (or go late) | the same, `/api/cron/notifier`; then Resend / the Chat webhook | [Rotate](#rotate-a-secret) if a key was revoked |
 | `probe-sin`, `probe-tyo` | every minute | That location stops voting; the other two still decide | the same, `/api/cron/probe-sin` / `-tyo` | [Fewer than 2 probe locations](#fewer-than-2-probe-locations) |
 | `probe-bkk` | every minute | Bangkok stops voting; SIN + TYO decide (D-019) | the VPS: `systemctl status dxt-agent@production` | [Restart the VPS agent](#restart-the-vps-agent) |
@@ -106,7 +106,7 @@ Always: change it at the source, set the new value in Vercel (and on the VPS whe
 | Secret | Where it's used | Steps | Expect meanwhile |
 | --- | --- | --- | --- |
 | `CRON_SECRET` | Vercel only: Vercel Cron sends it to every cron route | Vercel env (per project) → new value → redeploy | Nothing; Vercel Cron picks up the new value with the deploy |
-| `INGEST_TOKEN` | Vercel + `/etc/dxt-agent/<env>.env` | Vercel env → redeploy → on the VPS `sudoedit /etc/dxt-agent/production.env` → `systemctl restart dxt-agent@production` | 401s in the agent log until both match. Bangkok drops out of the vote for those minutes; SIN + TYO still decide |
+| `INGEST_TOKEN` | Vercel + `/etc/dxt-agent/<env>.env` | Vercel env → redeploy → on the VPS `sudoedit /etc/dxt-agent/production.env` → `systemctl restart dxt-agent@production` | 401s in the agent log until both match. Bangkok drops out of the vote for those minutes; SIN + TYO still decide. The token also guards the verifier's `/api/jobs`: do the VPS step straight after the redeploy, or after 2 min "Browser verifier unavailable" emails the Admins (it clears by itself) |
 | `PROBE_SECRET_HEADER_VALUE` | Vercel + both VPS env files; **clients' WAF allowlists** | Agree a time with the WAF owners first, then change it in all three places and redeploy / restart | Sites behind a WAF may show blocked / PROBLEM until their allowlist has the new value |
 | `GOOGLE_CHAT_ALERTS_WEBHOOK_URL` (and `…REPORTS…`) | Vercel | Chat Space → Apps & integrations → Webhooks → new URL → Vercel env → redeploy → remove the old webhook | Chat posts fail until redeploy; failed Chat alerts fall back to email (D-016) |
 | `RESEND_API_KEY` | Vercel | Resend → API keys → new key → Vercel env → redeploy → revoke the old key | Emails fail until redeploy (retried for ~10 min) |
@@ -140,7 +140,7 @@ Names and phone numbers are kept with the Admins, not in the repo (no real conta
 
 **Check:** on the VPS, `journalctl -u dxt-agent@production -n 50 --no-pager | grep control`, then `curl -sI https://www.google.com/generate_204`.
 
-**Fix:** a VPS network problem is the provider's; a bad control URL is fixed in `CONTROL_URLS` in the env file, followed by a restart. It clears by itself once a minute passes.
+**Fix:** a VPS network problem is the provider's; a bad control URL is fixed in `CONTROL_URLS` in the env file, followed by a restart. It clears by itself once a round's control check passes.
 
 ## Browser verifier
 
@@ -236,10 +236,10 @@ The second Admin does each step once, with Tao, on **staging** unless the step s
 | # | Step | Done (date, initials) |
 | --- | --- | --- |
 | 1 | Open every link in **What you need access to** and confirm the access works | |
-| 2 | Healthchecks: find all 7 production checks, read one check's events, and see that the Google Chat integration is on | |
+| 2 | Healthchecks: find all 7 production checks, read one check's events, and see that the Google Chat integration is on **and your own email is a notification target** on the production project (G1: Healthchecks alerts go to both Admins) | |
 | 3 | Vercel: open Cron Jobs, press **Run** on `/api/cron/crawler` (staging), then read its summary line with View Logs and with the `vercel logs` command | |
 | 4 | VPS: SSH in, read `systemctl status` and the journal of `dxt-agent@staging`, restart it, and see `probe_round` come back | |
-| 5 | App: on staging, schedule a 1 h maintenance on Test target, cancel it with Undo, mute it, then End now | |
+| 5 | App, on staging Test target: mute 1 h → **End now**; then schedule a 1 h maintenance → cancel → **Undo** inside 10 s (the window comes back) → cancel again and let it post (a mute is refused during a site's maintenance, so mute first) | |
 | 6 | Rotate one secret on staging end to end (`CRON_SECRET` is the safe one), then do the post-rotation checks | |
 | 7 | Read **Who to call** and add the real numbers to the Admins' own contact list (not here) | |
 | 8 | Production: find the open incidents and the latest `crawler` / `engine` summary lines, read-only | |
