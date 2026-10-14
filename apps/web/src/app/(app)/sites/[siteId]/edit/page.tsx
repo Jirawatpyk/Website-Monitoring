@@ -8,7 +8,6 @@ import { SiteForm } from '@/features/sites';
 import { getRegistrationOptions, getSite } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
 import { probeAllowlistInfo } from '@/lib/env';
-import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 export const metadata: Metadata = { title: 'Edit site' };
 
@@ -34,7 +33,7 @@ export default async function EditSitePage({
   const primaryUrl = site.monitors.find((m) => m.isPrimary)?.url;
   const header = (
     <PageHeader
-      className={PHONE_BAR_HEADER}
+      titleHideBelow="lg"
       // Phones: Visit site spans the row, as every page's header actions (layout-consistency).
       actionsFullWidthBelow="md"
       breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: site.name }]} />}

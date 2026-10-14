@@ -16,10 +16,18 @@ function pageDirs(dir: string): string[] {
   ];
 }
 
+/** The URL path of a route folder: route groups like `(list)` don't count. */
+const routeOf = (rel: string) =>
+  rel
+    .replaceAll('\\', '/')
+    .split('/')
+    .filter((p) => p && !/^\(.*\)$/.test(p))
+    .join('/');
+
 describe('loading skeletons', () => {
   // The shared (app)/loading.tsx is a plain list: a form or editor page that falls back to it jumps
   // from rows to cards when it arrives. Each signed-in page draws its own shape (retro 8 Oct 2026).
-  it('every signed-in page has its own loading.tsx (Overview uses the group root)', () => {
+  it('every signed-in page has its own loading.tsx', () => {
     const missing = pageDirs(APP)
       .filter((dir) => !existsSync(join(dir, 'loading.tsx')))
       .map((dir) => relative(APP, dir).replaceAll('\\', '/') || '(app) root');
@@ -32,14 +40,31 @@ describe('loading skeletons', () => {
     const BAR = join(APP, '@bar');
     const missing = pageDirs(APP)
       .map((dir) => relative(APP, dir))
-      .filter((rel) => !existsSync(join(BAR, rel, 'page.tsx')))
+      .filter((rel) => !existsSync(join(BAR, routeOf(rel), 'page.tsx')))
       .map((rel) => rel.replaceAll('\\', '/') || '(app) root');
     expect(missing).toEqual([]);
     const catchAll = readdirSync(BAR, { recursive: true }).filter((p) => String(p).includes('[...'));
     expect(catchAll).toEqual([]);
-    // Without its own loading the slot inherits (app)/loading.tsx: the Overview skeleton filled the top bar
+    // Without its own loading the slot inherited (app)/loading.tsx: the Overview skeleton filled the top bar
     // (600 px) while a page streamed on staging (/verify, D-045).
     expect(existsSync(join(BAR, 'loading.tsx')), '@bar/loading.tsx').toBe(true);
+  });
+
+  // A loading.tsx wraps its folder's layout children and every route below it, and its skeleton streams a 200
+  // before a page can call notFound(): /sites/<unknown id> answered 200 (D-045 /verify). Loading files sit in
+  // a route group beside their page (`sites/(list)/`), never in a folder that has a dynamic route under it.
+  it('no loading.tsx wraps a dynamic route', () => {
+    const wrapping = readdirSync(APP, { recursive: true })
+      .map((p) => String(p).replaceAll('\\', '/'))
+      .filter((p) => p.endsWith('/loading.tsx') || p === 'loading.tsx')
+      .map((p) => p.slice(0, -'loading.tsx'.length))
+      .filter((dir) => !dir.startsWith('@'))
+      .filter((dir) =>
+        readdirSync(join(APP, dir || '.'), { withFileTypes: true }).some(
+          (e) => e.isDirectory() && e.name.startsWith('['),
+        ),
+      );
+    expect(wrapping).toEqual([]);
   });
 
   // A static `@bar` page passes its path to phoneBarFor as a literal: it must be its own folder's path,

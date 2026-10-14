@@ -21,6 +21,8 @@ export function PhoneBar({
         <Link
           href={back.href}
           aria-label={back.label}
+          // A back-arrow page drops AppShell's ☰ (AURA 5.41, request 19): the tabs keep it for the drawer (D-018).
+          data-aura-hide-menubutton
           className="flex size-11 shrink-0 items-center justify-center rounded-aura-md text-fg-primary hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
           <IconArrowLeft aria-hidden className="size-5" />
