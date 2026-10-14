@@ -120,7 +120,12 @@ test('refuses migrations and runtime code together unless the schema lag was rev
 // Vercel's production deployments of #89's merge (12 Oct 2026), newest first: the build failed
 // (`git_info_fail`) and a redeploy 12 min later went live.
 const failed = { uid: 'dpl_2Wng', state: 'ERROR', url: 'dxt-monitor-5zvphanjy.vercel.app' };
-const redeployed = { uid: 'dpl_9dP7', state: 'READY', url: 'dxt-monitor-f46aw29sb.vercel.app' };
+const redeployed = {
+  uid: 'dpl_9dP7',
+  state: 'READY',
+  url: 'dxt-monitor-f46aw29sb.vercel.app',
+  aliasAssigned: 1791992843562,
+};
 const minute = 60_000;
 
 const migrated = { status: 'completed', conclusion: 'success' };
@@ -169,4 +174,23 @@ test('deployVerdict: production counts only once migrate-production succeeded (1
     deployVerdict({ migrate: migrate('completed', 'neutral'), deployments: [redeployed], elapsedMs: 0 }).kind,
     'ready',
   );
+});
+
+test("deployVerdict: READY isn't live until the production domains move to it (14 Oct: #114)", () => {
+  const v = (deployment, elapsedMs) =>
+    deployVerdict({ migrate: migrated, deployments: [deployment], elapsedMs });
+  // Vercel built it while the checks on main still ran; monitor.dxtspace.com served the deploy before.
+  const staged = {
+    uid: 'dpl_5n1l',
+    state: 'READY',
+    url: 'dxt-monitor-5n1l1uick.vercel.app',
+    aliasAssigned: null,
+  };
+  assert.equal(v(staged, minute).kind, 'waiting');
+  assert.match(v(staged, DEPLOY_TIMEOUT_MS).why, /dpl_5n1l.*still point at an older one/);
+  assert.match(
+    v({ ...staged, aliasError: { code: 'alias_failed' } }, minute).why,
+    /domains weren't moved.*alias_failed/,
+  );
+  assert.equal(v({ ...staged, aliasAssigned: 1791992843562 }, minute).kind, 'ready');
 });
