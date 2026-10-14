@@ -330,6 +330,10 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
             if (path === '/') await expect(bar.getByText('DxT')).toBeVisible();
             else await expect(bar.locator('p').first(), 'the page title in the bar').not.toBeEmpty();
             await expect(bar.getByRole('link', { name: /^Back to / })).toHaveCount(tab ? 0 : 1);
+            // A back-arrow page drops ☰ (AURA 5.41, request 19); the tabs keep it for the drawer (D-018).
+            const menu = bar.getByRole('button', { name: 'Open navigation' });
+            if (tab) await expect(menu, '☰ on a tab').toBeVisible();
+            else await expect(menu, 'no ☰ beside the back arrow').toBeHidden();
             await expect(bar.getByLabel(ADMIN.name)).toBeVisible();
             expect(await smallTargets(page), 'touch targets ≥ 44 px').toEqual([]);
             if (width < MD)

@@ -212,10 +212,11 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     const user = userEvent.setup();
     render(<SiteDetailView detail={detail()} range="30d" role="admin" meId="tao" nowIso={NOW} />);
     await user.click(more());
-    expect(menuLinks()).toEqual(['Edit site', 'Visit site']);
+    expect(menuLinks()).toEqual(['Edit site', 'Visit site (opens in a new tab)']);
     expect(screen.getByRole('menuitem', { name: 'Edit site' })).toHaveFocus();
     expect(screen.getByRole('menuitem', { name: 'Edit site' })).toHaveAttribute('href', '/sites/s1/edit');
-    const visit = screen.getByRole('menuitem', { name: 'Visit site' });
+    // AURA 5.41 (request 21) says a new-tab link opens a new tab, after the label.
+    const visit = screen.getByRole('menuitem', { name: /^Visit site.*opens in a new tab/ });
     expect(visit).toHaveAttribute('href', 'https://ba-taiwan.example.test/');
     expect(visit).toHaveAttribute('target', '_blank');
     expect(visit).toHaveAttribute('rel', 'noreferrer'); // AURA's, which implies noopener
@@ -229,13 +230,13 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
       <SiteDetailView detail={detail()} range="30d" role="responder" meId="arm" nowIso={NOW} />,
     );
     await user.click(more());
-    expect(menuLinks()).toEqual(['Visit site']);
+    expect(menuLinks()).toEqual(['Visit site (opens in a new tab)']);
     expect(screen.queryByRole('link', { name: 'Edit monitors' })).not.toBeInTheDocument();
     view.unmount();
     // A Viewer's actions hold only the ⋯, so below lg the whole box hides (no empty row; D-045).
     view = render(<SiteDetailView detail={detail()} range="30d" role="viewer" meId="mint" nowIso={NOW} />);
     await user.click(more());
-    expect(menuLinks()).toEqual(['Visit site']);
+    expect(menuLinks()).toEqual(['Visit site (opens in a new tab)']);
     expect(document.querySelector('.aura-page-header')?.className).toContain('dxt-phone-no-actions');
     view.unmount();
     // A Draft's Edit site is its Finish setup button, not a second entry in ⋯.
@@ -243,7 +244,7 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
       <SiteDetailView detail={detail({ live: false })} range="30d" role="admin" meId="tao" nowIso={NOW} />,
     );
     await user.click(more());
-    expect(menuLinks()).toEqual(['Visit site']);
+    expect(menuLinks()).toEqual(['Visit site (opens in a new tab)']);
     view.unmount();
     render(
       <SiteDetailView detail={detail({ url: null })} range="30d" role="responder" meId="arm" nowIso={NOW} />,
