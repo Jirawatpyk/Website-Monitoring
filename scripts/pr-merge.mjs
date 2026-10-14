@@ -12,7 +12,7 @@
 // deployment's crons start before `migrate-production` ends (docs/workflow.md, 8 Oct 2026), so that
 // code must work on the old schema — or the migration merges alone first.
 // After the merge it waits for production: the merge commit's `migrate-production` and its Vercel
-// production deployment, and exits 1 if either failed — on 12 Oct a production build failed
+// production deployment with the production domains moved to it, and exits 1 if either failed — on 12 Oct a production build failed
 // (`git_info_fail`) and nobody saw it for 10 min. The deployment comes from Vercel's API through the
 // signed-in `vercel` CLI: GitHub Deployments aren't posted for every commit (#93 had none and the
 // first version of this wait called its live deploy "skipped"). A build Vercel skipped or cancelled,
@@ -41,11 +41,44 @@ export const DEPLOY_TIMEOUT_MS = 15 * 60_000;
  * `migrate-production` check-run, if any.
  */
 export function deployVerdict({ deployments = [], migrate = null, elapsedMs }) {
-  if (migrate?.status === 'completed' && !['success', 'skipped', 'neutral'].includes(migrate.conclusion)) {
+  // migrate-production runs on every push to main (it needs `check` and `db`), so `skipped` means those
+  // never passed — on 14 Oct GitHub didn't start them (billing) while Vercel deployed anyway, and this
+  // said "production is live" with no migration run. Production counts only once the migration ran.
+  if (migrate?.status === 'completed' && migrate.conclusion === 'skipped') {
+    return {
+      kind: 'failed',
+      why: "migrate-production didn't run: check / db on main failed or never started (Actions billing?). Fix that, re-run the main workflow, and check migrate-production succeeds",
+    };
+  }
+  if (migrate?.status === 'completed' && !['success', 'neutral'].includes(migrate.conclusion)) {
     return { kind: 'failed', why: `migrate-production ended ${migrate.conclusion}` };
   }
+  if (migrate?.status !== 'completed') {
+    if (elapsedMs >= DEPLOY_TIMEOUT_MS)
+      return {
+        kind: 'failed',
+        why: `migrate-production ${migrate ? 'still running' : 'never started'} after 15 min`,
+      };
+    return { kind: 'waiting' };
+  }
   const latest = deployments[0];
-  if (latest?.state === 'READY') return { kind: 'ready', url: `https://${latest.url}` };
+  // READY isn't live: Vercel moves the production domains only after the GitHub checks on main pass
+  // (`aliasAssigned` is set then). On 14 Oct #114's deploy was READY while monitor.dxtspace.com still
+  // served the one before, and this said "production is live".
+  if (latest?.state === 'READY' && latest.aliasError) {
+    return {
+      kind: 'failed',
+      why: `deployment ${latest.uid} built, but the production domains weren't moved to it (${latest.aliasError.code ?? 'alias error'})`,
+    };
+  }
+  if (latest?.state === 'READY' && latest.aliasAssigned)
+    return { kind: 'ready', url: `https://${latest.url}` };
+  if (latest?.state === 'READY' && elapsedMs >= DEPLOY_TIMEOUT_MS) {
+    return {
+      kind: 'failed',
+      why: `deployment ${latest.uid} is ready, but the production domains still point at an older one after 15 min`,
+    };
+  }
   if (latest?.state === 'ERROR') {
     return { kind: 'failed', why: `deployment ${latest.uid} failed — vercel inspect ${latest.url} --logs` };
   }
