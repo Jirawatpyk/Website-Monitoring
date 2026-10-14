@@ -201,6 +201,46 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     expect(screen.queryByRole('link', { name: 'Edit monitors' })).not.toBeInTheDocument();
   });
 
+  // Both ⋯ render in jsdom (CSS hides one): the phone's by the breadcrumb comes first, the desktop's last in the actions.
+  const more = () => screen.getAllByRole('button', { name: 'More actions for Bangkok Airways – Taiwan' });
+  const menuLinks = () =>
+    within(screen.getByRole('menu'))
+      .getAllByRole('menuitem')
+      .map((i) => i.textContent);
+
+  it("⋯ (§25): an Admin's desktop menu has Edit site and Visit site in a new tab; the phone's Visit site only (D-043)", async () => {
+    const user = userEvent.setup();
+    render(<SiteDetailView detail={detail()} range="30d" role="admin" meId="tao" nowIso={NOW} />);
+    const [phone, desktop] = more();
+    await user.click(desktop!);
+    expect(menuLinks()).toEqual(['Edit site', 'Visit site']);
+    expect(screen.getByRole('menuitem', { name: 'Edit site' })).toHaveFocus();
+    expect(screen.getByRole('menuitem', { name: 'Edit site' })).toHaveAttribute('href', '/sites/s1/edit');
+    const visit = screen.getByRole('menuitem', { name: 'Visit site' });
+    expect(visit).toHaveAttribute('href', 'https://ba-taiwan.example.test/');
+    expect(visit).toHaveAttribute('target', '_blank');
+    expect(visit).toHaveAttribute('rel', 'noreferrer'); // AURA's, which implies noopener
+    await user.keyboard('{Escape}');
+    expect(desktop).toHaveFocus();
+    await user.click(phone!);
+    expect(menuLinks()).toEqual(['Visit site']);
+  });
+
+  it('⋯ for everyone else is Visit site only, with no Edit monitors; no URL and no Edit → no ⋯', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <SiteDetailView detail={detail()} range="30d" role="viewer" meId="mint" nowIso={NOW} />,
+    );
+    await user.click(more()[1]!);
+    expect(menuLinks()).toEqual(['Visit site']);
+    expect(screen.queryByRole('link', { name: 'Edit monitors' })).not.toBeInTheDocument();
+    unmount();
+    render(
+      <SiteDetailView detail={detail({ url: null })} range="30d" role="responder" meId="arm" nowIso={NOW} />,
+    );
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+  });
+
   it('history rows link their incident and word the client mapping (§12)', () => {
     render(<SiteDetailView detail={detail()} range="30d" role="admin" meId="tao" nowIso={NOW} />);
     const table = screen.getByRole('table', { name: 'Incident history, last 90 days' });

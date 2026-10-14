@@ -60,6 +60,7 @@ import {
   type SiteDetail,
 } from '../../types';
 import { GLYPHS, IncidentLink, MutedBadge, RowStatusBadge, TOUCH_HIT } from '../site-cells';
+import { SiteMoreMenu } from './more-menu';
 import { RangeControl, RangeDependent, RangeProvider } from './range-control';
 import { PauseActions } from '@/features/maintenance';
 
@@ -136,7 +137,21 @@ export function SiteDetailView({
             // Phones: AURA's actions box hugs its content, so the Mute / Maintenance / Edit grid would
             // stop short of the edge — let it take the row (MSite: the buttons span the page).
             actionsFullWidthBelow="md"
-            breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />}
+            breadcrumb={
+              // Phones: ⋯ at the end of the breadcrumb row, just above the title (D-043); -my keeps the row's height.
+              <span className="flex items-center justify-between gap-2">
+                <Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />
+                <span className="-my-3 md:hidden">
+                  <SiteMoreMenu
+                    siteId={detail.id}
+                    name={detail.name}
+                    url={detail.url}
+                    canEdit={isAdmin}
+                    phone
+                  />
+                </span>
+              </span>
+            }
             title={detail.name}
             meta={
               <span className="flex flex-col gap-1">
@@ -170,35 +185,37 @@ export function SiteDetailView({
               </span>
             }
             actions={
-              muting || isAdmin ? (
-                <>
-                  {muting && (
-                    <PauseActions
-                      site={{
-                        id: detail.id,
-                        name: detail.name,
-                        tier: detail.tier,
-                        owner: detail.owner,
-                        status: detail.status,
-                        mutedUntil: detail.mutedUntil,
-                        openIncident: detail.openIncident,
-                      }}
-                      isAdmin={isAdmin}
-                      viewerName={viewer.name}
-                      viewerEmail={viewer.email}
-                    />
-                  )}
-                  {isAdmin && (
-                    <Button
-                      variant="primary"
-                      icon={<IconPencil />}
-                      href={detail.live ? `/sites/${detail.id}/monitors` : `/sites/${detail.id}/edit`}
-                    >
-                      {detail.live ? 'Edit monitors' : 'Finish setup'}
-                    </Button>
-                  )}
-                </>
-              ) : undefined
+              <>
+                {muting && (
+                  <PauseActions
+                    site={{
+                      id: detail.id,
+                      name: detail.name,
+                      tier: detail.tier,
+                      owner: detail.owner,
+                      status: detail.status,
+                      mutedUntil: detail.mutedUntil,
+                      openIncident: detail.openIncident,
+                    }}
+                    isAdmin={isAdmin}
+                    viewerName={viewer.name}
+                    viewerEmail={viewer.email}
+                  />
+                )}
+                {isAdmin && (
+                  <Button
+                    variant="primary"
+                    icon={<IconPencil />}
+                    href={detail.live ? `/sites/${detail.id}/monitors` : `/sites/${detail.id}/edit`}
+                  >
+                    {detail.live ? 'Edit monitors' : 'Finish setup'}
+                  </Button>
+                )}
+                {/* §25: last in the actions from md; phones have their own ⋯ by the title (D-043). */}
+                <span className="max-md:hidden">
+                  <SiteMoreMenu siteId={detail.id} name={detail.name} url={detail.url} canEdit={isAdmin} />
+                </span>
+              </>
             }
           />
           {detail.openIncident && (
