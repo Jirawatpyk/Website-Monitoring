@@ -76,6 +76,8 @@ const view = (role: 'admin' | 'responder' | 'readonly', rows = [base, request]) 
 
 beforeEach(() => Object.values(actions).forEach((a) => a.mockClear()));
 
+// Reasons are pasted, not typed: a keystroke re-renders the whole page, and typing pushed one test past
+// 5 s while the suite ran in parallel (retro 14 Oct). The dialogs only read the field's value.
 describe('MaintenancePageView (board MaintenancePage)', () => {
   it('the header, sections and the Admin’s row actions', () => {
     view('admin');
@@ -126,7 +128,8 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
       })[0]!,
     );
     const end = await screen.findByRole('dialog', { name: /End .* now\?/ });
-    await user.type(within(end).getByLabelText(/Reason/), 'Done early');
+    await user.click(within(end).getByLabelText(/Reason/));
+    await user.paste('Done early');
     await user.click(within(end).getByRole('button', { name: /^End .* now$/ }));
     await waitFor(() => expect(actions.endWindowEarly).toHaveBeenCalled());
     // the refresh brings the row back as ended early
@@ -159,7 +162,8 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
       })[0]!,
     );
     const end = await screen.findByRole('dialog', { name: /End .* now\?/ });
-    await user.type(within(end).getByLabelText(/Reason/), 'Done early');
+    await user.click(within(end).getByLabelText(/Reason/));
+    await user.paste('Done early');
     await user.click(within(end).getByRole('button', { name: /^End .* now$/ }));
     rerender(page([{ ...base, endedAt: NOW }, request]));
     expect(await screen.findByText(/^Posting to Chat and email in \d+ s/)).toBeInTheDocument();
@@ -193,7 +197,8 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
     );
     const edit = await screen.findByRole('dialog', { name: /Edit or cancel/ });
     await user.click(within(edit).getAllByRole('button', { name: 'Cancel maintenance…' })[0]!);
-    await user.type(within(edit).getByLabelText(/Reason/), 'Client postponed');
+    await user.click(within(edit).getByLabelText(/Reason/));
+    await user.paste('Client postponed');
     await user.click(within(edit).getByRole('button', { name: 'Cancel maintenance' }));
     await waitFor(() => expect(actions.cancelWindow).toHaveBeenCalled());
     rerender(<MaintenancePageView rows={[{ ...scheduled, cancelledAt: NOW }, request]} {...props} />);
@@ -225,7 +230,8 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
       })[0]!,
     );
     const end = await screen.findByRole('dialog', { name: /End .* now\?/ });
-    await user.type(within(end).getByLabelText(/Reason/), 'Done early');
+    await user.click(within(end).getByLabelText(/Reason/));
+    await user.paste('Done early');
     await user.click(within(end).getByRole('button', { name: /^End .* now$/ }));
     expect(await screen.findByText(/^Posting to Chat and email in \d+ s/)).toBeInTheDocument();
     expect(actions.postWindowActionNow).not.toHaveBeenCalled();
@@ -249,7 +255,8 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
     );
     const decline = await screen.findByRole('dialog', { name: 'Decline Arm’s request?' });
     expect(within(decline).getByRole('button', { name: 'Decline request' })).toBeDisabled();
-    await user.type(within(decline).getByLabelText(/Reason/), 'Split it into two nights');
+    await user.click(within(decline).getByLabelText(/Reason/));
+    await user.paste('Split it into two nights');
     await user.click(within(decline).getByRole('button', { name: 'Decline request' }));
     await waitFor(() =>
       expect(actions.declineMaintenance).toHaveBeenCalledWith({
@@ -265,7 +272,8 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
     );
     const end = await screen.findByRole('dialog', { name: 'End WeCare Studio maintenance now?' });
     expect(within(end).getByRole('button', { name: 'End maintenance now' })).toBeDisabled();
-    await user.type(within(end).getByLabelText(/Reason for ending early/), 'Done early');
+    await user.click(within(end).getByLabelText(/Reason for ending early/));
+    await user.paste('Done early');
     await user.click(within(end).getByRole('button', { name: 'End maintenance now' }));
     await waitFor(() =>
       expect(actions.endWindowEarly).toHaveBeenCalledWith({ windowId: 'w1', reason: 'Done early' }),
@@ -281,7 +289,8 @@ describe('MaintenancePageView (board MaintenancePage)', () => {
     await user.click(waiting.getAllByRole('button', { name: 'Withdraw request…' })[0]!);
     const edit = await screen.findByRole('dialog', { name: /Edit or withdraw/ });
     expect(within(edit).queryByLabelText('Ends')).not.toBeInTheDocument();
-    await user.type(within(edit).getByLabelText(/Reason for the change/), 'Not needed');
+    await user.click(within(edit).getByLabelText(/Reason for the change/));
+    await user.paste('Not needed');
     await user.click(within(edit).getByRole('button', { name: 'Withdraw request' }));
     await waitFor(() =>
       expect(actions.withdrawRequest).toHaveBeenCalledWith({ windowId: 'w3', reason: 'Not needed' }),

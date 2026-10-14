@@ -287,6 +287,8 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     show(detail({ events: settled }));
     expect(screen.getByText('HTTP 502 (BKK, SIN, TYO) · OK since 22:22')).toBeInTheDocument();
     expect(screen.getByText('Immediate recheck · MTTD 30 s')).toBeInTheDocument();
+    // Every ⋯ is named "More actions for <what it acts on>" (spec §25.1).
+    expect(screen.getByRole('button', { name: /^More actions for INC-\d{4,}$/ })).toBeInTheDocument();
     fireEvent.click(resolveButton());
     const dialog = screen.getByRole('dialog', { name: 'Resolve incident' });
     expect(within(dialog).getByText('Down')).toBeInTheDocument();

@@ -361,8 +361,8 @@ export function IncidentDetailView({
               .join(' · ')}
           </span>
           <DropdownMenu
-            label="More actions"
-            trigger={<IconButton icon={<IconEllipsis />} label="More actions" />}
+            label={`More actions for ${incidentLabel}`}
+            trigger={<IconButton icon={<IconEllipsis />} label={`More actions for ${incidentLabel}`} />}
             items={menu}
           />
         </span>
