@@ -34,10 +34,20 @@ export function SiteMoreMenu({
       label={label}
       trigger={
         phone ? (
-          <IconButton icon={<IconEllipsis />} label={label} size="md" className="size-11" />
+          <IconButton
+            icon={<IconEllipsis />}
+            label={label}
+            size="md"
+            className="size-11 aria-expanded:bg-bg-surface-hover"
+          />
         ) : (
           // A secondary Button as the board draws it (IconButton has no border); its name is the hidden text.
-          <Button variant="secondary" icon={<IconEllipsis />} className="w-11 justify-center gap-0 px-0">
+          <Button
+            variant="secondary"
+            icon={<IconEllipsis />}
+            title="More actions"
+            className="w-11 justify-center gap-0 px-0"
+          >
             <span className="sr-only">{label}</span>
           </Button>
         )

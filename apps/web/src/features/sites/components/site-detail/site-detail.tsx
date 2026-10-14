@@ -141,13 +141,13 @@ export function SiteDetailView({
             // stop short of the edge — let it take the row (MSite: the buttons span the page).
             actionsFullWidthBelow="md"
             breadcrumb={
-              // Phones: ⋯ at the end of the breadcrumb row, just above the title (D-043); -my keeps the row's
+              // Phones: ⋯ at the end of the breadcrumb row, just above the title (D-043); -mt-3 keeps the row's
               // height. With no header actions (a Viewer) it is the only ⋯ at every width — Visit site either way.
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />
                 </div>
-                <div className={hasActions ? '-my-3 md:hidden' : '-my-3'}>
+                <div className={hasActions ? '-mt-3 md:hidden' : '-mt-3'}>
                   <SiteMoreMenu
                     siteId={detail.id}
                     name={detail.name}

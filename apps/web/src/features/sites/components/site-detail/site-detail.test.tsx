@@ -224,6 +224,8 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     expect(desktop).toHaveFocus();
     await user.click(phone!);
     expect(menuLinks()).toEqual(['Visit site']);
+    await user.keyboard('{Escape}');
+    expect(phone).toHaveFocus();
   });
 
   it('⋯ for everyone else is Visit site only, with no Edit monitors; no URL and no Edit → no ⋯', async () => {
