@@ -6,7 +6,6 @@ import { NoAccess } from '@/components/states';
 import { MonitorsEditor } from '@/features/sites';
 import { getSite } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
-import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 export const metadata: Metadata = { title: 'Edit monitors' };
 
@@ -60,12 +59,7 @@ export default async function EditMonitorsPage({
           />
         ) : (
           <>
-            <PageHeader
-              className={PHONE_BAR_HEADER}
-              breadcrumb={breadcrumb}
-              title="Edit monitors"
-              meta={meta}
-            />
+            <PageHeader titleHideBelow="lg" breadcrumb={breadcrumb} title="Edit monitors" meta={meta} />
             <NoAccess
               title="Only an Admin can change monitors"
               description="Monitors decide when people are alerted, so an Admin changes them. Ask one to make the change."

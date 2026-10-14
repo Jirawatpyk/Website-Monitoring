@@ -51,5 +51,11 @@ test.describe('phone top bar (local Supabase)', () => {
     await signIn(context, baseURL!, ADMIN.email);
     const response = await page.goto('/no-such-page');
     expect(response?.status()).toBe(404);
+    // A site or incident that doesn't exist: 404, not a 200 streamed by the page's loading skeleton.
+    const missing = '00000000-0000-4000-8000-000000000000';
+    expect((await page.goto(`/sites/${missing}`))?.status()).toBe(404);
+    await expect(page.getByText('No site at this address')).toBeVisible();
+    expect((await page.goto(`/sites/${missing}/edit`))?.status()).toBe(404);
+    expect((await page.goto(`/incidents/${missing}`))?.status()).toBe(404);
   });
 });

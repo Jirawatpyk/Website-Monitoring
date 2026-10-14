@@ -1,14 +1,23 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { activeNavId, bottomNavWithCounts, NAV_SECTIONS } from './nav';
 
 const appDir = path.resolve(import.meta.dirname, '../../app');
 
+/** A folder's page, directly or inside one of its route groups (`sites/(list)/page.tsx`, D-045). */
+function pageIn(dir: string): boolean {
+  if (existsSync(path.join(dir, 'page.tsx'))) return true;
+  if (!existsSync(dir)) return false;
+  return readdirSync(dir, { withFileTypes: true }).some(
+    (e) => e.isDirectory() && /^\(.*\)$/.test(e.name) && pageIn(path.join(dir, e.name)),
+  );
+}
+
 /** A nav href is served by a page in the (app) route group. */
 function hasPage(href: string): boolean {
   const route = href === '/' ? '' : href;
-  return existsSync(path.join(appDir, '(app)', route, 'page.tsx'));
+  return pageIn(path.join(appDir, '(app)', route));
 }
 
 describe('NAV_SECTIONS', () => {

@@ -61,7 +61,7 @@ import {
 } from '../../types';
 import { GLYPHS, IncidentLink, MutedBadge, RowStatusBadge, TOUCH_HIT } from '../site-cells';
 import { SiteMoreMenu } from './more-menu';
-import { PHONE_BAR_HEADER, phoneHeader } from '@/components/phone-header';
+import { phoneHeader } from '@/components/phone-header';
 import { RangeControl, RangeDependent, RangeProvider } from './range-control';
 import { PauseActions } from '@/features/maintenance';
 
@@ -142,7 +142,8 @@ export function SiteDetailView({
             // stop short of the edge — let it take the row (MSite: the buttons span the page).
             actionsFullWidthBelow="md"
             // Below lg the top bar carries the name, back and ⋯ (MSite, D-045).
-            className={phoneActions ? PHONE_BAR_HEADER : `${PHONE_BAR_HEADER} ${phoneHeader.noActions}`}
+            titleHideBelow="lg"
+            className={phoneActions ? undefined : phoneHeader.noActions}
             breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: detail.name }]} />}
             title={detail.name}
             meta={

@@ -5,7 +5,6 @@ import { SiteForm } from '@/features/sites';
 import { getRegistrationOptions } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
 import { probeAllowlistInfo } from '@/lib/env';
-import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 export const metadata: Metadata = { title: 'Add site' };
 
@@ -15,7 +14,7 @@ export default async function AddSitePage() {
   const isAdmin = access.status === 'active' && access.profile.role === 'admin';
   const header = (
     <PageHeader
-      className={PHONE_BAR_HEADER}
+      titleHideBelow="lg"
       breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: 'Add site' }]} />}
       title="Add site"
       meta="Monitoring starts only when the registration checklist is complete."
