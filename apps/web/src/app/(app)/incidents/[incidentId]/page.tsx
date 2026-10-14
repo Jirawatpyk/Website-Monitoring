@@ -14,7 +14,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const detail = await getIncident((await params).incidentId);
   return {
-    title: detail ? `${formatIncidentId(Number(detail.view.id.slice(4)))} · ${detail.siteName}` : 'Incident',
+    title: detail
+      ? `${formatIncidentId(Number(detail.view.id.slice(4)))} · ${detail.siteName}`
+      : 'Incident not found',
   };
 }
 // Ack and resolve send their held messages after the 10 s Undo window (`after()`): room for that.
