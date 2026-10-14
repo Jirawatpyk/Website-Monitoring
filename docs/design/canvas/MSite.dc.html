@@ -32,7 +32,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </header>
 <sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}">
 <div class="aura-menu ms-menu" role="menu" aria-label="More actions for Bangkok Airways – Taiwan" style="position: absolute; right: 52px; top: 52px; z-index: 40; width: 236px; line-height: 1.4">
-<sc-if value="{{admin}}" hint-placeholder-val="{{true}}"><a role="menuitem" class="aura-menu__item" href="AddSite.dc.html"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="sm"></x-import><span class="aura-menu__label">Edit site</span></a><span style="display: block; padding: 0 12px 8px 36px; margin-top: -8px; font-size: 12px; color: var(--aura-fg-secondary)">View only on phones</span></sc-if>
+<sc-if value="{{admin}}" hint-placeholder-val="{{true}}"><a role="menuitem" class="aura-menu__item" href="AddSite.dc.html"><x-import component-from-global-scope="Aura.Icon" name="pencil" size="sm"></x-import><span class="aura-menu__label">Edit site</span></a></sc-if>
 <a role="menuitem" class="aura-menu__item" href="https://[Taiwan site URL]/" target="_blank" rel="noopener noreferrer" aria-label="Visit site (opens in a new tab)"><x-import component-from-global-scope="Aura.Icon" name="external-link" size="sm"></x-import><span class="aura-menu__label">Visit site</span></a>
 </div>
 </sc-if>
@@ -105,7 +105,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </sc-if>
 </div>
 <sc-if value="{{hasList}}" hint-placeholder-val="{{true}}">
-<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · each row opens Incident detail for that incident — the sample screen shows INC-0142. Top-bar ⋯ (44 px, next to the title): Visit site for everyone; Admins also get Edit site, which opens view only on phones (§22.5). Opening it moves focus to the first item; a tap outside closes it.</div>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · each row opens Incident detail for that incident — the sample screen shows INC-0142. Top-bar ⋯ (44 px, between the title and the avatar): Visit site for everyone; Admins also get Edit site (editable on phones, D-044). Opening it moves focus to the first item; a tap outside closes it. Not drawn: anyone without header actions still gets the top-bar ⋯ with Visit site only; a Draft’s menu has no Edit site — Finish setup already opens that page.</div>
 </sc-if>
 
 <div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden; flex-shrink: 0">

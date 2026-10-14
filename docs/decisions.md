@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-045 | 14 Oct 2026 | Phones follow spec §22.1 and the phone boards: the top bar shows a back arrow on pages that aren't a bottom-nav tab, the page's title and the avatar, and a page's own phone button sits there (Site detail's ⋯ between the site name and the avatar, as MSite). Built after G1; until then the shell stays as D-018 built it | D-018 phone bar (brand + avatar, title in the page); D-043 point 1 (⋯ in the breadcrumb row), once built |
 | D-044 | 14 Oct 2026 | Spec §22.5 "View only on phones" covers the policy and settings editors only (Escalation, Alert channels, Users & roles, Security, Organisation, API & webhooks, Synthetic checks). Add site, Edit site and Edit monitors stay editable on phones, and Site detail's phone ⋯ offers Edit site with no "View only on phones" line | Spec §22.5 list (Edit monitors, Add site, Edit site); §25.2 and the MSite caption; D-043 point 2 |
 | D-043 | 14 Oct 2026 | Site detail's ⋯ menu (spec §25): on phones the ⋯ sits at the end of the breadcrumb row above the title, not in the top bar, because the phone top bar is the shared brand + avatar bar (D-018) and doesn't carry the site name; on phones the menu shows Visit site only until Add site, Edit site and Edit monitors are view only on phones (§22.5), then Edit site joins it with "View only on phones" | MSite board: ⋯ in the top bar between the site name and the avatar; §25.2 Edit site on phones |
 | D-042 | 13 Oct 2026 | S09c's open rules: crawler views check forbidden words and the redirect allowlist, not `must_contain`; per view the latest usable fetch before the round's end raises a PROBLEM for 65 min, and an open one holds until a clean usable fetch (no data never clears it, for up to a day); a redirect off the site is usable whatever the target answers, a body read that broke off clean is not; the crawler's User-Agent and Referer are fixed and go on every hop, custom headers stay same-site; `DEFACEMENT_ALERTS` (default off) gates shared-list and crawler alerts in the runner, a site's own words always alert; the shared list matches case-insensitively with whitespace collapsed; the page's charset is honoured | — (fills gaps in D-041) |
@@ -48,6 +49,40 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-045 — The phone top bar follows §22.1: back, page title, page actions, avatar
+
+**Conflict.** Spec §22.1 (added 10 Oct) and every phone board draw a 56 px top bar with:
+- a back arrow (44 × 44) when the page isn't a bottom-nav tab;
+- the page's title;
+- the viewer's avatar.
+
+The titles read "Incidents", "INC-0142", "Bangkok Airways – Taiwan" and "Escalation", and MSite also puts the page's ⋯ there.
+
+The build has the 7 Oct shell (D-018):
+- the brand and the avatar on every page, with a back arrow on two routes only;
+- the title in the page, through `PageHeader`.
+
+D-043 put Site detail's phone ⋯ in the breadcrumb row because of that. Claude Design asked which is right when it redrew MSite.
+
+**Decision (14 Oct 2026, Tao).** The boards and §22.1 are right; the build moves to them after G1:
+- **Top bar:** `MobileBar` shows the back arrow on every page that isn't a bottom-nav tab, then the page's title, then the page's own phone actions, then the avatar.
+- **Overview and MobileAck:** keep the brand where their boards draw it.
+- **Phone header:** below the top bar breakpoint, `PageHeader` drops its h1 and breadcrumb, since the title is in the bar.
+- **Site detail:** the ⋯ moves into the bar, between the site name and the avatar (MSite). This supersedes D-043 point 1.
+
+Until that work ships, the shell stays as D-018 built it. The spec and the boards are not changed back.
+
+**Why.**
+- The phone boards agree with each other and with §22.1, so redrawing them all to the 7 Oct shell would be churn.
+- A title in the bar saves a large heading on a 390 px screen.
+- It wasn't done before G1 because it changes every page's phone header, and the app works today.
+
+**Impact.**
+- `components/app-shell/mobile-bar.tsx` gets a title and a slot for page actions, filled per page.
+- Every page's phone header changes.
+- `e2e/layout-consistency.spec.ts` changes its phone-shell checks.
+- The Carried line under S06 tracks the work.
 
 ## D-044 — The site editors stay editable on phones
 
