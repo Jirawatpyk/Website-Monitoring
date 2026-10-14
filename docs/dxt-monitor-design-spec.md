@@ -1,6 +1,6 @@
 # DxT Monitor — Design spec for developer handoff
 
-Version: 12 Oct 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
+Version: 14 Oct 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
 Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (53 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
 
 ## 0. How to use this spec
@@ -19,7 +19,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | MOverview4 | Mobile — Overview · **S06, build this** | 390×844 | Web app — desktop 1440 + mobile 390 |
 | Main | Overview dashboard (pre-S06 reference — superseded by Main3, §21) | 1440×1840 | Web app — desktop 1440 + mobile 390 |
 | Sites | Sites list | 1440×2588 | Web app — desktop 1440 + mobile 390 |
-| SiteDetail | Site detail — Bangkok Airways – Taiwan | 1440×1680 | Web app — desktop 1440 + mobile 390 |
+| SiteDetail | Site detail — Bangkok Airways – Taiwan | 1440×1820 | Web app — desktop 1440 + mobile 390 |
 | Incident | Incident — INC-0142 MuvMi DOWN | 1440×1660 | Web app — desktop 1440 + mobile 390 |
 | MOverview | Mobile — Overview (pre-S06 reference — superseded by MOverview4, §21) | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MSites | Mobile — Sites | 390×844 | Web app — desktop 1440 + mobile 390 |
@@ -30,7 +30,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | ChatAlert | Google Chat alert thread (content spec) · STATE adds maintenance messages (§24) | 600×8500 | Status logic · Mobile ack · Alert channel |
 | Incidents | Incidents list | 1440×1100 | Core flows · incidents · maintenance · onboarding |
 | Maintenance | Maintenance / mute dialog | 1440×1240 | Core flows · incidents · maintenance · onboarding |
-| MaintenancePage | Maintenance & mutes — /maintenance (§23) | 1440×1750 | Core flows · incidents · maintenance · onboarding |
+| MaintenancePage | Maintenance & mutes — /maintenance (§23) | 1440×1790 | Core flows · incidents · maintenance · onboarding |
 | AddSite | Add site + registration checklist | 1440×1680 | Core flows · incidents · maintenance · onboarding |
 | Escalation | Escalation policies | 1440×1528 | Operations & governance · web |
 | OnCall | On-call rotation | 1440×1464 | Operations & governance · web |
@@ -285,7 +285,7 @@ Not every page has its own mobile board. A page without one still works at 390 p
 2. **Tables become cards.** Each table row becomes one tappable row card: name + one secondary line on the left, the status badge on the right, chevron if it opens something. Keep the desktop sort and filters; columns that don't fit go to the detail page — never a sideways-scrolling table.
 3. **Targets ≥ 44 px** for every button, link row, select, input, segmented option and dialog close (§15.6). Side-by-side buttons only in pairs, full width otherwise.
 4. **Actions that must work on a phone** (never send anyone to a computer): acknowledge, add root cause, resolve and undo (MIncident "Later" state — there is no separate mobile Resolve screen), mute / maintenance (MMaintenance), send a test alert, request an on-call swap, sign devices out, sign out.
-5. **View only on phones** — complex editors: Escalation steps, Alert channels & routing, Edit monitors, Add site, Users & roles, Security, Organisation, API & webhooks, Synthetic checks. They show the same content read-only, with one line at the top: "**View only on phones.** Admins change policies on a larger screen." No edit, reorder, delete or Save controls and no "Open on desktop" link. Everything else (Reports, Audit log, Expiry, Post-incident review, Probes) works fully at 390 under items 1–3.
+5. **View only on phones** — complex editors: Escalation steps, Alert channels & routing, Edit monitors, Add site, Edit site, Users & roles, Security, Organisation, API & webhooks, Synthetic checks. They show the same content read-only, with one line at the top: "**View only on phones.** Admins change policies on a larger screen." No edit, reorder, delete or Save controls and no "Open on desktop" link. Everything else (Reports, Audit log, Expiry, Post-incident review, Probes) works fully at 390 under items 1–3.
 6. **Boards that show this:**
    - **MEscalation** — policy switch (Tier 1 DOWN · Tier 2–3 DOWN · PROBLEM), "Show names for" a site, one vertical ladder L0 → L3 (when, condition, resolved names, role tokens, channel badges), an "Example · nobody acknowledges" timeline, and an "Always true" card (ack scope, reminders, who is on call). Same data as the desktop Escalation board; L2 CEO is approved (D-009).
    - **MProfile** — alert channels + "Send me a test alert", next on-call shift (swap state → MOnCall), sites I own or back up as row cards (→ MSite, or MIncident when the site has an open incident), "Where I sit in escalation" (→ MEscalation), signed-in devices, the org-wide "Same for everyone" values (read-only), Sign out. By role: Responder / Admin as drawn; AM — no on-call card, sites become "My clients' sites", escalation shows the client-update track and the Tier 1 L3 FYI; CEO — escalation shows L2 / L3 only; Viewer — channels, devices and org values only.
@@ -345,3 +345,11 @@ Shipped 12 Oct 2026; boards redrawn to match the build (§24.12–17). Boards: *
 16. **Chat card wording variants** (STATE "Mute & didn't-start variants"): the held line is **plain text** (bold allowed, no colour — no Chat card uses colour; the words carry it). Held PROBLEM text line "PROBLEM · <site> (Tier 2) · <summary> · held by a mute until 15:00 · please take a look" (no "acknowledge by"); posted next morning → "Held by a mute until Fri 25 Sep 18:00"; nobody can escalate (acked meanwhile / no policy) → only "Held by a mute until 15:00". DIDN'T START on an acknowledged incident → "INC-0155 (DOWN since 21:52) stays open — it is acknowledged. Nothing was hidden. …"; on a PROBLEM → "site had a PROBLEM at 22:00 (INC-0155)" / "(PROBLEM since 21:52)". MUTE ENDED with a held Tier 2–3 PROBLEM outside hours → "MUTE ENDED · Fuji Links · alerts back on · INC-0156 posts Mon 28 Sep 09:00 (PROBLEM since 17:00)". Site names are always written in full (no short-name field).
 17. **Emails:** request email — Admins get "Review request"; the backup (non-Admin) gets the lede "Arm asked for maintenance on <site>. An Admin approves or declines it on Maintenance & mutes." and "Open Maintenance & mutes". Every later action (APPROVED, DECLINED, REQUEST CHANGED, REQUEST WITHDRAWN, MAINTENANCE CHANGED, CANCELLED, STARTED, ENDED, ENDED EARLY, DIDN'T START, NOT APPROVED) is drawn in the same thread with label, headline, preheader and a "What changed" row; windows that are over or will never run drop the Effect and "If it's down" rows. REQUEST WITHDRAWN preheader ends "· no more reminders" (build to add). The first DOWN / PROBLEM email after a mute gets a first facts row "Held by a mute — until 15:00 — escalation starts now" (build to add).
 
+
+## 25. Site detail — ⋯ menu with Edit site and Visit site — added 14 Oct 2026
+Decided by Tao 14 Oct 2026: Site detail gets a ⋯ menu, not a fourth header button. Build after G1. Boards: **SiteDetail** (STATE Closed · Menu · Admin · Menu · not Admin) and **MSite** (STATE Closed · Owner menu · Admin menu).
+
+1. **Desktop.** A ⋯ button (secondary, icon only, 44 × 44 px — same height as the other header buttons, `aria-label="More actions for <site name>"`, `aria-haspopup="menu"`) sits last in the header actions, after Edit monitors. Its menu looks like the Sites row menu: **Edit site** (pencil) → `/sites/[siteId]/edit`; **Visit site** (external-link) → the site URL in a new tab. Mute and Schedule maintenance stay as buttons and aren't repeated in the menu. Opening it moves focus to the first item; Esc or a click outside closes it; Esc returns focus to ⋯.
+2. **Phone (MSite).** ⋯ is a 44 px icon button in the top bar, between the site name and the avatar; menu items are 44 px high. On phones Edit site opens view only (§22.5), and the menu says so under the item ("View only on phones").
+3. **Roles.** Admin: Edit site + Visit site. Owner, backup and everyone else: Visit site only. Edit site and Edit monitors are Admin-only (Users › "Edit sites, monitors and escalation"), so a non-Admin's header has no Edit monitors button; Mute and Schedule maintenance follow §23.7.
+4. **Not in scope:** no change to the Edit site page (it isn't drawn as its own board — the canvas links the Add site form as a stand-in), no archive / hide for sites with history (stop monitoring keeps them), no change to the Sites list menu.

@@ -2,6 +2,7 @@
 
 **For:** the DxT Monitor design canvas. Please add one state to the existing **SiteDetail** board, and show the same header at phone width (390 px).
 **Design system:** AURA, as on every other board. Reuse the **⋯ menu** the **Sites** board already draws (row menu: Open, Edit site, Mute…, Schedule maintenance).
+**Status:** drawn 14 Oct 2026 (SiteDetail, MSite, spec §25) and built in `fix/S06-site-detail-menu`; phone differences in D-043.
 **Decision:** Tao, 14 Oct 2026: Site detail gets a ⋯ menu with Edit site and Visit site, not a fourth header button. Build after G1.
 
 ## The gap

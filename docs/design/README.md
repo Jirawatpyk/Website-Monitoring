@@ -9,7 +9,7 @@
 
 ## The local canvas copy
 
-`canvas/` is a snapshot of the canvas taken 2026-09-28 (canvas version `1790571054-2831`). Each `<Board>.dc.html` holds one board's full markup plus a `DCLogic` class whose `renderVals()` carries the sample data and interactive states. Read a board to get exact layout, copy, states and which AURA component is mounted where (`component-from-global-scope="Aura.<Name>"`).
+`canvas/` is a snapshot of the canvas taken 2026-09-28 (canvas version `1790571054-2831`); SiteDetail, MSite, AuditLog and `canvas.json` refreshed 2026-10-14 (version `1791956614-2a65`, spec §25). Each `<Board>.dc.html` holds one board's full markup plus a `DCLogic` class whose `renderVals()` carries the sample data and interactive states. Read a board to get exact layout, copy, states and which AURA component is mounted where (`component-from-global-scope="Aura.<Name>"`).
 
 - The boards use inline styles and sample data. Rebuild them with AURA React components and real data; never copy the inline styles or the sample data into the app.
 - `canvas.json` lists every board with its title and size. `aura-tokens*.css` are the canvas's own resolved tokens; the app uses `@jirawatpyk/aura-tokens` instead.
