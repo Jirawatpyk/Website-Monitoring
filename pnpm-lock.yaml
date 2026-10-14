@@ -170,8 +170,8 @@ importers:
         specifier: ^9.39.0
         version: 9.39.5
       '@jirawatpyk/aura-tokens':
-        specifier: ^5.35.0
-        version: 5.35.0
+        specifier: ^5.36.0
+        version: 5.37.0
       '@next/eslint-plugin-next':
         specifier: ^16.3.8
         version: 16.3.8(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))
@@ -270,7 +270,7 @@ importers:
         specifier: ^5.37.0
         version: 5.37.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@jirawatpyk/aura-tokens':
-        specifier: ^5.37.0
+        specifier: ^5.36.0
         version: 5.37.0
       '@supabase/ssr':
         specifier: ^0.12.7
@@ -1117,9 +1117,6 @@ packages:
     peerDependencies:
       react: '>=18'
       react-dom: '>=18'
-
-  '@jirawatpyk/aura-tokens@5.35.0':
-    resolution: {integrity: sha512-/vsrXNXKyDcoZopqQ3+PTNoIggWcH28Ad5lPVMbT+pWZjlWcUy+Rtbi6vWrC9YuRoUXjuUe/GrdOvMKqvnv4fQ==}
 
   '@jirawatpyk/aura-tokens@5.37.0':
     resolution: {integrity: sha512-kzPkj40zFvcMwFG+yR0tC9fKZbTXTZFVbzBoKTmtDoIdghtubo+3LCLPSp7LQqm6iC5y2lBsMMyOvTjL9NGPpQ==}
@@ -3537,8 +3534,6 @@ snapshots:
     dependencies:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
-
-  '@jirawatpyk/aura-tokens@5.35.0': {}
 
   '@jirawatpyk/aura-tokens@5.37.0': {}
 
