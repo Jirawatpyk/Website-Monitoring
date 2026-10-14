@@ -37,6 +37,9 @@ describe('loading skeletons', () => {
     expect(missing).toEqual([]);
     const catchAll = readdirSync(BAR, { recursive: true }).filter((p) => String(p).includes('[...'));
     expect(catchAll).toEqual([]);
+    // Without its own loading the slot inherits (app)/loading.tsx: the Overview skeleton filled the top bar
+    // (600 px) while a page streamed on staging (/verify, D-045).
+    expect(existsSync(join(BAR, 'loading.tsx')), '@bar/loading.tsx').toBe(true);
   });
 
   // A static `@bar` page passes its path to phoneBarFor as a literal: it must be its own folder's path,
