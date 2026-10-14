@@ -65,7 +65,7 @@ The index `/implement-screen` reads. One row per canvas board (51). The board fi
 
 | Route | What it is | Phase | Built from |
 |---|---|---|---|
-| `/sites/[siteId]/edit` | Edit site — the AddSite form with "Edit site", Save changes, Stop monitoring and Delete (Drafts only) (S05, D-025); opened from the Sites row ⋯ and Site detail's ⋯ (§25). View only on phones (§22.5) is still to do (D-043) | P0 | `AddSite` |
+| `/sites/[siteId]/edit` | Edit site — the AddSite form with "Edit site", Save changes, Stop monitoring and Delete (Drafts only) (S05, D-025); opened from the Sites row ⋯ and Site detail's ⋯ (§25). Editable on phones too (D-044) | P0 | `AddSite` |
 | `/api/monitor-test/sin`, `/api/monitor-test/tyo` | Test check from SIN / TYO for AddSite and EditMonitors — Admin only, nothing stored (S05, D-025) | P0 | `AddSite` Test check, `EditMonitors` Test before saving |
 | `/auth/callback` | OAuth code exchange after Google sign-in, then redirect to `safeNextPath(next)` — built (S01) | P0 | — |
 

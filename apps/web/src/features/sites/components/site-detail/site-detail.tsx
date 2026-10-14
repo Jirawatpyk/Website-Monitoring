@@ -152,7 +152,7 @@ export function SiteDetailView({
                     siteId={detail.id}
                     name={detail.name}
                     url={detail.url}
-                    canEdit={false}
+                    canEdit={isAdmin && detail.live}
                     phone
                   />
                 </div>
