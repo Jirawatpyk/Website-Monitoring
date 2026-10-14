@@ -4,6 +4,7 @@ import { EscalationEditor, EscalationView } from '@/features/escalation';
 import { getEscalationPage } from '@/features/escalation/server';
 import { NoAccess } from '@/components/states';
 import { getAccess } from '@/lib/auth/session';
+import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 export const metadata: Metadata = { title: 'Escalation policies' };
 
@@ -18,7 +19,7 @@ export default async function EscalationPage() {
     return (
       <Container>
         <div className="flex flex-col gap-6">
-          <PageHeader eyebrow="OPERATIONS" title="Escalation policies" />
+          <PageHeader className={PHONE_BAR_HEADER} eyebrow="OPERATIONS" title="Escalation policies" />
           <NoAccess
             title="Escalation policies are for the DxT team"
             description="Ask an Admin if you need to see who is paged when a site goes down."
@@ -34,6 +35,7 @@ export default async function EscalationPage() {
     <Container>
       <div className="flex flex-col gap-6">
         <PageHeader
+          className={PHONE_BAR_HEADER}
           eyebrow="OPERATIONS"
           title="Escalation policies"
           meta="One person must acknowledge. No ack in time → the next level is notified. Acknowledge stops this chain."

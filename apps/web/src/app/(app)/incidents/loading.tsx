@@ -6,7 +6,7 @@ export default function Loading() {
   return (
     <Container>
       <PageSkeleton label="Loading incidents">
-        <PageHeaderSkeleton actions={1} actionsFromMd />
+        <PageHeaderSkeleton actions={1} actionsFromMd phoneBar="all" />
         <div className="hidden grid-cols-2 gap-4 md:grid lg:grid-cols-3 xl:grid-cols-5">
           {Array.from({ length: 5 }, (_, n) => (
             <CardSkeleton key={n} lines={2} />

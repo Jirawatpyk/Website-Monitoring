@@ -37,6 +37,7 @@ import {
 import { PhraseList } from './phrase-list';
 import { EDITOR_LIST, EDITOR_PANE, EDITOR_SPLIT } from './layout';
 import { TestCheckCard } from './test-check-card';
+import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 interface MonitorsEditorProps {
   siteId: string;
@@ -165,6 +166,7 @@ export function MonitorsEditor({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
+        className={PHONE_BAR_HEADER}
         // Phones: Cancel / Save side by side across the row, as Site detail (layout-consistency).
         actionsFullWidthBelow="md"
         breadcrumb={breadcrumb}

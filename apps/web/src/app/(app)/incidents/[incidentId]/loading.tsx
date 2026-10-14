@@ -6,7 +6,7 @@ export default function Loading() {
   return (
     <Container>
       <PageSkeleton label="Loading incident">
-        <PageHeaderSkeleton breadcrumb actions={3} actionsFromMd />
+        <PageHeaderSkeleton breadcrumb actions={3} actionsFromMd phoneBar="crumb" />
         <div className="hidden md:block">
           <CardSkeleton lines={2} />
         </div>

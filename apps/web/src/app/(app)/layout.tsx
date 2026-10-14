@@ -15,7 +15,7 @@ import { getAccess } from '@/lib/auth/session';
  * Signed-in frame. The proxy already sent signed-out people to /login; a session without an active
  * profile (deactivated, or never on the access list) is signed out by /auth/refused (D-007).
  */
-export default async function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children, bar }: { children: ReactNode; bar?: ReactNode }) {
   // Side by side: the counts are head counts under RLS, harmless (0 or null) for a session that then redirects.
   const [access, sites, incidents] = await Promise.all([
     getAccess(),
@@ -32,7 +32,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       headerHideFrom="lg"
       // …and slides away while scrolling down, back on the way up (AURA 5.35, request 13)
       headerHideOnScroll
-      header={<MobileBar displayName={profile.displayName} />}
+      // The page's part comes from the `@bar` slot: back arrow, title, its own buttons (spec §22.1, D-045).
+      header={<MobileBar displayName={profile.displayName}>{bar}</MobileBar>}
       nav={
         <AppNav
           header={<Brand />}

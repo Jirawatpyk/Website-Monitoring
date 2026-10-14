@@ -7,5 +7,6 @@ export type { RegistrationOptions, SiteListRow, SiteRecord } from './types';
 export { MonitorsEditor } from './components/monitors-editor';
 export { MonitorsEditorSkeleton, SiteFormSkeleton } from './components/site-form-skeleton';
 export { SiteDetailView } from './components/site-detail/site-detail';
+export { SiteMoreMenu } from './components/site-detail/more-menu';
 export { rangeOf, type SiteRange } from './detail';
 export type { SiteDetail } from './types';

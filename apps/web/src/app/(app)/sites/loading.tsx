@@ -7,7 +7,7 @@ export default function Loading() {
   return (
     <Container>
       <PageSkeleton label="Loading sites">
-        <PageHeaderSkeleton actions={1} actionFullOnPhone />
+        <PageHeaderSkeleton actions={1} actionFullOnPhone phoneBar="all" />
         <SitesListSkeleton />
       </PageSkeleton>
     </Container>

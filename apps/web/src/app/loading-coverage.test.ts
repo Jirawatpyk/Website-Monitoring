@@ -10,7 +10,8 @@ function pageDirs(dir: string): string[] {
   return [
     ...here,
     ...readdirSync(dir, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
+      // `@bar` is the phone top bar's slot (D-045), not a page: it waits inside the page's own loading.
+      .filter((e) => e.isDirectory() && !e.name.startsWith('@'))
       .flatMap((e) => pageDirs(join(dir, e.name))),
   ];
 }

@@ -54,6 +54,7 @@ import {
   type RootCauseValue,
 } from './incident-dialogs';
 import { POST_WAIT_WORDS, usePostWait, type PostOverdue } from './use-post-wait';
+import { phoneHeader } from '@/components/phone-header';
 
 const LIVE = ['incidents'] as const;
 /** Lines a phone shows before "Show all" (a long flapping incident has hundreds); the CSS above hides from 21. */
@@ -242,6 +243,7 @@ export function IncidentDetailView({
         {copied ? 'Incident link copied' : ''}
       </p>
       <PageHeader
+        className={phoneHeader.crumb}
         breadcrumb={
           <Breadcrumb items={[{ label: 'Incidents', href: '/incidents' }, { label: incidentLabel }]} />
         }

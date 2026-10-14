@@ -195,6 +195,19 @@ function resolvedOf(
   };
 }
 
+/** The incident's number for the phone top bar (MIncident "INC-0142", D-045); null when unknown. */
+export const getIncidentNumber = cache(async (incidentId: string): Promise<number | null> => {
+  if (!incidentIdSchema.safeParse(incidentId).success) return null;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('incidents')
+    .select('number')
+    .eq('id', incidentId)
+    .maybeSingle();
+  if (error) throw new Error(`incident number: ${error.message}`);
+  return data?.number ?? null;
+});
+
 /** The incident page (Incident / MIncident boards), read as the signed-in person. */
 export const getIncident = cache(async function getIncident(
   incidentId: string,

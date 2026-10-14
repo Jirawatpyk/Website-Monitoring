@@ -201,18 +201,17 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     expect(screen.queryByRole('link', { name: 'Edit monitors' })).not.toBeInTheDocument();
   });
 
-  // Both ⋯ render in jsdom (CSS hides one): the phone's by the breadcrumb comes first, the desktop's last in the actions.
-  const more = () => screen.getAllByRole('button', { name: 'More actions for Bangkok Airways – Taiwan' });
+  // The page's ⋯ is the desktop one (from lg); below lg it is in the top bar's `@bar` slot (D-045).
+  const more = () => screen.getByRole('button', { name: 'More actions for Bangkok Airways – Taiwan' });
   const menuLinks = () =>
     within(screen.getByRole('menu'))
       .getAllByRole('menuitem')
       .map((i) => i.textContent);
 
-  it("⋯ (§25): an Admin's menu has Edit site and Visit site in a new tab, on phones too (D-043, D-044)", async () => {
+  it("⋯ (§25): an Admin's menu has Edit site and Visit site in a new tab (D-044)", async () => {
     const user = userEvent.setup();
     render(<SiteDetailView detail={detail()} range="30d" role="admin" meId="tao" nowIso={NOW} />);
-    const [phone, desktop] = more();
-    await user.click(desktop!);
+    await user.click(more());
     expect(menuLinks()).toEqual(['Edit site', 'Visit site']);
     expect(screen.getByRole('menuitem', { name: 'Edit site' })).toHaveFocus();
     expect(screen.getByRole('menuitem', { name: 'Edit site' })).toHaveAttribute('href', '/sites/s1/edit');
@@ -221,11 +220,7 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     expect(visit).toHaveAttribute('target', '_blank');
     expect(visit).toHaveAttribute('rel', 'noreferrer'); // AURA's, which implies noopener
     await user.keyboard('{Escape}');
-    expect(desktop).toHaveFocus();
-    await user.click(phone!);
-    expect(menuLinks()).toEqual(['Edit site', 'Visit site']);
-    await user.keyboard('{Escape}');
-    expect(phone).toHaveFocus();
+    expect(more()).toHaveFocus();
   });
 
   it('⋯ for everyone else is Visit site only, with no Edit monitors; no URL and no Edit → no ⋯', async () => {
@@ -233,21 +228,23 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     let view = render(
       <SiteDetailView detail={detail()} range="30d" role="responder" meId="arm" nowIso={NOW} />,
     );
-    await user.click(more()[1]!);
+    await user.click(more());
     expect(menuLinks()).toEqual(['Visit site']);
     expect(screen.queryByRole('link', { name: 'Edit monitors' })).not.toBeInTheDocument();
     view.unmount();
-    // A Viewer has no header actions, so no empty actions row: the breadcrumb row's ⋯ is the only one.
+    // A Viewer's actions hold only the ⋯, so below lg the whole box hides (no empty row; D-045).
     view = render(<SiteDetailView detail={detail()} range="30d" role="viewer" meId="mint" nowIso={NOW} />);
-    expect(more()).toHaveLength(1);
-    await user.click(more()[0]!);
+    await user.click(more());
     expect(menuLinks()).toEqual(['Visit site']);
+    expect(document.querySelector('.aura-page-header')?.className).toContain(
+      'aura-page-header__actions]:hidden',
+    );
     view.unmount();
     // A Draft's Edit site is its Finish setup button, not a second entry in ⋯.
     view = render(
       <SiteDetailView detail={detail({ live: false })} range="30d" role="admin" meId="tao" nowIso={NOW} />,
     );
-    await user.click(more()[1]!);
+    await user.click(more());
     expect(menuLinks()).toEqual(['Visit site']);
     view.unmount();
     render(

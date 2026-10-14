@@ -213,6 +213,23 @@ export const getSiteName = cache(async (siteId: string): Promise<string | null> 
   return data?.name ?? null;
 });
 
+/** What Site detail's phone top bar shows (D-045): name, primary URL, live; null when unknown. */
+export const getSiteBar = cache(
+  async (siteId: string): Promise<{ name: string; url: string | null; live: boolean } | null> => {
+    if (!siteIdSchema.safeParse(siteId).success) return null;
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('sites')
+      .select('name, is_active, monitors(url, is_primary)')
+      .eq('id', siteId)
+      .maybeSingle();
+    if (error) throw new Error(`site bar: ${error.message}`);
+    if (!data) return null;
+    const primary = data.monitors.find((m) => m.is_primary);
+    return { name: data.name, url: primary?.url ?? null, live: data.is_active };
+  },
+);
+
 /** `/sites/[siteId]` for the range asked; null when the site doesn't exist or isn't readable. */
 export async function getSiteDetail(
   siteId: string,

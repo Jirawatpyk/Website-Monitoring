@@ -1,6 +1,7 @@
 import { Breadcrumb, Button, Card, Container, EmptyState, PageHeader } from '@jirawatpyk/aura-react';
 import type { Metadata } from 'next';
 import { IconMonitor } from '@jirawatpyk/aura-react/icons';
+import { PHONE_BAR_HEADER } from '@/components/phone-header';
 
 export const metadata: Metadata = { title: 'Site not found' };
 
@@ -10,6 +11,7 @@ export default function SiteNotFound() {
     <Container>
       <div className="flex flex-col gap-6">
         <PageHeader
+          className={PHONE_BAR_HEADER}
           breadcrumb={<Breadcrumb items={[{ label: 'Sites', href: '/sites' }, { label: 'Not found' }]} />}
           title="Site not found"
         />
