@@ -97,7 +97,7 @@ function statusLine(detail: SiteDetail, now: Date): string | null {
   const word = { ok: 'OK', problem: 'Problem', down: 'Down', maintenance: 'In maintenance' }[detail.status];
   const head = `${word} since ${formatWhen(new Date(detail.statusSince), now, { midSentence: true })}`;
   // §26.8: a Page change names itself and its incident — "Problem since 09:30 · page change · INC-0157".
-  if (detail.openTrigger === 'content_change' && detail.openIncident) {
+  if (detail.status === 'problem' && detail.openTrigger === 'content_change' && detail.openIncident) {
     return `${head} · page change · ${formatIncidentId(detail.openIncident.number)}`;
   }
   return `${head} · ${since}`;

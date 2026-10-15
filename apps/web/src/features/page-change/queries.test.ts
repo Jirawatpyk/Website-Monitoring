@@ -48,6 +48,10 @@ describe('loadPageChange', () => {
       incident: { id: 'i1', number: 157 },
     });
     const plain = calls.find((c) => c.table === 'crawler_checks');
+    const inc = calls.find((c) => c.table === 'incidents');
+    expect(inc?.filters).toEqual(
+      expect.arrayContaining([['in', 'state', ['unacked', 'escalated', 'acknowledged']]]),
+    );
     expect(plain?.filters).toEqual(
       expect.arrayContaining([
         ['eq', 'view', 'plain'],

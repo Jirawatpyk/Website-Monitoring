@@ -893,6 +893,10 @@ describe('timelineOf — baseline accepted (§26.6)', () => {
     ]);
   });
 
+  it('starts at the first fetch that differed, not a failed check', () => {
+    expect(timelineOf(i, [], nameOf, NOW)[0]).toMatchObject({ title: 'First fetch that differed' });
+  });
+
   it('with the resolve, and undone', () => {
     expect(line([accepted({ with_resolve: true })])[0]!.detail).toBe('Accepted with the resolve');
     expect(line([accepted({}), ev('baseline_undone', '25T10:07:04', {}, 'u-tao')])).toMatchObject([

@@ -664,7 +664,7 @@ export function timelineOf(
   item(
     { at: i.startedAt },
     'failed',
-    'First failed check',
+    i.trigger === 'content_change' ? 'First fetch that differed' : 'First failed check',
     str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
   );
 

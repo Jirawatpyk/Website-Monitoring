@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { CLOSED_INCIDENT_STATES_IN, FINGERPRINT_VIEW, pageFingerprintSchema } from '@dxt/shared';
+import { FINGERPRINT_VIEW, pageFingerprintSchema } from '@dxt/shared';
 import { ownDomains } from '@dxt/engine';
 import { buildPageChange, type BaselineRow, type PageChangeView, type PlainFetch } from './model';
 
@@ -47,7 +47,8 @@ export async function loadPageChange(
       .select('id, number, started_at')
       .eq('site_id', m.siteId)
       .eq('trigger', 'content_change')
-      .not('state', 'in', CLOSED_INCIDENT_STATES_IN)
+      // unrecovered only: after a recovery a new change is "waiting" again (/verify, 15 Oct)
+      .in('state', ['unacked', 'escalated', 'acknowledged'])
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle(),

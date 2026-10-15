@@ -690,13 +690,14 @@ async function pageChangeOf(
 }
 
 /** The incident's latest accept that wasn't undone (§26.6): when, by whom, with the resolve, matched. */
-function incidentAccept(
+export function incidentAccept(
   i: DetailRow,
   events: readonly EventRow[],
   nameOf: (id: string | null) => string,
 ): NonNullable<IncidentDetail['pageChange']>['accepted'] {
   const sorted = [...events].sort((a, b) => a.at.localeCompare(b.at));
-  const last = sorted.filter((e) => e.type === 'baseline_accepted').at(-1);
+  const dropAt = sorted.filter((e) => e.type === 'detected' || e.type === 'relapsed').at(-1)?.at ?? '';
+  const last = sorted.filter((e) => e.type === 'baseline_accepted' && e.at >= dropAt).at(-1);
   if (!last || sorted.some((e) => e.type === 'baseline_undone' && e.at >= last.at)) return null;
   return {
     at: last.at,
