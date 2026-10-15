@@ -111,6 +111,7 @@ export function SiteDetailView({
   meId,
   viewer = { name: '', email: '' },
   nowIso,
+  pageFingerprint,
 }: {
   detail: SiteDetail;
   range: SiteRange;
@@ -119,6 +120,11 @@ export function SiteDetailView({
   /** The signed-in person: the mute dialog's "recorded as" and phone "Signed in as" lines. */
   viewer?: { name: string; email: string };
   nowIso: string;
+  /**
+   * The Page fingerprint card (S09d, spec §26.8), drawn by the route: after Monitors, and on phones —
+   * where Monitors is hidden — after Latest round.
+   */
+  pageFingerprint?: React.ReactNode;
 }) {
   const now = new Date(nowIso);
   const isAdmin = role === 'admin';
@@ -323,6 +329,7 @@ export function SiteDetailView({
             </div>
 
             <MonitorsTable detail={detail} />
+            {pageFingerprint}
 
             <div className="grid grid-cols-1 gap-4 max-md:hidden xl:grid-cols-2">
               <IncidentHistory detail={detail} />
