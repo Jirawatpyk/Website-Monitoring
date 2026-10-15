@@ -102,6 +102,7 @@ Also show **"No data"** when the last fetches were refused by the site's bot pro
 
 ## States and checks
 
+- **Since this brief (14 Oct, D-045):** phone screens use the current phone top bar — back arrow, page title and the page's ⋯ menu, avatar on the right — as on the other phone boards (MSite, MIncident). Draw the new cards inside that layout.
 - Every state at **390 / 820 / 1440**, light and dark.
 - Touch targets ≥ 44 px.
 - Status is never shown by colour alone: added and removed domains carry "+" and "−".
