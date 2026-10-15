@@ -46,11 +46,14 @@ function RootCauseFields({
   onChange,
   errors,
   stillDown,
+  afterCategory,
 }: {
   value: RootCauseValue;
   onChange: (v: RootCauseValue) => void;
   errors: Partial<Record<Field, string>>;
   stillDown: boolean;
+  /** Under the category (Resolve's "Also accept the current page", S09d §26.7). */
+  afterCategory?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -68,6 +71,7 @@ function RootCauseFields({
             : undefined
         }
       />
+      {afterCategory}
       <Textarea
         label="What happened"
         required
@@ -653,29 +657,33 @@ export function ResolveDialog({
             }}
             errors={errors}
             stillDown={incident.stillDown}
+            afterCategory={
+              <>
+                {showBox && (
+                  <div className="flex flex-col gap-2 rounded-aura-md border border-border-default p-aura-3">
+                    <Checkbox
+                      checked={acceptBox}
+                      onChange={(checked) => setAcceptBox(checked)}
+                      description={`Saves the ${pageChange.changed} changed fields as the baseline, with “What happened” as the reason. Logged as ${viewerName}.`}
+                    >
+                      Also accept the current page as the new baseline
+                    </Checkbox>
+                    {acceptBox && pageChange.newScript.length > 0 && (
+                      <Alert tone="danger" title="A new script domain usually means injected code.">
+                        {`Accept only if you know the client added it. New: ${pageChange.newScript.join(', ')}.`}
+                      </Alert>
+                    )}
+                  </div>
+                )}
+                {clientChange && !pageChange.canAccept && !pageChange.matched && (
+                  <p className="m-0 flex items-center gap-2 text-sm text-fg-secondary">
+                    <IconLock aria-hidden />
+                    Only an Admin can accept a new baseline — resolve once the page matches it again.
+                  </p>
+                )}
+              </>
+            }
           />
-          {showBox && (
-            <div className="flex flex-col gap-2 rounded-aura-md border border-border-default p-aura-3">
-              <Checkbox
-                checked={acceptBox}
-                onChange={(checked) => setAcceptBox(checked)}
-                description={`Saves the ${pageChange.changed} changed fields as the baseline, with “What happened” as the reason. Logged as ${viewerName}.`}
-              >
-                Also accept the current page as the new baseline
-              </Checkbox>
-              {acceptBox && pageChange.newScript.length > 0 && (
-                <Alert tone="danger" title="A new script domain usually means injected code.">
-                  {`Accept only if you know the client added it. New: ${pageChange.newScript.join(', ')}.`}
-                </Alert>
-              )}
-            </div>
-          )}
-          {clientChange && !pageChange.canAccept && !pageChange.matched && (
-            <p className="m-0 flex items-center gap-2 text-sm text-fg-secondary">
-              <IconLock aria-hidden />
-              Only an Admin can accept a new baseline — resolve once the page matches it again.
-            </p>
-          )}
           {uptime && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Uptime</span>

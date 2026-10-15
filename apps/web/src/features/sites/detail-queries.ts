@@ -456,6 +456,7 @@ export async function loadSiteDetail(
     credentialRef: s.credential_ref,
     mutedUntil: s.muted_until,
     openIncident,
+    openTrigger: openRow ? (openRow.i.trigger as Trigger) : null,
     stats: {
       uptime: uptime?.uptime ?? null,
       p50: stats.p50,

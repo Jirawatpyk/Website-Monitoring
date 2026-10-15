@@ -28,6 +28,7 @@ const detail = (over: Partial<SiteDetail> = {}): SiteDetail => ({
   credentialRef: 'Team vault › BA',
   mutedUntil: null,
   openIncident: null,
+  openTrigger: null,
   stats: { uptime: 0.9997, p50: 398, p95: 740, incidents: 2, caption: '1 DOWN 11 min · 1 PROBLEM 6 min' },
   chart: { BKK: [], SIN: [], TYO: [] },
   chartFrom: Date.parse(NOW) - 30 * 86_400_000,

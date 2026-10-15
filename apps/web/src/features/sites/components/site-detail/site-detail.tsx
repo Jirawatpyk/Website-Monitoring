@@ -95,7 +95,12 @@ function statusLine(detail: SiteDetail, now: Date): string | null {
   if (!detail.statusSince) return null;
   const since = formatDuration((now.getTime() - Date.parse(detail.statusSince)) / 60_000);
   const word = { ok: 'OK', problem: 'Problem', down: 'Down', maintenance: 'In maintenance' }[detail.status];
-  return `${word} since ${formatWhen(new Date(detail.statusSince), now, { midSentence: true })} · ${since}`;
+  const head = `${word} since ${formatWhen(new Date(detail.statusSince), now, { midSentence: true })}`;
+  // §26.8: a Page change names itself and its incident — "Problem since 09:30 · page change · INC-0157".
+  if (detail.openTrigger === 'content_change' && detail.openIncident) {
+    return `${head} · page change · ${formatIncidentId(detail.openIncident.number)}`;
+  }
+  return `${head} · ${since}`;
 }
 
 /** Who sees Mute / maintenance (spec §11, D-012, D-036): an Admin, or a Responder on a site they own or back up. */

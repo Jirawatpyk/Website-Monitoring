@@ -101,6 +101,13 @@ test.describe('page change (local Supabase)', () => {
     test('Site detail shows the Page fingerprint card with the PROBLEM open', async ({ page }, info) => {
       const { siteId } = await openPageChangeIncident('arm@example.test');
       await page.goto(`/sites/${siteId}`);
+      // §26.8: the header names the page change and its incident
+      await expect(
+        page
+          .getByText(/^Problem since .* · page change · INC-\d{4,}$/)
+          .filter({ visible: true })
+          .first(),
+      ).toBeVisible();
       const card = visible(page);
       await expect(
         card.getByText(/^Differs from the baseline · PROBLEM open since \d\d:\d\d$/),

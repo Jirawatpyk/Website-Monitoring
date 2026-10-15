@@ -185,6 +185,8 @@ export interface SiteDetail {
   credentialRef: string | null;
   mutedUntil: string | null;
   openIncident: OpenIncident | null;
+  /** The open incident's trigger (S09d: the header names a Page change, spec §26.8). */
+  openTrigger: Trigger | null;
   stats: {
     uptime: number | null;
     p50: number | null;
