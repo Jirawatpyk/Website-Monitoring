@@ -19,6 +19,10 @@
  *                    Redirect "(from Google search)"); a probe and Googlebot get the page
  *   deep-spam      → everyone gets a page with the gambling links after 300 KB, past the probes' 256 KB
  *                    sample (S09c: only the crawler's whole-body read sees them)
+ *   defaced-title  → everyone gets the page with its <title> changed (S09d: PROBLEM · Page change on the
+ *                    3rd plain crawler fetch, ~1 h); the h1 keeps "Test target", so must_contain passes
+ *   injected-script → everyone gets a ~400 KB page with a <script> from a new domain at the end of <body>
+ *                    (S09d: PROBLEM · Page change on the next plain crawler fetch)
  * Anything else (store missing, unknown value) counts as ok. Only a probe (User-Agent `DxT-Monitor/`)
  * is held or challenged differently, so nobody else can tie up the function.
  */
@@ -38,6 +42,8 @@ export const TARGET_MODES = [
   'cloaked-ua',
   'cloaked-referer',
   'deep-spam',
+  'defaced-title',
+  'injected-script',
 ] as const;
 export type TargetMode = (typeof TARGET_MODES)[number];
 
@@ -50,6 +56,11 @@ export const CLOAKED_REDIRECT = 'https://example.com/';
 export const DEEP_SPAM_OFFSET = 300_000;
 /** Phrases from the shared forbidden list (`@dxt/shared` forbidden.ts), as a hacked page carries them. */
 export const SPAM = '<p><a href="#">สล็อตออนไลน์</a> <a href="#">บาคาร่า</a></p>';
+/** `defaced-title`'s title: not a shared-list phrase, so only the page change fires (S09d). */
+export const DEFACED_TITLE = 'Test target | Lucky Deals';
+/** `injected-script`'s script: a domain the baseline never had, after ~400 KB (S09d Done-when 1, 2). */
+export const INJECTED_SCRIPT = '<script src="https://evil-cdn.example/x.js"></script>';
+export const INJECTED_OFFSET = 400_000;
 
 export function parseMode(value: unknown): TargetMode {
   return TARGET_MODES.find((m) => m === value) ?? 'ok';
@@ -73,8 +84,8 @@ const CHALLENGE_PAGE =
 /** A broken deploy: answers 200, but the brand keyword the monitor looks for is gone. */
 const BROKEN_PAGE =
   '<!doctype html><html lang="en"><head><title>Index of /</title></head><body><h1>Index of /</h1></body></html>\n';
-const PAGE = (mode: TargetMode, extra = '') =>
-  `<!doctype html><html lang="en"><head><title>Test target</title></head><body><h1>Test target</h1><p>Mode: ${mode}</p>${extra}</body></html>\n`;
+const PAGE = (mode: TargetMode, extra = '', title = 'Test target') =>
+  `<!doctype html><html lang="en"><head><title>${title}</title></head><body><h1>Test target</h1><p>Mode: ${mode}</p>${extra}</body></html>\n`;
 
 export async function handle({
   readMode,
@@ -112,6 +123,15 @@ export async function handle({
   }
   if (mode === 'deep-spam') {
     return new Response(PAGE(mode, `<!-- ${'x'.repeat(DEEP_SPAM_OFFSET)} -->${SPAM}`), {
+      status: 200,
+      headers: html,
+    });
+  }
+  if (mode === 'defaced-title') {
+    return new Response(PAGE(mode, '', DEFACED_TITLE), { status: 200, headers: html });
+  }
+  if (mode === 'injected-script') {
+    return new Response(PAGE(mode, `<!-- ${'x'.repeat(INJECTED_OFFSET)} -->${INJECTED_SCRIPT}`), {
       status: 200,
       headers: html,
     });

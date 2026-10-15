@@ -4,7 +4,10 @@ import { readEdgeConfigItem } from './edge-config';
 import {
   CLOAKED_REDIRECT,
   DEEP_SPAM_OFFSET,
+  DEFACED_TITLE,
   handle,
+  INJECTED_OFFSET,
+  INJECTED_SCRIPT,
   parseMode,
   SLOW_HOLD_MS,
   SPAM,
@@ -112,6 +115,23 @@ describe('handle', () => {
     await vi.advanceTimersByTimeAsync(TIMEOUT_HOLD_MS);
     expect((await pending).status).toBe(200);
     vi.useRealTimers();
+  });
+});
+
+describe('page-change modes (S09d, D-046)', () => {
+  it('defaced-title: everyone gets the changed title, the h1 keeps the brand, no shared-list phrase', async () => {
+    const body = await (
+      await handle({ readMode: async () => 'defaced-title', userAgent: 'DxT-Monitor/1.0' })
+    ).text();
+    expect(body).toContain(`<title>${DEFACED_TITLE}</title>`);
+    expect(body).toContain('<h1>Test target</h1>');
+    expect(body.includes(SPAM)).toBe(false);
+  });
+
+  it('injected-script: the new script domain sits at the end of a ~400 KB page', async () => {
+    const body = await (await handle({ readMode: async () => 'injected-script' })).text();
+    expect(body.indexOf(INJECTED_SCRIPT)).toBeGreaterThan(INJECTED_OFFSET);
+    expect(body).toContain('<title>Test target</title>');
   });
 });
 
