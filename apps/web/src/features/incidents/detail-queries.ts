@@ -679,7 +679,7 @@ async function pageChangeOf(
   // (D-046 item 5), and "held" counts the 30-min fetches since then (spec-check 15 Oct).
   const firstSeen = opened?.firstSeenAt ?? null;
   const live =
-    firstSeen && view.checkedAt && view.firstSeenAt && view.firstSeenAt > firstSeen
+    firstSeen && view.checkedAt && view.firstSeenAt && Date.parse(view.firstSeenAt) > Date.parse(firstSeen)
       ? {
           ...view,
           firstSeenAt: firstSeen,

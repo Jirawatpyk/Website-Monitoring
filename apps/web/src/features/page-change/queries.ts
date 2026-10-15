@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { FINGERPRINT_VIEW, pageFingerprintSchema } from '@dxt/shared';
+import { CLOSED_INCIDENT_STATES_IN, FINGERPRINT_VIEW, pageFingerprintSchema } from '@dxt/shared';
 import { ownDomains } from '@dxt/engine';
 import { buildPageChange, type BaselineRow, type PageChangeView, type PlainFetch } from './model';
 
@@ -47,7 +47,7 @@ export async function loadPageChange(
       .select('id, number, started_at')
       .eq('site_id', m.siteId)
       .eq('trigger', 'content_change')
-      .not('state', 'in', '("resolved","in_review","closed")')
+      .not('state', 'in', CLOSED_INCIDENT_STATES_IN)
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle(),

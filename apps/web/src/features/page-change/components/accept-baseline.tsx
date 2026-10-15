@@ -96,14 +96,17 @@ export function AcceptBaseline({
       const applies = new Date(result.appliesAt);
       const done = `Applied ${formatTimeWithSeconds(applies)}${nextFetchAt ? ` · next check ${formatTime(new Date(nextFetchAt))}` : ''}`;
       // §26.6: once the window closes the toast says it applied, with its own title.
+      // The page redraws too: nothing else tells it the window closed (page_baselines isn't in Realtime).
       const applied = setTimeout(
-        () =>
+        () => {
           toast.success(`Baseline updated — ${siteName} is OK on the next check`, {
             id: toastId,
             description: done,
             duration: 4000,
-          }),
-        Math.max(applies.getTime() - Date.now(), 0),
+          });
+          router.refresh();
+        },
+        Math.max(applies.getTime() - Date.now(), 0) + 500,
       );
       const onUndo = async () => {
         clearTimeout(applied);

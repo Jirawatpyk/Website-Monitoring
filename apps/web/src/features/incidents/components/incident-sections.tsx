@@ -25,6 +25,7 @@ import { GLYPH_LEGEND, GLYPHS } from '@/components/site-cells';
 import type { CheckCell, IncidentDetail } from '../detail-queries';
 import type { TimelineItem } from '../model';
 import { FlapRun } from './flap-run';
+import { PAGE_CHANGE_HOLD_FETCHES } from '@dxt/engine';
 
 /**
  * The incident page's display-only parts (Incident / MIncident boards): no state, no handlers, so the
@@ -65,7 +66,7 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
       caption: page
         ? page.newScript.length
           ? 'New script domain — raised on the first fetch'
-          : 'Held 3 fetches (1 h)'
+          : `Held ${PAGE_CHANGE_HOLD_FETCHES} fetches (1 h)`
         : `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
     },
     {
