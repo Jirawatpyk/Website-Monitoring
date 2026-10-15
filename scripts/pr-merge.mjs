@@ -40,7 +40,13 @@ export const DEPLOY_TIMEOUT_MS = 15 * 60_000;
  * that commit, newest first (a redeploy after a failure is newer); `migrate` is the
  * `migrate-production` check-run, if any.
  */
-export function deployVerdict({ deployments = [], migrate = null, elapsedMs }) {
+export function deployVerdict({
+  deployments = [],
+  migrate = null,
+  elapsedMs,
+  sha = null,
+  buildsWeb = false,
+}) {
   // migrate-production runs on every push to main (it needs `check` and `db`), so `skipped` means those
   // never passed — on 14 Oct GitHub didn't start them (billing) while Vercel deployed anyway, and this
   // said "production is live" with no migration run. Production counts only once the migration ran.
@@ -82,10 +88,44 @@ export function deployVerdict({ deployments = [], migrate = null, elapsedMs }) {
   if (latest?.state === 'ERROR') {
     return { kind: 'failed', why: `deployment ${latest.uid} failed — vercel inspect ${latest.url} --logs` };
   }
+  // A merge that changes the web app must deploy. On 15 Oct (#121) Vercel never started a build for the
+  // push to main, this said "skipped (agent- or docs-only?)", and production kept the deploy before.
+  if (buildsWeb && (latest?.state === 'CANCELED' || (!latest && elapsedMs >= NO_DEPLOY_AFTER_MS))) {
+    return {
+      kind: 'failed',
+      why: `it changes the web app, but Vercel ${latest ? 'cancelled the build' : 'never started a build for the push'}. Build it from git: ${gitDeployCommand(sha)}`,
+    };
+  }
   if (latest?.state === 'CANCELED') return { kind: 'none' };
   if (!latest && elapsedMs >= NO_DEPLOY_AFTER_MS) return { kind: 'none' };
   if (elapsedMs >= DEPLOY_TIMEOUT_MS) return { kind: 'failed', why: 'still not ready after 15 min' };
   return { kind: 'waiting' };
+}
+
+/** Files whose change rebuilds the web app on Vercel: the app, the workspace packages, the lockfile and root config. */
+export function buildsWeb(pr) {
+  return (pr.files ?? []).some((f) =>
+    /^(apps\/web\/|packages\/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$)/.test(
+      f.path,
+    ),
+  );
+}
+
+/** A production deployment of `sha` built by Vercel from GitHub, for a push Vercel missed. */
+export function gitDeployCommand(sha) {
+  const body = JSON.stringify({
+    name: VERCEL_PROJECT,
+    project: VERCEL_PROJECT,
+    target: 'production',
+    gitSource: {
+      type: 'github',
+      org: 'Jirawatpyk',
+      repo: 'Website-Monitoring',
+      ref: 'main',
+      sha: sha ?? '<merge sha>',
+    },
+  });
+  return `echo '${body}' > deploy.json && vercel api "/v13/deployments?teamId=${VERCEL_TEAM}" --method POST --input deploy.json`;
 }
 
 /** Runtime code (not tests) that a deploy starts before its migrations are applied. */
@@ -166,7 +206,7 @@ export function vercelDeployments(sha) {
 }
 
 /** Polls until production is ready, failed, or (no deployment at all) skipped. */
-async function waitForProduction(number) {
+async function waitForProduction(number, web) {
   const sha = json(['pr', 'view', number, '--json', 'mergeCommit']).mergeCommit?.oid;
   if (!sha) {
     console.error('pr:merge — merged, but GitHub has no merge commit yet; check production by hand.');
@@ -193,6 +233,8 @@ async function waitForProduction(number) {
       deployments,
       migrate: runs.check_runs?.[0] ?? null,
       elapsedMs: Date.now() - started,
+      sha,
+      buildsWeb: web,
     });
     if (v.kind === 'ready') return console.info(`pr:merge — production is live: ${v.url}`);
     if (v.kind === 'none') {
@@ -202,7 +244,8 @@ async function waitForProduction(number) {
     }
     if (v.kind === 'failed') {
       console.error(`pr:merge — merged, but production did NOT deploy: ${v.why}`);
-      console.error('  Redeploy: vercel --scope <team> redeploy <deployment url> --target production');
+      if (!/Build it from git/.test(v.why))
+        console.error('  Redeploy: vercel --scope <team> redeploy <deployment url> --target production');
       process.exit(1);
     }
     await new Promise((r) => setTimeout(r, 15_000));
@@ -235,7 +278,7 @@ async function main() {
 
   console.info(`pr:merge — squash-merging #${pr.number} "${pr.title}" at ${pr.headRefOid.slice(0, 7)}`);
   gh(['pr', 'merge', number, '--squash', '--match-head-commit', pr.headRefOid], { stdio: 'inherit' });
-  if (!flags.includes(NO_WAIT_FLAG)) await waitForProduction(number);
+  if (!flags.includes(NO_WAIT_FLAG)) await waitForProduction(number, buildsWeb(pr));
 }
 
 if (process.argv[1] && path.basename(process.argv[1]) === 'pr-merge.mjs') await main();
