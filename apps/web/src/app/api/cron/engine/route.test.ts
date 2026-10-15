@@ -33,7 +33,10 @@ describe('GET /api/cron/engine', () => {
     const { GET } = await import('./route');
     const res = await GET(call(`Bearer ${TEST_ENV.CRON_SECRET}`));
     expect(res.status).toBe(200);
-    expect(mocks.runEngine).toHaveBeenCalledWith('db', expect.any(Date), { defacementAlerts: false });
+    expect(mocks.runEngine).toHaveBeenCalledWith('db', expect.any(Date), {
+      defacementAlerts: false,
+      pageChangeAlerts: false,
+    });
     expect(await res.json()).toMatchObject({ job: 'engine', ok: true, monitors: 1 });
   });
 

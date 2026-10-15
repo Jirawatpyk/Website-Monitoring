@@ -7,7 +7,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Database, DbClient } from '@dxt/db';
+import type { Database, DbClient, Json } from '@dxt/db';
 import { runEngine } from './engine/run-engine';
 import { engineAfterReport } from './engine/engine-and-deliver';
 import { storeBangkokResults } from './ingest/bangkok';
@@ -688,6 +688,58 @@ describe('PROBLEM triggers and status rules (S04a Done-when 1, 2)', () => {
     await results(booking, okRound(60));
     expect(await runEngine(db, t(125))).toMatchObject({ recovered: 1 });
     expect((await notificationsOf(incident!.id)).map((n) => n.template)).toEqual(['problem', 'recovered']);
+  });
+});
+
+describe('page change (S09d Done-when 1, D-046)', () => {
+  const BASE = { title: 'Site', h1: 'Welcome', scripts: ['static-cdn.example'], links: [] as string[] };
+  async function plainFetch(monitorId: string, at: Date, fingerprint: Json): Promise<string> {
+    const row = await must(
+      db
+        .from('crawler_checks')
+        .insert({
+          monitor_id: monitorId,
+          view: 'plain',
+          checked_at: at.toISOString(),
+          outcome: 'pass',
+          usable: true,
+          status_code: 200,
+          scan_complete: true,
+          fingerprint,
+        })
+        .select('id')
+        .single(),
+    );
+    return row.id;
+  }
+
+  it('the first plain fetch becomes the baseline; an injected script opens PROBLEM · Page change, a match recovers it', async () => {
+    const { siteId, monitorId } = await newSite('Page change');
+    const first = await plainFetch(monitorId, t(-3600), BASE);
+    expect(await must(db.rpc('crawler_set_baseline', { p_check_id: first }))).toBe(true);
+    // Recording is over for this test (the record starts at the first baseline).
+    await db
+      .from('page_baselines')
+      .update({ first_set_at: new Date(Date.now() - 15 * 86_400_000).toISOString() })
+      .eq('monitor_id', monitorId);
+    await plainFetch(monitorId, t(-60), { ...BASE, scripts: ['static-cdn.example', 'evil-cdn.example'] });
+    await results(monitorId, okRound());
+
+    expect(await runEngine(db, t(65), { pageChangeAlerts: true })).toMatchObject({ problems: 1 });
+    const [incident] = await must(db.from('incidents').select('id, trigger, severity').eq('site_id', siteId));
+    expect(incident).toMatchObject({ trigger: 'content_change', severity: 'problem' });
+    expect(
+      await must(db.from('monitor_status').select('status, trigger, cause').eq('monitor_id', monitorId)),
+    ).toEqual([
+      { status: 'problem', trigger: 'content_change', cause: '/ · new script domain evil-cdn.example' },
+    ]);
+
+    // The client takes the script out: the next plain fetch matches the baseline.
+    await plainFetch(monitorId, t(61), BASE);
+    await results(monitorId, okRound(60));
+    expect(await runEngine(db, t(125), { pageChangeAlerts: true })).toMatchObject({ recovered: 1 });
+    await db.from('page_baselines').delete().eq('monitor_id', monitorId);
+    await db.from('crawler_checks').delete().eq('monitor_id', monitorId);
   });
 });
 

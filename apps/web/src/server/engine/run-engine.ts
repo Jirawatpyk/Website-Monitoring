@@ -2,6 +2,11 @@ import 'server-only';
 import type { DbClient, Json } from '@dxt/db';
 import {
   crawlerIssue,
+  isRecording,
+  ownDomains,
+  pageChangeState,
+  type PageChangeInput,
+  type PageFact,
   latestPerView,
   decideSite,
   problemHoldUntil,
@@ -31,6 +36,7 @@ import {
 } from '@dxt/notifier';
 import {
   CRAWLER_LABELS,
+  pageFingerprintSchema,
   isForbiddenPhrase,
   TIER_CONFIG,
   type CrawlerView,
@@ -131,11 +137,18 @@ export interface EngineSummary extends CronJobResult {
    * didn't act on, e.g. `Site A · “บาคาร่า” (BKK, SIN)` or `Site A · → casino.example (from Google search)`.
    */
   defacementHeld?: string[];
+  /**
+   * D-046: page changes that would raise a PROBLEM but don't — PAGE_CHANGE_ALERTS off, or the site still
+   * in its 14-day recording — e.g. `Site A · new script domain evil-cdn.example`, `Site A · title (held 3)`.
+   */
+  pageChangeHeld?: string[];
 }
 
 export interface EngineOptions {
   /** D-042 (env DEFACEMENT_ALERTS): shared-list hits and crawler views raise PROBLEM; off logs them. */
   defacementAlerts?: boolean;
+  /** D-046 (env PAGE_CHANGE_ALERTS): page changes raise PROBLEM · Page change; off logs them. */
+  pageChangeAlerts?: boolean;
 }
 
 /**
@@ -148,7 +161,7 @@ export interface EngineOptions {
 export async function runEngine(
   db: DbClient,
   now: Date = new Date(),
-  { defacementAlerts = false }: EngineOptions = {},
+  { defacementAlerts = false, pageChangeAlerts = false }: EngineOptions = {},
 ): Promise<EngineSummary> {
   const summary: EngineSummary = {
     ok: true,
@@ -217,6 +230,9 @@ export async function runEngine(
     loadVerifierState(db, since, now),
     loadCrawler(db, now),
   ]);
+  const pages = await loadPageChange(db, now);
+  /** D-046: page changes held back (alerts off, or recording), logged instead of acted on. */
+  const pageHeld = new Set<string>();
   for (const r of [statuses, carries, incidents]) if (r.error) throw new Error(r.error.message);
   /** D-042: with alerts off, what the shared list and the crawler found, logged instead of acted on. */
   const held = new Map<string, Set<string>>();
@@ -298,6 +314,29 @@ export async function runEngine(
     }
     return undefined;
   };
+  /**
+   * The primary's page-change facts (D-046): passed to the engine when PAGE_CHANGE_ALERTS is on, else
+   * dropped. A change that would alert — with the switch off, or in the site's recording — is logged for
+   * the runs just after its fetch (Done-when 3's record).
+   */
+  const pageChangeFor = (site: SiteRow, m: MonitorRow): PageChangeInput | undefined => {
+    const input = m.isPrimary ? pages.get(m.id) : undefined;
+    if (!input) return undefined;
+    const state = pageChangeState(input, {
+      now,
+      own: ownDomains(m.url, m.allowedRedirectDomains),
+      open: false,
+    });
+    const fresh =
+      state.kind === 'differs' && state.fact.checkedAt.getTime() >= now.getTime() - CRAWLER_LOG_WINDOW_MS;
+    if (state.kind === 'differs' && state.alert && fresh && (!pageChangeAlerts || isRecording(input, now))) {
+      const what = state.diff.newScriptDomains.length
+        ? `new script domain ${state.diff.newScriptDomains.join(', ')}`
+        : `${state.diff.rows.map((r) => r.field).join(', ')} (held ${state.held})`;
+      pageHeld.add(`${site.name} · ${what}${pageChangeAlerts ? ' · recording' : ''}`);
+    }
+    return pageChangeAlerts ? input : undefined;
+  };
 
   // D-028: the BKK probe's control check (D-027) over the window's Bangkok checks.
   // Either VPS check failing counts: both control URLs, or the Akamai control (D-027 rule 2b) —
@@ -365,6 +404,7 @@ export async function runEngine(
   if (held.size) {
     summary.defacementHeld = [...held].map(([line, where]) => `${line} (${[...where].sort().join(', ')})`);
   }
+  if (pageHeld.size) summary.pageChangeHeld = [...pageHeld].sort();
   // `ok: false` fails the Healthchecks ping (cron-job.ts), while what the other sites queued is
   // still sent at once (engine-and-deliver.ts reads the counts).
   if (failures.length) return { ...summary, ok: false, failures };
@@ -425,6 +465,7 @@ export async function runEngine(
         carry: carryOf(carryByMonitor.get(m.id)),
         ...(verifier.jobs.get(m.id) ? { verifications: verifier.jobs.get(m.id)! } : {}),
         ...withCrawler(crawlerFor(site, m)),
+        ...withPageChange(pageChangeFor(site, m)),
       })),
       verifierAvailable: verifier.available,
       behindWaf: site.behindWaf,
@@ -523,6 +564,49 @@ async function loadLocations(db: DbClient, now: Date): Promise<ProbeLocation[]> 
 type CheckRow = Awaited<ReturnType<typeof loadChecks>>[number];
 
 const withCrawler = (crawler: readonly CrawlerFact[] | undefined) => (crawler?.length ? { crawler } : {});
+const withPageChange = (pageChange: PageChangeInput | undefined) => (pageChange ? { pageChange } : {});
+
+/**
+ * Each live primary monitor's baseline and newest plain fetches (D-046, `engine_page_fingerprints`):
+ * hashes always, fingerprints only where they differ from the baseline. A failed read never holds the
+ * run back: the round is judged without it (an open Page change PROBLEM then holds nothing — the next
+ * run reads it again).
+ */
+async function loadPageChange(db: DbClient, now: Date): Promise<Map<string, PageChangeInput>> {
+  const byMonitor = new Map<string, PageChangeInput>();
+  const { data, error } = await db.rpc('engine_page_fingerprints', {
+    p_now: now.toISOString(),
+    p_since: new Date(now.getTime() - CRAWLER_HOLD_MS).toISOString(),
+  });
+  if (error) {
+    console.error(JSON.stringify({ event: 'engine_page_fingerprints_failed', error: error.message }));
+    return byMonitor;
+  }
+  const fingerprint = (v: unknown) => (v && typeof v === 'object' ? pageFingerprintSchema.parse(v) : null);
+  for (const r of data ?? []) {
+    const facts = (Array.isArray(r.facts) ? r.facts : []).flatMap((f): PageFact[] => {
+      const v = f as { id?: unknown; checked_at?: unknown; hash?: unknown; fingerprint?: unknown };
+      if (typeof v.id !== 'string' || typeof v.checked_at !== 'string' || typeof v.hash !== 'string')
+        return [];
+      return [
+        {
+          id: v.id,
+          checkedAt: new Date(v.checked_at),
+          hash: v.hash,
+          fingerprint: fingerprint(v.fingerprint),
+        },
+      ];
+    });
+    byMonitor.set(r.monitor_id, {
+      baselineHash: r.baseline_hash,
+      baseline: fingerprint(r.baseline),
+      pendingUntil: r.pending_until ? new Date(r.pending_until) : null,
+      firstSetAt: new Date(r.first_set_at),
+      facts,
+    });
+  }
+  return byMonitor;
+}
 const viewLabel = (view: CrawlerView | undefined) => (view ? CRAWLER_LABELS[view] : 'crawler');
 
 /**
