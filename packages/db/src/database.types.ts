@@ -27,6 +27,7 @@ export type Database = {
                   Row: {
                     "created_at": string,"info": NonNullable<Json>,"last_seen_at": string,"name": string,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"info"?: NonNullable<Json>,"last_seen_at": string,"name": string,"updated_at"?: string
                   }
@@ -40,6 +41,7 @@ export type Database = {
                   Row: {
                     "action": string,"actor_id": string | null,"after": Json | null,"at": string,"before": Json | null,"entity": string,"entity_id": string | null,"id": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "action": string,"actor_id"?: string | null,"after"?: Json | null,"at"?: string,"before"?: Json | null,"entity": string,"entity_id"?: string | null,"id"?: string
                   }
@@ -59,6 +61,7 @@ isOneToOne: false
                   Row: {
                     "akamai_ok": boolean | null,"attempt": number,"checked_at": string,"control_ok": boolean | null,"created_at": string,"error": string | null,"final_url": string | null,"id": string,"keyword_forbidden": (string)[] | null,"keyword_missing": (string)[] | null,"location": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"resolved_ip": unknown,"response_ms": number | null,"status_code": number | null,"ttfb_ms": number | null,"waf": string | null
                   }
+                  ComputedFields: never
                   Insert: {
                     "akamai_ok"?: boolean | null,"attempt"?: number,"checked_at": string,"control_ok"?: boolean | null,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"id"?: string,"keyword_forbidden"?: (string)[] | null,"keyword_missing"?: (string)[] | null,"location": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"resolved_ip"?: unknown,"response_ms"?: number | null,"status_code"?: number | null,"ttfb_ms"?: number | null,"waf"?: string | null
                   }
@@ -84,6 +87,7 @@ isOneToOne: false
                   Row: {
                     "blocked": number,"bucket": Database["public"]['Enums']["rollup_bucket"],"bucket_start": string,"checks": number,"created_at": string,"hard_fails": number,"id": string,"location": string | null,"monitor_id": string,"p50_ms": number | null,"p95_ms": number | null,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "blocked": number,"bucket": Database["public"]['Enums']["rollup_bucket"],"bucket_start": string,"checks": number,"created_at"?: string,"hard_fails": number,"id"?: string,"location"?: string | null,"monitor_id": string,"p50_ms"?: number | null,"p95_ms"?: number | null,"updated_at"?: string
                   }
@@ -109,6 +113,7 @@ isOneToOne: false
                   Row: {
                     "am_user_id": string | null,"contact_email": string | null,"created_at": string,"id": string,"is_internal": boolean,"language": string,"name": string,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "am_user_id"?: string | null,"contact_email"?: string | null,"created_at"?: string,"id"?: string,"is_internal"?: boolean,"language"?: string,"name": string,"updated_at"?: string
                   }
@@ -128,6 +133,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"day": string,"id": string,"name": string,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"day": string,"id"?: string,"name": string,"updated_at"?: string
                   }
@@ -141,6 +147,7 @@ isOneToOne: false
                   Row: {
                     "checked_at": string,"created_at": string,"error": string | null,"final_url": string | null,"forbidden": (string)[] | null,"id": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms": number | null,"scan_complete": boolean | null,"status_code": number | null,"updated_at": string,"usable": boolean,"view": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "checked_at": string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable": boolean,"view": string
                   }
@@ -160,6 +167,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"id": string,"severity": Database["public"]['Enums']["severity"],"tier": number | null,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"id"?: string,"severity": Database["public"]['Enums']["severity"],"tier"?: number | null,"updated_at"?: string
                   }
@@ -173,6 +181,7 @@ isOneToOne: false
                   Row: {
                     "channels": (string)[],"created_at": string,"delay_min": number,"id": string,"level": number,"policy_id": string,"targets": (string)[],"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "channels": (string)[],"created_at"?: string,"delay_min": number,"id"?: string,"level": number,"policy_id": string,"targets": (string)[],"updated_at"?: string
                   }
@@ -192,6 +201,7 @@ isOneToOne: false
                   Row: {
                     "actor_id": string | null,"at": string,"id": string,"incident_id": string,"payload": NonNullable<Json>,"type": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "actor_id"?: string | null,"at"?: string,"id"?: string,"incident_id": string,"payload"?: NonNullable<Json>,"type": string
                   }
@@ -217,6 +227,7 @@ isOneToOne: false
                   Row: {
                     "acked_at": string | null,"acked_by": string | null,"alerted_at": string | null,"auto_resolved": boolean,"client_update_due_at": string | null,"client_update_note": string | null,"client_update_required": boolean,"client_updated_at": string | null,"client_updated_by": string | null,"created_at": string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level": number,"escalation_plan": Json | null,"id": string,"is_flapping": boolean,"is_manual": boolean,"monitor_id": string | null,"number": number,"recovered_at": string | null,"resolved_at": string | null,"resolved_by": string | null,"review_state": string | null,"root_cause": string | null,"root_cause_category": string | null,"root_cause_fix": string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state": Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "acked_at"?: string | null,"acked_by"?: string | null,"alerted_at"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state"?: Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
                   }
@@ -260,6 +271,7 @@ isOneToOne: false
                   Row: {
                     "approved_at": string | null,"approved_by": string | null,"cancelled_at": string | null,"created_at": string,"created_by": string | null,"end_logged": boolean,"end_reason": string | null,"ended_at": string | null,"ended_by": string | null,"ends_at": string,"id": string,"kind": string,"log": NonNullable<Json>,"outcome": string | null,"outcome_detail": string | null,"reason": string,"reminded_12h_at": string | null,"reminded_1h_at": string | null,"rrule": string | null,"site_id": string,"start_logged": boolean,"starts_at": string,"undo_action": string | null,"undo_before": Json | null,"undo_by": string | null,"undo_key": string | null,"undo_until": string | null,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_logged"?: boolean,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"ends_at": string,"id"?: string,"kind": string,"log"?: NonNullable<Json>,"outcome"?: string | null,"outcome_detail"?: string | null,"reason": string,"reminded_12h_at"?: string | null,"reminded_1h_at"?: string | null,"rrule"?: string | null,"site_id": string,"start_logged"?: boolean,"starts_at": string,"undo_action"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_key"?: string | null,"undo_until"?: string | null,"updated_at"?: string
                   }
@@ -303,6 +315,7 @@ isOneToOne: false
                   Row: {
                     "cause": string | null,"created_at": string,"failing_since": NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds": number,"status": Database["public"]['Enums']["site_state"],"trigger": Database["public"]['Enums']["incident_trigger"] | null,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "cause"?: string | null,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
                   }
@@ -328,6 +341,7 @@ isOneToOne: false
                   Row: {
                     "allowed_redirect_domains": (string)[],"created_at": string,"enabled": boolean,"expected_status": number,"headers": NonNullable<Json>,"id": string,"is_primary": boolean,"method": string,"must_contain": (string)[],"must_not_contain": (string)[],"removed_at": string | null,"site_id": string,"thresholds": NonNullable<Json>,"timeout_ms": number,"type": Database["public"]['Enums']["monitor_type"],"updated_at": string,"url": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "allowed_redirect_domains"?: (string)[],"created_at"?: string,"enabled"?: boolean,"expected_status"?: number,"headers"?: NonNullable<Json>,"id"?: string,"is_primary"?: boolean,"method"?: string,"must_contain"?: (string)[],"must_not_contain"?: (string)[],"removed_at"?: string | null,"site_id": string,"thresholds"?: NonNullable<Json>,"timeout_ms"?: number,"type": Database["public"]['Enums']["monitor_type"],"updated_at"?: string,"url": string
                   }
@@ -347,6 +361,7 @@ isOneToOne: false
                   Row: {
                     "at": string,"attempt": number,"error": string | null,"id": string,"notification_id": string,"ok": boolean,"provider_message_id": string | null
                   }
+                  ComputedFields: never
                   Insert: {
                     "at"?: string,"attempt": number,"error"?: string | null,"id"?: string,"notification_id": string,"ok": boolean,"provider_message_id"?: string | null
                   }
@@ -366,6 +381,7 @@ isOneToOne: false
                   Row: {
                     "attempts": number,"channel": Database["public"]['Enums']["notification_channel"],"context": NonNullable<Json>,"created_at": string,"dedupe_key": string,"error": string | null,"hold_until": string | null,"id": string,"incident_id": string | null,"maintenance_window_id": string | null,"next_retry_at": string | null,"provider_message_id": string | null,"sent_at": string | null,"status": Database["public"]['Enums']["notification_status"],"system_alert_id": string | null,"template": string,"thread_key": string | null,"updated_at": string,"user_id": string | null
                   }
+                  ComputedFields: never
                   Insert: {
                     "attempts"?: number,"channel": Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"maintenance_window_id"?: string | null,"next_retry_at"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template": string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
@@ -403,6 +419,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"down_reminder_min": number,"id": string,"problem_reminder_min": number,"response_days": (number)[],"response_end": string,"response_start": string,"singleton": boolean,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"down_reminder_min"?: number,"id"?: string,"problem_reminder_min"?: number,"response_days"?: (number)[],"response_end"?: string,"response_start"?: string,"singleton"?: boolean,"updated_at"?: string
                   }
@@ -416,6 +433,7 @@ isOneToOne: false
                   Row: {
                     "code": string,"created_at": string,"is_active": boolean,"last_heartbeat_at": string | null,"provider": string,"region": string,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "code": string,"created_at"?: string,"is_active"?: boolean,"last_heartbeat_at"?: string | null,"provider": string,"region": string,"updated_at"?: string
                   }
@@ -429,6 +447,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"display_name": string,"email": string,"google_chat_user_id": string | null,"id": string,"is_active": boolean,"notify_email": boolean,"phone": string | null,"role": Database["public"]['Enums']["app_role"],"timezone": string,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"display_name": string,"email": string,"google_chat_user_id"?: string | null,"id": string,"is_active"?: boolean,"notify_email"?: boolean,"phone"?: string | null,"role": Database["public"]['Enums']["app_role"],"timezone"?: string,"updated_at"?: string
                   }
@@ -442,6 +461,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"flip_ok": boolean | null,"flips": (string)[],"last_evaluated_at": string | null,"last_round_at": string | null,"note": string | null,"ok_rounds": number,"since": string,"site_id": string,"status": Database["public"]['Enums']["site_state"],"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"flip_ok"?: boolean | null,"flips"?: (string)[],"last_evaluated_at"?: string | null,"last_round_at"?: string | null,"note"?: string | null,"ok_rounds"?: number,"since"?: string,"site_id": string,"status"?: Database["public"]['Enums']["site_state"],"updated_at"?: string
                   }
@@ -461,6 +481,7 @@ isOneToOne: true
                   Row: {
                     "backup_owner_id": string | null,"behind_waf": boolean,"client_id": string,"created_at": string,"credential_ref": string | null,"hosting": string | null,"id": string,"is_active": boolean,"monitoring_started_at": string | null,"mute_reason": string | null,"muted_at": string | null,"muted_until": string | null,"name": string,"notes": string | null,"primary_owner_id": string | null,"tier": number,"updated_at": string,"waf_allowlist_confirmed": boolean
                   }
+                  ComputedFields: never
                   Insert: {
                     "backup_owner_id"?: string | null,"behind_waf"?: boolean,"client_id": string,"created_at"?: string,"credential_ref"?: string | null,"hosting"?: string | null,"id"?: string,"is_active"?: boolean,"monitoring_started_at"?: string | null,"mute_reason"?: string | null,"muted_at"?: string | null,"muted_until"?: string | null,"name": string,"notes"?: string | null,"primary_owner_id"?: string | null,"tier": number,"updated_at"?: string,"waf_allowlist_confirmed"?: boolean
                   }
@@ -492,6 +513,7 @@ isOneToOne: false
                   Row: {
                     "cleared_at": string | null,"context": NonNullable<Json>,"created_at": string,"id": string,"kind": string,"opened_at": string,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "cleared_at"?: string | null,"context"?: NonNullable<Json>,"created_at"?: string,"id"?: string,"kind": string,"opened_at"?: string,"updated_at"?: string
                   }
@@ -505,6 +527,7 @@ isOneToOne: false
                   Row: {
                     "attempts": number,"completed_at": string | null,"created_at": string,"detail": string | null,"http_status": number | null,"id": string,"incident_id": string | null,"kind": string,"lease_until": string | null,"monitor_id": string,"must_contain": (string)[],"result": string | null,"round_at": string | null,"screenshot_path": string | null,"site_id": string,"status": string,"updated_at": string,"url": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "attempts"?: number,"completed_at"?: string | null,"created_at"?: string,"detail"?: string | null,"http_status"?: number | null,"id"?: string,"incident_id"?: string | null,"kind": string,"lease_until"?: string | null,"monitor_id": string,"must_contain"?: (string)[],"result"?: string | null,"round_at"?: string | null,"screenshot_path"?: string | null,"site_id": string,"status"?: string,"updated_at"?: string,"url": string
                   }
@@ -881,7 +904,7 @@ isOneToOne: false
 { Args: { "p_site": Json,"p_site_id": string }; Returns: undefined
                            },
 "window_state":
-{ Args: { "p_at"?: string,"w": Database["public"]['Tables']["maintenance_windows"]['Row'] }; Returns: string
+{ Args: { "p_at"?: string,"w": Omit<Database["public"]['Tables']["maintenance_windows"]['Row'], Database["public"]['Tables']["maintenance_windows"]['ComputedFields']> }; Returns: string
                            },
 "withdraw_request":
 { Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
