@@ -7,3 +7,4 @@ export * from './sites';
 export * from './tls';
 export * from './escalation';
 export * from './forbidden';
+export * from './fingerprint';

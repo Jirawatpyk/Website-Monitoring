@@ -4,9 +4,11 @@ import {
   MAX_FORBIDDEN_PHRASE_LENGTH,
   PROBE_USER_AGENT,
   type CheckOutcome,
+  type PageFingerprint,
   type WafVendor,
 } from '@dxt/shared';
 import { classifyResponse, wafSignature } from './classify';
+import { fingerprintBuilder } from './fingerprint';
 import { Agent, fetch, type Response } from 'undici';
 import {
   assertPublicUrl,
@@ -45,6 +47,8 @@ export interface HttpCheckRequest {
    * everything up to KEYWORD_SCAN_BYTES, not only the sample — injected links sit at the end of <body>.
    */
   scanWholeBody?: boolean;
+  /** The crawler's plain view (S09d, D-046): build the page's fingerprint from what it reads. */
+  fingerprint?: boolean;
 }
 
 export interface HttpCheckResult {
@@ -66,6 +70,8 @@ export interface HttpCheckResult {
   waf: WafVendor | null;
   /** With `scanWholeBody`: the body was read to its end or to KEYWORD_SCAN_BYTES, not broken off. */
   scanComplete?: boolean;
+  /** With `fingerprint`, on a passing GET read to its end (or the 3 MB cap): the page's fingerprint. */
+  fingerprint?: PageFingerprint;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -101,15 +107,19 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
   try {
     const { res, url } = await fetchFollowing(req, agent);
     const ttfbMs = Math.round(performance.now() - started);
+    const builder = req.fingerprint && keywords ? fingerprintBuilder(url.href) : null;
     const { bodySample, missing, sampleAt, forbidden, complete } = await readBody(
       res,
       KEYWORD_BODY_BYTES,
       keywords ? mustContain : [],
-      keywords && req.scanWholeBody ? mustNotContain : null,
+      keywords && (req.scanWholeBody || builder) ? mustNotContain : null,
+      builder ? (text) => builder.write(text) : undefined,
     );
     const snapshot = { status: res.status, headers: res.headers, bodySample };
     const outcome = classifyResponse(snapshot);
     const checked = keywords && outcome === 'pass';
+    // A page read only in part has no say about its tail, where injected scripts sit (D-046).
+    const fingerprint = builder && checked && complete ? builder.end() : undefined;
     return {
       outcome,
       statusCode: res.status,
@@ -122,7 +132,8 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       keywordMissing: checked && missing ? capped(missing) : null,
       keywordForbidden: checked ? capped(forbidden ?? forbiddenIn(bodySample, mustNotContain)) : null,
       waf: outcome === 'blocked' ? wafSignature(snapshot) : null,
-      ...(req.scanWholeBody ? { scanComplete: complete } : {}),
+      ...(req.scanWholeBody || builder ? { scanComplete: complete } : {}),
+      ...(fingerprint ? { fingerprint } : {}),
     };
   } catch (err) {
     // DNS, TLS, refused connection and timeout all land here: a hard fail.
@@ -240,6 +251,8 @@ async function readBody(
   sampleLimit: number,
   mustContain: readonly string[],
   scanForbidden: readonly string[] | null,
+  /** Gets every decoded piece of text, in order (the fingerprint builder). */
+  onText?: (text: string) => void,
 ): Promise<{
   bodySample: string;
   missing: string[] | null;
@@ -272,6 +285,7 @@ async function readBody(
   let size = 0;
   let done = false;
   const take = (text: string) => {
+    onText?.(text);
     if (sample.length < sampleLimit) sample += text.slice(0, sampleLimit - sample.length);
     if (pending.length > 0) {
       const window = tail + text;
