@@ -15,6 +15,20 @@ const booking: ProblemCauseContext = {
   isPrimary: false,
 };
 const ALL = ['BKK', 'SIN', 'TYO'] as const;
+/** A Page change detail (S09d): made-up INC-0157 values, spec §26. */
+const pageChange = (
+  d: Partial<Extract<ProblemDetail, { kind: 'content_change' }>>,
+): Extract<ProblemDetail, { kind: 'content_change' }> => ({
+  kind: 'content_change',
+  path: '/',
+  changes: [],
+  newScriptDomains: [],
+  firstSeenAt: '2026-09-25T02:30:14Z',
+  held: 3,
+  checkId: 'c1',
+  checkedAt: '2026-09-25T03:00:14Z',
+  ...d,
+});
 
 describe('formatProblemCause / formatProblemSummary (D-022)', () => {
   it.each<[string, ProblemDetail, ProblemCauseContext, string, string]>([
@@ -87,6 +101,46 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
       home,
       '/ → casino.example.net · not in this site’s allowlist (from Google search)',
       'redirects to casino.example.net (from Google search)',
+    ],
+    [
+      'INC-0157 page change: a new script domain (spec §26.9)',
+      pageChange({
+        changes: [
+          { field: 'title', was: 'Bangkok Airways – Taiwan', now: 'Bangkok Airways – Taiwan | สล็อตออนไลน์' },
+          { field: 'scripts', added: ['evil-cdn.example'], removed: [] },
+        ],
+        newScriptDomains: ['evil-cdn.example'],
+      }),
+      home,
+      '/ · new script domain evil-cdn.example',
+      'new script domain evil-cdn.example',
+    ],
+    [
+      'INC-0157 page change: the title, a shared start shortened (spec §26.9)',
+      pageChange({
+        changes: [
+          { field: 'title', was: 'Bangkok Airways – Taiwan', now: 'Bangkok Airways – Taiwan | สล็อตออนไลน์' },
+        ],
+      }),
+      home,
+      '/ · title “Bangkok Airways – Taiwan” → “… | สล็อตออนไลน์”',
+      'page changed',
+    ],
+    [
+      'a page change: new link domains only',
+      pageChange({
+        changes: [{ field: 'links', added: ['casino.example', 'slotxo.example'], removed: ['old.example'] }],
+      }),
+      home,
+      '/ · new link domains casino.example, slotxo.example',
+      'page changed',
+    ],
+    [
+      'a page change: a robots tag added, markup stripped',
+      pageChange({ changes: [{ field: 'robots', was: null, now: 'noindex <b>' }] }),
+      home,
+      '/ · robots (none) → “noindex b”',
+      'page changed',
     ],
     [
       'INC-0138 Tubtong blocked, verifier unavailable',

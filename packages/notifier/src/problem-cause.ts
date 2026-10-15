@@ -99,6 +99,8 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
             ? 'BKK network check failed, not verified'
             : 'browser verifier unavailable'
       }`;
+    case 'content_change':
+      return `${d.path} · ${pageChange(d)}`;
   }
 }
 
@@ -129,6 +131,10 @@ function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
       if (d.reason === 'control_failed')
         return 'blocked by bot protection, not verified (BKK network check failed)';
       return 'blocked by bot protection, not verified';
+    case 'content_change':
+      return d.newScriptDomains.length
+        ? `new script domain ${plain(d.newScriptDomains[0]!)}`
+        : 'page changed';
   }
 }
 
@@ -166,4 +172,41 @@ function quoted(texts: readonly string[]): string {
 /** "Timeout > 30 s" reads "timeout > 30 s" inside the brackets; "HTTP 500", "DNS error" stay. */
 function lowerFirst(text: string): string {
   return /^(HTTP|DNS|TLS)\b/.test(text) ? text : text.charAt(0).toLowerCase() + text.slice(1);
+}
+/** How a Page change cause names a text field (spec §26.9: `title "…" → "…"`). */
+const PAGE_FIELD_WORDS: Record<string, string> = {
+  title: "title",
+  description: "description",
+  robots: "robots",
+  canonical: "canonical",
+  h1: "h1",
+};
+
+/**
+ * Spec §26.9: `new script domain evil-cdn.example`, else the first changed text field
+ * `title “Bangkok Airways – Taiwan” → “… | สล็อตออนไลน์”` (a shared start reads "…"), else the new
+ * link domains.
+ */
+function pageChange(
+  d: Extract<ProblemDetail, { kind: "content_change" }>,
+): string {
+  if (d.newScriptDomains.length) {
+    const more =
+      d.newScriptDomains.length > 1
+        ? ` (+${d.newScriptDomains.length - 1} more)`
+        : "";
+    return `new script domain ${plain(d.newScriptDomains[0]!)}${more}`;
+  }
+  const text = d.changes.find((c) => c.field in PAGE_FIELD_WORDS);
+  if (text) {
+    const was = text.was ?? "";
+    const now = text.now ?? "";
+    const shown =
+      was && now.startsWith(was) && now.length > was.length
+        ? `…${now.slice(was.length)}`
+        : now;
+    return `${PAGE_FIELD_WORDS[text.field]} ${was ? quoted([was]) : "(none)"} → ${shown ? quoted([shown]) : "(none)"}`;
+  }
+  const links = d.changes.find((c) => c.field === "links")?.added ?? [];
+  return `new link domain${links.length === 1 ? "" : "s"} ${links.map(plain).join(", ")}`;
 }

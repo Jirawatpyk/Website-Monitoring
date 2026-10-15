@@ -25,6 +25,14 @@ import {
 } from './monitor';
 import { abstainsOnWafSite, bkkUntrusted, BLOCKED_NOTE, confirmsDown, evaluateRound, wafNote } from './round';
 import {
+  isRecording,
+  ownDomains,
+  pageChangeDetail,
+  pageChangeState,
+  type PageChangeInput,
+  type PageChangeState,
+} from './page-change';
+import {
   crawlerIssue,
   keywordIssue,
   latestPerView,
@@ -92,6 +100,8 @@ export interface SiteMonitor {
    * freshness window. A round counts a fetch made before the round ended.
    */
   crawler?: readonly CrawlerFact[];
+  /** The primary's page-change facts (S09d, D-046): its baseline and newest plain fetches. */
+  pageChange?: PageChangeInput;
 }
 
 export interface SiteSnapshot {
@@ -496,6 +506,10 @@ function judgeSiteRound(
 function crawlerClearedAt(s: SiteSnapshot, roundAt: Date): Date | null {
   const m = s.monitors.find((x) => x.isPrimary);
   if (!m || m.carry.status !== 'problem') return null;
+  if (m.carry.trigger === 'content_change') {
+    const page = pageStateOf(m, s);
+    return page?.kind === 'matches' ? page.at : null;
+  }
   if (m.carry.trigger !== 'keyword' && m.carry.trigger !== 'redirect') return null;
   const fresh = crawlerFacts(m, s, roundAt).fresh;
   return fresh.length ? new Date(Math.max(...fresh.map((f) => f.checkedAt.getTime()))) : null;
@@ -774,7 +788,17 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
     const next = { slowRounds, failingSince };
     const crawler = crawlerFacts(m, s, roundAt);
-    const issue = problemOf(m, counted, failingSince, slowRounds, p50, minLocations, wafRound, crawler.fresh);
+    const issue = problemOf(
+      m,
+      counted,
+      failingSince,
+      slowRounds,
+      p50,
+      minLocations,
+      wafRound,
+      crawler.fresh,
+      pageIssue(m, s),
+    );
     if (issue) {
       return {
         verdict: {
@@ -799,6 +823,8 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     // site now refuses the fake Googlebot, or the crawler stopped) isn't over — no evidence either way,
     // so it holds until a clean usable fetch replaces the hit.
     if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next };
+    // D-046: an open Page change PROBLEM with no usable fetch, or an accept waiting for its Undo, holds.
+    if (pageHolds(m, s)) return { verdict: { kind: 'insufficient' }, next };
     // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
     const note =
       m.isPrimary && wafBlocked.length
@@ -845,6 +871,21 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
           };
         }
         if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next: reset };
+        // D-046: the page change, as on a passing round.
+        const page = pageIssue(m, s);
+        if (page) {
+          return {
+            verdict: {
+              kind: 'problem',
+              trigger: page.trigger,
+              detail: page.detail,
+              startedAt: crawlerStart(page.at, s),
+              reachable,
+            },
+            next: reset,
+          };
+        }
+        if (pageHolds(m, s)) return { verdict: { kind: 'insufficient' }, next: reset };
         return { verdict: { kind: 'ok', reachable, note: BLOCKED_NOTE }, next: reset };
       }
       case 'failed':
@@ -921,6 +962,36 @@ function crawlerStart(at: Date, s: SiteSnapshot): Date {
   return new Date(Math.max(at.getTime(), afterJudged));
 }
 
+/** The primary's page-change state at the snapshot's time (S09d, D-046); null without facts. */
+export function pageStateOf(m: SiteMonitor, s: Pick<SiteSnapshot, 'now'>): PageChangeState | null {
+  if (!m.isPrimary || !m.pageChange) return null;
+  return pageChangeState(m.pageChange, {
+    now: s.now,
+    own: ownDomains(m.url, m.allowedRedirectDomains),
+    open: m.carry.status === 'problem' && m.carry.trigger === 'content_change',
+  });
+}
+
+/** A Page change PROBLEM to raise or keep: the page differs enough, and its recording is over. */
+function pageIssue(
+  m: SiteMonitor,
+  s: SiteSnapshot,
+): { trigger: 'content_change'; detail: ProblemDetail; at: Date } | null {
+  const page = pageStateOf(m, s);
+  if (page?.kind !== 'differs' || !page.alert || isRecording(m.pageChange!, s.now)) return null;
+  return { trigger: 'content_change', detail: pageChangeDetail(page, m.url), at: page.firstSeenAt };
+}
+
+/**
+ * D-046 item 6: an open Page change PROBLEM doesn't recover without a fetch that matches — no data and an
+ * accept still inside its Undo window are no evidence either way.
+ */
+function pageHolds(m: SiteMonitor, s: SiteSnapshot): boolean {
+  if (m.carry.status !== 'problem' || m.carry.trigger !== 'content_change') return false;
+  const page = pageStateOf(m, s);
+  return page?.kind === 'no_data' || page?.kind === 'pending';
+}
+
 /** The first PROBLEM trigger of a passing round, in the order a person would fix them. */
 function problemOf(
   m: SiteMonitor,
@@ -931,6 +1002,7 @@ function problemOf(
   minLocations = 2,
   wafSite = false,
   crawler: readonly CrawlerFact[] = [],
+  page: { trigger: Trigger; detail: ProblemDetail; at: Date } | null = null,
 ): { trigger: Trigger; detail: ProblemDetail; at?: Date } | null {
   const as = (trigger: Trigger, detail: ProblemDetail | null) =>
     detail ? { trigger: m.isPrimary ? trigger : ('key_page' as const), detail } : null;
@@ -942,6 +1014,7 @@ function problemOf(
     as('keyword', keywordIssue(counted, minLocations)) ??
     as('redirect', redirectIssue(counted, m.url, m.allowedRedirectDomains, minLocations)) ??
     (viewed ? { trigger: viewed.detail.kind, detail: viewed.detail, at: viewed.at } : null) ??
+    page ??
     (slowRounds >= SLOW_ROUNDS && p50 !== null
       ? as('slow', {
           kind: 'slow',

@@ -1,5 +1,19 @@
 import type { ProbeLocation } from './domain';
+import type { FingerprintField } from './fingerprint';
 import type { CrawlerView } from './forbidden';
+
+/**
+ * One fingerprint row that differs from the baseline (S09d, D-046): a text field's before / after, or
+ * a domain set's added / removed domains (the unchanged ones aren't kept here — the pages read them
+ * from the fingerprints).
+ */
+export interface PageChangeRow {
+  field: FingerprintField;
+  was?: string | null;
+  now?: string | null;
+  added?: string[];
+  removed?: string[];
+}
 
 /**
  * Why a monitor shows PROBLEM in a round (PRD §5 triggers, D-022): the engine (`@dxt/engine`)
@@ -16,6 +30,21 @@ export type ProblemDetail =
       view?: CrawlerView;
     }
   | { kind: 'redirect'; host: string; locations: ProbeLocation[]; view?: CrawlerView }
+  /**
+   * The home page's fingerprint differs from its baseline (S09d, D-046): the rows that differ, the new
+   * script / iframe domains among them, when the run of differing fetches began, how many fetches it
+   * has held and the plain fetch it was read from.
+   */
+  | {
+      kind: 'content_change';
+      path: string;
+      changes: PageChangeRow[];
+      newScriptDomains: string[];
+      firstSeenAt: string;
+      held: number;
+      checkId: string;
+      checkedAt: string;
+    }
   | {
       kind: 'regional';
       location: ProbeLocation;
