@@ -5,7 +5,7 @@ vi.mock('@/server/db', () => ({ serviceDb: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/lib/auth/session', () => ({ getAccess: vi.fn() }));
 
-const { locationsOf } = await import('./detail-queries');
+const { incidentAccept, locationsOf } = await import('./detail-queries');
 
 const check = (location: string, at: string, over: Record<string, unknown> = {}) => ({
   location,
@@ -50,5 +50,44 @@ describe('Evidence by location (Incident board)', () => {
     expect(rows).toMatchObject([
       { location: 'TYO', first: { text: 'Timeout > 10 s', glyph: 'fail' }, recheck: null, latest: null },
     ]);
+  });
+});
+
+describe('incidentAccept (S09d, §26.6)', () => {
+  const ev = (type: string, at: string, payload: Record<string, unknown> = {}) => ({
+    type,
+    at: `2026-10-15T${at}+00:00`,
+    actor_id: 'u-tao',
+    payload,
+  });
+  const nameOf = () => 'Tao';
+  const i = { recovered_at: '2026-10-15T11:32:23+00:00' } as Parameters<typeof incidentAccept>[0];
+
+  it('the latest accept of the current drop, and the fetch that matched it', () => {
+    expect(
+      incidentAccept(i, [ev('detected', '11:16:01'), ev('baseline_accepted', '11:30:47')], nameOf),
+    ).toEqual({
+      at: '2026-10-15T11:30:47+00:00',
+      by: 'Tao',
+      withResolve: false,
+      matchedAt: '2026-10-15T11:32:23+00:00',
+    });
+  });
+
+  it('none once undone, and none carried into a relapse (/verify, 15 Oct)', () => {
+    expect(
+      incidentAccept(
+        i,
+        [ev('detected', '11:16:01'), ev('baseline_accepted', '11:30:08'), ev('baseline_undone', '11:30:16')],
+        nameOf,
+      ),
+    ).toBeNull();
+    expect(
+      incidentAccept(
+        i,
+        [ev('detected', '11:16:01'), ev('baseline_accepted', '11:30:47'), ev('relapsed', '11:39:00')],
+        nameOf,
+      ),
+    ).toBeNull();
   });
 });

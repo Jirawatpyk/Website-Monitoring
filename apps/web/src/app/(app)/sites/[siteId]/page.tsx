@@ -4,6 +4,8 @@ import { Container } from '@jirawatpyk/aura-react';
 import { SiteDetailView, rangeOf } from '@/features/sites';
 import { getSiteDetail, getSiteName } from '@/features/sites/server';
 import { getAccess } from '@/lib/auth/session';
+import { PageFingerprintCard } from '@/features/page-change';
+import { getSitePageChange } from '@/features/page-change/server';
 
 /** The tab reads the site's name ("Test target · DxT Monitor"). */
 export async function generateMetadata({
@@ -29,7 +31,11 @@ export default async function SiteDetailPage({
   const [{ siteId }, query] = await Promise.all([params, searchParams]);
   const range = rangeOf(query.range);
   const now = new Date();
-  const [detail, access] = await Promise.all([getSiteDetail(siteId, range, now), getAccess()]);
+  const [detail, access, page] = await Promise.all([
+    getSiteDetail(siteId, range, now),
+    getAccess(),
+    getSitePageChange(siteId, now),
+  ]);
   if (!detail) notFound();
   const active = access.status === 'active' ? access : null;
   return (
@@ -41,6 +47,16 @@ export default async function SiteDetailPage({
         meId={active?.profile.id ?? ''}
         viewer={{ name: active?.profile.displayName ?? '', email: active?.profile.email ?? '' }}
         nowIso={now.toISOString()}
+        pageFingerprint={
+          page ? (
+            <PageFingerprintCard
+              view={page.view}
+              siteName={detail.name}
+              canAccept={page.canAccept}
+              viewerName={active?.profile.displayName ?? ''}
+            />
+          ) : null
+        }
       />
     </Container>
   );

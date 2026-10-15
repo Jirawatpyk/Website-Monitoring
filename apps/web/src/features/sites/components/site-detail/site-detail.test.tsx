@@ -28,6 +28,7 @@ const detail = (over: Partial<SiteDetail> = {}): SiteDetail => ({
   credentialRef: 'Team vault › BA',
   mutedUntil: null,
   openIncident: null,
+  openTrigger: null,
   stats: { uptime: 0.9997, p50: 398, p95: 740, incidents: 2, caption: '1 DOWN 11 min · 1 PROBLEM 6 min' },
   chart: { BKK: [], SIN: [], TYO: [] },
   chartFrom: Date.parse(NOW) - 30 * 86_400_000,
@@ -104,6 +105,42 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     expect(screen.getByText('1 DOWN 11 min · 1 PROBLEM 6 min')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'SIN: Blocked by bot protection' })).toBeInTheDocument();
     expect(screen.getByText('1/2 pass')).toBeInTheDocument();
+  });
+
+  it('names a page change and its incident in the header only while the site shows Problem (S09d, /verify)', () => {
+    const open = {
+      id: 'i1',
+      number: 157,
+      state: 'unacked' as const,
+      level: 0,
+      detectedAt: '2026-09-25T02:30:14Z',
+      ackedBy: null,
+    };
+    const { unmount } = render(
+      <SiteDetailView
+        detail={detail({ status: 'problem', openIncident: open, openTrigger: 'content_change' })}
+        range="30d"
+        role="admin"
+        meId="tao"
+        nowIso={NOW}
+      />,
+    );
+    expect(screen.getByText(/^Problem since .* · page change · INC-0157$/)).toBeInTheDocument();
+    unmount();
+    render(
+      <SiteDetailView
+        detail={detail({
+          status: 'ok',
+          openIncident: { ...open, state: 'needs_root_cause' },
+          openTrigger: 'content_change',
+        })}
+        range="30d"
+        role="admin"
+        meId="tao"
+        nowIso={NOW}
+      />,
+    );
+    expect(screen.queryByText(/page change · INC-0157/)).not.toBeInTheDocument();
   });
 
   it('Mute opens the mute dialog for this site; Schedule maintenance the maintenance one (S09)', async () => {

@@ -26,6 +26,8 @@ export default function Loading() {
             <CardSkeleton lines={5} />
           </div>
           <CardSkeleton lines={4} />
+          {/* the Page fingerprint card (S09d) */}
+          <CardSkeleton lines={2} />
         </div>
         <div className="flex flex-col gap-6 md:hidden">
           {/* the header's phone rows: Mute / Maintenance, then Edit monitors full width */}
@@ -44,6 +46,7 @@ export default function Loading() {
           <CardSkeleton lines={3} />
           <CardSkeleton lines={2} />
           <CardSkeleton lines={4} />
+          <CardSkeleton lines={2} />
         </div>
       </PageSkeleton>
     </Container>

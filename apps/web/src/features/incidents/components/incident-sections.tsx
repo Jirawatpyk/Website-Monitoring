@@ -25,6 +25,7 @@ import { GLYPH_LEGEND, GLYPHS } from '@/components/site-cells';
 import type { CheckCell, IncidentDetail } from '../detail-queries';
 import type { TimelineItem } from '../model';
 import { FlapRun } from './flap-run';
+import { PAGE_CHANGE_HOLD_FETCHES } from '@dxt/engine';
 
 /**
  * The incident page's display-only parts (Incident / MIncident boards): no state, no handlers, so the
@@ -47,25 +48,37 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   escalated: { icon: <IconArrowUpRight />, tone: 'text-fg-warning' },
   undone: { icon: <IconRotateCcw />, tone: 'text-fg-secondary' },
   flapping: { icon: <IconActivity />, tone: 'text-fg-warning' },
+  baseline: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
 };
 
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {
   const confirmedAt = new Date(d.detectedAt);
+  const page = d.pageChange;
   const facts = [
     {
-      label: 'STARTED',
+      label: page ? 'FIRST SEEN' : 'STARTED',
       value: [startedOn(d, now), formatTimeWithSeconds(new Date(d.startedAt))].filter(Boolean).join(' '),
-      caption: 'First failed check',
+      caption: page ? 'First fetch that differed' : 'First failed check',
     },
     {
-      label: d.severity === 'down' ? 'CONFIRMED DOWN' : 'DETECTED',
+      label: d.severity === 'down' ? 'CONFIRMED DOWN' : page ? 'CONFIRMED PROBLEM' : 'DETECTED',
       value: formatTimeWithSeconds(confirmedAt),
-      caption: `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
+      caption: page
+        ? page.newScript.length
+          ? 'New script domain — raised on the first fetch'
+          : `Held ${PAGE_CHANGE_HOLD_FETCHES} fetches (1 h)`
+        : `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
     },
     {
       label: 'DURATION',
       value: formatDuration(d.durationMinutes),
-      caption: d.recoveredAt ? `Recovered ${formatTime(new Date(d.recoveredAt))}` : 'Still down',
+      caption: d.recoveredAt
+        ? d.severity === 'problem'
+          ? `Problem ${formatTime(new Date(d.startedAt))} → recovered ${formatTime(new Date(d.recoveredAt))}`
+          : `Recovered ${formatTime(new Date(d.recoveredAt))}`
+        : d.severity === 'problem'
+          ? `Problem since ${formatTime(new Date(d.startedAt))}`
+          : 'Still down',
       danger: !d.recoveredAt,
     },
     {

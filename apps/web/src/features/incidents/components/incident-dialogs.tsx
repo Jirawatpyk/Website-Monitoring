@@ -15,6 +15,7 @@ import {
 import {
   IconCircle,
   IconCircleCheck,
+  IconLock,
   IconClock,
   IconPencil,
   IconRotateCcw,
@@ -45,11 +46,14 @@ function RootCauseFields({
   onChange,
   errors,
   stillDown,
+  afterCategory,
 }: {
   value: RootCauseValue;
   onChange: (v: RootCauseValue) => void;
   errors: Partial<Record<Field, string>>;
   stillDown: boolean;
+  /** Under the category (Resolve's "Also accept the current page", S09d §26.7). */
+  afterCategory?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -67,6 +71,7 @@ function RootCauseFields({
             : undefined
         }
       />
+      {afterCategory}
       <Textarea
         label="What happened"
         required
@@ -323,9 +328,23 @@ export function ResolveDialog({
   onClose,
   returnFocus,
   onUndone,
+  pageChange,
 }: {
   incident: DialogIncident;
   initial: RootCauseValue;
+  /**
+   * A Page change incident (spec §26.7): Client-side change offers an Admin "Also accept the current page
+   * as the new baseline", ticked; other roles get the hint. Absent for every other trigger.
+   */
+  pageChange?: {
+    canAccept: boolean;
+    checkId: string | null;
+    /** The page's live new script domains, named in the warning (security review, 15 Oct). */
+    newScript: readonly string[];
+    changed: number;
+    /** The page already matches the baseline: Resolve doesn't wait for it any more. */
+    matched: boolean;
+  };
   /** The page's conditions; the root-cause line follows the form here. */
   conditions: Condition[];
   /** "Down 8 min · Window Thu 22:14–22:22 · OK since 22:22" cells. */
@@ -361,6 +380,11 @@ export function ResolveDialog({
 
   const unknown = value.category === UNKNOWN_ROOT_CAUSE;
   const filled = !!value.category && !!value.what.trim();
+  const [acceptBox, setAcceptBox] = useState(true);
+  const clientChange = !!pageChange && value.category === 'client_change';
+  const showBox = clientChange && pageChange.canAccept && !!pageChange.checkId;
+  // Ticked, the page is accepted first and then matches it: the page condition is met (§26.7).
+  const willAccept = showBox && acceptBox;
   const live: Condition[] = conditions.map((c) =>
     c.key !== 'root_cause'
       ? c
@@ -375,8 +399,10 @@ export function ResolveDialog({
         },
   );
   const gate = canResolve({
-    okRounds: conditions.find((c) => c.key === 'recovery')?.met ? 2 : 0,
-    clientUpdate: conditions.find((c) => c.key === 'client_update')?.met ? 'not_required' : 'pending',
+    okRounds: willAccept || conditions.find((c) => c.key === 'recovery')?.met ? 2 : 0,
+    // A Page change has no client-update track (§26.3): no condition means nothing pending.
+    clientUpdate:
+      (conditions.find((c) => c.key === 'client_update')?.met ?? true) ? 'not_required' : 'pending',
     rootCauseCategory: filled ? value.category : null,
   });
 
@@ -401,7 +427,11 @@ export function ResolveDialog({
         if (!r.ok) return r.field ? setErrors({ [r.field]: r.message }) : setFailure(r.message);
         setDone({ kind: 'kept', at: new Date() });
       } else {
-        const r = await resolveIncident({ incidentId: incident.incidentId, ...value }).catch(() => ({
+        const r = await resolveIncident({
+          incidentId: incident.incidentId,
+          ...value,
+          ...(willAccept && pageChange?.checkId ? { acceptCheckId: pageChange.checkId } : {}),
+        }).catch(() => ({
           ok: false as const,
           message: FAILED,
           field: undefined,
@@ -472,9 +502,13 @@ export function ResolveDialog({
                   ? 'Write what happened to continue'
                   : unknown
                     ? 'Saves your notes · the incident stays open'
-                    : gate.ok
-                      ? 'All 3 conditions met'
-                      : 'Resolve waits for every condition'}
+                    : willAccept
+                      ? 'Accepts the baseline first, then resolves — the page then matches it.'
+                      : gate.ok
+                        ? `All ${conditions.length} conditions met`
+                        : pageChange
+                          ? 'Resolve unlocks when the page matches the baseline again.'
+                          : 'Resolve waits for every condition'}
             </span>
             <Button variant="secondary" onClick={close}>
               Cancel
@@ -491,13 +525,13 @@ export function ResolveDialog({
               </Button>
             ) : (
               <Button
-                variant="primary"
+                variant={willAccept && pageChange?.newScript.length ? 'danger' : 'primary'}
                 icon={<IconCircleCheck />}
                 disabled={!gate.ok}
                 loading={pending}
                 onClick={submit}
               >
-                Resolve incident
+                {willAccept ? 'Accept baseline and resolve' : 'Resolve incident'}
               </Button>
             )}
           </>
@@ -623,6 +657,32 @@ export function ResolveDialog({
             }}
             errors={errors}
             stillDown={incident.stillDown}
+            afterCategory={
+              <>
+                {showBox && (
+                  <div className="flex flex-col gap-2 rounded-aura-md border border-border-default p-aura-3">
+                    <Checkbox
+                      checked={acceptBox}
+                      onChange={(checked) => setAcceptBox(checked)}
+                      description={`Saves the ${pageChange.changed} changed fields as the baseline, with “What happened” as the reason. Logged as ${viewerName}.`}
+                    >
+                      Also accept the current page as the new baseline
+                    </Checkbox>
+                    {acceptBox && pageChange.newScript.length > 0 && (
+                      <Alert tone="danger" title="A new script domain usually means injected code.">
+                        {`Accept only if you know the client added it. New: ${pageChange.newScript.join(', ')}.`}
+                      </Alert>
+                    )}
+                  </div>
+                )}
+                {clientChange && !pageChange.canAccept && !pageChange.matched && (
+                  <p className="m-0 flex items-center gap-2 text-sm text-fg-secondary">
+                    <IconLock aria-hidden />
+                    Only an Admin can accept a new baseline — resolve once the page matches it again.
+                  </p>
+                )}
+              </>
+            }
           />
           {uptime && (
             <div className="flex flex-col gap-2">

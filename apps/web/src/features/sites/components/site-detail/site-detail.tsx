@@ -95,7 +95,12 @@ function statusLine(detail: SiteDetail, now: Date): string | null {
   if (!detail.statusSince) return null;
   const since = formatDuration((now.getTime() - Date.parse(detail.statusSince)) / 60_000);
   const word = { ok: 'OK', problem: 'Problem', down: 'Down', maintenance: 'In maintenance' }[detail.status];
-  return `${word} since ${formatWhen(new Date(detail.statusSince), now, { midSentence: true })} · ${since}`;
+  const head = `${word} since ${formatWhen(new Date(detail.statusSince), now, { midSentence: true })}`;
+  // §26.8: a Page change names itself and its incident — "Problem since 09:30 · page change · INC-0157".
+  if (detail.status === 'problem' && detail.openTrigger === 'content_change' && detail.openIncident) {
+    return `${head} · page change · ${formatIncidentId(detail.openIncident.number)}`;
+  }
+  return `${head} · ${since}`;
 }
 
 /** Who sees Mute / maintenance (spec §11, D-012, D-036): an Admin, or a Responder on a site they own or back up. */
@@ -111,6 +116,7 @@ export function SiteDetailView({
   meId,
   viewer = { name: '', email: '' },
   nowIso,
+  pageFingerprint,
 }: {
   detail: SiteDetail;
   range: SiteRange;
@@ -119,6 +125,11 @@ export function SiteDetailView({
   /** The signed-in person: the mute dialog's "recorded as" and phone "Signed in as" lines. */
   viewer?: { name: string; email: string };
   nowIso: string;
+  /**
+   * The Page fingerprint card (S09d, spec §26.8), drawn by the route: after Monitors, and on phones —
+   * where Monitors is hidden — after Latest round.
+   */
+  pageFingerprint?: React.ReactNode;
 }) {
   const now = new Date(nowIso);
   const isAdmin = role === 'admin';
@@ -323,6 +334,7 @@ export function SiteDetailView({
             </div>
 
             <MonitorsTable detail={detail} />
+            {pageFingerprint}
 
             <div className="grid grid-cols-1 gap-4 max-md:hidden xl:grid-cols-2">
               <IncidentHistory detail={detail} />
@@ -541,7 +553,8 @@ function MonitorsTable({ detail }: { detail: SiteDetail }) {
           Monitors
         </h2>
         <span className="text-sm text-fg-secondary">
-          Site status = worst of these. Only the primary monitor can make the site DOWN.
+          Site status = worst of these and the page fingerprint below. Only the primary monitor can make the
+          site DOWN.
         </span>
       </div>
       <Table caption="Monitors" captionHidden stackBelow="md" rowHeight="density" align="middle">

@@ -77,6 +77,8 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     resolved: null,
     locations: [],
     evidence: null,
+    pageChange: null,
+    canAcceptBaseline: false,
     ...merged,
     gate: resolveGate(
       {
@@ -309,6 +311,17 @@ describe('Incident page — Resolve (T10, D-033)', () => {
       screen.getAllByText('Resolved by Tao · ORCA Thailand was down 8 min · root cause: Hosting / server.')
         .length,
     ).toBeGreaterThan(0);
+  });
+
+  it('auto-resolved: no conditions listed as "Not met", only the line that none were needed (/verify, 15 Oct)', () => {
+    const d = detail({ events: settled });
+    show({ ...d, state: 'resolved', view: { ...d.view, state: 'resolved' }, autoResolved: true });
+    expect(
+      screen.getAllByText(
+        'Resolved automatically — a short PROBLEM, never acknowledged. No root cause needed.',
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText('Root cause written')).not.toBeInTheDocument();
   });
 
   it('conditions say Met / Not met in words beside the icon (MIncident)', () => {

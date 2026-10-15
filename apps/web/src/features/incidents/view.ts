@@ -211,9 +211,11 @@ export function buildIncidentView(
     site,
     title: recovered
       ? `${site} ${problem ? 'is back to normal' : 'is back'}`
-      : i.severity === 'problem'
-        ? `${site} has a problem`
-        : `${site} is down`,
+      : i.trigger === 'content_change'
+        ? `${site} home page changed` // IncidentPageChange (§26.3)
+        : i.severity === 'problem'
+          ? `${site} has a problem`
+          : `${site} is down`,
     sub: [
       recovered ? `${problem ? 'problem' : 'down'} ${formatDuration(minutes)}` : formatDuration(minutes),
       formatTier(i.sites.tier),

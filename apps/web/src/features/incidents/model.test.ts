@@ -801,3 +801,111 @@ describe('timelineOf — flapping runs fold into one line', () => {
     });
   });
 });
+// ── S09d: a Page change incident (spec §26.6–§26.7, IncidentPageChange) ────────────────────────
+describe('resolveGate — Page change (§26.7: N of 2 met)', () => {
+  const page = {
+    admin: false,
+    pendingUntil: null,
+    acceptedAt: null,
+    nextFetchAt: at('25T10:30:00'),
+    differsSince: at('25T09:30:14'),
+  };
+  const problem = { ...gateBase, state: 'unacked' as const };
+
+  it('page differs: 0 of 2 met, no client update, locked for a Responder', () => {
+    const g = resolveGate(problem, [], nameOf, page);
+    expect(g.conditions.map((c) => [c.label, c.met, c.detail])).toEqual([
+      ['Page matches the baseline', false, 'Not yet · differs since 09:30'],
+      ['Root cause written', false, 'Not written yet · needed before Resolve'],
+    ]);
+    expect(g).toMatchObject({
+      metCount: 0,
+      canOpenDialog: false,
+      lockedReason: 'Resolve locked · 0 of 2 met — the page still differs from the baseline',
+    });
+  });
+
+  it('an Admin may open Resolve before the match, to accept the page with it', () => {
+    expect(resolveGate(problem, [], nameOf, { ...page, admin: true })).toMatchObject({
+      canOpenDialog: true,
+      lockedReason: null,
+    });
+  });
+
+  it.each([
+    [{ pendingUntil: at('25T10:07:10') }, 'Baseline accepted — Undo open until 10:07:10'],
+    [{ acceptedAt: at('25T10:07:00') }, 'Baseline accepted 10:07 · waiting for the 10:30 fetch'],
+    [
+      { acceptedAt: at('25T10:07:00'), nextFetchAt: null },
+      'Baseline accepted 10:07 · waiting for the next fetch',
+    ],
+    [{ differsSince: null }, 'Not yet · differs since the first fetch that differed'],
+  ])('the match line reads its state: %o', (over, detail) => {
+    expect(resolveGate(problem, [], nameOf, { ...page, ...over }).conditions[0]!.detail).toBe(detail);
+  });
+
+  it('matched on the 10:30 fetch, then the next OK round: both met with a root cause', () => {
+    const recovered = {
+      ...gateBase,
+      state: 'needs_root_cause' as const,
+      recoveredAt: at('25T10:30:14'),
+    };
+    expect(resolveGate(recovered, [], nameOf, page).conditions[0]!.detail).toBe(
+      'Matched on the 10:30 fetch · waiting for the next OK round',
+    );
+    const g = resolveGate(
+      { ...recovered, rootCauseCategory: 'client_change' },
+      [ev('ok_two_rounds', '25T10:31:10', { state: 'needs_root_cause' })],
+      nameOf,
+      page,
+    );
+    expect(g.conditions[0]!.detail).toBe('Matched on the 10:30 fetch');
+    expect(g).toMatchObject({ metCount: 2, ok: true });
+  });
+});
+
+describe('timelineOf — baseline accepted (§26.6)', () => {
+  const i = {
+    severity: 'problem' as const,
+    trigger: 'content_change' as const,
+    startedAt: at('25T09:30:14'),
+    recoveredAt: null,
+  };
+  const accepted = (payload: Record<string, unknown>) =>
+    ev(
+      'baseline_accepted',
+      '25T10:07:00',
+      { reason: 'Client redesign', applies_at: at('25T10:07:10'), ...payload },
+      'u-tao',
+    );
+  const line = (events: EventRow[], now = NOW) =>
+    timelineOf(i, events, nameOf, now).filter((t) => t.kind === 'baseline' || t.kind === 'undone');
+
+  it('"Baseline accepted by Tao · “reason”", Undo open, then applied', () => {
+    expect(line([accepted({})], new Date(at('25T10:07:05')))).toMatchObject([
+      {
+        title: 'Baseline accepted by Tao · “Client redesign”',
+        detail: 'Undo open — applies at 10:07:10',
+      },
+    ]);
+    expect(line([accepted({})], new Date(at('25T10:08:00')))).toMatchObject([
+      { detail: 'Applied 10:07:10 · the next fetch compares against it' },
+    ]);
+  });
+
+  it('starts at the first fetch that differed, not a failed check', () => {
+    expect(timelineOf(i, [], nameOf, NOW)[0]).toMatchObject({ title: 'First fetch that differed' });
+  });
+
+  it('with the resolve, and undone', () => {
+    expect(line([accepted({ with_resolve: true })])[0]!.detail).toBe('Accepted with the resolve');
+    expect(line([accepted({}), ev('baseline_undone', '25T10:07:04', {}, 'u-tao')])).toMatchObject([
+      { kind: 'baseline', detail: 'Undone — the baseline is unchanged' },
+      {
+        kind: 'undone',
+        title: 'Baseline accept undone by Tao',
+        detail: 'The baseline is unchanged',
+      },
+    ]);
+  });
+});

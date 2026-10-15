@@ -209,3 +209,129 @@ export async function siteOf(incidentId: string): Promise<{ id: string; name: st
   }[];
   return { id: i!.site_id, name: i!.sites.name };
 }
+/**
+ * S09d: a live `E2E …` site whose home page differs from its baseline by a new script domain and a title
+ * — a baseline from a plain fetch 90 min ago (recording backdated past its 14 days), the injected fetch
+ * 10 min ago, and the Page change incident the engine would open. Returns the ids.
+ */
+export async function openPageChangeIncident(ownerEmail: string): Promise<{
+  incidentId: string;
+  siteId: string;
+  monitorId: string;
+  checkId: string;
+}> {
+  const [owner] = (await admin(`/rest/v1/profiles?select=id&email=eq.${encodeURIComponent(ownerEmail)}`)) as {
+    id: string;
+  }[];
+  const [client] = (await admin('/rest/v1/clients?select=id&limit=1')) as {
+    id: string;
+  }[];
+  const tag = crypto.randomUUID().slice(0, 8);
+  const [site] = (await admin('/rest/v1/sites?select=id', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      client_id: client!.id,
+      name: `E2E ${tag}`,
+      tier: 1,
+      primary_owner_id: owner!.id,
+    }),
+  })) as { id: string }[];
+  const url = `https://e2e-${tag}.example.test/`;
+  const [monitor] = (await admin('/rest/v1/monitors?select=id', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      site_id: site!.id,
+      type: 'http',
+      is_primary: true,
+      url,
+    }),
+  })) as { id: string }[];
+  const now = Date.now();
+  const base = {
+    title: `E2E ${tag}`,
+    description: 'Fly to Taipei',
+    robots: 'index, follow',
+    canonical: url,
+    h1: 'Welcome',
+    scripts: ['static-cdn.example', 'tag-manager.example'],
+    links: [`e2e-${tag}.example.test`, 'booking.example'],
+  };
+  const injected = {
+    ...base,
+    title: `E2E ${tag} | Lucky Deals`,
+    scripts: [...base.scripts, 'evil-cdn.example'],
+  };
+  const plain = async (minAgo: number, fingerprint: object) =>
+    (
+      (await admin('/rest/v1/crawler_checks?select=id', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          monitor_id: monitor!.id,
+          view: 'plain',
+          checked_at: new Date(now - minAgo * 60_000).toISOString(),
+          outcome: 'pass',
+          usable: true,
+          status_code: 200,
+          scan_complete: true,
+          fingerprint,
+        }),
+      })) as { id: string }[]
+    )[0]!.id;
+  const first = await plain(90, base);
+  await admin('/rest/v1/rpc/crawler_set_baseline', {
+    method: 'POST',
+    body: JSON.stringify({ p_check_id: first }),
+  });
+  await admin(`/rest/v1/page_baselines?monitor_id=eq.${monitor!.id}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      first_set_at: new Date(now - 15 * 86_400_000).toISOString(),
+    }),
+  });
+  const checkId = await plain(10, injected);
+  const detail = {
+    kind: 'content_change',
+    path: '/',
+    changes: [
+      { field: 'title', was: base.title, now: injected.title },
+      { field: 'scripts', added: ['evil-cdn.example'], removed: [] },
+    ],
+    newScriptDomains: ['evil-cdn.example'],
+    newLinkDomains: [],
+    firstSeenAt: new Date(now - 10 * 60_000).toISOString(),
+    held: 1,
+    checkId,
+    checkedAt: new Date(now - 10 * 60_000).toISOString(),
+  };
+  const incidentId = (await admin('/rest/v1/rpc/engine_open_incident', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_site_id: site!.id,
+      p_monitor_id: monitor!.id,
+      p_trigger: 'content_change',
+      p_severity: 'problem',
+      p_started_at: new Date(now - 10 * 60_000).toISOString(),
+      p_detected_at: new Date(now - 9 * 60_000).toISOString(),
+      p_round_at: new Date(now - 9 * 60_000).toISOString(),
+      p_context: {
+        cause: '/ · new script domain evil-cdn.example',
+        summary: '2 changes · new script domain evil-cdn.example',
+        detail,
+      },
+      p_notify: true,
+    }),
+  })) as string;
+  return { incidentId, siteId: site!.id, monitorId: monitor!.id, checkId };
+}
+
+/** The page_baseline.* audit rows of a monitor, oldest first (S09d Done-when 2). */
+export async function baselineAudit(monitorId: string): Promise<string[]> {
+  const rows = (await admin(
+    `/rest/v1/audit_log?select=action&entity_id=eq.${monitorId}&action=like.page_baseline.*&order=at`,
+  )) as { action: string }[];
+  return rows.map((r) => r.action);
+}

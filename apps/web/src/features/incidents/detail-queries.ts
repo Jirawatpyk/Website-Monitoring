@@ -16,12 +16,15 @@ import {
   UNDO_WINDOW_SEC,
   type IncidentState,
   type ProbeLocation,
+  type ProblemDetail,
   type Role,
   type Severity,
   type Trigger,
 } from '@dxt/shared';
 import { getAccess } from '@/lib/auth/session';
 import { downEpisodesBySite, maintenanceSpansBySite } from '@/features/sites/server';
+import { changeRows, headerCause, type ChangeRowView, type PageChangeView } from '@/features/page-change';
+import { loadPageChange } from '@/features/page-change/server';
 import { fetchAllPages } from '@/lib/csv';
 import { createClient } from '@/lib/supabase/server';
 import { serviceDb } from '@/server/db';
@@ -96,6 +99,19 @@ export interface IncidentDetail {
   evidence: { url: string; takenAt: string; afterRecovery: boolean } | null;
   /** Resolve's Uptime box (D-033, S09): this month's uptime with this incident, and whether a window covered it. */
   uptime?: { text: string; inWindow: boolean } | null;
+  /**
+   * A Page change incident (S09d, spec §26): the home page's live state, the rows it opened with and
+   * its new script domains. Null for every other trigger.
+   */
+  pageChange: {
+    view: PageChangeView;
+    rows: ChangeRowView[];
+    newScript: string[];
+    /** This incident's accept (its latest `baseline_accepted`, not undone), for the card's success line. */
+    accepted: { at: string; by: string; withResolve: boolean; matchedAt: string | null } | null;
+  } | null;
+  /** Accept as new baseline: Admins only (D-046, Tao 13 Oct) — not the Acknowledge rule. */
+  canAcceptBaseline: boolean;
 }
 
 interface DetailRow extends IncidentRow {
@@ -241,7 +257,8 @@ export async function loadIncident(
       `id, number, state, severity, trigger, escalation_level, started_at, detected_at, acked_at, acked_by,
        recovered_at, resolved_at, resolved_by, auto_resolved, client_update_required, client_updated_at,
        root_cause_category, root_cause, root_cause_fix, site_id, monitor_id,
-       sites!inner(name, tier, primary_owner_id, backup_owner_id, monitors(url, is_primary, timeout_ms),
+       sites!inner(name, tier, primary_owner_id, backup_owner_id,
+         monitors(id, url, is_primary, timeout_ms, allowed_redirect_domains),
          clients(am_user_id))`,
     )
     .eq('id', incidentId)
@@ -251,9 +268,15 @@ export async function loadIncident(
   const i = incident.data;
   if (!i) return null;
 
-  const primary = (i.sites.monitors as { url: string; is_primary: boolean; timeout_ms?: number }[]).find(
-    (m) => m.is_primary,
-  );
+  const primary = (
+    i.sites.monitors as {
+      id?: string;
+      url: string;
+      is_primary: boolean;
+      timeout_ms?: number;
+      allowed_redirect_domains?: string[];
+    }[]
+  ).find((m) => m.is_primary);
   const monitorId = i.monitor_id;
   // From the first failed check (`started_at`): a passing check before it isn't evidence.
   const aroundFrom = i.started_at;
@@ -304,6 +327,11 @@ export async function loadIncident(
     if (e.actor_id) ids.add(e.actor_id);
     if (typeof e.payload.user_id === 'string') ids.add(e.payload.user_id);
   }
+  // S09d: a Page change incident's card — read beside the names (it doesn't need them).
+  const pageChangeRead =
+    i.trigger === 'content_change' && primary?.id
+      ? pageChangeOf(db, i, events, { ...primary, id: primary.id }, viewer, now)
+      : Promise.resolve(null);
   const people = ids.size
     ? await db
         .from('profiles')
@@ -314,13 +342,22 @@ export async function loadIncident(
   const names = new Map((people.data ?? []).map((p) => [p.id, p.display_name]));
   const nameOf = (id: string | null) => (id ? (names.get(id) ?? 'someone') : 'someone');
 
+  const pageChangeLive = await pageChangeRead;
+  const pageChange = pageChangeLive
+    ? { ...pageChangeLive, accepted: incidentAccept(i, events, nameOf) }
+    : null;
+  const view = buildIncidentView(i, events, viewer, names, now);
+
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
   const shot =
     typeof evidenceEvent?.payload.screenshotPath === 'string' ? evidenceEvent.payload.screenshotPath : null;
   const url = shot ? await sign(shot) : null;
 
   return {
-    view: buildIncidentView(i, events, viewer, names, now),
+    // §26.3: the header reads "Page title changed on /", not the Chat cause.
+    view: pageChange?.rows.length
+      ? { ...view, cause: headerCause(pageChange.rows, pageChange.newScript) }
+      : view,
     siteId: i.site_id,
     siteName: i.sites.name,
     tier: i.sites.tier,
@@ -359,6 +396,16 @@ export async function loadIncident(
       },
       events,
       nameOf,
+      pageChange
+        ? {
+            admin: viewer.role === 'admin',
+            pendingUntil: pageChange.view.pending?.until ?? null,
+            acceptedAt:
+              pageChange.view.status === 'accepted' ? (pageChange.view.baseline?.acceptedAt ?? null) : null,
+            nextFetchAt: pageChange.view.nextFetchAt,
+            differsSince: pageChange.view.firstSeenAt ?? i.started_at,
+          }
+        : undefined,
     ),
     resolved: resolvedOf(i, events, viewer, nameOf),
     timeline: timelineOf(
@@ -374,6 +421,8 @@ export async function loadIncident(
       primary?.timeout_ms ?? 30_000,
     ),
     uptime: await uptimeBox(db, i, events, now),
+    pageChange,
+    canAcceptBaseline: viewer.role === 'admin',
     evidence:
       url && evidenceEvent
         ? {
@@ -580,5 +629,80 @@ async function uptimeBox(
       ? `Not counted — inside a maintenance window → ${month}`
       : `${formatDuration(minutes ?? 0)} counts as downtime → ${month}`,
     inWindow,
+  };
+}
+
+/**
+ * The What changed card's inputs (spec §26.4): the rows come from the change the incident opened with
+ * (its latest detected / relapsed detail) — they stay after an accept, when the live diff is empty — and
+ * the live state from the page's baseline and newest plain fetches.
+ */
+async function pageChangeOf(
+  db: DbClient,
+  i: DetailRow,
+  events: readonly EventRow[],
+  primary: { id: string; url: string; allowed_redirect_domains?: string[] },
+  viewer: Viewer,
+  now: Date,
+): Promise<Omit<NonNullable<IncidentDetail['pageChange']>, 'accepted'>> {
+  const view = await loadPageChange(
+    db,
+    {
+      monitorId: primary.id,
+      siteId: i.site_id,
+      url: primary.url,
+      allowedRedirectDomains: primary.allowed_redirect_domains ?? [],
+    },
+    viewer,
+    now,
+  );
+  const opened = [...events]
+    .filter((e) => e.type === 'detected' || e.type === 'relapsed')
+    .map((e) => e.payload.detail as Partial<Extract<ProblemDetail, { kind: 'content_change' }>> | undefined)
+    .filter((d) => d?.kind === 'content_change')
+    .at(-1);
+  const baselineDomains = Object.fromEntries(
+    view.fingerprint.flatMap((r) => (r.kind === 'domains' ? [[r.field, r.domains]] : [])),
+  ) as { scripts?: string[]; links?: string[] };
+  const rows = opened?.changes
+    ? changeRows(opened.changes, {
+        title: null,
+        description: null,
+        robots: null,
+        canonical: null,
+        h1: null,
+        scripts: baselineDomains.scripts ?? [],
+        links: baselineDomains.links ?? [],
+      })
+    : view.rows;
+  // The plain fetches read cover 6 fetches (3 h): First seen comes from when the incident's change began
+  // (D-046 item 5), and "held" counts the 30-min fetches since then (spec-check 15 Oct).
+  const firstSeen = opened?.firstSeenAt ?? null;
+  const live =
+    firstSeen && view.checkedAt && view.firstSeenAt && Date.parse(view.firstSeenAt) > Date.parse(firstSeen)
+      ? {
+          ...view,
+          firstSeenAt: firstSeen,
+          held: Math.round((Date.parse(view.checkedAt) - Date.parse(firstSeen)) / 1_800_000) + 1,
+        }
+      : view;
+  return { view: live, rows, newScript: opened?.newScriptDomains ?? view.newScript };
+}
+
+/** The incident's latest accept that wasn't undone (§26.6): when, by whom, with the resolve, matched. */
+export function incidentAccept(
+  i: DetailRow,
+  events: readonly EventRow[],
+  nameOf: (id: string | null) => string,
+): NonNullable<IncidentDetail['pageChange']>['accepted'] {
+  const sorted = [...events].sort((a, b) => a.at.localeCompare(b.at));
+  const dropAt = sorted.filter((e) => e.type === 'detected' || e.type === 'relapsed').at(-1)?.at ?? '';
+  const last = sorted.filter((e) => e.type === 'baseline_accepted' && e.at >= dropAt).at(-1);
+  if (!last || sorted.some((e) => e.type === 'baseline_undone' && e.at >= last.at)) return null;
+  return {
+    at: last.at,
+    by: nameOf(last.actor_id),
+    withResolve: last.payload.with_resolve === true,
+    matchedAt: i.recovered_at && i.recovered_at > last.at ? i.recovered_at : null,
   };
 }

@@ -55,6 +55,7 @@ import {
 } from './incident-dialogs';
 import { POST_WAIT_WORDS, usePostWait, type PostOverdue } from './use-post-wait';
 import { phoneHeader } from '@/components/phone-header';
+import { WhatChangedCard } from '@/features/page-change';
 
 const LIVE = ['incidents'] as const;
 /** Lines a phone shows before "Show all" (a long flapping incident has hundreds); the CSS above hides from 21. */
@@ -208,6 +209,21 @@ export function IncidentDetailView({
       ? v.title
       : `${d.siteName} ${d.severity === 'down' ? 'recovered' : 'is back to normal'}`;
 
+  // S09d (§26.4): a Page change incident shows What changed where Evidence / Latest round sit.
+  const whatChanged = d.pageChange ? (
+    <WhatChangedCard
+      view={d.pageChange.view}
+      rows={d.pageChange.rows}
+      newScript={d.pageChange.newScript}
+      incidentLabel={incidentLabel}
+      resolved={resolved}
+      accepted={d.pageChange.accepted}
+      siteName={d.siteName}
+      canAccept={d.canAcceptBaseline}
+      viewerName={viewerName}
+    />
+  ) : null;
+
   const resolveCard = (ref: React.RefObject<HTMLButtonElement | null> | null, primary: boolean) => (
     <ResolveCard
       primary={primary}
@@ -264,7 +280,8 @@ export function IncidentDetailView({
             <span className="text-sm text-fg-secondary">
               {[
                 v.cause,
-                stillDown
+                // a page change has no failed check: the board shows only its cause (§26.3)
+                stillDown && !d.pageChange
                   ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
                   : d.recoveredAt && !resolved
                     ? `OK since ${formatTime(new Date(d.recoveredAt))}`
@@ -308,12 +325,14 @@ export function IncidentDetailView({
         {sections.facts}
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*88)]">
           <div className="flex min-w-0 flex-col gap-6">
-            <EvidenceCard
-              detail={d}
-              table={sections.evidenceTable}
-              summary={sections.evidenceSummary}
-              onOpenShot={() => setShotOpen(true)}
-            />
+            {whatChanged ?? (
+              <EvidenceCard
+                detail={d}
+                table={sections.evidenceTable}
+                summary={sections.evidenceSummary}
+                onOpenShot={() => setShotOpen(true)}
+              />
+            )}
             <Card
               title="Timeline"
               headingLevel={2}
@@ -376,7 +395,7 @@ export function IncidentDetailView({
             onUndone={() => setFocusResolve(true)}
           />
         )}
-        {sections.latestRound}
+        {whatChanged ?? sections.latestRound}
         {resolveCard(null, false)}
         {v.ack.kind === 'read-only' && (
           <NoAccess title={v.ack.title} description={v.ack.description} people={v.ack.people} />
@@ -406,7 +425,7 @@ export function IncidentDetailView({
                 <span id="phone-resolve-why" className="text-center text-xs text-fg-secondary">
                   {d.gate.lockedReason ??
                     (d.gate.ok
-                      ? 'All 3 conditions met · Resolve is a manual step'
+                      ? `All ${d.gate.conditions.length} conditions met · Resolve is a manual step`
                       : 'Write the root cause in Resolve')}
                 </span>
                 <span className="flex gap-2">
@@ -481,6 +500,23 @@ export function IncidentDetailView({
             onClose={() => setResolveOpen(false)}
             returnFocus={shownResolve}
             onUndone={() => setFocusResolve(true)}
+            pageChange={
+              d.pageChange
+                ? {
+                    canAccept: d.canAcceptBaseline,
+                    // none while an accept is waiting or done: the box is for accepting now (§26.7)
+                    checkId:
+                      d.pageChange.view.status === 'problem' &&
+                      !d.pageChange.view.pending &&
+                      !d.pageChange.accepted
+                        ? d.pageChange.view.checkId
+                        : null,
+                    newScript: d.pageChange.view.newScript,
+                    matched: !!d.recoveredAt,
+                    changed: d.pageChange.view.rows.length,
+                  }
+                : undefined
+            }
           />
         </>
       )}
@@ -668,12 +704,12 @@ function ResolveCard({
           ) : g.canOpenDialog ? null : (
             <IconLock aria-hidden className="size-4" />
           )}
-          {resolved ? 'Resolved' : `${g.metCount} of 3 met`}
+          {resolved ? 'Resolved' : `${g.metCount} of ${g.conditions.length} met`}
         </span>
       }
     >
       <div className="flex flex-col gap-3">
-        <ConditionList conditions={g.conditions} />
+        {!(resolved && d.autoResolved) && <ConditionList conditions={g.conditions} />}
         {resolved ? (
           <p className="m-0 text-sm text-fg-secondary">
             {d.autoResolved
@@ -683,14 +719,29 @@ function ResolveCard({
         ) : (
           <p className="m-0 text-sm text-fg-secondary">
             {g.ok
-              ? 'All 3 conditions met. Resolve is manual — resolve it when you’re sure.'
+              ? `All ${g.conditions.length} conditions met. Resolve is manual — resolve it when you’re sure.`
               : (g.lockedReason ??
                 (d.rootCause.category === UNKNOWN_ROOT_CAUSE
                   ? 'Unknown keeps the incident open. Pick a category once you know what happened.'
                   : 'Needs a root cause before it can be resolved.'))}
           </p>
         )}
-        {d.canAct && !resolved && (
+        {d.canAct && !resolved && d.pageChange && (
+          // IncidentPageChange / MIncidentPageChange: one button — an Admin may accept the page with
+          // the resolve before it matches (§26.7); otherwise the root cause until it does.
+          <Button
+            ref={primary ? (resolveButton ?? undefined) : undefined}
+            variant="secondary"
+            size={primary ? 'sm' : 'md'}
+            fullWidth={!primary}
+            icon={<IconPencil />}
+            // Everyone gets the Resolve dialog: it says why Resolve waits, and what an Admin can do.
+            onClick={onResolve}
+          >
+            Root cause &amp; resolve…
+          </Button>
+        )}
+        {d.canAct && !resolved && !d.pageChange && (
           <span className="flex flex-wrap gap-2">
             {primary && (
               <Button
