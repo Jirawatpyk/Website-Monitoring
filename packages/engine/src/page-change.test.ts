@@ -238,6 +238,11 @@ describe('decideSite — page change (S09d Done-when 1)', () => {
     });
   });
 
+  it('an open Page change PROBLEM holds when the runner couldn’t read the fingerprints', () => {
+    const { pageChange: _none, ...noFacts } = home(input([]), held);
+    expect(decideSite(site([noFacts], { open }))).toMatchObject({ kind: 'none', status: null });
+  });
+
   it('an open Page change PROBLEM recovers at the fetch that matches, never before it', () => {
     expect(decideSite(site([home(input([fact(1), fact(31, injected)]), held)], { open }))).toMatchObject({
       kind: 'recover',

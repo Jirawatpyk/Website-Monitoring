@@ -335,7 +335,9 @@ export async function runEngine(
         : `${state.diff.rows.map((r) => r.field).join(', ')} (held ${state.held})`;
       pageHeld.add(`${site.name} · ${what}${pageChangeAlerts ? ' · recording' : ''}`);
     }
-    return pageChangeAlerts ? input : undefined;
+    // An open Page change PROBLEM (opened while the switch was on) still gets its facts, to recover.
+    const open = carryByMonitor.get(m.id)?.trigger === 'content_change';
+    return pageChangeAlerts || open ? input : undefined;
   };
 
   // D-028: the BKK probe's control check (D-027) over the window's Bangkok checks.

@@ -988,6 +988,8 @@ function pageIssue(
  */
 function pageHolds(m: SiteMonitor, s: SiteSnapshot): boolean {
   if (m.carry.status !== 'problem' || m.carry.trigger !== 'content_change') return false;
+  // The runner couldn't read the fingerprints this run: no evidence either way.
+  if (m.isPrimary && !m.pageChange) return true;
   const page = pageStateOf(m, s);
   return page?.kind === 'no_data' || page?.kind === 'pending';
 }
