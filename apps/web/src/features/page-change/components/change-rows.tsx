@@ -78,7 +78,7 @@ function Domains({
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       {added.map((d) => (
-        <Badge key={`+${d}`} tone="danger" variant="outline">
+        <Badge key={`+${d}`} tone="danger" variant="soft">
           {`+ ${d}`}
           <span className="sr-only"> (new)</span>
         </Badge>

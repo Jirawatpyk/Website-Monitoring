@@ -1,4 +1,12 @@
-import { formatDay, formatDuration, formatIncidentId, formatTime, formatTimeWithSeconds } from '@dxt/shared';
+import {
+  FINGERPRINT_FIELDS,
+  formatDay,
+  formatDuration,
+  formatIncidentId,
+  formatTime,
+  formatTimeWithSeconds,
+} from '@dxt/shared';
+import { PAGE_CHANGE_HOLD_FETCHES } from '@dxt/engine';
 import { fetchesLeft, type PageChangeView } from './model';
 
 /** The boards' copy for the Page fingerprint and What changed cards (spec §26.4–§26.8). */
@@ -6,6 +14,7 @@ import { fetchesLeft, type PageChangeView } from './model';
 const time = (iso: string) => formatTime(new Date(iso));
 const day = (iso: string) => formatDay(new Date(iso), { weekday: true });
 const CRAWL_MIN = 30;
+const HOLD = PAGE_CHANGE_HOLD_FETCHES;
 
 /** "baseline accepted Thu 10 Sep by Tao", or "baseline set Thu 10 Sep" for the first, automatic one. */
 export function baselineWords(v: Pick<PageChangeView, 'baseline'>): string {
@@ -17,20 +26,38 @@ export function baselineWords(v: Pick<PageChangeView, 'baseline'>): string {
 }
 
 /** "held 2 checks (30 min)", "held 2 of 3 checks (30 min)" while it waits. */
-export function heldWords(v: Pick<PageChangeView, 'held' | 'newScript'>, ofThree = false): string {
+export function heldWords(v: Pick<PageChangeView, 'held' | 'newScript'>, ofHold = false): string {
   const span = formatDuration((v.held - 1) * CRAWL_MIN);
   const checks =
-    ofThree && fetchesLeft(v) > 0 ? `${v.held} of 3 checks` : `${v.held} check${v.held === 1 ? '' : 's'}`;
+    ofHold && fetchesLeft(v) > 0
+      ? `${v.held} of ${HOLD} checks`
+      : `${v.held} check${v.held === 1 ? '' : 's'}`;
   return v.held > 1 ? `held ${checks} (${span})` : `held ${checks}`;
 }
 
 /** The card's footer: "First seen 09:30 · held 2 checks (30 min)" and "From the 10:00:14 fetch · next fetch 10:30". */
-export function footerWords(v: PageChangeView, ofThree = false): [string, string] | null {
+export function footerWords(v: PageChangeView, ofHold = false): [string, string] | null {
   if (!v.firstSeenAt || !v.checkedAt) return null;
   return [
-    `First seen ${time(v.firstSeenAt)} · ${heldWords(v, ofThree)}`,
+    `First seen ${time(v.firstSeenAt)} · ${heldWords(v, ofHold)}`,
     `From the ${formatTimeWithSeconds(new Date(v.checkedAt))} fetch${v.nextFetchAt ? ` · next fetch ${time(v.nextFetchAt)}` : ''}`,
   ];
+}
+
+/** "Couldn’t read the page (blocked by bot protection)", "(timed out)", "(HTTP 503)" — or no fetch at all. */
+export function noDataWords(n: PageChangeView['noData']): string {
+  switch (n?.reason) {
+    case 'blocked':
+      return 'Couldn’t read the page (blocked by bot protection)';
+    case 'timeout':
+      return 'Couldn’t read the page (timed out)';
+    case 'http':
+      return `Couldn’t read the page (HTTP ${n.statusCode})`;
+    case 'stale':
+      return 'Couldn’t read the page — no fetch got through in the last hour';
+    default:
+      return 'Couldn’t read the page';
+  }
 }
 
 /** The Page fingerprint card's status line and its second line (§26.8). */
@@ -45,7 +72,7 @@ export function statusWords(v: PageChangeView): { line: string; sub: string | nu
       };
     case 'no_data':
       return {
-        line: `Couldn’t read the page (blocked by bot protection)${v.checkedAt ? ` · last read ${time(v.checkedAt)}` : ''}`,
+        line: `${noDataWords(v.noData)}${v.checkedAt ? ` · last read ${time(v.checkedAt)}` : ''}`,
         sub: 'Uptime checks are unaffected. The last fingerprint read is kept; nothing is compared until a fetch gets through.',
       };
     case 'matches':
@@ -71,9 +98,9 @@ export function statusWords(v: PageChangeView): { line: string; sub: string | nu
       return {
         line:
           left > 0 && at
-            ? `Differs from the baseline · held ${v.held} of 3 checks — a PROBLEM opens at ${at} if it still differs`
+            ? `Differs from the baseline · held ${v.held} of ${HOLD} checks — a PROBLEM opens at ${at} if it still differs`
             : `Differs from the baseline · ${heldWords(v)}`,
-        sub: v.newScript.length ? null : 'No new script domain, so it waits for 3 fetches (about 1 h).',
+        sub: v.newScript.length ? null : `No new script domain, so it waits for ${HOLD} fetches (about 1 h).`,
       };
     }
     case 'problem':
@@ -81,9 +108,27 @@ export function statusWords(v: PageChangeView): { line: string; sub: string | nu
         line: `Differs from the baseline · PROBLEM open since ${time(v.incident!.since)}`,
         sub: v.newScript.length
           ? 'A new script domain raises a PROBLEM on the first fetch.'
-          : 'It held for 3 fetches (about 1 h).',
+          : `It held for ${HOLD} fetches (about 1 h).`,
       };
   }
+}
+
+/**
+ * The incident card's success line after an accept (§26.6, IncidentPageChange): before the match, after
+ * it, or with the resolve.
+ */
+export function acceptedWords(a: {
+  at: string;
+  by: string;
+  withResolve: boolean;
+  matchedAt: string | null;
+  nextFetchAt: string | null;
+  incidentLabel: string;
+}): string {
+  if (a.withResolve) return `Accepted as the new baseline with the resolve · ${time(a.at)} by ${a.by}.`;
+  const head = `Accepted as the new baseline ${time(a.at)} by ${a.by}`;
+  if (a.matchedAt) return `${head} · matched on the ${time(a.matchedAt)} fetch.`;
+  return `${head} · the ${a.nextFetchAt ? time(a.nextFetchAt) : 'next'} fetch should match and recover ${a.incidentLabel}.`;
 }
 
 /** The line while an accept's Undo is open (§26.6). */
@@ -92,7 +137,7 @@ export const pendingWords = (until: string) =>
 
 /** The What changed card's line under its title (Incident board). */
 export function compareWords(v: PageChangeView, differing: number): string {
-  return `Home page / · compared with the ${baselineWords(v)} · ${differing} of 7 fields differ`;
+  return `Home page / · compared with the ${baselineWords(v)} · ${differing} of ${FINGERPRINT_FIELDS.length} fields differ`;
 }
 
 /**

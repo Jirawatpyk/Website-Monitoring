@@ -103,7 +103,13 @@ export interface IncidentDetail {
    * A Page change incident (S09d, spec §26): the home page's live state, the rows it opened with and
    * its new script domains. Null for every other trigger.
    */
-  pageChange: { view: PageChangeView; rows: ChangeRowView[]; newScript: string[] } | null;
+  pageChange: {
+    view: PageChangeView;
+    rows: ChangeRowView[];
+    newScript: string[];
+    /** This incident's accept (its latest `baseline_accepted`, not undone), for the card's success line. */
+    accepted: { at: string; by: string; withResolve: boolean; matchedAt: string | null } | null;
+  } | null;
   /** Accept as new baseline: Admins only (D-046, Tao 13 Oct) — not the Acknowledge rule. */
   canAcceptBaseline: boolean;
 }
@@ -321,6 +327,11 @@ export async function loadIncident(
     if (e.actor_id) ids.add(e.actor_id);
     if (typeof e.payload.user_id === 'string') ids.add(e.payload.user_id);
   }
+  // S09d: a Page change incident's card — read beside the names (it doesn't need them).
+  const pageChangeRead =
+    i.trigger === 'content_change' && primary?.id
+      ? pageChangeOf(db, i, events, { ...primary, id: primary.id }, viewer, now)
+      : Promise.resolve(null);
   const people = ids.size
     ? await db
         .from('profiles')
@@ -331,11 +342,10 @@ export async function loadIncident(
   const names = new Map((people.data ?? []).map((p) => [p.id, p.display_name]));
   const nameOf = (id: string | null) => (id ? (names.get(id) ?? 'someone') : 'someone');
 
-  // S09d: a Page change incident's card — the page's live state, and the change it opened with.
-  const pageChange =
-    i.trigger === 'content_change' && primary?.id
-      ? await pageChangeOf(db, i, events, { ...primary, id: primary.id }, viewer, now)
-      : null;
+  const pageChangeLive = await pageChangeRead;
+  const pageChange = pageChangeLive
+    ? { ...pageChangeLive, accepted: incidentAccept(i, events, nameOf) }
+    : null;
   const view = buildIncidentView(i, events, viewer, names, now);
 
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
@@ -634,7 +644,7 @@ async function pageChangeOf(
   primary: { id: string; url: string; allowed_redirect_domains?: string[] },
   viewer: Viewer,
   now: Date,
-): Promise<IncidentDetail['pageChange']> {
+): Promise<Omit<NonNullable<IncidentDetail['pageChange']>, 'accepted'>> {
   const view = await loadPageChange(
     db,
     {
@@ -665,5 +675,33 @@ async function pageChangeOf(
         links: baselineDomains.links ?? [],
       })
     : view.rows;
-  return { view, rows, newScript: opened?.newScriptDomains ?? view.newScript };
+  // The plain fetches read cover 6 fetches (3 h): First seen comes from when the incident's change began
+  // (D-046 item 5), and "held" counts the 30-min fetches since then (spec-check 15 Oct).
+  const firstSeen = opened?.firstSeenAt ?? null;
+  const live =
+    firstSeen && view.checkedAt && view.firstSeenAt && view.firstSeenAt > firstSeen
+      ? {
+          ...view,
+          firstSeenAt: firstSeen,
+          held: Math.round((Date.parse(view.checkedAt) - Date.parse(firstSeen)) / 1_800_000) + 1,
+        }
+      : view;
+  return { view: live, rows, newScript: opened?.newScriptDomains ?? view.newScript };
+}
+
+/** The incident's latest accept that wasn't undone (§26.6): when, by whom, with the resolve, matched. */
+function incidentAccept(
+  i: DetailRow,
+  events: readonly EventRow[],
+  nameOf: (id: string | null) => string,
+): NonNullable<IncidentDetail['pageChange']>['accepted'] {
+  const sorted = [...events].sort((a, b) => a.at.localeCompare(b.at));
+  const last = sorted.filter((e) => e.type === 'baseline_accepted').at(-1);
+  if (!last || sorted.some((e) => e.type === 'baseline_undone' && e.at >= last.at)) return null;
+  return {
+    at: last.at,
+    by: nameOf(last.actor_id),
+    withResolve: last.payload.with_resolve === true,
+    matchedAt: i.recovered_at && i.recovered_at > last.at ? i.recovered_at : null,
+  };
 }

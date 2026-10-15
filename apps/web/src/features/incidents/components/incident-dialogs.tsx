@@ -15,6 +15,7 @@ import {
 import {
   IconCircle,
   IconCircleCheck,
+  IconLock,
   IconClock,
   IconPencil,
   IconRotateCcw,
@@ -331,7 +332,15 @@ export function ResolveDialog({
    * A Page change incident (spec §26.7): Client-side change offers an Admin "Also accept the current page
    * as the new baseline", ticked; other roles get the hint. Absent for every other trigger.
    */
-  pageChange?: { canAccept: boolean; checkId: string | null; newScript: boolean; changed: number };
+  pageChange?: {
+    canAccept: boolean;
+    checkId: string | null;
+    /** The page's live new script domains, named in the warning (security review, 15 Oct). */
+    newScript: readonly string[];
+    changed: number;
+    /** The page already matches the baseline: Resolve doesn't wait for it any more. */
+    matched: boolean;
+  };
   /** The page's conditions; the root-cause line follows the form here. */
   conditions: Condition[];
   /** "Down 8 min · Window Thu 22:14–22:22 · OK since 22:22" cells. */
@@ -512,7 +521,7 @@ export function ResolveDialog({
               </Button>
             ) : (
               <Button
-                variant={willAccept && pageChange?.newScript ? 'danger' : 'primary'}
+                variant={willAccept && pageChange?.newScript.length ? 'danger' : 'primary'}
                 icon={<IconCircleCheck />}
                 disabled={!gate.ok}
                 loading={pending}
@@ -654,15 +663,16 @@ export function ResolveDialog({
               >
                 Also accept the current page as the new baseline
               </Checkbox>
-              {acceptBox && pageChange.newScript && (
+              {acceptBox && pageChange.newScript.length > 0 && (
                 <Alert tone="danger" title="A new script domain usually means injected code.">
-                  Accept only if you know the client added it.
+                  {`Accept only if you know the client added it. New: ${pageChange.newScript.join(', ')}.`}
                 </Alert>
               )}
             </div>
           )}
-          {clientChange && !pageChange.canAccept && (
-            <p className="m-0 text-sm text-fg-secondary">
+          {clientChange && !pageChange.canAccept && !pageChange.matched && (
+            <p className="m-0 flex items-center gap-2 text-sm text-fg-secondary">
+              <IconLock aria-hidden />
               Only an Admin can accept a new baseline — resolve once the page matches it again.
             </p>
           )}

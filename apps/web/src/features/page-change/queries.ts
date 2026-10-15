@@ -37,7 +37,7 @@ export async function loadPageChange(
       .maybeSingle(),
     db
       .from('crawler_checks')
-      .select('id, checked_at, usable, fingerprint')
+      .select('id, checked_at, usable, fingerprint, outcome, status_code, error')
       .eq('monitor_id', m.monitorId)
       .eq('view', FINGERPRINT_VIEW)
       .order('checked_at', { ascending: false })
@@ -87,6 +87,9 @@ export async function loadPageChange(
     checked_at: f.checked_at,
     usable: f.usable,
     fingerprint: fingerprint(f.fingerprint),
+    outcome: f.outcome,
+    status_code: f.status_code,
+    error: f.error,
   }));
   return buildPageChange({
     monitorId: m.monitorId,

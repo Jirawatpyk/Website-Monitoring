@@ -217,6 +217,7 @@ export function IncidentDetailView({
       newScript={d.pageChange.newScript}
       incidentLabel={incidentLabel}
       resolved={resolved}
+      accepted={d.pageChange.accepted}
       siteName={d.siteName}
       canAccept={d.canAcceptBaseline}
       viewerName={viewerName}
@@ -279,7 +280,8 @@ export function IncidentDetailView({
             <span className="text-sm text-fg-secondary">
               {[
                 v.cause,
-                stillDown
+                // a page change has no failed check: the board shows only its cause (§26.3)
+                stillDown && !d.pageChange
                   ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
                   : d.recoveredAt && !resolved
                     ? `OK since ${formatTime(new Date(d.recoveredAt))}`
@@ -423,7 +425,7 @@ export function IncidentDetailView({
                 <span id="phone-resolve-why" className="text-center text-xs text-fg-secondary">
                   {d.gate.lockedReason ??
                     (d.gate.ok
-                      ? 'All 3 conditions met · Resolve is a manual step'
+                      ? `All ${d.gate.conditions.length} conditions met · Resolve is a manual step`
                       : 'Write the root cause in Resolve')}
                 </span>
                 <span className="flex gap-2">
@@ -502,8 +504,15 @@ export function IncidentDetailView({
               d.pageChange
                 ? {
                     canAccept: d.canAcceptBaseline,
-                    checkId: d.pageChange.view.status === 'problem' ? d.pageChange.view.checkId : null,
-                    newScript: d.pageChange.view.newScript.length > 0,
+                    // none while an accept is waiting or done: the box is for accepting now (§26.7)
+                    checkId:
+                      d.pageChange.view.status === 'problem' &&
+                      !d.pageChange.view.pending &&
+                      !d.pageChange.accepted
+                        ? d.pageChange.view.checkId
+                        : null,
+                    newScript: d.pageChange.view.newScript,
+                    matched: !!d.recoveredAt,
                     changed: d.pageChange.view.rows.length,
                   }
                 : undefined
@@ -726,7 +735,8 @@ function ResolveCard({
             size={primary ? 'sm' : 'md'}
             fullWidth={!primary}
             icon={<IconPencil />}
-            onClick={g.canOpenDialog ? onResolve : onRootCause}
+            // Everyone gets the Resolve dialog: it says why Resolve waits, and what an Admin can do.
+            onClick={onResolve}
           >
             Root cause &amp; resolve…
           </Button>

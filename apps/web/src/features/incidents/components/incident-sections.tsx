@@ -52,21 +52,32 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
 
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {
   const confirmedAt = new Date(d.detectedAt);
+  const page = d.pageChange;
   const facts = [
     {
-      label: 'STARTED',
+      label: page ? 'FIRST SEEN' : 'STARTED',
       value: [startedOn(d, now), formatTimeWithSeconds(new Date(d.startedAt))].filter(Boolean).join(' '),
-      caption: 'First failed check',
+      caption: page ? 'First fetch that differed' : 'First failed check',
     },
     {
-      label: d.severity === 'down' ? 'CONFIRMED DOWN' : 'DETECTED',
+      label: d.severity === 'down' ? 'CONFIRMED DOWN' : page ? 'CONFIRMED PROBLEM' : 'DETECTED',
       value: formatTimeWithSeconds(confirmedAt),
-      caption: `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
+      caption: page
+        ? page.newScript.length
+          ? 'New script domain — raised on the first fetch'
+          : 'Held 3 fetches (1 h)'
+        : `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
     },
     {
       label: 'DURATION',
       value: formatDuration(d.durationMinutes),
-      caption: d.recoveredAt ? `Recovered ${formatTime(new Date(d.recoveredAt))}` : 'Still down',
+      caption: d.recoveredAt
+        ? d.severity === 'problem'
+          ? `Problem ${formatTime(new Date(d.startedAt))} → recovered ${formatTime(new Date(d.recoveredAt))}`
+          : `Recovered ${formatTime(new Date(d.recoveredAt))}`
+        : d.severity === 'problem'
+          ? `Problem since ${formatTime(new Date(d.startedAt))}`
+          : 'Still down',
       danger: !d.recoveredAt,
     },
     {

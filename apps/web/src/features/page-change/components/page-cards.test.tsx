@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Toaster } from '@jirawatpyk/aura-react';
 import type { PageChangeView } from '../model';
-import { PageFingerprintCard, WhatChangedCard } from './page-cards';
+import { PageFingerprintCard, WhatChangedCard, type IncidentAccept } from './page-cards';
 
 const m = vi.hoisted(() => ({ refresh: vi.fn(), accept: vi.fn(), undo: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: m.refresh }) }));
@@ -29,6 +29,7 @@ const view = (over: Partial<PageChangeView> = {}): PageChangeView => ({
   checkId: 'c1',
   pending: null,
   incident: null,
+  noData: null,
   ...over,
 });
 const ROWS: PageChangeView['rows'] = [
@@ -79,10 +80,10 @@ describe('PageFingerprintCard (§26.8)', () => {
     const { unmount } = card(view({ status: 'recording' }));
     expect(screen.getByText('Current fingerprint')).toBeTruthy();
     unmount();
-    const nodata = card(view({ status: 'no_data' }));
-    expect(screen.getByText(/^Couldn’t read the page/)).toBeTruthy();
+    const nodata = card(view({ status: 'no_data', noData: { reason: 'timeout', statusCode: null } }));
+    expect(screen.getByText(/^Couldn’t read the page \(timed out\) · last read \d\d:\d\d$/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Show fingerprint' }));
-    expect(screen.getByText('Last fingerprint read')).toBeTruthy();
+    expect(screen.getByText(/^Last fingerprint read · \d\d:\d\d$/)).toBeTruthy();
     nodata.unmount();
     card(view({ status: 'no_fingerprint', fingerprint: [] }));
     expect(screen.getByText('No fingerprint yet — the first check runs within 30 min')).toBeTruthy();
@@ -90,10 +91,11 @@ describe('PageFingerprintCard (§26.8)', () => {
 
   it('PROBLEM open: the rows with +/− chips and screen-reader words, the incident link, Accept for an Admin', () => {
     card(problem());
-    expect(screen.getByText('New script domain')).toBeTruthy();
     expect(screen.getByText(/\+ evil-cdn\.example/).textContent).toBe('+ evil-cdn.example (new)');
     expect(screen.getByText(/− old\.example/).textContent).toBe('− old.example (removed)');
-    expect(screen.getByRole('link', { name: 'Open INC-0157' }).getAttribute('href')).toBe('/incidents/i1');
+    expect(
+      screen.getByRole('link', { name: /INC-0157 · Page change · since \d\d:\d\d/ }).getAttribute('href'),
+    ).toBe('/incidents/i1');
     const more = screen.getByRole('button', { name: 'and 2 unchanged' });
     fireEvent.click(more);
     expect(screen.getByText('tag.example')).toBeTruthy();
@@ -115,14 +117,15 @@ describe('PageFingerprintCard (§26.8)', () => {
 });
 
 describe('WhatChangedCard (§26.4)', () => {
-  const what = (v: PageChangeView, resolved = false) =>
+  const what = (v: PageChangeView, accepted: IncidentAccept | null = null) =>
     render(
       <WhatChangedCard
         view={v}
         rows={ROWS}
         newScript={['evil-cdn.example']}
         incidentLabel="INC-0157"
-        resolved={resolved}
+        resolved={false}
+        accepted={accepted}
         siteName="Site A"
         canAccept
         viewerName="Tao"
@@ -138,26 +141,50 @@ describe('WhatChangedCard (§26.4)', () => {
     expect(screen.getByRole('button', { name: 'Accept as new baseline' })).toBeTruthy();
   });
 
-  it('after an accept: the success line, the rows kept, no Accept', () => {
-    what(
-      view({
-        status: 'accepted',
-        baseline: {
-          acceptedAt: ago(0),
-          acceptedBy: 'Tao',
-          reason: 'Client redesign',
-          firstSetAt: ago(30000),
-        },
-        incident: { id: 'i1', number: 157, since: ago(37) },
-      }),
-    );
-    expect(
-      screen.getByText(
-        /^Baseline accepted \d\d:\d\d by Tao · INC-0157 recovers when the \d\d:\d\d fetch matches it$/,
-      ),
-    ).toBeTruthy();
+  it.each<[string, Partial<IncidentAccept>, RegExp]>([
+    [
+      'before the match',
+      {},
+      /^Accepted as the new baseline \d\d:\d\d by Tao · the \d\d:\d\d fetch should match and recover INC-0157\.$/,
+    ],
+    [
+      'after it',
+      { matchedAt: ago(-20) },
+      /^Accepted as the new baseline \d\d:\d\d by Tao · matched on the \d\d:\d\d fetch\.$/,
+    ],
+    [
+      'with the resolve',
+      { withResolve: true },
+      /^Accepted as the new baseline with the resolve · \d\d:\d\d by Tao\.$/,
+    ],
+  ])('after an accept (%s): the success line, the rows kept, no Accept', (_n, over, line) => {
+    what(problem(), { at: ago(0), by: 'Tao', withResolve: false, matchedAt: null, ...over });
+    expect(screen.getByText(line)).toBeTruthy();
     expect(screen.getByText('Page title')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Accept as new baseline' })).toBeNull();
+  });
+
+  it('focus follows the accept: to the pending line, then back to Accept after an Undo (WCAG 2.4.3)', () => {
+    const { rerender } = what(problem());
+    const props = {
+      rows: ROWS,
+      newScript: ['evil-cdn.example'],
+      incidentLabel: 'INC-0157',
+      resolved: false,
+      accepted: null,
+      siteName: 'Site A',
+      canAccept: true,
+      viewerName: 'Tao',
+    };
+    rerender(
+      <WhatChangedCard
+        view={problem({ pending: { until: ago(-0.1), byViewer: true, reason: 'x' } })}
+        {...props}
+      />,
+    );
+    expect(screen.getByText(/^Accepting as the new baseline — Undo is open until/)).toHaveFocus();
+    rerender(<WhatChangedCard view={problem()} {...props} />);
+    expect(screen.getByRole('button', { name: 'Accept as new baseline' })).toHaveFocus();
   });
 });
 
@@ -171,6 +198,9 @@ describe('Accept as new baseline (§26.5–§26.6)', () => {
       name: 'Accept the current page as the new baseline?',
     });
     expect(dialog.textContent).toContain('A new script domain usually means injected code.');
+    expect(dialog.textContent).toContain('New: evil-cdn.example.');
+    // the Reason field takes focus when the dialog opens (§26.5)
+    await waitFor(() => expect(screen.getByLabelText(/^Reason/)).toHaveFocus());
     expect(dialog.textContent).toContain('Page title: Site A | สล็อตออนไลน์');
     expect(dialog.textContent).toContain('Script / iframe domains: + evil-cdn.example, − old.example');
     const confirm = screen.getByRole('button', { name: 'Accept as baseline' });

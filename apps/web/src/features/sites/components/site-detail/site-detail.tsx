@@ -548,7 +548,8 @@ function MonitorsTable({ detail }: { detail: SiteDetail }) {
           Monitors
         </h2>
         <span className="text-sm text-fg-secondary">
-          Site status = worst of these. Only the primary monitor can make the site DOWN.
+          Site status = worst of these and the page fingerprint below. Only the primary monitor can make the
+          site DOWN.
         </span>
       </div>
       <Table caption="Monitors" captionHidden stackBelow="md" rowHeight="density" align="middle">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, Button, Dialog, TextField, toast } from '@jirawatpyk/aura-react';
 import { IconCheck, IconLock } from '@jirawatpyk/aura-react/icons';
@@ -11,11 +11,15 @@ import type { ChangeRowView } from '../model';
 
 const FAILED = 'Couldn’t reach the server. Check your connection and try again.';
 
-/** "A new script domain usually means injected code. Accept only if you know the client added it." */
-export function NewScriptWarning() {
+/**
+ * "A new script domain usually means injected code. Accept only if you know the client added it." — with
+ * the domains themselves, so nobody accepts one they never saw (security review, 15 Oct).
+ */
+export function NewScriptWarning({ domains = [] }: { domains?: readonly string[] }) {
   return (
     <Alert tone="danger" title="A new script domain usually means injected code.">
       Accept only if you know the client added it.
+      {domains.length > 0 && ` New: ${domains.join(', ')}.`}
     </Alert>
   );
 }
@@ -55,7 +59,6 @@ export function AcceptBaseline({
   newScript,
   nextFetchAt,
   viewerName,
-  fullWidth = false,
 }: {
   checkId: string;
   monitorId: string;
@@ -66,14 +69,12 @@ export function AcceptBaseline({
   newScript: readonly string[];
   nextFetchAt: string | null;
   viewerName: string;
-  fullWidth?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
-  const button = useRef<HTMLButtonElement>(null);
   const danger = newScript.length > 0;
 
   const confirm = () => {
@@ -92,7 +93,20 @@ export function AcceptBaseline({
       }
       setOpen(false);
       const toastId = `baseline-${monitorId}`;
+      const applies = new Date(result.appliesAt);
+      const done = `Applied ${formatTimeWithSeconds(applies)}${nextFetchAt ? ` · next check ${formatTime(new Date(nextFetchAt))}` : ''}`;
+      // §26.6: once the window closes the toast says it applied, with its own title.
+      const applied = setTimeout(
+        () =>
+          toast.success(`Baseline updated — ${siteName} is OK on the next check`, {
+            id: toastId,
+            description: done,
+            duration: 4000,
+          }),
+        Math.max(applies.getTime() - Date.now(), 0),
+      );
       const onUndo = async () => {
+        clearTimeout(applied);
         const undone = await undoBaseline(monitorId).catch(() => ({ ok: false as const, message: FAILED }));
         if (undone.ok) {
           toast({
@@ -103,10 +117,9 @@ export function AcceptBaseline({
         } else {
           toast.error('Couldn’t undo the baseline', { id: toastId, description: undone.message });
         }
+        // The card moves focus back to Accept once the refreshed page has it again (WCAG 2.4.3).
         router.refresh();
-        button.current?.focus();
       };
-      const applies = new Date(result.appliesAt);
       toast.success('Accepting as the new baseline', {
         id: toastId,
         description: (
@@ -115,13 +128,11 @@ export function AcceptBaseline({
             onUndo={onUndo}
             words={{
               pending: (s) => `Applies in ${s} s — nothing changes until then`,
-              done: `Baseline updated — ${siteName} is OK on the next check · Applied ${formatTimeWithSeconds(applies)}${
-                nextFetchAt ? ` · next check ${formatTime(new Date(nextFetchAt))}` : ''
-              }`,
+              done,
             }}
           />
         ),
-        duration: Math.max(applies.getTime() - Date.now(), 0) + 3000,
+        duration: Math.max(applies.getTime() - Date.now(), 0) + 500,
       });
       router.refresh();
     });
@@ -130,10 +141,11 @@ export function AcceptBaseline({
   return (
     <>
       <Button
-        ref={button}
+        data-accept-baseline
         variant="secondary"
         icon={<IconCheck />}
-        fullWidth={fullWidth}
+        // full width on phones (§26.5, MIncidentPageChange / MSite)
+        className="max-md:w-full"
         loading={busy}
         onClick={() => {
           setReason('');
@@ -168,7 +180,7 @@ export function AcceptBaseline({
         }
       >
         <div className="flex flex-col gap-4">
-          {danger && <NewScriptWarning />}
+          {danger && <NewScriptWarning domains={newScript} />}
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-semibold">What changes in the baseline</span>
             <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">

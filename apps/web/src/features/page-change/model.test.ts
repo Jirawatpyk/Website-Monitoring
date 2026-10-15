@@ -38,6 +38,8 @@ const fetch = (min: number, over: Partial<PageFingerprint> | null = {}, usable =
   checked_at: ago(min),
   usable,
   fingerprint: usable && over ? { ...BASE, ...over } : null,
+  // an unusable fetch here is a bot-protection block (403)
+  ...(usable ? {} : { outcome: 'blocked', status_code: 403 }),
 });
 const input = (over: Partial<PageChangeInput> = {}): PageChangeInput => ({
   monitorId: 'm1',

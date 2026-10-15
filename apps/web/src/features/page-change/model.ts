@@ -76,6 +76,8 @@ export interface PageChangeView {
   pending: { until: string; byViewer: boolean; reason: string | null } | null;
   /** The site's open Page change incident. */
   incident: { id: string; number: number; since: string } | null;
+  /** Why it reads no data: the newest fetch's own failure, or no usable fetch for over an hour. */
+  noData: { reason: 'blocked' | 'timeout' | 'http' | 'error' | 'stale'; statusCode: number | null } | null;
 }
 
 export interface BaselineRow {
@@ -95,6 +97,9 @@ export interface PlainFetch {
   checked_at: string;
   usable: boolean;
   fingerprint: PageFingerprint | null;
+  outcome?: string | null;
+  status_code?: number | null;
+  error?: string | null;
 }
 
 export interface PageChangeInput {
@@ -183,6 +188,7 @@ export function buildPageChange(i: PageChangeInput): PageChangeView {
       ? { until: b!.undo_until!, byViewer: b!.undo_by === i.viewerId, reason: b!.reason }
       : null,
     incident: i.incident,
+    noData: null,
   };
   if (!b || !compareWith) {
     return { ...base, fingerprint: newest?.fingerprint ? fingerprintRows(newest.fingerprint) : [] };
@@ -192,7 +198,12 @@ export function buildPageChange(i: PageChangeInput): PageChangeView {
   const latest = i.fetches[0];
   const stale = !newest || i.now.getTime() - Date.parse(newest.checked_at) > CRAWLER_FRESH_MS;
   if ((latest && !latest.usable) || stale) {
-    return { ...base, status: 'no_data', fingerprint: fingerprintRows(newest?.fingerprint ?? b.fingerprint) };
+    return {
+      ...base,
+      status: 'no_data',
+      fingerprint: fingerprintRows(newest?.fingerprint ?? b.fingerprint),
+      noData: latest && !latest.usable ? failureOf(latest) : { reason: 'stale', statusCode: null },
+    };
   }
   if (isRecording({ firstSetAt: new Date(b.first_set_at) }, i.now)) {
     return { ...base, status: 'recording', fingerprint: fingerprintRows(newest!.fingerprint!) };
@@ -229,6 +240,14 @@ export function buildPageChange(i: PageChangeInput): PageChangeView {
     held,
     firstSeenAt,
   };
+}
+
+/** How a fetch that couldn't read the page failed. */
+function failureOf(f: PlainFetch): NonNullable<PageChangeView['noData']> {
+  if (f.outcome === 'blocked') return { reason: 'blocked', statusCode: f.status_code ?? null };
+  if (f.error === 'Timeout') return { reason: 'timeout', statusCode: null };
+  if (f.status_code) return { reason: f.status_code >= 400 ? 'http' : 'error', statusCode: f.status_code };
+  return { reason: 'error', statusCode: null };
 }
 
 /** Fetches still to go before a waiting change becomes a PROBLEM (0 when it would already alert). */

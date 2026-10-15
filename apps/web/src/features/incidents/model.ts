@@ -735,7 +735,9 @@ export function timelineOf(
         // §26.6: "Baseline accepted by Tao · “reason”".
         const reason = str(e.payload.reason);
         const applies = str(e.payload.applies_at);
-        const undone = later.some((l) => l.type === 'baseline_undone');
+        // the Undo of this accept: before the next accept
+        const next = later.findIndex((l) => l.type === 'baseline_accepted');
+        const undone = (next < 0 ? later : later.slice(0, next)).some((l) => l.type === 'baseline_undone');
         item(
           e,
           'baseline',
