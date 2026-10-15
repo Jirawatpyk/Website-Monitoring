@@ -167,6 +167,34 @@ describe('buildPageChange (spec §26.8)', () => {
     );
   });
 
+  it('A second accept inside its Undo: the header still names who accepted the baseline in force', () => {
+    const v = buildPageChange(
+      input({
+        baseline: baseline({
+          fingerprint: { ...BASE, ...retitled },
+          accepted_by: 'u-arm',
+          accepted_at: ago(0),
+          reason: 'Client redesign',
+          undo_before: {
+            fingerprint: BASE,
+            accepted_at: '2026-09-15T03:00:00Z',
+            accepted_by: 'u-tao',
+            reason: 'Partner script',
+          },
+          undo_until: new Date(NOW.getTime() + 8_000).toISOString(),
+          undo_by: 'u-arm',
+        }),
+        fetches: [fetch(7, retitled)],
+      }),
+    );
+    expect(v.baseline).toMatchObject({
+      acceptedAt: '2026-09-15T03:00:00Z',
+      acceptedBy: 'Tao',
+      reason: 'Partner script',
+    });
+    expect(v.pending).toMatchObject({ byViewer: false, reason: 'Client redesign' });
+  });
+
   it('Accepted: the newest fetch is the accepted one — the next fetch compares against it', () => {
     const v = buildPageChange(
       input({
