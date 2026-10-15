@@ -69,15 +69,16 @@ select is(
    from public.page_baselines where monitor_id = '00000000-0000-0000-0000-0000000000d1'),
   'Site A · true · true', 'set from that fetch, by nobody, recording from its time'
 );
-select is((select count(*)::int from public.audit_log where action = 'page_baseline.auto'), 1, 'audited once');
+select is((select count(*)::int from public.audit_log where action = 'page_baseline.auto'
+           and entity_id = '00000000-0000-0000-0000-0000000000d1'), 1, 'audited once');
 
 -- ── The engine's read ────────────────────────────────────────────────────
 select is(
   (select baseline->>'title' || ' · ' || coalesce(pending_until::text, 'none') || ' · ' || jsonb_array_length(facts)::text
-          || ' · ' || latest_usable::text
+          || ' · ' || (accepted_at = now() - interval '90 minutes')::text
    from public.engine_page_fingerprints(now(), now() - interval '1 day')
    where monitor_id = '00000000-0000-0000-0000-0000000000d1'),
-  'Site A · none · 2 · false', 'baseline, no accept waiting, the two usable plain fetches, the newest fetch blocked'
+  'Site A · none · 2 · true', 'baseline, no accept waiting, the two usable plain fetches (a blocked one hides none), accepted when first set'
 );
 select is(
   (select facts->0->>'id' from public.engine_page_fingerprints(now(), now() - interval '1 day')

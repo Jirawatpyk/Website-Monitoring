@@ -800,7 +800,7 @@ isOneToOne: false
                            },
 "engine_page_fingerprints":
 { Args: { "p_now": string,"p_since": string }; Returns: {
-              "baseline": Json,"baseline_hash": string,"facts": Json,"first_set_at": string,"latest_at": string,"latest_usable": boolean,"monitor_id": string,"pending_until": string
+              "accepted_at": string,"baseline": Json,"baseline_hash": string,"facts": Json,"first_set_at": string,"monitor_id": string,"pending_until": string
             }[]
                            },
 "engine_post_late_alert":

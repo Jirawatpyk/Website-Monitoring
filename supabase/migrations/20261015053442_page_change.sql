@@ -129,9 +129,10 @@ grant execute on function public.crawler_set_baseline(uuid) to service_role;
 
 -- ── The engine's read ──────────────────────────────────────────────────────
 -- Per primary monitor of an active site that has a baseline: the baseline to compare with at p_now
--- (the previous one while an accept's Undo is open), whether an accept is waiting, first_set_at, and
--- the six newest usable plain fetches since p_since plus the newest fetch of any kind (so a blocked
--- one reads as no data). One row per monitor, under PostgREST's 1,000-row cap. Fingerprints go only
+-- (the previous one while an accept's Undo is open), whether an accept is waiting, first_set_at, when
+-- that baseline was accepted (a fetch from before it can't recover an open incident: the Admin already
+-- saw it) and the six newest usable plain fetches since p_since — an unusable fetch never hides them
+-- (D-042). One row per monitor, under PostgREST's 1,000-row cap. Fingerprints go only
 -- where a hash differs from the baseline's (the baseline only then too): every minute, a page that
 -- matches costs a few hashes, not 7 × 15 KB (db-reviewer, 15 Oct).
 create function public.engine_page_fingerprints(p_now timestamptz, p_since timestamptz)
@@ -141,8 +142,7 @@ returns table (
   baseline jsonb,
   pending_until timestamptz,
   first_set_at timestamptz,
-  latest_at timestamptz,
-  latest_usable boolean,
+  accepted_at timestamptz,
   facts jsonb
 )
 language sql
@@ -158,8 +158,7 @@ as $$
     ) then e.fingerprint end,
     case when b.undo_until > p_now then b.undo_until end,
     b.first_set_at,
-    l.checked_at,
-    l.usable,
+    case when b.undo_until > p_now then (b.undo_before->>'accepted_at')::timestamptz else b.accepted_at end,
     coalesce((
       select jsonb_agg(jsonb_build_object('id', f.id, 'checked_at', f.checked_at, 'hash', f.fingerprint_hash,
                                           'fingerprint', case when f.fingerprint_hash <> e.hash then f.fingerprint end)
@@ -180,14 +179,7 @@ as $$
   cross join lateral (
     select case when b.undo_until > p_now then b.undo_before->'fingerprint' else b.fingerprint end as fingerprint,
            case when b.undo_until > p_now then md5((b.undo_before->'fingerprint')::text) else b.fingerprint_hash end as hash
-  ) e
-  left join lateral (
-    select c.checked_at, c.usable
-    from public.crawler_checks c
-    where c.monitor_id = b.monitor_id and c.view = 'plain' and c.checked_at >= p_since and c.checked_at <= p_now
-    order by c.checked_at desc
-    limit 1
-  ) l on true;
+  ) e;
 $$;
 
 revoke execute on function public.engine_page_fingerprints(timestamptz, timestamptz) from public, anon, authenticated;
