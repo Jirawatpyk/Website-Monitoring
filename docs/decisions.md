@@ -71,6 +71,8 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 **Impact.** S09d builds it in three PRs: the migration first (`content_change`, the `plain` view and `fingerprint`, `page_baselines`, the read / accept / undo RPCs, `resolve_incident` with `p_accept_check_id`); then the probe's fingerprint, the crawler's plain fetch, the engine rule, the runner gate and the notifier wording — merged early so the production record starts; then the screens, the test-target modes and staging. Plan S09d: Size L, Depends on `S09c (merged), S07`, Status In progress.
 
+**Screens, where the boards leave it open (Claude, spec-check 15 Oct).** Every role's "Root cause & resolve…" opens the Resolve dialog — locked until the page matches, saying why and that an Admin can accept with the resolve — rather than the root-cause form. Phones keep MIncident's sticky Resolve bar, so a Page change incident works like any other. The first, automatic baseline reads "baseline set Thu 24 Sep" (no "by"); one an Admin accepted reads "baseline accepted … by Tao".
+
 ## D-045 — The phone top bar follows §22.1: back, page title, page actions, avatar
 
 **Conflict.** Spec §22.1 (added 10 Oct) and every phone board draw a 56 px top bar with:
