@@ -90,7 +90,10 @@ test.describe('page change (local Supabase)', () => {
           'page_baseline.accept',
         ]);
       // The card says it while the Undo is open, and the timeline keeps both accepts (§16.11).
-      await expect(card.getByText(/^Accepting as the new baseline — Undo is open until/)).toBeVisible();
+      // the card's line comes with the re-render too, slow under next dev and a parallel run
+      await expect(card.getByText(/^Accepting as the new baseline — Undo is open until/)).toBeVisible({
+        timeout: 20_000,
+      });
       await expect(
         page
           .getByText(/Baseline accepted by Tao · “Client added the partner script/)
