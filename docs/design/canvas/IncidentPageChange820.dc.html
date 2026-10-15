@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Incident INC-0157 (page change) — 820 px</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+
+.pc-row{display:grid;grid-template-columns:176px minmax(0,1fr);gap:16px;padding:12px 0;border-bottom:1px solid var(--aura-border-subtle)}
+.pc-row:last-child{border-bottom:0}
+.pc-lab{font-size:13px;line-height:1.5;font-weight:500;color:var(--aura-fg-secondary)}
+.pc-val{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pc-was{font-size:13px;line-height:1.5;color:var(--aura-fg-secondary);overflow-wrap:anywhere}
+.pc-now{font-size:14px;line-height:1.5;font-weight:600;color:var(--aura-fg-primary);overflow-wrap:anywhere}
+.pc-plain{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.pc-tag{display:inline-block;width:40px;font-family:var(--font-mono);font-size:11px;font-weight:400;color:var(--aura-fg-tertiary)}
+.pc-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pc-chip{display:inline-flex;align-items:center;min-height:26px;box-sizing:border-box;padding:2px 10px;border-radius:9999px;border:1px solid var(--aura-border-default);background:var(--aura-bg-canvas);font-family:var(--font-mono);font-size:12px;line-height:1.4;overflow-wrap:anywhere}
+.pc-add{border-color:var(--aura-alert-danger-border);background:var(--aura-alert-danger-bg);color:var(--aura-alert-danger-fg);font-weight:600}
+.pc-rem{color:var(--aura-fg-secondary);text-decoration:line-through}
+.pc-more{border:0;background:none;padding:0 4px;min-height:26px;font:inherit;font-size:12px;color:var(--aura-fg-secondary);text-decoration:underline;cursor:pointer}
+.pc-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.pc-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;font-size:12px;line-height:1.5;color:var(--aura-fg-secondary)}
+.pc-hint{display:flex;align-items:center;gap:8px;font-size:13px;line-height:1.45;color:var(--aura-fg-secondary)}
+.pc-danger{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--aura-alert-danger-bg);border:1px solid var(--aura-alert-danger-border);border-radius:var(--aura-radius-md);font-size:13px;line-height:1.5;color:var(--aura-alert-danger-fg)}
+.pc-ok{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:var(--aura-alert-success-bg, var(--aura-bg-canvas));border:1px solid var(--aura-alert-success-border, var(--aura-border-default));border-radius:var(--aura-radius-md);font-size:13px;line-height:1.5}
+.pc-pend{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:var(--aura-bg-canvas);border:1px solid var(--aura-border-default);border-radius:var(--aura-radius-md);font-size:13px;line-height:1.5}
+.pc-after{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.5}
+.pc-after li{overflow-wrap:anywhere}
+.pc-ctl{display:flex;align-items:center;gap:10px;padding:4px 4px 4px 12px;border:1px dashed var(--aura-border-control);border-radius:var(--aura-radius-md);background:var(--aura-bg-canvas);font-size:11px;color:var(--aura-fg-secondary)}
+.pc-ctl>span{font-family:var(--font-mono);flex-shrink:0}
+
+</style>
+</helmet>
+<div style="width: 820px; height: 2460px; position: relative; display: flex; flex-direction: row-reverse; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 20px; position: relative">
+
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<div class="pc-ctl"><span>STATE</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import></div>
+<div class="pc-ctl"><span>CHANGES</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Sample change set" options="{{sets}}" value="{{set}}" on-change="{{setSet}}" size="sm"></x-import></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
+<a href="Incidents.dc.html" style="text-decoration: none">Incidents</a>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<span style="font-family: var(--font-mono); font-size: 12px">INC-0157</span>
+</div>
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+<div style="display: flex; align-items: center; gap: 16px">
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 30px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Bangkok Airways – Taiwan home page changed</h1>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+<sc-if value="{{open}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="soft" icon="triangle-alert">Problem</x-import></sc-if>
+<sc-if value="{{recovered}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="pencil">Needs root cause</x-import></sc-if>
+<sc-if value="{{resolved}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="success" variant="outline" icon="circle-check">Resolved</x-import></sc-if>
+<sc-if value="{{notAcked}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Badge" tone="danger" variant="outline" icon="clock">Unacked</x-import><span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-danger); padding-right: 4px">37 min unacked</span></sc-if>
+<sc-if value="{{acked}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="check">Acknowledged</x-import></sc-if>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Tier 1</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Trigger: Page change</x-import>
+</div>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{pc.cause}}</span>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0">
+<a href="SiteDetail.dc.html" style="height: 44px; padding: 0 24px; display: inline-flex; align-items: center; border-radius: 9999px; border: 1px solid var(--aura-button-secondary-border); color: var(--aura-fg-primary); font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap">View site</a>
+<sc-if value="{{showAck}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{ack}}">Acknowledge</x-import></sc-if>
+</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius); box-shadow: var(--aura-shadow-enterprise)">
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default); border-bottom: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">FIRST SEEN</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">{{pc.S.firstAt}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">First fetch that differed</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default); border-bottom: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">CONFIRMED PROBLEM</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">09:30:14</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{pc.S.confirmSub}}</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-bottom: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">DURATION</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">{{duration}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{durationSub}}</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ESCALATION</span><span style="font-size: 15px; font-weight: 600">L0 · Arm</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{escNext}}</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">OWNER</span><span style="font-size: 15px; font-weight: 600">Arm</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Backup Ploy · AM Bua</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ACKNOWLEDGED</span><span style="font-size: 15px; font-weight: 600">{{ackBy}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{ackMeta}}</span></div>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start">
+<div style="grid-column: span 1; display: flex; flex-direction: column; gap: 16px; min-width: 0">
+
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; line-height: 1.4">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">What changed</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Home page / · compared with the baseline accepted Thu 10 Sep by Tao · {{pc.n}} of 7 fields differ</span>
+</div>
+<sc-if value="{{pc.newScript}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Badge" tone="danger" variant="outline" icon="triangle-alert">New script domain</x-import></sc-if>
+</div>
+<sc-if value="{{accPend}}" hint-placeholder-val="{{false}}"><div class="pc-pend"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="clock" size="sm"></x-import></span><span>Accepting as the new baseline — Undo is open until 10:07:10.</span></div></sc-if>
+<sc-if value="{{accDone}}" hint-placeholder-val="{{false}}"><div class="pc-ok"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span><span>{{accLine}}</span></div></sc-if>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{pc.rows}}" as="r" hint-placeholder-count="4">
+<div class="pc-row">
+<span class="pc-lab">{{r.label}}</span>
+<div class="pc-val">
+<sc-if value="{{r.isText}}" hint-placeholder-val="{{true}}"><span class="pc-was"><span class="pc-tag">Was</span>{{r.was}}</span><span class="pc-now"><span class="pc-tag">Now</span>{{r.now}}</span></sc-if>
+<sc-if value="{{r.isPlain}}" hint-placeholder-val="{{false}}"><span class="pc-plain">{{r.val}}</span></sc-if>
+<sc-if value="{{r.isDom}}" hint-placeholder-val="{{false}}"><div class="pc-chips"><sc-for list="{{r.added}}" as="a" hint-placeholder-count="1"><span class="pc-chip pc-add">+&nbsp;{{a.t}}<span class="pc-sr"> (new)</span></span></sc-for><sc-for list="{{r.removed}}" as="m" hint-placeholder-count="0"><span class="pc-chip pc-rem">−&nbsp;{{m.t}}<span class="pc-sr"> (removed)</span></span></sc-for><sc-if value="{{r.showUnch}}" hint-placeholder-val="{{false}}"><sc-for list="{{r.unch}}" as="u" hint-placeholder-count="2"><span class="pc-chip">{{u.t}}</span></sc-for></sc-if><sc-if value="{{r.hasUnch}}" hint-placeholder-val="{{true}}"><button type="button" class="pc-more" aria-expanded="{{r.unchOpen}}" onClick="{{r.toggle}}">{{r.unchLabel}}</button></sc-if></div></sc-if>
+</div>
+</div>
+</sc-for>
+
+</div>
+<div class="pc-foot"><span>{{pc.foot1}}</span><span>{{pc.foot2}}</span></div>
+<sc-if value="{{showActRow}}" hint-placeholder-val="{{true}}"><div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--aura-border-subtle)">
+<sc-if value="{{canAccept}}" hint-placeholder-val="{{true}}"><span style="padding-top: 12px"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="check" disabled="{{acc.busy}}" loading="{{acc.busy}}" data-pc-focus="1" on-click="{{openAccept}}">Accept as new baseline</x-import></span><span style="padding-top: 12px; font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">Intended change (redesign, a new tool)? Accept it. A hack? The client fixes the page and this recovers when it matches the baseline again.</span></sc-if>
+<sc-if value="{{noAccept}}" hint-placeholder-val="{{false}}"><span class="pc-hint" style="padding-top: 12px"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import>Only an Admin can accept a new baseline</span></sc-if>
+</div></sc-if>
+</div>
+
+<div class="aura-card">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Timeline</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">All times UTC+7 · every event is in the audit log</span>
+</div>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{timeline}}" as="t" hint-placeholder-count="6">
+<div style="display: flex; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--aura-border-subtle)">
+<span style="width: 64px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); line-height: 22px">{{t.at}}</span>
+<span style="display: flex; padding-top: 3px; color: {{t.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.5; min-width: 0">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; overflow-wrap: anywhere">{{t.title}}<sc-if value="{{t.scheduled}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="clock">Scheduled</x-import></sc-if></span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.detail}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<div class="aura-card">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Escalation · Tier 1 PROBLEM</h3>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{ladder}}" as="l" hint-placeholder-count="2">
+<div style="display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--aura-border-subtle)">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; background: {{l.dotBg}}; color: {{l.dotFg}}">{{l.level}}</span>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; line-height: 1.5; min-width: 0">
+<span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 13px; font-weight: 600">{{l.when}}</span><span style="font-size: 12px; color: {{l.statusColor}}">{{l.status}}</span></span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{l.who}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">A PROBLEM never calls or reaches the CEO. No client update track — the client status page shows nothing for a page change.</span>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Resolve</h3>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{condCount}} of 2 met</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{conds}}" as="c" hint-placeholder-count="2">
+<div style="display: flex; align-items: flex-start; gap: 10px; line-height: 1.45">
+<span style="display: flex; padding-top: 2px; color: {{c.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm" label="{{c.state}}"></x-import></span>
+<span style="display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 500">{{c.label}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.detail}}</span></span>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="pencil" size="sm" disabled="{{resolved}}" on-click="{{openResolve}}">Root cause &amp; resolve…</x-import>
+</div>
+</div>
+
+<div style="padding: 14px 16px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.55; color: var(--aura-fg-secondary); display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · PAGE CHANGE (§26) · 820 PX</span>
+<span>At 820 px (tablet, small laptop) the sidebar collapses to its icon rail, the key-facts strip wraps to 3 per row and the side column (Escalation, Resolve) stacks under the main column. What changed keeps the field-name column.</span>
+<span>Wording example — made-up INC-0157, not in the sample ledger. CHANGES switches the sample: Defacement has a new script domain (raised on the first fetch, danger dialog); Redesign has none (raised after 3 fetches, ~1 h).</span>
+<span>“What changed” sits where Evidence / Latest round sits on other incidents. One row per differing field: Was (muted) → Now (emphasised); long values wrap. Domain sets are chips: “+” added (danger), “−” removed (muted, struck), unchanged folded into “and N unchanged”. No “view page source” — only the fingerprint is kept.</span>
+<span>Accept as new baseline: Admin only, secondary. Other roles see the card read-only with the hint (STATE › Not Admin). Confirm → in flight → Undo toast 10 s; the timeline gets “Baseline accepted by Tao · “reason””. The incident stays open until a fetch matches the new baseline (STATE › After 10:30: recovered, needs a root cause).</span>
+<span>Resolve with “Client-side change” shows “Also accept the current page as the new baseline”, ticked — Page change incidents only, Admins only.</span>
+</div>
+</div>
+</div>
+</main>
+<aside style="width: 72px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0; display: flex; align-items: center; justify-content: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="incidents" label="Main navigation" collapsed="{{yes}}" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" aria-label="My profile" style="padding: 16px 0; justify-content: center; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="md"></x-import>
+</a>
+</aside>
+
+
+<sc-if value="{{tst.show}}" hint-placeholder-val="{{false}}">
+<div role="status" aria-live="polite" style="position: absolute; {{tst.pos}}; z-index: 50; box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 10px 8px 10px 16px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); line-height: 1.4">
+<span style="display: flex"><x-import component-from-global-scope="Aura.Icon" name="{{tst.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px"><span style="font-weight: 600">{{tst.title}}</span><span style="font-size: 12px; opacity: 0.8">{{tst.line}}</span></span>
+<sc-if value="{{tst.pending}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{tst.undo}}" style="height: 44px; padding: 0 16px; flex-shrink: 0; border-radius: 9999px; border: 1px solid color-mix(in srgb, currentColor 45%, transparent); background: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums">Undo · {{tst.left}} s</button></sc-if>
+<sc-if value="{{tst.done}}" hint-placeholder-val="{{false}}"><button type="button" aria-label="Dismiss" onClick="{{tst.dismiss}}" style="width: 44px; height: 44px; flex-shrink: 0; border: 0; background: transparent; color: inherit; font-size: 18px; cursor: pointer">×</button></sc-if>
+</div>
+</sc-if>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{acc.open}}" on-close="{{acc.close}}" title="Accept the current page as the new baseline?" description="{{acc.desc}}" size="{{acc.size}}" auto-focus="{{yes}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<sc-if value="{{pc.newScript}}" hint-placeholder-val="{{true}}"><div class="pc-danger" role="alert"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span><b style="font-weight: 600">A new script domain usually means injected code.</b> Accept only if you know the client added it.</span></div></sc-if>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; font-weight: 600">What changes in the baseline</span>
+<ul class="pc-after"><sc-for list="{{pc.after}}" as="x" hint-placeholder-count="3"><li><span style="color: var(--aura-fg-secondary)">{{x.label}}:</span> {{x.t}}</li></sc-for></ul>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">The other fields stay as they are. Logged in the audit log as {{me}}.</span>
+</div>
+<x-import component-from-global-scope="Aura.TextField" label="Reason" required="{{yes}}" placeholder="e.g. Client redesigned the home page (ticket #…)" value="{{acc.reason}}" on-change="{{acc.setReason}}" hint="Required. Shown on the timeline and in the audit log."></x-import>
+<div style="display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" disabled="{{acc.busy}}" on-click="{{acc.close}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="{{acc.variant}}" disabled="{{acc.blocked}}" loading="{{acc.busy}}" on-click="{{acc.confirm}}">{{acc.cta}}</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{rs.open}}" on-close="{{rs.close}}" title="Root cause &amp; resolve" description="INC-0157 · Bangkok Airways – Taiwan · Page change · problem since 09:30" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 18px; padding-top: 4px">
+<x-import component-from-global-scope="Aura.Select" label="Root cause category" options="{{causes}}" placeholder="Choose one" required="{{yes}}" value="{{rs.cat}}" on-change="{{rs.setCat}}"></x-import>
+<sc-if value="{{rs.showBox}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<x-import component-from-global-scope="Aura.Checkbox" checked="{{rs.box}}" on-change="{{rs.toggleBox}}" description="{{rs.boxDesc}}">Also accept the current page as the new baseline</x-import>
+<sc-if value="{{rs.boxDanger}}" hint-placeholder-val="{{false}}"><div class="pc-danger" role="alert"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span><b style="font-weight: 600">A new script domain usually means injected code.</b> Accept only if you know the client added it.</span></div></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{rs.hasCatHint}}" hint-placeholder-val="{{false}}"><span class="pc-hint">{{rs.catHint}}</span></sc-if>
+<sc-if value="{{rs.roHint}}" hint-placeholder-val="{{false}}"><span class="pc-hint"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import>Only an Admin can accept a new baseline — resolve once the page matches it again.</span></sc-if>
+<x-import component-from-global-scope="Aura.Textarea" label="What happened" required="{{yes}}" rows="{{three}}" value="{{rs.text}}" on-change="{{rs.setText}}" hint="Plain language — this text goes into the weekly summary and the client report. With the box ticked it is also the baseline reason."></x-import>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px">
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{rs.note}}</span>
+<div style="display: flex; gap: 12px; flex-shrink: 0">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{rs.close}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="{{rs.variant}}" disabled="{{rs.blocked}}" on-click="{{rs.submit}}">{{rs.cta}}</x-import>
+</div>
+</div>
+</div>
+</x-import>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":820,"height":2460}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: 'Admin', set: 'Defacement', dlg: '', reason: '', busy: false, toast: null, accepted: false, acceptReason: '', acked: false, unch: {}, rsCat: '', rsText: '', rsBox: true, resolved: false, resolvedCat: '', resolvedText: '', resolveAccepted: false, fetched: false };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var ADMIN = st.view !== 'Not Admin';
+    var ME = ADMIN ? 'Tao' : 'Arm';
+    var SITE = 'Bangkok Airways – Taiwan';
+
+    // ---- Page-change sample (made up — never copy). Board time Fri 25 Sep 10:07 ----
+    var FPB = [
+      { k: 'title', label: 'Page title', base: 'Bangkok Airways – Taiwan' },
+      { k: 'desc', label: 'Meta description', base: 'Fly to Taipei, Kaohsiung and back with daily flights from Bangkok.' },
+      { k: 'robots', label: 'Robots', base: 'index, follow' },
+      { k: 'canon', label: 'Canonical URL', base: 'https://[Taiwan site URL]/' },
+      { k: 'h1', label: 'Main heading (first h1)', base: 'Welcome to Taiwan' },
+      { k: 'scripts', label: 'Script / iframe domains', dom: true, base: ['static-cdn.example', 'maps-embed.example', 'tag-manager.example', 'chat-widget.example'] },
+      { k: 'links', label: 'Link domains', dom: true, base: ['[Taiwan site URL]', 'booking-engine.example', 'payments.example', 'hotels.example', 'car-rental.example', 'insurance.example', 'loyalty.example', 'social-a.example', 'social-b.example', 'video.example', 'maps.example', 'help-desk.example', 'old-promo.example'] }
+    ];
+    var PCSETS = {
+      'Defacement': { title: 'Bangkok Airways – Taiwan | สล็อตออนไลน์', desc: 'แทงบอลออนไลน์ เว็บตรง ฝากถอนไม่มีขั้นต่ำ สมัครวันนี้รับโบนัส 100%', h1: 'บาคาร่า ฝากถอนออโต้',
+        add: { scripts: ['evil-cdn.example'], links: ['casino.example', 'slotxo.example', 'betflix.example'] }, rem: {},
+        firstSeen: '09:30', firstAt: '09:30:14', heldNow: '2 checks (30 min)', confirmSub: 'New script domain — raised on the first fetch', reason: 'Client confirmed the new title, text and partner links (ticket #4821)' },
+      'Redesign': { title: 'Bangkok Airways – Taiwan · Fly to Taipei from 2,990 THB', h1: 'Fly to Taipei from 2,990 THB',
+        add: { links: ['hotels-partner.example'] }, rem: { links: ['old-promo.example'] },
+        firstSeen: '08:30', firstAt: '08:30:13', heldNow: '4 checks (1 h 30 min)', confirmSub: 'Held 3 fetches (1 h)', reason: 'Client redesigned the home page (ticket #4821)' }
+    };
+    function PCM(setKey, unchOpen, toggleFn) {
+      var S = PCSETS[setKey] || PCSETS['Defacement'];
+      var rows = [], after = [], full = [];
+      FPB.forEach(function (f) {
+        if (f.dom) {
+          var add = (S.add[f.k] || []), rem = (S.rem[f.k] || []);
+          var unch = f.base.filter(function (d) { return rem.indexOf(d) < 0; });
+          var open = !!(unchOpen || {})[f.k];
+          var r = { label: f.label, isText: false, isPlain: false, isDom: true,
+            added: add.map(function (t) { return { t: t }; }), removed: rem.map(function (t) { return { t: t }; }),
+            unch: unch.map(function (t) { return { t: t }; }), hasUnch: unch.length > 0, showUnch: open, unchOpen: open ? 'true' : 'false',
+            unchLabel: open ? 'Hide unchanged' : 'and ' + unch.length + ' unchanged', toggle: function () { toggleFn(f.k); } };
+          full.push({ label: f.label, isText: false, isPlain: false, isDom: true, added: [], removed: [], unch: f.base.map(function (t) { return { t: t }; }), hasUnch: true, showUnch: open, unchOpen: open ? 'true' : 'false', unchLabel: open ? 'Hide' : f.base.length + ' domains', toggle: function () { toggleFn(f.k); } });
+          if (add.length || rem.length) { rows.push(r); after.push({ label: f.label, t: add.map(function (d) { return '+ ' + d; }).concat(rem.map(function (d) { return '− ' + d; })).join(', ') }); }
+        } else {
+          full.push({ label: f.label, isText: false, isPlain: true, isDom: false, val: f.base });
+          if (S[f.k] && S[f.k] !== f.base) { rows.push({ label: f.label, isText: true, isPlain: false, isDom: false, was: f.base, now: S[f.k] }); after.push({ label: f.label, t: S[f.k] }); }
+        }
+      });
+      var newScript = !!(S.add.scripts && S.add.scripts.length);
+      var n = rows.length;
+      var cause = n === 1 ? rows[0].label + ' changed on /' : n + ' changes on /' + (newScript ? ' · new script domain ' + S.add.scripts[0] : '');
+      return { rows: rows, after: after, full: full, n: n, newScript: newScript, cause: cause, S: S,
+        foot1: 'First seen ' + S.firstSeen + ' · held ' + S.heldNow, foot2: 'From the 10:00:14 fetch · next fetch 10:30' };
+    }
+
+    var pc = PCM(st.set, st.unch, function (k) { var u = Object.assign({}, self.state.unch); u[k] = !u[k]; self.setState({ unch: u }); });
+
+    function ACC(opts) {
+      var busy = !!st.busy;
+      function tick() {
+        clearInterval(self._iv);
+        self._iv = setInterval(function () {
+          var t = self.state.toast; if (!t || t.phase !== 'pending') { clearInterval(self._iv); return; }
+          if (t.left > 1) self.setState({ toast: Object.assign({}, t, { left: t.left - 1 }) });
+          else { clearInterval(self._iv); self.setState({ toast: Object.assign({}, t, { phase: 'posted', left: 0 }) }); }
+        }, 1000);
+      }
+      self._startToast = tick;
+      self._focusReason = function () { setTimeout(function () { var i = document.querySelector('[role=dialog] input'); if (i) i.focus(); }, 80); };
+      self._toastFor = function (kind, extra) { self.setState(Object.assign({ toast: { kind: kind, phase: 'pending', left: 10 } }, extra || {})); tick(); };
+      var acc = { open: st.dlg === 'accept', size: opts.size, desc: opts.desc,
+        reason: st.reason || '', setReason: function (e) { self.setState({ reason: e && e.target ? e.target.value : e }); },
+        busy: busy, blocked: !(st.reason || '').trim() || busy,
+        variant: pc.newScript ? 'danger' : 'primary', cta: busy ? 'Accepting…' : 'Accept as baseline',
+        close: function () { if (!self.state.busy) self.setState({ dlg: '' }); },
+        confirm: function () {
+          if (!(self.state.reason || '').trim() || self.state.busy) return;
+          self.setState({ busy: true });
+          clearTimeout(self._to);
+          self._to = setTimeout(function () {
+            if (!self.state.busy) return;
+            self.setState({ busy: false, dlg: '', accepted: true, acceptReason: self.state.reason.trim(), toast: { kind: 'accept', phase: 'pending', left: 10 } }); tick();
+          }, 1200);
+        } };
+      var t = st.toast, K = t && t.kind ? t.kind : 'accept';
+      var TT = {
+        accept: { p: 'Accepting as the new baseline', pl: 'Applies in {n} s — nothing changes until then', d: 'Baseline updated — ' + SITE + ' is OK on the next check', dl: 'Applied 10:07:10 · next check 10:30', u: 'Undone — the baseline is unchanged' },
+        ack: { p: 'Acknowledged INC-0157 · reminder stopped', pl: 'Posting to Chat, email and webhooks in {n} s — nothing is sent until then', d: 'Acknowledged INC-0157 · reminder stopped', dl: 'Posted to Chat, email and webhooks.', u: 'Undone — INC-0157 is not acknowledged' },
+        resolve: { p: 'Resolved INC-0157' + (st.resolveAccepted ? ' · baseline accepted' : ''), pl: 'Posting to Chat, email and webhooks in {n} s — nothing is sent until then', d: 'Resolved INC-0157' + (st.resolveAccepted ? ' · baseline accepted' : ''), dl: 'Posted to Chat, email and webhooks.', u: 'Undone — INC-0157 is still open' }
+      }[K] || {};
+      var tst = { show: !!t && !st.dlg, pos: opts.pos, pending: !!t && t.phase === 'pending', done: !!t && t.phase !== 'pending', left: t ? t.left : 10,
+        icon: t && t.phase === 'undone' ? 'info' : 'check',
+        title: !t ? '' : (t.phase === 'undone' ? TT.u : (t.phase === 'pending' ? TT.p : TT.d)),
+        line: !t ? '' : (t.phase === 'pending' ? TT.pl.replace('{n}', t.left) : (t.phase === 'posted' ? TT.dl : 'Nothing was changed or sent.')),
+        undo: function () {
+          clearInterval(self._iv);
+          var t0 = self.state.toast, k = t0 && t0.kind ? t0.kind : 'accept', u = { toast: Object.assign({}, t0, { phase: 'undone', left: 0 }) };
+          if (k === 'accept') u.accepted = false;
+          if (k === 'ack') u.acked = false;
+          if (k === 'resolve') { u.resolved = false; if (self.state.resolveAccepted) { u.accepted = false; u.resolveAccepted = false; } }
+          self.setState(u);
+          setTimeout(function () { var b = document.querySelector('[data-pc-focus]'); if (b) b.focus(); }, 60);
+        },
+        dismiss: function () { self.setState({ toast: null }); } };
+      return { acc: acc, tst: tst };
+    }
+
+    var A = ACC({ size: 'md', pos: 'left: calc(50% + 36px); transform: translateX(-50%); bottom: 24px; width: 600px', desc: 'INC-0157 · ' + SITE + ' · home page /' });
+    var accepted = st.accepted && (!st.toast || st.toast.phase !== 'undone' || st.toast.kind !== 'accept');
+    var accPending = accepted && !!st.toast && st.toast.kind === 'accept' && st.toast.phase === 'pending';
+    var posted = accepted && !accPending;
+    var fetched = !!st.fetched && posted;
+    var CATL = { hosting: 'Hosting / server', deploy: 'Deploy / code change', dns: 'DNS / domain', ssl: 'SSL certificate', third: 'Third-party / CDN', traffic: 'Traffic / capacity', client: 'Client-side change', 'false': 'False alarm (monitor)', unknown: 'Unknown — keep investigating' };
+    var tl = st.set === 'Redesign' ? [
+      { at: '08:30:13', icon: 'eye', color: 'var(--aura-fg-secondary)', title: 'Page differs from the baseline — waiting', detail: 'Title, h1 and link domains changed · no new script domain, so it must hold for 3 fetches' },
+      { at: '09:00:13', icon: 'clock', color: 'var(--aura-fg-secondary)', title: 'Still different · 2 of 3 fetches', detail: 'Same fingerprint as 08:30' },
+      { at: '09:30:14', icon: 'triangle-alert', color: 'var(--aura-alert-warning-fg)', title: 'PROBLEM — page changed', detail: 'Held 3 fetches (1 h) → incident opened' }
+    ] : [
+      { at: '09:00:13', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Fetch matches the baseline', detail: 'All 7 fields as accepted Thu 10 Sep' },
+      { at: '09:30:14', icon: 'triangle-alert', color: 'var(--aura-alert-warning-fg)', title: 'PROBLEM — page changed · new script domain evil-cdn.example', detail: 'A new script or iframe domain is raised on the first fetch — no 3-fetch wait. Title, description, h1 and 3 link domains changed too.' }
+    ];
+    tl = tl.concat([
+      { at: '09:30:15', icon: 'bell', color: 'var(--aura-fg-secondary)', title: 'L0 · Arm @mentioned in the Alerts Space + email', detail: 'Ploy (backup) is named in plain text until the 60-min reminder' },
+      { at: '10:00:14', icon: 'clock', color: 'var(--aura-fg-secondary)', title: 'Still different · held ' + pc.S.heldNow, detail: 'Same fingerprint as the fetch before' }
+    ]);
+    if (st.acked) tl.push({ at: '10:07', icon: 'check', color: 'var(--aura-fg-primary)', title: 'Acknowledged by ' + ME, detail: '60-min reminder cancelled' });
+    if (accepted) tl.push({ at: '10:07', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Baseline accepted by Tao · “' + st.acceptReason + '”', detail: accPending ? 'Undo open — applies at 10:07:10' : (st.resolveAccepted ? 'Accepted with the resolve' : 'Applied 10:07:10 · the 10:30 fetch compares against it') });
+    if (fetched) tl.push({ at: '10:30:14', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'RECOVERED — page matches the baseline', detail: 'Arm @mentioned — add a root cause to resolve' });
+    if (st.resolved) tl.push({ at: fetched ? '10:31' : '10:08', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Resolved by ' + ME + ' · ' + (CATL[st.resolvedCat] || ''), detail: '“' + st.resolvedText + '”' });
+    else if (!fetched) tl.push({ at: '10:30', icon: st.acked ? 'clock' : 'bell', color: 'var(--aura-fg-secondary)', title: st.acked || accepted ? 'Next fetch' : '60-min reminder · Arm + Ploy (backup)', detail: st.acked || accepted ? 'Recovers when the page matches the baseline' : 'Only if nobody acknowledges', scheduled: true });
+    var matchMet = fetched || (st.resolved && st.resolveAccepted);
+    var conds = [
+      { label: 'Page matches the baseline', detail: fetched ? 'Matched on the 10:30 fetch' : (st.resolved && st.resolveAccepted ? 'Baseline accepted with the resolve' : (accPending ? 'Baseline accepted — Undo open until 10:07:10' : (accepted ? 'Baseline accepted 10:07 · waiting for the 10:30 fetch' : 'Not yet · differs since ' + pc.S.firstSeen))), icon: matchMet ? 'circle-check' : 'circle', color: matchMet ? 'var(--aura-fg-positive)' : 'var(--aura-fg-tertiary)', state: matchMet ? 'Met' : 'Not met' },
+      { label: 'Root cause added', detail: st.resolved ? CATL[st.resolvedCat] : 'Not yet', icon: st.resolved ? 'circle-check' : 'circle', color: st.resolved ? 'var(--aura-fg-positive)' : 'var(--aura-fg-tertiary)', state: st.resolved ? 'Met' : 'Not met' }
+    ];
+    var isClient = st.rsCat === 'client';
+    var showBox = isClient && ADMIN && !accepted;
+    var willAccept = showBox && st.rsBox;
+    var catOk = !!st.rsCat && st.rsCat !== 'unknown';
+    var canResolve = !!(st.rsText || '').trim() && catOk && (fetched || willAccept);
+    function preset(v, setKey) {
+      clearInterval(self._iv); clearTimeout(self._to);
+      var sk = setKey || self.state.set;
+      var base = { view: v, set: sk, dlg: '', reason: '', busy: false, toast: null, accepted: false, acceptReason: '', acked: false, unch: {}, rsCat: '', rsText: '', rsBox: true, resolved: false, resolvedCat: '', resolvedText: '', resolveAccepted: false, fetched: false };
+      if (v === 'Accept dialog') base.dlg = 'accept';
+      if (v === 'In flight') Object.assign(base, { dlg: 'accept', reason: PCSETS[sk].reason, busy: true });
+      if (v === 'Undo toast') Object.assign(base, { accepted: true, acceptReason: PCSETS[sk].reason, toast: { kind: 'accept', phase: 'pending', left: 10 } });
+      if (v === 'After 10:30') Object.assign(base, { accepted: true, acceptReason: PCSETS[sk].reason, fetched: true });
+      if (v === 'Resolve') Object.assign(base, { set: setKey || 'Redesign', dlg: 'resolve', rsCat: 'client', rsText: 'Client launched a new home page headline and partner links (ticket #4821)' });
+      self.setState(base);
+      if (v === 'Undo toast') setTimeout(function () { if (self._startToast) self._startToast(); }, 0);
+    }
+    var stopped = st.resolved ? 'Stopped — resolved' : (fetched ? 'Stopped — recovered' : (st.acked ? 'Stopped — acknowledged' : ''));
+    return {
+      yes: true, no: false, three: 3,
+      views: ['Admin', 'Accept dialog', 'In flight', 'Undo toast', 'After 10:30', 'Not Admin', 'Resolve'], view: st.view,
+      setView: preset,
+      sets: ['Defacement', 'Redesign'], set: st.set,
+      setSet: function (v) { preset(self.state.view, v); },
+      me: ME, meLine: ADMIN ? 'Jirawat Piyakit · Admin' : 'Responder',
+      pc: pc, acc: A.acc, tst: A.tst,
+      open: !st.resolved && !fetched, recovered: fetched && !st.resolved, resolved: st.resolved,
+      notAcked: !st.acked && !st.resolved && !fetched, acked: st.acked && !st.resolved, showAck: !st.acked && !st.resolved && !fetched,
+      ack: function () { self._toastFor('ack', { acked: true }); },
+      ackBy: st.acked ? ME : 'Not yet', ackMeta: st.acked ? '10:07' + (stopped ? ' · ' + stopped.replace('Stopped — ', 'reminder stopped, ') : '') : (stopped ? 'Not needed — ' + stopped.replace('Stopped — ', '') : 'Reminder at 10:30'),
+      escNext: stopped || 'Reminder 10:30 · Arm + Ploy',
+      duration: fetched ? '1 h' : '37 min', durationSub: fetched ? 'Problem 09:30 → recovered 10:30' : 'Problem since 09:30',
+      canAccept: ADMIN && !accepted && !st.resolved, noAccept: !ADMIN && !st.resolved && !accepted, showActRow: (ADMIN && !accepted && !st.resolved) || (!ADMIN && !st.resolved && !accepted),
+      openAccept: function () { self.setState({ dlg: 'accept', reason: '' }); self._focusReason(); },
+      accPend: accPending, accDone: posted,
+      accLine: st.resolved && st.resolveAccepted ? 'Accepted as the new baseline with the resolve · 10:08 by ' + ME + '.' : (fetched ? 'Accepted as the new baseline 10:07 by Tao · matched on the 10:30 fetch.' : 'Accepted as the new baseline 10:07 by Tao · the 10:30 fetch should match and recover INC-0157.'),
+      timeline: tl,
+      ladder: [
+        { level: 'L0', when: '09:30 · owner', who: 'Arm @mentioned in the Alerts Space + email', status: 'Sent', statusColor: 'var(--aura-fg-secondary)', dotBg: 'var(--aura-bg-surface-strong)', dotFg: 'var(--aura-fg-inverted)' },
+        { level: '60', when: '10:30 · reminder', who: 'Arm + Ploy (backup) · email to both', status: stopped ? 'Cancelled' : 'If not acknowledged', statusColor: 'var(--aura-fg-secondary)', dotBg: 'var(--aura-bg-canvas)', dotFg: 'var(--aura-fg-secondary)' }
+      ],
+      conds: conds, condCount: conds.filter(function (c) { return c.state === 'Met'; }).length,
+      openResolve: function () { self.setState({ dlg: 'resolve' }); },
+      causes: [
+        { value: 'hosting', label: 'Hosting / server' }, { value: 'deploy', label: 'Deploy / code change' }, { value: 'dns', label: 'DNS / domain' },
+        { value: 'ssl', label: 'SSL certificate' }, { value: 'third', label: 'Third-party / CDN' }, { value: 'traffic', label: 'Traffic / capacity' },
+        { value: 'client', label: 'Client-side change' }, { value: 'false', label: 'False alarm (monitor)' }, { value: 'unknown', label: 'Unknown — keep investigating' }
+      ],
+      rs: {
+        open: st.dlg === 'resolve', close: function () { self.setState({ dlg: '' }); },
+        cat: st.rsCat, setCat: function (e) { self.setState({ rsCat: e && e.target ? e.target.value : e }); },
+        showBox: showBox, box: !!st.rsBox, toggleBox: function () { self.setState({ rsBox: !self.state.rsBox }); },
+        boxDesc: 'Saves the ' + pc.n + ' changed fields as the baseline, with “What happened” as the reason. Logged as Tao.',
+        boxDanger: showBox && st.rsBox && pc.newScript,
+        roHint: isClient && !ADMIN,
+        hasCatHint: st.rsCat === 'unknown', catHint: st.rsCat === 'unknown' ? 'Unknown keeps the incident open — it does not meet the root-cause condition.' : '',
+        text: st.rsText, setText: function (e) { self.setState({ rsText: e && e.target ? e.target.value : e }); },
+        note: canResolve ? (willAccept ? 'Accepts the baseline first, then resolves — the page then matches it.' : 'Resolves now.') : (!st.rsCat || !(st.rsText || '').trim() ? 'Choose a category and say what happened.' : (!catOk ? 'Pick the cause you found — Unknown keeps it open.' : 'Resolve unlocks when the page matches the baseline again' + (showBox ? ' — or tick the box above.' : ' (next fetch 10:30).'))),
+        blocked: !canResolve,
+        variant: willAccept && pc.newScript ? 'danger' : 'primary',
+        cta: willAccept ? 'Accept baseline and resolve' : 'Resolve',
+        submit: function () { if (!canResolve) return; var wa = willAccept; self._toastFor('resolve', { dlg: '', resolved: true, resolvedCat: self.state.rsCat, resolvedText: self.state.rsText.trim(), accepted: self.state.accepted || wa, resolveAccepted: wa, acceptReason: wa ? self.state.rsText.trim() : self.state.acceptReason }); }
+      },
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -20,7 +20,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </style>
 </helmet>
 
-<div class="r3-col" style="width: 600px; height: 8500px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+<div class="r3-col" style="width: 600px; height: 8630px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 14px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
 <div style="display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
 <span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
 <div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" label="Preview state" hide-label="{{yes}}" options="{{views}}" value="{{view}}" on-change="{{setView}}"></x-import></div>
@@ -233,7 +233,8 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Regional</span><span style="color: var(--aura-fg-secondary)">INC-0131 BA – Taiwan · one location ≥ 5 min</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">SIN failing 6 min (timeout &gt; 30 s) · BKK, TYO OK</span></div>
 <div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Redirect</span><span style="color: var(--aura-fg-secondary)">Final host outside the allowlist</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">/ → 302 → [other-domain] · not in this site’s allowlist</span></div>
 <div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">SSL expiring</span><span style="color: var(--aura-fg-secondary)">INC-0136 DxT AI · SSL &lt; 14 d, domain &lt; 30 d</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">SSL certificate expires in 13 days (Tue 6 Oct) · not renewed yet</span></div>
-<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Blocked, not verified</span><span style="color: var(--aura-fg-secondary)">INC-0138 Tubtong</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">HTTP 403 bot challenge (BKK, SIN, TYO) · browser verifier unavailable</span></div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Blocked, not verified</span><span style="color: var(--aura-fg-secondary)">INC-0138 Tubtong</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">HTTP 403 bot challenge (BKK, SIN, TYO) · browser verifier unavailable</span></div>
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 7px 14px; font-size: 12px; line-height: 1.4"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Page change</span><span style="color: var(--aura-fg-secondary)">INC-0157 BA – Taiwan · home page fingerprint differs from the baseline (made-up)</span></span><span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.45; color: var(--aura-fg-secondary); overflow-wrap: anywhere">/ · title “Bangkok Airways – Taiwan” → “… | สล็อตออนไลน์” <br>or: / · new script domain evil-cdn.example</span></div>
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 12px; padding-top: 16px; border-top: 1px solid var(--aura-border-default)">
@@ -419,7 +420,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":8500}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":8630}}'>
 class Component extends DCLogic {
   constructor(props) { super(props); this.state = { view: 'Incident thread' }; }
   renderVals() {

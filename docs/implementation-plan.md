@@ -28,7 +28,7 @@
 | S09 | Maintenance windows & mute | 1 · P0 | L | FR-10a, FR-14 | S06b, S08 | 3 | Done |
 | S09b | Maintenance messages | 1 · P0 | M | — (FR-10a, FR-14 messages, §24) | S09 + ChatAlert / EmailAlert boards | 3 | Done |
 | S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | M | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | In review |
-| S09d | Defacement: page-change detection | 1 · P1 | M | — (PRD §2 content-change, D-041) | S09c, S07 | 3–4 (alert on after a 2-week record) | Todo |
+| S09d | Defacement: page-change detection | 1 · P1 | L | — (PRD §2 content-change, D-041, D-046) | S09c (merged), S07 | 3–4 (alert on after a 2-week record) | In progress |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
@@ -512,9 +512,12 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
   The cause shows before → after.
 
-- **Baseline:** set on the first round after monitoring starts, or with "Accept as new baseline" on the incident or site page (Admin, audited). A Resolve with root cause "Expected change" also accepts it.
-- **Boards:** none drawn. The incident and site-page rows need a board or Tao's OK first (memory: no board → ask Tao).
-- **Depends on:** S09c, S07
+- **Baseline:** set from the first usable fetch after monitoring starts (and again when the home page URL changes), or with "Accept as new baseline" on the incident or site page (Admin, audited, 10 s Undo that applies only when it closes). Resolving a Page change as **Client-side change** offers "Also accept the current page as the new baseline" to Admins (D-046; no "Expected change" category).
+- **Rules settled in D-046:** the fingerprint fetch is its own view `plain` (the probe's own User-Agent), not a keyword view; "holding for 3 fetches" = the last 3 usable fetches each differ; removed domains never alert; no data holds an open PROBLEM; a 14-day recording per site (from its first baseline); `PAGE_CHANGE_ALERTS` (`on` | `off`, default `off`) gates the alert in the engine runner like `DEFACEMENT_ALERTS` — staging `on`, production `off` until Done-when 3.
+- **Boards:** IncidentPageChange, MIncidentPageChange, IncidentPageChange820, IncidentPageChangeDark, MIncidentPageChangeDark; the Page fingerprint card on SiteDetail and MSite; the ChatAlert Page change cause row (spec §26, drawn 15 Oct).
+- **Tables:** page_baselines; `crawler_checks` gains the `plain` view and `fingerprint`.
+- **Size:** L (was M): schema, probe, crawler, engine, notifier, two screens, test target. Three PRs: the migration first; the data path next, merged early so the 2-week production record starts; then the screens.
+- **Depends on:** S09c (merged — its Done-when 3 is a production week, as S05b started on S05 merged), S07
 - **Done when:**
   1. Table-driven tests cover:
      - an injected `<script src="evil.example">` at the end of a 400 KB page → PROBLEM on that fetch;
@@ -523,7 +526,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
      - tracking domains on an allowlist (Google Analytics, Tag Manager, Meta pixel …) → no PROBLEM.
   2. Staging: the test target's `defaced-title` and `injected-script` modes fire with before → after; "Accept as new baseline" clears it and writes `audit_log`.
   3. Two weeks of fingerprints from the 17 production sites (recorded, not alerting) show no false positive before the alert is switched on.
-- **Review:** engine-reviewer, db-reviewer (fingerprint table), security-reviewer, message-checker, spec-checker if a board comes.
+- **Review:** engine-reviewer, db-reviewer (fingerprint table), security-reviewer (the HTML parser, the accept RPCs), message-checker, spec-checker (IncidentPageChange ×5, SiteDetail, MSite).
 - **Phase:** Phase 1 · P1. It doesn't block G1: its alert switches on only after the two-week record (Done-when 3).
 - **Not in this slice:** a script that JavaScript adds at runtime isn't in the HTML, so the probes can't see it. Only the browser verifier (S03) renders the page, and it runs only for blocked rounds. This slice does not cover runtime-injected scripts.
 ### S10 · Escalation L2–L3 & on-call
@@ -800,6 +803,11 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | MMaintenance | S09 |
 | MaintenancePage | S09 |
 | MMaintenanceList | S09 |
+| IncidentPageChange | S09d |
+| MIncidentPageChange | S09d |
+| IncidentPageChange820 | S09d |
+| IncidentPageChangeDark | S09d |
+| MIncidentPageChangeDark | S09d |
 | OnCall | S10 |
 | MOnCall | S10 |
 | MainFault | S12 |

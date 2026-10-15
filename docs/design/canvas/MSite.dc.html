@@ -20,6 +20,34 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 .ms-more{width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:0;border-radius:9999px;background:none;color:var(--aura-fg-primary);cursor:pointer}
 .ms-more:hover,.ms-more[aria-expanded=true]{background:var(--aura-bg-surface-hover)}
 .ms-menu a.aura-menu__item{min-height:44px;box-sizing:border-box;color:var(--aura-fg-primary);text-decoration:none}
+
+.pc-row{display:grid;grid-template-columns:176px minmax(0,1fr);gap:16px;padding:12px 0;border-bottom:1px solid var(--aura-border-subtle)}
+.pc-row:last-child{border-bottom:0}
+.pc-lab{font-size:13px;line-height:1.5;font-weight:500;color:var(--aura-fg-secondary)}
+.pc-val{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pc-was{font-size:13px;line-height:1.5;color:var(--aura-fg-secondary);overflow-wrap:anywhere}
+.pc-now{font-size:14px;line-height:1.5;font-weight:600;color:var(--aura-fg-primary);overflow-wrap:anywhere}
+.pc-plain{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.pc-tag{display:inline-block;width:40px;font-family:var(--font-mono);font-size:11px;font-weight:400;color:var(--aura-fg-tertiary)}
+.pc-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pc-chip{display:inline-flex;align-items:center;min-height:26px;box-sizing:border-box;padding:2px 10px;border-radius:9999px;border:1px solid var(--aura-border-default);background:var(--aura-bg-canvas);font-family:var(--font-mono);font-size:12px;line-height:1.4;overflow-wrap:anywhere}
+.pc-add{border-color:var(--aura-alert-danger-border);background:var(--aura-alert-danger-bg);color:var(--aura-alert-danger-fg);font-weight:600}
+.pc-rem{color:var(--aura-fg-secondary);text-decoration:line-through}
+.pc-more{border:0;background:none;padding:0 4px;min-height:26px;font:inherit;font-size:12px;color:var(--aura-fg-secondary);text-decoration:underline;cursor:pointer}
+.pc-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.pc-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;font-size:12px;line-height:1.5;color:var(--aura-fg-secondary)}
+.pc-hint{display:flex;align-items:center;gap:8px;font-size:13px;line-height:1.45;color:var(--aura-fg-secondary)}
+.pc-danger{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--aura-alert-danger-bg);border:1px solid var(--aura-alert-danger-border);border-radius:var(--aura-radius-md);font-size:13px;line-height:1.5;color:var(--aura-alert-danger-fg)}
+.pc-ok{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:var(--aura-alert-success-bg, var(--aura-bg-canvas));border:1px solid var(--aura-alert-success-border, var(--aura-border-default));border-radius:var(--aura-radius-md);font-size:13px;line-height:1.5}
+.pc-pend{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:var(--aura-bg-canvas);border:1px solid var(--aura-border-default);border-radius:var(--aura-radius-md);font-size:13px;line-height:1.5}
+.pc-after{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.5}
+.pc-after li{overflow-wrap:anywhere}
+.pc-ctl{display:flex;align-items:center;gap:10px;padding:4px 4px 4px 12px;border:1px dashed var(--aura-border-control);border-radius:var(--aura-radius-md);background:var(--aura-bg-canvas);font-size:11px;color:var(--aura-fg-secondary)}
+.pc-ctl>span{font-family:var(--font-mono);flex-shrink:0}
+
+.pc-row{grid-template-columns:minmax(0,1fr);gap:4px}
+.pc-more{min-height:44px}
+.pc-chip{min-height:30px}
 </style>
 </helmet>
 <div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
@@ -41,7 +69,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 
 
 <div style="display: flex; flex-direction: column; gap: 4px">
-<div style="display: flex; align-items: center; gap: 8px"><x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">OK</x-import><span style="font-size: 14px; font-weight: 500">since Mon 14 Sep 21:18</span></div>
+<div style="display: flex; align-items: center; gap: 8px"><sc-if value="{{hdrOk}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">OK</x-import><span style="font-size: 14px; font-weight: 500">since Mon 14 Sep 21:18</span></sc-if><sc-if value="{{hdrProblem}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="soft" icon="triangle-alert">Problem</x-import><span style="font-size: 14px; font-weight: 500">since 09:30 · page change</span></sc-if></div>
 <span style="font-size: 13px; color: var(--aura-fg-secondary)">Tier 1 · every 1 min · 24/7 · owner Arm · backup Ploy</span>
 </div>
 
@@ -89,7 +117,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <div style="padding: 8px 14px; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary); border-bottom: 1px solid var(--aura-border-subtle)">INCIDENTS IN RANGE</div>
 <sc-if value="{{hasList}}" hint-placeholder-val="{{true}}">
 <sc-for list="{{stat.list}}" as="i" hint-placeholder-count="2">
-<a href="MIncident.dc.html" style="min-height: 44px; box-sizing: border-box; padding: 4px 8px 4px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; color: inherit; text-decoration: none">
+<a href="{{i.href}}" style="min-height: 44px; box-sizing: border-box; padding: 4px 8px 4px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--aura-border-subtle); font-size: 13px; color: inherit; text-decoration: none">
 <span style="width: 108px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="{{i.tone}}" variant="outline" icon="{{i.icon}}">{{i.sev}}</x-import></span>
 <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{i.what}}</span><span style="font-size: 11px; color: var(--aura-fg-secondary)">{{i.when}}</span></span>
 <span style="font-variant-numeric: tabular-nums; white-space: nowrap">{{i.dur}}</span>
@@ -105,7 +133,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </sc-if>
 </div>
 <sc-if value="{{hasList}}" hint-placeholder-val="{{true}}">
-<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · each row opens Incident detail for that incident — the sample screen shows INC-0142. Top-bar ⋯ (44 px, between the title and the avatar): Visit site for everyone; Admins also get Edit site (editable on phones, D-044). Opening it moves focus to the first item; a tap outside closes it. Not drawn: anyone without header actions still gets the top-bar ⋯ with Visit site only; a Draft’s menu has no Edit site — Finish setup already opens that page.</div>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · each row opens Incident detail for that incident — the sample screen shows INC-0142. Top-bar ⋯ (44 px, between the title and the avatar): Visit site for everyone; Admins also get Edit site (editable on phones, D-044). Opening it moves focus to the first item; a tap outside closes it. Not drawn: anyone without header actions still gets the top-bar ⋯ with Visit site only; a Draft’s menu has no Edit site — Finish setup already opens that page. Page fingerprint (§26): same states as desktop; rows stack, Accept is full width.</div>
 </sc-if>
 
 <div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden; flex-shrink: 0">
@@ -123,8 +151,83 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <x-import component-from-global-scope="Aura.Badge" tone="success">6/6</x-import>
 </div>
 </div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px"><span style="font-size: 15px; font-weight: 600">Page fingerprint</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Home page · every 30 min</span></div>
+<div class="pc-ctl" style="padding: 6px 8px"><x-import component-from-global-scope="Aura.Select" label="Fingerprint state (board only)" options="{{fpOpts}}" value="{{fpView}}" on-change="{{setFpSel}}"></x-import></div>
+
+<div style="padding: 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: flex-start; gap: 10px">
+<span style="display: flex; padding-top: 3px; color: {{fp.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{fp.icon}}" size="sm"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.45"><span style="font-size: 14px; font-weight: 500">{{fp.line}}</span><sc-if value="{{fp.hasSub}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{fp.sub}}</span></sc-if></div>
+</div>
+<sc-if value="{{fp.hasToggle}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" icon="{{fp.toggleIcon}}" full-width="{{yes}}" aria-expanded="{{fp.toggleStr}}" on-click="{{fp.toggle}}">{{fp.toggleLabel}}</x-import></sc-if>
+<sc-if value="{{fp.pend}}" hint-placeholder-val="{{false}}"><div class="pc-pend"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="clock" size="sm"></x-import></span><span>Accepting as the new baseline — Undo is open until 10:07:10.</span></div></sc-if>
+<sc-if value="{{fp.inc}}" hint-placeholder-val="{{false}}"><a href="MIncidentPageChange.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; font-weight: 500; text-decoration: none"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="soft" icon="triangle-alert">Problem</x-import><span>INC-0157 · Page change · open 37 min</span><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a></sc-if>
+<sc-if value="{{fp.showDiff}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; border-top: 1px solid var(--aura-border-subtle)">
+<sc-for list="{{pc.rows}}" as="r" hint-placeholder-count="4">
+<div class="pc-row">
+<span class="pc-lab">{{r.label}}</span>
+<div class="pc-val">
+<sc-if value="{{r.isText}}" hint-placeholder-val="{{true}}"><span class="pc-was"><span class="pc-tag">Was</span>{{r.was}}</span><span class="pc-now"><span class="pc-tag">Now</span>{{r.now}}</span></sc-if>
+<sc-if value="{{r.isPlain}}" hint-placeholder-val="{{false}}"><span class="pc-plain">{{r.val}}</span></sc-if>
+<sc-if value="{{r.isDom}}" hint-placeholder-val="{{false}}"><div class="pc-chips"><sc-for list="{{r.added}}" as="a" hint-placeholder-count="1"><span class="pc-chip pc-add">+&nbsp;{{a.t}}<span class="pc-sr"> (new)</span></span></sc-for><sc-for list="{{r.removed}}" as="m" hint-placeholder-count="0"><span class="pc-chip pc-rem">−&nbsp;{{m.t}}<span class="pc-sr"> (removed)</span></span></sc-for><sc-if value="{{r.showUnch}}" hint-placeholder-val="{{false}}"><sc-for list="{{r.unch}}" as="u" hint-placeholder-count="2"><span class="pc-chip">{{u.t}}</span></sc-for></sc-if><sc-if value="{{r.hasUnch}}" hint-placeholder-val="{{true}}"><button type="button" class="pc-more" aria-expanded="{{r.unchOpen}}" onClick="{{r.toggle}}">{{r.unchLabel}}</button></sc-if></div></sc-if>
+</div>
+</div>
+</sc-for>
+
+</div>
+<div class="pc-foot"><span>{{pc.foot1}}</span><span>{{pc.foot2}}</span></div>
+<sc-if value="{{fp.canAccept}}" hint-placeholder-val="{{false}}"><div style="display: flex"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="check" full-width="{{yes}}" disabled="{{acc.busy}}" loading="{{acc.busy}}" data-pc-focus="1" on-click="{{openAccept}}">Accept as new baseline</x-import></div></sc-if>
+<sc-if value="{{fp.noAccept}}" hint-placeholder-val="{{false}}"><span class="pc-hint" style="min-height: 44px"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import>Only an Admin can accept a new baseline</span></sc-if>
+</sc-if>
+<sc-if value="{{fp.showFull}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; border-top: 1px solid var(--aura-border-subtle)">
+<span style="padding-top: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{fp.fullTitle}}</span>
+<sc-for list="{{pc.full}}" as="r" hint-placeholder-count="4">
+<div class="pc-row">
+<span class="pc-lab">{{r.label}}</span>
+<div class="pc-val">
+<sc-if value="{{r.isText}}" hint-placeholder-val="{{true}}"><span class="pc-was"><span class="pc-tag">Was</span>{{r.was}}</span><span class="pc-now"><span class="pc-tag">Now</span>{{r.now}}</span></sc-if>
+<sc-if value="{{r.isPlain}}" hint-placeholder-val="{{false}}"><span class="pc-plain">{{r.val}}</span></sc-if>
+<sc-if value="{{r.isDom}}" hint-placeholder-val="{{false}}"><div class="pc-chips"><sc-for list="{{r.added}}" as="a" hint-placeholder-count="1"><span class="pc-chip pc-add">+&nbsp;{{a.t}}<span class="pc-sr"> (new)</span></span></sc-for><sc-for list="{{r.removed}}" as="m" hint-placeholder-count="0"><span class="pc-chip pc-rem">−&nbsp;{{m.t}}<span class="pc-sr"> (removed)</span></span></sc-for><sc-if value="{{r.showUnch}}" hint-placeholder-val="{{false}}"><sc-for list="{{r.unch}}" as="u" hint-placeholder-count="2"><span class="pc-chip">{{u.t}}</span></sc-for></sc-if><sc-if value="{{r.hasUnch}}" hint-placeholder-val="{{true}}"><button type="button" class="pc-more" aria-expanded="{{r.unchOpen}}" onClick="{{r.toggle}}">{{r.unchLabel}}</button></sc-if></div></sc-if>
+</div>
+</div>
+</sc-for>
+
+</div>
+</sc-if>
 </div>
 
+</div>
+</div>
+
+
+<sc-if value="{{tst.show}}" hint-placeholder-val="{{false}}">
+<div role="status" aria-live="polite" style="position: absolute; {{tst.pos}}; z-index: 50; box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 10px 8px 10px 16px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); line-height: 1.4">
+<span style="display: flex"><x-import component-from-global-scope="Aura.Icon" name="{{tst.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px"><span style="font-weight: 600">{{tst.title}}</span><span style="font-size: 12px; opacity: 0.8">{{tst.line}}</span></span>
+<sc-if value="{{tst.pending}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{tst.undo}}" style="height: 44px; padding: 0 16px; flex-shrink: 0; border-radius: 9999px; border: 1px solid color-mix(in srgb, currentColor 45%, transparent); background: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums">Undo · {{tst.left}} s</button></sc-if>
+<sc-if value="{{tst.done}}" hint-placeholder-val="{{false}}"><button type="button" aria-label="Dismiss" onClick="{{tst.dismiss}}" style="width: 44px; height: 44px; flex-shrink: 0; border: 0; background: transparent; color: inherit; font-size: 18px; cursor: pointer">×</button></sc-if>
+</div>
+</sc-if>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{acc.open}}" on-close="{{acc.close}}" title="Accept the current page as the new baseline?" description="{{acc.desc}}" size="{{acc.size}}" auto-focus="{{yes}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<sc-if value="{{pc.newScript}}" hint-placeholder-val="{{true}}"><div class="pc-danger" role="alert"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span><b style="font-weight: 600">A new script domain usually means injected code.</b> Accept only if you know the client added it.</span></div></sc-if>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; font-weight: 600">What changes in the baseline</span>
+<ul class="pc-after"><sc-for list="{{pc.after}}" as="x" hint-placeholder-count="3"><li><span style="color: var(--aura-fg-secondary)">{{x.label}}:</span> {{x.t}}</li></sc-for></ul>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">The other fields stay as they are. Logged in the audit log as {{me}}.</span>
+</div>
+<x-import component-from-global-scope="Aura.TextField" label="Reason" required="{{yes}}" placeholder="e.g. Client redesigned the home page (ticket #…)" value="{{acc.reason}}" on-change="{{acc.setReason}}" hint="Required. Shown on the timeline and in the audit log."></x-import>
+<div style="display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" disabled="{{acc.busy}}" on-click="{{acc.close}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="{{acc.variant}}" disabled="{{acc.blocked}}" loading="{{acc.busy}}" on-click="{{acc.confirm}}">{{acc.cta}}</x-import>
+</div>
+</div>
+</x-import>
 <x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="sites" label="Sections"></x-import>
 </div>
 </x-dc>
@@ -132,7 +235,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { range: '30 d', role: 'owner', menu: false };
+    this.state = { range: '30 d', role: 'owner', menu: false, fp: 'Matches', fpOpen: false, unch: {}, dlg: '', reason: '', busy: false, toast: null, accepted: false, acceptReason: '' };
   }
   line(seed, base, spread) {
     var v = seed, d = [];
@@ -145,22 +248,151 @@ class Component extends DCLogic {
   }
   renderVals() {
     var self = this;
-    var I118 = { id: 'INC-0118', sev: 'Was down', tone: 'danger', icon: 'ban', what: 'Hard fail · server fault', when: 'Wed 2 Sep 03:40', dur: '11 min' };
-    var I131 = { id: 'INC-0131', sev: 'Was problem', tone: 'warning', icon: 'triangle-alert', what: 'Regional · SIN CDN edge', when: 'Mon 14 Sep 21:12', dur: '6 min' };
+    var I118 = { href: 'MIncident.dc.html', id: 'INC-0118', sev: 'Was down', tone: 'danger', icon: 'ban', what: 'Hard fail · server fault', when: 'Wed 2 Sep 03:40', dur: '11 min' };
+    var I131 = { href: 'MIncident.dc.html', id: 'INC-0131', sev: 'Was problem', tone: 'warning', icon: 'triangle-alert', what: 'Regional · SIN CDN edge', when: 'Mon 14 Sep 21:12', dur: '6 min' };
     var R = {
       '24 h': { uptime: '100.00%', p50: '412', incidents: '0', list: [], more: '' },
       '7 d': { uptime: '100.00%', p50: '405', incidents: '0', list: [], more: '' },
       '30 d': { uptime: '99.97%', p50: '398', incidents: '2', list: [I131, I118], more: '' },
       '90 d': { uptime: '99.99%', p50: '410', incidents: '4', list: [I131, I118], more: '+ 2 in August: booking page slow 18 Aug (14 min), SSL early warning 11 Aug' }
     };
-    var st = R[this.state.range];
+    var STAT = R[this.state.range];
     var admin = this.state.role === 'admin', menuOpen = !!this.state.menu;
+    var st = this.state, ADMIN = admin, ME = admin ? 'Tao' : 'Arm', SITE = 'Bangkok Airways – Taiwan';
+
+    // ---- Page-change sample (made up — never copy). Board time Fri 25 Sep 10:07 ----
+    var FPB = [
+      { k: 'title', label: 'Page title', base: 'Bangkok Airways – Taiwan' },
+      { k: 'desc', label: 'Meta description', base: 'Fly to Taipei, Kaohsiung and back with daily flights from Bangkok.' },
+      { k: 'robots', label: 'Robots', base: 'index, follow' },
+      { k: 'canon', label: 'Canonical URL', base: 'https://[Taiwan site URL]/' },
+      { k: 'h1', label: 'Main heading (first h1)', base: 'Welcome to Taiwan' },
+      { k: 'scripts', label: 'Script / iframe domains', dom: true, base: ['static-cdn.example', 'maps-embed.example', 'tag-manager.example', 'chat-widget.example'] },
+      { k: 'links', label: 'Link domains', dom: true, base: ['[Taiwan site URL]', 'booking-engine.example', 'payments.example', 'hotels.example', 'car-rental.example', 'insurance.example', 'loyalty.example', 'social-a.example', 'social-b.example', 'video.example', 'maps.example', 'help-desk.example', 'old-promo.example'] }
+    ];
+    var PCSETS = {
+      'Defacement': { title: 'Bangkok Airways – Taiwan | สล็อตออนไลน์', desc: 'แทงบอลออนไลน์ เว็บตรง ฝากถอนไม่มีขั้นต่ำ สมัครวันนี้รับโบนัส 100%', h1: 'บาคาร่า ฝากถอนออโต้',
+        add: { scripts: ['evil-cdn.example'], links: ['casino.example', 'slotxo.example', 'betflix.example'] }, rem: {},
+        firstSeen: '09:30', firstAt: '09:30:14', heldNow: '2 checks (30 min)', confirmSub: 'New script domain — raised on the first fetch', reason: 'Client confirmed the new title, text and partner links (ticket #4821)' },
+      'Redesign': { title: 'Bangkok Airways – Taiwan · Fly to Taipei from 2,990 THB', h1: 'Fly to Taipei from 2,990 THB',
+        add: { links: ['hotels-partner.example'] }, rem: { links: ['old-promo.example'] },
+        firstSeen: '08:30', firstAt: '08:30:13', heldNow: '4 checks (1 h 30 min)', confirmSub: 'Held 3 fetches (1 h)', reason: 'Client redesigned the home page (ticket #4821)' }
+    };
+    function PCM(setKey, unchOpen, toggleFn) {
+      var S = PCSETS[setKey] || PCSETS['Defacement'];
+      var rows = [], after = [], full = [];
+      FPB.forEach(function (f) {
+        if (f.dom) {
+          var add = (S.add[f.k] || []), rem = (S.rem[f.k] || []);
+          var unch = f.base.filter(function (d) { return rem.indexOf(d) < 0; });
+          var open = !!(unchOpen || {})[f.k];
+          var r = { label: f.label, isText: false, isPlain: false, isDom: true,
+            added: add.map(function (t) { return { t: t }; }), removed: rem.map(function (t) { return { t: t }; }),
+            unch: unch.map(function (t) { return { t: t }; }), hasUnch: unch.length > 0, showUnch: open, unchOpen: open ? 'true' : 'false',
+            unchLabel: open ? 'Hide unchanged' : 'and ' + unch.length + ' unchanged', toggle: function () { toggleFn(f.k); } };
+          full.push({ label: f.label, isText: false, isPlain: false, isDom: true, added: [], removed: [], unch: f.base.map(function (t) { return { t: t }; }), hasUnch: true, showUnch: open, unchOpen: open ? 'true' : 'false', unchLabel: open ? 'Hide' : f.base.length + ' domains', toggle: function () { toggleFn(f.k); } });
+          if (add.length || rem.length) { rows.push(r); after.push({ label: f.label, t: add.map(function (d) { return '+ ' + d; }).concat(rem.map(function (d) { return '− ' + d; })).join(', ') }); }
+        } else {
+          full.push({ label: f.label, isText: false, isPlain: true, isDom: false, val: f.base });
+          if (S[f.k] && S[f.k] !== f.base) { rows.push({ label: f.label, isText: true, isPlain: false, isDom: false, was: f.base, now: S[f.k] }); after.push({ label: f.label, t: S[f.k] }); }
+        }
+      });
+      var newScript = !!(S.add.scripts && S.add.scripts.length);
+      var n = rows.length;
+      var cause = n === 1 ? rows[0].label + ' changed on /' : n + ' changes on /' + (newScript ? ' · new script domain ' + S.add.scripts[0] : '');
+      return { rows: rows, after: after, full: full, n: n, newScript: newScript, cause: cause, S: S,
+        foot1: 'First seen ' + S.firstSeen + ' · held ' + S.heldNow, foot2: 'From the 10:00:14 fetch · next fetch 10:30' };
+    }
+
+    function ACC(opts) {
+      var busy = !!st.busy;
+      function tick() {
+        clearInterval(self._iv);
+        self._iv = setInterval(function () {
+          var t = self.state.toast; if (!t || t.phase !== 'pending') { clearInterval(self._iv); return; }
+          if (t.left > 1) self.setState({ toast: Object.assign({}, t, { left: t.left - 1 }) });
+          else { clearInterval(self._iv); self.setState({ toast: Object.assign({}, t, { phase: 'posted', left: 0 }) }); }
+        }, 1000);
+      }
+      self._startToast = tick;
+      self._focusReason = function () { setTimeout(function () { var i = document.querySelector('[role=dialog] input'); if (i) i.focus(); }, 80); };
+      self._toastFor = function (kind, extra) { self.setState(Object.assign({ toast: { kind: kind, phase: 'pending', left: 10 } }, extra || {})); tick(); };
+      var acc = { open: st.dlg === 'accept', size: opts.size, desc: opts.desc,
+        reason: st.reason || '', setReason: function (e) { self.setState({ reason: e && e.target ? e.target.value : e }); },
+        busy: busy, blocked: !(st.reason || '').trim() || busy,
+        variant: pc.newScript ? 'danger' : 'primary', cta: busy ? 'Accepting…' : 'Accept as baseline',
+        close: function () { if (!self.state.busy) self.setState({ dlg: '' }); },
+        confirm: function () {
+          if (!(self.state.reason || '').trim() || self.state.busy) return;
+          self.setState({ busy: true });
+          clearTimeout(self._to);
+          self._to = setTimeout(function () {
+            if (!self.state.busy) return;
+            self.setState({ busy: false, dlg: '', accepted: true, acceptReason: self.state.reason.trim(), toast: { kind: 'accept', phase: 'pending', left: 10 } }); tick();
+          }, 1200);
+        } };
+      var t = st.toast, K = t && t.kind ? t.kind : 'accept';
+      var TT = {
+        accept: { p: 'Accepting as the new baseline', pl: 'Applies in {n} s — nothing changes until then', d: 'Baseline updated — ' + SITE + ' is OK on the next check', dl: 'Applied 10:07:10 · next check 10:30', u: 'Undone — the baseline is unchanged' },
+        ack: { p: 'Acknowledged INC-0157 · reminder stopped', pl: 'Posting to Chat, email and webhooks in {n} s — nothing is sent until then', d: 'Acknowledged INC-0157 · reminder stopped', dl: 'Posted to Chat, email and webhooks.', u: 'Undone — INC-0157 is not acknowledged' },
+        resolve: { p: 'Resolved INC-0157' + (st.resolveAccepted ? ' · baseline accepted' : ''), pl: 'Posting to Chat, email and webhooks in {n} s — nothing is sent until then', d: 'Resolved INC-0157' + (st.resolveAccepted ? ' · baseline accepted' : ''), dl: 'Posted to Chat, email and webhooks.', u: 'Undone — INC-0157 is still open' }
+      }[K] || {};
+      var tst = { show: !!t && !st.dlg, pos: opts.pos, pending: !!t && t.phase === 'pending', done: !!t && t.phase !== 'pending', left: t ? t.left : 10,
+        icon: t && t.phase === 'undone' ? 'info' : 'check',
+        title: !t ? '' : (t.phase === 'undone' ? TT.u : (t.phase === 'pending' ? TT.p : TT.d)),
+        line: !t ? '' : (t.phase === 'pending' ? TT.pl.replace('{n}', t.left) : (t.phase === 'posted' ? TT.dl : 'Nothing was changed or sent.')),
+        undo: function () {
+          clearInterval(self._iv);
+          var t0 = self.state.toast, k = t0 && t0.kind ? t0.kind : 'accept', u = { toast: Object.assign({}, t0, { phase: 'undone', left: 0 }) };
+          if (k === 'accept') u.accepted = false;
+          if (k === 'ack') u.acked = false;
+          if (k === 'resolve') { u.resolved = false; if (self.state.resolveAccepted) { u.accepted = false; u.resolveAccepted = false; } }
+          self.setState(u);
+          setTimeout(function () { var b = document.querySelector('[data-pc-focus]'); if (b) b.focus(); }, 60);
+        },
+        dismiss: function () { self.setState({ toast: null }); } };
+      return { acc: acc, tst: tst };
+    }
+
+    var FPV = ['Recording', 'Matches', 'Change waiting', 'PROBLEM open', 'No data', 'No fingerprint'];
+    var fv = st.fp || 'Matches';
+    var waiting = fv === 'Change waiting';
+    var pc = PCM(waiting ? 'Redesign' : 'Defacement', st.unch, function (k) { var u = Object.assign({}, self.state.unch || {}); u[k] = !u[k]; self.setState({ unch: u }); });
+    if (waiting) { pc.foot1 = 'First seen 09:30 · held 2 of 3 checks (30 min)'; pc.S = Object.assign({}, pc.S, { reason: 'Client redesigned the home page (ticket #4821)' }); }
+    var acceptedNow = !!st.accepted && (!st.toast || st.toast.phase !== 'undone');
+    var accPending = acceptedNow && !!st.toast && st.toast.phase === 'pending';
+    var diffState = (fv === 'Change waiting' || fv === 'PROBLEM open') && !(acceptedNow && !accPending);
+    var A = ACC({ size: 'sm', pos: 'left: 16px; right: 16px; bottom: 76px', desc: SITE + ' · home page /' });
+    var FPI = {
+      'Recording': { icon: 'eye', color: 'var(--aura-fg-secondary)', line: 'Recording — alerts start after 2 weeks of clean checks (from Thu 8 Oct)', sub: 'Until then it only records — no alerts.', full: true },
+      'Matches': { icon: 'circle-check', color: 'var(--aura-fg-positive)', line: 'Matches baseline · checked 10:00 · baseline accepted Thu 10 Sep by Tao', sub: '', full: false, toggle: true },
+      'Change waiting': { icon: 'clock', color: 'var(--aura-alert-warning-fg)', line: 'Differs from the baseline · held 2 of 3 checks — a PROBLEM opens at 10:30 if it still differs', sub: 'No new script domain, so it waits for 3 fetches (about 1 h).' },
+      'PROBLEM open': { icon: 'triangle-alert', color: 'var(--aura-alert-warning-fg)', line: 'Differs from the baseline · PROBLEM open since 09:30', sub: 'A new script domain raises a PROBLEM on the first fetch.', inc: true },
+      'No data': { icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)', line: 'Couldn’t read the page (blocked by bot protection) · last read 08:30', sub: 'Uptime checks are unaffected. The last fingerprint read is kept; nothing is compared until a fetch gets through.', full: false, toggle: true },
+      'No fingerprint': { icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)', line: 'No fingerprint yet — the first check runs within 30 min', sub: '' }
+    };
+    var fi = FPI[fv];
+    if (!diffState && (fv === 'Change waiting' || fv === 'PROBLEM open')) fi = { icon: 'circle-check', color: 'var(--aura-fg-positive)', line: fv === 'PROBLEM open' ? 'Baseline accepted 10:07 by Tao · INC-0157 recovers when the 10:30 fetch matches it' : 'Baseline accepted 10:07 by Tao · the 10:30 check compares against it', sub: '“' + st.acceptReason + '”', full: false, toggle: true };
+    var fpOpen = !!st.fpOpen;
+    var fpVals = {
+      fpViews: FPV, fpView: fv, fpOpts: FPV.map(function (v) { return { value: v, label: v }; }),
+      setFpSel: function (e) { var v = e && e.target ? e.target.value : e; clearInterval(self._iv); clearTimeout(self._to); self.setState({ fp: v, fpOpen: false, accepted: false, toast: null, dlg: '', busy: false, unch: {} }); },
+      setFp: function (v) { clearInterval(self._iv); clearTimeout(self._to); self.setState({ fp: v, fpOpen: false, accepted: false, toast: null, dlg: '', busy: false, unch: {} }); },
+      fp: { icon: fi.icon, color: fi.color, line: fi.line, sub: fi.sub, hasSub: !!fi.sub,
+        showDiff: diffState, showFull: !!fi.full || (!!fi.toggle && fpOpen), hasToggle: !!fi.toggle, toggleLabel: fpOpen ? 'Hide fingerprint' : 'Show fingerprint', toggleStr: fpOpen ? 'true' : 'false', toggleIcon: fpOpen ? 'chevron-up' : 'chevron-down',
+        toggle: function () { self.setState({ fpOpen: !self.state.fpOpen }); },
+        inc: fv === 'PROBLEM open', canAccept: diffState && ADMIN && !accPending, noAccept: diffState && !ADMIN, pend: accPending,
+        fullTitle: fv === 'Recording' ? 'Current fingerprint' : (fv === 'No data' ? 'Last fingerprint read · 08:30' : 'Baseline fingerprint') },
+      pc: pc, acc: A.acc, tst: A.tst,
+      openAccept: function () { self.setState({ dlg: 'accept', reason: '' }); self._focusReason(); },
+      hdrProblem: fv === 'PROBLEM open', hdrOk: fv !== 'PROBLEM open'
+    };
     if (!self._kd && typeof document !== 'undefined') {
       self._kd = true;
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && self.state.menu) { self.setState({ menu: false }); var b = document.querySelector('.ms-more'); if (b) b.focus(); } });
       document.addEventListener('click', function (e) { if (self.state.menu && e.target.closest && !e.target.closest('.ms-menu, .ms-more, .aura-segmented')) self.setState({ menu: false }); });
     }
-    return {
+    return Object.assign(fpVals, {
       yes: true,
       views: ['Closed', 'Owner menu', 'Admin menu'], view: menuOpen ? (admin ? 'Admin menu' : 'Owner menu') : 'Closed',
       setView: function (v) { self.setState(v === 'Closed' ? { menu: false } : { role: v === 'Admin menu' ? 'admin' : 'owner', menu: true }); },
@@ -170,10 +402,10 @@ class Component extends DCLogic {
       range: this.state.range,
       ranges: ['24 h', '7 d', '30 d', '90 d'],
       setRange: function (v) { self.setState({ range: v }); },
-      stat: st,
-      hasList: st.list.length > 0,
-      noList: st.list.length === 0,
-      hasMore: !!st.more,
+      stat: Object.assign({}, STAT, (st.fp === 'PROBLEM open') ? { list: [{ id: 'INC-0157', sev: 'Problem', tone: 'warning', icon: 'triangle-alert', what: 'Page change', when: 'Open since 09:30', dur: '37 min', href: 'MIncidentPageChange.dc.html' }].concat(STAT.list), incidents: String(+STAT.incidents + 1) } : {}),
+      hasList: (st.fp === 'PROBLEM open') || STAT.list.length > 0,
+      noList: !((st.fp === 'PROBLEM open') || STAT.list.length > 0),
+      hasMore: !!STAT.more,
       chart: { bkk: this.line(11, 230, 120), sin: this.line(29, 400, 180), tyo: this.line(47, 310, 150) },
       round: [
         { code: 'BKK', at: '10:07:10', ms: '212 ms' },
@@ -186,7 +418,7 @@ class Component extends DCLogic {
         { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
         { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
       ]
-    };
+    });
   }
 }
 </script>
