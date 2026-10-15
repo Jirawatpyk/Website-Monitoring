@@ -145,14 +145,14 @@ isOneToOne: false
                   ]
                 },"crawler_checks": {
                   Row: {
-                    "checked_at": string,"created_at": string,"error": string | null,"final_url": string | null,"fingerprint": Json | null,"forbidden": (string)[] | null,"id": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms": number | null,"scan_complete": boolean | null,"status_code": number | null,"updated_at": string,"usable": boolean,"view": string
+                    "checked_at": string,"created_at": string,"error": string | null,"final_url": string | null,"fingerprint": Json | null,"fingerprint_hash": string | null,"forbidden": (string)[] | null,"id": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms": number | null,"scan_complete": boolean | null,"status_code": number | null,"updated_at": string,"usable": boolean,"view": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "checked_at": string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"fingerprint"?: Json | null,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable": boolean,"view": string
+                    "checked_at": string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"fingerprint"?: Json | null,"fingerprint_hash"?: never,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable": boolean,"view": string
                   }
                   Update: {
-                    "checked_at"?: string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"fingerprint"?: Json | null,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id"?: string,"outcome"?: Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable"?: boolean,"view"?: string
+                    "checked_at"?: string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"fingerprint"?: Json | null,"fingerprint_hash"?: never,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id"?: string,"outcome"?: Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable"?: boolean,"view"?: string
                   }
                   Relationships: [
                     {
@@ -431,14 +431,14 @@ isOneToOne: false
                   ]
                 },"page_baselines": {
                   Row: {
-                    "accepted_at": string,"accepted_by": string | null,"created_at": string,"fingerprint": NonNullable<Json>,"first_set_at": string,"id": string,"monitor_id": string,"reason": string | null,"source_check_id": string | null,"undo_before": Json | null,"undo_by": string | null,"undo_until": string | null,"updated_at": string,"url": string
+                    "accepted_at": string,"accepted_by": string | null,"created_at": string,"fingerprint": NonNullable<Json>,"fingerprint_hash": string | null,"first_set_at": string,"id": string,"monitor_id": string,"reason": string | null,"source_check_id": string | null,"undo_before": Json | null,"undo_by": string | null,"undo_until": string | null,"updated_at": string,"url": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "accepted_at": string,"accepted_by"?: string | null,"created_at"?: string,"fingerprint": NonNullable<Json>,"first_set_at": string,"id"?: string,"monitor_id": string,"reason"?: string | null,"source_check_id"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_until"?: string | null,"updated_at"?: string,"url": string
+                    "accepted_at": string,"accepted_by"?: string | null,"created_at"?: string,"fingerprint": NonNullable<Json>,"fingerprint_hash"?: never,"first_set_at": string,"id"?: string,"monitor_id": string,"reason"?: string | null,"source_check_id"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_until"?: string | null,"updated_at"?: string,"url": string
                   }
                   Update: {
-                    "accepted_at"?: string,"accepted_by"?: string | null,"created_at"?: string,"fingerprint"?: NonNullable<Json>,"first_set_at"?: string,"id"?: string,"monitor_id"?: string,"reason"?: string | null,"source_check_id"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_until"?: string | null,"updated_at"?: string,"url"?: string
+                    "accepted_at"?: string,"accepted_by"?: string | null,"created_at"?: string,"fingerprint"?: NonNullable<Json>,"fingerprint_hash"?: never,"first_set_at"?: string,"id"?: string,"monitor_id"?: string,"reason"?: string | null,"source_check_id"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_until"?: string | null,"updated_at"?: string,"url"?: string
                   }
                   Relationships: [
                     {
@@ -800,7 +800,7 @@ isOneToOne: false
                            },
 "engine_page_fingerprints":
 { Args: { "p_now": string,"p_since": string }; Returns: {
-              "baseline": Json,"facts": Json,"first_set_at": string,"latest_at": string,"latest_usable": boolean,"monitor_id": string,"pending_until": string
+              "baseline": Json,"baseline_hash": string,"facts": Json,"first_set_at": string,"latest_at": string,"latest_usable": boolean,"monitor_id": string,"pending_until": string
             }[]
                            },
 "engine_post_late_alert":

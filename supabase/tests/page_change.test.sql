@@ -4,7 +4,7 @@
 -- timeline) and resolve with "Also accept the current page as the new baseline".
 begin;
 \ir _helpers.psql
-select plan(44);
+select plan(46);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -83,6 +83,12 @@ select is(
   (select facts->0->>'id' from public.engine_page_fingerprints(now(), now() - interval '1 day')
    where monitor_id = '00000000-0000-0000-0000-0000000000d1'),
   '00000000-0000-0000-0000-0000000000e2', 'newest usable first'
+);
+select is(
+  (select (facts->1->'fingerprint' = 'null'::jsonb)::text || ' · ' || (facts->0->'fingerprint'->>'title')
+   from public.engine_page_fingerprints(now(), now() - interval '1 day')
+   where monitor_id = '00000000-0000-0000-0000-0000000000d1'),
+  'true · Site A | สล็อตออนไลน์', 'only a fingerprint that differs from the baseline is sent'
 );
 select is((select count(*)::int from public.engine_page_fingerprints(now(), now() - interval '1 day')), 1,
   'a monitor with no baseline has no row');
@@ -214,6 +220,8 @@ select is(
                           '00000000-0000-0000-0000-0000000000e5'),
   now() + interval '10 seconds', 'an Admin accepts and resolves at once'
 );
+select throws_ok($$select public.undo_page_baseline('00000000-0000-0000-0000-0000000000d1')$$,
+  '55000', null, 'a baseline accepted with a resolve is undone only with the resolve');
 select lives_ok($$select public.undo_resolve('00000000-0000-0000-0000-0000000000f1')$$, 'Undo takes the resolve back');
 reset role;
 select is(

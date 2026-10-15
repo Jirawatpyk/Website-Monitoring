@@ -16,10 +16,14 @@ alter table public.crawler_checks
 alter table public.crawler_checks
   add column fingerprint jsonb
     check (fingerprint is null or (view = 'plain' and jsonb_typeof(fingerprint) = 'object'
-                                   and octet_length(fingerprint::text) <= 32768));
+                                   and octet_length(fingerprint::text) <= 32768)),
+  -- equal fingerprints have equal hashes (jsonb's text form is canonical): the engine's read compares
+  -- these and sends a fingerprint only when it differs from the baseline's
+  add column fingerprint_hash text generated always as (md5(fingerprint::text)) stored;
 
 -- The engine's and the pages' read: the newest plain fetches of one monitor.
-create index crawler_checks_monitor_view_idx on public.crawler_checks (monitor_id, view, checked_at desc);
+create index crawler_checks_plain_idx on public.crawler_checks (monitor_id, checked_at desc)
+  where view = 'plain';
 
 -- ── page_baselines ─────────────────────────────────────────────────────────
 -- One per primary monitor: the fingerprint the team accepted. Set automatically from the first usable
@@ -32,6 +36,7 @@ create table public.page_baselines (
   url text not null check (char_length(url) <= 2048),
   fingerprint jsonb not null
     check (jsonb_typeof(fingerprint) = 'object' and octet_length(fingerprint::text) <= 32768),
+  fingerprint_hash text generated always as (md5(fingerprint::text)) stored,
   first_set_at timestamptz not null,
   accepted_at timestamptz not null,
   accepted_by uuid references public.profiles (id) on delete restrict,
@@ -95,12 +100,20 @@ begin
     return false;
   end if;
 
-  insert into public.page_baselines (monitor_id, url, fingerprint, first_set_at, accepted_at, source_check_id)
-  values (v_check.monitor_id, v_url, v_check.fingerprint, v_check.checked_at, v_check.checked_at, v_check.id)
-  on conflict (monitor_id) do update
-    set url = excluded.url, fingerprint = excluded.fingerprint, first_set_at = excluded.first_set_at,
-        accepted_at = excluded.accepted_at, accepted_by = null, reason = null,
-        source_check_id = excluded.source_check_id, undo_before = null, undo_until = null, undo_by = null;
+  if v_old.id is null then
+    insert into public.page_baselines (monitor_id, url, fingerprint, first_set_at, accepted_at, source_check_id)
+    values (v_check.monitor_id, v_url, v_check.fingerprint, v_check.checked_at, v_check.checked_at, v_check.id)
+    on conflict (monitor_id) do nothing;
+    if not found then
+      return false; -- another crawler run set it first
+    end if;
+  else
+    update public.page_baselines
+      set url = v_url, fingerprint = v_check.fingerprint, first_set_at = v_check.checked_at,
+          accepted_at = v_check.checked_at, accepted_by = null, reason = null,
+          source_check_id = v_check.id, undo_before = null, undo_until = null, undo_by = null
+      where id = v_old.id;
+  end if;
 
   insert into public.audit_log (action, entity, entity_id, before, after)
   values ('page_baseline.auto', 'monitor', v_check.monitor_id,
@@ -118,10 +131,13 @@ grant execute on function public.crawler_set_baseline(uuid) to service_role;
 -- Per primary monitor of an active site that has a baseline: the baseline to compare with at p_now
 -- (the previous one while an accept's Undo is open), whether an accept is waiting, first_set_at, and
 -- the six newest usable plain fetches since p_since plus the newest fetch of any kind (so a blocked
--- one reads as no data). One row per monitor, under PostgREST's 1,000-row cap.
+-- one reads as no data). One row per monitor, under PostgREST's 1,000-row cap. Fingerprints go only
+-- where a hash differs from the baseline's (the baseline only then too): every minute, a page that
+-- matches costs a few hashes, not 7 × 15 KB (db-reviewer, 15 Oct).
 create function public.engine_page_fingerprints(p_now timestamptz, p_since timestamptz)
 returns table (
   monitor_id uuid,
+  baseline_hash text,
   baseline jsonb,
   pending_until timestamptz,
   first_set_at timestamptz,
@@ -134,16 +150,22 @@ stable
 set search_path = ''
 as $$
   select b.monitor_id,
-    case when b.undo_until > p_now then b.undo_before->'fingerprint' else b.fingerprint end,
+    e.hash,
+    case when exists (
+      select 1 from public.crawler_checks c
+      where c.monitor_id = b.monitor_id and c.view = 'plain' and c.usable and c.fingerprint is not null
+        and c.checked_at >= p_since and c.checked_at <= p_now and c.fingerprint_hash <> e.hash
+    ) then e.fingerprint end,
     case when b.undo_until > p_now then b.undo_until end,
     b.first_set_at,
     l.checked_at,
     l.usable,
     coalesce((
-      select jsonb_agg(jsonb_build_object('id', f.id, 'checked_at', f.checked_at, 'fingerprint', f.fingerprint)
+      select jsonb_agg(jsonb_build_object('id', f.id, 'checked_at', f.checked_at, 'hash', f.fingerprint_hash,
+                                          'fingerprint', case when f.fingerprint_hash <> e.hash then f.fingerprint end)
                        order by f.checked_at desc)
       from (
-        select c.id, c.checked_at, c.fingerprint
+        select c.id, c.checked_at, c.fingerprint, c.fingerprint_hash
         from public.crawler_checks c
         where c.monitor_id = b.monitor_id and c.view = 'plain' and c.usable
           and c.fingerprint is not null and c.checked_at >= p_since and c.checked_at <= p_now
@@ -155,6 +177,10 @@ as $$
   join public.monitors m on m.id = b.monitor_id and m.is_primary and m.enabled and m.removed_at is null
     and m.url = b.url
   join public.sites s on s.id = m.site_id and s.is_active
+  cross join lateral (
+    select case when b.undo_until > p_now then b.undo_before->'fingerprint' else b.fingerprint end as fingerprint,
+           case when b.undo_until > p_now then md5((b.undo_before->'fingerprint')::text) else b.fingerprint_hash end as hash
+  ) e
   left join lateral (
     select c.checked_at, c.usable
     from public.crawler_checks c
@@ -206,12 +232,19 @@ begin
     raise exception 'A new baseline is already waiting to apply' using errcode = '55000';
   end if;
 
+  select id into v_incident from public.incidents
+    where site_id = v_site and trigger = 'content_change'
+      and (state not in ('resolved', 'in_review', 'closed') or id = p_with_resolve)
+    order by started_at desc
+    limit 1;
+
   update public.page_baselines
     set fingerprint = v_check.fingerprint, accepted_at = v_now, accepted_by = auth.uid(),
         reason = v_reason, source_check_id = v_check.id, undo_until = v_until, undo_by = auth.uid(),
         undo_before = jsonb_build_object('fingerprint', v_old.fingerprint, 'accepted_at', v_old.accepted_at,
                                          'accepted_by', v_old.accepted_by, 'reason', v_old.reason,
-                                         'source_check_id', v_old.source_check_id)
+                                         'source_check_id', v_old.source_check_id,
+                                         'incident_id', v_incident, 'with_resolve', p_with_resolve)
     where id = v_old.id;
 
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
@@ -222,11 +255,6 @@ begin
                              'applies_at', v_until, 'with_resolve', p_with_resolve));
 
   select display_name into v_name from public.profiles where id = auth.uid();
-  select id into v_incident from public.incidents
-    where site_id = v_site and trigger = 'content_change'
-      and (state not in ('resolved', 'in_review', 'closed') or id = p_with_resolve)
-    order by started_at desc
-    limit 1;
   if v_incident is not null then
     insert into public.incident_events (incident_id, type, actor_id, payload, at)
     values (v_incident, 'baseline_accepted', auth.uid(),
@@ -238,16 +266,16 @@ begin
 end;
 $$;
 
--- Puts the previous baseline back inside the Undo window. p_actor_check: only the person who
--- accepted may undo (resolve's Undo already checked its own actor). Returns false when nothing waits.
-create function private.undo_baseline(p_monitor_id uuid, p_actor_check boolean)
+-- Puts the previous baseline back inside the Undo window, by the person who accepted it. p_resolve:
+-- the resolve whose Undo this is — it reverses only the accept that resolve made; without it, an accept
+-- made by a resolve is refused (undo the resolve instead). Returns false when nothing waits.
+create function private.undo_baseline(p_monitor_id uuid, p_resolve uuid default null)
 returns boolean
 language plpgsql
 set search_path = ''
 as $$
 declare
   v_b public.page_baselines%rowtype;
-  v_site uuid;
   v_incident uuid;
   v_name text;
 begin
@@ -255,8 +283,14 @@ begin
   if not found or v_b.undo_until is null or v_b.undo_until <= now() then
     return false;
   end if;
-  if p_actor_check and v_b.undo_by is distinct from auth.uid() then
+  if p_resolve is not null and (v_b.undo_before->>'with_resolve') is distinct from p_resolve::text then
+    return false;
+  end if;
+  if v_b.undo_by is distinct from auth.uid() then
     raise exception 'Only the person who accepted it can undo it' using errcode = '42501';
+  end if;
+  if p_resolve is null and v_b.undo_before->>'with_resolve' is not null then
+    raise exception 'This baseline came with a resolve — undo the resolve instead' using errcode = '55000';
   end if;
 
   update public.page_baselines
@@ -275,13 +309,7 @@ begin
           jsonb_build_object('fingerprint', v_b.fingerprint, 'reason', v_b.reason),
           jsonb_build_object('fingerprint', v_b.undo_before->'fingerprint'));
 
-  -- the timeline that got this accept's event
-  select site_id into v_site from public.monitors where id = p_monitor_id;
-  select e.incident_id into v_incident from public.incident_events e
-    join public.incidents i on i.id = e.incident_id and i.site_id = v_site
-    where e.type = 'baseline_accepted' and (e.payload->>'applies_at')::timestamptz = v_b.undo_until
-    order by e.at desc
-    limit 1;
+  v_incident := (v_b.undo_before->>'incident_id')::uuid; -- the timeline that got the accept
   if v_incident is not null then
     select display_name into v_name from public.profiles where id = auth.uid();
     insert into public.incident_events (incident_id, type, actor_id, payload)
@@ -292,7 +320,7 @@ end;
 $$;
 
 revoke execute on function private.accept_baseline(uuid, text, uuid) from public, anon, authenticated;
-revoke execute on function private.undo_baseline(uuid, boolean) from public, anon, authenticated;
+revoke execute on function private.undo_baseline(uuid, uuid) from public, anon, authenticated;
 
 -- Accept as new baseline (Incident and Site detail, spec §26.5). Admin only. Errors: 42501 not an
 -- Admin · 22023 no reason / not a usable plain fetch · 55000 no baseline / one already waiting.
@@ -321,7 +349,7 @@ begin
   if not coalesce(public.current_app_role() = 'admin', false) then
     raise exception 'Only an Admin can accept a new baseline' using errcode = '42501';
   end if;
-  if not private.undo_baseline(p_monitor_id, true) then
+  if not private.undo_baseline(p_monitor_id) then
     raise exception 'The undo window has closed' using errcode = '55000';
   end if;
 end;
@@ -403,7 +431,7 @@ begin
   end if;
 
   if v_accept then
-    perform private.accept_baseline(p_accept_check_id, v_rc->>'what', p_incident_id);
+    perform private.accept_baseline(p_accept_check_id, left(v_rc->>'what', 500), p_incident_id);
     perform public.engine_cancel_ladder(p_incident_id, 'Resolved with a new baseline');
     perform public.engine_cancel_held_problem(p_incident_id, 'Resolved with a new baseline');
   end if;
@@ -528,7 +556,7 @@ begin
   v_from := coalesce(v_from, 'needs_root_cause');
 
   if v_accepted is not null then
-    perform private.undo_baseline(c.monitor_id, false)
+    perform private.undo_baseline(c.monitor_id, p_incident_id)
       from public.crawler_checks c where c.id = v_accepted;
   end if;
 
@@ -549,4 +577,35 @@ begin
           jsonb_build_object('state', 'resolved', 'resolved_at', v_inc.resolved_at),
           jsonb_build_object('state', v_from));
 end;
+$$;
+
+-- ── engine_crawler_checks keeps to the keyword views ───────────────────────
+-- As in S09c (20261013070508), plus the view filter: plain fetches (above) are no keyword evidence and
+-- would only make the payload bigger.
+create or replace function public.engine_crawler_checks(p_since timestamptz)
+returns table (monitor_id uuid, facts jsonb)
+language sql
+stable
+set search_path = ''
+as $$
+  select r.monitor_id,
+    jsonb_agg(
+      jsonb_build_object(
+        'view', r.view,
+        'checked_at', r.checked_at,
+        'final_url', r.final_url,
+        'forbidden', coalesce(r.forbidden, '{}')
+      )
+      order by r.view, r.checked_at desc
+    )
+  from (
+    select c.monitor_id, c.view, c.checked_at, c.final_url, c.forbidden,
+      row_number() over (partition by c.monitor_id, c.view order by c.checked_at desc) as rn
+    from public.crawler_checks c
+    join public.monitors m on m.id = c.monitor_id and m.is_primary and m.enabled and m.removed_at is null
+    join public.sites s on s.id = m.site_id and s.is_active
+    where c.usable and c.checked_at >= p_since and c.view in ('googlebot', 'google_referer')
+  ) r
+  where r.rn <= 2
+  group by r.monitor_id;
 $$;
