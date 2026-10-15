@@ -56,6 +56,27 @@ const retitled = { title: 'Site A · Fly from 2,990 THB' };
 const injected = { scripts: [...BASE.scripts, 'evil-cdn.example'], title: 'Site A | สล็อตออนไลน์' };
 
 describe('buildPageChange (spec §26.8)', () => {
+  it('No data, not "No fingerprint yet", when every fetch so far failed — with the reason', () => {
+    const failed = (error: string | null, extra: Partial<PlainFetch> = {}): PlainFetch => ({
+      id: 'c1',
+      checked_at: ago(10),
+      usable: false,
+      fingerprint: null,
+      outcome: 'fail',
+      error,
+      ...extra,
+    });
+    const tls = buildPageChange(
+      input({ baseline: null, fetches: [failed('UNABLE_TO_VERIFY_LEAF_SIGNATURE')] }),
+    );
+    expect(tls.status).toBe('no_data');
+    expect(statusWords(tls).line).toBe('Couldn’t read the page (TLS chain misconfigured)');
+    const waf = buildPageChange(
+      input({ baseline: null, fetches: [failed(null, { outcome: 'blocked', status_code: 403 })] }),
+    );
+    expect(statusWords(waf).line).toBe('Couldn’t read the page (blocked by bot protection)');
+  });
+
   it('No fingerprint yet: no baseline and no fetch', () => {
     const v = buildPageChange(input({ baseline: null, fetches: [] }));
     expect(v.status).toBe('no_fingerprint');
