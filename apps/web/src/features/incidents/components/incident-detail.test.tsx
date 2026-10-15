@@ -77,6 +77,8 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     resolved: null,
     locations: [],
     evidence: null,
+    pageChange: null,
+    canAcceptBaseline: false,
     ...merged,
     gate: resolveGate(
       {

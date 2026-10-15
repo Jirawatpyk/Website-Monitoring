@@ -323,9 +323,15 @@ export function ResolveDialog({
   onClose,
   returnFocus,
   onUndone,
+  pageChange,
 }: {
   incident: DialogIncident;
   initial: RootCauseValue;
+  /**
+   * A Page change incident (spec §26.7): Client-side change offers an Admin "Also accept the current page
+   * as the new baseline", ticked; other roles get the hint. Absent for every other trigger.
+   */
+  pageChange?: { canAccept: boolean; checkId: string | null; newScript: boolean; changed: number };
   /** The page's conditions; the root-cause line follows the form here. */
   conditions: Condition[];
   /** "Down 8 min · Window Thu 22:14–22:22 · OK since 22:22" cells. */
@@ -361,6 +367,11 @@ export function ResolveDialog({
 
   const unknown = value.category === UNKNOWN_ROOT_CAUSE;
   const filled = !!value.category && !!value.what.trim();
+  const [acceptBox, setAcceptBox] = useState(true);
+  const clientChange = !!pageChange && value.category === 'client_change';
+  const showBox = clientChange && pageChange.canAccept && !!pageChange.checkId;
+  // Ticked, the page is accepted first and then matches it: the page condition is met (§26.7).
+  const willAccept = showBox && acceptBox;
   const live: Condition[] = conditions.map((c) =>
     c.key !== 'root_cause'
       ? c
@@ -375,7 +386,7 @@ export function ResolveDialog({
         },
   );
   const gate = canResolve({
-    okRounds: conditions.find((c) => c.key === 'recovery')?.met ? 2 : 0,
+    okRounds: willAccept || conditions.find((c) => c.key === 'recovery')?.met ? 2 : 0,
     clientUpdate: conditions.find((c) => c.key === 'client_update')?.met ? 'not_required' : 'pending',
     rootCauseCategory: filled ? value.category : null,
   });
@@ -401,7 +412,11 @@ export function ResolveDialog({
         if (!r.ok) return r.field ? setErrors({ [r.field]: r.message }) : setFailure(r.message);
         setDone({ kind: 'kept', at: new Date() });
       } else {
-        const r = await resolveIncident({ incidentId: incident.incidentId, ...value }).catch(() => ({
+        const r = await resolveIncident({
+          incidentId: incident.incidentId,
+          ...value,
+          ...(willAccept && pageChange?.checkId ? { acceptCheckId: pageChange.checkId } : {}),
+        }).catch(() => ({
           ok: false as const,
           message: FAILED,
           field: undefined,
@@ -472,9 +487,13 @@ export function ResolveDialog({
                   ? 'Write what happened to continue'
                   : unknown
                     ? 'Saves your notes · the incident stays open'
-                    : gate.ok
-                      ? 'All 3 conditions met'
-                      : 'Resolve waits for every condition'}
+                    : willAccept
+                      ? 'Accepts the baseline first, then resolves — the page then matches it.'
+                      : gate.ok
+                        ? `All ${conditions.length} conditions met`
+                        : pageChange
+                          ? 'Resolve unlocks when the page matches the baseline again.'
+                          : 'Resolve waits for every condition'}
             </span>
             <Button variant="secondary" onClick={close}>
               Cancel
@@ -491,13 +510,13 @@ export function ResolveDialog({
               </Button>
             ) : (
               <Button
-                variant="primary"
+                variant={willAccept && pageChange?.newScript ? 'danger' : 'primary'}
                 icon={<IconCircleCheck />}
                 disabled={!gate.ok}
                 loading={pending}
                 onClick={submit}
               >
-                Resolve incident
+                {willAccept ? 'Accept baseline and resolve' : 'Resolve incident'}
               </Button>
             )}
           </>
@@ -624,6 +643,27 @@ export function ResolveDialog({
             errors={errors}
             stillDown={incident.stillDown}
           />
+          {showBox && (
+            <div className="flex flex-col gap-2 rounded-aura-md border border-border-default p-aura-3">
+              <Checkbox
+                checked={acceptBox}
+                onChange={(checked) => setAcceptBox(checked)}
+                description={`Saves the ${pageChange.changed} changed fields as the baseline, with “What happened” as the reason. Logged as ${viewerName}.`}
+              >
+                Also accept the current page as the new baseline
+              </Checkbox>
+              {acceptBox && pageChange.newScript && (
+                <Alert tone="danger" title="A new script domain usually means injected code.">
+                  Accept only if you know the client added it.
+                </Alert>
+              )}
+            </div>
+          )}
+          {clientChange && !pageChange.canAccept && (
+            <p className="m-0 text-sm text-fg-secondary">
+              Only an Admin can accept a new baseline — resolve once the page matches it again.
+            </p>
+          )}
           {uptime && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Uptime</span>

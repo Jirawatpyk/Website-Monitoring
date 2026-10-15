@@ -163,13 +163,14 @@ export async function resolveIncident(input: RootCauseInput): Promise<ResolveRes
     const issue = parsed.error.issues[0]!;
     return { ok: false, message: issue.message, field: fieldOf(issue.path[0]) };
   }
-  const { incidentId, category, what, fix } = parsed.data;
+  const { incidentId, category, what, fix, acceptCheckId } = parsed.data;
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('resolve_incident', {
     p_incident_id: incidentId,
     p_category: category,
     p_what: what,
     p_fix: fix,
+    ...(acceptCheckId ? { p_accept_check_id: acceptCheckId } : {}),
   });
   if (error) return { ok: false, message: refusal(error, ACT_REFUSALS) };
   flushAfter(incidentId, data, 'resolve_flush_failed');

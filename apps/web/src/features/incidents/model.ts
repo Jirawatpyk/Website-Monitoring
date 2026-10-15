@@ -449,11 +449,28 @@ export interface Gate {
   lockedReason: string | null;
 }
 
+/**
+ * A Page change incident's gate inputs (spec §26.6–§26.7, IncidentPageChange "N of 2 met"): who may
+ * accept-and-resolve, and the page's live state for the "Page matches the baseline" line.
+ */
+export interface GatePage {
+  /** An Admin may resolve with "Also accept the current page", so the dialog opens before a match. */
+  admin: boolean;
+  /** An accept inside its Undo window, until (ISO). */
+  pendingUntil: string | null;
+  /** An Admin's accept the next fetch will compare against (ISO), and that fetch. */
+  acceptedAt: string | null;
+  nextFetchAt: string | null;
+  /** When the page began to differ (ISO). */
+  differsSince: string | null;
+}
+
 /** The three conditions in the boards' words (Incident, MIncident, Resolve; §15.4, §16.1–3). */
 export function resolveGate(
   i: GateIncident & { siteName: string },
   events: readonly EventRow[],
   nameOf: (id: string | null) => string,
+  page?: GatePage,
 ): Gate {
   const okAt = okTwoRoundsAt(i, events);
   const recovered =
@@ -497,6 +514,7 @@ export function resolveGate(
         ? 'Unknown keeps the incident open'
         : `${lastRc ? `${nameOf(lastRc.actor_id)} · ${formatTime(new Date(lastRc.at))} · ` : ''}${rcLabel ?? category}`,
   };
+  if (page) return pageGate(i, okAt, recovered, root, page);
   const conditions = [recovery, client, root];
   const verdict = canResolve({
     okRounds: okAt ? 2 : 0,
@@ -520,6 +538,46 @@ export function resolveGate(
   };
 }
 
+/**
+ * A Page change incident needs the page to match its baseline and a root cause — no client-update track
+ * (spec §26.3, §26.7); an Admin may open Resolve before the match to accept the page with it.
+ */
+function pageGate(
+  i: GateIncident & { siteName: string },
+  okAt: string | null,
+  recovered: boolean,
+  root: Condition,
+  page: GatePage,
+): Gate {
+  const t = (iso: string) => formatTime(new Date(iso));
+  const match: Condition = {
+    key: 'recovery',
+    label: 'Page matches the baseline',
+    met: !!okAt,
+    detail: okAt
+      ? `Matched on the ${t(i.recoveredAt!)} fetch`
+      : recovered
+        ? `Matched on the ${t(i.recoveredAt!)} fetch · waiting for the next OK round`
+        : page.pendingUntil
+          ? `Baseline accepted — Undo open until ${formatTimeWithSeconds(new Date(page.pendingUntil))}`
+          : page.acceptedAt
+            ? `Baseline accepted ${t(page.acceptedAt)} · waiting for the ${page.nextFetchAt ? t(page.nextFetchAt) : 'next'} fetch`
+            : `Not yet · differs since ${page.differsSince ? t(page.differsSince) : 'the first fetch that differed'}`,
+  };
+  const conditions = [match, root];
+  const metCount = conditions.filter((c) => c.met).length;
+  const canOpenDialog = match.met || page.admin;
+  return {
+    conditions,
+    metCount,
+    ok: match.met && root.met,
+    canOpenDialog,
+    lockedReason: canOpenDialog
+      ? null
+      : `Resolve locked · ${metCount} of 2 met — the page still differs from the baseline`,
+  };
+}
+
 /** One line of the timeline. */
 export interface TimelineItem {
   at: string;
@@ -538,7 +596,8 @@ export interface TimelineItem {
     | 'resolved'
     | 'escalated'
     | 'undone'
-    | 'flapping';
+    | 'flapping'
+    | 'baseline';
   title: string;
   detail: string | null;
   /** A collapsed flapping run (`kind: 'flapping'`): its lines, oldest first — kept, never dropped (§16.11). */
@@ -671,6 +730,28 @@ export function timelineOf(
       }
       case 'ack_undone':
         item(e, 'undone', `Acknowledgement undone by ${by}`);
+        return;
+      case 'baseline_accepted': {
+        // §26.6: "Baseline accepted by Tao · “reason”".
+        const reason = str(e.payload.reason);
+        const applies = str(e.payload.applies_at);
+        const undone = later.some((l) => l.type === 'baseline_undone');
+        item(
+          e,
+          'baseline',
+          `Baseline accepted by ${by}${reason ? ` · “${reason}”` : ''}`,
+          undone
+            ? 'Undone — the baseline is unchanged'
+            : e.payload.with_resolve === true
+              ? 'Accepted with the resolve'
+              : applies && new Date(applies) > now
+                ? `Undo open — applies at ${formatTimeWithSeconds(new Date(applies))}`
+                : `Applied${applies ? ` ${formatTimeWithSeconds(new Date(applies))}` : ''} · the next fetch compares against it`,
+        );
+        return;
+      }
+      case 'baseline_undone':
+        item(e, 'undone', `Baseline accept undone by ${by}`, 'The baseline is unchanged');
         return;
       case 'resolve_undone':
         item(e, 'undone', `Resolve undone by ${by}`, 'Back to waiting for a resolve');

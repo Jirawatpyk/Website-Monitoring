@@ -47,6 +47,7 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   escalated: { icon: <IconArrowUpRight />, tone: 'text-fg-warning' },
   undone: { icon: <IconRotateCcw />, tone: 'text-fg-secondary' },
   flapping: { icon: <IconActivity />, tone: 'text-fg-warning' },
+  baseline: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
 };
 
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {

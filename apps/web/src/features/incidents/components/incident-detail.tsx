@@ -55,6 +55,7 @@ import {
 } from './incident-dialogs';
 import { POST_WAIT_WORDS, usePostWait, type PostOverdue } from './use-post-wait';
 import { phoneHeader } from '@/components/phone-header';
+import { WhatChangedCard } from '@/features/page-change';
 
 const LIVE = ['incidents'] as const;
 /** Lines a phone shows before "Show all" (a long flapping incident has hundreds); the CSS above hides from 21. */
@@ -208,6 +209,20 @@ export function IncidentDetailView({
       ? v.title
       : `${d.siteName} ${d.severity === 'down' ? 'recovered' : 'is back to normal'}`;
 
+  // S09d (§26.4): a Page change incident shows What changed where Evidence / Latest round sit.
+  const whatChanged = d.pageChange ? (
+    <WhatChangedCard
+      view={d.pageChange.view}
+      rows={d.pageChange.rows}
+      newScript={d.pageChange.newScript}
+      incidentLabel={incidentLabel}
+      resolved={resolved}
+      siteName={d.siteName}
+      canAccept={d.canAcceptBaseline}
+      viewerName={viewerName}
+    />
+  ) : null;
+
   const resolveCard = (ref: React.RefObject<HTMLButtonElement | null> | null, primary: boolean) => (
     <ResolveCard
       primary={primary}
@@ -308,12 +323,14 @@ export function IncidentDetailView({
         {sections.facts}
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*88)]">
           <div className="flex min-w-0 flex-col gap-6">
-            <EvidenceCard
-              detail={d}
-              table={sections.evidenceTable}
-              summary={sections.evidenceSummary}
-              onOpenShot={() => setShotOpen(true)}
-            />
+            {whatChanged ?? (
+              <EvidenceCard
+                detail={d}
+                table={sections.evidenceTable}
+                summary={sections.evidenceSummary}
+                onOpenShot={() => setShotOpen(true)}
+              />
+            )}
             <Card
               title="Timeline"
               headingLevel={2}
@@ -376,7 +393,7 @@ export function IncidentDetailView({
             onUndone={() => setFocusResolve(true)}
           />
         )}
-        {sections.latestRound}
+        {whatChanged ?? sections.latestRound}
         {resolveCard(null, false)}
         {v.ack.kind === 'read-only' && (
           <NoAccess title={v.ack.title} description={v.ack.description} people={v.ack.people} />
@@ -481,6 +498,16 @@ export function IncidentDetailView({
             onClose={() => setResolveOpen(false)}
             returnFocus={shownResolve}
             onUndone={() => setFocusResolve(true)}
+            pageChange={
+              d.pageChange
+                ? {
+                    canAccept: d.canAcceptBaseline,
+                    checkId: d.pageChange.view.status === 'problem' ? d.pageChange.view.checkId : null,
+                    newScript: d.pageChange.view.newScript.length > 0,
+                    changed: d.pageChange.view.rows.length,
+                  }
+                : undefined
+            }
           />
         </>
       )}
