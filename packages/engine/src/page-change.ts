@@ -44,6 +44,8 @@ export interface PageChangeInput {
   /** An accept is waiting for its Undo to close until then (D-046 item 9). */
   pendingUntil: Date | null;
   firstSetAt: Date;
+  /** When the baseline compared with was accepted (its first set, for an automatic one). */
+  acceptedAt?: Date;
   facts: readonly PageFact[];
 }
 
@@ -53,6 +55,7 @@ export interface PageDiff {
   /** Rows that alert: a text field, or new domains outside the site's own and the tracking list. */
   alerting: boolean;
   newScriptDomains: string[];
+  newLinkDomains: string[];
 }
 
 export type PageChangeState =
@@ -94,6 +97,7 @@ export function diffFingerprint(
   }
   const quiet = new Set([...own, ...TRACKING_DOMAINS]);
   let newScriptDomains: string[] = [];
+  let newLinkDomains: string[] = [];
   for (const field of FINGERPRINT_DOMAIN_FIELDS) {
     const before = new Set(baseline[field]);
     const after = new Set(fp[field]);
@@ -104,8 +108,9 @@ export function diffFingerprint(
     const counted = added.filter((d) => !quiet.has(d));
     if (counted.length) alerting = true;
     if (field === 'scripts') newScriptDomains = counted;
+    else newLinkDomains = counted;
   }
-  return { rows, alerting, newScriptDomains };
+  return { rows, alerting, newScriptDomains, newLinkDomains };
 }
 
 /** The page's state at `now`. `open`: the monitor already shows a Page change PROBLEM. */
@@ -123,6 +128,9 @@ export function pageChangeState(
     return d.alerting ? d : null;
   };
   const diff = diffOf(newest);
+  // §26.6: after an accept the incident waits for the next fetch — the one the Admin accepted (or any
+  // from before) proves nothing new, and recovering on it would auto-resolve a < 5 min PROBLEM.
+  if (!diff && open && input.acceptedAt && newest.checkedAt <= input.acceptedAt) return { kind: 'no_data' };
   if (!diff) return { kind: 'matches', at: newest.checkedAt };
 
   let held = 1;
@@ -152,6 +160,7 @@ export function pageChangeDetail(
     path,
     changes: state.diff.rows,
     newScriptDomains: state.diff.newScriptDomains,
+    newLinkDomains: state.diff.newLinkDomains,
     firstSeenAt: state.firstSeenAt.toISOString(),
     held: state.held,
     checkId: state.fact.id,

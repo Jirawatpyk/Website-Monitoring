@@ -23,6 +23,7 @@ const pageChange = (
   path: '/',
   changes: [],
   newScriptDomains: [],
+  newLinkDomains: [],
   firstSeenAt: '2026-09-25T02:30:14Z',
   held: 3,
   checkId: 'c1',
@@ -113,7 +114,17 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
       }),
       home,
       '/ · new script domain evil-cdn.example',
-      'new script domain evil-cdn.example',
+      '2 changes · new script domain evil-cdn.example',
+    ],
+    [
+      'a page change: only a new script domain',
+      pageChange({
+        changes: [{ field: 'scripts', added: ['evil-cdn.example', 'x.example'], removed: [] }],
+        newScriptDomains: ['evil-cdn.example', 'x.example'],
+      }),
+      home,
+      '/ · new script domain evil-cdn.example (+1 more)',
+      'new script domain evil-cdn.example (+1 more)',
     ],
     [
       'INC-0157 page change: the title, a shared start shortened (spec §26.9)',
@@ -124,23 +135,37 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
       }),
       home,
       '/ · title “Bangkok Airways – Taiwan” → “… | สล็อตออนไลน์”',
-      'page changed',
+      'title changed',
+    ],
+    [
+      'a page change: a shared start mid-word stays whole',
+      pageChange({ changes: [{ field: 'h1', was: 'Shop', now: 'Shopping' }] }),
+      home,
+      '/ · main heading “Shop” → “Shopping”',
+      'main heading changed',
     ],
     [
       'a page change: new link domains only',
       pageChange({
-        changes: [{ field: 'links', added: ['casino.example', 'slotxo.example'], removed: ['old.example'] }],
+        changes: [
+          {
+            field: 'links',
+            added: ['facebook.com', 'casino.example', 'slotxo.example'],
+            removed: ['old.example'],
+          },
+        ],
+        newLinkDomains: ['casino.example', 'slotxo.example'],
       }),
       home,
       '/ · new link domains casino.example, slotxo.example',
-      'page changed',
+      'new link domains',
     ],
     [
       'a page change: a robots tag added, markup stripped',
       pageChange({ changes: [{ field: 'robots', was: null, now: 'noindex <b>' }] }),
       home,
       '/ · robots (none) → “noindex b”',
-      'page changed',
+      'robots changed',
     ],
     [
       'INC-0138 Tubtong blocked, verifier unavailable',

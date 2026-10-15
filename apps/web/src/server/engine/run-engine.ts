@@ -212,7 +212,7 @@ export async function runEngine(
   const siteIds = sites.map((s) => s.id);
   const windows = await loadWindows(db, siteIds, now);
   for (const s of sites) s.windows = windows.get(s.id);
-  const [checks, statuses, carries, incidents, verifier, crawler] = await Promise.all([
+  const [checks, statuses, carries, incidents, verifier, crawler, pages] = await Promise.all([
     loadChecks(db, since),
     db
       .from('site_status')
@@ -229,8 +229,8 @@ export async function runEngine(
       .not('state', 'in', CLOSED_INCIDENT_STATES_IN),
     loadVerifierState(db, since, now),
     loadCrawler(db, now),
+    loadPageChange(db, now),
   ]);
-  const pages = await loadPageChange(db, now);
   /** D-046: page changes held back (alerts off, or recording), logged instead of acted on. */
   const pageHeld = new Set<string>();
   for (const r of [statuses, carries, incidents]) if (r.error) throw new Error(r.error.message);
@@ -336,7 +336,11 @@ export async function runEngine(
       pageHeld.add(`${site.name} · ${what}${pageChangeAlerts ? ' · recording' : ''}`);
     }
     // An open Page change PROBLEM (opened while the switch was on) still gets its facts, to recover.
-    const open = carryByMonitor.get(m.id)?.trigger === 'content_change';
+    const carry = carryByMonitor.get(m.id);
+    const open =
+      carry?.status === 'problem' &&
+      carry.trigger === 'content_change' &&
+      (incidents.data ?? []).some((i) => i.site_id === site.id);
     return pageChangeAlerts || open ? input : undefined;
   };
 
@@ -604,6 +608,7 @@ async function loadPageChange(db: DbClient, now: Date): Promise<Map<string, Page
       baseline: fingerprint(r.baseline),
       pendingUntil: r.pending_until ? new Date(r.pending_until) : null,
       firstSetAt: new Date(r.first_set_at),
+      ...(r.accepted_at ? { acceptedAt: new Date(r.accepted_at) } : {}),
       facts,
     });
   }

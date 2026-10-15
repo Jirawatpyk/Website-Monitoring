@@ -72,6 +72,25 @@ describe('fingerprintBuilder (S09d, D-046)', () => {
     expect(fp.links[0]).toBe('d000.example');
   });
 
+  it('always fits the 32 KB the database takes, however long the made-up domains (security review)', () => {
+    const long = (i: number) => `${'a'.repeat(60)}${String(i).padStart(3, '0')}.${'b'.repeat(60)}`;
+    const html =
+      `<title>${'ก'.repeat(400)}</title><meta name="description" content="${'ข'.repeat(400)}"><h1>${'ค'.repeat(400)}</h1>` +
+      Array.from(
+        { length: 250 },
+        (_, i) =>
+          `<script src="https://x.${long(i)}/a.js"></script><a href="https://y.${long(i + 500)}/">x</a>`,
+      ).join('');
+    const fp = build(html);
+    expect(Buffer.byteLength(JSON.stringify(fp), 'utf8')).toBeLessThanOrEqual(FINGERPRINT_LIMITS.bytes);
+    expect(fp.scripts.length).toBeGreaterThan(0);
+  });
+
+  it('keeps a canonical only when it is a web address', () => {
+    expect(build('<link rel="canonical" href="javascript:alert(1)">').canonical).toBeNull();
+    expect(build('<link rel="canonical" href="data:text/html,x">').canonical).toBeNull();
+  });
+
   it('closes a title or h1 the page never closed', () => {
     expect(build('<title>Cut off').title).toBe('Cut off');
     expect(build('<h1>Open heading').h1).toBe('Open heading');

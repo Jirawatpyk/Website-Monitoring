@@ -137,6 +137,7 @@ describe('diffFingerprint', () => {
       ],
       alerting: true,
       newScriptDomains: ['evil-cdn.example'],
+      newLinkDomains: [],
     });
   });
 });
@@ -235,6 +236,43 @@ describe('decideSite — page change (S09d Done-when 1)', () => {
     expect(holding.kind === 'none' && holding.monitors[0]).toMatchObject({
       status: 'problem',
       trigger: 'content_change',
+    });
+  });
+
+  // Engine review, 15 Oct (S09d PR 2), built from the §26 sample INC-0157.
+  it('keeps "First seen": a change held 3 fetches starts at its first fetch, not at this round (D-046 item 5)', () => {
+    const three = [fact(10, retitled), fact(40, retitled), fact(70, retitled)];
+    expect(decideSite(site([home(input(three))], { lastRoundAt: at(-180) }))).toMatchObject({
+      kind: 'problem',
+      startedAt: minAgo(70),
+    });
+  });
+
+  it('after an accept the incident waits for the next fetch — no recovery (or < 5 min auto-resolve) on the one the Admin saw (§26.6)', () => {
+    const accepted = { ...BASE, ...retitled };
+    const fresh = (min: number): PageFact => ({
+      id: `a${min}`,
+      checkedAt: minAgo(min),
+      hash: hash(accepted),
+      fingerprint: null,
+    });
+    const after = (facts: PageFact[]) =>
+      input(facts, { baselineHash: hash(accepted), baseline: accepted, acceptedAt: minAgo(1) });
+    const recent = { ...open, detectedAt: minAgo(3), startedAt: minAgo(3) };
+    expect(decideSite(site([home(after([fresh(5)]), held)], { open: recent }))).toMatchObject({
+      kind: 'none',
+      status: null,
+    });
+    // The next fetch, after the accept, matches: now it recovers.
+    expect(decideSite(site([home(after([fresh(0), fresh(5)]), held)], { open }))).toMatchObject({
+      kind: 'recover',
+    });
+  });
+
+  it('a carry left by an incident resolved with a new baseline opens nothing until the change holds again (§26.7)', () => {
+    expect(decideSite(site([home(input([fact(5, retitled)]), held)], { open: null }))).toMatchObject({
+      kind: 'none',
+      status: 'ok',
     });
   });
 

@@ -391,7 +391,7 @@ importers:
         specifier: workspace:*
         version: link:../shared
       htmlparser2:
-        specifier: ^10.1.0
+        specifier: 10.1.0
         version: 10.1.0
       undici:
         specifier: 7.30.0

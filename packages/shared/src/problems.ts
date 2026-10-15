@@ -40,6 +40,8 @@ export type ProblemDetail =
       path: string;
       changes: PageChangeRow[];
       newScriptDomains: string[];
+      /** New link domains that count (not the site's own, not a tracking domain). */
+      newLinkDomains: string[];
       firstSeenAt: string;
       held: number;
       checkId: string;

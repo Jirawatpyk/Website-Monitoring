@@ -7,8 +7,11 @@ import { z } from 'zod';
  */
 export const FINGERPRINT_VIEW = 'plain' as const;
 
-/** Bounds applied at extraction, so a stored fingerprint stays small (crawler_checks caps it at 32 KB). */
-export const FINGERPRINT_LIMITS = { text: 300, domains: 200 } as const;
+/**
+ * Bounds applied at extraction: 300-character texts, 200 domains per set, and a JSON byte budget under the
+ * 32 KB crawler_checks and page_baselines take (domains are dropped from the end to fit).
+ */
+export const FINGERPRINT_LIMITS = { text: 300, domains: 200, bytes: 30_000 } as const;
 
 export const FINGERPRINT_TEXT_FIELDS = ['title', 'description', 'robots', 'canonical', 'h1'] as const;
 export const FINGERPRINT_DOMAIN_FIELDS = ['scripts', 'links'] as const;

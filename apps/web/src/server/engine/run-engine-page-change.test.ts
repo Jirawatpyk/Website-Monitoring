@@ -42,8 +42,7 @@ const pageRow = (over: Record<string, unknown> = {}) => ({
   baseline: BASE,
   pending_until: null,
   first_set_at: '2026-09-01T00:00:00Z', // recording over
-  latest_at: at(-60),
-  latest_usable: true,
+  accepted_at: '2026-09-01T00:00:00Z',
   facts: [{ id: 'c9', checked_at: at(-60), hash: 'h-evil', fingerprint: INJECTED }],
   ...over,
 });

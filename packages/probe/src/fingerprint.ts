@@ -63,8 +63,9 @@ export function fingerprintBuilder(pageUrl: string) {
           case 'link': {
             const rel = (attrs.rel ?? '').toLowerCase().split(/\s+/);
             if (rel.includes('canonical') && fp.canonical === null && attrs.href) {
+              // Only a web address: a `javascript:` / `data:` value never reaches a page as a link.
               const u = base ? safeUrl(attrs.href.trim(), base) : null;
-              fp.canonical = clean(u ? u.href : attrs.href);
+              fp.canonical = u && (u.protocol === 'http:' || u.protocol === 'https:') ? clean(u.href) : null;
             }
             break;
           }
@@ -108,10 +109,19 @@ export function fingerprintBuilder(pageUrl: string) {
       if (titleText !== null) fp.title = clean(titleText);
       if (h1Text !== null) fp.h1 = clean(h1Text);
       const sorted = (set: Set<string>) => [...set].sort().slice(0, FINGERPRINT_LIMITS.domains);
-      return { ...fp, h1: fp.h1 || null, scripts: sorted(scripts), links: sorted(links) };
+      const out = { ...fp, h1: fp.h1 || null, scripts: sorted(scripts), links: sorted(links) };
+      // Long made-up domains could still pass the 32 KB the database takes (security review): drop link
+      // domains, then script domains, from the end until it fits — what's left of them are new anyway.
+      while (bytes(out) > FINGERPRINT_LIMITS.bytes && (out.links.length || out.scripts.length)) {
+        if (out.links.length) out.links.pop();
+        else out.scripts.pop();
+      }
+      return out;
     },
   };
 }
+
+const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), 'utf8');
 
 /** Trimmed, whitespace collapsed, cut at the text limit; empty → null. */
 function clean(value: string | undefined | null): string | null {

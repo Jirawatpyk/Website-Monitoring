@@ -806,7 +806,9 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
           trigger: issue.trigger,
           detail: issue.detail,
           startedAt: issue.at
-            ? crawlerStart(issue.at, s)
+            ? issue.trigger === 'content_change'
+              ? pageStart(issue.at, s)
+              : crawlerStart(issue.at, s)
             : issueStart(issue.detail, counted, roundAt, s, slowRounds),
           reachable: passing,
         },
@@ -870,8 +872,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
             next: reset,
           };
         }
-        if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next: reset };
-        // D-046: the page change, as on a passing round.
+        // D-046: the page change, as on a passing round (before the crawler's stale hold).
         const page = pageIssue(m, s);
         if (page) {
           return {
@@ -879,12 +880,13 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
               kind: 'problem',
               trigger: page.trigger,
               detail: page.detail,
-              startedAt: crawlerStart(page.at, s),
+              startedAt: pageStart(page.at, s),
               reachable,
             },
             next: reset,
           };
         }
+        if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next: reset };
         if (pageHolds(m, s)) return { verdict: { kind: 'insufficient' }, next: reset };
         return { verdict: { kind: 'ok', reachable, note: BLOCKED_NOTE }, next: reset };
       }
@@ -963,13 +965,35 @@ function crawlerStart(at: Date, s: SiteSnapshot): Date {
 }
 
 /** The primary's page-change state at the snapshot's time (S09d, D-046); null without facts. */
-export function pageStateOf(m: SiteMonitor, s: Pick<SiteSnapshot, 'now'>): PageChangeState | null {
+export function pageStateOf(m: SiteMonitor, s: Pick<SiteSnapshot, 'now' | 'open'>): PageChangeState | null {
   if (!m.isPrimary || !m.pageChange) return null;
   return pageChangeState(m.pageChange, {
     now: s.now,
     own: ownDomains(m.url, m.allowedRedirectDomains),
-    open: m.carry.status === 'problem' && m.carry.trigger === 'content_change',
+    open: pageProblemOpen(m, s),
   });
+}
+
+/**
+ * The monitor shows a Page change PROBLEM and the site's incident is still open and hasn't recovered —
+ * a carry left over from an incident resolved with a new baseline (§26.7) doesn't count.
+ */
+function pageProblemOpen(m: SiteMonitor, s: Pick<SiteSnapshot, 'open'>): boolean {
+  return (
+    m.carry.status === 'problem' &&
+    m.carry.trigger === 'content_change' &&
+    !!s.open &&
+    !RECOVERED_STATES.includes(s.open.state)
+  );
+}
+
+/**
+ * A Page change starts at the first fetch of its run (D-046 item 5, §26.8 "Problem since"): the walk back
+ * already stops at a fetch that matched. Only a PROBLEM AGAIN on a recovered incident is clamped to the
+ * round after the last one judged, as a crawler problem is (D-042).
+ */
+function pageStart(at: Date, s: SiteSnapshot): Date {
+  return s.open && RECOVERED_STATES.includes(s.open.state) ? crawlerStart(at, s) : at;
 }
 
 /** A Page change PROBLEM to raise or keep: the page differs enough, and its recording is over. */
@@ -987,7 +1011,7 @@ function pageIssue(
  * accept still inside its Undo window are no evidence either way.
  */
 function pageHolds(m: SiteMonitor, s: SiteSnapshot): boolean {
-  if (m.carry.status !== 'problem' || m.carry.trigger !== 'content_change') return false;
+  if (!pageProblemOpen(m, s)) return false;
   // The runner couldn't read the fingerprints this run: no evidence either way.
   if (m.isPrimary && !m.pageChange) return true;
   const page = pageStateOf(m, s);
