@@ -87,7 +87,12 @@ export interface BaselineRow {
   accepted_at: string;
   accepted_by: string | null;
   reason: string | null;
-  undo_before: { fingerprint?: PageFingerprint; accepted_at?: string; reason?: string | null } | null;
+  undo_before: {
+    fingerprint?: PageFingerprint;
+    accepted_at?: string;
+    accepted_by?: string | null;
+    reason?: string | null;
+  } | null;
   undo_until: string | null;
   undo_by: string | null;
 }
@@ -164,16 +169,18 @@ export function buildPageChange(i: PageChangeInput): PageChangeView {
   const compareWith = pendingOpen
     ? (b?.undo_before?.fingerprint ?? b?.fingerprint ?? null)
     : (b?.fingerprint ?? null);
+  // …and the header names that baseline, not the accept still in its Undo window (/verify, 15 Oct).
+  const shown = pendingOpen && b?.undo_before ? { ...b, ...b.undo_before } : b;
   const base: PageChangeView = {
     monitorId: i.monitorId,
     status: 'no_fingerprint',
     recordingUntil: b ? new Date(Date.parse(b.first_set_at) + PAGE_RECORDING_MS).toISOString() : null,
-    baseline: b
+    baseline: shown
       ? {
-          acceptedAt: b.accepted_at,
-          acceptedBy: b.accepted_by ? i.nameOf(b.accepted_by) : null,
-          reason: b.reason,
-          firstSetAt: b.first_set_at,
+          acceptedAt: shown.accepted_at,
+          acceptedBy: shown.accepted_by ? i.nameOf(shown.accepted_by) : null,
+          reason: shown.reason ?? null,
+          firstSetAt: shown.first_set_at,
         }
       : null,
     checkedAt: newest?.checked_at ?? null,

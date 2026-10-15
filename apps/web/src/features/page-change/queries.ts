@@ -58,18 +58,19 @@ export async function loadPageChange(
   if (incident.error) throw new Error(`incidents: ${incident.error.message}`);
 
   const b = baseline.data && baseline.data.url === m.url ? baseline.data : null;
-  const ids = [b?.accepted_by].filter((x): x is string => !!x);
+  const undo = (b?.undo_before ?? null) as {
+    fingerprint?: unknown;
+    accepted_at?: string;
+    accepted_by?: string | null;
+    reason?: string | null;
+  } | null;
+  const ids = [b?.accepted_by, undo?.accepted_by].filter((x): x is string => !!x);
   const people = ids.length
     ? await db.from('profiles').select('id, display_name').in('id', ids)
     : { data: [], error: null };
   if (people.error) throw new Error(`profiles: ${people.error.message}`);
   const names = new Map((people.data ?? []).map((p) => [p.id, p.display_name]));
 
-  const undo = (b?.undo_before ?? null) as {
-    fingerprint?: unknown;
-    accepted_at?: string;
-    reason?: string | null;
-  } | null;
   const row: BaselineRow | null = b
     ? {
         monitor_id: b.monitor_id,

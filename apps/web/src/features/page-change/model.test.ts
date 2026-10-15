@@ -147,7 +147,12 @@ describe('buildPageChange (spec §26.8)', () => {
           accepted_by: 'u-tao',
           accepted_at: ago(0),
           reason: 'Client redesign',
-          undo_before: { fingerprint: BASE },
+          undo_before: {
+            fingerprint: BASE,
+            accepted_at: '2026-09-15T03:00:00Z',
+            accepted_by: null,
+            reason: null,
+          },
           undo_until: new Date(NOW.getTime() + 8_000).toISOString(),
           undo_by: 'u-tao',
         }),
@@ -155,6 +160,8 @@ describe('buildPageChange (spec §26.8)', () => {
       }),
     );
     expect(v).toMatchObject({ status: 'waiting', pending: { byViewer: true, reason: 'Client redesign' } });
+    // the header names the baseline still in force, not the accept waiting in its Undo (/verify, 15 Oct)
+    expect(v.baseline).toMatchObject({ acceptedAt: '2026-09-15T03:00:00Z', acceptedBy: null });
     expect(pendingWords(v.pending!.until)).toBe(
       'Accepting as the new baseline — Undo is open until 10:07:08.',
     );

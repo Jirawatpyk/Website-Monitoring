@@ -709,7 +709,7 @@ function ResolveCard({
       }
     >
       <div className="flex flex-col gap-3">
-        <ConditionList conditions={g.conditions} />
+        {!(resolved && d.autoResolved) && <ConditionList conditions={g.conditions} />}
         {resolved ? (
           <p className="m-0 text-sm text-fg-secondary">
             {d.autoResolved
