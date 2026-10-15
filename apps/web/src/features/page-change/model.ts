@@ -3,6 +3,7 @@ import {
   FINGERPRINT_DOMAIN_FIELDS,
   FINGERPRINT_FIELDS,
   FINGERPRINT_LABELS,
+  isTlsChainError,
   type FingerprintField,
   type PageChangeRow,
   type PageFingerprint,
@@ -77,7 +78,10 @@ export interface PageChangeView {
   /** The site's open Page change incident. */
   incident: { id: string; number: number; since: string } | null;
   /** Why it reads no data: the newest fetch's own failure, or no usable fetch for over an hour. */
-  noData: { reason: 'blocked' | 'timeout' | 'http' | 'error' | 'stale'; statusCode: number | null } | null;
+  noData: {
+    reason: 'blocked' | 'timeout' | 'tls_chain' | 'http' | 'error' | 'stale';
+    statusCode: number | null;
+  } | null;
 }
 
 export interface BaselineRow {
@@ -198,6 +202,9 @@ export function buildPageChange(i: PageChangeInput): PageChangeView {
     noData: null,
   };
   if (!b || !compareWith) {
+    // Fetched but never read: say why, not "the first check runs within 30 min" (production, 15 Oct).
+    const first = i.fetches[0];
+    if (first && !first.usable && !newest) return { ...base, status: 'no_data', noData: failureOf(first) };
     return { ...base, fingerprint: newest?.fingerprint ? fingerprintRows(newest.fingerprint) : [] };
   }
 
@@ -253,6 +260,7 @@ export function buildPageChange(i: PageChangeInput): PageChangeView {
 function failureOf(f: PlainFetch): NonNullable<PageChangeView['noData']> {
   if (f.outcome === 'blocked') return { reason: 'blocked', statusCode: f.status_code ?? null };
   if (f.error === 'Timeout') return { reason: 'timeout', statusCode: null };
+  if (isTlsChainError(f.error)) return { reason: 'tls_chain', statusCode: null };
   if (f.status_code) return { reason: f.status_code >= 400 ? 'http' : 'error', statusCode: f.status_code };
   return { reason: 'error', statusCode: null };
 }

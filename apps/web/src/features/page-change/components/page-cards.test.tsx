@@ -85,6 +85,21 @@ describe('PageFingerprintCard (§26.8)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show fingerprint' }));
     expect(screen.getByText(/^Last fingerprint read · \d\d:\d\d$/)).toBeTruthy();
     nodata.unmount();
+    // never read: the reason, no "last read", nothing to show
+    const never = card(
+      view({
+        status: 'no_data',
+        fingerprint: [],
+        checkedAt: null,
+        noData: { reason: 'tls_chain', statusCode: null },
+      }),
+    );
+    expect(screen.getByText('Couldn’t read the page (TLS chain misconfigured)')).toBeTruthy();
+    expect(
+      screen.getByText('Uptime checks are unaffected. Nothing is compared until a fetch gets through.'),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show fingerprint' })).toBeNull();
+    never.unmount();
     card(view({ status: 'no_fingerprint', fingerprint: [] }));
     expect(screen.getByText('No fingerprint yet — the first check runs within 30 min')).toBeTruthy();
   });

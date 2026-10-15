@@ -51,6 +51,8 @@ export function noDataWords(n: PageChangeView['noData']): string {
       return 'Couldn’t read the page (blocked by bot protection)';
     case 'timeout':
       return 'Couldn’t read the page (timed out)';
+    case 'tls_chain':
+      return 'Couldn’t read the page (TLS chain misconfigured)';
     case 'http':
       return `Couldn’t read the page (HTTP ${n.statusCode})`;
     case 'stale':
@@ -73,7 +75,9 @@ export function statusWords(v: PageChangeView): { line: string; sub: string | nu
     case 'no_data':
       return {
         line: `${noDataWords(v.noData)}${v.checkedAt ? ` · last read ${time(v.checkedAt)}` : ''}`,
-        sub: 'Uptime checks are unaffected. The last fingerprint read is kept; nothing is compared until a fetch gets through.',
+        sub: v.fingerprint.length
+          ? 'Uptime checks are unaffected. The last fingerprint read is kept; nothing is compared until a fetch gets through.'
+          : 'Uptime checks are unaffected. Nothing is compared until a fetch gets through.',
       };
     case 'matches':
       return {
