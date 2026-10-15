@@ -387,7 +387,9 @@ export function ResolveDialog({
   );
   const gate = canResolve({
     okRounds: willAccept || conditions.find((c) => c.key === 'recovery')?.met ? 2 : 0,
-    clientUpdate: conditions.find((c) => c.key === 'client_update')?.met ? 'not_required' : 'pending',
+    // A Page change has no client-update track (§26.3): no condition means nothing pending.
+    clientUpdate:
+      (conditions.find((c) => c.key === 'client_update')?.met ?? true) ? 'not_required' : 'pending',
     rootCauseCategory: filled ? value.category : null,
   });
 

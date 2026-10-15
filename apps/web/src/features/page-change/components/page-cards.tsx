@@ -95,7 +95,13 @@ export function PageFingerprintCard({ view: v, siteName, canAccept, viewerName }
             <ChangeRows rows={v.rows} />
             <Footer lines={footerWords(v, v.status === 'waiting')} />
             {v.incident && (
-              <Button variant="ghost" size="sm" touchHeight href={`/incidents/${v.incident.id}`}>
+              <Button
+                variant="ghost"
+                size="sm"
+                touchHeight
+                href={`/incidents/${v.incident.id}`}
+                className="self-start"
+              >
                 {`Open ${formatIncidentId(v.incident.number)}`}
               </Button>
             )}

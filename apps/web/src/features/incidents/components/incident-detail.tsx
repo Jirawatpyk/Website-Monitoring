@@ -695,7 +695,7 @@ function ResolveCard({
           ) : g.canOpenDialog ? null : (
             <IconLock aria-hidden className="size-4" />
           )}
-          {resolved ? 'Resolved' : `${g.metCount} of 3 met`}
+          {resolved ? 'Resolved' : `${g.metCount} of ${g.conditions.length} met`}
         </span>
       }
     >
@@ -710,14 +710,28 @@ function ResolveCard({
         ) : (
           <p className="m-0 text-sm text-fg-secondary">
             {g.ok
-              ? 'All 3 conditions met. Resolve is manual — resolve it when you’re sure.'
+              ? `All ${g.conditions.length} conditions met. Resolve is manual — resolve it when you’re sure.`
               : (g.lockedReason ??
                 (d.rootCause.category === UNKNOWN_ROOT_CAUSE
                   ? 'Unknown keeps the incident open. Pick a category once you know what happened.'
                   : 'Needs a root cause before it can be resolved.'))}
           </p>
         )}
-        {d.canAct && !resolved && (
+        {d.canAct && !resolved && d.pageChange && (
+          // IncidentPageChange / MIncidentPageChange: one button — an Admin may accept the page with
+          // the resolve before it matches (§26.7); otherwise the root cause until it does.
+          <Button
+            ref={primary ? (resolveButton ?? undefined) : undefined}
+            variant="secondary"
+            size={primary ? 'sm' : 'md'}
+            fullWidth={!primary}
+            icon={<IconPencil />}
+            onClick={g.canOpenDialog ? onResolve : onRootCause}
+          >
+            Root cause &amp; resolve…
+          </Button>
+        )}
+        {d.canAct && !resolved && !d.pageChange && (
           <span className="flex flex-wrap gap-2">
             {primary && (
               <Button

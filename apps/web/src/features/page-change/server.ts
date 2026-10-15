@@ -1,4 +1,5 @@
 import 'server-only';
+import { z } from 'zod';
 import { getAccess } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import type { PageChangeView } from './model';
@@ -14,6 +15,8 @@ export async function getSitePageChange(
   siteId: string,
   now = new Date(),
 ): Promise<{ view: PageChangeView; canAccept: boolean } | null> {
+  // An unknown address (`/sites/nope`) is the page's 404, never a query error here.
+  if (!z.uuid().safeParse(siteId).success) return null;
   const access = await getAccess();
   if (access.status !== 'active') return null;
   const db = await createClient();
