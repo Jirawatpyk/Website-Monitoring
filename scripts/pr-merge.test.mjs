@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  buildsWeb,
   deployVerdict,
   mergeBlockers,
   DEPLOY_TIMEOUT_MS,
@@ -143,6 +144,29 @@ test('deployVerdict: production ready, failed, redeployed, skipped, timed out', 
   assert.equal(v([], NO_DEPLOY_AFTER_MS - 1).kind, 'waiting');
   assert.equal(v([], NO_DEPLOY_AFTER_MS).kind, 'none');
   assert.equal(v([building], DEPLOY_TIMEOUT_MS).kind, 'failed');
+});
+
+test('deployVerdict: a web change with no build fails with the git deploy command (15 Oct: #121)', () => {
+  const sha = 'a'.repeat(40);
+  const v = (deployments, elapsedMs) =>
+    deployVerdict({ deployments, migrate: migrated, elapsedMs, sha, buildsWeb: true });
+  assert.equal(v([], NO_DEPLOY_AFTER_MS - 1).kind, 'waiting');
+  const none = v([], NO_DEPLOY_AFTER_MS);
+  assert.equal(none.kind, 'failed');
+  assert.match(none.why, /never started a build/);
+  assert.match(none.why, new RegExp(`/v13/deployments.*${sha}|${sha}.*`));
+  assert.match(v([{ state: 'CANCELED' }], minute).why, /cancelled the build/);
+});
+
+test('buildsWeb: the app, packages and the lockfile rebuild it; docs, the agent and migrations alone do not', () => {
+  const pr = (...paths) => ({ files: paths.map((path) => ({ path })) });
+  assert.equal(buildsWeb(pr('apps/web/src/features/page-change/model.ts')), true);
+  assert.equal(buildsWeb(pr('packages/engine/src/site.ts')), true);
+  assert.equal(buildsWeb(pr('pnpm-lock.yaml')), true);
+  assert.equal(
+    buildsWeb(pr('docs/retro.md', 'apps/vps-agent/src/main.ts', 'supabase/migrations/x.sql')),
+    false,
+  );
 });
 
 test('deployVerdict: production counts only once migrate-production succeeded (14 Oct: Actions billing)', () => {
