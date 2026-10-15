@@ -99,6 +99,8 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
             ? 'BKK network check failed, not verified'
             : 'browser verifier unavailable'
       }`;
+    case 'content_change':
+      return `${d.path} · ${pageChange(d)}`;
   }
 }
 
@@ -129,6 +131,8 @@ function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
       if (d.reason === 'control_failed')
         return 'blocked by bot protection, not verified (BKK network check failed)';
       return 'blocked by bot protection, not verified';
+    case 'content_change':
+      return pageChangeSummary(d);
   }
 }
 
@@ -166,4 +170,60 @@ function quoted(texts: readonly string[]): string {
 /** "Timeout > 30 s" reads "timeout > 30 s" inside the brackets; "HTTP 500", "DNS error" stay. */
 function lowerFirst(text: string): string {
   return /^(HTTP|DNS|TLS)\b/.test(text) ? text : text.charAt(0).toLowerCase() + text.slice(1);
+}
+type PageChange = Extract<ProblemDetail, { kind: 'content_change' }>;
+
+/** How a Page change names a text field: "title" as spec §26.9, the others as the card's rows. */
+const PAGE_FIELD_WORDS: Record<string, string> = {
+  title: 'title',
+  description: 'meta description',
+  robots: 'robots',
+  canonical: 'canonical URL',
+  h1: 'main heading',
+};
+
+/** The changes that alert: each text field, the new script domains, the new link domains. */
+function alertingChanges(d: PageChange): string[] {
+  return [
+    ...d.changes.filter((c) => c.field in PAGE_FIELD_WORDS).map((c) => PAGE_FIELD_WORDS[c.field]!),
+    ...(d.newScriptDomains.length ? ['script domains'] : []),
+    ...(d.newLinkDomains.length ? ['link domains'] : []),
+  ];
+}
+
+const scriptDomains = (d: PageChange) =>
+  `new script domain ${plain(d.newScriptDomains[0]!)}${
+    d.newScriptDomains.length > 1 ? ` (+${d.newScriptDomains.length - 1} more)` : ''
+  }`;
+
+/**
+ * The Chat text line (spec §26.3's words): one change → "title changed", "new script domain X";
+ * several → "3 changes · new script domain X".
+ */
+function pageChangeSummary(d: PageChange): string {
+  const changes = alertingChanges(d);
+  if (changes.length > 1)
+    return `${changes.length} changes${d.newScriptDomains.length ? ` · ${scriptDomains(d)}` : ''}`;
+  if (d.newScriptDomains.length) return scriptDomains(d);
+  return d.newLinkDomains.length ? 'new link domains' : `${changes[0] ?? 'page'} changed`;
+}
+
+/**
+ * Spec §26.9: `new script domain evil-cdn.example`, else the first changed text field
+ * `title “Bangkok Airways – Taiwan” → “… | สล็อตออนไลน์”` (a shared start reads "…"), else the new
+ * link domains.
+ */
+function pageChange(d: PageChange): string {
+  if (d.newScriptDomains.length) return scriptDomains(d);
+  const text = d.changes.find((c) => c.field in PAGE_FIELD_WORDS);
+  if (text) {
+    const was = text.was ?? '';
+    const now = text.now ?? '';
+    // A shared start reads "…" only at a word break: "Shop" → "Shopping" stays whole.
+    const rest = now.slice(was.length);
+    const shown = was && now.startsWith(was) && /^[\s\p{P}]/u.test(rest) ? `…${rest}` : now;
+    return `${PAGE_FIELD_WORDS[text.field]} ${was ? quoted([was]) : '(none)'} → ${shown ? quoted([shown]) : '(none)'}`;
+  }
+  const links = d.newLinkDomains;
+  return `new link domain${links.length === 1 ? '' : 's'} ${links.map(plain).join(', ')}`;
 }

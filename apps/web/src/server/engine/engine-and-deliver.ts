@@ -17,7 +17,10 @@ export async function engineAndDeliver(
   deadline: number,
   engine: (db: DbClient, now: Date, options: EngineOptions) => Promise<EngineSummary> = runEngine,
 ): Promise<EngineSummary & { delivery?: unknown }> {
-  const summary = await engine(db, new Date(), { defacementAlerts: env.DEFACEMENT_ALERTS === 'on' });
+  const summary = await engine(db, new Date(), {
+    defacementAlerts: env.DEFACEMENT_ALERTS === 'on',
+    pageChangeAlerts: env.PAGE_CHANGE_ALERTS === 'on',
+  });
   // Any incident change that queued messages (one count from the runner, whatever the kind), or an
   // Admin alert (D-019, D-022, D-024): send them now.
   if ((summary.notified ?? 0) + (summary.alerts ?? 0) === 0) return summary;

@@ -15,6 +15,21 @@ const booking: ProblemCauseContext = {
   isPrimary: false,
 };
 const ALL = ['BKK', 'SIN', 'TYO'] as const;
+/** A Page change detail (S09d): made-up INC-0157 values, spec §26. */
+const pageChange = (
+  d: Partial<Extract<ProblemDetail, { kind: 'content_change' }>>,
+): Extract<ProblemDetail, { kind: 'content_change' }> => ({
+  kind: 'content_change',
+  path: '/',
+  changes: [],
+  newScriptDomains: [],
+  newLinkDomains: [],
+  firstSeenAt: '2026-09-25T02:30:14Z',
+  held: 3,
+  checkId: 'c1',
+  checkedAt: '2026-09-25T03:00:14Z',
+  ...d,
+});
 
 describe('formatProblemCause / formatProblemSummary (D-022)', () => {
   it.each<[string, ProblemDetail, ProblemCauseContext, string, string]>([
@@ -87,6 +102,70 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
       home,
       '/ → casino.example.net · not in this site’s allowlist (from Google search)',
       'redirects to casino.example.net (from Google search)',
+    ],
+    [
+      'INC-0157 page change: a new script domain (spec §26.9)',
+      pageChange({
+        changes: [
+          { field: 'title', was: 'Bangkok Airways – Taiwan', now: 'Bangkok Airways – Taiwan | สล็อตออนไลน์' },
+          { field: 'scripts', added: ['evil-cdn.example'], removed: [] },
+        ],
+        newScriptDomains: ['evil-cdn.example'],
+      }),
+      home,
+      '/ · new script domain evil-cdn.example',
+      '2 changes · new script domain evil-cdn.example',
+    ],
+    [
+      'a page change: only a new script domain',
+      pageChange({
+        changes: [{ field: 'scripts', added: ['evil-cdn.example', 'x.example'], removed: [] }],
+        newScriptDomains: ['evil-cdn.example', 'x.example'],
+      }),
+      home,
+      '/ · new script domain evil-cdn.example (+1 more)',
+      'new script domain evil-cdn.example (+1 more)',
+    ],
+    [
+      'INC-0157 page change: the title, a shared start shortened (spec §26.9)',
+      pageChange({
+        changes: [
+          { field: 'title', was: 'Bangkok Airways – Taiwan', now: 'Bangkok Airways – Taiwan | สล็อตออนไลน์' },
+        ],
+      }),
+      home,
+      '/ · title “Bangkok Airways – Taiwan” → “… | สล็อตออนไลน์”',
+      'title changed',
+    ],
+    [
+      'a page change: a shared start mid-word stays whole',
+      pageChange({ changes: [{ field: 'h1', was: 'Shop', now: 'Shopping' }] }),
+      home,
+      '/ · main heading “Shop” → “Shopping”',
+      'main heading changed',
+    ],
+    [
+      'a page change: new link domains only',
+      pageChange({
+        changes: [
+          {
+            field: 'links',
+            added: ['facebook.com', 'casino.example', 'slotxo.example'],
+            removed: ['old.example'],
+          },
+        ],
+        newLinkDomains: ['casino.example', 'slotxo.example'],
+      }),
+      home,
+      '/ · new link domains casino.example, slotxo.example',
+      'new link domains',
+    ],
+    [
+      'a page change: a robots tag added, markup stripped',
+      pageChange({ changes: [{ field: 'robots', was: null, now: 'noindex <b>' }] }),
+      home,
+      '/ · robots (none) → “noindex b”',
+      'robots changed',
     ],
     [
       'INC-0138 Tubtong blocked, verifier unavailable',

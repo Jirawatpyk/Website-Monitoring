@@ -25,6 +25,7 @@ const READ_RPCS = new Set([
   'engine_monitor_status',
   'engine_verify_jobs',
   'engine_crawler_checks',
+  'engine_page_fingerprints',
   'engine_log_windows',
   'engine_window_reminders',
   'engine_silent_incidents',

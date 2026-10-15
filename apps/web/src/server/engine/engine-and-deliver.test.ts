@@ -17,7 +17,27 @@ describe('engineAndDeliver', () => {
       const engine = vi.fn().mockResolvedValue({ ok: true, notified: 0, alerts: 0 });
       const { db } = fakeDb();
       await engineAndDeliver(db, { ...env, DEFACEMENT_ALERTS: value }, 1, engine);
-      expect(engine).toHaveBeenCalledWith(db, expect.any(Date), { defacementAlerts: on });
+      expect(engine).toHaveBeenCalledWith(
+        db,
+        expect.any(Date),
+        expect.objectContaining({ defacementAlerts: on }),
+      );
+    },
+  );
+  it.each([
+    ['on', true],
+    ['off', false],
+  ] as const)(
+    'PAGE_CHANGE_ALERTS=%s reaches the engine as pageChangeAlerts: %s (D-046)',
+    async (value, on) => {
+      const engine = vi.fn().mockResolvedValue({ ok: true, notified: 0, alerts: 0 });
+      const { db } = fakeDb();
+      await engineAndDeliver(db, { ...env, PAGE_CHANGE_ALERTS: value }, 1, engine);
+      expect(engine).toHaveBeenCalledWith(
+        db,
+        expect.any(Date),
+        expect.objectContaining({ pageChangeAlerts: on }),
+      );
     },
   );
 });

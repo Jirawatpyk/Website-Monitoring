@@ -4,6 +4,7 @@ import { runHttpCheck, type HttpCheckRequest, type HttpCheckResult } from '@dxt/
 import {
   CRAWLER_CLIENTS,
   CRAWLER_VIEWS,
+  FINGERPRINT_VIEW,
   probeRequestHeaders,
   toMonitorHeaders,
   type MonitorHeader,
@@ -67,6 +68,17 @@ function endedOffSite(r: HttpCheckResult, url: string, allowlist: readonly strin
   }
 }
 
+/**
+ * S09d (D-046 item 4): a plain fetch counts when the page answered 2xx / 3xx, passed, was read to its
+ * end and stayed on the site — a fingerprint of a WAF page or of another host's page is no data.
+ */
+export function isUsablePlain(r: HttpCheckResult, url: string, allowlist: readonly string[] = []): boolean {
+  if (r.statusCode === null || !r.fingerprint || r.scanComplete === false) return false;
+  return (
+    r.outcome === 'pass' && r.statusCode >= 200 && r.statusCode < 400 && !endedOffSite(r, url, allowlist)
+  );
+}
+
 /** Each live site's home page: the primary monitor of an active site. */
 export async function loadCrawlerMonitors(db: DbClient): Promise<CrawlerMonitor[]> {
   const { data, error } = await db
@@ -92,6 +104,8 @@ export async function loadCrawlerMonitors(db: DbClient): Promise<CrawlerMonitor[
  * The 30-min crawler run (D-041, D-042): every live home page as Googlebot and as a mobile browser
  * arriving from Google search, the whole body read for the shared list and the site's own forbidden
  * words, one `crawler_checks` row per view. The engine reads the latest usable rows beside its rounds.
+ * S09d (D-046): a third, plain fetch as the monitor itself keeps the page's fingerprint; the first usable
+ * one (or the first after the URL changed) becomes the baseline.
  */
 export async function runCrawler({
   db,
@@ -106,53 +120,77 @@ export async function runCrawler({
   }
   const started = clock();
   const monitors = await loadCrawlerMonitors(db);
-  const all = monitors.flatMap((m) => CRAWLER_VIEWS.map((view) => ({ m, view })));
+  const views = [...CRAWLER_VIEWS, FINGERPRINT_VIEW] as const;
+  const all = monitors.flatMap((m) => views.map((view) => ({ m, view })));
   // Start each run further down the list, so a run cut by its budget never skips the same sites twice.
   const shift = all.length ? Math.floor(started / (30 * 60_000)) % all.length : 0;
   const jobs = [...all.slice(shift), ...all.slice(0, shift)];
   const ran = await inBatches(jobs, crawlerConcurrency(jobs.length), async ({ m, view }) => {
     if (clock() - started > CRAWLER_BUDGET_MS) return null;
     const checkedAt = new Date(clock());
+    const plain = view === FINGERPRINT_VIEW;
     const result = await check({
       url: m.url,
       method: 'GET',
       timeoutMs: CRAWLER_TIMEOUT_MS,
       headers: probeRequestHeaders(m.headers, secretHeader),
-      client: CRAWLER_CLIENTS[view],
+      // The plain view goes as the monitor itself (the probe's own User-Agent) and only fingerprints.
+      ...(plain
+        ? { fingerprint: true }
+        : { client: CRAWLER_CLIENTS[view], mustNotContain: m.mustNotContain }),
       scanWholeBody: true,
-      mustNotContain: m.mustNotContain,
       allowPrivateTargets,
     });
-    const { error } = await db.from('crawler_checks').insert({
-      monitor_id: m.id,
-      view,
-      checked_at: checkedAt.toISOString(),
-      outcome: result.outcome,
-      usable: isUsable(result, m.url, m.allowedRedirectDomains),
-      status_code: result.statusCode,
-      response_ms: result.responseMs,
-      final_url: result.finalUrl,
-      forbidden: result.keywordForbidden,
-      scan_complete: result.scanComplete ?? null,
-      error: result.error?.slice(0, 500) ?? null,
-    });
-    return { m, view, checkedAt, result, stored: error?.message ?? null };
+    const usable = plain
+      ? isUsablePlain(result, m.url, m.allowedRedirectDomains)
+      : isUsable(result, m.url, m.allowedRedirectDomains);
+    const { data: row, error } = await db
+      .from('crawler_checks')
+      .insert({
+        monitor_id: m.id,
+        view,
+        checked_at: checkedAt.toISOString(),
+        outcome: result.outcome,
+        usable,
+        status_code: result.statusCode,
+        response_ms: result.responseMs,
+        final_url: result.finalUrl,
+        forbidden: plain ? null : result.keywordForbidden,
+        scan_complete: result.scanComplete ?? null,
+        error: result.error?.slice(0, 500) ?? null,
+        fingerprint: plain && usable ? (result.fingerprint ?? null) : null,
+      })
+      .select('id')
+      .single();
+    // The first usable plain fetch of a monitor (or of its new URL) becomes its baseline.
+    let baseline: string | null = null;
+    let baselineSet = false;
+    if (!error && plain && usable) {
+      const set = await db.rpc('crawler_set_baseline', { p_check_id: row.id });
+      baseline = set.error?.message ?? null;
+      baselineSet = set.data === true;
+    }
+    return { m, view, checkedAt, result, usable, stored: error?.message ?? null, baseline, baselineSet };
   });
   const done = ran.filter((r) => r !== null);
   const writeErrors = [...new Set(done.map((r) => r.stored).filter((e) => e !== null))];
   if (writeErrors.length) throw new Error(`crawler_checks: ${writeErrors.join('; ')}`);
+  const baselineErrors = [...new Set(done.map((r) => r.baseline).filter((e) => e !== null))];
+  if (baselineErrors.length) throw new Error(`crawler_set_baseline: ${baselineErrors.join('; ')}`);
 
   // What the log keeps: the words or the final URL per site and view, never page content.
   const hits = done
     .filter(
-      ({ m, result }) =>
-        isUsable(result, m.url, m.allowedRedirectDomains) && (result.keywordForbidden?.length ?? 0) > 0,
+      ({ view, usable, result }) =>
+        view !== FINGERPRINT_VIEW && usable && (result.keywordForbidden?.length ?? 0) > 0,
     )
     .map(({ m, view, result }) => ({ site: m.siteName, view, forbidden: result.keywordForbidden }));
+  const baselinesSet = done.filter((r) => r.baselineSet).map((r) => r.m.siteName);
   return {
     ok: true,
     fetched: done.length,
-    unusable: done.filter(({ m, result }) => !isUsable(result, m.url, m.allowedRedirectDomains)).length,
+    unusable: done.filter((r) => !r.usable).length,
+    ...(baselinesSet.length ? { baselinesSet } : {}),
     ...(ran.length > done.length ? { skipped: ran.length - done.length } : {}),
     ...(hits.length ? { hits } : {}),
   };

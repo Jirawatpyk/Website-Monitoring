@@ -33,6 +33,11 @@ const serverEnvSchema = z.object({
    * the engine summary. Production stays off until S09c's week without a false positive.
    */
   DEFACEMENT_ALERTS: z.enum(['on', 'off']).default('off'),
+  /**
+   * D-046: a changed home page fingerprint raises PROBLEM · Page change only when `on`; `off` logs it
+   * in the engine summary (pageChangeHeld). Production stays off until S09d's two-week record.
+   */
+  PAGE_CHANGE_ALERTS: z.enum(['on', 'off']).default('off'),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

@@ -82,6 +82,33 @@ beforeAll(async () => {
       case '/bad-charset':
         res.writeHead(200, { 'content-type': 'text/html; charset=nonsense' }).end('slot online');
         break;
+      case '/fp-injected':
+        // S09d Done-when 1: a script injected at the end of a 400 KB page.
+        res
+          .writeHead(200, { 'content-type': 'text/html' })
+          .end(
+            `<html><head><title>Site A</title></head><body><h1>Welcome</h1>${'x'.repeat(400_000)}` +
+              '<script src="https://evil-cdn.example/x.js"></script></body></html>',
+          );
+        break;
+      case '/fp-split':
+        // The script tag arrives in two chunks past the sample.
+        res.writeHead(200, { 'content-type': 'text/html' });
+        res.write(`<title>Site A</title>${'x'.repeat(300_000)}<script sr`);
+        setTimeout(() => res.end('c="https://cdn.evil.example/a.js"></script>'), 20);
+        break;
+      case '/fp-thai':
+        // <title>บาคาร่า</title> in windows-874.
+        res
+          .writeHead(200, { 'content-type': 'text/html; charset=windows-874' })
+          .end(
+            Buffer.concat([
+              Buffer.from('<title>'),
+              Buffer.from([0xba, 0xd2, 0xa4, 0xd2, 0xc3, 0xe8, 0xd2]),
+              Buffer.from('</title>'),
+            ]),
+          );
+        break;
       case '/down':
         res.writeHead(504).end('Gateway Timeout');
         break;
@@ -346,6 +373,42 @@ describe('runHttpCheck', () => {
       expect(thai.keywordForbidden).toEqual(['บาคาร่า']);
       const unknown = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/bad-charset` });
       expect(unknown.keywordForbidden).toEqual(['slot online']);
+    });
+  });
+
+  describe('the page fingerprint (S09d, D-046)', () => {
+    const fp = (path: string) =>
+      runHttpCheck({ allowPrivateTargets: true, url: `${base}${path}`, fingerprint: true });
+
+    it('sees a script injected at the end of a 400 KB page', async () => {
+      const result = await fp('/fp-injected');
+      expect(result.fingerprint).toMatchObject({
+        title: 'Site A',
+        h1: 'Welcome',
+        scripts: ['evil-cdn.example'],
+      });
+      expect(result.scanComplete).toBe(true);
+    });
+
+    it('keeps a tag split across two chunks', async () => {
+      expect((await fp('/fp-split')).fingerprint?.scripts).toEqual(['evil.example']);
+    });
+
+    it('reads a windows-874 page in its charset', async () => {
+      expect((await fp('/fp-thai')).fingerprint?.title).toBe('บาคาร่า');
+    });
+
+    it('has none for a page that didn’t pass, one broken off, or when not asked', async () => {
+      expect((await fp('/challenge')).fingerprint).toBeUndefined();
+      expect((await fp('/broken-tail')).fingerprint).toBeUndefined();
+      expect(
+        (await runHttpCheck({ allowPrivateTargets: true, url: `${base}/fp-injected` })).fingerprint,
+      ).toBeUndefined();
+    });
+
+    it('goes as the monitor itself', async () => {
+      await fp('/ok');
+      expect(lastHeaders['user-agent']).toBe(PROBE_USER_AGENT);
     });
   });
 
