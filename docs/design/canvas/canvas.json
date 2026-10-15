@@ -35,7 +35,7 @@
       "y": 14216
     },
     "ChatAlert.dc.html": {
-      "h": 8500,
+      "h": 8630,
       "title": "Google Chat alert thread (content spec)",
       "w": 600,
       "x": 1990,
@@ -327,7 +327,7 @@
       "y": 24461
     },
     "SiteDetail.dc.html": {
-      "h": 1820,
+      "h": 2720,
       "is_interactive": true,
       "title": "Site detail — Bangkok Airways – Taiwan",
       "w": 1440,
@@ -419,6 +419,46 @@
       "w": 390,
       "x": 2350,
       "y": 16629
+    },
+    "IncidentPageChange.dc.html": {
+      "h": 1540,
+      "is_interactive": true,
+      "title": "Incident — page change (INC-0157 example)",
+      "w": 1440,
+      "x": 6080,
+      "y": 12036
+    },
+    "MIncidentPageChange.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Incident: page change",
+      "w": 390,
+      "x": 7600,
+      "y": 12036
+    },
+    "IncidentPageChange820.dc.html": {
+      "h": 2460,
+      "is_interactive": true,
+      "title": "Incident — page change · 820 px",
+      "w": 820,
+      "x": 8070,
+      "y": 12036
+    },
+    "IncidentPageChangeDark.dc.html": {
+      "h": 1540,
+      "is_interactive": true,
+      "title": "Incident — page change · dark",
+      "w": 1440,
+      "x": 8970,
+      "y": 12036
+    },
+    "MIncidentPageChangeDark.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Incident: page change · dark",
+      "w": 390,
+      "x": 10490,
+      "y": 12036
     }
   },
   "createdOnFiles": {
@@ -480,8 +520,8 @@
     },
     "row3": {
       "kind": "title1",
-      "maxW": 6000,
-      "text": "Core flows · incidents · maintenance · onboarding",
+      "maxW": 10900,
+      "text": "Core flows · incidents · maintenance · onboarding · page change",
       "w": 240,
       "x": 0,
       "y": 11736
@@ -551,6 +591,11 @@
     "Incidents.dc.html",
     "Maintenance.dc.html",
     "MaintenancePage.dc.html",
+    "IncidentPageChange.dc.html",
+    "MIncidentPageChange.dc.html",
+    "IncidentPageChange820.dc.html",
+    "IncidentPageChangeDark.dc.html",
+    "MIncidentPageChangeDark.dc.html",
     "AddSite.dc.html",
     "Escalation.dc.html",
     "OnCall.dc.html",

@@ -37,8 +37,8 @@ insert into public.crawler_checks (monitor_id, view, checked_at, outcome, usable
 
 select throws_ok(
   $$insert into public.crawler_checks (monitor_id, view, checked_at, outcome, usable, status_code)
-    values ('00000000-0000-0000-0000-0000000000d1', 'plain', now(), 'pass', true, 200)$$,
-  '23514', null, 'a view outside CRAWLER_VIEWS is refused'
+    values ('00000000-0000-0000-0000-0000000000d1', 'bingbot', now(), 'pass', true, 200)$$,
+  '23514', null, 'a view outside CRAWLER_VIEWS and the plain view is refused'
 );
 select throws_ok(
   $$insert into public.crawler_checks (monitor_id, view, checked_at, outcome, usable)

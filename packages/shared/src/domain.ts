@@ -60,6 +60,7 @@ export const TRIGGERS = [
   'regional',
   'manual',
   'tls_chain',
+  'content_change',
 ] as const;
 export type Trigger = (typeof TRIGGERS)[number];
 
@@ -76,6 +77,7 @@ export const TRIGGER_LABELS: Record<Trigger, string> = {
   regional: 'Regional',
   manual: 'Manual (hand check)',
   tls_chain: 'TLS chain',
+  content_change: 'Page change',
 };
 
 /**

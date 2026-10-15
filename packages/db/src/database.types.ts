@@ -145,14 +145,14 @@ isOneToOne: false
                   ]
                 },"crawler_checks": {
                   Row: {
-                    "checked_at": string,"created_at": string,"error": string | null,"final_url": string | null,"forbidden": (string)[] | null,"id": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms": number | null,"scan_complete": boolean | null,"status_code": number | null,"updated_at": string,"usable": boolean,"view": string
+                    "checked_at": string,"created_at": string,"error": string | null,"final_url": string | null,"fingerprint": Json | null,"forbidden": (string)[] | null,"id": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms": number | null,"scan_complete": boolean | null,"status_code": number | null,"updated_at": string,"usable": boolean,"view": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "checked_at": string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable": boolean,"view": string
+                    "checked_at": string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"fingerprint"?: Json | null,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable": boolean,"view": string
                   }
                   Update: {
-                    "checked_at"?: string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id"?: string,"outcome"?: Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable"?: boolean,"view"?: string
+                    "checked_at"?: string,"created_at"?: string,"error"?: string | null,"final_url"?: string | null,"fingerprint"?: Json | null,"forbidden"?: (string)[] | null,"id"?: string,"monitor_id"?: string,"outcome"?: Database["public"]['Enums']["check_outcome"],"response_ms"?: number | null,"scan_complete"?: boolean | null,"status_code"?: number | null,"updated_at"?: string,"usable"?: boolean,"view"?: string
                   }
                   Relationships: [
                     {
@@ -429,6 +429,44 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"page_baselines": {
+                  Row: {
+                    "accepted_at": string,"accepted_by": string | null,"created_at": string,"fingerprint": NonNullable<Json>,"first_set_at": string,"id": string,"monitor_id": string,"reason": string | null,"source_check_id": string | null,"undo_before": Json | null,"undo_by": string | null,"undo_until": string | null,"updated_at": string,"url": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "accepted_at": string,"accepted_by"?: string | null,"created_at"?: string,"fingerprint": NonNullable<Json>,"first_set_at": string,"id"?: string,"monitor_id": string,"reason"?: string | null,"source_check_id"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_until"?: string | null,"updated_at"?: string,"url": string
+                  }
+                  Update: {
+                    "accepted_at"?: string,"accepted_by"?: string | null,"created_at"?: string,"fingerprint"?: NonNullable<Json>,"first_set_at"?: string,"id"?: string,"monitor_id"?: string,"reason"?: string | null,"source_check_id"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_until"?: string | null,"updated_at"?: string,"url"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "page_baselines_accepted_by_fkey"
+      columns: ["accepted_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "page_baselines_monitor_id_fkey"
+      columns: ["monitor_id"]
+isOneToOne: true
+      referencedRelation: "monitors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "page_baselines_source_check_id_fkey"
+      columns: ["source_check_id"]
+isOneToOne: false
+      referencedRelation: "crawler_checks"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "page_baselines_undo_by_fkey"
+      columns: ["undo_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"probe_locations": {
                   Row: {
                     "code": string,"created_at": string,"is_active": boolean,"last_heartbeat_at": string | null,"provider": string,"region": string,"updated_at": string
@@ -561,7 +599,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "ack_incident":
+            "accept_page_baseline":
+{ Args: { "p_check_id": string,"p_reason": string }; Returns: string
+                           },
+"ack_incident":
 { Args: { "p_incident_id": string }; Returns: string
                            },
 "add_incident_note":
@@ -658,6 +699,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"crawler_set_baseline":
+{ Args: { "p_check_id": string }; Returns: boolean
+                           },
 "create_maintenance":
 { Args: { "p_ends_at": string,"p_reason": string,"p_site_id": string,"p_starts_at": string }; Returns: string
                            },
@@ -753,6 +797,11 @@ isOneToOne: false
                            },
 "engine_open_incident":
 { Args: { "p_context": Json,"p_detected_at": string,"p_hold_until"?: string,"p_monitor_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
+                           },
+"engine_page_fingerprints":
+{ Args: { "p_now": string,"p_since": string }; Returns: {
+              "baseline": Json,"facts": Json,"first_set_at": string,"latest_at": string,"latest_usable": boolean,"monitor_id": string,"pending_until": string
+            }[]
                            },
 "engine_post_late_alert":
 { Args: { "p_at": string,"p_hold_until"?: string,"p_incident_id": string }; Returns: boolean
@@ -862,7 +911,7 @@ isOneToOne: false
 { Args: { "p_notification_id": string }; Returns: number
                            },
 "resolve_incident":
-{ Args: { "p_category": string,"p_fix": string,"p_incident_id": string,"p_what": string }; Returns: string
+{ Args: { "p_accept_check_id"?: string,"p_category": string,"p_fix": string,"p_incident_id": string,"p_what": string }; Returns: string
                            },
 "save_escalation_policies":
 { Args: { "p_down_reminder_min": number,"p_note": string,"p_policies": Json,"p_problem_reminder_min": number }; Returns: undefined
@@ -894,6 +943,9 @@ isOneToOne: false
 "undo_ack":
 { Args: { "p_incident_id": string }; Returns: undefined
                            },
+"undo_page_baseline":
+{ Args: { "p_monitor_id": string }; Returns: undefined
+                           },
 "undo_resolve":
 { Args: { "p_incident_id": string }; Returns: undefined
                            },
@@ -914,7 +966,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "app_role": "admin"|"responder"|"stakeholder"|"viewer"|"client","check_outcome": "pass"|"fail"|"blocked","incident_state": "unacked"|"escalated"|"acknowledged"|"monitoring"|"needs_root_cause"|"resolved"|"in_review"|"closed","incident_trigger": "hard_fail"|"blocked_unverified"|"slow"|"keyword"|"key_page"|"ssl"|"domain"|"redirect"|"regional"|"manual"|"tls_chain","monitor_type": "http"|"keyword"|"ssl"|"domain"|"browser","notification_channel": "google_chat"|"email"|"voice","notification_status": "queued"|"sent"|"failed"|"cancelled","rollup_bucket": "hour"|"day","severity": "problem"|"down","site_state": "ok"|"problem"|"down"|"maintenance"
+            "app_role": "admin"|"responder"|"stakeholder"|"viewer"|"client","check_outcome": "pass"|"fail"|"blocked","incident_state": "unacked"|"escalated"|"acknowledged"|"monitoring"|"needs_root_cause"|"resolved"|"in_review"|"closed","incident_trigger": "hard_fail"|"blocked_unverified"|"slow"|"keyword"|"key_page"|"ssl"|"domain"|"redirect"|"regional"|"manual"|"tls_chain"|"content_change","monitor_type": "http"|"keyword"|"ssl"|"domain"|"browser","notification_channel": "google_chat"|"email"|"voice","notification_status": "queued"|"sent"|"failed"|"cancelled","rollup_bucket": "hour"|"day","severity": "problem"|"down","site_state": "ok"|"problem"|"down"|"maintenance"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1034,7 +1086,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "app_role": ["admin", "responder", "stakeholder", "viewer", "client"],"check_outcome": ["pass", "fail", "blocked"],"incident_state": ["unacked", "escalated", "acknowledged", "monitoring", "needs_root_cause", "resolved", "in_review", "closed"],"incident_trigger": ["hard_fail", "blocked_unverified", "slow", "keyword", "key_page", "ssl", "domain", "redirect", "regional", "manual", "tls_chain"],"monitor_type": ["http", "keyword", "ssl", "domain", "browser"],"notification_channel": ["google_chat", "email", "voice"],"notification_status": ["queued", "sent", "failed", "cancelled"],"rollup_bucket": ["hour", "day"],"severity": ["problem", "down"],"site_state": ["ok", "problem", "down", "maintenance"]
+            "app_role": ["admin", "responder", "stakeholder", "viewer", "client"],"check_outcome": ["pass", "fail", "blocked"],"incident_state": ["unacked", "escalated", "acknowledged", "monitoring", "needs_root_cause", "resolved", "in_review", "closed"],"incident_trigger": ["hard_fail", "blocked_unverified", "slow", "keyword", "key_page", "ssl", "domain", "redirect", "regional", "manual", "tls_chain", "content_change"],"monitor_type": ["http", "keyword", "ssl", "domain", "browser"],"notification_channel": ["google_chat", "email", "voice"],"notification_status": ["queued", "sent", "failed", "cancelled"],"rollup_bucket": ["hour", "day"],"severity": ["problem", "down"],"site_state": ["ok", "problem", "down", "maintenance"]
           }
         }
 } as const
