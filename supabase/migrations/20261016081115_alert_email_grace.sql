@@ -1,8 +1,26 @@
 -- D-047 (16 Oct 2026, after INC-0015): a drop that recovers within 5 min sends no email.
--- Google Chat is unchanged. The incident's alert email (owner's DOWN / PROBLEM) waits out a 5-min grace
--- in hold_until; a recovery inside it cancels the email, so nobody was emailed and no RECOVERED or
--- RESOLVED email follows (both go only to people already emailed). An ack or a failed Chat alert
--- (D-016) releases it at once. Same signatures: grants and comments carry over.
+-- Google Chat is unchanged. The incident's alert email (the owner's DOWN / PROBLEM, and a relapse's for
+-- an owner not emailed yet) waits out a 5-min grace in hold_until (= its queue time + 5 min, which tells
+-- it from a longer response-hours hold); a recovery inside it cancels the email, so nobody was emailed
+-- and no RECOVERED or RESOLVED email follows. An ack (with its Undo window) or a failed Chat alert
+-- (D-016) releases it. Same signatures: grants and comments carry over.
+
+create or replace function public.engine_cancel_held_problem(p_incident_id uuid, p_reason text)
+returns integer
+language sql
+set search_path = ''
+as $$
+  with c as (
+    update public.notifications
+      set status = 'cancelled', error = p_reason, next_retry_at = null
+      where incident_id = p_incident_id and template in ('problem', 'problem_again')
+        and status = 'queued' and attempts = 0 and hold_until > now()
+        -- D-047: not an email in its 5-min grace — recovery, ack and fallback handle those.
+        and not (channel = 'email' and hold_until <= created_at + interval '5 minutes')
+      returning 1
+  )
+  select count(*)::integer from c;
+$$;
 
 create or replace function public.engine_open_incident(
   p_site_id uuid,
@@ -249,6 +267,112 @@ begin
 end;
 $$;
 
+create or replace function public.engine_relapse_incident(
+  p_incident_id uuid,
+  p_severity public.severity,
+  p_trigger public.incident_trigger,
+  p_started_at timestamptz,
+  p_detected_at timestamptz,
+  p_round_at timestamptz,
+  p_context jsonb,
+  p_flapping boolean,
+  p_notify boolean,
+  p_monitors jsonb default null,
+  p_status public.site_state default null,
+  p_hold_until timestamptz default null
+)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_site_id uuid;
+  v_from public.incident_state;
+  v_before public.severity;
+  v_to public.incident_state;
+  v_after public.severity;
+begin
+  select site_id, state, severity into v_site_id, v_from, v_before
+  from public.incidents
+  where id = p_incident_id
+    -- A DOWN never relapses a PROBLEM incident: that is engine_escalate_incident (D-021), which
+    -- writes the escalated_to_down event (S06 engine-review L2).
+    and not (p_severity = 'down' and severity = 'problem')
+    and (state in ('monitoring', 'needs_root_cause')
+         -- D-023: the DOWN ended, a key page carried on as a PROBLEM, and the home page fails again.
+         or (p_severity = 'down' and severity = 'down' and episode_severity = 'problem'
+             and state not in ('resolved', 'in_review', 'closed')))
+  for update;
+
+  if v_site_id is null then
+    return false;
+  end if;
+
+  update public.incidents
+    set severity = case when p_severity = 'down' then 'down'::public.severity else severity end,
+        episode_severity = p_severity,
+        recovered_at = null,
+        is_flapping = is_flapping or coalesce(p_flapping, false),
+        state = case when acked_at is not null then 'acknowledged'::public.incident_state
+                     -- Escalated only when a step of this severity really paged someone (D-034).
+                     when exists (select 1 from public.incident_events e
+                                  where e.incident_id = p_incident_id and e.type = 'step_fired'
+                                    and e.payload ->> 'severity' = severity::text
+                                    and jsonb_array_length(e.payload -> 'notified') > 0)
+                       then 'escalated'::public.incident_state
+                     else 'unacked'::public.incident_state end
+    where id = p_incident_id
+    returning state, severity into v_to, v_after;
+
+  insert into public.incident_events (incident_id, type, payload, at)
+  values (p_incident_id, 'relapsed',
+          coalesce(p_context, '{}') || jsonb_build_object(
+            'severity', p_severity, 'trigger', p_trigger, 'startedAt', p_started_at,
+            'flapping', coalesce(p_flapping, false)),
+          p_detected_at);
+
+  insert into public.audit_log (action, entity, entity_id, before, after)
+  values ('incident.relapsed', 'incident', p_incident_id,
+          jsonb_build_object('state', v_from, 'severity', v_before),
+          jsonb_build_object('state', v_to, 'severity', v_after, 'episode', p_severity));
+
+  update public.site_status
+    set ok_rounds = 0, last_evaluated_at = p_detected_at, last_round_at = p_round_at
+    where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
+
+  perform public.engine_record_flip(v_site_id, p_round_at, false);
+  perform public.engine_cancel_flap_summary(p_incident_id);
+
+  if p_notify then
+    insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key, hold_until)
+    values (p_incident_id, 'google_chat', p_severity::text || '_again', p_incident_id::text,
+            p_context, to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+            case when p_severity = 'problem' and p_hold_until > p_detected_at then p_hold_until end)
+    on conflict do nothing;
+
+    -- D-047: the owner hasn't been emailed about this incident (every earlier drop came back inside
+    -- its grace): this drop's email waits out its own 5 min, as the first alert's did.
+    insert into public.notifications
+      (incident_id, user_id, channel, template, thread_key, context, dedupe_key, hold_until)
+    select p_incident_id, s.primary_owner_id, 'email', p_severity::text || '_again', p_incident_id::text,
+           p_context, to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+           greatest(case when p_severity = 'problem' and p_hold_until > p_detected_at then p_hold_until end,
+                    now() + interval '5 minutes')
+    from public.sites s
+    join public.profiles p on p.id = s.primary_owner_id and p.is_active
+    where s.id = v_site_id
+      and not exists (
+        select 1 from public.notifications e
+        where e.incident_id = p_incident_id and e.channel = 'email' and e.status <> 'cancelled'
+          and e.user_id = s.primary_owner_id)
+    on conflict do nothing;
+  end if;
+
+  perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
+  return true;
+end;
+$$;
+
 create or replace function public.engine_recover_incident(
   p_incident_id uuid,
   p_from public.incident_state,
@@ -334,13 +458,17 @@ begin
       -- waiting for a retry, not in flight: every attempt it was claimed for is logged
       and n.attempts = (select count(*) from public.notification_attempts a where a.notification_id = n.id);
 
-  -- D-047: back inside the 5-min grace → its alert email never goes (before the response-hours
-  -- cancel below, so the row says why).
+  -- D-047: back inside the 5-min grace → its alert email never goes (no RECOVERED email follows).
   update public.notifications
     set status = 'cancelled', error = 'Recovered within 5 min — no email (D-047)', next_retry_at = null
     where incident_id = p_incident_id and channel = 'email' and template in ('down', 'problem', 'down_again', 'problem_again')
-      and status = 'queued' and attempts = 0 and hold_until > now()
-      and hold_until <= now() + interval '5 minutes';
+      and status = 'queued' and attempts = 0
+      and hold_until > p_recovered_at and hold_until <= created_at + interval '5 minutes'
+      -- The team saw it in Chat; a card that never got through keeps the email.
+      and exists (
+        select 1 from public.notifications c
+        where c.incident_id = p_incident_id and c.channel = 'google_chat'
+          and c.template in ('down', 'problem', 'down_again', 'problem_again') and c.status = 'sent');
 
   perform public.engine_cancel_held_problem(p_incident_id, 'Superseded: recovered before response hours');
   perform public.engine_cancel_ladder(p_incident_id, 'Superseded: recovered first');
@@ -432,15 +560,13 @@ begin
           jsonb_build_object('state', v_inc.state),
           jsonb_build_object('state', 'acknowledged', 'acked_at', v_now));
 
-  -- D-047: the alert email held for the 5-min grace goes now — someone took it, so it is real, and the
-  -- record reads DOWN → ACKNOWLEDGED. A response-hours hold (longer) is the cancel below.
-  update public.notifications
-    set hold_until = v_now
-    where incident_id = p_incident_id and channel = 'email' and template in ('down', 'problem', 'down_again', 'problem_again')
-      and status = 'queued' and attempts = 0 and hold_until > v_now
-      and hold_until <= v_now + interval '5 minutes';
-
   perform public.engine_cancel_held_problem(p_incident_id, 'Superseded: acknowledged first');
+  -- D-047: an alert email in its 5-min grace goes when the ack does (after its 10-s Undo window):
+  -- someone took it, so it is real, and the record reads DOWN → ACKNOWLEDGED. Undo puts the grace back.
+  update public.notifications
+    set hold_until = v_hold
+    where incident_id = p_incident_id and channel = 'email' and template in ('down', 'problem', 'down_again', 'problem_again')
+      and status = 'queued' and attempts = 0 and hold_until > v_hold and hold_until <= created_at + interval '5 minutes';
   -- The chain stops (spec §8): a reminder or step still waiting never goes; Undo puts it back.
   perform public.engine_cancel_ladder(p_incident_id, 'Superseded: acknowledged first');
 
@@ -485,6 +611,81 @@ begin
 end;
 $$;
 
+create or replace function public.undo_ack(p_incident_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_inc public.incidents%rowtype;
+  v_from public.incident_state;
+begin
+  select * into v_inc from public.incidents where id = p_incident_id for update;
+  if not found then
+    raise exception 'incident not found' using errcode = 'P0002';
+  end if;
+  if v_inc.acked_by is null then
+    raise exception 'Nothing to undo' using errcode = '55000';
+  end if;
+  if v_inc.acked_by is distinct from auth.uid() then
+    raise exception 'Only the person who acknowledged can undo it' using errcode = '42501';
+  end if;
+  -- Their own ack, but the incident moved on (recovered) or the window passed: too late.
+  if v_inc.state <> 'acknowledged' or now() >= v_inc.acked_at + interval '10 seconds' then
+    raise exception 'The undo window has closed' using errcode = '55000';
+  end if;
+
+  perform 1 from public.notifications
+    where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued'
+    for update;
+  if exists (
+    select 1 from public.notifications
+    where incident_id = p_incident_id and template = 'acknowledged'
+      and (status = 'sent' or (status = 'queued' and attempts > 0))
+  ) then
+    raise exception 'The undo window has closed' using errcode = '55000';
+  end if;
+
+  select (payload->>'from')::public.incident_state into v_from
+  from public.incident_events
+  where incident_id = p_incident_id and type = 'acknowledged'
+  order by at desc
+  limit 1;
+
+  update public.notifications
+    set status = 'cancelled', next_retry_at = null
+    where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued';
+
+  -- D-047: the alert email the ack released waits out the rest of its grace again.
+  update public.notifications
+    set hold_until = created_at + interval '5 minutes'
+    where incident_id = p_incident_id and channel = 'email' and template in ('down', 'problem', 'down_again', 'problem_again')
+      and status = 'queued' and attempts = 0
+      and hold_until = v_inc.acked_at + interval '10 seconds'
+      and created_at + interval '5 minutes' > now();
+
+  -- As if the ack never happened: an alert it set aside is due again.
+  update public.notifications
+    set status = 'queued', error = null, next_retry_at = null
+    where incident_id = p_incident_id and status = 'cancelled'
+      and error = 'Superseded: acknowledged first';
+
+  update public.incidents
+    set state = coalesce(v_from, 'unacked'), acked_at = null, acked_by = null
+    where id = p_incident_id;
+
+  insert into public.incident_events (incident_id, type, actor_id, payload)
+  values (p_incident_id, 'ack_undone', auth.uid(),
+          jsonb_build_object('state', coalesce(v_from, 'unacked')));
+
+  insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
+  values (auth.uid(), 'incident.ack_undone', 'incident', p_incident_id,
+          jsonb_build_object('state', 'acknowledged', 'acked_at', v_inc.acked_at),
+          jsonb_build_object('state', coalesce(v_from, 'unacked')));
+end;
+$$;
+
 create or replace function public.queue_fallback_emails(p_notification_id uuid)
 returns integer
 language plpgsql
@@ -493,7 +694,7 @@ as $$
 declare
   v_count integer;
 begin
-  -- D-047: the Chat alert failed for good — the owner's alert email held for the grace goes now.
+  -- D-047: the Chat alert failed for good — the owner's alert email in its grace goes now.
   update public.notifications e
     set hold_until = now()
     from public.notifications n
@@ -501,8 +702,7 @@ begin
     where n.id = p_notification_id and n.channel = 'google_chat' and n.template in ('down', 'problem', 'down_again', 'problem_again')
       and i.state in ('unacked', 'escalated')
       and e.incident_id = n.incident_id and e.channel = 'email' and e.template in ('down', 'problem', 'down_again', 'problem_again')
-      and e.status = 'queued' and e.attempts = 0 and e.hold_until > now()
-      and e.hold_until <= now() + interval '5 minutes';
+      and e.status = 'queued' and e.attempts = 0 and e.hold_until > now() and e.hold_until <= e.created_at + interval '5 minutes';
 
   insert into public.notifications (incident_id, user_id, channel, template, thread_key, context, dedupe_key)
   select n.incident_id, r.user_id, 'email', n.template, n.thread_key,

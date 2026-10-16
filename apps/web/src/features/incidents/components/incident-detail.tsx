@@ -53,7 +53,7 @@ import {
   type DialogIncident,
   type RootCauseValue,
 } from './incident-dialogs';
-import { POST_WAIT_WORDS, usePostWait, type PostOverdue } from './use-post-wait';
+import { postWaitWords, usePostWait, type PostOverdue } from './use-post-wait';
 import { phoneHeader } from '@/components/phone-header';
 import { WhatChangedCard } from '@/features/page-change';
 
@@ -413,7 +413,7 @@ export function IncidentDetailView({
                 {d.resolved && (
                   <span className="text-center text-xs text-fg-secondary">
                     {holdLeft > 0
-                      ? `Resolved — posting to Chat and email in ${holdLeft} s. Undo is at the top.`
+                      ? `Resolved — posting to ${d.emailed ? 'Chat and email' : 'Chat'} in ${holdLeft} s. Undo is at the top.`
                       : `Resolved ${formatTime(new Date(d.resolved.at))}`}
                   </span>
                 )}
@@ -642,10 +642,10 @@ function ResolvedCard({
         )}
         <span role="status">
           {seconds > 0
-            ? 'Posting to Chat and email in a few seconds — nothing is sent until then.'
+            ? `Posting to ${d.emailed ? 'Chat and email' : 'Chat'} in a few seconds — nothing is sent until then.`
             : r.posted
-              ? `Posted to the Chat thread and email at ${formatTimeWithSeconds(new Date(r.posted))}`
-              : POST_WAIT_WORDS[overdue]}
+              ? `Posted to the Chat thread${d.emailed ? ' and email' : ''} at ${formatTimeWithSeconds(new Date(r.posted))}`
+              : postWaitWords(overdue, d.emailed)}
         </span>
         {seconds > 0 && <span aria-hidden className="tabular-nums">{`· ${seconds} s`}</span>}
       </span>

@@ -229,6 +229,9 @@ select ok(
 insert into inc values ('fuji', public.engine_open_incident(
   '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000d2', 'slow', 'problem',
   '2026-09-25 09:48Z', '2026-09-25 09:50:05Z', '2026-09-25 09:50Z', '{}'::jsonb, true));
+-- The PROBLEM card went out (the notifier); the owner's email still waits out its 5-min grace (D-047).
+update public.notifications set status = 'sent', sent_at = now()
+  where incident_id = (select id from inc where name = 'fuji') and channel = 'google_chat';
 select throws_ok(
   $$select public.engine_recover_incident((select id from inc where name = 'fuji'), 'unacked', 'monitoring',
     '2026-09-25 09:51Z', '2026-09-25 09:51Z', '{}'::jsonb, true, null, null, true, true)$$,

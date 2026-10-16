@@ -23,7 +23,7 @@ import {
 import { canResolve, UNKNOWN_ROOT_CAUSE } from '@dxt/engine';
 import { formatTime, formatTimeWithSeconds, ROOT_CAUSE_CATEGORIES, ROOT_CAUSE_LABELS } from '@dxt/shared';
 import { FOCUS_TARGET } from '@/components/focus-target';
-import { POST_WAIT_WORDS, type PostOverdue } from './use-post-wait';
+import { postWaitWords, type PostOverdue } from './use-post-wait';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { addNote, resolveIncident, saveRootCause, undoResolve } from '../actions';
 import type { Condition } from '../model';
@@ -571,7 +571,7 @@ export function ResolveDialog({
                   ? `Posting to ${where} in ${seconds} s — nothing is sent until then.`
                   : postedAt
                     ? `Posted to ${where} ${formatTimeWithSeconds(new Date(postedAt))}.`
-                    : POST_WAIT_WORDS[postOverdue]}
+                    : postWaitWords(postOverdue, incident.emailed)}
               </p>
             </div>
           </div>

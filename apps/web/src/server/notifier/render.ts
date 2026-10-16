@@ -387,8 +387,10 @@ export function renderEmail(
         cause: str(ctx.cause, 'Hard fail'),
         confirmingLocations: num(ctx.confirmingLocations, 2),
         confirmedByWaf: confirmedByWafOf(ctx),
-        // A PROBLEM raised to DOWN keeps its acknowledgement (D-021).
-        ackedBy: i.state === 'acknowledged' && i.acker ? i.acker.display_name : null,
+        // A PROBLEM raised to DOWN keeps its acknowledgement (D-021) — only then: a plain DOWN acked
+        // inside its 5-min email grace sends this email after the ack (D-047), and it never was a problem.
+        ackedBy:
+          ctx.escalated === true && i.state === 'acknowledged' && i.acker ? i.acker.display_name : null,
         ladder: ladderFactsOf(i, sentAt),
         now: sentAt,
         // The first alert after a mute (§24.17): "Held by a mute — until 15:00 — …".
