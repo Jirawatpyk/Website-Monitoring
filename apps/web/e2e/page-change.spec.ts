@@ -68,7 +68,8 @@ test.describe('page change (local Supabase)', () => {
       // the action re-renders the page (revalidatePath): slow under next dev
       await expect(page.getByText('Accepting as the new baseline').first()).toBeVisible({ timeout: 20_000 });
       await page.getByRole('button', { name: /^Undo · \d+ s$/ }).click();
-      await expect(page.getByText('Undone — the baseline is unchanged')).toBeVisible();
+      // The card, the toast and the timeline can all say it at once (main CI 16 Oct: 3 matches).
+      await expect(page.getByText('Undone — the baseline is unchanged').first()).toBeVisible();
       expect(await baselineAudit(monitorId)).toEqual([
         'page_baseline.auto',
         'page_baseline.accept',
