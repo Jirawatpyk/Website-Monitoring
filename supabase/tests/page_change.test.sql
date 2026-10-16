@@ -4,7 +4,7 @@
 -- timeline) and resolve with "Also accept the current page as the new baseline".
 begin;
 \ir _helpers.psql
-select plan(46);
+select plan(47);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -217,10 +217,21 @@ select throws_ok(
   $$select public.resolve_incident('00000000-0000-0000-0000-0000000000f1', 'deploy', 'Redesign', null,
                                    '00000000-0000-0000-0000-0000000000e5')$$,
   '22023', null, 'only with Client-side change');
+-- The owner's PROBLEM email is still in its 5-min grace (D-047).
+reset role;
+insert into public.notifications (incident_id, user_id, channel, template, thread_key, context, hold_until)
+values ('00000000-0000-0000-0000-0000000000f1', (select id from ids where name = 'admin'), 'email', 'problem',
+        '00000000-0000-0000-0000-0000000000f1', '{}', now() + interval '5 minutes');
+select tests.authenticate_as((select id from ids where name = 'admin'));
 select is(
   public.resolve_incident('00000000-0000-0000-0000-0000000000f1', 'client_change', 'Client launched a new home page', null,
                           '00000000-0000-0000-0000-0000000000e5'),
   now() + interval '10 seconds', 'an Admin accepts and resolves at once'
+);
+select is(
+  (select status::text || ' · ' || error from public.notifications
+   where incident_id = '00000000-0000-0000-0000-0000000000f1' and channel = 'email' and template = 'problem'),
+  'cancelled · Resolved within 5 min — no email (D-047)', 'resolved inside the grace: its PROBLEM email never goes'
 );
 select throws_ok($$select public.undo_page_baseline('00000000-0000-0000-0000-0000000000d1')$$,
   '55000', null, 'a baseline accepted with a resolve is undone only with the resolve');

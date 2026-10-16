@@ -79,6 +79,8 @@ export interface DownEmailInput extends EmailBaseInput {
   now?: Date;
   /** The first alert after a mute (§24.7, §24.17): when the mute that held it ended. */
   heldUntil?: Date | null;
+  /** Someone acknowledged before this email went (D-047: an ack releases the email held for its grace). */
+  acknowledged?: { by: string; at: Date } | null;
 }
 
 export interface ProblemEmailInput extends EmailBaseInput {
@@ -94,6 +96,8 @@ export interface ProblemEmailInput extends EmailBaseInput {
   now?: Date;
   /** The first alert after a mute (§24.7, §24.17): when the mute that held it ended. */
   heldUntil?: Date | null;
+  /** Someone acknowledged before this email went (D-047: an ack releases the email held for its grace). */
+  acknowledged?: { by: string; at: Date } | null;
 }
 
 export interface AcknowledgedEmailInput extends EmailBaseInput {
@@ -162,9 +166,15 @@ export interface AutoResolvedEmailInput extends EmailBaseInput {
 
 export interface AgainEmailInput extends EmailBaseInput {
   severity: 'down' | 'problem';
-  /** The Chat reply's own words: its title and body (D-024: the AGAIN replies are Chat; this is the fallback). */
+  /**
+   * The Chat reply's own words: its title and body. D-024: the AGAIN replies are Chat — this email is
+   * the D-016 fallback, or (D-047) the owner's first email of an incident whose earlier drops came back
+   * inside their 5-min grace.
+   */
   title: string;
   body: string;
+  /** Someone acknowledged before this email went (D-047: an ack releases the email held for its grace). */
+  acknowledged?: { by: string; at: Date } | null;
 }
 
 /**
@@ -319,7 +329,8 @@ const confirmedLabel = (d: Date) => `${formatDay(d, { weekday: true })} ${format
 export function buildDownEmail(input: DownEmailInput): EmailMessage {
   const { site } = input;
   const now = input.now ?? input.confirmedAt;
-  const held = input.ackedBy ? null : heldRow(input.heldUntil, input.ladder, now);
+  const acked = input.ackedBy ?? input.acknowledged?.by ?? null;
+  const held = acked ? null : heldRow(input.heldUntil, input.ladder, now);
   return render(input, {
     template: 'down',
     color: C.danger,
@@ -330,26 +341,28 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
       : [
           `${site} confirmed down ${formatTimeWithSeconds(input.confirmedAt)}`,
           input.cause,
-          ...ladderPre(input.ackedBy ? null : input.ladder, now),
+          ...ladderPre(acked ? null : input.ladder, now),
         ]
     ).join(' · '),
     headline: `${site} is down`,
     lede: input.ackedBy
       ? `${input.ackedBy} acknowledged it while it was a problem; it is now down.`
-      : held && input.reason === 'owner'
-        ? 'This went down while the site was muted, so nobody was told until now. Please acknowledge or hand it over in the Chat thread.'
-        : input.reason === 'owner'
-          ? `Nobody has acknowledged yet. You own ${site} — please acknowledge or hand it over in the Chat thread.`
-          : 'Nobody has acknowledged yet. The Google Chat alert couldn’t be delivered, so this email is the alert.',
+      : input.acknowledged
+        ? `${input.acknowledged.by} acknowledged it at ${formatTime(input.acknowledged.at)}.`
+        : held && input.reason === 'owner'
+          ? 'This went down while the site was muted, so nobody was told until now. Please acknowledge or hand it over in the Chat thread.'
+          : input.reason === 'owner'
+            ? `Nobody has acknowledged yet. You own ${site} — please acknowledge or hand it over in the Chat thread.`
+            : 'Nobody has acknowledged yet. The Google Chat alert couldn’t be delivered, so this email is the alert.',
     facts: [
       ...(held ? [held.row] : []),
       ['Confirmed down', confirmedLabel(input.confirmedAt)],
       ['Cause', input.cause],
       ['Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)],
-      ...ladderFacts(input.ackedBy ? null : input.ladder, input.now ?? input.confirmedAt, 'down'),
+      ...ladderFacts(acked ? null : input.ladder, input.now ?? input.confirmedAt, 'down'),
     ],
     // The board adds [Open incident], but Acknowledge opens that same page (one incident page, D-033).
-    buttons: input.ackedBy
+    buttons: acked
       ? [{ label: 'Open incident', href: input.incidentUrl, primary: true }]
       : held
         ? [
@@ -520,7 +533,8 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
       : chain
         ? 'The site opens in most browsers, but its certificate chain is misconfigured: install the right intermediate certificate.'
         : 'The site is up, with a problem.';
-  const held = heldRow(input.heldUntil, input.ladder, input.now ?? input.detectedAt);
+  const acked = input.acknowledged ?? null;
+  const held = acked ? null : heldRow(input.heldUntil, input.ladder, input.now ?? input.detectedAt);
   return render(input, {
     template: 'problem',
     color: C.warning,
@@ -530,8 +544,9 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
       ? `${site} · ${input.summary} · ${held.pre}`
       : `${site} · ${input.summary} · detected ${formatTime(input.detectedAt)}`,
     headline,
-    lede:
-      held && input.reason === 'owner'
+    lede: acked
+      ? `${opening} ${acked.by} acknowledged it at ${formatTime(acked.at)}.`
+      : held && input.reason === 'owner'
         ? `${opening} This started while the site was muted, so nobody was told until now. Please take a look and acknowledge, or hand it over in the Chat thread.`
         : input.reason === 'owner'
           ? `${opening} You own ${site} — please take a look and acknowledge, or hand it over in the Chat thread.`
@@ -542,9 +557,11 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
       ['Trigger', TRIGGER_LABELS[trigger]],
       ['Cause', input.cause],
       ['Site', state],
-      ...ladderFacts(input.ladder, input.now ?? input.detectedAt, 'problem', true),
+      ...ladderFacts(acked ? null : input.ladder, input.now ?? input.detectedAt, 'problem', true),
     ],
-    buttons: [{ label: 'Open / acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
+    buttons: acked
+      ? [{ label: 'Open incident', href: input.incidentUrl, primary: true }]
+      : [{ label: 'Open / acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }],
   });
 }
 
@@ -788,9 +805,17 @@ export function buildAgainEmail(input: AgainEmailInput): EmailMessage {
     label,
     pre: `${title} · same incident ${formatIncidentId(input.incidentNumber)}`,
     headline: down ? `${input.site} is down again` : `${input.site} has a problem again`,
-    lede: `${input.body} The Google Chat reply couldn’t be delivered, so this email is the alert.`,
+    lede:
+      input.reason !== 'owner'
+        ? `${input.body} The Google Chat reply couldn’t be delivered, so this email is the alert.`
+        : input.acknowledged
+          ? `${input.body} ${input.acknowledged.by} acknowledged it at ${formatTime(input.acknowledged.at)}.`
+          : `${input.body} You own ${input.site} — please acknowledge or hand it over in the Chat thread.`,
     facts: [['Same incident', formatIncidentId(input.incidentNumber)]],
-    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
+    buttons:
+      input.reason === 'owner' && !input.acknowledged
+        ? [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }]
+        : [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
   });
 }
 

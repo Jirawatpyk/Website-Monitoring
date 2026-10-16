@@ -305,3 +305,20 @@ describe('the first DOWN email after a mute', () => {
     expect(held({ next: null }).text).toContain('Held by a mute: until 15:00\n');
   });
 });
+
+describe('a DOWN email that goes after an ack (D-047)', () => {
+  it('says who acknowledged and when; no ladder, no Acknowledge button', () => {
+    const m = buildDownEmail({
+      ...base,
+      confirmedAt,
+      cause: CAUSE,
+      confirmingLocations: 2,
+      acknowledged: { by: 'Arm', at: new Date('2026-09-25T02:49:30Z') },
+    });
+    expect(m.text).toContain('Arm acknowledged it at 09:49.');
+    expect(m.text).not.toContain('Nobody has acknowledged');
+    expect(m.text).not.toContain('while it was a problem');
+    expect(m.text).toContain('Open incident: https://monitor.example.test/incidents/inc-1\n');
+    expect(m.text).not.toContain('?ack=1');
+  });
+});

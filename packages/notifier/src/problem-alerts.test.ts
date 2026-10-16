@@ -379,3 +379,27 @@ describe('PROBLEM emails (EmailAlert PROBLEM thread)', () => {
     expect(ackOther.text).toContain('Problem for: 6 min so far');
   });
 });
+
+describe('a PROBLEM email that goes after an ack (D-047)', () => {
+  it('says who acknowledged and opens the incident instead of asking to acknowledge', () => {
+    const m = buildProblemEmail({
+      incidentId: 'inc-141',
+      incidentNumber: 141,
+      site: 'Fuji Links',
+      tier: 2,
+      recipientId: 'u-ploy',
+      reason: 'owner',
+      incidentUrl: 'https://monitor.example.test/incidents/inc-141',
+      threadId: '<inc-inc-141@notify.example.test>',
+      startsThread: true,
+      trigger: 'slow',
+      detectedAt: new Date('2026-09-25T02:52:00Z'),
+      cause: 'p50 5.8 s (BKK, SIN, TYO)',
+      summary: 'slow, p50 5.8 s',
+      acknowledged: { by: 'Ploy', at: new Date('2026-09-25T02:53:00Z') },
+    });
+    expect(m.text).toContain('The site is up but slow. Ploy acknowledged it at 09:53.');
+    expect(m.text).not.toContain('please take a look and acknowledge');
+    expect(m.text).toContain('Open incident: https://monitor.example.test/incidents/inc-141\n');
+  });
+});

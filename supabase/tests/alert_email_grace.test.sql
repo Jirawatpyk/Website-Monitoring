@@ -4,7 +4,7 @@
 -- `tests.grace_elapsed` stands in for the 5 min passing.
 begin;
 \ir _helpers.psql
-select plan(32);
+select plan(33);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -187,9 +187,19 @@ update public.notifications set attempts = 1, next_retry_at = now() + interval '
   where incident_id = (select id from inc where name = 'retrying') and channel = 'google_chat';
 select ok(public.engine_recover_incident((select id from inc where name = 'retrying'), 'unacked', 'monitoring',
   now(), now(), '{}'::jsonb, true, null, null, true), 'it recovers while the DOWN card is still retrying');
-select is(pg_temp.mail('retrying', 'down'), 'queued',
-  'the DOWN email stays: it may be the only alert anyone gets');
+select is(
+  (select hold_until from public.notifications where incident_id = (select id from inc where name = 'retrying')
+     and channel = 'email' and template = 'down'),
+  now(), 'the DOWN email goes now: it may be the only alert anyone gets'
+);
 select is(pg_temp.mail('retrying', 'recovered'), 'queued', 'and its RECOVERED email follows');
+-- The DOWN email was queued at the open, before the recovery (one transaction, one now()).
+update public.notifications set created_at = now() - interval '1 minute'
+  where incident_id = (select id from inc where name = 'retrying') and channel = 'email' and template = 'down';
+select results_eq(
+  format($$select template from public.claim_notifications('email', 10, %L)$$, (select id from inc where name = 'retrying')),
+  $$values ('down')$$, 'DOWN first; RECOVERED waits behind it'
+);
 
 -- ── An ack keeps cancelling a response-hours hold (Chat and email together) ──
 select tests.authenticate_as((select id from ids where name = 'alex'));

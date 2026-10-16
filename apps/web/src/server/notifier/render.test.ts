@@ -476,9 +476,11 @@ describe('render — a DOWN email that goes after an ack (D-047)', () => {
   } as IncidentFacts;
   const thread = { threadId: '<inc-inc-141@notify.example.test>', startsThread: true };
 
-  it('acked inside its 5-min grace: the plain DOWN lede, never "while it was a problem"', () => {
+  it('acked inside its 5-min grace: says who has it, never "while it was a problem"', () => {
     const e = renderEmail(row('down', { cause: 'Timeout > 30 s (BKK, TYO)' }), down, ploy, appUrl, thread)!;
     expect(e.text).not.toContain('while it was a problem');
+    expect(e.text).not.toContain('Nobody has acknowledged');
+    expect(e.text).toContain('Ploy acknowledged it at 09:53.');
   });
 
   it('a PROBLEM raised to DOWN keeps its acknowledgement (D-021)', () => {

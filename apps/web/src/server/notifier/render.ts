@@ -369,6 +369,11 @@ export function renderEmail(
   const ctx = contextOf(n.context);
   // When it goes out: "acknowledge by 10:03" reads as a time today or tomorrow.
   const sentAt = new Date(n.hold_until ?? n.created_at);
+  // D-047: an ack releases the alert email held for its grace, so it can go after the ack.
+  const acknowledged =
+    ctx.escalated !== true && i.state === 'acknowledged' && i.acker && i.acked_at
+      ? { by: i.acker.display_name, at: new Date(i.acked_at) }
+      : null;
   const base: EmailBaseInput = {
     incidentId: i.id,
     incidentNumber: i.number,
@@ -395,6 +400,7 @@ export function renderEmail(
         now: sentAt,
         // The first alert after a mute (§24.17): "Held by a mute — until 15:00 — …".
         heldUntil: heldUntilOf(ctx),
+        acknowledged,
       });
     case 'problem':
       return buildProblemEmail({
@@ -407,6 +413,7 @@ export function renderEmail(
         ladder: ladderFactsOf(i, sentAt),
         now: sentAt,
         heldUntil: heldUntilOf(ctx),
+        acknowledged,
       });
     case 'step_fired': {
       const asFyi = ctx.asFyi === true;
@@ -476,7 +483,7 @@ export function renderEmail(
           })
         : null;
     }
-    // Only as the D-016 fallback when the Chat reply failed: the reply's own words.
+    // The D-016 fallback when the Chat reply failed, or (D-047) the owner's first email: the reply's words.
     case 'down_again':
     case 'problem_again': {
       const chat = againAlert(n, i);
@@ -487,6 +494,7 @@ export function renderEmail(
         severity: n.template === 'down_again' ? 'down' : 'problem',
         title: card.header.title,
         body: body && 'textParagraph' in body ? body.textParagraph.text.replace(/&lt;/g, '<') : '',
+        acknowledged,
       });
     }
     default:
