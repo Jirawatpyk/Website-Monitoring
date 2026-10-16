@@ -31,8 +31,59 @@ describe('pingHealthcheck (PRD §9)', () => {
     });
     await pingHealthcheck(undefined, 'ok', fetchImpl);
     expect(fetchImpl).not.toHaveBeenCalled();
-    await expect(pingHealthcheck(ping, 'ok', fetchImpl)).resolves.toBeUndefined();
+    await expect(pingHealthcheck(ping, 'ok', fetchImpl, 0)).resolves.toBeUndefined();
     expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain('hc-ping');
+  });
+
+  it('tries once more before giving up (16 Oct: a short blip from sin1 paged "engine is DOWN")', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError('fetch failed', { cause: { code: 'ECONNRESET' } }))
+      .mockResolvedValueOnce(new Response('OK'));
+    await pingHealthcheck(ping, 'ok', fetchImpl, 0);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it('an error status counts as a failed ping and is retried', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('busy', { status: 503 }))
+      .mockResolvedValueOnce(new Response('OK'));
+    await pingHealthcheck(ping, 'ok', fetchImpl, 0);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it('after the second failure logs once, with why — never the URL', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => {
+      throw new TypeError(`fetch failed ${ping}`, { cause: { code: 'ENOTFOUND' } });
+    });
+    await pingHealthcheck(ping, 'fail', fetchImpl, 0);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(console.warn).mock.calls).toEqual([
+      [
+        JSON.stringify({
+          event: 'healthcheck_ping_failed',
+          result: 'fail',
+          attempts: 2,
+          reason: 'ENOTFOUND',
+        }),
+      ],
+    ]);
+  });
+
+  it('names a timeout and an error status', async () => {
+    const timeout = vi.fn<typeof fetch>(async () => {
+      throw new DOMException('The operation timed out.', 'TimeoutError');
+    });
+    await pingHealthcheck(ping, 'ok', timeout, 0);
+    const status = vi.fn<typeof fetch>(async () => new Response('', { status: 429 }));
+    await pingHealthcheck(ping, 'ok', status, 0);
+    expect(vi.mocked(console.warn).mock.calls.map((c) => JSON.parse(String(c[0])).reason)).toEqual([
+      'timeout',
+      'http_429',
+    ]);
   });
 });
 
