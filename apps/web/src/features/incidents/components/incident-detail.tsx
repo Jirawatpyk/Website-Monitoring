@@ -180,6 +180,7 @@ export function IncidentDetailView({
       .filter(Boolean)
       .join(' · '),
     stillDown,
+    emailed: d.emailed,
   };
 
   // An email's "Add root cause" (…#resolve, D-033): open the form that fits, once — the hash leaves the

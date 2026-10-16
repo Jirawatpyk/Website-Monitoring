@@ -166,7 +166,8 @@ select is(
 select is(
   (select count(*)::int from public.incident_events where incident_id = '00000000-0000-0000-0000-0000000000f1'
      and type = 'baseline_undone')
-  + (select count(*)::int from public.audit_log where action = 'page_baseline.undo'),
+  + (select count(*)::int from public.audit_log where action = 'page_baseline.undo'
+       and entity_id = '00000000-0000-0000-0000-0000000000d1'),
   2, 'Undo is on the timeline and in the audit log'
 );
 

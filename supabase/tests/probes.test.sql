@@ -117,6 +117,9 @@ select throws_ok(
   '23505', null, 'the same message can''t be queued twice for one incident'
 );
 
+-- Down longer than the 5-min email grace, so the owner was emailed (D-047; alert_email_grace.test.sql
+-- has the short drop).
+select tests.grace_elapsed((select id from inc));
 select ok(
   public.engine_recover_incident((select id from inc), 'unacked', 'monitoring', now(), now(),
     '{"locations":2}', true),

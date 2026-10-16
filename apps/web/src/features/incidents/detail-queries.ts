@@ -94,6 +94,8 @@ export interface IncidentDetail {
   gate: Gate;
   /** The latest resolve, while its messages may still be held (Undo). */
   resolved: { by: string; byViewer: boolean; at: string; postsAt: string; posted: string | null } | null;
+  /** An email about it went. D-047: a drop back inside 5 min emails nobody, so Resolve posts to Chat only. */
+  emailed: boolean;
   timeline: TimelineItem[];
   locations: LocationEvidence[];
   evidence: { url: string; takenAt: string; afterRecovery: boolean } | null;
@@ -408,6 +410,7 @@ export async function loadIncident(
         : undefined,
     ),
     resolved: resolvedOf(i, events, viewer, nameOf),
+    emailed: events.some((e) => e.type === 'alerted' && e.payload.channel === 'email'),
     timeline: timelineOf(
       { severity: i.severity, trigger: i.trigger, startedAt: i.started_at, recoveredAt: i.recovered_at },
       events,

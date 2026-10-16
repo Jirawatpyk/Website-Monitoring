@@ -249,6 +249,8 @@ select is(
   0,
   'while the DOWN is still queued (retrying), the later reply stays behind it'
 );
+-- The site stays down past the 5-min email grace (D-047).
+select tests.grace_elapsed((select id from inc where name = 'e'));
 select is(
   (select count(*)::int from public.claim_notifications('email', 10,
     (select id from inc where name = 'e'))),

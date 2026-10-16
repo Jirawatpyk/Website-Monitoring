@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-047 | 16 Oct 2026 | A drop that recovers within 5 min sends no email: the incident's alert email (DOWN / PROBLEM) waits out a 5-min grace and is cancelled if the site is back first, so no RECOVERED or RESOLVED email follows either; an ack or a failed Chat alert releases it at once; the flap summary emails only an owner already emailed; Google Chat is unchanged | PRD §9 channel table ("Email: every DOWN/PROBLEM alert"), S02b email timing, D-039 for DOWN episodes |
 | D-046 | 15 Oct 2026 | S09d page change (spec §26): the fingerprint comes from a third crawler fetch, view `plain` with the probe's own User-Agent, kept apart from the keyword views; a new script / iframe domain raises PROBLEM `content_change` on that fetch, any other change when the last 3 usable fetches each differ, removed domains never; no data holds an open one; per-site 14-day recording from the first baseline and a `PAGE_CHANGE_ALERTS` gate (production off until Done-when 3); accepting is Admin only and applies when its 10 s Undo closes; resolving as Client-side change can accept and resolve at once; "Expected change" = `client_change` | Plan S09d "Resolve with root cause 'Expected change'", "holding for 3 fetches" (undefined), Size M |
 | D-045 | 14 Oct 2026 | Phones follow spec §22.1 and the phone boards: the top bar shows a back arrow on pages that aren't a bottom-nav tab, the page's title and the avatar, and a page's own phone button sits there (Site detail's ⋯ between the site name and the avatar, as MSite). Built after G1; until then the shell stays as D-018 built it | D-018 phone bar (brand + avatar, title in the page); D-043 point 1 (⋯ in the breadcrumb row), once built |
 | D-044 | 14 Oct 2026 | Spec §22.5 "View only on phones" covers the policy and settings editors only (Escalation, Alert channels, Users & roles, Security, Organisation, API & webhooks, Synthetic checks). Add site, Edit site and Edit monitors stay editable on phones, and Site detail's phone ⋯ offers Edit site with no "View only on phones" line | Spec §22.5 list (Edit monitors, Add site, Edit site); §25.2 and the MSite caption; D-043 point 2 |
@@ -50,6 +51,25 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-047 — No email for a drop that recovers within 5 min
+
+**Context.** On 16 Oct 2026 ENEOS Industrial (Tier 1) was down for about a minute (INC-0015: confirmed 13:43:38, OK again 13:44): all three locations timed out while every other site was fine — a real, self-healing blip. Its owner got three emails for it — DOWN, RECOVERED and, after Tao wrote the root cause, RESOLVED. PRD §9 makes email "the record + fallback" for every DOWN / PROBLEM alert; Google Chat is the alert.
+
+**Decision (Tao, 16 Oct 2026: "no email at all if it comes back within 5 min", PROBLEM included).**
+
+1. **Google Chat is unchanged:** the DOWN / PROBLEM card, RECOVERED and RESOLVED post as before, at once.
+2. **The incident's alert email waits out a 5-min grace.** The owner's DOWN / PROBLEM email — from the open, from D-021's raise to DOWN, from the first alert after a mute — is queued with `hold_until` = the later of now + 5 min and a Tier 2–3 response-hours hold.
+3. **Back inside the grace → no email at all.** The recovery cancels the held email ("Recovered within 5 min — no email (D-047)"). Nobody was emailed, so no RECOVERED email (it goes to people already emailed, S02b / D-038) and no RESOLVED email (people with a sent email) follow.
+4. **Still down when the grace ends →** the email goes as before; RECOVERED and RESOLVED emails follow as today.
+5. **Acknowledged inside the grace →** the held email goes at once: someone took it, so it is real, and the record reads DOWN → ACKNOWLEDGED.
+6. **The Chat alert failed for good (D-016) →** the held email goes at once: it is the alert then.
+7. **The flap summary emails the owner only if they were already emailed about the incident** — DOWN episodes included, so drops that each came back inside 5 min email nobody. Its Chat summary is unchanged.
+8. **Unchanged:** escalation emails (L1 fires at +15 min, past the grace), the AGAIN emails (only the fallback sends them), a muted incident (no messages at all).
+
+**Why.** Email is the record and the fallback, not the alert: a blip the team saw in Chat and that healed itself needs no mail trail, and three emails for a minute train people to ignore them. Five minutes is the existing boundary for a short drop (the PROBLEM auto-resolve, spec §16.1). The fallback promise is kept: when Chat fails, the email still goes at once.
+
+**Impact.** Migration `alert_email_grace` (engine_open_incident, engine_escalate_incident, engine_post_late_alert, engine_recover_incident, ack_incident, queue_fallback_emails; claim_notifications lets a held DOWN email not hold back the person's later emails); the Resolve done dialog says "Posting to Chat" and shows no email row when nobody was emailed; pgTAP `alert_email_grace.test.sql` (+ `tests.grace_elapsed`), and the S02b / S04b / D-038 tests age the grace where their drop outlasts it.
 
 ## D-046 — S09d: how a page change is read, held, gated and accepted
 

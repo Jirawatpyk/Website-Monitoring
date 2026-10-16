@@ -891,6 +891,8 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
   it('holds ACKNOWLEDGED for the 10 s Undo window, then posts it under the person’s name in Chat and email', async () => {
     const incidentId = await openDown('Ack');
     await onlyMine(incidentId);
+    // Down past the 5-min email grace, so the DOWN email went before the ack (D-047).
+    await due(incidentId, 'down');
     const post = okPost();
     const send = okSend();
     await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
@@ -922,6 +924,8 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
   it('T08: Ack → Undo within 10 s → no Chat post and no email, the rows end cancelled', async () => {
     const incidentId = await openDown('Undo');
     await onlyMine(incidentId);
+    // Down past the 5-min email grace, so the DOWN email went before the ack (D-047).
+    await due(incidentId, 'down');
     const post = okPost();
     const send = okSend();
     await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });

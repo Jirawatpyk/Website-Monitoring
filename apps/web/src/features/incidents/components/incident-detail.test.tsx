@@ -67,6 +67,7 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     detectedAt: at('24T22:14:30'),
     resolvedAt: null,
     autoResolved: false,
+    emailed: true,
     detectSeconds: 30,
     durationMinutes: 8,
     owner: 'Tao',
@@ -357,6 +358,24 @@ describe('Incident page — Resolve (T10, D-033)', () => {
       within(done).getByText('Resolved email to the DOWN recipients · held for undo'),
     ).toBeInTheDocument();
     expect(within(done).getAllByText(/nothing is sent until then\.$/).length).toBeGreaterThan(0);
+  });
+
+  it('resolved a drop that came back inside 5 min: Chat only, no email row (D-047)', async () => {
+    m.resolveIncident.mockResolvedValue({ ok: true, postsAt: new Date(Date.now() + 10_000).toISOString() });
+    show(
+      detail({
+        events: settled,
+        emailed: false,
+        rootCause: { category: 'dns', what: 'Record removed', fix: null },
+      }),
+    );
+    fireEvent.click(resolveButton());
+    const dialog = screen.getByRole('dialog', { name: 'Resolve incident' });
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Resolve incident' })));
+    const done = await screen.findByRole('dialog', { name: 'Incident resolved' });
+    expect(within(done).getByText('Resolved reply to the Chat thread · held for undo')).toBeInTheDocument();
+    expect(within(done).queryByText(/Resolved email/)).not.toBeInTheDocument();
+    expect(within(done).getAllByText(/^Root cause: .*Posting to Chat in \d+ s/).length).toBeGreaterThan(0);
   });
 });
 

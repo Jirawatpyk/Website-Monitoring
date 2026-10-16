@@ -113,6 +113,8 @@ export interface DialogIncident {
   /** "INC-0139 · ORCA Thailand · Tier 2 · owner Tao" */
   description: string;
   stillDown: boolean;
+  /** Someone was emailed about it; if not (D-047: back inside 5 min), RESOLVED goes to Chat only. */
+  emailed: boolean;
 }
 
 /** "Signed in as arm@…" under a phone dialog's fields (MIncident). */
@@ -380,6 +382,8 @@ export function ResolveDialog({
 
   const unknown = value.category === UNKNOWN_ROOT_CAUSE;
   const filled = !!value.category && !!value.what.trim();
+  // RESOLVED emails only people already emailed (D-047: a drop back inside 5 min emailed nobody).
+  const where = incident.emailed ? 'Chat and email' : 'Chat';
   const [acceptBox, setAcceptBox] = useState(true);
   const clientChange = !!pageChange && value.category === 'client_change';
   const showBox = clientChange && pageChange.canAccept && !!pageChange.checkId;
@@ -547,8 +551,8 @@ export function ResolveDialog({
         <div className="flex flex-col gap-2">
           <p role="status" className="sr-only">
             {postedAt
-              ? `Posted to Chat and email ${formatTimeWithSeconds(new Date(postedAt))}.`
-              : 'Resolved. Posting to Chat and email in a few seconds — nothing is sent until then.'}
+              ? `Posted to ${where} ${formatTimeWithSeconds(new Date(postedAt))}.`
+              : `Resolved. Posting to ${where} in a few seconds — nothing is sent until then.`}
           </p>
           <div className="flex items-start gap-3">
             <span
@@ -564,9 +568,9 @@ export function ResolveDialog({
               <p className="m-0 text-sm text-fg-secondary">
                 {`Root cause: ${label(done.category)}. ${lasted ? `${lasted}. ` : ''}`}
                 {seconds > 0
-                  ? `Posting to Chat and email in ${seconds} s — nothing is sent until then.`
+                  ? `Posting to ${where} in ${seconds} s — nothing is sent until then.`
                   : postedAt
-                    ? `Posted to Chat and email ${formatTimeWithSeconds(new Date(postedAt))}.`
+                    ? `Posted to ${where} ${formatTimeWithSeconds(new Date(postedAt))}.`
                     : POST_WAIT_WORDS[postOverdue]}
               </p>
             </div>
@@ -574,12 +578,16 @@ export function ResolveDialog({
           <ul className="m-0 flex list-none flex-col divide-y divide-border-subtle rounded-aura-md border border-border-default p-0 text-sm">
             {[
               ['Resolved reply to the Chat thread', 'Resolved reply posted in the Chat thread'],
-              [
-                incident.severity === 'down'
-                  ? 'Resolved email to the DOWN recipients'
-                  : 'Resolved email to everyone emailed about it',
-                'Resolved email sent in the incident thread',
-              ],
+              ...(incident.emailed
+                ? [
+                    [
+                      incident.severity === 'down'
+                        ? 'Resolved email to the DOWN recipients'
+                        : 'Resolved email to everyone emailed about it',
+                      'Resolved email sent in the incident thread',
+                    ],
+                  ]
+                : []),
             ].map(([held, sent]) => (
               <li key={held} className="flex items-start gap-2 px-aura-3 py-2">
                 <span

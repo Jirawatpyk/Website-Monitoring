@@ -50,6 +50,18 @@ $$;
 
 -- Back to the test owner: plain `reset role;` (the session user is postgres).
 
+-- D-047: the incident's 5-min email grace has run out, so its held alert emails are due. One pgTAP
+-- transaction has one now(): time never passes on its own.
+create or replace function tests.grace_elapsed(p_incident_id uuid)
+returns void
+language sql
+as $$
+  update public.notifications set hold_until = now() - interval '1 second'
+  where incident_id = p_incident_id and channel = 'email'
+    and template in ('down', 'problem', 'down_again', 'problem_again')
+    and status = 'queued' and hold_until > now() and hold_until <= now() + interval '5 minutes'
+$$;
+
 grant execute on all functions in schema tests to anon, authenticated;
 
 insert into private.allowed_email_domains (domain) values ('pgtap.test')
