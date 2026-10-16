@@ -371,7 +371,7 @@ export function renderEmail(
   const sentAt = new Date(n.hold_until ?? n.created_at);
   // D-047: an ack releases the alert email held for its grace, so it can go after the ack.
   const acknowledged =
-    ctx.escalated !== true && i.state === 'acknowledged' && i.acker && i.acked_at
+    ctx.escalated !== true && i.acker && i.acked_at
       ? { by: i.acker.display_name, at: new Date(i.acked_at) }
       : null;
   const base: EmailBaseInput = {
