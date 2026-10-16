@@ -307,3 +307,37 @@ describe('DOWN AGAIN by email — only as the fallback when Chat failed (D-016, 
     expect(e.text).toContain('couldn’t be delivered, so this email is the alert');
   });
 });
+
+describe('DOWN AGAIN by email to the owner — their first email of the incident (D-047)', () => {
+  const owner = {
+    incidentId: 'inc-133',
+    incidentNumber: 133,
+    site: 'VOCA',
+    tier: 2,
+    recipientId: 'u-arm',
+    reason: 'owner' as const,
+    incidentUrl: 'https://monitor.example.test/incidents/inc-133',
+    threadId: '<inc-inc-133@notify.example.test>',
+    startsThread: true,
+    severity: 'down' as const,
+    title: 'DOWN AGAIN · VOCA · was back for 5 min (03:19–03:24)',
+    body: 'Joined INC-0133 — no new incident.',
+  };
+
+  it('asks the owner to acknowledge; never says Chat failed', () => {
+    const e = buildAgainEmail(owner);
+    expect(e.text).toContain('You own VOCA — please acknowledge or hand it over in the Chat thread.');
+    expect(e.text).not.toContain('couldn’t be delivered');
+    expect(e.text).toContain('Acknowledge: https://monitor.example.test/incidents/inc-133?ack=1');
+  });
+
+  it('acknowledged before it went: says who has it, and opens the incident', () => {
+    const e = buildAgainEmail({
+      ...owner,
+      acknowledged: { by: 'Arm', at: new Date('2026-09-21T03:25:00Z') },
+    });
+    expect(e.text).toContain('Arm acknowledged it at 10:25.');
+    expect(e.text).toContain('Open incident: https://monitor.example.test/incidents/inc-133\n');
+    expect(e.text).not.toContain('?ack=1');
+  });
+});

@@ -8,7 +8,7 @@ import { formatTimeWithSeconds } from '@dxt/shared';
 import { FOCUS_TARGET } from '@/components/focus-target';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge } from '../actions';
-import { POST_WAIT_WORDS, usePostWait } from './use-post-wait';
+import { postWaitWords, usePostWait } from './use-post-wait';
 import type { AckState } from '../view';
 
 interface AckPanelProps {
@@ -85,7 +85,7 @@ export function AckPanel({
           ? 'Nothing to post — no alert went out for this incident.'
           : ack.posted
             ? `Posted to ${ack.posted.to} at ${formatTimeWithSeconds(new Date(ack.posted.at))}`
-            : POST_WAIT_WORDS[overdue];
+            : postWaitWords(overdue);
 
   return (
     <>

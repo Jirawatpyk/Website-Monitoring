@@ -44,6 +44,8 @@ $$;
 insert into inc select public.engine_open_incident(
   '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 'blocked_unverified', 'problem',
   '2026-09-12 06:00Z', '2026-09-12 06:00:40Z', '2026-09-12 06:00Z', '{}'::jsonb, true);
+-- The owner's PROBLEM email went: the first drop outlasted the 5-min email grace (D-047).
+select tests.grace_elapsed((select id from inc));
 
 -- The first drop recovers: RECOVERED to Chat and to the owner emailed about the PROBLEM.
 select ok(public.engine_recover_incident((select id from inc), 'unacked', 'monitoring',

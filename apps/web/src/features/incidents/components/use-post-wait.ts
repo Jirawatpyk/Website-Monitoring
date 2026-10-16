@@ -14,12 +14,20 @@ const LATE_AFTER_MS = 30_000;
 /** How long held messages have gone unposted: `late` after 30 s, `stale` once the retries are over. */
 export type PostOverdue = 'no' | 'late' | 'stale';
 
-/** What the sending line says while it waits (§14.16 — never "now" for ever). */
-export const POST_WAIT_WORDS: Record<PostOverdue, string> = {
-  no: 'Posting to the Chat thread and email now',
-  late: 'Still sending — retried automatically until it goes through',
-  stale: 'Not confirmed as posted — Chat and email didn’t answer. Tell the team in the Chat thread.',
-};
+/**
+ * What the sending line says while it waits (§14.16 — never "now" for ever). It names only the
+ * channels used (§16.8): a resolve after a drop that emailed nobody posts to Chat only (D-047).
+ */
+export function postWaitWords(overdue: PostOverdue, email = true): string {
+  switch (overdue) {
+    case 'no':
+      return email ? 'Posting to the Chat thread and email now' : 'Posting to the Chat thread now';
+    case 'late':
+      return 'Still sending — retried automatically until it goes through';
+    case 'stale':
+      return `Not confirmed as posted — ${email ? 'Chat and email didn’t' : 'Chat didn’t'} answer. Tell the team in the Chat thread.`;
+  }
+}
 
 /**
  * Once an ack's or a resolve's hold is over (`waiting`: due at `postsAt`, nothing posted yet), the

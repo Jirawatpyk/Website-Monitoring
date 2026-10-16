@@ -34,6 +34,8 @@ create temp table inc (name text primary key, id uuid) on commit drop;
 insert into inc values ('voca', public.engine_open_incident(
   '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 'hard_fail', 'down',
   '2026-09-21 03:12Z', '2026-09-21 03:12:40Z', '2026-09-21 03:12Z', '{}'::jsonb, true));
+-- Down 7 min before the 03:19 recovery: past the 5-min email grace, so the owner was emailed (D-047).
+select tests.grace_elapsed((select id from inc where name = 'voca'));
 select results_eq(
   $$select episode_severity::text, flip_ok, cardinality(flips) from public.incidents i
     join public.site_status s on s.site_id = i.site_id where i.id = (select id from inc where name = 'voca')$$,
@@ -227,6 +229,9 @@ select ok(
 insert into inc values ('fuji', public.engine_open_incident(
   '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000d2', 'slow', 'problem',
   '2026-09-25 09:48Z', '2026-09-25 09:50:05Z', '2026-09-25 09:50Z', '{}'::jsonb, true));
+-- The PROBLEM card went out (the notifier); the owner's email still waits out its 5-min grace (D-047).
+update public.notifications set status = 'sent', sent_at = now()
+  where incident_id = (select id from inc where name = 'fuji') and channel = 'google_chat';
 select throws_ok(
   $$select public.engine_recover_incident((select id from inc where name = 'fuji'), 'unacked', 'monitoring',
     '2026-09-25 09:51Z', '2026-09-25 09:51Z', '{}'::jsonb, true, null, null, true, true)$$,
@@ -243,7 +248,7 @@ select results_eq(
 select is(
   (select count(*)::int from public.notifications where incident_id = (select id from inc where name = 'fuji')
      and template = 'recovered'),
-  2, 'it still gets RECOVERED in Chat and by email'
+  1, 'it still gets RECOVERED in Chat; no email — it came back inside the 5-min grace (D-047)'
 );
 select is(
   (select count(*)::int from public.incident_events where incident_id = (select id from inc where name = 'fuji')
