@@ -27,7 +27,7 @@
 | S08 | Escalation L0–L1 & response hours | 1 · P0 | M | FR-09a | S07 | 3 | Done |
 | S09 | Maintenance windows & mute | 1 · P0 | L | FR-10a, FR-14 | S06b, S08 | 3 | Done |
 | S09b | Maintenance messages | 1 · P0 | M | — (FR-10a, FR-14 messages, §24) | S09 + ChatAlert / EmailAlert boards | 3 | Done |
-| S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | M | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | In review |
+| S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | M | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Done |
 | S09d | Defacement: page-change detection | 1 · P1 | L | — (PRD §2 content-change, D-041, D-046) | S09c (merged), S07 | 3–4 (alert on after a 2-week record) | In review |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
@@ -492,7 +492,11 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
   3. **(After G1, as S05's production line):** replay every live site's current home page, both crawler views included, through the list before the alert goes on. Then a week of production checks with no false positive.
   4. message-checker passes the PROBLEM · Keyword / Redirect card and email with the new cause wording.
-- **G1 needs Done-when 1, 2 and 4.** Done-when 3 is collected after G1. Until it passes, the slice is In review and the shared list's alerts stay off on production: findings are logged, not posted.
+- **G1 needs Done-when 1, 2 and 4.** Done-when 3 was collected on production after the merge (#102, 13 Oct 2026); the close-out turned `DEFACEMENT_ALERTS` on there.
+- **Done-when 3 evidence (production, 13 Oct 12:00 – 21 Oct 06:30 UTC, over 7 days, the shared list unchanged since #102):**
+  - `crawler_checks`: 4,114 Googlebot fetches (3,739 usable) and 4,114 from-Google-search fetches (2,991 usable) of the 11 live home pages, whole body; 0 with a forbidden word, 0 that ended on another host. The crawler stores what it finds whatever the flag, so 0 is a real result.
+  - `check_results` (BKK, SIN, TYO every minute): 0 with a forbidden word; no Keyword / Redirect incident.
+  - Coverage: 8 sites read in both views; Bangkok Airways China and Taiwan in the Googlebot view only (the from-Google-search view gets 403 on every run, Akamai); Cando Asia in neither (`UNABLE_TO_VERIFY_LEAF_SIGNATURE` on every fetch, the probes' too: its open PROBLEM · TLS chain since 8 Oct, D-029). The crawler rows those views lost are no data by design (D-042), not a PROBLEM; Cando Asia gets crawler coverage once the client fixes the chain.
 - **Review:** engine-reviewer, db-reviewer (`crawler_checks`), message-checker, security-reviewer (the crawler fetches: fixed User-Agents and Referer, the same SSRF guard).
 - **Not in this slice:** "the page changed from its last version" is S09d.
 
