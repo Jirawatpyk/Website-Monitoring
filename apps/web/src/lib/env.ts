@@ -35,7 +35,7 @@ const serverEnvSchema = z.object({
   DEFACEMENT_ALERTS: z.enum(['on', 'off']).default('off'),
   /**
    * D-046: a changed home page fingerprint raises PROBLEM · Page change only when `on`; `off` logs it
-   * in the engine summary (pageChangeHeld). Production stays off until S09d's two-week record.
+   * in the engine summary (pageChangeHeld). Production is on since S09d's two-week record (28 Oct 2026).
    */
   PAGE_CHANGE_ALERTS: z.enum(['on', 'off']).default('off'),
 });
