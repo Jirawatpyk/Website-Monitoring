@@ -28,7 +28,7 @@
 | S09 | Maintenance windows & mute | 1 · P0 | L | FR-10a, FR-14 | S06b, S08 | 3 | Done |
 | S09b | Maintenance messages | 1 · P0 | M | — (FR-10a, FR-14 messages, §24) | S09 + ChatAlert / EmailAlert boards | 3 | Done |
 | S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | M | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Done |
-| S09d | Defacement: page-change detection | 1 · P1 | L | — (PRD §2 content-change, D-041, D-046) | S09c (merged), S07 | 3–4 (alert on after a 2-week record) | In review |
+| S09d | Defacement: page-change detection | 1 · P1 | L | — (PRD §2 content-change, D-041, D-046) | S09c (merged), S07 | 3–4 (alert on after a 2-week record) | Done |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
@@ -532,6 +532,13 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   3. Two weeks of fingerprints from the 17 production sites (recorded, not alerting) show no false positive before the alert is switched on.
 - **Review:** engine-reviewer, db-reviewer (fingerprint table), security-reviewer (the HTML parser, the accept RPCs), message-checker, spec-checker (IncidentPageChange ×5, SiteDetail, MSite).
 - **Phase:** Phase 1 · P1. It doesn't block G1: its alert switches on only after the two-week record (Done-when 3).
+- **Done-when 3 evidence (production, 15 Oct 10:30 – 28 Oct 06:00 UTC, the close-out on 28 Oct 2026):**
+  - 8 of the 11 live sites were read: DxT, DxT Games, ENEOS Industrial, Fuji Links, MuvMi, realme.link, Tubtong and WeCare Asia. Each got 622 usable plain fetches, and all 622 matched its first baseline: 0 differences in title, description, h1, canonical or robots, and no script / iframe or link domain outside the baseline. So nothing would have alerted, and no baseline was accepted by hand.
+  - 3 sites were never read, so they have no baseline and get no page-change alert:
+    - Bangkok Airways China and Taiwan: the WAF refuses the plain fetch from SIN.
+    - Cando Asia: its certificate chain is incomplete (INC-0003).
+    They are recorded as a known gap, not exempted in code. Cando Asia starts recording on its own once the chain is fixed. Bangkok Airways would need the plain fetch to run from BKK, which is a follow-up and not in this slice.
+  - The 14-day recording gate per monitor (`first_set_at`, D-046 item 2) still holds after `PAGE_CHANGE_ALERTS` goes on, so the first alerts can start on 29 Oct 10:30 UTC. The fetches from 28 Oct 06:00 UTC up to then are compared again after 29 Oct 10:30 UTC, and any difference is reviewed (D-046 item 3). The 17 sites in Done-when 3 are the 11 that are live today; the other 6 record their own 14 days once they start.
 - **Not in this slice:** a script that JavaScript adds at runtime isn't in the HTML, so the probes can't see it. Only the browser verifier (S03) renders the page, and it runs only for blocked rounds. This slice does not cover runtime-injected scripts.
 ### S10 · Escalation L2–L3 & on-call
 
