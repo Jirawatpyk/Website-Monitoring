@@ -18,7 +18,7 @@
 | S03 | Bangkok probe & browser verifier | 1 · P0 | L | FR-04 | S02b | 2–3 | Done |
 | S04a | PROBLEM triggers & status rules | 1 · P0 | L | FR-03 | S03 | 3 | Done |
 | S04b | Relapse, flapping & auto-resolve | 1 · P0 | L | — | S04a | 3 | Done |
-| S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | In review |
+| S05 | Sites & monitors | 1 · P0 | L | FR-01 | S01 | 3 | Done |
 | S05b | Sites behind a WAF: trusted location + control check | 1 · P0 | M | FR-04 | S05 (merged) | 3 | Done |
 | S05c | Sites list (board) | 1 · P0 | M | FR-05 | S05 (merged) | 3 | Done |
 | S06 | Site detail & check rollups | 1 · P0 | L | FR-08 | S02a, S05 (merged) | 3 | Done |
@@ -301,8 +301,8 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   4. spec-checker passes AddSite and EditMonitors; nav "Sites" is live.
   5. A site can't be saved with an owner or backup who has no Google Chat user id; the form names them (D-015, test).
 - **Review:** spec-checker, security-reviewer (SSRF, RLS), db-reviewer (audit trigger).
-- **Notes (evidence):** In review — Done-when 2–5 verified; Done-when 1 is production data entry after the merge (close-out PR). Built 8 Oct 2026 in one day with two review rounds (planned L). Staging: migration `sites_registration` by `pnpm db:push:staging`, `release.sh staging` (the Bangkok probe sends custom headers).
-  - **Done-when 1 — after merge:** owners sign in → `supabase/access/clients.template.sql` and `chat-ids.template.sql` (reviewed, run by Claude with Tao's OK) → the 17 sites entered as Drafts through Add site → Tao starts each → close-out PR with the production SQL count (17 active, both owners linked, client, hosting) and the `site.create` audit rows.
+- **Notes (evidence):** Done 28 Oct 2026 — Done-when 2–5 verified at the merge; Done-when 1 from production data entry (close-out PR). Built 8 Oct 2026 in one day with two review rounds (planned L). Staging: migration `sites_registration` by `pnpm db:push:staging`, `release.sh staging` (the Bangkok probe sends custom headers).
+  - **Done-when 1 ✓** (production SQL, read only, 28 Oct 2026 11:30 UTC) 17 sites, 17 active; 17 with a primary owner and 17 with a different backup, all with a Google Chat id; 17 with client, hosting and credential reference; 17 with a primary monitor; 17 `site.create` rows in `audit_log`, all with an actor (entered through Add site). The last 6 (EQHO, ORCA Thailand, VOCA, WeCare Studio, DxT AI, DxT Solutions) waited as Drafts for their owners; on 28 Oct Tao made Alex owner and Tle backup through Edit site and started them (12 `site.update` rows). Their first rounds passed from BKK, SIN and TYO; DxT AI's `/contact` and `/services` key pages 301 to www.dxt-solutions.com, which was added to their redirect allowlist.
   - **Done-when 2 ✓** `mutations.test.ts` "refuses http://169.254.169.254/ / http://10.0.0.5/ / a host resolving to 127.0.0.1" (injected DNS, nothing saved), `test-check.test.ts`, probe `target.test.ts`; staging `/verify`: both addresses refused "This address points inside a private network — monitors check public sites only".
   - **Done-when 3 ✓** pgTAP `sites_registration.test.sql` (41: one row per create / update / delete of a site and a monitor, before / after, actor, no-op skipped, script actor null); e2e `sites.spec.ts` audit sequence; staging `audit_log` after `/verify`: site.create, monitor.create ×2, monitor.delete ×2, site.delete — all by Tao.
   - **Done-when 4 ✓** spec-checker AddSite + EditMonitors, two rounds each (High: a key page's Test check said DOWN → PROBLEM; Mediums fixed in 784a425 / 41c83da; `/verify` focus-after-Undo fixed in 04caa21 and re-checked on staging). Nav "Sites" live; `layout-consistency` passes and now also covers the Sites detail pages.
