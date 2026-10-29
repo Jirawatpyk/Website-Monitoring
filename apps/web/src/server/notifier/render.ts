@@ -45,17 +45,39 @@ import {
 } from '@dxt/shared';
 import {
   contextOf,
+  l0IsOnCall,
+  l0Of,
   type IncidentFacts,
   type Notification,
   type Recipient,
   type SystemAlertFacts,
 } from './facts';
-import { ladderFactsOf, namedIn, readerOf, stepFactsOf, stepWhy, stoppedOf, toldAtOf } from './ladder-facts';
+import {
+  l0PeopleOf,
+  l0PersonsOf,
+  ladderFactsOf,
+  namedIn,
+  readerOf,
+  stepFactsOf,
+  stepWhy,
+  stoppedOf,
+  toldAtOf,
+} from './ladder-facts';
+
+const L0_TEMPLATES = new Set(['down', 'problem', 'down_again', 'problem_again', 'flap_summary']);
 
 const person = (p: IncidentFacts['sites']['primary']): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
 
 const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
+
+/** The people the L0 pencil adds (S10): everyone L0 names but the owner / on-call. */
+const alsoL0 = (i: IncidentFacts): ChatPerson[] => {
+  const main = l0Of(i)?.id;
+  return l0PersonsOf(i)
+    .filter((p) => p.id !== main)
+    .map((p) => ({ name: p.display_name, chatUserId: p.google_chat_user_id }));
+};
 const num = (v: unknown, fallback: number) => (typeof v === 'number' ? v : fallback);
 
 export const incidentUrl = (appUrl: string, incidentId: string) =>
@@ -157,10 +179,10 @@ function againAlert(n: Notification, i: IncidentFacts, now: Date = new Date(n.cr
     tier: i.sites.tier,
     severity: n.template === 'down_again' ? 'down' : 'problem',
     trigger: (typeof ctx.trigger === 'string' ? ctx.trigger : i.trigger) as IncidentFacts['trigger'],
-    // §19.3: whoever acts now — the person who acknowledged, else the L0 person (the owner).
+    // §19.3: whoever acts now — the person who acknowledged, else the L0 person (owner / on-call).
     mention: acked
       ? { name: i.acker!.display_name, chatUserId: i.acker!.google_chat_user_id ?? null }
-      : person(i.sites.primary),
+      : person(l0Of(i)),
     ackedBy: acked ? i.acker!.display_name : null,
     fromState: str(ctx.fromState, 'monitoring'),
     droppedAt,
@@ -224,7 +246,9 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         cause: str(ctx.cause, 'Hard fail'),
         confirmingLocations: num(ctx.confirmingLocations, 2),
         confirmedByWaf: confirmedByWafOf(ctx),
-        owner: person(i.sites.primary),
+        owner: person(l0Of(i)),
+        alsoMention: alsoL0(i),
+        siteOwner: l0IsOnCall(i) ? person(i.sites.primary) : null,
         backup: person(i.sites.backup),
         // MobileAck: the card's link opens the incident ready to acknowledge.
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
@@ -245,7 +269,9 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         summary: str(ctx.summary, 'problem'),
         seenFrom: seenFrom(ctx),
         verifier: typeof ctx.verifier === 'string' ? ctx.verifier : null,
-        owner: person(i.sites.primary),
+        owner: person(l0Of(i)),
+        alsoMention: alsoL0(i),
+        siteOwner: l0IsOnCall(i) ? person(i.sites.primary) : null,
         backup: person(i.sites.backup),
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
         ladder: ladderFactsOf(i, now),
@@ -282,9 +308,14 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
         level: num(ctx.level, 1),
         elapsedMin: num(ctx.elapsedMin, 15),
-        owner: person(i.sites.primary),
+        owner: person(l0Of(i)),
         asked: named.asked,
         fyi: named.fyi,
+        // L1 · night: the backup on call was paged at L0, so L1 asks only the Admin (ChatAlert).
+        alreadyPaged:
+          num(ctx.level, 1) === 1 && l0IsOnCall(i) && i.sites.backup?.id === l0Of(i)?.id
+            ? (l0Of(i)?.display_name ?? null)
+            : null,
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
         viewUrl: incidentUrl(appUrl, i.id),
         kind: step.kind,
@@ -323,7 +354,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         startedAt: drop.start,
         recoveredAt: drop.end,
         okLocations: num(ctx.okLocations, 2),
-        owner: person(i.sites.primary),
+        owner: person(l0Of(i)),
         problem: dropProblem(i, drop, ctx),
       });
     }
@@ -341,7 +372,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
             incidentId: i.id,
             site: i.sites.name,
             severity: summarySeverity(i),
-            owner: person(i.sites.primary),
+            owner: person(l0Of(i)),
             drops,
           })
         : null;
@@ -360,7 +391,9 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   if (n.template === 'acknowledged' && contextOf(n.context).ackedById === n.user_id) return 'acked';
   // A step's own email (its people); the Chat fallback goes to the backup and Admins (D-016).
   if (n.template === 'step_fired') return contextOf(n.context).fallback === true ? 'fallback' : 'step';
-  if (i.sites.primary?.id === n.user_id) return 'owner';
+  if (l0Of(i)?.id === n.user_id) return l0IsOnCall(i) ? 'oncall' : 'owner';
+  // Someone the L0 pencil adds (S10): told at once by email too, then followed up like anyone emailed.
+  if (n.user_id && l0PeopleOf(i).includes(n.user_id)) return L0_TEMPLATES.has(n.template) ? 'l0' : 'emailed';
   if (n.template === 'resolved') return 'emailed';
   return 'fallback';
 }
@@ -443,7 +476,7 @@ export function renderEmail(
         level,
         elapsedMin: num(ctx.elapsedMin, 15),
         confirmedAt: new Date(i.detected_at),
-        owner: i.sites.primary?.display_name ?? null,
+        owner: l0Of(i)?.display_name ?? null,
         asFyi,
         asked: namedIn(i, n.context).askedNames.join(' and ') || null,
         cause: causeOf(i),
@@ -481,7 +514,7 @@ export function renderEmail(
         startedAt: drop.start,
         recoveredAt: drop.end,
         okLocations: num(ctx.okLocations, 2),
-        owner: i.sites.primary?.display_name ?? null,
+        owner: l0Of(i)?.display_name ?? null,
         ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
         problem: dropProblem(i, drop, ctx),
       });
@@ -495,7 +528,7 @@ export function renderEmail(
             ...base,
             severity: summarySeverity(i),
             drops,
-            owner: i.sites.primary?.display_name ?? null,
+            owner: l0Of(i)?.display_name ?? null,
             ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
             pausedUntil: i.acked_at ? null : (ladderFactsOf(i, sentAt)?.pausedUntil ?? null),
           })

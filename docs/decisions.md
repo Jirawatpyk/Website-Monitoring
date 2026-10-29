@@ -76,11 +76,25 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
     - **The STILL DOWN reminders never @mention the CEO or the site's AM**: L2 / L3 tell them once.
     - **On-call reasons are personal** (S10 PR B0 security review): a swap's reason, answer and decision notes, and a hand-over's reason, are seen only by the people involved and Admins (`oncall_notes()`); every other on-call field is for all staff. Only active Admins and Responders take part in swaps or send a test alert; one test alert a minute; reopening a test link shows the same receipt until the next test replaces it. A swap still open when one of its weeks starts expires (it can't be approved on a live week, §27); an approved swap drops an earlier hand-over of those weeks.
     - **Who L0 pages is fixed when the ladder clock starts** (S10 B1, Tao 29 Oct): at the open, a D-021 raise that restarts the ladder, or the first alert after a mute. A Tier 1 incident outside response hours (nights, weekends, company holidays) pages whoever is on call then. It stays theirs through relapses and across the Monday hand-over. With nobody on call, or once they're deactivated, it pages the owner. The person on call acts on every Tier 1 incident while on call, and on the incidents L0 paged them for: ack, notes, root cause and resolve. They may also **mute**, and end or shorten a mute they set (Tao: "OK"). They never edit the site. Scheduling maintenance, or changing someone else's windows, stays with the owner, the backup and Admins (security review: on call is about the incident, not the site's windows).
+    - **Accepted as they are (S10 B1b reviews):**
+      - The SQL rule is per site: the person L0 paged for one open incident may act on any open incident on that site. Today a site has at most one open incident (`incidents_one_open_per_site`), so this equals per incident. The pages mirror it per incident.
+      - "Outside response hours" for Tier 1 uses the same `organisation_settings` hours and `company_holidays` as the Tier 2–3 timers. When S17 makes them editable, the settings copy must say they also move Tier 1's on-call hand-over.
 11. **The texts drafted under item 6** (no board row; message-checker reviewed them):
     - Chat, FYI nobody acknowledged: `<users/CEO> <users/BUA> FYI · L3 · MuvMi still DOWN 1 h · not acknowledged · Arm, Ploy, Tao informed · no action needed`; card "For your information — no action needed. Nobody has acknowledged yet; Arm, Ploy and Tao were asked."
     - Email, FYI nobody acknowledged: headline "MuvMi still down after 1 h — not acknowledged yet"; lede to the CEO "For your information — no action needed. Nobody has acknowledged yet; Arm, Ploy and Tao were asked. This goes out because a Tier 1 site is still down after 1 h."; to the AM "For your information — MuvMi is still down after 1 h and nobody has acknowledged yet. If the client needs a second update, the draft on the incident page is current."
     - Chat, Tier 2–3 L2: the ChatAlert row; card "Nobody has acknowledged yet. Acknowledge to stop these reminders."
     - Email, Tier 2–3 L2 (§16.5 names it, no board): label "REMINDER · L2"; headline "WeCare Studio still down — 30 min, no ack"; lede "WeCare Studio is still down after 30 min and nobody has acknowledged. Acknowledge, or make sure the owner has it."; footer "You got this because WeCare Studio wasn't acknowledged in 30 min — L2 reminds you."
+    - **On-call routing (B1b, message-checker reviewed):**
+      - The first card at night @mentions the person on call. Its rows are `On call · Tle (Tier 1, outside response hours) — the person who acts` and `Owner · Arm · not paged outside response hours`. The ChatAlert board says "night"; these say "outside response hours" because they also cover weekends and holidays.
+      - L1 · night: `<users/TAO> ESCALATED · L1 · … · please acknowledge · Ploy (on call) already paged · CEO at 04:10`.
+      - The on-call email lede is "Nobody has acknowledged yet. You’re on call — please acknowledge or hand it over in the Chat thread."
+      - The on-call email footer is "You got this because you were on call when MuvMi (Tier 1) alerted outside response hours." It stays true on a later email.
+      - In the ledger an earlier step's person reads "Tle (on call)".
+    - **The L0 pencil @mentions everyone L0 names on the first card**, the owner / on-call first. This stretches §10's "only the person expected to act": the pencil makes them someone expected to act, and L1 leaves them out.
+      - Their email lede: "You’re told at once for MuvMi, with the owner / on-call — …".
+      - Their footer: "You got this because MuvMi’s escalation policy tells you at L0, together with the owner / on-call."
+      - Later emails read "you were emailed about this incident".
+      - Only the owner or the person on call is asked for the root cause.
     - Swap, hand-over, rotation and day-before reminder texts come with PR B.
 
 **Why.** G1's people steps don't block S10's code, and a second code reviewer doesn't exist. The drill proves the alert path end to end; staging has the same probes, engine and notifier as production.

@@ -11,7 +11,8 @@ export type EscalationTarget = (typeof ESCALATION_TARGETS)[number];
 
 /** On screen. "Owner" reads "Owner / on-call" once on-call exists (S10); the CEO token is S10's too. */
 export const ESCALATION_TARGET_LABELS: Record<EscalationTarget, string> = {
-  owner: 'Owner',
+  // Spec §8: by day the owner, outside response hours on Tier 1 the person on call (S10).
+  owner: 'Owner / on-call',
   backup: 'Backup',
   admins: 'Admin',
   site_am: 'Site AM',

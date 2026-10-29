@@ -99,28 +99,33 @@ export function StepRow({
               </span>
             ))}
           </div>
-          {!pinned && (
-            <div className="flex items-center gap-0.5">
-              <IconButton
-                icon={<IconArrowUp />}
-                label={move.up}
-                touchHeight
-                disabled={!move.canUp}
-                onClick={() => onMove(index, -1)}
-              />
-              <IconButton
-                icon={<IconArrowDown />}
-                label={move.down}
-                touchHeight
-                disabled={!move.canDown}
-                onClick={() => onMove(index, 1)}
-              />
-              <IconButton
-                icon={<IconPencil />}
-                label={`Edit ${label}`}
-                touchHeight
-                onClick={() => onEdit(index)}
-              />
+          <div className="flex items-center gap-0.5">
+            {!pinned && (
+              <>
+                <IconButton
+                  icon={<IconArrowUp />}
+                  label={move.up}
+                  touchHeight
+                  disabled={!move.canUp}
+                  onClick={() => onMove(index, -1)}
+                />
+                <IconButton
+                  icon={<IconArrowDown />}
+                  label={move.down}
+                  touchHeight
+                  disabled={!move.canDown}
+                  onClick={() => onMove(index, 1)}
+                />
+              </>
+            )}
+            {/* L0 has the pencil too (S10): people and email only — it stays pinned. */}
+            <IconButton
+              icon={<IconPencil />}
+              label={`Edit ${label}`}
+              touchHeight
+              onClick={() => onEdit(index)}
+            />
+            {!pinned && (
               <IconButton
                 icon={<IconTrash2 />}
                 touchHeight
@@ -129,8 +134,8 @@ export function StepRow({
                 disabled={!canDelete(step)}
                 onClick={() => onDelete(index)}
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
         <dl className="m-0 grid grid-cols-[calc(var(--spacing)*22)_minmax(0,1fr)] items-center gap-x-4 gap-y-2.5">
           <dt className="font-mono text-xs text-fg-tertiary">NOTIFY</dt>

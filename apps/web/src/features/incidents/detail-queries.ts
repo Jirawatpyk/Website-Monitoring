@@ -38,6 +38,7 @@ import {
   type ListIncident,
   type TimelineItem,
 } from './model';
+import { loadOnCallNow } from './oncall-now';
 import { incidentIdSchema } from './schemas';
 import { buildIncidentView, canAcknowledge, type IncidentRow, type IncidentView, type Viewer } from './view';
 
@@ -269,7 +270,7 @@ export async function loadIncident(
     .select(
       `id, number, state, severity, trigger, escalation_level, started_at, detected_at, acked_at, acked_by,
        recovered_at, resolved_at, resolved_by, auto_resolved, client_update_required, client_updated_at,
-       root_cause_category, root_cause, root_cause_fix, site_id, monitor_id,
+       root_cause_category, root_cause, root_cause_fix, site_id, monitor_id, l0_user_id,
        sites!inner(name, tier, primary_owner_id, backup_owner_id,
          monitors(id, url, is_primary, timeout_ms, allowed_redirect_domains),
          clients(am_user_id))`,
@@ -295,7 +296,9 @@ export async function loadIncident(
   const aroundFrom = i.started_at;
   const aroundTo = new Date(Date.parse(i.detected_at) + 60_000).toISOString();
   const checkCols = 'location, outcome, status_code, response_ms, error, checked_at';
-  const [events, around, latest] = await Promise.all([
+  // can_ack's on-call branch (S10, D-048): a Responder holding the shift acts on any Tier 1 incident.
+  const askShift = viewer.role === 'responder' && i.sites.tier === 1;
+  const [events, around, latest, onCall] = await Promise.all([
     fetchAllPages<EventRow>(
       (from, to) =>
         db
@@ -327,13 +330,21 @@ export async function loadIncident(
           .order('checked_at', { ascending: false })
           .limit(30)
       : Promise.resolve({ data: [] as CheckRow[], error: null }),
+    askShift ? loadOnCallNow(db, now) : Promise.resolve(null),
   ]);
   if (around.error) throw new Error(`check_results: ${around.error.message}`);
   if (latest.error) throw new Error(`check_results: ${latest.error.message}`);
 
   const ids = new Set<string>();
   const am = i.sites.clients?.am_user_id ?? null;
-  for (const id of [i.acked_by, i.resolved_by, i.sites.primary_owner_id, i.sites.backup_owner_id, am]) {
+  for (const id of [
+    i.acked_by,
+    i.resolved_by,
+    i.sites.primary_owner_id,
+    i.sites.backup_owner_id,
+    am,
+    i.l0_user_id ?? null,
+  ]) {
     if (id) ids.add(id);
   }
   for (const e of events) {
@@ -359,7 +370,8 @@ export async function loadIncident(
   const pageChange = pageChangeLive
     ? { ...pageChangeLive, accepted: incidentAccept(i, events, nameOf) }
     : null;
-  const view = buildIncidentView(i, events, viewer, names, now);
+  const actor: Viewer = askShift ? { ...viewer, onCallNow: onCall === viewer.id } : viewer;
+  const view = buildIncidentView(i, events, actor, names, now);
 
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
   const shot =
@@ -395,7 +407,7 @@ export async function loadIncident(
     backup: i.sites.backup_owner_id ? nameOf(i.sites.backup_owner_id) : null,
     am: am ? nameOf(am) : null,
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
-    canAct: canAcknowledge(viewer, i),
+    canAct: canAcknowledge(actor, i),
     rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },
     gate: resolveGate(
       {
@@ -458,11 +470,14 @@ export async function countOpenIncidents(): Promise<number | null> {
   return error ? null : count;
 }
 
+/** States an incident is done in: its L0 person no longer acts on it (S10). */
+const CLOSED = new Set<string>(['resolved', 'in_review', 'closed']);
+
 // ── List ─────────────────────────────────────────────────────────────────
 
 export interface IncidentList {
   /** The signed-in person (`listIncidents` only; the CSV reads without one). */
-  viewer?: { id: string; role: Role };
+  viewer?: { id: string; role: Role; onCallNow?: boolean };
   incidents: ListIncident[];
   sites: { id: string; name: string }[];
 }
@@ -486,6 +501,7 @@ interface ListRow {
   root_cause_category: string | null;
   root_cause: string | null;
   root_cause_fix: string | null;
+  l0_user_id: string | null;
   acker: { display_name: string } | null;
   sites: {
     name: string;
@@ -500,8 +516,10 @@ interface ListRow {
 export async function listIncidents(now = new Date()): Promise<IncidentList | null> {
   const access = await getAccess();
   if (access.status !== 'active') return null;
-  const list = await loadIncidentList(await createClient(), now);
-  return { ...list, viewer: { id: access.profile.id, role: access.profile.role } };
+  const db = await createClient();
+  const [list, onCall] = await Promise.all([loadIncidentList(db, now), loadOnCallNow(db, now)]);
+  const { id, role } = access.profile;
+  return { ...list, viewer: { id, role, onCallNow: onCall === id } };
 }
 
 export async function loadIncidentList(db: DbClient, now: Date): Promise<IncidentList> {
@@ -514,7 +532,7 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
           .select(
             `id, number, site_id, severity, trigger, state, escalation_level, started_at, detected_at,
              acked_at, recovered_at, resolved_at, auto_resolved, is_flapping, is_manual,
-             root_cause_category, root_cause, root_cause_fix,
+             root_cause_category, root_cause, root_cause_fix, l0_user_id,
              acker:profiles!incidents_acked_by_fkey(display_name),
              sites!inner(name, tier, primary_owner_id, backup_owner_id,
                owner:profiles!sites_primary_owner_id_fkey(display_name))`,
@@ -593,6 +611,8 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
       ownerName: r.sites.owner?.display_name ?? null,
       primaryOwnerId: r.sites.primary_owner_id,
       backupOwnerId: r.sites.backup_owner_id,
+      // the L0 person acts only while it's open (private.oncall_acts_on)
+      l0UserId: CLOSED.has(r.state) ? null : r.l0_user_id,
       rootCauseCategory: r.root_cause_category,
       rootCause: r.root_cause,
       rootCauseFix: r.root_cause_fix,

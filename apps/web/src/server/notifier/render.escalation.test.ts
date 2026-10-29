@@ -115,6 +115,23 @@ describe('render — L2 and the L3 FYI (S10)', () => {
     );
   });
 
+  it('L1 · night: the backup on call was paged at L0, so L1 asks the Admin and says so (ChatAlert)', () => {
+    const m = renderChat(
+      row('step_fired', { level: 1, severity: 'down', elapsedMin: 15, mentioned: ['u-tao'], fyi: [] }),
+      {
+        ...incident,
+        l0: { ...ploy, is_active: true, role: 'responder' },
+        state: 'escalated',
+        escalation_level: 1,
+      },
+      appUrl,
+      new Date('2026-09-25T03:03:42Z'),
+    )!;
+    expect(m.text).toMatch(
+      /^<users\/TAO> ESCALATED · L1 · MuvMi DOWN 15 min, not acknowledged · please acknowledge · Ploy \(on call\) already paged/,
+    );
+  });
+
   it('L2 @mentions the CEO and names who was told', () => {
     const m = renderChat(
       row('step_fired', { level: 2, severity: 'down', elapsedMin: 30, mentioned: ['u-ceo'], fyi: [] }),

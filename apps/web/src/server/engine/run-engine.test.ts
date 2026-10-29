@@ -119,6 +119,8 @@ describe('runEngine', () => {
             },
           ],
           p_status: 'down',
+          // Tue 17:00 Bangkok, inside response hours: L0 is the owner (S10).
+          p_outside_hours: false,
         },
       },
     ]);
@@ -883,8 +885,53 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     expect(rpcCalls.find((c) => c.name === 'engine_post_late_alert')?.args).toEqual({
       p_incident_id: 'i9',
       p_at: now.toISOString(),
+      p_outside_hours: false,
     });
     expect(summary.notified).toBe(1);
+  });
+
+  it.each([
+    // Hours end 17:01 Bangkok (whole minutes): confirmed 17:00:32 (inside), the run at 17:01:05 (outside) → judged at the confirm.
+    ['judged at the confirm, not the run', { response_end: '17:01:00' }, [], false],
+    // D-048 item 8: Tier 1 on a company holiday goes to the person on call, as at weekends.
+    ['a company holiday', { response_end: '18:00:00' }, [{ day: '2026-10-06' }], true],
+  ])('a DOWN open passes p_outside_hours — %s (S10)', async (_label, hours, holidays, expected) => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'rpc.engine_open_incident': { data: 'i1' },
+      'organisation_settings.select': {
+        data: { response_start: '09:00:00', response_days: [1, 2, 3, 4, 5], ...hours },
+      },
+      'company_holidays.select': { data: holidays },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_open_incident')?.args).toMatchObject({
+      p_outside_hours: expected,
+    });
+  });
+
+  it('at 23:00 on a weekday the first alert is judged outside response hours, so L0 pages on call (S10)', async () => {
+    const night = new Date('2026-10-06T16:00:00Z'); // Tue 23:00 Bangkok
+    const { db, rpcCalls, readCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: [] },
+      'rpc.engine_silent_incidents': {
+        data: [{ incident_id: 'i9', site_id: 's1', tier: 1, severity: 'down', detected_at: at(-900) }],
+      },
+      'rpc.engine_post_late_alert': { data: true },
+    });
+    await runEngine(db, night);
+    expect(rpcCalls.find((c) => c.name === 'engine_post_late_alert')?.args).toMatchObject({
+      p_outside_hours: true,
+    });
+    // On the hour, the run keeps four weeks of on-call shifts made from the rotation.
+    expect(readCalls.find((c) => c.name === 'oncall_extend_shifts')?.args).toEqual({
+      p_until: new Date(night.getTime() + 28 * 86_400_000).toISOString(),
+    });
+    const later = fakeDb({ 'monitors.select': { data: [monitor()] }, 'rpc.engine_checks': { data: [] } });
+    await runEngine(later.db, new Date('2026-10-06T16:01:00Z'));
+    expect(later.readCalls.some((c) => c.name === 'oncall_extend_shifts')).toBe(false);
   });
 
   it('one late alert that fails never holds back the next site’s (engine review H1)', async () => {

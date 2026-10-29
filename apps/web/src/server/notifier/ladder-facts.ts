@@ -9,7 +9,7 @@ import {
   type EscalationTarget,
   type Tier,
 } from '@dxt/shared';
-import { contextOf, type IncidentFacts, type Owner } from './facts';
+import { contextOf, l0IsOnCall, l0Of, type IncidentFacts, type Owner } from './facts';
 
 /**
  * The ladder's words for a message (S08, D-034), from the plan the incident opened with: the next
@@ -34,8 +34,10 @@ const ROLE: Record<EscalationTarget, string> = {
 /** The people a token names for this incident's site. */
 function peopleOf(i: IncidentFacts, token: EscalationTarget): Owner[] {
   switch (token) {
-    case 'owner':
-      return i.sites.primary ? [i.sites.primary] : [];
+    case 'owner': {
+      const l0 = l0Of(i);
+      return l0 ? [l0] : [];
+    }
     case 'backup':
       return i.sites.backup ? [i.sites.backup] : [];
     case 'site_am':
@@ -46,6 +48,17 @@ function peopleOf(i: IncidentFacts, token: EscalationTarget): Owner[] {
       return i.ladder?.ceo ?? [];
   }
 }
+
+/** Everyone L0 names, owner / on-call first, then anyone the L0 pencil adds (no plan: the owner). */
+export function l0PersonsOf(i: IncidentFacts): Owner[] {
+  const targets = planOf(i)?.steps.find((s) => s.level === 0)?.targets ?? ['owner'];
+  const ordered = [...targets].sort((a, b) => Number(b === 'owner') - Number(a === 'owner'));
+  const byId = new Map<string, Owner>();
+  for (const p of ordered.flatMap((t) => peopleOf(i, t))) if (!byId.has(p.id)) byId.set(p.id, p);
+  return [...byId.values()];
+}
+
+export const l0PeopleOf = (i: IncidentFacts): string[] => l0PersonsOf(i).map((p) => p.id);
 
 /** Who a step asks and tells FYI, minus those already told (L0's people). */
 function stepPeople(i: IncidentFacts, level: number) {
@@ -168,7 +181,14 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
     for (const t of s.targets)
       for (const name of tokenWords(i, t))
         if (!own.has(name) && !told.has(name))
-          told.set(name, t === 'owner' ? `${name} (owner)` : t === 'backup' ? `${name} (backup)` : name);
+          told.set(
+            name,
+            t === 'owner'
+              ? `${name} (${l0IsOnCall(i) ? 'on call' : 'owner'})`
+              : t === 'backup'
+                ? `${name} (backup)`
+                : name,
+          );
   const informed = [...told.keys()];
   const schedule = plan && hours ? scheduleOf({ plan, detectedAt: clockOf(i), hours }) : [];
   // "Arm 09:48 · Ploy + Tao 10:03" (EmailAlert L2 "Already told").
@@ -234,7 +254,7 @@ function directory(i: IncidentFacts): Map<string, Owner & { token: EscalationTar
     ...(i.ladder?.admins ?? []).map((p) => ({ ...p, token: 'admins' as const })),
     ...(i.sites.client?.am ? [{ ...i.sites.client.am, token: 'site_am' as const }] : []),
     ...(i.sites.backup ? [{ ...i.sites.backup, token: 'backup' as const }] : []),
-    ...(i.sites.primary ? [{ ...i.sites.primary, token: 'owner' as const }] : []),
+    ...(l0Of(i) ? [{ ...l0Of(i)!, token: 'owner' as const }] : []),
   ];
   return new Map(all.map((p) => [p.id, p]));
 }

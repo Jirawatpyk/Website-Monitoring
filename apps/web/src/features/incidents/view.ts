@@ -30,6 +30,8 @@ export interface IncidentRow {
   acked_at: string | null;
   acked_by: string | null;
   recovered_at: string | null;
+  /** The person L0 paged (S10): the person on call outside response hours, else null (the owner). */
+  l0_user_id?: string | null;
   sites: {
     name: string;
     tier: number;
@@ -51,6 +53,8 @@ export interface Viewer {
   email: string;
   displayName: string;
   role: Role;
+  /** Holds the on-call shift right now (S10). */
+  onCallNow?: boolean;
 }
 
 export type AckState =
@@ -104,6 +108,9 @@ export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
   return mayAcknowledge(viewer, {
     primaryOwnerId: i.sites.primary_owner_id,
     backupOwnerId: i.sites.backup_owner_id,
+    tier: i.sites.tier,
+    // the L0 person acts only while it's open (private.oncall_acts_on)
+    l0UserId: ['resolved', 'in_review', 'closed'].includes(i.state) ? null : (i.l0_user_id ?? null),
   });
 }
 
@@ -136,7 +143,9 @@ export function buildIncidentView(
       ? 'You’re the owner.'
       : isBackup
         ? 'You’re the backup owner.'
-        : 'You’re an Admin.';
+        : viewer.role === 'admin'
+          ? 'You’re an Admin.'
+          : 'You’re on call.';
 
   let ack: AckState;
   if (i.state === 'acknowledged' && i.acked_at) {
@@ -173,7 +182,10 @@ export function buildIncidentView(
     if (allowed) {
       ack = { kind: 'can-ack' };
     } else {
+      const onCall = i.l0_user_id && i.l0_user_id !== i.sites.primary_owner_id ? i.l0_user_id : null;
       const people: PersonWhoCanAct[] = [
+        // L0 paged the person on call (S10): they're the one expected to act.
+        ...(onCall ? [{ name: nameOf(onCall), duty: 'on call', status: 'Not acked', urgent: true }] : []),
         ...(i.sites.primary_owner_id
           ? [{ name: nameOf(i.sites.primary_owner_id), duty: 'owner', status: 'Not acked', urgent: true }]
           : []),

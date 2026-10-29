@@ -255,7 +255,7 @@ describe('delayCheck — the edit dialog', () => {
 
 describe('the rest', () => {
   it('describes a step', () => {
-    expect(describeStep(l0)).toBe('+0 · Owner · Chat @mention, Alerts Space, Email');
+    expect(describeStep(l0)).toBe('+0 · Owner / on-call · Chat @mention, Alerts Space, Email');
   });
   it('affects line, as the board', () => {
     expect(affectsLine(5, [142])).toBe(

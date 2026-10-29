@@ -149,6 +149,30 @@ In the SQL editor, read the editor's text back before every `ctrl+Return` — `w
 
 Response hours (Tier 2–3 timers paused, PROBLEM held until 09:00) can't be driven on staging, because the clock can't move. The engine tests (`escalation.test.ts`, `response-hours.test.ts`) and pgTAP (`escalation.test.sql`) cover them.
 
+On-call routing (S10 B1, D-048): outside response hours a Tier 1 DOWN pages the person on call, not the owner.
+
+1. Run `staging/escalation-people-s10.sql` first, then `staging/oncall-routing-s10.sql`. The second one seeds "Staging OnCall", who has the backup fixture's Chat id (Tao's), and a one-person rotation.
+2. Check `oncall_person_at(now())` in a **separate** query. Asked in the same statement as `oncall_extend_shifts` it reads null, because a stable function doesn't see the rows that statement made.
+3. Drive it at night or at the weekend. In the daytime, set `organisation_settings.response_end` to a minute ago, then restore it.
+4. Start clean, set the target to `error`, then read the query below. Expect:
+   - `l0` is Staging OnCall, and the `incident.opened` audit row has its `l0_user_id`.
+   - The DOWN Chat row is sent with a `provider_message_id`. The owner fixture has no Chat id, so a mention reaching Tao proves the on-call person was paged.
+   - The card rows read "On call · Staging OnCall (Tier 1, outside response hours) — the person who acts" and "Owner · Staging Owner · not paged outside response hours".
+   - The DOWN email is queued to Staging OnCall (D-047 grace).
+   - Measured S10: INC-0051, confirmed 16:59:32Z, Chat 16:59:36Z.
+5. Undo: the fixture file's last lines.
+
+```sql
+select json_build_object('inc', (select row_to_json(x) from (select i.number, i.state, i.detected_at,
+    (select display_name from profiles where id = i.l0_user_id) l0
+  from incidents i join sites s on s.id = i.site_id where s.name = 'Test target' order by i.created_at desc limit 1) x),
+  'msgs', (select json_agg(json_build_object('t', n.template, 'c', n.channel, 'to', (select display_name from profiles where id = n.user_id),
+    's', n.status, 'at', n.sent_at, 'pm', (select bool_or(a.provider_message_id is not null) from notification_attempts a where a.notification_id = n.id)) order by n.created_at)
+  from notifications n where n.incident_id = (select i.id from incidents i join sites s on s.id = i.site_id where s.name = 'Test target' order by i.created_at desc limit 1))) j;
+```
+
+The SQL editor's "Potential issue detected" dialog appears for the fixture's deletes; confirm it on staging only.
+
 Maintenance and mute (S09, D-036, spec §23), as Tao on https://monitor-staging.dxtspace.com — start clean (`reset-test-incident.sql`, target `ok`):
 
 | Do                                                                   | Expect                                                                                                                                                                                |

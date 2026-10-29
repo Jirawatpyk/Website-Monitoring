@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { PolicyDraft } from './model';
-import { ackCase, isReminderStep, nobodyWhy, scenario, sitesOf, stepNames, tokenRows } from './preview';
+import {
+  ackCase,
+  isReminderStep,
+  nobodyWhy,
+  scenario,
+  sitesOf,
+  stepNames,
+  tokenRows,
+  previewOwner,
+} from './preview';
 
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
 const hours = { startMin: 540, endMin: 1080, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };
@@ -17,10 +26,21 @@ const down = (tier: number): PolicyDraft => ({
   ],
 });
 
+describe('previewOwner (S10)', () => {
+  it.each([
+    [1, true, 'Tle', 'Tle (on call)'],
+    [1, false, 'Tle', 'Arm'],
+    [2, true, 'Tle', 'Arm'],
+    [1, true, null, 'Arm'],
+  ] as const)('Tier %s, outside hours %s, on call %s → %s', (tier, outside, onCall, expected) => {
+    expect(previewOwner(tier, 'Arm', onCall, outside)).toBe(expected);
+  });
+});
+
 describe('preview (S08, D-034)', () => {
   it('resolves the tokens for a site; an internal site has no AM', () => {
     expect(tokenRows(muvmi, ['Tao'])).toEqual([
-      { token: 'Owner', name: 'Arm' },
+      { token: 'Owner / on-call', name: 'Arm' },
       { token: 'Backup', name: 'Ploy' },
       { token: 'Admin', name: 'Tao' },
       { token: 'Site AM', name: 'Bua' },
@@ -157,7 +177,7 @@ describe('preview (S08, D-034)', () => {
     const s = scenario(down(1), undefined, ['Tao'], hours, bkk('2026-09-25T09:48:00'));
     expect(s.caseLine).toBe('A site DOWN confirmed now, nobody acknowledges:');
     expect(s.rows.map((r) => r.what)).toEqual([
-      'L0 → Owner + Alerts Space',
+      'L0 → Owner / on-call + Alerts Space',
       'L1 → Backup + Admin (Tao)',
       'Reminder in the thread (every 15 min)',
     ]);

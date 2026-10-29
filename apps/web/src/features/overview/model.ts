@@ -190,8 +190,13 @@ const roleOf = (kind: ViewerKind): Role =>
 /** Whether this person may acknowledge on this site (D-016 / D-031: never AM, CEO or Viewer). */
 export function canAck(viewer: OverviewViewer, site: OverviewSite): boolean {
   return mayAcknowledge(
-    { id: viewer.id, role: roleOf(viewer.kind) },
-    { primaryOwnerId: site.ownerId, backupOwnerId: site.backupId },
+    { id: viewer.id, role: roleOf(viewer.kind), onCallNow: viewer.onCallNow },
+    {
+      primaryOwnerId: site.ownerId,
+      backupOwnerId: site.backupId,
+      tier: site.tier,
+      l0UserId: site.incident?.l0UserId ?? null,
+    },
   );
 }
 

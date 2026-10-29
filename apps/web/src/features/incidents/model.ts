@@ -61,6 +61,8 @@ export interface ListIncident {
   /** The site's owners: who may acknowledge it (`mayAcknowledge`, D-016). */
   primaryOwnerId: string | null;
   backupOwnerId: string | null;
+  /** The person L0 paged (S10): the person on call outside response hours, else null (the owner). */
+  l0UserId?: string | null;
   rootCauseCategory: string | null;
   rootCause: string | null;
   rootCauseFix: string | null;

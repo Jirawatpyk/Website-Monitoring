@@ -26,6 +26,8 @@ export interface IncidentFacts {
   acked_at: string | null;
   recovered_at: string | null;
   acker: { display_name: string; google_chat_user_id?: string | null } | null;
+  /** The person on call L0 paged (S10, D-048), frozen when the ladder clock started; null = the owner. */
+  l0?: (Owner & { is_active: boolean; role: string }) | null;
   /**
    * The timeline: the `detected` one carries the cause line; `detected` / `relapsed` / `recovered`
    * give the drops (DOWN AGAIN "Down 7 min so far", the flapping summary).
@@ -108,6 +110,7 @@ export async function loadFacts(
         `id, number, state, severity, trigger, started_at, detected_at, alerted_at, acked_at, recovered_at,
          escalation_plan, escalation_level,
          acker:profiles!incidents_acked_by_fkey(display_name, google_chat_user_id),
+         l0:profiles!incidents_l0_user_id_fkey(id, display_name, google_chat_user_id, is_active, role),
          incident_events(type, payload, at),
          sites!inner(name, tier,
            primary:profiles!sites_primary_owner_id_fkey(id, display_name, google_chat_user_id),
@@ -236,3 +239,20 @@ async function loadLadderEnv(db: DbClient, now: Date): Promise<LadderEnv | null>
     hours,
   };
 }
+
+/**
+ * "Owner / on-call": who L0 names by the owner token — the person on call L0 paged while an active
+ * Admin / Responder, else the site's owner (SQL `escalation_people`, S10).
+ */
+export function l0Of(i: IncidentFacts): Owner | null {
+  const l = i.l0;
+  if (l && l.is_active && (l.role === 'admin' || l.role === 'responder'))
+    return { id: l.id, display_name: l.display_name, google_chat_user_id: l.google_chat_user_id };
+  return i.sites.primary;
+}
+
+/** Whether the L0 person is the person on call rather than the owner. */
+export const l0IsOnCall = (i: IncidentFacts) => {
+  const l = l0Of(i);
+  return l !== null && l.id !== i.sites.primary?.id;
+};

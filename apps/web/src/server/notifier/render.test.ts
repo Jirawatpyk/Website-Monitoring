@@ -43,6 +43,83 @@ const problemContext = {
   reporting: 3,
 };
 
+describe('render — the person on call L0 paged (S10, D-048)', () => {
+  const tle = { id: 'u-tle', display_name: 'Tle', google_chat_user_id: 'TLE' };
+  const night: IncidentFacts = {
+    ...incident,
+    sites: { ...incident.sites, tier: 1 },
+    l0: { ...tle, is_active: true, role: 'responder' },
+  };
+  const thread = { threadId: '<inc-inc-141@notify.example.test>', startsThread: true };
+
+  it('@mentions the person on call instead of the owner, and the email says why they got it', () => {
+    const m = renderChat(row('problem', problemContext), night, appUrl, now)!;
+    expect(m.text).toMatch(/^<users\/TLE> PROBLEM · Fuji Links \(Tier 1\)/);
+    const email = renderEmail(
+      { ...row('problem', problemContext), user_id: 'u-tle', channel: 'email' },
+      night,
+      { id: 'u-tle', email: 'tle@example.test', display_name: 'Tle' },
+      appUrl,
+      thread,
+    )!;
+    expect(email.text).toContain('You’re on call — please take a look');
+    expect(email.text).toContain(
+      'You got this because you were on call when Fuji Links (Tier 1) alerted outside response hours.',
+    );
+    expect(email.text).not.toContain('you own');
+    // ChatAlert night: who acts, and the owner who isn't paged.
+    const card = JSON.stringify(m.cardsV2);
+    expect(card).toContain('Tle (Tier 1, outside response hours) — the person who acts');
+    expect(card).toContain('Ploy · not paged outside response hours');
+  });
+
+  it('someone the L0 pencil adds gets RECOVERED as "you were emailed", and isn\u2019t asked for the root cause', () => {
+    const plan = {
+      severity: 'problem',
+      tier: 1,
+      reminderMin: 60,
+      steps: [
+        { level: 0, delayMin: 0, targets: ['owner', 'backup'], channels: ['chat', 'space', 'email'] },
+        { level: 1, delayMin: 60, targets: ['admins'], channels: ['chat', 'email'] },
+      ],
+    };
+    const rec = renderEmail(
+      { ...row('recovered', { okLocations: 3 }), user_id: 'u-nok', channel: 'email' },
+      { ...night, escalation_plan: plan },
+      { id: 'u-nok', email: 'nok@example.test', display_name: 'Nok' },
+      appUrl,
+      thread,
+    )!;
+    expect(rec.text).toContain('You got this because you were emailed about this incident.');
+    expect(rec.text).not.toContain('couldn’t be delivered');
+    expect(rec.text).not.toContain('Add root cause');
+  });
+
+  it('the L0 pencil: the first card @mentions everyone L0 names, owner / on-call first', () => {
+    const plan = {
+      severity: 'problem',
+      tier: 1,
+      reminderMin: 60,
+      steps: [
+        { level: 0, delayMin: 0, targets: ['owner', 'backup'], channels: ['chat', 'space', 'email'] },
+        { level: 1, delayMin: 60, targets: ['admins'], channels: ['chat', 'email'] },
+      ],
+    };
+    const m = renderChat(row('problem', problemContext), { ...night, escalation_plan: plan }, appUrl, now)!;
+    expect(m.text).toMatch(/^<users\/TLE> <users\/NOK> PROBLEM · Fuji Links/);
+  });
+
+  it('falls back to the owner once the person on call is deactivated or no longer a Responder', () => {
+    for (const l0 of [
+      { ...tle, is_active: false, role: 'responder' },
+      { ...tle, is_active: true, role: 'viewer' },
+    ]) {
+      const m = renderChat(row('problem', problemContext), { ...night, l0 }, appUrl, now)!;
+      expect(m.text).toMatch(/^<users\/PLOY> PROBLEM/);
+    }
+  });
+});
+
 describe('render — PROBLEM rows', () => {
   it('renders the PROBLEM card with the stored cause, summary and where it was seen', () => {
     const m = renderChat(row('problem', problemContext), incident, appUrl, now)!;

@@ -56,6 +56,10 @@ export type ChatWidget =
 
 export interface DownAlertInput {
   incidentId: string;
+  /** Everyone else L0 names (the L0 pencil, S10): @mentioned after the owner / on-call. */
+  alsoMention?: readonly ChatPerson[];
+  /** Set when L0 paged the person on call (`owner`) instead of the site's owner, named here (S10). */
+  siteOwner?: ChatPerson | null;
   incidentNumber: number;
   site: string;
   tier: number;
@@ -86,6 +90,10 @@ export interface ProblemFacts {
 
 export interface ProblemAlertInput {
   incidentId: string;
+  /** Everyone else L0 names (the L0 pencil, S10): @mentioned after the owner / on-call. */
+  alsoMention?: readonly ChatPerson[];
+  /** Set when L0 paged the person on call (`owner`) instead of the site's owner, named here (S10). */
+  siteOwner?: ChatPerson | null;
   incidentNumber: number;
   site: string;
   tier: number;
@@ -138,7 +146,24 @@ export interface RecoveredAlertInput {
  */
 export const plainName = (name: string) => name.replace(/[<>]/g, '');
 
-const mentionOf = (owner: ChatPerson | null) => (owner?.chatUserId ? [owner.chatUserId] : []);
+const mentionOf = (owner: ChatPerson | null, also: readonly ChatPerson[] = []) => [
+  ...new Set([owner, ...also].flatMap((p) => (p?.chatUserId ? [p.chatUserId] : []))),
+];
+
+/**
+ * ChatAlert night: the person on call acts and the owner isn't paged — two rows instead of "Owner"
+ * (S10; "outside response hours" covers weekends and holidays too, D-048 item 11).
+ */
+function whoRows(owner: ChatPerson | null, siteOwner: ChatPerson | null | undefined, ownerText: string) {
+  if (!siteOwner) return [row('Owner', ownerText)];
+  return [
+    row(
+      'On call',
+      `${owner ? plainName(owner.name) : 'Nobody'} (Tier 1, outside response hours) — the person who acts`,
+    ),
+    row('Owner', `${plainName(siteOwner.name)} · not paged outside response hours`),
+  ];
+}
 
 /** "Arm · backup Ploy (not notified yet)" while the backup's step is still ahead (ChatAlert). */
 function ownerRow(owner: ChatPerson | null, backup: ChatPerson | null, ladder?: LadderFacts | null) {
@@ -174,7 +199,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
     text: buildChatTextLine({
       state: 'DOWN',
       site: `${site} (${formatTier(tier)})`,
-      mention: mentionOf(owner),
+      mention: mentionOf(owner, input.alsoMention),
       detail: held?.line ?? ladderLine(input.ladder, now),
     }),
     cardsV2: [
@@ -188,7 +213,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
                 ...(held ? [{ textParagraph: { text: held.card } }] : []),
                 row('Cause', input.cause),
                 row('Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)),
-                row('Owner', ownerText),
+                ...whoRows(owner, input.siteOwner, ownerText),
                 ...(next ? [row('Next', next)] : []),
                 {
                   buttonList: {
@@ -359,7 +384,7 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
     text: buildChatTextLine({
       state: 'PROBLEM',
       site: `${site} (${formatTier(tier)})`,
-      mention: mentionOf(owner),
+      mention: mentionOf(owner, input.alsoMention),
       detail: held ? [input.summary, ...held.line] : [input.summary, 'please take a look'],
     }),
     cardsV2: [
@@ -374,7 +399,7 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
                 row('Trigger', TRIGGER_LABELS[input.trigger]),
                 row('Cause', input.cause),
                 ...known,
-                row('Owner', ownerText),
+                ...whoRows(owner, input.siteOwner, ownerText),
                 ...(next ? [row('Next', next)] : []),
                 ...adminNote,
                 {

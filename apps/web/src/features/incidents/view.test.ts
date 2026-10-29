@@ -75,6 +75,12 @@ describe('MobileAck view', () => {
   it('names the role of whoever can act', () => {
     expect(view({}, [detected], viewer({ id: 'u-ploy' })).role).toBe('You’re the backup owner.');
     expect(view({}, [detected], viewer({ id: 'u-tao', role: 'admin' })).role).toBe('You’re an Admin.');
+    // S10: the person on call, and the person L0 paged after the shift changed (Tier 1).
+    expect(view({}, [detected], viewer({ id: 'u-nok', onCallNow: true })).role).toBe('You’re on call.');
+    expect(view({ l0_user_id: 'u-nok' }, [detected], viewer({ id: 'u-nok' })).role).toBe('You’re on call.');
+    expect(
+      view({ l0_user_id: 'u-nok', state: 'resolved' }, [detected], viewer({ id: 'u-nok' })).role,
+    ).toBeNull();
   });
 
   it('shows read-only roles who can act instead (EmptyStates panel 5)', () => {

@@ -46,7 +46,18 @@ export interface EmailMessage {
 }
 
 /** Why the recipient got the email — one footer line each (EmailAlert board). */
-export type EmailReason = 'owner' | 'acked' | 'fallback' | 'emailed' | 'step';
+export type EmailReason = 'owner' | 'oncall' | 'l0' | 'acked' | 'fallback' | 'emailed' | 'step';
+
+/** The L0 people (S10): the owner by day, the person on call at night, anyone the L0 pencil adds. */
+const isL0 = (r: EmailReason) => r === 'owner' || r === 'oncall' || r === 'l0';
+const yourPart = (r: EmailReason, site: string) =>
+  r === 'oncall'
+    ? 'You’re on call'
+    : r === 'l0'
+      ? `You’re told at once for ${site}, with the owner / on-call`
+      : `You own ${site}`;
+/** Asked for the root cause: the owner, or the person on call L0 paged — not someone the pencil adds. */
+const addsRootCause = (r: EmailReason) => r === 'owner' || r === 'oncall';
 
 export interface EmailBaseInput {
   incidentId: string;
@@ -219,6 +230,10 @@ const whyOf = (i: EmailBaseInput): string => {
   switch (i.reason) {
     case 'owner':
       return `You got this because you own ${i.site}.`;
+    case 'oncall':
+      return `You got this because you were on call when ${i.site} (Tier 1) alerted outside response hours.`;
+    case 'l0':
+      return `You got this because ${i.site}’s escalation policy tells you at L0, together with the owner / on-call.`;
     case 'acked':
       return 'You got this because you acknowledged this incident.';
     case 'fallback':
@@ -349,10 +364,10 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
       ? `${input.ackedBy} acknowledged it while it was a problem; it is now down.`
       : input.acknowledged
         ? `${input.acknowledged.by} acknowledged it at ${formatTime(input.acknowledged.at)}.`
-        : held && input.reason === 'owner'
+        : held && isL0(input.reason)
           ? 'This went down while the site was muted, so nobody was told until now. Please acknowledge or hand it over in the Chat thread.'
-          : input.reason === 'owner'
-            ? `Nobody has acknowledged yet. You own ${site} — please acknowledge or hand it over in the Chat thread.`
+          : isL0(input.reason)
+            ? `Nobody has acknowledged yet. ${yourPart(input.reason, site)} — please acknowledge or hand it over in the Chat thread.`
             : 'Nobody has acknowledged yet. The Google Chat alert couldn’t be delivered, so this email is the alert.',
     facts: [
       ...(held ? [held.row] : []),
@@ -443,7 +458,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
 export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
   const { site, owner, ack, problem } = input;
   const { duration, range } = downtime(input.startedAt, input.recoveredAt);
-  const isOwner = input.reason === 'owner';
+  const isOwner = addsRootCause(input.reason);
   const ackFact = ack ? [['Acknowledged', `${ack.by} at ${formatTime(ack.at)}`] as [string, string]] : [];
   if (problem) {
     return render(input, {
@@ -547,10 +562,10 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
     headline,
     lede: acked
       ? `${opening} ${acked.by} acknowledged it at ${formatTime(acked.at)}.`
-      : held && input.reason === 'owner'
+      : held && isL0(input.reason)
         ? `${opening} This started while the site was muted, so nobody was told until now. Please take a look and acknowledge, or hand it over in the Chat thread.`
-        : input.reason === 'owner'
-          ? `${opening} You own ${site} — please take a look and acknowledge, or hand it over in the Chat thread.`
+        : isL0(input.reason)
+          ? `${opening} ${yourPart(input.reason, site)} — please take a look and acknowledge, or hand it over in the Chat thread.`
           : `${opening} The Google Chat alert couldn’t be delivered, so this email is the alert.`,
     facts: [
       ...(held ? [held.row] : []),
@@ -725,7 +740,7 @@ export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessag
   const stable = last ? formatTime(last.end) : '';
   const total = formatDuration(minutes);
   const down = input.severity === 'down';
-  const isOwner = input.reason === 'owner';
+  const isOwner = addsRootCause(input.reason);
   return render(input, {
     template: 'flap_summary',
     color: C.positive,
@@ -806,15 +821,14 @@ export function buildAgainEmail(input: AgainEmailInput): EmailMessage {
     label,
     pre: `${title} · same incident ${formatIncidentId(input.incidentNumber)}`,
     headline: down ? `${input.site} is down again` : `${input.site} has a problem again`,
-    lede:
-      input.reason !== 'owner'
-        ? `${input.body} The Google Chat reply couldn’t be delivered, so this email is the alert.`
-        : input.acknowledged
-          ? `${input.body} ${input.acknowledged.by} acknowledged it at ${formatTime(input.acknowledged.at)}.`
-          : `${input.body} You own ${input.site} — please acknowledge or hand it over in the Chat thread.`,
+    lede: !isL0(input.reason)
+      ? `${input.body} The Google Chat reply couldn’t be delivered, so this email is the alert.`
+      : input.acknowledged
+        ? `${input.body} ${input.acknowledged.by} acknowledged it at ${formatTime(input.acknowledged.at)}.`
+        : `${input.body} ${yourPart(input.reason, input.site)} — please acknowledge or hand it over in the Chat thread.`,
     facts: [['Same incident', formatIncidentId(input.incidentNumber)]],
     buttons:
-      input.reason === 'owner' && !input.acknowledged
+      isL0(input.reason) && !input.acknowledged
         ? [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }]
         : [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
   });

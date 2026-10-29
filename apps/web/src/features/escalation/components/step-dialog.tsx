@@ -61,7 +61,10 @@ export function StepDialog({
   const fyi = !!start.fyi;
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   // The board's locks: CEO + Site AM fixed on the FYI step; the CEO only on Tier 1 from L2.
+  const l0 = index === 0;
   const locked = (t: EscalationTarget) =>
+    // L0 always @mentions the Owner / on-call (spec §14.7); the pencil only adds people (S10).
+    (l0 && t === 'owner') ||
     (fyi && (t === 'ceo' || t === 'site_am')) ||
     (t === 'ceo' && !targets.includes('ceo') && (policy.key !== 't1' || index < 2));
   const pick = (t: EscalationTarget) => {
@@ -116,6 +119,7 @@ export function StepDialog({
     >
       <div className="flex flex-col gap-4">
         <TextField
+          disabled={l0}
           label="Notify after"
           suffix="min after Confirmed down"
           inputMode="numeric"
@@ -153,10 +157,15 @@ export function StepDialog({
         </fieldset>
         <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
           <legend className="mb-2 p-0 text-sm font-medium">Channels</legend>
-          <Checkbox checked={channels.includes('chat')} onChange={channel('chat')}>
+          <Checkbox checked={channels.includes('chat')} disabled={l0} onChange={channel('chat')}>
             Chat @mention
           </Checkbox>
-          <Checkbox checked={channels.includes('space')} onChange={channel('space')}>
+          <Checkbox
+            checked={channels.includes('space')}
+            disabled={l0}
+            description={l0 ? 'Always on for L0: it fires the moment the incident is confirmed.' : undefined}
+            onChange={channel('space')}
+          >
             Alerts Space
           </Checkbox>
           <Checkbox checked={channels.includes('email')} onChange={channel('email')}>

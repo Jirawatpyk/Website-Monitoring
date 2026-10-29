@@ -126,6 +126,8 @@ export interface StepAlertInput {
   asked: readonly (ChatPerson & { role: string })[];
   /** Told for information, named in plain text ("Tao FYI"). */
   fyi: readonly ChatPerson[];
+  /** L1 · night (ChatAlert): this step's backup is the person on call, paged at L0 already (S10). */
+  alreadyPaged?: string | null;
   incidentUrl: string;
   /**
    * What this step is (S10): `ask` someone new to acknowledge (L1); `ceo` the Tier 1 L2 page; `fyi` the
@@ -209,7 +211,12 @@ export function buildStepAlert(input: StepAlertInput): ChatMessage {
       state: `ESCALATED · L${levelOf(input.level)}` as const,
       site: `${site} DOWN ${duration}, not acknowledged`,
       mention: mentions(input.asked),
-      detail: ['please acknowledge', ...fyi, ...next],
+      detail: [
+        'please acknowledge',
+        ...fyi,
+        ...(input.alreadyPaged ? [`${plainName(input.alreadyPaged)} (on call) already paged`] : []),
+        ...next,
+      ],
     }),
     cardsV2: [
       {
