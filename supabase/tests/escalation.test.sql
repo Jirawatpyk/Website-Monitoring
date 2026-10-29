@@ -42,8 +42,10 @@ select results_eq(
   $$select level, delay_min, targets, channels from public.escalation_steps
     where policy_id = (select id from pol where name = 'down1') order by level$$,
   $$values (0::smallint, 0, array['owner'], array['chat', 'space', 'email']),
-           (1::smallint, 15, array['backup', 'admins'], array['chat', 'email'])$$,
-  'DOWN: L0 owner (Chat, Space, email) · L1 +15 backup + Admin (Chat, email)');
+           (1::smallint, 15, array['backup', 'admins'], array['chat', 'email']),
+           (2::smallint, 30, array['ceo'], array['chat', 'email', 'voice']),
+           (3::smallint, 60, array['ceo', 'site_am'], array['chat', 'email'])$$,
+  'Tier 1 DOWN: L0 owner · L1 +15 backup + Admin · L2 +30 CEO (voice configured) · L3 +60 CEO + AM (S10)');
 select results_eq(
   $$select level, delay_min, targets from public.escalation_steps
     where policy_id = (select id from pol where name = 'problem') order by level$$,
@@ -64,7 +66,7 @@ select tests.as_anon();
 select throws_ok('select * from public.escalation_policies', '42501', null, 'anon can''t read policies');
 reset role;
 select tests.authenticate_as((select id from ids where name = 'mint'));
-select is((select count(*)::int from public.escalation_steps), 8, 'a Viewer reads the steps');
+select is((select count(*)::int from public.escalation_steps), 12, 'a Viewer reads the steps');
 select is((select count(*)::int from public.company_holidays) > 0, true, 'and the holidays');
 select throws_ok('update public.escalation_steps set delay_min = 5', '42501', null,
   'nobody updates the steps directly');
@@ -76,10 +78,11 @@ create function pg_temp.policies(p_l1_delay integer, p_l1_channels text[] defaul
                                  p_l1_targets text[] default array['backup', 'admins'])
 returns jsonb language sql as $$
   select jsonb_build_array(jsonb_build_object(
-    'policyId', (select id from pol where name = 'down1'),
+    'policyId', (select id from pol where name = 'down2'),
     'steps', jsonb_build_array(
       jsonb_build_object('level', 0, 'delayMin', 0, 'targets', array['owner'], 'channels', array['chat', 'space', 'email']),
-      jsonb_build_object('level', 1, 'delayMin', p_l1_delay, 'targets', p_l1_targets, 'channels', p_l1_channels))));
+      jsonb_build_object('level', 1, 'delayMin', p_l1_delay, 'targets', p_l1_targets, 'channels', p_l1_channels),
+      jsonb_build_object('level', 2, 'delayMin', 30, 'targets', array['admins'], 'channels', array['chat', 'email']))));
 $$;
 grant execute on function pg_temp.policies(integer, text[], text[]) to authenticated;
 
@@ -114,9 +117,9 @@ select throws_ok(
   '22023', 'L0 is pinned on every policy', 'L0 keeps Chat @mention and the Alerts Space');
 select throws_ok(
   format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, jsonb_build_array(jsonb_build_object(
-    'policyId', (select id from pol where name = 'down1'),
+    'policyId', (select id from pol where name = 'down2'),
     'steps', jsonb_build_array(jsonb_build_object('level', 0, 'delayMin', 0, 'targets', array['owner'], 'channels', array['chat', 'space', 'email']))))),
-  '22023', 'Tier 1 DOWN needs at least one step after L0 — otherwise nobody else is ever told.',
+  '22023', 'Tier 2 DOWN needs at least one step after L0 — otherwise nobody else is ever told.',
   'a DOWN policy needs a step after L0');
 select lives_ok(
   format($$select public.save_escalation_policies(%L, 15, 60, 'backup only')$$, jsonb_build_array(jsonb_build_object(
@@ -127,7 +130,7 @@ select lives_ok($$select public.save_escalation_policies(pg_temp.policies(20), 1
   'the Admin saves L1 at +20 and the PROBLEM reminder at 45');
 reset role;
 
-select is((select delay_min from public.escalation_steps where policy_id = (select id from pol where name = 'down1') and level = 1),
+select is((select delay_min from public.escalation_steps where policy_id = (select id from pol where name = 'down2') and level = 1),
   20, 'L1 now waits 20 min');
 select is((select problem_reminder_min from public.organisation_settings), 45, 'the reminder interval is saved');
 select is(
@@ -372,8 +375,10 @@ select throws_ok(
     'steps', jsonb_build_array(
       jsonb_build_object('level', 0, 'delayMin', 0, 'targets', array['owner'], 'channels', array['chat', 'space', 'email']),
       jsonb_build_object('level', 1, 'delayMin', 15, 'targets', array['backup'], 'channels', array['chat']),
-      jsonb_build_object('level', 2, 'delayMin', 30, 'targets', array['admins'], 'channels', array['chat']))))),
-  '22023', 'Only L0 and L1 can be set for now', 'L2 and later wait for S10');
+      jsonb_build_object('level', 2, 'delayMin', 30, 'targets', array['admins'], 'channels', array['chat']),
+      jsonb_build_object('level', 3, 'delayMin', 45, 'targets', array['admins'], 'channels', array['chat']),
+      jsonb_build_object('level', 4, 'delayMin', 60, 'targets', array['admins'], 'channels', array['chat']))))),
+  '22023', 'At most four steps, L0–L3', 'a fifth step is refused (S10: L0–L3)');
 select throws_ok(
   format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, jsonb_build_array(jsonb_build_object(
     'policyId', (select id from pol where name = 'down1'),
