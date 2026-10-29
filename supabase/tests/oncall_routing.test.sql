@@ -4,7 +4,7 @@
 -- L1 told-already set leaves them out, a relapse keeps them; the L0 pencil; on-call may acknowledge.
 begin;
 \ir _helpers.psql
-select plan(39);
+select plan(41);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -179,6 +179,15 @@ select lives_ok($$select public.mute_site('00000000-0000-0000-0000-0000000000a1'
   'the person on call mutes a Tier 1 site');
 select throws_ok($$select public.create_maintenance('00000000-0000-0000-0000-0000000000a1', now() + interval '1 day',
   now() + interval '1 day 1 hour', 'patch')$$, '42501', null, 'but schedules no maintenance on a site they don''t own');
+select lives_ok($$select public.end_window_early((select id from public.maintenance_windows
+  where site_id = '00000000-0000-0000-0000-0000000000a1' and kind = 'mute' order by created_at desc limit 1), 'back up')$$,
+  'they end the mute they set');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select public.mute_site('00000000-0000-0000-0000-0000000000a1', now() + interval '2 hours', 'owner mute');
+select tests.authenticate_as((select id from ids where name = 'nok'));
+select throws_ok($$select public.edit_window_end((select id from public.maintenance_windows
+  where site_id = '00000000-0000-0000-0000-0000000000a1' and kind = 'mute' and reason = 'owner mute'),
+  now() + interval '30 minutes', 'shorter')$$, '42501', null, 'but not a mute the owner set');
 reset role;
 
 -- The frozen person demoted to Viewer while the incident is open: "Owner / on-call" is the owner again,
