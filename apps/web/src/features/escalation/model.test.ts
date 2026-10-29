@@ -200,6 +200,20 @@ describe('saveProblems — the save dialog’s list', () => {
   });
 });
 
+describe('diff — a deleted step reads as removed (S10 /verify)', () => {
+  it('deleting the Tier 1 CEO step names L2, not "L2 changed, L3 removed"', () => {
+    const saved = draft([t1full()]);
+    const edited = draft([t1([l0, l1(), { ...l3fyi, level: 2 }])]);
+    expect(diff(saved, edited)).toEqual([
+      {
+        where: 'Tier 1 DOWN · L2',
+        before: '+30 min · CEO · Chat @mention, Email, Voice call',
+        after: 'Removed',
+      },
+    ]);
+  });
+});
+
 describe('diff and the unsaved bar', () => {
   it('lists each changed level and the reminders', () => {
     const rows = diff(draft([t1()]), draft([t1([l0, l1({ delayMin: 20 })])], '10'));

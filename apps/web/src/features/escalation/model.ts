@@ -263,6 +263,21 @@ export interface DiffRow {
 export const normalInterval = (v: string) => (/^\d+$/.test(v.trim()) ? String(Number(v.trim())) : v.trim());
 
 /** What changed since the saved policies (the save dialog's rows and the unsaved count). */
+/** The index of the one step `after` is missing from `before` (everything else the same), or -1. */
+function removedIndex(
+  before: readonly EscalationStep[],
+  after: readonly EscalationStep[],
+  admins: readonly string[],
+): number {
+  if (before.length !== after.length + 1) return -1;
+  const b = before.map((s) => describeStep(s, admins));
+  const a = after.map((s) => describeStep(s, admins));
+  for (let k = 0; k < b.length; k++) {
+    if (b.filter((_x, i) => i !== k).every((x, i) => x === a[i])) return k;
+  }
+  return -1;
+}
+
 export function diff(
   saved: EscalationDraft,
   draft: EscalationDraft,
@@ -271,6 +286,17 @@ export function diff(
   const rows: DiffRow[] = [];
   for (const p of draft.policies) {
     const was = saved.policies.find((s) => s.id === p.id);
+    // One step deleted and nothing else changed (the steps after it move up a level with their
+    // delays): say which step went, not "L2 changed, L3 removed" (S10 /verify).
+    const removed = was ? removedIndex(was.steps, p.steps, admins) : -1;
+    if (removed >= 0 && was) {
+      rows.push({
+        where: `${policyShort(p.key)} · L${removed}`,
+        before: describeStep(was.steps[removed]!, admins),
+        after: 'Removed',
+      });
+      continue;
+    }
     const levels = Math.max(p.steps.length, was?.steps.length ?? 0);
     for (let i = 0; i < levels; i++) {
       const a = was?.steps[i];
