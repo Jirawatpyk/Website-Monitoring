@@ -50,6 +50,103 @@ const row = (template: string, context: Notification['context'] = {}, over: Part
 const appUrl = 'https://monitor.example.test';
 const thread = { threadId: '<inc-inc-142@notify.example.test>', startsThread: false };
 
+describe('render — L2 and the L3 FYI (S10)', () => {
+  const ceo = { id: 'u-ceo', display_name: 'CEO', google_chat_user_id: 'CEO' };
+  const bua = { id: 'u-bua', display_name: 'Bua', google_chat_user_id: 'BUA' };
+  const full = {
+    ...plan,
+    steps: [
+      ...plan.steps,
+      { level: 2, delayMin: 30, targets: ['ceo'], channels: ['chat', 'email', 'voice'] },
+      { level: 3, delayMin: 60, targets: ['ceo', 'site_am'], channels: ['chat', 'email'], fyi: true },
+    ],
+  };
+  const t1: IncidentFacts = {
+    ...incident,
+    sites: { ...incident.sites, client: { am: bua } } as IncidentFacts['sites'],
+    escalation_plan: full,
+    ladder: { admins: [tao], ceo: [ceo], hours: HOURS },
+  };
+
+  it('L1 says when the CEO is next: "· CEO at 10:18"', () => {
+    const m = renderChat(
+      row('step_fired', {
+        level: 1,
+        severity: 'down',
+        elapsedMin: 15,
+        mentioned: ['u-ploy'],
+        fyi: ['u-tao'],
+      }),
+      { ...t1, state: 'escalated', escalation_level: 1 },
+      appUrl,
+      new Date('2026-09-25T03:03:42Z'),
+    )!;
+    expect(m.text).toBe(
+      '<users/PLOY> ESCALATED · L1 · MuvMi DOWN 15 min, not acknowledged · please acknowledge · Tao FYI · CEO at 10:18',
+    );
+  });
+
+  it('L2 @mentions the CEO and names who was told', () => {
+    const m = renderChat(
+      row('step_fired', { level: 2, severity: 'down', elapsedMin: 30, mentioned: ['u-ceo'], fyi: [] }),
+      { ...t1, state: 'escalated', escalation_level: 2 },
+      appUrl,
+      new Date('2026-09-25T03:18:42Z'),
+    )!;
+    expect(m.text).toBe(
+      '<users/CEO> ESCALATED · L2 · MuvMi DOWN 30 min, not acknowledged · Arm, Ploy, Tao informed',
+    );
+  });
+
+  it('L3 FYI after Arm acknowledged at 10:07', () => {
+    const m = renderChat(
+      row('step_fired', {
+        level: 3,
+        severity: 'down',
+        elapsedMin: 60,
+        mentioned: ['u-ceo', 'u-bua'],
+        fyi: [],
+        fyiStep: true,
+        ackedBy: 'Arm',
+        ackedAt: '2026-09-25T03:07:40Z',
+      }),
+      { ...t1, state: 'acknowledged', escalation_level: 3 },
+      appUrl,
+      new Date('2026-09-25T03:48:42Z'),
+    )!;
+    expect(m.text).toBe(
+      '<users/CEO> <users/BUA> FYI · L3 · MuvMi still DOWN 1 h · acknowledged by Arm 10:07 · no action needed',
+    );
+  });
+
+  it('ACKNOWLEDGED · L1–L2 stopped', () => {
+    const m = renderChat(
+      row('acknowledged', { ackedBy: 'Arm', ackedAt: '2026-09-25T03:07:40Z', escalationLevel: 1 }),
+      { ...t1, state: 'acknowledged' },
+      appUrl,
+      new Date('2026-09-25T03:07:51Z'),
+    )!;
+    expect(m.text).toBe('ACKNOWLEDGED · MuvMi · by Arm 10:07 · L1–L2 stopped');
+  });
+
+  it('the CEO’s L2 email: voice configured, next L3 (CEO + Bua, no call) at 10:48', () => {
+    const m = renderEmail(
+      row(
+        'step_fired',
+        { level: 2, severity: 'down', elapsedMin: 30, mentioned: ['u-ceo'], fyi: [], asFyi: false },
+        { channel: 'email', user_id: 'u-ceo' },
+      ),
+      { ...t1, state: 'escalated', escalation_level: 2 },
+      { id: 'u-ceo', display_name: 'CEO', email: 'ceo@example.test' },
+      appUrl,
+      thread,
+    )!;
+    expect(m.html).toContain('Configured · off until approved');
+    expect(m.html).toContain('L3 (CEO + Bua, no call) at 10:48');
+    expect(m.html).toContain('the step you approved');
+  });
+});
+
 describe('render — the ladder (S08, D-034)', () => {
   it('the DOWN card promises the L1 time and names Ploy, Tao', () => {
     const m = renderChat(

@@ -15,6 +15,7 @@ export type ChatState =
   | 'STILL DOWN'
   | 'STILL PROBLEM'
   | 'ESCALATED · L2'
+  | 'ESCALATED · L3'
   | 'FYI · L3'
   | 'REMINDER · L2'
   | 'CLIENT UPDATE DUE'

@@ -881,14 +881,104 @@ export interface StepEmailInput extends EmailBaseInput {
   toldAt?: Date;
   /** The Chat reply couldn't be delivered: this email is the alert (D-016 fallback). */
   fallback?: boolean;
+  /** S10: what the step is — as `StepAlertInput.kind` (default `ask`). */
+  kind?: 'ask' | 'ceo' | 'fyi' | 'reminder';
+  /** This reader's role at the step: the FYI words differ for the CEO and the site's AM. */
+  readerIs?: 'ceo' | 'site_am' | 'other';
+  /** Everyone told before this step: "Arm (owner), Ploy (backup) and Tao were asked". */
+  informed?: readonly string[];
+  /** Who acknowledged, for the FYI: "Arm acknowledged at 10:07". */
+  acked?: { by: string; at: Date } | null;
+  /** The next level if nobody acknowledges: "L3 (CEO + Bua, no call) at 10:48". */
+  nextStep?: string | null;
+  /** The step carries a voice call that stays off until approved (Tier 1 L2, D-009). */
+  voiceConfigured?: boolean;
+}
+
+const andList = (names: readonly string[]) =>
+  names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : (names[0] ?? 'Nobody');
+
+/**
+ * The S10 step emails (EmailAlert "ESCALATED · L2" to the CEO and "FYI · L3" to the CEO and the AM; the
+ * Tier 2–3 L2 reminder to the Admin, spec §16.5; the FYI nobody acknowledged is D-048's draft).
+ */
+function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder'): EmailMessage {
+  const { site } = input;
+  const duration = formatDuration(input.elapsedMin);
+  const informed = input.informed ?? [];
+  const sentAt = new Date((input.toldAt ?? input.confirmedAt).getTime() + input.elapsedMin * 60_000);
+  const detected = withDayIfNot(input.confirmedAt, sentAt, formatTimeWithSeconds);
+  const downFor: [string, string] = ['Down for', `${duration} (confirmed down ${detected})`];
+  const open = [{ label: 'Open incident', href: input.incidentUrl, primary: kind === 'ceo' }];
+  if (kind === 'ceo') {
+    return render(input, {
+      template: 'down',
+      color: C.warning,
+      bar: C.warning,
+      label: `ESCALATED · L${input.level}`,
+      pre: `${site} down ${duration}, not acknowledged${informed.length ? ` · ${informed.join(', ')} informed` : ''}`,
+      headline: `${site} down ${duration} — nobody has acknowledged`,
+      lede: `${site} has been down ${duration} and nobody on the team has acknowledged. ${andList(informed)} ${informed.length > 1 ? 'were' : 'was'} asked. Open it to see the latest.`,
+      facts: [
+        downFor,
+        ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+        ...(input.voiceConfigured
+          ? [['Voice call', 'Configured · off until approved'] as [string, string]]
+          : []),
+        ...(input.nextStep ? [['Next step', input.nextStep] as [string, string]] : []),
+      ],
+      buttons: open,
+    });
+  }
+  if (kind === 'fyi') {
+    const a = input.acked;
+    const ackedWords = a ? `${a.by} acknowledged at ${formatTime(a.at)} and is working on it.` : null;
+    const lede =
+      input.readerIs === 'site_am'
+        ? `For your information — ${site} is still down after ${duration} and ${a ? `${a.by} is on it` : 'nobody has acknowledged yet'}. If the client needs a second update, the draft on the incident page is current.`
+        : `For your information — no action needed. ${ackedWords ?? `Nobody has acknowledged yet; ${andList(informed)} ${informed.length > 1 ? 'were' : 'was'} asked.`} This goes out because a Tier 1 site is still down after ${duration}.`;
+    return render(input, {
+      template: 'down',
+      color: C.warning,
+      bar: C.warning,
+      label: `FYI · L${input.level}`,
+      pre: `${site} still down ${duration} · ${a ? `acknowledged by ${a.by} ${formatTime(a.at)}` : 'not acknowledged'} · no action needed`,
+      headline: a
+        ? `${site} still down after ${duration} — ${a.by} is on it`
+        : `${site} still down after ${duration} — not acknowledged yet`,
+      lede,
+      facts: [
+        downFor,
+        ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+        ['Next step', 'Recovery email when it’s back · no more escalation'],
+      ],
+      buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
+    });
+  }
+  return render(input, {
+    template: 'down',
+    color: C.warning,
+    bar: C.warning,
+    label: `REMINDER · L${input.level}`,
+    pre: `${site} down ${duration}, not acknowledged`,
+    headline: `${site} still down — ${duration}, no ack`,
+    lede: `${site} is still down after ${duration} and nobody has acknowledged. Acknowledge, or make sure the owner has it.`,
+    facts: [downFor, ...(input.cause ? [['Cause', input.cause] as [string, string]] : [])],
+    buttons: [
+      { label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true },
+      { label: 'Open incident', href: input.incidentUrl, primary: false },
+    ],
+  });
 }
 
 /**
  * The L1 email (EmailAlert "ESCALATED · L1", sent 10:03 to Ploy and Tao, one each): the backup is
  * asked to acknowledge, the Admin is told for information. A PROBLEM's L1 is the backup's first email
- * (EmailAlert: "first emailed with the 60-min reminder"). No "Next step" until S10 builds L2.
+ * (EmailAlert: "first emailed with the 60-min reminder"). L2 / L3 and the reminder step: `otherStepEmail`.
  */
 export function buildStepEmail(input: StepEmailInput): EmailMessage {
+  const kind = input.fallback ? 'ask' : (input.kind ?? 'ask');
+  if (kind !== 'ask' && input.severity === 'down') return otherStepEmail(input, kind);
   const { site } = input;
   const duration = formatDuration(input.elapsedMin);
   const down = input.severity === 'down';
