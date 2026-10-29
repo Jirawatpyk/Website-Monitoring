@@ -7,7 +7,7 @@ import {
   type EscalationStep,
   type ResponseHours,
 } from '@dxt/shared';
-import { targetLabels, type PolicyDraft } from './model';
+import { stoppedBefore, targetLabels, type PolicyDraft } from './model';
 import type { EscalationPageData, PreviewSite } from './types';
 
 /**
@@ -36,12 +36,17 @@ export function tokenRows(
     { key: 'backup', token: 'Backup', name: site?.backup ?? '—' },
     { key: 'admins', token: 'Admin', name: admins.length ? admins.join(', ') : '—' },
     { key: 'site_am', token: 'Site AM', name: site ? (site.am ?? '— (internal)') : '—' },
+    { key: 'ceo', token: 'CEO', name: 'CEO' },
   ] as const;
   const tokens = used ? new Set(used.flatMap((s) => s.targets)) : null;
   return all.filter((t) => !tokens || tokens.has(t.key)).map(({ token, name }) => ({ token, name }));
 }
 
-/** The names a step reaches for the site, minus those an earlier step already told (PRD §8). */
+/**
+ * The names a step reaches for the site, minus those an earlier step already told (PRD §8). The FYI
+ * step tells everyone it names; from L2, a step whose people all heard already reminds them (S10, as
+ * `engine_fire_step`: Tier 2–3 L2 → the Admin).
+ */
 export function stepNames(
   steps: readonly EscalationStep[],
   i: number,
@@ -64,10 +69,32 @@ export function stepNames(
               : []
             : t === 'admins'
               ? [...admins]
-              : [],
+              : t === 'ceo'
+                ? ['CEO']
+                : [],
     );
+  const step = steps[i]!;
+  const all = [...new Set(namesOf(step))];
+  if (step.fyi || i === 0) return all;
   const told = new Set(steps.slice(0, i).flatMap(namesOf));
-  return [...new Set(namesOf(steps[i]!))].filter((n) => !told.has(n));
+  const fresh = all.filter((n) => !told.has(n));
+  return fresh.length || i < 2 ? fresh : all;
+}
+
+/** From L2, a step that reaches only people told already: it reminds them (MEscalation "L2 → Tao (reminder)"). */
+export function isReminderStep(
+  steps: readonly EscalationStep[],
+  i: number,
+  site: PreviewSite | undefined,
+  admins: readonly string[],
+): boolean {
+  const s = steps[i];
+  if (!s || s.fyi || i < 2 || !site) return false;
+  const names = stepNames(steps, i, site, admins);
+  const earlier = new Set(
+    steps.slice(0, i).flatMap((_x, j) => stepNames(steps.slice(0, i), j, site, admins)),
+  );
+  return names.length > 0 && names.every((n) => earlier.has(n));
 }
 
 const NO_ONE: Partial<Record<EscalationStep['targets'][number], string>> = {
@@ -157,7 +184,7 @@ export function scenario(
     // No site to resolve for: the role tokens stand in for names (spec-check round 2).
     const names = site ? stepNames(p.steps, i, site, admins) : targetLabels(s, admins);
     const due = held && i === 0 ? opening : (schedule.find((x) => x.level === s.level)?.dueAt ?? now);
-    const nobody = !s.channels.length
+    const nobody = !s.channels.some((c) => c !== 'voice')
       ? 'notifies nobody (no channel ticked)'
       : !s.targets.length
         ? 'notifies nobody (no one picked)'
@@ -165,11 +192,20 @@ export function scenario(
           ? nobodyWhy(s, site, admins)
           : null;
     const space = i === 0 && s.channels.includes('space') ? ' + Alerts Space' : '';
-    const suffix = i > 0 ? '' : held ? ' (held until response hours)' : outside ? ' · timers paused' : '';
+    const suffix =
+      i > 0
+        ? s.fyi && !nobody
+          ? ' · FYI even if acked'
+          : ''
+        : held
+          ? ' (held until response hours)'
+          : outside
+            ? ' · timers paused'
+            : '';
     add(due, {
       level: s.level,
-      what: `L${i} → ${nobody ?? names.join(' + ') + space}${suffix}`,
-      danger: !s.channels.length || !s.targets.length,
+      what: `L${i} → ${nobody ?? names.join(' + ') + space + (isReminderStep(p.steps, i, site, admins) ? ' (reminder)' : '')}${suffix}`,
+      danger: !s.channels.some((c) => c !== 'voice') || !s.targets.length,
     });
   });
   // Steps before the muted row at the same minute; otherwise by time (a stable sort keeps the order added).
@@ -180,6 +216,37 @@ export function scenario(
   return {
     caseLine: `${site?.name ?? 'A site'} ${what} now${outside ? ' (outside response hours)' : ''}${options.phone ? ':' : ', nobody acknowledges:'}`,
     rows,
+  };
+}
+
+/**
+ * The Preview's Tier 1 ack box (Escalation board `hasAckCase`, §14.1's canonical sentence): the owner
+ * acknowledges a few minutes after L1, and the FYI step still goes if the site is still down.
+ * "If Arm acknowledges at 10:07" / "Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at
+ * 10:48, CEO + Bua get an FYI (no call)." Null without an FYI step or a site.
+ */
+export function ackCase(
+  p: PolicyDraft,
+  site: PreviewSite | undefined,
+  hours: ResponseHours,
+  now: Date,
+): { label: string; body: string } | null {
+  const fyi = p.steps.find((s) => s.fyi);
+  if (!fyi || !site) return null;
+  const plan = { severity: p.severity, tier: p.tier ?? 1, reminderMin: 15, steps: p.steps };
+  const schedule = scheduleOf({ plan, detectedAt: now, hours });
+  const l1 = schedule.find((x) => x.level === 1)?.dueAt ?? now;
+  const fyiAt = schedule.find((x) => x.level === fyi.level)?.dueAt;
+  if (!fyiAt) return null;
+  // Between L1 and the next step, as the board's 10:07 sits between 10:03 and 10:18.
+  const ackAt = new Date(l1.getTime() + 4 * 60_000);
+  const owner = site.owner ?? 'the owner';
+  const who = fyi.targets
+    .map((t) => (t === 'ceo' ? 'CEO' : t === 'site_am' ? (site.am ?? 'Site AM') : t))
+    .join(' + ');
+  return {
+    label: `If ${owner} acknowledges at ${formatTime(ackAt)}`,
+    body: `Acknowledged by ${owner} → ${stoppedBefore(fyi.level)} stopped. If ${site.name} is still down at ${formatTime(fyiAt)}, ${who} get${fyi.targets.length > 1 ? '' : 's'} an FYI (no call).`,
   };
 }
 

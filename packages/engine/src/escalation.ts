@@ -17,6 +17,8 @@ import { addInsideMinutes, isInsideHours, minutesInsideHours, nextOpening } from
  *     ladder and the reminders, and so does recovery. A relapse keeps the clock and the fired level
  *     (D-004), so a level that came due while the site was up fires on the relapse.
  *   · Reminders fall due every `reminderMin` from the clock start, skipped on a step's minute.
+ *   · The Tier 1 FYI step (CEO + Site AM, S10) also comes due while Acknowledged — the site is still
+ *     DOWN then (§14.1: "Acknowledge stops L1 and L2"); recovered by then → nothing is sent.
  */
 
 const MINUTE = 60_000;
@@ -102,13 +104,21 @@ export function ladderDue(input: LadderInput): LadderDue {
   }
   // Paused (Tier 2–3 outside response hours): nothing fires now, not even a level that came due
   // earlier while the site was up — it waits for the next opening (engine review round 2, D-034).
-  if (!WAITING.includes(input.state) || due.pausedUntil) return due;
+  if (due.pausedUntil) return due;
+  const acked = input.state === 'acknowledged';
+  if (!WAITING.includes(input.state) && !acked) return due;
 
-  const next = input.plan.steps.filter((s) => s.level > input.level).sort((a, b) => a.level - b.level)[0];
+  // Acknowledged: only the FYI step, whatever level the incident reached — an FYI sent after an ack
+  // doesn't move the level (an Undo must let L2 still fire), and a D-021 raise keeps a PROBLEM
+  // ladder's level; the SQL sends each drop severity's FYI once (engine review M1, M2).
+  const next = input.plan.steps
+    .filter((s) => (acked ? !!s.fyi : s.level > input.level))
+    .sort((a, b) => a.level - b.level)[0];
   if (next) {
     const dueAt = clockAt(input, next.delayMin);
     if (dueAt.getTime() <= input.now.getTime()) due.step = { level: next.level, dueAt };
   }
+  if (acked) return due;
 
   const every = input.plan.reminderMin;
   const stepMinutes = stepMinutesOf(input.plan);

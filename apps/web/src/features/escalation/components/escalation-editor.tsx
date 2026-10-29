@@ -8,9 +8,11 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { UnsavedBar } from '@/components/unsaved-bar';
 import { saveEscalation } from '../actions';
 import {
+  addBlocked,
   affectedPolicies,
   affectsLine,
   canAdd,
+  canSwap,
   diff,
   newStep,
   normalInterval,
@@ -19,13 +21,14 @@ import {
   reminderError,
   saveProblems,
   saveWarnings,
+  swapSteps,
   timerBasis,
   toSaveInput,
   unsavedSummary,
   type EscalationDraft,
   type PolicyKey,
 } from '../model';
-import { hoursLabel, hoursOf, scenario, sitesOf, tokenRows } from '../preview';
+import { ackCase, hoursLabel, hoursOf, scenario, sitesOf, tokenRows } from '../preview';
 import type { EscalationPageData } from '../types';
 import { useNow } from '../use-now';
 import { SaveDialog } from './save-dialog';
@@ -81,6 +84,11 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
   const rows = diff(saved, draft, data.admins);
   const summary = unsavedSummary(rows);
   const message = policyMessage(policy);
+  const ack = policy.key === 't1' ? ackCase(policy, site, hours, clock) : null;
+  // The board's right-column Alert while a Tier 1 step pages the CEO with voice configured.
+  const voiceStep = policy.steps.find(
+    (s) => !s.fyi && s.targets.includes('ceo') && s.channels.includes('voice'),
+  );
   const hoursText = hoursLabel(data.hours);
 
   const change = (next: (d: EscalationDraft) => EscalationDraft) => {
@@ -169,24 +177,30 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
                   setSteps(policy.steps.filter((_s, j) => j !== index));
                   setRefocus((n) => n + 1);
                 }}
+                onMove={(index, by) => {
+                  const [a, b] = by < 0 ? [index - 1, index] : [index, index + 1];
+                  if (canSwap(policy.steps, a, b)) setSteps(swapSteps(policy.steps, a, b));
+                }}
               />
             ))}
           </ol>
           <div className="flex flex-wrap items-center gap-3 pl-14">
-            {canAdd(policy) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                touchHeight
-                icon={<IconPlus />}
-                onClick={() => setEditing({ index: policy.steps.length, adding: true })}
-              >
-                Add step
-              </Button>
-            )}
+            {/* Always shown; disabled with its reason (§14.16) at the L3 limit or after the FYI step. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              touchHeight
+              icon={<IconPlus />}
+              disabled={!canAdd(policy)}
+              title={addBlocked(policy) ?? undefined}
+              onClick={() => setEditing({ index: policy.steps.length, adding: true })}
+            >
+              Add step
+            </Button>
+            {addBlocked(policy) && <span className="text-xs text-fg-secondary">{addBlocked(policy)}.</span>}
             <span className="text-xs text-fg-secondary">
               L0 is pinned. Every step needs at least one channel. Each later step is at least +15 min and
-              later than the one before.
+              later than the one before; delays stay with the level when you reorder.
             </span>
           </div>
           {message && (
@@ -244,6 +258,12 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
                       </li>
                     ))}
                   </ol>
+                  {ack && (
+                    <div className="flex flex-col gap-1 rounded-aura-md bg-bg-canvas px-3 py-2.5 text-sm">
+                      <span className="font-semibold">{ack.label}</span>
+                      <span className="text-fg-secondary">{ack.body}</span>
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="m-0 text-sm text-fg-secondary">
@@ -289,6 +309,14 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
               </dl>
             </div>
           </Card>
+
+          {voiceStep && (
+            <Alert tone="warning" title={`Voice call on L${voiceStep.level} is off until approved`}>
+              The CEO step at L{voiceStep.level} is live and sends a Chat @mention and email. Its voice call
+              is configured but stays off until the CEO approves voice calls (Twilio, ~$23–26 / month). It
+              can’t move above L2.
+            </Alert>
+          )}
         </div>
       </div>
 

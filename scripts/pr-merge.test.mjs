@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  actionsCantStart,
   buildsWeb,
   deployVerdict,
   mergeBlockers,
@@ -26,6 +27,30 @@ const green = {
 
 test('a green, open PR against main may be merged', () => {
   assert.deepEqual(mergeBlockers(green), []);
+});
+
+test('refuses a migration while Actions on main can’t start (billing, 29 Oct 2026)', () => {
+  const blocked = [
+    { name: 'check', conclusion: 'failure', steps: [] },
+    { name: 'db', conclusion: 'failure', steps: [] },
+    { name: 'migrate-production', conclusion: 'skipped', steps: [] },
+  ];
+  assert.equal(actionsCantStart(blocked), true);
+  // a real failure ran steps; a run with nothing but skips isn't blocked
+  assert.equal(
+    actionsCantStart([{ name: 'check', conclusion: 'failure', steps: [{ name: 'Lint' }] }]),
+    false,
+  );
+  assert.equal(actionsCantStart([{ name: 'migrate-production', conclusion: 'skipped', steps: [] }]), false);
+  const migration = {
+    ...green,
+    files: [{ path: 'supabase/migrations/20261029051916_escalation_l2_l3.sql' }],
+  };
+  const problems = mergeBlockers(migration, { mainActionsBlocked: true });
+  assert.equal(problems.length, 1);
+  assert.ok(problems[0].includes('migrate-production would not run'));
+  // a PR without migrations still merges (Vercel deploys it either way)
+  assert.deepEqual(mergeBlockers(green, { mainActionsBlocked: true }), []);
 });
 
 test('refuses while CI check is running, failed or missing', () => {

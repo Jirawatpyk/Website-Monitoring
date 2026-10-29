@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PolicyDraft } from './model';
-import { nobodyWhy, scenario, sitesOf, stepNames, tokenRows } from './preview';
+import { ackCase, isReminderStep, nobodyWhy, scenario, sitesOf, stepNames, tokenRows } from './preview';
 
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
 const hours = { startMin: 540, endMin: 1080, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };
@@ -24,8 +24,57 @@ describe('preview (S08, D-034)', () => {
       { token: 'Backup', name: 'Ploy' },
       { token: 'Admin', name: 'Tao' },
       { token: 'Site AM', name: 'Bua' },
+      { token: 'CEO', name: 'CEO' },
     ]);
     expect(tokenRows({ ...muvmi, am: null }, [])[3]).toEqual({ token: 'Site AM', name: '— (internal)' });
+  });
+
+  it('S10: L2 names the CEO; the FYI tells CEO + AM again; Tier 2–3 L2 reminds the Admin', () => {
+    const t1 = [
+      ...down(1).steps,
+      { level: 2, delayMin: 30, targets: ['ceo' as const], channels: ['chat' as const, 'email' as const] },
+      {
+        level: 3,
+        delayMin: 60,
+        targets: ['ceo' as const, 'site_am' as const],
+        channels: ['chat' as const, 'email' as const],
+        fyi: true,
+      },
+    ];
+    expect(stepNames(t1, 2, muvmi, ['Tao'])).toEqual(['CEO']);
+    expect(stepNames(t1, 3, muvmi, ['Tao'])).toEqual(['CEO', 'Bua']);
+    const t2 = [
+      ...down(2).steps,
+      { level: 2, delayMin: 30, targets: ['admins' as const], channels: ['chat' as const, 'email' as const] },
+    ];
+    expect(stepNames(t2, 2, orca, ['Tao'])).toEqual(['Tao']);
+    expect(isReminderStep(t2, 2, orca, ['Tao'])).toBe(true);
+    expect(isReminderStep(t1, 2, muvmi, ['Tao'])).toBe(false);
+  });
+
+  it('S10: the Tier 1 ack box says §14.1’s sentence', () => {
+    const t1 = {
+      id: 'p1',
+      key: 't1' as const,
+      severity: 'down' as const,
+      tier: 1,
+      steps: [
+        ...down(1).steps,
+        { level: 2, delayMin: 30, targets: ['ceo' as const], channels: ['chat' as const, 'email' as const] },
+        {
+          level: 3,
+          delayMin: 60,
+          targets: ['ceo' as const, 'site_am' as const],
+          channels: ['chat' as const],
+          fyi: true,
+        },
+      ],
+    };
+    const HOURS = { startMin: 540, endMin: 1080, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };
+    expect(ackCase(t1, muvmi, HOURS, new Date('2026-09-25T02:48:41Z'))).toEqual({
+      label: 'If Arm acknowledges at 10:07',
+      body: 'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).',
+    });
   });
 
   it('L1 leaves out whoever L0 already told (the Admin who owns the site)', () => {

@@ -42,7 +42,7 @@ export interface IncidentFacts {
   escalation_plan?: Json | null;
   escalation_level?: number;
   /** Who "Admin" names and the Tier 2–3 hours, for the ladder's words (attached by loadFacts). */
-  ladder?: { admins: Owner[]; hours: ResponseHours };
+  ladder?: LadderEnv;
 }
 
 /** An Admin alert that isn't about one incident (D-019). */
@@ -195,25 +195,44 @@ export function contextOf(context: Json): Record<string, Json | undefined> {
   return context && typeof context === 'object' && !Array.isArray(context) ? context : {};
 }
 
+/** Who the ladder's tokens name beyond a site's own people, and the Tier 2–3 hours. */
+export interface LadderEnv {
+  admins: Owner[];
+  /** The CEO (D-032): every active stakeholder who manages no client — `escalation_people`'s rule. */
+  ceo?: Owner[];
+  hours: ResponseHours;
+}
+
 /**
- * Every active Admin ("Admin" in a step) and the response hours: the ladder's words (S08, D-034). A
- * failed read renders the messages without the ladder (null) instead of holding every alert back.
+ * Every active Admin ("Admin" in a step), the CEO and the response hours: the ladder's words (S08,
+ * D-034; S10). A failed read renders the messages without the ladder (null) instead of holding every
+ * alert back.
  */
-async function loadLadderEnv(
-  db: DbClient,
-  now: Date,
-): Promise<{ admins: Owner[]; hours: ResponseHours } | null> {
-  const [admins, hours] = await Promise.all([
+async function loadLadderEnv(db: DbClient, now: Date): Promise<LadderEnv | null> {
+  const [people, ams, hours] = await Promise.all([
     db
       .from('profiles')
-      .select('id, display_name, google_chat_user_id')
-      .eq('role', 'admin')
+      .select('id, display_name, google_chat_user_id, role')
+      .in('role', ['admin', 'stakeholder'])
       .eq('is_active', true),
+    db.from('clients').select('am_user_id').not('am_user_id', 'is', null),
     loadResponseHours(db, now),
   ]);
-  if (admins.error) {
-    console.error(JSON.stringify({ event: 'ladder_people_unreadable', error: admins.error.message }));
+  const error = people.error ?? ams.error;
+  if (error) {
+    console.error(JSON.stringify({ event: 'ladder_people_unreadable', error: error.message }));
     return null;
   }
-  return { admins: (admins.data ?? []) as Owner[], hours };
+  const managing = new Set((ams.data ?? []).map((c) => c.am_user_id));
+  const owner = ({ id, display_name, google_chat_user_id }: Owner) => ({
+    id,
+    display_name,
+    google_chat_user_id,
+  });
+  const rows = (people.data ?? []) as (Owner & { role: string })[];
+  return {
+    admins: rows.filter((p) => p.role === 'admin').map(owner),
+    ceo: rows.filter((p) => p.role === 'stakeholder' && !managing.has(p.id)).map(owner),
+    hours,
+  };
 }

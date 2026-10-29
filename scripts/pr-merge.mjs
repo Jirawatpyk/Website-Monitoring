@@ -10,7 +10,9 @@
 // can't slip in. No shell: arguments go straight to `gh`.
 // A PR that changes migrations and runtime code together also needs --schema-lag-reviewed: the new
 // deployment's crons start before `migrate-production` ends (docs/workflow.md, 8 Oct 2026), so that
-// code must work on the old schema — or the migration merges alone first.
+// code must work on the old schema — or the migration merges alone first. A PR with migrations is
+// also refused while GitHub can't start Actions on main (billing, 29 Oct 2026): Vercel would still
+// deploy the code, and `migrate-production` would never run.
 // After the merge it waits for production: the merge commit's `migrate-production` and its Vercel
 // production deployment with the production domains moved to it, and exits 1 if either failed — on 12 Oct a production build failed
 // (`git_info_fail`) and nobody saw it for 10 min. The deployment comes from Vercel's API through the
@@ -146,9 +148,29 @@ export function ciFiles(pr) {
   return (pr.files ?? []).map((f) => f.path).filter((p) => /^\.github\/(workflows|actions)\//.test(p));
 }
 
+/**
+ * Whether GitHub refused to start the latest `main` run's jobs (Actions billing or the spending limit,
+ * 29 Oct 2026): every job ended without running a single step. Then `migrate-production` won't run
+ * after the merge, while Vercel still deploys `main` — the new code would meet the old schema.
+ * `jobs` are that run's jobs (`gh api …/actions/runs/<id>/jobs`).
+ */
+export function actionsCantStart(jobs) {
+  const ran = (jobs ?? []).filter((j) => j.conclusion !== 'skipped');
+  return ran.length > 0 && ran.every((j) => j.conclusion === 'failure' && (j.steps ?? []).length === 0);
+}
+
 /** Reasons the PR must not be merged yet; empty when it may be merged. */
-export function mergeBlockers(pr, { workflowChangesReviewed = false, schemaLagReviewed = false } = {}) {
+export function mergeBlockers(
+  pr,
+  { workflowChangesReviewed = false, schemaLagReviewed = false, mainActionsBlocked = false } = {},
+) {
   const problems = [];
+  const migrates = (pr.files ?? []).some((f) => f.path.startsWith('supabase/migrations/'));
+  if (migrates && mainActionsBlocked) {
+    problems.push(
+      'Actions on main can’t start (billing / spending limit): migrate-production would not run after the merge while Vercel still deploys the code — fix Actions first',
+    );
+  }
   const code = migrationWithCode(pr);
   if (code.length && !schemaLagReviewed) {
     problems.push(
@@ -191,6 +213,19 @@ function gh(args, options = {}) {
 }
 
 const json = (args) => JSON.parse(gh(args));
+
+/** The latest `main` run's jobs, read through `gh`; unreadable → not blocked (the CI checks still gate). */
+function mainActionsBlocked() {
+  try {
+    // The CI workflow's runs only: other workflows (Dependabot) run on main too.
+    const run = json(['api', 'repos/{owner}/{repo}/actions/workflows/ci.yml/runs?branch=main&per_page=1'])
+      .workflow_runs?.[0];
+    if (!run) return false;
+    return actionsCantStart(json(['api', `repos/{owner}/{repo}/actions/runs/${run.id}/jobs`]).jobs);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Vercel's production deployments of `sha`, newest first, through the signed-in CLI (`vercel api`).
@@ -269,6 +304,7 @@ async function main() {
   const problems = mergeBlockers(pr, {
     workflowChangesReviewed: flags.includes(WORKFLOW_FLAG),
     schemaLagReviewed: flags.includes(SCHEMA_FLAG),
+    mainActionsBlocked: mainActionsBlocked(),
   });
   if (problems.length) {
     console.error(`pr:merge — not merging #${pr.number} "${pr.title}":`);

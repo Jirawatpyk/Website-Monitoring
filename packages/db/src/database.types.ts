@@ -179,14 +179,14 @@ isOneToOne: false
                   ]
                 },"escalation_steps": {
                   Row: {
-                    "channels": (string)[],"created_at": string,"delay_min": number,"id": string,"level": number,"policy_id": string,"targets": (string)[],"updated_at": string
+                    "channels": (string)[],"created_at": string,"delay_min": number,"fyi": boolean,"id": string,"level": number,"policy_id": string,"targets": (string)[],"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "channels": (string)[],"created_at"?: string,"delay_min": number,"id"?: string,"level": number,"policy_id": string,"targets": (string)[],"updated_at"?: string
+                    "channels": (string)[],"created_at"?: string,"delay_min": number,"fyi"?: boolean,"id"?: string,"level": number,"policy_id": string,"targets": (string)[],"updated_at"?: string
                   }
                   Update: {
-                    "channels"?: (string)[],"created_at"?: string,"delay_min"?: number,"id"?: string,"level"?: number,"policy_id"?: string,"targets"?: (string)[],"updated_at"?: string
+                    "channels"?: (string)[],"created_at"?: string,"delay_min"?: number,"fyi"?: boolean,"id"?: string,"level"?: number,"policy_id"?: string,"targets"?: (string)[],"updated_at"?: string
                   }
                   Relationships: [
                     {

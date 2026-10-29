@@ -37,6 +37,11 @@ export const escalationStepSchema = z.object({
   delayMin: z.number().int().min(0),
   targets: z.array(z.enum(ESCALATION_TARGETS)),
   channels: z.array(z.enum(ESCALATION_CHANNELS)),
+  /**
+   * The Tier 1 CEO + Site AM step (spec §14.1, §15.5): it still goes after an acknowledgement, as an
+   * FYI if the site is still DOWN, and tells everyone it names (never a call). Absent = an ordinary step.
+   */
+  fyi: z.boolean().optional(),
 });
 export type EscalationStep = z.infer<typeof escalationStepSchema>;
 

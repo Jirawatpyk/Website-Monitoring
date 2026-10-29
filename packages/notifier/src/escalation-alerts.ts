@@ -1,12 +1,13 @@
 import { formatDay, formatDuration, formatTime, isSameBangkokDay } from '@dxt/shared';
 import { plainName, type ChatMessage, type ChatPerson } from './chat-alerts';
-import { buildChatTextLine } from './chat-text';
+import { buildChatTextLine, type StepLevel } from './chat-text';
 
 /**
  * The escalation ladder's messages (S08, D-034; ChatAlert / EmailAlert rows, spec §8, §14.10, §15.7):
  * ESCALATED · L1 for a DOWN, STILL PROBLEM for a PROBLEM's L1 (the backup's step at +60), the
  * reminders in the thread, the L1 emails, and the escalation facts the first cards and the
- * ACKNOWLEDGED replies carry. CEO, L2 / L3, voice and on-call wording waits for S10 (D-013).
+ * ACKNOWLEDGED replies carry. S10 (D-048): ESCALATED · L2 to the CEO, the Tier 1 FYI · L3 (acknowledged
+ * or not), the Tier 2–3 REMINDER · L2, and "· CEO at 10:18" on L1.
  */
 
 /** What the first card and its email say about the ladder (D-034). */
@@ -63,13 +64,38 @@ export type LadderStopped = {
   l1Fired: boolean;
   /** The PROBLEM reminder interval: "the 60-min reminder". */
   reminderMin?: number;
+  /** DOWN: the last level an ack stops (the FYI step isn't one) — 2 gives "L1–L2 stopped". */
+  stopsThrough?: number;
+  /**
+   * Tier 1: when the FYI still goes if the site is still down, and to whom ("CEO + Bua") — only while
+   * it's still ahead of the ack (an ack after +60 promises nothing).
+   */
+  fyi?: { level: number; at: Date; who: string } | null;
+  /** The site, for §14.1's "If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call)." */
+  site?: string;
+  /** The highest level that had fired when the ack came: a step already sent isn't "cancelled". */
+  firedLevel?: number;
 };
 
 export function stoppedWords(
   s: LadderStopped | null | undefined,
 ): { line: string; body: string; fact: [string, string] | null } | null {
   if (!s) return null;
-  if (s.severity === 'down') return { line: 'L1 stopped', body: 'L1 stopped.', fact: null };
+  if (s.severity === 'down') {
+    const through = s.stopsThrough ?? 1;
+    const stopped = through > 1 ? `L1–L${through} stopped` : 'L1 stopped';
+    // §14.1 / EmailAlert ACKNOWLEDGED: "L2 cancelled · acked · L3 FYI at 10:48 if still down".
+    const cancelled = through > 1 && (s.firedLevel ?? 0) < through ? `L${through} cancelled · acked · ` : '';
+    const fact: [string, string] | null = s.fyi
+      ? ['Escalation', `${cancelled}L${s.fyi.level} FYI at ${formatTime(s.fyi.at)} if still down`]
+      : null;
+    // §14.1's canonical sentence: "Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at
+    // 10:48, CEO + Bua get an FYI (no call)."
+    const fyi = s.fyi
+      ? ` If ${plainName(s.site ?? 'the site')} is still down at ${formatTime(s.fyi.at)}, ${plainName(s.fyi.who)} get an FYI (no call).`
+      : '';
+    return { line: stopped, body: `${stopped}.${fyi}`, fact };
+  }
   const reminder = `${s.reminderMin ?? 60}-min reminder`;
   const what =
     !s.l1Fired && s.backup
@@ -101,7 +127,30 @@ export interface StepAlertInput {
   /** Told for information, named in plain text ("Tao FYI"). */
   fyi: readonly ChatPerson[];
   incidentUrl: string;
+  /**
+   * What this step is (S10): `ask` someone new to acknowledge (L1); `ceo` the Tier 1 L2 page; `fyi` the
+   * Tier 1 CEO + AM step that goes even after an ack; `reminder` a step whose people were all told
+   * already (Tier 2–3 L2 → the Admin). Default `ask`.
+   */
+  kind?: 'ask' | 'ceo' | 'fyi' | 'reminder';
+  /** The level after this one, if nobody acknowledges: "· CEO at 10:18" on L1. */
+  next?: { who: string; at: Date } | null;
+  /** Everyone told before this step, for "Arm, Ploy, Tao informed" (L2 to the CEO, an FYI nobody acked). */
+  informed?: readonly string[];
+  /** Who acknowledged and when, for the FYI: "acknowledged by Arm 10:07". */
+  acked?: { by: string; at: Date } | null;
+  /** The incident page without the ack flow: the CEO / FYI card's "Open incident" (they never ack). */
+  viewUrl?: string;
 }
+
+/** The level as the text line names it: L1–L3 (the SQL keeps levels 0–3). */
+const levelOf = (n: number): StepLevel => (n >= 3 ? 3 : n <= 1 ? 1 : 2);
+
+const listed = (names: readonly string[]) => names.map(plainName).join(', ');
+const spoken = (names: readonly string[]) => {
+  const n = names.map(plainName);
+  return n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n.at(-1)}` : (n[0] ?? 'Nobody');
+};
 
 const openButton = (url: string) => ({
   buttonList: { buttons: [{ text: 'Open / acknowledge', onClick: { openLink: { url } } }] },
@@ -149,14 +198,18 @@ export function buildStepAlert(input: StepAlertInput): ChatMessage {
       ],
     };
   }
+  const kind = input.kind ?? 'ask';
+  if (kind !== 'ask') return otherStepAlert(input, kind, site, duration);
   const fyi = input.fyi.length ? [`${names(input.fyi)} FYI`] : [];
   const informed = input.fyi.length ? `; ${names(input.fyi)} ${verb(input.fyi)} informed` : '';
+  // ChatAlert L1: "… · please acknowledge · Tao FYI · CEO at 10:18".
+  const next = input.next ? [`${plainName(input.next.who)} at ${formatTime(input.next.at)}`] : [];
   return {
     text: buildChatTextLine({
-      state: input.level === 1 ? 'ESCALATED · L1' : 'ESCALATED · L2',
+      state: `ESCALATED · L${levelOf(input.level)}` as const,
       site: `${site} DOWN ${duration}, not acknowledged`,
       mention: mentions(input.asked),
-      detail: ['please acknowledge', ...fyi],
+      detail: ['please acknowledge', ...fyi, ...next],
     }),
     cardsV2: [
       {
@@ -170,10 +223,99 @@ export function buildStepAlert(input: StepAlertInput): ChatMessage {
               widgets: [
                 {
                   textParagraph: {
-                    text: `${owner} hasn’t acknowledged. ${asked || 'Nobody new'} please take it${informed}.`,
+                    text: `${owner} hasn’t acknowledged. ${asked || 'Nobody new'} please take it${informed}.${
+                      input.next ? ` Next: ${plainName(input.next.who)} at ${formatTime(input.next.at)}.` : ''
+                    }`,
                   },
                 },
                 openButton(input.incidentUrl),
+              ],
+            },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * The S10 steps (ChatAlert rows; D-048 for the FYI nobody acknowledged):
+ *   · ceo:      `<users/CEO> ESCALATED · L2 · MuvMi DOWN 30 min, not acknowledged · Arm, Ploy, Tao informed`
+ *   · fyi:      `<users/CEO> <users/BUA> FYI · L3 · MuvMi still DOWN 60 min · acknowledged by Arm 10:07 · no action needed`
+ *               (nobody acked: `… still DOWN 60 min · not acknowledged · Arm, Ploy, Tao informed · no action needed`)
+ *   · reminder: `<users/TAO> REMINDER · L2 · WeCare Studio DOWN 30 min, not acknowledged` (§16.5)
+ */
+function otherStepAlert(
+  input: StepAlertInput,
+  kind: 'ceo' | 'fyi' | 'reminder',
+  site: string,
+  duration: string,
+): ChatMessage {
+  const informed = input.informed ?? [];
+  const acked = input.acked;
+  const line =
+    kind === 'ceo'
+      ? buildChatTextLine({
+          state: `ESCALATED · L${levelOf(input.level)}` as const,
+          site: `${site} DOWN ${duration}, not acknowledged`,
+          mention: mentions(input.asked),
+          detail: informed.length ? [`${listed(informed)} informed`] : [],
+        })
+      : kind === 'fyi'
+        ? buildChatTextLine({
+            state: `FYI · L${levelOf(input.level)}` as const,
+            site: `${site} still DOWN ${duration}`,
+            mention: mentions(input.asked),
+            detail: acked
+              ? [`acknowledged by ${plainName(acked.by)} ${formatTime(acked.at)}`, 'no action needed']
+              : [
+                  'not acknowledged',
+                  ...(informed.length ? [`${listed(informed)} informed`] : []),
+                  'no action needed',
+                ],
+          })
+        : buildChatTextLine({
+            state: `REMINDER · L${levelOf(input.level)}` as const,
+            site: `${site} DOWN ${duration}, not acknowledged`,
+            mention: mentions(input.asked),
+          });
+  const title =
+    kind === 'ceo'
+      ? `ESCALATED · L${input.level} · ${site} down ${duration} · nobody has acknowledged`
+      : kind === 'fyi'
+        ? `FYI · L${input.level} · ${site} still down after ${duration}`
+        : `REMINDER · L${input.level} · ${site} down ${duration}, not acknowledged`;
+  const body =
+    kind === 'ceo'
+      ? `Nobody on the team has acknowledged. ${spoken(informed)} ${informed.length > 1 ? 'were' : 'was'} asked.`
+      : kind === 'fyi'
+        ? acked
+          ? `For your information — no action needed. ${plainName(acked.by)} acknowledged at ${formatTime(acked.at)} and is working on it.`
+          : `For your information — no action needed. Nobody has acknowledged yet; ${spoken(informed)} ${informed.length > 1 ? 'were' : 'was'} asked.`
+        : 'Nobody has acknowledged yet. Acknowledge to stop these reminders.';
+  return {
+    text: line,
+    cardsV2: [
+      {
+        cardId: `step-${input.incidentId}-down-${input.level}`,
+        card: {
+          header: { title },
+          sections: [
+            {
+              widgets: [
+                { textParagraph: { text: body } },
+                kind === 'reminder'
+                  ? openButton(input.incidentUrl)
+                  : {
+                      buttonList: {
+                        buttons: [
+                          {
+                            text: 'Open incident',
+                            onClick: { openLink: { url: input.viewUrl ?? input.incidentUrl } },
+                          },
+                        ],
+                      },
+                    },
               ],
             },
           ],

@@ -50,7 +50,7 @@ import {
   type Recipient,
   type SystemAlertFacts,
 } from './facts';
-import { ladderFactsOf, namedIn, stepWhy, stoppedOf, toldAtOf } from './ladder-facts';
+import { ladderFactsOf, namedIn, readerOf, stepFactsOf, stepWhy, stoppedOf, toldAtOf } from './ladder-facts';
 
 const person = (p: IncidentFacts['sites']['primary']): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
@@ -275,6 +275,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
       });
     case 'step_fired': {
       const named = namedIn(i, n.context);
+      const step = stepFactsOf(i, n.context);
       return buildStepAlert({
         incidentId: i.id,
         site: i.sites.name,
@@ -285,6 +286,12 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         asked: named.asked,
         fyi: named.fyi,
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
+        viewUrl: incidentUrl(appUrl, i.id),
+        kind: step.kind,
+        // A level promised only while nobody has acknowledged (an ack stops it, §14.1).
+        next: i.state === 'acknowledged' ? null : step.next,
+        informed: step.informed,
+        acked: step.acked,
       });
     }
     case 'reminder':
@@ -418,9 +425,20 @@ export function renderEmail(
     case 'step_fired': {
       const asFyi = ctx.asFyi === true;
       const level = num(ctx.level, 1);
+      const step = stepFactsOf(i, n.context);
       return buildStepEmail({
         ...base,
-        why: stepWhy(i, to.id, level, asFyi),
+        why: stepWhy(i, to.id, level, asFyi, step.kind),
+        kind: step.kind,
+        readerIs: readerOf(i, to.id),
+        informed: step.informed,
+        informedRoles: step.informedRoles,
+        alreadyTold: step.alreadyTold,
+        admin: step.admin,
+        acked: step.acked,
+        stopped: step.stopped,
+        nextStep: step.nextStep,
+        voiceConfigured: step.voiceConfigured,
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
         level,
         elapsedMin: num(ctx.elapsedMin, 15),

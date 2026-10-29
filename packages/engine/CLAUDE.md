@@ -18,7 +18,9 @@ The status engine as pure functions: no I/O, no clock (`now` is always a paramet
 
 - S08 (D-034): `response-hours.ts` — Tier 2–3 minutes inside Mon–Fri 09:00–18:00 Bangkok minus company holidays (`isInsideHours`, `nextOpening`, `addInsideMinutes`, `minutesInsideHours`; [start, end)). `escalation.ts` — `ladderDue` (the next level once its time came, the latest reminder due, `pausedUntil`), `scheduleOf`, `problemHoldUntil`: the clock starts at Confirmed down, Tier 1 24/7, Tier 2–3 in response-hours minutes, only while Unacked / Escalated, one level per call, a reminder every `reminderMin` skipped on a step minute; who is told is SQL (`engine_fire_step` / `engine_remind`). INC-0142 / INC-0139 cases in `escalation.test.ts`.
 
-Still to build here, by slice (`docs/implementation-plan.md`): L2–L3 + on-call → **S10**; client-update track wiring → **S11**; SSL / domain thresholds → **S13**.
+S10 (D-048): `ladderDue` also brings the plan’s `fyi` step due while Acknowledged (the Tier 1 CEO + AM FYI, §14.1), with no reminders; cases in `escalation.test.ts` (INC-0142 L2 10:18:41, L3 10:48:41 acked or not, INC-0139 L2 Fri 09:30).
+
+Still to build here, by slice (`docs/implementation-plan.md`): on-call → **S10** PR B; client-update track wiring → **S11**; SSL / domain thresholds → **S13**.
 
 Contract notes for the engine cron route:
 

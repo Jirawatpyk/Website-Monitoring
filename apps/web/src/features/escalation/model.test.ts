@@ -1,10 +1,19 @@
 import type { EscalationStep } from '@dxt/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  addBlocked,
   affectedPolicies,
   affectsLine,
   canAdd,
+  canDelete,
+  canSwap,
+  deleteLabel,
   delayCheck,
+  fyiNote,
+  moveLabels,
+  stepCondition,
+  stepNote,
+  swapSteps,
   describeStep,
   diff,
   newStep,
@@ -58,13 +67,107 @@ describe('stepErrors — the board’s guardrails (spec §14.7, §15.5)', () => 
     ['under +15 min', l1({ delayMin: 10 }), ['Must be at least +15 min.']],
     ['no channel', l1({ channels: [] }), ['No channel ticked — this step notifies nobody.']],
     ['nobody', l1({ targets: [] }), ['Pick at least one person.']],
+    // The board says the first that applies: under +15 covers "not later than L0".
+    ['at +0', l1({ delayMin: 0 }), ['Must be at least +15 min.']],
     [
-      'not later than L0 (+0)',
-      l1({ delayMin: 0 }),
-      ['Must be at least +15 min.', 'Must be later than L0 (+0 min).'],
+      'voice alone reaches nobody',
+      l1({ channels: ['voice'] }),
+      ['No channel ticked — this step notifies nobody.'],
     ],
   ])('%s', (_case, step, want) => {
     expect(stepErrors([l0, step], 1)).toEqual(want);
+  });
+});
+
+// The S10 seed (spec §8): Tier 1 L2 CEO (voice configured), L3 CEO + Site AM FYI.
+const l2ceo: EscalationStep = {
+  level: 2,
+  delayMin: 30,
+  targets: ['ceo'],
+  channels: ['chat', 'email', 'voice'],
+};
+const l3fyi: EscalationStep = {
+  level: 3,
+  delayMin: 60,
+  targets: ['ceo', 'site_am'],
+  channels: ['chat', 'email'],
+  fyi: true,
+};
+const t1full = () => t1([l0, l1(), l2ceo, l3fyi]);
+
+describe('S10 — the CEO, the FYI step, moving steps (Escalation board, §14.7, §15.5)', () => {
+  it('the seed passes', () => {
+    const p = t1full();
+    expect(p.steps.flatMap((_s, i) => stepErrors(p.steps, i, 't1'))).toEqual([]);
+  });
+  it.each<[string, EscalationStep[], number, 't1' | 't2', string[]]>([
+    [
+      'CEO on L1',
+      [l0, l1({ targets: ['ceo'] })],
+      1,
+      't1',
+      ['A step that pages the CEO can’t sit above L2.', 'The CEO can be paged only from L2 onward.'],
+    ],
+    [
+      'CEO on Tier 2',
+      [l0, l1(), { ...l2ceo, channels: ['chat', 'email'] }],
+      2,
+      't2',
+      ['The CEO is paged only on Tier 1 DOWN — remove CEO from this step.'],
+    ],
+  ])('%s', (_case, steps, i, key, want) => {
+    expect(stepErrors(steps, i, key)).toEqual(want);
+  });
+  it('the FYI step can’t be deleted or moved; L0 never moves', () => {
+    expect(canDelete(l3fyi)).toBe(false);
+    expect(deleteLabel(l3fyi)).toBe('The CEO + AM FYI step can’t be removed from Tier 1 DOWN');
+    const steps = t1full().steps;
+    expect(canSwap(steps, 2, 3)).toBe(false);
+    expect(moveLabels(steps, 3)).toMatchObject({ up: 'The CEO + AM FYI step keeps its place', canUp: false });
+    expect(moveLabels(steps, 1)).toMatchObject({
+      up: 'L0 is pinned — nothing can move above it',
+      canUp: false,
+    });
+  });
+  it('a CEO step never lands above L2', () => {
+    const steps = t1full().steps;
+    expect(canSwap(steps, 1, 2)).toBe(false);
+    expect(moveLabels(steps, 1).down).toBe('L2 pages the CEO — it can’t move up to L1');
+    expect(moveLabels(steps, 2).up).toBe('A step that pages the CEO can’t move above L2');
+  });
+  it('swapping keeps each level’s delay', () => {
+    const steps = [l0, l1(), { ...l1({ targets: ['admins'] }), level: 2, delayMin: 30 }];
+    expect(swapSteps(steps, 1, 2).map((s) => [s.level, s.delayMin, s.targets.join('+')])).toEqual([
+      [0, 0, 'owner'],
+      [1, 15, 'admins'],
+      [2, 30, 'backup+admins'],
+    ]);
+  });
+  it('the FYI step doesn’t count as the step after L0', () => {
+    expect(policyMessage(t1([l0, l3fyi]))?.tone).toBe('danger');
+    expect(policyMessage(t1full())).toBeNull();
+  });
+  it('conditions and notes (board / MEscalation)', () => {
+    const t2 = { ...t1(), key: 't2' as const, tier: 2 };
+    const l2rem = { ...l1({ targets: ['admins'] }), level: 2, delayMin: 30 };
+    expect(stepCondition(t1full(), l3fyi)).toBe('Still DOWN — sent even after acknowledge');
+    expect(stepCondition(t2, l2rem)).toBe('Still no acknowledgement');
+    expect(stepNote(t2, l2rem, false, ['Tao'])).toBe(
+      'Reminder to Tao. No CEO page — the CEO sees it in the daily digest.',
+    );
+    expect(stepNote(t1full(), l3fyi, true)).toBe(
+      'FYI only, never a call. Recovered by then → nothing is sent.',
+    );
+    expect(fyiNote(l3fyi)).toBe(
+      'Acknowledge stops L1–L2 only. If the site is still DOWN at +60 min, CEO + Site AM get an FYI — Chat @mention + email, never a voice call. Recovered by then → nothing is sent.',
+    );
+    // L2 deleted: the FYI is L2 and an ack stops L1 only (spec-check M3).
+    expect(fyiNote({ ...l3fyi, level: 2 })).toMatch(/^Acknowledge stops L1 only\./);
+  });
+  it('Add step stays, disabled with its reason (board gaps 1–2, D-048)', () => {
+    expect(addBlocked(t1full())).toBe('L3 is the last level');
+    expect(addBlocked(t1([l0, l1(), { ...l3fyi, level: 2 }]))).toBe('The CEO + AM FYI step stays last');
+    expect(addBlocked(t1())).toBeNull();
   });
 });
 
@@ -94,6 +197,20 @@ describe('saveProblems — the save dialog’s list', () => {
     ]);
     expect(reminderError('0')).toBe('Whole minutes above 0, e.g. 15');
     expect(reminderError('15')).toBeNull();
+  });
+});
+
+describe('diff — a deleted step reads as removed (S10 /verify)', () => {
+  it('deleting the Tier 1 CEO step names L2, not "L2 changed, L3 removed"', () => {
+    const saved = draft([t1full()]);
+    const edited = draft([t1([l0, l1(), { ...l3fyi, level: 2 }])]);
+    expect(diff(saved, edited)).toEqual([
+      {
+        where: 'Tier 1 DOWN · L2',
+        before: '+30 min · CEO · Chat @mention, Email, Voice call',
+        after: 'Removed',
+      },
+    ]);
   });
 });
 
@@ -149,9 +266,10 @@ describe('the rest', () => {
       'Affects 17 sites · 2 open incidents (INC-0141, INC-0142) keep their current timers',
     );
   });
-  it('adds an L1 only when there is none (L2+ is S10)', () => {
+  it('adds steps up to L3', () => {
     expect(canAdd(problem([l0]))).toBe(true);
-    expect(canAdd(t1())).toBe(false);
+    expect(canAdd(t1())).toBe(true);
+    expect(canAdd(t1full())).toBe(false);
     expect(newStep(problem([l0]))).toEqual({
       level: 1,
       delayMin: 30,

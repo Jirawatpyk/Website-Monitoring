@@ -30,7 +30,7 @@
 | S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | M | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Done |
 | S09d | Defacement: page-change detection | 1 · P1 | L | — (PRD §2 content-change, D-041, D-046) | S09c (merged), S07 | 3–4 (alert on after a 2-week record) | Done |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
-| S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 | 4 | Todo |
+| S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | In progress |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
 | S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06b, S10, S11 | 4 | Todo |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
@@ -444,8 +444,8 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### G1 · MVP gate (PRD §12 Phase 1 exit)
 
 - ข้อมูล 17 เว็บครบ 100% ก่อน go-live (S05 Done-when 1).
-- DOWN จำลองแล้ว alert ถึงภายใน 3 นาที — on production, against the test target, for a Tier 1 monitor.
-- A second Admin is active, with their 2-Step Verification page confirmed per D-007 (PRD §9: "ต้องมี admin คนที่ 2 ก่อน Phase 2"), and Healthchecks alerts go to both Admins. They are added to `.github/CODEOWNERS` and review every PR before `pnpm pr:merge` (D-008; with GitHub Pro the ruleset "main" would require 1 code-owner approval instead).
+- DOWN จำลองแล้ว alert ถึงภายใน 3 นาที — on staging, against the test target (Tier 1), run by Claude (D-048). **Done 29 Oct 2026:** mode `error` at 05:10:21 UTC, first failed check 05:10:46, INC-0048 DOWN posted to Chat 05:11:35.96 (`notification_attempts.ok`, provider message id) — 49 s.
+- A second Admin is active, with their 2-Step Verification page confirmed per D-007 (PRD §9: "ต้องมี admin คนที่ 2 ก่อน Phase 2"), and Healthchecks alerts go to both Admins. No second code reviewer: Tao works solo with Claude (D-048 — no CODEOWNERS line).
 - `docs/runbook.md` v1 exists and the second Admin has walked through it once: what each heartbeat / Healthchecks alert means, restarting the VPS agent, checking Vercel Cron and function logs, pausing alerts with maintenance, rotating `CRON_SECRET` / `INGEST_TOKEN` / webhook URLs, and who to call (PRD §13 bus-factor mitigation).
 - From here every production deploy happens inside a maintenance window, and the parallel run with the CEO's hourly monitor starts; S19 keeps its log.
 
@@ -544,7 +544,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
 - **Scope:** FR-09b. L2 CEO step on (approved 5 Oct 2026, D-009 — no "pending CEO" tag); voice "Configured · off" (Twilio not used for now); Tier 1 L3 FYI to CEO + AM at +60 min even after ack, never a call; Tier 2–3 L2 reminder to Tao. Full editor guardrails (§14.7, §15.5). `oncall_shifts`, rotation page, swap request / accept, hand over shift with reason, reminder a day before, on-call phone checklist with test alert; Tier 1 nights, weekends and holidays page the on-call person.
 - **Boards:** OnCall, MOnCall, Escalation (L2–L3) · **Tables:** oncall_shifts · **Test plan:** T05
-- **Depends on:** G1
+- **Depends on:** G1 — waived by Tao on 29 Oct 2026 (D-048): S10 is built and merged before G1.
 - **Done when:**
   1. **T05:** with no ack, a Tier 1 DOWN on staging walks L0 → L1 → L2 (enabled on staging) → L3 on time; with ack at +5 min, L1–L2 stop and L3 still sends the FYI at +60 min (timestamps in the PR).
   2. The editor refuses: CEO token on Tier 2–3 or before L2, voice on the CEO + AM step, removing that step, a DOWN policy with no step after L0 (tests).

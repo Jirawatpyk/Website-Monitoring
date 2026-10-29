@@ -79,7 +79,7 @@ describe('Tier 2 DOWN outside response hours (ChatAlert ORCA row)', () => {
 });
 
 describe('ESCALATED · L1 (ChatAlert 10:03)', () => {
-  it('@mentions the backup, Tao FYI, no CEO until S10', () => {
+  it('@mentions the backup, Tao FYI (no next level named when there is none)', () => {
     const msg = buildStepAlert({
       incidentId: 'i142',
       site: 'MuvMi',
@@ -137,6 +137,192 @@ describe('ESCALATED · L1 (ChatAlert 10:03)', () => {
   });
 });
 
+describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (ChatAlert rows, D-048)', () => {
+  const ceo = { name: 'CEO', chatUserId: 'CEO' };
+  const bua = { name: 'Bua', chatUserId: 'BUA' };
+  const step = (over: Partial<Parameters<typeof buildStepAlert>[0]>) =>
+    buildStepAlert({
+      incidentId: 'i142',
+      site: 'MuvMi',
+      severity: 'down',
+      level: 1,
+      elapsedMin: 15,
+      owner: arm,
+      asked: [],
+      fyi: [],
+      incidentUrl: `${url}?ack=1`,
+      viewUrl: url,
+      ...over,
+    });
+
+  it('L1 names the next level: "· CEO at 10:18"', () => {
+    const msg = step({
+      asked: [{ ...ploy, role: 'backup' }],
+      fyi: [tao],
+      next: { who: 'CEO', at: bkk('2026-09-25T10:18:41') },
+    });
+    expect(msg.text).toBe(
+      '<users/PLOY> ESCALATED · L1 · MuvMi DOWN 15 min, not acknowledged · please acknowledge · Tao FYI · CEO at 10:18',
+    );
+    expect(JSON.stringify(msg.cardsV2)).toContain(
+      'Arm hasn’t acknowledged. Ploy (backup) please take it; Tao is informed. Next: CEO at 10:18.',
+    );
+  });
+
+  it('L2 (CEO): @mentions the CEO, names who was told', () => {
+    const msg = step({
+      level: 2,
+      elapsedMin: 30,
+      kind: 'ceo',
+      asked: [{ ...ceo, role: 'CEO' }],
+      informed: ['Arm', 'Ploy', 'Tao'],
+    });
+    expect(msg.text).toBe(
+      '<users/CEO> ESCALATED · L2 · MuvMi DOWN 30 min, not acknowledged · Arm, Ploy, Tao informed',
+    );
+    const card = JSON.stringify(msg.cardsV2);
+    expect(card).toContain('Arm, Ploy and Tao were asked.');
+    expect(card).toContain('Open incident');
+    expect(card).not.toContain('?ack=1');
+  });
+
+  it('L3 FYI after an ack: CEO + Bua, no action needed', () => {
+    const msg = step({
+      level: 3,
+      elapsedMin: 60,
+      kind: 'fyi',
+      asked: [
+        { ...ceo, role: 'CEO' },
+        { ...bua, role: 'account manager' },
+      ],
+      acked: { by: 'Arm', at: bkk('2026-09-25T10:07:40') },
+    });
+    expect(msg.text).toBe(
+      '<users/CEO> <users/BUA> FYI · L3 · MuvMi still DOWN 1 h · acknowledged by Arm 10:07 · no action needed',
+    );
+    expect(JSON.stringify(msg.cardsV2)).toContain('Arm acknowledged at 10:07 and is working on it.');
+  });
+
+  it('L3 FYI nobody acknowledged (D-048 draft)', () => {
+    const msg = step({
+      level: 3,
+      elapsedMin: 60,
+      kind: 'fyi',
+      asked: [
+        { ...ceo, role: 'CEO' },
+        { ...bua, role: 'account manager' },
+      ],
+      // The step's own people (the CEO) aren't listed as informed in their own FYI.
+      informed: ['Arm', 'Ploy', 'Tao'],
+    });
+    expect(msg.text).toBe(
+      '<users/CEO> <users/BUA> FYI · L3 · MuvMi still DOWN 1 h · not acknowledged · Arm, Ploy, Tao informed · no action needed',
+    );
+  });
+
+  it('Tier 2–3 L2: REMINDER · L2 to Tao (§16.5)', () => {
+    const msg = step({
+      site: 'WeCare Studio',
+      level: 2,
+      elapsedMin: 30,
+      kind: 'reminder',
+      asked: [{ ...tao, role: 'Admin' }],
+    });
+    expect(msg.text).toBe('<users/TAO> REMINDER · L2 · WeCare Studio DOWN 30 min, not acknowledged');
+  });
+
+  it('ACKNOWLEDGED on a Tier 1 ladder: L1–L2 stopped', () => {
+    const msg = buildAcknowledgedAlert({
+      incidentId: 'i142',
+      site: 'MuvMi',
+      ackedBy: 'Arm',
+      ackedAt: bkk('2026-09-25T10:07:40'),
+      stopped: {
+        severity: 'down',
+        backup: 'Ploy',
+        l1Fired: true,
+        stopsThrough: 2,
+        firedLevel: 1,
+        site: 'MuvMi',
+        fyi: { level: 3, at: bkk('2026-09-25T10:48:41'), who: 'CEO + Bua' },
+      },
+    });
+    expect(msg.text).toBe('ACKNOWLEDGED · MuvMi · by Arm 10:07 · L1–L2 stopped');
+    // §14.1's canonical sentence.
+    expect(JSON.stringify(msg.cardsV2)).toContain(
+      'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).',
+    );
+  });
+
+  it('the ACKNOWLEDGED email carries the Escalation row (EmailAlert)', () => {
+    const m = buildAcknowledgedEmail({
+      ...base,
+      recipientId: 'arm',
+      reason: 'owner',
+      ackedBy: 'Arm',
+      ackedAt: bkk('2026-09-25T10:07:40'),
+      startedAt: bkk('2026-09-25T09:48:12'),
+      confirmedAt: bkk('2026-09-25T09:48:41'),
+      stopped: {
+        severity: 'down',
+        backup: 'Ploy',
+        l1Fired: true,
+        stopsThrough: 2,
+        firedLevel: 1,
+        site: 'MuvMi',
+        fyi: { level: 3, at: bkk('2026-09-25T10:48:41'), who: 'CEO + Bua' },
+      },
+    });
+    expect(m.text).toContain('Escalation: L2 cancelled · acked · L3 FYI at 10:48 if still down');
+  });
+});
+
+describe('S10 emails (EmailAlert L2 / L3)', () => {
+  const email = (over: Partial<Parameters<typeof buildStepEmail>[0]>) =>
+    buildStepEmail({
+      ...base,
+      recipientId: 'ceo',
+      reason: 'step',
+      why: 'You got this because …',
+      severity: 'down',
+      level: 2,
+      elapsedMin: 30,
+      confirmedAt: bkk('2026-09-25T09:48:41'),
+      owner: 'Arm',
+      asFyi: false,
+      asked: 'CEO',
+      ...over,
+    });
+  it('L2 to the CEO: voice configured, next step L3', () => {
+    const m = email({
+      kind: 'ceo',
+      informed: ['Arm', 'Ploy', 'Tao'],
+      voiceConfigured: true,
+      nextStep: 'L3 (CEO + Bua, no call) at 10:48',
+    });
+    expect(m.html).toContain('ESCALATED · L2');
+    expect(m.html).toContain('MuvMi down 30 min — nobody has acknowledged');
+    expect(m.html).toContain('Arm, Ploy and Tao were asked.');
+    expect(m.html).toContain('Configured · off until approved');
+    expect(m.html).toContain('L3 (CEO + Bua, no call) at 10:48');
+  });
+  it('L3 FYI to the AM after an ack', () => {
+    const m = email({
+      level: 3,
+      elapsedMin: 60,
+      kind: 'fyi',
+      readerIs: 'site_am',
+      acked: { by: 'Arm', at: bkk('2026-09-25T10:07:40') },
+    });
+    expect(m.html).toContain('FYI · L3');
+    expect(m.html).toContain('MuvMi still down after 1 h — Arm is on it');
+    expect(m.html).toContain(
+      'If the client needs a second update, the draft on the incident page is current.',
+    );
+    expect(m.html).toContain('Recovery email when it’s back · no more escalation');
+  });
+});
+
 describe('reminders (PRD §7, D-034)', () => {
   it('STILL DOWN at +30', () => {
     const msg = buildReminderAlert({
@@ -165,7 +351,7 @@ describe('reminders (PRD §7, D-034)', () => {
 });
 
 describe('ACKNOWLEDGED says what stopped', () => {
-  it('DOWN: L1 stopped (the board’s L1–L2 comes with S10)', () => {
+  it('DOWN with no L2 (an edited ladder): L1 stopped', () => {
     const msg = buildAcknowledgedAlert({
       incidentId: 'i142',
       site: 'MuvMi',

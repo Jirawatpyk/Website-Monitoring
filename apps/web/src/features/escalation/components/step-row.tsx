@@ -1,7 +1,10 @@
 import { Badge, IconButton, Tag } from '@jirawatpyk/aura-react';
 import {
+  IconArrowDown,
+  IconArrowUp,
   IconBell,
   IconCircleAlert,
+  IconInfo,
   IconLock,
   IconMail,
   IconPencil,
@@ -13,19 +16,32 @@ import {
 } from '@jirawatpyk/aura-react/icons';
 import type { EscalationChannel, EscalationStep } from '@dxt/shared';
 import type { ReactElement } from 'react';
-import { stepCondition, stepErrors, stepNote, stepWhen, targetLabels, type PolicyDraft } from '../model';
+import {
+  canDelete,
+  deleteLabel,
+  fyiNote,
+  moveLabels,
+  stepCondition,
+  stepErrors,
+  stepNote,
+  stepWhen,
+  targetLabels,
+  type PolicyDraft,
+} from '../model';
 
 const CHANNEL: Record<EscalationChannel, { label: string; icon: ReactElement }> = {
   chat: { label: 'Chat @mention', icon: <IconBell /> },
   space: { label: 'Alerts Space', icon: <IconUsers /> },
   email: { label: 'Email', icon: <IconMail /> },
-  voice: { label: 'Voice call · configured, off until approved', icon: <IconLock /> },
+  // §15.5 / D-048: "Configured · off until approved" (over the board badge's lower-case form).
+  voice: { label: 'Voice call · Configured · off until approved', icon: <IconLock /> },
 };
 const CHANNEL_ORDER: readonly EscalationChannel[] = ['chat', 'space', 'email', 'voice'];
 
 /**
  * One step of a policy (Escalation board): the level dot, when and on what, its errors, who and which
- * channels, its note; pencil and delete. L0 is pinned (no pencil until S10 adds on-call, D-034).
+ * channels, its note and the FYI box; move up / down, pencil and delete (each disabled with the board's
+ * reason). L0 is pinned.
  */
 export function StepRow({
   policy,
@@ -33,6 +49,7 @@ export function StepRow({
   admins,
   onEdit,
   onDelete,
+  onMove,
 }: {
   policy: PolicyDraft;
   index: number;
@@ -40,12 +57,15 @@ export function StepRow({
   admins: readonly string[];
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
+  /** Trade places with the step above (-1) or below (+1). */
+  onMove: (index: number, by: -1 | 1) => void;
 }) {
   const step = policy.steps[index] as EscalationStep;
-  const errs = stepErrors(policy.steps, index);
-  const note = stepNote(policy, step);
+  const errs = stepErrors(policy.steps, index, policy.key);
+  const note = stepNote(policy, step, false, admins);
   const pinned = index === 0;
   const label = `L${index}`;
+  const move = moveLabels(policy.steps, index);
   return (
     <li className="flex gap-4">
       <div className="flex w-10 shrink-0 flex-col items-center" aria-hidden>
@@ -65,6 +85,11 @@ export function StepRow({
                   Pinned
                 </Badge>
               )}
+              {step.fyi && (
+                <Badge tone="neutral" variant="outline" icon={<IconInfo />}>
+                  FYI after ack · no call
+                </Badge>
+              )}
             </h3>
             <span className="text-sm text-fg-secondary">{stepCondition(policy, step)}</span>
             {errs.map((e) => (
@@ -77,6 +102,20 @@ export function StepRow({
           {!pinned && (
             <div className="flex items-center gap-0.5">
               <IconButton
+                icon={<IconArrowUp />}
+                label={move.up}
+                touchHeight
+                disabled={!move.canUp}
+                onClick={() => onMove(index, -1)}
+              />
+              <IconButton
+                icon={<IconArrowDown />}
+                label={move.down}
+                touchHeight
+                disabled={!move.canDown}
+                onClick={() => onMove(index, 1)}
+              />
+              <IconButton
                 icon={<IconPencil />}
                 label={`Edit ${label}`}
                 touchHeight
@@ -86,7 +125,8 @@ export function StepRow({
                 icon={<IconTrash2 />}
                 touchHeight
                 tone="danger"
-                label={`Delete ${label}`}
+                label={deleteLabel(step)}
+                disabled={!canDelete(step)}
                 onClick={() => onDelete(index)}
               />
             </div>
@@ -119,7 +159,7 @@ export function StepRow({
                 {CHANNEL[c].label}
               </Badge>
             ))}
-            {!step.channels.length && (
+            {!step.channels.some((c) => c !== 'voice') && (
               <Badge tone="danger" variant="outline" icon={<IconCircleAlert />}>
                 No channel · notifies nobody
               </Badge>
@@ -127,6 +167,15 @@ export function StepRow({
           </dd>
         </dl>
         {note && <p className="m-0 border-t border-border-subtle pt-2.5 text-xs text-fg-secondary">{note}</p>}
+        {step.fyi && (
+          <div className="flex gap-2.5 rounded-aura-md bg-bg-canvas px-3 py-2.5 text-xs">
+            <IconInfo size="sm" className="mt-0.5 shrink-0 text-fg-secondary" aria-hidden />
+            <div className="flex flex-col gap-0.5">
+              <b className="font-semibold">After ack: FYI only if still down, no call</b>
+              <span className="text-fg-secondary">{fyiNote(step)}</span>
+            </div>
+          </div>
+        )}
       </div>
     </li>
   );

@@ -110,6 +110,129 @@ describe('ladderDue — the DOWN ladder (spec §8, D-034)', () => {
   });
 });
 
+// The S10 seed (spec §8, §14.1, D-009): Tier 1 L2 +30 CEO, L3 +60 CEO + Site AM as an FYI that still
+// goes after an ack; Tier 2–3 L2 +30 a reminder to the Admin.
+const full = (tier: 1 | 2 | 3): EscalationPlan => ({
+  ...down(tier),
+  steps: [
+    ...down(tier).steps,
+    ...(tier === 1
+      ? [
+          {
+            level: 2,
+            delayMin: 30,
+            targets: ['ceo' as const],
+            channels: ['chat' as const, 'email' as const, 'voice' as const],
+          },
+          {
+            level: 3,
+            delayMin: 60,
+            targets: ['ceo' as const, 'site_am' as const],
+            channels: ['chat' as const, 'email' as const],
+            fyi: true,
+          },
+        ]
+      : [
+          {
+            level: 2,
+            delayMin: 30,
+            targets: ['admins' as const],
+            channels: ['chat' as const, 'email' as const],
+          },
+        ]),
+  ],
+});
+
+describe('ladderDue — L2 and the L3 FYI (spec §8, §14.1; S10 T05)', () => {
+  const t1 = (now: string, over: Partial<LadderInput> = {}) => inc0142(now, { plan: full(1), ...over });
+  it.each([
+    ['no ack, 10:18:40: nothing yet', t1('2026-09-25T10:18:40', { level: 1, state: 'escalated' }), null],
+    ['no ack, 10:18:41: L2 (CEO, +30)', t1('2026-09-25T10:18:41', { level: 1, state: 'escalated' }), 2],
+    ['no ack, 10:48:41: L3 (+60)', t1('2026-09-25T10:48:41', { level: 2, state: 'escalated' }), 3],
+    ['all four fired: nothing more', t1('2026-09-25T11:30:00', { level: 3, state: 'escalated' }), null],
+    // §14.1: "Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI".
+    [
+      'acked 10:07 after L1, 10:18:41: no L2',
+      t1('2026-09-25T10:18:41', { level: 1, state: 'acknowledged' }),
+      null,
+    ],
+    [
+      'acked 10:07, 10:48:40: nothing yet',
+      t1('2026-09-25T10:48:40', { level: 1, state: 'acknowledged' }),
+      null,
+    ],
+    [
+      'acked 10:07, still down 10:48:41: the L3 FYI',
+      t1('2026-09-25T10:48:41', { level: 1, state: 'acknowledged' }),
+      3,
+    ],
+    [
+      'acked at +5 before L1, 10:48:41: the L3 FYI',
+      t1('2026-09-25T10:48:41', { level: 0, state: 'acknowledged' }),
+      3,
+    ],
+    [
+      // The level doesn't say whether the FYI went (an FYI after an ack keeps it): the SQL sends it once.
+      'acked at level 3 (a D-021 raise from a PROBLEM ladder): the FYI is still offered',
+      t1('2026-09-25T11:00:00', { level: 3, state: 'acknowledged' }),
+      3,
+    ],
+    [
+      'acked after L2, 10:48:41: the L3 FYI',
+      t1('2026-09-25T10:48:41', { level: 2, state: 'acknowledged' }),
+      3,
+    ],
+    [
+      'unacked at level 1, 10:48:41: L2 first, one level at a time',
+      t1('2026-09-25T10:48:41', { level: 1, state: 'escalated' }),
+      2,
+    ],
+    [
+      'recovered by 10:48 (Monitoring): nothing is sent',
+      t1('2026-09-25T10:48:41', { level: 1, state: 'monitoring' }),
+      null,
+    ],
+    ['Needs root cause: nothing', t1('2026-09-25T10:48:41', { level: 1, state: 'needs_root_cause' }), null],
+    [
+      'Tier 2 INC-0139: L2 reminder to the Admin Fri 09:30',
+      inc0139('2026-09-25T09:30:00', { plan: full(2), level: 1, state: 'escalated' }),
+      2,
+    ],
+    [
+      'Tier 2 acked: no L2 (no FYI step)',
+      inc0139('2026-09-25T09:30:00', { plan: full(2), level: 1, state: 'acknowledged' }),
+      null,
+    ],
+  ])('%s', (_case, input, level) => {
+    expect(ladderDue(input).step?.level ?? null).toBe(level);
+  });
+
+  it('the FYI keeps its due time (Confirmed down + 60), and an ack sends no reminder', () => {
+    const due = ladderDue(t1('2026-09-25T10:50:00', { level: 1, state: 'acknowledged' }));
+    expect(due.step).toEqual({ level: 3, dueAt: bkk('2026-09-25T10:48:41') });
+    expect(due.reminder).toBeUndefined();
+  });
+
+  it('INC-0142 schedule: L1 10:03:41, L2 10:18:41, L3 10:48:41', () => {
+    expect(scheduleOf(t1('2026-09-25T10:00:00')).map((s) => s.dueAt)).toEqual([
+      bkk('2026-09-25T09:48:41'),
+      bkk('2026-09-25T10:03:41'),
+      bkk('2026-09-25T10:18:41'),
+      bkk('2026-09-25T10:48:41'),
+    ]);
+  });
+
+  it('reminders skip the step minutes: +45 then +75', () => {
+    expect(ladderDue(t1('2026-09-25T10:34:00', { level: 2, state: 'escalated' })).reminder?.afterMin).toBe(
+      45,
+    );
+    expect(ladderDue(t1('2026-09-25T10:48:41', { level: 2, state: 'escalated' })).reminder).toBeUndefined();
+    expect(ladderDue(t1('2026-09-25T11:04:00', { level: 3, state: 'escalated' })).reminder?.afterMin).toBe(
+      75,
+    );
+  });
+});
+
 describe('ladderDue — reminders in the thread (PRD §7, D-034)', () => {
   it.each([
     ['at +15 the L1 message is the reminder', inc0142('2026-09-25T10:03:41'), null],
