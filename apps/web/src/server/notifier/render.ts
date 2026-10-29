@@ -45,12 +45,25 @@ import {
 } from '@dxt/shared';
 import {
   contextOf,
+  l0IsOnCall,
+  l0Of,
   type IncidentFacts,
   type Notification,
   type Recipient,
   type SystemAlertFacts,
 } from './facts';
-import { ladderFactsOf, namedIn, readerOf, stepFactsOf, stepWhy, stoppedOf, toldAtOf } from './ladder-facts';
+import {
+  l0PeopleOf,
+  ladderFactsOf,
+  namedIn,
+  readerOf,
+  stepFactsOf,
+  stepWhy,
+  stoppedOf,
+  toldAtOf,
+} from './ladder-facts';
+
+const L0_TEMPLATES = new Set(['down', 'problem', 'down_again', 'problem_again', 'flap_summary']);
 
 const person = (p: IncidentFacts['sites']['primary']): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
@@ -157,10 +170,10 @@ function againAlert(n: Notification, i: IncidentFacts, now: Date = new Date(n.cr
     tier: i.sites.tier,
     severity: n.template === 'down_again' ? 'down' : 'problem',
     trigger: (typeof ctx.trigger === 'string' ? ctx.trigger : i.trigger) as IncidentFacts['trigger'],
-    // §19.3: whoever acts now — the person who acknowledged, else the L0 person (the owner).
+    // §19.3: whoever acts now — the person who acknowledged, else the L0 person (owner / on-call).
     mention: acked
       ? { name: i.acker!.display_name, chatUserId: i.acker!.google_chat_user_id ?? null }
-      : person(i.sites.primary),
+      : person(l0Of(i)),
     ackedBy: acked ? i.acker!.display_name : null,
     fromState: str(ctx.fromState, 'monitoring'),
     droppedAt,
@@ -224,7 +237,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         cause: str(ctx.cause, 'Hard fail'),
         confirmingLocations: num(ctx.confirmingLocations, 2),
         confirmedByWaf: confirmedByWafOf(ctx),
-        owner: person(i.sites.primary),
+        owner: person(l0Of(i)),
         backup: person(i.sites.backup),
         // MobileAck: the card's link opens the incident ready to acknowledge.
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
@@ -245,7 +258,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         summary: str(ctx.summary, 'problem'),
         seenFrom: seenFrom(ctx),
         verifier: typeof ctx.verifier === 'string' ? ctx.verifier : null,
-        owner: person(i.sites.primary),
+        owner: person(l0Of(i)),
         backup: person(i.sites.backup),
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
         ladder: ladderFactsOf(i, now),
@@ -282,7 +295,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
         level: num(ctx.level, 1),
         elapsedMin: num(ctx.elapsedMin, 15),
-        owner: person(i.sites.primary),
+        owner: person(l0Of(i)),
         asked: named.asked,
         fyi: named.fyi,
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
@@ -323,7 +336,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         startedAt: drop.start,
         recoveredAt: drop.end,
         okLocations: num(ctx.okLocations, 2),
-        owner: person(i.sites.primary),
+        owner: person(l0Of(i)),
         problem: dropProblem(i, drop, ctx),
       });
     }
@@ -341,7 +354,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
             incidentId: i.id,
             site: i.sites.name,
             severity: summarySeverity(i),
-            owner: person(i.sites.primary),
+            owner: person(l0Of(i)),
             drops,
           })
         : null;
@@ -360,7 +373,9 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   if (n.template === 'acknowledged' && contextOf(n.context).ackedById === n.user_id) return 'acked';
   // A step's own email (its people); the Chat fallback goes to the backup and Admins (D-016).
   if (n.template === 'step_fired') return contextOf(n.context).fallback === true ? 'fallback' : 'step';
-  if (i.sites.primary?.id === n.user_id) return 'owner';
+  if (l0Of(i)?.id === n.user_id) return l0IsOnCall(i) ? 'oncall' : 'owner';
+  // Someone the L0 pencil adds (S10): told at once, by email too.
+  if (L0_TEMPLATES.has(n.template) && n.user_id && l0PeopleOf(i).includes(n.user_id)) return 'l0';
   if (n.template === 'resolved') return 'emailed';
   return 'fallback';
 }
@@ -443,7 +458,7 @@ export function renderEmail(
         level,
         elapsedMin: num(ctx.elapsedMin, 15),
         confirmedAt: new Date(i.detected_at),
-        owner: i.sites.primary?.display_name ?? null,
+        owner: l0Of(i)?.display_name ?? null,
         asFyi,
         asked: namedIn(i, n.context).askedNames.join(' and ') || null,
         cause: causeOf(i),
@@ -481,7 +496,7 @@ export function renderEmail(
         startedAt: drop.start,
         recoveredAt: drop.end,
         okLocations: num(ctx.okLocations, 2),
-        owner: i.sites.primary?.display_name ?? null,
+        owner: l0Of(i)?.display_name ?? null,
         ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
         problem: dropProblem(i, drop, ctx),
       });
@@ -495,7 +510,7 @@ export function renderEmail(
             ...base,
             severity: summarySeverity(i),
             drops,
-            owner: i.sites.primary?.display_name ?? null,
+            owner: l0Of(i)?.display_name ?? null,
             ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
             pausedUntil: i.acked_at ? null : (ladderFactsOf(i, sentAt)?.pausedUntil ?? null),
           })

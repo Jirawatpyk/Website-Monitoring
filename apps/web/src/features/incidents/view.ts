@@ -30,6 +30,8 @@ export interface IncidentRow {
   acked_at: string | null;
   acked_by: string | null;
   recovered_at: string | null;
+  /** The person L0 paged (S10): the person on call outside response hours, else null (the owner). */
+  l0_user_id?: string | null;
   sites: {
     name: string;
     tier: number;
@@ -51,6 +53,8 @@ export interface Viewer {
   email: string;
   displayName: string;
   role: Role;
+  /** Holds the on-call shift right now (S10). */
+  onCallNow?: boolean;
 }
 
 export type AckState =
@@ -104,6 +108,8 @@ export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
   return mayAcknowledge(viewer, {
     primaryOwnerId: i.sites.primary_owner_id,
     backupOwnerId: i.sites.backup_owner_id,
+    tier: i.sites.tier,
+    l0UserId: i.l0_user_id ?? null,
   });
 }
 
@@ -136,7 +142,9 @@ export function buildIncidentView(
       ? 'You’re the owner.'
       : isBackup
         ? 'You’re the backup owner.'
-        : 'You’re an Admin.';
+        : viewer.role === 'admin'
+          ? 'You’re an Admin.'
+          : 'You’re on call.';
 
   let ack: AckState;
   if (i.state === 'acknowledged' && i.acked_at) {

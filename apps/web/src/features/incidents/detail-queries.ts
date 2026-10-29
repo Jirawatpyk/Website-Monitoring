@@ -269,7 +269,7 @@ export async function loadIncident(
     .select(
       `id, number, state, severity, trigger, escalation_level, started_at, detected_at, acked_at, acked_by,
        recovered_at, resolved_at, resolved_by, auto_resolved, client_update_required, client_updated_at,
-       root_cause_category, root_cause, root_cause_fix, site_id, monitor_id,
+       root_cause_category, root_cause, root_cause_fix, site_id, monitor_id, l0_user_id,
        sites!inner(name, tier, primary_owner_id, backup_owner_id,
          monitors(id, url, is_primary, timeout_ms, allowed_redirect_domains),
          clients(am_user_id))`,
@@ -280,6 +280,18 @@ export async function loadIncident(
   if (incident.error) throw new Error(`incident: ${incident.error.message}`);
   const i = incident.data;
   if (!i) return null;
+  // can_ack's on-call branch (S10, D-048): a Responder holding the shift acts on any Tier 1 incident.
+  let actor = viewer;
+  if (viewer.role === 'responder' && i.sites.tier === 1) {
+    const shift = await db
+      .from('oncall_shifts')
+      .select('user_id')
+      .lte('starts_at', now.toISOString())
+      .gt('ends_at', now.toISOString())
+      .maybeSingle();
+    if (shift.error) throw new Error(`oncall_shifts: ${shift.error.message}`);
+    actor = { ...viewer, onCallNow: shift.data?.user_id === viewer.id };
+  }
 
   const primary = (
     i.sites.monitors as {
@@ -359,7 +371,7 @@ export async function loadIncident(
   const pageChange = pageChangeLive
     ? { ...pageChangeLive, accepted: incidentAccept(i, events, nameOf) }
     : null;
-  const view = buildIncidentView(i, events, viewer, names, now);
+  const view = buildIncidentView(i, events, actor, names, now);
 
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
   const shot =
@@ -395,7 +407,7 @@ export async function loadIncident(
     backup: i.sites.backup_owner_id ? nameOf(i.sites.backup_owner_id) : null,
     am: am ? nameOf(am) : null,
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
-    canAct: canAcknowledge(viewer, i),
+    canAct: canAcknowledge(actor, i),
     rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },
     gate: resolveGate(
       {

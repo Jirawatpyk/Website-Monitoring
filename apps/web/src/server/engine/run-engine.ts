@@ -10,6 +10,7 @@ import {
   latestPerView,
   decideSite,
   problemHoldUntil,
+  isInsideHours,
   bkkControlDown,
   bkkControlFailing,
   faultyByMinute,
@@ -183,7 +184,12 @@ export async function runEngine(
   const logged = await db.rpc('engine_log_windows', { p_now: now.toISOString() });
   if (logged.error)
     console.error(JSON.stringify({ event: 'engine_log_windows_failed', error: logged.error.message }));
-  // A waiting request's reminders, 12 h and 1 h before its start (S09b, §24.2); a failure retries next run.
+  // On-call weeks four weeks ahead (S10, never fatal), then a waiting request's reminders, 12 h and 1 h before its start (S09b, §24.2); a failure retries next run.
+  const shifts = await db.rpc('oncall_extend_shifts', {
+    p_until: new Date(now.getTime() + 28 * 86_400_000).toISOString(),
+  });
+  if (shifts.error)
+    console.error(JSON.stringify({ event: 'oncall_extend_shifts_failed', error: shifts.error.message }));
   const reminded = await db.rpc('engine_window_reminders', { p_now: now.toISOString() });
   if (reminded.error)
     console.error(JSON.stringify({ event: 'engine_window_reminders_failed', error: reminded.error.message }));
@@ -1018,6 +1024,7 @@ async function apply(
         },
         p_notify: !site.muted,
         ...holdFor(site.tier, now, hours),
+        p_outside_hours: !isInsideHours(now, hours),
         ...judged,
       });
       if (error) throw new Error(`engine_open_incident: ${error.message}`);
@@ -1038,6 +1045,7 @@ async function apply(
           escalated: true,
         },
         p_notify: !site.muted,
+        p_outside_hours: !isInsideHours(d.confirmedAt, hours),
         ...judged,
       });
       if (error) throw new Error(`engine_escalate_incident: ${error.message}`);
@@ -1099,6 +1107,8 @@ async function apply(
         p_round_at: d.roundAt.toISOString(),
         p_context: downContext(d, site),
         p_notify: !site.muted,
+        // Who L0 pages is judged at the moment the SQL freezes them (S10, D-048): Tier 1 outside hours → on call.
+        p_outside_hours: !isInsideHours(d.confirmedAt, hours),
         ...judged,
       });
       if (error) throw new Error(`engine_open_incident: ${error.message}`);
@@ -1225,6 +1235,7 @@ async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promis
       p_incident_id: inc.incident_id,
       p_at: now.toISOString(),
       ...(inc.severity === 'problem' ? holdFor(inc.tier as Tier, now, hours) : {}),
+      p_outside_hours: !isInsideHours(now, hours),
     });
     if (posted.error) failed.push(`${inc.incident_id}: ${posted.error.message}`);
     else if (posted.data) queued += 1;

@@ -43,6 +43,43 @@ const problemContext = {
   reporting: 3,
 };
 
+describe('render — the person on call L0 paged (S10, D-048)', () => {
+  const tle = { id: 'u-tle', display_name: 'Tle', google_chat_user_id: 'TLE' };
+  const night: IncidentFacts = {
+    ...incident,
+    sites: { ...incident.sites, tier: 1 },
+    l0: { ...tle, is_active: true, role: 'responder' },
+  };
+  const thread = { threadId: '<inc-inc-141@notify.example.test>', startsThread: true };
+
+  it('@mentions the person on call instead of the owner, and the email says why they got it', () => {
+    const m = renderChat(row('problem', problemContext), night, appUrl, now)!;
+    expect(m.text).toMatch(/^<users\/TLE> PROBLEM · Fuji Links \(Tier 1\)/);
+    const email = renderEmail(
+      { ...row('problem', problemContext), user_id: 'u-tle', channel: 'email' },
+      night,
+      { id: 'u-tle', email: 'tle@example.test', display_name: 'Tle' },
+      appUrl,
+      thread,
+    )!;
+    expect(email.text).toContain('You’re on call for Fuji Links — please take a look');
+    expect(email.text).toContain(
+      'You got this because you’re on call: Fuji Links is Tier 1 and it’s outside response hours.',
+    );
+    expect(email.text).not.toContain('you own');
+  });
+
+  it('falls back to the owner once the person on call is deactivated or no longer a Responder', () => {
+    for (const l0 of [
+      { ...tle, is_active: false, role: 'responder' },
+      { ...tle, is_active: true, role: 'viewer' },
+    ]) {
+      const m = renderChat(row('problem', problemContext), { ...night, l0 }, appUrl, now)!;
+      expect(m.text).toMatch(/^<users\/PLOY> PROBLEM/);
+    }
+  });
+});
+
 describe('render — PROBLEM rows', () => {
   it('renders the PROBLEM card with the stored cause, summary and where it was seen', () => {
     const m = renderChat(row('problem', problemContext), incident, appUrl, now)!;

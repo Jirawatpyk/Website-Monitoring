@@ -119,6 +119,8 @@ describe('runEngine', () => {
             },
           ],
           p_status: 'down',
+          // Tue 17:00 Bangkok, inside response hours: L0 is the owner (S10).
+          p_outside_hours: false,
         },
       },
     ]);
@@ -883,8 +885,29 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     expect(rpcCalls.find((c) => c.name === 'engine_post_late_alert')?.args).toEqual({
       p_incident_id: 'i9',
       p_at: now.toISOString(),
+      p_outside_hours: false,
     });
     expect(summary.notified).toBe(1);
+  });
+
+  it('at 23:00 on a weekday the first alert is judged outside response hours, so L0 pages on call (S10)', async () => {
+    const night = new Date('2026-10-06T16:00:00Z'); // Tue 23:00 Bangkok
+    const { db, rpcCalls, readCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: [] },
+      'rpc.engine_silent_incidents': {
+        data: [{ incident_id: 'i9', site_id: 's1', tier: 1, severity: 'down', detected_at: at(-900) }],
+      },
+      'rpc.engine_post_late_alert': { data: true },
+    });
+    await runEngine(db, night);
+    expect(rpcCalls.find((c) => c.name === 'engine_post_late_alert')?.args).toMatchObject({
+      p_outside_hours: true,
+    });
+    // Every run keeps four weeks of on-call shifts made from the rotation.
+    expect(readCalls.find((c) => c.name === 'oncall_extend_shifts')?.args).toEqual({
+      p_until: new Date(night.getTime() + 28 * 86_400_000).toISOString(),
+    });
   });
 
   it('one late alert that fails never holds back the next site’s (engine review H1)', async () => {
