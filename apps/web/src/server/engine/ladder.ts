@@ -22,8 +22,11 @@ export async function escalationTick(
     .select(
       'id, state, severity, episode_severity, detected_at, alerted_at, escalation_level, escalation_plan',
     )
-    // Acknowledged too: the Tier 1 FYI step still goes while the site is down (S10, spec §14.1).
-    .in('state', ['unacked', 'escalated', 'acknowledged'])
+    // Acknowledged too, but only Tier 1 DOWN: its FYI step still goes while the site is down (S10,
+    // spec §14.1); no other plan fires anything after an ack.
+    .or(
+      'state.in.(unacked,escalated),and(state.eq.acknowledged,severity.eq.down,escalation_plan->>tier.eq.1)',
+    )
     .not('escalation_plan', 'is', null);
   if (error) throw new Error(`incidents: ${error.message}`);
 
