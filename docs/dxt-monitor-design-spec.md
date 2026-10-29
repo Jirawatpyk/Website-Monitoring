@@ -1,6 +1,6 @@
 # DxT Monitor — Design spec for developer handoff
 
-Version: 15 Oct 2026 (r2) · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
+Version: 29 Oct 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
 Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (53 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
 
 ## 0. How to use this spec
@@ -38,11 +38,11 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | MIncidentPageChangeDark | Mobile — Incident: page change · dark (§26.10) | 390×844 | Core flows · incidents · maintenance · onboarding · page change |
 | AddSite | Add site + registration checklist | 1440×1680 | Core flows · incidents · maintenance · onboarding |
 | Escalation | Escalation policies | 1440×1528 | Operations & governance · web |
-| OnCall | On-call rotation | 1440×1464 | Operations & governance · web |
+| OnCall | On-call rotation · VIEW AS + REQUEST show the swap states (§27) | 1440×1960 | Operations & governance · web |
 | Probes | Probes & heartbeat | 1440×1496 | Operations & governance · web |
 | AuditLog | Audit log | 1440×2000 | Operations & governance · web |
 | MIncidents | Mobile — Incidents | 390×844 | Mobile app · 390 |
-| MOnCall | Mobile — On-call | 390×844 | Mobile app · 390 |
+| MOnCall | Mobile — On-call · BOARD STATE: test-link landing + swap request (§27) | 390×904 | Mobile app · 390 |
 | MMaintenance | Mobile — Mute / maintenance sheet | 390×844 | Mobile app · 390 |
 | MEscalation | Mobile — Escalation (view only, §22) | 390×844 | Mobile app · 390 |
 | MProfile | Mobile — My profile (§22) | 390×844 | Mobile app · 390 |
@@ -81,7 +81,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 ## 2. People — sample data
 - Tao = Jirawat Piyakit, Admin. Display **"Tao"** everywhere (sidebar footer: "Tao" / "Jirawat Piyakit · Admin"). Never "Jirawat Piyakit (Tao)" or "Jirawat Piyakit" alone in activity text.
 - Responders: Arm, Ploy, Nok. Stakeholders: Thee (AM), Bua (AM), CEO. Viewer: Mint. "Second Admin" = invited, not joined → only 1 active Admin today (show a warning where monitor-fault alerts or admin coverage are described).
-- On-call rotation (Tier 1 nights/weekends): Ploy Mon 21 Sep → Mon 28 Sep (current), Nok 28 Sep → 5 Oct, Arm 5 Oct → 12 Oct (swap requested by Arm with Nok, Nok has NOT accepted yet), Ploy 12 → 19 Oct. Tao is not in the rotation (Admin backstop).
+- On-call rotation (Tier 1 nights/weekends): Ploy Mon 21 Sep → Mon 28 Sep (current), Nok 28 Sep → 5 Oct, Arm 5 Oct → 12 Oct (swap requested by Arm with Nok's Mon 19 → 26 Oct week, Nok has NOT accepted yet — §27), Ploy 12 → 19 Oct, Nok 19 → 26 Oct. Tao is not in the rotation (Admin backstop).
 
 ## 3. Sites (17) — tier (proposed) · owner · backup · client · AM (owners/backups/AMs are sample data)
 Tier 1 (1 min, 24/7): Bangkok Airways – Taiwan · Arm · Ploy · Bangkok Airways · Bua | Bangkok Airways – China · Arm · Ploy · Bangkok Airways · Bua | ENEOS Industrial · Ploy · Arm · ENEOS · Thee | MuvMi · Arm · Ploy · MuvMi · Bua | realme.link · Nok · Arm · realme · Thee
@@ -380,4 +380,21 @@ Decision D-041 (Tao, 13 Oct 2026). Boards: **IncidentPageChange** (desktop; STAT
    - **No fingerprint yet** — "No fingerprint yet — the first check runs within 30 min".
 9. **Chat and email.** Cause row added to the ChatAlert PROBLEM cause table: `/ · title "Bangkok Airways – Taiwan" → "… | สล็อตออนไลน์"` or `/ · new script domain evil-cdn.example`. The PROBLEM email is unchanged apart from the cause text.
 10. **Checks.** Every state at 390 / 820 / 1440, light and dark (AURA tokens only; the danger chip and dialog alert use the alert-danger tokens; dark = aura-tokens-dark.css loaded after the light tokens). **820 px** (IncidentPageChange820): sidebar collapsed to its icon rail, key-facts strip 3 per row, side column (Escalation, Resolve) stacked under the main column, What changed keeps the field-name column. **Dark**: IncidentPageChangeDark (1440) and MIncidentPageChangeDark (390), every STATE. The Site detail card uses the same rows and tokens, so it follows these. Touch targets ≥ 44 px. Added / removed domains always carry "+" / "−" and a screen-reader word ("new" / "removed"), never colour alone. Copy per §13 — no spec codes in the UI.
+
+## 27. On-call swap — the person asked, and the test-link landing — slice S10, added 29 Oct 2026
+Decision D-048: a swap is accepted by the person asked, then approved by an Admin; every step is logged. Boards: **OnCall** (1440; VIEW AS Tao · Admin / Nok · asked / Arm · requester / Ploy · others × REQUEST Waiting for Nok / Accepted / Declined by Nok / Approved / Declined by Tao / Withdrawn) and **MOnCall** (390; BOARD STATE Ploy · on call / Ploy · opened the test link / Tao · opened Ploy’s test link / Nok · swap request / accepted / declined / approved / closed by Tao / withdrawn by Arm). The board controls are dashed and are not part of the product. Sample: Arm asks Nok (Tue 22 Sep 10:12, “Family trip”) — Nok takes Arm’s Mon 5 → 12 Oct, Arm takes Nok’s Mon 19 → 26 Oct.
+
+1. **Order.** Requester asks → the person asked accepts or declines → an Admin approves or declines. Nothing changes in the rotation before the Admin approves. Each step messages the others in Chat (and email where drawn — the message text is not in this slice) and adds an audit-log line. No Undo anywhere in this flow: until the Admin acts, the requester can withdraw and the Admin can decline.
+2. **Entry.** The Chat / email message to the person asked links to `/oncall?swap=<id>`. Opening it shows the request card near the top of On-call — desktop above the on-call hero, phone first in the scroll.
+3. **Request card (person asked).** Eyebrow “SWAP REQUEST”, “Arm asks you to swap weeks”, the request time and reason, a state badge. Two weeks with dates — side by side on desktop, stacked on the phone with the swap icon between: “You would take · Mon 5 → 12 Oct · Arm’s week now” and “Arm would take · Mon 19 → 26 Oct · Your week now”. Back-to-back warning when accepting would give the person two weeks in a row (“You would be on call Mon 28 Sep → Mon 12 Oct — two weeks in a row.”). Buttons Accept (primary, check) and Decline (secondary) — a pair on the phone, Decline left — with “Accepting sends it to Tao to approve. Nothing changes in the rotation until then. Logged in the audit log.”
+4. **Decline** opens a dialog: “Decline Arm’s swap?” · “Arm keeps Mon 5 → 12 Oct and you keep Mon 19 → 26 Oct. Arm gets a Chat message and an email.” · Reason **optional** (“e.g. I’m away that week”, hint “Optional. Arm sees it.”) · Back / Decline swap (danger). The Admin’s decline dialog keeps its **required** reason.
+5. **States after the person asked acts** (status line in the card; buttons gone):
+   - Accepted — badge “Waiting for Tao” · “Accepted · waiting for an Admin to approve. Nothing changes in the rotation until then.” Both weeks’ rows still show Swap requested; the back-to-back warning stays.
+   - Declined — “You declined · Arm keeps Mon 5 → 12 Oct.” + time, reason (or “No reason given”), “Arm got a Chat message and an email”.
+   - Approved — the rows have swapped (Nok Mon 5 → 12 Oct, Arm Mon 19 → 26 Oct, both Scheduled, “Swapped · Fri 10:08”) and the card says “The weeks have swapped …” + “Approved by Tao · Fri 10:08”.
+   - No longer open — badge “Closed” · “This request is closed — Declined by Tao · “<reason>”” or “— Withdrawn by Arm · <time>”, plus who keeps which week.
+6. **Roles.** Person asked: Accept / Decline. Requester: the side card read-only with Withdraw while open. Admin: Approve / Decline — Approve is disabled with “Approve unlocks once Nok accepts — Nok first, then an Admin.” until the person asked accepts. Everyone else: the rotation rows only (“Swap requested”), no card. Only Admins edit the rotation; others get “Swap” only on their own future rows.
+7. **Rotation rows.** Both weeks of an open request (waiting or accepted) show Swap requested (neutral outline arrow-up-down, §15.8). On the phone the second line says what it waits for: “with Nok, waiting for Nok” / “… waiting for an Admin”. Request-a-swap dialog copy (desktop + phone): “<name> gets a Chat message and an email to accept, then an Admin approves. Nothing changes in the rotation until then.”
+8. **Test-alert landing (phone).** Opening the test link on the tester’s phone: success alert “Test alert received on this phone at 10:08”; the checklist row ticks with “Received on this phone at 10:08”; the count reads 3/3 and “Ploy’s phone 3 of 3 ready · test alert received 10:08” (OnCall’s phone card matches). Someone else opening it (Tao): warning “This test was for Ploy — open it on Ploy’s phone.” — nothing is ticked, and Tao sees no checklist.
+9. **Not in this slice:** the 2-step lines (D-007 retired them — still on the OnCall Admin side card, to be removed by Tao’s call), the rotation editor and Hand over, Chat / email message text. Sample people, dates and reasons are made up — compute them; never copy.
 

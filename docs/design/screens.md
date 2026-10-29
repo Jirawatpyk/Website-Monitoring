@@ -44,8 +44,8 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | MMaintenanceList | Mobile — Maintenance & mutes | `/maintenance` (390) | P0 (mute pulled into the MVP) | S09 | §22, §23.9 | FR-10a, FR-14 |
 | Escalation | Escalation policies | `/escalation` | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §14.1, §14.7, §15.5, §22 | FR-09a, FR-09b |
 | MEscalation | Mobile — Escalation (view only) | `/escalation` (390) | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §22.5–6 | FR-09a, FR-09b |
-| OnCall | On-call rotation | `/oncall` | P1 | S10 | §2, §15.8 | FR-09b, §8 |
-| MOnCall | Mobile — On-call | `/oncall` (390) | P1 | S10 | §10 (checklist) | §8 |
+| OnCall | On-call rotation | `/oncall` | P1 | S10 | §2, §15.8, §27 | FR-09b, §8 |
+| MOnCall | Mobile — On-call | `/oncall` (390) | P1 | S10 | §10 (checklist), §27 | §8 |
 | Expiry | SSL & domain expiry | `/expiry` | P1 | S13 | §14.12, §15.8 | FR-11 |
 | Probes | Probes & heartbeat | `/probes` | P1 | S12 | §14.4, §15.3 | §9 |
 | AuditLog | Audit log | `/audit` | P1 | S15 | §16.11 | FR-13 |
