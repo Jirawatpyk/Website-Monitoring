@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-048 | 29 Oct 2026 | S10 is built and merged before G1; G1 drops CODEOWNERS (Tao works solo with Claude) and runs its DOWN drill on staging (Claude runs it). S10: a swap is accepted by the other person, then approved by an Admin; Hand over shift is built in S10 from the On-call page; Claude drafts messages with no board (message-checker reviews), UI with no board goes to Claude Design; Claude seeds the S10 staging fixtures | D-008 second reviewer; D-035 fixture seeding (S10) |
 | D-047 | 16 Oct 2026 | A drop that recovers within 5 min sends no email: the incident's alert email (DOWN / PROBLEM) waits out a 5-min grace and is cancelled if the site is back first, so no RECOVERED or RESOLVED email follows either; an ack or a failed Chat alert releases it at once; the flap summary emails only an owner already emailed; Google Chat is unchanged | PRD §9 channel table ("Email: every DOWN/PROBLEM alert"), S02b email timing, D-039 for DOWN episodes |
 | D-046 | 15 Oct 2026 | S09d page change (spec §26): the fingerprint comes from a third crawler fetch, view `plain` with the probe's own User-Agent, kept apart from the keyword views; a new script / iframe domain raises PROBLEM `content_change` on that fetch, any other change when the last 3 usable fetches each differ, removed domains never; no data holds an open one; per-site 14-day recording from the first baseline and a `PAGE_CHANGE_ALERTS` gate (production off until Done-when 3); accepting is Admin only and applies when its 10 s Undo closes; resolving as Client-side change can accept and resolve at once; "Expected change" = `client_change` | Plan S09d "Resolve with root cause 'Expected change'", "holding for 3 fetches" (undefined), Size M |
 | D-045 | 14 Oct 2026 | Phones follow spec §22.1 and the phone boards: the top bar shows a back arrow on pages that aren't a bottom-nav tab, the page's title and the avatar, and a page's own phone button sits there (Site detail's ⋯ between the site name and the avatar, as MSite). Built after G1; until then the shell stays as D-018 built it | D-018 phone bar (brand + avatar, title in the page); D-043 point 1 (⋯ in the breadcrumb row), once built |
@@ -51,6 +52,25 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-048 — S10 goes ahead of G1; G1 without CODEOWNERS, drill on staging; S10's open rules
+
+**Context.** S10 (Escalation L2–L3 & on-call) depends on G1, which is still open on 29 Oct 2026: the second Admin hasn't walked through the runbook. G1 also asked for a second maintainer in `.github/CODEOWNERS` (D-008) and a DOWN drill on production. Tao builds DxT Monitor alone with Claude; the second Admin runs operations, not code. The S10 sources leave a few rules open (the swap flow differs between OnCall and MOnCall, the hand-over dialog is drawn on Users, several messages have no board).
+
+**Decision (Tao, 29 Oct 2026).**
+
+1. **S10 is built and merged before G1** ("ทำและ merge ได้เลย"). G1 still gates the rest of Phase 2 as written.
+2. **G1 drops the CODEOWNERS line** ("CODEOWNERS ไม่ต้องครับ เรา Solo กับคุณ"). Reviews stay the project agents plus `/code-review` (D-008's `pnpm pr:merge` gate is unchanged).
+3. **G1's DOWN drill runs on staging, and Claude runs it** — the test target (Tier 1) set to `error`, timed from the first failed check to the DOWN post in Chat, ≤ 3 min.
+4. **Swap:** the person asked accepts first, then an Admin approves; every step is logged in `audit_log`. This is the OnCall board (and the Guide); MOnCall's "Nothing changes … until X accepts" is read as the first of the two steps.
+5. **Hand over shift is built in S10** with the dialog drawn on Users, opened from "Hand over…" on the live row of the On-call page; S16's Users page opens the same dialog.
+6. **Messages with no board** (swap request / accepted / declined / approved, hand-over, rotation change, the reminder a day before a shift, the L3 FYI when nobody acknowledged) are drafted by Claude on the pattern of the existing ChatAlert / EmailAlert rows and checked by message-checker; the texts are listed below once built. **UI with no board goes to Claude Design first** (the counterpart's view of a swap request; the test-alert link's landing).
+7. **Staging fixture people** for S10 (CEO, AM, on-call, all with Tao's Chat id) are seeded by Claude on staging, replacing D-035's "Tao runs it" for this slice. Never on production.
+8. **Settled by precedence, recorded here so they aren't re-asked:** the Tier 1 L2 CEO step is on with no tag (D-009); Tier 2–3 L2 is a reminder to Tao by Chat and email (spec §16.5 over the board's Chat only); the OnCall board's 2-step lines are dropped (D-007); the voice label is "Configured · off until approved" (§15.5); the phone checklist says "@mentions only" (§10, over PRD §13's risk row); there is no PROBLEM L2 (PRD §8's "T+1 business day" has no spec or board); Tier 1 on company holidays goes to the person on call, as at weekends (plan S10, `company_holidays`); a rotation of one person (on-call = Tle every week, D-009) shows Swap disabled with nobody to swap with.
+
+**Why.** G1's people steps don't block S10's code, and a second code reviewer doesn't exist. The drill proves the alert path end to end; staging has the same probes, engine and notifier as production.
+
+**Impact.** Plan: G1 (no CODEOWNERS, drill on staging), S10 status. S10 PR A (L2–L3) and PR B (on-call). Supersedes D-008's "second Admin reviews every PR" and D-035's "Tao seeds the fixtures" for S10.
 
 ## D-047 — No email for a drop that recovers within 5 min
 
