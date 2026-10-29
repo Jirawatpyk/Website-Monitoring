@@ -49,7 +49,7 @@ create table public.oncall_swaps (
   counterpart_id uuid not null references public.profiles (id) on delete restrict,
   reason text check (reason is null or length(reason) <= 500),
   status text not null default 'waiting'
-    check (status in ('waiting', 'accepted', 'declined', 'approved', 'admin_declined', 'withdrawn')),
+    check (status in ('waiting', 'accepted', 'declined', 'approved', 'admin_declined', 'withdrawn', 'expired')),
   responded_at timestamptz,
   response_note text check (response_note is null or length(response_note) <= 500),
   decided_by uuid references public.profiles (id) on delete set null,
@@ -83,7 +83,7 @@ create table public.oncall_events (
   id uuid primary key default gen_random_uuid(),
   kind text not null check (kind in (
     'rotation_changed', 'swap_requested', 'swap_accepted', 'swap_declined', 'swap_approved',
-    'swap_admin_declined', 'swap_withdrawn', 'handed_over', 'test_alert', 'shift_reminder')),
+    'swap_admin_declined', 'swap_withdrawn', 'swap_expired', 'handed_over', 'test_alert', 'shift_reminder')),
   actor_id uuid references public.profiles (id) on delete set null,
   user_id uuid references public.profiles (id) on delete set null,
   swap_id uuid references public.oncall_swaps (id) on delete restrict,
@@ -101,7 +101,7 @@ alter table public.notifications
 alter table public.notifications drop constraint notifications_one_subject;
 alter table public.notifications
   add constraint notifications_one_subject
-  check (num_nonnulls(incident_id, system_alert_id, maintenance_window_id, oncall_event_id) = 1);
+  check (num_nonnulls(incident_id, system_alert_id, maintenance_window_id, oncall_event_id) = 1) not valid;
 create unique index notifications_once_per_oncall_event
   on public.notifications (oncall_event_id, channel, template, user_id, dedupe_key) nulls not distinct
   where status <> 'cancelled' and oncall_event_id is not null;
@@ -179,8 +179,9 @@ as $$
   select s.user_id from public.oncall_shifts s
   join public.profiles p on p.id = s.user_id and p.is_active and p.role in ('admin', 'responder')
   where s.starts_at <= p_at and p_at < s.ends_at
-    -- The session's role, not the JWT: the engine's service-role calls may carry no claims.
-    and (current_setting('role', true) = 'service_role' or (select public.is_staff()))
+    -- A signed-in session must be staff; the engine (service role, maybe without claims), cron and the
+    -- owner always see the shift. The session's role, not the JWT: it can't be set by the caller.
+    and (current_setting('role', true) is distinct from 'authenticated' or (select public.is_staff()))
   order by s.starts_at desc limit 1;
 $$;
 
@@ -211,9 +212,23 @@ declare
   v_start timestamptz;
   v_slot integer;
   v_made integer := 0;
+  v_swap record;
 begin
   -- One writer at a time: the cron and a rotation save (db review L5).
   perform pg_advisory_xact_lock(hashtext('oncall_extend_shifts'));
+  -- A request still open when one of its weeks starts can't be approved any more (§27: live shifts are
+  -- handed over): closed as expired, logged and told.
+  for v_swap in
+    update public.oncall_swaps w set status = 'expired', decided_at = now()
+      where w.status in ('waiting', 'accepted')
+        and exists (select 1 from public.oncall_shifts s
+                    where s.id in (w.requester_shift_id, w.counterpart_shift_id) and s.starts_at <= now())
+      returning w.id, w.requester_shift_id
+  loop
+    insert into public.audit_log (actor_id, action, entity, entity_id, after)
+    values (null, 'oncall.swap_expire', 'oncall_swap', v_swap.id, jsonb_build_object('status', 'expired'));
+    perform private.oncall_event('swap_expired', null, v_swap.id, v_swap.requester_shift_id);
+  end loop;
   select array_agg(r.user_id order by r.position) into v_people
   from public.oncall_rotation r join public.profiles p on p.id = r.user_id and p.is_active;
   if v_people is null then
@@ -239,6 +254,23 @@ begin
     v_start := v_start + interval '7 days';
   end loop;
   return v_made;
+end;
+$$;
+
+-- A free-text reason or note: trimmed, null when empty, at most 500 characters.
+create function private.oncall_note(p_text text)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v text := nullif(btrim(coalesce(p_text, '')), '');
+begin
+  if length(v) > 500 then
+    raise exception 'The reason is too long (500 characters at most)' using errcode = '22023', hint = 'reason_too_long';
+  end if;
+  return v;
 end;
 $$;
 
@@ -335,7 +367,7 @@ begin
     raise exception 'A swap is already waiting' using errcode = '22023', hint = 'swap_open';
   end if;
   insert into public.oncall_swaps (requester_shift_id, counterpart_shift_id, requester_id, counterpart_id, reason)
-  values (v_a.id, v_b.id, v_a.user_id, v_b.user_id, nullif(btrim(coalesce(p_reason, '')), ''))
+  values (v_a.id, v_b.id, v_a.user_id, v_b.user_id, private.oncall_note(p_reason))
   returning id into v_id;
   insert into public.audit_log (actor_id, action, entity, entity_id, after)
   values (auth.uid(), 'oncall.swap_request', 'oncall_swap', v_id,
@@ -354,6 +386,7 @@ set search_path = ''
 as $$
 declare
   v public.oncall_swaps%rowtype;
+  v_note text := private.oncall_note(p_note);
 begin
   if p_accept is null then
     raise exception 'Accept or decline' using errcode = '22023', hint = 'invalid';
@@ -373,12 +406,12 @@ begin
   end if;
   update public.oncall_swaps
     set status = case when p_accept then 'accepted' else 'declined' end, responded_at = now(),
-        response_note = nullif(btrim(coalesce(p_note, '')), '')
+        response_note = v_note
     where id = v.id;
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), case when p_accept then 'oncall.swap_accept' else 'oncall.swap_decline' end,
           'oncall_swap', v.id, jsonb_build_object('status', v.status),
-          jsonb_build_object('status', case when p_accept then 'accepted' else 'declined' end, 'note', nullif(btrim(coalesce(p_note, '')), '')));
+          jsonb_build_object('status', case when p_accept then 'accepted' else 'declined' end, 'note', v_note));
   perform private.oncall_event(case when p_accept then 'swap_accepted' else 'swap_declined' end,
                                v.requester_id, v.id, v.requester_shift_id);
 end;
@@ -393,7 +426,7 @@ set search_path = ''
 as $$
 declare
   v public.oncall_swaps%rowtype;
-  v_note text := nullif(btrim(coalesce(p_note, '')), '');
+  v_note text := private.oncall_note(p_note);
 begin
   if coalesce(public.current_app_role() = 'admin', false) is not true then
     raise exception 'Only an Admin can approve or decline a swap' using errcode = '42501';
@@ -422,8 +455,11 @@ begin
                and starts_at <= now()) then
       raise exception 'The live shift can’t be swapped — hand it over in Users' using errcode = '22023', hint = 'swap_live';
     end if;
-    update public.oncall_shifts set user_id = v.counterpart_id where id = v.requester_shift_id;
-    update public.oncall_shifts set user_id = v.requester_id where id = v.counterpart_shift_id;
+    -- A week handed over earlier now belongs to someone else: its hand-over (and private reason) goes.
+    update public.oncall_shifts set user_id = v.counterpart_id, handed_over_from = null, handover_reason = null
+      where id = v.requester_shift_id;
+    update public.oncall_shifts set user_id = v.requester_id, handed_over_from = null, handover_reason = null
+      where id = v.counterpart_shift_id;
   end if;
   update public.oncall_swaps
     set status = case when p_approve then 'approved' else 'admin_declined' end,
@@ -477,7 +513,7 @@ set search_path = ''
 as $$
 declare
   v public.oncall_shifts%rowtype;
-  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_reason text := private.oncall_note(p_reason);
   v_at timestamptz := greatest(coalesce(p_at, now()), now());
   v_new uuid;
   v_swap record;
@@ -544,6 +580,9 @@ begin
   if not private.oncall_eligible(auth.uid()) then
     raise exception 'Only Admins and Responders take on-call weeks' using errcode = '42501';
   end if;
+  if p_mentions_only is null or p_dnd_allowed is null then
+    raise exception 'Tick or untick each item' using errcode = '22023', hint = 'invalid';
+  end if;
   insert into public.oncall_checklist (user_id, mentions_only, dnd_allowed)
   values (auth.uid(), p_mentions_only, p_dnd_allowed)
   on conflict (user_id) do update set mentions_only = excluded.mentions_only, dnd_allowed = excluded.dnd_allowed;
@@ -563,18 +602,21 @@ begin
   if not private.oncall_eligible(auth.uid()) then
     raise exception 'Only Admins and Responders take on-call weeks' using errcode = '42501';
   end if;
-  if exists (select 1 from public.oncall_checklist where user_id = auth.uid() and test_sent_at > now() - interval '1 minute') then
-    raise exception 'A test alert went less than a minute ago — wait a moment' using errcode = '55000', hint = 'test_too_soon';
-  end if;
   insert into public.oncall_checklist (user_id, test_sent_at, test_token, test_received_at)
   values (auth.uid(), v_at, gen_random_uuid(), null)
-  on conflict (user_id) do update set test_sent_at = v_at, test_token = gen_random_uuid(), test_received_at = null;
+  on conflict (user_id) do update set test_sent_at = v_at, test_token = gen_random_uuid(), test_received_at = null
+    where public.oncall_checklist.test_sent_at is null
+       or public.oncall_checklist.test_sent_at <= v_at - interval '1 minute';
+  if not found then
+    raise exception 'A test alert went less than a minute ago — wait a moment' using errcode = '55000', hint = 'test_too_soon';
+  end if;
   perform private.oncall_event('test_alert', auth.uid(), null, null);
   return v_at;
 end;
 $$;
 
--- The test link opened: only the person it was for ticks it (§27.8 "This test was for Ploy").
+-- The test link opened: only the person it was for ticks it (§27.8 "This test was for Ploy"). Opening
+-- it again shows the same receipt; the next test alert replaces the link.
 create function public.confirm_oncall_test(p_token uuid)
 returns timestamptz
 language plpgsql
@@ -598,7 +640,7 @@ begin
       using errcode = '42501', hint = 'test_other_person';
   end if;
   if v.test_received_at is null then
-    update public.oncall_checklist set test_received_at = now(), test_token = null where id = v.id returning * into v;
+    update public.oncall_checklist set test_received_at = now() where id = v.id returning * into v;
   end if;
   return v.test_received_at;
 end;
@@ -617,11 +659,13 @@ as $$
   select w.reason, w.response_note, w.decision_note, null::text
   from public.oncall_swaps w
   where w.id = p_swap_id
+    and (select public.is_staff())
     and ((select public.current_app_role()) = 'admin' or auth.uid() in (w.requester_id, w.counterpart_id))
   union all
   select null, null, null, s.handover_reason
   from public.oncall_shifts s
   where s.id = p_shift_id
+    and (select public.is_staff())
     and ((select public.current_app_role()) = 'admin' or auth.uid() in (s.user_id, s.handed_over_from));
 $$;
 
@@ -632,6 +676,7 @@ revoke execute on function
   private.oncall_event(text, uuid, uuid, uuid, jsonb),
   public.oncall_extend_shifts(timestamptz),
   private.oncall_eligible(uuid),
+  private.oncall_note(text),
   public.save_oncall_rotation(uuid[], text),
   public.request_oncall_swap(uuid, uuid, text),
   public.respond_oncall_swap(uuid, boolean, text),
@@ -647,7 +692,8 @@ revoke execute on function
 revoke execute on function
   public.oncall_extend_shifts(timestamptz),
   private.oncall_event(text, uuid, uuid, uuid, jsonb),
-  private.oncall_eligible(uuid)
+  private.oncall_eligible(uuid),
+  private.oncall_note(text)
   from authenticated;
 grant execute on function
   public.oncall_week_start(timestamptz),

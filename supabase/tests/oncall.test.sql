@@ -4,7 +4,7 @@
 -- and that nobody writes the tables directly.
 begin;
 \ir _helpers.psql
-select plan(60);
+select plan(65);
 
 -- ── Fixtures ─────────────────────────────────────────────────────────────
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -215,8 +215,41 @@ select is((select array[(select status from public.oncall_swaps where id = (sele
 select tests.authenticate_as((select id from ids where name = 'ploy'));
 select throws_ok($$ select public.send_oncall_test() $$, '55000', null, 'a second test within a minute is refused');
 reset role;
-select is((select test_token from public.oncall_checklist where user_id = (select id from ids where name = 'ploy')), null,
-  'the confirmed link''s token is gone');
+select tests.authenticate_as((select id from ids where name = 'ploy'));
+select is(public.confirm_oncall_test((select t from tok)),
+  (select test_received_at from public.oncall_checklist where user_id = auth.uid()), 'opening the link again shows the same receipt');
+select throws_ok($$ select public.set_oncall_checklist(null, true) $$, '22023', 'Tick or untick each item', 'a null checklist item is refused');
+reset role;
+-- Week 4 was handed to Arm above ("Ploy is away").
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select throws_ok($$ select public.request_oncall_swap((select id from wk where n = 4), (select id from wk where n = 3), repeat('x', 501)) $$,
+  '22023', 'The reason is too long (500 characters at most)', 'a reason over 500 characters is refused with its own message');
+-- An approved swap clears the hand-over of a week that changed hands: Nok never sees "Ploy is away".
+reset role;
+delete from sw;
+select tests.authenticate_as((select id from ids where name = 'arm'));
+insert into sw select public.request_oncall_swap((select id from wk where n = 4), (select id from wk where n = 3));
+reset role;
+select tests.authenticate_as((select id from ids where name = 'nok'));
+select public.respond_oncall_swap((select id from sw), true);
+reset role;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select lives_ok($$ select public.decide_oncall_swap((select id from sw), true) $$, 'the Admin approves Arm ↔ Nok on weeks 4 and 3');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'nok'));
+select is((select handover_reason from public.oncall_notes(null, (select id from wk where n = 4))), null,
+  'Nok, who now has week 4, doesn''t see the earlier hand-over reason');
+reset role;
+-- A request still open when its week starts expires on the next extend (the cron).
+insert into public.oncall_swaps (requester_shift_id, counterpart_shift_id, requester_id, counterpart_id)
+values ((select id from wk where n = 1), (select id from wk where n = 2), (select who from wk where n = 1),
+        (select user_id from public.oncall_shifts where id = (select id from wk where n = 2)));
+set local role service_role;
+select public.oncall_extend_shifts(now());
+reset role;
+select is((select array[status, (select count(*)::text from public.oncall_events e where e.swap_id = w.id and e.kind = 'swap_expired')]
+           from public.oncall_swaps w where w.requester_shift_id = (select id from wk where n = 1)),
+  array['expired', '1'], 'an open request on a started week expires, with its event');
 
 -- ── Nobody writes directly; staff read ───────────────────────────────────
 select tests.authenticate_as((select id from ids where name = 'tao'));
