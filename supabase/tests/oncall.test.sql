@@ -4,7 +4,7 @@
 -- and that nobody writes the tables directly.
 begin;
 \ir _helpers.psql
-select plan(59);
+select plan(60);
 
 -- ── Fixtures ─────────────────────────────────────────────────────────────
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -185,6 +185,9 @@ select throws_ok($$ select public.send_oncall_test() $$, '42501', null, 'nor sen
 reset role;
 select tests.as_anon();
 select throws_ok($$ select public.oncall_person_at(now()) $$, '42501', null, 'anon can''t ask who is on call');
+reset role;
+set local role service_role;
+select isnt(public.oncall_person_at(now()), null, 'the service role finds the on-call person without JWT claims');
 reset role;
 -- L5: a signed-in session never extends the weeks.
 select tests.authenticate_as((select id from ids where name = 'tao'));

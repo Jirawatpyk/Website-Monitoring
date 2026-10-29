@@ -179,7 +179,8 @@ as $$
   select s.user_id from public.oncall_shifts s
   join public.profiles p on p.id = s.user_id and p.is_active and p.role in ('admin', 'responder')
   where s.starts_at <= p_at and p_at < s.ends_at
-    and (auth.role() = 'service_role' or (select public.is_staff()))
+    -- The session's role, not the JWT: the engine's service-role calls may carry no claims.
+    and (current_setting('role', true) = 'service_role' or (select public.is_staff()))
   order by s.starts_at desc limit 1;
 $$;
 
