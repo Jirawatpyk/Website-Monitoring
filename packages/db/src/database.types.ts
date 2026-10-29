@@ -225,14 +225,14 @@ isOneToOne: false
                   ]
                 },"incidents": {
                   Row: {
-                    "acked_at": string | null,"acked_by": string | null,"alerted_at": string | null,"auto_resolved": boolean,"client_update_due_at": string | null,"client_update_note": string | null,"client_update_required": boolean,"client_updated_at": string | null,"client_updated_by": string | null,"created_at": string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level": number,"escalation_plan": Json | null,"id": string,"is_flapping": boolean,"is_manual": boolean,"monitor_id": string | null,"number": number,"recovered_at": string | null,"resolved_at": string | null,"resolved_by": string | null,"review_state": string | null,"root_cause": string | null,"root_cause_category": string | null,"root_cause_fix": string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state": Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at": string
+                    "acked_at": string | null,"acked_by": string | null,"alerted_at": string | null,"auto_resolved": boolean,"client_update_due_at": string | null,"client_update_note": string | null,"client_update_required": boolean,"client_updated_at": string | null,"client_updated_by": string | null,"created_at": string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level": number,"escalation_plan": Json | null,"id": string,"is_flapping": boolean,"is_manual": boolean,"l0_user_id": string | null,"monitor_id": string | null,"number": number,"recovered_at": string | null,"resolved_at": string | null,"resolved_by": string | null,"review_state": string | null,"root_cause": string | null,"root_cause_category": string | null,"root_cause_fix": string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state": Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "acked_at"?: string | null,"acked_by"?: string | null,"alerted_at"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state"?: Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
+                    "acked_at"?: string | null,"acked_by"?: string | null,"alerted_at"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"l0_user_id"?: string | null,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state"?: Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
                   }
                   Update: {
-                    "acked_at"?: string | null,"acked_by"?: string | null,"alerted_at"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at"?: string,"episode_severity"?: Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity"?: Database["public"]['Enums']["severity"],"site_id"?: string,"started_at"?: string,"state"?: Database["public"]['Enums']["incident_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
+                    "acked_at"?: string | null,"acked_by"?: string | null,"alerted_at"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at"?: string,"episode_severity"?: Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"l0_user_id"?: string | null,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity"?: Database["public"]['Enums']["severity"],"site_id"?: string,"started_at"?: string,"state"?: Database["public"]['Enums']["incident_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -244,6 +244,12 @@ isOneToOne: false
     },{
       foreignKeyName: "incidents_client_updated_by_fkey"
       columns: ["client_updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "incidents_l0_user_id_fkey"
+      columns: ["l0_user_id"]
 isOneToOne: false
       referencedRelation: "profiles"
       referencedColumns: ["id"]
@@ -379,14 +385,14 @@ isOneToOne: false
                   ]
                 },"notifications": {
                   Row: {
-                    "attempts": number,"channel": Database["public"]['Enums']["notification_channel"],"context": NonNullable<Json>,"created_at": string,"dedupe_key": string,"error": string | null,"hold_until": string | null,"id": string,"incident_id": string | null,"maintenance_window_id": string | null,"next_retry_at": string | null,"provider_message_id": string | null,"sent_at": string | null,"status": Database["public"]['Enums']["notification_status"],"system_alert_id": string | null,"template": string,"thread_key": string | null,"updated_at": string,"user_id": string | null
+                    "attempts": number,"channel": Database["public"]['Enums']["notification_channel"],"context": NonNullable<Json>,"created_at": string,"dedupe_key": string,"error": string | null,"hold_until": string | null,"id": string,"incident_id": string | null,"maintenance_window_id": string | null,"next_retry_at": string | null,"oncall_event_id": string | null,"provider_message_id": string | null,"sent_at": string | null,"status": Database["public"]['Enums']["notification_status"],"system_alert_id": string | null,"template": string,"thread_key": string | null,"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "attempts"?: number,"channel": Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"maintenance_window_id"?: string | null,"next_retry_at"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template": string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "attempts"?: number,"channel": Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"maintenance_window_id"?: string | null,"next_retry_at"?: string | null,"oncall_event_id"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template": string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "attempts"?: number,"channel"?: Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"maintenance_window_id"?: string | null,"next_retry_at"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template"?: string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "attempts"?: number,"channel"?: Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"maintenance_window_id"?: string | null,"next_retry_at"?: string | null,"oncall_event_id"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template"?: string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -402,6 +408,12 @@ isOneToOne: false
       referencedRelation: "maintenance_windows"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "notifications_oncall_event_id_fkey"
+      columns: ["oncall_event_id"]
+isOneToOne: false
+      referencedRelation: "oncall_events"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "notifications_system_alert_id_fkey"
       columns: ["system_alert_id"]
 isOneToOne: false
@@ -412,6 +424,154 @@ isOneToOne: false
       columns: ["user_id"]
 isOneToOne: false
       referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"oncall_checklist": {
+                  Row: {
+                    "created_at": string,"dnd_allowed": boolean,"id": string,"mentions_only": boolean,"test_received_at": string | null,"test_sent_at": string | null,"test_token": string | null,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"dnd_allowed"?: boolean,"id"?: string,"mentions_only"?: boolean,"test_received_at"?: string | null,"test_sent_at"?: string | null,"test_token"?: string | null,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"dnd_allowed"?: boolean,"id"?: string,"mentions_only"?: boolean,"test_received_at"?: string | null,"test_sent_at"?: string | null,"test_token"?: string | null,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "oncall_checklist_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: true
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"oncall_events": {
+                  Row: {
+                    "actor_id": string | null,"at": string,"id": string,"kind": string,"payload": NonNullable<Json>,"shift_id": string | null,"swap_id": string | null,"user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "actor_id"?: string | null,"at"?: string,"id"?: string,"kind": string,"payload"?: NonNullable<Json>,"shift_id"?: string | null,"swap_id"?: string | null,"user_id"?: string | null
+                  }
+                  Update: {
+                    "actor_id"?: string | null,"at"?: string,"id"?: string,"kind"?: string,"payload"?: NonNullable<Json>,"shift_id"?: string | null,"swap_id"?: string | null,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "oncall_events_actor_id_fkey"
+      columns: ["actor_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "oncall_events_shift_id_fkey"
+      columns: ["shift_id"]
+isOneToOne: false
+      referencedRelation: "oncall_shifts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "oncall_events_swap_id_fkey"
+      columns: ["swap_id"]
+isOneToOne: false
+      referencedRelation: "oncall_swaps"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "oncall_events_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"oncall_rotation": {
+                  Row: {
+                    "created_at": string,"id": string,"position": number,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"position": number,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"position"?: number,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "oncall_rotation_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: true
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"oncall_shifts": {
+                  Row: {
+                    "created_at": string,"ends_at": string,"handed_over_from": string | null,"handover_reason": string | null,"id": string,"starts_at": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"ends_at": string,"handed_over_from"?: string | null,"handover_reason"?: string | null,"id"?: string,"starts_at": string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"ends_at"?: string,"handed_over_from"?: string | null,"handover_reason"?: string | null,"id"?: string,"starts_at"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "oncall_shifts_handed_over_from_fkey"
+      columns: ["handed_over_from"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "oncall_shifts_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"oncall_swaps": {
+                  Row: {
+                    "counterpart_id": string,"counterpart_shift_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"decision_note": string | null,"id": string,"reason": string | null,"requester_id": string,"requester_shift_id": string,"responded_at": string | null,"response_note": string | null,"status": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "counterpart_id": string,"counterpart_shift_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decision_note"?: string | null,"id"?: string,"reason"?: string | null,"requester_id": string,"requester_shift_id": string,"responded_at"?: string | null,"response_note"?: string | null,"status"?: string,"updated_at"?: string
+                  }
+                  Update: {
+                    "counterpart_id"?: string,"counterpart_shift_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decision_note"?: string | null,"id"?: string,"reason"?: string | null,"requester_id"?: string,"requester_shift_id"?: string,"responded_at"?: string | null,"response_note"?: string | null,"status"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "oncall_swaps_counterpart_id_fkey"
+      columns: ["counterpart_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "oncall_swaps_counterpart_shift_id_fkey"
+      columns: ["counterpart_shift_id"]
+isOneToOne: false
+      referencedRelation: "oncall_shifts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "oncall_swaps_decided_by_fkey"
+      columns: ["decided_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "oncall_swaps_requester_id_fkey"
+      columns: ["requester_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "oncall_swaps_requester_shift_id_fkey"
+      columns: ["requester_shift_id"]
+isOneToOne: false
+      referencedRelation: "oncall_shifts"
       referencedColumns: ["id"]
     }
                   ]
@@ -627,6 +787,7 @@ isOneToOne: false
 "incident_id": string | null,
 "maintenance_window_id": string | null,
 "next_retry_at": string | null,
+"oncall_event_id": string | null,
 "provider_message_id": string | null,
 "sent_at": string | null,
 "status": Database["public"]['Enums']["notification_status"],
@@ -699,6 +860,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"confirm_oncall_test":
+{ Args: { "p_token": string }; Returns: string
+                           },
 "crawler_set_baseline":
 { Args: { "p_check_id": string }; Returns: boolean
                            },
@@ -710,6 +874,9 @@ isOneToOne: false
                            },
 "current_app_role":
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
+                           },
+"decide_oncall_swap":
+{ Args: { "p_approve": boolean,"p_note"?: string,"p_swap_id": string }; Returns: undefined
                            },
 "decline_maintenance":
 { Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
@@ -879,6 +1046,9 @@ isOneToOne: false
 "expire_verification_jobs":
 { Args: Record<PropertyKey, never>; Returns: number
                            },
+"hand_over_oncall_shift":
+{ Args: { "p_at": string,"p_reason": string,"p_shift_id": string,"p_to": string }; Returns: string
+                           },
 "hook_before_user_created":
 { Args: { "event": Json }; Returns: Json
                            },
@@ -892,6 +1062,15 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "display_name": string,"email": string,"id": string,"role": Database["public"]['Enums']["app_role"],"status": string
             }[]
+                           },
+"oncall_extend_shifts":
+{ Args: { "p_until": string }; Returns: number
+                           },
+"oncall_person_at":
+{ Args: { "p_at": string }; Returns: string
+                           },
+"oncall_week_start":
+{ Args: { "p_at": string }; Returns: string
                            },
 "open_system_alert":
 { Args: { "p_context": Json,"p_kind": string }; Returns: string
@@ -910,8 +1089,14 @@ isOneToOne: false
 "queue_fallback_emails":
 { Args: { "p_notification_id": string }; Returns: number
                            },
+"request_oncall_swap":
+{ Args: { "p_reason"?: string,"p_shift_id": string,"p_with_shift_id": string }; Returns: string
+                           },
 "resolve_incident":
 { Args: { "p_accept_check_id"?: string,"p_category": string,"p_fix": string,"p_incident_id": string,"p_what": string }; Returns: string
+                           },
+"respond_oncall_swap":
+{ Args: { "p_accept": boolean,"p_note"?: string,"p_swap_id": string }; Returns: undefined
                            },
 "save_escalation_policies":
 { Args: { "p_down_reminder_min": number,"p_note": string,"p_policies": Json,"p_problem_reminder_min": number }; Returns: undefined
@@ -919,8 +1104,17 @@ isOneToOne: false
 "save_monitors":
 { Args: { "p_removals"?: (string)[],"p_site_id": string,"p_upserts": Json }; Returns: undefined
                            },
+"save_oncall_rotation":
+{ Args: { "p_note"?: string,"p_user_ids": (string)[] }; Returns: undefined
+                           },
 "save_root_cause":
 { Args: { "p_category": string,"p_fix": string,"p_incident_id": string,"p_what": string }; Returns: undefined
+                           },
+"send_oncall_test":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
+"set_oncall_checklist":
+{ Args: { "p_dnd_allowed": boolean,"p_mentions_only": boolean }; Returns: undefined
                            },
 "set_site_monitoring":
 { Args: { "p_on": boolean,"p_site_id": string }; Returns: undefined
@@ -957,6 +1151,9 @@ isOneToOne: false
                            },
 "window_state":
 { Args: { "p_at"?: string,"w": Omit<Database["public"]['Tables']["maintenance_windows"]['Row'], Database["public"]['Tables']["maintenance_windows"]['ComputedFields']> }; Returns: string
+                           },
+"withdraw_oncall_swap":
+{ Args: { "p_swap_id": string }; Returns: undefined
                            },
 "withdraw_request":
 { Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
