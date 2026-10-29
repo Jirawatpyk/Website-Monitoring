@@ -56,6 +56,8 @@ export type ChatWidget =
 
 export interface DownAlertInput {
   incidentId: string;
+  /** Everyone else L0 names (the L0 pencil, S10): @mentioned after the owner / on-call. */
+  alsoMention?: readonly ChatPerson[];
   incidentNumber: number;
   site: string;
   tier: number;
@@ -86,6 +88,8 @@ export interface ProblemFacts {
 
 export interface ProblemAlertInput {
   incidentId: string;
+  /** Everyone else L0 names (the L0 pencil, S10): @mentioned after the owner / on-call. */
+  alsoMention?: readonly ChatPerson[];
   incidentNumber: number;
   site: string;
   tier: number;
@@ -138,7 +142,9 @@ export interface RecoveredAlertInput {
  */
 export const plainName = (name: string) => name.replace(/[<>]/g, '');
 
-const mentionOf = (owner: ChatPerson | null) => (owner?.chatUserId ? [owner.chatUserId] : []);
+const mentionOf = (owner: ChatPerson | null, also: readonly ChatPerson[] = []) => [
+  ...new Set([owner, ...also].flatMap((p) => (p?.chatUserId ? [p.chatUserId] : []))),
+];
 
 /** "Arm · backup Ploy (not notified yet)" while the backup's step is still ahead (ChatAlert). */
 function ownerRow(owner: ChatPerson | null, backup: ChatPerson | null, ladder?: LadderFacts | null) {
@@ -174,7 +180,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
     text: buildChatTextLine({
       state: 'DOWN',
       site: `${site} (${formatTier(tier)})`,
-      mention: mentionOf(owner),
+      mention: mentionOf(owner, input.alsoMention),
       detail: held?.line ?? ladderLine(input.ladder, now),
     }),
     cardsV2: [
@@ -359,7 +365,7 @@ export function buildProblemAlert(input: ProblemAlertInput): ChatMessage {
     text: buildChatTextLine({
       state: 'PROBLEM',
       site: `${site} (${formatTier(tier)})`,
-      mention: mentionOf(owner),
+      mention: mentionOf(owner, input.alsoMention),
       detail: held ? [input.summary, ...held.line] : [input.summary, 'please take a look'],
     }),
     cardsV2: [

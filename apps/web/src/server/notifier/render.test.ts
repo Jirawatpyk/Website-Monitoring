@@ -69,6 +69,20 @@ describe('render — the person on call L0 paged (S10, D-048)', () => {
     expect(email.text).not.toContain('you own');
   });
 
+  it('the L0 pencil: the first card @mentions everyone L0 names, owner / on-call first', () => {
+    const plan = {
+      severity: 'problem',
+      tier: 1,
+      reminderMin: 60,
+      steps: [
+        { level: 0, delayMin: 0, targets: ['owner', 'backup'], channels: ['chat', 'space', 'email'] },
+        { level: 1, delayMin: 60, targets: ['admins'], channels: ['chat', 'email'] },
+      ],
+    };
+    const m = renderChat(row('problem', problemContext), { ...night, escalation_plan: plan }, appUrl, now)!;
+    expect(m.text).toMatch(/^<users\/TLE> <users\/NOK> PROBLEM · Fuji Links/);
+  });
+
   it('falls back to the owner once the person on call is deactivated or no longer a Responder', () => {
     for (const l0 of [
       { ...tle, is_active: false, role: 'responder' },

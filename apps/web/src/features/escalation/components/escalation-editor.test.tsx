@@ -94,10 +94,19 @@ describe('Escalation editor — guardrails (Done-when 3, spec §14.7, §15.5)', 
     expect(within(d).getByText('Pick at least one person.')).toBeInTheDocument();
   });
 
-  it('L0 is pinned: no pencil, no delete; the CEO is locked until L2 (S10)', () => {
+  it('L0 is pinned: no delete, no arrows; its pencil adds people and email only (S10)', () => {
     render(<EscalationEditor data={data} now={NOW} />);
-    expect(screen.queryByRole('button', { name: 'Edit L0' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete L0' })).toBeNull();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit L0' })[0]!);
+    const l0 = dialog(/Edit L0/);
+    expect(within(l0).getByRole('button', { name: 'Owner / on-call' })).toBeDisabled();
+    expect(within(l0).getByRole('button', { name: 'CEO' })).toBeDisabled();
+    expect(within(l0).getByRole('button', { name: 'Backup' })).toBeEnabled();
+    expect(within(l0).getByRole('checkbox', { name: 'Chat @mention' })).toBeDisabled();
+    expect(within(l0).getByRole('checkbox', { name: /Alerts Space/ })).toBeDisabled();
+    expect(within(l0).getByRole('checkbox', { name: 'Email' })).toBeEnabled();
+    expect(within(l0).getByRole('textbox', { name: /Notify after/ })).toBeDisabled();
+    fireEvent.click(within(l0).getByRole('button', { name: 'Cancel' }));
     openL1();
     expect(within(dialog(/Edit L1/)).getByRole('button', { name: 'CEO' })).toBeDisabled();
   });

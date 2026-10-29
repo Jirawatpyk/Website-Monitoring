@@ -20,7 +20,7 @@ const down = (tier: number): PolicyDraft => ({
 describe('preview (S08, D-034)', () => {
   it('resolves the tokens for a site; an internal site has no AM', () => {
     expect(tokenRows(muvmi, ['Tao'])).toEqual([
-      { token: 'Owner', name: 'Arm' },
+      { token: 'Owner / on-call', name: 'Arm' },
       { token: 'Backup', name: 'Ploy' },
       { token: 'Admin', name: 'Tao' },
       { token: 'Site AM', name: 'Bua' },
@@ -157,7 +157,7 @@ describe('preview (S08, D-034)', () => {
     const s = scenario(down(1), undefined, ['Tao'], hours, bkk('2026-09-25T09:48:00'));
     expect(s.caseLine).toBe('A site DOWN confirmed now, nobody acknowledges:');
     expect(s.rows.map((r) => r.what)).toEqual([
-      'L0 → Owner + Alerts Space',
+      'L0 → Owner / on-call + Alerts Space',
       'L1 → Backup + Admin (Tao)',
       'Reminder in the thread (every 15 min)',
     ]);

@@ -32,7 +32,8 @@ export function tokenRows(
   used?: readonly EscalationStep[],
 ) {
   const all = [
-    { key: 'owner', token: 'Owner', name: site?.owner ?? '—' },
+    // Spec §8: the owner by day, on Tier 1 outside response hours the person on call (S10).
+    { key: 'owner', token: 'Owner / on-call', name: site?.owner ?? '—' },
     { key: 'backup', token: 'Backup', name: site?.backup ?? '—' },
     { key: 'admins', token: 'Admin', name: admins.length ? admins.join(', ') : '—' },
     { key: 'site_am', token: 'Site AM', name: site ? (site.am ?? '— (internal)') : '—' },

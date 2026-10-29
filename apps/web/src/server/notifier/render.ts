@@ -69,6 +69,20 @@ const person = (p: IncidentFacts['sites']['primary']): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
 
 const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
+
+/** The people the L0 pencil adds (S10): everyone L0 names but the owner / on-call. */
+const alsoL0 = (i: IncidentFacts): ChatPerson[] => {
+  const main = l0Of(i)?.id;
+  const known = new Map(
+    [i.sites.backup, i.sites.client?.am, ...(i.ladder?.admins ?? []), ...(i.ladder?.ceo ?? [])].flatMap(
+      (p) => (p ? [[p.id, p] as const] : []),
+    ),
+  );
+  return l0PeopleOf(i).flatMap((id) => {
+    const p = id === main ? undefined : known.get(id);
+    return p ? [{ name: p.display_name, chatUserId: p.google_chat_user_id }] : [];
+  });
+};
 const num = (v: unknown, fallback: number) => (typeof v === 'number' ? v : fallback);
 
 export const incidentUrl = (appUrl: string, incidentId: string) =>
@@ -238,6 +252,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         confirmingLocations: num(ctx.confirmingLocations, 2),
         confirmedByWaf: confirmedByWafOf(ctx),
         owner: person(l0Of(i)),
+        alsoMention: alsoL0(i),
         backup: person(i.sites.backup),
         // MobileAck: the card's link opens the incident ready to acknowledge.
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
@@ -259,6 +274,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         seenFrom: seenFrom(ctx),
         verifier: typeof ctx.verifier === 'string' ? ctx.verifier : null,
         owner: person(l0Of(i)),
+        alsoMention: alsoL0(i),
         backup: person(i.sites.backup),
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
         ladder: ladderFactsOf(i, now),
