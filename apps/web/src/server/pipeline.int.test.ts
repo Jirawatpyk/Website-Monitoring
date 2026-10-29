@@ -911,8 +911,8 @@ describe('delivery, ack and undo (S02b Done-when 3 and 5)', () => {
     await due(incidentId, 'acknowledged');
     await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
     const text = (post.mock.calls[0] as unknown as [string, { text: string }])[1].text;
-    // S08 (D-034): the ack stops L1.
-    expect(text).toMatch(new RegExp(`^ACKNOWLEDGED · Ack ${run} · by Arm \\d\\d:\\d\\d · L1 stopped$`));
+    // S08 (D-034), S10: the ack stops L1–L2 (the Tier 1 L3 FYI still goes).
+    expect(text).toMatch(new RegExp(`^ACKNOWLEDGED · Ack ${run} · by Arm \\d\\d:\\d\\d · L1–L2 stopped$`));
     expect(sentEmails(send)).toEqual([
       {
         to: 'arm@example.test',
@@ -1182,8 +1182,13 @@ describe('escalation ladder (S08, D-034, Done-when 1)', () => {
     const [state] = await must(db.from('incidents').select('state, escalation_level').eq('id', inc!.id));
     expect(state).toMatchObject({ state: 'escalated', escalation_level: 1 });
 
+    // S10: +30 is L2 (the CEO); the first STILL DOWN reminder moves to +45 (skipped on a step minute).
     await runEngine(db, at(30));
-    await runEngine(db, at(30, 30));
+    expect(
+      (await stepRows(inc!.id)).filter((n) => n.template === 'step_fired' && n.channel === 'google_chat'),
+    ).toHaveLength(2);
+    await runEngine(db, at(45));
+    await runEngine(db, at(45, 30));
     expect((await stepRows(inc!.id)).filter((n) => n.template === 'reminder')).toHaveLength(1);
   });
 });
@@ -1248,7 +1253,14 @@ describe('mute and maintenance (S09, D-036)', () => {
 
     await runEngine(db, new Date(confirmed + 15 * 60_000));
     await runEngine(db, new Date(confirmed + 30 * 60_000));
-    expect((await chat(inc!.id)).map((n) => n.template)).toEqual(['down', 'step_fired', 'reminder']);
+    await runEngine(db, new Date(confirmed + 45 * 60_000));
+    // L1 at +15, L2 at +30 (S10), the STILL DOWN reminder at +45 — all while muted.
+    expect((await chat(inc!.id)).map((n) => n.template)).toEqual([
+      'down',
+      'step_fired',
+      'step_fired',
+      'reminder',
+    ]);
     const [state] = await must(db.from('incidents').select('state').eq('id', inc!.id));
     expect(state!.state).toBe('escalated'); // muting is not an acknowledgement
   });
