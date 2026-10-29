@@ -17,7 +17,7 @@ export async function getEscalationPage(now = new Date()): Promise<EscalationPag
   const from = new Date(now.getTime() - 60 * 86_400_000).toISOString().slice(0, 10);
   const [policies, steps, settings, holidays, sites, admins, open] = await Promise.all([
     db.from('escalation_policies').select('id, severity, tier'),
-    db.from('escalation_steps').select('policy_id, level, delay_min, targets, channels').order('level'),
+    db.from('escalation_steps').select('policy_id, level, delay_min, targets, channels, fyi').order('level'),
     db
       .from('organisation_settings')
       .select('response_start, response_end, response_days, down_reminder_min, problem_reminder_min')
@@ -60,6 +60,8 @@ export async function getEscalationPage(now = new Date()): Promise<EscalationPag
           delayMin: s.delay_min,
           targets: s.targets,
           channels: s.channels,
+          // The Tier 1 CEO + AM step (S10): without it a save drops the flag and is refused.
+          ...(s.fyi ? { fyi: true } : {}),
         }),
       );
 
