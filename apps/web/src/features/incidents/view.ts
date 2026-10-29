@@ -109,7 +109,8 @@ export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
     primaryOwnerId: i.sites.primary_owner_id,
     backupOwnerId: i.sites.backup_owner_id,
     tier: i.sites.tier,
-    l0UserId: i.l0_user_id ?? null,
+    // the L0 person acts only while it's open (private.oncall_acts_on)
+    l0UserId: ['resolved', 'in_review', 'closed'].includes(i.state) ? null : (i.l0_user_id ?? null),
   });
 }
 
@@ -181,7 +182,10 @@ export function buildIncidentView(
     if (allowed) {
       ack = { kind: 'can-ack' };
     } else {
+      const onCall = i.l0_user_id && i.l0_user_id !== i.sites.primary_owner_id ? i.l0_user_id : null;
       const people: PersonWhoCanAct[] = [
+        // L0 paged the person on call (S10): they're the one expected to act.
+        ...(onCall ? [{ name: nameOf(onCall), duty: 'on call', status: 'Not acked', urgent: true }] : []),
         ...(i.sites.primary_owner_id
           ? [{ name: nameOf(i.sites.primary_owner_id), duty: 'owner', status: 'Not acked', urgent: true }]
           : []),

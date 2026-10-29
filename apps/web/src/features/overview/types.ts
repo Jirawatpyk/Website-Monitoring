@@ -13,6 +13,8 @@ export interface OverviewViewer {
   id: string;
   name: string;
   kind: ViewerKind;
+  /** Holds the on-call shift right now (S10): acts on every Tier 1 incident. */
+  onCallNow?: boolean;
 }
 
 /** A site's open incident (any state before Resolved). */
@@ -34,6 +36,8 @@ export interface OverviewIncident {
   detectedAt: string;
   recoveredAt: string | null;
   ackedBy: string | null;
+  /** The person L0 paged (S10): the person on call outside response hours, else null (the owner). */
+  l0UserId?: string | null;
   /** The cause in words: DOWN in short form ("Timeout ×2 · 504 ×1"), PROBLEM its summary. */
   cause: string | null;
 }

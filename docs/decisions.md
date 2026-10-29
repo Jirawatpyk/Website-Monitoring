@@ -81,6 +81,17 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
     - Email, FYI nobody acknowledged: headline "MuvMi still down after 1 h — not acknowledged yet"; lede to the CEO "For your information — no action needed. Nobody has acknowledged yet; Arm, Ploy and Tao were asked. This goes out because a Tier 1 site is still down after 1 h."; to the AM "For your information — MuvMi is still down after 1 h and nobody has acknowledged yet. If the client needs a second update, the draft on the incident page is current."
     - Chat, Tier 2–3 L2: the ChatAlert row; card "Nobody has acknowledged yet. Acknowledge to stop these reminders."
     - Email, Tier 2–3 L2 (§16.5 names it, no board): label "REMINDER · L2"; headline "WeCare Studio still down — 30 min, no ack"; lede "WeCare Studio is still down after 30 min and nobody has acknowledged. Acknowledge, or make sure the owner has it."; footer "You got this because WeCare Studio wasn't acknowledged in 30 min — L2 reminds you."
+    - **On-call routing (B1b, message-checker reviewed):**
+      - The first card at night @mentions the person on call. Its rows are `On call · Tle (Tier 1, outside response hours) — the person who acts` and `Owner · Arm · not paged outside response hours`. The ChatAlert board says "night"; these say "outside response hours" because they also cover weekends and holidays.
+      - L1 · night: `<users/TAO> ESCALATED · L1 · … · please acknowledge · Ploy (on call) already paged · CEO at 04:10`.
+      - The on-call email lede is "Nobody has acknowledged yet. You’re on call — please acknowledge or hand it over in the Chat thread."
+      - The on-call email footer is "You got this because you were on call when MuvMi (Tier 1) alerted outside response hours." It stays true on a later email.
+      - In the ledger an earlier step's person reads "Tle (on call)".
+    - **The L0 pencil @mentions everyone L0 names on the first card**, the owner / on-call first. This stretches §10's "only the person expected to act": the pencil makes them someone expected to act, and L1 leaves them out.
+      - Their email lede: "You’re told at once for MuvMi, with the owner / on-call — …".
+      - Their footer: "You got this because MuvMi’s escalation policy tells you at L0, together with the owner / on-call."
+      - Later emails read "you were emailed about this incident".
+      - Only the owner or the person on call is asked for the root cause.
     - Swap, hand-over, rotation and day-before reminder texts come with PR B.
 
 **Why.** G1's people steps don't block S10's code, and a second code reviewer doesn't exist. The drill proves the alert path end to end; staging has the same probes, engine and notifier as production.

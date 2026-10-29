@@ -62,11 +62,37 @@ describe('render — the person on call L0 paged (S10, D-048)', () => {
       appUrl,
       thread,
     )!;
-    expect(email.text).toContain('You’re on call for Fuji Links — please take a look');
+    expect(email.text).toContain('You’re on call — please take a look');
     expect(email.text).toContain(
-      'You got this because you’re on call: Fuji Links is Tier 1 and it’s outside response hours.',
+      'You got this because you were on call when Fuji Links (Tier 1) alerted outside response hours.',
     );
     expect(email.text).not.toContain('you own');
+    // ChatAlert night: who acts, and the owner who isn't paged.
+    const card = JSON.stringify(m.cardsV2);
+    expect(card).toContain('Tle (Tier 1, outside response hours) — the person who acts');
+    expect(card).toContain('Ploy · not paged outside response hours');
+  });
+
+  it('someone the L0 pencil adds gets RECOVERED as "you were emailed", and isn\u2019t asked for the root cause', () => {
+    const plan = {
+      severity: 'problem',
+      tier: 1,
+      reminderMin: 60,
+      steps: [
+        { level: 0, delayMin: 0, targets: ['owner', 'backup'], channels: ['chat', 'space', 'email'] },
+        { level: 1, delayMin: 60, targets: ['admins'], channels: ['chat', 'email'] },
+      ],
+    };
+    const rec = renderEmail(
+      { ...row('recovered', { okLocations: 3 }), user_id: 'u-nok', channel: 'email' },
+      { ...night, escalation_plan: plan },
+      { id: 'u-nok', email: 'nok@example.test', display_name: 'Nok' },
+      appUrl,
+      thread,
+    )!;
+    expect(rec.text).toContain('You got this because you were emailed about this incident.');
+    expect(rec.text).not.toContain('couldn’t be delivered');
+    expect(rec.text).not.toContain('Add root cause');
   });
 
   it('the L0 pencil: the first card @mentions everyone L0 names, owner / on-call first', () => {

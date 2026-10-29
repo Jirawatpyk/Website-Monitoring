@@ -54,6 +54,7 @@ import {
 } from './facts';
 import {
   l0PeopleOf,
+  l0PersonsOf,
   ladderFactsOf,
   namedIn,
   readerOf,
@@ -73,15 +74,9 @@ const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallb
 /** The people the L0 pencil adds (S10): everyone L0 names but the owner / on-call. */
 const alsoL0 = (i: IncidentFacts): ChatPerson[] => {
   const main = l0Of(i)?.id;
-  const known = new Map(
-    [i.sites.backup, i.sites.client?.am, ...(i.ladder?.admins ?? []), ...(i.ladder?.ceo ?? [])].flatMap(
-      (p) => (p ? [[p.id, p] as const] : []),
-    ),
-  );
-  return l0PeopleOf(i).flatMap((id) => {
-    const p = id === main ? undefined : known.get(id);
-    return p ? [{ name: p.display_name, chatUserId: p.google_chat_user_id }] : [];
-  });
+  return l0PersonsOf(i)
+    .filter((p) => p.id !== main)
+    .map((p) => ({ name: p.display_name, chatUserId: p.google_chat_user_id }));
 };
 const num = (v: unknown, fallback: number) => (typeof v === 'number' ? v : fallback);
 
@@ -253,6 +248,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         confirmedByWaf: confirmedByWafOf(ctx),
         owner: person(l0Of(i)),
         alsoMention: alsoL0(i),
+        siteOwner: l0IsOnCall(i) ? person(i.sites.primary) : null,
         backup: person(i.sites.backup),
         // MobileAck: the card's link opens the incident ready to acknowledge.
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
@@ -275,6 +271,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         verifier: typeof ctx.verifier === 'string' ? ctx.verifier : null,
         owner: person(l0Of(i)),
         alsoMention: alsoL0(i),
+        siteOwner: l0IsOnCall(i) ? person(i.sites.primary) : null,
         backup: person(i.sites.backup),
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
         ladder: ladderFactsOf(i, now),
@@ -314,6 +311,11 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         owner: person(l0Of(i)),
         asked: named.asked,
         fyi: named.fyi,
+        // L1 · night: the backup on call was paged at L0, so L1 asks only the Admin (ChatAlert).
+        alreadyPaged:
+          num(ctx.level, 1) === 1 && l0IsOnCall(i) && i.sites.backup?.id === l0Of(i)?.id
+            ? (l0Of(i)?.display_name ?? null)
+            : null,
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
         viewUrl: incidentUrl(appUrl, i.id),
         kind: step.kind,
@@ -390,8 +392,8 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   // A step's own email (its people); the Chat fallback goes to the backup and Admins (D-016).
   if (n.template === 'step_fired') return contextOf(n.context).fallback === true ? 'fallback' : 'step';
   if (l0Of(i)?.id === n.user_id) return l0IsOnCall(i) ? 'oncall' : 'owner';
-  // Someone the L0 pencil adds (S10): told at once, by email too.
-  if (L0_TEMPLATES.has(n.template) && n.user_id && l0PeopleOf(i).includes(n.user_id)) return 'l0';
+  // Someone the L0 pencil adds (S10): told at once by email too, then followed up like anyone emailed.
+  if (n.user_id && l0PeopleOf(i).includes(n.user_id)) return L0_TEMPLATES.has(n.template) ? 'l0' : 'emailed';
   if (n.template === 'resolved') return 'emailed';
   return 'fallback';
 }

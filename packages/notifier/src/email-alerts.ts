@@ -52,10 +52,12 @@ export type EmailReason = 'owner' | 'oncall' | 'l0' | 'acked' | 'fallback' | 'em
 const isL0 = (r: EmailReason) => r === 'owner' || r === 'oncall' || r === 'l0';
 const yourPart = (r: EmailReason, site: string) =>
   r === 'oncall'
-    ? `You’re on call for ${site}`
+    ? 'You’re on call'
     : r === 'l0'
-      ? `You’re told first for ${site}`
+      ? `You’re told at once for ${site}, with the owner / on-call`
       : `You own ${site}`;
+/** Asked for the root cause: the owner, or the person on call L0 paged — not someone the pencil adds. */
+const addsRootCause = (r: EmailReason) => r === 'owner' || r === 'oncall';
 
 export interface EmailBaseInput {
   incidentId: string;
@@ -229,9 +231,9 @@ const whyOf = (i: EmailBaseInput): string => {
     case 'owner':
       return `You got this because you own ${i.site}.`;
     case 'oncall':
-      return `You got this because you’re on call: ${i.site} is Tier 1 and it’s outside response hours.`;
+      return `You got this because you were on call when ${i.site} (Tier 1) alerted outside response hours.`;
     case 'l0':
-      return `You got this because the escalation policy tells you as soon as ${i.site} has an alert.`;
+      return `You got this because ${i.site}’s escalation policy tells you at L0, together with the owner / on-call.`;
     case 'acked':
       return 'You got this because you acknowledged this incident.';
     case 'fallback':
@@ -456,7 +458,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
 export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
   const { site, owner, ack, problem } = input;
   const { duration, range } = downtime(input.startedAt, input.recoveredAt);
-  const isOwner = isL0(input.reason);
+  const isOwner = addsRootCause(input.reason);
   const ackFact = ack ? [['Acknowledged', `${ack.by} at ${formatTime(ack.at)}`] as [string, string]] : [];
   if (problem) {
     return render(input, {
@@ -738,7 +740,7 @@ export function buildFlapSummaryEmail(input: FlapSummaryEmailInput): EmailMessag
   const stable = last ? formatTime(last.end) : '';
   const total = formatDuration(minutes);
   const down = input.severity === 'down';
-  const isOwner = isL0(input.reason);
+  const isOwner = addsRootCause(input.reason);
   return render(input, {
     template: 'flap_summary',
     color: C.positive,

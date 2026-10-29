@@ -23,6 +23,7 @@ import {
 } from '@/features/sites/server';
 import { chainStreakStart, currentDrop, lastRoundP50, probeHealth, seriesOf, viewerKindOf } from './assemble';
 import { EVENT_TYPES, reasonOf } from './model';
+import { loadOnCallNow } from '@/features/incidents/server';
 import {
   OVERVIEW_LOCATIONS,
   type OverviewData,
@@ -53,6 +54,8 @@ export async function loadOverview(
 ): Promise<OverviewData> {
   const from30d = new Date(now.getTime() - THIRTY_DAYS_MIN * 60_000);
   const from60d = new Date(now.getTime() - 60 * DAY_MS);
+  // Who is on call now, beside the other reads (S10): they act on every Tier 1 incident.
+  const onCallRead = loadOnCallNow(db, now);
   const [
     sites,
     checks,
@@ -76,7 +79,7 @@ export async function loadOverview(
          owner:profiles!sites_primary_owner_id_fkey(display_name),
          site_status(status, since, last_round_at),
          monitors(id, is_primary, thresholds),
-         incidents(id, number, state, severity, trigger, escalation_level, started_at, detected_at, recovered_at,
+         incidents(id, number, state, severity, trigger, escalation_level, started_at, detected_at, recovered_at, l0_user_id,
                    acker:profiles!incidents_acked_by_fkey(display_name),
                    incident_events(type, at, payload))`,
       )
@@ -171,6 +174,7 @@ export async function loadOverview(
           detectedAt: inc.detected_at,
           recoveredAt: inc.recovered_at,
           ackedBy: inc.acker?.display_name ?? null,
+          l0UserId: inc.l0_user_id ?? null,
           // a PROBLEM drop's short summary ("slow, p50 5.8 s"); a DOWN's cause in short form (spec §10)
           cause:
             drop?.severity === 'problem'
@@ -250,13 +254,19 @@ export async function loadOverview(
     autoResolved: e.incidents.auto_resolved,
   }));
 
+  const onCall = await onCallRead;
   const rounds = rows
     .map((r) => r.checkedAt)
     .filter((t): t is string => !!t)
     .sort();
   return {
     nowIso: now.toISOString(),
-    viewer: { id: person.id, name: person.name, kind: viewerKindOf(person.role, (managed.count ?? 0) > 0) },
+    viewer: {
+      id: person.id,
+      name: person.name,
+      kind: viewerKindOf(person.role, (managed.count ?? 0) > 0),
+      onCallNow: onCall === person.id,
+    },
     sites: rows,
     // a Draft has never been started; a stopped site is neither monitored nor a draft
     drafts: (sites.data ?? []).filter((s) => !s.is_active && !s.monitoring_started_at).length,

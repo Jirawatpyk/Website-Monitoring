@@ -24,6 +24,13 @@ describe('mayAcknowledge', () => {
       true,
     ],
     ['a Viewer on call', { id: 'mint', role: 'viewer' as const, onCallNow: true }, site, false],
+    // the caller passes l0UserId only while the incident is open (private.oncall_acts_on)
+    [
+      'a closed incident: its former L0 person',
+      { id: 'nok', role: 'responder' as const },
+      { ...site, l0UserId: null },
+      false,
+    ],
   ])('%s → %s', (_label, viewer, s, expected) => {
     expect(mayAcknowledge(viewer, s)).toBe(expected);
   });

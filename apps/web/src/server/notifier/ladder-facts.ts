@@ -9,7 +9,7 @@ import {
   type EscalationTarget,
   type Tier,
 } from '@dxt/shared';
-import { contextOf, l0Of, type IncidentFacts, type Owner } from './facts';
+import { contextOf, l0IsOnCall, l0Of, type IncidentFacts, type Owner } from './facts';
 
 /**
  * The ladder's words for a message (S08, D-034), from the plan the incident opened with: the next
@@ -49,11 +49,16 @@ function peopleOf(i: IncidentFacts, token: EscalationTarget): Owner[] {
   }
 }
 
-/** Everyone L0 names: the owner / on-call and anyone the L0 pencil adds (no plan: the owner). */
-export function l0PeopleOf(i: IncidentFacts): string[] {
+/** Everyone L0 names, owner / on-call first, then anyone the L0 pencil adds (no plan: the owner). */
+export function l0PersonsOf(i: IncidentFacts): Owner[] {
   const targets = planOf(i)?.steps.find((s) => s.level === 0)?.targets ?? ['owner'];
-  return [...new Set(targets.flatMap((t) => peopleOf(i, t).map((p) => p.id)))];
+  const ordered = [...targets].sort((a, b) => Number(b === 'owner') - Number(a === 'owner'));
+  const byId = new Map<string, Owner>();
+  for (const p of ordered.flatMap((t) => peopleOf(i, t))) if (!byId.has(p.id)) byId.set(p.id, p);
+  return [...byId.values()];
 }
+
+export const l0PeopleOf = (i: IncidentFacts): string[] => l0PersonsOf(i).map((p) => p.id);
 
 /** Who a step asks and tells FYI, minus those already told (L0's people). */
 function stepPeople(i: IncidentFacts, level: number) {
@@ -176,7 +181,14 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
     for (const t of s.targets)
       for (const name of tokenWords(i, t))
         if (!own.has(name) && !told.has(name))
-          told.set(name, t === 'owner' ? `${name} (owner)` : t === 'backup' ? `${name} (backup)` : name);
+          told.set(
+            name,
+            t === 'owner'
+              ? `${name} (${l0IsOnCall(i) ? 'on call' : 'owner'})`
+              : t === 'backup'
+                ? `${name} (backup)`
+                : name,
+          );
   const informed = [...told.keys()];
   const schedule = plan && hours ? scheduleOf({ plan, detectedAt: clockOf(i), hours }) : [];
   // "Arm 09:48 · Ploy + Tao 10:03" (EmailAlert L2 "Already told").
