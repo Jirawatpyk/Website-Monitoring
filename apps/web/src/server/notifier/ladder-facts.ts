@@ -150,10 +150,14 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
       ]
     : [];
   const ackedAt = typeof ctx.ackedAt === 'string' ? new Date(ctx.ackedAt) : null;
+  // A next level that only reminds people already told (Tier 2–3 L2 → the Admin) isn't an escalation
+  // to announce: "· CEO at 10:18" is Tier 1's.
+  const afterPeople = after ? stepPeople(i, after.level) : null;
+  const afterIsNew = !!afterPeople && afterPeople.ask.length + afterPeople.fyi.length > 0;
   return {
     kind,
     next:
-      kind === 'ask' && after && afterAt
+      kind === 'ask' && after && afterAt && afterIsNew
         ? { who: after.targets.flatMap((t) => tokenWords(i, t)).join(' + '), at: afterAt }
         : null,
     // "L3 (CEO + Bua, no call) at 10:48" on the CEO's L2 email.

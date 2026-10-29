@@ -1,6 +1,6 @@
 import { formatDay, formatDuration, formatTime, isSameBangkokDay } from '@dxt/shared';
 import { plainName, type ChatMessage, type ChatPerson } from './chat-alerts';
-import { buildChatTextLine, type ChatState } from './chat-text';
+import { buildChatTextLine, type StepLevel } from './chat-text';
 
 /**
  * The escalation ladder's messages (S08, D-034; ChatAlert / EmailAlert rows, spec §8, §14.10, §15.7):
@@ -129,7 +129,12 @@ export interface StepAlertInput {
   informed?: readonly string[];
   /** Who acknowledged and when, for the FYI: "acknowledged by Arm 10:07". */
   acked?: { by: string; at: Date } | null;
+  /** The incident page without the ack flow: the CEO / FYI card's "Open incident" (they never ack). */
+  viewUrl?: string;
 }
+
+/** The level as the text line names it: L1–L3 (the SQL keeps levels 0–3). */
+const levelOf = (n: number): StepLevel => (n >= 3 ? 3 : n <= 1 ? 1 : 2);
 
 const listed = (names: readonly string[]) => names.map(plainName).join(', ');
 const spoken = (names: readonly string[]) => {
@@ -191,7 +196,7 @@ export function buildStepAlert(input: StepAlertInput): ChatMessage {
   const next = input.next ? [`${plainName(input.next.who)} at ${formatTime(input.next.at)}`] : [];
   return {
     text: buildChatTextLine({
-      state: `ESCALATED · L${input.level}` as ChatState,
+      state: `ESCALATED · L${levelOf(input.level)}` as const,
       site: `${site} DOWN ${duration}, not acknowledged`,
       mention: mentions(input.asked),
       detail: ['please acknowledge', ...fyi, ...next],
@@ -241,14 +246,14 @@ function otherStepAlert(
   const line =
     kind === 'ceo'
       ? buildChatTextLine({
-          state: `ESCALATED · L${input.level}` as ChatState,
+          state: `ESCALATED · L${levelOf(input.level)}` as const,
           site: `${site} DOWN ${duration}, not acknowledged`,
           mention: mentions(input.asked),
           detail: informed.length ? [`${listed(informed)} informed`] : [],
         })
       : kind === 'fyi'
         ? buildChatTextLine({
-            state: `FYI · L${input.level}` as ChatState,
+            state: `FYI · L${levelOf(input.level)}` as const,
             site: `${site} still DOWN ${duration}`,
             mention: mentions(input.asked),
             detail: acked
@@ -260,7 +265,7 @@ function otherStepAlert(
                 ],
           })
         : buildChatTextLine({
-            state: `REMINDER · L${input.level}` as ChatState,
+            state: `REMINDER · L${levelOf(input.level)}` as const,
             site: `${site} DOWN ${duration}, not acknowledged`,
             mention: mentions(input.asked),
           });
@@ -296,7 +301,7 @@ function otherStepAlert(
                         buttons: [
                           {
                             text: 'Open incident',
-                            onClick: { openLink: { url: input.incidentUrl.replace(/\?ack=1$/, '') } },
+                            onClick: { openLink: { url: input.viewUrl ?? input.incidentUrl } },
                           },
                         ],
                       },

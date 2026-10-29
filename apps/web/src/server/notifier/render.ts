@@ -286,6 +286,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         asked: named.asked,
         fyi: named.fyi,
         incidentUrl: `${incidentUrl(appUrl, i.id)}?ack=1`,
+        viewUrl: incidentUrl(appUrl, i.id),
         kind: step.kind,
         // A level promised only while nobody has acknowledged (an ack stops it, §14.1).
         next: i.state === 'acknowledged' ? null : step.next,

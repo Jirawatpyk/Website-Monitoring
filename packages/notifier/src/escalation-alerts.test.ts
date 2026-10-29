@@ -151,6 +151,7 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
       asked: [],
       fyi: [],
       incidentUrl: `${url}?ack=1`,
+      viewUrl: url,
       ...over,
     });
 

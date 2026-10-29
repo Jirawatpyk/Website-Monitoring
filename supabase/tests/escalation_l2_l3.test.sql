@@ -4,7 +4,7 @@
 -- a queued FYI alone, and a muted site still getting its L3 FYI (T09 re-check, Done-when 4).
 begin;
 \ir _helpers.psql
-select plan(34);
+select plan(36);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -96,6 +96,12 @@ select throws_ok(format($$select public.save_escalation_policies(%L, 15, 60, 'x'
 select throws_ok(format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, pg_temp.t1(jsonb_build_array(
     pg_temp.step(0, 0, array['owner'], array['chat', 'space', 'email']),
     pg_temp.step(1, 15, array['backup', 'admins'], array['chat', 'email']),
+    pg_temp.step(2, 30, array['ceo'], array['voice']),
+    pg_temp.step(3, 60, array['ceo', 'site_am'], array['chat', 'email'], true)))),
+  '22023', 'No channel ticked — this step notifies nobody.', 'voice alone notifies nobody (off until approved)');
+select throws_ok(format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, pg_temp.t1(jsonb_build_array(
+    pg_temp.step(0, 0, array['owner'], array['chat', 'space', 'email']),
+    pg_temp.step(1, 15, array['backup', 'admins'], array['chat', 'email']),
     pg_temp.step(2, 30, array['ceo'], array['chat', 'email']),
     pg_temp.step(3, 60, array['ceo'], array['chat', 'email'], true)))),
   '22023', null, 'CEO + Site AM stay on the FYI step');
@@ -155,6 +161,12 @@ reset role;
 select is((select (payload->>'fyiStep') || ' ' || jsonb_array_length(payload->'mentioned') from public.incident_events
            where incident_id = (select id from inc where name = 'a') and type = 'step_fired' and payload->>'level' = '3'),
   'true 2', 'the FYI mentions CEO + AM, the CEO again though L2 told them');
+set local role service_role;
+select public.engine_remind((select id from inc where name = 'a'), date_trunc('minute', now()), '{"elapsedMin":75}');
+reset role;
+select is((select context->'mentioned' ?| array[(select id from ids where name = 'ceo')::text, (select id from ids where name = 'bua')::text]
+           from public.notifications where incident_id = (select id from inc where name = 'a') and template = 'reminder'),
+  false, 'STILL DOWN after L2 / L3 doesn''t @mention the CEO or the AM (told once, never asked to act)');
 
 -- ── Ack at +5: L2 stops, L3 still sends the FYI ───────────────────────────
 insert into inc values ('m', public.engine_open_incident('00000000-0000-0000-0000-0000000000a2', null, 'hard_fail', 'down',

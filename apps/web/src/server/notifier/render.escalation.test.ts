@@ -86,6 +86,35 @@ describe('render — L2 and the L3 FYI (S10)', () => {
     );
   });
 
+  it('Tier 2 L1 names no next level: its L2 only reminds the Admin', () => {
+    const t2plan = {
+      ...plan,
+      tier: 2,
+      steps: [...plan.steps, { level: 2, delayMin: 30, targets: ['admins'], channels: ['chat', 'email'] }],
+    };
+    const m = renderChat(
+      row('step_fired', {
+        level: 1,
+        severity: 'down',
+        elapsedMin: 15,
+        mentioned: ['u-ploy'],
+        fyi: ['u-tao'],
+      }),
+      {
+        ...t1,
+        sites: { ...t1.sites, tier: 2 },
+        escalation_plan: t2plan,
+        state: 'escalated',
+        escalation_level: 1,
+      },
+      appUrl,
+      new Date('2026-09-25T03:03:42Z'),
+    )!;
+    expect(m.text).toBe(
+      '<users/PLOY> ESCALATED · L1 · MuvMi DOWN 15 min, not acknowledged · please acknowledge · Tao FYI',
+    );
+  });
+
   it('L2 @mentions the CEO and names who was told', () => {
     const m = renderChat(
       row('step_fired', { level: 2, severity: 'down', elapsedMin: 30, mentioned: ['u-ceo'], fyi: [] }),

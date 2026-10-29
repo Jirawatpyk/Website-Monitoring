@@ -6,18 +6,20 @@
  * Full event → text line → who is @mentioned table: ChatAlert board (docs/design/canvas/ChatAlert.dc.html).
  */
 
+/** A ladder level after L0 (`escalation_steps.level`, at most L3). */
+export type StepLevel = 1 | 2 | 3;
+
 export type ChatState =
   | 'DOWN'
   | 'PROBLEM'
   | 'DOWN AGAIN'
   | 'PROBLEM AGAIN'
-  | 'ESCALATED · L1'
+  | `ESCALATED · L${StepLevel}`
   | 'STILL DOWN'
   | 'STILL PROBLEM'
-  | 'ESCALATED · L2'
-  | 'ESCALATED · L3'
-  | 'FYI · L3'
-  | 'REMINDER · L2'
+  // S10: any level an edited ladder can have (L1–L3) — an FYI step at L2 once L2 is deleted, too.
+  | `FYI · L${StepLevel}`
+  | `REMINDER · L${StepLevel}`
   | 'CLIENT UPDATE DUE'
   | 'ACKNOWLEDGED'
   | 'RECOVERED'
