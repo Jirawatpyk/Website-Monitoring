@@ -1,4 +1,5 @@
 import 'server-only';
+import { isInsideHours } from '@dxt/engine';
 import {
   escalationStepSchema,
   timeToMinutes,
@@ -7,6 +8,7 @@ import {
 } from '@dxt/shared';
 import { createClient } from '@/lib/supabase/server';
 import { policyKeyOf, type PolicyDraft, type PolicyKey } from './model';
+import { previewOwner } from './preview';
 import type { EscalationPageData, PreviewSite } from './types';
 
 const ORDER: Record<PolicyKey, number> = { t1: 0, t2: 1, t3: 2, problem: 3 };
@@ -15,7 +17,8 @@ const ORDER: Record<PolicyKey, number> = { t1: 0, t2: 1, t3: 2, problem: 3 };
 export async function getEscalationPage(now = new Date()): Promise<EscalationPageData> {
   const db = await createClient();
   const from = new Date(now.getTime() - 60 * 86_400_000).toISOString().slice(0, 10);
-  const [policies, steps, settings, holidays, sites, admins, open] = await Promise.all([
+  const at = now.toISOString();
+  const [policies, steps, settings, holidays, sites, admins, open, shift] = await Promise.all([
     db.from('escalation_policies').select('id, severity, tier'),
     db.from('escalation_steps').select('policy_id, level, delay_min, targets, channels, fyi').order('level'),
     db
@@ -46,8 +49,15 @@ export async function getEscalationPage(now = new Date()): Promise<EscalationPag
       .not('state', 'in', CLOSED_INCIDENT_STATES_IN)
       .not('escalation_plan', 'is', null)
       .order('number'),
+    // Who is on call now (S10): "Owner / on-call" on Tier 1 outside response hours.
+    db
+      .from('oncall_shifts')
+      .select('person:profiles!oncall_shifts_user_id_fkey(display_name, is_active, role)')
+      .lte('starts_at', at)
+      .gt('ends_at', at)
+      .maybeSingle(),
   ]);
-  for (const r of [policies, steps, settings, holidays, sites, admins, open]) {
+  for (const r of [policies, steps, settings, holidays, sites, admins, open, shift]) {
     if (r.error) throw new Error(r.error.message);
   }
 
@@ -83,11 +93,26 @@ export async function getEscalationPage(now = new Date()): Promise<EscalationPag
     backup: { display_name: string } | null;
     client: { is_internal: boolean; am: { display_name: string } | null } | null;
   };
+  const hours = {
+    startMin: timeToMinutes(settings.data!.response_start),
+    endMin: timeToMinutes(settings.data!.response_end),
+    days: settings.data!.response_days,
+    holidays: (holidays.data ?? []).map((h) => h.day),
+  };
+  // As escalation_people: the person on call while an active Admin / Responder, else the owner.
+  const person = (
+    shift.data as { person: { display_name: string; is_active: boolean; role: string } | null } | null
+  )?.person;
+  const onCall =
+    person?.is_active && (person.role === 'admin' || person.role === 'responder')
+      ? person.display_name
+      : null;
+  const outside = !isInsideHours(now, { ...hours, holidays: new Set(hours.holidays) });
   const previewSites: PreviewSite[] = ((sites.data ?? []) as unknown as SiteRow[]).map((s) => ({
     id: s.id,
     name: s.name,
     tier: s.tier,
-    owner: s.primary?.display_name ?? null,
+    owner: previewOwner(s.tier, s.primary?.display_name ?? null, onCall, outside),
     backup: s.backup?.display_name ?? null,
     am: s.client && !s.client.is_internal ? (s.client.am?.display_name ?? null) : null,
   }));
@@ -102,12 +127,7 @@ export async function getEscalationPage(now = new Date()): Promise<EscalationPag
     policies: drafts,
     downReminder: settings.data!.down_reminder_min,
     problemReminder: settings.data!.problem_reminder_min,
-    hours: {
-      startMin: timeToMinutes(settings.data!.response_start),
-      endMin: timeToMinutes(settings.data!.response_end),
-      days: settings.data!.response_days,
-      holidays: (holidays.data ?? []).map((h) => h.day),
-    },
+    hours,
     sites: previewSites,
     admins: (admins.data ?? []).map((a) => a.display_name),
     openIncidents: (open.data ?? []).flatMap((i) => {

@@ -904,10 +904,13 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     expect(rpcCalls.find((c) => c.name === 'engine_post_late_alert')?.args).toMatchObject({
       p_outside_hours: true,
     });
-    // Every run keeps four weeks of on-call shifts made from the rotation.
+    // On the hour, the run keeps four weeks of on-call shifts made from the rotation.
     expect(readCalls.find((c) => c.name === 'oncall_extend_shifts')?.args).toEqual({
       p_until: new Date(night.getTime() + 28 * 86_400_000).toISOString(),
     });
+    const later = fakeDb({ 'monitors.select': { data: [monitor()] }, 'rpc.engine_checks': { data: [] } });
+    await runEngine(later.db, new Date('2026-10-06T16:01:00Z'));
+    expect(later.readCalls.some((c) => c.name === 'oncall_extend_shifts')).toBe(false);
   });
 
   it('one late alert that fails never holds back the next site’s (engine review H1)', async () => {

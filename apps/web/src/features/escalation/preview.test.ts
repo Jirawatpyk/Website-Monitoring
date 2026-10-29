@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { PolicyDraft } from './model';
-import { ackCase, isReminderStep, nobodyWhy, scenario, sitesOf, stepNames, tokenRows } from './preview';
+import {
+  ackCase,
+  isReminderStep,
+  nobodyWhy,
+  scenario,
+  sitesOf,
+  stepNames,
+  tokenRows,
+  previewOwner,
+} from './preview';
 
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
 const hours = { startMin: 540, endMin: 1080, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };
@@ -15,6 +24,17 @@ const down = (tier: number): PolicyDraft => ({
     { level: 0, delayMin: 0, targets: ['owner'], channels: ['chat', 'space', 'email'] },
     { level: 1, delayMin: 15, targets: ['backup', 'admins'], channels: ['chat', 'email'] },
   ],
+});
+
+describe('previewOwner (S10)', () => {
+  it.each([
+    [1, true, 'Tle', 'Tle (on call)'],
+    [1, false, 'Tle', 'Arm'],
+    [2, true, 'Tle', 'Arm'],
+    [1, true, null, 'Arm'],
+  ] as const)('Tier %s, outside hours %s, on call %s → %s', (tier, outside, onCall, expected) => {
+    expect(previewOwner(tier, 'Arm', onCall, outside)).toBe(expected);
+  });
 });
 
 describe('preview (S08, D-034)', () => {

@@ -20,6 +20,13 @@ export const hoursOf = (h: EscalationPageData['hours']): ResponseHours => ({
   holidays: new Set(h.holidays),
 });
 
+/**
+ * Who "Owner / on-call" names in the preview right now (S10, spec §8): on Tier 1 outside response
+ * hours the person on call, marked "(on call)"; otherwise, or with nobody on call, the owner.
+ */
+export const previewOwner = (tier: number, owner: string | null, onCall: string | null, outside: boolean) =>
+  tier === 1 && outside && onCall ? `${onCall} (on call)` : owner;
+
 /** The sites a policy covers (PROBLEM: all). */
 export const sitesOf = (p: PolicyDraft, sites: readonly PreviewSite[]) =>
   p.tier === null ? [...sites] : sites.filter((s) => s.tier === p.tier);

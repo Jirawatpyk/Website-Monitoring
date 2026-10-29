@@ -184,12 +184,16 @@ export async function runEngine(
   const logged = await db.rpc('engine_log_windows', { p_now: now.toISOString() });
   if (logged.error)
     console.error(JSON.stringify({ event: 'engine_log_windows_failed', error: logged.error.message }));
-  // On-call weeks four weeks ahead (S10, never fatal), then a waiting request's reminders, 12 h and 1 h before its start (S09b, §24.2); a failure retries next run.
-  const shifts = await db.rpc('oncall_extend_shifts', {
-    p_until: new Date(now.getTime() + 28 * 86_400_000).toISOString(),
-  });
-  if (shifts.error)
-    console.error(JSON.stringify({ event: 'oncall_extend_shifts_failed', error: shifts.error.message }));
+  // On-call weeks four weeks ahead, once an hour (S10; a rotation save extends them at once, and the
+  // swaps of a week that started expire at its 09:00). Never fatal: the next hour catches up.
+  if (now.getUTCMinutes() === 0) {
+    const shifts = await db.rpc('oncall_extend_shifts', {
+      p_until: new Date(now.getTime() + 28 * 86_400_000).toISOString(),
+    });
+    if (shifts.error)
+      console.error(JSON.stringify({ event: 'oncall_extend_shifts_failed', error: shifts.error.message }));
+  }
+  // A waiting request's reminders, 12 h and 1 h before its start (S09b, §24.2); a failure retries next run.
   const reminded = await db.rpc('engine_window_reminders', { p_now: now.toISOString() });
   if (reminded.error)
     console.error(JSON.stringify({ event: 'engine_window_reminders_failed', error: reminded.error.message }));
