@@ -10,6 +10,8 @@
 --   · incidents.l0_user_id — the L0 person frozen when the ladder clock starts (B1 fills it).
 -- Every people-facing change goes through a security definer RPC that writes one audit row.
 
+set local lock_timeout = '5s';
+
 -- ── Tables ───────────────────────────────────────────────────────────────
 create table public.oncall_rotation (
   id uuid primary key default gen_random_uuid(),
@@ -17,7 +19,7 @@ create table public.oncall_rotation (
   position smallint not null check (position >= 1),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (position) deferrable initially deferred
+  unique (position)
 );
 
 create table public.oncall_shifts (
@@ -28,11 +30,15 @@ create table public.oncall_shifts (
   -- A hand-over (§27 / Users "Hand over shift"): who had it, and why.
   handed_over_from uuid references public.profiles (id) on delete set null,
   handover_reason text check (handover_reason is null or length(handover_reason) between 1 and 500),
+  -- The rotation position this week was made for (1-based): the next week follows the slot, not the
+  -- person, so a swap or a hand-over doesn't shift the order (db review M2). Null for a hand-over's tail.
+  slot smallint check (slot is null or slot >= 1),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (starts_at)
+  unique (starts_at),
+  -- One person on call at a time, whatever writes the rows (db review M1); also serves oncall_person_at.
+  constraint oncall_shifts_no_overlap exclude using gist (tstzrange(starts_at, ends_at) with &&)
 );
-create index oncall_shifts_window_idx on public.oncall_shifts (starts_at, ends_at);
 create index oncall_shifts_user_idx on public.oncall_shifts (user_id, starts_at);
 
 create table public.oncall_swaps (
@@ -87,12 +93,11 @@ create table public.oncall_events (
 );
 create index oncall_events_at_idx on public.oncall_events (at desc);
 -- The day-before reminder goes once per shift (B2's cron step).
-create unique index oncall_events_one_reminder on public.oncall_events (shift_id) where kind = 'shift_reminder';
+create unique index oncall_events_one_reminder on public.oncall_events (shift_id, user_id) where kind = 'shift_reminder';
 
 -- A fourth message subject: an incident, a system alert, a maintenance window — or an on-call event.
 alter table public.notifications
   add column oncall_event_id uuid references public.oncall_events (id) on delete restrict;
-create index notifications_oncall_idx on public.notifications (oncall_event_id) where oncall_event_id is not null;
 alter table public.notifications drop constraint notifications_one_subject;
 alter table public.notifications
   add constraint notifications_one_subject
@@ -146,7 +151,7 @@ grant all on public.oncall_rotation, public.oncall_shifts, public.oncall_swaps, 
 create function public.oncall_week_start(p_at timestamptz)
 returns timestamptz
 language sql
-immutable
+stable
 set search_path = ''
 as $$
   select ((date_trunc('week', p_at at time zone 'Asia/Bangkok') + interval '9 hours') at time zone 'Asia/Bangkok')
@@ -192,28 +197,33 @@ as $$
 declare
   v_people uuid[];
   v_start timestamptz;
-  v_last uuid;
-  v_idx integer;
+  v_slot integer;
   v_made integer := 0;
 begin
+  -- One writer at a time: the cron and a rotation save (db review L5).
+  perform pg_advisory_xact_lock(hashtext('oncall_extend_shifts'));
   select array_agg(r.user_id order by r.position) into v_people
   from public.oncall_rotation r join public.profiles p on p.id = r.user_id and p.is_active;
   if v_people is null then
     return 0;
   end if;
-  select s.ends_at, s.user_id into v_start, v_last
-  from public.oncall_shifts s order by s.ends_at desc limit 1;
-  if v_start is null then
-    v_start := public.oncall_week_start(now());
+  -- After the last week, never in the past (a stalled cron, a refilled rotation — db review M3).
+  select s.ends_at into v_start from public.oncall_shifts s order by s.ends_at desc limit 1;
+  v_start := greatest(coalesce(v_start, '-infinity'), public.oncall_week_start(now()));
+  -- The slot after the last week's slot; from the top when there is none or the rotation shrank.
+  select s.slot into v_slot from public.oncall_shifts s where s.slot is not null order by s.starts_at desc limit 1;
+  v_slot := coalesce(v_slot, 0);
+  if v_slot > cardinality(v_people) then
+    v_slot := 0;
   end if;
-  -- The next person after whoever had the last week; from the top when they left the rotation.
-  v_idx := coalesce(array_position(v_people, v_last), 0);
   while v_start < p_until loop
-    v_idx := v_idx % cardinality(v_people) + 1;
-    insert into public.oncall_shifts (user_id, starts_at, ends_at)
-    values (v_people[v_idx], v_start, v_start + interval '7 days')
-    on conflict (starts_at) do nothing;
-    v_made := v_made + 1;
+    v_slot := v_slot % cardinality(v_people) + 1;
+    insert into public.oncall_shifts (user_id, starts_at, ends_at, slot)
+    values (v_people[v_slot], v_start, v_start + interval '7 days', v_slot)
+    on conflict do nothing;
+    if found then
+      v_made := v_made + 1;
+    end if;
     v_start := v_start + interval '7 days';
   end loop;
   return v_made;
@@ -260,6 +270,7 @@ begin
     end if;
   end loop;
 
+  perform pg_advisory_xact_lock(hashtext('oncall_extend_shifts'));
   select coalesce(jsonb_agg(user_id order by position), '[]'::jsonb) into v_before from public.oncall_rotation;
   delete from public.oncall_rotation;
   insert into public.oncall_rotation (user_id, position)

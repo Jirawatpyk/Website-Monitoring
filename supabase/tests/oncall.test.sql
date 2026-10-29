@@ -4,7 +4,7 @@
 -- and that nobody writes the tables directly.
 begin;
 \ir _helpers.psql
-select plan(40);
+select plan(43);
 
 -- ── Fixtures ─────────────────────────────────────────────────────────────
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -144,6 +144,19 @@ select tests.authenticate_as((select id from ids where name = 'ploy'));
 select isnt(public.confirm_oncall_test((select t from tok)), null, 'Ploy opening it on her phone ticks it');
 select throws_ok($$ select test_token from public.oncall_checklist $$, '42501', null, 'nobody reads the link''s token');
 reset role;
+
+-- ── The database keeps it sound (db review M1–M3) ───────────────────────
+select throws_ok($$ insert into public.oncall_shifts (user_id, starts_at, ends_at)
+                    values ((select id from ids where name = 'arm'), now() + interval '1 day', now() + interval '2 days') $$,
+  '23P01', null, 'two people can''t be on call at once');
+-- Weeks 2 and 3 were swapped above (Arm ↔ Nok): week 5 still follows the slot order — Nok, the 2nd slot.
+set local role service_role;
+select public.oncall_extend_shifts((select max(ends_at) from public.oncall_shifts) + interval '7 days');
+reset role;
+select is((select slot from public.oncall_shifts order by starts_at desc limit 1),
+  ((select slot from public.oncall_shifts where slot is not null order by starts_at desc offset 1 limit 1) % 3 + 1)::smallint,
+  'the next week takes the next slot, whatever a swap did to the people');
+select ok((select min(starts_at) from public.oncall_shifts) >= public.oncall_week_start(now()), 'no week is made in the past');
 
 -- ── Nobody writes directly; staff read ───────────────────────────────────
 select tests.authenticate_as((select id from ids where name = 'tao'));

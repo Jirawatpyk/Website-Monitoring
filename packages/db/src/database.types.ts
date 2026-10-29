@@ -507,14 +507,14 @@ isOneToOne: true
                   ]
                 },"oncall_shifts": {
                   Row: {
-                    "created_at": string,"ends_at": string,"handed_over_from": string | null,"handover_reason": string | null,"id": string,"starts_at": string,"updated_at": string,"user_id": string
+                    "created_at": string,"ends_at": string,"handed_over_from": string | null,"handover_reason": string | null,"id": string,"slot": number | null,"starts_at": string,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"ends_at": string,"handed_over_from"?: string | null,"handover_reason"?: string | null,"id"?: string,"starts_at": string,"updated_at"?: string,"user_id": string
+                    "created_at"?: string,"ends_at": string,"handed_over_from"?: string | null,"handover_reason"?: string | null,"id"?: string,"slot"?: number | null,"starts_at": string,"updated_at"?: string,"user_id": string
                   }
                   Update: {
-                    "created_at"?: string,"ends_at"?: string,"handed_over_from"?: string | null,"handover_reason"?: string | null,"id"?: string,"starts_at"?: string,"updated_at"?: string,"user_id"?: string
+                    "created_at"?: string,"ends_at"?: string,"handed_over_from"?: string | null,"handover_reason"?: string | null,"id"?: string,"slot"?: number | null,"starts_at"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
