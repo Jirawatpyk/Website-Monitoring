@@ -932,10 +932,15 @@ isOneToOne: false
             }[]
                            },
 "engine_escalate_incident":
-{ Args: { "p_context": Json,"p_detected_at": string,"p_flapping"?: boolean,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"] }; Returns: boolean
+{ Args: { "p_context": Json,"p_detected_at": string,"p_flapping"?: boolean,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_outside_hours"?: boolean,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"] }; Returns: boolean
                            },
 "engine_fire_step":
 { Args: { "p_context"?: Json,"p_due_at": string,"p_incident_id": string,"p_level": number }; Returns: boolean
+                           },
+"engine_l0_people":
+{ Args: { "p_incident_id": string }; Returns: {
+              "user_id": string
+            }[]
                            },
 "engine_log_windows":
 { Args: { "p_now": string }; Returns: undefined
@@ -963,7 +968,7 @@ isOneToOne: false
 { Args: { "p_note"?: string,"p_round_at": string,"p_site_id": string }; Returns: undefined
                            },
 "engine_open_incident":
-{ Args: { "p_context": Json,"p_detected_at": string,"p_hold_until"?: string,"p_monitor_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
+{ Args: { "p_context": Json,"p_detected_at": string,"p_hold_until"?: string,"p_monitor_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_outside_hours"?: boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
                            },
 "engine_page_fingerprints":
 { Args: { "p_now": string,"p_since": string }; Returns: {
@@ -971,7 +976,10 @@ isOneToOne: false
             }[]
                            },
 "engine_post_late_alert":
-{ Args: { "p_at": string,"p_hold_until"?: string,"p_incident_id": string }; Returns: boolean
+{ Args: { "p_at": string,"p_hold_until"?: string,"p_incident_id": string,"p_outside_hours"?: boolean }; Returns: boolean
+                           },
+"engine_queue_l0_emails":
+{ Args: { "p_context": Json,"p_dedupe": string,"p_hold": string,"p_incident_id": string,"p_only_unemailed": boolean,"p_template": string }; Returns: number
                            },
 "engine_queue_window_messages":
 { Args: { "p_actor"?: string,"p_extra"?: Json,"p_hold"?: string,"p_key"?: string,"p_kind": string,"p_window_id": string }; Returns: number
