@@ -21,7 +21,8 @@ export type NoteResult = { ok: true } | { ok: false; message: string };
 export type RootCauseResult =
   { ok: true } | { ok: false; message: string; field?: 'category' | 'what' | 'fix' };
 export type ResolveResult =
-  { ok: true; postsAt: string } | { ok: false; message: string; field?: 'category' | 'what' | 'fix' };
+  | { ok: true; postsAt: string; notifies: boolean }
+  | { ok: false; message: string; field?: 'category' | 'what' | 'fix' };
 
 /** Database refusals in words (`ack_incident` / `undo_ack` error codes). */
 const REFUSALS: Record<string, string> = {
@@ -173,9 +174,19 @@ export async function resolveIncident(input: RootCauseInput): Promise<ResolveRes
     ...(acceptCheckId ? { p_accept_check_id: acceptCheckId } : {}),
   });
   if (error) return { ok: false, message: refusal(error, ACT_REFUSALS) };
-  flushAfter(incidentId, data, 'resolve_flush_failed');
+  // The resolve's event says whether anything was queued (D-047: no alert went out → nothing to post).
+  const { data: event } = await supabase
+    .from('incident_events')
+    .select('payload')
+    .eq('incident_id', incidentId)
+    .eq('type', 'resolved')
+    .order('at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const notifies = (event?.payload as { notifies?: unknown } | null)?.notifies !== false;
+  if (notifies) flushAfter(incidentId, data, 'resolve_flush_failed');
   revalidate(incidentId);
-  return { ok: true, postsAt: data };
+  return { ok: true, postsAt: data, notifies };
 }
 
 /** Take back one's own resolve inside the 10 s window: nothing is sent. */

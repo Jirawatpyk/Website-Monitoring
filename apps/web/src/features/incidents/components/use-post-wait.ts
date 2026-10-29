@@ -11,6 +11,9 @@ const POLL_FOR_MS = 11 * 60_000;
 /** Past this the copy says it's still being tried rather than "now". */
 const LATE_AFTER_MS = 30_000;
 
+/** An ack or resolve with nothing queued (no alert ever went out, D-047): its line says so. */
+export const NOTHING_TO_POST = 'Nothing to post — no alert went out for this incident.';
+
 /** How long held messages have gone unposted: `late` after 30 s, `stale` once the retries are over. */
 export type PostOverdue = 'no' | 'late' | 'stale';
 

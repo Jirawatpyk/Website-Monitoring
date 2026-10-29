@@ -3,11 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({
   rpc: vi.fn(),
+  resolvedEvent: { payload: {} as Record<string, unknown> } as { payload: Record<string, unknown> } | null,
   after: vi.fn(),
   revalidatePath: vi.fn(),
   dispatch: vi.fn(),
 }));
-vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ rpc: m.rpc }) }));
+vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ rpc: m.rpc, from: () => events }) }));
+// `incident_events` read after a resolve: the latest resolved event's payload.
+const events = {
+  select: () => events,
+  eq: () => events,
+  order: () => events,
+  limit: () => events,
+  maybeSingle: async () => ({ data: m.resolvedEvent, error: null }),
+};
 vi.mock('next/server', () => ({ after: m.after }));
 vi.mock('next/cache', () => ({ revalidatePath: m.revalidatePath }));
 vi.mock('@/server/db', () => ({ serviceDb: () => 'db' }));
@@ -138,7 +147,7 @@ describe('note, root cause, resolve (S07, D-033)', () => {
     vi.setSystemTime(new Date('2026-10-06T14:00:00Z'));
     m.rpc.mockResolvedValue({ data: '2026-10-06T14:00:10Z', error: null });
     m.dispatch.mockResolvedValue({ ok: true });
-    expect(await resolveIncident(rc)).toEqual({ ok: true, postsAt: '2026-10-06T14:00:10Z' });
+    expect(await resolveIncident(rc)).toEqual({ ok: true, postsAt: '2026-10-06T14:00:10Z', notifies: true });
     expect(m.revalidatePath).toHaveBeenCalledWith('/incidents');
     const flush = (m.after.mock.calls[0] as [() => Promise<void>])[0]();
     await vi.advanceTimersByTimeAsync(11_000);
@@ -169,6 +178,14 @@ describe('note, root cause, resolve (S07, D-033)', () => {
     m.rpc.mockResolvedValue({ data: null, error: { code, message } });
     expect(await resolveIncident(rc)).toEqual({ ok: false, message: shown });
     expect(m.after).not.toHaveBeenCalled();
+  });
+
+  it('resolves with nothing queued (no alert ever went out, D-047): says so and sends nothing', async () => {
+    m.rpc.mockResolvedValue({ data: '2026-10-06T14:00:10Z', error: null });
+    m.resolvedEvent = { payload: { notifies: false } };
+    expect(await resolveIncident(rc)).toEqual({ ok: true, postsAt: '2026-10-06T14:00:10Z', notifies: false });
+    expect(m.after).not.toHaveBeenCalled();
+    m.resolvedEvent = { payload: {} };
   });
 
   it('undo resolve: inside the window, then too late', async () => {

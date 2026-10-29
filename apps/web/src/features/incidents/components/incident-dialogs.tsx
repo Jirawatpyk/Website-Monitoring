@@ -23,7 +23,7 @@ import {
 import { canResolve, UNKNOWN_ROOT_CAUSE } from '@dxt/engine';
 import { formatTime, formatTimeWithSeconds, ROOT_CAUSE_CATEGORIES, ROOT_CAUSE_LABELS } from '@dxt/shared';
 import { FOCUS_TARGET } from '@/components/focus-target';
-import { postWaitWords, type PostOverdue } from './use-post-wait';
+import { NOTHING_TO_POST, postWaitWords, type PostOverdue } from './use-post-wait';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { addNote, resolveIncident, saveRootCause, undoResolve } from '../actions';
 import type { Condition } from '../model';
@@ -282,7 +282,8 @@ export function RootCauseDialog({
 // ── Resolve (Resolve board) ──────────────────────────────────────────────
 
 type ResolveDone =
-  { kind: 'resolved'; at: Date; postsAt: string; category: string } | { kind: 'kept'; at: Date };
+  | { kind: 'resolved'; at: Date; postsAt: string; notifies: boolean; category: string }
+  | { kind: 'kept'; at: Date };
 
 const CondIcon = ({ met }: { met: boolean }) =>
   met ? (
@@ -374,7 +375,7 @@ export function ResolveDialog({
   const [done, setDone] = useState<ResolveDone | null>(null);
   const [pending, start] = useTransition();
   const doneTitle = useRef<HTMLParagraphElement>(null);
-  const seconds = useSecondsLeft(done?.kind === 'resolved' ? done.postsAt : null);
+  const seconds = useSecondsLeft(done?.kind === 'resolved' && done.notifies ? done.postsAt : null);
   // The button pressed is gone once the dialog shows the outcome: focus its first line (WCAG 2.4.3).
   useEffect(() => {
     if (done) doneTitle.current?.focus();
@@ -441,7 +442,13 @@ export function ResolveDialog({
           field: undefined,
         }));
         if (!r.ok) return r.field ? setErrors({ [r.field]: r.message }) : setFailure(r.message);
-        setDone({ kind: 'resolved', at: new Date(), postsAt: r.postsAt, category: value.category });
+        setDone({
+          kind: 'resolved',
+          at: new Date(),
+          postsAt: r.postsAt,
+          notifies: r.notifies,
+          category: value.category,
+        });
       }
       router.refresh();
     });
@@ -550,9 +557,11 @@ export function ResolveDialog({
       {done?.kind === 'resolved' ? (
         <div className="flex flex-col gap-2">
           <p role="status" className="sr-only">
-            {postedAt
-              ? `Posted to ${where} ${formatTimeWithSeconds(new Date(postedAt))}.`
-              : `Resolved. Posting to ${where} in a few seconds — nothing is sent until then.`}
+            {!done.notifies
+              ? `Resolved. ${NOTHING_TO_POST}`
+              : postedAt
+                ? `Posted to ${where} ${formatTimeWithSeconds(new Date(postedAt))}.`
+                : `Resolved. Posting to ${where} in a few seconds — nothing is sent until then.`}
           </p>
           <div className="flex items-start gap-3">
             <span
@@ -567,54 +576,58 @@ export function ResolveDialog({
               </p>
               <p className="m-0 text-sm text-fg-secondary">
                 {`Root cause: ${label(done.category)}. ${lasted ? `${lasted}. ` : ''}`}
-                {seconds > 0
-                  ? `Posting to ${where} in ${seconds} s — nothing is sent until then.`
-                  : postedAt
-                    ? `Posted to ${where} ${formatTimeWithSeconds(new Date(postedAt))}.`
-                    : postWaitWords(postOverdue, incident.emailed)}
+                {!done.notifies
+                  ? NOTHING_TO_POST
+                  : seconds > 0
+                    ? `Posting to ${where} in ${seconds} s — nothing is sent until then.`
+                    : postedAt
+                      ? `Posted to ${where} ${formatTimeWithSeconds(new Date(postedAt))}.`
+                      : postWaitWords(postOverdue, incident.emailed)}
               </p>
             </div>
           </div>
-          <ul className="m-0 flex list-none flex-col divide-y divide-border-subtle rounded-aura-md border border-border-default p-0 text-sm">
-            {[
-              ['Resolved reply to the Chat thread', 'Resolved reply posted in the Chat thread'],
-              ...(incident.emailed
-                ? [
-                    [
-                      incident.severity === 'down'
-                        ? 'Resolved email to the DOWN recipients'
-                        : 'Resolved email to everyone emailed about it',
-                      'Resolved email sent in the incident thread',
-                    ],
-                  ]
-                : []),
-            ].map(([held, sent]) => (
-              <li key={held} className="flex items-start gap-2 px-aura-3 py-2">
-                <span
-                  className={`flex pt-0.5 ${postedAt ? 'text-fg-positive' : 'text-fg-secondary'}`}
-                  aria-hidden
-                >
-                  {postedAt ? <IconCircleCheck className="size-4" /> : <IconClock className="size-4" />}
-                </span>
-                <span className="grow">
-                  {postedAt
-                    ? sent
-                    : seconds > 0
-                      ? `${held} · held for undo`
-                      : `${held} · ${postOverdue === 'stale' ? 'not confirmed' : 'sending'}`}
-                </span>
-                <span className="shrink-0 font-mono text-xs text-fg-secondary tabular-nums">
-                  {postedAt
-                    ? formatTimeWithSeconds(new Date(postedAt))
-                    : seconds > 0
-                      ? `in ${seconds} s`
-                      : postOverdue === 'no'
-                        ? 'now'
-                        : 'retrying'}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {done.notifies && (
+            <ul className="m-0 flex list-none flex-col divide-y divide-border-subtle rounded-aura-md border border-border-default p-0 text-sm">
+              {[
+                ['Resolved reply to the Chat thread', 'Resolved reply posted in the Chat thread'],
+                ...(incident.emailed
+                  ? [
+                      [
+                        incident.severity === 'down'
+                          ? 'Resolved email to the DOWN recipients'
+                          : 'Resolved email to everyone emailed about it',
+                        'Resolved email sent in the incident thread',
+                      ],
+                    ]
+                  : []),
+              ].map(([held, sent]) => (
+                <li key={held} className="flex items-start gap-2 px-aura-3 py-2">
+                  <span
+                    className={`flex pt-0.5 ${postedAt ? 'text-fg-positive' : 'text-fg-secondary'}`}
+                    aria-hidden
+                  >
+                    {postedAt ? <IconCircleCheck className="size-4" /> : <IconClock className="size-4" />}
+                  </span>
+                  <span className="grow">
+                    {postedAt
+                      ? sent
+                      : seconds > 0
+                        ? `${held} · held for undo`
+                        : `${held} · ${postOverdue === 'stale' ? 'not confirmed' : 'sending'}`}
+                  </span>
+                  <span className="shrink-0 font-mono text-xs text-fg-secondary tabular-nums">
+                    {postedAt
+                      ? formatTimeWithSeconds(new Date(postedAt))
+                      : seconds > 0
+                        ? `in ${seconds} s`
+                        : postOverdue === 'no'
+                          ? 'now'
+                          : 'retrying'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : done?.kind === 'kept' ? (
         <div className="flex items-start gap-3">

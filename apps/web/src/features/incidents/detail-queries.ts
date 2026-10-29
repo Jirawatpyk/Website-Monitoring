@@ -92,8 +92,18 @@ export interface IncidentDetail {
   canAct: boolean;
   rootCause: { category: string | null; what: string | null; fix: string | null };
   gate: Gate;
-  /** The latest resolve, while its messages may still be held (Undo). */
-  resolved: { by: string; byViewer: boolean; at: string; postsAt: string; posted: string | null } | null;
+  /**
+   * The latest resolve, while its messages may still be held (Undo). `notifies` is false when nothing
+   * was queued: no alert ever went out (D-047), so there is nothing to post or wait for.
+   */
+  resolved: {
+    by: string;
+    byViewer: boolean;
+    at: string;
+    postsAt: string;
+    posted: string | null;
+    notifies: boolean;
+  } | null;
   /** An email about it went. D-047: a drop back inside 5 min emails nobody, so Resolve posts to Chat only. */
   emailed: boolean;
   timeline: TimelineItem[];
@@ -210,6 +220,7 @@ function resolvedOf(
     at: i.resolved_at,
     postsAt,
     posted: posted ?? null,
+    notifies: e?.payload.notifies !== false,
   };
 }
 
