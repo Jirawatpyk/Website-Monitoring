@@ -890,6 +890,27 @@ describe('runEngine — maintenance and mute (S09, D-036)', () => {
     expect(summary.notified).toBe(1);
   });
 
+  it.each([
+    // Hours end 17:01 Bangkok (whole minutes): confirmed 17:00:32 (inside), the run at 17:01:05 (outside) → judged at the confirm.
+    ['judged at the confirm, not the run', { response_end: '17:01:00' }, [], false],
+    // D-048 item 8: Tier 1 on a company holiday goes to the person on call, as at weekends.
+    ['a company holiday', { response_end: '18:00:00' }, [{ day: '2026-10-06' }], true],
+  ])('a DOWN open passes p_outside_hours — %s (S10)', async (_label, hours, holidays, expected) => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: down },
+      'rpc.engine_open_incident': { data: 'i1' },
+      'organisation_settings.select': {
+        data: { response_start: '09:00:00', response_days: [1, 2, 3, 4, 5], ...hours },
+      },
+      'company_holidays.select': { data: holidays },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_open_incident')?.args).toMatchObject({
+      p_outside_hours: expected,
+    });
+  });
+
   it('at 23:00 on a weekday the first alert is judged outside response hours, so L0 pages on call (S10)', async () => {
     const night = new Date('2026-10-06T16:00:00Z'); // Tue 23:00 Bangkok
     const { db, rpcCalls, readCalls } = fakeDb({

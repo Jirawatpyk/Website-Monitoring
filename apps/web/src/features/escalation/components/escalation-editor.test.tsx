@@ -106,7 +106,11 @@ describe('Escalation editor — guardrails (Done-when 3, spec §14.7, §15.5)', 
     expect(within(l0).getByRole('checkbox', { name: /Alerts Space/ })).toBeDisabled();
     expect(within(l0).getByRole('checkbox', { name: 'Email' })).toBeEnabled();
     expect(within(l0).getByRole('textbox', { name: /Notify after/ })).toBeDisabled();
-    fireEvent.click(within(l0).getByRole('button', { name: 'Cancel' }));
+    // Adding the backup to L0 applies cleanly and waits in the unsaved bar.
+    fireEvent.click(within(l0).getByRole('button', { name: 'Backup' }));
+    fireEvent.click(within(l0).getByRole('button', { name: 'Apply to L0' }));
+    expect(screen.queryByText(/L0 is pinned on every policy/)).toBeNull();
+    expect(screen.getByText(/1 unsaved change/)).toBeInTheDocument();
     openL1();
     expect(within(dialog(/Edit L1/)).getByRole('button', { name: 'CEO' })).toBeDisabled();
   });
