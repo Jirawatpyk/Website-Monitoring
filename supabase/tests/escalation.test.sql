@@ -366,9 +366,9 @@ select throws_ok(
   format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, jsonb_build_array(jsonb_build_object(
     'policyId', (select id from pol where name = 'down1'),
     'steps', jsonb_build_array(
-      jsonb_build_object('level', 0, 'delayMin', 0, 'targets', array['owner', 'backup'], 'channels', array['chat', 'space', 'email']),
+      jsonb_build_object('level', 0, 'delayMin', 0, 'targets', array['backup'], 'channels', array['chat', 'space', 'email']),
       jsonb_build_object('level', 1, 'delayMin', 15, 'targets', array['admins'], 'channels', array['chat']))))),
-  '22023', 'L0 is pinned on every policy', 'L0 names the owner only (what the first alert really reaches)');
+  '22023', 'L0 is pinned on every policy', 'L0 always names the owner / on-call (the pencil adds people, S10)');
 select throws_ok(
   format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, jsonb_build_array(jsonb_build_object(
     'policyId', (select id from pol where name = 'down1'),
