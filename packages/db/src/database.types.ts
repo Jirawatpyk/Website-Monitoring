@@ -1066,6 +1066,11 @@ isOneToOne: false
 "oncall_extend_shifts":
 { Args: { "p_until": string }; Returns: number
                            },
+"oncall_notes":
+{ Args: { "p_shift_id"?: string,"p_swap_id"?: string }; Returns: {
+              "decision_note": string,"handover_reason": string,"reason": string,"response_note": string
+            }[]
+                           },
 "oncall_person_at":
 { Args: { "p_at": string }; Returns: string
                            },

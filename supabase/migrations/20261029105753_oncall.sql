@@ -138,9 +138,18 @@ create policy oncall_checklist_select_staff on public.oncall_checklist
 create policy oncall_events_select_staff on public.oncall_events
   for select to authenticated using ((select public.is_staff()));
 
-grant select on public.oncall_rotation, public.oncall_shifts, public.oncall_swaps, public.oncall_events
-  to authenticated;
--- The checklist without its secret token.
+revoke all on public.oncall_rotation, public.oncall_shifts, public.oncall_swaps, public.oncall_checklist,
+  public.oncall_events from public, anon, authenticated;
+grant select on public.oncall_rotation to authenticated;
+-- Reasons are personal ("Ploy is sick", "Family trip"): the people involved and Admins read them through
+-- oncall_notes(); every other column is for all staff (security review M1). The checklist without its
+-- secret token; events without their payload.
+grant select (id, user_id, starts_at, ends_at, handed_over_from, slot, created_at, updated_at)
+  on public.oncall_shifts to authenticated;
+grant select (id, requester_shift_id, counterpart_shift_id, requester_id, counterpart_id, status, responded_at,
+              decided_by, decided_at, created_at, updated_at)
+  on public.oncall_swaps to authenticated;
+grant select (id, kind, actor_id, user_id, swap_id, shift_id, at) on public.oncall_events to authenticated;
 grant select (id, user_id, mentions_only, dnd_allowed, test_sent_at, test_received_at, created_at, updated_at)
   on public.oncall_checklist to authenticated;
 grant all on public.oncall_rotation, public.oncall_shifts, public.oncall_swaps, public.oncall_checklist,
@@ -167,8 +176,10 @@ stable
 security definer
 set search_path = ''
 as $$
-  select s.user_id from public.oncall_shifts s join public.profiles p on p.id = s.user_id and p.is_active
+  select s.user_id from public.oncall_shifts s
+  join public.profiles p on p.id = s.user_id and p.is_active and p.role in ('admin', 'responder')
   where s.starts_at <= p_at and p_at < s.ends_at
+    and (auth.role() = 'service_role' or (select public.is_staff()))
   order by s.starts_at desc limit 1;
 $$;
 
@@ -299,8 +310,14 @@ declare
 begin
   select * into v_a from public.oncall_shifts where id = p_shift_id for update;
   select * into v_b from public.oncall_shifts where id = p_with_shift_id for update;
+  if not private.oncall_eligible(auth.uid()) then
+    raise exception 'Only Admins and Responders take on-call weeks' using errcode = '42501';
+  end if;
   if v_a.id is null or v_b.id is null then
     raise exception 'That week doesn''t exist any more' using errcode = 'P0002';
+  end if;
+  if not private.oncall_eligible(v_b.user_id) then
+    raise exception 'Only active Admins and Responders can be on call' using errcode = '22023', hint = 'rotation_person';
   end if;
   if v_a.user_id is distinct from auth.uid() then
     raise exception 'You can ask to swap only your own week' using errcode = '42501';
@@ -337,6 +354,12 @@ as $$
 declare
   v public.oncall_swaps%rowtype;
 begin
+  if p_accept is null then
+    raise exception 'Accept or decline' using errcode = '22023', hint = 'invalid';
+  end if;
+  if not private.oncall_eligible(auth.uid()) then
+    raise exception 'Only Admins and Responders take on-call weeks' using errcode = '42501';
+  end if;
   select * into v from public.oncall_swaps where id = p_swap_id for update;
   if not found then
     raise exception 'That request doesn''t exist any more' using errcode = 'P0002';
@@ -374,6 +397,9 @@ begin
   if coalesce(public.current_app_role() = 'admin', false) is not true then
     raise exception 'Only an Admin can approve or decline a swap' using errcode = '42501';
   end if;
+  if p_approve is null then
+    raise exception 'Approve or decline' using errcode = '22023', hint = 'invalid';
+  end if;
   select * into v from public.oncall_swaps where id = p_swap_id for update;
   if not found then
     raise exception 'That request doesn''t exist any more' using errcode = 'P0002';
@@ -388,6 +414,9 @@ begin
     raise exception 'Say why — both of them see this' using errcode = '22023', hint = 'swap_reason';
   end if;
   if p_approve then
+    if not (private.oncall_eligible(v.requester_id) and private.oncall_eligible(v.counterpart_id)) then
+      raise exception 'Only active Admins and Responders can be on call' using errcode = '22023', hint = 'rotation_person';
+    end if;
     if exists (select 1 from public.oncall_shifts where id in (v.requester_shift_id, v.counterpart_shift_id)
                and starts_at <= now()) then
       raise exception 'The live shift can’t be swapped — hand it over in Users' using errcode = '22023', hint = 'swap_live';
@@ -422,7 +451,7 @@ begin
   if not found then
     raise exception 'That request doesn''t exist any more' using errcode = 'P0002';
   end if;
-  if v.requester_id is distinct from auth.uid() then
+  if v.requester_id is distinct from auth.uid() or not public.is_staff() then
     raise exception 'Only the person who asked can withdraw it' using errcode = '42501';
   end if;
   if v.status not in ('waiting', 'accepted') then
@@ -450,6 +479,7 @@ declare
   v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
   v_at timestamptz := greatest(coalesce(p_at, now()), now());
   v_new uuid;
+  v_swap record;
 begin
   if coalesce(public.current_app_role() = 'admin', false) is not true then
     raise exception 'Only an Admin can hand over a shift' using errcode = '42501';
@@ -470,10 +500,18 @@ begin
   if v_at >= v.ends_at then
     raise exception 'That shift is over' using errcode = '22023', hint = 'handover_over';
   end if;
-  -- An open swap on this week can't go through any more.
-  update public.oncall_swaps set status = 'admin_declined', decided_by = auth.uid(), decided_at = now(),
-         decision_note = 'The week was handed over'
-    where status in ('waiting', 'accepted') and (requester_shift_id = v.id or counterpart_shift_id = v.id);
+  -- An open swap on this week can't go through any more: closed, logged and told like a decline.
+  for v_swap in
+    update public.oncall_swaps set status = 'admin_declined', decided_by = auth.uid(), decided_at = now(),
+           decision_note = 'The week was handed over'
+      where status in ('waiting', 'accepted') and (requester_shift_id = v.id or counterpart_shift_id = v.id)
+      returning id, status, requester_shift_id
+  loop
+    insert into public.audit_log (actor_id, action, entity, entity_id, after)
+    values (auth.uid(), 'oncall.swap_admin_decline', 'oncall_swap', v_swap.id,
+            jsonb_build_object('status', 'admin_declined', 'note', 'The week was handed over'));
+    perform private.oncall_event('swap_admin_declined', null, v_swap.id, v_swap.requester_shift_id);
+  end loop;
   if v_at <= v.starts_at then
     update public.oncall_shifts set user_id = p_to, handed_over_from = v.user_id, handover_reason = v_reason
       where id = v.id;
@@ -487,7 +525,7 @@ begin
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), 'oncall.handover', 'oncall_shift', v.id,
           jsonb_build_object('user', v.user_id, 'starts', v.starts_at, 'ends', v.ends_at),
-          jsonb_build_object('user', p_to, 'from', v_at, 'reason', v_reason));
+          jsonb_build_object('user', p_to, 'from', v_at, 'reason', v_reason, 'shift', v_new));
   perform private.oncall_event('handed_over', p_to, null, v_new,
                                jsonb_build_object('from', v.user_id, 'at', v_at, 'reason', v_reason));
   return v_new;
@@ -502,8 +540,8 @@ security definer
 set search_path = ''
 as $$
 begin
-  if not public.is_staff() then
-    raise exception 'Sign in first' using errcode = '42501';
+  if not private.oncall_eligible(auth.uid()) then
+    raise exception 'Only Admins and Responders take on-call weeks' using errcode = '42501';
   end if;
   insert into public.oncall_checklist (user_id, mentions_only, dnd_allowed)
   values (auth.uid(), p_mentions_only, p_dnd_allowed)
@@ -521,8 +559,11 @@ as $$
 declare
   v_at timestamptz := now();
 begin
-  if not public.is_staff() then
-    raise exception 'Sign in first' using errcode = '42501';
+  if not private.oncall_eligible(auth.uid()) then
+    raise exception 'Only Admins and Responders take on-call weeks' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.oncall_checklist where user_id = auth.uid() and test_sent_at > now() - interval '1 minute') then
+    raise exception 'A test alert went less than a minute ago — wait a moment' using errcode = '55000', hint = 'test_too_soon';
   end if;
   insert into public.oncall_checklist (user_id, test_sent_at, test_token, test_received_at)
   values (auth.uid(), v_at, gen_random_uuid(), null)
@@ -543,6 +584,9 @@ declare
   v public.oncall_checklist%rowtype;
   v_name text;
 begin
+  if not public.is_staff() then
+    raise exception 'Sign in first' using errcode = '42501';
+  end if;
   select * into v from public.oncall_checklist where test_token = p_token for update;
   if not found then
     raise exception 'This test link has expired — send a new test alert' using errcode = 'P0002';
@@ -553,10 +597,31 @@ begin
       using errcode = '42501', hint = 'test_other_person';
   end if;
   if v.test_received_at is null then
-    update public.oncall_checklist set test_received_at = now() where id = v.id returning * into v;
+    update public.oncall_checklist set test_received_at = now(), test_token = null where id = v.id returning * into v;
   end if;
   return v.test_received_at;
 end;
+$$;
+
+-- ── Reasons, for those who may see them (security review M1) ─────────────
+-- A swap's reason, answer and decision notes: its requester, the person asked, and Admins. A
+-- hand-over's reason: the person who had the shift, the one who took it, and Admins.
+create function public.oncall_notes(p_swap_id uuid default null, p_shift_id uuid default null)
+returns table (reason text, response_note text, decision_note text, handover_reason text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select w.reason, w.response_note, w.decision_note, null::text
+  from public.oncall_swaps w
+  where w.id = p_swap_id
+    and ((select public.current_app_role()) = 'admin' or auth.uid() in (w.requester_id, w.counterpart_id))
+  union all
+  select null, null, null, s.handover_reason
+  from public.oncall_shifts s
+  where s.id = p_shift_id
+    and ((select public.current_app_role()) = 'admin' or auth.uid() in (s.user_id, s.handed_over_from));
 $$;
 
 -- ── Grants ───────────────────────────────────────────────────────────────
@@ -574,8 +639,15 @@ revoke execute on function
   public.hand_over_oncall_shift(uuid, uuid, timestamptz, text),
   public.set_oncall_checklist(boolean, boolean),
   public.send_oncall_test(),
-  public.confirm_oncall_test(uuid)
+  public.confirm_oncall_test(uuid),
+  public.oncall_notes(uuid, uuid)
   from public, anon;
+-- Service role only (L5): a signed-in session never extends the weeks or calls the helpers.
+revoke execute on function
+  public.oncall_extend_shifts(timestamptz),
+  private.oncall_event(text, uuid, uuid, uuid, jsonb),
+  private.oncall_eligible(uuid)
+  from authenticated;
 grant execute on function
   public.oncall_week_start(timestamptz),
   public.oncall_person_at(timestamptz),
@@ -587,7 +659,8 @@ grant execute on function
   public.hand_over_oncall_shift(uuid, uuid, timestamptz, text),
   public.set_oncall_checklist(boolean, boolean),
   public.send_oncall_test(),
-  public.confirm_oncall_test(uuid)
+  public.confirm_oncall_test(uuid),
+  public.oncall_notes(uuid, uuid)
   to authenticated;
 grant execute on function
   public.oncall_week_start(timestamptz),

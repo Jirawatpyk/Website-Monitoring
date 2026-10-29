@@ -4,7 +4,7 @@
 -- and that nobody writes the tables directly.
 begin;
 \ir _helpers.psql
-select plan(43);
+select plan(59);
 
 -- ── Fixtures ─────────────────────────────────────────────────────────────
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -157,6 +157,63 @@ select is((select slot from public.oncall_shifts order by starts_at desc limit 1
   ((select slot from public.oncall_shifts where slot is not null order by starts_at desc offset 1 limit 1) % 3 + 1)::smallint,
   'the next week takes the next slot, whatever a swap did to the people');
 select ok((select min(starts_at) from public.oncall_shifts) >= public.oncall_week_start(now()), 'no week is made in the past');
+
+-- ── Security review (M1–M3, L4–L7) ──────────────────────────────────────
+-- M1: reasons only for the people involved and Admins.
+select tests.authenticate_as((select id from ids where name = 'mint'));
+select throws_ok($$ select reason from public.oncall_swaps $$, '42501', null, 'a Viewer can''t read a swap''s reason');
+select throws_ok($$ select handover_reason from public.oncall_shifts $$, '42501', null, 'nor a hand-over''s reason');
+select throws_ok($$ select payload from public.oncall_events $$, '42501', null, 'nor an event''s payload');
+reset role;
+create temp table sw1 (k text primary key, id uuid) on commit drop;
+grant select on sw1 to authenticated;
+insert into sw1 select 'swap', id from public.oncall_swaps where reason = 'Family trip';
+insert into sw1 select 'shift', id from public.oncall_shifts where handover_reason = 'Ploy is sick';
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select is((select reason from public.oncall_notes((select id from sw1 where k = 'swap'))), 'Family trip', 'the requester reads the reason');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'ploy'));
+select is((select count(*)::int from public.oncall_notes((select id from sw1 where k = 'swap'))), 0, 'someone else gets nothing');
+select is((select handover_reason from public.oncall_notes(null, (select id from sw1 where k = 'shift'))),
+  'Ploy is sick', 'the person who handed over reads the hand-over reason');
+reset role;
+-- M2: only people who can be on call act; L7: who is on call is for staff.
+select tests.authenticate_as((select id from ids where name = 'bua'));
+select throws_ok($$ select public.request_oncall_swap((select id from wk where n = 3), (select id from wk where n = 4)) $$,
+  '42501', null, 'a stakeholder can''t ask for a swap');
+select throws_ok($$ select public.send_oncall_test() $$, '42501', null, 'nor send a test alert');
+reset role;
+select tests.as_anon();
+select throws_ok($$ select public.oncall_person_at(now()) $$, '42501', null, 'anon can''t ask who is on call');
+reset role;
+-- L5: a signed-in session never extends the weeks.
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok($$ select public.oncall_extend_shifts(now() + interval '60 days') $$, '42501', null, 'only the service role extends the weeks');
+reset role;
+-- L4: a null answer is refused.
+delete from sw;
+select tests.authenticate_as((select id from ids where name = 'nok'));
+insert into sw select public.request_oncall_swap((select id from wk where n = 3), (select id from wk where n = 4), 'Wedding');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'ploy'));
+select throws_ok($$ select public.respond_oncall_swap((select id from sw), null) $$, '22023', 'Accept or decline', 'the person asked must accept or decline');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok($$ select public.decide_oncall_swap((select id from sw), null) $$, '22023', 'Approve or decline', 'the Admin must approve or decline');
+-- M3: a hand-over closes the open swap on that week, logged and told.
+select lives_ok($$ select public.hand_over_oncall_shift((select id from wk where n = 4), (select id from ids where name = 'arm'), now(), 'Ploy is away') $$,
+  'the Admin hands week 4 to Arm');
+reset role;
+select is((select array[(select status from public.oncall_swaps where id = (select id from sw)),
+                        (select count(*)::text from public.audit_log where action = 'oncall.swap_admin_decline' and entity_id = (select id from sw)),
+                        (select count(*)::text from public.oncall_events where kind = 'swap_admin_declined' and swap_id = (select id from sw))]),
+  array['admin_declined', '1', '1'], 'the open swap is declined, with its audit row and event');
+-- L6: one test a minute; a confirmed link works once.
+select tests.authenticate_as((select id from ids where name = 'ploy'));
+select throws_ok($$ select public.send_oncall_test() $$, '55000', null, 'a second test within a minute is refused');
+reset role;
+select is((select test_token from public.oncall_checklist where user_id = (select id from ids where name = 'ploy')), null,
+  'the confirmed link''s token is gone');
 
 -- ── Nobody writes directly; staff read ───────────────────────────────────
 select tests.authenticate_as((select id from ids where name = 'tao'));
