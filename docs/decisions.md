@@ -67,10 +67,10 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 6. **Messages with no board** (swap request / accepted / declined / approved, hand-over, rotation change, the reminder a day before a shift, the L3 FYI when nobody acknowledged) are drafted by Claude on the pattern of the existing ChatAlert / EmailAlert rows and checked by message-checker; the texts are listed below once built. **UI with no board goes to Claude Design first** (the counterpart's view of a swap request; the test-alert link's landing).
 7. **Staging fixture people** for S10 (CEO, AM, on-call, all with Tao's Chat id) are seeded by Claude on staging, replacing D-035's "Tao runs it" for this slice. Never on production.
 8. **Settled by precedence, recorded here so they aren't re-asked:** the Tier 1 L2 CEO step is on with no tag (D-009); Tier 2–3 L2 is a reminder to Tao by Chat and email (spec §16.5 over the board's Chat only); the OnCall board's 2-step lines are dropped (D-007); the voice label is "Configured · off until approved" (§15.5); the phone checklist says "@mentions only" (§10, over PRD §13's risk row); there is no PROBLEM L2 (PRD §8's "T+1 business day" has no spec or board); Tier 1 on company holidays goes to the person on call, as at weekends (plan S10, `company_holidays`); a rotation of one person (on-call = Tle every week, D-009) shows Swap disabled with nobody to swap with.
+9. **The L0 pencil** (D-034 deferred it to S10) comes with PR B, on-call: both change who L0 tells, which needs the first DOWN card and email to reach everyone L0 names. PR A keeps L0 pinned as in S08 (Tao, 29 Oct 2026).
 
 **Why.** G1's people steps don't block S10's code, and a second code reviewer doesn't exist. The drill proves the alert path end to end; staging has the same probes, engine and notifier as production.
-
-**Impact.** Plan: G1 (no CODEOWNERS, drill on staging), S10 status. S10 PR A (L2–L3) and PR B (on-call). Supersedes D-008's "second Admin reviews every PR" and D-035's "Tao seeds the fixtures" for S10.
+**Impact.** Plan: G1 (no CODEOWNERS, drill on staging), S10 status. S10 PR A (L2–L3) and PR B (on-call, the L0 pencil). Supersedes D-008's "second Admin reviews every PR" and D-035's "Tao seeds the fixtures" for S10.
 
 ## D-047 — No email for a drop that recovers within 5 min
 
