@@ -29,7 +29,7 @@ const VIEWS: { value: ViewKey; label: string }[] = [
 /**
  * MEscalation (spec §22.5–6, D-034): the policies read-only — on phones for everyone, and at every
  * width for anyone who isn't an Admin. One vertical ladder with names resolved for the picked site,
- * "Example · nobody acknowledges" and "Always true". L2 / L3 and on-call come with S10.
+ * "Example · nobody acknowledges" and "Always true", with the S10 L2 / L3 rows (on-call: S10 PR B).
  */
 export function EscalationView({
   data,
@@ -58,6 +58,7 @@ export function EscalationView({
   const policy =
     view === 't1' ? find('t1') : view === 'problem' ? find('problem') : find(site?.tier === 3 ? 't3' : 't2');
   if (!policy) throw new Error('No escalation policies — the S08 migration seeds four');
+  const fyiStep = policy.steps.find((s) => s.fyi);
   const example = scenario(policy, site, data.admins, hours, clock, {
     phone: true,
     reminderMin: policy.severity === 'down' ? data.downReminder : data.problemReminder,
@@ -179,7 +180,11 @@ export function EscalationView({
 
       <section className="flex flex-col gap-1.5 rounded-aura-lg border border-border-default bg-bg-surface px-3.5 py-3 text-sm">
         <h2 className="m-0 font-mono text-xs font-normal text-fg-tertiary">ALWAYS TRUE</h2>
-        <p className="m-0">Acknowledge stops the steps above.</p>
+        <p className="m-0">
+          {fyiStep
+            ? `Acknowledge stops the steps above up to L${fyiStep.level - 1} (L${fyiStep.level} is the FYI).`
+            : 'Acknowledge stops the steps above.'}
+        </p>
         <p className="m-0">
           Reminders in the thread: DOWN every {data.downReminder} min · PROBLEM every {data.problemReminder}{' '}
           min.

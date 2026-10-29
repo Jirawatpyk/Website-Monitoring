@@ -102,6 +102,66 @@ describe('Escalation editor — guardrails (Done-when 3, spec §14.7, §15.5)', 
     expect(within(dialog(/Edit L1/)).getByRole('button', { name: 'CEO' })).toBeDisabled();
   });
 
+  describe('S10 — L2 / L3 (Done-when 2)', () => {
+    const l2 = {
+      level: 2,
+      delayMin: 30,
+      targets: ['ceo' as const],
+      channels: ['chat' as const, 'email' as const, 'voice' as const],
+    };
+    const l3 = {
+      level: 3,
+      delayMin: 60,
+      targets: ['ceo' as const, 'site_am' as const],
+      channels: ['chat' as const, 'email' as const],
+      fyi: true,
+    };
+    const full: EscalationPageData = {
+      ...data,
+      policies: data.policies.map((p) => (p.key === 't1' ? { ...p, steps: [l0, l1, l2, l3] } : p)),
+    };
+
+    it('the CEO + AM FYI step can’t be removed or moved, and says what it does', () => {
+      render(<EscalationEditor data={full} now={NOW} />);
+      expect(
+        screen.getByRole('button', { name: 'The CEO + AM FYI step can’t be removed from Tier 1 DOWN' }),
+      ).toBeDisabled();
+      expect(
+        screen.getAllByRole('button', { name: 'The CEO + AM FYI step keeps its place' })[0],
+      ).toBeDisabled();
+      expect(screen.getByText('After ack: FYI only if still down, no call')).toBeInTheDocument();
+      expect(screen.getByText('Voice call · configured, off until approved')).toBeInTheDocument();
+    });
+
+    it('on the FYI step CEO + Site AM are fixed and voice can’t be ticked', () => {
+      render(<EscalationEditor data={full} now={NOW} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit L3' }));
+      const d = dialog(/Edit L3/);
+      expect(within(d).getByRole('button', { name: 'CEO', pressed: true })).toBeDisabled();
+      expect(within(d).getByRole('button', { name: 'Site AM', pressed: true })).toBeDisabled();
+      expect(within(d).getByRole('checkbox', { name: 'Voice call' })).toBeDisabled();
+      expect(
+        within(d).getByText('Never on this step — the FYI goes by Chat @mention + email only.'),
+      ).toBeInTheDocument();
+    });
+
+    it('a CEO step can’t move above L2; the CEO isn’t offered on Tier 2', () => {
+      render(<EscalationEditor data={full} now={NOW} />);
+      expect(
+        screen.getByRole('button', { name: 'A step that pages the CEO can’t move above L2' }),
+      ).toBeDisabled();
+      fireEvent.click(screen.getByRole('radio', { name: 'Tier 2 DOWN' }));
+      openL1();
+      const d = dialog(/Edit L1 · Tier 2 DOWN/);
+      expect(within(d).getByRole('button', { name: 'CEO' })).toBeDisabled();
+      expect(
+        within(d).getByText(
+          'CEO isn’t available here — the CEO is paged only on Tier 1 DOWN, from L2 onward. On this policy the CEO sees incidents in the daily digest.',
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
   it('deleting a DOWN L1 blocks the save; PROBLEM only warns and offers Add step', () => {
     render(<EscalationEditor data={data} now={NOW} />);
     fireEvent.click(screen.getByRole('button', { name: 'Delete L1' }));

@@ -30,8 +30,8 @@ export interface EscalationDraft {
   problemReminder: string;
 }
 
-/** S08 edits L0–L1 (L2+ with S10, D-034). */
-export const MAX_LEVEL = 1;
+/** L0–L3 (S10; `save_escalation_policies` refuses a fifth step). */
+export const MAX_LEVEL = 3;
 
 export const POLICY_LABELS: Record<PolicyKey, string> = {
   t1: 'Tier 1 DOWN',
@@ -58,6 +58,8 @@ export const stepWhen = (s: EscalationStep) => (s.level === 0 ? '+0 · immediate
 
 /** The row's condition line (Escalation board; the phone's shorter "any hour", MEscalation). */
 export function stepCondition(p: PolicyDraft, s: EscalationStep, phone = false): string {
+  if (s.fyi) return phone ? 'Still DOWN — even if acknowledged' : 'Still DOWN — sent even after acknowledge';
+  if (s.level >= 2 && p.key !== 't1' && p.severity === 'down') return 'Still no acknowledgement';
   if (s.level > 0) return 'No acknowledgement';
   if (p.severity === 'problem') return 'PROBLEM confirmed';
   if (p.key === 't1') return 'DOWN confirmed';
@@ -68,7 +70,21 @@ export function stepCondition(p: PolicyDraft, s: EscalationStep, phone = false):
  * The row's note (Escalation board / MEscalation; on-call wording waits for S10). The phone has no
  * locked checkboxes to talk about, and says the PROBLEM hold once, in its subtitle.
  */
-export function stepNote(p: PolicyDraft, s: EscalationStep, phone = false): string | null {
+export function stepNote(
+  p: PolicyDraft,
+  s: EscalationStep,
+  phone = false,
+  admins: readonly string[] = [],
+): string | null {
+  if (s.fyi) return phone ? 'FYI only, never a call. Recovered by then → nothing is sent.' : null;
+  // Tier 2–3 L2 (Escalation board / MEscalation): a reminder to the Admin, no CEO page.
+  if (s.level >= 2 && p.severity === 'down' && p.key !== 't1' && !s.targets.includes('ceo')) {
+    const who =
+      s.targets.length === 1 && s.targets[0] === 'admins' && admins.length ? admins.join(', ') : null;
+    return phone
+      ? 'No CEO page — the CEO sees it in the digest.'
+      : `${who ? `Reminder to ${who}. ` : ''}No CEO page — the CEO sees it in the daily digest.`;
+  }
   // Only where an earlier step may already have told someone (the Admin beside the backup, MEscalation).
   if (s.level > 0) return s.targets.includes('admins') ? 'Anyone already paged is left out.' : null;
   if (p.severity === 'down') {
@@ -101,24 +117,98 @@ export function describeStep(s: EscalationStep, admins: readonly string[] = []):
   ].join(' · ');
 }
 
-/** A step's blocking errors, in the board's words and order. */
-export function stepErrors(steps: readonly EscalationStep[], i: number): string[] {
+/** Voice is never a channel that reaches anyone yet (off until approved, D-009). */
+const reaching = (s: EscalationStep) => s.channels.filter((c) => c !== 'voice');
+
+/** A step that pages the CEO (and isn't the FYI): it can't sit above L2 (§14.7). */
+export const pagesCeo = (s: EscalationStep | undefined) => !!s && !s.fyi && s.targets.includes('ceo');
+
+/** A step's blocking errors, in the board's words and order. `key` adds the CEO rules (§15.5). */
+export function stepErrors(steps: readonly EscalationStep[], i: number, key?: PolicyKey): string[] {
   const s = steps[i];
   if (!s) return [];
   const errs: string[] = [];
-  if (!s.channels.length) errs.push('No channel ticked — this step notifies nobody.');
+  if (!reaching(s).length) errs.push('No channel ticked — this step notifies nobody.');
   if (!s.targets.length) errs.push('Pick at least one person.');
-  if (i > 0 && s.delayMin < MIN_STEP_DELAY_MIN) errs.push(`Must be at least +${MIN_STEP_DELAY_MIN} min.`);
   const prev = steps[i - 1];
-  if (i > 0 && prev && s.delayMin <= prev.delayMin) {
+  if (i > 0 && s.delayMin < MIN_STEP_DELAY_MIN) errs.push(`Must be at least +${MIN_STEP_DELAY_MIN} min.`);
+  else if (i > 0 && prev && s.delayMin <= prev.delayMin) {
     errs.push(`Must be later than L${i - 1} (+${prev.delayMin} min).`);
+  }
+  if (pagesCeo(s) && i < 2) errs.push('A step that pages the CEO can’t sit above L2.');
+  if (s.targets.includes('ceo') && key) {
+    if (key !== 't1') errs.push('The CEO is paged only on Tier 1 DOWN — remove CEO from this step.');
+    else if (i < 2) errs.push('The CEO can be paged only from L2 onward.');
   }
   return errs;
 }
 
+/** The FYI step's box (Escalation board: "After ack: FYI only if still down, no call"). */
+export const fyiNote = (s: EscalationStep) =>
+  `Acknowledge stops L1–L2 only. If the site is still DOWN at +${s.delayMin} min, ${targetLabels(s).join(' + ')} ${
+    s.targets.length > 1 ? 'get' : 'gets'
+  } an FYI — Chat @mention + email, never a voice call. Recovered by then → nothing is sent.`;
+
+/**
+ * Whether steps `a` and `b` (a < b) can trade places — their people and channels; each level keeps
+ * its delay (the board: "delays stay with the level when you reorder"). L0 and the FYI step never
+ * move; a CEO step never lands above L2.
+ */
+export function canSwap(steps: readonly EscalationStep[], a: number, b: number): boolean {
+  const x = steps[a];
+  const y = steps[b];
+  if (!x || !y || a === 0 || x.fyi || y.fyi) return false;
+  if (pagesCeo(y) && a < 2) return false;
+  if (pagesCeo(x) && b < 2) return false;
+  return true;
+}
+
+export function swapSteps(steps: readonly EscalationStep[], a: number, b: number): EscalationStep[] {
+  const out = steps.map((s) => ({ ...s }));
+  const x = out[a]!;
+  const y = out[b]!;
+  out[a] = { ...y, level: x.level, delayMin: x.delayMin };
+  out[b] = { ...x, level: y.level, delayMin: y.delayMin };
+  return out;
+}
+
+/** The arrows' labels: what they do, or why they can't (Escalation board `upWhy` / `downWhy`). */
+export function moveLabels(steps: readonly EscalationStep[], i: number) {
+  const s = steps[i];
+  const L = `L${i}`;
+  const fyiNear = (j: number) => !!s?.fyi || !!steps[j]?.fyi;
+  const up =
+    i === 0
+      ? 'L0 is pinned'
+      : i === 1
+        ? 'L0 is pinned — nothing can move above it'
+        : !canSwap(steps, i - 1, i)
+          ? fyiNear(i - 1)
+            ? 'The CEO + AM FYI step keeps its place'
+            : 'A step that pages the CEO can’t move above L2'
+          : `Move ${L} earlier`;
+  const down =
+    i === 0
+      ? 'L0 is pinned'
+      : i === steps.length - 1
+        ? 'Already the last step'
+        : !canSwap(steps, i, i + 1)
+          ? fyiNear(i + 1)
+            ? 'The CEO + AM FYI step keeps its place'
+            : `L${i + 1} pages the CEO — it can’t move up to L${i}`
+          : `Move ${L} later`;
+  return {
+    up,
+    down,
+    canUp: i > 0 && canSwap(steps, i - 1, i),
+    canDown: i < steps.length - 1 && canSwap(steps, i, i + 1),
+  };
+}
+
 /** The policy's own message under its steps: a DOWN needs a step after L0; PROBLEM only warns. */
 export function policyMessage(p: PolicyDraft): { tone: 'danger' | 'warning'; text: string } | null {
-  if (p.steps.length > 1) return null;
+  // The FYI step doesn't ask anyone to acknowledge (`save_escalation_policies` counts it out too).
+  if (p.steps.filter((s) => !s.fyi).length > 1) return null;
   return p.severity === 'down'
     ? {
         tone: 'danger',
@@ -139,7 +229,7 @@ export function saveProblems(d: EscalationDraft): string[] {
   const out: string[] = [];
   for (const p of d.policies) {
     p.steps.forEach((s, i) => {
-      for (const e of stepErrors(p.steps, i))
+      for (const e of stepErrors(p.steps, i, p.key))
         out.push(`${policyShort(p.key)} · L${i} (+${s.delayMin} min): ${e}`);
     });
     const m = policyMessage(p);
@@ -254,8 +344,14 @@ export function affectsLine(sites: number, openIncidents: readonly number[]): st
     : `${head} · ${openIncidents.length} open incidents (${ids}) keep their current timers`;
 }
 
-/** Whether a step can be deleted / a step added (S08: L1 only; L0 is pinned). */
-export const canDelete = (s: EscalationStep) => s.level > 0;
+/** Whether a step can be deleted / a step added (L0 is pinned; the Tier 1 FYI step stays, §15.5). */
+export const canDelete = (s: EscalationStep) => s.level > 0 && !s.fyi;
+export const deleteLabel = (s: EscalationStep) =>
+  s.level === 0
+    ? 'L0 is pinned on every policy and can’t be deleted'
+    : s.fyi
+      ? 'The CEO + AM FYI step can’t be removed from Tier 1 DOWN'
+      : `Delete L${s.level}`;
 export const canAdd = (p: PolicyDraft) => p.steps.length <= MAX_LEVEL;
 
 /** A new L1: the last step's delay + 30 (at least 15), Chat + email, nobody picked (Escalation board). */

@@ -36,12 +36,17 @@ export function tokenRows(
     { key: 'backup', token: 'Backup', name: site?.backup ?? '—' },
     { key: 'admins', token: 'Admin', name: admins.length ? admins.join(', ') : '—' },
     { key: 'site_am', token: 'Site AM', name: site ? (site.am ?? '— (internal)') : '—' },
+    { key: 'ceo', token: 'CEO', name: 'CEO' },
   ] as const;
   const tokens = used ? new Set(used.flatMap((s) => s.targets)) : null;
   return all.filter((t) => !tokens || tokens.has(t.key)).map(({ token, name }) => ({ token, name }));
 }
 
-/** The names a step reaches for the site, minus those an earlier step already told (PRD §8). */
+/**
+ * The names a step reaches for the site, minus those an earlier step already told (PRD §8). The FYI
+ * step tells everyone it names; from L2, a step whose people all heard already reminds them (S10, as
+ * `engine_fire_step`: Tier 2–3 L2 → the Admin).
+ */
 export function stepNames(
   steps: readonly EscalationStep[],
   i: number,
@@ -64,10 +69,16 @@ export function stepNames(
               : []
             : t === 'admins'
               ? [...admins]
-              : [],
+              : t === 'ceo'
+                ? ['CEO']
+                : [],
     );
+  const step = steps[i]!;
+  const all = [...new Set(namesOf(step))];
+  if (step.fyi || i === 0) return all;
   const told = new Set(steps.slice(0, i).flatMap(namesOf));
-  return [...new Set(namesOf(steps[i]!))].filter((n) => !told.has(n));
+  const fresh = all.filter((n) => !told.has(n));
+  return fresh.length || i < 2 ? fresh : all;
 }
 
 const NO_ONE: Partial<Record<EscalationStep['targets'][number], string>> = {
@@ -157,7 +168,7 @@ export function scenario(
     // No site to resolve for: the role tokens stand in for names (spec-check round 2).
     const names = site ? stepNames(p.steps, i, site, admins) : targetLabels(s, admins);
     const due = held && i === 0 ? opening : (schedule.find((x) => x.level === s.level)?.dueAt ?? now);
-    const nobody = !s.channels.length
+    const nobody = !s.channels.some((c) => c !== 'voice')
       ? 'notifies nobody (no channel ticked)'
       : !s.targets.length
         ? 'notifies nobody (no one picked)'
@@ -165,11 +176,20 @@ export function scenario(
           ? nobodyWhy(s, site, admins)
           : null;
     const space = i === 0 && s.channels.includes('space') ? ' + Alerts Space' : '';
-    const suffix = i > 0 ? '' : held ? ' (held until response hours)' : outside ? ' · timers paused' : '';
+    const suffix =
+      i > 0
+        ? s.fyi && !nobody
+          ? ' · FYI even if acked'
+          : ''
+        : held
+          ? ' (held until response hours)'
+          : outside
+            ? ' · timers paused'
+            : '';
     add(due, {
       level: s.level,
       what: `L${i} → ${nobody ?? names.join(' + ') + space}${suffix}`,
-      danger: !s.channels.length || !s.targets.length,
+      danger: !s.channels.some((c) => c !== 'voice') || !s.targets.length,
     });
   });
   // Steps before the muted row at the same minute; otherwise by time (a stable sort keeps the order added).

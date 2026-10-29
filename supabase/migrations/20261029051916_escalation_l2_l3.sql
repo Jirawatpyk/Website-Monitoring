@@ -112,8 +112,8 @@ $$;
 --   · an FYI step fires while Acknowledged too, only while the drop is DOWN, and tells everyone it
 --     names (the CEO told at L2 hears the FYI too — ChatAlert L3 mentions CEO + AM); the incident's
 --     state stays as it is;
---   · a step whose people were all told already reminds them (`reminder`): Tier 2–3 L2 → Tao. It
---     doesn't make the incident Escalated (nobody new was paged, §14.3);
+--   · from L2, a step whose people were all told already reminds them (`reminder`): Tier 2–3 L2 →
+--     Tao. It doesn't make the incident Escalated (nobody new was paged, §14.3);
 --   · the payload carries who acknowledged (for "acknowledged by Arm 10:07").
 create or replace function public.engine_fire_step(
   p_incident_id uuid,
@@ -198,8 +198,9 @@ begin
     from public.escalation_people(p_incident_id, v_step -> 'targets') pe
     where pe.user_id <> all (v_told);
 
-    if cardinality(v_new) = 0 then
+    if cardinality(v_new) = 0 and p_level >= 2 then
       -- Everyone this step names heard already: remind them (Tier 2–3 L2, "REMINDER · L2" to Tao).
+      -- L1 keeps S08's rule (nobody new → the level passes quietly).
       select coalesce(array_agg(pe.user_id), '{}') into v_new
       from public.escalation_people(p_incident_id, v_step -> 'targets') pe;
       v_reminder := cardinality(v_new) > 0;
@@ -264,7 +265,8 @@ $$;
 -- S08 body with the S10 guardrails (§14.7, §15.5; the Escalation board's words):
 --   · up to L3; the CEO only on Tier 1 DOWN and from L2;
 --   · voice only on a Tier 1 DOWN CEO step that isn't the FYI step (stored, never sent);
---   · Tier 1 DOWN keeps exactly one FYI step, last, naming CEO + Site AM; no other policy has one.
+--   · Tier 1 DOWN keeps exactly one FYI step, naming CEO + Site AM; no other policy has one. (The
+--     editor never moves it — "keeps its place" — but a step added after it is allowed, as the board.)
 create or replace function public.save_escalation_policies(
   p_policies jsonb,
   p_down_reminder_min integer,
@@ -416,9 +418,6 @@ begin
     if v_t1_down and v_fyi_level is null then
       raise exception 'The CEO + AM FYI step can’t be removed from Tier 1 DOWN'
         using errcode = '22023', hint = 'fyi_required';
-    end if;
-    if v_fyi_level is not null and v_fyi_level <> v_count - 1 then
-      raise exception 'The CEO + AM FYI step keeps its place' using errcode = '22023', hint = 'fyi_last';
     end if;
     -- A step after L0 that isn't the FYI: otherwise nobody is asked to acknowledge after the owner.
     if v_policy.severity = 'down' and v_count - (case when v_fyi_level is null then 0 else 1 end) < 2 then

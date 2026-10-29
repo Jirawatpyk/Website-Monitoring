@@ -87,12 +87,12 @@ select throws_ok(format($$select public.save_escalation_policies(%L, 15, 60, 'x'
     pg_temp.step(1, 15, array['backup', 'admins'], array['chat', 'email']),
     pg_temp.step(2, 30, array['ceo'], array['chat', 'email', 'voice'])))),
   '22023', 'The CEO + AM FYI step can’t be removed from Tier 1 DOWN', 'the FYI step can''t be removed');
-select throws_ok(format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, pg_temp.t1(jsonb_build_array(
-    pg_temp.step(0, 0, array['owner'], array['chat', 'space', 'email']),
-    pg_temp.step(1, 15, array['backup', 'admins'], array['chat', 'email']),
-    pg_temp.step(2, 30, array['ceo', 'site_am'], array['chat', 'email'], true),
-    pg_temp.step(3, 60, array['ceo'], array['chat', 'email'])))),
-  '22023', 'The CEO + AM FYI step keeps its place', 'the FYI step stays last');
+select throws_ok(format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, jsonb_build_array(jsonb_build_object(
+    'policyId', (select id from pol where name = 'down2'), 'steps', jsonb_build_array(
+      pg_temp.step(0, 0, array['owner'], array['chat', 'space', 'email']),
+      pg_temp.step(1, 15, array['backup', 'admins'], array['chat', 'email']),
+      pg_temp.step(2, 60, array['site_am'], array['chat', 'email'], true))))),
+  '22023', 'Only Tier 1 DOWN has the CEO + AM FYI step', 'no FYI step on Tier 2–3');
 select throws_ok(format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, pg_temp.t1(jsonb_build_array(
     pg_temp.step(0, 0, array['owner'], array['chat', 'space', 'email']),
     pg_temp.step(1, 15, array['backup', 'admins'], array['chat', 'email']),

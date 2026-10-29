@@ -24,8 +24,30 @@ describe('preview (S08, D-034)', () => {
       { token: 'Backup', name: 'Ploy' },
       { token: 'Admin', name: 'Tao' },
       { token: 'Site AM', name: 'Bua' },
+      { token: 'CEO', name: 'CEO' },
     ]);
     expect(tokenRows({ ...muvmi, am: null }, [])[3]).toEqual({ token: 'Site AM', name: '— (internal)' });
+  });
+
+  it('S10: L2 names the CEO; the FYI tells CEO + AM again; Tier 2–3 L2 reminds the Admin', () => {
+    const t1 = [
+      ...down(1).steps,
+      { level: 2, delayMin: 30, targets: ['ceo' as const], channels: ['chat' as const, 'email' as const] },
+      {
+        level: 3,
+        delayMin: 60,
+        targets: ['ceo' as const, 'site_am' as const],
+        channels: ['chat' as const, 'email' as const],
+        fyi: true,
+      },
+    ];
+    expect(stepNames(t1, 2, muvmi, ['Tao'])).toEqual(['CEO']);
+    expect(stepNames(t1, 3, muvmi, ['Tao'])).toEqual(['CEO', 'Bua']);
+    const t2 = [
+      ...down(2).steps,
+      { level: 2, delayMin: 30, targets: ['admins' as const], channels: ['chat' as const, 'email' as const] },
+    ];
+    expect(stepNames(t2, 2, orca, ['Tao'])).toEqual(['Tao']);
   });
 
   it('L1 leaves out whoever L0 already told (the Admin who owns the site)', () => {

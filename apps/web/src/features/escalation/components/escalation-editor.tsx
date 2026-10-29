@@ -11,6 +11,7 @@ import {
   affectedPolicies,
   affectsLine,
   canAdd,
+  canSwap,
   diff,
   newStep,
   normalInterval,
@@ -19,6 +20,7 @@ import {
   reminderError,
   saveProblems,
   saveWarnings,
+  swapSteps,
   timerBasis,
   toSaveInput,
   unsavedSummary,
@@ -169,6 +171,10 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
                   setSteps(policy.steps.filter((_s, j) => j !== index));
                   setRefocus((n) => n + 1);
                 }}
+                onMove={(index, by) => {
+                  const [a, b] = by < 0 ? [index - 1, index] : [index, index + 1];
+                  if (canSwap(policy.steps, a, b)) setSteps(swapSteps(policy.steps, a, b));
+                }}
               />
             ))}
           </ol>
@@ -186,7 +192,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
             )}
             <span className="text-xs text-fg-secondary">
               L0 is pinned. Every step needs at least one channel. Each later step is at least +15 min and
-              later than the one before.
+              later than the one before; delays stay with the level when you reorder.
             </span>
           </div>
           {message && (
