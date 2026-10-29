@@ -1,6 +1,7 @@
 import type { EscalationStep } from '@dxt/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  addBlocked,
   affectedPolicies,
   affectsLine,
   canAdd,
@@ -158,8 +159,15 @@ describe('S10 — the CEO, the FYI step, moving steps (Escalation board, §14.7,
       'FYI only, never a call. Recovered by then → nothing is sent.',
     );
     expect(fyiNote(l3fyi)).toBe(
-      'Acknowledge stops L1–L2 only. If the site is still DOWN at +60 min, Site AM + CEO get an FYI — Chat @mention + email, never a voice call. Recovered by then → nothing is sent.',
+      'Acknowledge stops L1–L2 only. If the site is still DOWN at +60 min, CEO + Site AM get an FYI — Chat @mention + email, never a voice call. Recovered by then → nothing is sent.',
     );
+    // L2 deleted: the FYI is L2 and an ack stops L1 only (spec-check M3).
+    expect(fyiNote({ ...l3fyi, level: 2 })).toMatch(/^Acknowledge stops L1 only\./);
+  });
+  it('Add step stays, disabled with its reason (board gaps 1–2, D-048)', () => {
+    expect(addBlocked(t1full())).toBe('L3 is the last level');
+    expect(addBlocked(t1([l0, l1(), { ...l3fyi, level: 2 }]))).toBe('The CEO + AM FYI step stays last');
+    expect(addBlocked(t1())).toBeNull();
   });
 });
 

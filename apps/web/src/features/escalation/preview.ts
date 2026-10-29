@@ -7,7 +7,7 @@ import {
   type EscalationStep,
   type ResponseHours,
 } from '@dxt/shared';
-import { targetLabels, type PolicyDraft } from './model';
+import { stoppedBefore, targetLabels, type PolicyDraft } from './model';
 import type { EscalationPageData, PreviewSite } from './types';
 
 /**
@@ -79,6 +79,22 @@ export function stepNames(
   const told = new Set(steps.slice(0, i).flatMap(namesOf));
   const fresh = all.filter((n) => !told.has(n));
   return fresh.length || i < 2 ? fresh : all;
+}
+
+/** From L2, a step that reaches only people told already: it reminds them (MEscalation "L2 → Tao (reminder)"). */
+export function isReminderStep(
+  steps: readonly EscalationStep[],
+  i: number,
+  site: PreviewSite | undefined,
+  admins: readonly string[],
+): boolean {
+  const s = steps[i];
+  if (!s || s.fyi || i < 2 || !site) return false;
+  const names = stepNames(steps, i, site, admins);
+  const earlier = new Set(
+    steps.slice(0, i).flatMap((_x, j) => stepNames(steps.slice(0, i), j, site, admins)),
+  );
+  return names.length > 0 && names.every((n) => earlier.has(n));
 }
 
 const NO_ONE: Partial<Record<EscalationStep['targets'][number], string>> = {
@@ -188,7 +204,7 @@ export function scenario(
             : '';
     add(due, {
       level: s.level,
-      what: `L${i} → ${nobody ?? names.join(' + ') + space}${suffix}`,
+      what: `L${i} → ${nobody ?? names.join(' + ') + space + (isReminderStep(p.steps, i, site, admins) ? ' (reminder)' : '')}${suffix}`,
       danger: !s.channels.some((c) => c !== 'voice') || !s.targets.length,
     });
   });
@@ -200,6 +216,37 @@ export function scenario(
   return {
     caseLine: `${site?.name ?? 'A site'} ${what} now${outside ? ' (outside response hours)' : ''}${options.phone ? ':' : ', nobody acknowledges:'}`,
     rows,
+  };
+}
+
+/**
+ * The Preview's Tier 1 ack box (Escalation board `hasAckCase`, §14.1's canonical sentence): the owner
+ * acknowledges a few minutes after L1, and the FYI step still goes if the site is still down.
+ * "If Arm acknowledges at 10:07" / "Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at
+ * 10:48, CEO + Bua get an FYI (no call)." Null without an FYI step or a site.
+ */
+export function ackCase(
+  p: PolicyDraft,
+  site: PreviewSite | undefined,
+  hours: ResponseHours,
+  now: Date,
+): { label: string; body: string } | null {
+  const fyi = p.steps.find((s) => s.fyi);
+  if (!fyi || !site) return null;
+  const plan = { severity: p.severity, tier: p.tier ?? 1, reminderMin: 15, steps: p.steps };
+  const schedule = scheduleOf({ plan, detectedAt: now, hours });
+  const l1 = schedule.find((x) => x.level === 1)?.dueAt ?? now;
+  const fyiAt = schedule.find((x) => x.level === fyi.level)?.dueAt;
+  if (!fyiAt) return null;
+  // Between L1 and the next step, as the board's 10:07 sits between 10:03 and 10:18.
+  const ackAt = new Date(l1.getTime() + 4 * 60_000);
+  const owner = site.owner ?? 'the owner';
+  const who = fyi.targets
+    .map((t) => (t === 'ceo' ? 'CEO' : t === 'site_am' ? (site.am ?? 'Site AM') : t))
+    .join(' + ');
+  return {
+    label: `If ${owner} acknowledges at ${formatTime(ackAt)}`,
+    body: `Acknowledged by ${owner} → ${stoppedBefore(fyi.level)} stopped. If ${site.name} is still down at ${formatTime(fyiAt)}, ${who} get${fyi.targets.length > 1 ? '' : 's'} an FYI (no call).`,
   };
 }
 

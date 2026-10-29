@@ -4,7 +4,7 @@
 -- a queued FYI alone, and a muted site still getting its L3 FYI (T09 re-check, Done-when 4).
 begin;
 \ir _helpers.psql
-select plan(36);
+select plan(42);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -185,6 +185,24 @@ select is((select state::text from public.incidents where id = (select id from i
 select is((select payload->>'ackedBy' from public.incident_events
            where incident_id = (select id from inc where name = 'm') and type = 'step_fired'),
   'Arm', 'the FYI says who acknowledged');
+select is((select escalation_level from public.incidents where id = (select id from inc where name = 'm')), 0::smallint,
+  'an FYI after an ack doesn''t move the level');
+set local role service_role;
+select ok(not public.engine_fire_step((select id from inc where name = 'm'), 3::smallint, now(), '{}'),
+  'the FYI goes once (asked again next run: no)');
+reset role;
+-- Engine review M1: Arm undoes the ack inside 10 s — the ladder is back where it was, so L1 / L2 still go.
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select public.undo_ack((select id from inc where name = 'm'));
+reset role;
+set local role service_role;
+select ok(public.engine_fire_step((select id from inc where name = 'm'), 1::smallint, now(), '{}'), 'after the Undo L1 goes');
+select ok(public.engine_fire_step((select id from inc where name = 'm'), 2::smallint, now(), '{}'), 'and L2 pages the CEO');
+select ok(not public.engine_fire_step((select id from inc where name = 'm'), 3::smallint, now(), '{}'),
+  'L3 isn''t sent twice — the FYI already went');
+reset role;
+select is((select escalation_level from public.incidents where id = (select id from inc where name = 'm')), 3::smallint,
+  'the ladder moves past L3');
 
 -- An FYI already queued when someone acks still goes.
 update public.incidents set state = 'unacked', acked_at = null, acked_by = null, escalation_level = 2

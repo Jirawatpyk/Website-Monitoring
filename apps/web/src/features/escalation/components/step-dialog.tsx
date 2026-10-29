@@ -13,7 +13,7 @@ import { scenario } from '../preview';
 import type { PreviewSite } from '../types';
 
 /** The role tokens; the CEO only on Tier 1 DOWN from L2 (§15.5). */
-const TOKENS: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'site_am', 'ceo'];
+const TOKENS: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'ceo', 'site_am'];
 
 /** The CEO line under the tokens (Escalation board `eCeoNote`). */
 function ceoNote(key: PolicyDraft['key'], index: number, fyi: boolean): string {

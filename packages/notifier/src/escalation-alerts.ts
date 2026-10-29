@@ -66,8 +66,15 @@ export type LadderStopped = {
   reminderMin?: number;
   /** DOWN: the last level an ack stops (the FYI step isn't one) — 2 gives "L1–L2 stopped". */
   stopsThrough?: number;
-  /** Tier 1: when the FYI still goes if the site is still down ("L3 FYI at 10:48 if still down"). */
-  fyi?: { level: number; at: Date } | null;
+  /**
+   * Tier 1: when the FYI still goes if the site is still down, and to whom ("CEO + Bua") — only while
+   * it's still ahead of the ack (an ack after +60 promises nothing).
+   */
+  fyi?: { level: number; at: Date; who: string } | null;
+  /** The site, for §14.1's "If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call)." */
+  site?: string;
+  /** The highest level that had fired when the ack came: a step already sent isn't "cancelled". */
+  firedLevel?: number;
 };
 
 export function stoppedWords(
@@ -78,13 +85,16 @@ export function stoppedWords(
     const through = s.stopsThrough ?? 1;
     const stopped = through > 1 ? `L1–L${through} stopped` : 'L1 stopped';
     // §14.1 / EmailAlert ACKNOWLEDGED: "L2 cancelled · acked · L3 FYI at 10:48 if still down".
+    const cancelled = through > 1 && (s.firedLevel ?? 0) < through ? `L${through} cancelled · acked · ` : '';
     const fact: [string, string] | null = s.fyi
-      ? [
-          'Escalation',
-          `${through > 1 ? `L${through} cancelled · acked · ` : ''}L${s.fyi.level} FYI at ${formatTime(s.fyi.at)} if still down`,
-        ]
+      ? ['Escalation', `${cancelled}L${s.fyi.level} FYI at ${formatTime(s.fyi.at)} if still down`]
       : null;
-    return { line: stopped, body: `${stopped}.`, fact };
+    // §14.1's canonical sentence: "Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at
+    // 10:48, CEO + Bua get an FYI (no call)."
+    const fyi = s.fyi
+      ? ` If ${plainName(s.site ?? 'the site')} is still down at ${formatTime(s.fyi.at)}, ${plainName(s.fyi.who)} get an FYI (no call).`
+      : '';
+    return { line: stopped, body: `${stopped}.${fyi}`, fact };
   }
   const reminder = `${s.reminderMin ?? 60}-min reminder`;
   const what =
@@ -282,7 +292,7 @@ function otherStepAlert(
         ? acked
           ? `For your information — no action needed. ${plainName(acked.by)} acknowledged at ${formatTime(acked.at)} and is working on it.`
           : `For your information — no action needed. Nobody has acknowledged yet; ${spoken(informed)} ${informed.length > 1 ? 'were' : 'was'} asked.`
-        : 'Still not acknowledged. Acknowledge to stop the escalation.';
+        : 'Nobody has acknowledged yet. Acknowledge to stop these reminders.';
   return {
     text: line,
     cardsV2: [

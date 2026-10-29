@@ -173,6 +173,10 @@ describe('render — L2 and the L3 FYI (S10)', () => {
     expect(m.html).toContain('Configured · off until approved');
     expect(m.html).toContain('L3 (CEO + Bua, no call) at 10:48');
     expect(m.html).toContain('the step you approved');
+    expect(m.text).toContain(
+      'MuvMi (Tier 1) has been down 30 min and nobody on the team has acknowledged. Arm (owner), Ploy (backup) and Tao were asked. Open it to see the latest, or call Tao.',
+    );
+    expect(m.text).toContain('Already told: Arm 09:48 · Ploy + Tao 10:03');
   });
 });
 

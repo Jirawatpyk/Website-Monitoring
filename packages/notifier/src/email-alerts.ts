@@ -434,6 +434,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
             'Down for',
             `${duration} so far (confirmed down ${withDayIfNot(input.confirmedAt, input.ackedAt, formatTimeWithSeconds)})`,
           ],
+          ...(stopped?.fact ? [stopped.fact] : []),
         ],
     buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
@@ -893,6 +894,14 @@ export interface StepEmailInput extends EmailBaseInput {
   nextStep?: string | null;
   /** The step carries a voice call that stays off until approved (Tier 1 L2, D-009). */
   voiceConfigured?: boolean;
+  /** `informed` with the roles the L2 lede names: "Arm (owner)", "Ploy (backup)", "Tao". */
+  informedRoles?: readonly string[];
+  /** The L2 email's "Already told" row: "Arm 09:48 · Ploy + Tao 10:03". */
+  alreadyTold?: string | null;
+  /** The Admin the CEO can call ("Open it to see the latest, or call Tao."). */
+  admin?: string | null;
+  /** What the ack stopped, for the FYI's Acknowledged row: "L1–L2 stopped". */
+  stopped?: string;
 }
 
 const andList = (names: readonly string[]) =>
@@ -918,10 +927,13 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
       label: `ESCALATED · L${input.level}`,
       pre: `${site} down ${duration}, not acknowledged${informed.length ? ` · ${informed.join(', ')} informed` : ''}`,
       headline: `${site} down ${duration} — nobody has acknowledged`,
-      lede: `${site} has been down ${duration} and nobody on the team has acknowledged. ${andList(informed)} ${informed.length > 1 ? 'were' : 'was'} asked. Open it to see the latest.`,
+      // EmailAlert L2 (CEO): "MuvMi (Tier 1) has been down 30 min … Arm (owner), Ploy (backup) and Tao
+      // were asked. Open it to see the latest, or call Tao."
+      lede: `${site} (Tier ${input.tier}) has been down ${duration} and nobody on the team has acknowledged. ${andList(input.informedRoles ?? informed)} ${informed.length > 1 ? 'were' : 'was'} asked. Open it to see the latest${input.admin ? `, or call ${input.admin}` : ''}.`,
       facts: [
         downFor,
         ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+        ...(input.alreadyTold ? [['Already told', input.alreadyTold] as [string, string]] : []),
         ...(input.voiceConfigured
           ? [['Voice call', 'Configured · off until approved'] as [string, string]]
           : []),
@@ -950,6 +962,15 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
       facts: [
         downFor,
         ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+        // EmailAlert FYI: "Acknowledged · Arm at 10:07 · L1–L2 stopped".
+        ...(a
+          ? [
+              ['Acknowledged', `${a.by} at ${formatTime(a.at)} · ${input.stopped ?? 'L1–L2 stopped'}`] as [
+                string,
+                string,
+              ],
+            ]
+          : []),
         ['Next step', 'Recovery email when it’s back · no more escalation'],
       ],
       buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
@@ -977,7 +998,8 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
  * (EmailAlert: "first emailed with the 60-min reminder"). L2 / L3 and the reminder step: `otherStepEmail`.
  */
 export function buildStepEmail(input: StepEmailInput): EmailMessage {
-  const kind = input.fallback ? 'ask' : (input.kind ?? 'ask');
+  // A D-016 fallback keeps the step's own form: an FYI stays an FYI, a reminder a reminder.
+  const kind = input.kind ?? 'ask';
   if (kind !== 'ask' && input.severity === 'down') return otherStepEmail(input, kind);
   const { site } = input;
   const duration = formatDuration(input.elapsedMin);

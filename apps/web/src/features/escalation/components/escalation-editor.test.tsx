@@ -130,7 +130,7 @@ describe('Escalation editor — guardrails (Done-when 3, spec §14.7, §15.5)', 
         screen.getAllByRole('button', { name: 'The CEO + AM FYI step keeps its place' })[0],
       ).toBeDisabled();
       expect(screen.getByText('After ack: FYI only if still down, no call')).toBeInTheDocument();
-      expect(screen.getByText('Voice call · configured, off until approved')).toBeInTheDocument();
+      expect(screen.getByText('Voice call · Configured · off until approved')).toBeInTheDocument();
     });
 
     it('on the FYI step CEO + Site AM are fixed and voice can’t be ticked', () => {

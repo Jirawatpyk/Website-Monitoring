@@ -33,7 +33,8 @@ const CHANNEL: Record<EscalationChannel, { label: string; icon: ReactElement }> 
   chat: { label: 'Chat @mention', icon: <IconBell /> },
   space: { label: 'Alerts Space', icon: <IconUsers /> },
   email: { label: 'Email', icon: <IconMail /> },
-  voice: { label: 'Voice call · configured, off until approved', icon: <IconLock /> },
+  // §15.5 / D-048: "Configured · off until approved" (over the board badge's lower-case form).
+  voice: { label: 'Voice call · Configured · off until approved', icon: <IconLock /> },
 };
 const CHANNEL_ORDER: readonly EscalationChannel[] = ['chat', 'space', 'email', 'voice'];
 

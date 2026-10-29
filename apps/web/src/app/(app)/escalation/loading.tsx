@@ -15,10 +15,13 @@ export default function Loading() {
           <div className="flex flex-col gap-3 lg:col-span-2">
             <CardSkeleton lines={4} />
             <CardSkeleton lines={4} />
+            <CardSkeleton lines={4} />
+            <CardSkeleton lines={4} />
           </div>
           <div className="flex flex-col gap-4">
             <CardSkeleton fields={1} lines={4} />
             <CardSkeleton fields={2} columns={2} lines={3} />
+            <CardSkeleton lines={2} />
           </div>
         </div>
       </PageSkeleton>

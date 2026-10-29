@@ -97,7 +97,7 @@ export function stepNote(
   return phone ? null : 'Tier 2–3 outside response hours are held until the next opening.';
 }
 
-const ORDER: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'site_am', 'ceo'];
+const ORDER: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'ceo', 'site_am'];
 const CHANNEL_ORDER: readonly EscalationChannel[] = ['chat', 'space', 'email', 'voice'];
 
 /** "Backup", "Admin (Tao)" — the Admin token names every active Admin (D-034). */
@@ -144,8 +144,11 @@ export function stepErrors(steps: readonly EscalationStep[], i: number, key?: Po
 }
 
 /** The FYI step's box (Escalation board: "After ack: FYI only if still down, no call"). */
+/** "L1–L2" — the levels an ack stops ahead of the FYI step at `fyiLevel` (§14.1). */
+export const stoppedBefore = (fyiLevel: number) => (fyiLevel > 2 ? `L1–L${fyiLevel - 1}` : 'L1');
+
 export const fyiNote = (s: EscalationStep) =>
-  `Acknowledge stops L1–L2 only. If the site is still DOWN at +${s.delayMin} min, ${targetLabels(s).join(' + ')} ${
+  `Acknowledge stops ${stoppedBefore(s.level)} only. If the site is still DOWN at +${s.delayMin} min, ${targetLabels(s).join(' + ')} ${
     s.targets.length > 1 ? 'get' : 'gets'
   } an FYI — Chat @mention + email, never a voice call. Recovered by then → nothing is sent.`;
 
@@ -352,7 +355,13 @@ export const deleteLabel = (s: EscalationStep) =>
     : s.fyi
       ? 'The CEO + AM FYI step can’t be removed from Tier 1 DOWN'
       : `Delete L${s.level}`;
-export const canAdd = (p: PolicyDraft) => p.steps.length <= MAX_LEVEL;
+export const canAdd = (p: PolicyDraft) => addBlocked(p) === null;
+/** Why "Add step" is disabled, or null: L3 is the last level; nothing goes after the FYI step. */
+export function addBlocked(p: PolicyDraft): string | null {
+  if (p.steps.length > MAX_LEVEL) return 'L3 is the last level';
+  if (p.steps.at(-1)?.fyi) return 'The CEO + AM FYI step stays last';
+  return null;
+}
 
 /** A new L1: the last step's delay + 30 (at least 15), Chat + email, nobody picked (Escalation board). */
 export function newStep(p: PolicyDraft): EscalationStep {

@@ -1191,6 +1191,39 @@ describe('escalation ladder (S08, D-034, Done-when 1)', () => {
     await runEngine(db, at(45, 30));
     expect((await stepRows(inc!.id)).filter((n) => n.template === 'reminder')).toHaveLength(1);
   });
+
+  it('T05 (S10): acknowledged at +5, the runner still sends the Tier 1 L3 FYI at +60 — once, no L1–L2', async () => {
+    const arm = await profileId('arm@example.test');
+    const ploy = await profileId('ploy@example.test');
+    const { siteId, monitorId } = await newSite('Ladder FYI', {
+      primary_owner_id: arm,
+      backup_owner_id: ploy,
+    });
+    await results(monitorId, downRound());
+    await runEngine(db, t(65));
+    const [inc] = await must(db.from('incidents').select('id, detected_at').eq('site_id', siteId));
+    const confirmed = new Date(inc!.detected_at).getTime();
+    const at = (min: number) => new Date(confirmed + min * 60_000);
+    // The ack itself is ack_incident's (S02b tests); here the runner meets an Acknowledged incident.
+    await must(
+      db
+        .from('incidents')
+        .update({ state: 'acknowledged', acked_at: at(5).toISOString(), acked_by: arm })
+        .eq('id', inc!.id)
+        .select('id'),
+    );
+
+    await runEngine(db, at(30));
+    expect(await stepRows(inc!.id)).toEqual([]);
+    await runEngine(db, at(60));
+    await runEngine(db, at(61));
+    const fyi = (await stepRows(inc!.id)).filter((n) => n.channel === 'google_chat');
+    expect(fyi).toHaveLength(1);
+    expect(fyi[0]!.context).toMatchObject({ level: 3, fyiStep: true, ackedBy: expect.any(String) });
+    const [state] = await must(db.from('incidents').select('state, escalation_level').eq('id', inc!.id));
+    // An FYI after an ack doesn't move the level (an Undo lets L2 still go).
+    expect(state).toMatchObject({ state: 'acknowledged', escalation_level: 0 });
+  });
 });
 
 describe('mute and maintenance (S09, D-036)', () => {

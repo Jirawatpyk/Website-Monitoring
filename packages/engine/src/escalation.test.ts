@@ -172,9 +172,20 @@ describe('ladderDue — L2 and the L3 FYI (spec §8, §14.1; S10 T05)', () => {
       3,
     ],
     [
-      'acked, the FYI already sent: nothing',
+      // The level doesn't say whether the FYI went (an FYI after an ack keeps it): the SQL sends it once.
+      'acked at level 3 (a D-021 raise from a PROBLEM ladder): the FYI is still offered',
       t1('2026-09-25T11:00:00', { level: 3, state: 'acknowledged' }),
-      null,
+      3,
+    ],
+    [
+      'acked after L2, 10:48:41: the L3 FYI',
+      t1('2026-09-25T10:48:41', { level: 2, state: 'acknowledged' }),
+      3,
+    ],
+    [
+      'unacked at level 1, 10:48:41: L2 first, one level at a time',
+      t1('2026-09-25T10:48:41', { level: 1, state: 'escalated' }),
+      2,
     ],
     [
       'recovered by 10:48 (Monitoring): nothing is sent',

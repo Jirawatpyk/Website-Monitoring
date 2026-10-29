@@ -108,8 +108,11 @@ export function ladderDue(input: LadderInput): LadderDue {
   const acked = input.state === 'acknowledged';
   if (!WAITING.includes(input.state) && !acked) return due;
 
+  // Acknowledged: only the FYI step, whatever level the incident reached — an FYI sent after an ack
+  // doesn't move the level (an Undo must let L2 still fire), and a D-021 raise keeps a PROBLEM
+  // ladder's level; the SQL sends each drop severity's FYI once (engine review M1, M2).
   const next = input.plan.steps
-    .filter((s) => s.level > input.level && (!acked || s.fyi))
+    .filter((s) => (acked ? !!s.fyi : s.level > input.level))
     .sort((a, b) => a.level - b.level)[0];
   if (next) {
     const dueAt = clockAt(input, next.delayMin);

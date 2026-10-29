@@ -91,6 +91,7 @@ export function EscalationView({
         options={VIEWS}
         size="sm"
         fullWidth
+        touchHeight
       />
 
       <div className="flex flex-col gap-0.5 px-0.5">
@@ -145,6 +146,12 @@ export function EscalationView({
                 {site && (
                   <span className="text-xs text-fg-secondary">
                     {targetLabels(s, data.admins).join(' + ')}
+                    {s.level >= 2 &&
+                    policy.severity === 'down' &&
+                    policy.key !== 't1' &&
+                    !s.targets.includes('ceo')
+                      ? ' · reminder'
+                      : ''}
                   </span>
                 )}
                 <span className="flex flex-wrap gap-1 pt-0.5">
@@ -154,7 +161,9 @@ export function EscalationView({
                     </Badge>
                   ))}
                 </span>
-                {note && <span className="text-xs text-fg-secondary">{note}</span>}
+                {note && (
+                  <span className={`text-xs ${s.fyi ? 'text-fg-warning' : 'text-fg-secondary'}`}>{note}</span>
+                )}
               </div>
             </li>
           );

@@ -1,7 +1,14 @@
 import 'server-only';
 import { isInsideHours, ladderClockStart, nextOpening, problemHoldUntil, scheduleOf } from '@dxt/engine';
 import type { ChatPerson, LadderFacts, LadderStopped } from '@dxt/notifier';
-import { escalationPlanSchema, formatTime, TIER_CONFIG, type EscalationTarget, type Tier } from '@dxt/shared';
+import {
+  escalationPlanSchema,
+  formatDuration,
+  formatTime,
+  TIER_CONFIG,
+  type EscalationTarget,
+  type Tier,
+} from '@dxt/shared';
 import { contextOf, type IncidentFacts, type Owner } from './facts';
 
 /**
@@ -100,14 +107,26 @@ export function stoppedOf(i: IncidentFacts, ctx: Record<string, unknown>): Ladde
     fyiStep && hours
       ? scheduleOf({ plan, detectedAt: clockOf(i), hours }).find((s) => s.level === fyiStep.level)?.dueAt
       : undefined;
+  const ackedAt = typeof ctx.ackedAt === 'string' ? new Date(ctx.ackedAt) : null;
+  const fired = typeof ctx.escalationLevel === 'number' ? ctx.escalationLevel : 0;
   return {
     severity: plan.severity,
     backup: i.sites.backup?.display_name ?? null,
-    l1Fired: typeof ctx.escalationLevel === 'number' && ctx.escalationLevel >= 1,
+    l1Fired: fired >= 1,
     reminderMin: plan.reminderMin,
     // §14.1: "Acknowledge stops L1 and L2" — every level but the FYI.
     stopsThrough: Math.max(1, ...plan.steps.filter((s) => !s.fyi).map((s) => s.level)),
-    fyi: fyiStep && fyiAt ? { level: fyiStep.level, at: fyiAt } : null,
+    firedLevel: fired,
+    site: i.sites.name,
+    // Promised only while it's still ahead of the ack (engine review L2).
+    fyi:
+      fyiStep && fyiAt && (!ackedAt || fyiAt > ackedAt)
+        ? {
+            level: fyiStep.level,
+            at: fyiAt,
+            who: fyiStep.targets.flatMap((t) => tokenWords(i, t)).join(' + '),
+          }
+        : null,
   };
 }
 
@@ -140,16 +159,29 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
     plan && after && hours
       ? scheduleOf({ plan, detectedAt: clockOf(i), hours }).find((s) => s.level === after.level)?.dueAt
       : undefined;
-  const informed = plan
-    ? [
-        ...new Set(
-          plan.steps
-            .filter((s) => s.level < level && !s.fyi)
-            .flatMap((s) => s.targets.flatMap((t) => tokenWords(i, t))),
-        ),
-      ]
-    : [];
+  // Everyone told before this step, minus this step's own people (the CEO isn't "informed" in the
+  // FYI the CEO receives — message-check 8), each with the role the EmailAlert L2 lede names.
+  const own = new Set(step?.targets.flatMap((t) => tokenWords(i, t)) ?? []);
+  const earlier = (plan?.steps ?? []).filter((s) => s.level < level && !s.fyi);
+  const told = new Map<string, string>();
+  for (const s of earlier)
+    for (const t of s.targets)
+      for (const name of tokenWords(i, t))
+        if (!own.has(name) && !told.has(name))
+          told.set(name, t === 'owner' ? `${name} (owner)` : t === 'backup' ? `${name} (backup)` : name);
+  const informed = [...told.keys()];
+  const schedule = plan && hours ? scheduleOf({ plan, detectedAt: clockOf(i), hours }) : [];
+  // "Arm 09:48 · Ploy + Tao 10:03" (EmailAlert L2 "Already told").
+  const alreadyTold = earlier
+    .map((s) => {
+      const names = [...new Set(s.targets.flatMap((t) => tokenWords(i, t)))].filter((n) => !own.has(n));
+      const at = schedule.find((x) => x.level === s.level)?.dueAt;
+      return names.length && at ? `${names.join(' + ')} ${formatTime(at)}` : null;
+    })
+    .filter((x): x is string => !!x)
+    .join(' · ');
   const ackedAt = typeof ctx.ackedAt === 'string' ? new Date(ctx.ackedAt) : null;
+  const stopsThrough = Math.max(1, ...(plan?.steps ?? []).filter((s) => !s.fyi).map((s) => s.level));
   // A next level that only reminds people already told (Tier 2–3 L2 → the Admin) isn't an escalation
   // to announce: "· CEO at 10:18" is Tier 1's.
   const afterPeople = after ? stepPeople(i, after.level) : null;
@@ -166,7 +198,12 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
         ? `L${after.level} (${after.targets.flatMap((t) => tokenWords(i, t)).join(' + ')}${after.fyi ? ', no call' : ''}) at ${formatTime(afterAt)}`
         : null,
     informed,
+    informedRoles: [...told.values()],
+    alreadyTold: alreadyTold || null,
+    // "Open it to see the latest, or call Tao." — the Admin the CEO can ring.
+    admin: i.ladder?.admins[0]?.display_name ?? null,
     acked: typeof ctx.ackedBy === 'string' && ackedAt ? { by: ctx.ackedBy, at: ackedAt } : null,
+    stopped: stopsThrough > 1 ? `L1–L${stopsThrough} stopped` : 'L1 stopped',
     voiceConfigured: step?.channels.includes('voice') ?? false,
   };
 }
@@ -236,13 +273,14 @@ export function stepWhy(
   const p = directory(i).get(userId);
   const delay = planOf(i)?.steps.find((s) => s.level === level)?.delayMin;
   const site = i.sites.name;
-  const minutes = `${delay ?? 15} min`;
+  // Durations in the spec's format (§13: "1 h", not the board's "60 min").
+  const minutes = formatDuration(delay ?? 15);
   if (kind === 'ceo')
     return `You got this because a Tier 1 site was down ${minutes} without an acknowledgement (L${level}, the step you approved).`;
   if (kind === 'fyi')
     return p?.token === 'site_am'
       ? `You got this because you’re the AM for ${site} and a Tier 1 site is still down after ${minutes}.`
-      : `You got this because a Tier 1 site is still down after ${minutes} — the FYI step that runs even after an acknowledgement. No call.`;
+      : `You got this because ${site} (Tier ${i.sites.tier}) is still down after ${minutes} — the FYI step that runs even after an acknowledgement. No call.`;
   if (kind === 'reminder')
     return `You got this because ${site} wasn’t acknowledged in ${minutes} — L${level} reminds you.`;
   if (asFyi) return `You got this because you’re the Admin — L${level} keeps you informed.`;

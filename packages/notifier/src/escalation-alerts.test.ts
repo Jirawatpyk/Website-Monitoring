@@ -212,10 +212,11 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
         { ...ceo, role: 'CEO' },
         { ...bua, role: 'account manager' },
       ],
-      informed: ['Arm', 'Ploy', 'Tao', 'CEO'],
+      // The step's own people (the CEO) aren't listed as informed in their own FYI.
+      informed: ['Arm', 'Ploy', 'Tao'],
     });
     expect(msg.text).toBe(
-      '<users/CEO> <users/BUA> FYI · L3 · MuvMi still DOWN 1 h · not acknowledged · Arm, Ploy, Tao, CEO informed · no action needed',
+      '<users/CEO> <users/BUA> FYI · L3 · MuvMi still DOWN 1 h · not acknowledged · Arm, Ploy, Tao informed · no action needed',
     );
   });
 
@@ -241,11 +242,38 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
         backup: 'Ploy',
         l1Fired: true,
         stopsThrough: 2,
-        fyi: { level: 3, at: bkk('2026-09-25T10:48:41') },
+        firedLevel: 1,
+        site: 'MuvMi',
+        fyi: { level: 3, at: bkk('2026-09-25T10:48:41'), who: 'CEO + Bua' },
       },
     });
     expect(msg.text).toBe('ACKNOWLEDGED · MuvMi · by Arm 10:07 · L1–L2 stopped');
-    expect(JSON.stringify(msg.cardsV2)).toContain('Acknowledged by Arm → L1–L2 stopped.');
+    // §14.1's canonical sentence.
+    expect(JSON.stringify(msg.cardsV2)).toContain(
+      'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).',
+    );
+  });
+
+  it('the ACKNOWLEDGED email carries the Escalation row (EmailAlert)', () => {
+    const m = buildAcknowledgedEmail({
+      ...base,
+      recipientId: 'arm',
+      reason: 'owner',
+      ackedBy: 'Arm',
+      ackedAt: bkk('2026-09-25T10:07:40'),
+      startedAt: bkk('2026-09-25T09:48:12'),
+      confirmedAt: bkk('2026-09-25T09:48:41'),
+      stopped: {
+        severity: 'down',
+        backup: 'Ploy',
+        l1Fired: true,
+        stopsThrough: 2,
+        firedLevel: 1,
+        site: 'MuvMi',
+        fyi: { level: 3, at: bkk('2026-09-25T10:48:41'), who: 'CEO + Bua' },
+      },
+    });
+    expect(m.text).toContain('Escalation: L2 cancelled · acked · L3 FYI at 10:48 if still down');
   });
 });
 
