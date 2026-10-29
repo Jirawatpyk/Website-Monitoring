@@ -16,7 +16,9 @@ insert into ids values
   ('nok',  tests.create_user('nok@pgtap.test', 'responder')),
   ('bua',  tests.create_user('bua@pgtap.test', 'stakeholder')),
   ('mint', tests.create_user('mint@pgtap.test', 'viewer'));
-delete from public.oncall_swaps; delete from public.oncall_events; delete from public.oncall_shifts;
+select tests.clear_sites();
+-- Messages → events → swaps → shifts: each refers to the next (S10 B2a).
+delete from public.oncall_events; delete from public.oncall_swaps; delete from public.oncall_shifts;
 delete from public.oncall_rotation;
 
 -- ── The week boundary ────────────────────────────────────────────────────

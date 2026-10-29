@@ -8,7 +8,7 @@ select plan(41);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
-delete from public.oncall_swaps; delete from public.oncall_events; delete from public.oncall_shifts;
+delete from public.oncall_events; delete from public.oncall_swaps; delete from public.oncall_shifts;
 update public.profiles set is_active = false where role = 'admin';
 create temp table ids (name text primary key, id uuid) on commit drop;
 grant select on ids to anon, authenticated;

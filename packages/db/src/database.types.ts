@@ -775,7 +775,7 @@ isOneToOne: false
 { Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
                            },
 "claim_notifications":
-{ Args: { "p_channel": Database["public"]['Enums']["notification_channel"],"p_incident_id"?: string,"p_limit"?: number }; Returns: {
+{ Args: { "p_channel": Database["public"]['Enums']["notification_channel"],"p_incident_id"?: string,"p_limit"?: number,"p_oncall"?: boolean }; Returns: {
               "attempts": number,
 "channel": Database["public"]['Enums']["notification_channel"],
 "context": NonNullable<Json>,
@@ -966,6 +966,9 @@ isOneToOne: false
       } },
 "engine_note_site":
 { Args: { "p_note"?: string,"p_round_at": string,"p_site_id": string }; Returns: undefined
+                           },
+"engine_oncall_reminders":
+{ Args: { "p_now": string }; Returns: number
                            },
 "engine_open_incident":
 { Args: { "p_context": Json,"p_detected_at": string,"p_hold_until"?: string,"p_monitor_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_outside_hours"?: boolean,"p_round_at": string,"p_severity": Database["public"]['Enums']["severity"],"p_site_id": string,"p_started_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: string
