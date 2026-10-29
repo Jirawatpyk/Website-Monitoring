@@ -53,7 +53,7 @@ import {
   type DialogIncident,
   type RootCauseValue,
 } from './incident-dialogs';
-import { postWaitWords, usePostWait, type PostOverdue } from './use-post-wait';
+import { NOTHING_TO_POST, postWaitWords, usePostWait, type PostOverdue } from './use-post-wait';
 import { phoneHeader } from '@/components/phone-header';
 import { WhatChangedCard } from '@/features/page-change';
 
@@ -157,7 +157,7 @@ export function IncidentDetailView({
     return () => clearTimeout(t);
   });
   // RESOLVED leaves after the hold (`after()` in the action): refresh until the page shows it sent.
-  const resolvedPostsAt = d.resolved && !d.resolved.posted ? d.resolved.postsAt : null;
+  const resolvedPostsAt = d.resolved && d.resolved.notifies && !d.resolved.posted ? d.resolved.postsAt : null;
   const holdLeft = useSecondsLeft(resolvedPostsAt);
   const postOverdue = usePostWait(!!resolvedPostsAt && holdLeft === 0, resolvedPostsAt);
 
@@ -610,7 +610,7 @@ function ResolvedCard({
   headingRef: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const r = d.resolved!;
-  const seconds = useSecondsLeft(r.posted ? null : r.postsAt);
+  const seconds = useSecondsLeft(r.posted || !r.notifies ? null : r.postsAt);
   const [failure, setFailure] = useState<string | null>(null);
   const [undoing, startUndo] = useTransition();
   const cause = rootCauseLabel(d.rootCause.category);
@@ -643,9 +643,11 @@ function ResolvedCard({
         <span role="status">
           {seconds > 0
             ? `Posting to ${d.emailed ? 'Chat and email' : 'Chat'} in a few seconds — nothing is sent until then.`
-            : r.posted
-              ? `Posted to the Chat thread${d.emailed ? ' and email' : ''} at ${formatTimeWithSeconds(new Date(r.posted))}`
-              : postWaitWords(overdue, d.emailed)}
+            : !r.notifies
+              ? NOTHING_TO_POST
+              : r.posted
+                ? `Posted to the Chat thread${d.emailed ? ' and email' : ''} at ${formatTimeWithSeconds(new Date(r.posted))}`
+                : postWaitWords(overdue, d.emailed)}
         </span>
         {seconds > 0 && <span aria-hidden className="tabular-nums">{`· ${seconds} s`}</span>}
       </span>

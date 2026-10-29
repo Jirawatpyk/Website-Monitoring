@@ -149,7 +149,11 @@ describe('Incident page — Resolve (T10, D-033)', () => {
   });
 
   it('resolved: Undo inside the window, then focus back on Resolve (WCAG 2.4.3)', async () => {
-    m.resolveIncident.mockResolvedValue({ ok: true, postsAt: new Date(Date.now() + 10_000).toISOString() });
+    m.resolveIncident.mockResolvedValue({
+      ok: true,
+      postsAt: new Date(Date.now() + 10_000).toISOString(),
+      notifies: true,
+    });
     m.undoResolve.mockResolvedValue({ ok: true });
     show(
       detail({
@@ -180,7 +184,11 @@ describe('Incident page — Resolve (T10, D-033)', () => {
   });
 
   it('Undo after the page refreshed to Resolved: focus lands on Resolve once the next refresh brings it back', async () => {
-    m.resolveIncident.mockResolvedValue({ ok: true, postsAt: new Date(Date.now() + 10_000).toISOString() });
+    m.resolveIncident.mockResolvedValue({
+      ok: true,
+      postsAt: new Date(Date.now() + 10_000).toISOString(),
+      notifies: true,
+    });
     m.undoResolve.mockResolvedValue({ ok: true });
     const open = detail({
       events: settled,
@@ -197,6 +205,7 @@ describe('Incident page — Resolve (T10, D-033)', () => {
         at: new Date().toISOString(),
         postsAt: new Date(Date.now() + 10_000).toISOString(),
         posted: null,
+        notifies: true,
       },
     };
     const draw = (x: IncidentDetail) => (
@@ -238,6 +247,7 @@ describe('Incident page — Resolve (T10, D-033)', () => {
           at: new Date().toISOString(),
           postsAt: new Date(Date.now() + 10_000).toISOString(),
           posted: null,
+          notifies: true,
         },
       });
       // held: nothing to look for yet
@@ -306,7 +316,7 @@ describe('Incident page — Resolve (T10, D-033)', () => {
       ...d,
       state: 'resolved',
       view: { ...d.view, state: 'resolved' },
-      resolved: { by: 'Tao', byViewer: true, at: NOW, postsAt: NOW, posted: NOW },
+      resolved: { by: 'Tao', byViewer: true, at: NOW, postsAt: NOW, posted: NOW, notifies: true },
     });
     expect(
       screen.getAllByText('Resolved by Tao · ORCA Thailand was down 8 min · root cause: Hosting / server.')
@@ -348,7 +358,11 @@ describe('Incident page — Resolve (T10, D-033)', () => {
   });
 
   it('resolved a DOWN: the email row names the DOWN recipients; the sentence ends with a full stop', async () => {
-    m.resolveIncident.mockResolvedValue({ ok: true, postsAt: new Date(Date.now() + 10_000).toISOString() });
+    m.resolveIncident.mockResolvedValue({
+      ok: true,
+      postsAt: new Date(Date.now() + 10_000).toISOString(),
+      notifies: true,
+    });
     show(detail({ events: settled, rootCause: { category: 'dns', what: 'Record removed', fix: null } }));
     fireEvent.click(resolveButton());
     const dialog = screen.getByRole('dialog', { name: 'Resolve incident' });
@@ -361,7 +375,11 @@ describe('Incident page — Resolve (T10, D-033)', () => {
   });
 
   it('resolved a drop that came back inside 5 min: Chat only, no email row (D-047)', async () => {
-    m.resolveIncident.mockResolvedValue({ ok: true, postsAt: new Date(Date.now() + 10_000).toISOString() });
+    m.resolveIncident.mockResolvedValue({
+      ok: true,
+      postsAt: new Date(Date.now() + 10_000).toISOString(),
+      notifies: true,
+    });
     show(
       detail({
         events: settled,
@@ -376,6 +394,60 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     expect(within(done).getByText('Resolved reply to the Chat thread · held for undo')).toBeInTheDocument();
     expect(within(done).queryByText(/Resolved email/)).not.toBeInTheDocument();
     expect(within(done).getAllByText(/^Root cause: .*Posting to Chat in \d+ s/).length).toBeGreaterThan(0);
+  });
+
+  it('resolved with no alert ever sent (D-047): says nothing will post, no countdown, no Undo, no message rows', async () => {
+    m.resolveIncident.mockResolvedValue({
+      ok: true,
+      postsAt: new Date(Date.now() + 10_000).toISOString(),
+      notifies: false,
+    });
+    show(
+      detail({
+        events: settled,
+        emailed: false,
+        rootCause: { category: 'false_alarm', what: 'Redirect not allowed yet', fix: null },
+      }),
+    );
+    fireEvent.click(resolveButton());
+    const dialog = screen.getByRole('dialog', { name: 'Resolve incident' });
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Resolve incident' })));
+    const done = await screen.findByRole('dialog', { name: 'Incident resolved' });
+    expect(within(done).getAllByText(/Nothing to post — no alert went out for this incident\.$/).length).toBe(
+      2,
+    );
+    expect(within(done).queryByText(/Posting to/)).not.toBeInTheDocument();
+    expect(within(done).queryByText(/held for undo/)).not.toBeInTheDocument();
+    expect(within(done).queryByRole('button', { name: /^Undo/ })).not.toBeInTheDocument();
+  });
+
+  it('a page resolved with nothing to post never waits for a post that won’t come (no "Not confirmed")', () => {
+    vi.useFakeTimers();
+    try {
+      const d = detail({ events: settled, emailed: false });
+      show({
+        ...d,
+        state: 'resolved',
+        view: { ...d.view, state: 'resolved' },
+        resolved: {
+          by: 'Tao',
+          byViewer: true,
+          at: new Date(Date.now() - 20 * 60_000).toISOString(),
+          postsAt: new Date(Date.now() - 20 * 60_000 + 10_000).toISOString(),
+          posted: null,
+          notifies: false,
+        },
+      });
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(m.refresh).not.toHaveBeenCalled();
+      expect(
+        screen.getAllByText('Nothing to post — no alert went out for this incident.').length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByText(/Not confirmed as posted/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Undo/ })).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
