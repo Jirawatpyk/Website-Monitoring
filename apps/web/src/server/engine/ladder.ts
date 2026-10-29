@@ -5,7 +5,8 @@ import { escalationPlanSchema, type IncidentState, type ResponseHours, type Tier
 
 /**
  * The escalation ladder's tick (S08, D-034), once per engine run after the sites are judged: every
- * incident waiting for an ack that opened with a plan gets its next level and its latest reminder
+ * incident waiting for an ack (or acknowledged, for the Tier 1 FYI step — S10) that opened with a
+ * plan gets its next level and its latest reminder
  * when their time has come (`ladderDue`). The SQL functions are guarded — state, level, a first alert
  * out, one reminder per due time — so overlapping runs (the cron, a probe's recheck, Ingest) send each
  * message once. One incident's failure doesn't hold the others back; the run reports it at the end.
@@ -21,7 +22,8 @@ export async function escalationTick(
     .select(
       'id, state, severity, episode_severity, detected_at, alerted_at, escalation_level, escalation_plan',
     )
-    .in('state', ['unacked', 'escalated'])
+    // Acknowledged too: the Tier 1 FYI step still goes while the site is down (S10, spec §14.1).
+    .in('state', ['unacked', 'escalated', 'acknowledged'])
     .not('escalation_plan', 'is', null);
   if (error) throw new Error(`incidents: ${error.message}`);
 

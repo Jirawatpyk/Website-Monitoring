@@ -44,6 +44,35 @@ describe('escalationTick (S08, D-034)', () => {
     ]);
   });
 
+  it('S10: an acknowledged Tier 1 DOWN still sends its L3 FYI at 10:48:41, and no reminder', async () => {
+    const full = {
+      ...plan(1),
+      steps: [
+        ...plan(1).steps,
+        { level: 2, delayMin: 30, targets: ['ceo'], channels: ['chat', 'email', 'voice'] },
+        { level: 3, delayMin: 60, targets: ['ceo', 'site_am'], channels: ['chat', 'email'], fyi: true },
+      ],
+    };
+    const { db, rpcCalls } = fakeDb({
+      'incidents.select': {
+        data: [inc0142({ state: 'acknowledged', escalation_level: 1, escalation_plan: full })],
+      },
+      'rpc.engine_fire_step': { data: true },
+    });
+    expect((await escalationTick(db, bkk('2026-09-25T10:48:41'), HOURS)).queued).toBe(1);
+    expect(rpcCalls).toEqual([
+      {
+        name: 'engine_fire_step',
+        args: {
+          p_incident_id: 'i142',
+          p_level: 3,
+          p_due_at: bkk('2026-09-25T10:48:41').toISOString(),
+          p_context: { elapsedMin: 60 },
+        },
+      },
+    ]);
+  });
+
   it('does nothing a second early', async () => {
     const { db, rpcCalls } = fakeDb({ 'incidents.select': { data: [inc0142()] } });
     expect((await escalationTick(db, bkk('2026-09-25T10:03:40'), HOURS)).queued).toBe(0);
