@@ -1014,32 +1014,46 @@ function PhoneRotation({
   onEdit: () => void;
 }) {
   const empty = rows.length === 0;
+  const canEdit = admin && !empty && !rows[0]?.nobody;
+  const both = canRequest && canEdit;
+  const request = canRequest && (
+    <Button
+      variant="ghost"
+      icon={<IconArrowUpDown />}
+      fullWidth={both}
+      disabled={one || !swapRow}
+      aria-describedby={one || !swapRow ? 'oc-swap-why' : undefined}
+      onClick={() => swapRow && onSwap(swapRow)}
+    >
+      Request swap
+    </Button>
+  );
+  const edit = canEdit && (
+    <Button variant="ghost" icon={<IconUsers />} fullWidth={both} onClick={onEdit}>
+      Edit rotation
+    </Button>
+  );
   return (
     // No overflow-hidden: it would clip the buttons' focus rings (layout-consistency).
     <div className="rounded-aura-lg border border-border-default bg-bg-surface">
       {/* Padding all round: the 44 px buttons' hover fill must not touch the card's edge. */}
-      <div className="flex items-center justify-between gap-2 border-b border-border-subtle py-1.5 pr-2 pl-4">
+      <div className="flex min-h-11 items-center justify-between gap-2 border-b border-border-subtle py-1.5 pr-2 pl-4">
         <h2 className="m-0 font-mono text-xs font-normal text-fg-tertiary">ROTATION</h2>
-        <span className="flex flex-wrap justify-end gap-1">
-          {canRequest && (
-            <Button
-              variant="ghost"
-              icon={<IconArrowUpDown />}
-              disabled={one || !swapRow}
-              aria-describedby={one || !swapRow ? 'oc-swap-why' : undefined}
-              onClick={() => swapRow && onSwap(swapRow)}
-            >
-              Request swap
-            </Button>
-          )}
-          {/* An Admin in the rotation gets both (§28.7). */}
-          {admin && !empty && !rows[0]?.nobody && (
-            <Button variant="ghost" icon={<IconUsers />} onClick={onEdit}>
-              Edit rotation
-            </Button>
-          )}
-        </span>
+        {!both && (
+          <span className="flex">
+            {request}
+            {edit}
+          </span>
+        )}
       </div>
+      {/* An Admin in the rotation gets both (§28.7), which the board never draws together: they
+          don't fit beside the label at 390, so they get a row of their own, half each. */}
+      {both && (
+        <div className="grid grid-cols-2 gap-1 border-b border-border-subtle p-1.5">
+          {request}
+          {edit}
+        </div>
+      )}
       {canRequest && (one || !swapRow) && (
         <div
           id="oc-swap-why"
