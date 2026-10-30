@@ -4,7 +4,7 @@
 -- day-before reminder once per shift and person.
 begin;
 \ir _helpers.psql
-select plan(32);
+select plan(35);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -149,6 +149,49 @@ update public.oncall_shifts set starts_at = starts_at - interval '400 days', end
   where id = (select requester_shift_id from public.oncall_swaps where id = (select id from sw));
 select public.oncall_extend_shifts(now() + interval '28 days');
 select is(pg_temp.chat_people('swap_expired'), 'nok:asked ploy:requester', 'an expired request tells both people');
+
+-- ── The Admins (message-check B2b) ──────────────────────────────────────
+-- An accepted request withdrawn before an Admin decides: the Admins asked to approve hear it too.
+truncate sw;
+update public.oncall_swaps set status = 'withdrawn' where status in ('waiting', 'accepted');
+-- Earlier requests aged out of the 5-in-10-minutes limit (one transaction: now() doesn't move).
+update public.oncall_swaps set created_at = created_at - interval '1 hour';
+select tests.authenticate_as(pg_temp.uid('ploy'));
+insert into sw select public.request_oncall_swap(
+  (select id from public.oncall_shifts where user_id = pg_temp.uid('ploy') and starts_at > now() order by starts_at limit 1),
+  (select id from public.oncall_shifts where user_id = pg_temp.uid('nok') and starts_at > now() order by starts_at limit 1));
+reset role;
+select tests.authenticate_as(pg_temp.uid('nok'));
+select public.respond_oncall_swap((select id from sw), true);
+reset role;
+select tests.authenticate_as(pg_temp.uid('ploy'));
+select public.withdraw_oncall_swap((select id from sw));
+reset role;
+select is(pg_temp.chat_people('swap_withdrawn'), 'nok:asked tao:admin', 'an accepted request withdrawn tells the Admin too');
+-- Withdrawn before anyone accepted: no Admin was asked, none is told.
+truncate sw;
+select tests.authenticate_as(pg_temp.uid('ploy'));
+insert into sw select public.request_oncall_swap(
+  (select id from public.oncall_shifts where user_id = pg_temp.uid('ploy') and starts_at > now() order by starts_at limit 1),
+  (select id from public.oncall_shifts where user_id = pg_temp.uid('nok') and starts_at > now() order by starts_at limit 1));
+select public.withdraw_oncall_swap((select id from sw));
+reset role;
+select is(pg_temp.chat_people('swap_withdrawn'), 'nok:asked', 'withdrawn before an accept: only the person asked');
+-- The requester is the only Admin: they're asked to approve their own accepted swap.
+update public.profiles set role = 'admin' where id = pg_temp.uid('ploy');
+update public.profiles set is_active = false where id = pg_temp.uid('tao');
+truncate sw;
+select tests.authenticate_as(pg_temp.uid('ploy'));
+insert into sw select public.request_oncall_swap(
+  (select id from public.oncall_shifts where user_id = pg_temp.uid('ploy') and starts_at > now() order by starts_at limit 1),
+  (select id from public.oncall_shifts where user_id = pg_temp.uid('nok') and starts_at > now() order by starts_at limit 1));
+reset role;
+select tests.authenticate_as(pg_temp.uid('nok'));
+select public.respond_oncall_swap((select id from sw), true);
+reset role;
+select is(pg_temp.chat_people('swap_accepted'), 'ploy:admin', 'the only Admin, as requester, is asked to approve');
+update public.profiles set role = 'responder' where id = pg_temp.uid('ploy');
+update public.profiles set is_active = true where id = pg_temp.uid('tao');
 
 -- ── At most 5 swap requests in 10 minutes (security review B2a) ────────
 update public.oncall_swaps set status = 'withdrawn' where status in ('waiting', 'accepted');
