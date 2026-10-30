@@ -4,7 +4,7 @@
 -- and that nobody writes the tables directly.
 begin;
 \ir _helpers.psql
-select plan(65);
+select plan(71);
 
 -- ── Fixtures ─────────────────────────────────────────────────────────────
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -50,7 +50,9 @@ select is((select array_agg(p.display_name order by s.starts_at) from (select * 
    where a.id = (select id from ids where name = 'ploy') and b.id = (select id from ids where name = 'nok') and c.id = (select id from ids where name = 'arm')),
   'weeks follow the order and wrap: Ploy, Nok, Arm, Ploy');
 select is(public.oncall_person_at(now()), (select id from ids where name = 'ploy'), 'Ploy is on call now');
-select is((select count(*)::int from public.audit_log where action = 'oncall.rotation'), 1, 'one audit row for the rotation');
+-- Scoped to this test's Admin: a local database keeps rows from earlier e2e runs.
+select is((select count(*)::int from public.audit_log where action = 'oncall.rotation'
+           and actor_id = (select id from ids where name = 'tao')), 1, 'one audit row for the rotation');
 select is((select count(*)::int from public.oncall_events where kind = 'rotation_changed'), 1, 'and one event for its messages');
 
 create temp table wk (n int primary key, id uuid, who uuid) on commit drop;
@@ -96,7 +98,8 @@ select is((select array[(select user_id from public.oncall_shifts where id = (se
                         (select user_id from public.oncall_shifts where id = (select id from wk where n = 3))]),
   array[(select id from ids where name = 'arm'), (select id from ids where name = 'nok')], 'the weeks swapped');
 -- One transaction has one now(): compare the set, not the order.
-select is((select array_agg(action order by action) from public.audit_log where entity = 'oncall_swap'),
+select is((select array_agg(action order by action) from public.audit_log
+           where entity = 'oncall_swap' and entity_id = (select id from sw)),
   array['oncall.swap_accept', 'oncall.swap_approve', 'oncall.swap_request'], 'every step is in the audit log');
 select is((select array_agg(kind order by at, kind) from public.oncall_events where swap_id = (select id from sw)),
   array['swap_accepted', 'swap_approved', 'swap_requested'], 'and has its event for the messages');
@@ -262,6 +265,48 @@ select ok((select count(*) from public.oncall_shifts) > 0, 'a Viewer reads the r
 reset role;
 select tests.as_anon();
 select throws_ok('select * from public.oncall_shifts', '42501', null, 'anon reads nothing');
+reset role;
+
+-- ── Someone in a swap doesn't decide it, unless the only active Admin (D-048 12.17) ──
+-- A second Admin; the swaps are written directly (accepted) so an Admin can be one of the two.
+insert into ids values ('alex', tests.create_user('alex@pgtap.test', 'admin'));
+create temp table sw2 (name text primary key, id uuid) on commit drop;
+grant select on sw2 to authenticated, service_role;
+with w as (
+  insert into public.oncall_swaps (requester_shift_id, counterpart_shift_id, requester_id, counterpart_id, status, responded_at)
+  values ((select id from wk where n = 4), (select id from wk where n = 3), (select id from ids where name = 'tao'),
+          (select id from ids where name = 'nok'), 'accepted', now())
+  returning id)
+insert into sw2 select 'tao_asks', id from w;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok($$ select public.decide_oncall_swap((select id from sw2 where name = 'tao_asks'), true) $$,
+  '42501', 'Another Admin decides on a swap you’re part of', 'with two Admins, the requester can''t approve their own swap');
+select throws_ok($$ select public.decide_oncall_swap((select id from sw2 where name = 'tao_asks'), false, 'Changed my mind') $$,
+  '42501', 'Another Admin decides on a swap you’re part of', '…nor decline it as an Admin (they withdraw)');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'alex'));
+select lives_ok($$ select public.decide_oncall_swap((select id from sw2 where name = 'tao_asks'), true) $$,
+  'an Admin who isn''t in the swap approves it');
+reset role;
+with w as (
+  insert into public.oncall_swaps (requester_shift_id, counterpart_shift_id, requester_id, counterpart_id, status, responded_at)
+  values ((select id from wk where n = 4), (select id from wk where n = 3), (select id from ids where name = 'nok'),
+          (select id from ids where name = 'tao'), 'accepted', now())
+  returning id)
+insert into sw2 select 'tao_asked', id from w;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok($$ select public.decide_oncall_swap((select id from sw2 where name = 'tao_asked'), true) $$,
+  '42501', 'Another Admin decides on a swap you’re part of', 'with two Admins, the person asked can''t approve it either');
+select throws_ok($$ select public.decide_oncall_swap((select id from sw2 where name = 'tao_asked'), false, 'No longer works for me') $$,
+  '42501', 'Another Admin decides on a swap you’re part of', '…nor decline it as an Admin');
+reset role;
+-- With every other Admin deactivated (the seed has its own) Tao is the only one: he decides, or the
+-- request would be stuck. Rolled back with the rest of the file.
+update public.profiles set is_active = false
+  where role = 'admin' and is_active and id <> (select id from ids where name = 'tao');
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select lives_ok($$ select public.decide_oncall_swap((select id from sw2 where name = 'tao_asked'), true) $$,
+  'the only active Admin approves a swap they are part of');
 reset role;
 
 select * from finish();
