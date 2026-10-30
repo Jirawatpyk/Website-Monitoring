@@ -32,6 +32,8 @@ as $$
       where a.role = 'admin' and a.is_active and a.id <> e.counterpart_id
         and (e.kind = 'swap_accepted'
              or (e.kind in ('swap_withdrawn', 'swap_expired') and e.responded_at is not null))
+        -- An Admin who withdraws their own request isn't told about it.
+        and not (e.kind = 'swap_withdrawn' and a.id = e.requester_id)
     union all
     select x.uid, x.role, x.ord from e
       cross join lateral (values (e.user_id, 'new', 1), ((e.payload ->> 'from')::uuid, 'previous', 2)) x (uid, role, ord)
