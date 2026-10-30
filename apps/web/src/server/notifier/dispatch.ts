@@ -6,6 +6,8 @@ import type { CronJobResult } from '../cron-job';
 import { contextOf, loadFacts, type Facts, type Notification } from './facts';
 import { renderChat, renderEmail, renderSystemAlertEmail } from './render';
 import { renderWindowChat, renderWindowEmail } from './render-window';
+import { loadOncallFacts, oncallThreadStarts } from './oncall-facts';
+import { renderOncallChat, renderOncallEmail } from './render-oncall';
 
 export interface EmailConfig {
   apiKey: string;
@@ -107,6 +109,8 @@ export async function dispatchNotifications(
       p_channel: channel,
       p_limit: CLAIM_LIMIT,
       ...(options.incidentId ? { p_incident_id: options.incidentId } : {}),
+      // On-call rows too (S10 B2b): this notifier renders them.
+      p_oncall: true,
     });
     if (claimed.error) throw new Error(`claim_notifications: ${claimed.error.message}`);
     return claimed.data;
@@ -118,6 +122,7 @@ export async function dispatchNotifications(
   // One load of incidents, owners and recipients for both channels.
   const all = [...(chatRows ?? []), ...(emailRows ?? [])];
   const facts = all.length ? await loadFacts(deps.db, all) : null;
+  if (facts && all.some((n) => n.oncall_event_id)) facts.oncall = await loadOncallFacts(deps.db, all);
   const [chat, email] = await settled([
     chatRows && facts
       ? dispatchChannel(deps, 'google_chat', chatRows, facts, options)
@@ -273,6 +278,7 @@ async function release(db: DbClient, rows: readonly Notification[]): Promise<num
 async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: Date): Promise<Outcome> {
   if (n.system_alert_id) return deliverSystemAlert(deps, n, facts);
   if (n.maintenance_window_id) return deliverWindow(deps, n, facts, now);
+  if (n.oncall_event_id) return deliverOncall(deps, n, facts);
   const incident = n.incident_id ? facts.incidents.get(n.incident_id) : undefined;
   if (!n.incident_id || !incident) return { ok: false, error: 'Incident not found', retryable: false };
 
@@ -334,6 +340,36 @@ async function deliverWindow(deps: DispatchDeps, n: Notification, facts: Facts, 
     startsThread: !first || first.id === n.id,
     now,
   });
+  if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
+  const send = deps.send ?? sendEmail;
+  const result = await send(message, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });
+  return result.ok ? { ok: true, providerId: result.id } : result;
+}
+
+/**
+ * An on-call event's message (S10 B2b, D-048): its line in the subject's Space thread, or an email to
+ * one person in the same subject's mail thread.
+ */
+async function deliverOncall(deps: DispatchDeps, n: Notification, facts: Facts): Promise<Outcome> {
+  const e = facts.oncall?.get(n.oncall_event_id!);
+  if (!e) return { ok: false, error: 'On-call event not found', retryable: false };
+  if (n.channel === 'google_chat') {
+    const message = renderOncallChat(n, e, deps.appUrl);
+    if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
+    const post = deps.post ?? postChatMessage;
+    const result = await post(deps.webhookUrl!, message, {
+      threadKey: n.thread_key ?? `oncall-${e.id}`,
+      messageId: `client-${n.id}`,
+    });
+    return result.ok
+      ? { ok: true, providerId: result.messageName }
+      : { ok: false, error: result.error, retryable: true };
+  }
+  const to = n.user_id ? facts.recipients.get(n.user_id) : undefined;
+  if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
+  const { apiKey, from } = deps.email!;
+  const startsThread = await oncallThreadStarts(deps.db, n);
+  const message = renderOncallEmail(n, e, to, deps.appUrl, { from, startsThread });
   if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
   const send = deps.send ?? sendEmail;
   const result = await send(message, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });
