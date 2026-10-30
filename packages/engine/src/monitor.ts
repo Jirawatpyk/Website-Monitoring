@@ -83,6 +83,14 @@ export function lookbackMs(intervalSec: number): number {
   return intervalSec * 1000 + ROUND_DEADLINE_MS + RECHECK_WITHIN_MS + VERIFY_WAIT_MAX_MS + 30_000;
 }
 
+/**
+ * How far back the runner loads results: the lookback plus one interval, so the round before the
+ * oldest one still to be judged is in view too — a timeout alone reads it (D-049, `firstTimeoutRound`).
+ */
+export function historyMs(intervalSec: number): number {
+  return lookbackMs(intervalSec) + intervalSec * 1000;
+}
+
 export interface Round {
   start: Date;
   /** The scheduled check per location. */

@@ -692,7 +692,8 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     // round just before also hard-failed at enough locations (its own scheduled checks, so a
     // skipped or no-data round can't stand in). A 5xx, a refused connection, DNS or TLS confirm in
     // one round as before.
-    if (firstTimeoutRound(failing, round.scheduled, m.checks, roundAt, s.intervalSec)) {
+    const sitsOut = wafSite ? (c: StoredCheck) => abstainsOnWafSite(c, akamaiSite) : undefined;
+    if (firstTimeoutRound(failing, round.scheduled, m.checks, roundAt, s.intervalSec, sitsOut)) {
       return { verdict: { kind: 'blip' }, next: reset };
     }
     const history = wafSite

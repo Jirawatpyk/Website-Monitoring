@@ -37,21 +37,23 @@ type Timed = Vote & { location: ProbeLocation; checkedAt: Date; attempt?: 1 | 2 
  * still counts. Read from the checks themselves, not the carried failing-since clock: a round the
  * engine skipped, or one with no data, must not pass for "the round before" (engine review H1).
  */
-export function firstTimeoutRound(
+export function firstTimeoutRound<T extends Timed>(
   confirming: readonly Timed[],
   scheduled: readonly Timed[],
-  history: readonly Timed[],
+  history: readonly T[],
   roundAt: Date,
   intervalSec: number,
+  /** Behind a WAF, a check that sits its round out (D-027) is no evidence for that round either. */
+  sitsOut: (c: T) => boolean = () => false,
 ): boolean {
   if (!confirming.length || !confirming.every((c) => isTimeoutError(c.error))) return false;
   const here = new Set(confirming.map((c) => c.location));
   if (!scheduled.filter((c) => here.has(c.location)).every((c) => isTimeoutError(c.error))) return false;
   const from = roundAt.getTime() - intervalSec * 1000;
-  const latest = new Map<ProbeLocation, Timed>();
+  const latest = new Map<ProbeLocation, T>();
   for (const c of history) {
     const t = c.checkedAt.getTime();
-    if ((c.attempt ?? 1) !== 1 || t < from || t >= roundAt.getTime()) continue;
+    if ((c.attempt ?? 1) !== 1 || t < from || t >= roundAt.getTime() || sitsOut(c)) continue;
     const prev = latest.get(c.location);
     if (!prev || prev.checkedAt < c.checkedAt) latest.set(c.location, c);
   }

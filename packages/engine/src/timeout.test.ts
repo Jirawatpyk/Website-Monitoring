@@ -281,4 +281,41 @@ describe('a timeout needs two failing rounds before DOWN (D-049)', () => {
     );
     expect(d).toMatchObject({ kind: 'escalate', downStartedAt: at(1) });
   });
+
+  it('a newer round still incomplete changes nothing: the second timeout round is judged DOWN', () => {
+    const newer = [check('BKK', 'fail', 121)]; // no recheck, no other location yet
+    const d = decideSite(
+      site([home([...timeoutRound(0), ...timeoutRound(60), ...newer], afterTimeoutRound(0))], {
+        lastRoundAt: at(0),
+        now: at(140),
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'open', roundAt: at(60), startedAt: at(1) });
+  });
+});
+
+describe('a timeout on a site behind a WAF, decided by one location (D-027, D-049)', () => {
+  // Bangkok Airways style: SIN and TYO WAF-blocked sit out, BKK alone decides (need = 1).
+  const wafRound = (base: number, bkk: Partial<StoredCheck> = {}) => [
+    check('BKK', 'fail', base + 1, { controlOk: true, ...bkk }),
+    check('SIN', 'blocked', base + 2, { statusCode: 403, error: null, waf: 'cloudflare' }),
+    check('TYO', 'blocked', base + 3, { statusCode: 403, error: null, waf: 'cloudflare' }),
+    recheck('BKK', base + 31, { controlOk: true, ...bkk }),
+  ];
+  const waf = (checks: StoredCheck[], over: Partial<SiteSnapshot> = {}) =>
+    decideSite(site([home(checks)], { behindWaf: true, ...over }));
+
+  it('the first timeout round of the one voter is no DOWN; the second is', () => {
+    expect(waf(wafRound(0)).kind).toBe('none');
+    expect(waf([...wafRound(0), ...wafRound(60)], { lastRoundAt: at(0), now: at(200) })).toMatchObject({
+      kind: 'open',
+      startedAt: at(1),
+      roundAt: at(60),
+    });
+  });
+
+  it('a Bangkok failure its control check can’t vouch for is no "round before"', () => {
+    const untrusted = wafRound(0, { controlOk: false });
+    expect(waf([...untrusted, ...wafRound(60)], { lastRoundAt: at(0), now: at(200) }).kind).toBe('none');
+  });
 });

@@ -15,7 +15,7 @@ import {
   bkkControlFailing,
   faultyByMinute,
   slowLocationsByMinute,
-  lookbackMs,
+  historyMs,
   NEW_MONITOR,
   UNKNOWN_ROOT_CAUSE,
   type CrawlerFact,
@@ -227,7 +227,7 @@ export async function runEngine(
   summary.monitors = monitors.length;
 
   const since = new Date(
-    now.getTime() - Math.max(...sites.map((s) => lookbackMs(TIER_CONFIG[s.tier].intervalSec))),
+    now.getTime() - Math.max(...sites.map((s) => historyMs(TIER_CONFIG[s.tier].intervalSec))),
   );
   const siteIds = sites.map((s) => s.id);
   const windows = await loadWindows(db, siteIds, now);
