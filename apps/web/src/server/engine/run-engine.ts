@@ -193,13 +193,16 @@ export async function runEngine(
     if (shifts.error)
       console.error(JSON.stringify({ event: 'oncall_extend_shifts_failed', error: shifts.error.message }));
   }
-  // The day-before on-call reminder, once per shift and person (S10, D-048 item 6); never fatal.
-  const onCallReminded = await db.rpc('engine_oncall_reminders', { p_now: now.toISOString() });
-  if (onCallReminded.error)
-    console.error(
-      JSON.stringify({ event: 'engine_oncall_reminders_failed', error: onCallReminded.error.message }),
-    );
-  else if (typeof onCallReminded.data === 'number') summary.notified += onCallReminded.data;
+  // The day-before on-call reminder, once per shift and person, checked once an hour like the weeks
+  // above (S10, D-048 item 6); never fatal.
+  if (now.getUTCMinutes() === 0) {
+    const onCallReminded = await db.rpc('engine_oncall_reminders', { p_now: now.toISOString() });
+    if (onCallReminded.error)
+      console.error(
+        JSON.stringify({ event: 'engine_oncall_reminders_failed', error: onCallReminded.error.message }),
+      );
+    else if (typeof onCallReminded.data === 'number') summary.notified += onCallReminded.data;
+  }
   // A waiting request's reminders, 12 h and 1 h before its start (S09b, §24.2); a failure retries next run.
   const reminded = await db.rpc('engine_window_reminders', { p_now: now.toISOString() });
   if (reminded.error)

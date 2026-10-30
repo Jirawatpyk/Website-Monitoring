@@ -6,7 +6,7 @@ import type { CronJobResult } from '../cron-job';
 import { contextOf, loadFacts, type Facts, type Notification } from './facts';
 import { renderChat, renderEmail, renderSystemAlertEmail } from './render';
 import { renderWindowChat, renderWindowEmail } from './render-window';
-import { loadOncallFacts, oncallThreadStarts } from './oncall-facts';
+import { loadOncallFacts } from './oncall-facts';
 import { renderOncallChat, renderOncallEmail } from './render-oncall';
 
 export interface EmailConfig {
@@ -122,7 +122,14 @@ export async function dispatchNotifications(
   // One load of incidents, owners and recipients for both channels.
   const all = [...(chatRows ?? []), ...(emailRows ?? [])];
   const facts = all.length ? await loadFacts(deps.db, all) : null;
-  if (facts && all.some((n) => n.oncall_event_id)) facts.oncall = await loadOncallFacts(deps.db, all);
+  // On-call facts (S10): a failed read never holds an outage alert back — those rows retry next pass.
+  if (facts && all.some((n) => n.oncall_event_id)) {
+    try {
+      facts.oncall = await loadOncallFacts(deps.db, all);
+    } catch (err) {
+      console.error(JSON.stringify({ event: 'oncall_facts_unreadable', error: String(err) }));
+    }
+  }
   const [chat, email] = await settled([
     chatRows && facts
       ? dispatchChannel(deps, 'google_chat', chatRows, facts, options)
@@ -351,9 +358,12 @@ async function deliverWindow(deps: DispatchDeps, n: Notification, facts: Facts, 
  * one person in the same subject's mail thread.
  */
 async function deliverOncall(deps: DispatchDeps, n: Notification, facts: Facts): Promise<Outcome> {
-  const e = facts.oncall?.get(n.oncall_event_id!);
+  if (!facts.oncall) return { ok: false, error: 'On-call facts unreadable', retryable: true };
+  const e = facts.oncall.get(n.oncall_event_id!);
   if (!e) return { ok: false, error: 'On-call event not found', retryable: false };
   if (n.channel === 'google_chat') {
+    if (e.kind === 'test_alert' && !e.test?.token)
+      return { ok: false, error: 'Test link no longer valid', retryable: false };
     const message = renderOncallChat(n, e, deps.appUrl);
     if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
     const post = deps.post ?? postChatMessage;
@@ -368,7 +378,7 @@ async function deliverOncall(deps: DispatchDeps, n: Notification, facts: Facts):
   const to = n.user_id ? facts.recipients.get(n.user_id) : undefined;
   if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
   const { apiKey, from } = deps.email!;
-  const startsThread = await oncallThreadStarts(deps.db, n);
+  const startsThread = !e.emailed?.has(`${n.thread_key}:${to.id}`);
   const message = renderOncallEmail(n, e, to, deps.appUrl, { from, startsThread });
   if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
   const send = deps.send ?? sendEmail;

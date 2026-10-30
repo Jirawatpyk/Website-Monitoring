@@ -162,6 +162,9 @@ describe('S10 — the CEO, the FYI step, moving steps (Escalation board, §14.7,
     expect(stepNote(t1full(), l0, false, [], 'Mon–Sat 08:30–17:00')).toBe(
       'Chat @mention and Alerts Space are locked on. Owner by day (Mon–Sat 08:30–17:00), the person on call otherwise. Only they are @mentioned; the backup is named in plain text.',
     );
+    expect(stepNote(t1full(), l0, true)).toBe(
+      'Only this person is @mentioned; the backup is named in plain text.',
+    );
     expect(stepNote(t1full(), { ...l0, targets: ['owner', 'backup'] }, true)).toBe(
       'Everyone on this step is @mentioned.',
     );

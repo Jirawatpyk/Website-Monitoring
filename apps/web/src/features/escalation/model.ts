@@ -98,7 +98,9 @@ export function stepNote(
         ? 'Everyone on this step is @mentioned.'
         : 'Only they are @mentioned; the backup is named in plain text.';
     return phone
-      ? mentioned
+      ? s.targets.length > 1
+        ? mentioned
+        : 'Only this person is @mentioned; the backup is named in plain text.'
       : `Chat @mention and Alerts Space are locked on. Owner by day (${hoursText}), the person on call otherwise. ${mentioned}`;
   }
   return phone ? null : 'Tier 2–3 outside response hours are held until the next opening.';

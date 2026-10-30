@@ -198,6 +198,26 @@ describe('on-call messages', () => {
     );
   });
 
+  it('an unreadable on-call batch never throws: its rows retry, the rest of the batch still goes', async () => {
+    const post = okPost();
+    const { db: d, calls } = db(
+      [row()],
+      [],
+      {},
+      { 'oncall_events.select': { error: { message: 'timeout' } } },
+    );
+    await expect(
+      dispatchNotifications({ db: d, webhookUrl, email, appUrl, now, post }),
+    ).resolves.toBeDefined();
+    expect(post).not.toHaveBeenCalled();
+    const update = calls.find((c) => c.table === 'notifications' && c.op === 'update')?.values as {
+      error?: string;
+      next_retry_at?: string | null;
+    };
+    expect(update.error).toBe('On-call facts unreadable');
+    expect(update.next_retry_at).not.toBeNull();
+  });
+
   it('an event that no longer exists fails for good instead of retrying', async () => {
     const post = okPost();
     const { db: d, calls } = db([row({ oncall_event_id: 'gone' })]);

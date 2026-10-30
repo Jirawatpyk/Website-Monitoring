@@ -21,6 +21,8 @@ export interface OncallEventFacts {
   rotation?: OncallFacts['rotation'];
   shift?: Week;
   shiftHolder?: string;
+  /** `thread:user` of every on-call email already sent: a later one replies in that mail thread. */
+  emailed?: Set<string>;
   /** The test link's token; the URL is built with the app's address at render time. */
   test?: { name: string; token: string | null };
 }
@@ -139,9 +141,25 @@ export async function loadOncallFacts(
   );
   const nameOf = (id: string | null | undefined) => (id ? (people.get(id)?.name ?? 'someone') : null);
 
+  // The thread roots: on-call emails already sent in these threads, once for the batch.
+  const threads = [
+    ...new Set(rows.flatMap((n) => (n.channel === 'email' && n.thread_key ? [n.thread_key] : []))),
+  ];
+  const sent = threads.length
+    ? await db
+        .from('notifications')
+        .select('thread_key, user_id')
+        .eq('channel', 'email')
+        .eq('status', 'sent')
+        .not('oncall_event_id', 'is', null)
+        .in('thread_key', threads)
+    : { data: [] as { thread_key: string | null; user_id: string | null }[], error: null };
+  if (sent.error) throw new Error(`notifications: ${sent.error.message}`);
+  const emailed = new Set((sent.data ?? []).map((r) => `${r.thread_key}:${r.user_id}`));
+
   const out = new Map<string, OncallEventFacts>();
   for (const e of events) {
-    const f: OncallEventFacts = { id: e.id, kind: e.kind, at: e.at, by: nameOf(e.actor_id), people };
+    const f: OncallEventFacts = { id: e.id, kind: e.kind, at: e.at, by: nameOf(e.actor_id), people, emailed };
     const s = e.swap_id ? (swaps.data ?? []).find((x) => x.id === e.swap_id) : undefined;
     if (s) {
       const rw = week(shiftOf.get(s.requester_shift_id));
@@ -180,28 +198,13 @@ export async function loadOncallFacts(
         removed: ids(e.payload?.removed).map((uid) => nameOf(uid) ?? 'someone'),
       };
     }
-    if (e.kind === 'shift_reminder') f.shiftHolder = nameOf(e.user_id) ?? undefined;
-    if (e.kind === 'shift_reminder')
+    if (e.kind === 'shift_reminder') {
+      f.shiftHolder = nameOf(e.user_id) ?? undefined;
       f.shift = week(e.shift_id ? shiftOf.get(e.shift_id) : undefined) ?? undefined;
+    }
     if (e.kind === 'test_alert' && e.user_id)
       f.test = { name: nameOf(e.user_id)!, token: tokenOf.get(e.user_id) ?? null };
     out.set(e.id, f);
   }
   return out;
-}
-
-/** Whether this email starts its person's mail thread: nothing sent to them in that thread yet. */
-export async function oncallThreadStarts(db: DbClient, n: Notification): Promise<boolean> {
-  if (!n.thread_key || !n.user_id) return true;
-  const { data, error } = await db
-    .from('notifications')
-    .select('id')
-    .eq('channel', 'email')
-    .eq('status', 'sent')
-    .eq('thread_key', n.thread_key)
-    .eq('user_id', n.user_id)
-    .neq('id', n.id)
-    .limit(1);
-  if (error) return true;
-  return !(data ?? []).length;
 }
