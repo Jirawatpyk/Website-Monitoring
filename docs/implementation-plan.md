@@ -30,7 +30,7 @@
 | S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | M | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Done |
 | S09d | Defacement: page-change detection | 1 · P1 | L | — (PRD §2 content-change, D-041, D-046) | S09c (merged), S07 | 3–4 (alert on after a 2-week record) | Done |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
-| S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | In review |
+| S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | Done |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
 | S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06b, S10, S11 | 4 | Todo |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
@@ -565,7 +565,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
      - Nav `oncall` `live: true` (`layout.test.tsx`); `e2e/oncall.spec.ts`.
      - Staging `/verify` at 390 / 820 / 1440, light and dark (30 Oct, two runs, findings fixed).
 
-  The slice goes to Done when #145 merges.
+  Done on 30 Oct 2026, when #145 merged (b35edd5). Production checked after the deploy: `/oncall` reads "Nobody on call" (no rotation yet: an Admin saves one there), the Overview On call card reads "Nobody on call · Site owners at night", the nav On-call is live, and there were no runtime errors.
 
 ### S11 · Client-update track
 
