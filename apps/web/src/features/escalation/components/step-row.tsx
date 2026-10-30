@@ -47,6 +47,7 @@ export function StepRow({
   policy,
   index,
   admins,
+  hoursText,
   onEdit,
   onDelete,
   onMove,
@@ -55,6 +56,8 @@ export function StepRow({
   index: number;
   /** Every active Admin: the token reads "Admin (Tao)" (D-034). */
   admins: readonly string[];
+  /** The response hours in words, for L0's note (S10). */
+  hoursText: string;
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
   /** Trade places with the step above (-1) or below (+1). */
@@ -62,7 +65,7 @@ export function StepRow({
 }) {
   const step = policy.steps[index] as EscalationStep;
   const errs = stepErrors(policy.steps, index, policy.key);
-  const note = stepNote(policy, step, false, admins);
+  const note = stepNote(policy, step, false, admins, hoursText);
   const pinned = index === 0;
   const label = `L${index}`;
   const move = moveLabels(policy.steps, index);

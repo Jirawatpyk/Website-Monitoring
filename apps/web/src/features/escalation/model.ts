@@ -75,6 +75,8 @@ export function stepNote(
   s: EscalationStep,
   phone = false,
   admins: readonly string[] = [],
+  /** "Mon–Fri 09:00–18:00", the organisation's response hours (Escalation board, S10). */
+  hoursText = 'Mon–Fri 09:00–18:00',
 ): string | null {
   if (s.fyi) return phone ? 'FYI only, never a call. Recovered by then → nothing is sent.' : null;
   // Tier 2–3 L2 (Escalation board / MEscalation): a reminder to the Admin, no CEO page.
@@ -90,9 +92,16 @@ export function stepNote(
   if (p.severity === 'down') {
     if (p.key !== 't1')
       return 'Outside response hours it still posts, but the timers below wait for the next opening.';
+    // The L0 pencil (S10): anyone added to L0 is @mentioned too.
+    const mentioned =
+      s.targets.length > 1
+        ? 'Everyone on this step is @mentioned.'
+        : 'Only they are @mentioned; the backup is named in plain text.';
     return phone
-      ? 'Only this person is @mentioned; the backup is named in plain text.'
-      : 'Chat @mention and Alerts Space are locked on. Only the owner is @mentioned; the backup is named in plain text.';
+      ? s.targets.length > 1
+        ? mentioned
+        : 'Only this person is @mentioned; the backup is named in plain text.'
+      : `Chat @mention and Alerts Space are locked on. Owner by day (${hoursText}), the person on call otherwise. ${mentioned}`;
   }
   return phone ? null : 'Tier 2–3 outside response hours are held until the next opening.';
 }

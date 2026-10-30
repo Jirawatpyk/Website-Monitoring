@@ -71,7 +71,7 @@ export function EscalationView({
         : `PROBLEM · all ${candidates.length} site${candidates.length === 1 ? '' : 's'}`;
   const sub =
     view === 't1'
-      ? '24/7. The owner is @mentioned first.'
+      ? `24/7. Owner by day (${hoursLabel(data.hours)}), the person on call otherwise.`
       : view === 't23'
         ? `Posted at any hour; outside ${hoursLabel(data.hours)} the timers wait until the next opening. No CEO page.`
         : 'Tier 2–3 outside response hours are held until the next opening.';

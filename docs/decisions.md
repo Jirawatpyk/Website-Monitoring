@@ -95,7 +95,23 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
       - Their footer: "You got this because MuvMi’s escalation policy tells you at L0, together with the owner / on-call."
       - Later emails read "you were emailed about this incident".
       - Only the owner or the person on call is asked for the root cause.
-    - Swap, hand-over, rotation and day-before reminder texts come with PR B.
+    - **On-call messages (B2b).** Each event posts one line in the Alerts Space, in its subject's thread, @mentioning whoever it tells, and emails each person (one subject per mail thread so Gmail keeps it together — "DxT Monitor · On-call · Swap · Arm ↔ Nok · Mon 5 → 12 Oct", "… · Hand-over · Ploy → Arm · Fri 25 Sep 18:00", "… · Shift · Mon 19 → 26 Oct" — the headline in the body; button "Open On-call", or "Accept or decline" for the person asked). The Space is the whole team's, so **a reason is never in Chat**: the requester's reason, the answer and an Admin's note go only in the people's emails.
+
+      | Event | Chat line |
+      | --- | --- |
+      | swap requested | `<users/NOK> SWAP REQUEST · On-call · Arm asks Nok to swap weeks · Nok would take Mon 5 → 12 Oct · Arm would take Mon 19 → 26 Oct · accept or decline on On-call` |
+      | swap accepted | `<users/ARM> <users/TAO> SWAP ACCEPTED · On-call · Nok accepted Arm’s swap · waiting for an Admin to approve` |
+      | swap declined | `<users/ARM> SWAP DECLINED · On-call · Nok declined Arm’s swap · Arm keeps Mon 5 → 12 Oct` |
+      | swap withdrawn | `<users/NOK> SWAP WITHDRAWN · On-call · Arm withdrew the swap request · Nok keeps Mon 19 → 26 Oct` |
+      | swap approved | `<users/ARM> <users/NOK> SWAP APPROVED · On-call · approved by Tao · Nok takes … · Arm takes …` |
+      | swap declined by an Admin | `<users/ARM> <users/NOK> SWAP NOT APPROVED · On-call · declined by Tao · nothing changes in the rotation` |
+      | swap expired | `<users/ARM> <users/NOK> SWAP EXPIRED · On-call · Arm’s week started before it was approved · both weeks unchanged` |
+      | hand-over | `<users/ARM> <users/PLOY> SHIFT HANDED OVER · On-call · Arm covers Ploy from Fri 25 Sep 18:00 until Mon 28 Sep 09:00` |
+      | rotation change | `<users/…> ROTATION CHANGED · On-call · by Tao · next weeks: Nok from Mon 19 Oct, … · Ploy no longer in the rotation` (Chat only) |
+      | day-before reminder | `<users/NOK> ON CALL TOMORROW · On-call · Nok’s shift Mon 19 Oct 09:00 → Mon 26 Oct 09:00 · Tier 1 alerts outside response hours come to you` |
+      | test alert | ChatAlert row: `<users/PLOY> TEST — no action · alert test for Ploy’s phone`, with "Open test link on this phone" (Chat only) |
+
+      Email footers say why each person got it: Arm asked you to swap; you asked; you're an Admin and a swap needs an Admin to approve; your on-call week changed; you were part of the request; an on-call shift you hold changed hands; you're on call next.
 
 **Why.** G1's people steps don't block S10's code, and a second code reviewer doesn't exist. The drill proves the alert path end to end; staging has the same probes, engine and notifier as production.
 **Impact.** Plan: G1 (no CODEOWNERS, drill on staging), S10 status. S10 PR A (L2–L3) and PR B (on-call, the L0 pencil). Supersedes D-008's "second Admin reviews every PR" and D-035's "Tao seeds the fixtures" for S10.

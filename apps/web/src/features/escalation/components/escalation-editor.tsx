@@ -172,6 +172,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
                 policy={policy}
                 index={i}
                 admins={data.admins}
+                hoursText={hoursText}
                 onEdit={(index) => setEditing({ index, adding: false })}
                 onDelete={(index) => {
                   setSteps(policy.steps.filter((_s, j) => j !== index));

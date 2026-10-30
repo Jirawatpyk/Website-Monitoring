@@ -30,6 +30,7 @@ const READ_RPCS = new Set([
   'engine_window_reminders',
   'engine_silent_incidents',
   'oncall_extend_shifts',
+  'engine_oncall_reminders',
 ]);
 
 /** Rows every engine run reads, unless a test registers its own: the seeded response hours (D-034). */

@@ -2,6 +2,7 @@ import 'server-only';
 import type { Database, DbClient, Json } from '@dxt/db';
 import type { ResponseHours, Trigger } from '@dxt/shared';
 import { loadResponseHours } from '../escalation/response-hours';
+import type { OncallEventFacts } from './oncall-facts';
 
 export type Notification = Database['public']['Tables']['notifications']['Row'];
 
@@ -88,6 +89,8 @@ export interface Facts {
   recipients: Map<string, Recipient>;
   /** `incident:user` (or `window:user`) → the first email that person was really sent (the thread root). */
   firstEmail: Map<string, { id: string }>;
+  /** On-call events (S10 B2b), attached by the dispatcher. */
+  oncall?: Map<string, OncallEventFacts>;
 }
 
 /** Loads the incidents, system alerts and email recipients of a batch of claimed messages. */

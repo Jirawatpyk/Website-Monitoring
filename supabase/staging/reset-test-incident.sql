@@ -17,6 +17,13 @@ insert into public.audit_log (action, entity, entity_id, after)
 select 'incident.resolved', 'incident', id, jsonb_build_object('state', state, 'by', 'staging reset')
 from closed;
 
+-- Its messages still waiting go nowhere: a DOWN email held in its 5-min grace (D-047) would otherwise
+-- go out after the reset (S10 /verify, INC-0051).
+update public.notifications n
+  set status = 'cancelled', error = 'Staging reset', next_retry_at = null
+from public.incidents i join public.sites s on s.id = i.site_id
+where n.incident_id = i.id and s.name = 'Test target' and n.status = 'queued';
+
 update public.site_status st set status = 'ok', ok_rounds = 0, flips = '{}', flip_ok = null
 from public.sites s
 where s.id = st.site_id and s.name = 'Test target';
