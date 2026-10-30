@@ -107,8 +107,9 @@ describe('D-029 — TLS chain errors are a PROBLEM, not DOWN (decideSite)', () =
   });
 
   it('two real hard fails still make DOWN, whatever the third location saw', () => {
-    const t1 = check('SIN', 'fail', 2);
-    const t2 = check('TYO', 'fail', 3);
+    // 503s: a timeout alone would need a second round (D-049, timeout.test.ts).
+    const t1 = check('SIN', 'fail', 2, { statusCode: 503, error: null });
+    const t2 = check('TYO', 'fail', 3, { statusCode: 503, error: null });
     const rows = [chain('BKK', 1), t1, t2, recheck(t1, 32), recheck(t2, 33)];
     expect(decideSite(site([home(rows)]))).toMatchObject({ kind: 'open' });
   });
@@ -331,9 +332,10 @@ describe('D-029 with an open incident', () => {
     });
   });
 
-  it('an open TLS chain PROBLEM, then two real hard fails with rechecks → escalated to DOWN, starting at the first timeout', () => {
-    const sin = check('SIN', 'fail', 2);
-    const tyo = check('TYO', 'fail', 3);
+  it('an open TLS chain PROBLEM, then two real hard fails with rechecks → escalated to DOWN, starting at the first failure', () => {
+    // 503s: a timeout alone would need a second round (D-049, timeout.test.ts).
+    const sin = check('SIN', 'fail', 2, { statusCode: 503, error: null });
+    const tyo = check('TYO', 'fail', 3, { statusCode: 503, error: null });
     const rows = [chain('BKK', 1), sin, tyo, recheck(sin, 32), recheck(tyo, 33)];
     expect(decideSite(site([home(rows)], { open: incident('unacked', 'problem') }))).toMatchObject({
       kind: 'escalate',
