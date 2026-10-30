@@ -615,16 +615,14 @@ function EmptyRotation({ admin, onEdit }: { admin: boolean; onEdit: () => void }
   );
 }
 
-/** The rotation table (OnCall); the head is upper-case as drawn. */
 /**
  * The rotation table (OnCall); the head is upper-case as drawn. One column set at every width (D-048
- * 12.28): the alerts column is the one flexible column, so the spare goes there, not to the action
- * column. AURA counts a flexible column as 160 px in the row's minimum whatever its `minWidth` (its
- * FLEX_MIN), so the flexible one is the column whose minimum really is ~160. With it the row needs
- * 180 + 100 + 144 + 160 + 96 + 48 = 728 px: the table beside the swap card at 1440 is 740, or ~730 with a
- * classic (Windows) scrollbar, and the column must stay there. A narrower table (1280 beside the card,
- * 1024 below xl) drops that column instead of scrolling — AURA measures the table box itself, so nothing
- * here depends on the screen (e2e at 1440 / 1280 / 1100 / 1024).
+ * 12.28): "On call" is the one flexible column, so the spare goes to the names, not the action column
+ * (AURA ≥ 5.51 counts its `minWidth` in the row minimum, request 23). The row needs
+ * 180 + 88 + 144 + 174 + 96 + 48 = 730 px: the table beside the swap card at 1440 is 740, or ~730 with a
+ * classic (Windows) scrollbar, and the alerts column must stay there. A narrower table (1280 beside the
+ * card, 1024 below xl) drops that column instead of scrolling — AURA measures the table box itself, so
+ * nothing here depends on the screen (e2e at 1440 / 1280 / 1100 / 1024).
  */
 function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): DataTableColumn<RotationRow>[] {
   const cols: DataTableColumn<RotationRow>[] = [
@@ -638,18 +636,18 @@ function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): Da
     {
       key: 'who',
       label: 'On call',
-      // No avatar: at 100 px one cut every name to "Stagi…" (staging /verify). Names wrap; the phone's
-      // row cards and the hero keep their avatars.
-      width: 100,
+      // No avatar: beside the card this column is ~88–98 px, and one cut every name to "Stagi…" (staging
+      // /verify). Names wrap; the phone's row cards and the hero keep their avatars.
+      minWidth: 88,
       render: (r) => <span className={`break-words ${r.nobody ? 'text-fg-secondary' : ''}`}>{r.who}</span>,
     },
-    // 144 holds "Swap requested" (~125 px + padding).
+    // 144 holds "Swap requested" (~125 px + padding); the alerts head needs 174 to read whole.
     { key: 'status', label: 'Status', width: 144, render: (r) => <StateBadge b={r.status} /> },
     {
       key: 'alerts',
       label: 'Tier 1 alerts at night',
-      minWidth: 160,
-      hideBelow: 728,
+      width: 174,
+      hideBelow: 730,
       render: (r) => <span className="text-fg-secondary">{r.alerts}</span>,
     },
     {

@@ -73,7 +73,7 @@ test.describe('on-call (local Supabase)', () => {
     await expect(page.getByText('Approved — the weeks have swapped.').first()).toBeVisible();
     await expect(page.getByText(/^Swapped · /).first()).toBeVisible();
     // The table never scrolls sideways (D-048 12.28): from xl the swap card sits beside it, below xl
-    // under it, and a table narrower than the 728 px row drops its alerts column — 1440 beside the card
+    // under it, and a table narrower than the 730 px row drops its alerts column — 1440 beside the card
     // (740–750) and 1100 under it keep the column; 1280 beside it and 1024 under it drop it. A change to
     // AURA's table padding, its flexible-column minimum or the longest week fails here. AURA measures
     // the box with a ResizeObserver, so each width is polled.

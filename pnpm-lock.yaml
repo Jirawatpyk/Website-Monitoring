@@ -267,11 +267,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@jirawatpyk/aura-react':
-        specifier: ^5.41.0
-        version: 5.41.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: ^5.76.0
+        version: 5.76.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@jirawatpyk/aura-tokens':
-        specifier: ^5.41.0
-        version: 5.41.0
+        specifier: ^5.76.0
+        version: 5.76.0
       '@supabase/ssr':
         specifier: ^0.12.7
         version: 0.12.7(@supabase/supabase-js@2.117.2)
@@ -1114,8 +1114,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@jirawatpyk/aura-react@5.41.0':
-    resolution: {integrity: sha512-0wcF44HTAkiLMQIKSUHSCnPFLeqibzaRUgiifEHGhV2NYApZt3aZoPHabuNwl0bnQVoj/q3u/qtdp9cYvnDS7g==}
+  '@jirawatpyk/aura-react@5.76.0':
+    resolution: {integrity: sha512-ek73k/JwNG2Px5PTlpBjCgimxFPKRY3B0ityinWzPNFwS9YNiGyNxF2QY2lfuoiBtQBxCvrOo3ByS475Zyslpw==}
     hasBin: true
     peerDependencies:
       react: '>=18'
@@ -1123,6 +1123,9 @@ packages:
 
   '@jirawatpyk/aura-tokens@5.41.0':
     resolution: {integrity: sha512-YGLVRtjl+M+Nzmtaf60THaopaJZLCSF+ovtWk75ok5+olibdfPh8IyJLJu2S+z/vydd1Q2o4QCS9fBnJFT2X/g==}
+
+  '@jirawatpyk/aura-tokens@5.76.0':
+    resolution: {integrity: sha512-quQ8Z+t43Riaehx4Fx4Ai346GcVzRZ/1IoJNVW1kNbXD8fu+oORC9Ae+hXlsNGRcpCgp5A0Mb18lukHv+vs9Kg==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -3553,12 +3556,14 @@ snapshots:
   '@img/sharp-win32-x64@0.35.5':
     optional: true
 
-  '@jirawatpyk/aura-react@5.41.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@jirawatpyk/aura-react@5.76.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
   '@jirawatpyk/aura-tokens@5.41.0': {}
+
+  '@jirawatpyk/aura-tokens@5.76.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

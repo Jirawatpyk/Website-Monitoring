@@ -39,7 +39,7 @@ AURA is the only UI kit. Its full docs live in the [AURA design system](https://
 
 The canvas's orange note listed 14 issues. As of AURA 5.10 these are fixed (and since then a Tag's remove button is named from rich children, so `removeLabel` is no longer needed): StatusPill `warning` tone (5.1), Checkbox visible label (5.1, shown in 6.0), published `tokens.css`/`aura.css` with dark theme, README consuming section, fonts moved out of `bundle.css` (5.1), the six monitoring icons (5.1), SideNav top spacing and `bordered={false}` (5.1). Still check these before relying on them:
 
-1. DataTable columns with fixed widths can overflow narrow containers (~550 px) — give one column flex, or use `stackBelow` / `hideBelow`. A flexible column counts as 160 px in the row minimum whatever its `minWidth` (request 23, below): flex the one column whose minimum is ~160.
+1. DataTable columns with fixed widths can overflow narrow containers (~550 px) — give one column flex, or use `stackBelow` / `hideBelow`. Since 5.51 a flexible column's `minWidth` counts in the row minimum (request 23); on 5.41 it counted as 160 px whatever it said.
 2. Dialog initial focus lands on the close button — set focus to the first field or the title.
 3. SideNav item `badge` has no tone of its own — pass a `<Badge tone="danger">Fault</Badge>` element (documented in AURA); `count` stays neutral.
 4. Switch disabled + checked looks like off — for "always on" settings show Badge "Always on" instead (Security board does this).
@@ -48,18 +48,30 @@ Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build proj
 
 ## Requests to AURA
 
-Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). Requests 1–22 have shipped (5.32–5.41). Open: request 23 (30 Oct 2026).
+Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). Requests 1–23 have shipped (5.32–5.51); none open (30 Oct 2026).
 
 A new request goes in the doc (template at its foot) and here.
 
-Open (stand-in in DxT until AURA ships):
+AURA 5.76 (from 5.41, 30 Oct 2026; DxT took it in `chore/aura-5.76`):
 
-- **Request 23 — DataTable: a flexible column's `minWidth` is not counted in the row's minimum** (5.41.0, found in S10 B2c, 30 Oct 2026).
-  - The row minimum counts every flexible column as 160 px (`FLEX_MIN`). The cell, meanwhile, uses its own `minWidth`. So a narrow flexible column makes the table scroll sideways, and a wide one overflows the row. `hideBelow` is judged against that same wrong sum.
-  - **Stand-in:** make flexible only a column whose real minimum is about 160, and fix every other width.
-    - Example: the On-call rotation table (`features/oncall/components/oncall-page.tsx` `columns()`). "Tier 1 alerts at night" is flexible (`minWidth: 160`, `hideBelow: 728`); On call is fixed at 100 with no avatar (D-048 12.28). The e2e is `oncall.spec.ts` at 1440 / 1280 / 1100 / 1024.
-  - Don't use `minWidth` below or above 160 on a flexible column until this ships.
-  - Once shipped: On call flexes again, with its avatar, and alerts goes back to a fixed 174.
+- **Request 23** (found on 5.41 in S10 B2c): DataTable counted every flexible column as 160 px in the row minimum, whatever its `minWidth`. It was already fixed in 5.51, which counts the column's own `minWidth`. The stand-in (flexing only a ~160 px column) is gone.
+  - The On-call rotation table now flexes On call (`minWidth: 88`).
+  - Alerts is fixed at 174 with `hideBelow: 730`.
+  - Names still wrap with no avatar. Beside the swap card the column is only ~88–98 px, so an avatar would cut the names (D-048 12.28).
+- **5.75: status pills are soft in every tone** (`variant="solid"` for the one status that must catch the eye).
+  - DxT's site and incident statuses are Badges (unchanged).
+  - The only StatusPill is Site detail's check outcome: "Fail" is now soft red. Its board gives a tone only, so AURA's default is kept.
+- **5.75, dark theme:**
+  - the selected fill is a violet wash;
+  - the active SideNav item has a violet edge;
+  - the table header band is a step above the card.
+- **5.75:** plain links in a PageHeader, Popover or Drawer take the accent and an underline.
+- Nothing else in 5.42–5.76 needed a DxT change (`tsc`, 1232 web tests and the e2e on the local stack). New props to reach for later:
+  - DataTable `grow` and `keyboard="tab"`;
+  - `linkClass()`, `Spinner`, `CheckboxGroup`;
+  - PageHeader `actionsBar` / `actionsBarBelow`;
+  - `fullWidth="below-sm"`;
+  - `TableSkeleton`.
 
 AURA 5.32 (requests 1–4, 6 Oct 2026):
 
