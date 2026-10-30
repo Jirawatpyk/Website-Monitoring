@@ -49,9 +49,12 @@ export default async function OncallPage({
     role: profile.role === 'admin' ? 'admin' : profile.role === 'responder' ? 'responder' : 'readonly',
   };
   const data = await getOncallPage(viewer, idOf(params.swap));
+  // A test link goes to the page as given (capped): a cut-off token still reaches the confirm, which
+  // answers "expired" — dropping it here would leave the person with no word at all (code review).
+  const test = Array.isArray(params.test) ? params.test[0] : params.test;
   return (
     <Container>
-      <OncallPageView data={data} testToken={idOf(params.test)} />
+      <OncallPageView data={data} testToken={test ? test.slice(0, 64) : null} />
     </Container>
   );
 }

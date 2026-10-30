@@ -3,6 +3,7 @@ import {
   formatDay,
   formatDuration,
   formatIncidentId,
+  BANGKOK_OFFSET_MS,
   formatWhen,
   formatNameList,
   formatResponseHours,
@@ -36,6 +37,8 @@ export interface ShiftRow {
   endsAt: string;
   /** The person who had it before a hand-over (the live shift is split at the hand-over time). */
   handedOverFrom: string | null;
+  /** The rotation position the week was made for (null for the rest of a handed-over shift). */
+  slot?: number | null;
 }
 
 export type SwapStatus =
@@ -350,9 +353,10 @@ export interface WeekDay {
 
 /** Midnight in Bangkok of the Monday of `now`'s calendar week. */
 function mondayOf(now: Date): Date {
-  const local = new Date(now.getTime() + 7 * HOUR_MS);
+  const local = new Date(now.getTime() + BANGKOK_OFFSET_MS);
   const dow = local.getUTCDay() === 0 ? 7 : local.getUTCDay();
-  const midnight = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - 7 * HOUR_MS;
+  const midnight =
+    Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - BANGKOK_OFFSET_MS;
   return new Date(midnight - (dow - 1) * DAY_MS);
 }
 
@@ -941,8 +945,8 @@ export function swapChoices(d: OncallData, shiftId: string, now: Date): SwapChoi
 }
 
 /** The viewer's next week they may ask to swap (the phone's "Request swap"). */
-export function mySwappableShift(d: OncallData, now: Date): RotationRow | null {
-  return rotationRows(d, now).find((r) => r.action?.kind === 'swap') ?? null;
+export function mySwappableShift(rows: RotationRow[]): RotationRow | null {
+  return rows.find((r) => r.action?.kind === 'swap') ?? null;
 }
 
 // ── Edit rotation ─────────────────────────────────────────────────────────
@@ -960,12 +964,13 @@ export function rotationFrom(d: OncallData, now: Date): Date {
 export function rotationPreview(order: string[], d: OncallData, now: Date): string {
   if (order.length === 0) return 'Nobody yet — add someone';
   const from = rotationFrom(d, now);
-  // The slot after the last week's person, as oncall_extend_shifts continues.
-  const last = d.shifts.at(-1);
-  const at = last ? order.indexOf(last.userId) : -1;
+  // The slot after the last week's slot, as oncall_extend_shifts continues (from the top when there is
+  // none or the rotation shrank below it) — positions, not people, so a reorder moves who comes next.
+  const lastSlot = [...d.shifts].reverse().find((x) => x.slot != null)?.slot ?? 0;
+  const base = lastSlot > order.length ? 0 : lastSlot;
   return Array.from({ length: 4 }, (_, i) => {
     const w = new Date(from.getTime() + i * WEEK_MS);
-    const who = order[(at + 1 + i) % order.length]!;
+    const who = order[(base + i) % order.length]!;
     return `${formatDay(w)} ${nameOf(d, who)}`;
   }).join(' · ');
 }
@@ -1003,10 +1008,10 @@ export function handoverTimes(d: OncallData, shift: ShiftRow, now: Date): Handov
   if (inside && from.getTime() < end) {
     out.push({ value: 'tonight', label: `Tonight ${formatTime(from)}`, at: from });
   }
-  const local = new Date(now.getTime() + 7 * HOUR_MS);
+  const local = new Date(now.getTime() + BANGKOK_OFFSET_MS);
   const tomorrow = new Date(
     Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1) -
-      7 * HOUR_MS +
+      BANGKOK_OFFSET_MS +
       d.hours.startMin * 60_000,
   );
   if (tomorrow.getTime() < end) out.push({ value: 'tomorrow', label: dayTime(tomorrow), at: tomorrow });

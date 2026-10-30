@@ -82,7 +82,7 @@ export async function loadOncallData(
   const [shifts, rotation, people, checks, sites, hours] = await Promise.all([
     db
       .from('oncall_shifts')
-      .select('id, user_id, starts_at, ends_at, handed_over_from')
+      .select('id, user_id, starts_at, ends_at, handed_over_from, slot')
       .gt('ends_at', since)
       .order('starts_at')
       .limit(20),
@@ -101,6 +101,7 @@ export async function loadOncallData(
     startsAt: s.starts_at,
     endsAt: s.ends_at,
     handedOverFrom: s.handed_over_from,
+    slot: s.slot,
   }));
   const ids = shiftRows.map((s) => s.id);
   const oldest = shiftRows[0]?.startsAt ?? since;

@@ -152,7 +152,7 @@ describe('rotation rows (OnCall table, MOnCall row cards)', () => {
     const rows = rotationRows(one, NOW);
     expect(rows.filter((r) => !r.past && !r.live).every((r) => r.action?.kind === 'swap-off')).toBe(true);
     expect(rows[2]!.action).toEqual({ kind: 'swap-off', why: 'Nobody else in the rotation to swap with' });
-    expect(mySwappableShift(one, NOW)).toBeNull();
+    expect(mySwappableShift(rotationRows(one, NOW))).toBeNull();
   });
 
   it('starts with "No one on call" when no week covers now (§28.4 Nobody on call)', () => {
@@ -488,8 +488,8 @@ describe('request a swap', () => {
   });
 
   it('finds the viewer’s own next week for the phone button', () => {
-    expect(mySwappableShift(data('nok'), NOW)!.shiftId).toBe('nok28');
-    expect(mySwappableShift(data('tao'), NOW)).toBeNull();
+    expect(mySwappableShift(rotationRows(data('nok'), NOW))!.shiftId).toBe('nok28');
+    expect(mySwappableShift(rotationRows(data('tao'), NOW))).toBeNull();
   });
 });
 
@@ -503,6 +503,14 @@ describe('edit rotation', () => {
       '26 Oct Arm · 2 Nov Ploy · 9 Nov Nok · 16 Nov Arm',
     );
     expect(rotationPreview([], data('tao'), NOW)).toBe('Nobody yet — add someone');
+  });
+
+  it('continues from the last week’s slot after a reorder, as the SQL does (code review)', () => {
+    // Nok's week (slot 3) is the last one made; the new order is Nok, Arm, Ploy: slot 3 % 3 + 1 = 1 → Nok.
+    const slotted = data('tao', { shifts: SHIFTS.map((s, i) => ({ ...s, slot: (i % 3) + 1 })) });
+    expect(rotationPreview([ID.nok, ID.arm, ID.ploy], slotted, NOW)).toBe(
+      '26 Oct Nok · 2 Nov Arm · 9 Nov Ploy · 16 Nov Nok',
+    );
   });
 
   it('starts an empty rotation this week, from Monday 09:00', () => {

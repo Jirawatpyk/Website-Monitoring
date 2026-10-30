@@ -59,8 +59,12 @@ export function useSubmit(onDone: (r: Extract<OncallResult, { ok: true }>) => vo
         return;
       }
       onDone(r);
-      if (swapId) router.replace(`/oncall?swap=${swapId}`, { scroll: false });
-      router.refresh();
+      const target = swapId ? `/oncall?swap=${swapId}` : null;
+      if (target && `${window.location.pathname}${window.location.search}` !== target) {
+        router.replace(target, { scroll: false });
+      } else {
+        router.refresh();
+      }
     });
   return { error, pending, run };
 }
@@ -502,7 +506,7 @@ export function HandOverDialog({
             touchHeight
             label="Takes effect"
             options={times.map((t) => ({ value: t.value, label: t.label }))}
-            value={when}
+            value={at.value}
             onChange={(e) => setWhen(e.target.value)}
           />
         </div>

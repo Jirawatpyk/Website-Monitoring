@@ -87,7 +87,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
   const mine = inRotation ? readinessOf(data, data.viewer.id, now) : null;
   const foot = footOf(data, now);
   const one = onePerson(data);
-  const phoneSwap = mySwappableShift(data, now);
+  const phoneSwap = mySwappableShift(rows);
   const liveShift = data.shifts.find(
     (s) => Date.parse(s.startsAt) <= now.getTime() && now.getTime() < Date.parse(s.endsAt),
   );
@@ -212,6 +212,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
         <DesktopHero hero={hero} now={now} />
         {ready && !nobody && !empty ? (
           <PhoneCard
+            now={now}
             ready={ready}
             mine={ready.personId === data.viewer.id}
             handedFrom={
@@ -283,7 +284,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
         {(nobody || empty) && (
           <OwnersCard data={data} admin={admin} empty={empty} phone onEdit={() => show({ kind: 'edit' })} />
         )}
-        {mine && !nobody && !empty && <Checklist ready={mine} data={data} />}
+        {mine && !nobody && !empty && <Checklist ready={mine} data={data} now={now} />}
         <PhoneRotation
           rows={rows}
           admin={admin}
@@ -395,9 +396,11 @@ function PhoneCard({
   ready,
   mine,
   handedFrom,
+  now,
 }: {
   ready: Readiness;
   mine: boolean;
+  now: Date;
   handedFrom: { name: string; at: string } | null;
 }) {
   const sub =
@@ -429,16 +432,31 @@ function PhoneCard({
             </div>
           ))}
         </div>
-        {mine && <SendTest size="sm" />}
+        {mine && <SendTest size="sm" sentAt={ready.sent} now={now} />}
       </div>
     </Card>
   );
 }
 
-function SendTest({ size, full }: { size?: 'sm'; full?: boolean }) {
+/**
+ * "Send test alert to me". Off for a minute after a send (the SQL's limit), then on again — a test that
+ * reached the wrong phone is sent again from here (§27.8).
+ */
+function SendTest({
+  size,
+  full,
+  sentAt,
+  now,
+}: {
+  size?: 'sm';
+  full?: boolean;
+  sentAt: Date | null;
+  now: Date;
+}) {
   const [sent, setSent] = useState<string | null>(null);
   const { error, pending, run } = useSubmit((r) => setSent(r.at ?? null));
-  const at = sent ? new Date(sent) : null;
+  const last = sent ? new Date(sent) : sentAt;
+  const at = last && now.getTime() - last.getTime() < 60_000 ? last : null;
   return (
     <div className="flex flex-col gap-2">
       <Button
@@ -871,7 +889,7 @@ function PhoneSwapCard({ view, want, claim, onDecline }: CardProps) {
 // ── Phone parts ───────────────────────────────────────────────────────────
 
 /** MOnCall "Before your shift": two ticks the person sets, the test alert that ticks itself (§10, §27.8). */
-function Checklist({ ready, data }: { ready: Readiness; data: OncallData }) {
+function Checklist({ ready, data, now }: { ready: Readiness; data: OncallData; now: Date }) {
   const c = data.checklists[data.viewer.id];
   const [mentions, setMentions] = useState(!!c?.mentionsOnly);
   const [dnd, setDnd] = useState(!!c?.dndAllowed);
@@ -946,7 +964,7 @@ function Checklist({ ready, data }: { ready: Readiness; data: OncallData }) {
           </span>
         </div>
       ) : (
-        !ready.received && <SendTest full />
+        !ready.received && <SendTest full sentAt={ready.sent} now={now} />
       )}
       <Refusal error={error} />
       <span className="text-xs leading-snug text-fg-secondary">
