@@ -71,6 +71,7 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     detectSeconds: 30,
     durationMinutes: 8,
     owner: 'Tao',
+    youOwn: true,
     backup: 'Nok',
     am: null,
     paged: null,

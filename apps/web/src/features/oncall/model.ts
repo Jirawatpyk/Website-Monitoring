@@ -699,7 +699,8 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
     accepted: `Waiting for ${adminWord(d)}`,
     declined: `Declined by ${A}`,
     approved: 'Approved',
-    admin_declined: `Declined by ${w.decidedBy ? nameOf(d, w.decidedBy) : adminWord(d)}`,
+    // "Declined" as drawn (OnCall side card): the status line says who.
+    admin_declined: 'Declined',
     withdrawn: 'Withdrawn',
     expired: 'Expired',
   };
@@ -895,11 +896,23 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
     canApprove: w.status === 'accepted',
     canWithdraw: part === 'requester' && open,
     line,
-    declineTitle: part === 'asked' ? `Decline ${R}’s swap?` : `Decline ${R}’s swap with ${A}?`,
-    declineText:
-      part === 'asked'
-        ? `${R} keeps ${rqW} and you keep ${cpW}. ${R} gets a Chat message and an email.`
-        : `${R} keeps ${rqW} and ${A} keeps ${cpW}. ${R} and ${A} get a Chat message, and an email with your reason.`,
+    // The words follow the action: the person asked answering a waiting request, else an Admin's
+    // decline (§28.2, 12.20) — the only Admin may be one of the two (12.17).
+    ...(part === 'asked' && w.status === 'waiting'
+      ? {
+          declineTitle: `Decline ${R}’s swap?`,
+          declineText: `${R} keeps ${rqW} and you keep ${cpW}. ${R} gets a Chat message and an email.`,
+        }
+      : (() => {
+          const r = part === 'requester' ? 'you' : R;
+          const a = part === 'asked' ? 'you' : A;
+          const keeps = (who: string) => (who === 'you' ? 'keep' : 'keeps');
+          return {
+            declineTitle:
+              part === 'requester' ? `Decline your swap with ${A}?` : `Decline ${R}’s swap with ${a}?`,
+            declineText: `${part === 'requester' ? 'You' : R} ${keeps(r)} ${rqW} and ${a} ${keeps(a)} ${cpW}. ${part === 'requester' ? 'You' : R} and ${a} get a Chat message, and an email with your reason.`,
+          };
+        })()),
   };
 }
 
@@ -1115,7 +1128,14 @@ export function oncallCardOf(d: Pick<OncallData, 'shifts' | 'names' | 'hours'>, 
   const next = groupsOf(data).find((g) => g.start.getTime() > now.getTime());
   if (next) {
     const who = nameOf(data, next.first.userId);
-    lines.push({ who, text: `${who} · next week`, when: `from ${day(next.start)}` });
+    // Monday before 09:00 the next week starts today; a rotation that starts later isn't "next week".
+    const today = day(next.start) === day(now);
+    const soon = next.start.getTime() - now.getTime() <= 7 * 24 * 3_600_000;
+    lines.push({
+      who,
+      text: `${who} · ${soon ? 'next week' : 'first week'}`,
+      when: today ? `from today ${formatTime(next.start)}` : `from ${day(next.start)}`,
+    });
   }
   const open = formatResponseHours(d.hours);
   return {

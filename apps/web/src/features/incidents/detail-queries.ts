@@ -86,6 +86,8 @@ export interface IncidentDetail {
   detectSeconds: number;
   durationMinutes: number;
   owner: string | null;
+  /** The viewer is the site's owner (by id: two people may share a display name). */
+  youOwn: boolean;
   backup: string | null;
   am: string | null;
   /**
@@ -416,6 +418,7 @@ export async function loadIncident(
         now,
       ),
     owner: i.sites.primary_owner_id ? nameOf(i.sites.primary_owner_id) : null,
+    youOwn: !!i.sites.primary_owner_id && i.sites.primary_owner_id === viewer.id,
     backup: i.sites.backup_owner_id ? nameOf(i.sites.backup_owner_id) : null,
     am: am ? nameOf(am) : null,
     paged:

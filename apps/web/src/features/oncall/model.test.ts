@@ -638,6 +638,12 @@ describe('footers and the Overview card', () => {
       text: 'Nobody on call',
       when: 'Site owners at night',
     });
+    // Mon 28 Sep 08:00 Bangkok: the next week starts today; weeks away it is the first week.
+    const monday = new Date('2026-09-28T01:00:00Z');
+    expect(oncallCardOf(data('tao'), monday).lines.at(-1)).toMatchObject({ when: 'from today 09:00' });
+    expect(oncallCardOf(data('tao'), new Date('2026-09-01T03:00:00Z')).lines.at(-1)?.text).toMatch(
+      / · first week$/,
+    );
   });
 
   it('writes times within a week by weekday, older ones by date', () => {

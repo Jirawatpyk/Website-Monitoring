@@ -624,7 +624,8 @@ function columns(
     {
       key: 'shift',
       label: 'Shift',
-      width: 180,
+      // The board's 190 holds "Mon 18 May → Mon 25 May"; beside the swap card 180 keeps the table in.
+      width: beside ? 180 : 190,
       render: (r) => (
         <span className={`whitespace-nowrap tabular-nums ${r.past ? 'text-fg-secondary' : ''}`}>
           {r.range}
@@ -993,6 +994,8 @@ function Checklist({ ready, data, now }: { ready: Readiness; data: OncallData; n
             <IconExternalLink size="sm" />
             Open the link in that Chat message on this phone.
           </span>
+          {/* No dead end (§14.16): a link that expired or reached another phone is sent again here. */}
+          <SendTest size="sm" sentAt={ready.sent} now={now} />
         </div>
       ) : (
         !ready.received && <SendTest full sentAt={ready.sent} now={now} />
