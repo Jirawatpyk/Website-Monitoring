@@ -126,11 +126,41 @@ describe('OncallPageView', () => {
 
   it('lets the person asked accept, and keeps the page on that request (§27.3)', async () => {
     const user = userEvent.setup();
-    render(<OncallPageView data={withSwap('nok', 'waiting')} testToken={null} />);
+    const { rerender } = render(<OncallPageView data={withSwap('nok', 'waiting')} testToken={null} />);
     expect(screen.getAllByText('Arm asks you to swap weeks')[0]).toBeInTheDocument();
     await user.click(visible('Accept'));
     await waitFor(() => expect(actions.respondSwap).toHaveBeenCalledWith({ swapId: 'w1', accept: true }));
     expect(router.replace).toHaveBeenCalledWith('/oncall?swap=w1', { scroll: false });
+    // The refresh brings the accepted request: Accept is gone, focus is on what it says now.
+    rerender(<OncallPageView data={withSwap('nok', 'accepted')} testToken={null} />);
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toContain('Accepted · waiting for an Admin to approve'),
+    );
+  });
+
+  it('puts focus on the closed request after an Admin declines it', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<OncallPageView data={withSwap('tao', 'accepted')} testToken={null} />);
+    await user.click(visible('Decline'));
+    const dialog = await screen.findByRole('dialog', { name: 'Decline Arm’s swap with Nok?' });
+    await user.click(within(dialog).getByLabelText(/Reason/));
+    await user.paste('Two weeks in a row');
+    await user.click(within(dialog).getByRole('button', { name: 'Decline swap' }));
+    await waitFor(() => expect(actions.decideSwap).toHaveBeenCalled());
+    const declined: SwapRow = {
+      ...swap('admin_declined'),
+      decidedBy: 'tao',
+      decidedAt: '2026-09-25T03:08:00Z',
+    };
+    rerender(
+      <OncallPageView
+        data={data('tao', { swaps: [declined], focus: { swap: declined, notes: null } })}
+        testToken={null}
+      />,
+    );
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toContain('This request is closed — You declined'),
+    );
   });
 
   it('keeps Approve off until the person asked accepts (§27.6)', async () => {

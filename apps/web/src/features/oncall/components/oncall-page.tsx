@@ -23,7 +23,7 @@ import {
   IconUsers,
 } from '@jirawatpyk/aura-react/icons';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useNow } from '@/components/use-now';
 import { confirmTest, decideSwap, respondSwap, sendTest, setChecklist, withdrawSwap } from '../actions';
 import {
@@ -101,6 +101,20 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
   };
   const close = () => setOpen((o) => (o ? { ...o, shown: false } : o));
   const [handed, setHanded] = useState<HandedOver | null>(null);
+  // After a swap step or a hand-over the button pressed is gone: focus goes to what replaced it.
+  const statusFocus = useRef(false);
+  const wantStatusFocus = () => {
+    statusFocus.current = true;
+  };
+  const claimStatusFocus = useCallback((el: HTMLElement) => {
+    if (!statusFocus.current) return;
+    el.focus();
+    if (document.activeElement === el) statusFocus.current = false;
+  }, []);
+  const handedBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (handed) handedBox.current?.focus();
+  }, [handed]);
   const [test, setTest] = useState<TestResult>(null);
 
   // The test link (§27.8): confirmed by an explicit call once the page is up, never while it renders
@@ -172,15 +186,26 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
         </Alert>
       )}
       {handed && (
-        <Alert tone="success" title={handed.title} role="status" onDismiss={() => setHanded(null)}>
-          {`${handed.from} and ${handed.to} got a Chat message. Logged in the audit log.`}
-        </Alert>
+        <div
+          ref={handedBox}
+          tabIndex={-1}
+          className="rounded-aura-md focus-visible:outline-2 focus-visible:outline-focus-ring"
+        >
+          <Alert tone="success" title={handed.title} role="status" onDismiss={() => setHanded(null)}>
+            {`${handed.from} and ${handed.to} got a Chat message. Logged in the audit log.`}
+          </Alert>
+        </div>
       )}
 
       {/* ── Desktop (OnCall) ── */}
       {view?.part === 'asked' && (
         <div className="max-lg:hidden">
-          <RequestCard view={view} onDecline={() => show({ kind: 'decline', phone: false })} />
+          <RequestCard
+            view={view}
+            want={wantStatusFocus}
+            claim={claimStatusFocus}
+            onDecline={() => show({ kind: 'decline', phone: false })}
+          />
         </div>
       )}
       <div className="grid grid-cols-3 gap-4 max-lg:hidden">
@@ -230,14 +255,26 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
             )}
           </section>
           {view && view.part !== 'asked' && (
-            <SideCard view={view} onDecline={() => show({ kind: 'decline', phone: false })} />
+            <SideCard
+              view={view}
+              want={wantStatusFocus}
+              claim={claimStatusFocus}
+              onDecline={() => show({ kind: 'decline', phone: false })}
+            />
           )}
         </div>
       </div>
 
       {/* ── Phone (MOnCall) ── */}
       <div className="flex flex-col gap-3 lg:hidden">
-        {view && <PhoneSwapCard view={view} onDecline={() => show({ kind: 'decline', phone: true })} />}
+        {view && (
+          <PhoneSwapCard
+            view={view}
+            want={wantStatusFocus}
+            claim={claimStatusFocus}
+            onDecline={() => show({ kind: 'decline', phone: true })}
+          />
+        )}
         <div className="flex flex-col gap-1.5 rounded-aura-card bg-bg-surface-strong px-4.5 py-3.5 text-fg-inverted">
           <span className="font-mono text-xs opacity-70">{hero.phoneEyebrow}</span>
           <span className="font-display text-2xl leading-tight font-semibold">{hero.phoneTitle}</span>
@@ -272,7 +309,14 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
         />
       )}
       {open?.kind === 'decline' && view && (
-        <DeclineDialog key={`d${n}`} open={open.shown} onClose={close} phone={open.phone} view={view} />
+        <DeclineDialog
+          key={`d${n}`}
+          open={open.shown}
+          onClose={close}
+          onDone={wantStatusFocus}
+          phone={open.phone}
+          view={view}
+        />
       )}
       {open?.kind === 'edit' && (
         <EditRotationDialog key={`e${n}`} open={open.shown} onClose={close} data={data} now={now} />
@@ -615,11 +659,19 @@ function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): Da
 
 // ── Swap cards ────────────────────────────────────────────────────────────
 
+interface CardProps {
+  view: SwapView;
+  /** After an action here focus moves to the refreshed status line: ask for it, and let the line claim it. */
+  want: () => void;
+  claim: (el: HTMLElement) => void;
+  onDecline: () => void;
+}
+
 /** Answer / approve / withdraw, shared by the desktop and phone cards. */
-function useSwapActions(view: SwapView) {
-  const accept = useSubmit(() => {}, view.id);
-  const approve = useSubmit(() => {}, view.id);
-  const withdraw = useSubmit(() => {}, view.id);
+function useSwapActions(view: SwapView, done: () => void) {
+  const accept = useSubmit(done, view.id);
+  const approve = useSubmit(done, view.id);
+  const withdraw = useSubmit(done, view.id);
   return {
     accept: () => accept.run(() => respondSwap({ swapId: view.id, accept: true })),
     approve: () => approve.run(() => decideSwap({ swapId: view.id, approve: true })),
@@ -630,8 +682,8 @@ function useSwapActions(view: SwapView) {
 }
 
 /** OnCall request card for the person asked (§27.3), above the hero. */
-function RequestCard({ view, onDecline }: { view: SwapView; onDecline: () => void }) {
-  const a = useSwapActions(view);
+function RequestCard({ view, want, claim, onDecline }: CardProps) {
+  const a = useSwapActions(view, want);
   return (
     <Card>
       <section aria-labelledby="oc-request" className="flex flex-col gap-3.5">
@@ -671,7 +723,7 @@ function RequestCard({ view, onDecline }: { view: SwapView; onDecline: () => voi
             <span className="text-xs leading-normal text-fg-secondary">{view.hint}</span>
           </div>
         )}
-        {view.line && <StatusLine line={view.line} />}
+        {view.line && <StatusLine line={view.line} claimFocus={claim} />}
         <Refusal error={a.error} />
       </section>
     </Card>
@@ -679,8 +731,8 @@ function RequestCard({ view, onDecline }: { view: SwapView; onDecline: () => voi
 }
 
 /** OnCall side card for the requester (Withdraw) and Admins (Approve / Decline). */
-function SideCard({ view, onDecline }: { view: SwapView; onDecline: () => void }) {
-  const a = useSwapActions(view);
+function SideCard({ view, want, claim, onDecline }: CardProps) {
+  const a = useSwapActions(view, want);
   return (
     <Card>
       <div className="flex flex-col gap-3">
@@ -726,7 +778,7 @@ function SideCard({ view, onDecline }: { view: SwapView; onDecline: () => void }
             <span className="text-xs leading-normal text-fg-secondary">{view.hint}</span>
           </div>
         )}
-        {view.line && <StatusLine line={view.line} />}
+        {view.line && <StatusLine line={view.line} claimFocus={claim} />}
         <Refusal error={a.error} />
       </div>
     </Card>
@@ -734,8 +786,8 @@ function SideCard({ view, onDecline }: { view: SwapView; onDecline: () => void }
 }
 
 /** MOnCall swap card: one shape for the person asked, the requester and an Admin (§27.3, §28.1–2). */
-function PhoneSwapCard({ view, onDecline }: { view: SwapView; onDecline: () => void }) {
-  const a = useSwapActions(view);
+function PhoneSwapCard({ view, want, claim, onDecline }: CardProps) {
+  const a = useSwapActions(view, want);
   return (
     <section
       aria-label={view.title}
@@ -810,7 +862,7 @@ function PhoneSwapCard({ view, onDecline }: { view: SwapView; onDecline: () => v
             : view.hint}
         </span>
       )}
-      {view.line && <StatusLine line={view.line} />}
+      {view.line && <StatusLine line={view.line} claimFocus={claim} />}
       <Refusal error={a.error} />
     </section>
   );

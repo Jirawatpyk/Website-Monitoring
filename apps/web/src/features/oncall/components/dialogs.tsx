@@ -113,11 +113,20 @@ interface Base {
  * Decline a swap (§27.4): the person asked may give a reason ("Optional. Arm sees it."); an Admin must
  * ("Say why — Arm and Nok see this").
  */
-export function DeclineDialog({ view, open, onClose, phone }: Base & { view: SwapView }) {
+export function DeclineDialog({
+  view,
+  open,
+  onClose,
+  onDone,
+  phone,
+}: Base & { view: SwapView; onDone?: () => void }) {
   const admin = view.part !== 'asked';
   const [note, setNote] = useState('');
   const [tried, setTried] = useState(false);
-  const { error, pending, run } = useSubmit(onClose, view.id);
+  const { error, pending, run } = useSubmit(() => {
+    onDone?.();
+    onClose();
+  }, view.id);
   const missing = admin && !note.trim();
   const submit = () => {
     if (missing) {

@@ -129,7 +129,15 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
     13. **The handed-over hero follows each board at its width** (desktop "ON CALL TONIGHT · COVERING PLOY", phone "ON CALL TONIGHT · ARM, COVERING PLOY") — layout, not behaviour.
     14. **The checklist "Before your shift" shows to everyone in the rotation**, not only the person on call now — they prepare before their week.
     15. **The test link is confirmed by the page once it has loaded**, never while it renders (a prefetch would use it up), and the token leaves the address bar after.
-    16. **After a swap step the page stays on that request** (`?swap=`), so its card shows the closed state instead of disappearing.
+    16. **After a swap step the page stays on that request** (`?swap=`), so its card shows the closed state instead of disappearing; focus moves to its new status line.
+    17. **The requester never approves their own request**, unless they are the only active Admin (as #143 asks them to). The page enforces it; the SQL still lets any Admin decide.
+    18. **Swap times follow §13's `formatWhen`** ("today 10:08", "yesterday 16:40", "Mon 14 Sep 21:18"), not the board's "Fri 10:08". Spec over board on formats.
+    19. **The requester sees the back-to-back warning too** (OnCall side card), as the swap dialog promises: "Nok and the Admin see this warning too".
+    20. **An Admin's decline reason goes by email, not Chat** (item 11). The decline dialog reads "… get a Chat message, and an email with your reason."
+    21. **The test link is opened from the Chat message**, so the checklist says "Open the link in that Chat message on this phone." instead of the board's button (its mock trigger). An expired link reads "This test link has expired — send a new test alert." with "Send a new test alert from your checklist."
+    22. **Hand over at 390 is the AURA Dialog** (a bottom sheet on phones), as Maintenance's phone sheet; there is no full-height sheet component.
+    23. **The phone rotation keeps the last done week**, as on desktop. Both rows of an open request say what it waits for, per §27.7.
+    24. **Deferred to the slice that builds the Incident page's Escalation card:** §28.6's L0 / L1 ledger lines, the ESCALATION key-fact ("L1 · Tao") and Tao's role line "You're L1 at 03:55 if nobody acknowledges". S10 ships the PAGED · ON CALL cell, the line under the cause, the phone's "Paged · on call" row and its role line. The Chat and email side of §28.6 shipped in B1b.
 
 **Why.** G1's people steps don't block S10's code, and a second code reviewer doesn't exist. The drill proves the alert path end to end; staging has the same probes, engine and notifier as production.
 **Impact.** Plan: G1 (no CODEOWNERS, drill on staging), S10 status. S10 PR A (L2–L3) and PR B (on-call, the L0 pencil). Supersedes D-008's "second Admin reviews every PR" and D-035's "Tao seeds the fixtures" for S10.

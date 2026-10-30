@@ -1,4 +1,5 @@
 import { Avatar, Badge } from '@jirawatpyk/aura-react';
+import { useEffect, useRef } from 'react';
 import {
   IconArrowRight,
   IconArrowUpDown,
@@ -64,7 +65,21 @@ export function PeopleList({ people }: { people: PersonState[] }) {
 }
 
 /** A closed request's status line (or Accepted, for the person asked). */
-export function StatusLine({ line }: { line: NonNullable<SwapView['line']> }) {
+export function StatusLine({
+  line,
+  claimFocus,
+}: {
+  line: NonNullable<SwapView['line']>;
+  /**
+   * After an action on this request the buttons it came from are gone: the page focuses this line once
+   * the refreshed one is in (a hidden twin — desktop or phone — can't take focus, so the visible one does).
+   */
+  claimFocus?: (el: HTMLElement) => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (box.current) claimFocus?.(box.current);
+  }, [line.text, claimFocus]);
   const icon = {
     check: <IconCheck size="sm" />,
     'circle-check': <IconCircleCheck size="sm" />,
@@ -73,8 +88,10 @@ export function StatusLine({ line }: { line: NonNullable<SwapView['line']> }) {
   }[line.icon];
   return (
     <div
+      ref={box}
       role="status"
-      className="flex items-start gap-2 rounded-aura-md border border-border-default px-3 py-2.5 leading-snug"
+      tabIndex={-1}
+      className="flex items-start gap-2 rounded-aura-md border border-border-default px-3 py-2.5 leading-snug focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
     >
       <span className={`flex pt-0.5 ${line.positive ? 'text-fg-positive' : 'text-fg-secondary'}`}>
         {icon}
