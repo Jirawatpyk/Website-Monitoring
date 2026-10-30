@@ -1017,9 +1017,10 @@ function PhoneRotation({
   return (
     // No overflow-hidden: it would clip the buttons' focus rings (layout-consistency).
     <div className="rounded-aura-lg border border-border-default bg-bg-surface">
-      <div className="flex min-h-11 items-center justify-between border-b border-border-subtle py-0 pr-1 pl-4">
+      {/* Padding all round: the 44 px buttons' hover fill must not touch the card's edge. */}
+      <div className="flex items-center justify-between gap-2 border-b border-border-subtle py-1.5 pr-2 pl-4">
         <h2 className="m-0 font-mono text-xs font-normal text-fg-tertiary">ROTATION</h2>
-        <span className="flex flex-wrap justify-end">
+        <span className="flex flex-wrap justify-end gap-1">
           {canRequest && (
             <Button
               variant="ghost"
