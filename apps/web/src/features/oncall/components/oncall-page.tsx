@@ -622,8 +622,10 @@ function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): Da
     {
       key: 'who',
       label: 'On call',
-      // A name and an avatar: narrow, so the table fits beside the swap card at 1440 (OnCall).
-      width: 100,
+      // The one flexible column: it takes the spare width when the table runs full width and
+      // shrinks to 100 beside the swap card at 1440 (OnCall). A fixed width here left the spare
+      // to the action column and cut the names short (staging /verify).
+      minWidth: 100,
       render: (r) => (
         <span className="flex items-center gap-2.5">
           {r.nobody ? (
