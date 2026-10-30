@@ -9,6 +9,7 @@ import {
   Checkbox,
   DataTable,
   PageHeader,
+  useBreakpoint,
   type DataTableColumn,
 } from '@jirawatpyk/aura-react';
 import {
@@ -78,6 +79,9 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
   const rows = rotationRows(data, now);
   const hero = heroOf(data, now);
   const view = swapViewOf(data, now);
+  // The requester's and an Admin's side card (the person asked gets the request card above the hero).
+  const side = !!view && view.part !== 'asked';
+  const wide = useBreakpoint() === 'xl';
   const empty = rows.length === 0;
   const nobody = rows[0]?.nobody === true;
   // The person the hero names: whoever covers once owners stop responding.
@@ -238,10 +242,10 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
       <WeekCard data={data} now={now} />
       <div className="flex flex-col gap-4 max-lg:hidden">
         <h2 className="m-0 text-2xl font-semibold">Rotation</h2>
-        <div className="grid grid-cols-3 items-start gap-4">
-          <section
-            className={`flex min-w-0 flex-col gap-3 ${view && view.part !== 'asked' ? 'col-span-2' : 'col-span-3'}`}
-          >
+        {/* The swap card sits beside the table from xl, as drawn at 1440; below that it goes under the
+            table, as Maintenance's fixed columns do (D-036): beside it, the table would scroll at 1024–1400. */}
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+          <section className={`flex min-w-0 flex-col gap-3 ${side ? 'xl:col-span-2' : 'xl:col-span-3'}`}>
             {empty ? (
               <EmptyRotation admin={admin} onEdit={() => show({ kind: 'edit' })} />
             ) : (
@@ -251,7 +255,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
                 columns={columns(
                   (row) => show({ kind: 'swap', row, phone: false }),
                   () => show({ kind: 'handover', phone: false }),
-                  !!view && view.part !== 'asked',
+                  side && wide,
                 )}
                 rows={rows}
                 rowHeight="auto"
@@ -263,7 +267,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
               </span>
             )}
           </section>
-          {view && view.part !== 'asked' && (
+          {side && view && (
             <SideCard
               view={view}
               want={wantStatusFocus}
@@ -665,7 +669,9 @@ function columns(
     {
       key: 'alerts',
       label: 'Tier 1 alerts at night',
-      ...(beside ? { width: 174 } : { minWidth: 160 }),
+      // 740 is what the row needs with this column: narrower beside the card (1280, or 1440 less a
+      // scrollbar) it drops out instead of making the table scroll (e2e at 1440 / 1280 / 1100).
+      ...(beside ? { width: 174, hideBelow: 740 } : { minWidth: 160 }),
       render: (r) => <span className="text-fg-secondary">{r.alerts}</span>,
     },
     {
@@ -1002,7 +1008,7 @@ function Checklist({ ready, data, now }: { ready: Readiness; data: OncallData; n
             Open the link in that Chat message on this phone.
           </span>
           {/* No dead end (§14.16): a link that expired or reached another phone is sent again here. */}
-          <SendTest size="sm" sentAt={ready.sent} now={now} />
+          <SendTest full sentAt={ready.sent} now={now} />
         </div>
       ) : (
         !ready.received && <SendTest full sentAt={ready.sent} now={now} />

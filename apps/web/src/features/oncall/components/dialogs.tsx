@@ -170,13 +170,11 @@ export function DeclineDialog({
           required={admin}
           optional={!admin}
           rows={2}
-          placeholder={
-            admin ? 'e.g. that would be two weeks in a row for one person' : 'e.g. I’m away that week'
-          }
+          placeholder={admin ? view.declineExample : 'e.g. I’m away that week'}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           hint={admin ? undefined : `Optional. ${view.requester} sees it.`}
-          error={tried && missing ? 'Say why — both people in the swap see this' : undefined}
+          error={tried && missing ? view.declineWhy : undefined}
         />
         <Refusal error={error} />
       </div>

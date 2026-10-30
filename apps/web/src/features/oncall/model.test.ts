@@ -472,6 +472,15 @@ describe('the swap card (§27.3–6, §28.1–2, §28.5)', () => {
     // Before accepting, they answer as the person asked: no second Decline / Approve beside it.
     const waiting = swapViewOf(withSwap('tao', { ...onlyAdminAsked, status: 'waiting' }), NOW)!;
     expect(waiting).toMatchObject({ canAnswer: true, canDecide: false });
+    // The decline words follow the seat (§28.2, 12.27): the asked Admin, the requesting Admin, any Admin.
+    expect(v).toMatchObject({
+      declineTitle: 'Decline Arm’s swap?',
+      declineWhy: 'Say why — Arm sees this',
+      declineExample: 'e.g. I’d be on call two weeks in a row',
+    });
+    const ownAccepted = swapViewOf(withSwap('tao', { ...swap('accepted'), requesterId: ID.tao }), NOW)!;
+    expect(ownAccepted.declineTitle).toMatch(/^Decline your swap with /);
+    expect(ownAccepted.declineWhy).toMatch(/^Say why — \S+ sees this$/);
     // The requester who is the only Admin withdraws while it waits, and decides once accepted.
     const own = { ...swap('waiting'), requesterId: ID.tao };
     expect(swapViewOf(withSwap('tao', own), NOW)).toMatchObject({ canWithdraw: true, canDecide: false });

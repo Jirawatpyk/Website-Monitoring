@@ -179,7 +179,7 @@ describe('OncallPageView', () => {
     await user.click(visible('Decline'));
     const dialog = await screen.findByRole('dialog', { name: 'Decline Arm’s swap with Nok?' });
     await user.click(within(dialog).getByRole('button', { name: 'Decline swap' }));
-    expect(within(dialog).getByText('Say why — both people in the swap see this')).toBeInTheDocument();
+    expect(within(dialog).getByText('Say why — Arm and Nok see this')).toBeInTheDocument();
     expect(actions.decideSwap).not.toHaveBeenCalled();
     await user.click(within(dialog).getByLabelText(/Reason/));
     await user.paste('Nok would be on call two weeks in a row');

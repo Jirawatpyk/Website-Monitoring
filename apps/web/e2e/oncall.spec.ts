@@ -74,12 +74,17 @@ test.describe('on-call (local Supabase)', () => {
     await expect(page.getByText(/^Swapped · /).first()).toBeVisible();
     // The column widths are tuned so the table fits beside the swap card at 1440 (OnCall): it never
     // scrolls sideways there — a change to AURA's table padding or the longest week fails here.
-    await page.setViewportSize({ width: 1440, height: 1000 });
-    const fits = await page
-      .locator('.aura-table__scroll')
-      .first()
-      .evaluate((e) => e.scrollWidth <= e.clientWidth);
-    expect(fits, 'the rotation table fits beside the swap card at 1440').toBe(true);
+    // From xl the card sits beside the table and the alerts column drops out when the table is under
+    // 740 px (1280); below xl the card goes under the table. The widths switch after a re-render, so poll.
+    const scroll = page.locator('.aura-table__scroll').first();
+    for (const width of [1440, 1280, 1100]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await expect
+        .poll(() => scroll.evaluate((e) => [e.scrollWidth, e.clientWidth].join(' / ')), {
+          message: `the rotation table fits at ${width}, with the swap card`,
+        })
+        .toMatch(/^(\d+) \/ \1$/);
+    }
   });
 
   test('a one-person rotation turns Swap off with its reason, on a phone too (§28.4)', async ({

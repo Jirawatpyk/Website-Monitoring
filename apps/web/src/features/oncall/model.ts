@@ -619,6 +619,9 @@ export interface SwapView {
   /** The dialogs' words. */
   declineTitle: string;
   declineText: string;
+  /** An Admin's decline: the required reason's example and its error, naming who sees it (§28.2). */
+  declineExample: string;
+  declineWhy: string;
 }
 
 /** Whether taking `w` gives `personId` two weeks in a row (their other weeks, minus the one they give up). */
@@ -902,15 +905,30 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
       ? {
           declineTitle: `Decline ${R}’s swap?`,
           declineText: `${R} keeps ${rqW} and you keep ${cpW}. ${R} gets a Chat message and an email.`,
+          declineExample: '',
+          declineWhy: '',
         }
       : (() => {
           const r = part === 'requester' ? 'you' : R;
           const a = part === 'asked' ? 'you' : A;
           const keeps = (who: string) => (who === 'you' ? 'keep' : 'keeps');
           return {
+            // The only Admin in the swap (12.17) reads it from their own seat, as the board's person asked.
             declineTitle:
-              part === 'requester' ? `Decline your swap with ${A}?` : `Decline ${R}’s swap with ${a}?`,
+              part === 'requester'
+                ? `Decline your swap with ${A}?`
+                : part === 'asked'
+                  ? `Decline ${R}’s swap?`
+                  : `Decline ${R}’s swap with ${A}?`,
             declineText: `${part === 'requester' ? 'You' : R} ${keeps(r)} ${rqW} and ${a} ${keeps(a)} ${cpW}. ${part === 'requester' ? 'You' : R} and ${a} get a Chat message, and an email with your reason.`,
+            declineExample:
+              part === 'asked'
+                ? 'e.g. I’d be on call two weeks in a row'
+                : `e.g. ${A} would be on call two weeks in a row`,
+            declineWhy:
+              part === 'admin'
+                ? `Say why — ${R} and ${A} see this`
+                : `Say why — ${part === 'asked' ? R : A} sees this`,
           };
         })()),
   };
