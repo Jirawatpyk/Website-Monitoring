@@ -72,18 +72,26 @@ test.describe('on-call (local Supabase)', () => {
     await page.getByRole('button', { name: 'Approve' }).first().click();
     await expect(page.getByText('Approved — the weeks have swapped.').first()).toBeVisible();
     await expect(page.getByText(/^Swapped · /).first()).toBeVisible();
-    // The column widths are tuned so the table fits beside the swap card at 1440 (OnCall): it never
-    // scrolls sideways there — a change to AURA's table padding or the longest week fails here.
-    // From xl the card sits beside the table and the alerts column drops out when the table is under
-    // 740 px (1280); below xl the card goes under the table. The widths switch after a re-render, so poll.
+    // The table never scrolls sideways (D-048 12.28): from xl the swap card sits beside it, below xl
+    // under it, and a table narrower than the 728 px row drops its alerts column — 1440 beside the card
+    // (740–750) and 1100 under it keep the column; 1280 beside it and 1024 under it drop it. A change to
+    // AURA's table padding, its flexible-column minimum or the longest week fails here. AURA measures
+    // the box with a ResizeObserver, so each width is polled.
     const scroll = page.locator('.aura-table__scroll').first();
-    for (const width of [1440, 1280, 1100]) {
+    const alerts = page.getByRole('columnheader', { name: 'Tier 1 alerts at night' });
+    for (const [width, shown] of [
+      [1440, true],
+      [1280, false],
+      [1100, true],
+      [1024, false],
+    ] as const) {
       await page.setViewportSize({ width, height: 1000 });
       await expect
-        .poll(() => scroll.evaluate((e) => [e.scrollWidth, e.clientWidth].join(' / ')), {
+        .poll(() => scroll.evaluate((e) => e.scrollWidth <= e.clientWidth), {
           message: `the rotation table fits at ${width}, with the swap card`,
         })
-        .toMatch(/^(\d+) \/ \1$/);
+        .toBe(true);
+      await expect(alerts, `the alerts column at ${width}`).toBeVisible({ visible: shown });
     }
   });
 

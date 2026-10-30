@@ -142,11 +142,11 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
     26. **The phone's on-call role line sits in the "Paged · on call" row** of the MIncident layout the phone uses (D-016), not under the title as MobileAckDark draws it, and reads "You're on call (Tier 1, outside response hours)." instead of "(Tier 1 night)": the desktop line and the messages say "outside response hours" (item 11), which is also true at weekends and on holidays (spec-checker, 30 Oct).
     27. **An Admin decline names the side's own words; the admin-declined badge reads "Declined"** as the OnCall side card draws it (the status line names who). The only Admin in a swap (12.17) decides only once it is accepted: before that the person asked answers and the requester withdraws, so no card shows two Declines. The Overview card's last line reads "from today 09:00" when the next week starts that Monday, and "first week" when the rotation starts later than a week away (code review / spec-checker, 30 Oct).
     28. **Below 1440 the swap side card moves (the board draws 1440 only).**
-        - From xl (1280 px) the card sits beside the rotation table. The row needs 740 px, so a table narrower than that (1280, or 1440 less a scrollbar) drops its "Tier 1 alerts at night" column; the side card and the hero still say who is paged.
-        - Below xl the card goes under the table, as Maintenance's fixed columns do (D-036).
-        - Beside the card, names wrap without the avatar.
+        - From xl (1280 px) the card sits beside the rotation table (CSS only); below xl it goes under the table, as Maintenance's fixed columns do (D-036).
+        - One column set at every width. The row needs 728 px; a narrower table (1280 beside the card, 1024 under it, with or without a card) drops its "Tier 1 alerts at night" column, and that width loses the "Swapped · today …" notes there (the hero, the side card and the foot still say who is paged).
+        - The table's names wrap without an avatar (the phone row cards and the hero keep theirs). The alerts column is the flexible one: AURA counts a flexible column as 160 px in the row minimum whatever its `minWidth` (Tao, AURA follow-up).
         - An Admin decline's example and error name the people, from the viewer's seat: "Say why — Arm and Nok see this" (§28.2); "… Arm sees this" when the only Admin is one of the two.
-        - Source: spec-checker, 30 Oct; e2e at 1440 / 1280 / 1100.
+        - Source: spec-checker, 30 Oct; e2e at 1440 / 1280 / 1100 / 1024.
 
 **Why.** G1's people steps don't block S10's code, and a second code reviewer doesn't exist. The drill proves the alert path end to end; staging has the same probes, engine and notifier as production.
 **Impact.** Plan: G1 (no CODEOWNERS, drill on staging), S10 status. S10 PR A (L2–L3) and PR B (on-call, the L0 pencil). Supersedes D-008's "second Admin reviews every PR" and D-035's "Tao seeds the fixtures" for S10.

@@ -9,7 +9,6 @@ import {
   Checkbox,
   DataTable,
   PageHeader,
-  useBreakpoint,
   type DataTableColumn,
 } from '@jirawatpyk/aura-react';
 import {
@@ -81,7 +80,6 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
   const view = swapViewOf(data, now);
   // The requester's and an Admin's side card (the person asked gets the request card above the hero).
   const side = !!view && view.part !== 'asked';
-  const wide = useBreakpoint() === 'xl';
   const empty = rows.length === 0;
   const nobody = rows[0]?.nobody === true;
   // The person the hero names: whoever covers once owners stop responding.
@@ -255,7 +253,6 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
                 columns={columns(
                   (row) => show({ kind: 'swap', row, phone: false }),
                   () => show({ kind: 'handover', phone: false }),
-                  side && wide,
                 )}
                 rows={rows}
                 rowHeight="auto"
@@ -619,59 +616,40 @@ function EmptyRotation({ admin, onEdit }: { admin: boolean; onEdit: () => void }
 }
 
 /** The rotation table (OnCall); the head is upper-case as drawn. */
-function columns(
-  onSwap: (row: RotationRow) => void,
-  onHandover: () => void,
-  beside: boolean,
-): DataTableColumn<RotationRow>[] {
+/**
+ * The rotation table (OnCall); the head is upper-case as drawn. One column set at every width (D-048
+ * 12.28): the alerts column is the one flexible column, so the spare goes there, not to the action
+ * column. AURA counts a flexible column as 160 px in the row's minimum whatever its `minWidth` (its
+ * FLEX_MIN), so the flexible one is the column whose minimum really is ~160. With it the row needs
+ * 180 + 100 + 144 + 160 + 96 + 48 = 728 px: the table beside the swap card at 1440 is 740, or ~730 with a
+ * classic (Windows) scrollbar, and the column must stay there. A narrower table (1280 beside the card,
+ * 1024 below xl) drops that column instead of scrolling — AURA measures the table box itself, so nothing
+ * here depends on the screen (e2e at 1440 / 1280 / 1100 / 1024).
+ */
+function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): DataTableColumn<RotationRow>[] {
   const cols: DataTableColumn<RotationRow>[] = [
     {
       key: 'shift',
       label: 'Shift',
-      // The board's 190 holds "Mon 18 May → Mon 25 May"; beside the swap card 180 keeps the table in.
-      width: beside ? 180 : 190,
-      render: (r) => (
-        <span className={`whitespace-nowrap tabular-nums ${r.past ? 'text-fg-secondary' : ''}`}>
-          {r.range}
-        </span>
-      ),
+      // 180 holds "Mon 26 Oct → Mon 2 Nov"; the longest weeks ("Mon 18 May → Mon 25 May") wrap.
+      width: 180,
+      render: (r) => <span className={`tabular-nums ${r.past ? 'text-fg-secondary' : ''}`}>{r.range}</span>,
     },
     {
       key: 'who',
       label: 'On call',
-      // Beside the swap card (1440, OnCall) fixed narrow widths make the table fit: DataTable's row
-      // minimum counts fixed widths only, so flexing here overflowed (e2e). Full width, this and the
-      // alerts column flex, else the spare went to the action column and cut names short (/verify).
-      // Beside the card the name wraps without its avatar: 100 less an avatar left ~60 px and cut
-      // every name to "Stagi…" (staging /verify).
-      ...(beside ? { width: 96 } : { minWidth: 100 }),
-      render: (r) =>
-        beside ? (
-          <span className={`break-words ${r.nobody ? 'text-fg-secondary' : ''}`}>{r.who}</span>
-        ) : (
-          <span className="flex items-center gap-2.5">
-            {r.nobody ? (
-              <span className="flex size-7 items-center justify-center rounded-full border border-dashed border-border-strong text-fg-tertiary">
-                <IconMinus size="sm" />
-              </span>
-            ) : (
-              <Avatar name={r.who} size="sm" />
-            )}
-            <span className={`min-w-0 truncate ${r.nobody ? 'text-fg-secondary' : ''}`} title={r.who}>
-              {r.who}
-            </span>
-          </span>
-        ),
+      // No avatar: at 100 px one cut every name to "Stagi…" (staging /verify). Names wrap; the phone's
+      // row cards and the hero keep their avatars.
+      width: 100,
+      render: (r) => <span className={`break-words ${r.nobody ? 'text-fg-secondary' : ''}`}>{r.who}</span>,
     },
-    // Beside the card: 144 still holds "Swap requested" (~125 px + padding), and the alerts head needs
-    // 174 to read whole. The row stays inside the 740 px card (e2e "fits beside the swap card").
-    { key: 'status', label: 'Status', width: beside ? 144 : 150, render: (r) => <StateBadge b={r.status} /> },
+    // 144 holds "Swap requested" (~125 px + padding).
+    { key: 'status', label: 'Status', width: 144, render: (r) => <StateBadge b={r.status} /> },
     {
       key: 'alerts',
       label: 'Tier 1 alerts at night',
-      // 740 is what the row needs with this column: narrower beside the card (1280, or 1440 less a
-      // scrollbar) it drops out instead of making the table scroll (e2e at 1440 / 1280 / 1100).
-      ...(beside ? { width: 174, hideBelow: 740 } : { minWidth: 160 }),
+      minWidth: 160,
+      hideBelow: 728,
       render: (r) => <span className="text-fg-secondary">{r.alerts}</span>,
     },
     {
