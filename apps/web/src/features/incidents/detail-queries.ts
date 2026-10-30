@@ -10,6 +10,7 @@ import {
   formatDuration,
   formatMonth,
   formatPercent,
+  formatWhen,
   isTlsChainError,
   PROBE_LOCATIONS,
   TRIGGER_LABELS,
@@ -94,7 +95,8 @@ export interface IncidentDetail {
    * The person L0 paged on call (S10, §28.6): set when a Tier 1 incident opened outside response hours
    * and someone other than the owner was on call — the owner wasn't paged. `at`: when L0 went out.
    */
-  paged: { name: string; at: string; you: boolean } | null;
+  /** `when` is "today 03:41" / "yesterday 23:59" / "Thu 29 Oct 23:59": a page read the next day names it. */
+  paged: { name: string; at: string; when: string; you: boolean } | null;
   acked: { by: string; at: string } | null;
   /** Add note, root cause, Resolve: the Acknowledge rule (D-033). */
   canAct: boolean;
@@ -423,7 +425,12 @@ export async function loadIncident(
     am: am ? nameOf(am) : null,
     paged:
       i.l0_user_id && i.l0_user_id !== i.sites.primary_owner_id
-        ? { name: nameOf(i.l0_user_id), at: i.alerted_at ?? i.detected_at, you: i.l0_user_id === viewer.id }
+        ? {
+            name: nameOf(i.l0_user_id),
+            at: i.alerted_at ?? i.detected_at,
+            when: formatWhen(new Date(i.alerted_at ?? i.detected_at), now, { midSentence: true }),
+            you: i.l0_user_id === viewer.id,
+          }
         : null,
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
     canAct: canAcknowledge(actor, i),

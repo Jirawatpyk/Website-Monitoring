@@ -394,7 +394,7 @@ export function IncidentDetailView({
             <span className="text-fg-secondary">Paged · on call</span>
             <span className="flex items-center gap-2 font-medium">
               <Avatar name={d.paged.name} size="sm" />
-              {`${d.paged.name}${d.paged.you ? ' (you)' : ''} · ${formatTime(new Date(d.paged.at))} · L0`}
+              {`${d.paged.name}${d.paged.you ? ' (you)' : ''} · ${d.paged.when} · L0`}
             </span>
             {d.owner && (
               <span className="text-xs text-fg-secondary">{`Owner ${d.owner} · not paged outside response hours`}</span>
@@ -403,7 +403,7 @@ export function IncidentDetailView({
             <span className="pt-1 text-xs">
               {d.paged.you
                 ? 'You’re on call (Tier 1, outside response hours).'
-                : `${d.youOwn ? 'You own this site — you weren’t paged. ' : ''}${d.paged.name} is on call and was paged at ${formatTime(new Date(d.paged.at))}.`}
+                : `${d.youOwn ? 'You own this site — you weren’t paged. ' : ''}${d.paged.name} is on call and was paged ${d.paged.when}.`}
             </span>
           </span>
         )}

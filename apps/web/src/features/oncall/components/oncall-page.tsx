@@ -638,27 +638,34 @@ function columns(
       // Beside the swap card (1440, OnCall) fixed narrow widths make the table fit: DataTable's row
       // minimum counts fixed widths only, so flexing here overflowed (e2e). Full width, this and the
       // alerts column flex, else the spare went to the action column and cut names short (/verify).
-      ...(beside ? { width: 100 } : { minWidth: 100 }),
-      render: (r) => (
-        <span className="flex items-center gap-2.5">
-          {r.nobody ? (
-            <span className="flex size-7 items-center justify-center rounded-full border border-dashed border-border-strong text-fg-tertiary">
-              <IconMinus size="sm" />
+      // Beside the card the name wraps without its avatar: 100 less an avatar left ~60 px and cut
+      // every name to "Stagi…" (staging /verify).
+      ...(beside ? { width: 96 } : { minWidth: 100 }),
+      render: (r) =>
+        beside ? (
+          <span className={`break-words ${r.nobody ? 'text-fg-secondary' : ''}`}>{r.who}</span>
+        ) : (
+          <span className="flex items-center gap-2.5">
+            {r.nobody ? (
+              <span className="flex size-7 items-center justify-center rounded-full border border-dashed border-border-strong text-fg-tertiary">
+                <IconMinus size="sm" />
+              </span>
+            ) : (
+              <Avatar name={r.who} size="sm" />
+            )}
+            <span className={`min-w-0 truncate ${r.nobody ? 'text-fg-secondary' : ''}`} title={r.who}>
+              {r.who}
             </span>
-          ) : (
-            <Avatar name={r.who} size="sm" />
-          )}
-          <span className={`min-w-0 truncate ${r.nobody ? 'text-fg-secondary' : ''}`} title={r.who}>
-            {r.who}
           </span>
-        </span>
-      ),
+        ),
     },
-    { key: 'status', label: 'Status', width: 150, render: (r) => <StateBadge b={r.status} /> },
+    // Beside the card: 144 still holds "Swap requested" (~125 px + padding), and the alerts head needs
+    // 174 to read whole. The row stays inside the 740 px card (e2e "fits beside the swap card").
+    { key: 'status', label: 'Status', width: beside ? 144 : 150, render: (r) => <StateBadge b={r.status} /> },
     {
       key: 'alerts',
       label: 'Tier 1 alerts at night',
-      ...(beside ? { width: 160 } : { minWidth: 160 }),
+      ...(beside ? { width: 174 } : { minWidth: 160 }),
       render: (r) => <span className="text-fg-secondary">{r.alerts}</span>,
     },
     {
