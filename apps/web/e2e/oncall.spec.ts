@@ -72,6 +72,14 @@ test.describe('on-call (local Supabase)', () => {
     await page.getByRole('button', { name: 'Approve' }).first().click();
     await expect(page.getByText('Approved — the weeks have swapped.').first()).toBeVisible();
     await expect(page.getByText(/^Swapped · /).first()).toBeVisible();
+    // The column widths are tuned so the table fits beside the swap card at 1440 (OnCall): it never
+    // scrolls sideways there — a change to AURA's table padding or the longest week fails here.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const fits = await page
+      .locator('.aura-table__scroll')
+      .first()
+      .evaluate((e) => e.scrollWidth <= e.clientWidth);
+    expect(fits, 'the rotation table fits beside the swap card at 1440').toBe(true);
   });
 
   test('a one-person rotation turns Swap off with its reason, on a phone too (§28.4)', async ({
