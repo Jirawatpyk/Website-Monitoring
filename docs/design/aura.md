@@ -39,7 +39,7 @@ AURA is the only UI kit. Its full docs live in the [AURA design system](https://
 
 The canvas's orange note listed 14 issues. As of AURA 5.10 these are fixed (and since then a Tag's remove button is named from rich children, so `removeLabel` is no longer needed): StatusPill `warning` tone (5.1), Checkbox visible label (5.1, shown in 6.0), published `tokens.css`/`aura.css` with dark theme, README consuming section, fonts moved out of `bundle.css` (5.1), the six monitoring icons (5.1), SideNav top spacing and `bordered={false}` (5.1). Still check these before relying on them:
 
-1. DataTable columns with fixed widths can overflow narrow containers (~550 px) — give one column flex, or use `stackBelow` / `hideBelow`.
+1. DataTable columns with fixed widths can overflow narrow containers (~550 px) — give one column flex, or use `stackBelow` / `hideBelow`. A flexible column counts as 160 px in the row minimum whatever its `minWidth` (request 23, below): flex the one column whose minimum is ~160.
 2. Dialog initial focus lands on the close button — set focus to the first field or the title.
 3. SideNav item `badge` has no tone of its own — pass a `<Badge tone="danger">Fault</Badge>` element (documented in AURA); `count` stays neutral.
 4. Switch disabled + checked looks like off — for "always on" settings show Badge "Always on" instead (Security board does this).
@@ -48,9 +48,18 @@ Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build proj
 
 ## Requests to AURA
 
-Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). Requests 1–16 have shipped (5.32–5.36); none open (10 Oct 2026).
+Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). Requests 1–22 have shipped (5.32–5.41). Open: request 23 (30 Oct 2026).
 
 A new request goes in the doc (template at its foot) and here.
+
+Open (stand-in in DxT until AURA ships):
+
+- **Request 23 — DataTable: a flexible column's `minWidth` is not counted in the row's minimum** (5.41.0, found in S10 B2c, 30 Oct 2026).
+  - The row minimum counts every flexible column as 160 px (`FLEX_MIN`). The cell, meanwhile, uses its own `minWidth`. So a narrow flexible column makes the table scroll sideways, and a wide one overflows the row. `hideBelow` is judged against that same wrong sum.
+  - **Stand-in:** make flexible only a column whose real minimum is about 160, and fix every other width.
+    - Example: the On-call rotation table (`features/oncall/components/oncall-page.tsx` `columns()`). "Tier 1 alerts at night" is flexible (`minWidth: 160`, `hideBelow: 728`); On call is fixed at 100 with no avatar (D-048 12.28). The e2e is `oncall.spec.ts` at 1440 / 1280 / 1100 / 1024.
+  - Don't use `minWidth` below or above 160 on a flexible column until this ships.
+  - Once shipped: On call flexes again, with its avatar, and alerts goes back to a fixed 174.
 
 AURA 5.32 (requests 1–4, 6 Oct 2026):
 
