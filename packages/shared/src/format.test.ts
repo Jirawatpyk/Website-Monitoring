@@ -11,6 +11,7 @@ import {
   bangkokMonthStart,
   formatDuration,
   formatDurationSeconds,
+  formatWeek,
   formatWindowLength,
   formatNameList,
   formatIncidentId,
@@ -245,5 +246,17 @@ describe('formatMonth / bangkokMonthStart', () => {
     expect(formatMonth(late)).toBe('October');
     expect(bangkokMonthStart(late).toISOString()).toBe('2026-09-30T17:00:00.000Z');
     expect(formatMonth(new Date('2026-09-25T03:07:00Z'))).toBe('September');
+  });
+});
+
+describe('formatWeek (OnCall, the on-call messages)', () => {
+  it('writes a week as on the boards', () => {
+    const at = (iso: string) => new Date(iso);
+    expect(formatWeek({ start: at('2026-10-05T02:00:00Z'), end: at('2026-10-12T02:00:00Z') })).toBe(
+      'Mon 5 → 12 Oct',
+    );
+    expect(formatWeek({ start: at('2026-09-28T02:00:00Z'), end: at('2026-10-05T02:00:00Z') })).toBe(
+      'Mon 28 Sep → 5 Oct',
+    );
   });
 });

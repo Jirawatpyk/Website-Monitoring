@@ -1,4 +1,4 @@
-import { formatDay, formatTime } from '@dxt/shared';
+import { formatDay, formatTime, formatWeek, type Week } from '@dxt/shared';
 import { plainName, type ChatMessage, type ChatPerson } from './chat-alerts';
 import { buildChatTextLine, type ChatState } from './chat-text';
 import { EMAIL_COLORS, emailLayout, senderDomain, type EmailMessage, type Envelope } from './email-alerts';
@@ -28,10 +28,7 @@ export type OncallKind =
 export type OncallRole =
   'asked' | 'requester' | 'admin' | 'new' | 'previous' | 'rotation' | 'removed' | 'self';
 
-export interface Week {
-  start: Date;
-  end: Date;
-}
+export { formatWeek, type Week };
 
 export interface OncallFacts {
   kind: OncallKind;
@@ -60,13 +57,6 @@ export interface OncallFacts {
   shiftHolder?: string;
   /** The test alert: the tester and the link that ticks "Test alert received on this phone". */
   test?: { name: string; url: string };
-}
-
-/** "Mon 5 → 12 Oct", or "Mon 28 Sep → 5 Oct" across a month. */
-export function formatWeek(w: Week): string {
-  const a = formatDay(w.start, { weekday: true }).split(' ');
-  const b = formatDay(w.end).split(' ');
-  return a[2] === b[1] ? `${a[0]} ${a[1]} → ${b[0]} ${b[1]}` : `${a.join(' ')} → ${b.join(' ')}`;
 }
 
 const when = (d: Date) => `${formatDay(d, { weekday: true })} ${formatTime(d)}`;

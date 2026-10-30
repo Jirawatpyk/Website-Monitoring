@@ -66,7 +66,7 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
   {
     title: 'Operations',
     items: [
-      { id: 'oncall', label: 'On-call', icon: <IconUsers />, href: '/oncall', slice: 'S10', live: false },
+      { id: 'oncall', label: 'On-call', icon: <IconUsers />, href: '/oncall', slice: 'S10', live: true },
       {
         id: 'maintenance',
         label: 'Maintenance',
