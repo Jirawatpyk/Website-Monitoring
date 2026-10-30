@@ -622,9 +622,9 @@ function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): Da
     {
       key: 'who',
       label: 'On call',
-      // The one flexible column: it takes the spare width when the table runs full width and
-      // shrinks to 100 beside the swap card at 1440 (OnCall). A fixed width here left the spare
-      // to the action column and cut the names short (staging /verify).
+      // This and the alerts column flex: they share the spare width when the table runs full
+      // width and shrink to their minimum beside the swap card at 1440 (OnCall). Fixed widths
+      // left the spare to the action column and cut names and the head short (staging /verify).
       minWidth: 100,
       render: (r) => (
         <span className="flex items-center gap-2.5">
@@ -645,7 +645,7 @@ function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): Da
     {
       key: 'alerts',
       label: 'Tier 1 alerts at night',
-      width: 160,
+      minWidth: 160,
       render: (r) => <span className="text-fg-secondary">{r.alerts}</span>,
     },
     {
