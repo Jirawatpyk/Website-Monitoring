@@ -48,7 +48,18 @@ export type ChatState =
   | 'WAITING FOR APPROVAL'
   | 'STILL WAITING'
   | 'APPROVED'
-  | 'DECLINED';
+  | 'DECLINED'
+  // On-call (S10, D-048 item 11).
+  | 'SWAP REQUEST'
+  | 'SWAP ACCEPTED'
+  | 'SWAP DECLINED'
+  | 'SWAP APPROVED'
+  | 'SWAP NOT APPROVED'
+  | 'SWAP WITHDRAWN'
+  | 'SWAP EXPIRED'
+  | 'SHIFT HANDED OVER'
+  | 'ROTATION CHANGED'
+  | 'ON CALL TOMORROW';
 
 export interface ChatTextLine {
   state: ChatState;

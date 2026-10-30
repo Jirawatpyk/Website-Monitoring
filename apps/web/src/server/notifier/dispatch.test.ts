@@ -330,8 +330,8 @@ describe('dispatchNotifications', () => {
     const { db, rpcCalls } = fakeDb(queue([]));
     await dispatchNotifications({ db, webhookUrl, email, appUrl }, { incidentId: 'i9' });
     expect(rpcCalls.map((c) => c.args)).toEqual([
-      { p_channel: 'google_chat', p_limit: 20, p_incident_id: 'i9' },
-      { p_channel: 'email', p_limit: 20, p_incident_id: 'i9' },
+      { p_channel: 'google_chat', p_limit: 20, p_incident_id: 'i9', p_oncall: true },
+      { p_channel: 'email', p_limit: 20, p_incident_id: 'i9', p_oncall: true },
     ]);
   });
 
