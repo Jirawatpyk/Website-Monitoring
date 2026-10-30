@@ -4,7 +4,7 @@
 -- and that nobody writes the tables directly.
 begin;
 \ir _helpers.psql
-select plan(70);
+select plan(71);
 
 -- ── Fixtures ─────────────────────────────────────────────────────────────
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -297,6 +297,8 @@ insert into sw2 select 'tao_asked', id from w;
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select throws_ok($$ select public.decide_oncall_swap((select id from sw2 where name = 'tao_asked'), true) $$,
   '42501', 'Another Admin decides on a swap you’re part of', 'with two Admins, the person asked can''t approve it either');
+select throws_ok($$ select public.decide_oncall_swap((select id from sw2 where name = 'tao_asked'), false, 'No longer works for me') $$,
+  '42501', 'Another Admin decides on a swap you’re part of', '…nor decline it as an Admin');
 reset role;
 -- With every other Admin deactivated (the seed has its own) Tao is the only one: he decides, or the
 -- request would be stuck. Rolled back with the rest of the file.
