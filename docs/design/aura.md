@@ -48,9 +48,16 @@ Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build proj
 
 ## Requests to AURA
 
-Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). Requests 1–23 have shipped (5.32–5.51); none open (30 Oct 2026).
+Tracked in the Claude Doc [AURA feature requests — from DxT Monitor](https://claude.ai/code/artifact/b1691a29-0ad9-420e-b26b-966c4ad86aac). Requests 1–23 have shipped (5.32–5.51). Open: request 24 (30 Oct 2026).
 
 A new request goes in the doc (template at its foot) and here.
+
+Open (stand-in in DxT until AURA ships):
+
+- **Request 24 — BottomNav `hideOnScroll`: a tap leaves focus on the tab, so the bar never hides on the next page** (5.76, 30 Oct 2026).
+  - AURA keeps the bar while focus is in it, which is right for a keyboard. But a tap on Chrome / Android also focuses the tab, and the BottomNav stays mounted across client-side navigation, so the bar stayed put on the new page however far you scrolled. Long pages like On-call showed it most.
+  - **Stand-in:** `components/app-shell/phone-nav.tsx` wraps BottomNav in a `display: contents` div that blurs the tab on a pointer click (`event.detail > 0`). A keyboard's Enter is `detail` 0, so keyboard focus stays (test `phone-nav.test.tsx`).
+  - Once shipped: drop the wrapper.
 
 AURA 5.76 (from 5.41, 30 Oct 2026; DxT took it in `chore/aura-5.76`):
 
