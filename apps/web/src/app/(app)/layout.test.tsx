@@ -53,12 +53,12 @@ describe('AppLayout', () => {
     expect(within(sideNav).getByRole('link', { name: /Sites/ })).toHaveTextContent('17');
     expect(within(sideNav).getByRole('link', { name: /Incidents/ })).toHaveTextContent('3');
     const bottom = screen.getByRole('navigation', { name: 'Sections' });
-    // live sections only (D-032): Incidents since S07, On-call joins with S10; Incidents carries its count
+    // live sections only (D-032): Incidents since S07, On-call since S10; Incidents carries its count
     expect(
       within(bottom)
         .getAllByRole('link')
         .map((a) => a.textContent),
-    ).toEqual(['Overview', '3Incidents (3)', 'Sites']);
+    ).toEqual(['Overview', '3Incidents (3)', 'Sites', 'On-call']);
   });
 
   it('shows no number when the count cannot be read', async () => {

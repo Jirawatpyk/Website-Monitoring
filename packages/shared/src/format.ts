@@ -74,6 +74,19 @@ export function formatDay(date: Date, options: { weekday?: boolean; year?: boole
   return options.weekday ? `${WEEKDAYS[p.weekday]} ${day}` : day;
 }
 
+/** An on-call week: Monday 09:00 to the next Monday 09:00 (or part of one after a hand-over). */
+export interface Week {
+  start: Date;
+  end: Date;
+}
+
+/** "Mon 5 → 12 Oct", or "Mon 28 Sep → 5 Oct" across a month (OnCall, the on-call messages). */
+export function formatWeek(w: Week): string {
+  const a = formatDay(w.start, { weekday: true }).split(' ');
+  const b = formatDay(w.end).split(' ');
+  return a[2] === b[1] ? `${a[0]} ${a[1]} → ${b[0]} ${b[1]}` : `${a.join(' ')} → ${b.join(' ')}`;
+}
+
 /**
  * When something happened, relative to `now` (spec §13): "Today 10:07", "Yesterday 16:40", else
  * "Mon 14 Sep 21:18". `midSentence` lower-cases Today / Yesterday ("OK since today 10:50").

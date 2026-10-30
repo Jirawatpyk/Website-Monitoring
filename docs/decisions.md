@@ -113,6 +113,41 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
       Email footers say why each person got it: Arm asked you to swap; you asked; you're an Admin and a swap needs an Admin to approve; your on-call week changed; you were part of the request; an on-call shift you hold changed hands; you're on call next.
 
+12. **The On-call screens (B2c), settled by Claude by precedence and the recommendation rule** (30 Oct; the boards OnCall, MOnCall, Users and spec §27–28):
+    1. **Edit rotation is built in S10.** Production has no rotation and nothing else can make one; §27.9's "not in this slice" was about the §27 brief. On a phone the Edit rotation buttons open the same dialog (§28.7). People are added from the active Admins and Responders and removed with Remove; the order moves with up / down.
+    2. **Swap only on your own future weeks** (the B0 RPC rule). An Admin approves or declines, hands over and edits the rotation, but gets no Swap on other people's rows.
+    3. **The person asked gives up their next free whole week**, as drawn — no week picker. The rest of a shift someone was handed is never offered.
+    4. **One-person rotation:** Swap is disabled with "Nobody else in the rotation to swap with".
+    5. **2-step lines are dropped everywhere** (D-007, D-048 item 8). The live row's note points to "Hand over…" on this page, not Users (item 5); the SQL refusal `swap_live` is reworded the same way.
+    6. **One badge set at every width.** AURA has no circle-dot icon, so On call now is solid with the `user` icon (MOnCall's); Done and Next soft; Scheduled, Swap requested, Handed to … outline.
+    7. **The phone card counts the person's real checklist** (`N of 3 ready`), the same three rows on both widths. The voice-number row shows only once Twilio is approved, so not now.
+    8. **A test alert goes to whoever sends it** (B0: the tester is the caller). Desktop shows Send test alert on your own phone card only; the Hand over dialog shows the new person's checklist without a send button.
+    9. **The request card's eyebrow is "SWAP REQUEST"** (§27.3), not "… OPENED FROM YOUR CHAT LINK".
+    10. **Dates and names are computed**, never copied from the boards ("Changes apply from …", the order preview, hand-over times: now, tonight at closing, tomorrow at opening).
+    11. **The request dialog says "Nothing changes in the rotation until then"** (§27.7 over the board's shorter line).
+    12. **"Waiting for Tao" names the Admin only when there is one**; with more it is "an Admin" (the requester's hint always says "an Admin", spec §28.1).
+    13. **The handed-over hero follows each board at its width** (desktop "ON CALL TONIGHT · COVERING PLOY", phone "ON CALL TONIGHT · ARM, COVERING PLOY") — layout, not behaviour.
+    14. **The checklist "Before your shift" shows to everyone in the rotation**, not only the person on call now — they prepare before their week.
+    15. **The test link is confirmed by the page once it has loaded**, never while it renders (a prefetch would use it up), and the token leaves the address bar after.
+    16. **After a swap step the page stays on that request** (`?swap=`), so its card shows the closed state instead of disappearing; focus moves to its new status line.
+    17. **Neither person in a swap approves it**, unless they are the only active Admin — the requester (as #143 asks them to) or the person asked, once they have accepted (staging /verify, 30 Oct: otherwise the request is stuck). The page enforces it; the SQL still lets any Admin decide.
+    18. **Swap times follow §13's `formatWhen`** ("today 10:08", "yesterday 16:40", "Mon 14 Sep 21:18"), not the board's "Fri 10:08". Spec over board on formats.
+    19. **The requester sees the back-to-back warning too** (OnCall side card), as the swap dialog promises: "Nok and the Admin see this warning too".
+    20. **An Admin's decline reason goes by email, not Chat** (item 11). The decline dialog reads "… get a Chat message, and an email with your reason."
+    21. **The test link is opened from the Chat message**, so the checklist says "Open the link in that Chat message on this phone." instead of the board's button (its mock trigger). An expired link reads "This test link has expired — send a new test alert." with "Send a new test alert from your checklist."
+    22. **Hand over at 390 is the AURA Dialog** (a bottom sheet on phones), as Maintenance's phone sheet; there is no full-height sheet component.
+    23. **The phone rotation keeps the last done week**, as on desktop. Both rows of an open request say what it waits for, per §27.7.
+    24. **Deferred to the slice that builds the Incident page's Escalation card:** §28.6's L0 / L1 ledger lines, the ESCALATION key-fact ("L1 · Tao") and Tao's role line "You're L1 at 03:55 if nobody acknowledges". S10 ships the PAGED · ON CALL cell, the line under the cause, the phone's "Paged · on call" row and its role line. The Chat and email side of §28.6 shipped in B1b.
+    25. **The handed-over row's badge reads "Handed over"**, not "Handed to <name>" (§28.4). The person and the time are already in the row's line ("… covers from today 18:00") and the alerts column; a real full name in the badge crushed the name column at 390 and 1440 (staging /verify, 30 Oct).
+    26. **The phone's on-call role line sits in the "Paged · on call" row** of the MIncident layout the phone uses (D-016), not under the title as MobileAckDark draws it, and reads "You're on call (Tier 1, outside response hours)." instead of "(Tier 1 night)": the desktop line and the messages say "outside response hours" (item 11), which is also true at weekends and on holidays (spec-checker, 30 Oct).
+    27. **An Admin decline names the side's own words; the admin-declined badge reads "Declined"** as the OnCall side card draws it (the status line names who). The only Admin in a swap (12.17) decides only once it is accepted: before that the person asked answers and the requester withdraws, so no card shows two Declines. The Overview card's last line reads "from today 09:00" when the next week starts that Monday, and "first week" when the rotation starts later than a week away (code review / spec-checker, 30 Oct).
+    28. **Below 1440 the swap side card moves (the board draws 1440 only).**
+        - From xl (1280 px) the card sits beside the rotation table (CSS only); below xl it goes under the table, as Maintenance's fixed columns do (D-036).
+        - One column set at every width. The row needs 728 px; a narrower table (1280 beside the card, 1024 under it, with or without a card) drops its "Tier 1 alerts at night" column, and that width loses the "Swapped · today …" notes there (the hero, the side card and the foot still say who is paged).
+        - The table's names wrap without an avatar (the phone row cards and the hero keep theirs). The alerts column is the flexible one: AURA counts a flexible column as 160 px in the row minimum whatever its `minWidth` (Tao, AURA follow-up).
+        - An Admin decline's example and error name the people, from the viewer's seat: "Say why — Arm and Nok see this" (§28.2); "… Arm sees this" when the only Admin is one of the two.
+        - Source: spec-checker, 30 Oct; e2e at 1440 / 1280 / 1100 / 1024.
+
 **Why.** G1's people steps don't block S10's code, and a second code reviewer doesn't exist. The drill proves the alert path end to end; staging has the same probes, engine and notifier as production.
 **Impact.** Plan: G1 (no CODEOWNERS, drill on staging), S10 status. S10 PR A (L2–L3) and PR B (on-call, the L0 pencil). Supersedes D-008's "second Admin reviews every PR" and D-035's "Tao seeds the fixtures" for S10.
 

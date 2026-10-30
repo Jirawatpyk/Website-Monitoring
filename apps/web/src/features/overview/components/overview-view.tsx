@@ -10,6 +10,7 @@ import type { OverviewData, ProbeHealth } from '../types';
 import { DesktopBanners, Kpis, LIVE_ISSUES_ID, LiveIssuesTable, RecentEvents, SiteTiles } from './desktop';
 import { PhoneAllSites, PhoneBanners, PhoneCounts, PhoneLiveIssues } from './phone';
 import { MaintenanceCard, PhoneMaintenance } from './maintenance-card';
+import { OncallCard } from '@/features/oncall';
 import { useLiveRefresh } from '@/components/use-live-refresh';
 import { useAckToast, type AckAction, type UndoAction } from '@/components/use-ack-toast';
 
@@ -151,7 +152,17 @@ export function OverviewView({
           lastRoundAt={data.lastRoundAt}
           onAck={onAck}
         />
-        {data.maintenance && <MaintenanceCard card={data.maintenance} />}
+        {/* One band of "right now" cards (§23.8): On call left, Maintenance & mutes right; one alone is full width. */}
+        {(data.oncall || data.maintenance) && (
+          <div className="flex items-stretch gap-4">
+            {data.oncall && <OncallCard card={data.oncall} />}
+            {data.maintenance && (
+              <div className="flex min-w-0 flex-1 flex-col *:grow">
+                <MaintenanceCard card={data.maintenance} />
+              </div>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*90)]">
           <SiteTiles sites={sites} drafts={data.drafts} now={now} />
           <RecentEvents events={events} />

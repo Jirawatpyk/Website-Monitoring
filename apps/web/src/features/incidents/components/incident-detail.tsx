@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   toast,
+  Avatar,
   Badge,
   Breadcrumb,
   Button,
@@ -22,6 +23,7 @@ import {
   IconExternalLink,
   IconImage,
   IconLock,
+  IconMoon,
   IconPencil,
   IconRotateCcw,
 } from '@jirawatpyk/aura-react/icons';
@@ -291,6 +293,20 @@ export function IncidentDetailView({
                 .filter(Boolean)
                 .join(' · ')}
             </span>
+            {d.paged && (
+              <span className="flex items-center gap-2 text-sm max-md:hidden">
+                <span className="flex text-fg-secondary">
+                  <IconMoon size="sm" />
+                </span>
+                <span>
+                  <b className="font-semibold">{`On call · ${d.paged.name}`}</b> (Tier 1, outside response
+                  hours) — paged at L0, the person who acts.{' '}
+                  {d.owner && (
+                    <span className="text-fg-secondary">{`Owner ${d.owner} isn’t paged outside response hours.`}</span>
+                  )}
+                </span>
+              </span>
+            )}
           </span>
         }
         actions={
@@ -372,10 +388,30 @@ export function IncidentDetailView({
             .filter(Boolean)
             .join(' · ')}
         </span>
+        {/* MobileAckDark "Paged · on call" (§28.6): who L0 paged instead of the owner. */}
+        {d.paged && (
+          <span className="flex flex-col gap-0.5 border-b border-border-subtle pb-2 text-sm leading-snug">
+            <span className="text-fg-secondary">Paged · on call</span>
+            <span className="flex items-center gap-2 font-medium">
+              <Avatar name={d.paged.name} size="sm" />
+              {`${d.paged.name}${d.paged.you ? ' (you)' : ''} · ${d.paged.when} · L0`}
+            </span>
+            {d.owner && (
+              <span className="text-xs text-fg-secondary">{`Owner ${d.owner} · not paged outside response hours`}</span>
+            )}
+            {/* The role line follows the viewer (MobileAckDark, §28.6). */}
+            <span className="pt-1 text-xs">
+              {d.paged.you
+                ? 'You’re on call (Tier 1, outside response hours).'
+                : `${d.youOwn ? 'You own this site — you weren’t paged. ' : ''}${d.paged.name} is on call and was paged ${d.paged.when}.`}
+            </span>
+          </span>
+        )}
         <span className="flex items-center gap-2">
           <span className="grow text-sm">
             {[
-              d.owner ? `Owner ${d.owner}${d.owner === viewerName ? ' (you)' : ''}` : 'No owner set',
+              // With a Paged row above, the owner is named there already.
+              d.paged ? null : d.owner ? `Owner ${d.owner}${d.youOwn ? ' (you)' : ''}` : 'No owner set',
               d.backup ? `backup ${d.backup}` : null,
               d.am ? `AM ${d.am}` : null,
             ]

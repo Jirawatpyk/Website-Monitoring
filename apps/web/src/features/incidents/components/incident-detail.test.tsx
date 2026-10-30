@@ -71,8 +71,10 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     detectSeconds: 30,
     durationMinutes: 8,
     owner: 'Tao',
+    youOwn: true,
     backup: 'Nok',
     am: null,
+    paged: null,
     acked: null,
     canAct: true,
     resolved: null,
@@ -267,6 +269,22 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('paged on call: the phone row names the day it paged, and the owner by id (§28.6)', () => {
+    show(
+      detail({
+        owner: 'Arm',
+        youOwn: true,
+        paged: { name: 'Ploy', at: at('24T23:59:00'), when: 'yesterday 23:59', you: false },
+      }),
+    );
+    expect(screen.getByText('Ploy · yesterday 23:59 · L0')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'You own this site — you weren’t paged. Ploy is on call and was paged yesterday 23:59.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('started before today: STARTED and the phone line name the day (§13)', () => {

@@ -24,6 +24,7 @@ import {
 import { chainStreakStart, currentDrop, lastRoundP50, probeHealth, seriesOf, viewerKindOf } from './assemble';
 import { EVENT_TYPES, reasonOf } from './model';
 import { loadOnCallNow } from '@/features/incidents/server';
+import { loadOncallCard } from '@/features/oncall/server';
 import {
   OVERVIEW_LOCATIONS,
   type OverviewData,
@@ -56,6 +57,8 @@ export async function loadOverview(
   const from60d = new Date(now.getTime() - 60 * DAY_MS);
   // Who is on call now, beside the other reads (S10): they act on every Tier 1 incident.
   const onCallRead = loadOnCallNow(db, now);
+  // The "On call" card (§23.8): who responds now, tonight and next week.
+  const oncallCardRead = loadOncallCard(db, now);
   const [
     sites,
     checks,
@@ -254,7 +257,7 @@ export async function loadOverview(
     autoResolved: e.incidents.auto_resolved,
   }));
 
-  const onCall = await onCallRead;
+  const [onCall, oncall] = await Promise.all([onCallRead, oncallCardRead]);
   const rounds = rows
     .map((r) => r.checkedAt)
     .filter((t): t is string => !!t)
@@ -272,6 +275,7 @@ export async function loadOverview(
     drafts: (sites.data ?? []).filter((s) => !s.is_active && !s.monitoring_started_at).length,
     events: eventRows,
     ...maintenanceOf(windowRows, person.role === 'admin', now),
+    oncall,
     kpis: {
       enough: current.enough,
       mttaSeconds: current.mttaSeconds,
