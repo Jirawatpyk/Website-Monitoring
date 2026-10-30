@@ -30,7 +30,7 @@
 | S09c | Defacement: shared forbidden words & crawler view | 1 · P0 | M | — (FR-03 defacement, PRD §2 / §5, D-041) | S04a | 3 | Done |
 | S09d | Defacement: page-change detection | 1 · P1 | L | — (PRD §2 content-change, D-041, D-046) | S09c (merged), S07 | 3–4 (alert on after a 2-week record) | Done |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
-| S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | In progress |
+| S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | In review |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Todo |
 | S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06b, S10, S11 | 4 | Todo |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
@@ -552,6 +552,20 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   4. T09 re-check: a muted site with an open Tier 1 incident still gets its L3 FYI.
   5. spec-checker passes OnCall, MOnCall, Escalation; nav "On-call" live.
 - **Review:** engine-reviewer, message-checker, spec-checker, security-reviewer, db-reviewer.
+- **Evidence (`/slice-review`, 30 Oct 2026; slice-verifier: every line met):**
+  1. Staging timestamps in #136:
+     - INC-0049, no ack: L1 +15, L2 +30, L3 FYI +60.
+     - INC-0050, acked at +5:17: no L1 or L2; L3 FYI at +60.
+  2. `escalation_l2_l3.test.sql` and `escalation.test.sql` (pgTAP), plus `features/escalation` `model.test.ts` and `escalation-editor.test.tsx` (#136).
+  3. `oncall_routing.test.sql` and the runner's 23:00 weekday case (#139 / #140). On staging, INC-0051 (Thu 29 Oct 23:59) paged Staging OnCall, not the owner; its Chat card was sent with a provider id, and its page shows "Paged · on call".
+  4. `escalation_l2_l3.test.sql` "the L3 FYI fires on a muted site", plus `pipeline.int.test.ts` T09.
+  5. spec-checker results:
+     - Escalation in #136;
+     - OnCall, MOnCall, Main3 and Incident in #145, with no open High and the Mediums fixed or settled as D-048 12.25–12.27.
+     - Nav `oncall` `live: true` (`layout.test.tsx`); `e2e/oncall.spec.ts`.
+     - Staging `/verify` at 390 / 820 / 1440, light and dark (30 Oct, two runs, findings fixed).
+
+  The slice goes to Done when #145 merges.
 
 ### S11 · Client-update track
 
