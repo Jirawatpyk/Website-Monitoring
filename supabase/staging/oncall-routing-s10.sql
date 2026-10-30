@@ -24,7 +24,10 @@ where exists (select 1 from auth.users where id = '5ea5e000-0000-4000-8000-00000
 on conflict (id) do update set is_active = true, role = 'responder',
   google_chat_user_id = excluded.google_chat_user_id;
 
--- The rotation is Staging OnCall alone; the weeks are made again from this week.
+-- The rotation is Staging OnCall alone; the weeks are made again from this week. Their messages and
+-- events go first (notifications → events → swaps → shifts: each refers to the next, S10 B2a).
+delete from public.notifications where oncall_event_id is not null;
+delete from public.oncall_events;
 delete from public.oncall_swaps;
 delete from public.oncall_shifts;
 delete from public.oncall_rotation;
@@ -37,5 +40,6 @@ select public.oncall_person_at(now()) = '5ea5e000-0000-4000-8000-000000000005' a
         where s.name = 'Test target' order by i.created_at desc limit 1) as latest_l0;
 
 -- ── Undo (after the drive) ─────────────────────────────────────────────────
--- delete from public.oncall_shifts; delete from public.oncall_rotation;
+-- delete from public.notifications where oncall_event_id is not null; delete from public.oncall_events;
+-- delete from public.oncall_swaps; delete from public.oncall_shifts; delete from public.oncall_rotation;
 -- update public.profiles set is_active = false where id = '5ea5e000-0000-4000-8000-000000000005';
