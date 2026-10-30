@@ -44,6 +44,7 @@ export const PROBLEM_WORDS: Record<string, string> = {
   swap_too_soon: 'Too many swap requests — wait a few minutes.',
   swap_closed: 'This request is closed — reload the page to see what happened.',
   swap_not_accepted: 'Approve unlocks once the person asked accepts.',
+  swap_self: 'Another Admin decides on a swap you’re part of.',
   swap_reason: 'Say why — both of them see this.',
   handover_reason: 'Add a short reason — both of them see it.',
   handover_same: 'Pick someone else.',
@@ -57,9 +58,11 @@ type DbError = { code?: string; hint?: string | null; message: string };
 function refusal(error: DbError, notAllowed: string): OncallResult {
   if (error.hint === 'test_other_person')
     return { ok: false, message: error.message, code: 'test_other_person' };
+  const words = error.hint ? PROBLEM_WORDS[error.hint] : undefined;
+  // A refusal the page has words for (a 42501 like swap_self, D-048 12.17) says why, not just "not allowed".
+  if (words) return { ok: false, message: words };
   if (error.code === '42501') return { ok: false, message: notAllowed };
   if (error.code === 'P0002') return { ok: false, message: 'It no longer exists — reload the page.' };
-  const words = error.hint ? PROBLEM_WORDS[error.hint] : undefined;
   // A refusal with no words is a bug or an outage: log what the database said (never the input).
   if (!words)
     console.error(JSON.stringify({ event: 'oncall_refusal', code: error.code, message: error.message }));
