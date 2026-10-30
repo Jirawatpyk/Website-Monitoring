@@ -1,6 +1,6 @@
 # DxT Monitor — Design spec for developer handoff
 
-Version: 29 Oct 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
+Version: 30 Oct 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
 Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (53 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
 
 ## 0. How to use this spec
@@ -20,7 +20,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | Main | Overview dashboard (pre-S06 reference — superseded by Main3, §21) | 1440×1840 | Web app — desktop 1440 + mobile 390 |
 | Sites | Sites list | 1440×2588 | Web app — desktop 1440 + mobile 390 |
 | SiteDetail | Site detail — Bangkok Airways – Taiwan · Page fingerprint card (§26) | 1440×2720 | Web app — desktop 1440 + mobile 390 |
-| Incident | Incident — INC-0142 MuvMi DOWN | 1440×1660 | Web app — desktop 1440 + mobile 390 |
+| Incident | Incident — INC-0142 MuvMi DOWN · OPENED shows who was paged outside response hours (§28.6) | 1440×1730 | Web app — desktop 1440 + mobile 390 |
 | MOverview | Mobile — Overview (pre-S06 reference — superseded by MOverview4, §21) | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MSites | Mobile — Sites | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MSite | Mobile — Site detail | 390×844 | Web app — desktop 1440 + mobile 390 |
@@ -38,11 +38,11 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | MIncidentPageChangeDark | Mobile — Incident: page change · dark (§26.10) | 390×844 | Core flows · incidents · maintenance · onboarding · page change |
 | AddSite | Add site + registration checklist | 1440×1680 | Core flows · incidents · maintenance · onboarding |
 | Escalation | Escalation policies | 1440×1528 | Operations & governance · web |
-| OnCall | On-call rotation · VIEW AS + REQUEST show the swap states (§27) | 1440×1960 | Operations & governance · web |
+| OnCall | On-call rotation · VIEW AS + REQUEST + ROTATION show the swap states and the no-one-to-page cases (§27, §28) | 1440×2080 | Operations & governance · web |
 | Probes | Probes & heartbeat | 1440×1496 | Operations & governance · web |
 | AuditLog | Audit log | 1440×2000 | Operations & governance · web |
 | MIncidents | Mobile — Incidents | 390×844 | Mobile app · 390 |
-| MOnCall | Mobile — On-call · BOARD STATE: test-link landing + swap request (§27) | 390×904 | Mobile app · 390 |
+| MOnCall | Mobile — On-call · BOARD STATE: test link, swap for Nok / Arm / Tao, Hand over sheet, no-one-to-page cases (§27, §28) | 390×904 | Mobile app · 390 |
 | MMaintenance | Mobile — Mute / maintenance sheet | 390×844 | Mobile app · 390 |
 | MEscalation | Mobile — Escalation (view only, §22) | 390×844 | Mobile app · 390 |
 | MProfile | Mobile — My profile (§22) | 390×844 | Mobile app · 390 |
@@ -55,7 +55,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | PostIncident | Post-incident review — INC-0133 VOCA | 1440×1732 | Review loop · alert routing · dark mode |
 | AlertChannels | Settings — alert channels & routing | 1440×1960 | Review loop · alert routing · dark mode |
 | MainDark | Overview dashboard — dark (pre-S06 reference — superseded by MainDark3, §21) | 1440×1840 | Review loop · alert routing · dark mode |
-| MobileAckDark | Mobile ack — dark (night on-call) | 390×844 | Review loop · alert routing · dark mode |
+| MobileAckDark | Mobile ack — dark (night on-call) · VIEW AS Ploy / Arm / Tao, paged row (§28.6) | 390×904 | Review loop · alert routing · dark mode |
 | Login | Sign in — Google SSO + Admin 2-step | 1440×900 | Access · monitor config · resolve · when the monitor itself fails |
 | MLogin | Mobile — session expired from alert link | 390×844 | Access · monitor config · resolve · when the monitor itself fails |
 | EditMonitors | Edit monitors | 1440×1560 | Access · monitor config · resolve · when the monitor itself fails |
@@ -396,5 +396,21 @@ Decision D-048: a swap is accepted by the person asked, then approved by an Admi
 6. **Roles.** Person asked: Accept / Decline. Requester: the side card read-only with Withdraw while open. Admin: Approve / Decline — Approve is disabled with “Approve unlocks once Nok accepts — Nok first, then an Admin.” until the person asked accepts. Everyone else: the rotation rows only (“Swap requested”), no card. Only Admins edit the rotation; others get “Swap” only on their own future rows.
 7. **Rotation rows.** Both weeks of an open request (waiting or accepted) show Swap requested (neutral outline arrow-up-down, §15.8). On the phone the second line says what it waits for: “with Nok, waiting for Nok” / “… waiting for an Admin”. Request-a-swap dialog copy (desktop + phone): “<name> gets a Chat message and an email to accept, then an Admin approves. Nothing changes in the rotation until then.”
 8. **Test-alert landing (phone).** Opening the test link on the tester’s phone: success alert “Test alert received on this phone at 10:08”; the checklist row ticks with “Received on this phone at 10:08”; the count reads 3/3 and “Ploy’s phone 3 of 3 ready · test alert received 10:08” (OnCall’s phone card matches). Someone else opening it (Tao): warning “This test was for Ploy — open it on Ploy’s phone.” — nothing is ticked, and Tao sees no checklist.
-9. **Not in this slice:** the 2-step lines (D-007 retired them — still on the OnCall Admin side card, to be removed by Tao’s call), the rotation editor and Hand over, Chat / email message text. Sample people, dates and reasons are made up — compute them; never copy.
+9. **Not in this slice:** the 2-step lines (D-007 retired them; removed from OnCall on 30 Oct — side card, Edit rotation order and the swap dialog, whose warning is now back-to-back), the rotation editor and Hand over, Chat / email message text. Sample people, dates and reasons are made up — compute them; never copy.
+
+## 28. On-call — the requester and Admin on a phone, Hand over at 390, no one to page, expired requests, who was paged — slice S10 (B2c), added 30 Oct 2026
+Decision D-048 (as §27). Boards: **MOnCall** (BOARD STATE lists every case below), **OnCall** (ROTATION Normal · Handed over · One person · Nobody on call · Empty; REQUEST gains Expired), **Incident** (OPENED Inside / Outside response hours) and **MobileAckDark** (VIEW AS Ploy · on call / Arm · owner / Tao · Admin). The 2-step lines are retired (D-007) and are drawn nowhere on these boards.
+
+1. **Swap card on a phone — requester (Arm).** Top of the scroll, same shape as Nok’s card (§27.3): eyebrow “YOUR SWAP REQUEST”, “You asked Nok to swap weeks”, the two weeks stacked (“Nok would take · Mon 5 → 12 Oct · Your week now” / “You would take · Mon 19 → 26 Oct · Nok’s week now”), the people list (Arm · requester / Nok · asked / Tao · Admin, each with its state badge), then **Withdraw** (secondary, full width) with “Waiting for Nok to accept, then an Admin approves. You can withdraw until an Admin acts.” Badge: Waiting for Nok → Waiting for an Admin. Closed states replace the button with a status line: Approved (“Approved — the weeks have swapped.” + who is on call when), Declined by Nok (with Nok’s reason), Declined by Tao (with the reason), “You withdrew · Fri 10:05”, Expired. The hero shows Arm’s next shift (Mon 19 Oct after approval).
+2. **Swap card on a phone — Admin (Tao).** “Arm and Nok swap weeks”, “Requested by Arm · …”, both weeks (“Nok takes Arm’s week” / “Arm takes Nok’s week”), the people list, the back-to-back warning, then the pair **Decline** / **Approve** (Approve primary, disabled with “Approve unlocks once Nok accepts — Nok first, then an Admin.” until Nok accepts). Decline opens a dialog with a **required** reason (“Say why — Arm and Nok see this”). Closed states as in item 1.
+3. **Hand over at 390 (Admins only).** The live row card on MOnCall gets a full-width secondary **Hand over…** under it (Admins only). It opens a full-height sheet with the Users dialog’s content: “Hand over Ploy’s live shift”, the description, New on-call person (Arm / Nok, with phone readiness), Takes effect (Now · Fri 10:08 / Tonight 18:00 / Sat 26 Sep 09:00), that person’s phone checklist + **Send test alert to <name>**, the summary line, a **required** reason, footer Cancel + “Hand over to <name>” and “Logged in the audit log”. Picking Nok shows “Nok is on call next (Mon 28 Sep → 5 Oct) — this makes it back-to-back.” Confirming shows a success alert “Ploy’s shift handed to Arm from tonight 18:00” · “Ploy and Arm got a Chat message. Logged in the audit log.”
+4. **No one to page** (hero + rotation, 1440 and 390):
+   - **Nobody on call right now** — no week covers now (sample: the rotation starts Mon 28 Sep). Hero “Nobody on call” · “No week covers tonight — the rotation starts Mon 28 Sep 09:00 with Nok. Until then Tier 1 alerts at night page each site’s owner.” The phone-readiness card becomes **Tonight · site owners** (each Tier 1 owner and their sites). The rotation starts with a row “No one · Now → Mon 28 Sep” (warning outline, triangle-alert “No one on call”, “Site owners at night”). Admin: Edit rotation becomes the primary action (desktop header; phone in the owners card).
+   - **Empty rotation** (first time on production) — hero “Nobody on call” · “No rotation yet. …”, the week grid shows owners only, and the rotation becomes an empty card “No rotation yet”: Admin — “Add the people who take Tier 1 nights and weekends, one week each.” + **Edit rotation** (the one primary action; the header button hides); others — “An Admin sets up the rotation.”
+   - **Handed over** — the hero names the person covering (“ON CALL TONIGHT · COVERING PLOY / Arm”, “Covering Ploy from 18:00 · ill tonight”); the reason shows only to the two people and Admins. Ploy’s row reads “Handed to Arm” (neutral outline arrow-up-down) with “Arm from Fri 18:00”; the week grid gives Fri night → Sun to Arm; the phone card shows Arm’s phone. Hand over… is gone from that row.
+   - **One person** (production starts with one person; the boards use Ploy as sample) — every week is Ploy’s; Swap is disabled (desktop rows, phone “Request swap”) with “Nobody else in the rotation to swap with”; the hero still works (“then Ploy again — the only person in the rotation”). No swap request can exist, so no request cards.
+5. **Expired request.** A request still open when one of its weeks starts expires at that time (D-048 — it can’t be approved on a live week). Nok’s card, the side card (Arm, Tao) and both rows show it: badge “Expired” (neutral outline clock), “Expired — Arm’s week started before it was approved”, “Mon 5 Oct 09:00 · both weeks unchanged”, rows “Swap expired Mon 5 Oct”; Tao’s step reads “Too late”. The boards draw it at their Fri 25 Sep time, so the Mon 5 Oct row still says Scheduled; on the day it reads On call now.
+6. **Who was paged — Incident header and MobileAckDark.** For an incident opened outside response hours (Tier 1): the key-facts cell becomes **PAGED · ON CALL · Ploy** (“Owner Arm, not paged · AM Bua”), a line under the cause says “On call · Ploy (Tier 1, outside response hours) — paged at L0, the person who acts. Owner Arm isn’t paged outside response hours.”, L0 reads “Ploy (on call, outside response hours) @mention + Alerts Space · owner Arm not paged”, and L1 is Tao only (“backup Ploy is already paged as on call” — §15.7 “minus anyone already paged”); the Escalation cell reads “L1 · Tao”. On Incident the OPENED switch changes only these lines — the times stay as the 09:48 sample. Board height 1730 (was 1660). MobileAckDark adds a **Paged · on call** row (“Ploy (you) · 03:41 · L0” / “Owner Arm · not paged outside response hours”), and the role line follows the viewer: Ploy “You’re on call (Tier 1 night).”; Arm “You own this site — you weren’t paged. Ploy is on call and was paged at 03:41.”; Tao “Ploy is on call and was paged at 03:41. You’re L1 at 03:55 if nobody acknowledges.” Inside response hours nothing changes (OWNER cell as before).
+7. **Edit rotation on a phone** isn’t drawn (not in scope); the phone’s Edit rotation buttons open the same editor (the boards link the OnCall board).
+8. Message text for Chat and email isn’t in this slice — Claude drafts it and message-checker reviews it (D-048 item 11). Sample people, times and reasons are made up — compute them; never copy.
 

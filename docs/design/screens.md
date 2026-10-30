@@ -28,7 +28,7 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | EditMonitors | Edit monitors | `/sites/[siteId]/monitors` | P0 | S05 | §6 | FR-01 |
 | Incidents | Incidents list | `/incidents` | P0 | S07 | §4, §11, §16.1 | FR-06 |
 | MIncidents | Mobile — Incidents | `/incidents` (390) | P0 | S07 | §17 | FR-06 |
-| Incident | Incident — INC-0142 MuvMi DOWN | `/incidents/[incidentId]` | P0 | S07 | §8, §9, §14.1, §14.3, §15.4, §16.2–3 | FR-06, FR-20 |
+| Incident | Incident — INC-0142 MuvMi DOWN | `/incidents/[incidentId]` | P0 | S07 | §8, §9, §14.1, §14.3, §15.4, §16.2–3, §28.6 (S10: who was paged on call) | FR-06, FR-20 |
 | MIncident | Mobile — Incident detail | `/incidents/[incidentId]` (390) | P0 | S07 | §15.6, §17 | FR-06 |
 | IncidentPageChange | Incident — page change (INC-0157 example) | `/incidents/[incidentId]` (trigger Page change) | P1 | S09d | §16.2–3, §26 | — (PRD §2 content-change, D-041) |
 | MIncidentPageChange | Mobile — Incident: page change | `/incidents/[incidentId]` (390, trigger Page change) | P1 | S09d | §17, §26 | — |
@@ -36,7 +36,7 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | IncidentPageChangeDark | Incident — page change · dark | same, dark theme | P1 | S09d | §26.10 | — |
 | MIncidentPageChangeDark | Mobile — Incident: page change · dark | same (390), dark theme | P1 | S09d | §26.10 | — |
 | MobileAck | Mobile — acknowledge from alert | `/incidents/[incidentId]?ack=1` (390) | P0 | S02b | §14.3, §16.8, §17 | FR-07 |
-| MobileAckDark | Mobile ack — dark (night on-call) | same, dark theme | P0 | S02b | §15.7 | FR-07 |
+| MobileAckDark | Mobile ack — dark (night on-call) | same, dark theme | P0 | S02b | §15.7, §28.6 (S10: paged on call) | FR-07 |
 | Resolve | Resolve incident + root cause | dialog on `/incidents/[incidentId]` | P0 | S07 | §15.4, §16.1–4 | FR-06 |
 | Maintenance | Maintenance / mute dialog | dialog (Site detail, Sites ⋯, `/maintenance`) | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1, §23.6 | FR-10a, FR-14 |
 | MMaintenance | Mobile — Mute / maintenance sheet | sheet (390) | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1, §23.6 | FR-10a, FR-14 |
@@ -44,8 +44,8 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | MMaintenanceList | Mobile — Maintenance & mutes | `/maintenance` (390) | P0 (mute pulled into the MVP) | S09 | §22, §23.9 | FR-10a, FR-14 |
 | Escalation | Escalation policies | `/escalation` | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §14.1, §14.7, §15.5, §22 | FR-09a, FR-09b |
 | MEscalation | Mobile — Escalation (view only) | `/escalation` (390) | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §22.5–6 | FR-09a, FR-09b |
-| OnCall | On-call rotation | `/oncall` | P1 | S10 | §2, §15.8, §27 | FR-09b, §8 |
-| MOnCall | Mobile — On-call | `/oncall` (390) | P1 | S10 | §10 (checklist), §27 | §8 |
+| OnCall | On-call rotation | `/oncall` | P1 | S10 | §2, §15.8, §27, §28 | FR-09b, §8 |
+| MOnCall | Mobile — On-call | `/oncall` (390) | P1 | S10 | §10 (checklist), §27, §28 | §8 |
 | Expiry | SSL & domain expiry | `/expiry` | P1 | S13 | §14.12, §15.8 | FR-11 |
 | Probes | Probes & heartbeat | `/probes` | P1 | S12 | §14.4, §15.3 | §9 |
 | AuditLog | Audit log | `/audit` | P1 | S15 | §16.11 | FR-13 |

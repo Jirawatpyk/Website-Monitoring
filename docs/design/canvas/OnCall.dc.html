@@ -23,7 +23,7 @@ main > *{flex-shrink:0}
 .oc-line{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--aura-border-default);border-radius:var(--aura-radius-md);font-size:14px;line-height:1.5}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1960px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 2080px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -49,7 +49,8 @@ main > *{flex-shrink:0}
 
 <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin: -12px 0 -8px">
 <div class="oc-ctl"><span>VIEW AS</span><x-import component-from-global-scope="Aura.SegmentedControl" label="View as" options="{{viewers}}" value="{{viewer}}" on-change="{{setViewer}}" size="sm"></x-import></div>
-<div class="oc-ctl"><span>REQUEST</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Swap request state" options="{{reqs}}" value="{{req}}" on-change="{{setReq}}" size="sm"></x-import></div>
+<sc-if value="{{showReq}}" hint-placeholder-val="{{true}}"><div class="oc-ctl"><span>REQUEST</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Swap request state" options="{{reqs}}" value="{{req}}" on-change="{{setReq}}" size="sm"></x-import></div></sc-if>
+<div class="oc-ctl"><span>ROTATION</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Rotation case" options="{{scens}}" value="{{scen}}" on-change="{{setScen}}" size="sm"></x-import></div>
 </div>
 
 <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
@@ -58,7 +59,7 @@ main > *{flex-shrink:0}
 <h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">On-call</h1>
 <span style="font-size: 14px; color: var(--aura-fg-secondary); line-height: 1.5">Weekly rotation for Tier 1. Mon–Fri 09:00–18:00 the owners respond; outside that, Tier 1 goes to the person on call.<br>Tier 2–3 have no on-call: they’re covered Mon–Fri 09:00–18:00 — DOWN still posts at night, timers wait until 09:00.</span>
 </div>
-<sc-if value="{{isAdmin}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="users" on-click="{{openEdit}}">Edit rotation</x-import></sc-if>
+<sc-if value="{{headEdit}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="{{editVariant}}" icon="users" on-click="{{openEdit}}">Edit rotation</x-import></sc-if>
 </div>
 
 
@@ -95,21 +96,23 @@ main > *{flex-shrink:0}
 </sc-if>
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
 <div style="grid-column: span 2; display: flex; align-items: center; gap: 20px; padding: 24px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-card-radius)">
-<x-import component-from-global-scope="Aura.Avatar" name="Ploy" size="lg"></x-import>
+<sc-if value="{{hero.hasAvatar}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Avatar" name="{{hero.who}}" size="lg"></x-import></sc-if>
+<sc-if value="{{hero.noAvatar}}" hint-placeholder-val="{{false}}"><span style="width: 56px; height: 56px; flex-shrink: 0; box-sizing: border-box; border-radius: 9999px; border: 1px dashed currentColor; opacity: 0.7; display: flex; align-items: center; justify-content: center"><x-import component-from-global-scope="Aura.Icon" name="users" size="md"></x-import></span></sc-if>
 <div style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.4">
-<span style="font-family: var(--font-mono); font-size: 11px; opacity: 0.7">ON CALL TONIGHT</span>
-<span style="font-size: 24px; font-weight: 600">Ploy</span>
-<span style="font-size: 13px; opacity: 0.8">Fri 25 Sep 18:00 → Mon 28 Sep 09:00</span>
-<span style="font-size: 12px; opacity: 0.6">Shift Mon 21 Sep → Mon 28 Sep · then Nok</span>
+<span style="font-family: var(--font-mono); font-size: 11px; opacity: 0.7">{{hero.eyebrow}}</span>
+<span style="font-size: 24px; font-weight: 600">{{hero.title}}</span>
+<span style="font-size: 13px; opacity: 0.8">{{hero.l1}}</span>
+<span style="font-size: 12px; opacity: 0.6">{{hero.l2}}</span>
 </div>
 <div style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1.4; text-align: right; white-space: nowrap">
 <span style="font-family: var(--font-mono); font-size: 11px; opacity: 0.7">RIGHT NOW · 10:07</span>
 <span style="font-size: 15px; font-weight: 600">Owners respond</span>
-<span style="font-size: 13px; opacity: 0.8">until 18:00 today</span>
+<span style="font-size: 13px; opacity: 0.8">{{hero.rs}}</span>
 </div>
 </div>
+<sc-if value="{{showPhone}}" hint-placeholder-val="{{true}}">
 <div class="aura-card" style="gap: 12px">
-<div style="display: flex; flex-direction: column; line-height: 1.4"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Ploy’s phone · {{readyCount}} ready</h3><span style="font-size: 13px; color: {{readyColor}}">{{readySub}}</span></div>
+<div style="display: flex; flex-direction: column; line-height: 1.4"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">{{phoneWho}}’s phone · {{readyCount}} ready</h3><span style="font-size: 13px; color: {{readyColor}}">{{readySub}}</span></div>
 <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px">
 <sc-for list="{{ready}}" as="r" hint-placeholder-count="4">
 <div style="display: flex; gap: 10px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: {{r.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{r.icon}}" size="sm" label="{{r.state}}"></x-import></span><span>{{r.label}}</span></div>
@@ -117,6 +120,18 @@ main > *{flex-shrink:0}
 </div>
 <x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="bell" disabled="{{testSent}}" on-click="{{sendTest}}">{{testLabel}}</x-import>
 </div>
+</sc-if>
+<sc-if value="{{showOwners}}" hint-placeholder-val="{{false}}">
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; flex-direction: column; line-height: 1.4"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Tonight · site owners</h3><span style="font-size: 13px; color: var(--aura-fg-secondary)">No one is on call, so Tier 1 alerts at night page each site’s owner</span></div>
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{owners}}" as="o" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: {{o.border}}; font-size: 13px; line-height: 1.35"><x-import component-from-global-scope="Aura.Avatar" name="{{o.who}}" size="sm"></x-import><span style="display: flex; flex-direction: column"><span style="font-weight: 500">{{o.who}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{o.sites}}</span></span></div>
+</sc-for>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{ownersFoot}}</span>
+</div>
+</sc-if>
 </div>
 
 <div class="aura-card" style="gap: 16px">
@@ -149,6 +164,7 @@ main > *{flex-shrink:0}
 <h2 style="margin: 0 0 -8px; font-size: 24px; line-height: 1.3; font-weight: 600">Rotation</h2>
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start">
 <section style="grid-column: span {{rotSpan}}; display: flex; flex-direction: column; gap: 12px; min-width: 0">
+<sc-if value="{{hasRows}}" hint-placeholder-val="{{true}}">
 <div class="aura-table">
 <div class="aura-table__head" style="text-transform: uppercase">
 <div class="aura-table__gutter"></div>
@@ -163,15 +179,25 @@ main > *{flex-shrink:0}
 <div class="aura-table__row">
 <div class="aura-table__gutter"></div>
 <div class="aura-table__td" style="width: 190px; font-variant-numeric: tabular-nums; color: {{r.color}}">{{r.shift}}</div>
-<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 10px; line-height: 1"><x-import component-from-global-scope="Aura.Avatar" name="{{r.who}}" size="sm"></x-import><span>{{r.who}}</span></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 10px; line-height: 1"><sc-if value="{{r.person}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Avatar" name="{{r.who}}" size="sm"></x-import></sc-if><sc-if value="{{r.nobody}}" hint-placeholder-val="{{false}}"><span style="width: 28px; height: 28px; box-sizing: border-box; border-radius: 9999px; border: 1px dashed var(--aura-border-strong); display: flex; align-items: center; justify-content: center; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="minus" size="sm"></x-import></span></sc-if><span style="color: {{r.whoColor}}">{{r.who}}</span></div>
 <div class="aura-table__td" style="width: 160px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.status}}</x-import></div>
 <div class="aura-table__td" style="width: 170px; color: var(--aura-fg-secondary)">{{r.alerts}}</div>
-<div class="aura-table__td" style="width: 96px; display: flex; align-items: center; justify-content: flex-end; padding-right: 0; line-height: 1"><sc-if value="{{r.canSwap}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{r.swap}}">Swap</x-import></sc-if><sc-if value="{{r.handover}}" hint-placeholder-val="{{false}}"><a href="Users.dc.html" title="The live shift can’t be swapped — hand it over in Users" style="font-size: 13px; font-weight: 500; white-space: nowrap; padding-right: 8px">Hand over…</a></sc-if><sc-if value="{{r.noSwap}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-tertiary); white-space: nowrap; padding-right: 8px" title="{{r.noSwapWhy}}">{{r.noSwapText}}</span></sc-if></div>
+<div class="aura-table__td" style="width: 96px; display: flex; align-items: center; justify-content: flex-end; padding-right: 0; line-height: 1"><sc-if value="{{r.canSwap}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{r.swap}}">Swap</x-import></sc-if><sc-if value="{{r.handover}}" hint-placeholder-val="{{false}}"><a href="Users.dc.html" title="The live shift can’t be swapped — hand it over in Users" style="font-size: 13px; font-weight: 500; white-space: nowrap; padding-right: 8px">Hand over…</a></sc-if><sc-if value="{{r.swapOff}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" disabled="{{yes}}" title="Nobody else in the rotation to swap with">Swap</x-import></sc-if><sc-if value="{{r.noSwap}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-tertiary); white-space: nowrap; padding-right: 8px" title="{{r.noSwapWhy}}">{{r.noSwapText}}</span></sc-if></div>
 <div class="aura-table__gutter aura-table__gutter--end"></div>
 </div>
 </sc-for>
 </div>
-<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Shifts change Monday 09:00. The live shift can’t be swapped — use “Hand over shift…” on Ploy’s row in <a href="Users.dc.html">Settings › Users</a> (new person, effective time, their phone checklist). Tao isn’t in the rotation: as Admin backstop, Tao is at L1 for every DOWN.</span>
+</sc-if>
+<sc-if value="{{noRows}}" hint-placeholder-val="{{false}}">
+<div class="aura-card" style="gap: 10px; align-items: flex-start; padding: 32px">
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="users" size="lg"></x-import></span>
+<h3 style="margin: 0; font-size: 18px; line-height: 1.4; font-weight: 600">No rotation yet</h3>
+<span style="font-size: 14px; line-height: 1.55; color: var(--aura-fg-secondary); max-width: 620px">{{emptyText}}</span>
+<sc-if value="{{isAdmin}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="users" on-click="{{openEdit}}">Edit rotation</x-import></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{footPlain}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">{{foot}}</span></sc-if>
+<sc-if value="{{footNormal}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">Shifts change Monday 09:00. The live shift can’t be swapped — {{handFoot}} (<a href="Users.dc.html">Hand over shift</a>: new person, effective time, their phone checklist). Tao isn’t in the rotation: as Admin backstop, Tao is at L1 for every DOWN.</span></sc-if>
 </section>
 <sc-if value="{{hasSide}}" hint-placeholder-val="{{true}}">
 <div class="aura-card" style="gap: 12px">
@@ -190,10 +216,6 @@ main > *{flex-shrink:0}
 <x-import component-from-global-scope="Aura.Alert" tone="warning" title="Back-to-back for Nok">Nok would be on call Mon 28 Sep → Mon 12 Oct — two weeks in a row.</x-import>
 </sc-if>
 <sc-if value="{{adminLive}}" hint-placeholder-val="{{true}}">
-<div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
-<span style="display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import>Nok has 2-step off; required from 5 Oct</span>
-<span>From Mon 5 Oct Nok can still sign in to acknowledge; everything else is locked until 2-step is on. Applies whether or not the swap is accepted (Nok owns 4 sites, backs up 8). <a href="Security.dc.html">Sign-in &amp; security</a></span>
-</div>
 <div style="display: flex; gap: 8px">
 <x-import component-from-global-scope="Aura.Button" variant="primary" size="sm" icon="check" disabled="{{approveOff}}" on-click="{{approve}}">Approve</x-import>
 <x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" on-click="{{openDecline}}">Decline</x-import>
@@ -250,13 +272,13 @@ main > *{flex-shrink:0}
 </div>
 </div>
 </x-import>
-<x-import component-from-global-scope="Aura.Dialog" open="{{editOpen}}" on-close="{{closeModal}}" title="Edit rotation" description="Changes apply from Mon 19 Oct. Weeks already scheduled keep their person — use Swap for those." size="md" auto-focus="{{no}}">
+<x-import component-from-global-scope="Aura.Dialog" open="{{editOpen}}" on-close="{{closeModal}}" title="Edit rotation" description="{{editDesc}}" size="md" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 16px">
 <div style="display: flex; flex-direction: column; gap: 8px">
 <span style="font-size: 13px; font-weight: 500">Order</span>
 <div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
 <sc-for list="{{order}}" as="o" hint-placeholder-count="3">
-<div style="display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-top: {{o.border}}; font-size: 13px; line-height: 1.4"><span style="width: 18px; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-tertiary)">{{o.n}}</span><x-import component-from-global-scope="Aura.Avatar" name="{{o.who}}" size="sm"></x-import><span style="flex-grow: 1; font-weight: 500">{{o.who}} <span style="font-weight: 400; color: var(--aura-fg-secondary)">· 2-step {{o.sv}}</span></span><x-import component-from-global-scope="Aura.IconButton" icon="arrow-up" label="{{o.upLabel}}" disabled="{{o.first}}" on-click="{{o.up}}"></x-import><x-import component-from-global-scope="Aura.IconButton" icon="arrow-down" label="{{o.downLabel}}" disabled="{{o.last}}" on-click="{{o.down}}"></x-import></div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-top: {{o.border}}; font-size: 13px; line-height: 1.4"><span style="width: 18px; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-tertiary)">{{o.n}}</span><x-import component-from-global-scope="Aura.Avatar" name="{{o.who}}" size="sm"></x-import><span style="flex-grow: 1; font-weight: 500">{{o.who}}</span><x-import component-from-global-scope="Aura.IconButton" icon="arrow-up" label="{{o.upLabel}}" disabled="{{o.first}}" on-click="{{o.up}}"></x-import><x-import component-from-global-scope="Aura.IconButton" icon="arrow-down" label="{{o.downLabel}}" disabled="{{o.last}}" on-click="{{o.down}}"></x-import></div>
 </sc-for>
 </div>
 </div>
@@ -277,18 +299,19 @@ main > *{flex-shrink:0}
 </x-import>
 
 <div style="padding: 14px 18px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.55; color: var(--aura-fg-secondary); display: flex; flex-direction: column; gap: 4px">
-<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · SWAP REQUEST (§27, D-048)</span>
-<span><b style="color: var(--aura-fg-primary); font-weight: 600">Order.</b> The requester asks → the person asked accepts or declines → an Admin approves or declines. Nothing changes in the rotation before the Admin approves. Every step is logged and messages the others (Chat + email). VIEW AS switches the viewer, REQUEST the request’s state; both drive the card, the rotation rows and the buttons.</span>
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · SWAP REQUEST + ROTATION CASES (§27, §28, D-048)</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Order.</b> The requester asks → the person asked accepts or declines → an Admin approves or declines. Nothing changes in the rotation before the Admin approves. Every step is logged and messages the others (Chat + email). VIEW AS switches the viewer, REQUEST the request’s state, ROTATION the case; all three drive the card, the hero, the rotation rows and the buttons. Expired: a request still open when one of its weeks starts expires at that week’s start (Mon 5 Oct 09:00) — drawn here at the board’s Fri 25 Sep time, so the 5 Oct row still reads Scheduled; on the day it reads On call now.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Who sees what.</b> Nok (asked, opened from the Chat / email link /oncall?swap=…): the request card at the top with Accept / Decline (reason optional). Arm (requester): the side card read-only with Withdraw. Admin: Approve / Decline — Approve unlocks once Nok accepts. Everyone else (Ploy): the rotation rows only. No Undo: until the Admin acts, Arm can withdraw and Tao can decline.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">No one to page (§28).</b> Nobody on call: no week covers now — Tier 1 nights page each site’s owner, the hero says so and the Admin’s Edit rotation turns primary. Empty: no rotation at all — Admin gets Edit rotation as the one primary action; others read that an Admin sets it up. Handed over: the hero names who covers, the reason only for the two people and Admins. One person: Swap is disabled — “Nobody else in the rotation to swap with”.</span>
 </div>
 </main>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1960}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2080}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { modal: null, row: null, swapWith: '', declineNote: '', dTried: false, requested: {}, order: ['Arm', 'Ploy', 'Nok'], sOrder: ['Arm', 'Ploy', 'Nok'], viewer: 'Tao · Admin', req: 'Waiting for Nok', nokNote: '' };
+    this.state = { modal: null, row: null, swapWith: '', declineNote: '', dTried: false, requested: {}, order: ['Arm', 'Ploy', 'Nok'], sOrder: ['Arm', 'Ploy', 'Nok'], viewer: 'Tao · Admin', req: 'Waiting for Nok', nokNote: '', scen: 'Normal' };
   }
   renderVals() {
     var self = this;
@@ -296,6 +319,11 @@ class Component extends DCLogic {
     var VW = { 'Tao · Admin': 'Tao', 'Nok · asked': 'Nok', 'Arm · requester': 'Arm', 'Ploy · others': 'Ploy' };
     var ME = VW[st.viewer] || 'Tao', ADMIN = ME === 'Tao';
     var RQ = st.req;
+    var SC = st.scen || 'Normal';
+    var NOREQ = SC === 'One person' || SC === 'Nobody on call' || SC === 'Empty';
+    var HANDED = SC === 'Handed over', ONE = SC === 'One person', NOBODY = SC === 'Nobody on call', EMPTY = SC === 'Empty';
+    if (NOREQ) RQ = 'Withdrawn';
+    var EXPIRED = RQ === 'Expired';
     var LIVE = RQ === 'Waiting for Nok' || RQ === 'Accepted';
     var APPROVED = RQ === 'Approved';
     st = Object.assign({}, st, { declined: !LIVE && !APPROVED });
@@ -304,21 +332,26 @@ class Component extends DCLogic {
     function seg(h, who, style) { return Object.assign({ h: h, who: who }, style); }
     function weekday(prev, next) { return [seg(61, prev, ONC), seg(61, 'Owners', OWN), seg(40, next, ONC)]; }
     var days = [
-      { label: 'Mon 21', segs: weekday('Arm', 'Ploy') },
+      { label: 'Mon 21', segs: weekday(ONE ? 'Ploy' : 'Arm', 'Ploy') },
       { label: 'Tue 22', segs: weekday('Ploy', 'Ploy') },
       { label: 'Wed 23', segs: weekday('Ploy', 'Ploy') },
       { label: 'Thu 24', segs: weekday('Ploy', 'Ploy') },
-      { label: 'Fri 25 · today', segs: weekday('Ploy', 'Ploy'), today: true },
-      { label: 'Sat 26', segs: [seg(166, 'Ploy · all day', ONC)] },
-      { label: 'Sun 27', segs: [seg(166, 'Ploy · all day', ONC)] }
+      { label: 'Fri 25 · today', segs: weekday('Ploy', HANDED ? 'Arm' : 'Ploy'), today: true },
+      { label: 'Sat 26', segs: [seg(166, (HANDED ? 'Arm' : 'Ploy') + ' · all day', ONC)] },
+      { label: 'Sun 27', segs: [seg(166, (HANDED ? 'Arm' : 'Ploy') + ' · all day', ONC)] }
     ];
+    if (NOBODY || EMPTY) days = days.map(function (d, i) { return { label: d.label, today: d.today, segs: i < 5 ? [seg(61, 'Owners', OWN), seg(61, 'Owners', OWN), seg(40, 'Owners', OWN)] : [seg(166, 'Owners · all day', OWN)] }; });
     function R(shift, who, status, tone, variant, icon, alerts, past, key, start) {
       var live = status === 'On call now';
       var open = (key === 'arm5' || key === 'nok19') && LIVE;
       var req = st.requested[key];
-      var canSwap = !past && !live && !open && !req && (ADMIN || who === ME);
-      return { shift: shift, who: who, status: req ? 'Swap requested' : status, tone: req ? 'neutral' : tone, variant: req ? 'outline' : variant, icon: req ? 'arrow-up-down' : icon, alerts: alerts,
-        canSwap: canSwap, noSwap: open && !past && !live, handover: live, noSwapText: live ? 'Live shift' : 'Request open', noSwapWhy: live ? 'The live shift can’t be swapped' : 'A swap is already waiting',
+      var nobody = who === 'No one';
+      var canSwap = !past && !live && !open && !req && !ONE && !nobody && (ADMIN || who === ME);
+      var handed = HANDED && key === 'ploy21';
+      if (EXPIRED && (key === 'arm5' || key === 'nok19')) alerts = 'Swap expired Mon 5 Oct';
+      if (handed) { status = 'Handed to Arm'; variant = 'outline'; icon = 'arrow-up-down'; alerts = 'Arm from Fri 18:00'; }
+      return { person: !nobody, nobody: nobody, whoColor: nobody ? 'var(--aura-fg-secondary)' : 'inherit', swapOff: ONE && !past && !live, shift: shift, who: who, status: req ? 'Swap requested' : status, tone: req ? 'neutral' : tone, variant: req ? 'outline' : variant, icon: req ? 'arrow-up-down' : icon, alerts: alerts,
+        canSwap: canSwap, noSwap: open && !past && !live, handover: live && !handed && ADMIN, noSwapText: live ? 'Live shift' : 'Request open', noSwapWhy: live ? 'The live shift can’t be swapped' : 'A swap is already waiting',
         color: past ? 'var(--aura-fg-secondary)' : 'var(--aura-fg-primary)',
         swap: function () { var others = ['Arm', 'Ploy', 'Nok'].filter(function (x) { return x !== who; }); self.setState({ modal: 'swap', row: { key: key, shift: shift, who: who, start: start }, swapWith: others[0] }); } };
     }
@@ -330,6 +363,27 @@ class Component extends DCLogic {
       R('Mon 12 Oct → Mon 19 Oct', 'Ploy', 'Scheduled', 'neutral', 'outline', 'clock', '—', false, 'ploy12', 42),
       R('Mon 19 Oct → Mon 26 Oct', APPROVED ? 'Arm' : 'Nok', LIVE ? 'Swap requested' : 'Scheduled', 'neutral', 'outline', LIVE ? 'arrow-up-down' : 'clock', APPROVED ? 'Swapped · Fri 10:08' : '—', false, 'nok19', 49)
     ];
+    if (ONE) rows = [
+      R('Mon 14 Sep → Mon 21 Sep', 'Ploy', 'Done', 'neutral', 'soft', 'check', 'INC-0131 · BA – Taiwan', true, 'p14', 14),
+      R('Mon 21 Sep → Mon 28 Sep', 'Ploy', 'On call now', 'neutral', 'solid', 'circle-dot', 'None so far', false, 'p21', 21),
+      R('Mon 28 Sep → Mon 5 Oct', 'Ploy', 'Next', 'neutral', 'soft', 'arrow-right', '—', false, 'p28', 28),
+      R('Mon 5 Oct → Mon 12 Oct', 'Ploy', 'Scheduled', 'neutral', 'outline', 'clock', '—', false, 'p5', 35),
+      R('Mon 12 Oct → Mon 19 Oct', 'Ploy', 'Scheduled', 'neutral', 'outline', 'clock', '—', false, 'p12', 42)
+    ];
+    if (NOBODY) rows = [
+      R('Now → Mon 28 Sep', 'No one', 'No one on call', 'warning', 'outline', 'triangle-alert', 'Site owners at night', false, 'none', 21),
+      R('Mon 28 Sep → Mon 5 Oct', 'Nok', 'Next', 'neutral', 'soft', 'arrow-right', '—', false, 'nok28', 28),
+      R('Mon 5 Oct → Mon 12 Oct', 'Arm', 'Scheduled', 'neutral', 'outline', 'clock', '—', false, 'arm5x', 35),
+      R('Mon 12 Oct → Mon 19 Oct', 'Ploy', 'Scheduled', 'neutral', 'outline', 'clock', '—', false, 'ploy12', 42),
+      R('Mon 19 Oct → Mon 26 Oct', 'Nok', 'Scheduled', 'neutral', 'outline', 'clock', '—', false, 'nok19x', 49)
+    ];
+    if (EMPTY) rows = [];
+    var INVOLVED = ME === 'Tao' || ME === 'Ploy' || ME === 'Arm';
+    var HERO = { hasAvatar: true, noAvatar: false, who: 'Ploy', eyebrow: 'ON CALL TONIGHT', title: 'Ploy', l1: 'Fri 25 Sep 18:00 → Mon 28 Sep 09:00', l2: 'Shift Mon 21 Sep → Mon 28 Sep · then Nok', rs: 'until 18:00 today' };
+    if (HANDED) HERO = Object.assign({}, HERO, { who: 'Arm', eyebrow: 'ON CALL TONIGHT · COVERING PLOY', title: 'Arm', l2: 'Covering Ploy from 18:00' + (INVOLVED ? ' · ill tonight' : '') + ' · then Nok from Mon 28 Sep' });
+    if (ONE) HERO = Object.assign({}, HERO, { l2: 'Shift Mon 21 Sep → Mon 28 Sep · then Ploy again — the only person in the rotation' });
+    if (NOBODY) HERO = { hasAvatar: false, noAvatar: true, eyebrow: 'ON CALL TONIGHT', title: 'Nobody on call', l1: 'No week covers tonight — the rotation starts Mon 28 Sep 09:00 with Nok', l2: 'Until then Tier 1 alerts at night page each site’s owner' + (ADMIN ? ' · add a week in Edit rotation' : ''), rs: 'until 18:00 — and tonight' };
+    if (EMPTY) HERO = { hasAvatar: false, noAvatar: true, eyebrow: 'ON CALL TONIGHT', title: 'Nobody on call', l1: 'No rotation yet', l2: (ADMIN ? 'Set one up in Edit rotation. ' : 'An Admin sets it up. ') + 'Until then Tier 1 alerts at night page each site’s owner', rs: 'until 18:00 — and tonight' };
     var NEXT = { Arm: ['Mon 5 Oct → 12 Oct', 35], Ploy: ['Mon 12 Oct → 19 Oct', 42], Nok: ['Mon 28 Sep → 5 Oct', 28] };
     var sr = st.row;
     var sw = st.swapWith;
@@ -338,20 +392,20 @@ class Component extends DCLogic {
       var theirs = NEXT[sw] || ['—', 0];
       if (sw === 'Nok' && sr.who === 'Arm') theirs = ['Mon 28 Sep → 5 Oct', 28];
       swapRows = [{ who: sw, week: sr.shift.replace(' → ', ' → ').replace(/ Sep| Oct/g, function (m) { return m; }), border: 'none' }, { who: sr.who, week: theirs[0], border: '1px solid var(--aura-border-subtle)' }];
-      var nokStart = sw === 'Nok' ? sr.start : (sr.who === 'Nok' ? theirs[1] : null);
-      if (nokStart !== null && nokStart >= 35) flag = { t: 'Nok has 2-step off; required from 5 Oct', x: 'From Mon 5 Oct Nok can still sign in to acknowledge; everything else is locked until 2-step is on. This applies whether or not this swap is accepted (Nok owns 4 sites, backs up 8); the swap would also put Nok on nights from that day.' };
-      else if (nokStart !== null && nokStart >= 28) flag = { t: 'Nok has 2-step off', x: 'Not required yet for this week (required from 5 Oct), but Nok should turn it on before the shift.' };
+      var WEEKS = { Arm: [14, 35], Ploy: [21, 42], Nok: [28, 49] };
+      var mine = (WEEKS[sw] || []).filter(function (x) { return x !== theirs[1]; });
+      if (mine.indexOf(sr.start - 7) >= 0 || mine.indexOf(sr.start + 7) >= 0) flag = { t: 'Back-to-back for ' + sw, x: sw + ' would be on call two weeks in a row. You can still send the request — ' + sw + ' and the Admin see this warning too.' };
     }
     var ORD = st.order;
     var wk = ['19 Oct', '26 Oct', '2 Nov', '9 Nov'];
-    var SV = { Arm: 'on', Ploy: 'on', Nok: 'off' };
     var NK = {
       'Waiting for Nok': { badge: 'Waiting for you', tone: 'warning', icon: 'clock', left: 'You would take', right: 'Arm would take', open: true, warn: true },
       'Accepted': { badge: 'Waiting for Tao', tone: 'warning', icon: 'clock', left: 'You would take', right: 'Arm would take', warn: true, line: 'Accepted · waiting for an Admin to approve. Nothing changes in the rotation until then.', sub: 'Accepted Fri 10:07 · Arm and Tao got a Chat message', li: 'check', lc: 'var(--aura-fg-positive)' },
       'Declined by Nok': { badge: 'Declined', tone: 'neutral', icon: 'ban', left: 'Arm’s week', right: 'Your week', line: 'You declined · Arm keeps Mon 5 → 12 Oct.', sub: 'Fri 10:07' + ((st.nokNote || '').trim() ? ' · “' + st.nokNote.trim() + '”' : '') + ' · Arm got a Chat message and an email', li: 'ban', lc: 'var(--aura-fg-secondary)' },
       'Approved': { badge: 'Approved', tone: 'success', icon: 'circle-check', left: 'You take', right: 'Arm takes', line: 'The weeks have swapped — you’re on call Mon 5 → 12 Oct, Arm Mon 19 → 26 Oct.', sub: 'Approved by Tao · Fri 10:08', li: 'circle-check', lc: 'var(--aura-fg-positive)' },
       'Declined by Tao': { badge: 'Closed', tone: 'neutral', icon: 'ban', left: 'Arm’s week', right: 'Your week', line: 'This request is closed — Declined by Tao · “Nok would be on call two weeks in a row”', sub: 'Fri 10:08 · Arm keeps Mon 5 → 12 Oct, you keep Mon 19 → 26 Oct', li: 'ban', lc: 'var(--aura-fg-secondary)' },
-      'Withdrawn': { badge: 'Closed', tone: 'neutral', icon: 'ban', left: 'Arm’s week', right: 'Your week', line: 'This request is closed — Withdrawn by Arm · Fri 10:05', sub: 'Nothing changes: Arm keeps Mon 5 → 12 Oct, you keep Mon 19 → 26 Oct', li: 'ban', lc: 'var(--aura-fg-secondary)' }
+      'Withdrawn': { badge: 'Closed', tone: 'neutral', icon: 'ban', left: 'Arm’s week', right: 'Your week', line: 'This request is closed — Withdrawn by Arm · Fri 10:05', sub: 'Nothing changes: Arm keeps Mon 5 → 12 Oct, you keep Mon 19 → 26 Oct', li: 'ban', lc: 'var(--aura-fg-secondary)' },
+      'Expired': { badge: 'Expired', tone: 'neutral', icon: 'clock', left: 'Arm’s week', right: 'Your week', line: 'Expired — Arm’s week started before it was approved', sub: 'Mon 5 Oct 09:00 · both weeks unchanged: Arm keeps Mon 5 → 12 Oct, you keep Mon 19 → 26 Oct · Arm and you got a Chat message', li: 'clock', lc: 'var(--aura-fg-secondary)' }
     }[RQ];
     var SIDE = {
       'Waiting for Nok': { status: 'Waiting for Nok', tone: 'warning', icon: 'clock', arm: ['Requested', 'success', 'check'], nok: ['Pending', 'warning', 'clock'], tao: ['Not yet', 'neutral', 'minus'] },
@@ -359,15 +413,25 @@ class Component extends DCLogic {
       'Declined by Nok': { status: 'Declined by Nok', tone: 'neutral', icon: 'ban', arm: ['Requested', 'success', 'check'], nok: ['Declined', 'neutral', 'ban'], tao: ['Not needed', 'neutral', 'minus'], done: 'Declined by Nok · Fri 10:07' + ((st.nokNote || '').trim() ? ' · “' + st.nokNote.trim() + '”' : '') + '. Arm keeps Mon 5 → 12 Oct; Arm got a Chat message and an email.', di: 'ban' },
       'Approved': { status: 'Approved', tone: 'success', icon: 'circle-check', arm: ['Requested', 'success', 'check'], nok: ['Accepted', 'success', 'check'], tao: ['Approved', 'success', 'check'], done: 'Approved by Tao · Fri 10:08. Nok is on call Mon 5 → 12 Oct, Arm Mon 19 → 26 Oct; both got a Chat message and an email.', di: 'circle-check' },
       'Declined by Tao': { status: 'Declined', tone: 'neutral', icon: 'ban', arm: ['Requested', 'success', 'check'], nok: [st.nokAccepted ? 'Accepted' : 'Not needed', 'neutral', st.nokAccepted ? 'check' : 'minus'], tao: ['Declined', 'neutral', 'ban'], done: 'Declined by Tao · Fri 10:08 · “' + (st.declineNote || 'Nok would be on call two weeks in a row') + '”. Arm keeps Mon 5 → 12 Oct; Arm and Nok got a Chat message.', di: 'ban' },
-      'Withdrawn': { status: 'Withdrawn', tone: 'neutral', icon: 'ban', arm: ['Withdrew', 'neutral', 'ban'], nok: ['Not needed', 'neutral', 'minus'], tao: ['Not needed', 'neutral', 'minus'], done: 'Withdrawn by Arm · Fri 10:05. Nok and Tao got a Chat message; nothing changed.', di: 'ban' }
+      'Withdrawn': { status: 'Withdrawn', tone: 'neutral', icon: 'ban', arm: ['Withdrew', 'neutral', 'ban'], nok: ['Not needed', 'neutral', 'minus'], tao: ['Not needed', 'neutral', 'minus'], done: 'Withdrawn by Arm · Fri 10:05. Nok and Tao got a Chat message; nothing changed.', di: 'ban' },
+      'Expired': { status: 'Expired', tone: 'neutral', icon: 'clock', arm: ['Requested', 'success', 'check'], nok: ['Accepted', 'success', 'check'], tao: ['Too late', 'neutral', 'clock'], done: 'Expired — Arm’s week started before it was approved (Mon 5 Oct 09:00). Both weeks unchanged; Arm and Nok got a Chat message.', di: 'clock' }
     }[RQ];
-    var hasSide = ADMIN || ME === 'Arm';
+    var hasSide = (ADMIN || ME === 'Arm') && !NOREQ;
     return {
       me: ME, meLine: ADMIN ? 'Jirawat Piyakit · Admin' : 'Responder',
       viewers: Object.keys(VW), viewer: st.viewer, setViewer: function (v) { self.setState({ viewer: v, modal: null }); },
-      reqs: ['Waiting for Nok', 'Accepted', 'Declined by Nok', 'Approved', 'Declined by Tao', 'Withdrawn'], req: RQ,
-      setReq: function (v) { self.setState({ req: v, modal: null, nokNote: v === 'Declined by Nok' ? 'I’m away that week' : '', declineNote: v === 'Declined by Tao' ? 'Nok would be on call two weeks in a row' : self.state.declineNote }); },
-      isAdmin: ADMIN, isNok: ME === 'Nok', hasSide: hasSide, rotSpan: hasSide ? 2 : 3,
+      reqs: ['Waiting for Nok', 'Accepted', 'Declined by Nok', 'Approved', 'Declined by Tao', 'Withdrawn', 'Expired'], req: st.req, showReq: !NOREQ,
+      scens: ['Normal', 'Handed over', 'One person', 'Nobody on call', 'Empty'], scen: SC, setScen: function (v) { self.setState({ scen: v, modal: null, test: false }); },
+      hero: HERO, headEdit: ADMIN && !EMPTY, editVariant: NOBODY ? 'primary' : 'secondary',
+      hasRows: !EMPTY, noRows: EMPTY, emptyText: ADMIN ? 'Add the people who take Tier 1 nights and weekends, one week each. Until there is a rotation, Tier 1 alerts at night page each site’s owner.' : 'An Admin sets up the rotation. Until then, Tier 1 alerts at night page each site’s owner.',
+      footNormal: SC === 'Normal', handFoot: ADMIN ? 'use “Hand over…” on its row' : 'an Admin hands it over', footPlain: SC !== 'Normal' && !EMPTY,
+      foot: HANDED ? 'Ploy’s live shift was handed to Arm from Fri 18:00 (Settings › Users). Arm gets Tier 1 alerts at night and on the weekend until Mon 28 Sep 09:00; Ploy’s later weeks don’t change. Shifts change Monday 09:00.' : ONE ? 'Swap is off — nobody else in the rotation to swap with. Ploy is on call every week until an Admin adds someone in Edit rotation. Shifts change Monday 09:00.' : 'The rotation starts Mon 28 Sep 09:00. Until then no one is on call: Tier 1 alerts at night page each site’s owner. Shifts change Monday 09:00.',
+      showPhone: !NOBODY && !EMPTY, showOwners: NOBODY || EMPTY, phoneWho: HANDED ? 'Arm' : 'Ploy',
+      owners: [{ who: 'Arm', sites: 'Bangkok Airways – Taiwan, Bangkok Airways – China, MuvMi', border: 'none' }, { who: 'Ploy', sites: 'ENEOS Industrial', border: '1px solid var(--aura-border-subtle)' }, { who: 'Nok', sites: 'realme.link', border: '1px solid var(--aura-border-subtle)' }],
+      ownersFoot: ADMIN ? (EMPTY ? 'Set up a rotation to give nights and weekends to one person a week.' : 'Add a week in Edit rotation to give tonight to one person.') : 'An Admin sets up who is on call.',
+      editDesc: EMPTY ? 'Pick the people who take Tier 1 nights and weekends and their order. The first week starts Mon 28 Sep 09:00.' : NOBODY ? 'The rotation starts Mon 28 Sep 09:00. Weeks already scheduled keep their person — use Swap for those.' : 'Changes apply from Mon 19 Oct. Weeks already scheduled keep their person — use Swap for those.',
+      setReq: function (v) { self.setState({ req: v, nokAccepted: v === 'Expired' ? true : self.state.nokAccepted, modal: null, nokNote: v === 'Declined by Nok' ? 'I’m away that week' : '', declineNote: v === 'Declined by Tao' ? 'Nok would be on call two weeks in a row' : self.state.declineNote }); },
+      isAdmin: ADMIN, isNok: ME === 'Nok' && !NOREQ, hasSide: hasSide, rotSpan: hasSide ? 2 : 3,
       n: { badge: NK.badge, tone: NK.tone, icon: NK.icon, leftLabel: NK.left, rightLabel: NK.right, leftSub: APPROVED ? 'Was Arm’s week · Tier 1 nights and weekend' : 'Arm’s week now · Tier 1 nights and weekend', rightSub: APPROVED ? 'Was your week · Tier 1 nights and weekend' : 'Your week now · Tier 1 nights and weekend', isOpen: !!NK.open, showWarn: !!NK.warn, hasLine: !!NK.line, line: NK.line || '', sub: NK.sub || '', lineIcon: NK.li || 'check', lineColor: NK.lc || 'var(--aura-fg-secondary)' },
       nokAccept: function () { self.setState({ req: 'Accepted', nokAccepted: true }); },
       openNokDecline: function () { self.setState({ modal: 'nokDecline', nokNote: '' }); },
@@ -383,18 +447,18 @@ class Component extends DCLogic {
       approveHint: RQ === 'Accepted' ? 'Nok accepted Fri 10:07. Approve swaps the two weeks; Arm and Nok get a Chat message and an email. Logged in the audit log.' : 'Approve unlocks once Nok accepts — Nok first, then an Admin. Logged in the audit log.',
       withdraw: function () { self.setState({ req: 'Withdrawn' }); },
       armHint: RQ === 'Accepted' ? 'Nok accepted Fri 10:07 · waiting for Tao to approve. You can still withdraw until then.' : 'Waiting for Nok to accept, then Tao approves. You can withdraw until Tao acts.',
-      sideDone: !LIVE, sideDoneText: SIDE.done || '', sideDoneIcon: SIDE.di || 'ban', sideDoneColor: APPROVED ? 'var(--aura-fg-positive)' : 'var(--aura-fg-secondary)',
+      sideDone: !LIVE && !NOREQ, sideDoneText: SIDE.done || '', sideDoneIcon: SIDE.di || 'ban', sideDoneColor: APPROVED ? 'var(--aura-fg-positive)' : 'var(--aura-fg-secondary)',
       swapDesc: (st.swapWith || 'They') + ' gets a Chat message and an email to accept, then an Admin approves. Nothing changes until then.',
       week: days.map(function (d) { return { label: d.label, segs: d.segs, headWeight: d.today ? '700' : '500' }; }),
       ready: [
         { label: 'Alerts Space: notify for @mentions only', icon: 'circle-check', color: 'var(--aura-fg-positive)', state: 'Done' },
         { label: 'Space allowed through Do Not Disturb', icon: 'circle-check', color: 'var(--aura-fg-positive)', state: 'Done' },
-        st.test ? { label: 'Test alert sent 10:08 to Ploy’s current phone — waiting for Ploy to confirm it arrived', icon: 'clock', color: 'var(--aura-fg-secondary)', state: 'Waiting' } : { label: 'Test alert not received on current phone · last one reached the previous phone, Mon 21 Sep', icon: 'triangle-alert', color: 'var(--aura-alert-warning-fg)', state: 'Not done' },
+        HANDED ? { label: 'Test alert received on this phone · Mon 14 Sep', icon: 'circle-check', color: 'var(--aura-fg-positive)', state: 'Done' } : st.test ? { label: 'Test alert sent 10:08 to Ploy’s current phone — waiting for Ploy to confirm it arrived', icon: 'clock', color: 'var(--aura-fg-secondary)', state: 'Waiting' } : { label: 'Test alert not received on current phone · last one reached the previous phone, Mon 21 Sep', icon: 'triangle-alert', color: 'var(--aura-alert-warning-fg)', state: 'Not done' },
         { label: 'Phone number for voice call (only if Twilio is approved)', icon: 'circle', color: 'var(--aura-fg-tertiary)', state: 'Optional' }
       ],
       rotation: rows,
-      readyCount: '2 of 3', readySub: st.test ? 'Test alert sent 10:08 · waiting for Ploy' : 'Test alert not received on current phone', readyColor: st.test ? 'var(--aura-fg-secondary)' : 'var(--aura-alert-warning-fg)',
-      testSent: !!st.test, testLabel: st.test ? 'Test alert sent · 10:08' : 'Send test alert to Ploy',
+      readyCount: HANDED ? '3 of 3' : '2 of 3', readySub: HANDED ? 'Ready · covering Ploy from 18:00' : st.test ? 'Test alert sent 10:08 · waiting for Ploy' : 'Test alert not received on current phone', readyColor: HANDED ? 'var(--aura-fg-positive)' : st.test ? 'var(--aura-fg-secondary)' : 'var(--aura-alert-warning-fg)',
+      testSent: !!st.test, testLabel: st.test ? 'Test alert sent · 10:08' : 'Send test alert to ' + (HANDED ? 'Arm' : 'Ploy'),
       sendTest: function () { self.setState({ test: true }); },
       two: 2, yes: true,
       nokStatus: SIDE.nok[0], nokTone: SIDE.nok[1], nokIcon: SIDE.nok[2],
@@ -416,7 +480,7 @@ class Component extends DCLogic {
       sendSwap: function () { var r = JSON.parse(JSON.stringify(st.requested)); r[sr.key] = sw; self.setState({ modal: null, requested: r }); },
       openEdit: function () { self.setState({ modal: 'edit', order: st.sOrder.slice() }); },
       editOpen: st.modal === 'edit',
-      order: ORD.map(function (w, i) { return { n: i + 1, who: w, sv: SV[w], first: i === 0, last: i === ORD.length - 1, border: i ? '1px solid var(--aura-border-subtle)' : 'none', upLabel: 'Move ' + w + ' up', downLabel: 'Move ' + w + ' down',
+      order: ORD.map(function (w, i) { return { n: i + 1, who: w, first: i === 0, last: i === ORD.length - 1, border: i ? '1px solid var(--aura-border-subtle)' : 'none', upLabel: 'Move ' + w + ' up', downLabel: 'Move ' + w + ' down',
         up: function () { if (!i) return; var o = ORD.slice(); o[i] = o[i - 1]; o[i - 1] = w; self.setState({ order: o }); },
         down: function () { if (i === ORD.length - 1) return; var o = ORD.slice(); o[i] = o[i + 1]; o[i + 1] = w; self.setState({ order: o }); } }; }),
       lenOpts: [{ value: '1w', label: '1 week' }], handOpts: [{ value: 'mon9', label: 'Monday 09:00' }],
