@@ -55,8 +55,9 @@ export interface OncallFacts {
   handover?: { from: string; to: string; at: Date; until: Date; reason: string | null };
   /** A rotation change: the order, each person's next week; who was taken out. */
   rotation?: { order: { name: string; next: Week | null }[]; removed: string[] };
-  /** The day-before reminder: the shift. */
+  /** The day-before reminder: the shift, and who holds it. */
   shift?: Week;
+  shiftHolder?: string;
   /** The test alert: the tester and the link that ticks "Test alert received on this phone". */
   test?: { name: string; url: string };
 }
@@ -123,7 +124,7 @@ function chatDetail(f: OncallFacts): string[] {
       // The week that started first is the one that made it expire (spec §28.5).
       return [
         `${plainName(s!.requesterWeek.start <= s!.askedWeek.start ? s!.requester : s!.asked)}’s week started before it was approved`,
-        'nothing changes',
+        'both weeks unchanged',
       ];
     case 'handed_over': {
       const h = f.handover!;
@@ -142,8 +143,8 @@ function chatDetail(f: OncallFacts): string[] {
     }
     case 'shift_reminder':
       return [
-        `your shift ${when(f.shift!.start)} → ${when(f.shift!.end)}`,
-        'Tier 1 alerts at night and on the weekend come to you',
+        `${f.shiftHolder ? `${plainName(f.shiftHolder)}’s shift` : 'Shift'} ${when(f.shift!.start)} → ${when(f.shift!.end)}`,
+        'Tier 1 alerts outside response hours come to you',
       ];
     case 'test_alert':
       return [];
@@ -214,6 +215,15 @@ export function buildOncallChat(f: OncallFacts, mention: readonly ChatPerson[]):
   };
 }
 
+/** One subject per mail thread, so every message of a swap / hand-over / shift stays in one thread. */
+function subjectOf(f: OncallFacts): string {
+  if (f.swap)
+    return `DxT Monitor · On-call · Swap · ${plainName(f.swap.requester)} ↔ ${plainName(f.swap.asked)} · ${formatWeek(f.swap.requesterWeek)}`;
+  if (f.handover)
+    return `DxT Monitor · On-call · Hand-over · ${plainName(f.handover.from)} → ${plainName(f.handover.to)} · ${when(f.handover.at)}`;
+  return `DxT Monitor · On-call · Shift · ${f.shift ? formatWeek(f.shift) : ''}`;
+}
+
 export const ONCALL_EMAIL_FOOTER =
   'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. The rotation and every swap are on the On-call page.';
 
@@ -265,6 +275,7 @@ export function buildOncallEmail(input: OncallEmailInput): EmailMessage | null {
       headline = `${plainName(s!.requester)} asks you to swap weeks`;
       lede = `You would take ${formatWeek(s!.requesterWeek)} and ${plainName(s!.requester)} would take ${formatWeek(s!.askedWeek)}. Accepting sends it to an Admin to approve. Nothing changes in the rotation until then.`;
       facts = [
+        ['Requested', when(f.at)],
         ['You would take', formatWeek(s!.requesterWeek)],
         [`${plainName(s!.requester)} would take`, formatWeek(s!.askedWeek)],
         ...reasonRow('Reason', s!.reason),
@@ -278,7 +289,7 @@ export function buildOncallEmail(input: OncallEmailInput): EmailMessage | null {
           : `${plainName(s!.asked)} accepted your swap`;
       lede =
         role === 'admin'
-          ? 'It needs an Admin to approve. Approve swaps the two weeks; both get a Chat message and an email.'
+          ? `It needs an Admin to approve. Approving swaps the two weeks; ${plainName(s!.requester)} and ${plainName(s!.asked)} each get a Chat message and an email.`
           : 'It now waits for an Admin to approve. Nothing changes in the rotation until then.';
       facts = [...weeks(), ...(role === 'admin' ? reasonRow('Reason', s!.reason) : [])];
       why =
@@ -320,7 +331,7 @@ export function buildOncallEmail(input: OncallEmailInput): EmailMessage | null {
       break;
     case 'swap_expired':
       headline = 'The swap request expired';
-      lede = `One of the weeks started before an Admin approved it, so nothing changes: ${plainName(s!.requester)} keeps ${formatWeek(s!.requesterWeek)} and ${plainName(s!.asked)} keeps ${formatWeek(s!.askedWeek)}.`;
+      lede = `${plainName(s!.requesterWeek.start <= s!.askedWeek.start ? s!.requester : s!.asked)}’s week started before it was approved, so nothing changes: ${plainName(s!.requester)} keeps ${formatWeek(s!.requesterWeek)} and ${plainName(s!.asked)} keeps ${formatWeek(s!.askedWeek)}.`;
       facts = weeks();
       why = 'You got this because you were part of this swap request.';
       break;
@@ -332,27 +343,27 @@ export function buildOncallEmail(input: OncallEmailInput): EmailMessage | null {
           : `Your on-call shift was handed to ${plainName(h.to)}`;
       lede =
         role === 'new'
-          ? `From ${when(h.at)} until ${when(h.until)}, Tier 1 alerts at night and on the weekend @mention you instead of ${plainName(h.from)}.`
-          : `From ${when(h.at)} until ${when(h.until)}, ${plainName(h.to)} gets Tier 1 alerts at night and on the weekend. Your later weeks don’t change.`;
+          ? `From ${when(h.at)} until ${when(h.until)}, Tier 1 alerts outside response hours (nights, weekends, holidays) @mention you instead of ${plainName(h.from)}.`
+          : `From ${when(h.at)} until ${when(h.until)}, ${plainName(h.to)} gets Tier 1 alerts outside response hours. Your later weeks don’t change.`;
       facts = [
         ['From', when(h.at)],
         ['Until', when(h.until)],
         ...(f.by ? [['By', plainName(f.by)] as [string, string]] : []),
         ...reasonRow('Reason', h.reason),
       ];
-      why = 'You got this because an on-call shift you hold changed hands.';
+      why = 'You got this because your on-call shift changed hands.';
       break;
     }
     case 'shift_reminder':
       label = 'ON CALL TOMORROW';
       headline = 'Your on-call shift starts tomorrow';
-      lede = `From ${when(f.shift!.start)} to ${when(f.shift!.end)}, Tier 1 alerts at night and on the weekend come to you. Check your phone is ready: Alerts Space notifies for @mentions, it’s allowed through Do Not Disturb, and a test alert reaches it.`;
+      lede = `From ${when(f.shift!.start)} to ${when(f.shift!.end)}, Tier 1 alerts outside response hours (nights, weekends, holidays) come to you. Check your phone is ready: Alerts Space notifies for @mentions, it’s allowed through Do Not Disturb, and a test alert reaches it.`;
       facts = [['Shift', `${when(f.shift!.start)} → ${when(f.shift!.end)}`]];
       why = 'You got this because you’re on call next.';
       break;
   }
   const envelope: Envelope = {
-    subject: `DxT Monitor · On-call · ${headline}`,
+    subject: subjectOf(f),
     why,
     footer: ONCALL_EMAIL_FOOTER,
     headers: input.startsThread

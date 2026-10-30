@@ -71,7 +71,7 @@ describe('on-call messages (S10, D-048 item 11)', () => {
     [
       'swap_expired',
       [arm, nok],
-      '<users/ARM> <users/NOK> SWAP EXPIRED · On-call · Arm’s week started before it was approved · nothing changes',
+      '<users/ARM> <users/NOK> SWAP EXPIRED · On-call · Arm’s week started before it was approved · both weeks unchanged',
     ],
   ] as const)('%s: the Chat line @mentions whoever it tells, and never the reason', (kind, who, text) => {
     const m = buildOncallChat(base(kind), who);
@@ -100,8 +100,10 @@ describe('on-call messages (S10, D-048 item 11)', () => {
     expect(buildOncallChat(base('rotation_changed', { rotation }), [nok]).text).toBe(
       '<users/NOK> ROTATION CHANGED · On-call · by Tao · next weeks: Nok from Mon 19 Oct · Ploy no longer in the rotation',
     );
-    expect(buildOncallChat(base('shift_reminder', { by: null, shift: nokWeek }), [nok]).text).toBe(
-      '<users/NOK> ON CALL TOMORROW · On-call · your shift Mon 19 Oct 09:00 → Mon 26 Oct 09:00 · Tier 1 alerts at night and on the weekend come to you',
+    expect(
+      buildOncallChat(base('shift_reminder', { by: null, shift: nokWeek, shiftHolder: 'Nok' }), [nok]).text,
+    ).toBe(
+      '<users/NOK> ON CALL TOMORROW · On-call · Nok’s shift Mon 19 Oct 09:00 → Mon 26 Oct 09:00 · Tier 1 alerts outside response hours come to you',
     );
   });
 
@@ -117,7 +119,9 @@ describe('on-call messages (S10, D-048 item 11)', () => {
 
   it('emails: the person asked accepts or declines; the reason only by email', () => {
     const e = buildOncallEmail({ facts: base('swap_requested'), role: 'asked', to: 'Nok', ...thread })!;
-    expect(e.subject).toBe('DxT Monitor · On-call · Arm asks you to swap weeks');
+    // One subject per mail thread (message-check B2b): the headline is in the body.
+    expect(e.subject).toBe('DxT Monitor · On-call · Swap · Arm ↔ Nok · Mon 5 → 12 Oct');
+    expect(e.text).toContain('Arm asks you to swap weeks');
     expect(e.text).toContain('You would take Mon 5 → 12 Oct and Arm would take Mon 19 → 26 Oct.');
     expect(e.text).toContain('“Family trip”');
     expect(e.text).toContain('Accept or decline');

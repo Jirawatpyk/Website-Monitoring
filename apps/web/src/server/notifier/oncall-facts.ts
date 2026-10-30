@@ -20,6 +20,7 @@ export interface OncallEventFacts {
   handover?: OncallFacts['handover'];
   rotation?: OncallFacts['rotation'];
   shift?: Week;
+  shiftHolder?: string;
   /** The test link's token; the URL is built with the app's address at render time. */
   test?: { name: string; token: string | null };
 }
@@ -179,6 +180,7 @@ export async function loadOncallFacts(
         removed: ids(e.payload?.removed).map((uid) => nameOf(uid) ?? 'someone'),
       };
     }
+    if (e.kind === 'shift_reminder') f.shiftHolder = nameOf(e.user_id) ?? undefined;
     if (e.kind === 'shift_reminder')
       f.shift = week(e.shift_id ? shiftOf.get(e.shift_id) : undefined) ?? undefined;
     if (e.kind === 'test_alert' && e.user_id)

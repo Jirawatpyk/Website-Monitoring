@@ -124,7 +124,7 @@ describe('on-call messages', () => {
       { to: string },
     ];
     expect(options.to).toBe('nok@example.test');
-    expect(message.subject).toBe('DxT Monitor · On-call · Arm asks you to swap weeks');
+    expect(message.subject).toBe('DxT Monitor · On-call · Swap · Arm ↔ Nok · Mon 5 → 12 Oct');
     expect(message.text).toContain('“Family trip”');
   });
 

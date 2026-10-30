@@ -25,6 +25,7 @@ export function oncallFactsOf(e: OncallEventFacts, appUrl: string): OncallFacts 
     ...(e.handover ? { handover: e.handover } : {}),
     ...(e.rotation ? { rotation: e.rotation } : {}),
     ...(e.shift ? { shift: e.shift } : {}),
+    ...(e.shiftHolder ? { shiftHolder: e.shiftHolder } : {}),
     ...(e.test
       ? { test: { name: e.test.name, url: oncallUrl(appUrl, e.test.token ? `?test=${e.test.token}` : '') } }
       : {}),
@@ -48,7 +49,7 @@ export function renderOncallChat(n: Notification, e: OncallEventFacts, appUrl: s
   if (
     (f.kind === 'handed_over' && !f.handover) ||
     (f.kind === 'shift_reminder' && !f.shift) ||
-    (f.kind === 'test_alert' && !f.test)
+    (f.kind === 'test_alert' && !e.test?.token)
   )
     return null;
   return buildOncallChat(f, mentionedIn(n, e));

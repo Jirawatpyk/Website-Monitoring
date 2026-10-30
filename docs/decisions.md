@@ -95,7 +95,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
       - Their footer: "You got this because MuvMi’s escalation policy tells you at L0, together with the owner / on-call."
       - Later emails read "you were emailed about this incident".
       - Only the owner or the person on call is asked for the root cause.
-    - **On-call messages (B2b).** Each event posts one line in the Alerts Space, in its subject's thread, @mentioning whoever it tells, and emails each person ("DxT Monitor · On-call · <headline>", one mail thread per subject, button "Open On-call", or "Accept or decline" for the person asked). The Space is the whole team's, so **a reason is never in Chat**: the requester's reason, the answer and an Admin's note go only in the people's emails.
+    - **On-call messages (B2b).** Each event posts one line in the Alerts Space, in its subject's thread, @mentioning whoever it tells, and emails each person (one subject per mail thread so Gmail keeps it together — "DxT Monitor · On-call · Swap · Arm ↔ Nok · Mon 5 → 12 Oct", "… · Hand-over · Ploy → Arm · Fri 25 Sep 18:00", "… · Shift · Mon 19 → 26 Oct" — the headline in the body; button "Open On-call", or "Accept or decline" for the person asked). The Space is the whole team's, so **a reason is never in Chat**: the requester's reason, the answer and an Admin's note go only in the people's emails.
 
       | Event | Chat line |
       | --- | --- |
@@ -103,12 +103,12 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
       | swap accepted | `<users/ARM> <users/TAO> SWAP ACCEPTED · On-call · Nok accepted Arm’s swap · waiting for an Admin to approve` |
       | swap declined | `<users/ARM> SWAP DECLINED · On-call · Nok declined Arm’s swap · Arm keeps Mon 5 → 12 Oct` |
       | swap withdrawn | `<users/NOK> SWAP WITHDRAWN · On-call · Arm withdrew the swap request · Nok keeps Mon 19 → 26 Oct` |
-      | swap approved | `SWAP APPROVED · On-call · approved by Tao · Nok takes … · Arm takes …` |
-      | swap declined by an Admin | `SWAP NOT APPROVED · On-call · declined by Tao · nothing changes in the rotation` |
-      | swap expired | `SWAP EXPIRED · On-call · Arm’s week started before it was approved · nothing changes` |
-      | hand-over | `SHIFT HANDED OVER · On-call · Arm covers Ploy from Fri 25 Sep 18:00 until Mon 28 Sep 09:00` |
-      | rotation change | `ROTATION CHANGED · On-call · by Tao · next weeks: Nok from Mon 19 Oct, … · Ploy no longer in the rotation` (Chat only) |
-      | day-before reminder | `ON CALL TOMORROW · On-call · your shift Mon 19 Oct 09:00 → Mon 26 Oct 09:00 · Tier 1 alerts at night and on the weekend come to you` |
+      | swap approved | `<users/ARM> <users/NOK> SWAP APPROVED · On-call · approved by Tao · Nok takes … · Arm takes …` |
+      | swap declined by an Admin | `<users/ARM> <users/NOK> SWAP NOT APPROVED · On-call · declined by Tao · nothing changes in the rotation` |
+      | swap expired | `<users/ARM> <users/NOK> SWAP EXPIRED · On-call · Arm’s week started before it was approved · both weeks unchanged` |
+      | hand-over | `<users/ARM> <users/PLOY> SHIFT HANDED OVER · On-call · Arm covers Ploy from Fri 25 Sep 18:00 until Mon 28 Sep 09:00` |
+      | rotation change | `<users/…> ROTATION CHANGED · On-call · by Tao · next weeks: Nok from Mon 19 Oct, … · Ploy no longer in the rotation` (Chat only) |
+      | day-before reminder | `<users/NOK> ON CALL TOMORROW · On-call · Nok’s shift Mon 19 Oct 09:00 → Mon 26 Oct 09:00 · Tier 1 alerts outside response hours come to you` |
       | test alert | ChatAlert row: `<users/PLOY> TEST — no action · alert test for Ploy’s phone`, with "Open test link on this phone" (Chat only) |
 
       Email footers say why each person got it: Arm asked you to swap; you asked; you're an Admin and a swap needs an Admin to approve; your on-call week changed; you were part of the request; an on-call shift you hold changed hands; you're on call next.
