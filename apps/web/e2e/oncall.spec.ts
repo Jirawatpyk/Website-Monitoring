@@ -14,11 +14,11 @@ import {
 test.describe('on-call (local Supabase)', () => {
   test.skip(!localSupabaseEnabled, 'needs the local Supabase stack: E2E_LOCAL_SUPABASE=1');
   test.describe.configure({ mode: 'serial' });
-  test.beforeEach(({}, info) => {
+  test.beforeEach(({ baseURL: _ }, info) => {
     test.skip(info.project.name !== 'desktop', 'one shared rotation: desktop only');
   });
   // A skipped (mobile) test still runs afterEach: only desktop may clear the rotation it owns.
-  test.afterEach(async ({}, info) => {
+  test.afterEach(async ({ baseURL: _ }, info) => {
     if (info.project.name === 'desktop') await resetOncall();
   });
 
