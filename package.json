@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
-    "@jirawatpyk/aura-tokens": "^5.41.0",
+    "@jirawatpyk/aura-tokens": "^5.66.0",
     "@next/eslint-plugin-next": "^16.4.0",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
