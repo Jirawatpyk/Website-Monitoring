@@ -183,6 +183,11 @@ function adminWord(d: OncallData): string {
   return d.admins[0] === d.viewer.id ? 'you' : nameOf(d, d.admins[0]);
 }
 
+/** Who approves, in the people's own lines: "an Admin" (§27.5), or "you" when the viewer is the only one. */
+function approverWord(d: OncallData): string {
+  return d.admins.length === 1 && d.admins[0] === d.viewer.id ? 'you' : 'an Admin';
+}
+
 // ── Badges ────────────────────────────────────────────────────────────────
 
 export type BadgeIcon =
@@ -771,7 +776,7 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
     line = {
       waiting: null,
       accepted: closed(
-        'Accepted · waiting for an Admin to approve. Nothing changes in the rotation until then.',
+        `Accepted · waiting for ${approverWord(d)} to approve. Nothing changes in the rotation until then.`,
         `Accepted ${when(w.respondedAt)} · ${formatNameList([R, ...d.admins.map((id) => nameOf(d, id))])} got a Chat message`,
       ),
       declined: closed(
@@ -832,7 +837,7 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
         ? null
         : me
           ? w.status === 'accepted'
-            ? `${A} accepted ${when(w.respondedAt)} · waiting for an Admin to approve. You can withdraw until then.`
+            ? `${A} accepted ${when(w.respondedAt)} · waiting for ${approverWord(d)} to approve. You can withdraw until then.`
             : `Waiting for ${A} to accept, then an Admin approves. You can withdraw until an Admin acts.`
           : w.status === 'accepted'
             ? `${A} accepted ${when(w.respondedAt)}. Approve swaps the two weeks; ${R} and ${A} get a Chat message and an email. Logged in the audit log.`
@@ -880,9 +885,13 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
       : `${A} takes ${R}’s week, ${rqW}. ${R} takes ${A}’s week, ${cpW}.`,
     people,
     canAnswer: part === 'asked' && w.status === 'waiting',
-    // Someone not in the request decides — or the only Admin, whoever they are in it (staging /verify:
-    // Tao asked and the only Admin would otherwise leave the request stuck).
-    canDecide: d.viewer.role === 'admin' && open && (part === 'admin' || d.admins.length === 1),
+    // Someone not in the request decides. The only Admin decides even in it, once the person asked has
+    // accepted (12.17; staging /verify: Tao asked would otherwise leave it stuck) — before that the
+    // person asked answers and the requester withdraws, with no second Decline beside them.
+    canDecide:
+      d.viewer.role === 'admin' &&
+      open &&
+      (part === 'admin' || (d.admins.length === 1 && w.status === 'accepted')),
     canApprove: w.status === 'accepted',
     canWithdraw: part === 'requester' && open,
     line,

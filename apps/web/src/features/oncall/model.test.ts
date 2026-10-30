@@ -466,6 +466,15 @@ describe('the swap card (§27.3–6, §28.1–2, §28.5)', () => {
     const v = swapViewOf(withSwap('tao', onlyAdminAsked), NOW)!;
     expect(v).toMatchObject({ part: 'asked', canDecide: true, canApprove: true, canAnswer: false });
     expect(v.badge.label).toBe('Waiting for you');
+    expect(v.line?.text).toBe(
+      'Accepted · waiting for you to approve. Nothing changes in the rotation until then.',
+    );
+    // Before accepting, they answer as the person asked: no second Decline / Approve beside it.
+    const waiting = swapViewOf(withSwap('tao', { ...onlyAdminAsked, status: 'waiting' }), NOW)!;
+    expect(waiting).toMatchObject({ canAnswer: true, canDecide: false });
+    // The requester who is the only Admin withdraws while it waits, and decides once accepted.
+    const own = { ...swap('waiting'), requesterId: ID.tao };
+    expect(swapViewOf(withSwap('tao', own), NOW)).toMatchObject({ canWithdraw: true, canDecide: false });
     const two = { ...withSwap('tao', onlyAdminAsked), admins: [ID.tao, ID.ploy] };
     expect(swapViewOf(two, NOW)!.canDecide).toBe(false);
   });

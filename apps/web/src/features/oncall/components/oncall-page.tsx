@@ -123,27 +123,34 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
   useEffect(() => {
     if (!testToken || confirming.current) return;
     confirming.current = true;
-    void confirmTest({ token: testToken }).then((r) => {
-      if (r.ok && r.at) {
-        setTest({
-          tone: 'success',
-          title: `Test alert received on this phone at ${formatTime(new Date(r.at))}`,
-          text: 'Alerts reach this phone. Nothing else to do before tonight.',
-        });
-      } else if (!r.ok) {
-        const who = r.message.match(/^This test was for (.+?) — /)?.[1];
-        setTest({
-          tone: 'warning',
-          title: r.message,
-          text:
-            r.code === 'test_other_person' && who
-              ? `Opening it here doesn’t tick anything on ${who}’s checklist.`
-              : 'Send a new test alert from your checklist.',
-        });
-      }
-      router.replace('/oncall', { scroll: false });
-      router.refresh();
+    // A call that throws (network, a new deploy) still drops the token from the address bar.
+    const failed = (): Awaited<ReturnType<typeof confirmTest>> => ({
+      ok: false,
+      message: 'The test couldn’t be confirmed',
     });
+    void confirmTest({ token: testToken })
+      .catch(failed)
+      .then((r) => {
+        if (r.ok && r.at) {
+          setTest({
+            tone: 'success',
+            title: `Test alert received on this phone at ${formatTime(new Date(r.at))}`,
+            text: 'Alerts reach this phone. Nothing else to do before tonight.',
+          });
+        } else if (!r.ok) {
+          const who = r.message.match(/^This test was for (.+?) — /)?.[1];
+          setTest({
+            tone: 'warning',
+            title: r.message,
+            text:
+              r.code === 'test_other_person' && who
+                ? `Opening it here doesn’t tick anything on ${who}’s checklist.`
+                : 'Send a new test alert from your checklist.',
+          });
+        }
+        router.replace('/oncall', { scroll: false });
+        router.refresh();
+      });
   }, [testToken, router]);
 
   const openSwapId = (id: string) => router.replace(`/oncall?swap=${id}`, { scroll: false });
@@ -244,6 +251,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
                 columns={columns(
                   (row) => show({ kind: 'swap', row, phone: false }),
                   () => show({ kind: 'handover', phone: false }),
+                  !!view && view.part !== 'asked',
                 )}
                 rows={rows}
                 rowHeight="auto"
@@ -607,7 +615,11 @@ function EmptyRotation({ admin, onEdit }: { admin: boolean; onEdit: () => void }
 }
 
 /** The rotation table (OnCall); the head is upper-case as drawn. */
-function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): DataTableColumn<RotationRow>[] {
+function columns(
+  onSwap: (row: RotationRow) => void,
+  onHandover: () => void,
+  beside: boolean,
+): DataTableColumn<RotationRow>[] {
   const cols: DataTableColumn<RotationRow>[] = [
     {
       key: 'shift',
@@ -622,10 +634,10 @@ function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): Da
     {
       key: 'who',
       label: 'On call',
-      // This and the alerts column flex: they share the spare width when the table runs full
-      // width and shrink to their minimum beside the swap card at 1440 (OnCall). Fixed widths
-      // left the spare to the action column and cut names and the head short (staging /verify).
-      minWidth: 100,
+      // Beside the swap card (1440, OnCall) fixed narrow widths make the table fit: DataTable's row
+      // minimum counts fixed widths only, so flexing here overflowed (e2e). Full width, this and the
+      // alerts column flex, else the spare went to the action column and cut names short (/verify).
+      ...(beside ? { width: 100 } : { minWidth: 100 }),
       render: (r) => (
         <span className="flex items-center gap-2.5">
           {r.nobody ? (
@@ -645,7 +657,7 @@ function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): Da
     {
       key: 'alerts',
       label: 'Tier 1 alerts at night',
-      minWidth: 160,
+      ...(beside ? { width: 160 } : { minWidth: 160 }),
       render: (r) => <span className="text-fg-secondary">{r.alerts}</span>,
     },
     {
@@ -744,7 +756,7 @@ function RequestCard({ view, want, claim, onDecline }: CardProps) {
           </div>
         )}
         {/* The only Admin was the person asked: once accepted, they approve here too. */}
-        {view.canDecide && !view.canAnswer && (
+        {view.canDecide && (
           <div className="flex flex-wrap items-center gap-3">
             <Button
               variant="primary"
