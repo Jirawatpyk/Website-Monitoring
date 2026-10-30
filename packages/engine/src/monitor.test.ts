@@ -130,7 +130,7 @@ describe('decideMonitor — DOWN on the check and its recheck (spec §6, S02a Do
     });
   });
 
-  it('a timeout check and a timeout recheck confirm DOWN from the first check’s start', () => {
+  it('a timeout check and a timeout recheck are no DOWN in their first round (D-049; the second is, timeout.test.ts)', () => {
     const timeout = (location: ProbeLocation, sec: number, attempt: 1 | 2 = 1) => ({
       ...check(location, 'fail', sec, attempt),
       statusCode: null,
@@ -139,7 +139,7 @@ describe('decideMonitor — DOWN on the check and its recheck (spec §6, S02a Do
     const d = decideMonitor(
       snapshot([timeout('SIN', 0), timeout('TYO', 1), timeout('SIN', 30, 2), timeout('TYO', 31, 2)]),
     );
-    expect(d).toMatchObject({ kind: 'open', startedAt: at(0) });
+    expect(d).toMatchObject({ kind: 'none', roundAt: at(0) });
   });
 
   it('judges Tier 2 rounds on their 3-minute ticks', () => {

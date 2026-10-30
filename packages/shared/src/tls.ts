@@ -16,6 +16,15 @@ export function isTlsChainError(error: string | null | undefined): boolean {
 }
 
 /**
+ * The probe gave up waiting (`describeError` in @dxt/probe writes `'Timeout'` for an AbortSignal
+ * timeout). A timeout alone needs two failing rounds before DOWN (D-049): on these sites it was a
+ * server stalling for a minute far more often than a site down.
+ */
+export function isTimeoutError(error: string | null | undefined): boolean {
+  return error === 'Timeout';
+}
+
+/**
  * D-029: is this check a hard-fail vote? A failure that isn't a certificate-chain error. The engine's
  * `isHardFail` and the probes' recheck decision both use it — the one rule.
  */

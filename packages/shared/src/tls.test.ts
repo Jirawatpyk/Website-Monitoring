@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isTlsChainError, TLS_CHAIN_ERRORS } from './tls';
+import { isTimeoutError, isTlsChainError, TLS_CHAIN_ERRORS } from './tls';
 
 describe('isTlsChainError (D-029)', () => {
   it.each([
@@ -20,5 +20,22 @@ describe('isTlsChainError (D-029)', () => {
 
   it('lists exactly the three chain codes', () => {
     expect(TLS_CHAIN_ERRORS).toHaveLength(3);
+  });
+});
+
+describe('isTimeoutError (D-049)', () => {
+  it('is the probe timeout and nothing else', () => {
+    expect(isTimeoutError('Timeout')).toBe(true);
+    for (const e of [
+      null,
+      undefined,
+      '',
+      'ECONNREFUSED',
+      'ENOTFOUND',
+      'timeout',
+      'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+    ]) {
+      expect(isTimeoutError(e)).toBe(false);
+    }
   });
 });

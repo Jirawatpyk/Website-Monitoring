@@ -1,4 +1,4 @@
-import { failsHere, isHardFail, isTlsChainFail } from './hard-fail';
+import { failsHere, firstTimeoutRound, isHardFail, isTlsChainFail } from './hard-fail';
 import {
   CRAWLER_FRESH_MS,
   type IncidentState,
@@ -687,6 +687,14 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       return { verdict: { kind: 'blip' }, next: reset };
     }
     const failing = round.rechecks.filter((c) => second.failing.includes(c.location));
+    // D-049: a timeout alone is no DOWN (nor a key-page PROBLEM) in its first round — on these sites
+    // it was a server stalling for a minute far more often than a site down. It counts once the
+    // round just before also hard-failed at enough locations (its own scheduled checks, so a
+    // skipped or no-data round can't stand in). A 5xx, a refused connection, DNS or TLS confirm in
+    // one round as before.
+    if (firstTimeoutRound(failing, round.scheduled, m.checks, roundAt, s.intervalSec)) {
+      return { verdict: { kind: 'blip' }, next: reset };
+    }
     const history = wafSite
       ? m.checks.map((c) => (bkkUntrusted(c, akamaiSite) ? { ...c, outcome: 'blocked' as const } : c))
       : m.checks;
