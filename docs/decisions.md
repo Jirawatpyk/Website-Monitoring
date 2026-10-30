@@ -138,6 +138,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
     22. **Hand over at 390 is the AURA Dialog** (a bottom sheet on phones), as Maintenance's phone sheet; there is no full-height sheet component.
     23. **The phone rotation keeps the last done week**, as on desktop. Both rows of an open request say what it waits for, per §27.7.
     24. **Deferred to the slice that builds the Incident page's Escalation card:** §28.6's L0 / L1 ledger lines, the ESCALATION key-fact ("L1 · Tao") and Tao's role line "You're L1 at 03:55 if nobody acknowledges". S10 ships the PAGED · ON CALL cell, the line under the cause, the phone's "Paged · on call" row and its role line. The Chat and email side of §28.6 shipped in B1b.
+    25. **The handed-over row's badge reads "Handed over"**, not "Handed to <name>" (§28.4). The person and the time are already in the row's line ("… covers from today 18:00") and the alerts column; a real full name in the badge crushed the name column at 390 and 1440 (staging /verify, 30 Oct).
 
 **Why.** G1's people steps don't block S10's code, and a second code reviewer doesn't exist. The drill proves the alert path end to end; staging has the same probes, engine and notifier as production.
 **Impact.** Plan: G1 (no CODEOWNERS, drill on staging), S10 status. S10 PR A (L2–L3) and PR B (on-call, the L0 pencil). Supersedes D-008's "second Admin reviews every PR" and D-035's "Tao seeds the fixtures" for S10.

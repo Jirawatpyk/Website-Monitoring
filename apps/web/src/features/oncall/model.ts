@@ -294,7 +294,8 @@ export function rotationRows(d: OncallData, now: Date): RotationRow[] {
     if (g.rest) {
       const to = nameOf(d, g.rest.userId);
       const at = new Date(g.rest.startsAt);
-      status = badge(`Handed to ${to}`, 'arrow-up-down');
+      // The state only: the name is in the line and the alerts column (D-048 12.25).
+      status = badge('Handed over', 'arrow-up-down');
       alerts = `${to} from ${shortWhen(at, now)}`;
       extra = ` · ${to} covers from ${shortWhen(at, now)}`;
     } else if (g.first.handedOverFrom && !past) {

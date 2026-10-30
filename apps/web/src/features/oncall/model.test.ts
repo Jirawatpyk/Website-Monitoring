@@ -184,7 +184,7 @@ describe('a handed-over shift (§28.4 Handed over)', () => {
     expect(live).toMatchObject({
       who: 'Ploy',
       alerts: 'Arm from today 18:00',
-      status: { label: 'Handed to Arm' },
+      status: { label: 'Handed over' },
     });
     expect(live.action).toBeNull();
   });
