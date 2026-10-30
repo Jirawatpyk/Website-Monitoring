@@ -741,6 +741,23 @@ function RequestCard({ view, want, claim, onDecline }: CardProps) {
             <span className="text-xs leading-normal text-fg-secondary">{view.hint}</span>
           </div>
         )}
+        {/* The only Admin was the person asked: once accepted, they approve here too. */}
+        {view.canDecide && !view.canAnswer && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="primary"
+              icon={<IconCheck />}
+              disabled={!view.canApprove}
+              loading={a.pending.approve}
+              onClick={a.approve}
+            >
+              Approve
+            </Button>
+            <Button variant="secondary" onClick={onDecline}>
+              Decline
+            </Button>
+          </div>
+        )}
         {view.line && <StatusLine line={view.line} claimFocus={claim} />}
         <Refusal error={a.error} />
       </section>

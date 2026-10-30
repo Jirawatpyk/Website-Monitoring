@@ -130,7 +130,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
     14. **The checklist "Before your shift" shows to everyone in the rotation**, not only the person on call now — they prepare before their week.
     15. **The test link is confirmed by the page once it has loaded**, never while it renders (a prefetch would use it up), and the token leaves the address bar after.
     16. **After a swap step the page stays on that request** (`?swap=`), so its card shows the closed state instead of disappearing; focus moves to its new status line.
-    17. **The requester never approves their own request**, unless they are the only active Admin (as #143 asks them to). The page enforces it; the SQL still lets any Admin decide.
+    17. **Neither person in a swap approves it**, unless they are the only active Admin — the requester (as #143 asks them to) or the person asked, once they have accepted (staging /verify, 30 Oct: otherwise the request is stuck). The page enforces it; the SQL still lets any Admin decide.
     18. **Swap times follow §13's `formatWhen`** ("today 10:08", "yesterday 16:40", "Mon 14 Sep 21:18"), not the board's "Fri 10:08". Spec over board on formats.
     19. **The requester sees the back-to-back warning too** (OnCall side card), as the swap dialog promises: "Nok and the Admin see this warning too".
     20. **An Admin's decline reason goes by email, not Chat** (item 11). The decline dialog reads "… get a Chat message, and an email with your reason."

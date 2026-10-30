@@ -461,6 +461,15 @@ describe('the swap card (§27.3–6, §28.1–2, §28.5)', () => {
     );
   });
 
+  it('lets the only Admin decide a request they were asked about, once accepted (staging /verify)', () => {
+    const onlyAdminAsked = { ...swap('accepted'), counterpartId: ID.tao };
+    const v = swapViewOf(withSwap('tao', onlyAdminAsked), NOW)!;
+    expect(v).toMatchObject({ part: 'asked', canDecide: true, canApprove: true, canAnswer: false });
+    expect(v.badge.label).toBe('Waiting for you');
+    const two = { ...withSwap('tao', onlyAdminAsked), admins: [ID.tao, ID.ploy] };
+    expect(swapViewOf(two, NOW)!.canDecide).toBe(false);
+  });
+
   it('shows no card to anyone else (§27.6)', () => {
     expect(swapViewOf(withSwap('ploy', swap('waiting')), NOW)).toBeNull();
   });

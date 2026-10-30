@@ -124,7 +124,8 @@ export function DeclineDialog({
   onDone,
   phone,
 }: Base & { view: SwapView; onDone?: () => void }) {
-  const admin = view.part !== 'asked';
+  // The Admin's decline (reason required) unless the person asked is answering a waiting request.
+  const admin = !view.canAnswer;
   const [note, setNote] = useState('');
   const [tried, setTried] = useState(false);
   const { error, pending, run } = useSubmit(() => {

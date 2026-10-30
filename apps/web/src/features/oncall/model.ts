@@ -179,7 +179,8 @@ export const onePerson = (d: OncallData) => d.rotation.filter((id) => d.eligible
 
 /** "Waiting for Tao" with one Admin, "Waiting for an Admin" with more (§27.5, D-048 item 12). */
 function adminWord(d: OncallData): string {
-  return d.admins.length === 1 ? nameOf(d, d.admins[0]) : 'an Admin';
+  if (d.admins.length !== 1) return 'an Admin';
+  return d.admins[0] === d.viewer.id ? 'you' : nameOf(d, d.admins[0]);
 }
 
 // ── Badges ────────────────────────────────────────────────────────────────
@@ -878,11 +879,9 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
       : `${A} takes ${R}’s week, ${rqW}. ${R} takes ${A}’s week, ${cpW}.`,
     people,
     canAnswer: part === 'asked' && w.status === 'waiting',
-    canDecide:
-      d.viewer.role === 'admin' &&
-      open &&
-      w.counterpartId !== d.viewer.id &&
-      (part !== 'requester' || d.admins.length === 1),
+    // Someone not in the request decides — or the only Admin, whoever they are in it (staging /verify:
+    // Tao asked and the only Admin would otherwise leave the request stuck).
+    canDecide: d.viewer.role === 'admin' && open && (part === 'admin' || d.admins.length === 1),
     canApprove: w.status === 'accepted',
     canWithdraw: part === 'requester' && open,
     line,
