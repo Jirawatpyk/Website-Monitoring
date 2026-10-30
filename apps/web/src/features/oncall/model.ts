@@ -3,6 +3,7 @@ import {
   formatDay,
   formatDuration,
   formatNameList,
+  formatResponseHours,
   formatTime,
   formatWeek,
   type ResponseHours,
@@ -105,7 +106,7 @@ export interface OncallData {
   hours: { startMin: number; endMin: number; days: number[]; holidays: string[] };
 }
 
-export const hoursOf = (d: OncallData): ResponseHours => ({
+export const hoursOf = (d: Pick<OncallData, 'hours'>): ResponseHours => ({
   ...d.hours,
   holidays: new Set(d.hours.holidays),
 });
@@ -124,12 +125,12 @@ const week = (w: { start: string; end: string }): Week => ({
 });
 const quote = (s: string | null | undefined) => (s && s.trim() ? `“${s.trim()}”` : null);
 
-export function nameOf(d: OncallData, id: string | null | undefined): string {
+export function nameOf(d: Pick<OncallData, 'names'>, id: string | null | undefined): string {
   return (id && d.names[id]) || 'Someone';
 }
 
 /** Whoever covers `at`: the shift holder, or null. */
-export function personAt(d: OncallData, at: Date): ShiftRow | null {
+export function personAt(d: Pick<OncallData, 'shifts'>, at: Date): ShiftRow | null {
   const t = at.getTime();
   return d.shifts.find((s) => Date.parse(s.startsAt) <= t && t < Date.parse(s.endsAt)) ?? null;
 }
@@ -143,7 +144,7 @@ export interface ShiftGroup {
   end: Date;
 }
 
-export function groupsOf(d: OncallData): ShiftGroup[] {
+export function groupsOf(d: Pick<OncallData, 'shifts'>): ShiftGroup[] {
   const out: ShiftGroup[] = [];
   for (const s of d.shifts) {
     const prev = out.at(-1);
@@ -389,7 +390,10 @@ export function weekGrid(d: OncallData, now: Date): WeekDay[] {
 // ── Hero ──────────────────────────────────────────────────────────────────
 
 /** Tonight's on-call stretch: from the next closing (or now, outside hours) to the next opening. */
-export function tonightOf(d: OncallData, now: Date): { from: Date; until: Date; inside: boolean } {
+export function tonightOf(
+  d: Pick<OncallData, 'hours'>,
+  now: Date,
+): { from: Date; until: Date; inside: boolean } {
   const hours = hoursOf(d);
   const closing = closingOf(now, hours);
   const from = closing ?? now;
@@ -1038,4 +1042,49 @@ export function footOf(d: OncallData, now: Date): string | null {
     return `Swap is off — nobody else in the rotation to swap with. ${who} is on call every week until an Admin adds someone in Edit rotation. Shifts change Monday 09:00.`;
   }
   return `Shifts change Monday 09:00. The live shift can’t be swapped — ${admin ? 'use “Hand over…” on its row' : 'an Admin hands it over'}.${backstop}`;
+}
+
+// ── Overview "On call" card (§23.8, Main3) ────────────────────────────────
+
+export interface OncallCardLine {
+  /** The person, or null for the site owners. */
+  who: string | null;
+  text: string;
+  when: string;
+}
+export interface OncallCard {
+  lines: OncallCardLine[];
+  /** "Tier 2–3: Mon–Fri 09:00–18:00 — outside those hours escalation waits until 09:00." */
+  foot: string;
+}
+
+/** Who responds now, who is on call tonight, who has next week — the On-call page's own rules. */
+export function oncallCardOf(d: Pick<OncallData, 'shifts' | 'names' | 'hours'>, now: Date): OncallCard {
+  const data = d;
+  const { from, until, inside } = tonightOf(data, now);
+  const tonight = personAt(data, from);
+  const lines: OncallCardLine[] = [];
+  if (inside) lines.push({ who: null, text: 'Site owners respond', when: `until ${formatTime(from)}` });
+  if (tonight) {
+    const who = nameOf(data, tonight.userId);
+    const start = inside ? formatTime(from) : 'Now';
+    lines.push({
+      who,
+      text: `${who} · Tier 1 on call`,
+      when: `${start} → ${day(until).split(' ')[0]} ${formatTime(until)}`,
+    });
+  } else {
+    lines.push({ who: null, text: 'Nobody on call tonight', when: 'site owners at night' });
+  }
+  // The week after the current one (the same person again is still "next week").
+  const next = groupsOf(data).find((g) => g.start.getTime() > now.getTime());
+  if (next) {
+    const who = nameOf(data, next.first.userId);
+    lines.push({ who, text: `${who} · next week`, when: `from ${day(next.start)}` });
+  }
+  const open = formatResponseHours(d.hours);
+  return {
+    lines,
+    foot: `Tier 2–3: ${open} — outside those hours escalation waits until ${formatTime(nextOpening(until, hoursOf(data)))}.`,
+  };
 }

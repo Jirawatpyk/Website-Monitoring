@@ -88,6 +88,11 @@ export interface IncidentDetail {
   owner: string | null;
   backup: string | null;
   am: string | null;
+  /**
+   * The person L0 paged on call (S10, §28.6): set when a Tier 1 incident opened outside response hours
+   * and someone other than the owner was on call — the owner wasn't paged. `at`: when L0 went out.
+   */
+  paged: { name: string; at: string; you: boolean } | null;
   acked: { by: string; at: string } | null;
   /** Add note, root cause, Resolve: the Acknowledge rule (D-033). */
   canAct: boolean;
@@ -406,6 +411,10 @@ export async function loadIncident(
     owner: i.sites.primary_owner_id ? nameOf(i.sites.primary_owner_id) : null,
     backup: i.sites.backup_owner_id ? nameOf(i.sites.backup_owner_id) : null,
     am: am ? nameOf(am) : null,
+    paged:
+      i.l0_user_id && i.l0_user_id !== i.sites.primary_owner_id
+        ? { name: nameOf(i.l0_user_id), at: i.detected_at, you: i.l0_user_id === viewer.id }
+        : null,
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
     canAct: canAcknowledge(actor, i),
     rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },

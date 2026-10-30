@@ -81,13 +81,23 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           : 'Still down',
       danger: !d.recoveredAt,
     },
-    {
-      label: 'OWNER',
-      value: d.owner ?? 'No owner set',
-      caption:
-        [d.backup ? `Backup ${d.backup}` : null, d.am ? `AM ${d.am}` : null].filter(Boolean).join(' · ') ||
-        ' ',
-    },
+    // Outside response hours a Tier 1 incident pages the person on call, not the owner (§28.6).
+    d.paged
+      ? {
+          label: 'PAGED · ON CALL',
+          value: `${d.paged.name}${d.paged.you ? ' (you)' : ''}`,
+          caption: [d.owner ? `Owner ${d.owner}, not paged` : null, d.am ? `AM ${d.am}` : null]
+            .filter(Boolean)
+            .join(' · '),
+        }
+      : {
+          label: 'OWNER',
+          value: d.owner ?? 'No owner set',
+          caption:
+            [d.backup ? `Backup ${d.backup}` : null, d.am ? `AM ${d.am}` : null]
+              .filter(Boolean)
+              .join(' · ') || ' ',
+        },
     {
       label: 'ACKNOWLEDGED',
       value: d.acked

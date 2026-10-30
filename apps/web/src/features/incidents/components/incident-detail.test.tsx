@@ -73,6 +73,7 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     owner: 'Tao',
     backup: 'Nok',
     am: null,
+    paged: null,
     acked: null,
     canAct: true,
     resolved: null,

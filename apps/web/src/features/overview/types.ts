@@ -1,5 +1,6 @@
 import type { SiteStatus, Tier, Trigger } from '@dxt/shared';
 import { SITE_LOCATIONS, type LocationGlyph, type SiteLocation } from '@/components/site-cells';
+import type { OncallCardData } from '@/features/oncall';
 
 /** BKK / SIN / TYO glyphs, as the Sites list draws them (spec §11 legend). */
 export type { LocationGlyph };
@@ -119,6 +120,8 @@ export interface OverviewData {
   lastRoundAt: string | null;
   /** The "Maintenance & mutes" card (§23.8); null = nothing active, waiting or scheduled. */
   maintenance?: (OverviewMaintenanceCard & { phoneLine: string | null }) | null;
+  /** The "On call" card (§23.8, S10); null when it can't be read. */
+  oncall?: OncallCardData | null;
   /** Recent events lines from windows and mutes (Main3). */
   windowEvents?: { id: string; at: string; text: string }[];
 }

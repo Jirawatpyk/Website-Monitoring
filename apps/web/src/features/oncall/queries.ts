@@ -3,7 +3,9 @@ import type { DbClient } from '@dxt/db';
 import { loadResponseHours } from '@/server/escalation/response-hours';
 import {
   OPEN_SWAP,
+  oncallCardOf,
   type Checklist,
+  type OncallCard,
   type OncallData,
   type PagedIncident,
   type ShiftRow,
@@ -199,4 +201,41 @@ export async function loadOncallData(
     paged: pagedRows,
     hours: { ...hours, days: [...hours.days], holidays: [...hours.holidays] },
   };
+}
+
+/**
+ * The Overview's "On call" card (§23.8): who responds now, tonight and next week. A failed read leaves
+ * the card out rather than failing the Overview.
+ */
+export async function loadOncallCard(db: DbClient, now: Date): Promise<OncallCard | null> {
+  const [shifts, hours] = await Promise.all([
+    db
+      .from('oncall_shifts')
+      .select(
+        'id, user_id, starts_at, ends_at, handed_over_from, person:profiles!oncall_shifts_user_id_fkey(display_name)',
+      )
+      .gt('ends_at', now.toISOString())
+      .order('starts_at')
+      .limit(6),
+    loadResponseHours(db, now),
+  ]);
+  if (shifts.error) {
+    console.error(JSON.stringify({ event: 'oncall_card_unreadable', error: shifts.error.message }));
+    return null;
+  }
+  const rows = shifts.data ?? [];
+  return oncallCardOf(
+    {
+      shifts: rows.map((s) => ({
+        id: s.id,
+        userId: s.user_id,
+        startsAt: s.starts_at,
+        endsAt: s.ends_at,
+        handedOverFrom: s.handed_over_from,
+      })),
+      names: Object.fromEntries(rows.map((s) => [s.user_id, s.person?.display_name ?? 'Someone'])),
+      hours: { ...hours, days: [...hours.days], holidays: [...hours.holidays] },
+    },
+    now,
+  );
 }
