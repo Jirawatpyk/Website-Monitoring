@@ -15,7 +15,10 @@ export function OncallCard({ card }: { card: OncallCardData }) {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <h3 className="m-0 text-base font-semibold">On call</h3>
-          <Link href="/oncall" className={`rounded-aura-sm text-sm whitespace-nowrap ${FOCUS}`}>
+          <Link
+            href="/oncall"
+            className={`flex min-h-11 items-center rounded-aura-sm text-sm whitespace-nowrap ${FOCUS}`}
+          >
             Rotation →
           </Link>
         </div>

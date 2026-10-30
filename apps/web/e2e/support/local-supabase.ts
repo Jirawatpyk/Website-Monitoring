@@ -335,3 +335,51 @@ export async function baselineAudit(monitorId: string): Promise<string[]> {
   )) as { action: string }[];
   return rows.map((r) => r.action);
 }
+
+/**
+ * Empties the on-call tables (S10), in the order their foreign keys allow: messages → events → swaps →
+ * shifts, then the rotation. A spec that seeds a rotation calls it again when it ends.
+ */
+export async function resetOncall(): Promise<void> {
+  await admin('/rest/v1/notifications?oncall_event_id=not.is.null', { method: 'DELETE' });
+  for (const table of ['oncall_events', 'oncall_swaps', 'oncall_shifts', 'oncall_rotation']) {
+    await admin(`/rest/v1/${table}?id=not.is.null`, { method: 'DELETE' });
+  }
+}
+
+/**
+ * A rotation of `emails` and four weekly shifts in that order from this week's Monday 09:00 Bangkok —
+ * the first is live now (what `oncall_extend_shifts` makes after a save). Returns the user ids.
+ */
+export async function ensureRotation(emails: string[]): Promise<string[]> {
+  await resetOncall();
+  const ids: string[] = [];
+  for (const email of emails) {
+    const [p] = (await admin(`/rest/v1/profiles?select=id&email=eq.${encodeURIComponent(email)}`)) as {
+      id: string;
+    }[];
+    if (!p) throw new Error(`no profile for ${email}`);
+    ids.push(p.id);
+  }
+  await admin('/rest/v1/oncall_rotation', {
+    method: 'POST',
+    body: JSON.stringify(ids.map((user_id, i) => ({ user_id, position: i + 1 }))),
+  });
+  const hour = 3_600_000;
+  const local = new Date(Date.now() + 7 * hour);
+  const dow = local.getUTCDay() === 0 ? 7 : local.getUTCDay();
+  let start = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - (dow - 1), 2);
+  if (start > Date.now()) start -= 7 * 24 * hour;
+  await admin('/rest/v1/oncall_shifts', {
+    method: 'POST',
+    body: JSON.stringify(
+      Array.from({ length: 4 }, (_, i) => ({
+        user_id: ids[i % ids.length],
+        starts_at: new Date(start + i * 7 * 24 * hour).toISOString(),
+        ends_at: new Date(start + (i + 1) * 7 * 24 * hour).toISOString(),
+        slot: (i % ids.length) + 1,
+      })),
+    ),
+  });
+  return ids;
+}

@@ -91,13 +91,14 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
     (s) => Date.parse(s.startsAt) <= now.getTime() && now.getTime() < Date.parse(s.endsAt),
   );
 
-  const [open, setOpen] = useState<Open | null>(null);
+  // The dialog stays mounted while it closes (`shown` false), so focus goes back to its button.
+  const [open, setOpen] = useState<(Open & { shown: boolean }) | null>(null);
   const [n, setN] = useState(0);
   const show = (o: Open) => {
     setN((x) => x + 1);
-    setOpen(o);
+    setOpen({ ...o, shown: true });
   };
-  const close = () => setOpen(null);
+  const close = () => setOpen((o) => (o ? { ...o, shown: false } : o));
   const [handed, setHanded] = useState<string | null>(null);
   const [test, setTest] = useState<TestResult>(null);
 
@@ -249,7 +250,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
       {open?.kind === 'swap' && (
         <RequestSwapDialog
           key={`s${n}`}
-          open
+          open={open.shown}
           onClose={close}
           phone={open.phone}
           row={open.row}
@@ -259,15 +260,15 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
         />
       )}
       {open?.kind === 'decline' && view && (
-        <DeclineDialog key={`d${n}`} open onClose={close} phone={open.phone} view={view} />
+        <DeclineDialog key={`d${n}`} open={open.shown} onClose={close} phone={open.phone} view={view} />
       )}
       {open?.kind === 'edit' && (
-        <EditRotationDialog key={`e${n}`} open onClose={close} data={data} now={now} />
+        <EditRotationDialog key={`e${n}`} open={open.shown} onClose={close} data={data} now={now} />
       )}
       {open?.kind === 'handover' && liveShift && (
         <HandOverDialog
           key={`h${n}`}
-          open
+          open={open.shown}
           onClose={close}
           phone={open.phone}
           data={data}
@@ -893,7 +894,8 @@ function PhoneRotation({
 }) {
   const empty = rows.length === 0;
   return (
-    <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
+    // No overflow-hidden: it would clip the buttons' focus rings (layout-consistency).
+    <div className="rounded-aura-lg border border-border-default bg-bg-surface">
       <div className="flex min-h-11 items-center justify-between border-b border-border-subtle py-0 pr-1 pl-4">
         <span className="font-mono text-xs text-fg-tertiary">ROTATION</span>
         {canRequest && (
