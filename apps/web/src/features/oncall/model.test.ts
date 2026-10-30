@@ -141,7 +141,7 @@ describe('rotation rows (OnCall table, MOnCall row cards)', () => {
   it('says when a swap went through or expired', () => {
     expect(
       rotationRows(withSwap('tao', swap('approved')), NOW).find((r) => r.shiftId === 'arm5')!.alerts,
-    ).toBe('Swapped · Fri 10:08');
+    ).toBe('Swapped · today 10:08');
     expect(
       rotationRows(withSwap('tao', swap('expired')), NOW).find((r) => r.shiftId === 'arm5')!.alerts,
     ).toBe('Swap expired Mon 5 Oct');
@@ -183,7 +183,7 @@ describe('a handed-over shift (§28.4 Handed over)', () => {
     const live = rotationRows(handed, NOW)[1]!;
     expect(live).toMatchObject({
       who: 'Ploy',
-      alerts: 'Arm from Fri 18:00',
+      alerts: 'Arm from today 18:00',
       status: { label: 'Handed to Arm' },
     });
     expect(live.action).toBeNull();
@@ -314,9 +314,29 @@ describe('the hero (OnCall, MOnCall per viewer)', () => {
     const night = new Date('2026-09-25T16:00:00Z'); // Fri 23:00
     expect(heroOf(data('ploy'), night)).toMatchObject({
       phoneEyebrow: 'YOU’RE ON CALL NOW',
+      phoneTitle: 'Now → Mon 09:00',
+      phoneText: 'All Tier 1 alerts (5 sites) come to you until Mon 28 Sep 09:00.',
+      l1: 'Now → Mon 28 Sep 09:00',
       nowTitle: 'Ploy responds',
       nowLine: 'until Mon 28 Sep 09:00',
     });
+  });
+
+  it('never says "Tonight 10:00" on a Saturday morning (MOnCall review)', () => {
+    const saturday = new Date('2026-09-26T03:00:00Z'); // Sat 10:00
+    expect(heroOf(data('tao'), saturday)).toMatchObject({
+      phoneTitle: 'Now → Mon 09:00',
+      l1: 'Now → Mon 28 Sep 09:00',
+    });
+  });
+
+  it('says how a week came from an approved swap, and names an Admin in the rotation as not a backstop', () => {
+    const approved = { ...swap('approved'), requesterShiftId: 'nok28', counterpartShiftId: 'arm5' };
+    expect(heroOf(withSwap('nok', approved), NOW).phoneText).toBe(
+      'Swapped with Arm · today 10:08. Tier 1 alerts at night and on the weekend come to you.',
+    );
+    const inRotation = data('tao', { rotation: [ID.arm, ID.ploy, ID.nok, ID.tao] });
+    expect(heroOf(inRotation, NOW).phoneText).toBe('Ploy gets Tier 1 alerts at night and on the weekend.');
   });
 });
 
@@ -356,30 +376,30 @@ describe('the swap card (§27.3–6, §28.1–2, §28.5)', () => {
       'accepted',
       'Waiting for Tao',
       'Accepted · waiting for an Admin to approve. Nothing changes in the rotation until then.',
-      'Accepted Fri 10:07 · Arm and Tao got a Chat message',
+      'Accepted today 10:07 · Arm and Tao got a Chat message',
     ],
     [
       'declined',
       'Declined',
       'You declined · Arm keeps Mon 5 → 12 Oct.',
-      'Fri 10:07 · No reason given · Arm got a Chat message and an email',
+      'today 10:07 · No reason given · Arm got a Chat message and an email',
     ],
     [
       'approved',
       'Approved',
       'The weeks have swapped — you’re on call Mon 5 → 12 Oct, Arm Mon 19 → 26 Oct.',
-      'Approved by Tao · Fri 10:08',
+      'Approved by Tao · today 10:08',
     ],
     [
       'admin_declined',
       'Closed',
       'This request is closed — Declined by Tao · No reason given',
-      'Fri 10:08 · Arm keeps Mon 5 → 12 Oct, you keep Mon 19 → 26 Oct',
+      'today 10:08 · Arm keeps Mon 5 → 12 Oct, you keep Mon 19 → 26 Oct',
     ],
     [
       'withdrawn',
       'Closed',
-      'This request is closed — Withdrawn by Arm · Fri 10:08',
+      'This request is closed — Withdrawn by Arm · today 10:08',
       'Nothing changes: Arm keeps Mon 5 → 12 Oct, you keep Mon 19 → 26 Oct',
     ],
     [
@@ -404,7 +424,8 @@ describe('the swap card (§27.3–6, §28.1–2, §28.5)', () => {
       badge: { label: 'Waiting for Nok' },
       canWithdraw: true,
       canDecide: false,
-      warn: null,
+      // The requester sees the warning too: the dialog promised "Nok and the Admin see this warning too".
+      warn: { title: 'Back-to-back for Nok' },
       hint: 'Waiting for Nok to accept, then an Admin approves. You can withdraw until an Admin acts.',
     });
     expect(open.people.map((p) => [p.who, p.status.label])).toEqual([
@@ -412,7 +433,9 @@ describe('the swap card (§27.3–6, §28.1–2, §28.5)', () => {
       ['Nok', 'Pending'],
       ['Tao', 'Not yet'],
     ]);
-    expect(swapViewOf(withSwap('arm', swap('withdrawn')), NOW)!.line!.text).toBe('You withdrew · Fri 10:08');
+    expect(swapViewOf(withSwap('arm', swap('withdrawn')), NOW)!.line!.text).toBe(
+      'You withdrew · today 10:08',
+    );
   });
 
   it('lets an Admin approve only once the person asked accepted, and decline with a reason', () => {
@@ -495,7 +518,7 @@ describe('hand over', () => {
   const live = SHIFTS[1]!;
   it('offers now, tonight and tomorrow morning while the shift runs', () => {
     expect(handoverTimes(data('tao'), live, NOW).map((t) => t.label)).toEqual([
-      'Now · Fri 10:07',
+      'Now · 10:07',
       'Tonight 18:00',
       'Sat 26 Sep 09:00',
     ]);
@@ -586,13 +609,13 @@ describe('footers and the Overview card', () => {
     });
     expect(oncallCardOf(data('tao', { shifts: [] }), NOW).lines[1]).toEqual({
       who: null,
-      text: 'Nobody on call tonight',
-      when: 'site owners at night',
+      text: 'Nobody on call',
+      when: 'Site owners at night',
     });
   });
 
   it('writes times within a week by weekday, older ones by date', () => {
-    expect(shortWhen(new Date('2026-09-24T03:00:00Z'), NOW)).toBe('Thu 10:00');
+    expect(shortWhen(new Date('2026-09-24T03:00:00Z'), NOW)).toBe('yesterday 10:00');
     expect(shortWhen(new Date('2026-09-14T03:00:00Z'), NOW)).toBe('Mon 14 Sep 10:00');
   });
 });

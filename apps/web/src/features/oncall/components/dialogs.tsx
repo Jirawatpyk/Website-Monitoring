@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Avatar, Button, Dialog, IconButton, Select, Textarea } from '@jirawatpyk/aura-react';
+import { Alert, Avatar, Badge, Button, Dialog, IconButton, Select, Textarea } from '@jirawatpyk/aura-react';
 import {
   IconArrowDown,
   IconArrowUp,
@@ -13,7 +13,7 @@ import {
   IconInfo,
   IconTriangleAlert,
 } from '@jirawatpyk/aura-react/icons';
-import { formatDay, formatNameList, formatTime } from '@dxt/shared';
+import { formatDay, formatNameList, formatTime, formatWeek } from '@dxt/shared';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { decideSwap, handOver, requestSwap, respondSwap, saveRotation } from '../actions';
@@ -31,6 +31,13 @@ import {
   type SwapChoice,
   type SwapView,
 } from '../model';
+
+/** A hand-over that went through: the success alert's title and who got a Chat message. */
+export interface HandedOver {
+  title: string;
+  from: string;
+  to: string;
+}
 
 const FAILED = 'Couldn’t save. Check your connection and try again.';
 
@@ -66,13 +73,26 @@ export function Refusal({ error }: { error: string | null }) {
   ) : null;
 }
 
-/** "Logged in the audit log" left of the buttons (OnCall dialogs); the phone puts the pair in two columns. */
-function Foot({ children, phone, wide }: { children: React.ReactNode; phone?: boolean; wide?: boolean }) {
+/**
+ * "Logged in the audit log" left of the buttons (OnCall dialogs); the phone puts the pair in two columns
+ * and shows the line only where MOnCall draws it (`phoneLogged`: the Admin's decline, the hand-over).
+ */
+function Foot({
+  children,
+  phone,
+  wide,
+  phoneLogged = false,
+}: {
+  children: React.ReactNode;
+  phone?: boolean;
+  wide?: boolean;
+  phoneLogged?: boolean;
+}) {
   return phone ? (
     <div className="flex w-full flex-col gap-1.5">
       {/* `wide`: a narrow Cancel and the long "Hand over to Nok" taking the rest (MOnCall sheet). */}
       <div className={`grid gap-2 ${wide ? 'grid-cols-[auto_1fr]' : 'grid-cols-2'}`}>{children}</div>
-      <span className="text-center text-xs text-fg-secondary">Logged in the audit log</span>
+      {phoneLogged && <span className="text-center text-xs text-fg-secondary">Logged in the audit log</span>}
     </div>
   ) : (
     <div className="flex w-full flex-wrap items-center gap-2">
@@ -119,7 +139,7 @@ export function DeclineDialog({ view, open, onClose, phone }: Base & { view: Swa
       title={view.declineTitle}
       description={view.declineText}
       footer={
-        <Foot phone={phone}>
+        <Foot phone={phone} phoneLogged={admin}>
           <Button variant="secondary" fullWidth={phone} onClick={onClose}>
             Back
           </Button>
@@ -203,6 +223,12 @@ export function RequestSwapDialog({
       }
     >
       <div className="flex flex-col gap-4">
+        {choices.length === 0 && (
+          <Alert tone="info" role="status">
+            Nobody has a free week to swap right now — every other week already has a request or was handed
+            over.
+          </Alert>
+        )}
         <Select
           touchHeight
           label="Swap with"
@@ -275,7 +301,11 @@ export function EditRotationDialog({ data, now, open, onClose }: Base & { data: 
       footer={
         <div className="flex w-full flex-wrap items-center gap-2">
           <span className="grow text-xs text-fg-secondary">
-            {changed ? `${told} get a Chat message with their new weeks · logged` : 'No change yet'}
+            {order.length === 0
+              ? 'Add someone to save'
+              : changed
+                ? `${told} get a Chat message with their new weeks · logged`
+                : 'No change yet'}
           </span>
           <Button variant="secondary" onClick={onClose}>
             Cancel
@@ -322,6 +352,7 @@ export function EditRotationDialog({ data, now, open, onClose }: Base & { data: 
                     <Button
                       variant="ghost"
                       size="sm"
+                      aria-label={`Remove ${who}`}
                       onClick={() => setOrder((o) => o.filter((x) => x !== id))}
                     >
                       Remove
@@ -388,7 +419,7 @@ export function HandOverDialog({
   onClose,
   phone,
   onHanded,
-}: Base & { data: OncallData; shift: ShiftRow; now: Date; onHanded: (text: string) => void }) {
+}: Base & { data: OncallData; shift: ShiftRow; now: Date; onHanded: (result: HandedOver) => void }) {
   const holder = nameOf(data, shift.userId);
   const people = data.eligible.filter((id) => id !== shift.userId);
   const nextShift = data.shifts.find((s) => Date.parse(s.startsAt) >= Date.parse(shift.endsAt));
@@ -403,9 +434,13 @@ export function HandOverDialog({
   const onNext = nextShift?.userId === to;
   const { error, pending, run } = useSubmit(() => {
     onClose();
-    onHanded(
-      `${holder}’s shift handed to ${toName} from ${at.value === 'now' ? 'now' : at.value === 'tonight' ? `tonight ${at.label.split(' ').at(-1)}` : at.label}`,
-    );
+    const from =
+      at.value === 'now'
+        ? `now (${formatTime(at.at)})`
+        : at.value === 'tonight'
+          ? `tonight ${formatTime(at.at)}`
+          : at.label;
+    onHanded({ title: `${holder}’s shift handed to ${toName} from ${from}`, from: holder, to: toName });
   });
   const submit = () => {
     if (!reason.trim()) {
@@ -424,7 +459,7 @@ export function HandOverDialog({
       title={`Hand over ${holder}’s live shift`}
       description={`${holder} is on call now, until ${formatDay(until, { weekday: true })} ${formatTime(until)}. The new person gets Tier 1 alerts at night and on the weekend from the time you pick. ${holder}’s sites, backups and later weeks don’t change.`}
       footer={
-        <Foot phone={phone} wide>
+        <Foot phone={phone} wide phoneLogged>
           <Button variant="secondary" fullWidth={phone} onClick={onClose}>
             Cancel
           </Button>
@@ -468,17 +503,20 @@ export function HandOverDialog({
           >
             <div className="flex items-center justify-between gap-3">
               <span className="font-semibold">{`${toName}’s phone · ${ready.count} of 3 ready`}</span>
-              <span className="flex items-center gap-1 text-xs text-fg-secondary">
-                {ready.count === 3 ? <IconCircleCheck size="sm" /> : <IconClock size="sm" />}
+              <Badge
+                tone={ready.count === 3 ? 'success' : 'neutral'}
+                icon={ready.count === 3 ? <IconCircleCheck /> : <IconClock />}
+              >
                 {ready.count === 3
                   ? 'Phone ready'
                   : ready.sent && !ready.received
                     ? `Test sent ${formatTime(ready.sent)}`
                     : 'Not ready yet'}
-              </span>
+              </Badge>
             </div>
             {ready.items.map((it) => (
               <div key={it.label} className="flex gap-2.5">
+                <span className="sr-only">{it.done ? 'Done: ' : 'Not done: '}</span>
                 <span className={`flex pt-0.5 ${it.done ? 'text-fg-positive' : 'text-fg-tertiary'}`}>
                   {it.done ? <IconCircleCheck size="sm" /> : <IconCircle size="sm" />}
                 </span>
@@ -490,7 +528,7 @@ export function HandOverDialog({
                 <span className="flex pt-0.5">
                   <IconTriangleAlert size="sm" />
                 </span>
-                <span>{`${toName} is on call next — this makes it back-to-back.`}</span>
+                <span>{`${toName} is on call next (${formatWeek({ start: new Date(nextShift.startsAt), end: new Date(nextShift.endsAt) })}) — this makes it back-to-back.`}</span>
               </span>
             )}
           </div>

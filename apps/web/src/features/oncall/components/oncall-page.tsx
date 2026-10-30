@@ -1,6 +1,6 @@
 'use client';
 
-import { formatTime } from '@dxt/shared';
+import { formatResponseHours, formatTime } from '@dxt/shared';
 import {
   Alert,
   Avatar,
@@ -53,6 +53,7 @@ import {
   Refusal,
   RequestSwapDialog,
   useSubmit,
+  type HandedOver,
 } from './dialogs';
 import { PeopleList, StateBadge, StatusLine, WeekBox } from './parts';
 
@@ -99,7 +100,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
     setOpen({ ...o, shown: true });
   };
   const close = () => setOpen((o) => (o ? { ...o, shown: false } : o));
-  const [handed, setHanded] = useState<string | null>(null);
+  const [handed, setHanded] = useState<HandedOver | null>(null);
   const [test, setTest] = useState<TestResult>(null);
 
   // The test link (§27.8): confirmed by an explicit call once the page is up, never while it renders
@@ -133,13 +134,13 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
 
   const openSwapId = (id: string) => router.replace(`/oncall?swap=${id}`, { scroll: false });
   const editPrimary = nobody;
+  const hours = formatResponseHours(data.hours);
+  const opening = hours.split(' ').at(-1)?.split('–')[0] ?? '';
   const meta = (
     <span className="max-lg:hidden">
-      Weekly rotation for Tier 1. Mon–Fri 09:00–18:00 the owners respond; outside that, Tier 1 goes to the
-      person on call.
+      {`Weekly rotation for Tier 1. ${hours} the owners respond; outside that, Tier 1 goes to the person on call.`}
       <br />
-      Tier 2–3 have no on-call: they’re covered Mon–Fri 09:00–18:00 — DOWN still posts at night, timers wait
-      until 09:00.
+      {`Tier 2–3 have no on-call: they’re covered ${hours} — DOWN still posts at night, timers wait until ${opening}.`}
     </span>
   );
 
@@ -171,8 +172,8 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
         </Alert>
       )}
       {handed && (
-        <Alert tone="success" title={handed} role="status" onDismiss={() => setHanded(null)}>
-          {`${handed.split('’s shift')[0]} and ${handed.split('handed to ')[1]?.split(' from')[0] ?? ''} got a Chat message. Logged in the audit log.`}
+        <Alert tone="success" title={handed.title} role="status" onDismiss={() => setHanded(null)}>
+          {`${handed.from} and ${handed.to} got a Chat message. Logged in the audit log.`}
         </Alert>
       )}
 
@@ -188,7 +189,14 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
           <PhoneCard
             ready={ready}
             mine={ready.personId === data.viewer.id}
-            handedFrom={tonightPerson?.handedOverFrom ? nameOf(data, tonightPerson.handedOverFrom) : null}
+            handedFrom={
+              tonightPerson?.handedOverFrom
+                ? {
+                    name: nameOf(data, tonightPerson.handedOverFrom),
+                    at: formatTime(new Date(tonightPerson.startsAt)),
+                  }
+                : null
+            }
           />
         ) : (
           <OwnersCard data={data} admin={admin} empty={empty} />
@@ -215,7 +223,11 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
                 rowHeight="auto"
               />
             )}
-            {foot && <span className="text-xs leading-normal text-fg-secondary">{foot}</span>}
+            {foot && (
+              <span id="oc-foot" className="text-xs leading-normal text-fg-secondary">
+                {foot}
+              </span>
+            )}
           </section>
           {view && view.part !== 'asked' && (
             <SideCard view={view} onDecline={() => show({ kind: 'decline', phone: false })} />
@@ -309,6 +321,16 @@ function DesktopHero({ hero, now }: { hero: ReturnType<typeof heroOf>; now: Date
 }
 
 function ReadyIcon({ done, waiting }: { done: boolean; waiting?: boolean }) {
+  const word = <span className="sr-only">{done ? 'Done: ' : waiting ? 'Waiting: ' : 'Not done: '}</span>;
+  return (
+    <>
+      {word}
+      <ReadyMark done={done} waiting={waiting} />
+    </>
+  );
+}
+
+function ReadyMark({ done, waiting }: { done: boolean; waiting?: boolean }) {
   return done ? (
     <span className="flex pt-0.5 text-fg-positive">
       <IconCircleCheck size="sm" />
@@ -332,12 +354,12 @@ function PhoneCard({
 }: {
   ready: Readiness;
   mine: boolean;
-  handedFrom: string | null;
+  handedFrom: { name: string; at: string } | null;
 }) {
   const sub =
     ready.count === 3
       ? handedFrom
-        ? `Ready · covering ${handedFrom}`
+        ? `Ready · covering ${handedFrom.name} from ${handedFrom.at}`
         : 'Ready'
       : ready.sent && !ready.received
         ? `Test alert sent ${formatTime(ready.sent)} · waiting for ${ready.who}`
@@ -348,7 +370,7 @@ function PhoneCard({
     <Card>
       <div className="flex flex-col gap-3">
         <div className="flex flex-col leading-snug">
-          <h3 className="m-0 text-base font-semibold">{`${ready.who}’s phone · ${ready.count} of 3 ready`}</h3>
+          <h2 className="m-0 text-base font-semibold">{`${ready.who}’s phone · ${ready.count} of 3 ready`}</h2>
           <span
             className={`text-sm ${ready.count === 3 ? 'text-fg-positive' : ready.sent && !ready.received ? 'text-fg-secondary' : 'text-alert-warning-fg'}`}
           >
@@ -414,12 +436,15 @@ function OwnersCard({
     <Card>
       <div className="flex flex-col gap-3">
         <div className="flex flex-col leading-snug">
-          <h3 className="m-0 text-base font-semibold">Tonight · site owners</h3>
+          <h2 className="m-0 text-base font-semibold">Tonight · site owners</h2>
           <span className="text-sm text-fg-secondary">
             No one is on call, so Tier 1 alerts at night page each site’s owner
           </span>
         </div>
-        <div className="flex flex-col rounded-aura-md border border-border-default">
+        {owners.length === 0 && <span className="text-sm text-fg-secondary">No Tier 1 sites yet.</span>}
+        <div
+          className={`flex flex-col rounded-aura-md border border-border-default ${owners.length ? '' : 'hidden'}`}
+        >
           {owners.map((o, i) => (
             <div
               key={o.who}
@@ -450,7 +475,7 @@ function WeekCard({ data, now }: { data: OncallData; now: Date }) {
     <Card className="max-lg:hidden">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h3 className="m-0 text-base font-semibold">This week · who gets Tier 1 alerts</h3>
+          <h2 className="m-0 text-base font-semibold">This week · who gets Tier 1 alerts</h2>
           <div className="flex items-center gap-4 text-xs text-fg-secondary">
             <span className="flex items-center gap-1.5">
               <span className="size-3.5 rounded-aura-sm border border-fg-secondary bg-status-neutral-bg" />
@@ -458,16 +483,15 @@ function WeekCard({ data, now }: { data: OncallData; now: Date }) {
             </span>
             <span className="flex items-center gap-1.5">
               <span className="size-3.5 rounded-aura-sm border border-dashed border-border-strong bg-bg-surface" />
-              Owners (Mon–Fri 09:00–18:00)
+              {`Owners (${formatResponseHours(data.hours)})`}
             </span>
           </div>
         </div>
         <div className="flex gap-3">
           <div className="flex w-11 shrink-0 flex-col justify-between pt-7 font-mono text-xs text-fg-tertiary">
-            <span>00:00</span>
-            <span>09:00</span>
-            <span>18:00</span>
-            <span>24:00</span>
+            {['00:00', ...formatResponseHours(data.hours).split(' ').at(-1)!.split('–'), '24:00'].map((t) => (
+              <span key={t}>{t}</span>
+            ))}
           </div>
           <div className="grid grow grid-cols-7 gap-2">
             {days.map((d) => (
@@ -547,7 +571,9 @@ function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): Da
           ) : (
             <Avatar name={r.who} size="sm" />
           )}
-          <span className={r.nobody ? 'text-fg-secondary' : ''}>{r.who}</span>
+          <span className={`min-w-0 truncate ${r.nobody ? 'text-fg-secondary' : ''}`} title={r.who}>
+            {r.who}
+          </span>
         </span>
       ),
     },
@@ -569,7 +595,8 @@ function columns(onSwap: (row: RotationRow) => void, onHandover: () => void): Da
             Swap
           </Button>
         ) : r.action?.kind === 'swap-off' ? (
-          <Button variant="ghost" size="sm" disabled title={r.action.why}>
+          // The reason is the sentence under the table (§14.16): a title alone isn't reachable.
+          <Button variant="ghost" size="sm" disabled title={r.action.why} aria-describedby="oc-foot">
             Swap
           </Button>
         ) : r.action?.kind === 'handover' ? (
@@ -802,6 +829,11 @@ function Checklist({ ready, data }: { ready: Readiness; data: OncallData }) {
     start(async () => {
       const r = await setChecklist(next);
       setError(r.ok ? null : r.message);
+      // Not saved: the boxes go back to what is stored.
+      if (!r.ok) {
+        setMentions(!!c?.mentionsOnly);
+        setDnd(!!c?.dndAllowed);
+      }
     });
   const count = [mentions, dnd, !!ready.received].filter(Boolean).length;
   const sent = !!ready.sent && !ready.received;
@@ -897,26 +929,36 @@ function PhoneRotation({
     // No overflow-hidden: it would clip the buttons' focus rings (layout-consistency).
     <div className="rounded-aura-lg border border-border-default bg-bg-surface">
       <div className="flex min-h-11 items-center justify-between border-b border-border-subtle py-0 pr-1 pl-4">
-        <span className="font-mono text-xs text-fg-tertiary">ROTATION</span>
-        {canRequest && (
-          <Button
-            variant="ghost"
-            icon={<IconArrowUpDown />}
-            disabled={one || !swapRow}
-            onClick={() => swapRow && onSwap(swapRow)}
-          >
-            Request swap
-          </Button>
-        )}
-        {admin && !empty && !rows[0]?.nobody && !canRequest && (
-          <Button variant="ghost" icon={<IconUsers />} onClick={onEdit}>
-            Edit rotation
-          </Button>
-        )}
+        <h2 className="m-0 font-mono text-xs font-normal text-fg-tertiary">ROTATION</h2>
+        <span className="flex flex-wrap justify-end">
+          {canRequest && (
+            <Button
+              variant="ghost"
+              icon={<IconArrowUpDown />}
+              disabled={one || !swapRow}
+              aria-describedby={one || !swapRow ? 'oc-swap-why' : undefined}
+              onClick={() => swapRow && onSwap(swapRow)}
+            >
+              Request swap
+            </Button>
+          )}
+          {/* An Admin in the rotation gets both (§28.7). */}
+          {admin && !empty && !rows[0]?.nobody && (
+            <Button variant="ghost" icon={<IconUsers />} onClick={onEdit}>
+              Edit rotation
+            </Button>
+          )}
+        </span>
       </div>
-      {canRequest && one && (
-        <div className="border-b border-border-subtle px-4 py-2 text-xs leading-snug text-fg-secondary">
-          {SWAP_OFF}
+      {canRequest && (one || !swapRow) && (
+        <div
+          id="oc-swap-why"
+          className="border-b border-border-subtle px-4 py-2 text-xs leading-snug text-fg-secondary"
+        >
+          {/* No dead control (§14.16): say why there's nothing to swap. */}
+          {one
+            ? SWAP_OFF
+            : 'None of your weeks can be swapped now — the next one already has a request, or none is made yet'}
         </div>
       )}
       {rows.map((r) => (

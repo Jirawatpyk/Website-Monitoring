@@ -17,7 +17,7 @@ describe('OncallCard (Overview, Main3)', () => {
       />,
     );
     expect(screen.getByRole('heading', { name: 'On call' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Rotation →' })).toHaveAttribute('href', '/oncall');
+    expect(screen.getByRole('link', { name: 'Rotation' })).toHaveAttribute('href', '/oncall');
     expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'Site owners responduntil 18:00',
       'PLPloy · Tier 1 on call18:00 → Mon 09:00',

@@ -19,6 +19,10 @@ export function OverviewSkeleton() {
       <div className="max-md:hidden">
         <CardSkeleton lines={6} />
       </div>
+      {/* the "right now" band (§23.8): On call is almost always there, so its room is kept */}
+      <div className="max-md:hidden">
+        <CardSkeleton lines={3} />
+      </div>
       {/* phones: "Live issues" and its rows, then the "All N sites" row */}
       <div className="flex flex-col gap-6 md:hidden">
         <PhoneRowsSkeleton rows={5} heading />

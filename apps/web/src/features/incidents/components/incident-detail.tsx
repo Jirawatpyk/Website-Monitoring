@@ -399,12 +399,23 @@ export function IncidentDetailView({
             {d.owner && (
               <span className="text-xs text-fg-secondary">{`Owner ${d.owner} · not paged outside response hours`}</span>
             )}
+            {/* The role line follows the viewer (MobileAckDark, §28.6). */}
+            <span className="pt-1 text-xs">
+              {d.paged.you
+                ? 'You’re on call (Tier 1 night).'
+                : `${d.owner && d.owner === viewerName ? 'You own this site — you weren’t paged. ' : ''}${d.paged.name} is on call and was paged at ${formatTime(new Date(d.paged.at))}.`}
+            </span>
           </span>
         )}
         <span className="flex items-center gap-2">
           <span className="grow text-sm">
             {[
-              d.owner ? `Owner ${d.owner}${d.owner === viewerName ? ' (you)' : ''}` : 'No owner set',
+              // With a Paged row above, the owner is named there already.
+              d.paged
+                ? null
+                : d.owner
+                  ? `Owner ${d.owner}${d.owner === viewerName ? ' (you)' : ''}`
+                  : 'No owner set',
               d.backup ? `backup ${d.backup}` : null,
               d.am ? `AM ${d.am}` : null,
             ]

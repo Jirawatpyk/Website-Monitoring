@@ -143,6 +143,8 @@ interface DetailRow extends IncidentRow {
   root_cause_category: string | null;
   root_cause: string | null;
   root_cause_fix: string | null;
+  alerted_at: string | null;
+  l0: { is_active: boolean; role: string } | null;
   sites: IncidentRow['sites'] & { clients: { am_user_id: string | null } | null };
 }
 
@@ -275,7 +277,8 @@ export async function loadIncident(
     .select(
       `id, number, state, severity, trigger, escalation_level, started_at, detected_at, acked_at, acked_by,
        recovered_at, resolved_at, resolved_by, auto_resolved, client_update_required, client_updated_at,
-       root_cause_category, root_cause, root_cause_fix, site_id, monitor_id, l0_user_id,
+       root_cause_category, root_cause, root_cause_fix, site_id, monitor_id, l0_user_id, alerted_at,
+       l0:profiles!incidents_l0_user_id_fkey(is_active, role),
        sites!inner(name, tier, primary_owner_id, backup_owner_id,
          monitors(id, url, is_primary, timeout_ms, allowed_redirect_domains),
          clients(am_user_id))`,
@@ -286,6 +289,10 @@ export async function loadIncident(
   if (incident.error) throw new Error(`incident: ${incident.error.message}`);
   const i = incident.data;
   if (!i) return null;
+  // L0 pages an inactive person's owner instead (escalation_people, D-048 item 10): the page says so too.
+  if (i.l0_user_id && !(i.l0?.is_active && (i.l0.role === 'admin' || i.l0.role === 'responder'))) {
+    i.l0_user_id = null;
+  }
 
   const primary = (
     i.sites.monitors as {
@@ -413,7 +420,7 @@ export async function loadIncident(
     am: am ? nameOf(am) : null,
     paged:
       i.l0_user_id && i.l0_user_id !== i.sites.primary_owner_id
-        ? { name: nameOf(i.l0_user_id), at: i.detected_at, you: i.l0_user_id === viewer.id }
+        ? { name: nameOf(i.l0_user_id), at: i.alerted_at ?? i.detected_at, you: i.l0_user_id === viewer.id }
         : null,
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
     canAct: canAcknowledge(actor, i),

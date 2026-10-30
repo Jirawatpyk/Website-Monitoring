@@ -2,6 +2,8 @@ import { closingOf, isInsideHours, nextOpening } from '@dxt/engine';
 import {
   formatDay,
   formatDuration,
+  formatIncidentId,
+  formatWhen,
   formatNameList,
   formatResponseHours,
   formatTime,
@@ -115,9 +117,7 @@ const day = (d: Date) => formatDay(d, { weekday: true });
 const dayTime = (d: Date) => `${day(d)} ${formatTime(d)}`;
 /** "Fri 10:07" within the week, "Mon 14 Sep 21:18" further back (boards' swap and hand-over times). */
 export function shortWhen(d: Date, now: Date): string {
-  return Math.abs(now.getTime() - d.getTime()) < 6 * DAY_MS
-    ? `${day(d).split(' ')[0]} ${formatTime(d)}`
-    : dayTime(d);
+  return formatWhen(d, now, { midSentence: true });
 }
 const week = (w: { start: string; end: string }): Week => ({
   start: new Date(w.start),
@@ -239,7 +239,7 @@ function pagedText(d: OncallData, g: ShiftGroup, now: Date, live: boolean): stri
   const first = hits[0];
   if (!first) return live ? 'None so far' : g.end.getTime() <= now.getTime() ? 'None' : '—';
   const more = hits.length > 1 ? ` +${hits.length - 1}` : '';
-  return `INC-${String(first.number).padStart(4, '0')} · ${first.site}${more}`;
+  return `${formatIncidentId(first.number)} · ${first.site}${more}`;
 }
 
 export function rotationRows(d: OncallData, now: Date): RotationRow[] {
@@ -416,8 +416,9 @@ export interface Hero {
   phoneText: string;
 }
 
-const tonightRange = (from: Date, until: Date, now: Date) =>
-  `${formatDay(from) === formatDay(now) ? 'Tonight' : day(from)} ${formatTime(from)} → ${day(until).split(' ')[0]} ${formatTime(until)}`;
+/** "Tonight 18:00 → Mon 09:00" while owners respond; "Now → Mon 09:00" once on call (night, weekend). */
+const tonightRange = (from: Date, until: Date, now: Date, inside: boolean) =>
+  `${inside ? `${formatDay(from) === formatDay(now) ? 'Tonight' : day(from)} ${formatTime(from)}` : 'Now'} → ${day(until).split(' ')[0]} ${formatTime(until)}`;
 
 export function heroOf(d: OncallData, now: Date): Hero {
   const admin = d.viewer.role === 'admin';
@@ -456,12 +457,12 @@ export function heroOf(d: OncallData, now: Date): Hero {
   const covering = at.handedOverFrom ? nameOf(d, at.handedOverFrom) : null;
   const reason = d.handoverReasons[at.id];
   const one = onePerson(d);
-  const range = tonightRange(from, until, now);
+  const range = tonightRange(from, until, now, inside);
   const desk = {
     avatar: who,
     eyebrow: covering ? `ON CALL TONIGHT · COVERING ${covering.toUpperCase()}` : 'ON CALL TONIGHT',
     title: who,
-    l1: `${dayTime(from)} → ${dayTime(until)}`,
+    l1: `${inside ? dayTime(from) : 'Now'} → ${dayTime(until)}`,
     l2: covering
       ? `Covering ${covering} from ${formatTime(new Date(at.startsAt))}${reason ? ` · ${reason}` : ''}${next ? ` · then ${next} from ${day(g.end)}` : ''}`
       : `Shift ${day(g.start)} → ${day(g.end)} · ${one ? `then ${who} again — the only person in the rotation` : next ? `then ${next}` : 'nothing after it yet'}`,
@@ -470,6 +471,7 @@ export function heroOf(d: OncallData, now: Date): Hero {
   };
   // Phone: what this viewer needs to know (MOnCall hero per viewer).
   const mine = at.userId === d.viewer.id;
+  const sitesWord = `${d.tier1Sites} ${d.tier1Sites === 1 ? 'site' : 'sites'}`;
   const myNext = groups.find((x) => x.start.getTime() > now.getTime() && x.first.userId === d.viewer.id);
   let phone: Pick<Hero, 'phoneEyebrow' | 'phoneTitle' | 'phoneText'>;
   if (covering) {
@@ -485,24 +487,33 @@ export function heroOf(d: OncallData, now: Date): Hero {
         ? `YOUR ON-CALL HOURS START IN ${formatDuration(left).toUpperCase()}`
         : 'YOU’RE ON CALL NOW',
       phoneTitle: range,
-      phoneText: one
-        ? `You’re the only person in the rotation, so you’re on call every week. Owners handle alerts until ${formatTime(from)}.`
-        : `Owners handle alerts until ${formatTime(from)}. Then all Tier 1 alerts (${d.tier1Sites} ${d.tier1Sites === 1 ? 'site' : 'sites'}) come to you instead of the owners.`,
+      // At night or at the weekend the owners aren't responding: no "until 18:00" (MOnCall review).
+      phoneText: !inside
+        ? `${one ? 'You’re the only person in the rotation, so you’re on call every week. ' : ''}All Tier 1 alerts (${sitesWord}) come to you until ${dayTime(until)}.`
+        : one
+          ? `You’re the only person in the rotation, so you’re on call every week. Owners handle alerts until ${formatTime(from)}.`
+          : `Owners handle alerts until ${formatTime(from)}. Then all Tier 1 alerts (${sitesWord}) come to you instead of the owners.`,
     };
   } else if (myNext) {
+    // "Swapped with Nok · Fri 10:08." when this week came from an approved swap (MOnCall Arm · approved).
+    const swapped = swapOn(d, myNext.first.id);
+    const via =
+      swapped?.status === 'approved' && swapped.decidedAt
+        ? `Swapped with ${nameOf(d, swapped.requesterId === d.viewer.id ? swapped.counterpartId : swapped.requesterId)} · ${shortWhen(new Date(swapped.decidedAt), now)}. `
+        : '';
     phone = {
       phoneEyebrow: `YOUR NEXT SHIFT STARTS ${dayTime(myNext.start).toUpperCase()}`,
       phoneTitle: `${day(myNext.start)} → ${day(myNext.end)}`,
-      phoneText:
-        'Tier 1 alerts at night and on the weekend come to you. Owners handle them Mon–Fri 09:00–18:00.',
+      phoneText: `${via}Tier 1 alerts at night and on the weekend come to you.${via ? '' : ` Owners handle them ${formatResponseHours(d.hours)}.`}`,
     };
   } else {
     phone = {
       phoneEyebrow: `ON CALL TONIGHT · ${who.toUpperCase()}`,
       phoneTitle: range,
-      phoneText: admin
-        ? 'You’re not in the rotation. As Admin backstop you’re at L1 for every DOWN.'
-        : `${who} gets Tier 1 alerts at night and on the weekend.`,
+      phoneText:
+        admin && !d.rotation.includes(d.viewer.id)
+          ? 'You’re not in the rotation. As Admin backstop you’re at L1 for every DOWN.'
+          : `${who} gets Tier 1 alerts at night and on the weekend.`,
     };
   }
   return { ...desk, ...phone };
@@ -677,7 +688,7 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
     accepted: `Waiting for ${adminWord(d)}`,
     declined: `Declined by ${A}`,
     approved: 'Approved',
-    admin_declined: `Declined by ${D === 'you' ? 'you' : D}`,
+    admin_declined: `Declined by ${w.decidedBy ? nameOf(d, w.decidedBy) : adminWord(d)}`,
     withdrawn: 'Withdrawn',
     expired: 'Expired',
   };
@@ -784,7 +795,7 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
     base = {
       eyebrow: me ? 'YOUR SWAP REQUEST' : 'SWAP REQUEST',
       title: me ? `You asked ${A} to swap weeks` : `${R} and ${A} swap weeks`,
-      sub: `Requested by ${me ? 'you' : R} · ${sub}`,
+      sub: me ? sub : `Requested by ${R} · ${sub}`,
       badge: badge(SIDE[w.status], icon, 'outline', tone),
       left: me
         ? {
@@ -808,15 +819,14 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
             week: cpW,
             sub: approved ? `Swapped ${when(w.decidedAt)}` : `${A}’s week now · ${tier}`,
           },
-      warn:
-        b2b && !me
-          ? { title: `Back-to-back for ${A}`, text: `${A} would be on call ${b2b} — two weeks in a row.` }
-          : null,
+      warn: b2b
+        ? { title: `Back-to-back for ${A}`, text: `${A} would be on call ${b2b} — two weeks in a row.` }
+        : null,
       hint: !open
         ? null
         : me
           ? w.status === 'accepted'
-            ? `${A} accepted ${when(w.respondedAt)} · waiting for an Admin to approve. You can still withdraw until then.`
+            ? `${A} accepted ${when(w.respondedAt)} · waiting for an Admin to approve. You can withdraw until then.`
             : `Waiting for ${A} to accept, then an Admin approves. You can withdraw until an Admin acts.`
           : w.status === 'accepted'
             ? `${A} accepted ${when(w.respondedAt)}. Approve swaps the two weeks; ${R} and ${A} get a Chat message and an email. Logged in the audit log.`
@@ -833,17 +843,17 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
       ),
       approved: closed(
         'Approved — the weeks have swapped.',
-        `Approved by ${D} · ${when(w.decidedAt)} · ${A} is on call ${rqW}, ${r} ${cpW}`,
+        `Approved by ${D} · ${when(w.decidedAt)} · ${A} is on call ${rqW}, ${r} ${cpW} · both got a Chat message and an email`,
       ),
       admin_declined: closed(
         `This request is closed — ${D === 'you' ? 'You declined' : `Declined by ${D}`} · ${decision}`,
-        `${when(w.decidedAt)} · ${Rcap} keep${me ? '' : 's'} ${rqW}, ${A} keeps ${cpW}`,
+        `${when(w.decidedAt)} · ${Rcap} keep${me ? '' : 's'} ${rqW}, ${A} keeps ${cpW} · ${me ? 'you' : R} and ${A} got a Chat message`,
       ),
       withdrawn: closed(
         me
           ? `You withdrew · ${when(w.decidedAt ?? w.updatedAt)}`
           : `Withdrawn by ${R} · ${when(w.decidedAt ?? w.updatedAt)}`,
-        `Nothing changes: ${r} keep${me ? '' : 's'} ${rqW}, ${A} keeps ${cpW}`,
+        `Nothing changes: ${r} keep${me ? '' : 's'} ${rqW}, ${A} keeps ${cpW} · ${A} got a Chat message`,
       ),
       expired: closed(
         `Expired — ${firstWeekOf === 'requester' ? (me ? 'your' : `${R}’s`) : `${A}’s`} week started before it was approved`,
@@ -864,7 +874,11 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
       : `${A} takes ${R}’s week, ${rqW}. ${R} takes ${A}’s week, ${cpW}.`,
     people,
     canAnswer: part === 'asked' && w.status === 'waiting',
-    canDecide: d.viewer.role === 'admin' && open && w.counterpartId !== d.viewer.id,
+    canDecide:
+      d.viewer.role === 'admin' &&
+      open &&
+      w.counterpartId !== d.viewer.id &&
+      (part !== 'requester' || d.admins.length === 1),
     canApprove: w.status === 'accepted',
     canWithdraw: part === 'requester' && open,
     line,
@@ -872,7 +886,7 @@ export function swapViewOf(d: OncallData, now: Date): SwapView | null {
     declineText:
       part === 'asked'
         ? `${R} keeps ${rqW} and you keep ${cpW}. ${R} gets a Chat message and an email.`
-        : `${R} keeps ${rqW} and ${A} keeps ${cpW}. ${R} and ${A} get a Chat message with your reason.`,
+        : `${R} keeps ${rqW} and ${A} keeps ${cpW}. ${R} and ${A} get a Chat message, and an email with your reason.`,
   };
 }
 
@@ -961,6 +975,12 @@ export function rotationText(d: OncallData, now: Date): string {
   if (d.rotation.length === 0) {
     return `Pick the people who take Tier 1 nights and weekends and their order. The first week starts ${dayTime(from)}.`;
   }
+  const now0 = now.getTime();
+  const covered = d.shifts.some((x) => Date.parse(x.startsAt) <= now0 && now0 < Date.parse(x.endsAt));
+  const first = d.shifts.find((x) => Date.parse(x.startsAt) > now0);
+  if (!covered && first) {
+    return `The rotation starts ${dayTime(new Date(first.startsAt))}. Weeks already scheduled keep their person — use Swap for those.`;
+  }
   return `Changes apply from ${day(from)}. Weeks already scheduled keep their person — use Swap for those.`;
 }
 
@@ -979,7 +999,7 @@ export interface HandoverOption {
 export function handoverTimes(d: OncallData, shift: ShiftRow, now: Date): HandoverOption[] {
   const end = Date.parse(shift.endsAt);
   const { from, inside } = tonightOf(d, now);
-  const out: HandoverOption[] = [{ value: 'now', label: `Now · ${shortWhen(now, now)}`, at: now }];
+  const out: HandoverOption[] = [{ value: 'now', label: `Now · ${formatTime(now)}`, at: now }];
   if (inside && from.getTime() < end) {
     out.push({ value: 'tonight', label: `Tonight ${formatTime(from)}`, at: from });
   }
@@ -1074,7 +1094,8 @@ export function oncallCardOf(d: Pick<OncallData, 'shifts' | 'names' | 'hours'>, 
       when: `${start} → ${day(until).split(' ')[0]} ${formatTime(until)}`,
     });
   } else {
-    lines.push({ who: null, text: 'Nobody on call tonight', when: 'site owners at night' });
+    // §28.4's words, true by day and at the weekend too.
+    lines.push({ who: null, text: 'Nobody on call', when: 'Site owners at night' });
   }
   // The week after the current one (the same person again is still "next week").
   const next = groupsOf(data).find((g) => g.start.getTime() > now.getTime());
