@@ -454,6 +454,35 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
     });
   });
 
+  it('Tier 2: a failing confirm a minute after a timeout round opens the DOWN from the first timeout (D-051)', async () => {
+    const timeout = (location: string, sec: number, attempt = 1, confirm: boolean | null = null) => ({
+      ...row(location, 'fail', sec, attempt, null),
+      error: 'Timeout',
+      confirm,
+    });
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor({ tier: 2 })] },
+      'rpc.engine_checks': {
+        data: [
+          timeout('SIN', 0),
+          timeout('TYO', 1),
+          timeout('SIN', 31, 2),
+          timeout('TYO', 32, 2),
+          timeout('SIN', 61, 1, true),
+          timeout('TYO', 62, 1, true),
+          timeout('SIN', 91, 2, true),
+          timeout('TYO', 92, 2, true),
+        ],
+      },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    expect(await runEngine(db, new Date(at(150)))).toMatchObject({ opened: 1 });
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_open_incident',
+      args: { p_trigger: 'hard_fail', p_started_at: at(0), p_detected_at: at(92) },
+    });
+  });
+
   it('a monitor’s own slow limit wins over the tier’s', async () => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [page({ thresholds: { slowMs: 4_000 } })] },

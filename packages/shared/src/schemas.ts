@@ -24,6 +24,8 @@ export const checkResultSchema = z.object({
   keywordForbidden: z.array(z.string().max(200)).max(20).nullable().optional(),
   // S05b (D-027): the WAF signature of a blocked check; null / absent = none.
   waf: z.enum(WAF_VENDORS).nullable().optional(),
+  // D-051: a Tier 2–3 confirm check or its recheck; absent / null = an ordinary check.
+  confirm: z.boolean().nullable().optional(),
 });
 export type CheckResultInput = z.infer<typeof checkResultSchema>;
 
@@ -68,6 +70,8 @@ export const dueMonitorSchema = z.object({
   mustNotContain: z.array(z.string()).default([]),
   /** Custom request headers (S05, D-025); absent from a server that doesn't send them yet. */
   headers: wireHeadersSchema,
+  /** D-051: a confirm check — the agent sends it (and its recheck) back with `confirm: true`. */
+  confirm: z.boolean().optional(),
 });
 export type DueMonitor = z.infer<typeof dueMonitorSchema>;
 export const dueMonitorsResponseSchema = z.object({ monitors: z.array(dueMonitorSchema) });

@@ -56,7 +56,8 @@ export function createApi(baseUrl: string, token: string, fetchImpl: typeof fetc
 
   return {
     async dueMonitors() {
-      return (await json('/api/ingest', dueMonitorsResponseSchema)).monitors;
+      // D-051: this agent echoes the confirm flag, so it may be given confirm checks.
+      return (await json('/api/ingest?confirm=1', dueMonitorsResponseSchema)).monitors;
     },
     async postResults(results, control) {
       const res = await call('/api/ingest', { method: 'POST', body: JSON.stringify({ results, control }) });

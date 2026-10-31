@@ -11,10 +11,12 @@ import { autoResolves, isFlapping, RECOVERED_STATES, stillFlapping, transition }
 import {
   buildRound,
   confirmedAt,
+  confirmOf,
   downDecided,
   earliest,
   firstFailedCheck,
   isReady,
+  ROUND_DEADLINE_MS,
   roundStarts,
   UNVERIFIED_NOTE,
   type OpenIncident,
@@ -697,14 +699,20 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     if (!(confirmsDown(first, second) && second.kind === 'hard_fail')) {
       return { verdict: { kind: 'blip' }, next: reset };
     }
-    const failing = round.rechecks.filter((c) => second.failing.includes(c.location));
+    let failing = round.rechecks.filter((c) => second.failing.includes(c.location));
     // D-049: a timeout alone is no DOWN (nor a key-page PROBLEM) in its first round — on these sites
     // it was a server stalling for a minute far more often than a site down. It counts once the
     // round just before also hard-failed at enough locations (its own scheduled checks, so a
     // skipped or no-data round can't stand in). A 5xx, a refused connection, DNS or TLS confirm in
     // one round as before.
     const sitsOut = wafSite ? (c: StoredCheck) => abstainsOnWafSite(c, akamaiSite) : undefined;
-    if (firstTimeoutRound(failing, round.scheduled, m.checks, roundAt, s.intervalSec, sitsOut)) {
+    const confirm = firstTimeoutRound(failing, round.scheduled, m.checks, roundAt, s.intervalSec, sitsOut)
+      ? confirmRound(s, m, roundAt, failing, excluded, sitsOut)
+      : 'none';
+    if (confirm === PENDING) return PENDING;
+    // D-051: a Tier 2–3 confirm check that failed at enough locations is the second round: DOWN.
+    if (Array.isArray(confirm)) failing = confirm;
+    else if (confirm === 'blip') {
       if (!m.isPrimary) return { verdict: { kind: 'blip' }, next: reset };
       // D-050: the 3rd such blip in 30 min — a site timing out on and off — is a PROBLEM from the 1st.
       const now = liveBlips([...blips, firstFail ?? roundAt], roundAt, s.intervalSec);
@@ -1038,6 +1046,30 @@ function pageProblemOpen(m: SiteMonitor, s: Pick<SiteSnapshot, 'open'>): boolean
  */
 function pageStart(at: Date, s: SiteSnapshot): Date {
   return s.open && RECOVERED_STATES.includes(s.open.state) ? crawlerStart(at, s) : at;
+}
+
+/**
+ * D-051: a Tier 2–3 home page's first timeout round, judged with its confirm checks (every location runs
+ * one at the next minute tick when the scheduled checks timed out at 2+). The confirm check and its
+ * recheck failing at 2 locations is the second round — the confirm rechecks are the DOWN's evidence;
+ * otherwise a blip, as D-049. The round waits for confirms still to come until its deadline. Tier 1
+ * (its next round is a minute away), key pages and a round one location decided (D-027: due-ness
+ * never asks for a confirm there) keep D-049's next-round rule.
+ */
+function confirmRound(
+  s: SiteSnapshot,
+  m: SiteMonitor,
+  roundAt: Date,
+  failing: readonly StoredCheck[],
+  excluded: ReadonlySet<ProbeLocation>,
+  sitsOut: ((c: StoredCheck) => boolean) | undefined,
+): StoredCheck[] | 'blip' | typeof PENDING {
+  if (!m.isPrimary || s.intervalSec <= 60 || failing.length < 2) return 'blip';
+  const expected = s.locations.filter((l) => !excluded.has(l));
+  const c = confirmOf(m.checks, roundAt, s.intervalSec, expected, sitsOut);
+  if (c.failing.length >= 2) return c.failing;
+  const pastDeadline = s.now.getTime() - (roundAt.getTime() + s.intervalSec * 1000) >= ROUND_DEADLINE_MS;
+  return c.failing.length + c.pending >= 2 && !pastDeadline ? PENDING : 'blip';
 }
 
 /**

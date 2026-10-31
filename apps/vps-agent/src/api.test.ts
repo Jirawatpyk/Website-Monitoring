@@ -29,7 +29,8 @@ describe('createApi — the only way out of the VPS (PRD §10)', () => {
       { ...MONITOR, mustContain: [], mustNotContain: [], headers: [] },
     ]);
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit];
-    expect(url.toString()).toBe('https://monitor.example.test/api/ingest');
+    // D-051: this agent echoes the confirm flag, so it asks for confirm checks.
+    expect(url.toString()).toBe('https://monitor.example.test/api/ingest?confirm=1');
     expect(init.headers).toMatchObject({ authorization: `Bearer ${TOKEN}` });
   });
 

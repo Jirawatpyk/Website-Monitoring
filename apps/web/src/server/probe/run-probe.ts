@@ -56,7 +56,7 @@ export async function runProbe({
   }
 
   const started = clock();
-  const monitors = await loadDueMonitors(db, new Date(started));
+  const monitors = await loadDueMonitors(db, new Date(started), { location });
 
   // Scheduled checks carry the run's start time, so a run that starts at :59.9 still lands in the
   // round it was due for; rechecks carry their own start time.
@@ -139,6 +139,8 @@ async function insertResults(
       keyword_missing: result.keywordMissing,
       keyword_forbidden: result.keywordForbidden,
       waf: result.waf,
+      // D-051: a confirm check and its recheck (the recheck reuses the same monitor).
+      confirm: m.confirm ? true : null,
     })),
   );
 }

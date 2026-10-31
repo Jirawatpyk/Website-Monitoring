@@ -26,7 +26,7 @@ export function failsHere(c: Vote): boolean {
   return isHardFail(c) || isTlsChainFail(c);
 }
 
-type Timed = Vote & { location: ProbeLocation; checkedAt: Date; attempt?: 1 | 2 };
+type Timed = Vote & { location: ProbeLocation; checkedAt: Date; attempt?: 1 | 2; confirm?: boolean };
 
 /**
  * D-049: is this confirmed hard fail a timeout alone, in its first round? Then it is not DOWN yet.
@@ -53,7 +53,8 @@ export function firstTimeoutRound<T extends Timed>(
   const latest = new Map<ProbeLocation, T>();
   for (const c of history) {
     const t = c.checkedAt.getTime();
-    if ((c.attempt ?? 1) !== 1 || t < from || t >= roundAt.getTime() || sitsOut(c)) continue;
+    // A D-051 confirm check isn't the round's own check: only scheduled checks speak for a round.
+    if ((c.attempt ?? 1) !== 1 || c.confirm || t < from || t >= roundAt.getTime() || sitsOut(c)) continue;
     const prev = latest.get(c.location);
     if (!prev || prev.checkedAt < c.checkedAt) latest.set(c.location, c);
   }

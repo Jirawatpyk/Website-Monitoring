@@ -19,6 +19,11 @@ export interface StoredCheck extends LocationResult, CheckFacts {
   attempt: 1 | 2;
   statusCode: number | null;
   error: string | null;
+  /**
+   * D-051: a Tier 2–3 confirm check (or its recheck), run a minute after a round whose scheduled checks
+   * timed out. Judged with that round (`confirmOf`), never as its own round or its scheduled check.
+   */
+  confirm?: boolean;
 }
 
 export interface OpenIncident {
@@ -110,7 +115,8 @@ export function roundStarts(
   const oldestAllowed = now.getTime() - lookbackMs(intervalSec);
   const starts = new Set<number>();
   for (const c of checks) {
-    if (c.attempt === 1) starts.add(Math.floor(c.checkedAt.getTime() / intervalMs) * intervalMs);
+    if (c.attempt === 1 && !c.confirm)
+      starts.add(Math.floor(c.checkedAt.getTime() / intervalMs) * intervalMs);
   }
   return [...starts]
     .filter((start) => start >= oldestAllowed && (!lastRoundAt || start > lastRoundAt.getTime()))
@@ -149,25 +155,76 @@ export function buildRound(checks: readonly StoredCheck[], start: number, interv
   const scheduled = new Map<ProbeLocation, StoredCheck>();
   for (const c of checks) {
     const t = c.checkedAt.getTime();
-    if (c.attempt !== 1 || t < start || t >= start + intervalMs) continue;
+    // A D-051 confirm check never stands in for the round's own check (the latest would win).
+    if (c.attempt !== 1 || c.confirm || t < start || t >= start + intervalMs) continue;
     const prev = scheduled.get(c.location);
     if (!prev || prev.checkedAt < c.checkedAt) scheduled.set(c.location, c);
   }
   const rechecks: StoredCheck[] = [];
   for (const first of scheduled.values()) {
-    const t0 = first.checkedAt.getTime();
-    const recheck = checks
-      .filter(
-        (c) =>
-          c.attempt === 2 &&
-          c.location === first.location &&
-          c.checkedAt.getTime() > t0 &&
-          c.checkedAt.getTime() <= t0 + RECHECK_WITHIN_MS,
-      )
-      .sort((a, b) => a.checkedAt.getTime() - b.checkedAt.getTime())[0];
+    const recheck = recheckOf(checks, first, false);
     if (recheck) rechecks.push(recheck);
   }
   return { start: new Date(start), scheduled: [...scheduled.values()], rechecks };
+}
+
+/** The first recheck of this check at its location within `RECHECK_WITHIN_MS` (a confirm's: a confirm's). */
+function recheckOf(
+  checks: readonly StoredCheck[],
+  first: StoredCheck,
+  confirm: boolean,
+): StoredCheck | undefined {
+  const t0 = first.checkedAt.getTime();
+  return checks
+    .filter(
+      (c) =>
+        c.attempt === 2 &&
+        !!c.confirm === confirm &&
+        c.location === first.location &&
+        c.checkedAt.getTime() > t0 &&
+        c.checkedAt.getTime() <= t0 + RECHECK_WITHIN_MS,
+    )
+    .sort((a, b) => a.checkedAt.getTime() - b.checkedAt.getTime())[0];
+}
+
+/**
+ * D-051: the confirm checks of a Tier 2–3 timeout round — each expected location's latest confirm in the
+ * round's bucket and its recheck. `failing`: the confirm rechecks of locations whose confirm and recheck
+ * both hard-failed (the second round's evidence); `pending`: expected locations with no confirm yet, or a
+ * failed confirm still waiting for its recheck. A location the round sat out (D-027) is neither.
+ */
+export function confirmOf(
+  checks: readonly StoredCheck[],
+  roundAt: Date,
+  intervalSec: number,
+  expected: readonly ProbeLocation[],
+  sitsOut: (c: StoredCheck) => boolean = () => false,
+): { failing: StoredCheck[]; pending: number } {
+  const start = roundAt.getTime();
+  const end = start + intervalSec * 1000;
+  const failing: StoredCheck[] = [];
+  let pending = 0;
+  for (const location of expected) {
+    const confirm = checks
+      .filter(
+        (c) =>
+          c.confirm &&
+          c.attempt === 1 &&
+          c.location === location &&
+          c.checkedAt.getTime() >= start &&
+          c.checkedAt.getTime() < end,
+      )
+      .sort((a, b) => b.checkedAt.getTime() - a.checkedAt.getTime())[0];
+    if (!confirm) {
+      pending += 1;
+      continue;
+    }
+    if (sitsOut(confirm) || !isHardFail(confirm)) continue;
+    const recheck = recheckOf(checks, confirm, true);
+    if (!recheck) pending += 1;
+    else if (isHardFail(recheck)) failing.push(recheck);
+  }
+  return { failing, pending };
 }
 
 /** Complete: every expected location reported and every failure was rechecked. Nobody expected → never. */

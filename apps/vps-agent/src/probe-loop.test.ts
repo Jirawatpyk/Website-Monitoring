@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { HttpCheckResult } from '@dxt/probe';
+import type { DueMonitor } from '@dxt/shared';
 import type { Api } from './api';
 import { runProbeRound, untilNextTick } from './probe-loop';
 
@@ -35,7 +36,7 @@ const monitors = [
     headers: [{ name: 'Accept-Language', value: 'th' }],
   },
 ];
-const fakeApi = (due = monitors) => {
+const fakeApi = (due: DueMonitor[] = monitors) => {
   const posted: unknown[][] = [];
   const controls: unknown[] = [];
   const api: Api = {
@@ -206,6 +207,25 @@ describe('runProbeRound (Bangkok)', () => {
     expect(check).toHaveBeenLastCalledWith(
       expect.objectContaining({ url: 'https://down.example.test', timeoutMs: 18_000 }),
     );
+  });
+
+  it('sends a D-051 confirm check back flagged, its recheck too; ordinary checks carry no flag', async () => {
+    let now = START;
+    const { api, posted } = fakeApi([monitors[0]!, { ...monitors[1]!, confirm: true }]);
+    const check = vi.fn(async ({ url }: { url: string }) =>
+      url.includes('down') ? result('fail', null) : result('pass'),
+    );
+    await runProbeRound({
+      api,
+      check,
+      clock: () => now,
+      sleep: vi.fn(async (ms: number) => void (now += ms)),
+    });
+    expect(posted[0]).toEqual([
+      expect.not.objectContaining({ confirm: expect.anything() }),
+      expect.objectContaining({ monitorId: 'm-down', attempt: 1, confirm: true }),
+    ]);
+    expect(posted[1]).toEqual([expect.objectContaining({ monitorId: 'm-down', attempt: 2, confirm: true })]);
   });
 
   it('posts nothing when nothing is due', async () => {

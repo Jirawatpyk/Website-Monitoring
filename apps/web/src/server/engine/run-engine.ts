@@ -264,11 +264,12 @@ export async function runEngine(
     (checksByMonitor.get(c.monitor_id) ?? checksByMonitor.set(c.monitor_id, []).get(c.monitor_id)!).push(c);
   const carryByMonitor = new Map((carries.data ?? []).map((c) => [c.monitor_id, c]));
 
-  // A location that failed most monitors in a minute is no data for that minute (spec §15.3).
+  // A location that failed most monitors in a minute is no data for that minute (spec §15.3). Scheduled
+  // checks only: a D-051 confirm check runs only on a site that just timed out, so it would skew the minute.
   const siteOfPrimary = new Map(sites.map((s) => [s.monitors.find((m) => m.isPrimary)!.id, s.id]));
   const faulty = faultyByMinute(
     checks
-      .filter((c) => c.attempt !== 2 && siteOfPrimary.has(c.monitor_id))
+      .filter((c) => c.attempt !== 2 && !c.confirm && siteOfPrimary.has(c.monitor_id))
       .map((c) => ({
         siteId: siteOfPrimary.get(c.monitor_id)!,
         location: c.location as ProbeLocation,
@@ -282,7 +283,7 @@ export async function runEngine(
   const primaryOf = new Map(sites.map((s) => [s.monitors.find((m) => m.isPrimary)!.id, s]));
   const slowLocations = slowLocationsByMinute(
     checks
-      .filter((c) => c.attempt !== 2 && primaryOf.has(c.monitor_id))
+      .filter((c) => c.attempt !== 2 && !c.confirm && primaryOf.has(c.monitor_id))
       .map((c) => ({
         siteId: primaryOf.get(c.monitor_id)!.id,
         location: c.location as ProbeLocation,
@@ -672,6 +673,8 @@ const toStoredCheck = (c: CheckRow): StoredCheck => ({
   outcome: c.outcome,
   checkedAt: new Date(c.checked_at),
   attempt: c.attempt === 2 ? 2 : 1,
+  // D-051: judged with its round (`confirmOf`), never as a round's own check.
+  confirm: c.confirm === true,
   statusCode: c.status_code,
   error: c.error,
   responseMs: c.response_ms,
