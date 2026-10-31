@@ -94,6 +94,9 @@ const CORE_COLUMNS = [
   'status_code',
   'response_ms',
   'error',
+  // D-051: a confirm check stored without it would count as a scheduled one and replace the
+  // round's own check — better the insert fails (the migration lands before the code that sets it).
+  'confirm',
 ];
 
 describe('every check_results column is classified (retro fix/tls-chain-problem)', () => {
