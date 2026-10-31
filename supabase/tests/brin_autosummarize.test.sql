@@ -2,7 +2,7 @@
 -- that exist, and each one the partition job makes.
 begin;
 \ir _helpers.psql
-select plan(4);
+select plan(6);
 
 create temp view brin_children as
   select c.relname, coalesce(c.reloptions, '{}') as opts
@@ -17,6 +17,17 @@ select is(
   'every existing partition summarizes as it fills'
 );
 
+select lives_ok(
+  $$select private.summarize_check_results_brin()$$,
+  'the nightly backstop summarizes every partition''s new ranges'
+);
+select is(
+  (select count(*) from cron.job where jobname = 'check-results-brin-summarize'),
+  1::bigint,
+  'the backstop runs nightly'
+);
+
+-- Four months on, the job also drops this month's partition (90 days) — fine, the test rolls back.
 select lives_ok(
   $$select private.manage_check_results_partitions(now() + interval '4 months')$$,
   'the partition job makes later months'

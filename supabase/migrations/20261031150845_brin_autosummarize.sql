@@ -17,6 +17,9 @@ returns void
 language plpgsql
 security definer
 set search_path = ''
+-- Creating a partition locks the parent and an option change locks its index: never wait long behind
+-- the probes' inserts (two months of partitions ahead, so a night that gives up costs nothing).
+set lock_timeout = '5s'
 as $$
 declare
   v_month date;
@@ -61,6 +64,8 @@ begin
     join pg_catalog.pg_class c on c.oid = h.inhrelid
     where h.inhparent = 'public.check_results_checked_at_brin'::regclass
       and not ('autosummarize=on' = any (coalesce(c.reloptions, '{}')))
+    -- Oldest month first, the order the planner locks partitions in (db-reviewer: no deadlock).
+    order by h.inhrelid::regclass::text
   loop
     execute format('alter index %s set (autosummarize = on)', v_index);
   end loop;
@@ -68,3 +73,39 @@ end;
 $$;
 
 select private.manage_check_results_partitions();
+
+-- The backstop: autosummarize's requests live in shared memory (lost on a restart or when its queue is
+-- full) and only cover a range once the next one starts, so a month that stopped receiving rows keeps
+-- whatever was left. Nightly, every partition's BRIN index summarizes what is still new — a
+-- ShareUpdateExclusive lock, so the probes keep inserting. Its own job, not the partition job: that one
+-- holds the parent's exclusive lock on a night it creates a partition. Its first run clears the backlog
+-- left before this migration (no one-off call on the hosted projects).
+create function private.summarize_check_results_brin()
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_index regclass;
+  v_ranges bigint := 0;
+begin
+  for v_index in
+    select h.inhrelid::regclass
+    from pg_catalog.pg_inherits h
+    where h.inhparent = 'public.check_results_checked_at_brin'::regclass
+    order by h.inhrelid::regclass::text
+  loop
+    v_ranges := v_ranges + pg_catalog.brin_summarize_new_values(v_index);
+  end loop;
+  return v_ranges;
+end;
+$$;
+
+revoke execute on function private.summarize_check_results_brin() from public, anon, authenticated;
+
+select cron.schedule(
+  'check-results-brin-summarize',
+  '47 19 * * *', -- 02:47 Bangkok, half an hour after the partition job
+  $$select private.summarize_check_results_brin()$$
+);
