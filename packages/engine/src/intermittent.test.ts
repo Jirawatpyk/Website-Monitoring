@@ -266,15 +266,33 @@ describe('a timeout that keeps coming back is a PROBLEM (D-050)', () => {
     expect(clear.kind).toBe('recover');
   });
 
-  it('a PROBLEM AGAIN never starts before the recovery it follows (engine review M1)', () => {
-    // Blips at 1 and 121 came while an earlier drop was open; it recovered (Monitoring) before 240.
+  it('PROBLEM AGAIN on a recovered incident starts at its 1st blip (engine re-review M1)', () => {
+    // The earlier drop recovered (Monitoring) before 0; the three blips all came after it.
     const d = decideSite(
-      site(300, [home([...okRound(240), ...timeoutRound(300)], carry({ blips: [at(1), at(121)] }))], {
-        lastRoundAt: at(240),
-        open: openIntermittent({ state: 'monitoring' }),
+      site(300, [home([...okRound(240), ...timeoutRound(300)], carry({ blips: [at(61), at(181)] }))], {
+        open: openIntermittent({ state: 'monitoring', startedAt: at(-600) }),
       }),
     );
-    expect(d).toMatchObject({ kind: 'relapse', trigger: 'intermittent', startedAt: at(300) });
+    expect(d).toMatchObject({ kind: 'relapse', trigger: 'intermittent', startedAt: at(61) });
+  });
+
+  it('a lone timeout before an unrelated PROBLEM opened doesn’t hold it (engine re-review M2)', () => {
+    // A blip at 1, then a keyword PROBLEM from 60 that clears at 300: it auto-resolves as before.
+    const d = decideSite(
+      site(
+        300,
+        [
+          home(
+            [...okRound(240), ...okRound(300)],
+            carry({ status: 'problem', trigger: 'keyword', blips: [at(1)] }),
+          ),
+        ],
+        {
+          open: openIntermittent({ startedAt: at(61), detectedAt: at(120) }),
+        },
+      ),
+    );
+    expect(d).toMatchObject({ kind: 'recover', autoResolve: true });
   });
 
   it('the 3rd blip, then a DOWN the next round: PROBLEM first, then escalate from the 3rd blip’s timeout', () => {

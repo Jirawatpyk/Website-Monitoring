@@ -710,9 +710,9 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       const now = liveBlips([...blips, firstFail ?? roundAt], roundAt, s.intervalSec);
       const next = { ...reset, blips: now };
       if (now.length < BLIP_ROUNDS) return { verdict: { kind: 'blip' }, next };
-      // A PROBLEM AGAIN never starts before the recovery it follows (engine review M1, as D-042).
-      const startedAt =
-        s.open && RECOVERED_STATES.includes(s.open.state) ? crawlerStart(now[0]!, s) : now[0]!;
+      // From the 1st blip. A PROBLEM AGAIN can't start before the recovery it follows: a DOWN clears the
+      // blips, and a PROBLEM drop doesn't recover while one of its own is in the window.
+      const startedAt = now[0]!;
       return {
         verdict: {
           kind: 'problem',
@@ -1045,11 +1045,16 @@ function pageStart(at: Date, s: SiteSnapshot): Date {
  * it, so an Intermittent PROBLEM neither recovers (nor auto-resolves) between two timeouts nor relapses
  * on the next, and recovers on the first OK round 30 min after the last blip. Keyed on the open drop,
  * not on the monitor's latest trigger: a slow or keyword verdict in between overwrites that and would
- * let it go early (engine review H1). A DOWN drop recovers when the home page answers, as before (D-023).
+ * let it go early (engine review H1). Only blips since the incident started count: a lone timeout
+ * before an unrelated keyword PROBLEM opened doesn't hold it (engine re-review M2). A DOWN drop recovers
+ * when the home page answers, as before (D-023).
  */
 function intermittentHolds(m: SiteMonitor, s: SiteSnapshot, blips: readonly Date[]): boolean {
-  if (!m.isPrimary || !blips.length || !s.open || RECOVERED_STATES.includes(s.open.state)) return false;
-  return (s.open.episodeSeverity ?? s.open.severity) === 'problem';
+  const open = s.open;
+  if (!m.isPrimary || !open || RECOVERED_STATES.includes(open.state)) return false;
+  if ((open.episodeSeverity ?? open.severity) !== 'problem') return false;
+  const since = open.startedAt?.getTime() ?? -Infinity;
+  return blips.some((b) => b.getTime() >= since);
 }
 
 /** A Page change PROBLEM to raise or keep: the page differs enough, and its recording is over. */
