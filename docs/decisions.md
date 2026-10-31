@@ -4,6 +4,8 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-051 | 31 Oct 2026 | Tier 2–3: a round whose primary timed out at ≥ 2 locations gets a confirm check from every location at the next minute (with its own recheck); it is judged with that round — failing at 2 locations it is the second round (DOWN from the first timeout, ~2.5 min), passing it is a blip. Confirm checks are never a round of their own | D-049 item 2 (Tier 2–3 wait for their normal next round) |
+| D-050 | 31 Oct 2026 | A 3rd D-049 timeout blip within 30 min on the primary is a PROBLEM · Intermittent from the 1st; it holds while blips are in the window and recovers on the first OK round after 30 min without one (so never auto-resolved) | D-049 accepted gap (a site timing out every other round raises nothing) |
 | D-049 | 31 Oct 2026 | A timeout alone needs two failing rounds in a row (the round just before hard-failed at any 2 locations, read from its own checks) before DOWN (or a key-page PROBLEM, or a PROBLEM raised to DOWN); a 5xx, a refused connection, DNS and TLS errors still confirm in one round (check + recheck). Tier 2–3 wait for their normal next round (a +1 min confirm round is a possible follow-up). The DOWN still starts at the first timeout | Spec §6 DOWN rule ("two checks in a row" = the check and its recheck, for every hard fail) |
 | D-048 | 29 Oct 2026 | S10 is built and merged before G1; G1 drops CODEOWNERS (Tao works solo with Claude) and runs its DOWN drill on staging (Claude runs it). S10: a swap is accepted by the other person, then approved by an Admin; Hand over shift is built in S10 from the On-call page; Claude drafts messages with no board (message-checker reviews), UI with no board goes to Claude Design; Claude seeds the S10 staging fixtures | D-008 second reviewer; D-035 fixture seeding (S10) |
 | D-047 | 16 Oct 2026 | A drop that recovers within 5 min sends no email: the incident's alert email (DOWN / PROBLEM) waits out a 5-min grace and is cancelled if the site is back first, so no RECOVERED or RESOLVED email follows either; an ack or a failed Chat alert releases it at once; the flap summary emails only an owner already emailed; Google Chat is unchanged | PRD §9 channel table ("Email: every DOWN/PROBLEM alert"), S02b email timing, D-039 for DOWN episodes |
@@ -53,6 +55,34 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-051 — Tier 2–3 confirm a timeout round a minute later
+
+**Context.** D-049 item 2 left Tier 2–3 waiting a whole interval (3 / 5 min) for the second failing round, so a timeout DOWN lands at ~3.5 / ~5.5 min, against ~1.5 min on Tier 1. An extra check a minute later can't simply be another check: it falls in the same round bucket, which is already judged, and the latest check of a bucket replaces the scheduled one. Tao asked for the follow-up (31 Oct 2026).
+
+**Decision (Tao, 31 Oct 2026).**
+
+1. **When.** On a Tier 2–3 site, the primary monitor's scheduled checks in the current round timed out at ≥ 2 locations. Key pages never get one (they can't go DOWN).
+2. **What.** At the next minute tick each location without a confirm check of its own in that round runs one (`check_results.confirm = true`), with its own recheck as usual. Per location, so a probe that asks a moment after another still runs its own.
+3. **Judging.** The round waits for its confirm (the existing round deadline is the limit: no confirm → a blip, as before). The confirm check and its recheck hard-failing at ≥ 2 locations (1 for a WAF round one location decided, D-027) is the second round: DOWN from the first timeout, ~2.5 min after it. Otherwise the round is a blip and counts toward D-050.
+4. Confirm checks are never a round of their own: the engine's bucketing, slow p50, faulty-location minutes and regional clocks ignore them. Everything else that reads `check_results` counts them as the real measurements they are — the hourly rollups (checks, hard fails, p50 / p95), the Sites list's 24 h response and latest check per location (db-reviewer M1). They come only after a timeout round, so the effect is a few extra rows on a bad hour; uptime is unaffected (it comes from DOWN incidents, spec §5).
+
+Gain: Tier 2 ~1 min sooner, Tier 3 ~3 min sooner; both were already inside the ≤ 10 min target. The VPS agent asks for confirm monitors explicitly (`?confirm=1`), so an agent not redeployed never mixes confirm checks into a round.
+
+**Where.** `check_results.confirm` (migration `d049_followups`); due-ness in `apps/web/src/server/probe/due-monitors.ts`; the engine's `confirmOf` (`packages/engine/src/hard-fail.ts`).
+
+## D-050 — A timeout that keeps coming back is a PROBLEM
+
+**Context.** D-049 accepted that a site timing out every other round (timeout, OK, timeout…) raises nothing, as no two rounds in a row fail. Tao asked for the repeated-blip follow-up (31 Oct 2026).
+
+**Decision (Tao, 31 Oct 2026).**
+
+1. **A blip** is a D-049 first timeout round that no second round (or D-051 confirm) confirmed. Narrow on purpose: a 5xx whose recheck passed is not counted (that was silent before D-049 too, and nothing in the data asks for it); widening is a later decision.
+2. **The 3rd blip within 30 min** on the primary opens PROBLEM · Intermittent (trigger `intermittent`), starting at the 1st blip in the window — the same 3-in-30-min as flapping (spec §19.4). Cause: "Timing out on and off · 3 times in 30 min (BKK, TYO)".
+3. **It holds** (an OK round changes nothing) while the open incident's trigger is `intermittent` and a blip is still in the window, so the OK round between blips neither recovers nor auto-resolves it, and the next blip doesn't relapse it. It recovers on the first OK round 30 min after the last blip — at least 30 min after it was flagged, so auto-resolve (§19.6, < 5 min) never applies: every one ends in Needs root cause, on purpose.
+4. A confirmed DOWN escalates it (D-021) and clears the blips (the DOWN supersedes them). Key pages don't count.
+
+**Where.** `monitor_status.blips` (migration `d049_followups`, kept 30 min); the engine's blip rule in `packages/engine/src/site.ts` / `triggers.ts`; the cause words in `@dxt/notifier` `problem-cause.ts`.
 
 ## D-049 — A timeout needs two failing rounds before DOWN
 

@@ -61,6 +61,7 @@ export const TRIGGERS = [
   'manual',
   'tls_chain',
   'content_change',
+  'intermittent',
 ] as const;
 export type Trigger = (typeof TRIGGERS)[number];
 
@@ -78,6 +79,7 @@ export const TRIGGER_LABELS: Record<Trigger, string> = {
   manual: 'Manual (hand check)',
   tls_chain: 'TLS chain',
   content_change: 'Page change',
+  intermittent: 'Intermittent',
 };
 
 /**
