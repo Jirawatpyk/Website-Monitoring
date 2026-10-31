@@ -69,6 +69,8 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 Gain: Tier 2 ~1 min sooner, Tier 3 ~3 min sooner; both were already inside the ≤ 10 min target. The VPS agent asks for confirm monitors explicitly (`?confirm=1`), so an agent not redeployed never mixes confirm checks into a round.
 
+A passing confirm makes that round a blip, nothing more: the next round is still judged by D-049 from its scheduled checks, so if it times out again it is DOWN (the round before timed out at 2 locations) — the confirm doesn't count as an OK round in between (engine review L4). A confirm from a location faulty in its own minute (spec §15.3) is no evidence either way.
+
 Accepted costs: a round whose rechecks passed (a plain blip, not D-049's) still gets confirm checks, which the engine ignores — waiting for the rechecks to time out first would miss the next minute's tick. Until the VPS agent runs this code, Bangkok runs no confirm and counts as still to come: a round whose SIN and TYO confirms split (one fails, one passes) waits to its deadline (Tier 2 ~4.25 min) before it is a blip; `release.sh` follows the merge at once.
 
 **Where.** `check_results.confirm` (migration `d049_followups`); due-ness in `apps/web/src/server/probe/due-monitors.ts` (`loadDueMonitors(…, { location })`); the engine's `confirmOf` (`packages/engine/src/monitor.ts`) and `confirmRound` (`site.ts`).

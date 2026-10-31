@@ -316,7 +316,11 @@ export function decideSite(s: SiteSnapshot): SiteDecision {
   for (const later of rounds.slice(1)) {
     if (!later.ready && !later.primaryDown) continue;
     const d = judgeSiteRound(s, later.byMonitor, new Date(later.start));
-    if (d !== PENDING && (d.kind === 'open' || d.kind === 'escalate')) return d;
+    // DOWN AGAIN too: an older round waiting for its D-051 confirm mustn't hold it (engine review M2).
+    const down =
+      d !== PENDING &&
+      (d.kind === 'open' || d.kind === 'escalate' || (d.kind === 'relapse' && d.severity === 'down'));
+    if (down) return d;
   }
   return { kind: 'wait' };
 }
@@ -1066,7 +1070,10 @@ function confirmRound(
 ): StoredCheck[] | 'blip' | typeof PENDING {
   if (!m.isPrimary || s.intervalSec <= 60 || failing.length < 2) return 'blip';
   const expected = s.locations.filter((l) => !excluded.has(l));
-  const c = confirmOf(m.checks, roundAt, s.intervalSec, expected, sitsOut);
+  // A location faulty in its confirm's own minute (spec §15.3) is no evidence either (engine review M1).
+  const noVote = (c: StoredCheck) =>
+    !!sitsOut?.(c) || !!s.faulty?.get(minuteOf(c.checkedAt))?.has(c.location);
+  const c = confirmOf(m.checks, roundAt, s.intervalSec, expected, noVote);
   if (c.failing.length >= 2) return c.failing;
   const pastDeadline = s.now.getTime() - (roundAt.getTime() + s.intervalSec * 1000) >= ROUND_DEADLINE_MS;
   return c.failing.length + c.pending >= 2 && !pastDeadline ? PENDING : 'blip';

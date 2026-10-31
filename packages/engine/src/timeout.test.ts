@@ -429,6 +429,33 @@ describe('Tier 2–3: a timeout round is confirmed a minute later (D-051)', () =
     expect(ok.kind).toBe('wait');
   });
 
+  it('DOWN AGAIN on the next round isn’t held by a round waiting for its confirm (engine review M2)', () => {
+    const open: OpenIncident = {
+      id: 'i1',
+      state: 'monitoring',
+      severity: 'down',
+      hasRootCause: false,
+      episodeSeverity: 'down',
+    };
+    const fiveOhThree = { statusCode: 503, error: null };
+    const next = [
+      check('BKK', 'fail', T + 181, fiveOhThree),
+      check('SIN', 'pass', T + 181),
+      check('TYO', 'fail', T + 182, fiveOhThree),
+      recheck('BKK', T + 211, fiveOhThree),
+      recheck('TYO', T + 212, fiveOhThree),
+    ];
+    const d = tier2([...timeoutRound(T), ...next], { open, now: at(T + 220) });
+    expect(d).toMatchObject({ kind: 'relapse', severity: 'down', roundAt: at(T + 180) });
+  });
+
+  it('a confirm from a location faulty in its own minute is no evidence (spec §15.3, engine review M1)', () => {
+    // BKK fails most sites in the minute of its confirm: only TYO's failing confirm counts → no DOWN.
+    const faulty = new Map([[Math.floor(at(T + 61).getTime() / 60_000) * 60_000, new Set(['BKK' as const])]]);
+    const d = tier2([...timeoutRound(T), ...failingConfirm(T)], { faulty });
+    expect(d.kind).toBe('none');
+  });
+
   it('Tier 1 never waits for a confirm: its next round is a minute away', () => {
     expect(decideSite(site([home(timeoutRound(0))], { now: at(70) })).kind).toBe('none');
   });
