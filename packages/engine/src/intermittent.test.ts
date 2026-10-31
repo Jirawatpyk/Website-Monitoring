@@ -214,7 +214,104 @@ describe('a timeout that keeps coming back is a PROBLEM (D-050)', () => {
     expect(blipsOf(down)).toEqual([]);
   });
 
-  it('blips never hold a slow PROBLEM', () => {
+  it('a slow PROBLEM drop with no blip in the window recovers as before', () => {
+    const d = decideSite(
+      site(
+        300,
+        [
+          home(
+            [...okRound(240), ...okRound(300)],
+            carry({ status: 'problem', trigger: 'slow', slowRounds: 3 }),
+          ),
+        ],
+        {
+          open: openIntermittent(),
+        },
+      ),
+    );
+    expect(d.kind).toBe('recover');
+  });
+
+  it('a slow verdict in between doesn’t let an open Intermittent go early (engine review H1)', () => {
+    // The carry says slow now (the latest verdict), the drop is still the Intermittent one.
+    const d = decideSite(
+      site(
+        480,
+        [
+          home(
+            [...okRound(420), ...okRound(480)],
+            carry({ status: 'problem', trigger: 'slow', slowRounds: 3, blips: [at(1), at(121), at(241)] }),
+          ),
+        ],
+        {
+          open: openIntermittent(),
+        },
+      ),
+    );
+    expect(d).toMatchObject({ kind: 'none', status: null });
+  });
+
+  it('the round exactly 30 min after the last blip is the first clear of it (engine review L1)', () => {
+    const held = decideSite(
+      site(1980, [home([...okRound(1920), ...okRound(1980)], intermittentCarry([at(241)]))], {
+        open: openIntermittent(),
+      }),
+    );
+    expect(held.kind).toBe('none');
+    const clear = decideSite(
+      site(2040, [home([...okRound(1980), ...okRound(2040)], intermittentCarry([at(241)]))], {
+        open: openIntermittent(),
+      }),
+    );
+    expect(clear.kind).toBe('recover');
+  });
+
+  it('a PROBLEM AGAIN never starts before the recovery it follows (engine review M1)', () => {
+    // Blips at 1 and 121 came while an earlier drop was open; it recovered (Monitoring) before 240.
+    const d = decideSite(
+      site(300, [home([...okRound(240), ...timeoutRound(300)], carry({ blips: [at(1), at(121)] }))], {
+        lastRoundAt: at(240),
+        open: openIntermittent({ state: 'monitoring' }),
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'relapse', trigger: 'intermittent', startedAt: at(300) });
+  });
+
+  it('the 3rd blip, then a DOWN the next round: PROBLEM first, then escalate from the 3rd blip’s timeout', () => {
+    const d = decideSite(
+      site(
+        300,
+        [home([...timeoutRound(240), ...timeoutRound(300)], intermittentCarry([at(1), at(121), at(241)]))],
+        {
+          open: openIntermittent(),
+        },
+      ),
+    );
+    expect(d).toMatchObject({ kind: 'escalate', downStartedAt: at(241) });
+  });
+
+  it('a WAF round one location decided: BKK’s timeout alone is a blip (D-027)', () => {
+    const waf = { outcome: 'blocked' as const, statusCode: 403, error: null, waf: 'cloudflare' as const };
+    const round = (base: number) => [
+      check('BKK', 'fail', base + 1),
+      check('SIN', 'blocked', base + 1, waf),
+      check('TYO', 'blocked', base + 2, waf),
+      recheck('BKK', base + 31),
+    ];
+    const okWaf = (base: number) => [
+      check('BKK', 'pass', base + 1),
+      check('SIN', 'blocked', base + 1, waf),
+      check('TYO', 'blocked', base + 2, waf),
+    ];
+    const d = decideSite(
+      site(240, [home([...okWaf(180), ...round(240)], carry({ blips: [at(1), at(121)] }))], {
+        behindWaf: true,
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'problem', trigger: 'intermittent', detail: { locations: ['BKK'] } });
+  });
+
+  it('blips hold any open PROBLEM drop, keyed on the drop', () => {
     const d = decideSite(
       site(
         300,
@@ -224,12 +321,11 @@ describe('a timeout that keeps coming back is a PROBLEM (D-050)', () => {
             carry({ status: 'problem', trigger: 'slow', slowRounds: 3, blips: [at(241)] }),
           ),
         ],
-        {
-          open: openIntermittent(),
-        },
+        // A slow PROBLEM incident, and the home page timed out one round ago: not over yet.
+        { open: openIntermittent() },
       ),
     );
-    expect(d.kind).toBe('recover');
+    expect(d).toMatchObject({ kind: 'none', status: null });
   });
 
   it('a key page timing out on and off is never Intermittent (the home page only)', () => {

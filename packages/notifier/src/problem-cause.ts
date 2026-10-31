@@ -102,7 +102,7 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
     case 'content_change':
       return `${d.path} · ${pageChange(d)}`;
     case 'intermittent':
-      return `Timing out on and off · ${d.blips} times in ${d.windowMin} min (${where(d.locations)})`;
+      return `Timing out on and off (${where(d.locations)}) · ${d.blips} times in ${d.windowMin} min`;
   }
 }
 

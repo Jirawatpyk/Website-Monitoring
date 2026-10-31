@@ -639,7 +639,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     : [];
   // D-050: every path carries the blips still in the window; only a timeout blip adds one, a DOWN
   // clears them (`stateOf`).
-  const blips = m.isPrimary ? liveBlips(m.carry.blips, roundAt) : [];
+  const blips = m.isPrimary ? liveBlips(m.carry.blips, roundAt, s.intervalSec) : [];
   const carried = { slowRounds: m.carry.slowRounds, failingSince, blips };
   const reset = { slowRounds: 0, failingSince, blips };
   const blockedChecks = round.scheduled.filter((c) => c.outcome === 'blocked');
@@ -707,9 +707,12 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     if (firstTimeoutRound(failing, round.scheduled, m.checks, roundAt, s.intervalSec, sitsOut)) {
       if (!m.isPrimary) return { verdict: { kind: 'blip' }, next: reset };
       // D-050: the 3rd such blip in 30 min — a site timing out on and off — is a PROBLEM from the 1st.
-      const now = liveBlips([...blips, firstFail ?? roundAt], roundAt);
+      const now = liveBlips([...blips, firstFail ?? roundAt], roundAt, s.intervalSec);
       const next = { ...reset, blips: now };
       if (now.length < BLIP_ROUNDS) return { verdict: { kind: 'blip' }, next };
+      // A PROBLEM AGAIN never starts before the recovery it follows (engine review M1, as D-042).
+      const startedAt =
+        s.open && RECOVERED_STATES.includes(s.open.state) ? crawlerStart(now[0]!, s) : now[0]!;
       return {
         verdict: {
           kind: 'problem',
@@ -720,7 +723,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
             windowMin: BLIP_WINDOW_MS / 60_000,
             locations: failing.map((c) => c.location),
           },
-          startedAt: now[0]!,
+          startedAt,
         },
         next,
       };
@@ -1038,14 +1041,15 @@ function pageStart(at: Date, s: SiteSnapshot): Date {
 }
 
 /**
- * D-050: an open Intermittent PROBLEM holds through OK rounds while a blip is still in the window, so it
- * neither recovers (nor auto-resolves) between two timeouts nor relapses on the next; it recovers on the
- * first OK round 30 min after the last blip. Only that trigger: blips never hold a slow PROBLEM.
+ * D-050: a PROBLEM drop isn't over while the home page timed out in the last 30 min — an OK round holds
+ * it, so an Intermittent PROBLEM neither recovers (nor auto-resolves) between two timeouts nor relapses
+ * on the next, and recovers on the first OK round 30 min after the last blip. Keyed on the open drop,
+ * not on the monitor's latest trigger: a slow or keyword verdict in between overwrites that and would
+ * let it go early (engine review H1). A DOWN drop recovers when the home page answers, as before (D-023).
  */
 function intermittentHolds(m: SiteMonitor, s: SiteSnapshot, blips: readonly Date[]): boolean {
-  if (!m.isPrimary || !blips.length) return false;
-  if (m.carry.status !== 'problem' || m.carry.trigger !== 'intermittent') return false;
-  return !!s.open && !RECOVERED_STATES.includes(s.open.state);
+  if (!m.isPrimary || !blips.length || !s.open || RECOVERED_STATES.includes(s.open.state)) return false;
+  return (s.open.episodeSeverity ?? s.open.severity) === 'problem';
 }
 
 /** A Page change PROBLEM to raise or keep: the page differs enough, and its recording is over. */

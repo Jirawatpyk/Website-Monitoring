@@ -64,10 +64,17 @@ export const BLIP_WINDOW_MS = 30 * 60_000;
 /** monitor_status.blips is bounded (≤ 20); a Tier 1 site can't blip more than every other minute. */
 const MAX_BLIPS = 20;
 
-/** The blips still inside the window at `at`, oldest first, each once. */
-export function liveBlips(blips: readonly Date[] | undefined, at: Date): Date[] {
-  const from = at.getTime() - BLIP_WINDOW_MS;
-  const times = [...new Set((blips ?? []).map((b) => b.getTime()))].filter((t) => t > from);
+/**
+ * The blips still inside the window at round `roundAt`, oldest first, each once. A blip is its round's
+ * first timeout, a few seconds into the round: it is aged by its round, so the round 30 min after it is
+ * the first one clear of it (engine review L1).
+ */
+export function liveBlips(blips: readonly Date[] | undefined, roundAt: Date, intervalSec: number): Date[] {
+  const from = roundAt.getTime() - BLIP_WINDOW_MS;
+  const intervalMs = intervalSec * 1000;
+  const times = [...new Set((blips ?? []).map((b) => b.getTime()))].filter(
+    (t) => Math.floor(t / intervalMs) * intervalMs > from,
+  );
   return times
     .sort((a, b) => a - b)
     .slice(-MAX_BLIPS)

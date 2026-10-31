@@ -444,7 +444,7 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
         p_severity: 'problem',
         p_started_at: at(-240),
         p_context: {
-          cause: 'Timing out on and off · 3 times in 30 min (SIN, TYO)',
+          cause: 'Timing out on and off (SIN, TYO) · 3 times in 30 min',
           summary: 'timing out on and off',
         },
         p_monitors: [

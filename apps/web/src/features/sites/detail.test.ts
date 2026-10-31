@@ -113,6 +113,7 @@ describe('client wording (spec §12)', () => {
     ['problem', 'regional', 'Problem · Degraded'],
     ['problem', 'slow', 'Problem · Degraded'],
     ['problem', 'key_page', 'Problem · Degraded'],
+    ['problem', 'intermittent', 'Problem · Degraded'],
     ['problem', 'ssl', 'Problem · internal only'],
     ['problem', 'blocked_unverified', 'Problem · internal only'],
     ['problem', 'tls_chain', 'Problem'],
