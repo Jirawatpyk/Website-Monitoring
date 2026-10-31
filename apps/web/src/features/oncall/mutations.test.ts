@@ -116,6 +116,14 @@ describe('on-call mutations (D-048, §27)', () => {
     expect(r).toEqual({ ok: false, message: 'The live shift can’t be swapped — use Hand over… on its row.' });
   });
 
+  it('says why someone in the swap can’t decide it, not just “only an Admin” (D-048 12.17)', async () => {
+    const r = await m.decideSwap(
+      { swapId: SWAP, approve: true },
+      db({ error: { code: '42501', hint: 'swap_self', message: 'x' } }),
+    );
+    expect(r).toEqual({ ok: false, message: 'Another Admin decides on a swap you’re part of.' });
+  });
+
   it('logs a refusal it has no words for, and says try again', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const r = await m.saveRotation(
