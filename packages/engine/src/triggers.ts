@@ -56,6 +56,24 @@ export function nextSlowRounds(previous: number, p50: number | null, thresholdMs
   return p50 > thresholdMs ? Math.min(previous + 1, 100) : 0;
 }
 
+// ── Intermittent (D-050: timeout blips that keep coming back) ───────────────
+
+/** The 3rd D-049 timeout blip within 30 min is a PROBLEM — the same 3-in-30-min as flapping (§19.4). */
+export const BLIP_ROUNDS = 3;
+export const BLIP_WINDOW_MS = 30 * 60_000;
+/** monitor_status.blips is bounded (≤ 20); a Tier 1 site can't blip more than every other minute. */
+const MAX_BLIPS = 20;
+
+/** The blips still inside the window at `at`, oldest first, each once. */
+export function liveBlips(blips: readonly Date[] | undefined, at: Date): Date[] {
+  const from = at.getTime() - BLIP_WINDOW_MS;
+  const times = [...new Set((blips ?? []).map((b) => b.getTime()))].filter((t) => t > from);
+  return times
+    .sort((a, b) => a - b)
+    .slice(-MAX_BLIPS)
+    .map((t) => new Date(t));
+}
+
 // ── Keyword (must-contain missing / must-not-contain found) ─────────────────
 
 /** Missing or forbidden text at a majority of the locations that checked keywords (2 or more). */

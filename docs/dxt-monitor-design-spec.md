@@ -116,6 +116,7 @@ Formula to state in StatusModel: site uptime = 1 − DOWN minutes / minutes in w
 ## 6. DOWN rule (canonical sentence — use it verbatim or a faithful short form)
 "DOWN when at least 2 of 3 locations get a hard fail (timeout, 5xx, DNS/TLS error, connection refused) on two checks in a row. The second check is an immediate recheck about 30 s after the first failure. A timeout alone needs two rounds in a row: when every failing check and recheck timed out, DOWN waits until the next round fails at 2 locations too, and starts at the first timeout (D-049). Hard fails don't wait for the browser verifier — it only takes a screenshot afterwards as evidence. If locations are blocked (403, 429, bot challenge), the browser verifier decides: page loads and keyword found → OK with a note; page fails → DOWN; verifier unavailable → PROBLEM (unverified)."
 Regional: one location failing ≥ 5 min while the others pass → PROBLEM (regional). Incident duration starts at the first failed check.
+Intermittent (D-050): the home page timing out at 2 locations for one round only, a 3rd time within 30 min → PROBLEM (Intermittent) from the 1st, "Timing out on and off · 3 times in 30 min (BKK, TYO)"; it stays open through the OK rounds in between and recovers on the first OK round 30 min after the last timeout.
 Detection targets (unchanged from PRD): Tier 1 ≤ 3 min, Tier 2–3 ≤ 10 min. Typical confirm time: check interval + ~30 s; a timeout alone one interval more (D-049).
 Only the primary monitor can make a site DOWN; all other monitors cap at PROBLEM.
 

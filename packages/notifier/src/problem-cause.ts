@@ -101,6 +101,8 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
       }`;
     case 'content_change':
       return `${d.path} · ${pageChange(d)}`;
+    case 'intermittent':
+      return `Timing out on and off · ${d.blips} times in ${d.windowMin} min (${where(d.locations)})`;
   }
 }
 
@@ -133,6 +135,8 @@ function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
       return 'blocked by bot protection, not verified';
     case 'content_change':
       return pageChangeSummary(d);
+    case 'intermittent':
+      return 'timing out on and off';
   }
 }
 

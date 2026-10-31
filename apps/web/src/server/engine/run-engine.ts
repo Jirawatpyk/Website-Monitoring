@@ -689,6 +689,8 @@ interface CarryRow {
   cause: string | null;
   slow_rounds: number;
   failing_since: Json;
+  /** D-050; absent before the migration reached this database. */
+  blips?: string[] | null;
 }
 
 function carryOf(row: CarryRow | undefined): MonitorCarry {
@@ -703,6 +705,7 @@ function carryOf(row: CarryRow | undefined): MonitorCarry {
     cause: row.cause,
     slowRounds: row.slow_rounds,
     failingSince,
+    blips: (row.blips ?? []).map((b) => new Date(b)).filter((b) => Number.isFinite(b.getTime())),
   };
 }
 
@@ -715,6 +718,7 @@ function nextCarry(state: MonitorState | undefined, m: SiteMonitor, site: SiteRo
     cause: causeOf(state, site),
     slowRounds: state.slowRounds,
     failingSince: state.failingSince,
+    blips: state.blips,
   };
 }
 
@@ -736,6 +740,7 @@ function monitorsJson(d: Exclude<SiteDecision, { kind: 'wait' | 'verify' }>, sit
     cause: m.status === 'problem' ? causeOf(m, site) : null,
     slowRounds: m.slowRounds,
     failingSince: m.failingSince as Json,
+    blips: m.blips.map((b) => b.toISOString()),
   }));
 }
 

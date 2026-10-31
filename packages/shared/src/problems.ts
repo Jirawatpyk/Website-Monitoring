@@ -66,6 +66,11 @@ export type ProblemDetail =
     }
   /** The certificate chain is misconfigured at most locations (D-029): browsers open it, apps don't. */
   | { kind: 'tls_chain'; code: string; locations: ProbeLocation[] }
+  /**
+   * D-050: the home page timed out at 2+ locations in `blips` rounds within `windowMin` minutes, each
+   * time back by the next round, so none was a DOWN (D-049). `locations`: where the latest one timed out.
+   */
+  | { kind: 'intermittent'; blips: number; windowMin: number; locations: ProbeLocation[] }
   /** A blocked key page whose page then failed in the browser. */
   | { kind: 'browser'; detail: string | null }
   /**
