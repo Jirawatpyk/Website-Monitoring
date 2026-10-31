@@ -116,6 +116,7 @@ describe('runEngine', () => {
                 SIN: at(0),
                 TYO: at(1),
               },
+              blips: [],
             },
           ],
           p_status: 'down',
@@ -185,7 +186,15 @@ describe('runEngine', () => {
       p_evaluated_at: now.toISOString(),
       p_ok_rounds: 1,
       p_monitors: [
-        { monitorId: 'm1', status: 'ok', trigger: null, cause: null, slowRounds: 0, failingSince: {} },
+        {
+          monitorId: 'm1',
+          status: 'ok',
+          trigger: null,
+          cause: null,
+          slowRounds: 0,
+          failingSince: {},
+          blips: [],
+        },
       ],
       p_status: 'ok',
     });
@@ -213,7 +222,15 @@ describe('runEngine', () => {
         p_auto_resolve: false,
         p_hold_summary: false,
         p_monitors: [
-          { monitorId: 'm1', status: 'ok', trigger: null, cause: null, slowRounds: 0, failingSince: {} },
+          {
+            monitorId: 'm1',
+            status: 'ok',
+            trigger: null,
+            cause: null,
+            slowRounds: 0,
+            failingSince: {},
+            blips: [],
+          },
         ],
         // PRD §5: the site shows OK only after the second OK round.
         p_status: 'down',
@@ -390,6 +407,49 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
         p_notify: true,
         p_status: 'problem',
         p_monitors: [{ monitorId: 'm1', status: 'problem', trigger: 'slow', slowRounds: 3 }],
+      },
+    });
+  });
+
+  it('the third timeout blip in 30 min opens PROBLEM · Intermittent from the stored blips (D-050)', async () => {
+    const timeout = (location: string, sec: number, attempt = 1) => ({
+      ...row(location, 'fail', sec, attempt, null),
+      error: 'Timeout',
+    });
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': {
+        data: [timeout('SIN', 0), timeout('TYO', 1), timeout('SIN', 31, 2), timeout('TYO', 32, 2)],
+      },
+      'rpc.engine_monitor_status': {
+        data: [
+          {
+            monitor_id: 'm1',
+            status: 'ok',
+            trigger: null,
+            cause: null,
+            slow_rounds: 0,
+            failing_since: {},
+            blips: [at(-240), at(-120)],
+          },
+        ],
+      },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ problems: 1, opened: 0 });
+    expect(rpcCalls[0]).toMatchObject({
+      name: 'engine_open_incident',
+      args: {
+        p_trigger: 'intermittent',
+        p_severity: 'problem',
+        p_started_at: at(-240),
+        p_context: {
+          cause: 'Timing out on and off (SIN, TYO) · 3 times in 30 min',
+          summary: 'timing out on and off',
+        },
+        p_monitors: [
+          { monitorId: 'm1', status: 'problem', trigger: 'intermittent', blips: [at(-240), at(-120), at(0)] },
+        ],
       },
     });
   });

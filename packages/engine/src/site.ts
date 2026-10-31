@@ -33,9 +33,12 @@ import {
   type PageChangeState,
 } from './page-change';
 import {
+  BLIP_ROUNDS,
+  BLIP_WINDOW_MS,
   crawlerIssue,
   keywordIssue,
   latestPerView,
+  liveBlips,
   minuteOf,
   nextFailingSince,
   nextSlowRounds,
@@ -74,6 +77,8 @@ export interface MonitorCarry {
   cause: string | null;
   slowRounds: number;
   failingSince: FailingSince;
+  /** D-050: the primary's timeout blips of the last 30 min (none = none). */
+  blips?: readonly Date[];
 }
 
 export const NEW_MONITOR: MonitorCarry = {
@@ -82,6 +87,7 @@ export const NEW_MONITOR: MonitorCarry = {
   cause: null,
   slowRounds: 0,
   failingSince: {},
+  blips: [],
 };
 
 export interface SiteMonitor {
@@ -148,6 +154,8 @@ export interface MonitorState {
   cause: string | null;
   slowRounds: number;
   failingSince: FailingSince;
+  /** D-050: the timeout blips still in the window (a DOWN clears them). */
+  blips: Date[];
 }
 
 /** What every judged decision records besides its incident change. */
@@ -272,7 +280,7 @@ type Verdict =
 
 interface Judgement {
   verdict: Verdict;
-  next: Pick<MonitorCarry, 'slowRounds' | 'failingSince'>;
+  next: Pick<MonitorCarry, 'slowRounds' | 'failingSince'> & { blips: Date[] };
 }
 
 export function decideSite(s: SiteSnapshot): SiteDecision {
@@ -324,7 +332,7 @@ function judgeSiteRound(
       m.id,
       isReady(round, s.locations, s.intervalSec, s.now, excludedIn(s, round))
         ? judgeMonitor(s, m, round)
-        : { verdict: { kind: 'insufficient' }, next: m.carry },
+        : { verdict: { kind: 'insufficient' }, next: { ...m.carry, blips: [...(m.carry.blips ?? [])] } },
     );
   }
 
@@ -629,8 +637,11 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         .filter((c) => c.outcome === 'blocked' && c.waf && !excluded.has(c.location))
         .map((c) => c.location)
     : [];
-  const carried = { slowRounds: m.carry.slowRounds, failingSince };
-  const reset = { slowRounds: 0, failingSince };
+  // D-050: every path carries the blips still in the window; only a timeout blip adds one, a DOWN
+  // clears them (`stateOf`).
+  const blips = m.isPrimary ? liveBlips(m.carry.blips, roundAt, s.intervalSec) : [];
+  const carried = { slowRounds: m.carry.slowRounds, failingSince, blips };
+  const reset = { slowRounds: 0, failingSince, blips };
   const blockedChecks = round.scheduled.filter((c) => c.outcome === 'blocked');
   const unverified = (reason: UnverifiedReason, startedAt: Date): Judgement => ({
     verdict: {
@@ -694,7 +705,28 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     // one round as before.
     const sitsOut = wafSite ? (c: StoredCheck) => abstainsOnWafSite(c, akamaiSite) : undefined;
     if (firstTimeoutRound(failing, round.scheduled, m.checks, roundAt, s.intervalSec, sitsOut)) {
-      return { verdict: { kind: 'blip' }, next: reset };
+      if (!m.isPrimary) return { verdict: { kind: 'blip' }, next: reset };
+      // D-050: the 3rd such blip in 30 min — a site timing out on and off — is a PROBLEM from the 1st.
+      const now = liveBlips([...blips, firstFail ?? roundAt], roundAt, s.intervalSec);
+      const next = { ...reset, blips: now };
+      if (now.length < BLIP_ROUNDS) return { verdict: { kind: 'blip' }, next };
+      // From the 1st blip. A PROBLEM AGAIN can't start before the recovery it follows: a DOWN clears the
+      // blips, and a PROBLEM drop doesn't recover while one of its own is in the window.
+      const startedAt = now[0]!;
+      return {
+        verdict: {
+          kind: 'problem',
+          trigger: 'intermittent',
+          detail: {
+            kind: 'intermittent',
+            blips: now.length,
+            windowMin: BLIP_WINDOW_MS / 60_000,
+            locations: failing.map((c) => c.location),
+          },
+          startedAt,
+        },
+        next,
+      };
     }
     const history = wafSite
       ? m.checks.map((c) => (bkkUntrusted(c, akamaiSite) ? { ...c, outcome: 'blocked' as const } : c))
@@ -795,7 +827,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     const timed = counted.filter((c) => !s.slowLocations?.get(minuteOf(c.checkedAt))?.has(c.location));
     const p50 = roundP50(timed, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
-    const next = { slowRounds, failingSince };
+    const next = { slowRounds, failingSince, blips };
     const crawler = crawlerFacts(m, s, roundAt);
     const issue = problemOf(
       m,
@@ -836,6 +868,8 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next };
     // D-046: an open Page change PROBLEM with no usable fetch, or an accept waiting for its Undo, holds.
     if (pageHolds(m, s)) return { verdict: { kind: 'insufficient' }, next };
+    // D-050: the OK round between two timeouts isn't the end of an Intermittent PROBLEM.
+    if (intermittentHolds(m, s, blips)) return { verdict: { kind: 'insufficient' }, next };
     // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
     const note =
       m.isPrimary && wafBlocked.length
@@ -897,6 +931,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         }
         if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next: reset };
         if (pageHolds(m, s)) return { verdict: { kind: 'insufficient' }, next: reset };
+        if (intermittentHolds(m, s, blips)) return { verdict: { kind: 'insufficient' }, next: reset };
         return { verdict: { kind: 'ok', reachable, note: BLOCKED_NOTE }, next: reset };
       }
       case 'failed':
@@ -1005,6 +1040,23 @@ function pageStart(at: Date, s: SiteSnapshot): Date {
   return s.open && RECOVERED_STATES.includes(s.open.state) ? crawlerStart(at, s) : at;
 }
 
+/**
+ * D-050: a PROBLEM drop isn't over while the home page timed out in the last 30 min — an OK round holds
+ * it, so an Intermittent PROBLEM neither recovers (nor auto-resolves) between two timeouts nor relapses
+ * on the next, and recovers on the first OK round 30 min after the last blip. Keyed on the open drop,
+ * not on the monitor's latest trigger: a slow or keyword verdict in between overwrites that and would
+ * let it go early (engine review H1). Only blips since the incident started count: a lone timeout
+ * before an unrelated keyword PROBLEM opened doesn't hold it (engine re-review M2). A DOWN drop recovers
+ * when the home page answers, as before (D-023).
+ */
+function intermittentHolds(m: SiteMonitor, s: SiteSnapshot, blips: readonly Date[]): boolean {
+  const open = s.open;
+  if (!m.isPrimary || !open || RECOVERED_STATES.includes(open.state)) return false;
+  if ((open.episodeSeverity ?? open.severity) !== 'problem') return false;
+  const since = open.startedAt?.getTime() ?? -Infinity;
+  return blips.some((b) => b.getTime() >= since);
+}
+
 /** A Page change PROBLEM to raise or keep: the page differs enough, and its recording is over. */
 function pageIssue(
   m: SiteMonitor,
@@ -1089,7 +1141,8 @@ function stateOf(m: SiteMonitor, j: Judgement): MonitorState {
   const base = { monitorId: m.id, ...j.next };
   switch (v.kind) {
     case 'down':
-      return { ...base, status: 'down', trigger: null, cause: null };
+      // D-050: the DOWN supersedes the blips it was waiting on.
+      return { ...base, status: 'down', trigger: null, cause: null, blips: [] };
     case 'problem':
       return { ...base, status: 'problem', trigger: v.trigger, detail: v.detail, cause: null };
     case 'ok':
@@ -1108,6 +1161,7 @@ function keep(m: SiteMonitor): MonitorState {
     cause: m.carry.cause,
     slowRounds: m.carry.slowRounds,
     failingSince: m.carry.failingSince,
+    blips: [...(m.carry.blips ?? [])],
   };
 }
 

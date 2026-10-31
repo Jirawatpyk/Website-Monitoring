@@ -189,6 +189,13 @@ describe('formatProblemCause / formatProblemSummary (D-022)', () => {
       'TLS chain misconfigured',
     ],
     [
+      'a home page timing out on and off (D-050)',
+      { kind: 'intermittent', blips: 3, windowMin: 30, locations: ['TYO', 'BKK'] },
+      home,
+      'Timing out on and off (BKK, TYO) · 3 times in 30 min',
+      'timing out on and off',
+    ],
+    [
       'behind a WAF, the VPS’s control check down (D-027)',
       { kind: 'blocked', reason: 'control_failed', locations: ['SIN', 'TYO'], statusCode: 403 },
       home,

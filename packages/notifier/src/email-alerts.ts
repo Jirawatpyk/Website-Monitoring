@@ -528,18 +528,24 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
   const slow = trigger === 'slow';
   const unverified = trigger === 'blocked_unverified';
   const chain = trigger === 'tls_chain';
+  // D-050: each timeout was over by the next check, so it never became an outage — but it keeps coming back.
+  const intermittent = trigger === 'intermittent';
   const headline = slow
     ? `${site} is slow`
     : unverified
       ? `${site} can’t be verified`
-      : `${site} has a problem`;
+      : intermittent
+        ? `${site} keeps timing out`
+        : `${site} has a problem`;
   const state = slow
     ? 'Up — pages load, but slowly. Not an outage.'
     : unverified
       ? 'Unknown — blocked by bot protection; no proof either way.'
       : chain
         ? 'Up in most browsers — apps and API clients can’t connect. Not an outage.'
-        : 'Up — reachable, with an issue. Not an outage.';
+        : intermittent
+          ? 'On and off — times out for a minute at a time, then answers again. Not an outage.'
+          : 'Up — reachable, with an issue. Not an outage.';
   const opening = slow
     ? 'The site is up but slow.'
     : unverified
@@ -548,7 +554,9 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
         : 'The site is blocked by bot protection and couldn’t be checked in a browser.'
       : chain
         ? 'The site opens in most browsers, but its certificate chain is misconfigured: install the right intermediate certificate.'
-        : 'The site is up, with a problem.';
+        : intermittent
+          ? 'The site keeps timing out for a minute at a time and coming back, so some visitors can’t open it.'
+          : 'The site is up, with a problem.';
   const acked = input.acknowledged ?? null;
   const held = acked ? null : heldRow(input.heldUntil, input.ladder, input.now ?? input.detectedAt);
   return render(input, {

@@ -280,6 +280,23 @@ describe('PROBLEM emails (EmailAlert PROBLEM thread)', () => {
     expect(m.text).toContain('install the right intermediate certificate');
   });
 
+  it('words a site timing out on and off (D-050)', () => {
+    const m = buildProblemEmail({
+      ...base,
+      trigger: 'intermittent',
+      detectedAt,
+      cause: 'Timing out on and off (BKK, TYO) · 3 times in 30 min',
+      summary: 'timing out on and off',
+    });
+    expect(m.text).toMatch(/^PROBLEM — Fuji Links keeps timing out/);
+    expect(m.text).toContain(
+      'Site: On and off — times out for a minute at a time, then answers again. Not an outage.',
+    );
+    expect(m.text).toContain('so some visitors can’t open it');
+    expect(m.text).toContain('Trigger: Intermittent');
+    expect(m.text).toContain('Cause: Timing out on and off (BKK, TYO) · 3 times in 30 min');
+  });
+
   it('words the other triggers, and the fallback reader', () => {
     const unverified = buildProblemEmail({
       ...base,

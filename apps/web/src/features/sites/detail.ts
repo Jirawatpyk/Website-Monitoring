@@ -97,12 +97,14 @@ export function intervalLabel(tier: Tier): string {
 }
 
 /**
- * What a client is told about an incident (spec §12): DOWN → Outage; slow, key page, regional →
- * Degraded; the rest is internal only. A TLS chain PROBLEM gets no client word yet (D-029 → S21).
+ * What a client is told about an incident (spec §12): DOWN → Outage; slow, key page, regional and
+ * intermittent timeouts (D-050) → Degraded; the rest is internal only. A TLS chain PROBLEM gets no
+ * client word yet (D-029 → S21).
  */
 export function clientWord(severity: Severity, trigger: Trigger): string | null {
   if (severity === 'down') return 'Outage';
-  if (trigger === 'slow' || trigger === 'key_page' || trigger === 'regional') return 'Degraded';
+  if (trigger === 'slow' || trigger === 'key_page' || trigger === 'regional' || trigger === 'intermittent')
+    return 'Degraded';
   if (trigger === 'tls_chain') return null;
   return 'internal only';
 }

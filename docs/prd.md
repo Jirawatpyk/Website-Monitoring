@@ -155,6 +155,7 @@ flowchart TD
 - Fail เฉพาะ 1 location ต่อเนื่อง ≥ 5 นาที ขณะที่ location อื่นผ่าน (ปัญหาเฉพาะภูมิภาค เช่น CDN)
 - SSL certificate หมดอายุภายใน 14 วัน / domain หมดอายุภายใน 30 วัน
 - Redirect ไป domain ที่ไม่อยู่ใน allowlist ของเว็บนั้น (สัญญาณ hijack)
+- หน้าหลัก timeout ≥ 2 location แค่รอบเดียวแล้วกลับมา ครั้งที่ 3 ภายใน 30 นาที (Intermittent, D-050) — เปิดค้างไว้จนผ่านไป 30 นาทีโดยไม่ timeout อีก
 
 **Recovery:** รอบแรกที่ majority location ผ่าน → ส่ง RECOVERED (reply ใน thread + email) พร้อม downtime duration และ incident เข้าสถานะ Monitoring; ผ่านครบ 2 รอบติด → เว็บกลับเป็น OK และ incident เป็น Needs root cause (ถ้ายังไม่เขียน) — ปิด incident ต้องกด Resolve เองตามเงื่อนไขใน Section 8 ข้อความ recovered ใช้คำว่า "Needs a root cause before it can be resolved"
 
