@@ -100,11 +100,16 @@ function toDue(m: MonitorRow): DueMonitor {
   };
 }
 
+/** Monitor ids per read: 50 uuids keep the query string near 2 KB (the gateway's limit is 8 KB, S04b). */
+const IDS_PER_READ = 50;
+
 /**
  * D-051: the home pages whose round so far has scheduled checks that timed out at 2+ locations and no
  * confirm check from `location` yet — each location runs its own, so one that sees the others' timeouts
- * only a minute later still confirms at its next tick. One read of the current buckets' timeouts and
- * confirms (normally none), with no monitor ids in the query string.
+ * only a minute later still confirms at its next tick. Not when the round before timed out at 2+ too:
+ * that round already is D-049's second round, so a confirm can't change the verdict (an outage would
+ * otherwise get one every round). Monitor-first reads of this round and the one before, on
+ * `check_results_monitor_idx` (db-reviewer), normally empty.
  */
 async function confirmsDue(
   db: DbClient,
@@ -112,27 +117,49 @@ async function confirmsDue(
   at: Date,
   location: ProbeLocation,
 ): Promise<Set<string>> {
-  const bucketOf = (tier: Tier) => {
-    const ms = TIER_CONFIG[tier].intervalSec * 1000;
-    return Math.floor(at.getTime() / ms) * ms;
+  const intervalOf = (tier: Tier) => TIER_CONFIG[tier].intervalSec * 1000;
+  const bucketOf = (tier: Tier) => Math.floor(at.getTime() / intervalOf(tier)) * intervalOf(tier);
+  const since = Math.min(...monitors.map((m) => bucketOf(m.tier) - intervalOf(m.tier)));
+  const reads = [];
+  for (let i = 0; i < monitors.length; i += IDS_PER_READ) {
+    reads.push(
+      db
+        .from('check_results')
+        .select('monitor_id, location, checked_at, error, confirm')
+        .in(
+          'monitor_id',
+          monitors.slice(i, i + IDS_PER_READ).map((m) => m.id),
+        )
+        .gte('checked_at', new Date(since).toISOString())
+        .eq('attempt', 1)
+        .or('error.eq.Timeout,confirm.is.true')
+        // Past PostgREST's 1,000-row cap the newest (this round's) rows are the ones kept (security L2).
+        .order('checked_at', { ascending: false }),
+    );
+  }
+  type Row = {
+    monitor_id: string;
+    location: string;
+    checked_at: string;
+    error: string | null;
+    confirm: boolean | null;
   };
-  const since = Math.min(...monitors.map((m) => bucketOf(m.tier)));
-  const { data, error } = await db
-    .from('check_results')
-    .select('monitor_id, location, checked_at, error, confirm')
-    .gte('checked_at', new Date(since).toISOString())
-    .eq('attempt', 1)
-    .or('error.eq.Timeout,confirm.is.true');
-  if (error) throw new Error(`check_results: ${error.message}`);
+  const rows: Row[] = [];
+  for (const { data, error } of await Promise.all(reads)) {
+    if (error) throw new Error(`check_results: ${error.message}`);
+    rows.push(...data);
+  }
+  const timedOutAt = (r: Row) => !r.confirm && isTimeoutError(r.error);
   const owed = new Set<string>();
   for (const m of monitors) {
     const start = bucketOf(m.tier);
-    const rows = data.filter((r) => r.monitor_id === m.id && Date.parse(r.checked_at) >= start);
-    const timedOut = new Set(
-      rows.filter((r) => !r.confirm && isTimeoutError(r.error)).map((r) => r.location),
-    );
-    const confirmedHere = rows.some((r) => r.confirm && r.location === location);
-    if (timedOut.size >= 2 && !confirmedHere) owed.add(m.id);
+    const mine = rows.filter((r) => r.monitor_id === m.id);
+    const inRound = mine.filter((r) => Date.parse(r.checked_at) >= start);
+    const before = mine.filter((r) => Date.parse(r.checked_at) < start);
+    const timedOut = new Set(inRound.filter(timedOutAt).map((r) => r.location));
+    const timedOutBefore = new Set(before.filter(timedOutAt).map((r) => r.location));
+    const confirmedHere = inRound.some((r) => r.confirm && r.location === location);
+    if (timedOut.size >= 2 && timedOutBefore.size < 2 && !confirmedHere) owed.add(m.id);
   }
   return owed;
 }

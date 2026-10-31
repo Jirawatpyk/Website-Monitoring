@@ -84,12 +84,20 @@ describe('D-051 confirm checks (loadDueMonitors)', () => {
     expect((await due([monitor('eqho', 2)], timedOut('eqho'), null)).list).toEqual([]);
   });
 
-  it('reads the current rounds’ timeouts and confirms once, with no monitor ids in the query', async () => {
-    const { calls } = await due([monitor('eqho', 2), monitor('dxt', 3)], []);
-    const read = calls.find((c) => c.table === 'check_results')!;
-    // Tier 3's round started at 06:40, the oldest current round.
-    expect(read.filters).toEqual([
-      ['gte', 'checked_at', '2026-10-16T06:40:00.000Z'],
+  it('no confirm while the site is already down: the round before timed out at 2+ too (D-049 decides)', async () => {
+    const before = [row('eqho', 'BKK', '2026-10-16T06:39:01Z'), row('eqho', 'TYO', '2026-10-16T06:39:02Z')];
+    expect((await due([monitor('eqho', 2)], [...before, ...timedOut('eqho')])).list).toEqual([]);
+  });
+
+  it('reads monitor-first, this round and the one before, in batches of 50 ids', async () => {
+    const many = Array.from({ length: 51 }, (_, i) => monitor(`m${i}`, i % 2 ? 2 : 3));
+    const { calls } = await due(many, []);
+    const reads = calls.filter((c) => c.table === 'check_results');
+    expect(reads).toHaveLength(2);
+    // Tier 3's round started at 06:40, and the one before it at 06:35: the oldest that counts.
+    expect(reads[0]!.filters).toEqual([
+      ['in', 'monitor_id', many.slice(0, 50).map((m) => m.id)],
+      ['gte', 'checked_at', '2026-10-16T06:35:00.000Z'],
       ['eq', 'attempt', 1],
       ['or', 'error.eq.Timeout,confirm.is.true'],
     ]);

@@ -28,7 +28,7 @@ export async function checksCsv(siteId: string, now = new Date()): Promise<Respo
       supabase
         .from('check_results')
         .select(
-          'id, checked_at, location, attempt, outcome, status_code, response_ms, ttfb_ms, error, monitors!inner(site_id, is_primary)',
+          'id, checked_at, location, attempt, confirm, outcome, status_code, response_ms, ttfb_ms, error, monitors!inner(site_id, is_primary)',
         )
         .eq('monitors.site_id', site.id)
         .eq('monitors.is_primary', true)
@@ -39,11 +39,23 @@ export async function checksCsv(siteId: string, now = new Date()): Promise<Respo
     { max: MAX_ROWS },
   );
   const body = toCsv(
-    ['checked_at_utc', 'location', 'attempt', 'outcome', 'http_status', 'response_ms', 'ttfb_ms', 'error'],
+    // `confirm`: a D-051 confirm check (or its recheck), not the round's own check.
+    [
+      'checked_at_utc',
+      'location',
+      'attempt',
+      'confirm',
+      'outcome',
+      'http_status',
+      'response_ms',
+      'ttfb_ms',
+      'error',
+    ],
     data.map((c) => [
       c.checked_at,
       c.location,
       c.attempt,
+      c.confirm ? 'yes' : '',
       c.outcome,
       c.status_code,
       c.response_ms,

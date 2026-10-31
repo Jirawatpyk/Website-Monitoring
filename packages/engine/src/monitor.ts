@@ -168,7 +168,11 @@ export function buildRound(checks: readonly StoredCheck[], start: number, interv
   return { start: new Date(start), scheduled: [...scheduled.values()], rechecks };
 }
 
-/** The first recheck of this check at its location within `RECHECK_WITHIN_MS` (a confirm's: a confirm's). */
+/**
+ * The first recheck of this check at its location within `RECHECK_WITHIN_MS`. `confirm` keeps the two
+ * kinds apart: a D-051 confirm check pairs only with a confirm recheck, a scheduled check only with an
+ * ordinary one.
+ */
 function recheckOf(
   checks: readonly StoredCheck[],
   first: StoredCheck,

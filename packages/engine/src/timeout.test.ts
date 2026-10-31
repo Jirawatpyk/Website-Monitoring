@@ -420,6 +420,15 @@ describe('Tier 2–3: a timeout round is confirmed a minute later (D-051)', () =
     expect(d).toMatchObject({ kind: 'escalate', downStartedAt: at(T + 1) });
   });
 
+  it('a round waiting for its confirm never holds back a DOWN on the next round, but holds an OK one', () => {
+    // No confirm came for 06:42 (BKK on an old agent, say) and 06:45 times out again: DOWN at once.
+    const down = tier2([...timeoutRound(T), ...timeoutRound(T + 180)], { now: at(T + 220) });
+    expect(down).toMatchObject({ kind: 'open', roundAt: at(T + 180), startedAt: at(T + 1) });
+    // 06:45 passes: it waits behind 06:42 (judged oldest first) until that one is decided.
+    const ok = tier2([...timeoutRound(T), ...okRound(T + 180)], { now: at(T + 230) });
+    expect(ok.kind).toBe('wait');
+  });
+
   it('Tier 1 never waits for a confirm: its next round is a minute away', () => {
     expect(decideSite(site([home(timeoutRound(0))], { now: at(70) })).kind).toBe('none');
   });
