@@ -147,14 +147,19 @@ async function confirmsDue(
   const rows: Row[] = [];
   for (const { data, error } of await Promise.all(reads)) {
     if (error) throw new Error(`check_results: ${error.message}`);
+    // A full page means PostgREST may have cut rows: say so rather than miss a confirm silently.
+    if (data.length >= 1000)
+      console.warn(JSON.stringify({ event: 'confirm_due_truncated', rows: data.length }));
     rows.push(...data);
   }
   const timedOutAt = (r: Row) => !r.confirm && isTimeoutError(r.error);
   const owed = new Set<string>();
   for (const m of monitors) {
     const start = bucketOf(m.tier);
+    const end = start + intervalOf(m.tier);
     const mine = rows.filter((r) => r.monitor_id === m.id);
-    const inRound = mine.filter((r) => Date.parse(r.checked_at) >= start);
+    // A BKK row may be stamped up to 5 min ahead (the ingest skew): it isn't this round's.
+    const inRound = mine.filter((r) => Date.parse(r.checked_at) >= start && Date.parse(r.checked_at) < end);
     const before = mine.filter((r) => Date.parse(r.checked_at) < start);
     const timedOut = new Set(inRound.filter(timedOutAt).map((r) => r.location));
     const timedOutBefore = new Set(before.filter(timedOutAt).map((r) => r.location));
