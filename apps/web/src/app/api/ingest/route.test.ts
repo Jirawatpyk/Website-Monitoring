@@ -115,6 +115,18 @@ describe('GET /api/ingest (monitors due for Bangkok)', () => {
     const { GET } = await import('./route');
     const res = await GET(get(TOKEN));
     expect(await res.json()).toEqual({ monitors });
-    expect(m.due).toHaveBeenCalledWith('db', new Date(NOW));
+    // No `?confirm=1`: an agent that doesn't echo the flag gets no D-051 confirm checks.
+    expect(m.due).toHaveBeenCalledWith('db', new Date(NOW), false);
+  });
+
+  it('gives confirm checks only to an agent that asks with ?confirm=1 (D-051)', async () => {
+    m.due.mockResolvedValue([]);
+    const { GET } = await import('./route');
+    const ask = (query: string) =>
+      new Request(`https://monitor.example.test/api/ingest${query}`, { headers: get(TOKEN).headers });
+    await GET(ask('?confirm=1'));
+    expect(m.due).toHaveBeenLastCalledWith('db', new Date(NOW), true);
+    await GET(ask('?confirm=true'));
+    expect(m.due).toHaveBeenLastCalledWith('db', new Date(NOW), false);
   });
 });

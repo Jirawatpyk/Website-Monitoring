@@ -17,11 +17,13 @@ const ENGINE_BUDGET_MS = 50_000;
 /**
  * Ingest API for the Bangkok probe on the VPS, bearer INGEST_TOKEN; the VPS never holds a database
  * key (PRD §10). GET: the monitors due this minute. POST: a batch of results, stored as BKK — the
- * location is fixed here, so a leaked token can't speak for Singapore or Tokyo.
+ * location is fixed here, so a leaked token can't speak for Singapore or Tokyo. `?confirm=1`: the agent
+ * echoes D-051's confirm flag, so it may be given confirm checks (anything else: none).
  */
 export async function GET(request: Request): Promise<Response> {
   if (!hasBearer(request, serverEnv().INGEST_TOKEN)) return unauthorized();
-  const monitors = await dueForBangkok(serviceDb(), new Date());
+  const confirms = new URL(request.url).searchParams.get('confirm') === '1';
+  const monitors = await dueForBangkok(serviceDb(), new Date(), confirms);
   return Response.json({ monitors });
 }
 

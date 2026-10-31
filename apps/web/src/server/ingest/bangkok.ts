@@ -20,10 +20,11 @@ export async function beatBangkok(db: DbClient, now: Date): Promise<void> {
  * The monitors the Bangkok probe should check this minute — the same rule as SIN and TYO. Bangkok
  * beats when its results are stored, so an agent whose posts fail never holds rounds open; in a
  * minute with nothing due no batch follows, so asking is the beat then (else a Tier 2–3-only
- * minute would let it drop out of the vote).
+ * minute would let it drop out of the vote). D-051's confirm checks only for an agent that asks for
+ * them (`?confirm=1`): one that doesn't echo the flag would store them as the round's own checks.
  */
-export async function dueForBangkok(db: DbClient, now: Date): Promise<DueMonitor[]> {
-  const monitors = await loadDueMonitors(db, now);
+export async function dueForBangkok(db: DbClient, now: Date, confirms = false): Promise<DueMonitor[]> {
+  const monitors = await loadDueMonitors(db, now, confirms ? { location: LOCATION } : undefined);
   if (!monitors.length) await beatBangkok(db, now);
   return monitors;
 }
@@ -58,6 +59,7 @@ export async function storeBangkokResults(
       waf: r.outcome === 'blocked' ? (r.waf ?? null) : null,
       control_ok: control?.ok ?? null,
       akamai_ok: control?.akamaiOk ?? null,
+      confirm: r.confirm ? true : null,
     })),
   );
   await beatBangkok(db, now);

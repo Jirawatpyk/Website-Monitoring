@@ -116,6 +116,21 @@ describe('Bangkok through the Ingest API', () => {
     expect(calls2.find((c) => c.table === 'check_results')?.values).toEqual([
       expect.objectContaining({ monitor_id: 'm3', waf: null, control_ok: null, akamai_ok: null }),
     ]);
+
+    // D-051: a confirm check comes back flagged; everything else (an old agent too) stays null.
+    const { db: db3, calls: calls3 } = fakeDb();
+    await storeBangkokResults(
+      db3,
+      [
+        { ...base, monitorId: 'm4', outcome: 'pass', statusCode: 200, confirm: true },
+        { ...base, monitorId: 'm5', outcome: 'pass', statusCode: 200 },
+      ],
+      now,
+    );
+    expect(calls3.find((c) => c.table === 'check_results')?.values).toEqual([
+      expect.objectContaining({ monitor_id: 'm4', confirm: true }),
+      expect.objectContaining({ monitor_id: 'm5', confirm: null }),
+    ]);
   });
 
   it('throws when the insert fails, before beating', async () => {

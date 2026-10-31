@@ -189,6 +189,50 @@ describe('runProbe', () => {
     ]);
   });
 
+  it('stores a D-051 confirm check and its recheck with `confirm`, ordinary checks without', async () => {
+    // Tier 2 home page, its 10:00 round timed out at BKK and TYO: SIN confirms at 10:01.
+    const home = { ...monitor('eqho', 2), is_primary: true };
+    const fake = fakeDb({
+      'monitors.select': { data: [home, monitor('a', 1)] },
+      'check_results.select': {
+        data: [
+          {
+            monitor_id: 'eqho',
+            location: 'BKK',
+            checked_at: '2026-10-06T10:00:01Z',
+            error: 'Timeout',
+            confirm: null,
+          },
+          {
+            monitor_id: 'eqho',
+            location: 'TYO',
+            checked_at: '2026-10-06T10:00:02Z',
+            error: 'Timeout',
+            confirm: null,
+          },
+        ],
+      },
+    });
+    let t = start + 60_000;
+    const timeout = { ...fail, statusCode: null, error: 'Timeout' };
+    const check = vi.fn(async (req: { url: string }) => (req.url.includes('eqho') ? timeout : pass));
+    await runProbe({
+      db: fake.db,
+      location: 'SIN',
+      check,
+      clock: () => t,
+      sleep: async (ms) => {
+        t += ms;
+      },
+    });
+    const [scheduled, rechecks] = inserts(fake.calls);
+    expect(scheduled).toEqual([
+      expect.objectContaining({ monitor_id: 'a', attempt: 1, confirm: null }),
+      expect.objectContaining({ monitor_id: 'eqho', attempt: 1, confirm: true }),
+    ]);
+    expect(rechecks).toEqual([expect.objectContaining({ monitor_id: 'eqho', attempt: 2, confirm: true })]);
+  });
+
   it('caps a monitor timeout at 30 s and rechecks 30 s after the run started (PRD §5)', async () => {
     const s = setup([monitor('slow', 1, 60_000)], [[fail], [fail]]);
     await runProbe({ db: s.db, location: 'SIN', check: s.check, clock: s.clock, sleep: s.sleep });

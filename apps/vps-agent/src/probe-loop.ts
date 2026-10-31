@@ -47,6 +47,8 @@ const toResult = (m: DueMonitor, checkedAt: number, r: HttpCheckResult, attempt:
   keywordMissing: r.keywordMissing,
   keywordForbidden: r.keywordForbidden,
   waf: r.waf,
+  // D-051: a confirm check and its recheck (the recheck reuses the same monitor).
+  ...(m.confirm ? { confirm: true } : {}),
 });
 
 /**

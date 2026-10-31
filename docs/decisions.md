@@ -64,12 +64,16 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 1. **When.** On a Tier 2–3 site, the primary monitor's scheduled checks in the current round timed out at ≥ 2 locations. Key pages never get one (they can't go DOWN).
 2. **What.** At the next minute tick each location without a confirm check of its own in that round runs one (`check_results.confirm = true`), with its own recheck as usual. Per location, so a probe that asks a moment after another still runs its own.
-3. **Judging.** The round waits for its confirm (the existing round deadline is the limit: no confirm → a blip, as before). The confirm check and its recheck hard-failing at ≥ 2 locations (1 for a WAF round one location decided, D-027) is the second round: DOWN from the first timeout, ~2.5 min after it. Otherwise the round is a blip and counts toward D-050.
+3. **Judging.** The round waits for its confirm (the existing round deadline is the limit: no confirm → a blip, as before). The confirm check and its recheck hard-failing at ≥ 2 locations is the second round: DOWN from the first timeout, ~2.5 min after it. Otherwise the round is a blip and counts toward D-050. A WAF round one location decided (D-027) never asks for a confirm (item 1 needs 2 locations), so on Tier 2–3 it keeps D-049's next-round rule and doesn't wait (advisor, 31 Oct 2026).
 4. Confirm checks are never a round of their own: the engine's bucketing, slow p50, faulty-location minutes and regional clocks ignore them. Everything else that reads `check_results` counts them as the real measurements they are — the hourly rollups (checks, hard fails, p50 / p95), the Sites list's 24 h response and latest check per location (db-reviewer M1). They come only after a timeout round, so the effect is a few extra rows on a bad hour; uptime is unaffected (it comes from DOWN incidents, spec §5).
 
 Gain: Tier 2 ~1 min sooner, Tier 3 ~3 min sooner; both were already inside the ≤ 10 min target. The VPS agent asks for confirm monitors explicitly (`?confirm=1`), so an agent not redeployed never mixes confirm checks into a round.
 
-**Where.** `check_results.confirm` (migration `d049_followups`); due-ness in `apps/web/src/server/probe/due-monitors.ts`; the engine's `confirmOf` (`packages/engine/src/hard-fail.ts`).
+A passing confirm makes that round a blip, nothing more: the next round is still judged by D-049 from its scheduled checks, so if it times out again it is DOWN (the round before timed out at 2 locations) — the confirm doesn't count as an OK round in between (engine review L4). A confirm from a location faulty in its own minute (spec §15.3) is no evidence either way.
+
+Accepted costs: a round whose rechecks passed (a plain blip, not D-049's) still gets confirm checks, which the engine ignores — waiting for the rechecks to time out first would miss the next minute's tick. Until the VPS agent runs this code, Bangkok runs no confirm and counts as still to come: a round whose SIN and TYO confirms split (one fails, one passes) waits to its deadline (Tier 2 ~4.25 min) before it is a blip; `release.sh` follows the merge at once.
+
+**Where.** `check_results.confirm` (migration `d049_followups`); due-ness in `apps/web/src/server/probe/due-monitors.ts` (`loadDueMonitors(…, { location })`); the engine's `confirmOf` (`packages/engine/src/monitor.ts`) and `confirmRound` (`site.ts`).
 
 ## D-050 — A timeout that keeps coming back is a PROBLEM
 

@@ -7,7 +7,9 @@ type CheckRow = Database['public']['Tables']['check_results']['Insert'];
  * Columns that only add facts to a check (all nullable, added after the table). When a deploy's new
  * code runs before `migrate-production` has added one — Vercel's Deployment Check holds the alias, not
  * the new deployment's crons (8 Oct 2026: SIN / TYO stored nothing for 3 min) — the row is stored
- * without it rather than lost. A new nullable column on `check_results` belongs here.
+ * without it rather than lost. A new nullable column on `check_results` belongs here — except `confirm`
+ * (D-051): a confirm check stored without its flag would count as the round's own check, so it is a
+ * core column and the insert fails instead (`check-results.test.ts`).
  */
 export const LAG_TOLERANT_COLUMNS = [
   'ttfb_ms',
