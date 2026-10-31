@@ -89,6 +89,14 @@ describe('D-051 confirm checks (loadDueMonitors)', () => {
     expect((await due([monitor('eqho', 2)], [...before, ...timedOut('eqho')])).list).toEqual([]);
   });
 
+  it('only the round just before counts: timeouts two Tier 2 rounds back don’t stop a confirm', async () => {
+    // A Tier 3 monitor stretches the read back to 06:35; the Tier 2 round before 06:42 is 06:39 (OK).
+    const twoBack = [row('eqho', 'BKK', '2026-10-16T06:36:01Z'), row('eqho', 'TYO', '2026-10-16T06:36:02Z')];
+    expect(
+      (await due([monitor('eqho', 2), monitor('dxt', 3)], [...twoBack, ...timedOut('eqho')])).list,
+    ).toEqual([{ id: 'eqho', confirm: true }]);
+  });
+
   it('reads monitor-first, this round and the one before, in batches of 50 ids', async () => {
     const many = Array.from({ length: 51 }, (_, i) => monitor(`m${i}`, i % 2 ? 2 : 3));
     const { calls } = await due(many, []);

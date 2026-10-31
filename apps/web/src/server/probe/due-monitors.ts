@@ -160,7 +160,11 @@ async function confirmsDue(
     const mine = rows.filter((r) => r.monitor_id === m.id);
     // A BKK row may be stamped up to 5 min ahead (the ingest skew): it isn't this round's.
     const inRound = mine.filter((r) => Date.parse(r.checked_at) >= start && Date.parse(r.checked_at) < end);
-    const before = mine.filter((r) => Date.parse(r.checked_at) < start);
+    // Only the round just before (D-049's): the read reaches further back for Tier 3 (advisor).
+    const before = mine.filter((r) => {
+      const t = Date.parse(r.checked_at);
+      return t >= start - intervalOf(m.tier) && t < start;
+    });
     const timedOut = new Set(inRound.filter(timedOutAt).map((r) => r.location));
     const timedOutBefore = new Set(before.filter(timedOutAt).map((r) => r.location));
     const confirmedHere = inRound.some((r) => r.confirm && r.location === location);
