@@ -8,6 +8,7 @@ import {
   formatDay,
   formatDuration,
   formatTime,
+  isTimeoutError,
   TIER_CONFIG,
   TRIGGER_LABELS,
   type Severity,
@@ -94,6 +95,36 @@ export function responseHoursLabel(tier: Tier): string {
 
 export function intervalLabel(tier: Tier): string {
   return `Every ${TIER_CONFIG[tier].intervalSec / 60} min`;
+}
+
+/** What kind of check a Check log row is (spec §29): the round's own, a recheck, a D-051 confirm check. */
+export type CheckKind = 'scheduled' | 'recheck' | 'confirm' | 'confirm_recheck';
+
+export function checkKind(c: { attempt: 1 | 2; confirm: boolean }): CheckKind {
+  if (c.confirm) return c.attempt === 2 ? 'confirm_recheck' : 'confirm';
+  return c.attempt === 2 ? 'recheck' : 'scheduled';
+}
+
+/** Spec §29.2–3: each mark's accessible name and the sentence its tooltip (desktop) or key (phone) gives. */
+export const CHECK_KIND_WORDS: Record<Exclude<CheckKind, 'scheduled'>, { name: string; text: string }> = {
+  recheck: {
+    name: 'Recheck',
+    text: 'Recheck — a failed check, checked again about 30 s after its round started',
+  },
+  confirm: {
+    name: 'Confirm check',
+    text: 'Confirm check — run a minute after a round that timed out at 2 locations',
+  },
+  confirm_recheck: {
+    name: 'Confirm check, recheck',
+    text: 'Recheck of a confirm check — the confirm check failed, so it was checked again about 30 s after it started',
+  },
+};
+
+/** A check's Response cell (spec §29.5): its time, "Timeout" for a timeout, else a dash. */
+export function responseWord(c: { responseMs: number | null; error: string | null }): string {
+  if (c.responseMs !== null) return `${c.responseMs} ms`;
+  return isTimeoutError(c.error) ? 'Timeout' : '—';
 }
 
 /**

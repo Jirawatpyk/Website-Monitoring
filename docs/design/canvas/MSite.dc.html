@@ -48,6 +48,12 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 .pc-row{grid-template-columns:minmax(0,1fr);gap:4px}
 .pc-more{min-height:44px}
 .pc-chip{min-height:30px}
+.ck-mark{display:inline-flex;align-items:center;gap:3px;height:16px;font-family:var(--font-sans);font-size:11px;font-weight:400;line-height:1;color:var(--aura-fg-secondary);white-space:nowrap}
+.ck-chip{display:inline-flex;align-items:center;height:16px;padding:0 5px;box-sizing:border-box;border:1px solid var(--aura-border-strong);border-radius:9999px;color:var(--aura-fg-primary);font-weight:500}
+.ck-re{display:inline-flex;align-items:center;gap:3px}
+.ck-re svg{width:12px;height:12px}
+.ck-row{min-height:44px;box-sizing:border-box;padding:4px 14px;display:grid;grid-template-columns:84px 34px minmax(0,1fr) auto;align-items:center;gap:8px;border-bottom:1px solid var(--aura-border-subtle);font-size:13px}
+.ck-time{display:flex;flex-direction:column;align-items:flex-start;gap:3px;line-height:1.2}
 </style>
 </helmet>
 <div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
@@ -133,7 +139,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </sc-if>
 </div>
 <sc-if value="{{hasList}}" hint-placeholder-val="{{true}}">
-<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · each row opens Incident detail for that incident — the sample screen shows INC-0142. Top-bar ⋯ (44 px, between the title and the avatar): Visit site for everyone; Admins also get Edit site (editable on phones, D-044). Opening it moves focus to the first item; a tap outside closes it. Not drawn: anyone without header actions still gets the top-bar ⋯ with Visit site only; a Draft’s menu has no Edit site — Finish setup already opens that page. Page fingerprint (§26): same states as desktop; rows stack, Accept is full width.</div>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · each row opens Incident detail for that incident — the sample screen shows INC-0142. Top-bar ⋯ (44 px, between the title and the avatar): Visit site for everyone; Admins also get Edit site (editable on phones, D-044). Opening it moves focus to the first item; a tap outside closes it. Not drawn: anyone without header actions still gets the top-bar ⋯ with Visit site only; a Draft’s menu has no Edit site — Finish setup already opens that page. Page fingerprint (§26): same states as desktop; rows stack, Accept is full width. Check log: Time · Loc · Outcome · Response (HTTP and TTFB stay on desktop); same marks as desktop; no hover on phones, so a key under the rows explains each mark that appears in the list.</div>
 </sc-if>
 
 <div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden; flex-shrink: 0">
@@ -149,6 +155,30 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <div style="min-height: 44px; box-sizing: border-box; padding: 6px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px">
 <span style="flex-grow: 1; color: var(--aura-fg-secondary)">6 monitors pass · SSL 73 d · domain 211 d</span>
 <x-import component-from-global-scope="Aura.Badge" tone="success">6/6</x-import>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px"><span style="font-size: 15px; font-weight: 600">Check log</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Home page · last 24 h</span></div>
+<div class="pc-ctl" style="padding: 6px 8px"><x-import component-from-global-scope="Aura.Select" label="Check log state (board only)" options="{{logOpts}}" value="{{logView}}" on-change="{{setLogSel}}"></x-import></div>
+<sc-if value="{{logT2}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Sample rows from a Tier 2 site (every 3 min) — this board is the template.</span></sc-if>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{logRows}}" as="r" hint-placeholder-count="6">
+<div class="ck-row">
+<span class="ck-time"><span style="font-family: var(--font-mono); font-size: 12px">{{r.at}}</span><sc-if value="{{r.marked}}" hint-placeholder-val="{{false}}"><span class="ck-mark" role="img" aria-label="{{r.kindName}}"><sc-if value="{{r.confirm}}" hint-placeholder-val="{{false}}"><span class="ck-chip">Confirm</span></sc-if><sc-if value="{{r.recheck}}" hint-placeholder-val="{{false}}"><span class="ck-re"><x-import component-from-global-scope="Aura.Icon" name="rotate-ccw" size="sm"></x-import><sc-if value="{{r.reWord}}" hint-placeholder-val="{{true}}">Recheck</sc-if></span></sc-if></span></sc-if></span>
+<span style="font-family: var(--font-mono); font-size: 12px">{{r.loc}}</span>
+<span style="display: flex"><x-import component-from-global-scope="Aura.StatusPill" tone="{{r.tone}}">{{r.outcome}}</x-import></span>
+<span style="text-align: right; font-variant-numeric: tabular-nums; color: var(--aura-fg-secondary)">{{r.resp}}</span>
+</div>
+</sc-for>
+<sc-if value="{{logHasKey}}" hint-placeholder-val="{{false}}">
+<div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--aura-bg-canvas); border-bottom: 1px solid var(--aura-border-subtle)">
+<sc-for list="{{logKey}}" as="k" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span class="ck-mark" aria-hidden="true"><sc-if value="{{k.confirm}}" hint-placeholder-val="{{false}}"><span class="ck-chip">Confirm</span></sc-if><sc-if value="{{k.recheck}}" hint-placeholder-val="{{false}}"><span class="ck-re"><x-import component-from-global-scope="Aura.Icon" name="rotate-ccw" size="sm"></x-import><sc-if value="{{k.reWord}}" hint-placeholder-val="{{true}}">Recheck</sc-if></span></sc-if></span><span>{{k.text}}</span></div>
+</sc-for>
+</div>
+</sc-if>
+<div style="min-height: 44px; box-sizing: border-box; padding: 6px 14px; display: flex; align-items: center; font-size: 12px; color: var(--aura-fg-secondary)">{{logFoot}}</div>
 </div>
 </div>
 
@@ -235,7 +265,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { range: '30 d', role: 'owner', menu: false, fp: 'Matches', fpOpen: false, unch: {}, dlg: '', reason: '', busy: false, toast: null, accepted: false, acceptReason: '' };
+    this.state = { logView: 'Quiet hour', range: '30 d', role: 'owner', menu: false, fp: 'Matches', fpOpen: false, unch: {}, dlg: '', reason: '', busy: false, toast: null, accepted: false, acceptReason: '' };
   }
   line(seed, base, spread) {
     var v = seed, d = [];
@@ -256,6 +286,28 @@ class Component extends DCLogic {
       '30 d': { uptime: '99.97%', p50: '398', incidents: '2', list: [I131, I118], more: '' },
       '90 d': { uptime: '99.99%', p50: '410', incidents: '4', list: [I131, I118], more: '+ 2 in August: booking page slow 18 Aug (14 min), SSL early warning 11 Aug' }
     };
+
+    function CK(at, loc, attempt, confirm, ok, ms, err) {
+      var re = attempt === 2, marked = re || confirm;
+      return { at: at, loc: loc, outcome: ok ? 'Pass' : 'Fail', tone: ok ? 'ready' : 'blocked', resp: err ? err : ms + ' ms',
+        marked: marked, confirm: confirm, recheck: re, reWord: re && !confirm,
+        kindName: confirm && re ? 'Confirm check, recheck' : confirm ? 'Confirm check' : (re ? 'Recheck' : '') };
+    }
+    var T2_42 = [CK('06:42:31', 'BKK', 2, false, false, '', 'Timeout'), CK('06:42:31', 'TYO', 2, false, false, '', 'Timeout'), CK('06:42:02', 'SIN', 1, false, true, '412'), CK('06:42:01', 'BKK', 1, false, false, '', 'Timeout'), CK('06:42:01', 'TYO', 1, false, false, '', 'Timeout')];
+    var LOGS = {
+      'Quiet hour': { foot: 'Latest 6 of 1,830 checks today', rows: [CK('10:07:10', 'BKK', 1, false, true, '212'), CK('10:07:04', 'SIN', 1, false, true, '388'), CK('10:07:02', 'TYO', 1, false, true, '301'), CK('10:06:10', 'BKK', 1, false, true, '220'), CK('10:06:05', 'SIN', 1, false, true, '395'), CK('10:06:02', 'TYO', 1, false, true, '296')] },
+      'Tier 1 blip': { foot: 'Latest 7 of 1,831 checks today', rows: [CK('10:07:10', 'BKK', 1, false, true, '212'), CK('10:07:04', 'SIN', 1, false, true, '388'), CK('10:07:02', 'TYO', 1, false, true, '301'), CK('10:06:31', 'SIN', 2, false, true, '402'), CK('10:06:10', 'BKK', 1, false, true, '220'), CK('10:06:05', 'SIN', 1, false, false, '842'), CK('10:06:02', 'TYO', 1, false, true, '296')] },
+      'Tier 2 · DOWN': { foot: 'Latest 10 of 412 checks today', t2: true, rows: [CK('06:43:31', 'BKK', 2, true, false, '', 'Timeout'), CK('06:43:31', 'TYO', 2, true, false, '', 'Timeout'), CK('06:43:02', 'SIN', 1, true, true, '398'), CK('06:43:01', 'BKK', 1, true, false, '', 'Timeout'), CK('06:43:01', 'TYO', 1, true, false, '', 'Timeout')].concat(T2_42) },
+      'Tier 2 · cleared': { foot: 'Latest 8 of 410 checks today', t2: true, rows: [CK('06:43:03', 'TYO', 1, true, true, '322'), CK('06:43:02', 'SIN', 1, true, true, '405'), CK('06:43:01', 'BKK', 1, true, true, '236')].concat(T2_42) }
+    };
+    var LG = LOGS[this.state.logView] || LOGS['Quiet hour'];
+    var KEYS = [
+      { id: 're', confirm: false, recheck: true, reWord: true, text: 'Recheck — a failed check, checked again about 30 s after its round started' },
+      { id: 'c', confirm: true, recheck: false, reWord: false, text: 'Confirm check — run a minute after a round that timed out at 2 locations' },
+      { id: 'cre', confirm: true, recheck: true, reWord: false, text: 'Recheck of a confirm check — the confirm check failed, so it was checked again about 30 s after it started' }
+    ];
+    var present = { re: LG.rows.some(function (r) { return r.recheck && !r.confirm; }), c: LG.rows.some(function (r) { return r.confirm && !r.recheck; }), cre: LG.rows.some(function (r) { return r.confirm && r.recheck; }) };
+    var logKey = KEYS.filter(function (k) { return present[k.id]; });
     var STAT = R[this.state.range];
     var admin = this.state.role === 'admin', menuOpen = !!this.state.menu;
     var st = this.state, ADMIN = admin, ME = admin ? 'Tao' : 'Arm', SITE = 'Bangkok Airways – Taiwan';
@@ -394,6 +446,9 @@ class Component extends DCLogic {
     }
     return Object.assign(fpVals, {
       yes: true,
+      logRows: LG.rows, logFoot: LG.foot, logT2: !!LG.t2, logKey: logKey, logHasKey: logKey.length > 0,
+      logView: this.state.logView, logOpts: Object.keys(LOGS).map(function (v) { return { value: v, label: v }; }),
+      setLogSel: function (e) { self.setState({ logView: e && e.target ? e.target.value : e }); },
       views: ['Closed', 'Owner menu', 'Admin menu'], view: menuOpen ? (admin ? 'Admin menu' : 'Owner menu') : 'Closed',
       setView: function (v) { self.setState(v === 'Closed' ? { menu: false } : { role: v === 'Admin menu' ? 'admin' : 'owner', menu: true }); },
       admin: admin, me: admin ? 'Tao' : 'Arm',

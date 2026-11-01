@@ -158,6 +158,10 @@ export interface CheckLogRow {
   id: string;
   checkedAt: string;
   location: string;
+  /** 1 = the round's own check or a confirm check, 2 = a recheck (spec §29). */
+  attempt: 1 | 2;
+  /** A D-051 confirm check or its recheck. */
+  confirm: boolean;
   outcome: 'pass' | 'fail' | 'blocked';
   statusCode: number | null;
   responseMs: number | null;

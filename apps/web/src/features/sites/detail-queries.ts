@@ -300,10 +300,14 @@ export async function loadSiteDetail(
     primary
       ? supabase
           .from('check_results')
-          .select('id, location, outcome, status_code, response_ms, ttfb_ms, error, checked_at')
+          .select(
+            'id, location, attempt, confirm, outcome, status_code, response_ms, ttfb_ms, error, checked_at',
+          )
           .eq('monitor_id', primary.id)
           .gt('checked_at', new Date(now.getTime() - DAY_MS).toISOString())
           .order('checked_at', { ascending: false })
+          // spec §29.5: rows with the same time read BKK, SIN, TYO
+          .order('location')
           .limit(LOG_ROWS)
       : Promise.resolve({ data: [], error: null }),
     primary
@@ -479,6 +483,8 @@ export async function loadSiteDetail(
       id: c.id,
       checkedAt: c.checked_at,
       location: c.location,
+      attempt: c.attempt === 2 ? 2 : 1,
+      confirm: c.confirm === true,
       outcome: c.outcome,
       statusCode: c.status_code,
       responseMs: c.response_ms,
