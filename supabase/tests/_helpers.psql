@@ -8,7 +8,10 @@ grant usage on schema tests to anon, authenticated;
 
 -- Tests insert check_results at fixed dates (Sep–Oct 2026, the spec's sample timelines); a fresh
 -- database only has partitions from its own month on, so on 1 Nov 2026 those inserts found none
--- (main's `db` job). Make the months they use; later months the migrations already made.
+-- (main's `db` job). Make the months they use, and this month's run as the nightly job would (a local
+-- stack that skipped the night after a month changed lacks the newest one). Today's run first: it drops
+-- months over 90 days old, which the fixed dates will be from Feb 2027 on.
+select private.manage_check_results_partitions();
 select private.manage_check_results_partitions('2026-09-01');
 
 -- An auth user; with a role it is allowlisted first, so the sign-up trigger creates the profile.
