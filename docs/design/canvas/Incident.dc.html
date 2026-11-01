@@ -15,6 +15,7 @@
 <style>
 body{margin:0;background:#fafafa}
 a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+.ck-re svg{width:12px;height:12px}
 </style>
 </helmet>
 <div style="width: 1440px; height: 1730px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
@@ -103,7 +104,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <div class="aura-table__gutter"></div>
 <div class="aura-table__th" style="width: 150px">Location</div>
 <div class="aura-table__th" style="flex: 1 1 0; min-width: 0">First check · 09:48:12</div>
-<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Recheck · 09:48:41</div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px"><span class="ck-re" style="display: inline-flex"><x-import component-from-global-scope="Aura.Icon" name="rotate-ccw" size="sm"></x-import></span>Recheck · 09:48:41</div>
 <div class="aura-table__th" style="flex: 1 1 0; min-width: 0">{{latestLabel}}</div>
 <div class="aura-table__gutter aura-table__gutter--end"></div>
 </div>

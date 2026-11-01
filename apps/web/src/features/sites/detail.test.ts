@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   axisLabels,
   chartLines,
+  CHECK_KIND_WORDS,
+  checkKind,
   clientWord,
   incidentsCaption,
   intervalLabel,
   rangeOf,
   rangeStats,
   responseHoursLabel,
+  responseWord,
   severityLine,
+  sortLogRows,
   weightedMedian,
   type IncidentSummaryRow,
   type SeriesRow,
@@ -104,6 +108,43 @@ describe('labels (SiteDetail header, spec §7)', () => {
     expect(responseHoursLabel(2)).toBe('Mon–Fri 09:00–18:00');
     expect(intervalLabel(1)).toBe('Every 1 min');
     expect(intervalLabel(3)).toBe('Every 5 min');
+  });
+});
+
+describe('Check log marks (spec §29)', () => {
+  it.each([
+    [1, false, 'scheduled'],
+    [2, false, 'recheck'],
+    [1, true, 'confirm'],
+    [2, true, 'confirm_recheck'],
+  ] as const)('attempt %i, confirm %s → %s', (attempt, confirm, kind) => {
+    expect(checkKind({ attempt, confirm })).toBe(kind);
+  });
+
+  it('names each mark as the spec does', () => {
+    expect(CHECK_KIND_WORDS.recheck.name).toBe('Recheck');
+    expect(CHECK_KIND_WORDS.confirm.text).toBe(
+      'Confirm check — run a minute after a round that timed out at 2 locations',
+    );
+    expect(CHECK_KIND_WORDS.confirm_recheck.name).toBe('Confirm check, recheck');
+  });
+
+  it('newest second first; the same second reads BKK, SIN, TYO whatever the milliseconds', () => {
+    const rows = [
+      { checkedAt: '2026-10-16T06:43:31.900Z', location: 'TYO' },
+      { checkedAt: '2026-10-16T06:43:31.100Z', location: 'BKK' },
+      { checkedAt: '2026-10-16T06:43:02.000Z', location: 'SIN' },
+      { checkedAt: '2026-10-16T06:43:31.500Z', location: 'SIN' },
+    ];
+    expect(sortLogRows(rows).map((r) => r.location)).toEqual(['BKK', 'SIN', 'TYO', 'SIN']);
+  });
+
+  it.each([
+    [{ responseMs: 412, error: null }, '412 ms'],
+    [{ responseMs: null, error: 'Timeout' }, 'Timeout'],
+    [{ responseMs: null, error: 'ECONNREFUSED' }, '—'],
+  ])('Response cell %o → %s', (c, word) => {
+    expect(responseWord(c)).toBe(word);
   });
 });
 

@@ -41,9 +41,22 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 .pc-after li{overflow-wrap:anywhere}
 .pc-ctl{display:flex;align-items:center;gap:10px;padding:4px 4px 4px 12px;border:1px dashed var(--aura-border-control);border-radius:var(--aura-radius-md);background:var(--aura-bg-canvas);font-size:11px;color:var(--aura-fg-secondary)}
 .pc-ctl>span{font-family:var(--font-mono);flex-shrink:0}
+.ck-mark{display:inline-flex;align-items:center;gap:3px;height:16px;font-family:var(--font-sans);font-size:11px;font-weight:400;line-height:1;color:var(--aura-fg-secondary);border-radius:4px;white-space:nowrap}
+.ck-mark:focus-visible{outline:2px solid var(--aura-focus-ring, currentColor);outline-offset:2px}
+.ck-chip{display:inline-flex;align-items:center;height:16px;padding:0 5px;box-sizing:border-box;border:1px solid var(--aura-border-strong);border-radius:9999px;color:var(--aura-fg-primary);font-weight:500}
+.ck-re{display:inline-flex;align-items:center;gap:3px}
+.ck-re svg{width:12px;height:12px}
+.ck-wrap{position:relative;display:inline-flex}
+.ck-mark{cursor:default}
+.ck-wrap .ck-tip{position:absolute;top:calc(100% + 6px);left:0;width:max-content;max-width:280px;white-space:normal;display:none;font-weight:400}
+.ck-wrap:hover .ck-tip,.ck-wrap:focus-within .ck-tip{display:block}
+.aura-table__td.ck-time{overflow:visible}
+.ck-time{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:3px;line-height:1.2}
+.ck-ctl{display:flex;align-items:center;gap:10px;padding:4px 4px 4px 12px;border:1px dashed var(--aura-border-control);border-radius:var(--aura-radius-md);background:var(--aura-bg-canvas);font-size:11px;color:var(--aura-fg-secondary)}
+.ck-ctl>span{font-family:var(--font-mono);flex-shrink:0}
 </style>
 </helmet>
-<div style="width: 1440px; height: 2720px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 3420px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -319,6 +332,8 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Check log</h2>
 <span style="font-size: 13px; color: var(--aura-fg-secondary)">Raw results kept 90 days</span>
 </div>
+<div class="ck-ctl"><span>CHECK LOG</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Check log state (board only)" options="{{logViews}}" value="{{logView}}" on-change="{{setLogView}}" size="sm"></x-import></div>
+<sc-if value="{{logT2}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">Sample rows from a Tier 2 site (every 3 min) — this board is the template.</span></sc-if>
 <div class="aura-table">
 <div class="aura-table__head" style="text-transform: uppercase">
 <div class="aura-table__gutter"></div>
@@ -333,18 +348,18 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <sc-for list="{{logRows}}" as="r" hint-placeholder-count="4">
 <div class="aura-table__row">
 <div class="aura-table__gutter"></div>
-<div class="aura-table__td" style="width: 88px; font-family: var(--font-mono); font-size: 12px">{{r.at}}</div>
+<div class="aura-table__td ck-time" style="width: 88px"><span style="font-family: var(--font-mono); font-size: 12px">{{r.at}}</span><sc-if value="{{r.marked}}" hint-placeholder-val="{{false}}"><span class="ck-wrap"><span class="ck-mark" tabindex="0" role="img" aria-label="{{r.kindName}}" aria-describedby="{{r.tipId}}"><sc-if value="{{r.confirm}}" hint-placeholder-val="{{false}}"><span class="ck-chip">Confirm</span></sc-if><sc-if value="{{r.recheck}}" hint-placeholder-val="{{false}}"><span class="ck-re"><x-import component-from-global-scope="Aura.Icon" name="rotate-ccw" size="sm"></x-import><sc-if value="{{r.reWord}}" hint-placeholder-val="{{true}}">Recheck</sc-if></span></sc-if></span><span class="aura-tooltip ck-tip" role="tooltip" id="{{r.tipId}}">{{r.tip}}</span></span></sc-if></div>
 <div class="aura-table__td" style="width: 56px; font-family: var(--font-mono); font-size: 12px">{{r.loc}}</div>
-<div class="aura-table__td" style="width: 96px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.StatusPill" tone="ready">{{r.outcome}}</x-import></div>
+<div class="aura-table__td" style="width: 96px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.StatusPill" tone="{{r.tone}}">{{r.outcome}}</x-import></div>
 <div class="aura-table__td" style="width: 56px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{r.code}}</div>
-<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{r.ms}} ms</div>
-<div class="aura-table__td" style="width: 72px; text-align: right; padding-right: 0; font-variant-numeric: tabular-nums">{{r.ttfb}} ms</div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{r.resp}}</div>
+<div class="aura-table__td" style="width: 72px; text-align: right; padding-right: 0; font-variant-numeric: tabular-nums">{{r.ttfbT}}</div>
 <div class="aura-table__gutter aura-table__gutter--end"></div>
 </div>
 </sc-for>
 <div class="aura-table__row" style="font-size: 13px; color: var(--aura-fg-secondary)">
 <div class="aura-table__gutter"></div>
-<div class="aura-table__td" style="flex: 1 1 0; min-width: 0">Latest 4 of 1,830 checks today</div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0">{{logFoot}}</div>
 <div class="aura-table__td" style="width: 200px; display: flex; justify-content: flex-end; padding-right: 0"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="{{logIcon}}" on-click="{{doLog}}">{{logLabel}}</x-import></div>
 <div class="aura-table__gutter aura-table__gutter--end"></div>
 </div>
@@ -357,6 +372,14 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">⋯ More actions</b> (secondary, icon only, 44 × 44 px, aria-label “More actions for &lt;site&gt;”) sits last in the header, after Edit monitors. Same menu as the Sites row menu: <b style="color: var(--aura-fg-primary); font-weight: 600">Edit site</b> (pencil) → /sites/[siteId]/edit — name, URL, client, Tier, owner / backup, behind-WAF, Stop monitoring, Delete site (drafts only); <b style="color: var(--aura-fg-primary); font-weight: 600">Visit site</b> (external-link) → the site URL in a new tab. Mute and Schedule maintenance stay buttons and aren’t repeated. Opening it moves focus to the first item; Esc or a click outside closes it and Esc returns focus to ⋯.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Roles.</b> Admin: Edit site + Visit site. Everyone else, owner and backup included: Visit site only — Edit site and Edit monitors are Admin-only (Users › “Edit sites, monitors and escalation”), so the non-Admin header has no Edit monitors button (STATE › Menu · not Admin, signed in as Arm, the owner). Phone: MSite. Edit site isn’t drawn as its own board; the link goes to the Add site form as a stand-in.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Page fingerprint (§26).</b> Home page only — a key page has no card. FINGERPRINT switches the card: Recording (first 2 weeks per site, date computed) · Matches (one line, expandable) · Change waiting (held &lt; 3 fetches, no incident yet) · PROBLEM open (link to the incident) · No data (blocked by bot protection) · No fingerprint yet. Accept as new baseline is Admin only (STATE › Menu · not Admin shows the hint). The site stays Problem and the incident open until a fetch matches the new baseline. Recording’s date = the day the site’s baseline was first set (Thu 24 Sep) + 14 days. In PROBLEM open the Keyword monitor stays Clean: its forbidden list has none of these phrases — the fingerprint is what caught it.</span>
+</div>
+
+<div style="padding: 14px 18px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.55; color: var(--aura-fg-secondary); display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · CHECK LOG · WHAT KIND OF CHECK (31 OCT 2026)</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Where.</b> The mark sits on a second line inside the Time cell, under the time — no new column, every width unchanged (Time 88 · Loc 56 · Outcome 96 · HTTP 56 · Response flex · TTFB 72) and the row stays at density height. Rows newest first.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">When each mark shows.</b> Scheduled check (attempt 1, not confirm) — no mark; that is nearly every row, so the quiet hour looks as before. Recheck (attempt 2, not confirm) — ↻ icon + “Recheck”, plain text. Confirm check (attempt 1, confirm) — an outlined “Confirm” chip. Recheck of a confirm check (attempt 2, confirm) — the “Confirm” chip followed by the ↻ icon (one combined mark). The shape tells them apart (plain word vs outlined chip), never colour: all marks are neutral grey, no accent.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Hover / focus</b> (AURA Tooltip, below the mark; the mark is focusable and the tooltip is its description). Recheck: “Recheck — a failed check, checked again about 30 s after its round started”. Confirm: “Confirm check — run a minute after a round that timed out at 2 locations”. Confirm + ↻: “Recheck of a confirm check — the confirm check failed, so it was checked again about 30 s after it started”. Accessible names: “Recheck”, “Confirm check”, “Confirm check, recheck”.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Outcome and values.</b> Pass = StatusPill ready, Fail = StatusPill blocked (meaning unchanged). A timeout shows HTTP “—”, Response “Timeout”, TTFB “—”. Footer stays “Latest N of M checks today” + Download. Phones (MSite): same marks; no hover, so a key under the rows explains each mark that appears in the list. Incident: the Evidence table’s Recheck column carries the same ↻ mark. The CSV export already flags confirm checks.</span>
 </div>
 
 </main>
@@ -383,11 +406,11 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2720}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3420}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { range: '24 h', exp: false, log: false, role: 'admin', menu: false, fp: 'Matches', fpOpen: false, unch: {}, dlg: '', reason: '', busy: false, toast: null, accepted: false, acceptReason: '' };
+    this.state = { logView: 'Quiet hour', range: '24 h', exp: false, log: false, role: 'admin', menu: false, fp: 'Matches', fpOpen: false, unch: {}, dlg: '', reason: '', busy: false, toast: null, accepted: false, acceptReason: '' };
   }
   line(seed, base, spread) {
     var v = seed;
@@ -410,6 +433,41 @@ class Component extends DCLogic {
       '30 d': { upLabel: 'Uptime · 30 d', uptime: '99.97%', p50: '398', p95: '740', incidents: '2', incCaption: '1 DOWN 11 min · 1 PROBLEM 6 min · MTTR 11 min (DOWN only · median)', ax: { a: '26 Aug', b: '2 Sep', c: '9 Sep', d: '16 Sep' }, words: 'the last 30 days (daily median)', k: 7 },
       '90 d': { upLabel: 'Uptime · 90 d', uptime: '99.99%', p50: '410', p95: '760', incidents: '4', incCaption: '1 DOWN · 3 PROBLEM · MTTR 11 min (DOWN only · median)', ax: { a: '27 Jun', b: '20 Jul', c: '12 Aug', d: '4 Sep' }, words: 'the last 90 days (daily median)', k: 13 }
     };
+
+    // ---- Check log rows (sample, made up). attempt 1 = scheduled or confirm, 2 = recheck; confirm = confirm check or its recheck
+    function CK(at, loc, attempt, confirm, ok, code, ms, ttfb, err) {
+      var re = attempt === 2, marked = re || confirm;
+      var name = confirm && re ? 'Confirm check, recheck' : confirm ? 'Confirm check' : 'Recheck';
+      var tip = confirm && re ? 'Recheck of a confirm check — the confirm check failed, so it was checked again about 30 s after it started'
+        : confirm ? 'Confirm check — run a minute after a round that timed out at 2 locations'
+        : 'Recheck — a failed check, checked again about 30 s after its round started';
+      return { at: at, loc: loc, outcome: ok ? 'Pass' : 'Fail', tone: ok ? 'ready' : 'blocked', code: code || '—',
+        resp: err ? err : ms + ' ms', ttfbT: ttfb ? ttfb + ' ms' : '—',
+        tipId: 'ck-' + at.replace(/:/g, '') + '-' + loc, marked: marked, confirm: confirm, recheck: re, reWord: re && !confirm, kindName: marked ? name : '', tip: marked ? tip : '' };
+    }
+    var T2_42 = [
+      CK('06:42:31', 'BKK', 2, false, false, '', '', '', 'Timeout'),
+      CK('06:42:31', 'TYO', 2, false, false, '', '', '', 'Timeout'),
+      CK('06:42:02', 'SIN', 1, false, true, '200', '412', '188'),
+      CK('06:42:01', 'BKK', 1, false, false, '', '', '', 'Timeout'),
+      CK('06:42:01', 'TYO', 1, false, false, '', '', '', 'Timeout')
+    ];
+    var LOGS = {
+      'Quiet hour': { foot: 'Latest 6 of 1,830 checks today', rows: [
+        CK('10:07:10', 'BKK', 1, false, true, '200', '212', '96'), CK('10:07:04', 'SIN', 1, false, true, '200', '388', '171'), CK('10:07:02', 'TYO', 1, false, true, '200', '301', '140'),
+        CK('10:06:10', 'BKK', 1, false, true, '200', '220', '101'), CK('10:06:05', 'SIN', 1, false, true, '200', '395', '168'), CK('10:06:02', 'TYO', 1, false, true, '200', '296', '137')] },
+      'Tier 1 blip': { foot: 'Latest 7 of 1,831 checks today', rows: [
+        CK('10:07:10', 'BKK', 1, false, true, '200', '212', '96'), CK('10:07:04', 'SIN', 1, false, true, '200', '388', '171'), CK('10:07:02', 'TYO', 1, false, true, '200', '301', '140'),
+        CK('10:06:31', 'SIN', 2, false, true, '200', '402', '175'),
+        CK('10:06:10', 'BKK', 1, false, true, '200', '220', '101'), CK('10:06:05', 'SIN', 1, false, false, '503', '842', '830'), CK('10:06:02', 'TYO', 1, false, true, '200', '296', '137')] },
+      'Tier 2 · DOWN': { foot: 'Latest 10 of 412 checks today', t2: true, rows: [
+        CK('06:43:31', 'BKK', 2, true, false, '', '', '', 'Timeout'), CK('06:43:31', 'TYO', 2, true, false, '', '', '', 'Timeout'),
+        CK('06:43:02', 'SIN', 1, true, true, '200', '398', '181'),
+        CK('06:43:01', 'BKK', 1, true, false, '', '', '', 'Timeout'), CK('06:43:01', 'TYO', 1, true, false, '', '', '', 'Timeout')].concat(T2_42) },
+      'Tier 2 · cleared': { foot: 'Latest 8 of 410 checks today', t2: true, rows: [
+        CK('06:43:03', 'TYO', 1, true, true, '200', '322', '149'), CK('06:43:02', 'SIN', 1, true, true, '200', '405', '183'), CK('06:43:01', 'BKK', 1, true, true, '200', '236', '104')].concat(T2_42) }
+    };
+    var LG = LOGS[this.state.logView] || LOGS['Quiet hour'];
     var cur = R[this.state.range] || R['24 h'];
     var admin = this.state.role === 'admin';
     var st = this.state, ADMIN = admin, ME = admin ? 'Tao' : 'Arm', SITE = 'Bangkok Airways – Taiwan';
@@ -587,12 +645,8 @@ class Component extends DCLogic {
         { href: 'Incident.dc.html', id: 'INC-0097', started: '18 Aug 10:05', dur: '14 min', trigger: 'Slow · booking page', sev: 'Problem · Degraded', state: 'Resolved', tone: 'success', variant: 'outline', icon: 'circle-check' },
         { href: 'Incident.dc.html', id: 'INC-0090', started: '11 Aug 09:00', dur: '1 d', trigger: 'SSL expiring', sev: 'Problem · internal only', state: 'Resolved', tone: 'success', variant: 'outline', icon: 'circle-check' }
       ]),
-      logRows: [
-        { id: 1, at: '10:07:10', loc: 'BKK', outcome: 'Pass', code: '200', ms: '212', ttfb: '96' },
-        { id: 2, at: '10:07:04', loc: 'SIN', outcome: 'Pass', code: '200', ms: '388', ttfb: '171' },
-        { id: 3, at: '10:07:02', loc: 'TYO', outcome: 'Pass', code: '200', ms: '301', ttfb: '140' },
-        { id: 4, at: '10:06:10', loc: 'BKK', outcome: 'Pass', code: '200', ms: '220', ttfb: '101' }
-      ],
+      logRows: LG.rows, logFoot: LG.foot, logT2: !!LG.t2,
+      logViews: Object.keys(LOGS), logView: this.state.logView, setLogView: function (v) { self.setState({ logView: v }); },
       nav: [
         { items: [
           { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },

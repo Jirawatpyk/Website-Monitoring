@@ -29,6 +29,7 @@ import {
   incidentsCaption,
   rangeStats,
   SITE_RANGES,
+  sortLogRows,
   type SeriesRow,
   type SiteRange,
 } from './detail';
@@ -47,8 +48,8 @@ type Client = Awaited<ReturnType<typeof createClient>>;
 type DbClient = Client | ServiceDbClient;
 
 const HISTORY_DAYS = 90;
-/** Two full rounds of the three locations. */
-const LOG_ROWS = 6;
+/** Ten rows, so a Tier 2–3 timeout round and its confirm checks fit in one view (spec §29.6). */
+const LOG_ROWS = 10;
 /** Incidents read for a page (the history shows 90 days; Export has every row). */
 const INCIDENT_ROWS = 200;
 const DAY_MS = 86_400_000;
@@ -300,7 +301,9 @@ export async function loadSiteDetail(
     primary
       ? supabase
           .from('check_results')
-          .select('id, location, outcome, status_code, response_ms, ttfb_ms, error, checked_at')
+          .select(
+            'id, location, attempt, confirm, outcome, status_code, response_ms, ttfb_ms, error, checked_at',
+          )
           .eq('monitor_id', primary.id)
           .gt('checked_at', new Date(now.getTime() - DAY_MS).toISOString())
           .order('checked_at', { ascending: false })
@@ -475,16 +478,20 @@ export async function loadSiteDetail(
     historyMttr: mttrMinutes(
       history.map((h) => ({ severity: h.severity, startedAt: new Date(h.startedAt), minutes: h.minutes })),
     ),
-    log: log.data.map((c): CheckLogRow => ({
-      id: c.id,
-      checkedAt: c.checked_at,
-      location: c.location,
-      outcome: c.outcome,
-      statusCode: c.status_code,
-      responseMs: c.response_ms,
-      ttfbMs: c.ttfb_ms,
-      error: c.error,
-    })),
+    log: sortLogRows(
+      log.data.map((c): CheckLogRow => ({
+        id: c.id,
+        checkedAt: c.checked_at,
+        location: c.location,
+        attempt: c.attempt === 2 ? 2 : 1,
+        confirm: c.confirm === true,
+        outcome: c.outcome,
+        statusCode: c.status_code,
+        responseMs: c.response_ms,
+        ttfbMs: c.ttfb_ms,
+        error: c.error,
+      })),
+    ),
     checksToday: today.count ?? 0,
   };
 }

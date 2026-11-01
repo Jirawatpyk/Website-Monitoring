@@ -225,7 +225,13 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
           <Tr>
             <Th>Location</Th>
             <Th>{`First check · ${formatTimeWithSeconds(new Date(d.startedAt))}`}</Th>
-            <Th>{`Recheck · ${formatTimeWithSeconds(new Date(d.detectedAt))}`}</Th>
+            <Th>
+              {/* spec §29.7: the Check log's ↻ recheck mark */}
+              <span className="inline-flex items-center gap-1">
+                <IconRotateCcw size={12} aria-hidden />
+                {`Recheck · ${formatTimeWithSeconds(new Date(d.detectedAt))}`}
+              </span>
+            </Th>
             <Th>
               {latestRoundAt(d) ? `Latest · ${formatTimeWithSeconds(new Date(latestRoundAt(d)!))}` : 'Latest'}
             </Th>

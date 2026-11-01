@@ -1,6 +1,6 @@
 # DxT Monitor — Design spec for developer handoff
 
-Version: 30 Oct 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
+Version: 31 Oct 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
 Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (53 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
 
 ## 0. How to use this spec
@@ -19,11 +19,11 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | MOverview4 | Mobile — Overview · **S06, build this** | 390×844 | Web app — desktop 1440 + mobile 390 |
 | Main | Overview dashboard (pre-S06 reference — superseded by Main3, §21) | 1440×1840 | Web app — desktop 1440 + mobile 390 |
 | Sites | Sites list | 1440×2588 | Web app — desktop 1440 + mobile 390 |
-| SiteDetail | Site detail — Bangkok Airways – Taiwan · Page fingerprint card (§26) | 1440×2720 | Web app — desktop 1440 + mobile 390 |
-| Incident | Incident — INC-0142 MuvMi DOWN · OPENED shows who was paged outside response hours (§28.6) | 1440×1730 | Web app — desktop 1440 + mobile 390 |
+| SiteDetail | Site detail — Bangkok Airways – Taiwan · Page fingerprint card (§26) · CHECK LOG marks (§29) | 1440×3420 | Web app — desktop 1440 + mobile 390 |
+| Incident | Incident — INC-0142 MuvMi DOWN · OPENED shows who was paged outside response hours (§28.6) · ↻ on the Recheck column (§29) | 1440×1730 | Web app — desktop 1440 + mobile 390 |
 | MOverview | Mobile — Overview (pre-S06 reference — superseded by MOverview4, §21) | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MSites | Mobile — Sites | 390×844 | Web app — desktop 1440 + mobile 390 |
-| MSite | Mobile — Site detail | 390×844 | Web app — desktop 1440 + mobile 390 |
+| MSite | Mobile — Site detail · Check log with marks + key (§29) | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MIncident | Mobile — Incident detail | 390×844 | Web app — desktop 1440 + mobile 390 |
 | StatusModel | Status model & verification logic | 1440×4680 | Status logic · Mobile ack · Alert channel |
 | MobileAck | Mobile — acknowledge from alert | 390×844 | Status logic · Mobile ack · Alert channel |
@@ -415,3 +415,18 @@ Decision D-048 (as §27). Boards: **MOnCall** (BOARD STATE lists every case belo
 7. **Edit rotation on a phone** isn’t drawn (not in scope); the phone’s Edit rotation buttons open the same editor (the boards link the OnCall board).
 8. Message text for Chat and email isn’t in this slice — Claude drafts it and message-checker reviews it (D-048 item 11). Sample people, times and reasons are made up — compute them; never copy.
 
+## 29. Check log — what kind of check each row is — added 31 Oct 2026
+Boards: **SiteDetail** (CHECK LOG Quiet hour · Tier 1 blip · Tier 2 · DOWN · Tier 2 · cleared) and **MSite** (same four, board-only select); **Incident** reuses the ↻ mark on its Recheck column. Sample rows are made up; the two Tier 2 states use this board as a template (a line under the switch says so).
+
+1. **Three kinds of check.** Scheduled — the round’s own check (Tier 1 every minute, Tier 2 every 3 min, Tier 3 every 5 min) from each location. Recheck — a failed check run again about 30 s after its round started. Confirm check (new, 31 Oct) — when a Tier 2–3 site times out at 2 locations, every location checks again at the next minute; a confirm check that fails gets its own recheck. Data: attempt (1 = scheduled or confirm, 2 = recheck) and confirm (true on a confirm check and its recheck).
+2. **Marks** (second line inside the Time cell, under the time; no new column, widths unchanged — Time 88 · Loc 56 · Outcome 96 · HTTP 56 · Response flex · TTFB 72; the row stays at density height 48 px):
+   - Scheduled (attempt 1, not confirm): **no mark** — the quiet hour looks as before.
+   - Recheck (attempt 2, not confirm): ↻ icon (rotate-ccw, 12 px) + the word “Recheck”, plain text, secondary colour.
+   - Confirm check (attempt 1, confirm): an outlined pill “Confirm” (1 px border-strong, 16 px high, 11 px text).
+   - Recheck of a confirm check (attempt 2, confirm): one combined mark — the “Confirm” pill followed by the ↻ icon.
+   Shape tells them apart (plain word vs outlined pill), never colour; all marks are neutral, never accent. Accessible names: “Recheck”, “Confirm check”, “Confirm check, recheck”.
+3. **Hover / focus (desktop).** The mark is focusable; an AURA Tooltip below it is its description (aria-describedby), shown on hover and focus, closed with Esc: Recheck — “Recheck — a failed check, checked again about 30 s after its round started”; Confirm — “Confirm check — run a minute after a round that timed out at 2 locations”; Confirm + ↻ — “Recheck of a confirm check — the confirm check failed, so it was checked again about 30 s after it started”. (The canvas draws the tooltip with the AURA tooltip style because the canvas runtime can’t pass a single child to Aura.Tooltip; build it with Aura.Tooltip.)
+4. **Phones (MSite).** Check log card after Latest round: Time (with the mark) · Loc · Outcome · Response; HTTP and TTFB stay on desktop (§22.2). No hover, so a key under the rows lists each mark that appears in the list with the same sentence as the tooltip; nothing is tappable, so no 44 px target is needed; rows are 44 px. Footer “Latest N of M checks today”.
+5. **Values.** Outcome: Pass = StatusPill ready, Fail = StatusPill blocked (meanings unchanged). A timeout shows HTTP “—”, Response “Timeout”, TTFB “—”. Rows newest first; rows with the same time sort BKK, SIN, TYO. Footer and its Download button unchanged in form (“Latest 6 of 1,830 checks today”). Board height 3420 (was 2720): the longest case, PROBLEM open fingerprint + Tier 2 · DOWN with every “unchanged” list expanded, now fits. The CSV export already flags confirm checks.
+6. **Sample states.** Quiet hour: six scheduled Pass rows. Tier 1 blip: SIN scheduled Fail 10:06:05 (HTTP 503) → its recheck Pass 10:06:31, no incident. Tier 2 · DOWN: 06:42:01 BKK and TYO time out (scheduled) and again at 06:42:31 (recheck), SIN passes 06:42:02; confirm checks at 06:43:01–02 — BKK and TYO fail and their rechecks at 06:43:31 fail → DOWN (2 of 3), SIN passes. Tier 2 · cleared: the same 06:42 rows, then three confirm checks that pass.
+7. **Incident.** The Evidence by location table already has a Recheck column; its header carries the same ↻ icon. MobileAck lists no checks, so it is unchanged.

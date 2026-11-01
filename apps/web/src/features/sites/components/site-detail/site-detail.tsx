@@ -45,7 +45,9 @@ import { LineChart, SeriesKey, type ChartSeries } from '@/components/charts/line
 import { SeverityBadge, WorkflowBadge } from '@/components/status-badges';
 import {
   axisLabels,
+  checkKind,
   intervalLabel,
+  responseWord,
   responseHoursLabel,
   severityLine,
   SITE_RANGES,
@@ -60,6 +62,7 @@ import {
   type SiteDetail,
 } from '../../types';
 import { GLYPHS, IncidentLink, MutedBadge, RowStatusBadge, TOUCH_HIT } from '../site-cells';
+import { CheckKey, CheckMark, CheckMarkStatic } from './check-mark';
 import { SiteMoreMenu } from './more-menu';
 import { phoneHeader } from '@/components/phone-header';
 import { RangeControl, RangeDependent, RangeProvider } from './range-control';
@@ -73,7 +76,7 @@ const COLORS: Record<string, ChartSeries['color']> = {
 };
 /** Rows the phone's "Incidents in range" shows before "+ N more". */
 const PHONE_INCIDENTS = 5;
-/** Rows Incident history shows — as many as the Check log beside it; Export has every one (the full list
+/** Rows Incident history shows beside the Check log; Export has every one (the full list
  * of the incidents is on the Incidents page, filtered by site). */
 const HISTORY_ROWS = 6;
 
@@ -332,6 +335,7 @@ export function SiteDetailView({
               <IncidentsInRange incidents={detail.rangeIncidents} now={now} />
               <LatestRound detail={detail} now={now} />
             </div>
+            <PhoneCheckLog detail={detail} now={now} />
 
             <MonitorsTable detail={detail} />
             {pageFingerprint}
@@ -679,6 +683,62 @@ function OutcomePill({ c }: { c: CheckLogRow }) {
   return <StatusPill tone="blocked">Fail</StatusPill>;
 }
 
+/** "10:07:10", or "10:07:10 · Thu 24 Sep" for a check before today (Bangkok). */
+function logTime(c: CheckLogRow, now: Date): string {
+  const at = new Date(c.checkedAt);
+  return `${formatTimeWithSeconds(at)}${isSameBangkokDay(at, now) ? '' : ` · ${formatDay(at)}`}`;
+}
+
+/**
+ * MSite's Check log card (spec §29.4): Time (with the mark) · Loc · Outcome · Response — HTTP and TTFB stay
+ * on desktop — and a key under the rows for each mark the list shows (no hover on phones).
+ */
+function PhoneCheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
+  return (
+    <section className="flex flex-col gap-2 md:hidden" aria-labelledby="checklog-phone">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 id="checklog-phone" className="m-0 text-base font-semibold">
+          Check log
+        </h2>
+        <span className="text-xs text-fg-secondary">Home page · last 24 h</span>
+      </div>
+      <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
+        {detail.log.length === 0 ? (
+          <p className="m-0 px-3.5 py-2.5 text-sm text-fg-secondary">No checks in the last 24 hours.</p>
+        ) : (
+          // One grid for the list, a subgrid per row: the columns line up from row to row, the spare
+          // width goes to Outcome as MSite draws it.
+          <ul
+            className="m-0 grid list-none grid-cols-[auto_auto_minmax(0,1fr)_auto] p-0"
+            aria-label="Latest checks of the home page"
+          >
+            {detail.log.map((c) => (
+              <li
+                key={c.id}
+                className="col-span-4 grid min-h-11 grid-cols-subgrid items-center gap-x-2 border-b border-border-subtle px-3.5 py-1 text-sm"
+              >
+                <span className="flex flex-col items-start gap-1 leading-tight">
+                  <span className="font-mono text-xs">{logTime(c, now)}</span>
+                  <CheckMarkStatic kind={checkKind(c)} />
+                </span>
+                <span className="font-mono text-xs">{c.location}</span>
+                <span className="flex">
+                  <OutcomePill c={c} />
+                </span>
+                <span className="text-right text-fg-secondary tabular-nums">{responseWord(c)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <CheckKey kinds={detail.log.map(checkKind)} />
+        <p className="m-0 flex min-h-11 items-center px-3.5 py-1.5 text-xs text-fg-secondary">
+          {`Latest ${detail.log.length} of ${formatCount(detail.checksToday)} checks today`}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function CheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
   return (
     <section className="flex min-w-0 flex-col gap-3" aria-labelledby="checklog">
@@ -691,12 +751,7 @@ function CheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
       {detail.log.length === 0 ? (
         <p className="m-0 text-sm text-fg-secondary">No checks in the last 24 hours.</p>
       ) : (
-        <Table
-          caption="Latest checks of the primary monitor"
-          captionHidden
-          rowHeight="density"
-          align="middle"
-        >
+        <Table caption="Latest checks of the home page" captionHidden rowHeight="density" align="middle">
           <THead>
             <Tr>
               <Th>Time</Th>
@@ -711,17 +766,18 @@ function CheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
             {detail.log.map((c) => (
               <Tr key={c.id}>
                 <Td mono>
-                  {formatTimeWithSeconds(new Date(c.checkedAt))}
-                  {isSameBangkokDay(new Date(c.checkedAt), now)
-                    ? ''
-                    : ` · ${formatDay(new Date(c.checkedAt))}`}
+                  {/* 12 + 4 + 16 px: a marked row stays at density height (spec §29.2) */}
+                  <span className="flex flex-col items-start gap-1 text-xs leading-none">
+                    <span>{logTime(c, now)}</span>
+                    <CheckMark kind={checkKind(c)} />
+                  </span>
                 </Td>
                 <Td mono>{c.location}</Td>
                 <Td>
                   <OutcomePill c={c} />
                 </Td>
                 <Td numeric>{c.statusCode ?? '—'}</Td>
-                <Td numeric>{c.responseMs === null ? '—' : `${c.responseMs} ms`}</Td>
+                <Td numeric>{responseWord(c)}</Td>
                 <Td numeric>{c.ttfbMs === null ? '—' : `${c.ttfbMs} ms`}</Td>
               </Tr>
             ))}

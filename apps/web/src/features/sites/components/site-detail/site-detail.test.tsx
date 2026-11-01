@@ -177,6 +177,8 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
               id: 'c1',
               checkedAt: '2026-09-25T03:07:00Z',
               location: 'SIN',
+              attempt: 1,
+              confirm: false,
               outcome: 'fail',
               statusCode: null,
               responseMs: 120,
@@ -187,6 +189,8 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
               id: 'c2',
               checkedAt: '2026-09-25T03:07:01Z',
               location: 'TYO',
+              attempt: 1,
+              confirm: false,
               outcome: 'fail',
               statusCode: 503,
               responseMs: 900,
@@ -201,9 +205,80 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
         nowIso={NOW}
       />,
     );
-    expect(screen.getByText('TLS chain')).toBeInTheDocument();
-    expect(screen.getByText('Fail')).toBeInTheDocument();
-    expect(screen.getByText('Latest 2 of 1,830 checks today')).toBeInTheDocument();
+    // Desktop table and the phone card (spec §29.4) each list them.
+    expect(screen.getAllByText('TLS chain')).toHaveLength(2);
+    expect(screen.getAllByText('Fail')).toHaveLength(2);
+    expect(screen.getAllByText('Latest 2 of 1,830 checks today')).toHaveLength(2);
+  });
+
+  it('marks rechecks and confirm checks; the round’s own checks carry none (spec §29)', () => {
+    const row = (id: string, attempt: 1 | 2, confirm: boolean, over: object = {}) => ({
+      id,
+      checkedAt: '2026-09-25T03:07:01Z',
+      location: 'BKK',
+      attempt,
+      confirm,
+      outcome: 'fail' as const,
+      statusCode: null,
+      responseMs: null,
+      ttfbMs: null,
+      error: 'Timeout',
+      ...over,
+    });
+    render(
+      <SiteDetailView
+        detail={detail({
+          log: [row('a', 2, true), row('b', 1, true), row('c', 2, false), row('d', 1, false)],
+        })}
+        range="24h"
+        role="admin"
+        meId="tao"
+        nowIso={NOW}
+      />,
+    );
+    // Desktop marks are focusable (tooltip); phone marks aren't. Each kind once per list.
+    for (const name of ['Recheck', 'Confirm check', 'Confirm check, recheck']) {
+      const marks = screen.getAllByRole('img', { name });
+      expect(marks).toHaveLength(2);
+      expect(marks.filter((m) => m.tabIndex === 0)).toHaveLength(1);
+    }
+    // A timeout's Response reads "Timeout"; the phone key explains each mark that appears.
+    expect(screen.getAllByText('Timeout').length).toBeGreaterThanOrEqual(4);
+    expect(
+      screen.getByText('Recheck — a failed check, checked again about 30 s after its round started'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Confirm check — run a minute after a round that timed out at 2 locations'),
+    ).toBeInTheDocument();
+  });
+
+  it('the phone key lists only the marks the list shows: none in a quiet hour', () => {
+    render(
+      <SiteDetailView
+        detail={detail({
+          log: [
+            {
+              id: 'q',
+              checkedAt: '2026-09-25T03:07:01Z',
+              location: 'BKK',
+              attempt: 1,
+              confirm: false,
+              outcome: 'pass',
+              statusCode: 200,
+              responseMs: 212,
+              ttfbMs: 90,
+              error: null,
+            },
+          ],
+        })}
+        range="24h"
+        role="admin"
+        meId="tao"
+        nowIso={NOW}
+      />,
+    );
+    expect(screen.queryByRole('img', { name: 'Recheck' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Recheck —/)).not.toBeInTheDocument();
   });
 
   it('phones list at most 5 incidents in range, then how many more', () => {
