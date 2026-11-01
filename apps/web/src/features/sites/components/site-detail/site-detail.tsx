@@ -732,7 +732,7 @@ function PhoneCheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
         )}
         <CheckKey kinds={detail.log.map(checkKind)} />
         <p className="m-0 flex min-h-11 items-center px-3.5 py-1.5 text-xs text-fg-secondary">
-          {`Latest ${detail.log.length} of ${formatCount(detail.checksToday)} checks today`}
+          {`Latest ${detail.log.length} of ${formatCount(detail.checksLast24h)} checks in the last 24 h`}
         </p>
       </div>
     </section>
@@ -785,7 +785,7 @@ function CheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
         </Table>
       )}
       <div className="mt-auto flex min-h-8 flex-wrap items-center justify-between gap-3 text-sm text-fg-secondary">
-        <span>{`Latest ${detail.log.length} of ${formatCount(detail.checksToday)} checks today`}</span>
+        <span>{`Latest ${detail.log.length} of ${formatCount(detail.checksLast24h)} checks in the last 24 h`}</span>
         {detail.checksToday > 0 && (
           <Button variant="ghost" size="sm" icon={<IconDownload />} href={`/sites/${detail.id}/checks.csv`}>
             Download today’s log
