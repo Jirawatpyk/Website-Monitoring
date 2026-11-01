@@ -43,6 +43,7 @@ The canvas's orange note listed 14 issues. As of AURA 5.10 these are fixed (and 
 2. Dialog initial focus lands on the close button — set focus to the first field or the title.
 3. SideNav item `badge` has no tone of its own — pass a `<Badge tone="danger">Fault</Badge>` element (documented in AURA); `count` stays neutral.
 4. Switch disabled + checked looks like off — for "always on" settings show Badge "Always on" instead (Security board does this).
+5. No Badge small enough for a mark inside a density table row (spec §29, the Check log's "Confirm" pill: 16 px high, weight 500): `Badge variant="outline"` is at least 20 px and weight 600, which pushes the row past 48 px. The pill is built from tokens in `features/sites/components/site-detail/check-mark.tsx` (as the board draws it). Requested as AURA Request 25 (`Badge size="xs"`, 1 Nov, low priority); swap the pill for it once shipped.
 
 Report new gaps to the AURA repo (github.com/Jirawatpyk/Aura-design); build project-specific components in `apps/web/src/components`, not in AURA.
 

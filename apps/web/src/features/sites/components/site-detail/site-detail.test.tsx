@@ -93,6 +93,7 @@ const detail = (over: Partial<SiteDetail> = {}): SiteDetail => ({
   rangeIncidents: [],
   log: [],
   checksToday: 1830,
+  checksLast24h: 4320,
   ...over,
 });
 
@@ -208,7 +209,7 @@ describe('SiteDetailView (SiteDetail / MSite boards)', () => {
     // Desktop table and the phone card (spec §29.4) each list them.
     expect(screen.getAllByText('TLS chain')).toHaveLength(2);
     expect(screen.getAllByText('Fail')).toHaveLength(2);
-    expect(screen.getAllByText('Latest 2 of 1,830 checks today')).toHaveLength(2);
+    expect(screen.getAllByText('Latest 2 of 4,320 checks in the last 24 h')).toHaveLength(2);
   });
 
   it('marks rechecks and confirm checks; the round’s own checks carry none (spec §29)', () => {

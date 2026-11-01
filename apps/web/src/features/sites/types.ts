@@ -210,5 +210,8 @@ export interface SiteDetail {
   rangeIncidents: DetailIncident[];
   historyMttr: number | null;
   log: CheckLogRow[];
+  /** The primary's checks since Bangkok midnight: today's CSV (Download shows when there are any). */
   checksToday: number;
+  /** The primary's checks in the log's own window, the last 24 h: the footer's "of N". */
+  checksLast24h: number;
 }

@@ -270,7 +270,7 @@ export async function loadSiteDetail(
   const primary = monitors.find((m) => m.is_primary);
   const ids = monitors.map((m) => m.id);
 
-  const [incidents, series, latest, log, today, downs, spans, counted] = await Promise.all([
+  const [incidents, series, latest, log, today, lastDay, downs, spans, counted] = await Promise.all([
     supabase
       .from('incidents')
       .select(
@@ -316,6 +316,15 @@ export async function loadSiteDetail(
           .eq('monitor_id', primary.id)
           .gte('checked_at', bangkokDayStart(now).toISOString())
       : Promise.resolve({ count: 0, error: null }),
+    // the log's own window: its footer counts what it is "the latest" of (just after midnight "today"
+    // has a handful while the log still shows yesterday evening)
+    primary
+      ? supabase
+          .from('check_results')
+          .select('id', { count: 'exact', head: true })
+          .eq('monitor_id', primary.id)
+          .gt('checked_at', new Date(now.getTime() - DAY_MS).toISOString())
+      : Promise.resolve({ count: 0, error: null }),
     // uptime counts every DOWN drop in the range, whatever the row cap above
     downEpisodesBySite(supabase, [s.id], from),
     maintenanceSpansBySite(supabase, [s.id], from),
@@ -333,6 +342,7 @@ export async function loadSiteDetail(
   if (latest.error) throw new Error(`check_results: ${latest.error.message}`);
   if (log.error) throw new Error(`check_results: ${log.error.message}`);
   if (today.error) throw new Error(`check_results: ${today.error.message}`);
+  if (lastDay.error) throw new Error(`check_results: ${lastDay.error.message}`);
 
   // Incidents, their drops and the uptime over the range (D-031: from monitoring start at the latest)
   const rows = incidents.data.map((i) => {
@@ -493,5 +503,6 @@ export async function loadSiteDetail(
       })),
     ),
     checksToday: today.count ?? 0,
+    checksLast24h: lastDay.count ?? 0,
   };
 }
