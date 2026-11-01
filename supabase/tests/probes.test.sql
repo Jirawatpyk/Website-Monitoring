@@ -27,8 +27,11 @@ select results_eq(
   $$values ('BKK'), ('SIN'), ('TYO')$$,
   'all three locations are active; Bangkok votes while its agent beats (D-019)'
 );
+-- (the helper also makes the fixed-date months the tests use, so count only these three)
 select is(
-  (select count(*)::int from pg_inherits where inhparent = 'public.check_results'::regclass),
+  (select count(*)::int from generate_series(0, 2) m
+   where to_regclass('private.check_results_'
+     || to_char(date_trunc('month', now() at time zone 'UTC') + make_interval(months => m), 'YYYY_MM')) is not null),
   3,
   'check_results has this month and the next two months as partitions'
 );
