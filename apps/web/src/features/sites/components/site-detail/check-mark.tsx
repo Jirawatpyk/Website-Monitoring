@@ -13,7 +13,7 @@ function Glyph({ kind }: { kind: Exclude<CheckKind, 'scheduled'> }) {
   const confirm = kind === 'confirm' || kind === 'confirm_recheck';
   const recheck = kind === 'recheck' || kind === 'confirm_recheck';
   return (
-    <span className="inline-flex h-4 items-center gap-1 text-xs leading-none text-fg-secondary">
+    <span className="inline-flex h-4 items-center gap-1 font-sans text-xs leading-none text-fg-secondary">
       {confirm && (
         <span className="inline-flex h-4 items-center rounded-full border border-border-strong px-1.5 font-medium text-fg-primary">
           Confirm
@@ -35,7 +35,12 @@ export function CheckMark({ kind }: { kind: CheckKind }) {
   const words = CHECK_KIND_WORDS[kind];
   return (
     <Tooltip content={words.text} side="bottom">
-      <span role="img" tabIndex={0} aria-label={words.name} className="inline-flex rounded-aura-sm">
+      <span
+        role="img"
+        tabIndex={0}
+        aria-label={words.name}
+        className="aura-focusable inline-flex rounded-aura-sm"
+      >
         <Glyph kind={kind} />
       </span>
     </Tooltip>

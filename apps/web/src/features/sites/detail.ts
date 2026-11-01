@@ -121,6 +121,15 @@ export const CHECK_KIND_WORDS: Record<Exclude<CheckKind, 'scheduled'>, { name: s
   },
 };
 
+/**
+ * Spec §29.5: newest first, and rows the log shows at the same second read BKK, SIN, TYO — the locations
+ * never stamp the same millisecond, so the database order alone puts them in arrival order.
+ */
+export function sortLogRows<T extends { checkedAt: string; location: string }>(rows: readonly T[]): T[] {
+  const second = (r: T) => Math.floor(Date.parse(r.checkedAt) / 1000);
+  return [...rows].sort((a, b) => second(b) - second(a) || a.location.localeCompare(b.location));
+}
+
 /** A check's Response cell (spec §29.5): its time, "Timeout" for a timeout, else a dash. */
 export function responseWord(c: { responseMs: number | null; error: string | null }): string {
   if (c.responseMs !== null) return `${c.responseMs} ms`;

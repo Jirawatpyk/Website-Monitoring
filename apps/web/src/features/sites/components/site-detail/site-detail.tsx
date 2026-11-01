@@ -76,7 +76,7 @@ const COLORS: Record<string, ChartSeries['color']> = {
 };
 /** Rows the phone's "Incidents in range" shows before "+ N more". */
 const PHONE_INCIDENTS = 5;
-/** Rows Incident history shows — as many as the Check log beside it; Export has every one (the full list
+/** Rows Incident history shows beside the Check log; Export has every one (the full list
  * of the incidents is on the Incidents page, filtered by site). */
 const HISTORY_ROWS = 6;
 
@@ -706,11 +706,16 @@ function PhoneCheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
         {detail.log.length === 0 ? (
           <p className="m-0 px-3.5 py-2.5 text-sm text-fg-secondary">No checks in the last 24 hours.</p>
         ) : (
-          <ul className="m-0 list-none p-0" aria-label="Latest checks of the home page">
+          // One grid for the list, a subgrid per row: the columns line up from row to row, the spare
+          // width goes to Outcome as MSite draws it.
+          <ul
+            className="m-0 grid list-none grid-cols-[auto_auto_minmax(0,1fr)_auto] p-0"
+            aria-label="Latest checks of the home page"
+          >
             {detail.log.map((c) => (
               <li
                 key={c.id}
-                className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 border-b border-border-subtle px-3.5 py-1 text-sm"
+                className="col-span-4 grid min-h-11 grid-cols-subgrid items-center gap-x-2 border-b border-border-subtle px-3.5 py-1 text-sm"
               >
                 <span className="flex flex-col items-start gap-1 leading-tight">
                   <span className="font-mono text-xs">{logTime(c, now)}</span>
@@ -746,12 +751,7 @@ function CheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
       {detail.log.length === 0 ? (
         <p className="m-0 text-sm text-fg-secondary">No checks in the last 24 hours.</p>
       ) : (
-        <Table
-          caption="Latest checks of the primary monitor"
-          captionHidden
-          rowHeight="density"
-          align="middle"
-        >
+        <Table caption="Latest checks of the home page" captionHidden rowHeight="density" align="middle">
           <THead>
             <Tr>
               <Th>Time</Th>
@@ -766,7 +766,8 @@ function CheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
             {detail.log.map((c) => (
               <Tr key={c.id}>
                 <Td mono>
-                  <span className="flex flex-col items-start gap-1">
+                  {/* 12 + 4 + 16 px: a marked row stays at density height (spec §29.2) */}
+                  <span className="flex flex-col items-start gap-1 text-xs leading-none">
                     <span>{logTime(c, now)}</span>
                     <CheckMark kind={checkKind(c)} />
                   </span>

@@ -12,6 +12,7 @@ import {
   responseHoursLabel,
   responseWord,
   severityLine,
+  sortLogRows,
   weightedMedian,
   type IncidentSummaryRow,
   type SeriesRow,
@@ -126,6 +127,16 @@ describe('Check log marks (spec §29)', () => {
       'Confirm check — run a minute after a round that timed out at 2 locations',
     );
     expect(CHECK_KIND_WORDS.confirm_recheck.name).toBe('Confirm check, recheck');
+  });
+
+  it('newest second first; the same second reads BKK, SIN, TYO whatever the milliseconds', () => {
+    const rows = [
+      { checkedAt: '2026-10-16T06:43:31.900Z', location: 'TYO' },
+      { checkedAt: '2026-10-16T06:43:31.100Z', location: 'BKK' },
+      { checkedAt: '2026-10-16T06:43:02.000Z', location: 'SIN' },
+      { checkedAt: '2026-10-16T06:43:31.500Z', location: 'SIN' },
+    ];
+    expect(sortLogRows(rows).map((r) => r.location)).toEqual(['BKK', 'SIN', 'TYO', 'SIN']);
   });
 
   it.each([
