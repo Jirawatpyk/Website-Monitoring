@@ -22,10 +22,23 @@ export const STAGING_URL = 'https://monitor-staging.dxtspace.com/';
 const VPS = process.env.DXT_VPS ?? 'root@38.60.233.62';
 const VPS_KEY = process.env.DXT_VPS_KEY ?? path.join(os.homedir(), '.ssh', 'dxt_vps');
 const HC_API = 'https://healthchecks.io/api/v3/checks/';
+// Windows' own OpenSSH refuses the key file's permissions; Git's ssh (what release.sh runs in Git Bash)
+// doesn't check them.
+const GIT_SSH = 'C:\\Program Files\\Git\\usr\\bin\\ssh.exe';
+const SSH = process.env.DXT_SSH ?? (process.platform === 'win32' && existsSync(GIT_SSH) ? GIT_SSH : 'ssh');
 
-/** Staging's Healthchecks checks: those whose name or tags say staging (production's never do). */
+/**
+ * A Healthchecks API key sees one project's checks only: the key in `.env.staging.local` must come from
+ * the project "DxT Monitor — staging" (its seven checks carry no "staging" in their names), so every
+ * check it lists is staging's. A check named for production is refused, in case the wrong key is pasted.
+ */
 export function stagingChecks(checks) {
-  return checks.filter((c) => /staging/i.test(`${c.name ?? ''} ${c.tags ?? ''}`));
+  const prod = checks.filter((c) => /prod/i.test(`${c.name ?? ''} ${c.tags ?? ''}`));
+  if (prod.length)
+    throw new Error(
+      `this key sees production checks (${prod.map((c) => c.name).join(', ')}) — use the staging project's key`,
+    );
+  return checks;
 }
 
 /** The steps in order, as `[kind, action]` — the order is the point (see the header). */
@@ -48,7 +61,9 @@ export function stepsFor(command) {
 
 function run(file, args) {
   // The Vercel CLI is a .cmd shim on Windows; every argument here is a constant of this file.
-  const r = spawnSync(file, args, { encoding: 'utf8', shell: process.platform === 'win32' });
+  // ssh is a real executable: no shell, so `&&` in its remote command runs on the VPS, not here.
+  const shell = process.platform === 'win32' && file === 'vercel';
+  const r = spawnSync(file, args, { encoding: 'utf8', shell });
   if (r.status !== 0) throw new Error(`${file} ${args[0]} failed: ${(r.stderr || r.stdout || '').trim()}`);
   return r.stdout;
 }
@@ -61,7 +76,9 @@ async function healthchecks(action, apiKey) {
   for (const c of checks) {
     const id = c.uuid ?? c.unique_key;
     const res = await fetch(`${HC_API}${id}/${action}`, { method: 'POST', headers: { 'X-Api-Key': apiKey } });
-    if (!res.ok) throw new Error(`Healthchecks ${action} "${c.name}": HTTP ${res.status}`);
+    // 409 on resume: a ping already resumed it (a cron ran as soon as staging woke) — that is the goal.
+    if (!res.ok && !(action === 'resume' && res.status === 409))
+      throw new Error(`Healthchecks ${action} "${c.name}": HTTP ${res.status}`);
   }
   return `${checks.length} check(s) ${action}d: ${checks.map((c) => c.name).join(', ')}`;
 }
@@ -98,7 +115,7 @@ async function main() {
       let out;
       if (kind === 'healthchecks') out = await healthchecks(action, apiKey);
       else if (kind === 'agent')
-        out = run('ssh', [
+        out = run(SSH, [
           '-i',
           VPS_KEY,
           VPS,
