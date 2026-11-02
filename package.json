@@ -29,7 +29,9 @@
     "db:reset:staging": "node scripts/db-staging.mjs reset",
     "db:test": "supabase test db",
     "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts",
-    "prepare": "node scripts/install-git-hooks.mjs"
+    "prepare": "node scripts/install-git-hooks.mjs",
+    "staging:pause": "node scripts/staging-power.mjs pause",
+    "staging:resume": "node scripts/staging-power.mjs resume"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

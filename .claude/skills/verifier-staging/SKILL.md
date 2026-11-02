@@ -9,6 +9,7 @@ Staging = Vercel project `dxt-monitor-staging` (branch `staging`, https://monito
 
 ## 1. Deploy, in this order
 
+0. **Wake staging** — it sleeps between runs (Tao, 2 Nov 2026: its every-minute crons cost about as much as production's). `pnpm staging:resume` unpauses the Vercel project, waits until it answers, starts `dxt-agent@staging` and resumes the staging Healthchecks checks. If the staging Supabase project paused itself (a free project with no activity for 7 days), Tao restores it from the Supabase dashboard first. When the run is over and staging is reset: `pnpm staging:pause`.
 1. **Migrations first** — `pnpm db:push:staging --dry-run`, then `pnpm db:push:staging`. Code that calls new or changed `engine_*` parameters fails with "function not found" against the old database.
 2. **Web** — `git push --force-with-lease origin HEAD:staging`; wait until the staging deployment is Ready.
 3. **Test target** (only if `apps/test-target` changed) — the push above builds a Preview of `dxt-test-target`; promote it: `vercel --scope team_KLEKhF6PuSAbJSmgDpyEXES4 ls dxt-test-target`, then `vercel --scope team_KLEKhF6PuSAbJSmgDpyEXES4 promote <preview url> --yes`.
