@@ -16,12 +16,17 @@ export async function runCronJob(
   job: string,
   pingUrl: string | undefined,
   work: () => Promise<CronJobResult>,
+  /** S12a (D-053): the in-app beat stamped when the job did its work — the same outcome Healthchecks gets. */
+  beat?: () => Promise<void>,
 ): Promise<Response> {
   const region = process.env.VERCEL_REGION ?? 'local';
   try {
     const result = await work();
     console.info(JSON.stringify({ job, region, ...result }));
-    await pingHealthcheck(pingUrl, result.ok ? 'ok' : 'fail');
+    await Promise.all([
+      pingHealthcheck(pingUrl, result.ok ? 'ok' : 'fail'),
+      result.ok ? beat?.() : undefined,
+    ]);
     return Response.json({ job, region, ...result });
   } catch (err) {
     console.error(

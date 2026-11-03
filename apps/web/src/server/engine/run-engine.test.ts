@@ -131,8 +131,9 @@ describe('runEngine', () => {
 
   it.each([
     ['beating', '2026-10-06T10:00:40Z', []],
-    ['stopped 3 min ago', '2026-10-06T09:58:00Z', ['engine_record_round']],
-    ['never started', null, ['engine_record_round']],
+    // S12a (D-053): the one location missing > 3 min is also the Admins' email.
+    ['stopped 3 min ago', '2026-10-06T09:58:00Z', ['engine_record_round', 'open_system_alert']],
+    ['never started', null, ['engine_record_round', 'open_system_alert']],
   ])('expects Bangkok only while its agent beats (D-019) — agent %s', async (_name, beat, rpcs) => {
     const { db, rpcCalls } = fakeDb({
       'monitors.select': { data: [monitor()] },
@@ -626,6 +627,28 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
     const old = fakeDb({ ...alert('2026-10-06T09:50:00Z') });
     await runEngine(old.db, now);
     expect(old.rpcCalls).toEqual([{ name: 'clear_system_alert', args: { p_kind: 'probe_locations_low' } }]);
+  });
+
+  it('S12a: one location missing > 3 min → the Admins’ email; none while the cron sweep is stale (D-053)', async () => {
+    const bkkGone = { code: 'BKK', last_heartbeat_at: '2026-10-06T09:55:00Z' };
+    const live = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'probe_locations.select': { data: [...beating, bkkGone] },
+      'agent_heartbeats.select': { data: { last_seen_at: '2026-10-06T10:00:00Z' } },
+      'rpc.open_system_alert': { data: 'a1' },
+    });
+    await runEngine(live.db, now);
+    expect(live.rpcCalls).toContainEqual({
+      name: 'open_system_alert',
+      args: { p_kind: 'probe_location_missing', p_context: { location: 'BKK' } },
+    });
+    const faulted = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'probe_locations.select': { data: [...beating, bkkGone] },
+      'agent_heartbeats.select': { data: { last_seen_at: '2026-10-06T09:50:00Z' } },
+    });
+    await runEngine(faulted.db, now);
+    expect(faulted.rpcCalls.filter((c) => c.name === 'open_system_alert')).toEqual([]);
   });
 });
 

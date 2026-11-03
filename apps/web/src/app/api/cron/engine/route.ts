@@ -3,6 +3,7 @@ import { serverEnv } from '@/lib/env';
 import { runCronJob } from '@/server/cron-job';
 import { serviceDb } from '@/server/db';
 import { engineAndDeliver } from '@/server/engine/engine-and-deliver';
+import { stampBeat } from '@/server/heartbeats';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -13,7 +14,11 @@ export const maxDuration = 60;
 export const GET = cronHandler(() => {
   const env = serverEnv();
   const started = Date.now();
-  return runCronJob('engine', env.HEALTHCHECKS_PING_URL_ENGINE, () =>
-    engineAndDeliver(serviceDb(), env, started + 50_000),
+  return runCronJob(
+    'engine',
+    env.HEALTHCHECKS_PING_URL_ENGINE,
+    () => engineAndDeliver(serviceDb(), env, started + 50_000),
+    // D-053: only the cron sweep stamps it — the engine also runs after every Bangkok ingest.
+    () => stampBeat(serviceDb(), 'engine-sweep'),
   );
 });

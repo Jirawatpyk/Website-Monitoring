@@ -9,6 +9,8 @@ import {
   type PageFact,
   latestPerView,
   decideSite,
+  faultState,
+  probeMissing,
   problemHoldUntil,
   isInsideHours,
   bkkControlDown,
@@ -587,6 +589,27 @@ export async function runEngine(
   }
 }
 
+/** The one active location missing > 3 min while the others beat and the cron sweep runs (S12a, D-053). */
+async function missingLocation(db: DbClient, now: Date): Promise<string | null> {
+  const [locations, sweep] = await Promise.all([
+    db.from('probe_locations').select('code, last_heartbeat_at').eq('is_active', true),
+    db.from('agent_heartbeats').select('last_seen_at').eq('name', 'engine-sweep').maybeSingle(),
+  ]);
+  if (locations.error) throw new Error(`probe_locations: ${locations.error.message}`);
+  if (sweep.error) throw new Error(`agent_heartbeats: ${sweep.error.message}`);
+  return probeMissing(
+    faultState({
+      sweepAt: sweep.data?.last_seen_at ? new Date(sweep.data.last_seen_at) : null,
+      lastRoundAt: null,
+      locations: (locations.data ?? []).map((l) => ({
+        code: l.code,
+        lastBeatAt: l.last_heartbeat_at ? new Date(l.last_heartbeat_at) : null,
+      })),
+      now,
+    }),
+  );
+}
+
 /** The active locations whose probe beat in the last 3 min (D-019). */
 async function loadLocations(db: DbClient, now: Date): Promise<ProbeLocation[]> {
   const { data, error } = await db
@@ -858,6 +881,13 @@ async function adminAlerts(
   const low = verifier.openAlerts.get('probe_locations_low');
   if (locations.length < 2 && !low) await open('probe_locations_low', { active: [...locations].sort() });
   else if (locations.length >= 2 && low && settled(low)) await clear('probe_locations_low');
+
+  // S12a (spec §15.3, D-053): one location missing > 3 min while the others beat → the Admins' email,
+  // no page; never during an engine fault (the cron sweep stale) or with two missing (`probe_locations_low`).
+  const missingNow = await missingLocation(db, now);
+  const gone = verifier.openAlerts.get('probe_location_missing');
+  if (missingNow && !gone) await open('probe_location_missing', { location: missingNow });
+  else if (!missingNow && gone && settled(gone)) await clear('probe_location_missing');
 
   // D-028: the BKK VPS's own network failing its control check — the Admin's to fix. The sites it
   // leaves unverified (D-027) are listed; cleared once it passes again, no sooner than 10 min.

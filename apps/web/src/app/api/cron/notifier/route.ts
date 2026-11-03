@@ -3,6 +3,7 @@ import { serverEnv } from '@/lib/env';
 import { runCronJob } from '@/server/cron-job';
 import { serviceDb } from '@/server/db';
 import { notifierDeps } from '@/server/notifier/deps';
+import { stampBeat } from '@/server/heartbeats';
 import { runNotifierSweep } from '@/server/notifier/dispatch';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,10 @@ export const maxDuration = 60;
 // and ack messages whose Undo window has closed. New alerts are sent inline by the engine.
 export const GET = cronHandler(() => {
   const env = serverEnv();
-  return runCronJob('notifier', env.HEALTHCHECKS_PING_URL_NOTIFIER, () =>
-    runNotifierSweep(notifierDeps(serviceDb(), env)),
+  return runCronJob(
+    'notifier',
+    env.HEALTHCHECKS_PING_URL_NOTIFIER,
+    () => runNotifierSweep(notifierDeps(serviceDb(), env)),
+    () => stampBeat(serviceDb(), 'notifier'),
   );
 });

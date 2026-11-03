@@ -639,7 +639,11 @@ export function buildProblemEmail(input: ProblemEmailInput): EmailMessage {
 
 /** Admin alerts that aren't about one incident (D-019, D-022, `system_alerts.kind`). */
 export type SystemAlertKind =
-  'verifier_unavailable' | 'verifier_backlog' | 'probe_locations_low' | 'bkk_control_failing';
+  | 'verifier_unavailable'
+  | 'verifier_backlog'
+  | 'probe_locations_low'
+  | 'bkk_control_failing'
+  | 'probe_location_missing';
 
 /** Why the engine counted the verifier unavailable (D-019). */
 export type VerifierDownReason = 'no_poll' | 'not_picked_up' | 'lease_expired';
@@ -656,6 +660,10 @@ export interface SystemAlertEmailInput {
   queued?: number;
   /** probe_locations_low: the locations still reporting. */
   active?: readonly ProbeLocation[];
+  /** probe_location_missing (S12a): the one location that stopped. */
+  location?: ProbeLocation;
+  /** The Probes & heartbeat page, for the button (S12a). */
+  probesUrl?: string;
   /** Sender, for the alert's thread id. */
   from: string;
 }
@@ -686,12 +694,13 @@ const SYSTEM_TITLES: Record<SystemAlertKind, string> = {
   verifier_backlog: 'Browser verifier falling behind',
   probe_locations_low: 'Fewer than 2 probe locations',
   bkk_control_failing: 'BKK probe network check failing',
+  probe_location_missing: 'One probe location missing',
 };
 
 /**
  * Admin system emails (EmailAlert "Admin · system", spec §19.5): every active Admin, one email per
  * outage under its own subject with the start time (separate outages never merge into one mail
- * thread), nothing when it is back. No "Open Probes & heartbeat" button until that page (S12).
+ * thread), nothing when it is back. "Open Probes & heartbeat" once that page exists (S12a).
  */
 export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessage {
   const since = `${formatDay(input.openedAt, { weekday: true })} ${formatTime(input.openedAt)}`;
@@ -743,6 +752,26 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
         ['When it’s back', 'The sites are decided from BKK again on the next round and clear on their own.'],
       ],
       buttons: [],
+    });
+  }
+  // S12a (spec §15.3, Probes board "one email to Tao, no page. BKK + TYO kept deciding status").
+  if (input.kind === 'probe_location_missing' && input.location) {
+    const missing = input.location;
+    const others = PROBE_LOCATIONS.filter((l) => l !== missing);
+    return emailLayout(envelope, {
+      color: C.warning,
+      bar: C.warning,
+      label: 'PROBE MISSING',
+      pre: `${missing} stopped reporting · ${others.join(' + ')} keep deciding status · no page`,
+      headline: `The ${missing} probe stopped reporting`,
+      lede: `${LOCATION_NAMES[missing]} hasn’t reported for 3 min. ${others.join(' and ')} still vote, so statuses keep working — nobody is paged for this.`,
+      facts: [
+        ['Since', since],
+        ['Still reporting', others.map((l) => LOCATION_NAMES[l]).join(' · ')],
+        ['Effect', 'None on statuses while 2 locations report. If a second one stops, statuses freeze.'],
+        ['What to check', `${PROBE_CHECK[missing]} — it reports every minute.`],
+      ],
+      buttons: input.probesUrl ? [{ label: 'Open Probes & heartbeat', href: input.probesUrl, primary: true }] : [],
     });
   }
   if (input.kind === 'probe_locations_low') {

@@ -664,6 +664,8 @@ export function renderSystemAlertEmail(
   n: Notification,
   alert: SystemAlertFacts,
   from: string,
+  /** The app's base URL, for "Open Probes & heartbeat" (S12a); without it the email has no button. */
+  appUrl?: string,
 ): EmailMessage | null {
   const ctx = contextOf(alert.context);
   const sites = Array.isArray(ctx.sites) ? ctx.sites.filter((s): s is string => typeof s === 'string') : [];
@@ -676,6 +678,9 @@ export function renderSystemAlertEmail(
     case 'verifier_backlog':
     case 'probe_locations_low':
     case 'bkk_control_failing':
+    case 'probe_location_missing':
+      if (n.template === 'probe_location_missing' && !PROBE_LOCATIONS.includes(ctx.location as ProbeLocation))
+        return null;
       return buildSystemAlertEmail({
         alertId: alert.id,
         kind: n.template,
@@ -684,6 +689,8 @@ export function renderSystemAlertEmail(
         reason,
         queued: num(ctx.queued, 0),
         active,
+        location: PROBE_LOCATIONS.find((l: ProbeLocation) => l === ctx.location),
+        probesUrl: appUrl ? `${appUrl.replace(/\/$/, '')}/probes` : undefined,
         from,
       });
     default:
