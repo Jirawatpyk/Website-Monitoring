@@ -771,7 +771,9 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
         ['Effect', 'None on statuses while 2 locations report. If a second one stops, statuses freeze.'],
         ['What to check', `${PROBE_CHECK[missing]} — it reports every minute.`],
       ],
-      buttons: input.probesUrl ? [{ label: 'Open Probes & heartbeat', href: input.probesUrl, primary: true }] : [],
+      buttons: input.probesUrl
+        ? [{ label: 'Open Probes & heartbeat', href: input.probesUrl, primary: true }]
+        : [],
     });
   }
   if (input.kind === 'probe_locations_low') {
