@@ -31,7 +31,7 @@
 | S09d | Defacement: page-change detection | 1 · P1 | L | — (PRD §2 content-change, D-041, D-046) | S09c (merged), S07 | 3–4 (alert on after a 2-week record) | Done |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | Done |
-| S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | In review |
+| S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Done |
 | S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06b, S10, S11 | 4 | Todo |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
@@ -579,6 +579,18 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   4. T09 re-check: a muted site with an open incident still gets its client-update mention.
   5. message-checker passes the client-update rows.
 - **Review:** engine-reviewer, message-checker, security-reviewer.
+- **Evidence (`/slice-review`, 3 Nov 2026; slice-verifier: every line met; `/verify` by Tao on staging PASS):**
+  1. INC-0142 replay:
+     - `lifecycle.test.ts` gives 10:03:12.
+     - `pipeline.int.test.ts` "client-update track (S11)" covers not acked and acked: nothing at first failed + 14:59; at exactly 15:00, one Chat reply @mentioning the AM and one AM email, the due time and the timeline event at 15:00, once across overlapping runs.
+     - Staging INC-0060: due 11:01:01 (15:00 after the first failure); Chat sent 11:01:04 and the email 11:01:03.
+     - Staging INC-0061: due 12:53:01; Chat sent 12:53:03 and the email 12:53:02.
+  2. `lifecycle.test.ts` rows for 14 min (not required), exactly 15:00, 16 min (Resolve waits), the D-052 item 5 rows (DOWN minutes added up, Tier 2 inside response hours) and the mute rows. `client_update.test.sql` + `resolve.test.sql` cover the gate.
+  3. `client_update.test.sql` (#163) refuses a Viewer, another client's AM, a non-owning Responder, the on-call non-owner, a deactivated AM and anon. `actions.test.ts`, the `canMarkClientUpdate` table and `e2e/client-update.spec.ts` ("a Viewer sees the card without buttons") cover the app side.
+  4. T09: `client_update.test.sql` "a muted site with an open incident still gets its client-update mention".
+  5. message-checker rounds 1–2: all High and Medium findings fixed (the AM's footer, lede and button; the text line; "Not needed" said as such). The mute timing became D-052 item 6. `/verify` on staging: CLIENT UPDATE DUE in Chat + the AM email on time; Not needed refuses a blank or whitespace reason and records one; the card checked at 390 / 820 / 1440, light and dark.
+
+  Done on 3 Nov 2026, when #164 merged (e9ad664). The schema had merged in #163 (fb0d8c0). Production deploy READY, with no runtime errors in its first 15 min.
 
 ### S12 · Monitor-fault mode & probes
 
