@@ -26,8 +26,8 @@ import { flapCounts, timesWord, type Drop, type KeyPageFacts } from './relapse-a
 import { resolvedLasted } from './resolve-alerts';
 
 /**
- * Alert emails — EmailAlert board, spec §10, PRD §7, cut to what exists today (D-013 / D-016: no
- * client-update buttons until S11; escalation from S08 is L1 only, D-034).
+ * Alert emails — EmailAlert board, spec §10, PRD §7, cut to what exists today (D-013 / D-016;
+ * escalation from S08, D-034; the client update due email from S11, D-052).
  *
  * One email per event and per person, all under one subject per incident ("MuvMi · Tier 1 ·
  * INC-0142"), so a mail client stacks them like the Chat thread. The provider assigns each
@@ -144,7 +144,8 @@ type Template =
   | 'flap_summary'
   | 'down_again'
   | 'problem_again'
-  | 'resolved';
+  | 'resolved'
+  | 'client_update_due';
 
 export interface ResolvedEmailInput extends EmailBaseInput {
   resolvedBy: string;
@@ -1077,4 +1078,54 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
             { label: 'Open incident', href: input.incidentUrl, primary: false },
           ],
   });
+}
+
+export interface ClientUpdateDueEmailInput extends EmailBaseInput {
+  client: string;
+  confirmedAt: Date;
+  /** How long it had been down when the track fired, counted from the first failed check. */
+  downMinutes: number;
+  cause: string | null;
+  acked: { by: string; at: Date } | null;
+  /** No active AM: this goes to an Admin instead (D-052 item 2). */
+  noAm: boolean;
+  /** The incident page's Client update card (`#client-update`). */
+  draftUrl: string;
+}
+
+/** "Client update due" to the AM (EmailAlert, spec §14.11): primary "Open draft". S11. */
+export function buildClientUpdateDueEmail(input: ClientUpdateDueEmailInput): EmailMessage {
+  const { site, client } = input;
+  const wait = input.tier === 1 ? '15 min' : '60 min inside response hours';
+  return render(
+    {
+      ...input,
+      reason: 'step',
+      why: input.noAm
+        ? `You got this because you’re an Admin and ${client} has no account manager in DxT Monitor.`
+        : `You got this because you’re the AM for ${client} and a Tier ${input.tier} site was down ${wait}.`,
+    },
+    {
+      template: 'client_update_due',
+      color: C.warning,
+      bar: C.warning,
+      label: 'CLIENT UPDATE DUE',
+      pre: `${site} down ${wait} · draft ready`,
+      headline: `Tell ${client} what’s happening`,
+      lede: `${site} (${formatTier(input.tier)}) has been down ${wait}. Please update the client and mark it on the incident page — the incident can’t be resolved until you do.`,
+      facts: [
+        [
+          'Down for',
+          `${formatDuration(input.downMinutes)} (confirmed down ${formatTimeWithSeconds(input.confirmedAt)})`,
+        ],
+        ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+        ['Draft', 'Ready on the incident page — edit, send it to the client, then mark it'],
+        ['Acknowledged', input.acked ? `${input.acked.by} at ${formatTime(input.acked.at)}` : 'Not yet'],
+      ],
+      buttons: [
+        { label: 'Open draft', href: input.draftUrl, primary: true },
+        { label: 'Open incident', href: input.incidentUrl, primary: false },
+      ],
+    },
+  );
 }

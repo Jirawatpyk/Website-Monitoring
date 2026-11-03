@@ -23,6 +23,8 @@ import {
   buildStepAlert,
   buildStepEmail,
   buildSystemAlertEmail,
+  buildClientUpdateDueAlert,
+  buildClientUpdateDueEmail,
   type ChatMessage,
   type ChatPerson,
   type EmailBaseInput,
@@ -214,6 +216,9 @@ function resolvedOf(n: Notification, i: IncidentFacts) {
 }
 
 /** The cause line stored when the incident opened (its `detected` event). */
+/** The client the site belongs to; the site's name when it isn't loaded (an older facts query). */
+const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
+
 function causeOf(i: IncidentFacts): string | null {
   const detected = i.incident_events?.find((e) => e.type === 'detected');
   const cause = detected ? contextOf(detected.payload).cause : undefined;
@@ -298,6 +303,18 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
         problem: problemOf(i),
         stopped: stoppedOf(i, ctx),
+      });
+    case 'client_update_due':
+      return buildClientUpdateDueAlert({
+        incidentId: i.id,
+        site: i.sites.name,
+        tier: i.sites.tier,
+        people: namedIn(i, n.context).mentioned,
+        noAm: ctx.noAm === true,
+        client: clientOf(i),
+        // Fired in the minute it recovered (a DOWN drop covered the due time): "was down".
+        recovered: i.state === 'monitoring' || i.state === 'needs_root_cause',
+        draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
       });
     case 'step_fired': {
       const named = namedIn(i, n.context);
@@ -455,6 +472,21 @@ export function renderEmail(
         heldUntil: heldUntilOf(ctx),
         acknowledged,
       });
+    case 'client_update_due': {
+      const dueAt = new Date(str(ctx.dueAt, n.created_at));
+      return buildClientUpdateDueEmail({
+        ...base,
+        reason: 'step',
+        client: clientOf(i),
+        confirmedAt: new Date(i.detected_at),
+        // From the first failed check (D-002): 15 min on Tier 1; a Tier 2 night counts the wall clock.
+        downMinutes: clockMinutes(new Date(i.started_at), dueAt),
+        cause: causeOf(i),
+        acked: i.acker && i.acked_at ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
+        noAm: ctx.noAm === true,
+        draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
+      });
+    }
     case 'step_fired': {
       const asFyi = ctx.asFyi === true;
       const level = num(ctx.level, 1);

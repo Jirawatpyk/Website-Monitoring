@@ -39,7 +39,8 @@ export interface IncidentFacts {
     tier: number;
     primary: Owner | null;
     backup: Owner | null;
-    client?: { am: Owner | null } | null;
+    /** The client and its AM: the client-update messages name both (S11). */
+    client?: { name?: string; am: Owner | null } | null;
   };
   /** The policy it opened with and the level fired (S08, D-034); null before S08. */
   escalation_plan?: Json | null;
@@ -118,7 +119,7 @@ export async function loadFacts(
          sites!inner(name, tier,
            primary:profiles!sites_primary_owner_id_fkey(id, display_name, google_chat_user_id),
            backup:profiles!sites_backup_owner_id_fkey(id, display_name, google_chat_user_id),
-           client:clients(am:profiles!clients_am_user_id_fkey(id, display_name, google_chat_user_id)))`,
+           client:clients(name, am:profiles!clients_am_user_id_fkey(id, display_name, google_chat_user_id)))`,
       )
       .in('id', incidentIds)
       .overrideTypes<IncidentFacts[], { merge: false }>(),
