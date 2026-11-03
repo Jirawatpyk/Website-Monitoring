@@ -264,3 +264,25 @@ describe('OverviewView (Main3 / MOverview4)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('OverviewView — monitor fault (S12a, MainFault)', () => {
+  it('shows the fault banner on desktop and phone, the as-of meta and the heartbeat pill', () => {
+    // NOW is 10:07:12 Bangkok; the sweep and the last round stopped at 09:53.
+    const fault = { sweepAt: at('09:53'), alertedAt: at('09:56'), asOf: at('09:53'), onCallName: 'Ploy' };
+    renderView(data({ fault, lastRoundAt: at('09:53') }));
+    expect(screen.getAllByText('Monitoring is degraded — statuses below are 14 min old')).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'Open probes & heartbeat' })[0]).toHaveAttribute(
+      'href',
+      '/probes',
+    );
+    expect(screen.getByText(/statuses as of 09:53/)).toBeInTheDocument();
+    expect(screen.getByText('Heartbeat missed 14 min')).toBeInTheDocument();
+    expect(screen.queryByText(/Verifier idle/)).not.toBeInTheDocument();
+  });
+
+  it('no fault: no banner, the verifier in the pill', () => {
+    renderView(data({ fault: null }));
+    expect(screen.queryByText(/Monitoring is degraded/)).not.toBeInTheDocument();
+    expect(screen.getByText('Verifier idle')).toBeInTheDocument();
+  });
+});
