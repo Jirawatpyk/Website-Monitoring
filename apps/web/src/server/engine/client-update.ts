@@ -23,7 +23,9 @@ export async function clientUpdateTick(
 ): Promise<{ queued: number; failed: string[] }> {
   const { data, error } = await db
     .from('incidents')
-    .select('id, started_at, severity, resolved_at, sites!inner(tier, clients!inner(is_internal))')
+    .select(
+      'id, started_at, severity, resolved_at, alerted_at, sites!inner(tier, clients!inner(is_internal))',
+    )
     .eq('severity', 'down')
     .eq('client_update_required', false)
     // The open-incident index's predicate (incidents_one_open_per_site).
@@ -69,6 +71,8 @@ export async function clientUpdateTick(
           events.data.filter((e) => e.incident_id === inc.id),
         ),
         hours,
+        // A mute held its first alert back: the track counts from that alert (D-052 item 6).
+        alertedAt: inc.alerted_at ? new Date(inc.alerted_at) : null,
       });
     } catch (err) {
       // "response hours never open" on one Tier 2 incident mustn't hold the others back (engine review L1).

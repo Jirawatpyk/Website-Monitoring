@@ -138,6 +138,18 @@ describe('clientUpdateTick (S11, spec §9)', () => {
     expect(rpcCalls.map((c) => (c.args as { p_incident_id: string }).p_incident_id)).toEqual(['i142']);
   });
 
+  it('after a mute it counts from the late alert (D-052 item 6)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'incidents.select': { data: [inc0142({ alerted_at: bkk('2026-09-25T10:00:00').toISOString() })] },
+      'incident_events.select': { data: [detected] },
+      'rpc.engine_client_update_due': { data: true },
+    });
+    await clientUpdateTick(db, bkk('2026-09-25T10:14:59'), HOURS);
+    expect(rpcCalls).toEqual([]);
+    await clientUpdateTick(db, bkk('2026-09-25T10:15:00'), HOURS);
+    expect(rpcCalls).toHaveLength(1);
+  });
+
   it('a failed read fails the tick', async () => {
     const { db } = fakeDb({ 'incidents.select': { error: { message: 'down' } } });
     await expect(clientUpdateTick(db, bkk('2026-09-25T10:04:00'), HOURS)).rejects.toThrow('incidents: down');

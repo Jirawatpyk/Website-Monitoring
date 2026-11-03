@@ -99,12 +99,56 @@ describe('clientUpdateDueAt — the client-update track (spec §9, §16.2, D-002
       [down('2026-09-25T09:48:12', '2026-09-25T10:04:12')],
       '2026-09-25T10:03:12',
     ],
-    // D-004: the track keeps counting from the first failed check; a relapse after the due time fires then.
+    // D-052 item 5 (D-004, D-033): the DOWN minutes add up across drops; a recovery pauses the count.
     [
-      'relapse after the due time',
+      'a relapse goes on with the count: 10 min, then 5 more',
       1,
       [down('2026-09-25T09:48:12', '2026-09-25T09:58:12'), down('2026-09-25T10:10:00', null)],
-      '2026-09-25T10:10:00',
+      '2026-09-25T10:15:00',
+    ],
+    [
+      '7 min, then 2 min two days later → 9 min, Not required',
+      1,
+      [
+        down('2026-09-25T09:48:12', '2026-09-25T09:55:12'),
+        down('2026-09-27T10:20:00', '2026-09-27T10:22:00'),
+      ],
+      null,
+    ],
+    [
+      'a relapse starting exactly when 15 min would have passed counts only its own minutes',
+      1,
+      [down('2026-09-25T09:48:12', '2026-09-25T09:58:00'), down('2026-09-25T10:03:12', null)],
+      '2026-09-25T10:08:24',
+    ],
+    // VOCA's four drops (spec §19.4) as if it were a client's Tier 1: 7 + 8 min → 03:32 in the second.
+    [
+      'VOCA-shaped flapping as Tier 1',
+      1,
+      [
+        down('2026-09-21T03:12:00', '2026-09-21T03:19:00'),
+        down('2026-09-21T03:24:00', '2026-09-21T03:35:00'),
+        down('2026-09-21T03:38:00', '2026-09-21T03:52:00'),
+        down('2026-09-21T03:55:00', '2026-09-21T04:04:00'),
+      ],
+      '2026-09-21T03:32:00',
+    ],
+    // D-023: the home page back, a key page still failing — that PROBLEM drop doesn't count.
+    [
+      'DOWN 9 min, then a PROBLEM drop',
+      1,
+      [down('2026-09-25T09:48:12', '2026-09-25T09:58:00'), problem('2026-09-25T09:58:00', null)],
+      null,
+    ],
+    // D-021 after a 15-min PROBLEM: only the DOWN minutes count (14 min → Not required).
+    [
+      'PROBLEM 15 min, then DOWN 14 min',
+      1,
+      [
+        problem('2026-09-25T09:30:00', '2026-09-25T09:45:00'),
+        down('2026-09-25T09:45:00', '2026-09-25T09:59:00'),
+      ],
+      null,
     ],
     [
       'two short drops both over before 15 min',
@@ -134,8 +178,23 @@ describe('clientUpdateDueAt — the client-update track (spec §9, §16.2, D-002
     ],
     // INC-0139 ORCA: Thu 22:14, down overnight → the hours open Fri 09:00, due 10:00.
     ['Tier 2 at night (INC-0139)', 2, [down('2026-09-24T22:14:00', null)], '2026-09-25T10:00:00'],
-    // INC-0133 VOCA: down 41 min at night, back before 09:00 → never inside hours.
-    ['Tier 2 down at night only (INC-0133)', 2, [down('2026-09-29T03:12:00', '2026-09-29T03:53:00')], null],
+    // A Tier 2 night outage that's back before 09:00 has no minutes inside hours.
+    ['Tier 2 down at night only', 2, [down('2026-09-29T03:12:00', '2026-09-29T03:53:00')], null],
+    // 30 min inside hours, then a relapse at 20:00 Friday: the other 30 min are Monday 09:00–09:30 —
+    // never a mention at night (engine review M2).
+    [
+      'Tier 2 relapse at night waits for the hours',
+      2,
+      [down('2026-09-25T10:00:00', '2026-09-25T10:30:00'), down('2026-09-25T20:00:00', null)],
+      '2026-09-28T09:30:00',
+    ],
+    // INC-0139 back at 09:30 Fri (30 min inside hours), relapse Mon 09:40 → 10:10.
+    [
+      'Tier 2 recovered in the morning, relapse Monday',
+      2,
+      [down('2026-09-24T22:14:00', '2026-09-25T09:30:00'), down('2026-09-28T09:40:00', null)],
+      '2026-09-28T10:10:00',
+    ],
     ['Tier 2 across 18:00 and the weekend', 2, [down('2026-09-25T17:30:00', null)], '2026-09-28T09:30:00'],
     ['Tier 3: report only', 3, [down('2026-09-25T09:48:12', null)], null],
   ] as const)('%s', (_name, tier, episodes, expected) => {
@@ -152,6 +211,27 @@ describe('clientUpdateDueAt — the client-update track (spec §9, §16.2, D-002
         hours: FRIDAY_OFF,
       }),
     ).toEqual(bkk('2026-09-28T10:00:00'));
+  });
+
+  it('a muted incident counts from its first alert (D-052 item 6, ChatAlert: "Every timer … counts from 15:00")', () => {
+    // Down since 14:20:36 under a mute that ended 15:00: due 15:15, not at once.
+    expect(
+      clientUpdateDueAt({
+        tier: 1,
+        episodes: [down('2026-09-25T14:20:36', null)],
+        hours: HOURS,
+        alertedAt: bkk('2026-09-25T15:00:00'),
+      }),
+    ).toEqual(bkk('2026-09-25T15:15:00'));
+    // A drop over before the late alert doesn't count.
+    expect(
+      clientUpdateDueAt({
+        tier: 1,
+        episodes: [down('2026-09-25T14:00:00', '2026-09-25T14:30:00'), down('2026-09-25T14:40:00', null)],
+        hours: HOURS,
+        alertedAt: bkk('2026-09-25T15:00:00'),
+      }),
+    ).toEqual(bkk('2026-09-25T15:15:00'));
   });
 
   it('Tier 1 counts 24/7, whatever the response hours', () => {

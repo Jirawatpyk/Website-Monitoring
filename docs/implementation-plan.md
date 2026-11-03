@@ -583,6 +583,11 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S12 · Monitor-fault mode & probes
 
 - **Scope:** FR-21, PRD §9. Heartbeat routing: engine missing > 3 min → email Tao + Alerts Space post mentioning on-call through a sender that doesn't depend on the engine; a single probe missing > 3 min → email Tao only, suppressed during an engine fault. Overview fault banner with "as of" data; hand check → manual incident (L0 through the fallback sender, client-update track started, "Escalate now" by hand). VPS watchdog. Probes & heartbeat page.
+- **From S11 (engine review M3):** a manual incident needs four things before the client-update track can fire for it:
+  - a `detected` event, with `started_at` set to the hand check;
+  - a live `down` Chat row (`engine_thread_live`), or a guard of its own;
+  - a hand-fired path for "Escalate now", since `engine_client_update_due` is service role and refuses a future due time;
+  - after a fault, `client_update_required` already set if someone sent it by hand, so the catch-up doesn't tell the AM twice.
 - **Boards:** MainFault, Probes · **Test plan:** T02, T04, T11
 - **Depends on:** S06b, S10, S11
 - **Done when:**
