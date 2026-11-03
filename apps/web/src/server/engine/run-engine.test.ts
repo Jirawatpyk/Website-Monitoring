@@ -650,6 +650,43 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
     await runEngine(faulted.db, now);
     expect(faulted.rpcCalls.filter((c) => c.name === 'open_system_alert')).toEqual([]);
   });
+
+  const missingOpen = (location: string) => ({
+    data: [{ kind: 'probe_location_missing', context: { location }, opened_at: '2026-10-06T09:30:00Z' }],
+  });
+
+  it('S12a: an open probe-missing alert is left alone while the sweep is stale (no clear, no second email)', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'probe_locations.select': {
+        data: [...beating, { code: 'BKK', last_heartbeat_at: '2026-10-06T09:55:00Z' }],
+      },
+      'agent_heartbeats.select': { data: { last_seen_at: '2026-10-06T09:50:00Z' } },
+      'system_alerts.select': missingOpen('BKK'),
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.filter((c) => /system_alert/.test(c.name))).toEqual([]);
+  });
+
+  it('S12a: another location goes missing while the alert is open → cleared and reopened for it', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'probe_locations.select': {
+        data: [...beating, { code: 'BKK', last_heartbeat_at: '2026-10-06T09:55:00Z' }],
+      },
+      'agent_heartbeats.select': { data: { last_seen_at: '2026-10-06T10:00:00Z' } },
+      'system_alerts.select': missingOpen('SIN'),
+      'rpc.open_system_alert': { data: 'a2' },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.filter((c) => /system_alert/.test(c.name))).toEqual([
+      { name: 'clear_system_alert', args: { p_kind: 'probe_location_missing' } },
+      {
+        name: 'open_system_alert',
+        args: { p_kind: 'probe_location_missing', p_context: { location: 'BKK' } },
+      },
+    ]);
+  });
 });
 
 describe('runEngine — one failing site never blinds the others (security review M1)', () => {

@@ -39,6 +39,12 @@ describe('beatRowsOf (S12a, spec §15.3)', () => {
     expect(rows.find((r) => r.name === 'vps-watchdog')?.status).toBe('waiting');
     expect(beatRowsOf({ ...facts, engineSweep: ago(4 * 60) }, now)[0]?.status).toBe('up');
     expect(summaryOf(rows)).toEqual({ healthy: false, title: '1 heartbeat missed · engine' });
+    // nothing pinged yet: no claim of health
+    const none = beatRowsOf(
+      { engineSweep: null, notifier: null, crawler: null, verifier: null, watchdog: null, locations: {} },
+      now,
+    );
+    expect(summaryOf(none)).toEqual({ healthy: false, empty: true, title: 'No heartbeats yet' });
   });
 
   it('says how long ago', () => {

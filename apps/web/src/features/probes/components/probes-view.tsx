@@ -1,6 +1,6 @@
 import { Alert, Badge, Card, StatusPill, Table, TBody, Td, Th, THead, Tr } from '@jirawatpyk/aura-react';
-import { IconBell, IconCircleAlert, IconCircleCheck, IconMail } from '@jirawatpyk/aura-react/icons';
-import { formatTime, formatTimeWithSeconds, formatWhen } from '@dxt/shared';
+import { IconBell, IconCircleAlert, IconCircleCheck, IconInfo, IconMail } from '@jirawatpyk/aura-react/icons';
+import { formatTime, formatTimeWithSeconds, formatWhen, isSameBangkokDay } from '@dxt/shared';
 import { agoText, type BeatRow, type ProbeCard } from '../model';
 import type { ProbesData } from '../queries';
 
@@ -82,7 +82,7 @@ function ProbeCardView({ card, now }: { card: ProbeCard; now: Date }) {
 
 /** Today's beats with seconds ("10:07:10"); an older one with its day. */
 function formatWhenShort(d: Date, now: Date) {
-  return now.getTime() - d.getTime() < 12 * 3_600_000 ? formatTimeWithSeconds(d) : formatWhen(d, now);
+  return isSameBangkokDay(d, now) ? formatTimeWithSeconds(d) : formatWhen(d, now);
 }
 
 function BeatStatus({ row }: { row: BeatRow }) {
@@ -126,8 +126,10 @@ export function ProbesView({ data }: { data: ProbesData }) {
   return (
     <div className="flex flex-col gap-6">
       <Alert
-        tone={data.summary.healthy ? 'success' : 'danger'}
-        icon={data.summary.healthy ? <IconCircleCheck /> : <IconCircleAlert />}
+        tone={data.summary.healthy ? 'success' : data.summary.empty ? 'info' : 'danger'}
+        icon={
+          data.summary.healthy ? <IconCircleCheck /> : data.summary.empty ? <IconInfo /> : <IconCircleAlert />
+        }
         title={data.summary.title}
       >
         {data.gapLines.length

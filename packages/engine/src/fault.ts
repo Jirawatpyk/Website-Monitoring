@@ -30,6 +30,14 @@ export interface FaultState {
 
 const missed = (at: Date | null, now: Date) => !at || now.getTime() - at.getTime() >= MONITOR_GRACE_MS;
 
+/**
+ * The engine fault on its own: the cron sweep 3 min old or more. No sweep recorded yet (a fresh
+ * deploy, before the first cron minute) is no data, not a fault.
+ */
+export function isSweepStale(sweepAt: Date | null, now: Date): boolean {
+  return !!sweepAt && missed(sweepAt, now);
+}
+
 export function faultState(input: {
   sweepAt: Date | null;
   lastRoundAt: Date | null;
@@ -37,8 +45,7 @@ export function faultState(input: {
   locations: readonly LocationBeat[];
   now: Date;
 }): FaultState {
-  // No sweep recorded yet (a fresh deploy, before the first cron minute) is no data, not a fault.
-  const engineFault = !!input.sweepAt && missed(input.sweepAt, input.now);
+  const engineFault = isSweepStale(input.sweepAt, input.now);
   const sorted = [...input.locations].sort((a, b) => a.code.localeCompare(b.code));
   return {
     engineFault,

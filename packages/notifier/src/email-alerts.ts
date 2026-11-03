@@ -755,7 +755,9 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
     });
   }
   // S12a (spec §15.3, Probes board "one email to Tao, no page. BKK + TYO kept deciding status").
-  if (input.kind === 'probe_location_missing' && input.location) {
+  if (input.kind === 'probe_location_missing') {
+    // Never fall through to another kind's email (code review S12a).
+    if (!input.location) throw new Error('probe_location_missing needs the location');
     const missing = input.location;
     const others = PROBE_LOCATIONS.filter((l) => l !== missing);
     return emailLayout(envelope, {

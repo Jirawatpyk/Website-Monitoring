@@ -2,11 +2,19 @@ import 'server-only';
 import { PROBE_LOCATIONS, type ProbeLocation } from '@dxt/shared';
 import type { DbClient } from '@dxt/db';
 import { loadOnCallNow } from '@/features/incidents/server';
-import { beatRowsOf, gapLinesOf, probeCardsOf, summaryOf, type BeatRow, type ProbeCard } from './model';
+import {
+  beatRowsOf,
+  gapLinesOf,
+  probeCardsOf,
+  summaryOf,
+  type BeatRow,
+  type ProbeCard,
+  type Summary,
+} from './model';
 
 export interface ProbesData {
   nowIso: string;
-  summary: { healthy: boolean; title: string };
+  summary: Summary;
   probes: ProbeCard[];
   beats: BeatRow[];
   gapLines: { at: string; text: string }[];
@@ -40,7 +48,8 @@ export async function loadProbes(
   const since24h = new Date(now.getTime() - 24 * 3_600_000).toISOString();
   const count = (status: 'queued' | 'sent' | 'failed', sinceIso?: string) => {
     let q = db.from('notifications').select('id', { count: 'exact', head: true }).eq('status', status);
-    if (sinceIso) q = q.gte('updated_at', sinceIso);
+    // sent: by sent_at (notifications_sent_at_idx); failed rows are few (the status prefix of the due index)
+    if (sinceIso) q = q.gte(status === 'sent' ? 'sent_at' : 'updated_at', sinceIso);
     return q;
   };
   const [locations, beats, activity, gaps, admins, queue, lastJob, onCallId, waiting, sent, failed] =

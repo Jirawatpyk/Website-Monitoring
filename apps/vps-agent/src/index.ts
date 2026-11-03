@@ -35,12 +35,15 @@ async function main() {
     });
 
   const webhook = config.GOOGLE_CHAT_ALERTS_WEBHOOK_URL;
+  // No webhook configured: said once here; a fault is then only logged (once per fault, treated as
+  // handled), so a config gap never looks like a failed post or turns the watchdog's check red.
+  if (!webhook) console.warn(JSON.stringify({ event: 'watchdog_no_webhook' }));
   const watchdog = createWatchdog({
     startedAt: Date.now(),
     post: async (text, threadKey) => {
       if (!webhook) {
         console.warn(JSON.stringify({ event: 'monitor_fault_not_posted', reason: 'no_webhook' }));
-        return false;
+        return true;
       }
       const res = await postChatMessage(webhook, { text, cardsV2: [] }, { threadKey });
       if (!res.ok) console.error(JSON.stringify({ event: 'monitor_fault_post_failed', error: res.error }));

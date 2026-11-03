@@ -166,8 +166,16 @@ export function gapLinesOf(gaps: readonly GapRow[]): { at: string; text: string 
 }
 
 /** The line at the top: healthy, or which heartbeats missed. */
-export function summaryOf(rows: readonly BeatRow[]): { healthy: boolean; title: string } {
+export interface Summary {
+  healthy: boolean;
+  /** Nothing has pinged yet (a fresh environment): no claim either way. */
+  empty?: boolean;
+  title: string;
+}
+
+export function summaryOf(rows: readonly BeatRow[]): Summary {
   const counted = rows.filter((r) => r.status !== 'waiting');
+  if (!counted.length) return { healthy: false, empty: true, title: 'No heartbeats yet' };
   const down = counted.filter((r) => r.status === 'down');
   if (!down.length)
     return {

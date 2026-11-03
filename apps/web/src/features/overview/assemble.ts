@@ -1,4 +1,4 @@
-import { MONITOR_GRACE_MS } from '@dxt/engine';
+import { isSweepStale, MONITOR_GRACE_MS } from '@dxt/engine';
 import { isTlsChainError, type Role } from '@dxt/shared';
 import type { MonitorFault, ProbeHealth, ViewerKind } from './types';
 
@@ -118,7 +118,7 @@ export function probeHealth(
 /** Who is looking (D-032): an AM is a stakeholder who manages at least one client; any other is the CEO. */
 /** The engine cron's sweep is more than 3 min old (S12a, D-053); a sweep that never ran is no fault. */
 export function isEngineFault(sweepAt: string | null, now: Date): boolean {
-  return !!sweepAt && now.getTime() - new Date(sweepAt).getTime() >= MONITOR_GRACE_MS;
+  return isSweepStale(sweepAt ? new Date(sweepAt) : null, now);
 }
 
 /**

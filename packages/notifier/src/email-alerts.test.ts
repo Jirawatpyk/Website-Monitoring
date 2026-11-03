@@ -234,6 +234,7 @@ describe('Admin alert about the browser verifier (D-001, D-019)', () => {
     const noLink = alert({ kind: 'probe_location_missing', location: 'BKK', sites: [] });
     expect(noLink.text).toContain('BKK (BKK VPS) hasn’t reported for 3 min. SIN and TYO still vote');
     expect(noLink.html).not.toContain('<a href');
+    expect(() => alert({ kind: 'probe_location_missing', sites: [] })).toThrow('needs the location');
   });
 
   it('BKK network check failing (D-028): what it affects and what to check', () => {
