@@ -95,6 +95,8 @@ select json_build_object(
 
 ## 3. Observe
 
+Typing into a field in the browser pane: read the field's value (`find` / `read_page`) before typing again. A screenshot can show a field empty after the first `type` landed (INC-0035, INC-0060: a doubled note was saved).
+
 - **Database** — the Supabase SQL editor of the staging project (browser pane, signed in by Tao): https://supabase.com/dashboard/project/ctxmmrhvrjbkpodpgkqd/sql/new. Find the editor with `find "Editor content"`, then select-all, type, `ctrl+Return`, `get_page_text`. Return one JSON value so the result isn't cut off, e.g.:
 
   ```sql
