@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-052 | 3 Nov 2026 | S11 client update: "Mark client updated" opens a small dialog with an optional note; with no active AM at the due time the Admins get the @mention and the email ("no AM"); the Client update card shows only once the track fired (before that Resolve reads "Not required"); the Responder rule is own sites only (not on call) | Incident board (Mark saves at once, no note) |
 | D-051 | 31 Oct 2026 | Tier 2–3: a round whose primary timed out at ≥ 2 locations gets a confirm check from every location at the next minute (with its own recheck); it is judged with that round — failing at 2 locations it is the second round (DOWN from the first timeout, ~2.5 min), passing it is a blip. Confirm checks are never a round of their own | D-049 item 2 (Tier 2–3 wait for their normal next round) |
 | D-050 | 31 Oct 2026 | A 3rd D-049 timeout blip within 30 min on the primary is a PROBLEM · Intermittent from the 1st (client word Degraded); an open PROBLEM drop holds while a blip is in the window and recovers on the first OK round after 30 min without one (so never auto-resolved) | D-049 accepted gap (a site timing out every other round raises nothing) |
 | D-049 | 31 Oct 2026 | A timeout alone needs two failing rounds in a row (the round just before hard-failed at any 2 locations, read from its own checks) before DOWN (or a key-page PROBLEM, or a PROBLEM raised to DOWN); a 5xx, a refused connection, DNS and TLS errors still confirm in one round (check + recheck). Tier 2–3 wait for their normal next round (a +1 min confirm round is a possible follow-up). The DOWN still starts at the first timeout | Spec §6 DOWN rule ("two checks in a row" = the check and its recheck, for every hard fail) |
@@ -55,6 +56,26 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-052 — Client update: the note, no AM, when the card shows
+
+**Context.** S11 builds the client-update track (FR-20, spec §9, §16.2, §16.6). Three things are open in the sources:
+- The Incident board's "Mark client updated" saves at once with no note. But spec §14.11 and the EmailAlert L3 / Recovered rows show a note ("Called MuvMi ops, ETA shared").
+- Nothing says what happens when the client has no active AM at the due time. `site_start_problems` requires an AM only when a site starts, and an AM can be deactivated later.
+- No board draws the card before the track fires.
+
+**Decision (Tao, 3 Nov 2026).**
+
+1. **Mark client updated** opens a small dialog shaped like "Not needed…", with an **optional** note. The note shows on the card ("Note"), on the timeline and in the later emails' "Client update" fact.
+2. **No active AM at the due time:** every active Admin gets the @mention and the email instead, and the message says the client has no AM. The resolve condition is unchanged.
+3. **The card shows only once the track fired.** Before that, and for incidents it never fires on, the Resolve condition reads "Not required".
+4. **Who may mark:**
+   - an Admin;
+   - a Responder, on sites they own (owner or backup), but not as the person on call (§16.6: "Responder: own sites");
+   - the client's AM (`clients.am_user_id`), as a Stakeholder or a Responder — whoever gets the mention can act on it (security review L1);
+   - never a Viewer.
+
+**Where.** Migration `client_update_track`: `private.can_client_update`, `engine_client_update_due`, `mark_client_update`.
 
 ## D-051 — Tier 2–3 confirm a timeout round a minute later
 
