@@ -53,6 +53,7 @@ import {
 import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { loadResponseHours } from '../escalation/response-hours';
+import { clientUpdateTick } from './client-update';
 import { escalationTick } from './ladder';
 import { endedBefore, inWindow, loadWindows, windowHides, type SiteWindows } from './windows';
 import { BACKLOG_ALERT_OVER, loadVerifierState } from './verifier-state';
@@ -129,6 +130,8 @@ export interface EngineSummary extends CronJobResult {
   escalated: number;
   /** Incident changes this run that queued messages (any kind but `settled`): deliver them now. */
   notified: number;
+  /** Client-update tracks that fired this run (S11): the AM's @mention + email queued. */
+  clientUpdates?: number;
   /** Sites whose write failed this run (the rest were judged); the run reports `ok: false`. */
   failures?: string[];
   /** Recent minutes a location's times were left out of the slow rule, e.g. "2026-10-12T14:03Z BKK" (D-039). */
@@ -423,6 +426,16 @@ export async function runEngine(
   } catch (err) {
     failures.push(`escalation: ${err instanceof Error ? err.message : String(err)}`);
     console.error(JSON.stringify({ event: 'engine_escalation_failed', error: String(err) }));
+  }
+  // The client-update track (S11, spec §9): separate from the ladder, an ack doesn't stop it.
+  try {
+    const track = await clientUpdateTick(db, now, hours);
+    summary.notified += track.queued;
+    if (track.queued) summary.clientUpdates = track.queued;
+    for (const f of track.failed) failures.push(`client update ${f}`);
+  } catch (err) {
+    failures.push(`client update: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(JSON.stringify({ event: 'engine_client_update_failed', error: String(err) }));
   }
   summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, {
     failing: control,

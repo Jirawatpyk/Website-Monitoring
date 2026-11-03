@@ -1,8 +1,8 @@
 import 'server-only';
 import { cache } from 'react';
 import type { DbClient } from '@dxt/db';
-import { episodesFromTimeline, outageMinutes, siteUptimeOver } from '@dxt/engine';
-import { describeFailure } from '@dxt/notifier';
+import { downEpisodesFromTimeline, episodesFromTimeline, outageMinutes, siteUptimeOver } from '@dxt/engine';
+import { clientUpdateDraft, describeFailure } from '@dxt/notifier';
 import type { LocationGlyph } from '@/components/site-cells';
 import {
   bangkokMonthStart,
@@ -31,9 +31,12 @@ import { createClient } from '@/lib/supabase/server';
 import { serviceDb } from '@/server/db';
 import { SCREENSHOT_BUCKET } from '@/server/verifier/jobs';
 import {
+  canMarkClientUpdate,
+  clientUpdateCardOf,
   durationMinutes,
   resolveGate,
   timelineOf,
+  type ClientUpdateCard,
   type EventRow,
   type Gate,
   type ListIncident,
@@ -100,6 +103,8 @@ export interface IncidentDetail {
   acked: { by: string; at: string } | null;
   /** Add note, root cause, Resolve: the Acknowledge rule (D-033). */
   canAct: boolean;
+  /** The Client update card (S11), once the track fired (D-052 item 3); null before or never. */
+  clientUpdate: ClientUpdateCard | null;
   rootCause: { category: string | null; what: string | null; fix: string | null };
   gate: Gate;
   /**
@@ -144,12 +149,18 @@ interface DetailRow extends IncidentRow {
   auto_resolved: boolean;
   client_update_required: boolean;
   client_updated_at: string | null;
+  client_update_due_at: string | null;
+  client_updated_by: string | null;
+  client_update_note: string | null;
+  client_update_not_needed: boolean;
   root_cause_category: string | null;
   root_cause: string | null;
   root_cause_fix: string | null;
   alerted_at: string | null;
   l0: { is_active: boolean; role: string } | null;
-  sites: IncidentRow['sites'] & { clients: { am_user_id: string | null } | null };
+  sites: IncidentRow['sites'] & {
+    clients: { am_user_id: string | null; name: string; language: string } | null;
+  };
 }
 
 interface CheckRow {
@@ -281,11 +292,12 @@ export async function loadIncident(
     .select(
       `id, number, state, severity, trigger, escalation_level, started_at, detected_at, acked_at, acked_by,
        recovered_at, resolved_at, resolved_by, auto_resolved, client_update_required, client_updated_at,
+       client_update_due_at, client_updated_by, client_update_note, client_update_not_needed,
        root_cause_category, root_cause, root_cause_fix, site_id, monitor_id, l0_user_id, alerted_at,
        l0:profiles!incidents_l0_user_id_fkey(is_active, role),
        sites!inner(name, tier, primary_owner_id, backup_owner_id,
          monitors(id, url, is_primary, timeout_ms, allowed_redirect_domains),
-         clients(am_user_id))`,
+         clients(am_user_id, name, language))`,
     )
     .eq('id', incidentId)
     .maybeSingle()
@@ -360,6 +372,7 @@ export async function loadIncident(
     i.sites.backup_owner_id,
     am,
     i.l0_user_id ?? null,
+    i.client_updated_by,
   ]) {
     if (id) ids.add(id);
   }
@@ -388,6 +401,7 @@ export async function loadIncident(
     : null;
   const actor: Viewer = askShift ? { ...viewer, onCallNow: onCall === viewer.id } : viewer;
   const view = buildIncidentView(i, events, actor, names, now);
+  const clientUpdate = clientUpdateOf(i, events, nameOf, viewer, now);
 
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
   const shot =
@@ -444,6 +458,13 @@ export async function loadIncident(
         clientUpdateRequired: i.client_update_required,
         clientUpdatedAt: i.client_updated_at,
         rootCauseCategory: i.root_cause_category,
+        clientUpdate: {
+          tier: i.sites.tier,
+          dueAt: i.client_update_due_at,
+          by: i.client_updated_by ? nameOf(i.client_updated_by) : null,
+          notNeeded: i.client_update_not_needed,
+          note: i.client_update_note,
+        },
       },
       events,
       nameOf,
@@ -458,6 +479,7 @@ export async function loadIncident(
           }
         : undefined,
     ),
+    clientUpdate,
     resolved: resolvedOf(i, events, viewer, nameOf),
     emailed: events.some((e) => e.type === 'alerted' && e.payload.channel === 'email'),
     timeline: timelineOf(
@@ -484,6 +506,50 @@ export async function loadIncident(
           }
         : null,
   };
+}
+
+/** The Client update card (S11, spec §9): the record, the TH / EN draft and who may mark it. */
+function clientUpdateOf(
+  i: DetailRow,
+  events: readonly EventRow[],
+  nameOf: (id: string | null) => string,
+  viewer: Viewer,
+  now: Date,
+): ClientUpdateCard | null {
+  const amId = i.sites.clients?.am_user_id ?? null;
+  const client = i.sites.clients?.name ?? i.sites.name;
+  // Whom the track told and when, as it recorded them — not the client's AM now (spec-check M1).
+  const fired = events.find((e) => e.type === 'client_update_due');
+  const notified = fired
+    ? {
+        am: typeof fired.payload.am === 'string' && fired.payload.noAm !== true ? fired.payload.am : null,
+        at: fired.at,
+      }
+    : null;
+  const am = notified ? notified.am : amId ? nameOf(amId) : null;
+  // Unavailable since the first DOWN drop's first failed check — a PROBLEM raised to DOWN (D-021)
+  // was up until then (code review, S11).
+  const since = downEpisodesFromTimeline(i, events)[0]?.start ?? new Date(i.started_at);
+  const draft = (lang: 'th' | 'en') => clientUpdateDraft({ client, since, am, lang, now });
+  return clientUpdateCardOf({
+    notified,
+    required: i.client_update_required,
+    dueAt: i.client_update_due_at,
+    updatedAt: i.client_updated_at,
+    by: i.client_updated_by ? nameOf(i.client_updated_by) : null,
+    notNeeded: i.client_update_not_needed,
+    note: i.client_update_note,
+    tier: i.sites.tier,
+    am,
+    client,
+    drafts: { th: draft('th'), en: draft('en') },
+    lang: i.sites.clients?.language === 'th' ? 'th' : 'en',
+    canMark: canMarkClientUpdate(viewer, {
+      primaryOwnerId: i.sites.primary_owner_id,
+      backupOwnerId: i.sites.backup_owner_id,
+      amId,
+    }),
+  });
 }
 
 /** Open incidents (any state before Resolved) for the nav count; null when it can't be read. */

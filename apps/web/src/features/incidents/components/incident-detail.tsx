@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   toast,
+  Alert,
   Avatar,
   Badge,
   Breadcrumb,
@@ -44,7 +45,8 @@ import { useLiveRefresh } from '@/components/use-live-refresh';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge, undoResolve } from '../actions';
 import type { IncidentDetail } from '../detail-queries';
-import { rootCauseLabel } from '../model';
+import { clientUpdateWhy, rootCauseLabel } from '../model';
+import { ClientUpdateCard } from './client-update-card';
 import type { IncidentSections } from './incident-sections';
 import { AckPanel } from './ack-panel';
 import {
@@ -340,6 +342,11 @@ export function IncidentDetailView({
       {/* ── desktop and tablets (Incident) ── */}
       <div className="hidden flex-col gap-6 md:flex">
         {sections.facts}
+        {d.clientUpdate?.banner && (
+          <Alert tone="warning" title={d.clientUpdate.banner}>
+            {`${clientUpdateWhy(d.tier)}, so ${d.clientUpdate.am ? `${d.clientUpdate.am} (AM) was` : 'the Admins were'} @mentioned in the thread with a draft. Acknowledging does not stop this track — mark it in the Client update card once ${d.clientUpdate.client} has been told, or mark it “Not needed” with a reason.`}
+          </Alert>
+        )}
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*88)]">
           <div className="flex min-w-0 flex-col gap-6">
             {whatChanged ?? (
@@ -370,6 +377,17 @@ export function IncidentDetailView({
                 overdue={postOverdue}
                 headingRef={resolvedDesktop}
                 onUndone={() => setFocusResolve(true)}
+              />
+            )}
+            {d.clientUpdate && (
+              <ClientUpdateCard
+                card={d.clientUpdate}
+                incidentId={v.incidentId}
+                incidentLabel={incidentLabel}
+                siteName={d.siteName}
+                tier={d.tier}
+                acked={!!d.acked}
+                phone={false}
               />
             )}
             {resolveCard(resolveDesktop, true)}
@@ -433,6 +451,17 @@ export function IncidentDetailView({
           />
         )}
         {whatChanged ?? sections.latestRound}
+        {d.clientUpdate && (
+          <ClientUpdateCard
+            card={d.clientUpdate}
+            incidentId={v.incidentId}
+            incidentLabel={incidentLabel}
+            siteName={d.siteName}
+            tier={d.tier}
+            acked={!!d.acked}
+            phone
+          />
+        )}
         {resolveCard(null, false)}
         {v.ack.kind === 'read-only' && (
           <NoAccess title={v.ack.title} description={v.ack.description} people={v.ack.people} />

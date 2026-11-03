@@ -23,6 +23,9 @@ import {
   buildStepAlert,
   buildStepEmail,
   buildSystemAlertEmail,
+  buildClientUpdateDueAlert,
+  buildClientUpdateDueEmail,
+  plainName,
   type ChatMessage,
   type ChatPerson,
   type EmailBaseInput,
@@ -35,6 +38,7 @@ import {
 import {
   clockMinutes,
   confirmedByWafOf,
+  formatTime,
   PROBE_LOCATIONS,
   ROOT_CAUSE_CATEGORIES,
   ROOT_CAUSE_LABELS,
@@ -213,6 +217,50 @@ function resolvedOf(n: Notification, i: IncidentFacts) {
   };
 }
 
+/** How it was marked (S11): "marked by Bua 10:12" / "not needed · Tao 10:07"; null until marked. */
+function clientUpdateWords(i: IncidentFacts): string | null {
+  if (!i.client_update_required || !i.client_updated_at) return null;
+  const by = i.client_updater?.display_name ?? 'someone';
+  const at = formatTime(new Date(i.client_updated_at));
+  return i.client_update_not_needed ? `not needed · ${by} ${at}` : `marked by ${by} ${at}`;
+}
+
+/**
+ * The client-update record in words (S11, EmailAlert "Client update" rows): "Due 10:03 · Bua (AM)
+ * notified — the AM sends it" while waiting, "Marked by Bua 10:12 — “Called MuvMi ops, ETA shared”",
+ * "Not needed · Tao 10:07 — “<reason>”"; null when the track never fired.
+ */
+function clientUpdateFact(i: IncidentFacts): string | null {
+  if (!i.client_update_required || !i.client_update_due_at) return null;
+  const words = clientUpdateWords(i);
+  if (words) {
+    const head = `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+    return i.client_update_note ? `${head} — “${i.client_update_note}”` : head;
+  }
+  const am = i.sites.client?.am?.display_name;
+  const due = formatTime(new Date(i.client_update_due_at));
+  return am
+    ? `Due ${due} · ${am} (AM) notified — the AM sends it`
+    : `Due ${due} · no AM, the Admins were told`;
+}
+
+/** The RECOVERED card's line (ChatAlert): "Client update marked by Bua 10:12". */
+function clientUpdateMarked(i: IncidentFacts): string | null {
+  const words = clientUpdateWords(i);
+  return words ? `Client update ${words}` : null;
+}
+
+/** The client-update email this reader got (S11): when it went, and whether it went to an Admin (no AM). */
+function clientUpdateReaderOf(i: IncidentFacts, userId: string): { at: Date; noAm: boolean } | null {
+  const e = i.incident_events?.find((x) => x.type === 'client_update_due');
+  const p = e?.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : null;
+  const ids = Array.isArray(p?.notified) ? p.notified : [];
+  return e?.at && ids.includes(userId) ? { at: new Date(e.at), noAm: p?.noAm === true } : null;
+}
+
+/** The client the site belongs to; the site's name when it isn't loaded (an older facts query). */
+const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
+
 /** The cause line stored when the incident opened (its `detected` event). */
 function causeOf(i: IncidentFacts): string | null {
   const detected = i.incident_events?.find((e) => e.type === 'detected');
@@ -299,6 +347,18 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         problem: problemOf(i),
         stopped: stoppedOf(i, ctx),
       });
+    case 'client_update_due':
+      return buildClientUpdateDueAlert({
+        incidentId: i.id,
+        site: i.sites.name,
+        tier: i.sites.tier,
+        people: namedIn(i, n.context).mentioned,
+        noAm: ctx.noAm === true,
+        client: clientOf(i),
+        // Fired in the minute it recovered (a DOWN drop covered the due time): "was down".
+        recovered: i.state === 'monitoring' || i.state === 'needs_root_cause',
+        draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
+      });
     case 'step_fired': {
       const named = namedIn(i, n.context);
       const step = stepFactsOf(i, n.context);
@@ -356,6 +416,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         okLocations: num(ctx.okLocations, 2),
         owner: person(l0Of(i)),
         problem: dropProblem(i, drop, ctx),
+        clientUpdate: clientUpdateMarked(i),
       });
     }
     case 'down_again':
@@ -424,6 +485,26 @@ export function renderEmail(
     incidentUrl: incidentUrl(appUrl, i.id),
     ...thread,
   };
+  // S11 (EmailAlert Bua rows): someone emailed the client update gets its footer, not "fallback".
+  const cuReader = n.template === 'client_update_due' ? null : clientUpdateReaderOf(i, to.id);
+  if (cuReader && base.reason === 'fallback') {
+    base.reason = 'step';
+    base.why =
+      n.template === 'recovered' && i.client_updated_at && !i.client_update_not_needed && !cuReader.noAm
+        ? `You got this because you’re the AM for ${clientOf(i)} and handled its client update.`
+        : `You got this because you were emailed about the client update at ${formatTime(cuReader.at)}.`;
+  }
+  const amReader = cuReader
+    ? {
+        marked: i.client_updated_at ? formatTime(new Date(i.client_updated_at)) : null,
+        // "Not needed" is no update the AM sent (message-check M1): said as such, with who and when.
+        notNeeded:
+          i.client_updated_at && i.client_update_not_needed
+            ? `${plainName(i.client_updater?.display_name ?? 'someone')} ${formatTime(new Date(i.client_updated_at))}`
+            : null,
+        draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
+      }
+    : null;
   switch (n.template) {
     case 'down':
       return buildDownEmail({
@@ -455,6 +536,23 @@ export function renderEmail(
         heldUntil: heldUntilOf(ctx),
         acknowledged,
       });
+    case 'client_update_due': {
+      const dueAt = new Date(str(ctx.dueAt, n.created_at));
+      return buildClientUpdateDueEmail({
+        ...base,
+        reason: 'step',
+        client: clientOf(i),
+        confirmedAt: new Date(i.detected_at),
+        // From the first failed check (D-002): 15 min on Tier 1; a Tier 2 night counts the wall clock.
+        downMinutes: clockMinutes(new Date(i.started_at), dueAt),
+        cause: causeOf(i),
+        acked: i.acker && i.acked_at ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
+        noAm: ctx.noAm === true,
+        draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
+        dueAt,
+        recovered: i.state === 'monitoring' || i.state === 'needs_root_cause',
+      });
+    }
     case 'step_fired': {
       const asFyi = ctx.asFyi === true;
       const level = num(ctx.level, 1);
@@ -482,6 +580,7 @@ export function renderEmail(
         cause: causeOf(i),
         toldAt: toldAtOf(i),
         fallback: ctx.fallback === true,
+        clientUpdate: step.kind === 'fyi' ? clientUpdateFact(i) : null,
       });
     }
     case 'acknowledged':
@@ -495,6 +594,8 @@ export function renderEmail(
         downMinutes: outageAt(i, new Date(str(ctx.ackedAt, n.created_at))),
         confirmedAt: new Date(i.detected_at),
         stopped: stoppedOf(i, ctx),
+        clientUpdate: clientUpdateFact(i),
+        amReader,
       });
     case 'recovered': {
       const drop = recoveryOf(i, ctx);
@@ -517,6 +618,9 @@ export function renderEmail(
         owner: l0Of(i)?.display_name ?? null,
         ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
         problem: dropProblem(i, drop, ctx),
+        clientUpdate: clientUpdateFact(i),
+        amReader,
+        amName: i.sites.client?.am?.display_name ?? null,
       });
     }
     case 'resolved':

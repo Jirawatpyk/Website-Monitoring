@@ -9,6 +9,7 @@ import {
   IconCircleCheck,
   IconEye,
   IconImage,
+  IconMail,
   IconPencil,
   IconRotateCcw,
   IconTriangleAlert,
@@ -49,6 +50,9 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   undone: { icon: <IconRotateCcw />, tone: 'text-fg-secondary' },
   flapping: { icon: <IconActivity />, tone: 'text-fg-warning' },
   baseline: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
+  client_due: { icon: <IconMail />, tone: 'text-fg-warning' },
+  client_marked: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
+  client_not_needed: { icon: <IconCircleCheck />, tone: 'text-fg-secondary' },
 };
 
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {

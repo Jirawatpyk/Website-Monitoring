@@ -26,8 +26,8 @@ import { flapCounts, timesWord, type Drop, type KeyPageFacts } from './relapse-a
 import { resolvedLasted } from './resolve-alerts';
 
 /**
- * Alert emails — EmailAlert board, spec §10, PRD §7, cut to what exists today (D-013 / D-016: no
- * client-update buttons until S11; escalation from S08 is L1 only, D-034).
+ * Alert emails — EmailAlert board, spec §10, PRD §7, cut to what exists today (D-013 / D-016;
+ * escalation from S08, D-034; the client update due email from S11, D-052).
  *
  * One email per event and per person, all under one subject per incident ("MuvMi · Tier 1 ·
  * INC-0142"), so a mail client stacks them like the Chat thread. The provider assigns each
@@ -124,6 +124,13 @@ export interface AcknowledgedEmailInput extends EmailBaseInput {
   downMinutes?: number | null;
   /** What the ack stopped (S08): L1 for a DOWN, the reminders for a PROBLEM. */
   stopped?: LadderStopped | null;
+  /**
+   * The reader is the AM the client update went to (S11, EmailAlert Bua rows): `marked` = the time their
+   * update is on record ("10:12"), null while it still waits; `draftUrl` = the card ("Open draft").
+   */
+  amReader?: { marked: string | null; notNeeded?: string | null; draftUrl: string } | null;
+  /** The client-update record in words (S11): "Due 10:03 · Bua (AM) notified", "Marked by Bua 10:12 — …". */
+  clientUpdate?: string | null;
 }
 
 export interface RecoveredEmailInput extends EmailBaseInput {
@@ -134,6 +141,15 @@ export interface RecoveredEmailInput extends EmailBaseInput {
   ack: { by: string; at: Date } | null;
   /** Set for a PROBLEM incident (EmailAlert PROBLEM thread). */
   problem?: ProblemFacts | null;
+  /**
+   * The reader is the AM the client update went to (S11, EmailAlert Bua rows): `marked` = the time their
+   * update is on record ("10:12"), null while it still waits; `draftUrl` = the card ("Open draft").
+   */
+  amReader?: { marked: string | null; notNeeded?: string | null; draftUrl: string } | null;
+  /** The client-update record in words (S11): "Due 10:03 · Bua (AM) notified", "Marked by Bua 10:12 — …". */
+  clientUpdate?: string | null;
+  /** The AM, for "Still to do · tell the client it's back (Bua)". */
+  amName?: string | null;
 }
 
 type Template =
@@ -144,7 +160,8 @@ type Template =
   | 'flap_summary'
   | 'down_again'
   | 'problem_again'
-  | 'resolved';
+  | 'resolved'
+  | 'client_update_due';
 
 export interface ResolvedEmailInput extends EmailBaseInput {
   resolvedBy: string;
@@ -431,7 +448,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
     pre: [`by ${ackedBy} ${at}`, `${site} ${still}`, ...(stopped ? [stopped.line] : [])].join(' · '),
     headline: `${ackedBy} has ${site}`,
     lede: !problem
-      ? `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.body}` : '.'}`
+      ? `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.body}` : '.'}${input.amReader && !input.amReader.marked ? ' The client update is still yours to send.' : ''}`
       : `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.line}.` : '.'} The site is still up${slow ? ' but slow' : ''}; you’ll get one more email when it clears.`,
     facts: problem
       ? [
@@ -450,8 +467,15 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
             `${duration} so far (confirmed down ${withDayIfNot(input.confirmedAt, input.ackedAt, formatTimeWithSeconds)})`,
           ],
           ...(stopped?.fact ? [stopped.fact] : []),
+          ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
         ],
-    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
+    buttons:
+      input.amReader && !input.amReader.marked && !problem
+        ? [
+            { label: 'Open draft', href: input.amReader.draftUrl, primary: true },
+            { label: 'Open incident', href: input.incidentUrl, primary: false },
+          ]
+        : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
 }
 
@@ -498,24 +522,48 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
     label: 'RECOVERED',
     pre: `${site} back at ${formatTime(input.recoveredAt)} · down ${duration} · root cause needed`,
     headline: `${site} is back`,
+    // The owner's root cause comes first, even when the owner is also the AM (message-check L4).
     lede: isOwner
       ? 'Needs a root cause before it can be resolved.'
-      : owner
-        ? `Nothing needed from you. ${owner} adds the root cause.`
-        : 'Nothing needed from you.',
+      : input.amReader
+        ? input.amReader.notNeeded
+          ? `${site} is back after ${duration}. The client update was marked not needed (${input.amReader.notNeeded}) — let the client know it’s back if they need to hear it.`
+          : input.amReader.marked
+            ? `${site} is back after ${duration}. Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
+            : `${site} is back after ${duration}. Let the client know it’s back, and mark the client update on the incident page.`
+        : owner
+          ? `Nothing needed from you. ${owner} adds the root cause.`
+          : 'Nothing needed from you.',
     facts: [
       ['Down for', `${duration} (${range})`],
       ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)} → Monitoring`],
       ...ackFact,
-      ...(owner ? [['Still to do', `Root cause (${owner})`] as [string, string]] : []),
+      ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
+      ...(() => {
+        // "tell the client it's back (Bua)" — not when it was marked not needed, nor with no AM.
+        const tell = input.clientUpdate && input.amName && !input.amReader?.notNeeded;
+        const todo = [
+          owner ? `Root cause (${owner})` : null,
+          tell ? `tell the client it’s back (${input.amName})` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        return todo ? [['Still to do', todo] as [string, string]] : [];
+      })(),
     ],
-    // Board: the owner gets "Add root cause" first; for everyone else one secondary button.
+    // Board: the owner gets "Add root cause" first; the AM "Open incident" (primary), with "Open draft"
+    // while the update still waits; everyone else one secondary button.
     buttons: isOwner
       ? [
           { label: 'Add root cause', href: `${input.incidentUrl}#resolve`, primary: true },
           { label: 'Open incident', href: input.incidentUrl, primary: false },
         ]
-      : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
+      : input.amReader && !input.amReader.marked
+        ? [
+            { label: 'Open draft', href: input.amReader.draftUrl, primary: true },
+            { label: 'Open incident', href: input.incidentUrl, primary: false },
+          ]
+        : [{ label: 'Open incident', href: input.incidentUrl, primary: !!input.amReader }],
   });
 }
 
@@ -887,6 +935,8 @@ function ladderFacts(
 }
 
 export interface StepEmailInput extends EmailBaseInput {
+  /** The client-update record in words, on the L3 FYI (S11, EmailAlert "Client update · Marked by Bua 10:12 — …"). */
+  clientUpdate?: string | null;
   severity: 'down' | 'problem';
   level: number;
   /** Minutes unacknowledged since the owner was told: Confirmed down, or a held PROBLEM's opening (D-034). */
@@ -993,6 +1043,7 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
               ],
             ]
           : []),
+        ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
         ['Next step', 'Recovery email when it’s back · no more escalation'],
       ],
       buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
@@ -1077,4 +1128,58 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
             { label: 'Open incident', href: input.incidentUrl, primary: false },
           ],
   });
+}
+
+export interface ClientUpdateDueEmailInput extends EmailBaseInput {
+  client: string;
+  confirmedAt: Date;
+  /** How long it had been down when the track fired, counted from the first failed check. */
+  downMinutes: number;
+  cause: string | null;
+  acked: { by: string; at: Date } | null;
+  /** No active AM: this goes to an Admin instead (D-052 item 2). */
+  noAm: boolean;
+  /** The incident page's Client update card (`#client-update`). */
+  draftUrl: string;
+  /** When it fell due: the confirmed time gets its day when it was another day (a Tier 2 night). */
+  dueAt?: Date;
+  /** Fired in the minute it recovered: "was down", not "has been down". */
+  recovered?: boolean;
+}
+
+/** "Client update due" to the AM (EmailAlert, spec §14.11): primary "Open draft". S11. */
+export function buildClientUpdateDueEmail(input: ClientUpdateDueEmailInput): EmailMessage {
+  const { site, client } = input;
+  const wait = input.tier === 1 ? '15 min' : '60 min inside response hours';
+  return render(
+    {
+      ...input,
+      reason: 'step',
+      why: input.noAm
+        ? `You got this because you’re an Admin and ${client} has no account manager in DxT Monitor.`
+        : `You got this because you’re the AM for ${client} and a Tier ${input.tier} site was down ${wait}.`,
+    },
+    {
+      template: 'client_update_due',
+      color: C.warning,
+      bar: C.warning,
+      label: 'CLIENT UPDATE DUE',
+      pre: `${site} down ${wait} · draft ready`,
+      headline: `Tell ${client} what’s happening`,
+      lede: `${site} (${formatTier(input.tier)}) ${input.recovered ? 'was' : 'has been'} down ${wait}. Please update the client and mark it on the incident page — the incident can’t be resolved until you do.`,
+      facts: [
+        [
+          'Down for',
+          `${formatDuration(input.downMinutes)} (confirmed down ${input.dueAt ? withDayIfNot(input.confirmedAt, input.dueAt, formatTimeWithSeconds) : formatTimeWithSeconds(input.confirmedAt)})`,
+        ],
+        ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+        ['Draft', 'Ready on the incident page — edit, send it to the client, then mark it'],
+        ['Acknowledged', input.acked ? `${input.acked.by} at ${formatTime(input.acked.at)}` : 'Not yet'],
+      ],
+      buttons: [
+        { label: 'Open draft', href: input.draftUrl, primary: true },
+        { label: 'Open incident', href: input.incidentUrl, primary: false },
+      ],
+    },
+  );
 }

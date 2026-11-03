@@ -1,4 +1,5 @@
-import { clockMinutes, type IncidentState, type Severity, type Tier } from '@dxt/shared';
+import { clockMinutes, type IncidentState, type ResponseHours, type Severity, type Tier } from '@dxt/shared';
+import { addInsideMinutes, minutesInsideHours } from './response-hours';
 
 /**
  * Incident lifecycle (spec §15.4, §16; PRD §8).
@@ -76,26 +77,50 @@ export function canResolve(c: ResolveConditions): { ok: boolean; unmet: ResolveB
   return { ok: unmet.length === 0, unmet };
 }
 
+/** The client-update track's delay: Tier 1 24/7, Tier 2 inside response hours (spec §9). */
+export const CLIENT_UPDATE_MIN: Partial<Record<Tier, number>> = { 1: 15, 2: 60 };
+
 /**
- * The client-update track fires when a Tier 1 DOWN reaches 15 min, or a Tier 2 DOWN reaches 60 min
- * counted inside response hours. Tier 3 goes to the report only (spec §9, §16.2).
- * Minutes are incident duration — counted from the FIRST FAILED CHECK, not from "Confirmed down":
- * INC-0142 first failed 09:48:12 → client update due 10:03:12 (Incident, AuditLog, AlertChannels boards),
- * while escalation L1 counts from confirmed down (09:48:41 → 10:03:41).
- * "Reaching" means `>=`. Decision record: docs/decisions.md D-002.
+ * When the client-update track fires (spec §9, §16.2), or null if it doesn't (yet): a Tier 1 DOWN
+ * reaching 15 min, a Tier 2 DOWN reaching 60 min counted inside response hours; Tier 3 goes to the
+ * report only. The minutes are the incident's DOWN minutes (D-052 item 5, as D-033 counts how long it
+ * was down): its drops added up from the FIRST FAILED CHECK, not "Confirmed down" — INC-0142 first
+ * failed 09:48:12 → due 10:03:12 (Incident, AuditLog, AlertChannels boards), while escalation L1
+ * counts from confirmed down (09:48:41 → 10:03:41). A recovery pauses the count and a relapse goes on
+ * with it (D-004); Tier 2 counts only minutes inside response hours, so it never falls due at night.
+ * "Reaching" means `>=` (D-002): a drop that ends exactly at its due instant fires. A PROBLEM raised to
+ * DOWN (D-021) counts from the DOWN. An incident a mute silenced counts from its first alert
+ * (`alertedAt`, D-052 item 6; ChatAlert: "Every timer … counts from 15:00"), as the ladder does.
+ * Acknowledging changes nothing (§8), so the ack isn't an input.
  */
-export function clientUpdateRequired(input: {
+export function clientUpdateDueAt(input: {
   tier: Tier;
-  severity: Severity;
-  /** Minutes since the first failed check. */
-  downMinutes: number;
-  /** The same, counted only inside the tier's response hours. */
-  downMinutesInsideHours: number;
-}): boolean {
-  if (input.severity !== 'down') return false;
-  if (input.tier === 1) return input.downMinutes >= 15;
-  if (input.tier === 2) return input.downMinutesInsideHours >= 60;
-  return false;
+  /** The incident's drops (`episodesFromTimeline`). */
+  episodes: readonly Episode[];
+  hours: ResponseHours;
+  /** The first alert after a mute (`incidents.alerted_at`); null / absent when it went at once. */
+  alertedAt?: Date | null;
+}): Date | null {
+  const minutes = CLIENT_UPDATE_MIN[input.tier];
+  if (minutes === undefined) return null;
+  const from = input.alertedAt?.getTime() ?? -Infinity;
+  const drops = input.episodes
+    .filter((e) => e.severity === 'down' && (e.end === null || e.end.getTime() > from))
+    .map((e) => ({ start: new Date(Math.max(e.start.getTime(), from)), end: e.end }))
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  let left = minutes;
+  for (const d of drops) {
+    const at =
+      input.tier === 1
+        ? new Date(d.start.getTime() + left * 60_000)
+        : addInsideMinutes(d.start, left, input.hours);
+    if (d.end === null || at <= d.end) return at;
+    left -=
+      input.tier === 1
+        ? (d.end.getTime() - d.start.getTime()) / 60_000
+        : minutesInsideHours(d.start, d.end, input.hours);
+  }
+  return null;
 }
 
 /**

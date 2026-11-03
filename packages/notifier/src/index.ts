@@ -9,5 +9,6 @@ export * from './problem-cause';
 export * from './relapse-alerts';
 export * from './resolve-alerts';
 export * from './escalation-alerts';
+export * from './client-update-alerts';
 export * from './maintenance-alerts';
 export * from './oncall-alerts';

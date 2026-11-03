@@ -31,7 +31,7 @@
 | S09d | Defacement: page-change detection | 1 · P1 | L | — (PRD §2 content-change, D-041, D-046) | S09c (merged), S07 | 3–4 (alert on after a 2-week record) | Done |
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | Done |
-| S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | In progress |
+| S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | In review |
 | S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06b, S10, S11 | 4 | Todo |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
@@ -583,6 +583,11 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S12 · Monitor-fault mode & probes
 
 - **Scope:** FR-21, PRD §9. Heartbeat routing: engine missing > 3 min → email Tao + Alerts Space post mentioning on-call through a sender that doesn't depend on the engine; a single probe missing > 3 min → email Tao only, suppressed during an engine fault. Overview fault banner with "as of" data; hand check → manual incident (L0 through the fallback sender, client-update track started, "Escalate now" by hand). VPS watchdog. Probes & heartbeat page.
+- **From S11 (engine review M3):** a manual incident needs four things before the client-update track can fire for it:
+  - a `detected` event, with `started_at` set to the hand check;
+  - a live `down` Chat row (`engine_thread_live`), or a guard of its own;
+  - a hand-fired path for "Escalate now", since `engine_client_update_due` is service role and refuses a future due time;
+  - after a fault, `client_update_required` already set if someone sent it by hand, so the catch-up doesn't tell the AM twice.
 - **Boards:** MainFault, Probes · **Test plan:** T02, T04, T11
 - **Depends on:** S06b, S10, S11
 - **Done when:**

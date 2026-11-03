@@ -253,8 +253,15 @@ async function dispatchChannel(
       }),
     );
     // A window's Chat line has no email fallback: the owner and backup already get its email (D-037).
-    // Nor does an incident's MUTED line (mutes are Chat only, §24.5).
-    if (update.status === 'failed' && channel === 'google_chat' && n.incident_id && n.template !== 'muted') {
+    // Nor does an incident's MUTED line (mutes are Chat only, §24.5), nor CLIENT UPDATE DUE: the AM
+    // (or the Admins) it names got its email already (S11).
+    if (
+      update.status === 'failed' &&
+      channel === 'google_chat' &&
+      n.incident_id &&
+      n.template !== 'muted' &&
+      n.template !== 'client_update_due'
+    ) {
       const fallback = await db.rpc('queue_fallback_emails', { p_notification_id: n.id });
       if (fallback.error) throw new Error(`queue_fallback_emails: ${fallback.error.message}`);
       console.warn(

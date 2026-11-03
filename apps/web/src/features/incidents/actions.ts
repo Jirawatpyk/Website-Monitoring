@@ -8,8 +8,10 @@ import { serviceDb } from '@/server/db';
 import { notifierDeps } from '@/server/notifier/deps';
 import { dispatchNotifications } from '@/server/notifier/dispatch';
 import {
+  clientUpdateSchema,
   incidentIdSchema,
   noteSchema,
+  type ClientUpdateInput,
   rootCauseSchema,
   type NoteInput,
   type RootCauseInput,
@@ -150,6 +152,33 @@ export async function saveRootCause(input: RootCauseInput): Promise<RootCauseRes
     p_fix: fix,
   });
   if (error) return { ok: false, message: refusal(error, ACT_REFUSALS) };
+  revalidate(incidentId);
+  return { ok: true };
+}
+
+export type ClientUpdateResult = { ok: true } | { ok: false; message: string };
+
+const CLIENT_UPDATE_REFUSALS: Record<string, string> = {
+  '42501': 'Only an Admin, the site’s owner or backup, or the client’s account manager can mark this.',
+  P0002: 'This incident doesn’t exist any more.',
+  '22001': 'Keep it under 500 characters.',
+};
+
+/**
+ * Mark client updated / Not needed (S11, spec §9, §16.6, D-052): `mark_client_update` checks who may
+ * and records it with the timeline and the audit row. It sends nothing, so nothing is held.
+ */
+export async function markClientUpdate(input: ClientUpdateInput): Promise<ClientUpdateResult> {
+  const parsed = clientUpdateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]!.message };
+  const { incidentId, notNeeded, note } = parsed.data;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('mark_client_update', {
+    p_incident_id: incidentId,
+    p_not_needed: notNeeded,
+    p_note: note,
+  });
+  if (error) return { ok: false, message: refusal(error, CLIENT_UPDATE_REFUSALS) };
   revalidate(incidentId);
   return { ok: true };
 }

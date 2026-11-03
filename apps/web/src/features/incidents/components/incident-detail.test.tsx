@@ -77,6 +77,7 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     paged: null,
     acked: null,
     canAct: true,
+    clientUpdate: null,
     resolved: null,
     locations: [],
     evidence: null,

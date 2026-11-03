@@ -4,7 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
-| D-052 | 3 Nov 2026 | S11 client update: "Mark client updated" opens a small dialog with an optional note; with no active AM at the due time the Admins get the @mention and the email ("no AM"); the Client update card shows only once the track fired (before that Resolve reads "Not required"); the Responder rule is own sites only (not on call) | Incident board (Mark saves at once, no note) |
+| D-052 | 3 Nov 2026 | S11 client update: "Mark client updated" opens a small dialog with an optional note; with no active AM at the due time the Admins get the @mention and the email ("no AM"); the Client update card shows only once the track fired (before that Resolve reads "Not required"); the Responder rule is own sites only (not on call); "15 min" is the incident's DOWN minutes added up across drops (Tier 2: inside response hours), from the first alert after a mute | Incident board (Mark saves at once, no note) |
 | D-051 | 31 Oct 2026 | Tier 2–3: a round whose primary timed out at ≥ 2 locations gets a confirm check from every location at the next minute (with its own recheck); it is judged with that round — failing at 2 locations it is the second round (DOWN from the first timeout, ~2.5 min), passing it is a blip. Confirm checks are never a round of their own | D-049 item 2 (Tier 2–3 wait for their normal next round) |
 | D-050 | 31 Oct 2026 | A 3rd D-049 timeout blip within 30 min on the primary is a PROBLEM · Intermittent from the 1st (client word Degraded); an open PROBLEM drop holds while a blip is in the window and recovers on the first OK round after 30 min without one (so never auto-resolved) | D-049 accepted gap (a site timing out every other round raises nothing) |
 | D-049 | 31 Oct 2026 | A timeout alone needs two failing rounds in a row (the round just before hard-failed at any 2 locations, read from its own checks) before DOWN (or a key-page PROBLEM, or a PROBLEM raised to DOWN); a 5xx, a refused connection, DNS and TLS errors still confirm in one round (check + recheck). Tier 2–3 wait for their normal next round (a +1 min confirm round is a possible follow-up). The DOWN still starts at the first timeout | Spec §6 DOWN rule ("two checks in a row" = the check and its recheck, for every hard fail) |
@@ -75,7 +75,16 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
    - the client's AM (`clients.am_user_id`), as a Stakeholder or a Responder — whoever gets the mention can act on it (security review L1);
    - never a Viewer.
 
-**Where.** Migration `client_update_track`: `private.can_client_update`, `engine_client_update_due`, `mark_client_update`.
+5. **What "15 min" counts (Tao, 3 Nov, engine review M1/M2):** the incident's DOWN minutes added up across its drops. This is D-033's "how long it was down", counted from the first failed check (D-002). A recovery pauses the count and a relapse goes on with it.
+   - Example: 7 min, then 2 min two days later, is 9 min, so no client update is due.
+   - Tier 2 adds only the DOWN minutes inside response hours, so it never falls due at night.
+   - Supersedes the first reading of D-004's "keeps counting from the first failed check", which was wall-clock time since the first failure.
+6. **After a mute (Tao, 3 Nov; ChatAlert "Every timer (L1, client update, CEO, L3) counts from 15:00"):** an incident a mute silenced counts from its first alert (`alerted_at`), as the ladder does. The draft still tells the client when the site really went down.
+
+**Where.**
+- Migration `client_update_track`: `private.can_client_update`, `engine_client_update_due`, `mark_client_update`.
+- `clientUpdateDueAt` in `@dxt/engine`.
+- The runner's `clientUpdateTick`.
 
 ## D-051 — Tier 2–3 confirm a timeout round a minute later
 
@@ -1130,7 +1139,7 @@ The ChatAlert board has one PROBLEM text line and no PROBLEM card. EmailAlert ha
 - §16.2 defines the resolve condition as "required only if the client-update track fired"; its "> 15 min" paraphrases that trigger, it doesn't define a second threshold. Using `>=` keeps one rule everywhere: the condition is required exactly when the track fired.
 - The Tier 2 clause in the same sentence already uses `>=`.
 
-**Impact.** `clientUpdateRequired()` in `packages/engine/src/lifecycle.ts`; the engine must pass minutes since the first failed check. No UI copy changes ("Tier 1 DOWN over 15 min" in help text still reads correctly).
+**Impact.** `clientUpdateDueAt()` in `packages/engine/src/lifecycle.ts` (S11; it replaced `clientUpdateRequired()`), counted from the first failed check of the first DOWN drop. No UI copy changes ("Tier 1 DOWN over 15 min" in help text still reads correctly).
 
 ## D-001 — Verifier unavailable while a site is blocked: PROBLEM (unverified) immediately
 

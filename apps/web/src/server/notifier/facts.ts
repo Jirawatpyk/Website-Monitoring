@@ -39,13 +39,21 @@ export interface IncidentFacts {
     tier: number;
     primary: Owner | null;
     backup: Owner | null;
-    client?: { am: Owner | null } | null;
+    /** The client and its AM: the client-update messages name both (S11). */
+    client?: { name?: string; am: Owner | null } | null;
   };
   /** The policy it opened with and the level fired (S08, D-034); null before S08. */
   escalation_plan?: Json | null;
   escalation_level?: number;
   /** Who "Admin" names and the Tier 2–3 hours, for the ladder's words (attached by loadFacts). */
   ladder?: LadderEnv;
+  /** The client-update record (S11) for the ACKNOWLEDGED / RECOVERED / L3 FYI "Client update" row. */
+  client_update_required?: boolean;
+  client_update_due_at?: string | null;
+  client_updated_at?: string | null;
+  client_update_note?: string | null;
+  client_update_not_needed?: boolean;
+  client_updater?: { display_name: string } | null;
 }
 
 /** An Admin alert that isn't about one incident (D-019). */
@@ -111,14 +119,16 @@ export async function loadFacts(
       .from('incidents')
       .select(
         `id, number, state, severity, trigger, started_at, detected_at, alerted_at, acked_at, recovered_at,
-         escalation_plan, escalation_level,
+         escalation_plan, escalation_level, client_update_required, client_update_due_at, client_updated_at,
+         client_update_note, client_update_not_needed,
+         client_updater:profiles!incidents_client_updated_by_fkey(display_name),
          acker:profiles!incidents_acked_by_fkey(display_name, google_chat_user_id),
          l0:profiles!incidents_l0_user_id_fkey(id, display_name, google_chat_user_id, is_active, role),
          incident_events(type, payload, at),
          sites!inner(name, tier,
            primary:profiles!sites_primary_owner_id_fkey(id, display_name, google_chat_user_id),
            backup:profiles!sites_backup_owner_id_fkey(id, display_name, google_chat_user_id),
-           client:clients(am:profiles!clients_am_user_id_fkey(id, display_name, google_chat_user_id)))`,
+           client:clients(name, am:profiles!clients_am_user_id_fkey(id, display_name, google_chat_user_id)))`,
       )
       .in('id', incidentIds)
       .overrideTypes<IncidentFacts[], { merge: false }>(),
