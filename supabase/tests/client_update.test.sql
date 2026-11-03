@@ -5,7 +5,7 @@
 -- reason, and either mark meets the resolve gate.
 begin;
 \ir _helpers.psql
-select plan(43);
+select plan(50);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -61,6 +61,8 @@ grant execute on function pg_temp.inc(text) to anon, authenticated, service_role
 select tests.authenticate_as((select id from ids where name = 'arm'));
 select public.ack_incident(pg_temp.inc('a'));
 reset role;
+-- INC-0142: the first failed check at 09:48:12, due 15 min later (10:03:12 Bangkok).
+update public.incidents set started_at = '2026-09-25 02:48:12+00' where id = pg_temp.inc('a');
 
 set local role service_role;
 select ok(public.engine_client_update_due(pg_temp.inc('a'), '2026-09-25 03:03:12+00', '{"cause":"x"}'),
@@ -123,24 +125,55 @@ select ok(not public.engine_client_update_due(pg_temp.inc('i'), now() + interval
   'a due time still to come: not yet');
 reset role;
 update public.incidents set recovered_at = now() where id = pg_temp.inc('i');
+-- The recovery's Chat reply went out before the AM had an email row; an older drop's (before the
+-- latest relapse) is set aside.
+insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key, created_at)
+values (pg_temp.inc('i'), 'google_chat', 'recovered', pg_temp.inc('i')::text, '{"drop":1}', 'r1', now() - interval '1 hour'),
+       (pg_temp.inc('i'), 'google_chat', 'recovered', pg_temp.inc('i')::text, '{"drop":2}', 'r2', now());
+insert into public.audit_log (action, entity, entity_id, at)
+values ('incident.relapsed', 'incident', pg_temp.inc('i'), now() - interval '30 minutes');
 set local role service_role;
 select ok(public.engine_client_update_due(pg_temp.inc('i'), now() - interval '1 minute'),
-  'in Monitoring, the drop covered the due time: it fires (the runner decides that)');
+  'in Monitoring, the drop covered the due time (started + 15 min exactly): it fires (the runner decides that)');
 reset role;
+select is((select context || jsonb_build_object('key', dedupe_key) from public.notifications
+           where incident_id = pg_temp.inc('i') and channel = 'email' and template = 'recovered'
+             and user_id = (select id from ids where name = 'bua')),
+  '{"drop":2,"key":"r2"}'::jsonb, 'recovered in that minute: the AM gets this recovery''s RECOVERED email too');
+select ok((select r.created_at > c.created_at
+           from public.notifications r, public.notifications c
+           where r.incident_id = pg_temp.inc('i') and r.channel = 'email' and r.template = 'recovered'
+             and c.incident_id = pg_temp.inc('i') and c.channel = 'email' and c.template = 'client_update_due'),
+  'queued after the client-update email, so it goes second');
+select is((select count(*)::int from public.notifications
+           where incident_id = pg_temp.inc('a') and template = 'recovered'),
+  0, 'a DOWN incident still open gets no RECOVERED email from the track');
 
 -- ── T09: a muted site still gets its client update (Done-when 4) ──────────
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select public.mute_site('00000000-0000-0000-0000-0000000000a2', now() + interval '1 hour', 'Deploy');
 reset role;
 set local role service_role;
-select ok(public.engine_client_update_due(pg_temp.inc('m'), now()),
-  'a muted site with an open incident still gets its client-update mention (§15.1)');
+select ok(not public.engine_client_update_due(pg_temp.inc('m'),
+            (select started_at + interval '14 minutes' from public.incidents where id = pg_temp.inc('m'))),
+  'a due time under 15 min after the first failed check: refused, whatever the runner says');
+-- The runner's due time is a JS Date (milliseconds); started_at has microseconds.
+update public.incidents set started_at = now() - interval '16 minutes' + interval '123 microseconds'
+  where id = pg_temp.inc('m');
+select ok(public.engine_client_update_due(pg_temp.inc('m'),
+            (select date_trunc('milliseconds', started_at) + interval '15 minutes' from public.incidents where id = pg_temp.inc('m'))),
+  'a muted site with an open incident still gets its client-update mention (§15.1), at 15 min to the millisecond');
 reset role;
 
 -- ── No active AM → the Admins (D-052 item 2) ───────────────────────────────
 update public.profiles set is_active = false where id = (select id from ids where name = 'thee');
+-- D-023: D's drop went on as a PROBLEM AGAIN held until 09:00 (outside response hours).
+update public.incidents set episode_severity = 'problem' where id = pg_temp.inc('d');
+insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key, hold_until)
+values (pg_temp.inc('d'), 'google_chat', 'problem_again', pg_temp.inc('d')::text, '{}', 'again', now() + interval '1 hour');
+select ok(not public.engine_thread_live(pg_temp.inc('d')), 'the held PROBLEM AGAIN: the drop''s own thread check says no');
 set local role service_role;
-select ok(public.engine_client_update_due(pg_temp.inc('d'), now()), 'Tier 2 at 60 min inside hours');
+select ok(public.engine_client_update_due(pg_temp.inc('d'), now()), 'Tier 2 at 60 min inside hours: the DOWN alert went, so a held PROBLEM AGAIN doesn''t hold it back');
 reset role;
 select is((select array_agg(user_id) from public.notifications
            where incident_id = pg_temp.inc('d') and template = 'client_update_due' and channel = 'email'),
@@ -149,6 +182,20 @@ select is((select (context->>'noAm') || ' ' || (context->>'minutes') from public
            where incident_id = pg_temp.inc('d') and template = 'client_update_due' and channel = 'google_chat'),
   'true 60', 'and the message says the client has no AM');
 update public.profiles set is_active = true where id = (select id from ids where name = 'thee');
+
+-- ── A PROBLEM drop's recovery: no RECOVERED email from the track (D-038) ──
+insert into inc values ('q2', pg_temp.open('00000000-0000-0000-0000-0000000000a7'));
+update public.incidents set state = 'monitoring', recovered_at = now(), episode_severity = 'problem'
+  where id = pg_temp.inc('q2');
+insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key)
+values (pg_temp.inc('q2'), 'google_chat', 'recovered', pg_temp.inc('q2')::text, '{}', 'rq');
+set local role service_role;
+select ok(public.engine_client_update_due(pg_temp.inc('q2'), now() - interval '1 minute'),
+  'recovered from a PROBLEM drop in the minute it fell due: the track fires');
+reset role;
+select is((select count(*)::int from public.notifications
+           where incident_id = pg_temp.inc('q2') and channel = 'email' and template = 'recovered'),
+  0, 'but no RECOVERED email: a PROBLEM drop emails only who was emailed about it');
 
 -- ── Who may mark it (§16.6, Done-when 3) ───────────────────────────────────
 select tests.authenticate_as((select id from ids where name = 'mint'));

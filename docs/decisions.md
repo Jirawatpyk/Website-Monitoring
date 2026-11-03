@@ -80,9 +80,11 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
    - Tier 2 adds only the DOWN minutes inside response hours, so it never falls due at night.
    - Supersedes the first reading of D-004's "keeps counting from the first failed check", which was wall-clock time since the first failure.
 6. **After a mute (Tao, 3 Nov; ChatAlert "Every timer (L1, client update, CEO, L3) counts from 15:00"):** an incident a mute silenced counts from its first alert (`alerted_at`), as the ladder does. The draft still tells the client when the site really went down.
+7. **Fired in the minute the site recovered (Tao, 3 Nov; message check Low):** the recovery's RECOVERED emails were queued before the AM had an email row. The AM (or the Admins with no AM) gets that recovery's RECOVERED email from the track, after the client-update email — as they would have if the track had fired a minute earlier. Only after a DOWN drop: a PROBLEM drop's RECOVERED stays with the people emailed about it (D-038).
 
 **Where.**
 - Migration `client_update_track`: `private.can_client_update`, `engine_client_update_due`, `mark_client_update`.
+- Migration `client_update_followups`: item 7, the thread check on any DOWN alert (engine review L5), the 15-min floor on the due time (L6).
 - `clientUpdateDueAt` in `@dxt/engine`.
 - The runner's `clientUpdateTick`.
 
