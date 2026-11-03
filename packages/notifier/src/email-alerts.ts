@@ -664,6 +664,8 @@ export interface SystemAlertEmailInput {
   location?: ProbeLocation;
   /** The Probes & heartbeat page, for the button (S12a). */
   probesUrl?: string;
+  /** probe_location_missing: the location's last report (Since). */
+  lastBeatAt?: Date;
   /** Sender, for the alert's thread id. */
   from: string;
 }
@@ -710,6 +712,10 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
     footer: SYSTEM_EMAIL_FOOTER,
     headers: { References: `<alert-${input.alertId}@${senderDomain(input.from)}>` },
   };
+  // EmailAlert: the probe and verifier emails link the Probes & heartbeat page (S12a).
+  const probes = input.probesUrl
+    ? [{ label: 'Open Probes & heartbeat', href: input.probesUrl, primary: true }]
+    : [];
   if (input.kind === 'verifier_unavailable') {
     const waiting = input.sites.length;
     return emailLayout(envelope, {
@@ -726,10 +732,13 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
           'Effect',
           'Blocked sites can’t be confirmed OK or DOWN. Hard fails still go DOWN as usual — they don’t wait for the verifier.',
         ],
-        ['What to check', 'Restart the verifier service on the BKK VPS (dxt-agent).'],
+        [
+          'What to check',
+          `Restart the verifier service on the BKK VPS (dxt-agent)${input.probesUrl ? ', then check “Last job” on Probes & heartbeat' : ''}.`,
+        ],
         ['When it’s back', 'Waiting sites are re-checked on the next round and clear on their own.'],
       ],
-      buttons: [],
+      buttons: probes,
     });
   }
   if (input.kind === 'bkk_control_failing') {
@@ -768,14 +777,13 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
       headline: `The ${missing} probe stopped reporting`,
       lede: `${LOCATION_NAMES[missing]} hasn’t reported for 3 min. ${others.join(' and ')} still vote, so statuses keep working — nobody is paged for this.`,
       facts: [
-        ['Since', since],
+        // §15.3: SIN missed 03:12–03:16 → the email at 03:15 says since its last report, 03:12
+        ['Since', input.lastBeatAt ? `${formatTime(input.lastBeatAt)} (last report)` : since],
         ['Still reporting', others.map((l) => LOCATION_NAMES[l]).join(' · ')],
         ['Effect', 'None on statuses while 2 locations report. If a second one stops, statuses freeze.'],
         ['What to check', `${PROBE_CHECK[missing]} — it reports every minute.`],
       ],
-      buttons: input.probesUrl
-        ? [{ label: 'Open Probes & heartbeat', href: input.probesUrl, primary: true }]
-        : [],
+      buttons: probes,
     });
   }
   if (input.kind === 'probe_locations_low') {
@@ -798,7 +806,7 @@ export function buildSystemAlertEmail(input: SystemAlertEmailInput): EmailMessag
         ],
         ['What to check', `${missing.map((l) => PROBE_CHECK[l]).join(' · ')} — each reports every minute.`],
       ],
-      buttons: [],
+      buttons: probes,
     });
   }
   const queued = input.queued ?? 0;

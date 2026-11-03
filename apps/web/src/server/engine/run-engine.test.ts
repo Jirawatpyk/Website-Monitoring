@@ -640,7 +640,10 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
     await runEngine(live.db, now);
     expect(live.rpcCalls).toContainEqual({
       name: 'open_system_alert',
-      args: { p_kind: 'probe_location_missing', p_context: { location: 'BKK' } },
+      args: {
+        p_kind: 'probe_location_missing',
+        p_context: { location: 'BKK', lastBeatAt: '2026-10-06T09:55:00Z' },
+      },
     });
     const faulted = fakeDb({
       'monitors.select': { data: [monitor()] },
@@ -683,7 +686,10 @@ describe('runEngine — PROBLEM triggers and site status (S04a, D-022)', () => {
       { name: 'clear_system_alert', args: { p_kind: 'probe_location_missing' } },
       {
         name: 'open_system_alert',
-        args: { p_kind: 'probe_location_missing', p_context: { location: 'BKK' } },
+        args: {
+          p_kind: 'probe_location_missing',
+          p_context: { location: 'BKK', lastBeatAt: '2026-10-06T09:55:00Z' },
+        },
       },
     ]);
   });

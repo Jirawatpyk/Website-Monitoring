@@ -481,7 +481,8 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
     await results(a.monitorId, blockedRound());
     await results(b.monitorId, blockedRound());
 
-    expect(await runEngine(db, t(65))).toMatchObject({ unverified: 2, alerts: 1 });
+    // + BKK's probe_location_missing (S12a): the suite runs with Bangkok's agent not running
+    expect(await runEngine(db, t(65))).toMatchObject({ unverified: 2, alerts: 2 });
     for (const site of [a, b]) {
       expect(await incidentsOf(site.siteId)).toEqual([expect.objectContaining({ state: 'unacked' })]);
       expect(await noteOf(site.siteId)).toBe('Blocked, not verified');
@@ -489,7 +490,13 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
     const [incident] = await must(db.from('incidents').select('trigger, severity').eq('site_id', a.siteId));
     expect(incident).toEqual({ trigger: 'blocked_unverified', severity: 'problem' });
 
-    const alerts = await must(db.from('system_alerts').select('id, kind, context').is('cleared_at', null));
+    const alerts = await must(
+      db
+        .from('system_alerts')
+        .select('id, kind, context')
+        .is('cleared_at', null)
+        .neq('kind', 'probe_location_missing'),
+    );
     expect(alerts).toEqual([
       expect.objectContaining({
         kind: 'verifier_unavailable',
@@ -569,13 +576,16 @@ describe('browser verifier on blocked rounds (S03 Done-when 2, 3, 4)', () => {
     await beat('TYO', new Date());
     // Not before 10 min after it opened.
     await runEngine(db, new Date());
-    expect(await must(db.from('system_alerts').select('id').is('cleared_at', null))).toHaveLength(1);
+    // BKK, never beating in this suite, is now the one missing location (S12a): count the low alert only
+    const low = () =>
+      must(db.from('system_alerts').select('id').is('cleared_at', null).eq('kind', 'probe_locations_low'));
+    expect(await low()).toHaveLength(1);
     await db
       .from('system_alerts')
       .update({ opened_at: new Date(Date.now() - 11 * 60_000).toISOString() })
       .eq('id', alert!.id);
     await runEngine(db, new Date());
-    expect(await must(db.from('system_alerts').select('id').is('cleared_at', null))).toEqual([]);
+    expect(await low()).toEqual([]);
     await clearAlerts();
   });
 

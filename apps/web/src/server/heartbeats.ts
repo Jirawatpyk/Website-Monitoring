@@ -36,8 +36,9 @@ export async function loadWatchFacts(db: DbClient, now: Date): Promise<WatchFact
       .maybeSingle(),
   ]);
   if (sweep.error) throw new Error(`agent_heartbeats: ${sweep.error.message}`);
-  if (shift.error) throw new Error(`oncall_shifts: ${shift.error.message}`);
-  const person = shift.data?.person;
+  // The sweep is what the watchdog can't do without: a failed on-call read costs only the mention.
+  if (shift.error) console.warn(JSON.stringify({ event: 'watch_oncall_failed', error: shift.error.message }));
+  const person = shift.error ? null : shift.data?.person;
   return {
     engineSweepAt: sweep.data?.last_seen_at ?? null,
     onCall: person?.is_active ? { name: person.display_name, chatUserId: person.google_chat_user_id } : null,

@@ -37,7 +37,9 @@ describe('beatRowsOf (S12a, spec §15.3)', () => {
     const rows = beatRowsOf({ ...facts, engineSweep: ago(4 * 60 + 1), watchdog: null }, now);
     expect(rows.find((r) => r.name === 'engine')?.status).toBe('down');
     expect(rows.find((r) => r.name === 'vps-watchdog')?.status).toBe('waiting');
-    expect(beatRowsOf({ ...facts, engineSweep: ago(4 * 60) }, now)[0]?.status).toBe('up');
+    // the engine's rule: a minute check is missed at 3 min (D-053, as the cards and the Overview)
+    expect(beatRowsOf({ ...facts, engineSweep: ago(3 * 60 - 1) }, now)[0]?.status).toBe('up');
+    expect(beatRowsOf({ ...facts, engineSweep: ago(3 * 60) }, now)[0]?.status).toBe('down');
     expect(summaryOf(rows)).toEqual({ healthy: false, title: '1 heartbeat missed · engine' });
     // nothing pinged yet: no claim of health
     const none = beatRowsOf(
@@ -71,6 +73,20 @@ describe('probeCardsOf and gapLinesOf', () => {
     expect(sin?.gapHours[16]).toBe(true);
     expect(sin?.gapHours.filter(Boolean)).toHaveLength(1);
     expect(tyo).toMatchObject({ healthy: false, lastRunAt: null });
+  });
+
+  it('a silence still going on counts as a gap, and its hours show', () => {
+    const [, , tyo] = probeCardsOf([], [], { BKK: ago(2), SIN: ago(8), TYO: ago(2 * 3600) }, now);
+    expect(tyo).toMatchObject({ healthy: false, gaps: '1 · 2 h' });
+    expect(tyo?.gapHours.slice(21)).toEqual([true, true, true]);
+  });
+
+  it('says who was emailed for a gap when the alert is readable (Admins), else claims nothing', () => {
+    const alerts = [{ context: { location: 'SIN' }, opened_at: '2026-09-24T20:15:00Z' }];
+    expect(gapLinesOf(gaps, alerts)[0]?.text).toBe(
+      'SIN reported nothing 03:12–03:16 (4 min) → one email to the Admins at 03:15, no page',
+    );
+    expect(gapLinesOf(gaps, [])[0]?.text).toContain('→ no email (the status engine was down');
   });
 
   it('words each gap', () => {

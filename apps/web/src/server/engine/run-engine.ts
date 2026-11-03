@@ -605,7 +605,11 @@ async function missingLocation(
     .select('last_seen_at')
     .eq('name', 'engine-sweep')
     .maybeSingle();
-  if (sweep.error) throw new Error(`agent_heartbeats: ${sweep.error.message}`);
+  if (sweep.error) {
+    // Unknown: hold the alert as during a fault, and let the alerts after it still run (engine review L9).
+    console.error(JSON.stringify({ event: 'engine_sweep_read_failed', error: sweep.error.message }));
+    return { engineFault: true, missing: null };
+  }
   const state = faultState({
     sweepAt: sweep.data?.last_seen_at ? new Date(sweep.data.last_seen_at) : null,
     lastRoundAt: null,
@@ -634,7 +638,8 @@ async function loadLocationRows(db: DbClient): Promise<LocationRow[]> {
 function beatingOf(rows: readonly LocationRow[], now: Date): ProbeLocation[] {
   return rows
     .filter(
-      (l) => !!l.last_heartbeat_at && now.getTime() - Date.parse(l.last_heartbeat_at) <= HEARTBEAT_FRESH_MS,
+      // `<`: at exactly 3 min a location is missing, as `faultState` says (engine review L4)
+      (l) => !!l.last_heartbeat_at && now.getTime() - Date.parse(l.last_heartbeat_at) < HEARTBEAT_FRESH_MS,
     )
     .map((l) => l.code as ProbeLocation);
 }
@@ -902,13 +907,19 @@ async function adminAlerts(
   // no page; never during an engine fault (the cron sweep stale) or with two missing (`probe_locations_low`).
   const { engineFault, missing: missingNow } = await missingLocation(db, locationRows, now);
   const gone = verifier.openAlerts.get('probe_location_missing');
+  // the email's Since is the location's last report (§15.3: SIN 03:12, emailed 03:15)
+  const missingContext = (code: string) => ({
+    location: code,
+    lastBeatAt: locationRows.find((l) => l.code === code)?.last_heartbeat_at ?? null,
+  });
   if (engineFault) {
     // leave it as it is until the sweep is back
-  } else if (missingNow && gone && gone.context.location !== missingNow) {
-    // another location went missing: the Admins hear about that one too
+  } else if (missingNow && gone && gone.context.location !== missingNow && settled(gone)) {
+    // another location went missing: the Admins hear about that one too — once the open one is
+    // 10 min old, so two locations taking turns can't email every run (engine review L5)
     await clear('probe_location_missing');
-    await open('probe_location_missing', { location: missingNow });
-  } else if (missingNow && !gone) await open('probe_location_missing', { location: missingNow });
+    await open('probe_location_missing', missingContext(missingNow));
+  } else if (missingNow && !gone) await open('probe_location_missing', missingContext(missingNow));
   else if (!missingNow && gone && settled(gone)) await clear('probe_location_missing');
 
   // D-028: the BKK VPS's own network failing its control check — the Admin's to fix. The sites it

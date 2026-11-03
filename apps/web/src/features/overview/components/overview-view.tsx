@@ -126,7 +126,7 @@ export function OverviewView({
         eyebrow={
           <>
             <span className="max-md:hidden">OVERVIEW</span>
-            <span className="uppercase md:hidden">{`${formatDay(now, { weekday: true })} ${formatTime(now)} · UTC+7`}</span>
+            <span className="uppercase md:hidden">{`${formatDay(now, { weekday: true })} ${formatTime(now)} · ${data.fault?.asOf ? `as of ${formatTime(new Date(data.fault.asOf))}` : 'UTC+7'}`}</span>
           </>
         }
         title={
@@ -189,7 +189,7 @@ export function OverviewView({
           </div>
         )}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*90)]">
-          <SiteTiles sites={sites} drafts={data.drafts} now={now} />
+          <SiteTiles sites={sites} drafts={data.drafts} now={now} asOf={fault?.asOf} />
           <RecentEvents events={events} />
         </div>
       </div>

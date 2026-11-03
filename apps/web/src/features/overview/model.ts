@@ -528,7 +528,7 @@ export function faultBannerOf(fault: MonitorFault, probes: ProbeHealth, now: Dat
   const statusAge = fault.asOf ? minutesSince(fault.asOf, now) : null;
   const missing = OVERVIEW_LOCATIONS.filter((l) => !probes.beating.includes(l));
   const where = !missing.length
-    ? ''
+    ? ` ${OVERVIEW_LOCATIONS.join(', ').replace(/, (?=[^,]*$)/, ' and ')} still report.`
     : probes.beating.length
       ? ` ${probes.beating.join(' and ')} still ${probes.beating.length === 1 ? 'reports' : 'report'}; ${missing.join(' and ')} ${missing.length === 1 ? 'has' : 'have'} no results.`
       : ' No probe location is reporting.';

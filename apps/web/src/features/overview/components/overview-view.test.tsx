@@ -275,7 +275,9 @@ describe('OverviewView — monitor fault (S12a, MainFault)', () => {
       'href',
       '/probes',
     );
-    expect(screen.getByText(/statuses as of 09:53/)).toBeInTheDocument();
+    // the meta line and the All sites header (§30.1)
+    expect(screen.getAllByText(/statuses as of 09:53/)).toHaveLength(2);
+    expect(screen.getByText('17/3 OK · statuses as of 09:53'.replace('17/3', '2/3'))).toBeInTheDocument();
     expect(screen.getByText('Heartbeat missed 14 min')).toBeInTheDocument();
     // §30.1: the round-based KPIs say what they are as of
     expect(screen.getByText('All sites · only DOWN time counts · as of 09:53')).toBeInTheDocument();

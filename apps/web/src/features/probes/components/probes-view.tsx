@@ -1,6 +1,6 @@
 import { Alert, Badge, Card, StatusPill, Table, TBody, Td, Th, THead, Tr } from '@jirawatpyk/aura-react';
 import { IconBell, IconCircleAlert, IconCircleCheck, IconInfo, IconMail } from '@jirawatpyk/aura-react/icons';
-import { formatTime, formatTimeWithSeconds, formatWhen, isSameBangkokDay } from '@dxt/shared';
+import { formatTimeWithSeconds, formatWhen, isSameBangkokDay } from '@dxt/shared';
 import { agoText, type BeatRow, type ProbeCard } from '../model';
 import type { ProbesData } from '../queries';
 
@@ -19,7 +19,8 @@ function HourBars({ card }: { card: ProbeCard }) {
         aria-label={`${card.code}: results written per hour over the last 24 h${card.gaps === '0' ? ', no gaps' : `, gaps ${card.gaps}`}`}
       >
         {card.hours.map((n, i) => {
-          const h = n ? Math.max(2, (n / max) * 30) : 0;
+          // a gap hour always shows (the board's 12 of 32), even with no result in it
+          const h = card.gapHours[i] ? Math.max(12, (n / max) * 30) : n ? Math.max(2, (n / max) * 30) : 0;
           return (
             <rect
               key={i}
@@ -137,7 +138,9 @@ export function ProbesView({ data }: { data: ProbesData }) {
               .slice(0, 3)
               .map((g) => g.text)
               .join(' · ')}.`
-          : 'No probe location missed more than 3 min in the last 24 h.'}
+          : data.summary.empty
+            ? 'The jobs stamp their beats once they run.'
+            : 'No probe location missed more than 3 min in the last 24 h.'}
       </Alert>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -187,7 +190,7 @@ export function ProbesView({ data }: { data: ProbesData }) {
             {data.gapLines.map((g) => (
               <li key={g.at + g.text} className="flex flex-wrap gap-x-3">
                 <span className="font-medium">{formatWhen(new Date(g.at), now)}</span>
-                <span>{`${g.text} — the other two locations kept deciding status.`}</span>
+                <span>{`${g.text}.`}</span>
               </li>
             ))}
           </ul>
@@ -237,7 +240,7 @@ export function ProbesView({ data }: { data: ProbesData }) {
             label="Last job"
             value={
               verifier.lastJob
-                ? `${formatTime(new Date(verifier.lastJob.at))} · ${verifier.lastJob.site}${verifier.lastJob.result ? ` · ${RESULT_WORDS[verifier.lastJob.result]}` : ''}`
+                ? `${formatWhenShort(new Date(verifier.lastJob.at), now)} · ${verifier.lastJob.site}${verifier.lastJob.result ? ` · ${RESULT_WORDS[verifier.lastJob.result]}` : ''}`
                 : 'None yet'
             }
           />

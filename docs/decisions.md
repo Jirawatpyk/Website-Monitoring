@@ -80,6 +80,16 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 **Where.** Migration `monitor_fault`; `packages/engine/src/fault.ts`; the engine runner; the ingest route; `apps/vps-agent/src/watchdog.ts`; `features/overview`, `features/probes`.
 
+**Amended 4 Nov 2026 (S12a reviews; nothing Tao decided changes):**
+
+- **"> 3 min" above means 3 min or more**, as spec §14.4's example has it: last sweep 02:17 → the alert at 02:20. A location is missing at exactly 3 min everywhere: `faultState`, the runner's beating set, the Probes cards and rows.
+- **The sweep beat is stamped whenever the cron run finished.** A run with a failed site write still swept, so it isn't a fault; Healthchecks still gets `/fail` for it.
+- **`probe_location_missing`:**
+  - It holds during an engine fault: an engine run after a BKK ingest doesn't clear it, and nothing re-sends it later.
+  - When a different single location goes missing, it is cleared and reopened for that one once the open alert is 10 min old.
+  - Its Since is the location's last report.
+- **The watchdog:** an ingest answer without the sweep is unknown. That is no new post, and the "already posted" latch stays, so one fault never pages twice.
+
 ## D-052 — Client update: the note, no AM, when the card shows
 
 **Context.** S11 builds the client-update track (FR-20, spec §9, §16.2, §16.6). Three things are open in the sources:

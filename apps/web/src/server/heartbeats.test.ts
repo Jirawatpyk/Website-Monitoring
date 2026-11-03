@@ -60,8 +60,18 @@ describe('loadWatchFacts (S12a, D-053)', () => {
     expect((await loadWatchFacts(gone.db, now)).onCall).toBeNull();
   });
 
-  it('throws on a failed read (the ingest route then leaves the facts out)', async () => {
-    const { db } = fakeDb({ 'oncall_shifts.select': { error: { message: 'x' } } });
-    await expect(loadWatchFacts(db, now)).rejects.toThrow('oncall_shifts: x');
+  it('a failed sweep read throws (the route leaves the facts out); a failed on-call read keeps the sweep', async () => {
+    const sweepGone = fakeDb({ 'agent_heartbeats.select': { error: { message: 'x' } } });
+    await expect(loadWatchFacts(sweepGone.db, now)).rejects.toThrow('agent_heartbeats: x');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const shiftGone = fakeDb({
+      'agent_heartbeats.select': { data: { last_seen_at: '2026-11-03T07:59:05+00:00' } },
+      'oncall_shifts.select': { error: { message: 'y' } },
+    });
+    expect(await loadWatchFacts(shiftGone.db, now)).toEqual({
+      engineSweepAt: '2026-11-03T07:59:05+00:00',
+      onCall: null,
+    });
+    warn.mockRestore();
   });
 });

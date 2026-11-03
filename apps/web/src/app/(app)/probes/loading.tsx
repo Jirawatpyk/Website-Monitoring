@@ -18,6 +18,11 @@ export default function Loading() {
           </div>
         </div>
         <CardSkeleton lines={8} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3" aria-hidden>
+          <CardSkeleton lines={3} />
+          <CardSkeleton lines={3} />
+          <CardSkeleton lines={3} />
+        </div>
       </PageSkeleton>
     </Container>
   );

@@ -52,7 +52,7 @@ describe('ProbesView (S12a, board Probes)', () => {
     expect(screen.getByText(/@mentions the on-call person \(Ploy now\)/)).toBeInTheDocument();
     expect(screen.getByText('1 active Admin gets these emails.')).toBeInTheDocument();
     expect(screen.getByText('14 sent · 0 failed')).toBeInTheDocument();
-    expect(screen.getByText('09:41 · Tubtong · passed')).toBeInTheDocument();
+    expect(screen.getByText('09:41:00 · Tubtong · passed')).toBeInTheDocument();
   });
 
   it('a missed heartbeat, a gap, no delivery counts (not an Admin), no verifier job yet', () => {
@@ -75,7 +75,7 @@ describe('ProbesView (S12a, board Probes)', () => {
     expect(
       screen.getByText(/One gap in the last 24 h: SIN reported nothing 03:12–03:16 \(4 min\)\./),
     ).toBeInTheDocument();
-    expect(screen.getByText(/the other two locations kept deciding status/)).toBeInTheDocument();
+    expect(screen.getByText('SIN reported nothing 03:12–03:16 (4 min).')).toBeInTheDocument();
     expect(screen.getByText('Down')).toBeInTheDocument();
     expect(screen.getByText('No ping yet')).toBeInTheDocument();
     expect(screen.getByText('No data')).toBeInTheDocument();

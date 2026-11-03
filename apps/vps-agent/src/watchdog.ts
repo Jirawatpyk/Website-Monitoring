@@ -32,6 +32,8 @@ export interface WatchdogDeps {
 export function createWatchdog({ post, startedAt, graceMs = WATCH_GRACE_MS }: WatchdogDeps) {
   let lastContactAt = startedAt;
   let sweepAt: number | null = null;
+  /** The last answer carried the sweep (a string or `null`); absent = unknown this tick. */
+  let sweepKnown = true;
   let onCallChatId: string | null = null;
   /** The fault the line was posted for (its `since`), so one fault posts once. */
   let postedFor: number | null = null;
@@ -39,14 +41,16 @@ export function createWatchdog({ post, startedAt, graceMs = WATCH_GRACE_MS }: Wa
   return {
     contact(c: Contact) {
       lastContactAt = c.at;
-      // Absent (an older build, a failed read) or null (never ran): unknown, so no sweep fault.
-      sweepAt = typeof c.engineSweepAt === 'string' ? Date.parse(c.engineSweepAt) : null;
+      sweepKnown = c.engineSweepAt !== undefined;
+      // null = never ran (no fault); absent = unknown: no new post, and the latch stays (engine review M2)
+      if (sweepKnown) sweepAt = typeof c.engineSweepAt === 'string' ? Date.parse(c.engineSweepAt) : null;
       if (c.onCall !== undefined) onCallChatId = c.onCall?.chatUserId ?? null;
     },
 
     async tick(now: number): Promise<WatchOutcome> {
-      const sweepMissed = sweepAt !== null && now - sweepAt >= graceMs;
       const unreachable = now - lastContactAt >= graceMs;
+      if (!sweepKnown && !unreachable) return postedFor !== null ? 'fault' : 'ok';
+      const sweepMissed = sweepAt !== null && now - sweepAt >= graceMs;
       if (!sweepMissed && !unreachable) {
         postedFor = null;
         return 'ok';

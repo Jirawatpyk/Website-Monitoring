@@ -690,6 +690,7 @@ export function renderSystemAlertEmail(
         queued: num(ctx.queued, 0),
         active,
         location: PROBE_LOCATIONS.find((l: ProbeLocation) => l === ctx.location),
+        lastBeatAt: typeof ctx.lastBeatAt === 'string' ? new Date(ctx.lastBeatAt) : undefined,
         probesUrl: appUrl ? `${appUrl.replace(/\/$/, '')}/probes` : undefined,
         from,
       });

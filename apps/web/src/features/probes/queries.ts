@@ -52,7 +52,7 @@ export async function loadProbes(
     if (sinceIso) q = q.gte(status === 'sent' ? 'sent_at' : 'updated_at', sinceIso);
     return q;
   };
-  const [locations, beats, activity, gaps, admins, queue, lastJob, onCallId, waiting, sent, failed] =
+  const [locations, beats, activity, gaps, admins, queue, lastJob, onCallId, waiting, sent, failed, mails] =
     await Promise.all([
       db.from('probe_locations').select('code, is_active, last_heartbeat_at'),
       db.from('agent_heartbeats').select('name, last_seen_at'),
@@ -78,7 +78,16 @@ export async function loadProbes(
       isAdmin ? count('queued') : null,
       isAdmin ? count('sent', since24h) : null,
       isAdmin ? count('failed', since24h) : null,
+      // §15.3 "one email to Tao at 03:15 — show it in Probes": system alerts are Admin-read
+      isAdmin
+        ? db
+            .from('system_alerts')
+            .select('context, opened_at')
+            .eq('kind', 'probe_location_missing')
+            .gte('opened_at', since24h)
+        : null,
     ]);
+  if (mails) check('system_alerts', mails);
   for (const [name, r] of Object.entries({ locations, beats, activity, gaps, admins, queue, lastJob }))
     check(name, r);
   for (const [name, r] of Object.entries({ waiting, sent, failed })) if (r) check(name, r);
@@ -109,7 +118,7 @@ export async function loadProbes(
     summary: summaryOf(rows),
     probes: probeCardsOf(activity.data ?? [], gaps.data ?? [], lastBeat, now),
     beats: rows,
-    gapLines: gapLinesOf(gaps.data ?? []),
+    gapLines: gapLinesOf(gaps.data ?? [], mails ? (mails.data ?? []) : null),
     onCallName,
     admins: admins.count ?? 0,
     pipeline: {

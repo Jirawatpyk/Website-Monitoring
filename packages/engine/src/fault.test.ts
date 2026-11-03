@@ -108,4 +108,41 @@ describe('probeMissing — one location missing > 3 min (spec §15.3, D-053)', (
       ),
     ).toBeNull();
   });
+
+  it.each([
+    // [case, locations, now, expected]
+    [
+      'only 2 active, 1 missing: one left beating is too few',
+      [loc('BKK', '2026-09-25T03:15:00'), loc('SIN', '2026-09-25T03:12:00')],
+      '2026-09-25T03:15:00',
+      null,
+    ],
+    [
+      'exactly 3 min (180,000 ms) since its last beat is missing',
+      all('2026-09-25T03:15:00').map((l) => (l.code === 'SIN' ? loc('SIN', '2026-09-25T03:12:00') : l)),
+      '2026-09-25T03:15:00',
+      'SIN',
+    ],
+    [
+      '3 min less 1 ms is still beating',
+      all('2026-09-25T03:15:00').map((l) => (l.code === 'SIN' ? loc('SIN', '2026-09-25T03:12:00.001') : l)),
+      '2026-09-25T03:15:00',
+      null,
+    ],
+  ] as const)('%s (engine review)', (_case, locations, now, expected) => {
+    const state = faultState({ sweepAt: bkk(now), lastRoundAt: null, locations, now: bkk(now) });
+    expect(probeMissing(state)).toBe(expected);
+  });
+
+  it('MainFault boundary: sweep 02:17, at 02:19:59.999 no fault, at 02:20 a fault', () => {
+    const at = (now: string) =>
+      faultState({
+        sweepAt: bkk('2026-09-26T02:17:00'),
+        lastRoundAt: null,
+        locations: all(now),
+        now: bkk(now),
+      }).engineFault;
+    expect(at('2026-09-26T02:19:59.999')).toBe(false);
+    expect(at('2026-09-26T02:20:00')).toBe(true);
+  });
 });

@@ -1,3 +1,4 @@
+import { MONITOR_GRACE_MS } from '@dxt/engine';
 import { formatDuration, formatTime, PROBE_LOCATIONS, type ProbeLocation } from '@dxt/shared';
 
 /**
@@ -54,8 +55,10 @@ const every = (min: number) => (min === 1 ? '1 min' : formatDuration(min));
 export function beatRowsOf(f: BeatFacts, now: Date): BeatRow[] {
   return SPECS.map((s) => {
     const lastAt = s.last(f);
+    // The engine's rule (D-053): a minute check is missed 3 min after its last beat, as the cards and
+    // the Overview say; a longer period adds what it has beyond a minute (crawler: 30 + 15 → 44 min).
     const late = lastAt
-      ? now.getTime() - new Date(lastAt).getTime() > (s.periodMin + s.graceMin) * MIN
+      ? now.getTime() - new Date(lastAt).getTime() >= (s.periodMin - 1 + s.graceMin) * MIN
       : false;
     return {
       name: s.name,
@@ -69,7 +72,7 @@ export function beatRowsOf(f: BeatFacts, now: Date): BeatRow[] {
   });
 }
 
-/** "12 s ago" up to a minute, then "4 min ago" / "1 h 2 min ago"; a beat over a day old shows its day. */
+/** "12 s ago" up to a minute, then "4 min ago" / "1 h 2 min ago" / "1 d 2 h ago" (§13 durations). */
 export function agoText(iso: string, now: Date): string {
   const ms = Math.max(0, now.getTime() - new Date(iso).getTime());
   if (ms < MIN) return `${Math.floor(ms / 1000)} s ago`;
@@ -127,7 +130,13 @@ export function probeCardsOf(
       const i = slot(a.hour);
       if (a.location === code && i >= 0 && i < 24) hours[i] = a.results;
     }
-    const mine = gaps.filter((g) => g.location === code);
+    const lastRunAt = lastBeat[code] ?? null;
+    const silent = !lastRunAt || now.getTime() - new Date(lastRunAt).getTime() >= MONITOR_GRACE_MS;
+    // A silence still going on is a gap too (the SQL lists only closed ones).
+    const mine = [
+      ...gaps.filter((g) => g.location === code),
+      ...(silent && lastRunAt ? [{ location: code, gap_start: lastRunAt, gap_end: now.toISOString() }] : []),
+    ];
     const gapHours = Array.from({ length: 24 }, () => false);
     let minutes = 0;
     for (const g of mine) {
@@ -135,13 +144,12 @@ export function probeCardsOf(
       for (let i = Math.max(0, slot(g.gap_start)); i <= Math.min(23, slot(g.gap_end)); i++)
         gapHours[i] = true;
     }
-    const lastRunAt = lastBeat[code] ?? null;
     const lastFull = hours[22] ?? 0;
     return {
       code,
       ...LOCATION_FACTS[code],
       lastRunAt,
-      healthy: !!lastRunAt && now.getTime() - new Date(lastRunAt).getTime() <= 3 * MIN,
+      healthy: !silent,
       rate: lastFull ? (lastFull / 60).toFixed(1) : null,
       gaps: mine.length ? `${mine.length} · ${formatDuration(minutes)}` : '0',
       hours,
@@ -150,17 +158,40 @@ export function probeCardsOf(
   });
 }
 
-/** The 24 h gaps as lines, newest first: "SIN reported nothing 03:12–03:16 (4 min)". */
-export function gapLinesOf(gaps: readonly GapRow[]): { at: string; text: string }[] {
+/** A probe_location_missing alert (Admin-read): when the Admins' email went for a location. */
+export interface MissingAlertRow {
+  context: unknown;
+  opened_at: string;
+}
+
+/**
+ * The 24 h gaps as lines, newest first (§15.3): "SIN reported nothing 03:12–03:16 (4 min) → one email to
+ * the Admins at 03:15, no page". The email part only when the alert is readable (Admins) and one opened
+ * inside the gap; else nothing is claimed (none goes during an engine fault, D-053).
+ */
+export function gapLinesOf(
+  gaps: readonly GapRow[],
+  alerts: readonly MissingAlertRow[] | null = null,
+): { at: string; text: string }[] {
   return [...gaps]
     .sort((a, b) => b.gap_end.localeCompare(a.gap_end))
     .map((g) => {
       const start = new Date(g.gap_start);
       const end = new Date(g.gap_end);
       const minutes = (end.getTime() - start.getTime()) / MIN;
+      const mail = alerts?.find((a) => {
+        const at = new Date(a.opened_at).getTime();
+        const loc = (a.context as { location?: unknown } | null)?.location;
+        return loc === g.location && at >= start.getTime() && at <= end.getTime();
+      });
+      const told = mail
+        ? ` → one email to the Admins at ${formatTime(new Date(mail.opened_at))}, no page`
+        : alerts
+          ? ' → no email (the status engine was down, or another location was missing too)'
+          : '';
       return {
         at: g.gap_end,
-        text: `${g.location} reported nothing ${formatTime(start)}–${formatTime(end)} (${formatDuration(minutes)})`,
+        text: `${g.location} reported nothing ${formatTime(start)}–${formatTime(end)} (${formatDuration(minutes)})${told}`,
       };
     });
 }

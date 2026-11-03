@@ -86,4 +86,24 @@ describe('createWatchdog (S12a, D-053)', () => {
     fresh.dog.contact({ at: min(5), engineSweepAt: null });
     expect(await fresh.dog.tick(min(6))).toBe('ok');
   });
+
+  it('an answer without the sweep mid-fault keeps the latch: one post in all (engine review M2)', async () => {
+    const { post, dog } = setup();
+    dog.contact({ at: min(3), engineSweepAt: iso(T0) });
+    expect(await dog.tick(min(3))).toBe('posted');
+    dog.contact({ at: min(4) });
+    expect(await dog.tick(min(4))).toBe('fault');
+    dog.contact({ at: min(5), engineSweepAt: iso(T0) });
+    expect(await dog.tick(min(5))).toBe('fault');
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  it('posted while unreachable, then the API answers with a sweep still stale: no new post', async () => {
+    const { post, dog } = setup();
+    dog.contact({ at: min(0), engineSweepAt: iso(T0) });
+    expect(await dog.tick(min(3))).toBe('posted');
+    dog.contact({ at: min(6), engineSweepAt: iso(T0) });
+    expect(await dog.tick(min(6))).toBe('fault');
+    expect(post).toHaveBeenCalledTimes(1);
+  });
 });
