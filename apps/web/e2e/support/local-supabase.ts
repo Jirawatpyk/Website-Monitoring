@@ -138,6 +138,37 @@ export async function openTestIncident(ownerEmail: string, { ageMinutes = 2 } = 
   })) as string;
 }
 
+/**
+ * S11: the client-update track fires on the incident (as the engine runner would once it was due), on
+ * a client whose AM is `amEmail`. Returns the client's name.
+ */
+export async function fireClientUpdate(incidentId: string, amEmail: string): Promise<string> {
+  const [am] = (await admin(`/rest/v1/profiles?select=id&email=eq.${encodeURIComponent(amEmail)}`)) as {
+    id: string;
+  }[];
+  const [inc] = (await admin(`/rest/v1/incidents?select=site_id&id=eq.${incidentId}`)) as {
+    site_id: string;
+  }[];
+  const name = `E2E client ${crypto.randomUUID().slice(0, 8)}`;
+  const [client] = (await admin('/rest/v1/clients?select=id', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ name, am_user_id: am!.id, language: 'th' }),
+  })) as { id: string }[];
+  await admin(`/rest/v1/sites?id=eq.${inc!.site_id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ client_id: client!.id }),
+  });
+  await admin('/rest/v1/rpc/engine_client_update_due', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_incident_id: incidentId,
+      p_due_at: new Date(Date.now() - 60_000).toISOString(),
+    }),
+  });
+  return name;
+}
+
 /** The incident's ACKNOWLEDGED messages: channel and status. */
 export async function ackMessages(incidentId: string): Promise<{ channel: string; status: string }[]> {
   return (await admin(
