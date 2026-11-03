@@ -16,3 +16,30 @@ export async function stampBeat(db: DbClient, name: BeatName, now: Date = new Da
     console.warn(JSON.stringify({ event: 'beat_failed', name, error: String(err) }));
   }
 }
+
+/** What the VPS watchdog needs to speak for a stopped engine (S12a, D-053): GET /api/ingest carries it. */
+export type WatchFacts = {
+  engineSweepAt: string | null;
+  onCall: { name: string; chatUserId: string | null } | null;
+};
+
+/** The engine's last cron sweep and who holds the on-call shift now (an inactive person: nobody). */
+export async function loadWatchFacts(db: DbClient, now: Date): Promise<WatchFacts> {
+  const at = now.toISOString();
+  const [sweep, shift] = await Promise.all([
+    db.from('agent_heartbeats').select('last_seen_at').eq('name', 'engine-sweep').maybeSingle(),
+    db
+      .from('oncall_shifts')
+      .select('person:profiles!oncall_shifts_user_id_fkey(display_name, google_chat_user_id, is_active)')
+      .lte('starts_at', at)
+      .gt('ends_at', at)
+      .maybeSingle(),
+  ]);
+  if (sweep.error) throw new Error(`agent_heartbeats: ${sweep.error.message}`);
+  if (shift.error) throw new Error(`oncall_shifts: ${shift.error.message}`);
+  const person = shift.data?.person;
+  return {
+    engineSweepAt: sweep.data?.last_seen_at ?? null,
+    onCall: person?.is_active ? { name: person.display_name, chatUserId: person.google_chat_user_id } : null,
+  };
+}

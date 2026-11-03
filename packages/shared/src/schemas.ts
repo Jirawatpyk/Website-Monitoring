@@ -74,7 +74,25 @@ export const dueMonitorSchema = z.object({
   confirm: z.boolean().optional(),
 });
 export type DueMonitor = z.infer<typeof dueMonitorSchema>;
-export const dueMonitorsResponseSchema = z.object({ monitors: z.array(dueMonitorSchema) });
+export const dueMonitorsResponseSchema = z.object({
+  monitors: z.array(dueMonitorSchema),
+  /**
+   * S12a (D-053), for the VPS watchdog: the engine's last cron sweep, and who is on call now. Absent
+   * when the server didn't send them (an older build, or the read failed): unknown, not missed.
+   */
+  engineSweepAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  onCall: z
+    .object({
+      name: z.string().min(1).max(200),
+      chatUserId: z
+        .string()
+        .regex(/^[0-9]+$/)
+        .nullable(),
+    })
+    .nullable()
+    .optional(),
+});
+export type DueMonitorsResponse = z.infer<typeof dueMonitorsResponseSchema>;
 
 /** The query of a Job API poll: how many jobs the verifier can take, and its sessions in use. */
 export const leaseQuerySchema = z.object({
