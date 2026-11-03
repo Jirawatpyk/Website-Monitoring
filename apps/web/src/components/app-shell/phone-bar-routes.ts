@@ -38,5 +38,6 @@ export function phoneBarFor(pathname: string): PhoneBarSpec {
   if (first === 'incidents' && id) return { title: 'Incident', back: TO_INCIDENTS };
   if (path === '/maintenance') return { title: 'Maintenance', back: TO_OVERVIEW };
   if (path === '/escalation') return { title: 'Escalation', back: TO_OVERVIEW };
+  if (path === '/probes') return { title: 'Probes & heartbeat', back: TO_OVERVIEW };
   return { title: null };
 }

@@ -107,8 +107,8 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         label: 'Probes & heartbeat',
         icon: <IconServer />,
         href: '/probes',
-        slice: 'S12',
-        live: false,
+        slice: 'S12a',
+        live: true,
       },
       {
         id: 'settings',
