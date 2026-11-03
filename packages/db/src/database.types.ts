@@ -1110,6 +1110,16 @@ isOneToOne: false
 "post_window_action_now":
 { Args: { "p_window_id": string }; Returns: undefined
                            },
+"probe_activity_24h":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "hour": string,"location": string,"results": number
+            }[]
+                           },
+"probe_gaps_24h":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "gap_end": string,"gap_start": string,"location": string
+            }[]
+                           },
 "queue_fallback_emails":
 { Args: { "p_notification_id": string }; Returns: number
                            },
