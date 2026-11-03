@@ -33,3 +33,14 @@ export const rootCauseSchema = z.object({
 export type NoteInput = z.input<typeof noteSchema>;
 /** What a form sends: the category is any string until the schema checks it. */
 export type RootCauseInput = Omit<z.input<typeof rootCauseSchema>, 'category'> & { category: string };
+
+/** Mark client updated (optional note) / Not needed (reason required) — `mark_client_update`'s limits (S11, D-052). */
+export const clientUpdateSchema = z
+  .object({
+    incidentId: incidentIdSchema,
+    notNeeded: z.boolean(),
+    note: z.string().trim().max(500, 'Keep it under 500 characters').default(''),
+  })
+  .refine((v) => !v.notNeeded || v.note.length > 0, { message: 'A reason is required.', path: ['note'] });
+
+export type ClientUpdateInput = z.input<typeof clientUpdateSchema>;

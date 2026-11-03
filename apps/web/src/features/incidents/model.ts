@@ -414,6 +414,119 @@ export interface GateIncident {
   clientUpdateRequired: boolean;
   clientUpdatedAt: string | null;
   rootCauseCategory: string | null;
+  /** The track's record for the condition's words (S11); absent = the S07 wording. */
+  clientUpdate?: ClientUpdateFacts;
+}
+
+/** The client-update record (S11, spec §9, §16.2): what the card and the Resolve condition say. */
+export interface ClientUpdateFacts {
+  tier: number;
+  dueAt: string | null;
+  /** Who marked it, by name; null while not marked. */
+  by: string | null;
+  notNeeded: boolean;
+  note: string | null;
+}
+
+/** Why the track fired, in the boards' words: "Tier 1 down 15 min". */
+export const clientUpdateWhy = (tier: number) =>
+  tier === 1 ? 'Tier 1 down 15 min' : 'Tier 2 down 60 min inside response hours';
+
+/** The Client update condition's detail (Incident, MIncident, Resolve boards). */
+function clientDetail(i: GateIncident): string {
+  const c = i.clientUpdate;
+  if (!i.clientUpdateRequired) return 'Not required — the client-update track didn’t fire';
+  const t = (iso: string | null) => (iso ? formatTime(new Date(iso)) : '');
+  if (!i.clientUpdatedAt) {
+    return c
+      ? `Required — ${clientUpdateWhy(c.tier)} · due ${t(c.dueAt)} · not marked yet`
+      : 'Required — Tier 1 down 15 min or more · not marked yet';
+  }
+  if (!c) return 'Marked';
+  return c.notNeeded
+    ? `Not needed · ${c.by ?? 'someone'} ${t(i.clientUpdatedAt)} · reason recorded`
+    : `Marked by ${c.by ?? 'someone'} ${t(i.clientUpdatedAt)}`;
+}
+
+/** The incident page's Client update card (Incident / MIncident boards; D-052: only once it fired). */
+export interface ClientUpdateCard {
+  /** The AM's name; null with no AM (the Admins were told, D-052 item 2). */
+  am: string | null;
+  client: string;
+  dueAt: string;
+  /** "10:03 · Tier 1 down 15 min". */
+  dueLine: string;
+  status: 'pending' | 'marked' | 'not_needed';
+  /** "Not marked yet" · "Updated by Bua 10:12" · "Not needed · Tao 10:07". */
+  stateText: string;
+  note: { label: 'Note' | 'Reason'; text: string } | null;
+  /** The banner above the cards while it waits: "Client update due 10:03 · Bua notified 10:03 · not marked yet". */
+  banner: string | null;
+  foot: string;
+  drafts: { th: string; en: string };
+  lang: 'th' | 'en';
+  /** §16.6 (D-052 item 4), as `private.can_client_update`: the page only mirrors it. */
+  canMark: boolean;
+}
+
+export function clientUpdateCardOf(input: {
+  required: boolean;
+  dueAt: string | null;
+  updatedAt: string | null;
+  by: string | null;
+  notNeeded: boolean;
+  note: string | null;
+  tier: number;
+  am: string | null;
+  client: string;
+  drafts: { th: string; en: string };
+  lang: 'th' | 'en';
+  canMark: boolean;
+}): ClientUpdateCard | null {
+  if (!input.required || !input.dueAt) return null;
+  const due = formatTime(new Date(input.dueAt));
+  const at = input.updatedAt ? formatTime(new Date(input.updatedAt)) : null;
+  const status = !input.updatedAt ? 'pending' : input.notNeeded ? 'not_needed' : 'marked';
+  return {
+    am: input.am,
+    client: input.client,
+    dueAt: input.dueAt,
+    dueLine: `${due} · ${clientUpdateWhy(input.tier)}`,
+    status,
+    stateText:
+      status === 'pending'
+        ? 'Not marked yet'
+        : status === 'not_needed'
+          ? `Not needed · ${input.by ?? 'someone'} ${at}`
+          : `Updated by ${input.by ?? 'someone'} ${at}`,
+    note: input.note ? { label: status === 'not_needed' ? 'Reason' : 'Note', text: input.note } : null,
+    banner:
+      status === 'pending'
+        ? `Client update due ${due} · ${input.am ? `${input.am} notified ${due}` : `no AM · Admins notified ${due}`} · not marked yet`
+        : null,
+    foot:
+      status === 'pending'
+        ? `${clientUpdateWhy(input.tier)}: Resolve needs this marked, or marked “Not needed” with a reason.`
+        : 'Recorded in the audit log and the post-incident review (Client notified).',
+    drafts: input.drafts,
+    lang: input.lang,
+    canMark: input.canMark,
+  };
+}
+
+/** Who may mark it (spec §16.6, D-052 item 4) — `private.can_client_update`'s rule, for the page. */
+export function canMarkClientUpdate(
+  viewer: { id: string; role: string },
+  site: { primaryOwnerId: string | null; backupOwnerId: string | null; amId: string | null },
+): boolean {
+  if (viewer.role === 'admin') return true;
+  if (
+    viewer.role === 'responder' &&
+    (site.primaryOwnerId === viewer.id || site.backupOwnerId === viewer.id)
+  ) {
+    return true;
+  }
+  return (viewer.role === 'stakeholder' || viewer.role === 'responder') && site.amId === viewer.id;
 }
 
 /**
@@ -499,11 +612,7 @@ export function resolveGate(
     key: 'client_update',
     label: 'Client update marked',
     met: !clientPending,
-    detail: clientPending
-      ? 'Required — Tier 1 down 15 min or more · not marked yet'
-      : i.clientUpdateRequired
-        ? 'Marked'
-        : 'Not required — the client-update track didn’t fire',
+    detail: clientDetail(i),
   };
   const rcLabel = rootCauseLabel(category);
   const root: Condition = {
@@ -520,7 +629,13 @@ export function resolveGate(
   const conditions = [recovery, client, root];
   const verdict = canResolve({
     okRounds: okAt ? 2 : 0,
-    clientUpdate: clientPending ? 'pending' : i.clientUpdateRequired ? 'marked' : 'not_required',
+    clientUpdate: clientPending
+      ? 'pending'
+      : !i.clientUpdateRequired
+        ? 'not_required'
+        : i.clientUpdate?.notNeeded
+          ? 'not_needed'
+          : 'marked',
     rootCauseCategory: i.rootCauseCategory,
   });
   const metCount = conditions.filter((c) => c.met).length;
@@ -599,7 +714,10 @@ export interface TimelineItem {
     | 'escalated'
     | 'undone'
     | 'flapping'
-    | 'baseline';
+    | 'baseline'
+    /** S11: the client update fell due (mail, amber) / was marked (circle-check). */
+    | 'client_due'
+    | 'client_marked';
   title: string;
   detail: string | null;
   /** A collapsed flapping run (`kind: 'flapping'`): its lines, oldest first — kept, never dropped (§16.11). */
@@ -843,6 +961,36 @@ export function timelineOf(
       }
       case 'note':
         item(e, 'note', `Note by ${by}`, str(e.payload.text));
+        return;
+      // S11 (spec §9, Incident board 10:03:12 / 10:12:05).
+      case 'client_update_due': {
+        const am = str(e.payload.am);
+        const tier = num(e.payload.tier) ?? 1;
+        item(
+          e,
+          'client_due',
+          am ? `Client update due — ${am} @mentioned` : 'Client update due — no AM, the Admins @mentioned',
+          `${clientUpdateWhy(tier)} · draft client message posted in the thread${am ? ` for ${am} (AM)` : ''}`,
+        );
+        return;
+      }
+      case 'client_update_marked': {
+        const note = str(e.payload.note);
+        item(
+          e,
+          'client_marked',
+          `Client update marked by ${str(e.payload.by) ?? by}`,
+          `${note ? `“${note}” · ` : ''}client-update track closed`,
+        );
+        return;
+      }
+      case 'client_update_not_needed':
+        item(
+          e,
+          'client_marked',
+          `Client update marked not needed by ${str(e.payload.by) ?? by}`,
+          `Reason: ${str(e.payload.note) ?? ''}`,
+        );
         return;
       case 'root_cause': {
         const category = str(e.payload.category);

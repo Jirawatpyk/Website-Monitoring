@@ -1226,6 +1226,77 @@ describe('escalation ladder (S08, D-034, Done-when 1)', () => {
   });
 });
 
+describe('client-update track (S11, FR-20, Done-when 1)', () => {
+  const profileId = async (address: string) =>
+    (await must(db.from('profiles').select('id').eq('email', address).single())).id;
+  const rows = (incidentId: string) =>
+    must(
+      db
+        .from('notifications')
+        .select('channel, user_id, context')
+        .eq('incident_id', incidentId)
+        .eq('template', 'client_update_due'),
+    );
+
+  it.each([['not acked'], ['acked']])(
+    'INC-0142 replay (%s): nothing at 14:59 from the first failed check, the AM @mentioned + emailed at exactly 15:00 — once',
+    async (ack) => {
+      const arm = await profileId('arm@example.test');
+      const bua = await profileId('bua@example.test');
+      const client = await must(
+        db
+          .from('clients')
+          .insert({ name: `Client update ${ack} ${run}`, am_user_id: bua })
+          .select('id')
+          .single(),
+      );
+      created.clients.push(client.id);
+      const { siteId, monitorId } = await newSite(`Client update ${ack}`, { primary_owner_id: arm });
+      await must(db.from('sites').update({ client_id: client.id }).eq('id', siteId).select('id'));
+      // 20 min back, so the due time is in the database's past: engine_client_update_due refuses a
+      // due time still to come by its own clock.
+      const back = -20 * 60;
+      await results(monitorId, downRound(back));
+      await runEngine(db, t(back + 65));
+      const [inc] = await must(db.from('incidents').select('id, started_at').eq('site_id', siteId));
+      if (ack === 'acked') {
+        await must(
+          db
+            .from('incidents')
+            .update({ state: 'acknowledged', acked_at: t(back + 300).toISOString(), acked_by: arm })
+            .eq('id', inc!.id)
+            .select('id'),
+        );
+      }
+      const due = new Date(new Date(inc!.started_at).getTime() + 15 * 60_000);
+
+      await runEngine(db, new Date(due.getTime() - 1000));
+      expect(await rows(inc!.id)).toEqual([]);
+
+      // The cron and a probe's recheck at once: one Chat reply, one email.
+      await Promise.all([runEngine(db, due), runEngine(db, new Date(due.getTime() + 1000))]);
+      const sent = await rows(inc!.id);
+      expect(sent.filter((n) => n.channel === 'google_chat')).toHaveLength(1);
+      expect(sent.find((n) => n.channel === 'google_chat')?.context).toMatchObject({
+        mentioned: [bua],
+        noAm: false,
+      });
+      expect(sent.filter((n) => n.channel === 'email').map((n) => n.user_id)).toEqual([bua]);
+      const [after] = await must(
+        db.from('incidents').select('client_update_required, client_update_due_at, state').eq('id', inc!.id),
+      );
+      expect(after!.client_update_required).toBe(true);
+      expect(new Date(after!.client_update_due_at!).getTime()).toBe(due.getTime());
+      // The track is no ladder step: it moves no state (L1 counts from confirmed down, 30 s later).
+      expect(after!.state).toBe(ack === 'acked' ? 'acknowledged' : 'unacked');
+      const [event] = await must(
+        db.from('incident_events').select('at').eq('incident_id', inc!.id).eq('type', 'client_update_due'),
+      );
+      expect(new Date(event!.at).getTime()).toBe(due.getTime());
+    },
+  );
+});
+
 describe('mute and maintenance (S09, D-036)', () => {
   const profileId = async (address: string) =>
     (await must(db.from('profiles').select('id').eq('email', address).single())).id;

@@ -23,14 +23,52 @@ vi.mock('@/server/db', () => ({ serviceDb: () => 'db' }));
 vi.mock('@/server/notifier/dispatch', () => ({ dispatchNotifications: m.dispatch }));
 vi.mock('@/lib/env', () => ({ serverEnv: () => ({}) }));
 
-const { acknowledgeIncident, addNote, resolveIncident, saveRootCause, undoAcknowledge, undoResolve } =
-  await import('./actions');
+const {
+  acknowledgeIncident,
+  addNote,
+  markClientUpdate,
+  resolveIncident,
+  saveRootCause,
+  undoAcknowledge,
+  undoResolve,
+} = await import('./actions');
 const ID = '7c481a3b-6979-4c48-97eb-50a8d27c4e41';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
+});
+
+describe('markClientUpdate (S11, §16.6, D-052)', () => {
+  it('marks through the SQL function with the trimmed note; nothing to send', async () => {
+    m.rpc.mockResolvedValue({ data: null, error: null });
+    expect(await markClientUpdate({ incidentId: ID, notNeeded: false, note: ' Called ops ' })).toEqual({
+      ok: true,
+    });
+    expect(m.rpc).toHaveBeenCalledWith('mark_client_update', {
+      p_incident_id: ID,
+      p_not_needed: false,
+      p_note: 'Called ops',
+    });
+    expect(m.after).not.toHaveBeenCalled();
+  });
+
+  it('Not needed without a reason never reaches the database', async () => {
+    expect(await markClientUpdate({ incidentId: ID, notNeeded: true, note: '  ' })).toEqual({
+      ok: false,
+      message: 'A reason is required.',
+    });
+    expect(m.rpc).not.toHaveBeenCalled();
+  });
+
+  it('a Viewer or another client’s AM is refused in words (Done-when 3)', async () => {
+    m.rpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'x' } });
+    expect(await markClientUpdate({ incidentId: ID, notNeeded: false, note: '' })).toEqual({
+      ok: false,
+      message: 'Only an Admin, the site’s owner or backup, or the client’s account manager can mark this.',
+    });
+  });
 });
 
 describe('acknowledgeIncident', () => {
