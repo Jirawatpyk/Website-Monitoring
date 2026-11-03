@@ -155,15 +155,25 @@ const changeOf = (c: OverviewKpis['mttaChange']) =>
     : undefined;
 
 /** The KPI row (§21.3): organisation-wide for every role. */
-export function Kpis({ counts, kpis }: { counts: Counts; kpis: OverviewKpis }) {
+export function Kpis({
+  counts,
+  kpis,
+  asOf,
+}: {
+  counts: Counts;
+  kpis: OverviewKpis;
+  /** During a monitor fault (S12a, spec §30.1): "as of 02:17" on the round-based figures; Open incidents stays live. */
+  asOf?: string | null;
+}) {
   const notEnough = 'Not enough incidents yet';
+  const stale = (caption: string) => (asOf ? `${caption} · ${asOf}` : caption);
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
       <Stat
         label="Sites OK"
         value={counts.ok}
         unit={`/ ${counts.monitored}`}
-        caption={sitesOkCaption(counts)}
+        caption={stale(sitesOkCaption(counts))}
         icon={<IconCircleCheck />}
       />
       <Stat label="Open incidents" value={counts.open} caption={openCaption(counts)} icon={<IconBell />} />
@@ -184,7 +194,7 @@ export function Kpis({ counts, kpis }: { counts: Counts; kpis: OverviewKpis }) {
       <Stat
         label="Uptime · 30d"
         value={formatPercent(kpis.uptime30d)}
-        caption="All sites · only DOWN time counts"
+        caption={stale('All sites · only DOWN time counts')}
         icon={<IconChartColumn />}
       />
     </div>

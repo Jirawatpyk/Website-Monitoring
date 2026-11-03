@@ -277,6 +277,8 @@ describe('OverviewView — monitor fault (S12a, MainFault)', () => {
     );
     expect(screen.getByText(/statuses as of 09:53/)).toBeInTheDocument();
     expect(screen.getByText('Heartbeat missed 14 min')).toBeInTheDocument();
+    // §30.1: the round-based KPIs say what they are as of
+    expect(screen.getByText('All sites · only DOWN time counts · as of 09:53')).toBeInTheDocument();
     expect(screen.queryByText(/Verifier idle/)).not.toBeInTheDocument();
   });
 

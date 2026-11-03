@@ -164,7 +164,11 @@ export function OverviewView({
       <div className="flex flex-col gap-6 max-md:hidden">
         {fault && <FaultBanner banner={fault} />}
         <DesktopBanners {...banners} viewer={data.viewer} onAck={onAck} />
-        <Kpis counts={counts} kpis={data.kpis} />
+        <Kpis
+          counts={counts}
+          kpis={data.kpis}
+          asOf={data.fault?.asOf ? `as of ${formatTime(new Date(data.fault.asOf))}` : null}
+        />
         <LiveIssuesTable
           issues={issues}
           counts={counts}

@@ -1,15 +1,17 @@
 import { expect, test } from '@playwright/test';
-import { ensureUser, localSupabaseEnabled, setBeat, signIn } from './support/local-supabase';
+import { clearBeat, ensureUser, localSupabaseEnabled, setBeat, signIn } from './support/local-supabase';
 
 // S12a (spec §14.4, §15.3, D-053): with the engine cron's sweep 20 min old the Overview shows the fault
 // banner and "statuses as of", desktop and phone (Done-when 4); /probes lists every heartbeat and the
 // engine row is down. Local Supabase only (E2E_LOCAL_SUPABASE=1, after `pnpm db:reset`).
 test.describe('monitor fault and Probes (local Supabase)', () => {
   test.skip(!localSupabaseEnabled, 'needs the local Supabase stack: E2E_LOCAL_SUPABASE=1');
-  // Both tests age the same row; the other specs need it fresh again afterwards.
+  // Both tests age the same row. While they run, another file reading the Overview in parallel sees
+  // the fault banner (none asserts its absence today). Afterwards the row goes: a sweep that never ran
+  // is no fault, whereas a fresh stamp would age into one with no cron locally.
   test.describe.configure({ mode: 'serial' });
   test.afterAll(async () => {
-    if (localSupabaseEnabled) await setBeat('engine-sweep', new Date());
+    if (localSupabaseEnabled) await clearBeat('engine-sweep');
   });
 
   test('Done-when 4: the Overview shows the fault banner and as-of data', async ({
