@@ -17,6 +17,32 @@ describe('AKAMAI_CONTROL_URL (D-027 rule 2b)', () => {
   });
 });
 
+describe('GOOGLE_CHAT_ALERTS_WEBHOOK_URL (S12a watchdog)', () => {
+  it('takes only a Google Chat https webhook, so the line can’t be sent elsewhere', () => {
+    const base = { API_BASE_URL: 'https://monitor.example.test', INGEST_TOKEN: token };
+    expect(loadConfig(base).GOOGLE_CHAT_ALERTS_WEBHOOK_URL).toBeUndefined();
+    const blank = loadConfig({
+      ...base,
+      GOOGLE_CHAT_ALERTS_WEBHOOK_URL: ' ',
+      HEALTHCHECKS_PING_URL_WATCHDOG: '',
+    });
+    expect(blank.GOOGLE_CHAT_ALERTS_WEBHOOK_URL).toBeUndefined();
+    expect(blank.HEALTHCHECKS_PING_URL_WATCHDOG).toBeUndefined();
+    const url = 'https://chat.googleapis.com/v1/spaces/AAA/messages?key=k&token=t';
+    expect(loadConfig({ ...base, GOOGLE_CHAT_ALERTS_WEBHOOK_URL: url }).GOOGLE_CHAT_ALERTS_WEBHOOK_URL).toBe(
+      url,
+    );
+    for (const bad of [
+      'http://chat.googleapis.com/v1/x',
+      'https://evil.example/v1/x',
+      'https://chat.googleapis.com.evil.example/',
+    ])
+      expect(() => loadConfig({ ...base, GOOGLE_CHAT_ALERTS_WEBHOOK_URL: bad })).toThrow(
+        /GOOGLE_CHAT_ALERTS_WEBHOOK_URL/,
+      );
+  });
+});
+
 describe('loadConfig', () => {
   it('applies defaults', () => {
     const config = loadConfig({ API_BASE_URL: 'https://monitor.example.com', INGEST_TOKEN: token });

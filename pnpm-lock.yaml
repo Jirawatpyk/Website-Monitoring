@@ -217,6 +217,9 @@ importers:
 
   apps/vps-agent:
     dependencies:
+      '@dxt/notifier':
+        specifier: workspace:*
+        version: link:../../packages/notifier
       '@dxt/probe':
         specifier: workspace:*
         version: link:../../packages/probe

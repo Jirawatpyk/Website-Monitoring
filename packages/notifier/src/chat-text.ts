@@ -5,6 +5,7 @@
  *
  * Full event → text line → who is @mentioned table: ChatAlert board (docs/design/canvas/ChatAlert.dc.html).
  */
+import { formatTime } from '@dxt/shared';
 
 /** A ladder level after L0 (`escalation_steps.level`, at most L3). */
 export type StepLevel = 1 | 2 | 3;
@@ -59,7 +60,9 @@ export type ChatState =
   | 'SWAP EXPIRED'
   | 'SHIFT HANDED OVER'
   | 'ROTATION CHANGED'
-  | 'ON CALL TOMORROW';
+  | 'ON CALL TOMORROW'
+  // The VPS watchdog (S12a, D-053, ChatAlert "Monitor fault").
+  | 'MONITOR FAULT';
 
 export interface ChatTextLine {
   state: ChatState;
@@ -77,4 +80,24 @@ export function chatMention(userId: string): string {
 export function buildChatTextLine({ state, site, mention = [], detail = [] }: ChatTextLine): string {
   const head = [state, site, ...detail].join(' · ');
   return mention.length ? `${mention.map(chatMention).join(' ')} ${head}` : head;
+}
+
+/**
+ * ChatAlert "Monitor fault" (spec §14.4, §15.3): the VPS watchdog's line when the engine's sweep
+ * stopped — `<users/PLOY> MONITOR FAULT · all sites · heartbeat missed since 02:17 · status unknown,
+ * hand-check Tier 1`. `since` is the last sweep seen (Bangkok time); no Chat id, no mention.
+ */
+export function buildMonitorFaultLine({
+  since,
+  onCallChatId,
+}: {
+  since: Date;
+  onCallChatId?: string | null;
+}): string {
+  return buildChatTextLine({
+    state: 'MONITOR FAULT',
+    site: 'all sites',
+    mention: onCallChatId ? [onCallChatId] : [],
+    detail: [`heartbeat missed since ${formatTime(since)}`, 'status unknown, hand-check Tier 1'],
+  });
 }

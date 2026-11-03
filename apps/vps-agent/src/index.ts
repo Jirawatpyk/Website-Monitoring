@@ -4,6 +4,8 @@ import { loadConfig } from './config';
 import { ping } from './healthchecks';
 import { runProbeRound, untilNextTick } from './probe-loop';
 import { createVerifierPool } from './verifier';
+import { createWatchdog } from './watchdog';
+import { postChatMessage } from '@dxt/notifier';
 
 /** The verifier pings Healthchecks at most this often (its check expects one a minute, grace 3 min). */
 const VERIFIER_PING_EVERY_MS = 60_000;
@@ -32,7 +34,20 @@ async function main() {
       signal.addEventListener('abort', onAbort, { once: true });
     });
 
-  const api = createApi(config.API_BASE_URL, config.INGEST_TOKEN);
+  const webhook = config.GOOGLE_CHAT_ALERTS_WEBHOOK_URL;
+  const watchdog = createWatchdog({
+    startedAt: Date.now(),
+    post: async (text, threadKey) => {
+      if (!webhook) {
+        console.warn(JSON.stringify({ event: 'monitor_fault_not_posted', reason: 'no_webhook' }));
+        return false;
+      }
+      const res = await postChatMessage(webhook, { text, cardsV2: [] }, { threadKey });
+      if (!res.ok) console.error(JSON.stringify({ event: 'monitor_fault_post_failed', error: res.error }));
+      return res.ok;
+    },
+  });
+  const api = createApi(config.API_BASE_URL, config.INGEST_TOKEN, fetch, (c) => watchdog.contact(c));
   const value = config.PROBE_SECRET_HEADER_VALUE;
   const secretHeader = value ? { name: config.PROBE_SECRET_HEADER_NAME, value } : undefined;
   const browser = await launchBrowser();
@@ -59,6 +74,10 @@ async function main() {
         console.error(JSON.stringify({ event: 'probe_round_failed', error: String(err) }));
         await ping(config.HEALTHCHECKS_PING_URL_PROBE_BKK, 'fail');
       }
+      // The watchdog judges after every round, whatever the round did (S12a).
+      const watch = await watchdog.tick(Date.now());
+      if (watch !== 'ok') console.warn(JSON.stringify({ event: 'monitor_fault', outcome: watch }));
+      await ping(config.HEALTHCHECKS_PING_URL_WATCHDOG, watch === 'post_failed' ? 'fail' : 'ok');
     }
   };
 

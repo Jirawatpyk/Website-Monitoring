@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@dxt/notifier": "workspace:*",
     "@dxt/probe": "workspace:*",
     "@dxt/shared": "workspace:*",
     "playwright": "1.64.0",

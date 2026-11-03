@@ -12,6 +12,8 @@ export const DEFAULT_CONTROL_URLS = [
   'https://www.cloudflare.com/cdn-cgi/trace',
 ] as const;
 
+const blankToUndefined = (v: unknown) => (typeof v === 'string' && !v.trim() ? undefined : v);
+
 const configSchema = z.object({
   /** Base URL of the web app (Ingest / Job APIs). HTTPS only, so the token never travels in clear text. */
   API_BASE_URL: z.url().refine((value) => {
@@ -23,6 +25,16 @@ const configSchema = z.object({
   /** Healthchecks.io URLs pinged after every probe round / once a minute by the verifier (PRD §9). */
   HEALTHCHECKS_PING_URL_PROBE_BKK: z.url().optional(),
   HEALTHCHECKS_PING_URL_VERIFIER: z.url().optional(),
+  /**
+   * The watchdog (S12a, D-053): the Alerts Space's incoming webhook, posted to straight from the VPS
+   * when the engine stops (unset = the watchdog only logs), and its own Healthchecks check.
+   */
+  // Blank (a line copied from .env.example) = unset, so adding the names never stops the agent.
+  GOOGLE_CHAT_ALERTS_WEBHOOK_URL: z.preprocess(
+    blankToUndefined,
+    z.url({ protocol: /^https$/, hostname: /^chat\.googleapis\.com$/ }).optional(),
+  ),
+  HEALTHCHECKS_PING_URL_WATCHDOG: z.preprocess(blankToUndefined, z.url().optional()),
   PROBE_SECRET_HEADER_NAME: z.string().default('X-DxT-Monitor'),
   PROBE_SECRET_HEADER_VALUE: z.string().optional(),
   /** Browser verifier: at most 3 Chromium sessions (PRD §5); staging runs 1 beside production (D-019). */

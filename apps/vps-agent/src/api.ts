@@ -7,6 +7,7 @@ import {
   type Verdict,
 } from '@dxt/shared';
 import type { z } from 'zod';
+import type { Contact } from './watchdog';
 
 export type { DueMonitor, LeasedJob, Verdict };
 
@@ -34,7 +35,13 @@ const TIMEOUT_MS = 10_000;
  * The only way the agent talks to DxT Monitor: the Ingest and Job APIs with INGEST_TOKEN (PRD §10).
  * The token is sent only to API_BASE_URL (https, checked in config) and never logged.
  */
-export function createApi(baseUrl: string, token: string, fetchImpl: typeof fetch = fetch): Api {
+export function createApi(
+  baseUrl: string,
+  token: string,
+  fetchImpl: typeof fetch = fetch,
+  /** Each answer to GET /api/ingest, for the watchdog (S12a): when, the engine's sweep, who is on call. */
+  onContact?: (contact: Contact) => void,
+): Api {
   const call = async (route: string, init: RequestInit = {}) => {
     const res = await fetchImpl(new URL(route, baseUrl), {
       ...init,
@@ -57,7 +64,9 @@ export function createApi(baseUrl: string, token: string, fetchImpl: typeof fetc
   return {
     async dueMonitors() {
       // D-051: this agent echoes the confirm flag, so it may be given confirm checks.
-      return (await json('/api/ingest?confirm=1', dueMonitorsResponseSchema)).monitors;
+      const due = await json('/api/ingest?confirm=1', dueMonitorsResponseSchema);
+      onContact?.({ at: Date.now(), engineSweepAt: due.engineSweepAt, onCall: due.onCall });
+      return due.monitors;
     },
     async postResults(results, control) {
       const res = await call('/api/ingest', { method: 'POST', body: JSON.stringify({ results, control }) });
