@@ -19,7 +19,7 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | Main | Overview dashboard — pre-S06 reference, superseded by Main3 (§21) | — | P0 | S06b | §21 | FR-05 |
 | MOverview | Mobile — Overview — pre-S06 reference, superseded by MOverview4 (§21) | — | P0 | S06b | §21 | FR-05 |
 | MainDark | Overview dashboard — dark — pre-S06 reference, superseded by MainDark3 (§21) | — | P0 | S06b | §21 | FR-05 |
-| MainFault | Overview — monitoring degraded (heartbeat missed) | `/` fault state | P1 | S12b | §14.4, §14.6, §16.10 | FR-21, §9 |
+| MainFault | Overview — monitor fault: hand check (redrawn on Main3, 3 Nov 2026; MOverview4 FAULT is its phone) | `/` fault state | P1 | S12b | §30 (replaces §14.4's card), §14.6, §16.10 | FR-21, §9 |
 | Sites | Sites list | `/sites` | P0 | S05c | §5, §11, §14.5, §20 | FR-05 |
 | MSites | Mobile — Sites | `/sites` (390) | P0 | S05c | §17, §20 | FR-05 |
 | SiteDetail | Site detail — Bangkok Airways – Taiwan · Page fingerprint card | `/sites/[siteId]` | P0 | S06 (fingerprint card: S09d) | §5, §11, §12, §20, §25, §26.8 | FR-08 |
@@ -28,8 +28,8 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | EditMonitors | Edit monitors | `/sites/[siteId]/monitors` | P0 | S05 | §6 | FR-01 |
 | Incidents | Incidents list | `/incidents` | P0 | S07 | §4, §11, §16.1 | FR-06 |
 | MIncidents | Mobile — Incidents | `/incidents` (390) | P0 | S07 | §17 | FR-06 |
-| Incident | Incident — INC-0142 MuvMi DOWN | `/incidents/[incidentId]` | P0 | S07 | §8, §9, §14.1, §14.3, §15.4, §16.2–3, §28.6 (S10: who was paged on call) | FR-06, FR-20 |
-| MIncident | Mobile — Incident detail | `/incidents/[incidentId]` (390) | P0 | S07 | §15.6, §17 | FR-06 |
+| Incident | Incident — INC-0142 MuvMi DOWN | `/incidents/[incidentId]` | P0 | S07 | §8, §9, §14.1, §14.3, §15.4, §16.2–3, §28.6 (S10: who was paged on call), §30.5–8 (S12b: CASE manual incident, Escalate now) | FR-06, FR-20 |
+| MIncident | Mobile — Incident detail | `/incidents/[incidentId]` (390) | P0 | S07 | §15.6, §17, §30.5–8 (S12b) | FR-06 |
 | IncidentPageChange | Incident — page change (INC-0157 example) | `/incidents/[incidentId]` (trigger Page change) | P1 | S09d | §16.2–3, §26 | — (PRD §2 content-change, D-041) |
 | MIncidentPageChange | Mobile — Incident: page change | `/incidents/[incidentId]` (390, trigger Page change) | P1 | S09d | §17, §26 | — |
 | IncidentPageChange820 | Incident — page change · 820 px | `/incidents/[incidentId]` (820) | P1 | S09d | §26.10 | — |

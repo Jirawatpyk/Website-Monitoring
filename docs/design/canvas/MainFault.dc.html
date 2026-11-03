@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>DxT Monitor — Overview, monitoring degraded</title>
+<title>DxT Monitor — Overview · monitor fault</title>
 <script src="./support.js"></script>
 <link rel="stylesheet" href="aura-tokens.css">
 <link rel="stylesheet" href="ds/aura/components/bundle.css">
@@ -16,9 +16,28 @@
 <style>
 body{margin:0;background:#fafafa}
 a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}a.aura-btn--secondary:hover,a.aura-btn--ghost:hover{color:var(--aura-fg-primary)}
+.st-row{position:relative;cursor:pointer;height:auto!important;min-height:72px}
+.st-row>.aura-table__td{height:auto;align-self:stretch}
+.st-row>.aura-table__td>*{flex-shrink:0}
+.st-row .st-stretch{color:inherit;text-decoration:none}
+.st-row .st-stretch::after{content:"";position:absolute;inset:0;z-index:3}
+.st-row:hover .st-stretch{text-decoration:underline;text-underline-offset:2px}
+.st-row .st-stretch:focus-visible{outline:none}
+.st-row:has(.st-stretch:focus-visible){outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:-2px}
+.st-above{position:relative;z-index:4}
+.st-th{white-space:nowrap}
+.ov-more{display:inline-flex;align-items:center;gap:6px;min-height:36px;font-size:14px;font-weight:600;color:var(--aura-alert-danger-fg);text-decoration:underline;text-underline-offset:3px}
+.ov-more:hover{color:var(--aura-alert-danger-fg)}
+.ov-tile{min-height:60px;box-sizing:border-box;padding:10px 12px;display:flex;flex-direction:column;justify-content:center;gap:4px;border:1px solid;border-radius:var(--aura-radius-md);color:inherit;text-decoration:none;line-height:1.3}
+.ov-tile:hover{box-shadow:inset 0 0 0 1px var(--aura-border-control);color:inherit}
+.ov-name{flex-grow:1;min-width:0;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.ov-tile:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px}
+.hc-row{display:grid;grid-template-columns:minmax(0,1fr) 96px 110px minmax(0,1.1fr) auto;align-items:center;gap:16px;padding:12px 20px;border-top:1px solid var(--aura-border-subtle);font-size:13px;line-height:1.4}
+.hc-head{padding:8px 20px;font-family:var(--font-mono);font-size:11px;color:var(--aura-fg-tertiary);text-transform:uppercase}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1228px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 2500px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -32,48 +51,97 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="overview" label="Main navigation" style="height: 100%"></x-import>
 </div>
 <a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
-<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="md"></x-import>
 <div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
-<span style="font-size: 13px; font-weight: 500">Tao</span>
-<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+<span style="font-size: 13px; font-weight: 500">{{me}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{meLine}}</span>
 </div>
 </a>
 </aside>
 
-<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px 56px; display: flex; flex-direction: column; gap: 24px; position: relative">
 
-<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="position: absolute; top: 10px; right: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas); z-index: 5">
+<span style="font-family: var(--font-mono)">STATE</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import>
+<span style="font-family: var(--font-mono); padding-left: 8px">VIEW AS</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Preview as role" options="{{roles}}" value="{{role}}" on-change="{{setRole}}" size="sm"></x-import>
+</div>
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-top: 16px">
 <div style="display: flex; flex-direction: column; gap: 4px">
 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">OVERVIEW</span>
 <h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Overview</h1>
-<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">Sat 26 Sep 2026 · 02:31:40 (UTC+7) · statuses as of 02:17</span>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{metaLine}}</span>
 </div>
 <div style="display: flex; align-items: center; gap: 12px">
 <div style="height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: 9999px; font-size: 13px">
-<span style="display: flex; align-items: center; gap: 6px; color: var(--aura-fg-danger); font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 9999px; background: var(--aura-fg-danger)"></span>Probes 1/3</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 9999px; background: var(--aura-fg-danger)"></span>{{pill.probes}}</span>
 <span style="color: var(--aura-border-default)">|</span>
-<span style="color: var(--aura-fg-secondary)">SIN · TYO no data</span>
+<span style="color: var(--aura-fg-secondary)">{{pill.locs}}</span>
 <span style="color: var(--aura-border-default)">|</span>
-<span style="color: var(--aura-fg-danger)">Heartbeat missed 14 min</span>
+<span style="color: var(--aura-fg-danger); font-weight: 500">{{pill.hb}}</span>
 </div>
-<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="calendar" href="Maintenance.dc.html">Maintenance</x-import>
-<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="plus" href="AddSite.dc.html">Add site</x-import>
+<sc-if value="{{mxBtn}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="calendar" href="MaintenancePage.dc.html">Maintenance</x-import></sc-if>
+<sc-if value="{{isAdmin}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="plus" href="AddSite.dc.html">Add site</x-import></sc-if>
 </div>
 </div>
 
-<div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-lg)">
-<span style="color: var(--aura-alert-danger-fg); display: flex"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="md"></x-import></span>
-<div style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.5">
-<span style="font-size: 16px; font-weight: 600; color: var(--aura-alert-danger-fg)">Monitoring is degraded — statuses below are 14 min old</span>
-<span style="font-size: 14px">The status engine hasn’t run since 02:17 — nothing here can change or alert. BKK is still collecting; SIN and TYO have no results.</span>
-<span style="font-size: 14px">Engine heartbeat missed &gt; 3 min → Healthchecks.io alerted at 02:20: email Tao (Admin) + Alerts Space post @mentioning Ploy (on call). <span style="font-weight: 600">Only 1 active Admin</span> — the second Admin hasn’t joined yet.</span>
-<span style="font-size: 14px; font-weight: 500">{{faultState}}</span>
+<div role="alert" style="display: flex; align-items: flex-start; gap: 16px; padding: 16px 20px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-lg)">
+<span style="color: var(--aura-alert-danger-fg); display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="md"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; line-height: 1.5">
+<span style="font-size: 16px; font-weight: 600; color: var(--aura-alert-danger-fg)">{{fault.title}}</span>
+<span style="font-size: 14px">{{fault.cause}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{fault.told}}</span>
 </div>
-<a href="Probes.dc.html" style="height: 44px; padding: 0 24px; display: inline-flex; align-items: center; border-radius: 9999px; border: 1px solid var(--aura-button-secondary-border); color: var(--aura-fg-primary); font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap">Open probes &amp; heartbeat</a>
-<sc-if value="{{notAcked}}" hint-placeholder-val="{{true}}">
-<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{ack}}">Acknowledge monitor fault</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="monitor" href="Probes.dc.html">Open probes &amp; heartbeat</x-import>
+</div>
+
+<section class="aura-card" aria-labelledby="hc-h" style="padding: 0; gap: 0; overflow: hidden">
+<div style="padding: 16px 20px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.5">
+<h2 id="hc-h" style="margin: 0; font-size: 18px; line-height: 1.4; font-weight: 600">Hand check · Tier 1</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">While monitoring is degraded, open each Tier 1 site in a browser and record what you see. Check again every 30 min until monitoring is back.</span>
+</div>
+<span style="font-size: 13px; font-weight: 500; white-space: nowrap; padding-top: 4px">{{hcCount}}</span>
+</div>
+<div class="hc-row hc-head" style="padding-top: 8px; padding-bottom: 8px"><span>Site</span><span>Owner</span><span>Last status</span><span>Hand check</span><span style="width: 316px"></span></div>
+<sc-for list="{{hc}}" as="h" hint-placeholder-count="5">
+<div class="hc-row">
+<span style="display: flex; flex-direction: column; min-width: 0"><a href="SiteDetail.dc.html" style="font-weight: 500; color: inherit; text-decoration: none">{{h.name}}</a><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{h.url}}</span></span>
+<span style="display: flex; align-items: center; gap: 8px"><x-import component-from-global-scope="Aura.Avatar" name="{{h.owner}}" size="sm"></x-import>{{h.owner}}</span>
+<span style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px"><x-import component-from-global-scope="Aura.Badge" tone="{{h.tone}}" variant="{{h.variant}}" icon="{{h.icon}}">{{h.status}}</x-import><span style="font-size: 11px; color: var(--aura-fg-tertiary)">as of 02:17</span></span>
+<span style="display: flex; align-items: center; gap: 6px; min-width: 0; color: {{h.lineColor}}"><span style="display: flex; flex-shrink: 0"><x-import component-from-global-scope="Aura.Icon" name="{{h.lineIcon}}" size="sm"></x-import></span><sc-if value="{{h.isInc}}" hint-placeholder-val="{{false}}"><a href="Incident.dc.html" style="font-weight: 500; color: var(--aura-alert-danger-fg)">{{h.line}}</a></sc-if><sc-if value="{{h.notInc}}" hint-placeholder-val="{{true}}"><span>{{h.line}}</span></sc-if></span>
+<span style="width: 316px; display: flex; justify-content: flex-end; gap: 8px">
+<sc-if value="{{h.canAct}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="check" on-click="{{h.ok}}">Loads OK</x-import><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="ban" on-click="{{h.down}}">Down — open incident</x-import></sc-if>
+<sc-if value="{{h.readOnly}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-tertiary)">{{h.roText}}</span></sc-if>
+</span>
+</div>
+</sc-for>
+<div style="padding: 12px 20px; border-top: 1px solid var(--aura-border-subtle); background: var(--aura-bg-canvas); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span>{{hcFootLeft}}</span>
+<span>Tier 2–3 (6 sites): not needed — the hand check covers Tier 1 only.</span>
+</div>
+</section>
+
+<sc-if value="{{hasBanners}}" hint-placeholder-val="{{true}}">
+<div role="region" aria-label="Unacknowledged DOWN incidents" style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{banners}}" as="b" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-lg)">
+<span style="color: var(--aura-alert-danger-fg); display: flex"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="md"></x-import></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"><span style="font-size: 16px; font-weight: 600; color: var(--aura-alert-danger-fg)">{{b.title}}</span><sc-if value="{{b.escalated}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="arrow-up-right">{{b.escLabel}}</x-import></sc-if><span style="font-size: 13px; font-weight: 500; color: var(--aura-alert-danger-fg)">{{b.unacked}}</span></span>
+<span style="font-size: 14px">{{b.detail}}</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" href="Incident.dc.html">Open {{b.id}}</x-import>
+<sc-if value="{{canAck}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{b.ack}}">Acknowledge</x-import></sc-if>
+</div>
+</sc-for>
+<sc-if value="{{hasMore}}" hint-placeholder-val="{{true}}">
+<div style="padding-left: 20px"><a href="Incidents.dc.html" class="ov-more">{{moreText}}</a></div>
 </sc-if>
 </div>
+</sc-if>
 
 <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px">
 <sc-for list="{{kpis}}" as="k" hint-placeholder-count="5">
@@ -81,257 +149,456 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </sc-for>
 </div>
 
-<section style="display: flex; flex-direction: column; gap: 12px">
+<section style="display: flex; flex-direction: column; gap: 12px; position: relative">
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
 <div style="display: flex; align-items: baseline; gap: 12px">
-<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Sites</h2>
-<span style="font-size: 13px; color: var(--aura-fg-secondary)">As of 02:17 · frozen — only BKK reported (fewer than 2 locations)</span>
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Live issues</h2>
+<sc-if value="{{hasAttn}}" hint-placeholder-val="{{true}}"><span style="font-size: 13px; color: var(--aura-fg-secondary)">{{attnMeta}}</span></sc-if>
 </div>
-<div style="display: flex; align-items: center; gap: 12px">
-<x-import component-from-global-scope="Aura.SegmentedControl" label="Tier" options="{{tierOptions}}" value="{{tier}}" on-change="{{setTier}}" size="sm"></x-import>
-<label style="height: 32px; box-sizing: border-box; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; border: 1px solid {{ownerBorder}}; font-size: 13px; font-weight: 500; color: var(--aura-fg-primary)"><span style="display: flex"><x-import component-from-global-scope="Aura.Icon" name="filter" size="sm"></x-import></span><select aria-label="Owner filter" value="{{owner}}" onChange="{{ownerPick}}" style="border: 0; background: transparent; color: inherit; font: inherit; padding: 0 2px; cursor: pointer; outline-offset: 2px"><sc-for list="{{ownerOpts}}" as="o" hint-placeholder-count="5"><option value="{{o.value}}">{{o.label}}</option></sc-for></select></label>
-<label style="height: 32px; box-sizing: border-box; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; border: 1px solid {{clientBorder}}; font-size: 13px; font-weight: 500; color: var(--aura-fg-primary)"><span style="display: flex"><x-import component-from-global-scope="Aura.Icon" name="filter" size="sm"></x-import></span><select aria-label="Client filter" value="{{client}}" onChange="{{clientPick}}" style="border: 0; background: transparent; color: inherit; font: inherit; padding: 0 2px; cursor: pointer; outline-offset: 2px"><sc-for list="{{clientOpts}}" as="o" hint-placeholder-count="5"><option value="{{o.value}}">{{o.label}}</option></sc-for></select></label>
-</div>
+<x-import component-from-global-scope="Aura.IconButton" icon="info" label="{{legendBtn}}" on-click="{{toggleLegend}}"></x-import>
 </div>
 
+<sc-if value="{{legendOpen}}" hint-placeholder-val="{{false}}">
+<div role="dialog" aria-label="Legend" style="position: absolute; top: 48px; right: 0; z-index: 20; width: 600px; box-sizing: border-box; padding: 16px 20px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); font-size: 12px; line-height: 1.4; color: var(--aura-fg-secondary)">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">STATUS</span>
+<span style="display: flex; align-items: center; gap: 8px"><span style="width: 100px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="danger" variant="solid" icon="ban">Down</x-import></span>hard fail at 2 of 3 locations, twice</span>
+<span style="display: flex; align-items: center; gap: 8px"><span style="width: 100px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="warning" icon="triangle-alert">Problem</x-import></span>slow, key page, keyword, regional, SSL or domain expiry</span>
+<span style="display: flex; align-items: center; gap: 8px"><span style="width: 100px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="accent" icon="calendar">Maintenance</x-import></span>planned window</span>
+<span style="display: flex; align-items: center; gap: 8px"><span style="width: 100px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">OK</x-import></span>all checks pass</span>
+<span style="display: flex; align-items: center; gap: 8px"><span style="width: 100px; flex-shrink: 0; display: flex"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted</x-import></span>alerts off, status unchanged</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">LOCATIONS</span>
+<sc-for list="{{legend}}" as="g" hint-placeholder-count="7">
+<span style="display: flex; align-items: center; gap: 8px; min-height: 20px">
+<sc-if value="{{g.aura}}" hint-placeholder-val="{{true}}"><span style="display: flex; color: {{g.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{g.icon}}" size="sm"></x-import></span></sc-if>
+<sc-if value="{{g.shield}}" hint-placeholder-val="{{false}}"><span style="display: flex; color: var(--aura-alert-warning-fg)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg></span></sc-if>
+<span>{{g.label}}</span>
+</span>
+</sc-for>
+<span style="padding-top: 4px; border-top: 1px solid var(--aura-border-subtle)">Response 24h: line = p50 per 15 min · gap = no response (site down)</span>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{hasAttn}}" hint-placeholder-val="{{true}}">
 <div class="aura-table">
 <div class="aura-table__head" style="text-transform: uppercase">
 <div class="aura-table__gutter"></div>
-<div class="aura-table__th" style="width: 116px">Status</div>
-<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Site</div>
-<div class="aura-table__th" style="width: 52px">Tier</div>
-<div class="aura-table__th" style="width: 104px">Owner</div>
-<div class="aura-table__th" style="width: 120px">BKK SIN TYO</div>
-<div class="aura-table__th" style="width: 300px">Hand check</div>
-<div class="aura-table__th" style="width: 100px; justify-content: flex-end; padding-right: 16px">Uptime 30d</div>
-<div class="aura-table__th" style="width: 92px">Checked</div>
+<div class="aura-table__th st-th" style="width: 144px">Status</div>
+<div class="aura-table__th st-th" style="flex: 1 1 0; min-width: 0">Site · why</div>
+<div class="aura-table__th st-th" style="width: 112px">Since</div>
+<div class="aura-table__th st-th" style="width: 100px">Owner</div>
+<div class="aura-table__th st-th" style="width: 92px">BKK SIN TYO</div>
+<div class="aura-table__th st-th" style="width: 148px">Response 24h</div>
+<div class="aura-table__th st-th" style="width: 156px; justify-content: flex-end">Next step</div>
 <div class="aura-table__gutter aura-table__gutter--end"></div>
 </div>
-<sc-for list="{{rows}}" as="s" hint-placeholder-count="17">
-<div class="aura-table__row" style="background: var(--aura-bg-canvas)">
+<sc-for list="{{attn}}" as="s" hint-placeholder-count="6">
+<div class="aura-table__row st-row" style="min-height: 72px">
 <div class="aura-table__gutter"></div>
-<div class="aura-table__td" style="width: 116px; display: flex; align-items: center; line-height: 1">
-<x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import>
+<div class="aura-table__td" style="width: 144px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; line-height: 1.3; padding-top: 10px; padding-bottom: 10px">
+<span style="display: flex; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import></span>
+<sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><span style="display: flex; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">Muted · until 18:00</x-import></span></sc-if>
+<sc-if value="{{s.hasInc}}" hint-placeholder-val="{{false}}"><a href="{{s.incHref}}" class="st-above" style="max-width: 100%; white-space: normal; font-size: 12px; font-weight: 500; color: {{s.incColor}}; text-decoration: underline; text-underline-offset: 2px">{{s.incText}}</a></sc-if>
 </div>
-<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; line-height: 1.3">
-<a href="SiteDetail.dc.html" style="font-weight: 500; white-space: nowrap; color: inherit; text-decoration: none">{{s.name}}</a>
-<span style="font-size: 12px; color: {{s.noteColor}}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{s.note}}</span>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; line-height: 1.3; padding-top: 10px; padding-bottom: 10px">
+<span style="display: flex; align-items: baseline; gap: 8px; max-width: 100%"><a href="SiteDetail.dc.html" class="st-stretch" style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{s.name}}</a><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">T{{s.tier}}</span><sc-if value="{{s.yours}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; display: flex; align-self: center"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="{{s.yoursIcon}}">{{s.yoursLabel}}</x-import></span></sc-if></span>
+<span style="max-width: 100%; font-size: 12px; color: {{s.noteColor}}; font-weight: {{s.noteWeight}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{s.note}}</span>
 </div>
-<div class="aura-table__td" style="width: 52px; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">T{{s.tier}}</div>
-<div class="aura-table__td" style="width: 104px; display: flex; align-items: center; gap: 8px; line-height: 1">
+<div class="aura-table__td" style="width: 112px; display: flex; flex-direction: column; justify-content: center; gap: 2px; line-height: 1.3"><span style="font-size: 13px; font-variant-numeric: tabular-nums; font-weight: {{s.durWeight}}; color: {{s.durColor}}">{{s.dur}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{s.since}}</span></div>
+<div class="aura-table__td" style="width: 100px; display: flex; align-items: center; gap: 8px; line-height: 1">
 <x-import component-from-global-scope="Aura.Avatar" name="{{s.owner}}" size="sm"></x-import>
-<span>{{s.owner}}</span>
+<span style="font-size: 13px">{{s.owner}}</span>
 </div>
-<div class="aura-table__td" style="width: 120px; display: flex; align-items: center; gap: 14px; line-height: 1">
+<div class="aura-table__td" style="width: 92px; display: flex; align-items: center; gap: 12px; line-height: 1">
 <sc-for list="{{s.locs}}" as="l" hint-placeholder-count="3">
-<span title="{{l.title}}" style="display: flex; color: {{l.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{l.icon}}" size="sm" label="{{l.title}}"></x-import></span>
+<sc-if value="{{l.aura}}" hint-placeholder-val="{{true}}"><span title="{{l.title}}" style="display: flex; color: {{l.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{l.icon}}" size="sm" label="{{l.title}}"></x-import></span></sc-if>
+<sc-if value="{{l.shield}}" hint-placeholder-val="{{false}}"><span title="{{l.title}}" role="img" aria-label="{{l.title}}" style="display: flex; color: var(--aura-alert-warning-fg)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg></span></sc-if>
 </sc-for>
 </div>
-<div class="aura-table__td" style="width: 300px; display: flex; align-items: center; gap: 6px; line-height: 1">
-<sc-if value="{{s.canCheck}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{s.markChecked}}" style="height: 30px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; border: 1px solid var(--aura-button-secondary-border); background: transparent; color: var(--aura-fg-primary); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import>Loads OK</button><button type="button" onClick="{{s.askDown}}" style="height: 30px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; border: 1px solid var(--aura-button-secondary-border); background: transparent; color: var(--aura-fg-danger); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import>Down — open incident</button></sc-if>
-<sc-if value="{{s.isChecked}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import>{{s.checkedText}}</span></sc-if>
-<sc-if value="{{s.isDown}}" hint-placeholder-val="{{false}}"><a href="Incident.dc.html" style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import>INC-0143 opened · Tao 02:32</a></sc-if>
-<sc-if value="{{s.noCheck}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-tertiary)">Not needed · Tier {{s.tier}}</span></sc-if>
+<div class="aura-table__td" style="width: 148px; display: flex; align-items: center; gap: 10px; line-height: 1">
+<svg width="80" height="24" viewBox="0 0 96 24" preserveAspectRatio="none" role="img" aria-label="{{s.sparkLabel}}"><path d="{{s.spark}}" style="fill: none; stroke: {{s.sparkColor}}; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round"></path></svg>
+<span style="font-variant-numeric: tabular-nums; font-size: 12px; color: {{s.p50Color}}">{{s.p50}}</span>
 </div>
-<div class="aura-table__td" style="width: 100px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums">{{s.uptime}}</div>
-<div class="aura-table__td" style="width: 92px; font-family: var(--font-mono); font-size: 12px; color: var(--aura-alert-warning-fg)">{{s.checked}}</div>
+<div class="aura-table__td st-above" style="width: 156px; display: flex; align-items: center; justify-content: flex-end; line-height: 1">
+<sc-if value="{{s.actAck}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="check" on-click="{{s.ack}}">Acknowledge</x-import></sc-if>
+<sc-if value="{{s.actLink}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon-right="arrow-right" href="{{s.actHref}}">{{s.actLabel}}</x-import></sc-if>
+</div>
 <div class="aura-table__gutter aura-table__gutter--end"></div>
 </div>
 </sc-for>
 </div>
+</sc-if>
+
+<sc-if value="{{noAttn}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 14px; padding: 18px 20px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<span style="width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-surface-hover); color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="md"></x-import></span>
+<span style="display: flex; flex-direction: column; line-height: 1.45"><span style="font-size: 15px; font-weight: 600">All {{monitored}} monitored sites OK</span><span style="font-size: 13px; color: var(--aura-fg-secondary)">No open incidents, nothing muted, no location warnings · last full round 10:07:10</span></span>
+</div>
+</sc-if>
 </section>
 
-<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
-<div class="aura-card">
-<div style="display: flex; align-items: center; justify-content: space-between">
-<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Who is on it</h3>
-<x-import component-from-global-scope="Aura.StatusPill" tone="neutral">Night · weekend</x-import>
+<sc-if value="{{mx}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; gap: 16px; align-items: stretch">
+<sc-if value="{{oc}}" hint-placeholder-val="{{false}}">
+<div class="aura-card" style="gap: 12px; flex: 1 1 0; min-width: 0">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">On call</h3>
+<a href="OnCall.dc.html" style="font-size: 13px; white-space: nowrap">Rotation →</a>
 </div>
-<div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px">
-<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Tao" size="sm"></x-import><span style="flex-grow: 1">Tao — monitor faults · Admin</span><span style="color: {{taoColor}}">{{taoState}}</span></div>
-<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Ploy" size="sm"></x-import><span style="flex-grow: 1">Ploy — Tier 1 on-call</span><span style="color: var(--aura-fg-secondary)">→ Mon 09:00</span></div>
-<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">While this lasts, on-call checks Tier 1 sites by hand every 30 min and notes it in the Alerts Space.</span>
-<div style="display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.5">
-<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">HEARTBEAT RULES</span>
-<span><span style="font-weight: 500">Engine</span> <span style="color: var(--aura-fg-secondary)">missed &gt; 3 min → email Tao + @on-call (this fault)</span></span>
-<span><span style="font-weight: 500">One probe</span> <span style="color: var(--aura-fg-secondary)">missing &gt; 3 min → email Tao only, no page</span></span>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.4">
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Ploy" size="sm"></x-import><span style="flex-grow: 1">Ploy · Tier 1 on call now — does the hand check</span><span style="color: var(--aura-fg-secondary); white-space: nowrap">until Mon 09:00</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Nok" size="sm"></x-import><span style="flex-grow: 1">Nok · next week</span><span style="color: var(--aura-fg-secondary); white-space: nowrap">from Mon 28 Sep</span></div>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">Tier 2–3: Mon–Fri 09:00–18:00 — outside those hours escalation waits until 09:00.</span>
+</div>
+</sc-if>
+<sc-if value="{{mxCard}}" hint-placeholder-val="{{false}}">
+<div class="aura-card" style="gap: 12px; flex: 1 1 0; min-width: 0">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; line-height: 1.5">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Maintenance &amp; mutes</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Alerts off or muted, checks still run</span>
+</div>
+<a href="MaintenancePage.dc.html" style="font-size: 13px; white-space: nowrap">Open →</a>
+</div>
+<sc-for list="{{mxRows}}" as="m" hint-placeholder-count="1">
+<a href="MaintenancePage.dc.html" style="display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.5; color: inherit; text-decoration: none">
+<span style="display: flex; padding-top: 2px; color: {{m.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{m.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500">{{m.title}}</span><span style="color: var(--aura-fg-secondary)">{{m.detail}}</span></span>
+</a>
+</sc-for>
+<sc-if value="{{mxNone}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--aura-fg-secondary)">Nothing active right now.</span></sc-if>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-top: 10px; border-top: 1px solid var(--aura-border-subtle); font-size: 13px">
+<sc-for list="{{mxLinks}}" as="l" hint-placeholder-count="2"><a href="MaintenancePage.dc.html" style="display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{l.icon}}" size="sm"></x-import></span><span style="flex-grow: 1">{{l.text}}</span><span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span></a></sc-for>
 </div>
 </div>
+</sc-if>
 </div>
-<div class="aura-card">
-<div style="display: flex; flex-direction: column">
-<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">What still works</h3>
-<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">Each part fails on its own</span>
+</sc-if>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start">
+<section style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600">All sites</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{okCount}}/{{monitored}} OK · statuses as of 02:17</span>
 </div>
-<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px">
-<sc-for list="{{parts}}" as="p" hint-placeholder-count="5">
-<div style="display: flex; align-items: flex-start; gap: 10px; line-height: 1.45"><span style="display: flex; padding-top: 2px; color: {{p.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{p.icon}}" size="sm"></x-import></span><span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column"><span>{{p.name}}</span><sc-if value="{{p.hasSub}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{p.sub}}</span></sc-if></span><span style="color: var(--aura-fg-secondary); white-space: nowrap">{{p.state}}</span></div>
+<div style="display: flex; align-items: center; gap: 12px">
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Filter tiles by tier" options="{{tierOptions}}" value="{{tier}}" on-change="{{setTier}}" size="sm"></x-import>
+<a href="Sites.dc.html" style="font-size: 13px; font-weight: 500; white-space: nowrap">Manage on Sites →</a>
+</div>
+</div>
+<div role="list" aria-label="All monitored sites" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="11">
+<a role="listitem" href="SiteDetail.dc.html" aria-label="{{t.aria}}" class="ov-tile" style="background: {{t.bg}}; border-color: {{t.bd}}">
+<span style="display: flex; align-items: flex-start; gap: 8px; min-width: 0">
+<span style="display: flex; flex-shrink: 0; padding-top: 1px; color: {{t.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span>
+<span class="ov-name">{{t.name}}</span>
+<span style="flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; color: {{t.rightColor}}; font-weight: {{t.rightWeight}}">{{t.right}}</span>
+</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--aura-fg-secondary); padding-left: 24px; min-width: 0">
+<span style="font-family: var(--font-mono); font-size: 11px; flex-shrink: 0">T{{t.tier}}</span>
+<span style="flex-grow: 1; min-width: 0; color: {{t.lineColor}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{t.line}}</span>
+<sc-if value="{{t.flagShield}}" hint-placeholder-val="{{false}}"><span title="TLS chain error" style="display: flex; color: var(--aura-alert-warning-fg)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg></span></sc-if>
+<sc-if value="{{t.flagInc}}" hint-placeholder-val="{{false}}"><span title="Open incident" style="display: flex; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="bell" size="sm" label="Open incident"></x-import></span></sc-if>
+<sc-if value="{{t.muted}}" hint-placeholder-val="{{false}}"><span title="Muted until 18:00" style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="eye-off" size="sm" label="Muted until 18:00"></x-import></span></sc-if>
+</span>
+</a>
 </sc-for>
 </div>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{footText}}</span>
+</section>
+
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<div style="padding: 4px 4px 4px 12px; display: flex; align-items: center; gap: 10px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); flex-shrink: 0">SLICE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview slice" options="{{slices}}" value="{{slice}}" on-change="{{setSlice}}" full-width="{{yes}}" size="sm"></x-import></div>
 </div>
 <div class="aura-card">
 <div style="display: flex; align-items: center; justify-content: space-between">
-<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Monitor events</h3>
-<a href="AuditLog.dc.html" style="font-size: 13px">Audit log</a>
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Recent events</h3>
+<a href="Incidents.dc.html" style="font-size: 13px">All incidents</a>
 </div>
 <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px">
-<sc-if value="{{hasManual}}" hint-placeholder-val="{{false}}"><div style="display: flex; gap: 12px"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); width: 40px; flex-shrink: 0">02:32</span><span style="color: var(--aura-fg-danger)">{{manualEvent}}</span></div></sc-if>
-<div style="display: flex; gap: 12px"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); width: 40px; flex-shrink: 0">02:31</span><span>Cron retry failed — Vercel 504, next try 02:36</span></div>
-<div style="display: flex; gap: 12px"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); width: 40px; flex-shrink: 0">02:20</span><span>Engine heartbeat missed &gt; 3 min → email Tao, Chat @mention Ploy</span></div>
-<div style="display: flex; gap: 12px"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); width: 40px; flex-shrink: 0">02:18</span><span>SIN and TYO runs stopped reporting</span></div>
-<div style="display: flex; gap: 12px"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); width: 40px; flex-shrink: 0">02:17</span><span>Last complete round — 17/17 OK</span></div>
+<sc-for list="{{events}}" as="e" hint-placeholder-count="6"><div style="display: flex; gap: 12px"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); width: 40px; flex-shrink: 0">{{e.t}}</span><span>{{e.text}}</span></div></sc-for>
 </div>
 </div>
+</div>
+</div>
+
+<div style="padding: 16px 20px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.55; color: var(--aura-fg-secondary); display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · MONITOR FAULT · HAND CHECK (S12b, D-053)</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Layout.</b> Main3 with the S12a fault banner on top (above any DOWN banners), then the Hand check card, then the usual DOWN banners, KPIs, Live issues and tiles. Header meta ends “· statuses as of 02:17”; the probe pill reads “Probes 1/3 | BKK | Heartbeat missed 14 min” with a red dot. Statuses, KPIs and tiles are the last full sweep (02:17) and say so. There is no “Acknowledge monitor fault” button.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Hand check.</b> Tier 1 sites only, one row each: site, owner, last status (as of 02:17), the last hand check, and two buttons. <b style="color: var(--aura-fg-primary); font-weight: 600">Loads OK</b> records “Checked OK · &lt;name&gt; 02:31” at once (no confirm, no message; logged); it can be pressed again — the line keeps the latest, and the card asks for a check every 30 min. <b style="color: var(--aura-fg-primary); font-weight: 600">Down — open incident</b> opens the confirm (site, optional “What did you see?” ≤ 500 characters, “Posts the DOWN alert to the Alerts Space now and starts the client-update clock”, Open incident danger + Cancel). After it the row reads “INC-0143 opened · &lt;name&gt; 02:31” (links to the incident), the buttons go, and the incident gets its usual DOWN banner and Live issues row. Tier 2–3 get one quiet line under the list, not rows.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Who presses.</b> Admin, the person on call, and a Responder on their own sites (the Acknowledge rule). Everyone else sees the same card read-only (“Read only”). VIEW AS: Admin (Tao) · On call (Ploy) · Responder (Nok, owns realme.link) · AM (Bua).</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">STATE.</b> Before hand check · After hand check (Bangkok Airways – Taiwan loads OK, realme.link incident opened) · Open-incident dialog · Sweep only (rounds still arrive: title “Monitoring is degraded — the status engine’s sweep stopped 14 min ago”, probes 3/3). Sample names, times and IDs are made up — compute them; never copy.</span>
 </div>
 
 </main>
 
-<x-import component-from-global-scope="Aura.Dialog" open="{{downOpen}}" on-close="{{closeDown}}" title="{{downTitle}}" description="Trigger: Manual (hand check) · recorded as Tao · 02:32" size="md" auto-focus="{{no}}">
-<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
-<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
-<sc-for list="{{downSteps}}" as="d" hint-placeholder-count="3">
-<div style="display: flex; gap: 10px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{d.icon}}" size="sm"></x-import></span><span>{{d.text}}</span></div>
-</sc-for>
-</div>
-<x-import component-from-global-scope="Aura.TextField" label="What you saw" optional="{{yes}}" placeholder="e.g. Browser timeout from home and on 4G"></x-import>
-<div style="display: flex; justify-content: flex-end; gap: 12px">
-<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeDown}}">Cancel</x-import>
-<x-import component-from-global-scope="Aura.Button" variant="primary" icon="ban" on-click="{{confirmDown}}">Open incident</x-import>
+<x-import component-from-global-scope="Aura.Dialog" open="{{dlgOpen}}" on-close="{{closeDlg}}" title="{{dlg.title}}" description="{{dlg.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<x-import component-from-global-scope="Aura.Textarea" label="What did you see?" optional="{{yes}}" rows="{{three}}" maxlength="500" placeholder="e.g. Home page shows a 502 error from the hosting provider" value="{{dlg.note}}" on-change="{{setNote}}" hint="{{dlg.hint}}"></x-import>
+<div style="display: flex; gap: 10px; padding: 10px 14px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span>Posts the DOWN alert to the Alerts Space now and starts the client-update clock.</span></div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); margin-top: -6px">Logged in the audit log as {{me}}.</span>
+<div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeDlg}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="danger" icon="ban" on-click="{{confirmDlg}}">Open incident</x-import>
 </div>
 </div>
 </x-import>
+
+<sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+<div role="status" aria-live="polite" style="position: absolute; right: 40px; bottom: 24px; width: 640px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 12px 12px 12px 18px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); line-height: 1.45; z-index: 40">
+<span style="display: flex"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; font-size: 13px"><span><span style="font-weight: 600">Acknowledged {{toastId}}</span> · escalation stopped</span><span style="font-size: 12px; opacity: 0.75">Posting to Chat, email and webhooks in {{left}} s — nothing is sent until then</span></span>
+<button type="button" onClick="{{undo}}" style="height: 36px; padding: 0 16px; flex-shrink: 0; border-radius: 9999px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer">Undo · {{left}} s</button>
+</div>
+</sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1228}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2500}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { tier: 'Tier 1', acked: false, hand: {}, down: {}, ask: null, owner: 'all', client: 'all' };
+    this.state = { view: 'Before hand check', tier: 'All', acked: {}, toast: null, left: 10, legendOpen: false, role: 'Admin', slice: '+ On-call', hcs: {}, dlg: null, note: '' };
   }
-  spark(seed, base, jitter, broken) {
-    var pts = [];
-    var x = 0;
-    var v = seed * 9301 + 49297;
+  spark(seed, base, jitter, failFrom) {
+    // 25 sample buckets (spec: 96 × 15 min). Failed buckets = no point, the line breaks (gap).
+    var pts = [], fail = [], v = seed * 9301 + 49297, pen = false;
     for (var i = 0; i < 25; i++) {
       v = (v * 9301 + 49297) % 233280;
       var r = v / 233280;
+      var x = i * 4;
+      if (failFrom >= 0 && i >= failFrom) { pen = false; continue; }
       var ms = base + (r - 0.5) * jitter * 2;
       var y = 22 - Math.max(0, Math.min(20, (ms / (base * 2.2)) * 20));
-      x = i * 4;
-      if (broken && i > 20) { pts.push((i === 21 ? 'L' : 'L') + x + ' 2'); continue; }
-      pts.push((i === 0 ? 'M' : 'L') + x + ' ' + y.toFixed(1));
+      pts.push((pen ? 'L' : 'M') + x + ' ' + y.toFixed(1));
+      pen = true;
     }
-    return pts.join(' ');
+    return { d: pts.join(' ') || 'M0 0', fail: fail.join(' ') || 'M0 0' };
   }
   renderVals() {
-    var P = { icon: 'circle-check', color: 'var(--aura-fg-positive)' };
-    var F = { icon: 'ban', color: 'var(--aura-fg-danger)' };
-    var B = { icon: 'lock', color: 'var(--aura-fg-secondary)' };
-    var S = { icon: 'clock', color: 'var(--aura-alert-warning-fg)' };
-    var M = { icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)' };
+    var self = this;
+    var st = this.state;
+    var DANGER = 'var(--aura-fg-danger)', WARN = 'var(--aura-alert-warning-fg)', SEC = 'var(--aura-fg-secondary)';
+    var P = { icon: 'circle-check', color: 'var(--aura-fg-positive)', w: 'Pass' };
+    var F = { icon: 'ban', color: DANGER, w: 'Hard fail' };
+    var B = { icon: 'lock', color: SEC, w: 'Blocked by bot protection' };
+    var T = { shield: true, w: 'TLS chain error' };
+    var S = { icon: 'clock', color: WARN, w: 'Slow' };
     var codes = ['BKK', 'SIN', 'TYO'];
-    var words = { 'circle-check': 'Pass', 'ban': 'Hard fail', 'lock': 'Blocked, verified OK', 'clock': 'Slow', 'circle-dot-dashed': 'No data since 02:17' };
-    function locs(a) { return a.map(function (l, i) { return { icon: l.icon, color: l.color, title: codes[i] + ': ' + words[l.icon] }; }); }
+    function locs(a) { return a.map(function (l, i) { return { aura: !l.shield, shield: !!l.shield, icon: l.icon || '', color: l.color || '', title: codes[i] + ': ' + l.w }; }); }
     var STATUS = {
       down: { label: 'Down', tone: 'danger', variant: 'solid', icon: 'ban', rank: 0 },
       problem: { label: 'Problem', tone: 'warning', variant: 'soft', icon: 'triangle-alert', rank: 1 },
       maint: { label: 'Maintenance', tone: 'accent', variant: 'soft', icon: 'calendar', rank: 2 },
       ok: { label: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check', rank: 3 }
     };
-    var sites = [
-      ['MuvMi', 1, 'Arm', 'ok', [P, M, M], '', '402 ms', '99.71%', 400, false],
-      ['Bangkok Airways – Taiwan', 1, 'Arm', 'ok', [P, M, M], '', '412 ms', '99.97%', 410, false],
-      ['Bangkok Airways – China', 1, 'Arm', 'ok', [P, M, M], '', '688 ms', '100.00%', 680, false],
-      ['ENEOS Industrial', 1, 'Ploy', 'ok', [P, M, M], '', '356 ms', '100.00%', 350, false],
-      ['realme.link', 1, 'Nok', 'ok', [P, M, M], '', '241 ms', '100.00%', 240, false],
-      ['Fuji Links', 2, 'Ploy', 'ok', [P, M, M], '', '1.2 s', '100.00%', 1200, false],
-      ['WeCare Studio', 2, 'Nok', 'ok', [P, M, M], '', '505 ms', '100.00%', 520, false],
-      ['Tubtong', 2, 'Ploy', 'ok', [P, M, M], '', '1.1 s', '100.00%', 1100, false],
-      ['Cando Asia', 2, 'Nok', 'ok', [B, M, M], 'Blocked · verified via browser', '940 ms', '99.97%', 940, false],
-      ['ORCA Thailand', 2, 'Tao', 'ok', [P, M, M], '', '520 ms', '99.98%', 520, false],
-      ['WeCare Asia', 2, 'Nok', 'ok', [P, M, M], '', '610 ms', '100.00%', 610, false],
-      ['VOCA', 2, 'Ploy', 'ok', [P, M, M], '', '298 ms', '99.91%', 300, false],
-      ['EQHO', 2, 'Tao', 'ok', [P, M, M], '', '334 ms', '100.00%', 330, false],
-      ['DxT', 2, 'Tao', 'ok', [P, M, M], '', '280 ms', '100.00%', 280, false],
-      ['DxT Solutions', 3, 'Tao', 'ok', [P, M, M], '', '305 ms', '100.00%', 300, false],
-      ['DxT AI', 3, 'Tao', 'ok', [P, M, M], '', '450 ms', '100.00%', 450, false],
-      ['DxT Games', 3, 'Tao', 'ok', [P, M, M], '', '390 ms', '100.00%', 390, false]
+    var V = st.view;
+    var three = false, one = false, allOk = true;
+    var HC = st.hcs || {};
+    var NOW = '02:31';
+    var downs = {};
+    if (three || one) downs['MuvMi'] = { id: 'INC-0142', min: 19, un: 18, esc: true, cause: 'Timeout ×2 · 504 ×1', line: 'Timeout ×2 · 504 ×1 · L1 (Ploy + Tao) paged 10:03 · CEO step at 10:18 (in 11 min)', at: '09:48' };
+    if (three) {
+      downs['realme.link'] = { id: 'INC-0143', min: 6, un: 6, cause: 'Connection refused ×3', line: 'Connection refused ×3 · L1 (Nok + Tao) at 10:16 if still unacked (in 9 min)', at: '10:01' };
+      downs['Tubtong'] = { id: 'INC-0144', min: 3, un: 3, cause: '503 ×3', line: '503 ×3 · Ploy (owner) notified · L1 at 10:34 if still unacked (in 27 min)', at: '10:04' };
+      downs['Cando Asia'] = { id: 'INC-0140', min: 12, ackBy: 'Nok', cause: 'DNS not resolving ×3', at: '09:55' };
+    }
+    var IDS = {}, nid = 143;
+    Object.keys(HC).forEach(function (k) { if (HC[k].inc) { IDS[k] = 'INC-0' + (nid++); downs[k] = { id: IDS[k], min: 0, un: 0, manual: true, cause: 'Manual (hand check)' + (HC[k].note ? ' · “' + HC[k].note + '”' : ''), line: 'Opened by hand ' + NOW + ' · Ploy (on call) @mentioned in the Alerts Space · nothing escalates on its own while the engine is down — use Escalate now on the incident', at: NOW }; } });
+    var fuji = three || V === 'None';
+    // name, tier, owner, locations, p50, spark base, muted
+    var base = [
+      ['MuvMi', 1, 'Arm', [P, P, P], '412 ms', 400],
+      ['realme.link', 1, 'Nok', [P, P, P], '241 ms', 240],
+      ['Bangkok Airways – Taiwan', 1, 'Arm', [P, P, P], '412 ms', 410],
+      ['Bangkok Airways – China', 1, 'Arm', [P, B, B], '688 ms', 680],
+      ['ENEOS Industrial', 1, 'Ploy', allOk ? [P, P, P] : [P, T, P], '356 ms', 350],
+      ['Fuji Links', 2, 'Ploy', fuji ? [S, S, S] : [P, P, P], fuji ? '5.8 s' : '1.9 s', fuji ? 2600 : 1900],
+      ['ORCA Thailand', 2, 'Tao', [P, P, P], '520 ms', 520],
+      ['Tubtong', 2, 'Ploy', [P, P, P], '1.1 s', 1100],
+      ['Cando Asia', 2, 'Nok', [P, P, P], '940 ms', 940],
+      ['VOCA', 2, 'Ploy', [P, P, P], '298 ms', 300],
+      ['DxT Games', 3, 'Tao', [P, P, P], '390 ms', 390, !allOk]
     ];
-    var self = this;
-    var tier = this.state.tier;
-    var hand = this.state.hand;
-    var acked = this.state.acked;
-    var down = this.state.down;
-    var owner = this.state.owner, client = this.state.client;
-    var AM = { 'MuvMi': 'Bua', 'Bangkok Airways – Taiwan': 'Bua', 'Bangkok Airways – China': 'Bua', 'ENEOS Industrial': 'Thee', 'realme.link': 'Thee' };
-    var rows = sites.map(function (r, i) {
-      var st = STATUS[down[r[0]] ? 'down' : r[3]];
-      var noteColor = r[3] === 'down' ? 'var(--aura-fg-danger)' : (r[3] === 'problem' ? 'var(--aura-alert-warning-fg)' : 'var(--aura-fg-secondary)');
-      return {
-        name: r[0], tier: r[1], owner: r[2], label: down[r[0]] ? 'Down' : 'Last: ' + st.label, tone: down[r[0]] ? 'danger' : 'neutral', variant: down[r[0]] ? 'solid' : 'outline', icon: down[r[0]] ? 'ban' : 'clock',
-        internal: /^(VOCA|EQHO|DxT)/.test(r[0]),
-        locs: locs(r[4]), note: r[5], noteColor: noteColor, p50: r[6], uptime: r[7],
-        spark: self.spark(i + 3, r[8], r[8] * 0.35, r[9]),
-        sparkColor: 'var(--aura-fg-tertiary)',
-        checked: r[1] === 1 ? '02:17:05' : (r[1] === 2 ? '02:15:02' : '02:15:00'),
-        canCheck: r[1] === 1 && !hand[r[0]] && !down[r[0]],
-        isChecked: r[1] === 1 && !!hand[r[0]],
-        isDown: !!down[r[0]],
-        askDown: function () { self.setState({ ask: r[0] }); },
-        noCheck: r[1] !== 1,
-        checkedText: 'Loads OK · by Tao 02:32',
-        markChecked: function () { var h = Object.assign({}, self.state.hand); h[r[0]] = true; self.setState({ hand: h }); },
-        rank: st.rank
+    var DRAFTS = 1; // EQHO Academy — a draft, not monitored, not shown on Overview
+    var acked = st.acked;
+    // Viewer roles. Admin = Tao (desktop default). AM = Bua (Stakeholder). Viewer = Mint (read-only).
+    var SLICE = st.slice || 'S06';
+    var ROLE = st.role, ME = ROLE === 'AM' ? 'Bua' : (ROLE === 'On call' ? 'Ploy' : (ROLE === 'Responder' ? 'Nok' : 'Tao'));
+    var canAck = ROLE !== 'Viewer', canResolve = ROLE === 'Admin';
+    var N = { icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)', w: 'No data' };
+    // backup and AM per site — same as the Sites board
+    var BACKUP = { 'MuvMi': 'Ploy', 'realme.link': 'Arm', 'Bangkok Airways – Taiwan': 'Ploy', 'Bangkok Airways – China': 'Ploy', 'ENEOS Industrial': 'Arm', 'Fuji Links': 'Nok', 'ORCA Thailand': 'Nok', 'Tubtong': 'Nok', 'Cando Asia': 'Ploy', 'VOCA': 'Tao', 'DxT Games': 'Nok' };
+    var AMOF = { 'MuvMi': 'Bua', 'realme.link': 'Thee', 'Bangkok Airways – Taiwan': 'Bua', 'Bangkok Airways – China': 'Bua', 'ENEOS Industrial': 'Thee', 'Fuji Links': 'Thee', 'ORCA Thailand': 'Thee', 'Tubtong': 'Bua', 'Cando Asia': 'Bua' };
+    function ackFn(id) {
+      return function () {
+        clearInterval(self._iv);
+        var a = Object.assign({}, self.state.acked); a[id] = true;
+        self.setState({ acked: a, toast: id, left: 10 });
+        self._iv = setInterval(function () {
+          var l = self.state.left - 1;
+          if (l <= 0) { clearInterval(self._iv); self.setState({ toast: null, left: 0 }); } else self.setState({ left: l });
+        }, 1000);
       };
-    }).filter(function (r) { return (tier === 'All' || ('Tier ' + r.tier) === tier) && (owner === 'all' || r.owner === owner) && (client === 'all' || (client === 'internal') === r.internal); });
-    var manual = Object.keys(down);
-    var ask = this.state.ask;
-    var open = 1 + manual.length;
-    var okCount = sites.filter(function (r) { return r[3] === 'ok'; }).length;
-    return {
-      acked: acked,
-      notAcked: !acked,
-      ack: function () { self.setState({ acked: true }); },
-      faultState: acked ? 'Fault acknowledged by Tao (you) at 02:32 · repeat alerts stop; checks by hand continue.' : 'Not acknowledged yet — Healthchecks.io repeats every 15 min until someone does.',
-      taoState: acked ? 'Acked 02:32' : 'Not acked',
-      taoColor: acked ? 'var(--aura-fg-secondary)' : 'var(--aura-alert-warning-fg)',
-      tier: tier,
-      tierOptions: ['All', 'Tier 1', 'Tier 2', 'Tier 3'],
+    }
+    var all = base.map(function (r, i) {
+      var name = r[0], d = downs[name];
+      var key = d ? 'down' : (name === 'Fuji Links' && fuji ? 'problem' : 'ok');
+      var Sx = STATUS[key];
+      var isAck = d && (d.ackBy || acked[d.id]);
+      var o = { name: name, tier: r[1], owner: r[2], key: key, rank: Sx.rank, label: Sx.label, tone: Sx.tone, variant: Sx.variant, icon: Sx.icon,
+        locs: locs(d && d.manual ? [N, N, N] : (d ? [F, F, F] : [r[3][0], N, N])), muted: !!r[6], ackRank: 0, durMin: 0, noteWeight: 400, noteColor: SEC, durColor: 'var(--aura-fg-primary)', durWeight: 400,
+        hasInc: false, incText: '', incColor: SEC, incHref: '', reason: '', actAck: false, actLink: false, actHref: '', actLabel: '', ack: null };
+      var sp = self.spark(i + 3, r[5], r[5] * 0.35, d ? 21 : -1);
+      o.spark = sp.d;
+      o.sparkColor = key === 'down' ? DANGER : (key === 'problem' ? WARN : 'var(--aura-chart-1)');
+      o.p50 = d ? '—' : r[4]; o.p50Color = key === 'problem' ? WARN : SEC;
+      o.sparkLabel = 'Response last 24 h' + (d ? ', failing since ' + d.at : ', p50 ' + r[4]);
+      // Reason, in order: Down › Problem › Maintenance › root cause › location warning › muted
+      if (d) {
+        o.reason = 'down'; o.note = d.cause; o.noteColor = DANGER; o.noteWeight = 500;
+        o.dur = d.manual ? 'just now' : d.min + ' min'; o.durMin = d.min; o.since = 'since ' + d.at; o.durColor = DANGER; o.durWeight = 600;
+        o.ackRank = isAck ? 2 : (d.esc ? 0 : 1);
+        o.hasInc = true; o.incHref = 'Incident.dc.html';
+        o.incText = isAck ? d.id + ' · Acked by ' + (d.ackBy || 'Tao') : (d.manual ? d.id + ' · Manual · unacked' : d.id + (d.esc ? ' · Escalated L1 · ' : ' · ') + d.un + ' min unacked');
+        o.incColor = isAck ? SEC : DANGER;
+        if (isAck) { o.actLink = true; o.actHref = 'Incident.dc.html'; o.actLabel = 'Open ' + d.id; }
+        else if (canAck) { o.actAck = true; o.ack = ackFn(d.id); }
+        else { o.actLink = true; o.actHref = 'Incident.dc.html'; o.actLabel = 'Open ' + d.id; }
+        o.tileLine = isAck ? 'Acked · ' + (d.ackBy || 'Tao') : (d.esc ? 'Escalated L1 · unacked' : 'Unacked');
+      } else if (key === 'problem') {
+        o.reason = 'problem'; o.note = 'Slow: p50 5.8 s > 5 s'; o.noteColor = WARN;
+        o.dur = '15 min'; o.durMin = 15; o.since = 'since 09:52';
+        o.hasInc = true; o.incText = 'INC-0141 · Acked by Ploy'; o.incHref = 'Incidents.dc.html';
+        o.actLink = true; o.actHref = 'Incidents.dc.html'; o.actLabel = 'Open INC-0141';
+        o.tileLine = 'Slow · 15 min';
+      } else if (name === 'MuvMi') {
+        o.reason = 'rootcause'; o.note = 'Back up Fri 10:31 — root cause not added yet';
+        o.dur = '16 h'; o.durMin = 960; o.since = 'since Fri 10:31';
+        o.hasInc = true; o.incText = 'INC-0142 · Needs root cause'; o.incColor = WARN; o.incHref = 'Resolve.dc.html';
+        o.actLink = true; o.actHref = canResolve ? 'Resolve.dc.html' : 'Incidents.dc.html'; o.actLabel = canResolve ? 'Add root cause' : 'Open INC-0142';
+        o.tileLine = 'Root cause due'; o.flagInc = true;
+      } else if (name === 'ORCA Thailand' && !allOk) {
+        o.reason = 'rootcause'; o.note = 'Back up — root cause not added yet';
+        o.dur = '1 h 55 min'; o.durMin = 115; o.since = 'since 08:12';
+        o.hasInc = true; o.incText = 'INC-0139 · Needs root cause'; o.incColor = WARN; o.incHref = 'Resolve.dc.html';
+        o.actLink = true; o.actHref = canResolve ? 'Resolve.dc.html' : 'Incidents.dc.html'; o.actLabel = canResolve ? 'Add root cause' : 'Open INC-0139';
+        o.tileLine = 'Root cause due'; o.flagInc = true;
+      } else if (name === 'ENEOS Industrial' && !allOk) {
+        o.reason = 'warn'; o.note = 'TLS chain error at SIN · BKK, TYO OK';
+        o.dur = '36 min'; o.durMin = 36; o.since = 'since 09:31';
+        o.actLink = true; o.actHref = 'SiteDetail.dc.html'; o.actLabel = 'View checks';
+        o.tileLine = 'TLS chain · SIN'; o.flagShield = true;
+      } else if (o.muted) {
+        o.reason = 'muted'; o.note = 'Muted by Tao · redeploying build';
+        o.dur = '1 h 27 min'; o.durMin = 87; o.since = 'since 08:40';
+        o.actLink = true; o.actHref = SLICE !== 'S06' ? 'MaintenancePage.dc.html' : 'SiteDetail.dc.html'; o.actLabel = SLICE !== 'S06' ? (ROLE === 'Admin' ? 'Manage mute' : 'View mute') : 'View site';
+        o.tileLine = 'Muted';
+      } else {
+        o.tileLine = name === 'Bangkok Airways – China' ? 'Blocked by bot protection · verified' : '';
+      }
+      o.lineColor = key === 'down' ? DANGER : (key === 'problem' ? WARN : SEC);
+      if (ROLE === 'Admin' || ROLE === 'On call' || ROLE === 'Responder') { o.yours = r[2] === ME || BACKUP[name] === ME; o.yoursLabel = r[2] === ME ? 'Yours' : 'Backup'; o.yoursIcon = 'user'; }
+      else if (ROLE === 'AM') { o.yours = AMOF[name] === ME; o.yoursLabel = 'Your client'; o.yoursIcon = 'users'; }
+      else { o.yours = false; o.yoursLabel = ''; o.yoursIcon = 'user'; }
+      return o;
+    });
+    function cmp(a, b) { return a.rank - b.rank || a.ackRank - b.ackRank || a.tier - b.tier || b.durMin - a.durMin || a.name.localeCompare(b.name); }
+    var monitored = all.length;
+    var okCount = all.filter(function (r) { return r.key === 'ok'; }).length;
+    var attn = all.filter(function (r) { return !!r.reason; }).sort(cmp);
+    var TILE = {
+      down: { bg: 'var(--aura-alert-danger-bg)', bd: 'var(--aura-alert-danger-border)', c: DANGER },
+      problem: { bg: 'var(--aura-alert-warning-bg)', bd: 'var(--aura-alert-warning-border)', c: WARN },
+      maint: { bg: 'var(--aura-bg-surface)', bd: 'var(--aura-border-default)', c: 'var(--aura-fg-accent)' },
+      ok: { bg: 'var(--aura-bg-surface)', bd: 'var(--aura-border-default)', c: 'var(--aura-fg-positive)' }
+    };
+    var tier = st.tier;
+    var tiles = all.filter(function (r) { return tier === 'All' || ('Tier ' + r.tier) === tier; }).sort(cmp).map(function (r) {
+      var t = TILE[r.key], dn = r.key === 'down';
+      return { name: r.name, tier: r.tier, icon: r.icon, color: t.c, bg: t.bg, bd: t.bd, muted: r.muted,
+        right: dn ? r.dur : r.p50, rightColor: dn ? DANGER : (r.key === 'problem' ? WARN : SEC), rightWeight: dn ? 600 : 400,
+        line: r.tileLine, lineColor: r.lineColor, flagShield: !!r.flagShield, flagInc: !!r.flagInc,
+        aria: r.name + ', ' + r.label + (dn ? ' for ' + r.dur : ', p50 ' + r.p50) + (r.tileLine ? ', ' + r.tileLine : '') + (r.muted ? ', muted until 18:00' : '') };
+    });
+    // Banners: DOWN incidents not yet acknowledged
+    var q = attn.filter(function (r) { return r.key === 'down' && r.ackRank < 2; });
+    var banners = q.slice(0, 2).map(function (r) {
+      var d = downs[r.name];
+      return { id: d.id, title: d.manual ? r.name + ' is DOWN — opened by hand at ' + d.at : r.name + ' is DOWN — ' + d.min + ' min', escalated: !!d.esc, escLabel: 'Escalated · L1', unacked: d.manual ? 'Unacked' : d.un + ' min unacked', detail: d.line, ack: ackFn(d.id) };
+    });
+    var more = q.length - banners.length;
+    var nUnacked = q.length, nEsc = q.filter(function (r) { return r.ackRank === 0; }).length;
+    var nOpen = all.filter(function (r) { return r.hasInc; }).length;
+    var unackedText = nUnacked ? nUnacked + ' unacked' + (nEsc ? ' (' + nEsc + ' escalated)' : '') : '';
+    var down30 = 1 + Object.keys(downs).length;
+    var enough = down30 >= 3;
+    var nDown = all.filter(function (r) { return r.key === 'down'; }).length, nProb = all.filter(function (r) { return r.key === 'problem'; }).length;
+    var ev = [];
+    if (st.toast === null) Object.keys(acked).forEach(function (id) { ev.push({ t: '10:07', text: id + ' acked by Tao — escalation stopped' }); });
+    if (three) ev.push({ t: '10:04', text: 'Tubtong DOWN confirmed — 3/3 locations' });
+    if (three || one) ev.push({ t: '10:03', text: 'MuvMi escalated to L1 — Ploy, Tao' });
+    if (three) ev.push({ t: '10:01', text: 'realme.link DOWN confirmed — 3/3 locations' });
+    if (three) ev.push({ t: '09:58', text: 'Cando Asia acked by Nok' });
+    if (fuji) ev.push({ t: '09:52', text: 'Fuji Links PROBLEM — Slow, 3 rounds' });
+    if (three || one) ev.push({ t: '09:48', text: 'MuvMi DOWN confirmed — 3/3 locations' });
+    if (!allOk) ev.push({ t: '09:31', text: 'ENEOS Industrial — TLS chain error at SIN' });
+    if (!allOk) ev.push({ t: '08:40', text: 'DxT Games muted until 18:00 — Tao' });
+    if (!allOk) ev.push({ t: '08:12', text: 'ORCA Thailand back up — root cause needed' });
+    if (allOk) {
+      ev.push({ t: '10:02', text: 'Fuji Links back to OK — p50 1.9 s' });
+      ev.push({ t: '09:40', text: 'INC-0139 ORCA Thailand resolved — root cause added by Tao' });
+      ev.push({ t: '09:31', text: 'ENEOS Industrial TLS chain fixed at SIN' });
+      ev.push({ t: '09:15', text: 'DxT Games mute ended early — Tao' });
+      ev.push({ t: '08:12', text: 'ORCA Thailand back up after 14 min DOWN' });
+    }
+    ev = ev.slice(0, 7);
+    var RET = {
+      views: ['2 banners + more', '1 banner', 'None', 'All OK'], view: V,
+      setView: function (v) { clearInterval(self._iv); self.setState({ view: v, acked: {}, toast: null, legendOpen: false }); },
+      banners: banners, hasBanners: banners.length > 0, hasMore: more > 0,
+      moreText: 'and ' + more + ' more → Incidents',
+      toast: !!st.toast, toastId: st.toast || '', left: st.left,
+      undo: function () { clearInterval(self._iv); var a = Object.assign({}, self.state.acked); delete a[self.state.toast]; self.setState({ acked: a, toast: null, left: 10 }); },
+      okCount: okCount, monitored: monitored,
+      attn: attn, hasAttn: attn.length > 0, noAttn: attn.length === 0,
+      attnMeta: attn.length + ' of ' + monitored + ' monitored sites' + (unackedText ? ' · ' + unackedText : '') + (ROLE === 'Viewer' ? '' : ' · ' + attn.filter(function (r) { return r.yours; }).length + (ROLE === 'AM' ? ' your clients' : ' yours')),
+      me: ME, meLine: ROLE === 'AM' ? 'Account manager · Stakeholder' : (ROLE === 'Viewer' ? 'Viewer · read only' : 'Jirawat Piyakit · Admin'),
+      roles: ['Admin', 'AM', 'Viewer'], role: ROLE, isAdmin: ROLE === 'Admin', canAck: canAck,
+      slices: ['S06', '+ Maint.', '+ On-call'], slice: SLICE,
+      setSlice: function (v) { self.setState({ slice: v }); },
+      mx: SLICE !== 'S06', mxBtn: SLICE !== 'S06' && ROLE === 'Admin', oc: SLICE === '+ On-call', mxCard: SLICE !== 'S06',
+      mxRows: allOk ? [] : [{ icon: 'eye-off', color: SEC, title: 'DxT Games — muted', detail: 'until 18:00 · Redeploying build · by Tao · still counted in uptime' }],
+      mxNone: allOk,
+      mxLinks: (ROLE === 'Admin' ? [{ icon: 'clock', text: '1 waiting for approval' }] : []).concat([{ icon: 'calendar', text: '1 scheduled · next Tue 29 Sep 01:00' }]),
+      setRole: function (v) { clearInterval(self._iv); self.setState({ role: v, acked: {}, toast: null }); },
+      legendOpen: st.legendOpen, legendBtn: st.legendOpen ? 'Hide legend' : 'Show legend',
+      toggleLegend: function () { self.setState({ legendOpen: !self.state.legendOpen }); },
+      tier: tier, tierOptions: ['All', 'Tier 1', 'Tier 2', 'Tier 3'],
       setTier: function (v) { self.setState({ tier: v }); },
-      okCount: okCount,
-      owner: owner, client: client,
-      ownerBorder: owner === 'all' ? 'var(--aura-border-default)' : 'var(--aura-fg-primary)',
-      clientBorder: client === 'all' ? 'var(--aura-border-default)' : 'var(--aura-fg-primary)',
-      ownerOpts: [{ value: 'all', label: 'Owner: all' }, { value: 'Arm', label: 'Owner: Arm' }, { value: 'Ploy', label: 'Owner: Ploy' }, { value: 'Nok', label: 'Owner: Nok' }, { value: 'Tao', label: 'Owner: Tao' }],
-      clientOpts: [{ value: 'all', label: 'Client: all' }, { value: 'client', label: 'Client sites' }, { value: 'internal', label: 'Internal' }],
-      ownerPick: function (e) { self.setState({ owner: e.target.value }); },
-      clientPick: function (e) { self.setState({ client: e.target.value }); },
-      yes: true, no: false,
-      downOpen: !!ask,
-      downTitle: 'Open incident · ' + (ask || '') + ' is down',
-      downSteps: [
-        { icon: 'bell', text: 'Opens INC-0143 for ' + (ask || '') + ' with Trigger “Manual (hand check)” and starts the client-update track.' },
-        { icon: 'users', text: 'Posts L0 in the Alerts Space through the Healthchecks.io fallback sender and @mentions Ploy (on call); the owner is named in plain text.' },
-        { icon: 'arrow-up-right', text: 'Timers don’t run while the engine is down: L1+ and the client-update reminder to ' + (AM[ask] || 'the site AM') + ' (AM) are sent by hand with “Escalate now”. Automatic timers resume when the engine is back.' }
+      tiles: tiles,
+      footText: (tier === 'All' ? monitored + ' monitored sites' : tiles.length + ' of ' + monitored + ' monitored sites (' + tier + ')') + ' · ' + DRAFTS + (DRAFTS === 1 ? ' draft not monitored yet' : ' drafts not monitored yet'),
+      legend: [
+        { aura: true, icon: 'circle-check', color: 'var(--aura-fg-positive)', label: 'Pass' },
+        { aura: true, icon: 'ban', color: DANGER, label: 'Hard fail' },
+        { aura: true, icon: 'lock', color: SEC, label: 'Blocked by bot protection' },
+        { shield: true, label: 'TLS chain error (warning, status unchanged)' },
+        { aura: true, icon: 'clock', color: WARN, label: 'Slow' },
+        { aura: true, icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)', label: 'No data' },
+        { aura: true, icon: 'circle', color: 'var(--aura-fg-tertiary)', label: 'Paused / maintenance' }
       ],
-      closeDown: function () { self.setState({ ask: null }); },
-      confirmDown: function () { var d = Object.assign({}, self.state.down); d[self.state.ask] = true; self.setState({ down: d, ask: null }); },
-      hasManual: manual.length > 0,
-      manualEvent: manual.length ? 'INC-0143 opened by hand — ' + manual[0] + ' down (Tao) · L0 posted, @Ploy' : '',
-      parts: [
-        { name: 'BKK probe · Thai VPS', state: 'Collecting', icon: 'circle-check', color: 'var(--aura-fg-positive)', hasSub: false, sub: '' },
-        { name: 'SIN / TYO probes · Vercel', state: 'Stopped 02:18', icon: 'ban', color: 'var(--aura-fg-danger)', hasSub: false, sub: '' },
-        { name: 'Status engine · Vercel Cron', state: 'Stopped 02:17', icon: 'ban', color: 'var(--aura-fg-danger)', hasSub: false, sub: '' },
-        { name: 'Automatic alerts', state: 'Paused', icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)', hasSub: true, sub: 'Manual incidents still post via the Healthchecks.io fallback sender' },
-        { name: 'Single-probe emails (while the engine fault is open)', state: 'Suppressed', icon: 'circle-dot-dashed', color: 'var(--aura-fg-tertiary)', hasSub: false, sub: '' },
-        { name: 'Healthchecks.io → Chat + email', state: 'Working', icon: 'circle-check', color: 'var(--aura-fg-positive)', hasSub: false, sub: '' }
-      ],
-      rows: rows,
+      events: ev,
       nav: [
         { items: [
           { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
-          { id: 'incidents', label: 'Incidents', icon: 'bell', count: open, href: 'Incidents.dc.html' },
-          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: nOpen || undefined, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: monitored, href: 'Sites.dc.html' },
           { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
         ] },
         { title: 'Operations', items: [
@@ -344,19 +611,76 @@ class Component extends DCLogic {
           { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
         ] },
         { title: 'System', items: [
-          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', badge: 'Fault', href: 'Probes.dc.html' },
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
           { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
           { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
         ] }
       ],
       kpis: [
-        { label: 'Sites OK · live', value: '—', icon: 'circle-dot-dashed', caption: 'Last known ' + okCount + '/17 at 02:17' },
-        { label: 'Open incidents', value: String(open), icon: 'bell', caption: manual.length ? 'INC-0143 ' + manual[0] + ' · manual · INC-0142 needs root cause' : 'INC-0142 MuvMi · needs root cause' },
-        { label: 'MTTA · DOWN · 30d', value: '6 min 40 s', icon: 'clock', caption: 'As of 02:17 · target ≤ 15 min' },
-        { label: 'MTTD · Tier 1 · 30d', value: '1 min 52 s', icon: 'trending-down', caption: 'As of 02:17 · target ≤ 3 min' },
-        { label: 'Uptime · all sites · 30d', value: '99.97%', icon: 'chart-column', caption: 'As of 02:17 · gap stored as no data, not downtime' }
+        { label: 'Sites OK', value: String(okCount), unit: '/ ' + monitored, icon: 'circle-check', caption: (nDown || nProb) ? [nDown ? nDown + ' down' : '', nProb ? nProb + ' problem' : ''].filter(Boolean).join(' · ') : 'Nothing down or in problem' },
+        { label: 'Open incidents', value: String(nOpen), icon: 'bell', caption: nUnacked ? unackedText : (nOpen ? 'All acknowledged' : 'None open') },
+        enough ? { label: 'MTTA · 30d', value: '6 min 40 s', icon: 'clock', caption: 'DOWN, all tiers · target ≤ 15 min', change: { value: '1 min 12 s', direction: 'down', tone: 'positive', label: 'vs last 30d' } }
+               : { label: 'MTTA · 30d', value: '—', icon: 'clock', caption: 'Not enough incidents yet' },
+        enough ? { label: 'MTTD · 30d', value: '1 min 52 s', icon: 'trending-down', caption: 'DOWN, Tier 1 · target ≤ 3 min', change: { value: '18 s', direction: 'down', tone: 'positive', label: 'vs last 30d' } }
+               : { label: 'MTTD · 30d', value: '—', icon: 'trending-down', caption: 'Not enough incidents yet' },
+        { label: 'Uptime · 30d', value: '99.98%', icon: 'chart-column', caption: 'All sites · only DOWN time counts' }
       ]
     };
+    // ---- monitor fault (S12b)
+    var SWEEP = V === 'Sweep only';
+    var URL = { 'MuvMi': 'muvmi.co', 'realme.link': 'realme.link', 'Bangkok Airways – Taiwan': '[Taiwan site URL]', 'Bangkok Airways – China': '[China site URL]', 'ENEOS Industrial': '[ENEOS site URL]' };
+    function canHC(site, owner) { return ROLE === 'Admin' || ROLE === 'On call' || (ROLE === 'Responder' && owner === ME); }
+    var checked = 0;
+    var hc = base.filter(function (r) { return r[1] === 1; }).map(function (r) {
+      var name = r[0], h = HC[name], can = canHC(name, r[2]);
+      var o = { name: name, url: URL[name] || '', owner: r[2], status: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check',
+        line: 'Not checked yet', lineIcon: 'circle', lineColor: 'var(--aura-fg-tertiary)', isInc: false, notInc: true,
+        canAct: can, readOnly: !can, roText: ROLE === 'AM' ? 'Read only' : 'Only ' + r[2] + ', the person on call or an Admin',
+        ok: function () { var x = Object.assign({}, self.state.hcs); x[name] = { ok: true, who: ME }; self.setState({ hcs: x }); },
+        down: function () { self.setState({ dlg: name, note: '' }); } };
+      if (h && h.ok) { checked++; o.line = 'Checked OK · ' + h.who + ' ' + NOW; o.lineIcon = 'circle-check'; o.lineColor = 'var(--aura-fg-positive)'; }
+      if (h && h.inc) { checked++; o.line = IDS[name] + ' opened · ' + h.who + ' ' + NOW; o.lineIcon = 'ban'; o.lineColor = 'var(--aura-alert-danger-fg)'; o.isInc = true; o.notInc = false; o.canAct = false; o.readOnly = false; o.status = 'OK'; }
+      return o;
+    });
+    RET.hc = hc;
+    RET.hcCount = checked + ' of ' + hc.length + ' checked since 02:17';
+    RET.hcFootLeft = checked ? 'Next check due by 03:01 — every 30 min while monitoring is degraded.' : 'Nothing checked yet — Ploy (on call) was @mentioned at 02:20.';
+    RET.fault = SWEEP ? { title: 'Monitoring is degraded — the status engine’s sweep stopped 14 min ago', cause: 'The status engine’s sweep hasn’t run since 02:17 — escalations, reminders and recoveries wait until it does. BKK, SIN and TYO still report; statuses aren’t updated.', told: 'Engine heartbeat missed > 3 min → Healthchecks.io alerted at 02:20: email to the Admins + an Alerts Space post @mentioning Ploy (on call).' }
+      : { title: 'Monitoring is degraded — statuses below are 14 min old', cause: 'The status engine’s sweep hasn’t run since 02:17 — escalations, reminders and recoveries wait until it does. BKK still reports; SIN and TYO have no results.', told: 'Engine heartbeat missed > 3 min → Healthchecks.io alerted at 02:20: email to the Admins + an Alerts Space post @mentioning Ploy (on call).' };
+    RET.pill = SWEEP ? { probes: 'Probes 3/3', locs: 'BKK · SIN · TYO', hb: 'Heartbeat missed 14 min' } : { probes: 'Probes 1/3', locs: 'BKK', hb: 'Heartbeat missed 14 min' };
+    RET.metaLine = 'Sat 26 Sep 2026 · ' + NOW + ' (UTC+7) · statuses as of 02:17';
+    RET.views = ['Before hand check', 'After hand check', 'Open-incident dialog', 'Sweep only'];
+    RET.setView = function (v) {
+      clearInterval(self._iv);
+      var x = {}, dlg = null, note = '';
+      if (v === 'After hand check') { x['Bangkok Airways – Taiwan'] = { ok: true, who: ME }; x['realme.link'] = { inc: true, who: ME, note: 'Home page shows a 502 error' }; }
+      if (v === 'Open-incident dialog') { dlg = 'realme.link'; note = 'Home page shows a 502 error'; }
+      self.setState({ view: v, hcs: x, dlg: dlg, note: note, acked: {}, toast: null, legendOpen: false });
+    };
+    RET.roles = ['Admin', 'On call', 'Responder', 'AM'];
+    RET.meLine = ROLE === 'AM' ? 'Account manager · Stakeholder' : (ROLE === 'On call' ? 'Responder · on call' : (ROLE === 'Responder' ? 'Responder' : 'Jirawat Piyakit · Admin'));
+    var dn = st.dlg;
+    var noteLen = (st.note || '').length;
+    RET.dlgOpen = !!dn;
+    RET.dlg = { title: dn ? 'Open an incident for ' + dn + '?' : '', desc: dn ? dn + ' · Tier 1 · owner ' + ((base.filter(function (r) { return r[0] === dn; })[0] || [])[2] || '') + ' · statuses are from 02:17' : '', note: st.note || '', hint: noteLen + ' / 500 · optional — shown on the incident timeline' };
+    RET.setNote = function (e) { var v = e && e.target ? e.target.value : e; self.setState({ note: String(v).slice(0, 500) }); };
+    RET.closeDlg = function () { self.setState({ dlg: null }); };
+    RET.confirmDlg = function () { var x = Object.assign({}, self.state.hcs); x[self.state.dlg] = { inc: true, who: ME, note: (self.state.note || '').trim() }; self.setState({ hcs: x, dlg: null }); };
+    RET.no = false; RET.three = 3; RET.yes = true;
+    var nMan = Object.keys(IDS).length;
+    RET.kpis = RET.kpis.map(function (k, i) {
+      if (i === 1) return Object.assign({}, k, { change: undefined });
+      if (i === 0) return Object.assign({}, k, { caption: nMan ? nMan + ' down by hand check ' + NOW + ' · the rest as of 02:17' : 'As of 02:17 · hand-check Tier 1 below', change: undefined });
+      return Object.assign({}, k, { caption: (k.caption ? k.caption + ' · ' : '') + 'as of 02:17', change: undefined });
+    });
+    var ev2 = [];
+    if (checked) hc.forEach(function (h) { if (HC[h.name] && HC[h.name].inc) ev2.push({ t: NOW, text: IDS[h.name] + ' ' + h.name + ' opened by hand — ' + HC[h.name].who }); });
+    if (checked) hc.forEach(function (h) { if (HC[h.name] && HC[h.name].ok) ev2.push({ t: NOW, text: 'Hand check: ' + h.name + ' loads OK — ' + HC[h.name].who }); });
+    ev2.push({ t: '02:20', text: 'Engine heartbeat missed > 3 min — Admins emailed, Ploy @mentioned' });
+    ev2.push({ t: '02:17', text: 'Last full sweep — statuses on this page are from it' });
+    ev2.push({ t: 'Fri', text: 'MuvMi back up 10:31 — root cause needed (INC-0142)' });
+    RET.events = ev2;
+    return RET;
   }
 }
 </script>
