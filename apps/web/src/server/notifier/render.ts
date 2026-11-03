@@ -249,6 +249,14 @@ function clientUpdateMarked(i: IncidentFacts): string | null {
   return words ? `Client update ${words}` : null;
 }
 
+/** The client-update email this reader got (S11): when it went, and whether it went to an Admin (no AM). */
+function clientUpdateReaderOf(i: IncidentFacts, userId: string): { at: Date; noAm: boolean } | null {
+  const e = i.incident_events?.find((x) => x.type === 'client_update_due');
+  const p = e?.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : null;
+  const ids = Array.isArray(p?.notified) ? p.notified : [];
+  return e?.at && ids.includes(userId) ? { at: new Date(e.at), noAm: p?.noAm === true } : null;
+}
+
 /** The client the site belongs to; the site's name when it isn't loaded (an older facts query). */
 const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
 
@@ -476,6 +484,21 @@ export function renderEmail(
     incidentUrl: incidentUrl(appUrl, i.id),
     ...thread,
   };
+  // S11 (EmailAlert Bua rows): someone emailed the client update gets its footer, not "fallback".
+  const cuReader = n.template === 'client_update_due' ? null : clientUpdateReaderOf(i, to.id);
+  if (cuReader && base.reason === 'fallback') {
+    base.reason = 'step';
+    base.why =
+      n.template === 'recovered' && i.client_updated_at && !cuReader.noAm
+        ? `You got this because you’re the AM for ${clientOf(i)} and handled its client update.`
+        : `You got this because you were emailed about the client update at ${formatTime(cuReader.at)}.`;
+  }
+  const amReader = cuReader
+    ? {
+        marked: i.client_updated_at ? formatTime(new Date(i.client_updated_at)) : null,
+        draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
+      }
+    : null;
   switch (n.template) {
     case 'down':
       return buildDownEmail({
@@ -520,6 +543,8 @@ export function renderEmail(
         acked: i.acker && i.acked_at ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
         noAm: ctx.noAm === true,
         draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
+        dueAt,
+        recovered: i.state === 'monitoring' || i.state === 'needs_root_cause',
       });
     }
     case 'step_fired': {
@@ -564,6 +589,7 @@ export function renderEmail(
         confirmedAt: new Date(i.detected_at),
         stopped: stoppedOf(i, ctx),
         clientUpdate: clientUpdateFact(i),
+        amReader,
       });
     case 'recovered': {
       const drop = recoveryOf(i, ctx);
@@ -587,6 +613,8 @@ export function renderEmail(
         ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
         problem: dropProblem(i, drop, ctx),
         clientUpdate: clientUpdateFact(i),
+        amReader,
+        amName: i.sites.client?.am?.display_name ?? null,
       });
     }
     case 'resolved':

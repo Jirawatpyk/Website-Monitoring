@@ -52,6 +52,7 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   baseline: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
   client_due: { icon: <IconMail />, tone: 'text-fg-warning' },
   client_marked: { icon: <IconCircleCheck />, tone: 'text-fg-positive' },
+  client_not_needed: { icon: <IconCircleCheck />, tone: 'text-fg-secondary' },
 };
 
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {

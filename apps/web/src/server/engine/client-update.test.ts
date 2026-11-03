@@ -123,6 +123,21 @@ describe('clientUpdateTick (S11, spec §9)', () => {
     expect((await clientUpdateTick(refused.db, bkk('2026-09-25T10:04:00'), HOURS)).queued).toBe(0);
   });
 
+  it('one incident whose hours never open is reported; the next still fires (engine review L1)', async () => {
+    const closed = { ...HOURS, days: [] as number[] };
+    const { db, rpcCalls } = fakeDb({
+      'incidents.select': {
+        data: [inc0142({ id: 't2', sites: { tier: 2, clients: { is_internal: false } } }), inc0142()],
+      },
+      'incident_events.select': { data: [{ ...detected, incident_id: 't2' }, detected] },
+      'rpc.engine_client_update_due': { data: true },
+    });
+    const r = await clientUpdateTick(db, bkk('2026-09-25T10:04:00'), closed);
+    expect(r.queued).toBe(1);
+    expect(r.failed).toEqual([expect.stringMatching(/^t2: /)]);
+    expect(rpcCalls.map((c) => (c.args as { p_incident_id: string }).p_incident_id)).toEqual(['i142']);
+  });
+
   it('a failed read fails the tick', async () => {
     const { db } = fakeDb({ 'incidents.select': { error: { message: 'down' } } });
     await expect(clientUpdateTick(db, bkk('2026-09-25T10:04:00'), HOURS)).rejects.toThrow('incidents: down');

@@ -42,8 +42,8 @@ export function clientUpdateDraft(input: ClientUpdateDraftInput): string {
       ].join('\n');
 }
 
-/** How long the track waited, in the message's words: Tier 1 "15 min", Tier 2 "60 min in response hours". */
-export const clientUpdateWait = (tier: number) => (tier === 1 ? '15 min' : '60 min in response hours');
+/** How long the track waited, in the message's words: Tier 1 "15 min", Tier 2 "60 min inside response hours". */
+export const clientUpdateWait = (tier: number) => (tier === 1 ? '15 min' : '60 min inside response hours');
 
 export interface ClientUpdateDueAlertInput {
   incidentId: string;
@@ -71,10 +71,9 @@ export function buildClientUpdateDueAlert(input: ClientUpdateDueAlertInput): Cha
   return {
     text: buildChatTextLine({
       state: 'CLIENT UPDATE DUE',
-      site,
+      site: `${site} DOWN ${wait}`,
       mention: input.people.flatMap((p) => (p.chatUserId ? [p.chatUserId] : [])),
       detail: [
-        `DOWN ${wait}`,
         ...(input.noAm ? [`no account manager for ${plainName(input.client)}`] : []),
         // Someone without a Chat id is named, since a mention can't reach them (S09b).
         ...(unlinked.length ? [`for ${unlinked.join(' and ')}`] : []),

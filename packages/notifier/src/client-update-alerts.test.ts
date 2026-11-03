@@ -24,7 +24,7 @@ describe('CLIENT UPDATE DUE in the thread (ChatAlert 10:03, S11)', () => {
 
   it('@mentions Bua in the text line; the card opens the draft', () => {
     const m = alert();
-    expect(m.text).toBe('<users/BUA> CLIENT UPDATE DUE · MuvMi · DOWN 15 min · draft ready');
+    expect(m.text).toBe('<users/BUA> CLIENT UPDATE DUE · MuvMi DOWN 15 min · draft ready');
     const card = m.cardsV2[0]!.card;
     expect(card.header?.title).toBe('CLIENT UPDATE DUE · MuvMi still down · 15 min');
     expect(JSON.stringify(card)).toContain(
@@ -35,20 +35,20 @@ describe('CLIENT UPDATE DUE in the thread (ChatAlert 10:03, S11)', () => {
     );
   });
 
-  it('Tier 2 says 60 min in response hours; recovered in that minute says was down', () => {
+  it('Tier 2 says 60 min inside response hours; recovered in that minute says was down', () => {
     const m = alert({ tier: 2, recovered: true });
     expect(m.text).toBe(
-      '<users/BUA> CLIENT UPDATE DUE · MuvMi · DOWN 60 min in response hours · draft ready',
+      '<users/BUA> CLIENT UPDATE DUE · MuvMi DOWN 60 min inside response hours · draft ready',
     );
     expect(m.cardsV2[0]!.card.header?.title).toBe(
-      'CLIENT UPDATE DUE · MuvMi was down · 60 min in response hours',
+      'CLIENT UPDATE DUE · MuvMi was down · 60 min inside response hours',
     );
   });
 
   it('no AM: Tao (Admin) is @mentioned and the line says so (D-052 item 2)', () => {
     const m = alert({ people: [tao], noAm: true });
     expect(m.text).toBe(
-      '<users/TAO> CLIENT UPDATE DUE · MuvMi · DOWN 15 min · no account manager for MuvMi · draft ready',
+      '<users/TAO> CLIENT UPDATE DUE · MuvMi DOWN 15 min · no account manager for MuvMi · draft ready',
     );
     expect(JSON.stringify(m.cardsV2)).toContain(
       'MuvMi has no account manager in DxT Monitor, so Tao (Admin) is told',
@@ -57,7 +57,7 @@ describe('CLIENT UPDATE DUE in the thread (ChatAlert 10:03, S11)', () => {
 
   it('an AM without a Chat id is named, since a mention can’t reach them', () => {
     expect(alert({ people: [{ name: 'Bua', chatUserId: null }] }).text).toBe(
-      'CLIENT UPDATE DUE · MuvMi · DOWN 15 min · for Bua · draft ready',
+      'CLIENT UPDATE DUE · MuvMi DOWN 15 min · for Bua · draft ready',
     );
   });
 });

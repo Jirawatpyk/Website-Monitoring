@@ -450,15 +450,19 @@ function clientDetail(i: GateIncident): string {
 
 /** The incident page's Client update card (Incident / MIncident boards; D-052: only once it fired). */
 export interface ClientUpdateCard {
-  /** The AM's name; null with no AM (the Admins were told, D-052 item 2). */
+  /** Who was told, as the track recorded it (D-052 item 2): the AM's name, or null when the Admins were. */
   am: string | null;
   client: string;
   dueAt: string;
+  /** When the @mention went (the `client_update_due` event): the due time, or a muted incident's late alert. */
+  notifiedAt: string;
   /** "10:03 · Tier 1 down 15 min". */
   dueLine: string;
   status: 'pending' | 'marked' | 'not_needed';
   /** "Not marked yet" · "Updated by Bua 10:12" · "Not needed · Tao 10:07". */
   stateText: string;
+  /** The phone's success line (MIncident): "Marked by Bua 10:12" · "Not needed · Tao 10:07"; null while pending. */
+  markedLine: string | null;
   note: { label: 'Note' | 'Reason'; text: string } | null;
   /** The banner above the cards while it waits: "Client update due 10:03 · Bua notified 10:03 · not marked yet". */
   banner: string | null;
@@ -477,6 +481,9 @@ export function clientUpdateCardOf(input: {
   notNeeded: boolean;
   note: string | null;
   tier: number;
+  /** What the `client_update_due` event recorded: whom it told and when (null for an older row). */
+  notified: { am: string | null; at: string } | null;
+  /** The client's AM now: the fallback when no event was read. */
   am: string | null;
   client: string;
   drafts: { th: string; en: string };
@@ -484,25 +491,36 @@ export function clientUpdateCardOf(input: {
   canMark: boolean;
 }): ClientUpdateCard | null {
   if (!input.required || !input.dueAt) return null;
+  const am = input.notified ? input.notified.am : input.am;
+  const notifiedAt = input.notified?.at ?? input.dueAt;
   const due = formatTime(new Date(input.dueAt));
+  const told = formatTime(new Date(notifiedAt));
   const at = input.updatedAt ? formatTime(new Date(input.updatedAt)) : null;
   const status = !input.updatedAt ? 'pending' : input.notNeeded ? 'not_needed' : 'marked';
+  const by = input.by ?? 'someone';
   return {
-    am: input.am,
+    am,
     client: input.client,
     dueAt: input.dueAt,
+    notifiedAt,
     dueLine: `${due} · ${clientUpdateWhy(input.tier)}`,
     status,
     stateText:
       status === 'pending'
         ? 'Not marked yet'
         : status === 'not_needed'
-          ? `Not needed · ${input.by ?? 'someone'} ${at}`
-          : `Updated by ${input.by ?? 'someone'} ${at}`,
+          ? `Not needed · ${by} ${at}`
+          : `Updated by ${by} ${at}`,
+    markedLine:
+      status === 'pending'
+        ? null
+        : status === 'not_needed'
+          ? `Not needed · ${by} ${at}`
+          : `Marked by ${by} ${at}`,
     note: input.note ? { label: status === 'not_needed' ? 'Reason' : 'Note', text: input.note } : null,
     banner:
       status === 'pending'
-        ? `Client update due ${due} · ${input.am ? `${input.am} notified ${due}` : `no AM · Admins notified ${due}`} · not marked yet`
+        ? `Client update due ${due} · ${am ? `${am} notified ${told}` : `no AM · Admins notified ${told}`} · not marked yet`
         : null,
     foot:
       status === 'pending'
@@ -715,9 +733,10 @@ export interface TimelineItem {
     | 'undone'
     | 'flapping'
     | 'baseline'
-    /** S11: the client update fell due (mail, amber) / was marked (circle-check). */
+    /** S11: the client update fell due (mail, amber) / was marked (circle-check) / not needed (grey). */
     | 'client_due'
-    | 'client_marked';
+    | 'client_marked'
+    | 'client_not_needed';
   title: string;
   detail: string | null;
   /** A collapsed flapping run (`kind: 'flapping'`): its lines, oldest first — kept, never dropped (§16.11). */
@@ -987,7 +1006,7 @@ export function timelineOf(
       case 'client_update_not_needed':
         item(
           e,
-          'client_marked',
+          'client_not_needed',
           `Client update marked not needed by ${str(e.payload.by) ?? by}`,
           `Reason: ${str(e.payload.note) ?? ''}`,
         );

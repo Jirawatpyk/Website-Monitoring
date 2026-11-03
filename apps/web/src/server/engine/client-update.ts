@@ -2,6 +2,7 @@ import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { clientUpdateDueAt, episodesFromTimeline } from '@dxt/engine';
 import type { ResponseHours, Severity, Tier } from '@dxt/shared';
+import { fetchAllPages } from '@/lib/csv';
 
 /** The timeline rows a drop is read from (`episodesFromTimeline`). */
 const DROP_EVENTS = ['detected', 'relapsed', 'escalated_to_down', 'recovered'];
@@ -34,27 +35,46 @@ export async function clientUpdateTick(
   );
   if (candidates.length === 0) return { queued: 0, failed: [] };
 
-  const events = await db
-    .from('incident_events')
-    .select('incident_id, type, at, payload')
-    .in(
-      'incident_id',
-      candidates.map((i) => i.id),
-    )
-    .in('type', DROP_EVENTS);
-  if (events.error) throw new Error(`incident_events: ${events.error.message}`);
+  // Paged: PostgREST answers at most 1,000 rows, silently — a flapping incident's drops could push
+  // another incident's `detected` row out (code review, S11).
+  const events = {
+    data: await fetchAllPages(
+      (from, to) =>
+        db
+          .from('incident_events')
+          .select('incident_id, type, at, payload')
+          .in(
+            'incident_id',
+            candidates.map((i) => i.id),
+          )
+          .in('type', DROP_EVENTS)
+          .order('at')
+          .order('id')
+          .range(from, to),
+      { max: 50_000 },
+    ).catch((err: Error) => {
+      throw new Error(`incident_events: ${err.message}`);
+    }),
+  };
 
   let queued = 0;
   const failed: string[] = [];
   for (const inc of candidates) {
-    const due = clientUpdateDueAt({
-      tier: inc.sites.tier as Tier,
-      episodes: episodesFromTimeline(
-        { started_at: inc.started_at, severity: inc.severity as Severity, resolved_at: inc.resolved_at },
-        events.data.filter((e) => e.incident_id === inc.id),
-      ),
-      hours,
-    });
+    let due: Date | null;
+    try {
+      due = clientUpdateDueAt({
+        tier: inc.sites.tier as Tier,
+        episodes: episodesFromTimeline(
+          { started_at: inc.started_at, severity: inc.severity as Severity, resolved_at: inc.resolved_at },
+          events.data.filter((e) => e.incident_id === inc.id),
+        ),
+        hours,
+      });
+    } catch (err) {
+      // "response hours never open" on one Tier 2 incident mustn't hold the others back (engine review L1).
+      failed.push(`${inc.id}: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
     if (!due || due > now) continue;
     const { data: fired, error: rpcError } = await db.rpc('engine_client_update_due', {
       p_incident_id: inc.id,

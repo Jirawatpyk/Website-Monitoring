@@ -41,14 +41,14 @@ const ctx = { dueAt: '2026-09-25T03:03:12+00:00', tier: 1, minutes: 15, mentione
 describe('render — client update due (S11)', () => {
   it('Chat: @mentions Bua, the card opens the draft', () => {
     const m = renderChat(row(ctx), incident, appUrl, new Date('2026-09-25T03:03:40Z'));
-    expect(m?.text).toBe('<users/BUA> CLIENT UPDATE DUE · MuvMi · DOWN 15 min · draft ready');
+    expect(m?.text).toBe('<users/BUA> CLIENT UPDATE DUE · MuvMi DOWN 15 min · draft ready');
     expect(JSON.stringify(m)).toContain('https://monitor.example.test/incidents/inc-142#client-update');
   });
 
   it('Chat with no AM: Tao, and the line says so', () => {
     const m = renderChat(row({ ...ctx, mentioned: ['u-tao'], noAm: true }), incident, appUrl, new Date());
     expect(m?.text).toBe(
-      '<users/TAO> CLIENT UPDATE DUE · MuvMi · DOWN 15 min · no account manager for MuvMi · draft ready',
+      '<users/TAO> CLIENT UPDATE DUE · MuvMi DOWN 15 min · no account manager for MuvMi · draft ready',
     );
   });
 
@@ -78,6 +78,59 @@ describe('render — client update due (S11)', () => {
       thread,
     );
     expect(m?.text).toContain('Client update: Due 10:03 · Bua (AM) notified — the AM sends it');
+  });
+
+  // EmailAlert Bua rows: the AM emailed at 10:03 reads her own lede, button and footer later on.
+  const told = {
+    incident_events: [
+      { type: 'detected', payload: {}, at: '2026-09-25T02:48:41Z' },
+      {
+        type: 'client_update_due',
+        payload: { notified: ['u-bua'], noAm: false },
+        at: '2026-09-25T03:03:12Z',
+      },
+    ],
+  };
+
+  it('ACKNOWLEDGED to Bua: still hers to send, Open draft first, the client-update footer (message-check H1)', () => {
+    const m = renderEmail(
+      row(
+        { ackedBy: 'Arm', ackedAt: '2026-09-25T03:07:40Z' },
+        { template: 'acknowledged', channel: 'email', user_id: 'u-bua' },
+      ),
+      { ...incident, ...due, ...told, state: 'acknowledged' },
+      to,
+      appUrl,
+      thread,
+    );
+    expect(m?.text).toContain('The client update is still yours to send.');
+    expect(m?.text.indexOf('Open draft:')).toBeLessThan(m!.text.indexOf('Open incident:'));
+    expect(m?.text).toContain('You got this because you were emailed about the client update at 10:03.');
+  });
+
+  it('RECOVERED to Bua once marked: tell the client, already on record, the AM footer', () => {
+    const m = renderEmail(
+      row({ okLocations: 3 }, { template: 'recovered', channel: 'email', user_id: 'u-bua' }),
+      {
+        ...incident,
+        ...marked,
+        state: 'monitoring',
+        recovered_at: '2026-09-25T03:31:00Z',
+        incident_events: [
+          ...told.incident_events,
+          { type: 'recovered', payload: {}, at: '2026-09-25T03:31:00Z' },
+        ],
+      },
+      to,
+      appUrl,
+      thread,
+    );
+    expect(m?.text).toContain(
+      'MuvMi is back after 43 min. Let the client know it’s back — no need to mark it again; your 10:12 update is already on record.',
+    );
+    expect(m?.text).toContain('Still to do: Root cause (Arm) · tell the client it’s back (Bua)');
+    expect(m?.text).toContain('You got this because you’re the AM for MuvMi and handled its client update.');
+    expect(m?.text).not.toContain('Open draft');
   });
 
   it('RECOVERED: the card says who marked it; the email row has the note', () => {

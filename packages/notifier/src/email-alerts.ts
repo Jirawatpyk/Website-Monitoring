@@ -124,6 +124,11 @@ export interface AcknowledgedEmailInput extends EmailBaseInput {
   downMinutes?: number | null;
   /** What the ack stopped (S08): L1 for a DOWN, the reminders for a PROBLEM. */
   stopped?: LadderStopped | null;
+  /**
+   * The reader is the AM the client update went to (S11, EmailAlert Bua rows): `marked` = the time their
+   * update is on record ("10:12"), null while it still waits; `draftUrl` = the card ("Open draft").
+   */
+  amReader?: { marked: string | null; draftUrl: string } | null;
   /** The client-update record in words (S11): "Due 10:03 · Bua (AM) notified", "Marked by Bua 10:12 — …". */
   clientUpdate?: string | null;
 }
@@ -136,8 +141,15 @@ export interface RecoveredEmailInput extends EmailBaseInput {
   ack: { by: string; at: Date } | null;
   /** Set for a PROBLEM incident (EmailAlert PROBLEM thread). */
   problem?: ProblemFacts | null;
+  /**
+   * The reader is the AM the client update went to (S11, EmailAlert Bua rows): `marked` = the time their
+   * update is on record ("10:12"), null while it still waits; `draftUrl` = the card ("Open draft").
+   */
+  amReader?: { marked: string | null; draftUrl: string } | null;
   /** The client-update record in words (S11): "Due 10:03 · Bua (AM) notified", "Marked by Bua 10:12 — …". */
   clientUpdate?: string | null;
+  /** The AM, for "Still to do · tell the client it's back (Bua)". */
+  amName?: string | null;
 }
 
 type Template =
@@ -436,7 +448,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
     pre: [`by ${ackedBy} ${at}`, `${site} ${still}`, ...(stopped ? [stopped.line] : [])].join(' · '),
     headline: `${ackedBy} has ${site}`,
     lede: !problem
-      ? `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.body}` : '.'}`
+      ? `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.body}` : '.'}${input.amReader && !input.amReader.marked ? ' The client update is still yours to send.' : ''}`
       : `Acknowledged by ${ackedBy}${stopped ? ` → ${stopped.line}.` : '.'} The site is still up${slow ? ' but slow' : ''}; you’ll get one more email when it clears.`,
     facts: problem
       ? [
@@ -457,7 +469,13 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
           ...(stopped?.fact ? [stopped.fact] : []),
           ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
         ],
-    buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
+    buttons:
+      input.amReader && !input.amReader.marked && !problem
+        ? [
+            { label: 'Open draft', href: input.amReader.draftUrl, primary: true },
+            { label: 'Open incident', href: input.incidentUrl, primary: false },
+          ]
+        : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
 }
 
@@ -504,17 +522,33 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
     label: 'RECOVERED',
     pre: `${site} back at ${formatTime(input.recoveredAt)} · down ${duration} · root cause needed`,
     headline: `${site} is back`,
-    lede: isOwner
-      ? 'Needs a root cause before it can be resolved.'
-      : owner
-        ? `Nothing needed from you. ${owner} adds the root cause.`
-        : 'Nothing needed from you.',
+    lede: input.amReader
+      ? input.amReader.marked
+        ? `${site} is back after ${duration}. Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
+        : `${site} is back after ${duration}. Let the client know it’s back, and mark the client update on the incident page.`
+      : isOwner
+        ? 'Needs a root cause before it can be resolved.'
+        : owner
+          ? `Nothing needed from you. ${owner} adds the root cause.`
+          : 'Nothing needed from you.',
     facts: [
       ['Down for', `${duration} (${range})`],
       ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)} → Monitoring`],
       ...ackFact,
       ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
-      ...(owner ? [['Still to do', `Root cause (${owner})`] as [string, string]] : []),
+      ...(owner || input.clientUpdate
+        ? [
+            [
+              'Still to do',
+              [
+                owner ? `Root cause (${owner})` : null,
+                input.clientUpdate ? `tell the client it’s back (${input.amName ?? 'the AM'})` : null,
+              ]
+                .filter(Boolean)
+                .join(' · '),
+            ] as [string, string],
+          ]
+        : []),
     ],
     // Board: the owner gets "Add root cause" first; for everyone else one secondary button.
     buttons: isOwner
@@ -1100,6 +1134,10 @@ export interface ClientUpdateDueEmailInput extends EmailBaseInput {
   noAm: boolean;
   /** The incident page's Client update card (`#client-update`). */
   draftUrl: string;
+  /** When it fell due: the confirmed time gets its day when it was another day (a Tier 2 night). */
+  dueAt?: Date;
+  /** Fired in the minute it recovered: "was down", not "has been down". */
+  recovered?: boolean;
 }
 
 /** "Client update due" to the AM (EmailAlert, spec §14.11): primary "Open draft". S11. */
@@ -1121,11 +1159,11 @@ export function buildClientUpdateDueEmail(input: ClientUpdateDueEmailInput): Ema
       label: 'CLIENT UPDATE DUE',
       pre: `${site} down ${wait} · draft ready`,
       headline: `Tell ${client} what’s happening`,
-      lede: `${site} (${formatTier(input.tier)}) has been down ${wait}. Please update the client and mark it on the incident page — the incident can’t be resolved until you do.`,
+      lede: `${site} (${formatTier(input.tier)}) ${input.recovered ? 'was' : 'has been'} down ${wait}. Please update the client and mark it on the incident page — the incident can’t be resolved until you do.`,
       facts: [
         [
           'Down for',
-          `${formatDuration(input.downMinutes)} (confirmed down ${formatTimeWithSeconds(input.confirmedAt)})`,
+          `${formatDuration(input.downMinutes)} (confirmed down ${input.dueAt ? withDayIfNot(input.confirmedAt, input.dueAt, formatTimeWithSeconds) : formatTimeWithSeconds(input.confirmedAt)})`,
         ],
         ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
         ['Draft', 'Ready on the incident page — edit, send it to the client, then mark it'],

@@ -1,7 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import type { DbClient } from '@dxt/db';
-import { episodesFromTimeline, outageMinutes, siteUptimeOver } from '@dxt/engine';
+import { downEpisodesFromTimeline, episodesFromTimeline, outageMinutes, siteUptimeOver } from '@dxt/engine';
 import { clientUpdateDraft, describeFailure } from '@dxt/notifier';
 import type { LocationGlyph } from '@/components/site-cells';
 import {
@@ -401,7 +401,7 @@ export async function loadIncident(
     : null;
   const actor: Viewer = askShift ? { ...viewer, onCallNow: onCall === viewer.id } : viewer;
   const view = buildIncidentView(i, events, actor, names, now);
-  const clientUpdate = clientUpdateOf(i, nameOf, viewer, now);
+  const clientUpdate = clientUpdateOf(i, events, nameOf, viewer, now);
 
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
   const shot =
@@ -511,16 +511,28 @@ export async function loadIncident(
 /** The Client update card (S11, spec §9): the record, the TH / EN draft and who may mark it. */
 function clientUpdateOf(
   i: DetailRow,
+  events: readonly EventRow[],
   nameOf: (id: string | null) => string,
   viewer: Viewer,
   now: Date,
 ): ClientUpdateCard | null {
   const amId = i.sites.clients?.am_user_id ?? null;
-  const am = amId ? nameOf(amId) : null;
   const client = i.sites.clients?.name ?? i.sites.name;
-  const draft = (lang: 'th' | 'en') =>
-    clientUpdateDraft({ client, since: new Date(i.started_at), am, lang, now });
+  // Whom the track told and when, as it recorded them — not the client's AM now (spec-check M1).
+  const fired = events.find((e) => e.type === 'client_update_due');
+  const notified = fired
+    ? {
+        am: typeof fired.payload.am === 'string' && fired.payload.noAm !== true ? fired.payload.am : null,
+        at: fired.at,
+      }
+    : null;
+  const am = notified ? notified.am : amId ? nameOf(amId) : null;
+  // Unavailable since the first DOWN drop's first failed check — a PROBLEM raised to DOWN (D-021)
+  // was up until then (code review, S11).
+  const since = downEpisodesFromTimeline(i, events)[0]?.start ?? new Date(i.started_at);
+  const draft = (lang: 'th' | 'en') => clientUpdateDraft({ client, since, am, lang, now });
   return clientUpdateCardOf({
+    notified,
     required: i.client_update_required,
     dueAt: i.client_update_due_at,
     updatedAt: i.client_updated_at,

@@ -17,6 +17,7 @@ const card = (over: Partial<Parameters<typeof clientUpdateCardOf>[0]> = {}) =>
     notNeeded: false,
     note: null,
     tier: 1,
+    notified: { am: 'Bua', at: '2026-09-25T03:03:12Z' },
     am: 'Bua',
     client: 'MuvMi',
     drafts: { th: 'เรียนทีม MuvMi', en: 'Hi MuvMi team,' },
@@ -84,6 +85,15 @@ describe('ClientUpdateCard (Incident / MIncident boards, S11)', () => {
         note: 'Client told us first',
       }),
     );
+  });
+
+  it('Cancel returns focus to Mark client updated (the dialog stays mounted)', async () => {
+    view();
+    const mark = screen.getByRole('button', { name: 'Mark client updated' });
+    mark.focus();
+    fireEvent.click(mark);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(mark).toHaveFocus());
   });
 
   it('a refusal stays in the dialog', async () => {

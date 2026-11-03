@@ -12,6 +12,7 @@ const base = {
   notNeeded: false,
   note: null,
   tier: 1,
+  notified: null,
   am: 'Bua',
   client: 'MuvMi',
   drafts,
@@ -55,6 +56,19 @@ describe('clientUpdateCardOf (Incident board, D-052)', () => {
     })!;
     expect(nn.stateText).toBe('Not needed · Tao 10:07');
     expect(nn.note).toEqual({ label: 'Reason', text: 'Ops told us' });
+  });
+
+  it('whom the track told, as it recorded it: the Admins, though the client has an AM now (spec-check M1)', () => {
+    const c = clientUpdateCardOf({ ...base, notified: { am: null, at: at('10:20:00') } })!;
+    expect(c.am).toBeNull();
+    expect(c.notifiedAt).toBe(at('10:20:00'));
+    expect(c.banner).toBe('Client update due 10:03 · no AM · Admins notified 10:20 · not marked yet');
+  });
+
+  it('the phone line once marked', () => {
+    expect(clientUpdateCardOf({ ...base, updatedAt: at('10:12:05'), by: 'Bua' })!.markedLine).toBe(
+      'Marked by Bua 10:12',
+    );
   });
 
   it('Tier 2 and no AM', () => {

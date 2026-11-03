@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Alert,
@@ -14,8 +14,8 @@ import {
   Textarea,
   toast,
 } from '@jirawatpyk/aura-react';
-import { IconCheck, IconCircleCheck, IconClock, IconCopy } from '@jirawatpyk/aura-react/icons';
-import { formatTime } from '@dxt/shared';
+import { IconCheck, IconCircleCheck, IconClock, IconCopy, IconUsers } from '@jirawatpyk/aura-react/icons';
+import { formatTier, formatTime } from '@dxt/shared';
 import { markClientUpdate } from '../actions';
 import type { ClientUpdateCard as Card_ } from '../model';
 
@@ -50,157 +50,212 @@ export function ClientUpdateCard({
 }) {
   const [lang, setLang] = useState<'th' | 'en'>(c.lang);
   const [copied, setCopied] = useState(false);
-  const [dialog, setDialog] = useState<'mark' | 'not_needed' | null>(null);
+  // The dialog stays mounted so AURA can return focus on close; a fresh form each time it opens.
+  const [dialog, setDialog] = useState<{ open: boolean; kind: 'mark' | 'not_needed'; key: number }>({
+    open: false,
+    kind: 'mark',
+    key: 0,
+  });
+  const openDialog = (kind: 'mark' | 'not_needed') =>
+    setDialog((d) => ({ open: true, kind, key: d.key + 1 }));
+  const cardRef = useRef<HTMLDivElement>(null);
+  // "Open draft" (Chat, email) links to #client-update: the card drawn twice (desktop column, phone
+  // stack), so the one showing scrolls itself into view.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (window.location.hash === '#client-update' && el && el.getClientRects().length > 0) {
+      el.scrollIntoView({ block: 'start' });
+    }
+  }, []);
   const due = formatTime(new Date(c.dueAt));
   const pending = c.status === 'pending';
   const draft = c.drafts[lang];
-  const copy = () =>
+  const copyFailed = () =>
+    toast.error('Couldn’t copy the draft', { description: 'Select the text and copy it.' });
+  const copy = () => {
+    if (!navigator.clipboard) return copyFailed();
     void navigator.clipboard
-      ?.writeText(draft)
+      .writeText(draft)
       .then(() => setCopied(true))
-      .catch(() => toast.error('Couldn’t copy the draft', { description: 'Select the text and copy it.' }));
+      .catch(copyFailed);
+  };
+  // M4: after a mark the buttons are gone; focus moves to the recorded state, which is announced.
+  const doneRef = useRef<HTMLDivElement>(null);
+  const justMarked = useRef(false);
+  useEffect(() => {
+    if (justMarked.current && c.status !== 'pending') {
+      justMarked.current = false;
+      doneRef.current?.focus();
+    }
+  }, [c.status]);
+  const notified = formatTime(new Date(c.notifiedAt));
 
   return (
-    <Card
-      id={phone ? undefined : 'client-update'}
-      title="Client update"
-      headingLevel={2}
-      actions={
-        pending ? (
-          <Badge tone="warning" variant="outline" icon={<IconClock />}>{`Due ${due}`}</Badge>
-        ) : (
-          <Badge tone="success" variant="outline" icon={<IconCircleCheck />}>
-            {c.status === 'not_needed' ? 'Not needed' : 'Updated'}
-          </Badge>
-        )
-      }
-    >
-      <div className="flex flex-col gap-3 text-sm">
-        <span className="flex items-center gap-2.5">
-          <Avatar name={c.am ?? 'Admin'} size="sm" />
-          <span className="grow">
-            <b className="font-medium">{c.am ?? 'No account manager'}</b>
-            {c.am ? ' · Account manager' : ' · the Admins were told'}
-          </span>
-          <span className="text-fg-secondary">{phone ? `Due ${due}` : `Notified ${due}`}</span>
-        </span>
-        {!phone && (
-          <>
-            <span className="flex justify-between gap-2">
-              <span className="text-fg-secondary">Due</span>
-              <span>{c.dueLine}</span>
+    <div ref={cardRef} className="scroll-mt-4">
+      <Card
+        title="Client update"
+        headingLevel={2}
+        actions={
+          pending ? (
+            <Badge tone="warning" variant="outline" icon={<IconClock />}>{`Due ${due}`}</Badge>
+          ) : (
+            <Badge tone="success" variant="outline" icon={<IconCircleCheck />}>
+              {c.status === 'not_needed' ? 'Not needed' : 'Updated'}
+            </Badge>
+          )
+        }
+      >
+        <div className="flex flex-col gap-3 text-sm">
+          <span className="flex items-center gap-2.5">
+            {c.am ? (
+              <Avatar name={c.am} size="sm" />
+            ) : (
+              <span className="flex text-fg-secondary">
+                <IconUsers size="sm" aria-hidden />
+              </span>
+            )}
+            <span className="grow">
+              <b className="font-medium">{c.am ?? 'No account manager'}</b>
+              {c.am ? ' · Account manager' : ' · the Admins were told'}
             </span>
-            <span className="flex justify-between gap-3">
-              <span className="shrink-0 text-fg-secondary">State</span>
-              <span
-                className={`text-right font-medium ${pending ? 'text-fg-warning' : c.status === 'not_needed' ? 'text-fg-secondary' : 'text-fg-positive'}`}
+            <span className="text-fg-secondary">{phone ? `Due ${due}` : `Notified ${notified}`}</span>
+          </span>
+          {!phone && (
+            <>
+              <span className="flex justify-between gap-2">
+                <span className="text-fg-secondary">Due</span>
+                <span>{c.dueLine}</span>
+              </span>
+              <div
+                ref={phone ? undefined : doneRef}
+                tabIndex={-1}
+                role="status"
+                className="flex justify-between gap-3 outline-none"
               >
-                {c.stateText}
-              </span>
+                <span className="shrink-0 text-fg-secondary">State</span>
+                <span
+                  className={`text-right font-medium ${pending ? 'text-fg-warning' : c.status === 'not_needed' ? 'text-fg-secondary' : 'text-fg-positive'}`}
+                >
+                  {c.stateText}
+                </span>
+              </div>
+              {c.note && (
+                <span className="flex justify-between gap-3">
+                  <span className="shrink-0 text-fg-secondary">{c.note.label}</span>
+                  <span className="text-right">{c.note.text}</span>
+                </span>
+              )}
+            </>
+          )}
+          {phone && (
+            <div ref={doneRef} tabIndex={-1} role="status" className="outline-none">
+              {c.markedLine && (
+                <Alert tone="success" icon={<IconCircleCheck />}>
+                  <b className="font-semibold">{c.markedLine}</b>
+                  {c.note ? ` — ${c.note.text}` : ''}
+                </Alert>
+              )}
+            </div>
+          )}
+          <span className="flex items-center justify-between gap-2">
+            <span className="text-xs text-fg-secondary">
+              {phone
+                ? `Draft ${c.am ?? 'the Admins'} ${c.am ? 'was' : 'were'} sent at ${notified}`
+                : `Draft for ${c.client}`}
             </span>
-            {c.note && (
-              <span className="flex justify-between gap-3">
-                <span className="shrink-0 text-fg-secondary">{c.note.label}</span>
-                <span className="text-right">{c.note.text}</span>
-              </span>
-            )}
-          </>
-        )}
-        {phone && !pending && (
-          <Alert tone="success" icon={<IconCircleCheck />}>
-            <b className="font-semibold">{c.stateText.replace('Updated by', 'Marked by')}</b>
-            {c.note ? ` — ${c.note.text}` : ''}
-          </Alert>
-        )}
-        <span className="flex items-center justify-between gap-2">
-          <span className="text-xs text-fg-secondary">
-            {phone
-              ? `Draft ${c.am ?? 'the Admins'} ${c.am ? 'was' : 'were'} sent at ${due}`
-              : `Draft for ${c.client}`}
-          </span>
-          <span className="flex items-center gap-1">
-            {!phone && (
-              <IconButton
-                icon={copied ? <IconCheck /> : <IconCopy />}
-                label={copied ? 'Draft copied' : 'Copy draft'}
+            <span className="flex items-center gap-1">
+              {!phone && (
+                <IconButton
+                  icon={copied ? <IconCheck /> : <IconCopy />}
+                  label={copied ? 'Draft copied' : 'Copy draft'}
+                  size="sm"
+                  onClick={copy}
+                />
+              )}
+              <SegmentedControl
+                label="Draft language"
                 size="sm"
-                onClick={copy}
+                touchHeight={phone}
+                value={lang}
+                onChange={(v) => {
+                  setLang(v as 'th' | 'en');
+                  setCopied(false);
+                }}
+                options={LANGS}
               />
-            )}
-            <SegmentedControl
-              label="Draft language"
-              size="sm"
-              value={lang}
-              onChange={(v) => {
-                setLang(v as 'th' | 'en');
-                setCopied(false);
-              }}
-              options={LANGS}
-            />
+            </span>
           </span>
-        </span>
-        <div className="whitespace-pre-line rounded-aura-sm border border-border-default bg-bg-canvas px-3.5 py-3 leading-relaxed">
-          {draft}
+          <div className="whitespace-pre-line rounded-aura-sm border border-border-default bg-bg-canvas px-3.5 py-3 leading-relaxed">
+            {draft}
+          </div>
+          {phone && (
+            <Button variant="secondary" icon={copied ? <IconCheck /> : <IconCopy />} fullWidth onClick={copy}>
+              {copied ? 'Draft copied' : 'Copy draft'}
+            </Button>
+          )}
+          {pending && c.canMark && (
+            <span className="flex flex-wrap items-center gap-2">
+              <Button
+                variant={acked && !phone ? 'primary' : 'secondary'}
+                icon={<IconCheck />}
+                size={phone ? undefined : 'sm'}
+                fullWidth={phone}
+                onClick={() => openDialog('mark')}
+              >
+                Mark client updated
+              </Button>
+              <Button
+                variant="ghost"
+                size={phone ? undefined : 'sm'}
+                fullWidth={phone}
+                onClick={() => openDialog('not_needed')}
+              >
+                Not needed…
+              </Button>
+            </span>
+          )}
+          <span className="text-xs text-fg-secondary">
+            {pending && !c.canMark
+              ? `${c.am ? `${c.am}, the site’s owner or an Admin` : 'The site’s owner or an Admin'} marks it. ${c.foot}`
+              : c.foot}
+          </span>
+          <span role="status" className="sr-only">
+            {copied ? 'Draft copied' : ''}
+          </span>
         </div>
-        {phone && (
-          <Button variant="secondary" icon={copied ? <IconCheck /> : <IconCopy />} fullWidth onClick={copy}>
-            {copied ? 'Draft copied' : 'Copy draft'}
-          </Button>
+        {c.canMark && pending && (
+          <MarkDialog
+            key={dialog.key}
+            open={dialog.open}
+            kind={dialog.kind}
+            incidentId={incidentId}
+            description={`${incidentLabel} · ${siteName} · ${formatTier(tier)} · ${c.am ? `AM ${c.am}` : 'no AM'} · due ${due}`}
+            onClose={() => setDialog((d) => ({ ...d, open: false }))}
+            onSaved={() => {
+              justMarked.current = true;
+            }}
+          />
         )}
-        {pending && c.canMark && (
-          <span className="flex flex-wrap items-center gap-2">
-            <Button
-              variant={acked ? 'primary' : 'secondary'}
-              icon={<IconCheck />}
-              size={phone ? undefined : 'sm'}
-              fullWidth={phone}
-              onClick={() => setDialog('mark')}
-            >
-              Mark client updated
-            </Button>
-            <Button
-              variant="ghost"
-              size={phone ? undefined : 'sm'}
-              fullWidth={phone}
-              onClick={() => setDialog('not_needed')}
-            >
-              Not needed…
-            </Button>
-          </span>
-        )}
-        <span className="text-xs text-fg-secondary">
-          {pending && !c.canMark
-            ? `${c.am ?? 'An Admin'}, the site’s owner or an Admin marks it. ${c.foot}`
-            : c.foot}
-        </span>
-        <span role="status" className="sr-only">
-          {copied ? 'Draft copied' : ''}
-        </span>
-      </div>
-      {c.canMark && pending && (
-        <MarkDialog
-          key={dialog ?? 'closed'}
-          kind={dialog}
-          incidentId={incidentId}
-          description={`${incidentLabel} · ${siteName} · Tier ${tier} · ${c.am ? `AM ${c.am}` : 'no AM'} · due ${due}`}
-          onClose={() => setDialog(null)}
-        />
-      )}
-    </Card>
+      </Card>
+    </div>
   );
 }
 
 /** Mark client updated (optional note, D-052 item 1) and Not needed (reason required), one form. */
 function MarkDialog({
+  open,
   kind,
   incidentId,
   description,
   onClose,
+  onSaved,
 }: {
-  kind: 'mark' | 'not_needed' | null;
+  open: boolean;
+  kind: 'mark' | 'not_needed';
   incidentId: string;
   description: string;
   onClose: () => void;
+  onSaved: () => void;
 }) {
   const router = useRouter();
   const [note, setNote] = useState('');
@@ -219,12 +274,13 @@ function MarkDialog({
         setError(r.message);
         return;
       }
+      onSaved();
       onClose();
       router.refresh();
     });
   return (
     <Dialog
-      open={kind !== null}
+      open={open}
       onClose={onClose}
       title={notNeeded ? 'Client update not needed' : 'Mark client updated'}
       description={description}

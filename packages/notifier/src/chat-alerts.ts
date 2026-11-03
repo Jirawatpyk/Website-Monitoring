@@ -335,7 +335,7 @@ export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
               widgets: [
                 {
                   textParagraph: {
-                    text: `${back} Needs a root cause before it can be resolved.${input.clientUpdate ? ` ${input.clientUpdate}.` : ''}`,
+                    text: `${back} Needs a root cause before it can be resolved.${input.clientUpdate ? ` ${plainName(input.clientUpdate)}.` : ''}`,
                   },
                 },
               ],
