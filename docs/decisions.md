@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-053 | 3 Nov 2026 | Monitor fault (S12): the fault is the engine **cron sweep** stopping (`agent_heartbeats` `engine-sweep` > 3 min), since the engine also runs after every Bangkok ingest; Healthchecks + the VPS watchdog (MONITOR FAULT @on-call, straight to the Alerts Space) speak for it; one probe missing > 3 min is our own Admin email, silent during an engine fault; no "Acknowledge monitor fault"; S12 splits into S12a / S12b (hand check after Claude Design) | PRD risk table watchdog "> 5 min and BKK failing"; MainFault "Healthchecks.io fallback sender", "Acknowledge monitor fault" |
 | D-052 | 3 Nov 2026 | S11 client update: "Mark client updated" opens a small dialog with an optional note; with no active AM at the due time the Admins get the @mention and the email ("no AM"); the Client update card shows only once the track fired (before that Resolve reads "Not required"); the Responder rule is own sites only (not on call); "15 min" is the incident's DOWN minutes added up across drops (Tier 2: inside response hours), from the first alert after a mute | Incident board (Mark saves at once, no note) |
 | D-051 | 31 Oct 2026 | Tier 2–3: a round whose primary timed out at ≥ 2 locations gets a confirm check from every location at the next minute (with its own recheck); it is judged with that round — failing at 2 locations it is the second round (DOWN from the first timeout, ~2.5 min), passing it is a blip. Confirm checks are never a round of their own | D-049 item 2 (Tier 2–3 wait for their normal next round) |
 | D-050 | 31 Oct 2026 | A 3rd D-049 timeout blip within 30 min on the primary is a PROBLEM · Intermittent from the 1st (client word Degraded); an open PROBLEM drop holds while a blip is in the window and recovers on the first OK round after 30 min without one (so never auto-resolved) | D-049 accepted gap (a site timing out every other round raises nothing) |
@@ -56,6 +57,28 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-053 — Monitor fault: what the fault is, who speaks for it, the split
+
+**Context.** S12's sources disagree or say nothing:
+- The engine runs after every Bangkok ingest as well as on the cron, so "the engine stopped" has to be pinned down.
+- The PRD risk table has the VPS watchdog post only after 5 min with Bangkok seeing a failure; spec §15.3 has the engine fault page the person on call after 3 min.
+- MainFault posts L0 "through the Healthchecks.io fallback sender", which can't post content of ours.
+- The board's "Acknowledge monitor fault" has no spec or PRD backing.
+- MainFault is drawn on the pre-S06 Overview, so its hand-check column has no place on Main3 / MOverview4, and "Escalate now" isn't drawn at all.
+
+**Decision (Tao, 3 Nov 2026, where asked; the rest follows the spec).**
+
+1. **The engine fault** is the cron sweep stopping: `agent_heartbeats` `engine-sweep`, stamped by `/api/cron/engine` only, is older than 3 min. The Overview's "as of" is the last round at least 2 locations reported. When Vercel itself is down the page can't render; the VPS watchdog and Healthchecks are the voices then.
+2. **Who hears it** (spec §15.3 over the PRD risk table):
+   - engine sweep missed > 3 min → Healthchecks (its email + Chat) and the VPS watchdog's `MONITOR FAULT` line in the Alerts Space @mentioning the person on call, posted from the VPS once per fault;
+   - one probe location missing > 3 min → our own `probe_location_missing` Admin alert, an email to every active Admin (§19.5), no page, never during an engine fault or while fewer than 2 locations beat (Tao: our system sends it; Healthchecks' probe checks go dashboard-only);
+   - the notifier check stays Healthchecks email only.
+3. **The VPS watchdog** runs in the agent (no second scheduler): the ingest response carries the sweep time and the person on call, the agent caches them and posts when the sweep is > 3 min old or ingest has been unreachable > 3 min.
+4. **No "Acknowledge monitor fault"** (Tao): the repeats are Healthchecks', which the app can't stop.
+5. **The split** (Tao): S12a builds detection, alerts, the watchdog, the Overview banner and the Probes page; S12b builds the hand check, the manual incident and Escalate now once Claude Design has drawn them. The manual incident's L0 will be sent from the hand-check request itself (as Acknowledge flushes its messages), not by the notifier cron — that is the "sender that doesn't depend on the engine".
+
+**Where.** Migration `monitor_fault`; `packages/engine/src/fault.ts`; the engine runner; the ingest route; `apps/vps-agent/src/watchdog.ts`; `features/overview`, `features/probes`.
 
 ## D-052 — Client update: the note, no AM, when the card shows
 
