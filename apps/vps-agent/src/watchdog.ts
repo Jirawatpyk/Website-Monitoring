@@ -39,8 +39,8 @@ export function createWatchdog({ post, startedAt, graceMs = WATCH_GRACE_MS }: Wa
   return {
     contact(c: Contact) {
       lastContactAt = c.at;
-      if (typeof c.engineSweepAt === 'string') sweepAt = Date.parse(c.engineSweepAt);
-      else if (c.engineSweepAt === null) sweepAt = null;
+      // Absent (an older build, a failed read) or null (never ran): unknown, so no sweep fault.
+      sweepAt = typeof c.engineSweepAt === 'string' ? Date.parse(c.engineSweepAt) : null;
       if (c.onCall !== undefined) onCallChatId = c.onCall?.chatUserId ?? null;
     },
 

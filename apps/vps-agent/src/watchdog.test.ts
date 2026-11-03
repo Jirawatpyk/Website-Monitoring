@@ -76,11 +76,12 @@ describe('createWatchdog (S12a, D-053)', () => {
     expect(post).toHaveBeenCalledTimes(2);
   });
 
-  it('no sweep sent (older server) keeps the last one; null (never ran) is no fault', async () => {
-    const { dog } = setup();
+  it('no sweep sent (older server, failed read) is unknown, not missed; null (never ran) is no fault', async () => {
+    const { post, dog } = setup();
     dog.contact({ at: min(0), engineSweepAt: iso(T0) });
     dog.contact({ at: min(3) });
-    expect(await dog.tick(min(3))).toBe('posted');
+    expect(await dog.tick(min(3))).toBe('ok');
+    expect(post).not.toHaveBeenCalled();
     const fresh = setup();
     fresh.dog.contact({ at: min(5), engineSweepAt: null });
     expect(await fresh.dog.tick(min(6))).toBe('ok');

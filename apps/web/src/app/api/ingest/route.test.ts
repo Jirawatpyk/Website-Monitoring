@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   store: vi.fn(),
   engine: vi.fn(),
   watch: vi.fn(),
+  beat: vi.fn(),
 }));
 vi.mock('next/server', () => ({ after: m.after }));
 vi.mock('@/server/db', () => ({ serviceDb: () => 'db' }));
@@ -16,7 +17,7 @@ vi.mock('@/server/ingest/bangkok', () => ({
   storeBangkokResults: m.store,
 }));
 vi.mock('@/server/engine/engine-and-deliver', () => ({ engineAfterReport: m.engine }));
-vi.mock('@/server/heartbeats', () => ({ loadWatchFacts: m.watch }));
+vi.mock('@/server/heartbeats', () => ({ loadWatchFacts: m.watch, stampBeat: m.beat }));
 
 const NOW = Date.parse('2026-10-07T03:00:30Z');
 beforeEach(() => {
@@ -120,6 +121,7 @@ describe('GET /api/ingest (monitors due for Bangkok)', () => {
     const res = await GET(get(TOKEN));
     expect(await res.json()).toEqual({ monitors, ...watch });
     expect(m.watch).toHaveBeenCalledWith('db', new Date(NOW));
+    expect(m.beat).toHaveBeenCalledWith('db', 'vps-watchdog', new Date(NOW));
     // No `?confirm=1`: an agent that doesn't echo the flag gets no D-051 confirm checks.
     expect(m.due).toHaveBeenCalledWith('db', new Date(NOW), false);
   });
