@@ -2,18 +2,20 @@
 # Refuse pushes to main (D-008): the repository is private on GitHub Free, so GitHub doesn't
 # enforce the ruleset — changes reach main only by PR, merged with `pnpm pr:merge <number>`.
 # Every other push runs `pnpm check` first, so a branch never reaches CI or staging red (retro S04b:
-# a commit tested only in its own package broke two route tests).
+# a commit tested only in its own package broke two route tests), then `test:coverage` in the workspace
+# packages the pushed branch changes (scripts/pre-push-coverage.mjs): `pnpm check` runs `test`, so a
+# coverage threshold was only enforced in CI (retro 3 Nov 2026, PR #164).
 # Installed by `pnpm install` (scripts/install-git-hooks.mjs sets core.hooksPath to .githooks).
-pushes=0
+pushes=""
 while read -r local_ref local_sha remote_ref remote_sha; do
   if [ "$remote_ref" = "refs/heads/main" ]; then
     echo "pre-push: pushing to main is not allowed — open a PR and merge it with 'pnpm pr:merge <number>' (docs/decisions.md D-008)." >&2
     exit 1
   fi
   # A branch deletion pushes nothing to check.
-  [ "$local_sha" = "0000000000000000000000000000000000000000" ] || pushes=1
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] || pushes="$pushes $local_sha"
 done
-if [ "$pushes" = 1 ]; then
+if [ -n "$pushes" ]; then
   echo "pre-push: running pnpm check…" >&2
   log=$(mktemp)
   pnpm check >"$log" 2>&1 || {
@@ -23,6 +25,15 @@ if [ "$pushes" = 1 ]; then
     echo "pre-push: pnpm check failed — fix it before pushing (output above)." >&2
     exit 1
   }
+  # One argument per pushed commit (unquoted on purpose).
+  # shellcheck disable=SC2086
+  node scripts/pre-push-coverage.mjs $pushes >"$log" 2>&1 || {
+    tail -n 40 "$log" >&2
+    rm -f "$log"
+    echo "pre-push: test:coverage failed — a package is below its coverage threshold (output above)." >&2
+    exit 1
+  }
+  grep '^pre-push:' "$log" >&2
   rm -f "$log"
 fi
 exit 0
