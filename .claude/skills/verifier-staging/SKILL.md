@@ -67,6 +67,32 @@ Relapse, flapping and auto-resolve (S04b, D-024), on one incident without a rese
 
 A round that straddles the switch can mix outcomes (e.g. part challenged, part 500 → the browser decides).
 
+**Client update (S11, D-052).** The track needs a client AM. Check the Test target's client first:
+
+```sql
+select c.name, c.is_internal, p.display_name, p.is_active
+from sites s
+join clients c on c.id = s.client_id
+left join profiles p on p.id = c.am_user_id
+where s.name = 'Test target';
+```
+
+- An internal client gets no track.
+- With no active AM, the Admins (Tao) get the @mention, with `noAm`.
+
+| Do                                                         | Expect                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `error` for 16 min (Tier 1)                                | At first failed check + 15:00, `incidents.client_update_due_at` is set. On the next engine tick (≤ 1 min), the thread gets `<users/…> CLIENT UPDATE DUE · Test target · DOWN 15 min · draft ready` and the AM gets a "Client update due" email (subject = the incident's). The timeline shows "Client update due — … @mentioned" at the due time. An ack before that changes nothing |
+| `/incidents/<id>`                                          | The warning banner and the Client update card: Due, the TH / EN draft, Copy, Mark client updated, Not needed… The Resolve condition reads "Required — Tier 1 down 15 min · due HH:MM · not marked yet"                                                                                                                                                                               |
+| Mark client updated with a note (or Not needed + a reason) | The card says Updated / Not needed with the note. `incident_events` gets `client_update_marked` / `client_update_not_needed`, and `audit_log` gets `incident.client_update`. Once it is `ok` 2 rounds and has a root cause, Resolve unlocks. The RECOVERED card says "Client update marked by … HH:MM."                                                                              |
+
+```sql
+select json_build_object(
+  'inc', (select row_to_json(x) from (select number, state, client_update_required, client_update_due_at, client_updated_at, client_update_not_needed, client_update_note from incidents i join sites s on s.id = i.site_id where s.name = 'Test target' order by i.created_at desc limit 1) x),
+  'msgs', (select json_agg(y) from (select n.channel, n.status, n.sent_at, n.context->>'noAm' no_am from notifications n join incidents i on i.id = n.incident_id join sites s on s.id = i.site_id where s.name = 'Test target' and n.template = 'client_update_due' order by n.created_at desc limit 4) y)
+) j;
+```
+
 ## 3. Observe
 
 - **Database** — the Supabase SQL editor of the staging project (browser pane, signed in by Tao): https://supabase.com/dashboard/project/ctxmmrhvrjbkpodpgkqd/sql/new. Find the editor with `find "Editor content"`, then select-all, type, `ctrl+Return`, `get_page_text`. Return one JSON value so the result isn't cut off, e.g.:

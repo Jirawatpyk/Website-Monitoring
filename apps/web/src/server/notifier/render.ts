@@ -37,6 +37,7 @@ import {
 import {
   clockMinutes,
   confirmedByWafOf,
+  formatTime,
   PROBE_LOCATIONS,
   ROOT_CAUSE_CATEGORIES,
   ROOT_CAUSE_LABELS,
@@ -215,10 +216,43 @@ function resolvedOf(n: Notification, i: IncidentFacts) {
   };
 }
 
-/** The cause line stored when the incident opened (its `detected` event). */
+/** How it was marked (S11): "marked by Bua 10:12" / "not needed · Tao 10:07"; null until marked. */
+function clientUpdateWords(i: IncidentFacts): string | null {
+  if (!i.client_update_required || !i.client_updated_at) return null;
+  const by = i.client_updater?.display_name ?? 'someone';
+  const at = formatTime(new Date(i.client_updated_at));
+  return i.client_update_not_needed ? `not needed · ${by} ${at}` : `marked by ${by} ${at}`;
+}
+
+/**
+ * The client-update record in words (S11, EmailAlert "Client update" rows): "Due 10:03 · Bua (AM)
+ * notified — the AM sends it" while waiting, "Marked by Bua 10:12 — “Called MuvMi ops, ETA shared”",
+ * "Not needed · Tao 10:07 — “<reason>”"; null when the track never fired.
+ */
+function clientUpdateFact(i: IncidentFacts): string | null {
+  if (!i.client_update_required || !i.client_update_due_at) return null;
+  const words = clientUpdateWords(i);
+  if (words) {
+    const head = `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+    return i.client_update_note ? `${head} — “${i.client_update_note}”` : head;
+  }
+  const am = i.sites.client?.am?.display_name;
+  const due = formatTime(new Date(i.client_update_due_at));
+  return am
+    ? `Due ${due} · ${am} (AM) notified — the AM sends it`
+    : `Due ${due} · no AM, the Admins were told`;
+}
+
+/** The RECOVERED card's line (ChatAlert): "Client update marked by Bua 10:12". */
+function clientUpdateMarked(i: IncidentFacts): string | null {
+  const words = clientUpdateWords(i);
+  return words ? `Client update ${words}` : null;
+}
+
 /** The client the site belongs to; the site's name when it isn't loaded (an older facts query). */
 const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
 
+/** The cause line stored when the incident opened (its `detected` event). */
 function causeOf(i: IncidentFacts): string | null {
   const detected = i.incident_events?.find((e) => e.type === 'detected');
   const cause = detected ? contextOf(detected.payload).cause : undefined;
@@ -373,6 +407,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         okLocations: num(ctx.okLocations, 2),
         owner: person(l0Of(i)),
         problem: dropProblem(i, drop, ctx),
+        clientUpdate: clientUpdateMarked(i),
       });
     }
     case 'down_again':
@@ -514,6 +549,7 @@ export function renderEmail(
         cause: causeOf(i),
         toldAt: toldAtOf(i),
         fallback: ctx.fallback === true,
+        clientUpdate: step.kind === 'fyi' ? clientUpdateFact(i) : null,
       });
     }
     case 'acknowledged':
@@ -527,6 +563,7 @@ export function renderEmail(
         downMinutes: outageAt(i, new Date(str(ctx.ackedAt, n.created_at))),
         confirmedAt: new Date(i.detected_at),
         stopped: stoppedOf(i, ctx),
+        clientUpdate: clientUpdateFact(i),
       });
     case 'recovered': {
       const drop = recoveryOf(i, ctx);
@@ -549,6 +586,7 @@ export function renderEmail(
         owner: l0Of(i)?.display_name ?? null,
         ack: i.acked_at && i.acker ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
         problem: dropProblem(i, drop, ctx),
+        clientUpdate: clientUpdateFact(i),
       });
     }
     case 'resolved':

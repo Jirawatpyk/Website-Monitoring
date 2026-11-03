@@ -124,6 +124,8 @@ export interface AcknowledgedEmailInput extends EmailBaseInput {
   downMinutes?: number | null;
   /** What the ack stopped (S08): L1 for a DOWN, the reminders for a PROBLEM. */
   stopped?: LadderStopped | null;
+  /** The client-update record in words (S11): "Due 10:03 · Bua (AM) notified", "Marked by Bua 10:12 — …". */
+  clientUpdate?: string | null;
 }
 
 export interface RecoveredEmailInput extends EmailBaseInput {
@@ -134,6 +136,8 @@ export interface RecoveredEmailInput extends EmailBaseInput {
   ack: { by: string; at: Date } | null;
   /** Set for a PROBLEM incident (EmailAlert PROBLEM thread). */
   problem?: ProblemFacts | null;
+  /** The client-update record in words (S11): "Due 10:03 · Bua (AM) notified", "Marked by Bua 10:12 — …". */
+  clientUpdate?: string | null;
 }
 
 type Template =
@@ -451,6 +455,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
             `${duration} so far (confirmed down ${withDayIfNot(input.confirmedAt, input.ackedAt, formatTimeWithSeconds)})`,
           ],
           ...(stopped?.fact ? [stopped.fact] : []),
+          ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
         ],
     buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
   });
@@ -508,6 +513,7 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
       ['Down for', `${duration} (${range})`],
       ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)} → Monitoring`],
       ...ackFact,
+      ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
       ...(owner ? [['Still to do', `Root cause (${owner})`] as [string, string]] : []),
     ],
     // Board: the owner gets "Add root cause" first; for everyone else one secondary button.
@@ -888,6 +894,8 @@ function ladderFacts(
 }
 
 export interface StepEmailInput extends EmailBaseInput {
+  /** The client-update record in words, on the L3 FYI (S11, EmailAlert "Client update · Marked by Bua 10:12 — …"). */
+  clientUpdate?: string | null;
   severity: 'down' | 'problem';
   level: number;
   /** Minutes unacknowledged since the owner was told: Confirmed down, or a held PROBLEM's opening (D-034). */
@@ -994,6 +1002,7 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
               ],
             ]
           : []),
+        ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
         ['Next step', 'Recovery email when it’s back · no more escalation'],
       ],
       buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],

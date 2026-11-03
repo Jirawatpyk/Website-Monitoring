@@ -22,7 +22,9 @@ The status engine as pure functions: no I/O, no clock (`now` is always a paramet
 
 S10 (D-048): `ladderDue` also brings the plan’s `fyi` step due while Acknowledged (the Tier 1 CEO + AM FYI, §14.1), with no reminders; cases in `escalation.test.ts` (INC-0142 L2 10:18:41, L3 10:48:41 acked or not, INC-0139 L2 Fri 09:30).
 
-Still to build here, by slice (`docs/implementation-plan.md`): on-call → **S10** PR B; client-update track wiring → **S11**; SSL / domain thresholds → **S13**.
+S11 (FR-20, D-002, D-052): `clientUpdateDueAt` (`lifecycle.ts`) is when the client-update track fires. The clock starts at the first DOWN drop's first failed check. Tier 1 fires at +15 min, Tier 2 at +60 min counted inside response hours (`addInsideMinutes`), Tier 3 never. It fires at the first instant at or after that due time which a DOWN drop covers, so a drop ending exactly at the due time still fires, and a relapse after the due time fires at the relapse. The ack isn't an input. It replaced `clientUpdateRequired`. The runner's tick is `server/engine/client-update.ts`, and who is told is decided in SQL (`engine_client_update_due`). INC-0142 / INC-0139 / INC-0133 cases are in `lifecycle.test.ts`.
+
+Still to build here, by slice (`docs/implementation-plan.md`): SSL / domain thresholds → **S13**.
 
 Contract notes for the engine cron route:
 

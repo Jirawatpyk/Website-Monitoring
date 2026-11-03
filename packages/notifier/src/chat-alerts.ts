@@ -138,6 +138,8 @@ export interface RecoveredAlertInput {
   owner: ChatPerson | null;
   /** Set for a PROBLEM incident: "problem cleared after …", not "is back · down …". */
   problem?: ProblemFacts | null;
+  /** S11, ChatAlert RECOVERED: "Client update marked by Bua 10:12." */
+  clientUpdate?: string | null;
 }
 
 /**
@@ -330,7 +332,13 @@ export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
           header: { title },
           sections: [
             {
-              widgets: [{ textParagraph: { text: `${back} Needs a root cause before it can be resolved.` } }],
+              widgets: [
+                {
+                  textParagraph: {
+                    text: `${back} Needs a root cause before it can be resolved.${input.clientUpdate ? ` ${input.clientUpdate}.` : ''}`,
+                  },
+                },
+              ],
             },
           ],
         },

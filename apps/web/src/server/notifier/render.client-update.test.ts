@@ -52,6 +52,59 @@ describe('render — client update due (S11)', () => {
     );
   });
 
+  const due = {
+    client_update_required: true,
+    client_update_due_at: '2026-09-25T03:03:12Z',
+  };
+  const marked = {
+    ...due,
+    client_updated_at: '2026-09-25T03:12:05Z',
+    client_update_note: 'Called MuvMi ops, ETA shared',
+    client_update_not_needed: false,
+    client_updater: { display_name: 'Bua' },
+  };
+  const to = { id: 'u-bua', email: 'bua@example.test', display_name: 'Bua' };
+  const thread = { threadId: '<inc-inc-142@notify.example.test>', startsThread: false };
+
+  it('the ACKNOWLEDGED email carries the client update row while it waits (EmailAlert)', () => {
+    const m = renderEmail(
+      row(
+        { ackedBy: 'Arm', ackedAt: '2026-09-25T03:07:40Z' },
+        { template: 'acknowledged', channel: 'email' },
+      ),
+      { ...incident, ...due, state: 'acknowledged' },
+      to,
+      appUrl,
+      thread,
+    );
+    expect(m?.text).toContain('Client update: Due 10:03 · Bua (AM) notified — the AM sends it');
+  });
+
+  it('RECOVERED: the card says who marked it; the email row has the note', () => {
+    const facts = {
+      ...incident,
+      ...marked,
+      state: 'monitoring',
+      recovered_at: '2026-09-25T03:31:00Z',
+      incident_events: [
+        { type: 'detected', payload: {}, at: '2026-09-25T02:48:41Z' },
+        { type: 'recovered', payload: {}, at: '2026-09-25T03:31:00Z' },
+      ],
+    };
+    const card = renderChat(row({ okLocations: 3 }, { template: 'recovered' }), facts, appUrl, new Date());
+    expect(JSON.stringify(card)).toContain(
+      'Needs a root cause before it can be resolved. Client update marked by Bua 10:12.',
+    );
+    const email = renderEmail(
+      row({ okLocations: 3 }, { template: 'recovered', channel: 'email' }),
+      facts,
+      to,
+      appUrl,
+      thread,
+    );
+    expect(email?.text).toContain('Client update: Marked by Bua 10:12 — “Called MuvMi ops, ETA shared”');
+  });
+
   it('email to Bua: down 15 min from the first failed check, acked by Arm', () => {
     const m = renderEmail(
       row(ctx, { channel: 'email', user_id: 'u-bua' }),
