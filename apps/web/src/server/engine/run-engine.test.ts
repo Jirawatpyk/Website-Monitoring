@@ -58,6 +58,8 @@ const incident = (state: string, downQueued = true) => ({
   acked_at: null,
   recovered_at: state === 'monitoring' || state === 'needs_root_cause' ? at(-120) : null,
   escalation_level: 0,
+  // The client-update tick reads the same incidents (S11): an internal site, so it never fires here.
+  sites: { tier: 1, clients: { is_internal: true } },
   is_flapping: false,
   root_cause_category: null,
   notifications: downQueued ? [{ template: 'down' }] : [],

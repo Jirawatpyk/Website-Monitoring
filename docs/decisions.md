@@ -1130,7 +1130,7 @@ The ChatAlert board has one PROBLEM text line and no PROBLEM card. EmailAlert ha
 - §16.2 defines the resolve condition as "required only if the client-update track fired"; its "> 15 min" paraphrases that trigger, it doesn't define a second threshold. Using `>=` keeps one rule everywhere: the condition is required exactly when the track fired.
 - The Tier 2 clause in the same sentence already uses `>=`.
 
-**Impact.** `clientUpdateRequired()` in `packages/engine/src/lifecycle.ts`; the engine must pass minutes since the first failed check. No UI copy changes ("Tier 1 DOWN over 15 min" in help text still reads correctly).
+**Impact.** `clientUpdateDueAt()` in `packages/engine/src/lifecycle.ts` (S11; it replaced `clientUpdateRequired()`), counted from the first failed check of the first DOWN drop. No UI copy changes ("Tier 1 DOWN over 15 min" in help text still reads correctly).
 
 ## D-001 — Verifier unavailable while a site is blocked: PROBLEM (unverified) immediately
 

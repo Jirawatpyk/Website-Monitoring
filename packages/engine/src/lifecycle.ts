@@ -1,4 +1,5 @@
-import { clockMinutes, type IncidentState, type Severity, type Tier } from '@dxt/shared';
+import { clockMinutes, type IncidentState, type ResponseHours, type Severity, type Tier } from '@dxt/shared';
+import { addInsideMinutes } from './response-hours';
 
 /**
  * Incident lifecycle (spec §15.4, §16; PRD §8).
@@ -76,26 +77,38 @@ export function canResolve(c: ResolveConditions): { ok: boolean; unmet: ResolveB
   return { ok: unmet.length === 0, unmet };
 }
 
+/** The client-update track's delay: Tier 1 24/7, Tier 2 inside response hours (spec §9). */
+export const CLIENT_UPDATE_MIN: Partial<Record<Tier, number>> = { 1: 15, 2: 60 };
+
 /**
- * The client-update track fires when a Tier 1 DOWN reaches 15 min, or a Tier 2 DOWN reaches 60 min
- * counted inside response hours. Tier 3 goes to the report only (spec §9, §16.2).
- * Minutes are incident duration — counted from the FIRST FAILED CHECK, not from "Confirmed down":
- * INC-0142 first failed 09:48:12 → client update due 10:03:12 (Incident, AuditLog, AlertChannels boards),
- * while escalation L1 counts from confirmed down (09:48:41 → 10:03:41).
- * "Reaching" means `>=`. Decision record: docs/decisions.md D-002.
+ * When the client-update track fires (spec §9, §16.2), or null if it doesn't (yet): a Tier 1 DOWN
+ * reaching 15 min, a Tier 2 DOWN reaching 60 min counted inside response hours; Tier 3 goes to the
+ * report only. The clock starts at the FIRST FAILED CHECK of the first DOWN drop, not "Confirmed down":
+ * INC-0142 first failed 09:48:12 → due 10:03:12 (Incident, AuditLog, AlertChannels boards), while
+ * escalation L1 counts from confirmed down (09:48:41 → 10:03:41). "Reaching" means `>=` (D-002): a drop
+ * that ends exactly at the due time fires. It keeps counting through a recovery (D-004): a relapse
+ * after the due time fires at the relapse's start. A PROBLEM raised to DOWN (D-021) counts from the
+ * DOWN. Acknowledging changes nothing (§8), so the ack isn't an input.
  */
-export function clientUpdateRequired(input: {
+export function clientUpdateDueAt(input: {
   tier: Tier;
-  severity: Severity;
-  /** Minutes since the first failed check. */
-  downMinutes: number;
-  /** The same, counted only inside the tier's response hours. */
-  downMinutesInsideHours: number;
-}): boolean {
-  if (input.severity !== 'down') return false;
-  if (input.tier === 1) return input.downMinutes >= 15;
-  if (input.tier === 2) return input.downMinutesInsideHours >= 60;
-  return false;
+  /** The incident's drops (`episodesFromTimeline`). */
+  episodes: readonly Episode[];
+  hours: ResponseHours;
+}): Date | null {
+  const minutes = CLIENT_UPDATE_MIN[input.tier];
+  const drops = input.episodes
+    .filter((e) => e.severity === 'down')
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  const first = drops[0];
+  if (minutes === undefined || !first) return null;
+  const due =
+    input.tier === 1
+      ? new Date(first.start.getTime() + minutes * 60_000)
+      : addInsideMinutes(first.start, minutes, input.hours);
+  const covering = drops.find((d) => d.end === null || d.end >= due);
+  if (!covering) return null;
+  return covering.start > due ? covering.start : due;
 }
 
 /**
