@@ -223,6 +223,38 @@ describe('clientUpdateDueAt — the client-update track (spec §9, §16.2, D-002
         alertedAt: bkk('2026-09-25T15:00:00'),
       }),
     ).toEqual(bkk('2026-09-25T15:15:00'));
+    // Only the part after the alert counts (10 + 5 min); a drop over before it never fires alone.
+    expect(
+      clientUpdateDueAt({
+        tier: 1,
+        episodes: [down('2026-09-25T14:50:00', '2026-09-25T15:10:00'), down('2026-09-25T15:20:00', null)],
+        hours: HOURS,
+        alertedAt: bkk('2026-09-25T15:00:00'),
+      }),
+    ).toEqual(bkk('2026-09-25T15:25:00'));
+    expect(
+      clientUpdateDueAt({
+        tier: 1,
+        episodes: [down('2026-09-25T14:00:00', '2026-09-25T14:30:00')],
+        hours: HOURS,
+        alertedAt: bkk('2026-09-25T15:00:00'),
+      }),
+    ).toBeNull();
+    // Tier 2: ends exactly at its due instant, and due exactly at closing time.
+    expect(
+      clientUpdateDueAt({
+        tier: 2,
+        episodes: [down('2026-09-25T10:00:00', '2026-09-25T11:00:00')],
+        hours: HOURS,
+      }),
+    ).toEqual(bkk('2026-09-25T11:00:00'));
+    expect(
+      clientUpdateDueAt({
+        tier: 2,
+        episodes: [down('2026-09-25T17:00:00', '2026-09-25T19:00:00')],
+        hours: HOURS,
+      }),
+    ).toEqual(bkk('2026-09-25T18:00:00'));
     // A drop over before the late alert doesn't count.
     expect(
       clientUpdateDueAt({

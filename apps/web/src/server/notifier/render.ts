@@ -25,6 +25,7 @@ import {
   buildSystemAlertEmail,
   buildClientUpdateDueAlert,
   buildClientUpdateDueEmail,
+  plainName,
   type ChatMessage,
   type ChatPerson,
   type EmailBaseInput,
@@ -489,13 +490,18 @@ export function renderEmail(
   if (cuReader && base.reason === 'fallback') {
     base.reason = 'step';
     base.why =
-      n.template === 'recovered' && i.client_updated_at && !cuReader.noAm
+      n.template === 'recovered' && i.client_updated_at && !i.client_update_not_needed && !cuReader.noAm
         ? `You got this because you’re the AM for ${clientOf(i)} and handled its client update.`
         : `You got this because you were emailed about the client update at ${formatTime(cuReader.at)}.`;
   }
   const amReader = cuReader
     ? {
         marked: i.client_updated_at ? formatTime(new Date(i.client_updated_at)) : null,
+        // "Not needed" is no update the AM sent (message-check M1): said as such, with who and when.
+        notNeeded:
+          i.client_updated_at && i.client_update_not_needed
+            ? `${plainName(i.client_updater?.display_name ?? 'someone')} ${formatTime(new Date(i.client_updated_at))}`
+            : null,
         draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
       }
     : null;

@@ -128,7 +128,7 @@ export interface AcknowledgedEmailInput extends EmailBaseInput {
    * The reader is the AM the client update went to (S11, EmailAlert Bua rows): `marked` = the time their
    * update is on record ("10:12"), null while it still waits; `draftUrl` = the card ("Open draft").
    */
-  amReader?: { marked: string | null; draftUrl: string } | null;
+  amReader?: { marked: string | null; notNeeded?: string | null; draftUrl: string } | null;
   /** The client-update record in words (S11): "Due 10:03 · Bua (AM) notified", "Marked by Bua 10:12 — …". */
   clientUpdate?: string | null;
 }
@@ -145,7 +145,7 @@ export interface RecoveredEmailInput extends EmailBaseInput {
    * The reader is the AM the client update went to (S11, EmailAlert Bua rows): `marked` = the time their
    * update is on record ("10:12"), null while it still waits; `draftUrl` = the card ("Open draft").
    */
-  amReader?: { marked: string | null; draftUrl: string } | null;
+  amReader?: { marked: string | null; notNeeded?: string | null; draftUrl: string } | null;
   /** The client-update record in words (S11): "Due 10:03 · Bua (AM) notified", "Marked by Bua 10:12 — …". */
   clientUpdate?: string | null;
   /** The AM, for "Still to do · tell the client it's back (Bua)". */
@@ -522,12 +522,15 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
     label: 'RECOVERED',
     pre: `${site} back at ${formatTime(input.recoveredAt)} · down ${duration} · root cause needed`,
     headline: `${site} is back`,
-    lede: input.amReader
-      ? input.amReader.marked
-        ? `${site} is back after ${duration}. Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
-        : `${site} is back after ${duration}. Let the client know it’s back, and mark the client update on the incident page.`
-      : isOwner
-        ? 'Needs a root cause before it can be resolved.'
+    // The owner's root cause comes first, even when the owner is also the AM (message-check L4).
+    lede: isOwner
+      ? 'Needs a root cause before it can be resolved.'
+      : input.amReader
+        ? input.amReader.notNeeded
+          ? `${site} is back after ${duration}. The client update was marked not needed (${input.amReader.notNeeded}) — let the client know it’s back if they need to hear it.`
+          : input.amReader.marked
+            ? `${site} is back after ${duration}. Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
+            : `${site} is back after ${duration}. Let the client know it’s back, and mark the client update on the incident page.`
         : owner
           ? `Nothing needed from you. ${owner} adds the root cause.`
           : 'Nothing needed from you.',
@@ -536,27 +539,31 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
       ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)} → Monitoring`],
       ...ackFact,
       ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
-      ...(owner || input.clientUpdate
-        ? [
-            [
-              'Still to do',
-              [
-                owner ? `Root cause (${owner})` : null,
-                input.clientUpdate ? `tell the client it’s back (${input.amName ?? 'the AM'})` : null,
-              ]
-                .filter(Boolean)
-                .join(' · '),
-            ] as [string, string],
-          ]
-        : []),
+      ...(() => {
+        // "tell the client it's back (Bua)" — not when it was marked not needed, nor with no AM.
+        const tell = input.clientUpdate && input.amName && !input.amReader?.notNeeded;
+        const todo = [
+          owner ? `Root cause (${owner})` : null,
+          tell ? `tell the client it’s back (${input.amName})` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        return todo ? [['Still to do', todo] as [string, string]] : [];
+      })(),
     ],
-    // Board: the owner gets "Add root cause" first; for everyone else one secondary button.
+    // Board: the owner gets "Add root cause" first; the AM "Open incident" (primary), with "Open draft"
+    // while the update still waits; everyone else one secondary button.
     buttons: isOwner
       ? [
           { label: 'Add root cause', href: `${input.incidentUrl}#resolve`, primary: true },
           { label: 'Open incident', href: input.incidentUrl, primary: false },
         ]
-      : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
+      : input.amReader && !input.amReader.marked
+        ? [
+            { label: 'Open draft', href: input.amReader.draftUrl, primary: true },
+            { label: 'Open incident', href: input.incidentUrl, primary: false },
+          ]
+        : [{ label: 'Open incident', href: input.incidentUrl, primary: !!input.amReader }],
   });
 }
 

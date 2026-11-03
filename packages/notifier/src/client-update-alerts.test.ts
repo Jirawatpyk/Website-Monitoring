@@ -1,6 +1,142 @@
 import { describe, expect, it } from 'vitest';
 import { buildClientUpdateDueAlert, clientUpdateDraft } from './client-update-alerts';
-import { buildClientUpdateDueEmail } from './email-alerts';
+import {
+  buildAcknowledgedEmail,
+  buildClientUpdateDueEmail,
+  buildRecoveredEmail,
+  buildStepEmail,
+} from './email-alerts';
+
+describe('the client-update rows on later emails (EmailAlert Bua rows, S11)', () => {
+  const at = (iso: string) => new Date(`${iso}+07:00`);
+  const base = {
+    incidentId: 'i142',
+    incidentNumber: 142,
+    site: 'MuvMi',
+    tier: 1,
+    recipientId: 'bua',
+    reason: 'step' as const,
+    why: 'You got this because you were emailed about the client update at 10:03.',
+    incidentUrl: 'https://monitor.example.test/incidents/i142',
+    threadId: '<inc-i142@notify.example.test>',
+    startsThread: false,
+  };
+  const draftUrl = 'https://monitor.example.test/incidents/i142#client-update';
+  const ack = (over: Partial<Parameters<typeof buildAcknowledgedEmail>[0]> = {}) =>
+    buildAcknowledgedEmail({
+      ...base,
+      ackedBy: 'Arm',
+      ackedAt: at('2026-09-25T10:07:40'),
+      startedAt: at('2026-09-25T09:48:12'),
+      confirmedAt: at('2026-09-25T09:48:41'),
+      ...over,
+    });
+  const recovered = (over: Partial<Parameters<typeof buildRecoveredEmail>[0]> = {}) =>
+    buildRecoveredEmail({
+      ...base,
+      startedAt: at('2026-09-25T09:48:12'),
+      recoveredAt: at('2026-09-25T10:31:00'),
+      okLocations: 3,
+      owner: 'Arm',
+      ack: null,
+      ...over,
+    });
+
+  it('ACKNOWLEDGED: still yours + Open draft while waiting; one button once marked; none of it for a PROBLEM', () => {
+    const waiting = ack({
+      amReader: { marked: null, draftUrl },
+      clientUpdate: 'Due 10:03 · Bua (AM) notified',
+    });
+    expect(waiting.text).toContain('The client update is still yours to send.');
+    expect(waiting.text).toContain(`Open draft: ${draftUrl}`);
+    const marked = ack({ amReader: { marked: '10:12', draftUrl } });
+    expect(marked.text).not.toContain('still yours');
+    expect(marked.text).not.toContain('Open draft');
+    const problem = ack({ amReader: { marked: null, draftUrl }, problem: { trigger: 'slow' } });
+    expect(problem.text).not.toContain('Open draft');
+  });
+
+  it('RECOVERED: marked / not yet; Still to do names the AM, or "the AM"; no owner', () => {
+    expect(
+      recovered({
+        amReader: { marked: '10:12', draftUrl },
+        clientUpdate: 'Marked by Bua 10:12',
+        amName: 'Bua',
+      }).text,
+    ).toContain('your 10:12 update is already on record');
+    const pending = recovered({ amReader: { marked: null, draftUrl }, clientUpdate: 'Due 10:03' });
+    expect(pending.text).toContain('mark the client update on the incident page');
+    // No AM name given: no "tell the client" item (message-check L3).
+    expect(pending.text).toContain('Still to do: Root cause (Arm)\n');
+    expect(recovered({ owner: null, clientUpdate: 'Due 10:03', amName: 'Bua' }).text).toContain(
+      'Still to do: tell the client it’s back (Bua)',
+    );
+    expect(recovered({ owner: null }).text).not.toContain('Still to do');
+  });
+
+  it('RECOVERED to the AM: "not needed" said as such; no AM → no "tell the client" item; the owner first', () => {
+    const nn = recovered({
+      owner: null,
+      amReader: { marked: '10:07', notNeeded: 'Tao 10:07', draftUrl },
+      clientUpdate: 'Not needed · Tao 10:07',
+      amName: 'Bua',
+    });
+    expect(nn.text).toContain('The client update was marked not needed (Tao 10:07)');
+    expect(nn.text).not.toContain('already on record');
+    expect(nn.text).not.toContain('Still to do');
+    expect(recovered({ clientUpdate: 'Due 10:03 · no AM, the Admins were told' }).text).toContain(
+      'Still to do: Root cause (Arm)\n',
+    );
+    const ownerAm = recovered({
+      reason: 'owner',
+      amReader: { marked: '10:12', draftUrl },
+      clientUpdate: 'x',
+      amName: 'Arm',
+    });
+    expect(ownerAm.text).toContain('Needs a root cause before it can be resolved.');
+    // The AM's single "Open incident" is primary (EmailAlert Bua RECOVERED).
+    expect(recovered({ owner: null, amReader: { marked: '10:12', draftUrl } }).html).toContain(
+      'font-weight:600;font-size:14px;line-height:18px;text-decoration:none">Open incident',
+    );
+  });
+
+  it('the due email: the day on a confirmed time from another day; "was down" in the recovery minute', () => {
+    const m = buildClientUpdateDueEmail({
+      ...base,
+      tier: 2,
+      client: 'ORCA',
+      confirmedAt: at('2026-09-24T22:14:30'),
+      dueAt: at('2026-09-25T10:00:00'),
+      downMinutes: 706,
+      cause: null,
+      acked: null,
+      noAm: false,
+      draftUrl,
+      recovered: true,
+    });
+    expect(m.text).toContain('was down 60 min inside response hours');
+    expect(m.text).toMatch(/confirmed down Thu 24 Sep 22:14:30/);
+    expect(m.text).not.toContain('Cause:');
+  });
+
+  it('the L3 FYI carries the row', () => {
+    const m = buildStepEmail({
+      ...base,
+      severity: 'down',
+      level: 3,
+      elapsedMin: 60,
+      confirmedAt: at('2026-09-25T09:48:41'),
+      owner: 'Arm',
+      asFyi: false,
+      asked: 'CEO and Bua',
+      cause: null,
+      kind: 'fyi',
+      acked: { by: 'Arm', at: at('2026-09-25T10:07:40') },
+      clientUpdate: 'Marked by Bua 10:12 — “Called MuvMi ops, ETA shared”',
+    } as Parameters<typeof buildStepEmail>[0]);
+    expect(m.text).toContain('Client update: Marked by Bua 10:12 — “Called MuvMi ops, ETA shared”');
+  });
+});
 
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
 const bua = { name: 'Bua', chatUserId: 'BUA' };
