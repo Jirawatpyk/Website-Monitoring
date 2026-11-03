@@ -46,7 +46,15 @@ Each job pings Healthchecks.io. A missed ping alerts by email and in Google Chat
 | `probe-sin`, `probe-tyo` | every minute | That location stops voting; the other two still decide | the same, `/api/cron/probe-sin` / `-tyo` | [Fewer than 2 probe locations](#fewer-than-2-probe-locations) |
 | `probe-bkk` | every minute | Bangkok stops voting; SIN + TYO decide (D-019) | the VPS: `systemctl status dxt-agent@production` | [Restart the VPS agent](#restart-the-vps-agent) |
 | `browser-verifier` | every minute | Blocked sites show PROBLEM (unverified); the Admins also get the system email | the VPS, as above | [Browser verifier](#browser-verifier) |
-| `crawler` | every 30 min | No defacement views; an open crawler PROBLEM holds | `/api/cron/crawler` logs | [Crawler](#crawler-defacement-views-s09c) |
+| `crawler` | every 30 min (grace 15 min) | No defacement views; an open crawler PROBLEM holds | `/api/cron/crawler` logs | [Crawler](#crawler-defacement-views-s09c) |
+| `vps-watchdog` | every minute | The VPS can't speak for a stopped engine: no `MONITOR FAULT` line in the Alerts Space (S12a) | the VPS: `journalctl -u dxt-agent@production` (`monitor_fault` lines) | [Restart the VPS agent](#restart-the-vps-agent) |
+
+**Monitor fault (S12a, D-053).** When the `engine` check goes down, two voices speak, and neither needs the engine:
+
+- Healthchecks emails the Admins.
+- The VPS watchdog posts `MONITOR FAULT · all sites · heartbeat missed since HH:MM · status unknown, hand-check Tier 1` to the Alerts Space, @mentioning the person on call. It fires when the sweep is 3 min old or the Ingest API has been unreachable for 3 min, and posts once per fault.
+
+The Overview shows the fault banner, and `/probes` shows every heartbeat from our own timestamps. A single probe location missing for more than 3 min sends the Admins one email ("PROBE MISSING") and pages nobody. That email is suppressed while the engine itself is down. On staging, every `staging:pause` makes the staging watchdog post one MONITOR FAULT after 3 min: expected.
 
 A check that is **down** but whose job logs show it running usually means the ping URL in the env is wrong or was rotated. Compare the URL in Healthchecks with the env value (names only in chat).
 
