@@ -4,7 +4,7 @@
 -- by-hand action.
 begin;
 \ir _helpers.psql
-select plan(26);
+select plan(31);
 
 select tests.clear_sites();
 update public.profiles set is_active = false where role in ('admin', 'stakeholder');
@@ -24,9 +24,10 @@ select v.id, '00000000-0000-0000-0000-0000000000c1', v.name, 1, pg_temp.uid('arm
 from (values ('00000000-0000-0000-0000-0000000000a1'::uuid, 'Recovered'),
              ('00000000-0000-0000-0000-0000000000a2'::uuid, 'Problem'),
              ('00000000-0000-0000-0000-0000000000a3'::uuid, 'Still down'),
-             ('00000000-0000-0000-0000-0000000000a4'::uuid, 'Muted')) v (id, name);
+             ('00000000-0000-0000-0000-0000000000a4'::uuid, 'Muted'),
+             ('00000000-0000-0000-0000-0000000000a5'::uuid, 'Flap')) v (id, name);
 insert into public.monitors (site_id, type, url, is_primary)
-select id, 'http', 'https://' || id || '.example.test/', true from public.sites where name in ('Recovered', 'Problem', 'Still down', 'Muted');
+select id, 'http', 'https://' || id || '.example.test/', true from public.sites where name in ('Recovered', 'Problem', 'Still down', 'Muted', 'Flap');
 
 create temp table inc (name text primary key, id uuid) on commit drop;
 grant select on inc to anon, authenticated, service_role;
@@ -99,6 +100,9 @@ select is((select count(*)::int from public.notifications where incident_id = pg
   1, 'DOWN AGAIN in its thread, at once');
 select is((select status::text from public.site_status where site_id = '00000000-0000-0000-0000-0000000000a1'),
   'down', 'the site reads DOWN');
+select is((select (context ->> 'backSince') is not null and context ->> 'fromState' = 'monitoring'
+           from public.notifications where incident_id = pg_temp.inc('rec') and template = 'down_again'
+           and channel = 'google_chat'), true, 'DOWN AGAIN knows when it was back and where it was');
 select ok((select last_round_at < now() - interval '19 min' from public.site_status
            where site_id = '00000000-0000-0000-0000-0000000000a1'), 'its round clock stays the engine''s');
 select is((select count(*)::int from public.hand_checks where incident_id = pg_temp.inc('rec')), 1,
@@ -114,6 +118,8 @@ select is((select severity::text || ' ' || state::text from public.incidents whe
   'down unacked', 'DOWN, waiting for an ack');
 select is((select actor_id from public.incident_events where incident_id = pg_temp.inc('prob') and type = 'escalated_to_down'),
   pg_temp.uid('tao'), 'the raise names who reported it');
+select is((select payload ->> 'raised' from public.incident_events where incident_id = pg_temp.inc('prob')
+           and type = 'escalated_to_down'), 'true', 'worded as raised, not opened');
 select is((select count(*)::int from public.audit_log where action = 'incident.hand_down' and actor_id = pg_temp.uid('tao')),
   2, 'each logged');
 
@@ -128,6 +134,26 @@ select is((select count(*)::int from public.incident_events where incident_id = 
 set local role authenticated;
 select throws_ok('select public.engine_mark_engine_back(now())', '42501', null, 'only the engine writes the line');
 reset role;
+
+-- ── A run that read the incident before the press (engine review M1) ──────────
+set local role service_role;
+select is(public.engine_recover_incident(pg_temp.inc('prob'), 'unacked', 'monitoring', now() - interval '1 min',
+  now() - interval '1 min', '{}', true), false, 'a round from before the press never recovers it');
+select is(public.engine_recover_incident(pg_temp.inc('prob'), 'unacked', 'monitoring', now() + interval '1 min',
+  now() + interval '1 min', '{}', true), true, 'a round after the press does');
+reset role;
+
+-- ── The 3rd change in 30 min tags it flapping (D-004, engine review M2) ────────
+insert into inc values ('flap', public.engine_open_incident('00000000-0000-0000-0000-0000000000a5', null,
+  'hard_fail', 'down', now() - interval '40 min', now() - interval '39 min', now() - interval '40 min', '{"cause":"x"}', true));
+select public.engine_recover_incident(pg_temp.inc('flap'), 'unacked', 'monitoring', now() - interval '20 min',
+  now() - interval '20 min', '{}', false, null, null, true);
+update public.site_status set flips = array[now() - interval '25 min', now() - interval '20 min'], flip_ok = true
+  where site_id = '00000000-0000-0000-0000-0000000000a5';
+select tests.authenticate_as(pg_temp.uid('tao'));
+select public.report_down_by_hand(pg_temp.inc('flap'), null, false);
+reset role;
+select is((select is_flapping from public.incidents where id = pg_temp.inc('flap')), true, 'flapping from the press');
 
 select * from finish();
 rollback;
