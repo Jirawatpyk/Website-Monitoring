@@ -80,6 +80,14 @@ begin
     into v_flap
   from public.site_status st where st.site_id = v_inc.site_id;
   v_flap := coalesce(v_flap, false);
+  -- As the runner words them: "Now flapping" on the drop that tags it; a raise is D-021's escalate
+  -- (`escalated`: an ack words the email "while it was a problem") and its outage starts at the press.
+  v_context := v_context
+    || case when v_flap then jsonb_build_object('flapping', true)
+              || case when not v_inc.is_flapping then jsonb_build_object('nowFlapping', true) else '{}'::jsonb end
+            else '{}'::jsonb end
+    || case when v_kind = 'raise' then jsonb_build_object('escalated', true, 'downStartedAt', v_now)
+            else '{}'::jsonb end;
   if v_kind = 'relapse' then
     v_ok := public.engine_relapse_incident(p_incident_id, 'down', 'manual', v_now, v_now, v_round,
                                             v_context, v_flap, true);

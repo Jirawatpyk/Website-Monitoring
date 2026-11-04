@@ -4,7 +4,7 @@
 -- by-hand action.
 begin;
 \ir _helpers.psql
-select plan(31);
+select plan(33);
 
 select tests.clear_sites();
 update public.profiles set is_active = false where role in ('admin', 'stakeholder');
@@ -120,6 +120,9 @@ select is((select actor_id from public.incident_events where incident_id = pg_te
   pg_temp.uid('tao'), 'the raise names who reported it');
 select is((select payload ->> 'raised' from public.incident_events where incident_id = pg_temp.inc('prob')
            and type = 'escalated_to_down'), 'true', 'worded as raised, not opened');
+select ok((select (payload ->> 'downStartedAt')::timestamptz = now() and payload ->> 'escalated' = 'true'
+           from public.incident_events where incident_id = pg_temp.inc('prob') and type = 'escalated_to_down'),
+  'the outage starts at the press, as D-021''s escalate');
 select is((select count(*)::int from public.audit_log where action = 'incident.hand_down' and actor_id = pg_temp.uid('tao')),
   2, 'each logged');
 
@@ -154,6 +157,9 @@ select tests.authenticate_as(pg_temp.uid('tao'));
 select public.report_down_by_hand(pg_temp.inc('flap'), null, false);
 reset role;
 select is((select is_flapping from public.incidents where id = pg_temp.inc('flap')), true, 'flapping from the press');
+select is((select (context ->> 'nowFlapping') || ' ' || (context ->> 'flapping') from public.notifications
+           where incident_id = pg_temp.inc('flap') and template = 'down_again' and channel = 'google_chat'),
+  'true true', 'its DOWN AGAIN says Now flapping');
 
 select * from finish();
 rollback;
