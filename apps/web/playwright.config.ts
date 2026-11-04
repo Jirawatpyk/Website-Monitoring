@@ -8,6 +8,16 @@ const isCI = Boolean(process.env.CI);
  * Locally Playwright starts `pnpm dev` (or reuses one already on :3500); in CI it runs the built app.
  * Placeholder Supabase values are enough for signed-out flows; signed-in flows need a local stack.
  */
+const DESKTOP = { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } };
+const MOBILE = {
+  ...devices['Desktop Chrome'],
+  viewport: { width: 390, height: 844 },
+  isMobile: true,
+  hasTouch: true,
+};
+/** Specs that put the monitor into a fault (agent_heartbeats): run last, in their own projects. */
+const FAULT_SPECS = /probes\.spec\.ts$/;
+
 export default defineConfig({
   testDir: './e2e',
   // The monitor-fault specs' shared beats are cleared once, after every project (S12b).
@@ -23,17 +33,13 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     trace: 'on-first-retry',
   },
+  // The monitor-fault specs age the shared engine beats (a fault on every page): they run in their own
+  // projects, after every other spec, so no page under test sees a fault it didn't ask for (S12b CI).
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
-    {
-      name: 'mobile',
-      use: {
-        ...devices['Desktop Chrome'],
-        viewport: { width: 390, height: 844 },
-        isMobile: true,
-        hasTouch: true,
-      },
-    },
+    { name: 'desktop', testIgnore: FAULT_SPECS, use: DESKTOP },
+    { name: 'mobile', testIgnore: FAULT_SPECS, use: MOBILE },
+    { name: 'fault-desktop', testMatch: FAULT_SPECS, dependencies: ['desktop', 'mobile'], use: DESKTOP },
+    { name: 'fault-mobile', testMatch: FAULT_SPECS, dependencies: ['desktop', 'mobile'], use: MOBILE },
   ],
   webServer: {
     // In CI run Next directly: behind `pnpm start` the Next process didn't exit when Playwright stopped
