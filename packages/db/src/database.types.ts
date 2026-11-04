@@ -197,6 +197,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"hand_checks": {
+                  Row: {
+                    "checked_at": string,"checked_by": string,"created_at": string,"id": string,"incident_id": string | null,"note": string | null,"outcome": string,"site_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "checked_at"?: string,"checked_by": string,"created_at"?: string,"id"?: string,"incident_id"?: string | null,"note"?: string | null,"outcome": string,"site_id": string
+                  }
+                  Update: {
+                    "checked_at"?: string,"checked_by"?: string,"created_at"?: string,"id"?: string,"incident_id"?: string | null,"note"?: string | null,"outcome"?: string,"site_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "hand_checks_checked_by_fkey"
+      columns: ["checked_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "hand_checks_incident_id_fkey"
+      columns: ["incident_id"]
+isOneToOne: false
+      referencedRelation: "incidents"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "hand_checks_site_id_fkey"
+      columns: ["site_id"]
+isOneToOne: false
+      referencedRelation: "sites"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"incident_events": {
                   Row: {
                     "actor_id": string | null,"at": string,"id": string,"incident_id": string,"payload": NonNullable<Json>,"type": string
@@ -1051,6 +1083,9 @@ isOneToOne: false
 "engine_write_monitors":
 { Args: { "p_monitors": Json,"p_round_at": string,"p_site_id": string,"p_status": Database["public"]['Enums']["site_state"] }; Returns: undefined
                            },
+"escalate_now":
+{ Args: { "p_incident_id": string,"p_level": number }; Returns: Json
+                           },
 "escalation_people":
 { Args: { "p_incident_id": string,"p_targets": Json }; Returns: {
               "chat_user_id": string,"token": string,"user_id": string
@@ -1096,6 +1131,9 @@ isOneToOne: false
 "oncall_week_start":
 { Args: { "p_at": string }; Returns: string
                            },
+"open_manual_incident":
+{ Args: { "p_note": string,"p_outside_hours": boolean,"p_site_id": string }; Returns: string
+                           },
 "open_system_alert":
 { Args: { "p_context": Json,"p_kind": string }; Returns: string
                            },
@@ -1123,6 +1161,9 @@ isOneToOne: false
 "queue_fallback_emails":
 { Args: { "p_notification_id": string }; Returns: number
                            },
+"record_hand_check":
+{ Args: { "p_site_id": string }; Returns: string
+                           },
 "request_oncall_swap":
 { Args: { "p_reason"?: string,"p_shift_id": string,"p_with_shift_id": string }; Returns: string
                            },
@@ -1143,6 +1184,9 @@ isOneToOne: false
                            },
 "save_root_cause":
 { Args: { "p_category": string,"p_fix": string,"p_incident_id": string,"p_what": string }; Returns: undefined
+                           },
+"send_client_update_reminder":
+{ Args: { "p_incident_id": string }; Returns: boolean
                            },
 "send_oncall_test":
 { Args: Record<PropertyKey, never>; Returns: string
