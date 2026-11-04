@@ -88,6 +88,9 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
    - A site that is muted or in maintenance can't be opened by hand: a mute stops new alerts (§15.1). Security review M1.
    - The engine judges a manual incident only on rounds after it opened. Its first round after the hand check is the first evidence (§30.5), and a round from before it was opened never recovers it. The stored `last_round_at` stays the engine's, so "statuses as of" stays true. db review H1.
    - Escalate now names the level the person saw. Two people pressing at once send one level.
+6. **Left for a follow-up (Tao, 4 Nov 2026; engine review M4, spec check).**
+   - **"Down again" by hand.** A site with an incident still open (recovered and waiting for its root cause, or a PROBLEM) can't be opened by hand, because one site has one open incident. Its row links that incident instead, and Escalate now works there while it waits for an ack. A by-hand DOWN AGAIN in the same thread comes later.
+   - **The §30.8 timeline line.** "Status engine back — automatic escalation running again" isn't written yet. The Escalation card's "Automatic escalation is running again — levels already sent won't repeat." says the same thing until the engine writes the event.
 
 **Where.**
 - Migration `monitor_fault_hand_check`: `hand_checks`, `record_hand_check`, `open_manual_incident`, `escalate_now`, `send_client_update_reminder`, `private.engine_fault`, `private.engine_stopped`.
