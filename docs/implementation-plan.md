@@ -32,7 +32,8 @@
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | Done |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Done |
-| S12 | Monitor-fault mode & probes | 2 · P1 | M | FR-21 | S06b, S10, S11 | 4 | Todo |
+| S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | In progress |
+| S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Todo |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Todo |
@@ -592,7 +593,9 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
   Done on 3 Nov 2026, when #164 merged (e9ad664). The schema had merged in #163 (fb0d8c0). Production deploy READY, with no runtime errors in its first 15 min.
 
-### S12 · Monitor-fault mode & probes
+### S12a · Monitor fault: heartbeats, alerts, VPS watchdog, Probes page
+
+- **Split (Tao, 3 Nov 2026, D-053):** S12 became S12a (this) and S12b. MainFault is drawn on the pre-S06 Overview and "Escalate now" has no board, so the hand check, the manual incident and Escalate now wait for Claude Design (S12b).
 
 - **Scope:** FR-21, PRD §9. Heartbeat routing: engine missing > 3 min → email Tao + Alerts Space post mentioning on-call through a sender that doesn't depend on the engine; a single probe missing > 3 min → email Tao only, suppressed during an engine fault. Overview fault banner with "as of" data; hand check → manual incident (L0 through the fallback sender, client-update track started, "Escalate now" by hand). VPS watchdog. Probes & heartbeat page.
 - **From S11 (engine review M3):** a manual incident needs four things before the client-update track can fire for it:
@@ -606,9 +609,19 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   1. **T02:** stopping one probe → no false DOWN on any site and Tao gets the probe email only.
   2. **T04:** disabling Vercel Cron on staging → Healthchecks alerts reach both Admins and the VPS watchdog posts on its own.
   3. **T11:** engine heartbeat off → Tao email + on-call @mention; one probe off → Tao email only.
-  4. "Down — open incident" from the hand check posts L0 through the fallback sender while the engine is stopped.
-  5. spec-checker passes MainFault and Probes; nav "Probes & heartbeat" live.
-- **Review:** engine-reviewer, message-checker, spec-checker.
+  4. The Overview shows the fault banner and "as of" data while the engine sweep is stale (desktop and phone).
+  5. spec-checker passes Probes; nav "Probes & heartbeat" live.
+- **Review:** engine-reviewer, message-checker, spec-checker, security-reviewer (the ingest response carries the on-call Chat id; the VPS gets a Chat webhook).
+
+### S12b · Monitor fault: hand check, manual incident, Escalate now
+
+- **Scope:** FR-21 hand check. During an engine fault, Tier 1 sites get "Loads OK" / "Down — open incident". The second opens an incident with trigger Manual (hand check), posts L0 at once from the request (the action's own dispatch, not the notifier cron — D-053) and starts the client-update track. "Escalate now" sends L1+ and the client-update reminder by hand until the engine is back; automatic timers resume then.
+- **Boards:** MainFault (redrawn on Main3 / MOverview4 — Claude Design), Escalate now on the Incident board (new) · **Depends on:** S12a and the boards.
+- **Done when:**
+  1. "Down — open incident" from the hand check posts L0 while the engine is stopped.
+  2. Escalate now sends the next level and the client-update reminder once each; the automatic timers don't repeat them when the engine is back.
+  3. spec-checker passes MainFault and the Escalate-now state.
+- **Review:** engine-reviewer, message-checker, spec-checker, security-reviewer.
 
 ### S13 · SSL & domain expiry
 
@@ -807,7 +820,7 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | FR-18 | S22 |
 | FR-19 | S24 |
 | FR-20 | S11 |
-| FR-21 | S12 |
+| FR-21 | S12a |
 | FR-22 | S18 |
 
 ### Boards
@@ -852,8 +865,8 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | MIncidentPageChangeDark | S09d |
 | OnCall | S10 |
 | MOnCall | S10 |
-| MainFault | S12 |
-| Probes | S12 |
+| MainFault | S12b |
+| Probes | S12a |
 | Expiry | S13 |
 | WeeklySummary | S14 |
 | AuditLog | S15 |
@@ -903,14 +916,14 @@ Tables the plan adds beyond PRD §11: organisation settings and company holidays
 | Test | What | Slice |
 |---|---|---|
 | T01 | Staging site forced through every status path | S04a |
-| T02 | One probe off → no false DOWN, Admin alerted | S12 |
+| T02 | One probe off → no false DOWN, Admin alerted | S12a |
 | T03 | Verifier off → hard fail still DOWN; blocked → PROBLEM (unverified) | S03 |
-| T04 | Vercel Cron off → Healthchecks alerts 2 people, VPS watchdog alerts | S12 |
+| T04 | Vercel Cron off → Healthchecks alerts 2 people, VPS watchdog alerts | S12a |
 | T05 | No ack → L0–L3 on time | S10 |
 | T06 | UAT with owners twice on mobile | S19 |
 | T07 | Game day, MTTD / MTTA measured | S19 |
 | T08 | Ack → Undo within 10 s → nothing sent | S02b |
 | T09 | Mute with open incident → escalation, L3 FYI, client update continue | S09 |
 | T10 | Resolve blocked until 3 conditions | S07 |
-| T11 | Engine heartbeat off → Tao email + on-call mention; probe off → email only | S12 |
+| T11 | Engine heartbeat off → Tao email + on-call mention; probe off → email only | S12a |
 | T12 | Only allowlisted company accounts get in; 2-step enforced by Workspace (D-007) | S01 |

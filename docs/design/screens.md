@@ -19,7 +19,7 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | Main | Overview dashboard — pre-S06 reference, superseded by Main3 (§21) | — | P0 | S06b | §21 | FR-05 |
 | MOverview | Mobile — Overview — pre-S06 reference, superseded by MOverview4 (§21) | — | P0 | S06b | §21 | FR-05 |
 | MainDark | Overview dashboard — dark — pre-S06 reference, superseded by MainDark3 (§21) | — | P0 | S06b | §21 | FR-05 |
-| MainFault | Overview — monitoring degraded (heartbeat missed) | `/` fault state | P1 | S12 | §14.4, §14.6, §16.10 | FR-21, §9 |
+| MainFault | Overview — monitoring degraded (heartbeat missed) | `/` fault state | P1 | S12b | §14.4, §14.6, §16.10 | FR-21, §9 |
 | Sites | Sites list | `/sites` | P0 | S05c | §5, §11, §14.5, §20 | FR-05 |
 | MSites | Mobile — Sites | `/sites` (390) | P0 | S05c | §17, §20 | FR-05 |
 | SiteDetail | Site detail — Bangkok Airways – Taiwan · Page fingerprint card | `/sites/[siteId]` | P0 | S06 (fingerprint card: S09d) | §5, §11, §12, §20, §25, §26.8 | FR-08 |
@@ -47,7 +47,7 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | OnCall | On-call rotation | `/oncall` | P1 | S10 | §2, §15.8, §27, §28 | FR-09b, §8 |
 | MOnCall | Mobile — On-call | `/oncall` (390) | P1 | S10 | §10 (checklist), §27, §28 | §8 |
 | Expiry | SSL & domain expiry | `/expiry` | P1 | S13 | §14.12, §15.8 | FR-11 |
-| Probes | Probes & heartbeat | `/probes` | P1 | S12 | §14.4, §15.3 | §9 |
+| Probes | Probes & heartbeat | `/probes` | P1 | S12a | §14.4, §15.3 | §9 |
 | AuditLog | Audit log | `/audit` | P1 | S15 | §16.11 | FR-13 |
 | Users | Settings — users & roles | `/settings/users` | P1 — until then the allowlist and roles are set by SQL (S01, D-007) | S16 | §14.9, §15.2, §16.6 | §3 |
 | Security | Settings — sessions & security (no 2-step lock, D-007) | `/settings/security` | P1 | S16 | §15.2, §16.7 | §3, §9 |

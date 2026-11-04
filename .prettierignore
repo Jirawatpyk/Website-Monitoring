@@ -6,3 +6,5 @@ coverage/
 docs/
 packages/db/src/database.types.ts
 supabase/.temp/
+# Claude Code worktrees (other sessions' checkouts) are not this tree.
+.claude/worktrees/
