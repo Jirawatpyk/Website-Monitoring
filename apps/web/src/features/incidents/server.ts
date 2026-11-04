@@ -11,3 +11,4 @@ export {
   undoAcknowledge,
   undoResolve,
 } from './actions';
+export { escalateNow, openManualIncident, recordHandCheck, sendClientUpdateReminder } from './hand-actions';
