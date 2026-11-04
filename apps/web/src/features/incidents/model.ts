@@ -799,13 +799,15 @@ export function timelineOf(
     if (tag) tags.set(line, tag);
   };
 
-  // The first failed check comes from the incident itself (no event of its own).
-  item(
-    { at: i.startedAt },
-    'failed',
-    i.trigger === 'content_change' ? 'First fetch that differed' : 'First failed check',
-    str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
-  );
+  // The first failed check comes from the incident itself (no event of its own). Opened by hand
+  // (S12b, §30.5) there was none: the detected line says who opened it.
+  if (i.trigger !== 'manual')
+    item(
+      { at: i.startedAt },
+      'failed',
+      i.trigger === 'content_change' ? 'First fetch that differed' : 'First failed check',
+      str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
+    );
 
   sorted.forEach((e, n) => {
     const by = nameOf(e.actor_id);

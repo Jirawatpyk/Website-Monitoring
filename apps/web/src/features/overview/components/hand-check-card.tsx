@@ -95,7 +95,7 @@ export function HandCheckCard({
           <div role="table" aria-label="Hand check · Tier 1" className="flex flex-col">
             <div
               role="row"
-              className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto] gap-4 border-b border-border-subtle pb-2 text-xs text-fg-secondary"
+              className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_calc(var(--spacing)*80)] gap-4 border-b border-border-subtle pb-2 text-xs text-fg-secondary"
             >
               <span role="columnheader">Site</span>
               <span role="columnheader">Owner</span>
@@ -192,7 +192,7 @@ function DesktopRow({ row, asOf, ...rest }: RowProps) {
   return (
     <div
       role="row"
-      className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto] items-center gap-4 border-b border-border-subtle py-3 last:border-b-0"
+      className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_calc(var(--spacing)*80)] items-center gap-4 border-b border-border-subtle py-3 last:border-b-0"
     >
       <div role="cell" className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{row.name}</span>

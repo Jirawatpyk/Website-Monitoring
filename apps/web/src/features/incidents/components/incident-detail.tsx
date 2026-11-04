@@ -287,11 +287,13 @@ export function IncidentDetailView({
               {[
                 v.cause,
                 // a page change has no failed check: the board shows only its cause (§26.3)
-                stillDown && !d.pageChange
-                  ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
-                  : d.recoveredAt && !resolved
-                    ? `OK since ${formatTime(new Date(d.recoveredAt))}`
-                    : null,
+                d.trigger === 'manual'
+                  ? `opened by hand ${formatTime(new Date(d.startedAt))} · no probe check — the status engine was down`
+                  : stillDown && !d.pageChange
+                    ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
+                    : d.recoveredAt && !resolved
+                      ? `OK since ${formatTime(new Date(d.recoveredAt))}`
+                      : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -420,7 +422,9 @@ export function IncidentDetailView({
           {[
             `${stillDown ? (d.severity === 'down' ? 'Down' : 'Problem') : d.severity === 'down' ? 'Was down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`,
             downRange ? [sections.startedOn, downRange].filter(Boolean).join(' ') : sections.startedOn,
-            `confirmed ${formatTimeWithSeconds(new Date(d.detectedAt))}`,
+            d.trigger === 'manual'
+              ? `opened by hand ${formatTime(new Date(d.startedAt))}`
+              : `confirmed ${formatTimeWithSeconds(new Date(d.detectedAt))}`,
           ]
             .filter(Boolean)
             .join(' · ')}
@@ -700,7 +704,9 @@ function EvidenceCard({
           </>
         ) : (
           <span className="text-sm text-fg-secondary">
-            No screenshot — the browser verifier takes one after a hard-fail DOWN is confirmed.
+            {d.trigger === 'manual'
+              ? 'No screenshot — the browser verifier takes one only after a probe confirms a DOWN.'
+              : 'No screenshot — the browser verifier takes one after a hard-fail DOWN is confirmed.'}
           </span>
         )}
       </div>

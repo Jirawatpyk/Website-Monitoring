@@ -62,16 +62,22 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
     {
       label: page ? 'FIRST SEEN' : 'STARTED',
       value: [startedOn(d, now), formatTimeWithSeconds(new Date(d.startedAt))].filter(Boolean).join(' '),
-      caption: page ? 'First fetch that differed' : 'First failed check',
+      caption: page
+        ? 'First fetch that differed'
+        : d.trigger === 'manual'
+          ? 'Opened by hand'
+          : 'First failed check',
     },
     {
       label: d.severity === 'down' ? 'CONFIRMED DOWN' : page ? 'CONFIRMED PROBLEM' : 'DETECTED',
-      value: formatTimeWithSeconds(confirmedAt),
+      value: d.trigger === 'manual' ? '—' : formatTimeWithSeconds(confirmedAt),
       caption: page
         ? page.newScript.length
           ? 'New script domain — raised on the first fetch'
           : `Held ${PAGE_CHANGE_HOLD_FETCHES} fetches (1 h)`
-        : `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
+        : d.trigger === 'manual'
+          ? 'No probe check · engine down'
+          : `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
     },
     {
       label: 'DURATION',
@@ -220,7 +226,14 @@ export function TimelineLines({ items, newestFirst }: { items: TimelineItem[]; n
 /** Evidence by location: first check, recheck and latest per location, with the glyph legend. */
 export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
   if (d.locations.length === 0) {
-    return <p className="m-0 text-sm text-fg-secondary">No checks found around the start.</p>;
+    // Opened by hand while the engine was down (S12b, §30.5): no probe ran for it.
+    return (
+      <p className="m-0 text-sm text-fg-secondary">
+        {d.trigger === 'manual'
+          ? 'Opened by hand while the status engine was down — no probe results for this check. Probe evidence starts with the first round after the engine is back.'
+          : 'No checks found around the start.'}
+      </p>
+    );
   }
   return (
     <>
