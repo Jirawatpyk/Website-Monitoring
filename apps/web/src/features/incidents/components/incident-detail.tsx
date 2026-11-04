@@ -46,6 +46,7 @@ import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge, undoResolve } from '../actions';
 import type { IncidentDetail } from '../detail-queries';
 import { clientUpdateWhy, rootCauseLabel } from '../model';
+import { ClientUpdateReminder, EscalateNow, EscalationCard } from './escalation-card';
 import { ClientUpdateCard } from './client-update-card';
 import type { IncidentSections } from './incident-sections';
 import { AckPanel } from './ack-panel';
@@ -390,6 +391,24 @@ export function IncidentDetailView({
                 phone={false}
               />
             )}
+            {d.reminder && (
+              <ClientUpdateReminder
+                reminder={d.reminder}
+                incidentId={v.incidentId}
+                incidentLabel={incidentLabel}
+                siteName={d.siteName}
+                phone={false}
+              />
+            )}
+            {d.escalation && (
+              <EscalationCard
+                card={d.escalation}
+                incidentId={v.incidentId}
+                incidentLabel={incidentLabel}
+                siteName={d.siteName}
+                phone={false}
+              />
+            )}
             {resolveCard(resolveDesktop, true)}
           </div>
         </div>
@@ -450,7 +469,25 @@ export function IncidentDetailView({
             onUndone={() => setFocusResolve(true)}
           />
         )}
+        {d.escalation && (
+          <EscalateNow
+            card={d.escalation}
+            incidentId={v.incidentId}
+            incidentLabel={incidentLabel}
+            siteName={d.siteName}
+            phone
+          />
+        )}
         {whatChanged ?? sections.latestRound}
+        {d.escalation && (d.escalation.stopped || d.escalation.back) && (
+          <EscalationCard
+            card={d.escalation}
+            incidentId={v.incidentId}
+            incidentLabel={incidentLabel}
+            siteName={d.siteName}
+            phone
+          />
+        )}
         {d.clientUpdate && (
           <ClientUpdateCard
             card={d.clientUpdate}
@@ -459,6 +496,15 @@ export function IncidentDetailView({
             siteName={d.siteName}
             tier={d.tier}
             acked={!!d.acked}
+            phone
+          />
+        )}
+        {d.reminder && (
+          <ClientUpdateReminder
+            reminder={d.reminder}
+            incidentId={v.incidentId}
+            incidentLabel={incidentLabel}
+            siteName={d.siteName}
             phone
           />
         )}

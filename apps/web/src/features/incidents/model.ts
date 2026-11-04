@@ -813,6 +813,17 @@ export function timelineOf(
     switch (e.type) {
       case 'detected': {
         const time = formatTimeWithSeconds(new Date(e.at));
+        // Opened by hand from the hand check (S12b, spec §30.5).
+        if (e.payload.manual === true) {
+          const note = str(e.payload.note);
+          item(
+            e,
+            'down',
+            `Opened by ${by} from a hand check${note ? ` · “${note}”` : ''}`,
+            'Trigger: Manual (hand check) · the status engine was down, so there are no probe results',
+          );
+          return;
+        }
         if (
           typeof e.payload.summary === 'string' ||
           (i.severity === 'problem' && !e.payload.confirmingLocations)
@@ -975,7 +986,15 @@ export function timelineOf(
           ...(asked.length ? ['please acknowledge'] : []),
           ...(fyi.length ? [`${fyi.join(' and ')} FYI`] : []),
         ].join(' · ');
-        item(e, 'escalated', `Escalated to L${level} — not acknowledged`, `“${words}” in the thread + email`);
+        // Escalate now (§30.6): "Escalated to L1 by Tao (engine down)".
+        item(
+          e,
+          'escalated',
+          e.payload.byHand === true
+            ? `Escalated to L${level} by ${by} (engine down)`
+            : `Escalated to L${level} — not acknowledged`,
+          `“${words}” in the thread + email`,
+        );
         return;
       }
       case 'note':
@@ -985,6 +1004,16 @@ export function timelineOf(
       case 'client_update_due': {
         const am = str(e.payload.am);
         const tier = num(e.payload.tier) ?? 1;
+        // Sent by hand while the engine was stopped (§30.7, D-055 item 3).
+        if (e.payload.byHand === true) {
+          item(
+            e,
+            'client_due',
+            `Client-update reminder sent by ${by} (engine down)`,
+            `${am ? `${am} (AM)` : 'The Admins'} @mentioned in the thread with a draft client message + email`,
+          );
+          return;
+        }
         item(
           e,
           'client_due',
