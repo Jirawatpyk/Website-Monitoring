@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-054 | 4 Nov 2026 | Healthchecks.io production emails only Tao until the system is stable; the other Admins are added at S19 (go-live readiness). S12a's "Healthchecks reaches both Admins" (Done-when 2) moves there; S12a closes on the rest | S12a Done-when 2 "both Admins" |
 | D-053 | 3 Nov 2026 | Monitor fault (S12): the fault is the engine **cron sweep** stopping (`agent_heartbeats` `engine-sweep` > 3 min), since the engine also runs after every Bangkok ingest; Healthchecks + the VPS watchdog (MONITOR FAULT @on-call, straight to the Alerts Space) speak for it; one probe missing > 3 min is our own Admin email, silent during an engine fault; no "Acknowledge monitor fault"; S12 splits into S12a / S12b (hand check after Claude Design) | PRD risk table watchdog "> 5 min and BKK failing"; MainFault "Healthchecks.io fallback sender", "Acknowledge monitor fault" |
 | D-052 | 3 Nov 2026 | S11 client update: "Mark client updated" opens a small dialog with an optional note; with no active AM at the due time the Admins get the @mention and the email ("no AM"); the Client update card shows only once the track fired (before that Resolve reads "Not required"); the Responder rule is own sites only (not on call); "15 min" is the incident's DOWN minutes added up across drops (Tier 2: inside response hours), from the first alert after a mute | Incident board (Mark saves at once, no note) |
 | D-051 | 31 Oct 2026 | Tier 2–3: a round whose primary timed out at ≥ 2 locations gets a confirm check from every location at the next minute (with its own recheck); it is judged with that round — failing at 2 locations it is the second round (DOWN from the first timeout, ~2.5 min), passing it is a blip. Confirm checks are never a round of their own | D-049 item 2 (Tier 2–3 wait for their normal next round) |
@@ -57,6 +58,16 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-054 — Healthchecks emails Tao only until the system is stable
+
+**Context.** S12a Done-when 2 asks that a stopped engine reach "both Admins" through Healthchecks. On 4 Nov 2026 the production project's Email integration names only Tao. Alex and Tle are Admins in the app, but Healthchecks has no integration for them. The staging run (T04) proved Healthchecks and the VPS watchdog both speak, with one Admin as the target.
+
+**Decision (Tao, 4 Nov 2026).** Don't add other people to Healthchecks until the system is stable. Tao stays the only Healthchecks email target on production. S12a closes on its other Done-when lines and on the staging T04 run. Adding Alex and Tle as Email integrations on the production `engine` check (and the rest of the checks D-053 has emailing the Admins) becomes an S19 go-live readiness line. The in-app Admin emails (PROBE MISSING, Fewer than 2 probe locations, the verifier) already go to every active Admin; this decision doesn't change them.
+
+**Risk while it lasts.** Tao is the single Healthchecks recipient. If Tao misses a DOWN on `engine`, the VPS watchdog's MONITOR FAULT line in the Alerts Space, @mentioning the person on call, is the other voice.
+
+**Where.** `docs/implementation-plan.md` S12a Done-when 2 and S19 Done-when 6.
 
 ## D-053 — Monitor fault: what the fault is, who speaks for it, the split
 
