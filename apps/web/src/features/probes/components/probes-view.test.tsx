@@ -27,7 +27,11 @@ const data = (over: Partial<ProbesData> = {}): ProbesData => {
     gapLines: [],
     onCallName: 'Ploy',
     admins: 1,
-    pipeline: { sweepAt: ago(12), notifierAt: ago(12), delivery: { waiting: 0, sent24h: 14, failed24h: 0 } },
+    pipeline: {
+      sweepAt: ago(12),
+      notifierAt: ago(12),
+      delivery: { waiting: 0, sent24h: 14, failed24h: 0, fallback24h: 0 },
+    },
     verifier: {
       seenAt: ago(31),
       queue: 0,
@@ -50,7 +54,10 @@ describe('ProbesView (S12a, board Probes)', () => {
     expect(screen.getAllByText('Up')).toHaveLength(8);
     expect(screen.getByText('Email Admins + Alerts Space @on-call')).toBeInTheDocument();
     expect(screen.getByText(/@mentions the on-call person \(Ploy now\)/)).toBeInTheDocument();
-    expect(screen.getByText('1 active Admin gets these emails.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Only 1 active Admin gets these emails — add a second Admin.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('used 0 times')).toBeInTheDocument();
     expect(screen.getByText('14 sent · 0 failed')).toBeInTheDocument();
     expect(screen.getByText('09:41:00 · Tubtong · passed')).toBeInTheDocument();
   });

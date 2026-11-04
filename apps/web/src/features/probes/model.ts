@@ -111,6 +111,8 @@ export interface GapRow {
   location: string;
   gap_start: string;
   gap_end: string;
+  /** Still going on: ends now (`ongoingGaps`). */
+  ongoing?: boolean;
 }
 
 const HOUR = 60 * MIN;
@@ -133,10 +135,8 @@ export function probeCardsOf(
     const lastRunAt = lastBeat[code] ?? null;
     const silent = !lastRunAt || now.getTime() - new Date(lastRunAt).getTime() >= MONITOR_GRACE_MS;
     // A silence still going on is a gap too (the SQL lists only closed ones).
-    const mine = [
-      ...gaps.filter((g) => g.location === code),
-      ...(silent && lastRunAt ? [{ location: code, gap_start: lastRunAt, gap_end: now.toISOString() }] : []),
-    ];
+    // the ongoing silence comes in `gaps` from `ongoingGaps` (the lines use the same rows)
+    const mine = gaps.filter((g) => g.location === code);
     const gapHours = Array.from({ length: 24 }, () => false);
     let minutes = 0;
     for (const g of mine) {
@@ -169,6 +169,16 @@ export interface MissingAlertRow {
  * the Admins at 03:15, no page". The email part only when the alert is readable (Admins) and one opened
  * inside the gap; else nothing is claimed (none goes during an engine fault, D-053).
  */
+/** A location silent ≥ 3 min right now: an open gap from its last beat to now (cards and lines alike). */
+export function ongoingGaps(lastBeat: Partial<Record<ProbeLocation, string | null>>, now: Date): GapRow[] {
+  return PROBE_LOCATIONS.flatMap((code) => {
+    const at = lastBeat[code];
+    return at && now.getTime() - new Date(at).getTime() >= MONITOR_GRACE_MS
+      ? [{ location: code, gap_start: at, gap_end: now.toISOString(), ongoing: true }]
+      : [];
+  });
+}
+
 export function gapLinesOf(
   gaps: readonly GapRow[],
   alerts: readonly MissingAlertRow[] | null = null,
@@ -187,11 +197,13 @@ export function gapLinesOf(
       const told = mail
         ? ` → one email to the Admins at ${formatTime(new Date(mail.opened_at))}, no page`
         : alerts
-          ? ' → no email (the status engine was down, or another location was missing too)'
+          ? ' → no email'
           : '';
       return {
         at: g.gap_end,
-        text: `${g.location} reported nothing ${formatTime(start)}–${formatTime(end)} (${formatDuration(minutes)})${told}`,
+        text: g.ongoing
+          ? `${g.location} has reported nothing since ${formatTime(start)} (${formatDuration(minutes)})${told}`
+          : `${g.location} reported nothing ${formatTime(start)}–${formatTime(end)} (${formatDuration(minutes)})${told}`,
       };
     });
 }

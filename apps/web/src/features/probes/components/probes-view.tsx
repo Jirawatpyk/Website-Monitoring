@@ -1,5 +1,12 @@
 import { Alert, Badge, Card, StatusPill, Table, TBody, Td, Th, THead, Tr } from '@jirawatpyk/aura-react';
-import { IconBell, IconCircleAlert, IconCircleCheck, IconInfo, IconMail } from '@jirawatpyk/aura-react/icons';
+import {
+  IconBell,
+  IconCircleAlert,
+  IconCircleCheck,
+  IconInfo,
+  IconMail,
+  IconTriangleAlert,
+} from '@jirawatpyk/aura-react/icons';
 import { formatTimeWithSeconds, formatWhen, isSameBangkokDay } from '@dxt/shared';
 import { agoText, type BeatRow, type ProbeCard } from '../model';
 import type { ProbesData } from '../queries';
@@ -152,7 +159,12 @@ export function ProbesView({ data }: { data: ProbesData }) {
       <Card
         title="Heartbeats"
         headingLevel={2}
-        description="Pinged to Healthchecks.io, outside our system · grace and who is alerted per check"
+        // the board's note sits at the end of the title line (as the Incident page's "Newest first · UTC+7")
+        actions={
+          <span className="text-xs text-fg-secondary">
+            Pinged to Healthchecks.io, outside our system · grace and who is alerted per check
+          </span>
+        }
       >
         {/* row cards only on phones: at 820 the card is under 768 px, and six columns fit it (/verify 4 Nov) */}
         <Table caption="Heartbeats" captionHidden stackBelow="sm" align="middle" bleed>
@@ -208,9 +220,17 @@ export function ProbesView({ data }: { data: ProbesData }) {
               A single probe (BKK, SIN or TYO) missing &gt; 3 min → email to the Admins only, no page. The
               other two locations still decide status.
             </p>
-            <p className="m-0 text-fg-secondary">
-              {`${data.admins === 1 ? '1 active Admin gets' : `${data.admins} active Admins get`} these emails.`}
-            </p>
+            {data.admins <= 1 ? (
+              // §14.4 / §15.3: one Admin is the single point of failure for these emails (invites: S16)
+              <p className="m-0 flex items-start gap-2 text-alert-warning-fg">
+                <IconTriangleAlert size={16} aria-hidden className="mt-0.5 shrink-0" />
+                {data.admins === 1
+                  ? 'Only 1 active Admin gets these emails — add a second Admin.'
+                  : 'No active Admin gets these emails.'}
+              </p>
+            ) : (
+              <p className="m-0 text-fg-secondary">{`${data.admins} active Admins get these emails.`}</p>
+            )}
           </div>
         </Card>
         <Card title="Pipeline" headingLevel={2}>
@@ -228,6 +248,10 @@ export function ProbesView({ data }: { data: ProbesData }) {
               <Line
                 label="Delivery · 24 h"
                 value={`${pipeline.delivery.sent24h} sent · ${pipeline.delivery.failed24h} failed`}
+              />
+              <Line
+                label="Email fallback · 24 h"
+                value={`used ${pipeline.delivery.fallback24h} ${pipeline.delivery.fallback24h === 1 ? 'time' : 'times'}`}
               />
             </>
           ) : (

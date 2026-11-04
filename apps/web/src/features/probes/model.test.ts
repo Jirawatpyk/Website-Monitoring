@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agoText, beatRowsOf, gapLinesOf, probeCardsOf, summaryOf } from './model';
+import { agoText, beatRowsOf, gapLinesOf, ongoingGaps, probeCardsOf, summaryOf } from './model';
 
 // The Probes board: now 10:07:12 Bangkok; SIN missed 03:12–03:16.
 const now = new Date('2026-09-25T03:07:12Z');
@@ -76,9 +76,14 @@ describe('probeCardsOf and gapLinesOf', () => {
   });
 
   it('a silence still going on counts as a gap, and its hours show', () => {
-    const [, , tyo] = probeCardsOf([], [], { BKK: ago(2), SIN: ago(8), TYO: ago(2 * 3600) }, now);
+    const beats = { BKK: ago(2), SIN: ago(8), TYO: ago(2 * 3600) };
+    const open = ongoingGaps(beats, now);
+    expect(open).toEqual([expect.objectContaining({ location: 'TYO', ongoing: true })]);
+    const [, , tyo] = probeCardsOf([], open, beats, now);
     expect(tyo).toMatchObject({ healthy: false, gaps: '1 · 2 h' });
     expect(tyo?.gapHours.slice(21)).toEqual([true, true, true]);
+    // the same silence in the lines, worded as still going on (spec-check pass 2, M1)
+    expect(gapLinesOf(open)[0]?.text).toBe('TYO has reported nothing since 08:07 (2 h)');
   });
 
   it('says who was emailed for a gap when the alert is readable (Admins), else claims nothing', () => {
@@ -86,7 +91,7 @@ describe('probeCardsOf and gapLinesOf', () => {
     expect(gapLinesOf(gaps, alerts)[0]?.text).toBe(
       'SIN reported nothing 03:12–03:16 (4 min) → one email to the Admins at 03:15, no page',
     );
-    expect(gapLinesOf(gaps, [])[0]?.text).toContain('→ no email (the status engine was down');
+    expect(gapLinesOf(gaps, [])[0]?.text).toBe('SIN reported nothing 03:12–03:16 (4 min) → no email');
   });
 
   it('words each gap', () => {
