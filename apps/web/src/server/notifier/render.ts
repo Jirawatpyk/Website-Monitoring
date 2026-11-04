@@ -14,6 +14,7 @@ import {
   buildResolvedAlert,
   buildResolvedEmail,
   buildDownAlert,
+  manualCause,
   buildDownEmail,
   buildProblemAlert,
   buildProblemEmail,
@@ -264,8 +265,10 @@ const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
 /** The cause line stored when the incident opened (its `detected` event). */
 function causeOf(i: IncidentFacts): string | null {
   const detected = i.incident_events?.find((e) => e.type === 'detected');
-  const cause = detected ? contextOf(detected.payload).cause : undefined;
-  return typeof cause === 'string' ? cause : null;
+  const ctx = detected ? contextOf(detected.payload) : {};
+  const manual = manualOf(ctx);
+  if (manual) return manualCause(manual);
+  return typeof ctx.cause === 'string' ? ctx.cause : null;
 }
 
 /** "3 of 3 locations": where the problem was seen, of the locations reporting when it opened. */
@@ -392,7 +395,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         viewUrl: incidentUrl(appUrl, i.id),
         kind: step.kind,
         // A level promised only while nobody has acknowledged (an ack stops it, §14.1).
-        next: i.state === 'acknowledged' ? null : step.next,
+        next: i.state === 'acknowledged' || byHandOf(ctx) ? null : step.next,
         informed: step.informed,
         acked: step.acked,
       });
@@ -580,11 +583,11 @@ export function renderEmail(
         readerIs: readerOf(i, to.id),
         informed: step.informed,
         informedRoles: step.informedRoles,
-        alreadyTold: step.alreadyTold,
+        alreadyTold: byHandOf(ctx) ? null : step.alreadyTold,
         admin: step.admin,
         acked: step.acked,
         stopped: step.stopped,
-        nextStep: step.nextStep,
+        nextStep: byHandOf(ctx) ? null : step.nextStep,
         voiceConfigured: step.voiceConfigured,
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
         level,

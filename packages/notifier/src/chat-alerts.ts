@@ -91,7 +91,7 @@ export interface ManualOpen {
 
 /** The Cause of a manual incident: "Hand check by Tao · “Home page shows a 502 error”". */
 export const manualCause = (m: ManualOpen) =>
-  m.note ? `Hand check by ${m.openedBy} · “${m.note}”` : `Hand check by ${m.openedBy}`;
+  m.note ? `Hand check by ${plainName(m.openedBy)} · “${m.note}”` : `Hand check by ${plainName(m.openedBy)}`;
 
 /** Its "Confirmed by": nothing the probes saw (spec §30.5). */
 export const MANUAL_CONFIRMED_BY = 'No probe check — opened by hand while the status engine was down';
@@ -218,7 +218,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
       site: `${site} (${formatTier(tier)})`,
       mention: mentionOf(owner, input.alsoMention),
       detail: [
-        ...(manual ? [`opened by hand by ${manual.openedBy}`] : []),
+        ...(manual ? [`opened by hand by ${plainName(manual.openedBy)}`] : []),
         ...(held?.line ?? ladderLine(input.ladder, now)),
       ],
     }),

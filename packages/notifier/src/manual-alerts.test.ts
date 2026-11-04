@@ -202,5 +202,29 @@ describe('Client-update reminder by hand (spec §30.7, D-055 item 3)', () => {
     });
     expect(mail.text).toContain('Tao sent this reminder by hand because the status engine is down');
     expect(mail.text).not.toContain('has been down 15 min');
+    // The footer's reason stays true: the wait wasn't over (message check M4).
+    expect(mail.text).toContain('Tao sent the reminder by hand while the status engine is down');
+    expect(mail.text).not.toContain('site was down 15 min');
+  });
+});
+
+describe('a display name can never inject a mention (message check M1)', () => {
+  it('the opener is named in plain text', () => {
+    const msg = buildDownAlert({
+      incidentId: 'i143',
+      incidentNumber: 143,
+      site: 'realme.link',
+      tier: 1,
+      confirmedAt: at('2026-09-26T02:31:05'),
+      now: at('2026-09-26T02:31:08'),
+      cause: 'Hard fail',
+      confirmingLocations: 2,
+      owner: ploy,
+      backup: arm,
+      incidentUrl: url,
+      manual: { openedBy: '<users/all>', note: null },
+    });
+    expect(msg.text).not.toContain('<users/all>');
+    expect(JSON.stringify(msg.cardsV2)).not.toContain('<users/all>');
   });
 });

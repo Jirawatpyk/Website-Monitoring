@@ -1221,7 +1221,9 @@ export function buildClientUpdateDueEmail(input: ClientUpdateDueEmailInput): Ema
       reason: 'step',
       why: input.noAm
         ? `You got this because you’re an Admin and ${client} has no account manager in DxT Monitor.`
-        : `You got this because you’re the AM for ${client} and a Tier ${input.tier} site was down ${wait}.`,
+        : input.byHand
+          ? `You got this because you’re the AM for ${client} and ${input.byHand} sent the reminder by hand while the status engine is down.`
+          : `You got this because you’re the AM for ${client} and a Tier ${input.tier} site was down ${wait}.`,
     },
     {
       template: 'client_update_due',
