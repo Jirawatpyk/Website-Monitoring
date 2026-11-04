@@ -120,7 +120,7 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
         : d.recoveredAt || d.resolvedAt
           ? 'Not acknowledged'
           : `${formatDuration(Math.max(1, Math.round((now.getTime() - confirmedAt.getTime()) / 60_000)))} since ${
-              d.severity === 'down' ? 'confirmed down' : 'detected'
+              d.trigger === 'manual' ? 'opened' : d.severity === 'down' ? 'confirmed down' : 'detected'
             }`,
     },
   ];
@@ -170,6 +170,12 @@ function GlyphLegend() {
 
 export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
   const latest = d.locations.filter((l) => l.latest);
+  if (!latest.length && d.trigger === 'manual')
+    return (
+      <p className="m-0 rounded-aura-md border border-dashed border-border-default p-aura-3 text-sm text-fg-secondary">
+        Opened by hand while the status engine was down — no probe results for this check
+      </p>
+    );
   if (!latest.length) return null;
   const at = latestRoundAt(d);
   return (

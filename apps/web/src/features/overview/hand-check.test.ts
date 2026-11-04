@@ -59,7 +59,7 @@ const AFTER: HandCheckEntry[] = [
 
 describe('handCheckOf (S12b, spec §30.2–3)', () => {
   it('Before hand check: one row per Tier 1 site, nothing checked, the on-call line', () => {
-    const card = handCheckOf(SITES, [], tao, FAULT);
+    const card = handCheckOf(SITES, [], tao, FAULT, new Date(at('02:40')));
     expect(card.rows.map((r) => r.name)).toEqual(['MuvMi', 'realme.link', 'Taiwan', 'China', 'ENEOS']);
     expect(card.count).toBe('0 of 5 checked since 02:17');
     expect(card.shortCount).toBe('0 of 5 checked');
@@ -73,7 +73,7 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
   });
 
   it('After hand check: the latest per row, the opened incident links, its buttons go', () => {
-    const card = handCheckOf(SITES, AFTER, tao, FAULT);
+    const card = handCheckOf(SITES, AFTER, tao, FAULT, new Date(at('02:40')));
     expect(card.count).toBe('2 of 5 checked since 02:17');
     expect(card.footer).toBe('Next check due by 03:01 — every 30 min while monitoring is degraded.');
     const realme = card.rows.find((r) => r.name === 'realme.link')!;
@@ -113,6 +113,7 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
       ],
       tao,
       FAULT,
+      new Date(at('02:40')),
     );
     expect(card.rows[0]!.line.text).toBe('Checked OK · Ploy 03:02');
   });
@@ -134,13 +135,22 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
         cause: null,
       },
     });
-    expect(handCheckOf([open], [], tao, FAULT).rows[0]).toMatchObject({ canCheck: true, canOpen: false });
+    expect(handCheckOf([open], [], tao, FAULT, new Date(at('02:40'))).rows[0]).toMatchObject({
+      canCheck: true,
+      canOpen: false,
+    });
   });
 
   it('who presses (§30.3): the AM reads only; a Responder on another site is told who can', () => {
-    const am = handCheckOf(SITES, [], { id: 'u-bua', name: 'Bua', kind: 'am' }, FAULT);
+    const am = handCheckOf(SITES, [], { id: 'u-bua', name: 'Bua', kind: 'am' }, FAULT, new Date(at('02:40')));
     expect(am.rows[0]).toMatchObject({ canCheck: false, canOpen: false, readOnly: 'Read only' });
-    const nok = handCheckOf(SITES, [], { id: 'u-nok', name: 'Nok', kind: 'responder' }, FAULT);
+    const nok = handCheckOf(
+      SITES,
+      [],
+      { id: 'u-nok', name: 'Nok', kind: 'responder' },
+      FAULT,
+      new Date(at('02:40')),
+    );
     expect(nok.rows.find((r) => r.name === 'realme.link')).toMatchObject({ canOpen: true, readOnly: null });
     expect(nok.rows[0]!.readOnly).toBe('Only Arm, the person on call or an Admin');
   });
@@ -151,12 +161,19 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
       [],
       { id: 'u-ploy', name: 'Ploy', kind: 'responder', onCallNow: true },
       FAULT,
+      new Date(at('02:40')),
     );
     expect(ploy.rows.every((r) => r.canOpen)).toBe(true);
   });
 
   it('nobody on call and no Tier 2–3: the plain lines', () => {
-    const card = handCheckOf(SITES.slice(0, 5), [], tao, { ...FAULT, onCallName: null });
+    const card = handCheckOf(
+      SITES.slice(0, 5),
+      [],
+      tao,
+      { ...FAULT, onCallName: null },
+      new Date(at('02:40')),
+    );
     expect(card.footer).toBe('Nothing checked yet.');
     expect(card.otherTiers).toBeNull();
   });
@@ -168,5 +185,27 @@ describe('sitesOkByHand — the Sites OK caption (§30.1)', () => {
     ['one opened by hand at 02:31', AFTER, '1 down by hand check 02:31 · the rest as of 02:17'],
   ] as const)('%s', (_case, checks, expected) => {
     expect(sitesOkByHand(checks, '02:17')).toBe(expected);
+  });
+});
+
+describe('handCheckOf — paused and overdue (spec check M2, L12)', () => {
+  it('a muted site: no Down, and the row says why', () => {
+    const muted = site('MuvMi', { mutedUntil: at('03:00') });
+    expect(handCheckOf([muted], [], tao, FAULT, new Date(at('02:40'))).rows[0]).toMatchObject({
+      canOpen: false,
+      canCheck: true,
+      paused: 'Muted until 03:00 — no alert goes out',
+    });
+  });
+  it('past 30 min the footer says the check is overdue', () => {
+    expect(handCheckOf(SITES, AFTER, tao, FAULT, new Date(at('03:05'))).footer).toBe(
+      'Check overdue since 03:01 — every 30 min while monitoring is degraded.',
+    );
+  });
+  it('opened by hand: the status reads "by hand 02:31", not "as of" the sweep', () => {
+    const row = handCheckOf(SITES, AFTER, tao, FAULT, new Date(at('02:40'))).rows.find(
+      (r) => r.name === 'realme.link',
+    )!;
+    expect(row.statusNote).toBe('by hand 02:31');
   });
 });

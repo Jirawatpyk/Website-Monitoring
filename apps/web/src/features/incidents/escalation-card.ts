@@ -95,6 +95,20 @@ const buttonWho = (targets: readonly EscalationTarget[], p: LadderPeople) => {
   return parts.join(targets.includes('ceo') ? ' + ' : ' · ');
 };
 
+/**
+ * The Resolve condition while the pre-fire reminder card shows (D-055 item 3): "Due 02:46 · Tier 1 client
+ * site", not met — so the two cards agree. Resolve stays locked by OK-for-2-rounds anyway.
+ */
+export function pendingClientUpdate<
+  G extends { conditions: { key: string; met: boolean; detail: string }[]; metCount: number },
+>(reminder: { dueAt: string } | null, gate: G): G {
+  if (!reminder) return gate;
+  const conditions = gate.conditions.map((c) =>
+    c.key === 'client_update' ? { ...c, met: false, detail: `Due ${reminder.dueAt} · client site` } : c,
+  );
+  return { ...gate, conditions, metCount: conditions.filter((c) => c.met).length };
+}
+
 export function escalationCardOf(input: {
   plan: EscalationPlan | null;
   tier: number;
@@ -141,6 +155,11 @@ export function escalationCardOf(input: {
         tone: 'sent',
       };
     }
+    // The Tier 1 CEO + AM FYI still goes after an ack while the drop is DOWN (§14.1, D-048).
+    if (!waiting && s.fyi && input.state === 'acknowledged' && input.severity === 'down')
+      return input.engine.stopped
+        ? { label: `L${s.level}`, when, who, status: 'Waits — engine down', tone: 'waits' }
+        : { label: `L${s.level}`, when, who, status: `At ${formatTime(at)} · FYI`, tone: 'waits' };
     if (!waiting)
       return {
         label: `L${s.level}`,
@@ -169,7 +188,7 @@ export function escalationCardOf(input: {
 
   const stopped =
     input.engine.stopped && waiting
-      ? `Nothing escalates on its own — the status engine is down${input.engine.since ? ` since ${formatTime(new Date(input.engine.since))}` : ''}. Send the next level by hand if nobody acknowledges.`
+      ? `Nothing escalates on its own — the status engine is down${input.engine.since ? ` since ${formatTime(new Date(input.engine.since))}` : ''}${next && input.canAct ? '. Send the next level by hand if nobody acknowledges.' : '.'}`
       : null;
   const people = next ? peopleOf(next.targets, input.people) : [];
   return {

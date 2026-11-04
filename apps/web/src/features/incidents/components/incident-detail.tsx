@@ -288,7 +288,7 @@ export function IncidentDetailView({
                 v.cause,
                 // a page change has no failed check: the board shows only its cause (§26.3)
                 d.trigger === 'manual'
-                  ? `opened by hand ${formatTime(new Date(d.startedAt))} · no probe check — the status engine was down`
+                  ? `${formatTime(new Date(d.startedAt))} · no probe check — the status engine was down`
                   : stillDown && !d.pageChange
                     ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
                     : d.recoveredAt && !resolved

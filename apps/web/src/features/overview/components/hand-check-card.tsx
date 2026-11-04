@@ -51,18 +51,14 @@ export function HandCheckCard({
       router.refresh();
     });
 
+  const cards = card.rows.map((row) => (
+    <PhoneRow key={row.siteId} row={row} pending={pending} onOk={loadsOk} onDown={setOpening} />
+  ));
   const rows = card.rows.map((row) =>
     phone ? (
-      <PhoneRow key={row.siteId} row={row} asOf={asOf} pending={pending} onOk={loadsOk} onDown={setOpening} />
+      <PhoneRow key={row.siteId} row={row} pending={pending} onOk={loadsOk} onDown={setOpening} />
     ) : (
-      <DesktopRow
-        key={row.siteId}
-        row={row}
-        asOf={asOf}
-        pending={pending}
-        onOk={loadsOk}
-        onDown={setOpening}
-      />
+      <DesktopRow key={row.siteId} row={row} pending={pending} onOk={loadsOk} onDown={setOpening} />
     ),
   );
 
@@ -92,10 +88,13 @@ export function HandCheckCard({
         {phone ? (
           <ul className="m-0 flex list-none flex-col gap-3 p-0">{rows}</ul>
         ) : (
-          <div role="table" aria-label="Hand check · Tier 1" className="flex flex-col">
+          <ul className="m-0 flex list-none flex-col gap-3 p-0 xl:hidden">{cards}</ul>
+        )}
+        {!phone && (
+          <div role="table" aria-label="Hand check · Tier 1" className="flex flex-col max-xl:hidden">
             <div
               role="row"
-              className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_calc(var(--spacing)*80)] gap-4 border-b border-border-subtle pb-2 text-xs text-fg-secondary"
+              className="grid grid-cols-[minmax(0,1fr)_calc(var(--spacing)*28)_calc(var(--spacing)*28)_minmax(max-content,1.2fr)_calc(var(--spacing)*80)] gap-4 border-b border-border-subtle pb-2 text-xs text-fg-secondary"
             >
               <span role="columnheader">Site</span>
               <span role="columnheader">Owner</span>
@@ -145,19 +144,25 @@ function Line({ line }: { line: HandCheckLine }) {
   );
 }
 
+const STATUS_WORD: Record<NonNullable<HandCheckRow['status']>, string> = {
+  ok: 'OK',
+  problem: 'Problem',
+  down: 'Down',
+  maintenance: 'Maintenance',
+};
+
 type RowProps = {
   row: HandCheckRow;
-  asOf: string | null;
   pending: boolean;
   onOk: (row: HandCheckRow) => void;
   onDown: (row: HandCheckRow) => void;
 };
 
-function Buttons({ row, pending, onOk, onDown, phone }: Omit<RowProps, 'asOf'> & { phone: boolean }) {
+function Buttons({ row, pending, onOk, onDown, phone }: RowProps & { phone: boolean }) {
   if (row.readOnly) return <span className="text-xs text-fg-tertiary">{row.readOnly}</span>;
   if (!row.canCheck && !row.canOpen) return null;
   return (
-    <div className={phone ? 'grid grid-cols-2 gap-2' : 'flex flex-wrap justify-end gap-2'}>
+    <div className={phone ? 'grid grid-cols-2 gap-2' : 'flex flex-wrap items-center justify-end gap-2'}>
       {row.canCheck && (
         <Button
           variant="secondary"
@@ -184,15 +189,26 @@ function Buttons({ row, pending, onOk, onDown, phone }: Omit<RowProps, 'asOf'> &
           {phone ? 'Down…' : 'Down — open incident'}
         </Button>
       )}
+      {row.openIncident && (
+        <Button
+          variant="ghost"
+          size={phone ? 'md' : 'sm'}
+          fullWidth={phone}
+          href={`/incidents/${row.openIncident.id}`}
+        >
+          {row.openIncident.label}
+        </Button>
+      )}
+      {row.paused && <span className="text-xs text-fg-secondary">{row.paused}</span>}
     </div>
   );
 }
 
-function DesktopRow({ row, asOf, ...rest }: RowProps) {
+function DesktopRow({ row, ...rest }: RowProps) {
   return (
     <div
       role="row"
-      className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_calc(var(--spacing)*80)] items-center gap-4 border-b border-border-subtle py-3 last:border-b-0"
+      className="grid grid-cols-[minmax(0,1fr)_calc(var(--spacing)*28)_calc(var(--spacing)*28)_minmax(max-content,1.2fr)_calc(var(--spacing)*80)] items-center gap-4 border-b border-border-subtle py-3 last:border-b-0"
     >
       <div role="cell" className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{row.name}</span>
@@ -203,7 +219,7 @@ function DesktopRow({ row, asOf, ...rest }: RowProps) {
       </span>
       <div role="cell" className="flex flex-col items-start gap-1">
         {row.status ? <SiteStatusBadge status={row.status} /> : <span className="text-fg-tertiary">—</span>}
-        {row.status && asOf && <span className="text-xs text-fg-secondary">{`as of ${asOf}`}</span>}
+        {row.status && row.statusNote && <span className="text-xs text-fg-secondary">{row.statusNote}</span>}
       </div>
       <div role="cell">
         <Line line={row.line} />
@@ -215,14 +231,14 @@ function DesktopRow({ row, asOf, ...rest }: RowProps) {
   );
 }
 
-function PhoneRow({ row, asOf, ...rest }: RowProps) {
+function PhoneRow({ row, ...rest }: RowProps) {
   return (
     <li className="flex flex-col gap-2 rounded-aura-md border border-border-subtle p-aura-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col">
           <span className="font-medium">{row.name}</span>
           <span className="text-xs text-fg-secondary">
-            {`Owner ${row.ownerName ?? '—'}${row.status && asOf ? ` · ${row.status === 'ok' ? 'OK' : 'last status'} as of ${asOf}` : ''}`}
+            {`Owner ${row.ownerName ?? '—'}${row.status && row.statusNote ? ` · ${STATUS_WORD[row.status]} ${row.statusNote}` : ''}`}
           </span>
         </div>
         {row.status && <SiteStatusBadge status={row.status} />}
@@ -267,7 +283,7 @@ function OpenIncidentDialog({
         return;
       }
       onClose();
-      router.push(`/incidents/${r.incidentId}`);
+      router.refresh();
     });
   const logged = (
     <p className="m-0 text-xs text-fg-secondary">{`Logged in the audit log as ${viewerName}.`}</p>
@@ -298,6 +314,11 @@ function OpenIncidentDialog({
       }
     >
       <div className="flex flex-col gap-3">
+        {error && (
+          <Alert tone="danger" title="Not opened">
+            {error}
+          </Alert>
+        )}
         <Textarea
           label="What did you see?"
           optional
@@ -311,7 +332,6 @@ function OpenIncidentDialog({
               : 'e.g. Home page shows a 502 error from the hosting provider'
           }
           hint={`${note.length} / ${NOTE_MAX} · optional — shown on the incident timeline`}
-          error={error ?? undefined}
         />
         <p className="m-0 flex items-start gap-2 text-sm text-fg-secondary">
           <IconInfo aria-hidden className="mt-0.5 shrink-0" />

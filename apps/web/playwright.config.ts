@@ -10,6 +10,8 @@ const isCI = Boolean(process.env.CI);
  */
 export default defineConfig({
   testDir: './e2e',
+  // The monitor-fault specs' shared beats are cleared once, after every project (S12b).
+  globalTeardown: './e2e/global-teardown.ts',
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,

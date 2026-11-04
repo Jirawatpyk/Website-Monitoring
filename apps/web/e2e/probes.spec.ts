@@ -1,6 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect, expect as baseExpect, test } from '@playwright/test';
 import {
-  clearBeat,
   ensureUser,
   localSupabaseEnabled,
   newHandCheckSite,
@@ -18,11 +17,7 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
   // the fault banner (none asserts its absence today). Afterwards the row goes: a sweep that never ran
   // is no fault, whereas a fresh stamp would age into one with no cron locally.
   test.describe.configure({ mode: 'serial' });
-  test.afterAll(async () => {
-    if (!localSupabaseEnabled) return;
-    await clearBeat('engine-sweep');
-    await clearBeat('engine-run');
-  });
+  // The beats are cleared once, after every project (e2e/global-teardown.ts).
 
   test('Done-when 4: the Overview shows the fault banner and as-of data', async ({
     page,
@@ -49,7 +44,8 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
       fullPage: true,
     });
     await page.getByRole('link', { name: 'Open probes & heartbeat' }).locator('visible=true').click();
-    await expect(page).toHaveURL(/\/probes$/);
+    // the first visit compiles the route on the dev server
+    await expect(page).toHaveURL(/\/probes$/, { timeout: 30_000 });
   });
 
   test('Probes lists every heartbeat; the stale engine row is down', async ({
@@ -78,6 +74,10 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
   });
 
   test('Loads OK, Down — open incident, Escalate now · L1', async ({ page, context, baseURL }, info) => {
+    // Three server actions and their refreshes on the dev server, beside the other specs.
+    test.setTimeout(90_000);
+    // Each press refreshes the page from the server: slow on the dev server beside the other specs.
+    const expect = baseExpect.configure({ timeout: 20_000 });
     await ensureUser('tao@example.test');
     const site = await newHandCheckSite('arm@example.test', 'bua@example.test');
     const old = new Date(Date.now() - 10 * 60_000);
@@ -110,6 +110,15 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
     await dialog.getByLabel(/What did you see/).fill('Home page shows a 502 error');
     await expect(dialog.getByText('27 / 500 · optional — shown on the incident timeline')).toBeVisible();
     await dialog.getByRole('button', { name: 'Open incident' }).click();
+    // §30.2: it stays on the Overview, and the row links the new incident.
+    const opened = page
+      .locator('li, [role="row"]')
+      .filter({ hasText: site })
+      .getByRole('link', { name: /^INC-\d+ opened · / })
+      .locator('visible=true')
+      .first();
+    await expect(opened).toBeVisible({ timeout: 15_000 });
+    await opened.click();
     // the dev server may still be compiling the incident route
     await expect(page).toHaveURL(/\/incidents\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 
@@ -128,12 +137,14 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
     const confirm = page.getByRole('dialog', { name: 'Send L1 now?' });
     await expect(confirm).toBeVisible();
     await confirm.getByRole('button', { name: /^Send L1/ }).click();
+    await expect(confirm).toBeHidden({ timeout: 30_000 });
+    // the refresh after the send can be slow on the dev server
     await expect(
       page
         .getByText(/^Sent \d\d:\d\d by /)
         .locator('visible=true')
         .first(),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     await page.screenshot({
       path: `test-results/s12b-escalate-now-${info.project.name}.png`,
       fullPage: true,

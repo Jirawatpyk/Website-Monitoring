@@ -443,8 +443,10 @@ export async function runEngine(
     console.error(JSON.stringify({ event: 'engine_client_update_failed', error: String(err) }));
   }
   // The ladder and the track ran: nothing waits for Escalate now (S12b, D-055 item 1). Every run
-  // stamps it, the cron's and the one after a Bangkok batch; best effort, never fails the run.
-  await stampBeat(db, 'engine-run', now);
+  // stamps it, the cron's and the one after a Bangkok batch, unless they threw (engine review L1);
+  // best effort, never fails the run.
+  if (!failures.some((f) => f.startsWith('escalation') || f.startsWith('client update')))
+    await stampBeat(db, 'engine-run', now);
   summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, locationRows, {
     failing: control,
     sites: controlSites,

@@ -110,7 +110,16 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
     const card = escalationCardOf({ ...base, state: 'acknowledged', acked: { by: 'Tao' } })!;
     expect(card.button).toBeNull();
     expect(card.stopped).toBeNull();
-    expect(card.rows.slice(1).every((r) => r.status === 'Cancelled · acked')).toBe(true);
+    expect(card.rows.slice(1, 3).every((r) => r.status === 'Cancelled · acked')).toBe(true);
+    // The Tier 1 CEO + AM FYI still goes after an ack while it is DOWN (§14.1, engine review M2).
+    expect(card.rows[3]!.status).toBe('Waits — engine down');
+    const running = escalationCardOf({
+      ...base,
+      state: 'acknowledged',
+      acked: { by: 'Tao' },
+      engine: { stopped: false, since: at('02:40') },
+    })!;
+    expect(running.rows[3]!.status).toBe('At 03:31 · FYI');
     expect(card.footer).toBe('Acknowledged by Tao → escalation stopped. The client-update track continues.');
   });
 

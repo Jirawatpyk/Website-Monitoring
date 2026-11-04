@@ -118,7 +118,9 @@ export function OverviewView({
   const fault = data.fault ? faultBannerOf(data.fault, data.probes, now) : null;
   // The hand check under the fault banner (S12b, spec §30.1–2): Tier 1 only, the Acknowledge rule.
   const handCheck =
-    data.fault && handActions ? handCheckOf(sites, data.handChecks ?? [], data.viewer, data.fault) : null;
+    data.fault && handActions
+      ? handCheckOf(sites, data.handChecks ?? [], data.viewer, data.fault, now)
+      : null;
   const handAsOf = handCheckAsOf(data.fault?.asOf);
   const handCard = (phone: boolean) =>
     handCheck &&

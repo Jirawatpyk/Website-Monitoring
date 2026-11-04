@@ -38,9 +38,10 @@ export function EscalateNow({
 }) {
   if (card.back)
     return (
-      <Alert tone="success" icon={<IconCircleCheck />}>
+      <p className="m-0 flex items-start gap-2 rounded-aura-md border border-border-default p-aura-3 text-sm">
+        <IconCircleCheck aria-hidden className="mt-0.5 shrink-0 text-fg-positive" />
         {card.back}
-      </Alert>
+      </p>
     );
   if (!card.stopped) return null;
   return (
@@ -212,6 +213,7 @@ export function ClientUpdateReminder({
       }));
       if (!r.ok) {
         setError(r.message);
+        router.refresh();
         return;
       }
       setOpen(false);

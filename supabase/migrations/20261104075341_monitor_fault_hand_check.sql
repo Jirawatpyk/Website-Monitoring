@@ -199,6 +199,8 @@ begin
   values (p_site_id, 'down', v_now, v_now, 0)
   on conflict (site_id) do update
     set status = 'down', since = v_now, last_evaluated_at = v_now, ok_rounds = 0;
+  -- The OK → not-OK change counts toward flapping like any other drop (D-004, engine review M3).
+  perform public.engine_record_flip(p_site_id, v_now, false);
 
   -- L0: the Chat line leaves from the request (D-053 item 5); the emails wait out D-047's grace.
   insert into public.notifications (incident_id, channel, template, thread_key, context)
@@ -404,3 +406,15 @@ revoke execute on function public.record_hand_check(uuid), public.open_manual_in
   public.escalate_now(uuid, smallint), public.send_client_update_reminder(uuid) from public, anon;
 grant execute on function public.record_hand_check(uuid), public.open_manual_incident(uuid, text, boolean),
   public.escalate_now(uuid, smallint), public.send_client_update_reminder(uuid) to authenticated;
+
+-- Realtime (PRD §9): one person's Loads OK shows on the others' Overview, so a site isn't checked twice.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'hand_checks'
+  ) then
+    alter publication supabase_realtime add table public.hand_checks;
+  end if;
+end;
+$$;

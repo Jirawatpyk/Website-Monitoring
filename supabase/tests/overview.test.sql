@@ -6,11 +6,11 @@ select plan(15);
 
 -- Realtime publication: exactly these public tables, so adding another (monitor_status,
 -- notifications, incident_events, profiles …) has to be a reviewed change. S09b adds
--- maintenance_windows (/maintenance, D-037).
+-- maintenance_windows (/maintenance, D-037); S12b hand_checks (the Overview hand check, D-055).
 select set_eq(
   $$select tablename::text from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public'$$,
-  array['site_status', 'incidents', 'maintenance_windows'],
-  'supabase_realtime publishes exactly site_status, incidents and maintenance_windows'
+  array['site_status', 'incidents', 'maintenance_windows', 'hand_checks'],
+  'supabase_realtime publishes exactly site_status, incidents, maintenance_windows and hand_checks'
 );
 select is(
   (select bool_and(c.relrowsecurity) from pg_class c

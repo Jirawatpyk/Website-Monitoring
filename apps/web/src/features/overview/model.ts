@@ -432,6 +432,8 @@ export function eventLine(e: OverviewEvent): string | null {
   const confirmed = `${e.siteName} DOWN confirmed${where ? ` — ${where}/3 locations` : ''}`;
   switch (e.type) {
     case 'detected':
+      // Opened by hand from the hand check (S12b, MainFault Recent events).
+      if (e.trigger === 'manual') return `${inc} ${e.siteName} opened by hand — ${e.actorName ?? 'someone'}`;
       // a PROBLEM opens with its summary; without one (a script-made incident), one never raised to DOWN
       if (typeof e.payload.summary === 'string')
         return `${e.siteName} PROBLEM — ${capitalise(e.payload.summary)}`;

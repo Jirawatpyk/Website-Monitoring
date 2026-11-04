@@ -46,7 +46,7 @@ import { loadOnCallNow } from './oncall-now';
 import { isEngineStopped } from '@dxt/engine';
 import { escalationPlanSchema, formatTime } from '@dxt/shared';
 import { loadResponseHours } from '@/server/escalation/response-hours';
-import { escalationCardOf, type EscalationCardView } from './escalation-card';
+import { escalationCardOf, pendingClientUpdate, type EscalationCardView } from './escalation-card';
 import type { ReminderView } from './components/escalation-card';
 import { incidentIdSchema } from './schemas';
 import { buildIncidentView, canAcknowledge, type IncidentRow, type IncidentView, type Viewer } from './view';
@@ -445,7 +445,9 @@ export async function loadIncident(
       alertedAt: i.alerted_at,
       hours,
       steps: events
-        .filter((e) => e.type === 'step_fired' && e.payload.reminder !== true)
+        .filter(
+          (e) => e.type === 'step_fired' && e.payload.reminder !== true && e.payload.severity === i.severity,
+        )
         .map((e) => ({
           level: typeof e.payload.level === 'number' ? e.payload.level : 0,
           at: e.at,
@@ -529,35 +531,38 @@ export async function loadIncident(
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
     canAct: canAcknowledge(actor, i),
     rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },
-    gate: resolveGate(
-      {
-        siteName: i.sites.name,
-        state: i.state,
-        severity: i.severity,
-        recoveredAt: i.recovered_at,
-        clientUpdateRequired: i.client_update_required,
-        clientUpdatedAt: i.client_updated_at,
-        rootCauseCategory: i.root_cause_category,
-        clientUpdate: {
-          tier: i.sites.tier,
-          dueAt: i.client_update_due_at,
-          by: i.client_updated_by ? nameOf(i.client_updated_by) : null,
-          notNeeded: i.client_update_not_needed,
-          note: i.client_update_note,
+    gate: pendingClientUpdate(
+      byHand.reminder,
+      resolveGate(
+        {
+          siteName: i.sites.name,
+          state: i.state,
+          severity: i.severity,
+          recoveredAt: i.recovered_at,
+          clientUpdateRequired: i.client_update_required,
+          clientUpdatedAt: i.client_updated_at,
+          rootCauseCategory: i.root_cause_category,
+          clientUpdate: {
+            tier: i.sites.tier,
+            dueAt: i.client_update_due_at,
+            by: i.client_updated_by ? nameOf(i.client_updated_by) : null,
+            notNeeded: i.client_update_not_needed,
+            note: i.client_update_note,
+          },
         },
-      },
-      events,
-      nameOf,
-      pageChange
-        ? {
-            admin: viewer.role === 'admin',
-            pendingUntil: pageChange.view.pending?.until ?? null,
-            acceptedAt:
-              pageChange.view.status === 'accepted' ? (pageChange.view.baseline?.acceptedAt ?? null) : null,
-            nextFetchAt: pageChange.view.nextFetchAt,
-            differsSince: pageChange.view.firstSeenAt ?? i.started_at,
-          }
-        : undefined,
+        events,
+        nameOf,
+        pageChange
+          ? {
+              admin: viewer.role === 'admin',
+              pendingUntil: pageChange.view.pending?.until ?? null,
+              acceptedAt:
+                pageChange.view.status === 'accepted' ? (pageChange.view.baseline?.acceptedAt ?? null) : null,
+              nextFetchAt: pageChange.view.nextFetchAt,
+              differsSince: pageChange.view.firstSeenAt ?? i.started_at,
+            }
+          : undefined,
+      ),
     ),
     clientUpdate,
     ...byHand,

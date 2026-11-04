@@ -5,7 +5,7 @@
 -- steps never repeat them (Done-when 2).
 begin;
 \ir _helpers.psql
-select plan(50);
+select plan(51);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -136,6 +136,8 @@ select is((select payload ->> 'note' from public.incident_events where incident_
 select is((select status::text || ' ' || (last_round_at = now() - interval '14 minutes')::text
            from public.site_status where site_id = pg_temp.site('realme.link')),
   'down true', 'the site reads DOWN; last_round_at stays the engine''s ("statuses as of")');
+select is((select flip_ok::text || ' ' || cardinality(flips) from public.site_status where site_id = pg_temp.site('realme.link')),
+  'false 1', 'the manual drop counts toward flapping (D-004, engine review M3)');
 select is((select hold_until from public.notifications
            where incident_id = pg_temp.inc() and channel = 'google_chat' and template = 'down'),
   null, 'the L0 Chat line has no hold: the action sends it now');
