@@ -4,7 +4,7 @@
 -- by-hand action.
 begin;
 \ir _helpers.psql
-select plan(20);
+select plan(26);
 
 select tests.clear_sites();
 update public.profiles set is_active = false where role in ('admin', 'stakeholder');
@@ -13,7 +13,8 @@ grant select on ids to anon, authenticated, service_role;
 insert into ids values
   ('tao', tests.create_user('tao@pgtap.test', 'admin')),
   ('arm', tests.create_user('arm@pgtap.test', 'responder')),
-  ('mint', tests.create_user('mint@pgtap.test', 'viewer'));
+  ('mint', tests.create_user('mint@pgtap.test', 'viewer')),
+  ('nok', tests.create_user('nok@pgtap.test', 'responder'));
 create function pg_temp.uid(p text) returns uuid language sql as $$ select id from ids where name = p $$;
 grant execute on function pg_temp.uid(text) to anon, authenticated, service_role;
 
@@ -22,9 +23,10 @@ insert into public.sites (id, client_id, name, tier, primary_owner_id)
 select v.id, '00000000-0000-0000-0000-0000000000c1', v.name, 1, pg_temp.uid('arm')
 from (values ('00000000-0000-0000-0000-0000000000a1'::uuid, 'Recovered'),
              ('00000000-0000-0000-0000-0000000000a2'::uuid, 'Problem'),
-             ('00000000-0000-0000-0000-0000000000a3'::uuid, 'Still down')) v (id, name);
+             ('00000000-0000-0000-0000-0000000000a3'::uuid, 'Still down'),
+             ('00000000-0000-0000-0000-0000000000a4'::uuid, 'Muted')) v (id, name);
 insert into public.monitors (site_id, type, url, is_primary)
-select id, 'http', 'https://' || id || '.example.test/', true from public.sites where name in ('Recovered', 'Problem', 'Still down');
+select id, 'http', 'https://' || id || '.example.test/', true from public.sites where name in ('Recovered', 'Problem', 'Still down', 'Muted');
 
 create temp table inc (name text primary key, id uuid) on commit drop;
 grant select on inc to anon, authenticated, service_role;
@@ -34,13 +36,17 @@ insert into inc values
   ('prob', public.engine_open_incident('00000000-0000-0000-0000-0000000000a2', null, 'slow', 'problem',
      now() - interval '40 min', now() - interval '39 min', now() - interval '40 min', '{"summary":"slow"}', true)),
   ('down', public.engine_open_incident('00000000-0000-0000-0000-0000000000a3', null, 'hard_fail', 'down',
-     now() - interval '10 min', now() - interval '9 min', now() - interval '10 min', '{"cause":"x"}', true));
+     now() - interval '10 min', now() - interval '9 min', now() - interval '10 min', '{"cause":"x"}', true)),
+  ('muted', public.engine_open_incident('00000000-0000-0000-0000-0000000000a4', null, 'hard_fail', 'down',
+     now() - interval '40 min', now() - interval '39 min', now() - interval '40 min', '{"cause":"x"}', true));
 create function pg_temp.inc(p text) returns uuid language sql as $$ select id from inc where name = p $$;
 grant execute on function pg_temp.inc(text) to anon, authenticated, service_role;
 -- The first incident recovered 20 min ago; its L1 had fired.
 select public.engine_recover_incident(pg_temp.inc('rec'), 'unacked', 'monitoring', now() - interval '20 min',
-  now() - interval '20 min', '{}', false);
+  now() - interval '20 min', '{}', false, null, null, true);
 update public.incidents set escalation_level = 1 where id = pg_temp.inc('rec');
+select public.engine_recover_incident(pg_temp.inc('muted'), 'unacked', 'monitoring', now() - interval '20 min',
+  now() - interval '20 min', '{}', false, null, null, true);
 
 create function pg_temp.beats(p_age interval) returns void language sql as $$
   insert into public.agent_heartbeats (name, last_seen_at)
@@ -63,6 +69,20 @@ select throws_ok(format('select public.report_down_by_hand(%L, null, false)', pg
   'the site is down already', 'a DOWN still open is the alert already');
 select throws_ok(format('select public.report_down_by_hand(%L, %L, false)', pg_temp.inc('rec'), repeat('x', 501)),
   '22001', 'note too long', 'the note is 500 characters at most');
+select throws_ok(format('select public.report_down_by_hand(%L, null, false)', gen_random_uuid()), '42501',
+  'not allowed', 'an unknown incident reads as not allowed');
+select tests.authenticate_as(pg_temp.uid('arm'));
+select public.mute_site('00000000-0000-0000-0000-0000000000a4', now() + interval '1 hour', 'planned work');
+select tests.authenticate_as(pg_temp.uid('tao'));
+select throws_ok(format('select public.report_down_by_hand(%L, null, false)', pg_temp.inc('muted')), '55000',
+  'the site is muted or in maintenance', 'a mute stops new alerts, by hand too');
+select tests.authenticate_as(pg_temp.uid('nok'));
+select throws_ok(format('select public.report_down_by_hand(%L, null, false)', pg_temp.inc('rec')), '42501',
+  'not allowed', 'a Responder on someone else''s site, not on call');
+select tests.as_anon();
+select throws_ok(format('select public.report_down_by_hand(%L, null, false)', pg_temp.inc('rec')), '42501',
+  null, 'anon can''t call it');
+select tests.authenticate_as(pg_temp.uid('tao'));
 
 -- ── A recovered DOWN relapses (D-004) ───────────────────────────────────────
 select is(public.report_down_by_hand(pg_temp.inc('rec'), ' 502 again ', false), 'relapse', 'Down again on a recovered incident');
@@ -83,6 +103,8 @@ select ok((select last_round_at < now() - interval '19 min' from public.site_sta
            where site_id = '00000000-0000-0000-0000-0000000000a1'), 'its round clock stays the engine''s');
 select is((select count(*)::int from public.hand_checks where incident_id = pg_temp.inc('rec')), 1,
   'a hand-check row links it');
+select is((select flip_ok::text || ' ' || (now() = any (flips))::text from public.site_status
+           where site_id = '00000000-0000-0000-0000-0000000000a1'), 'false true', 'the drop counts toward flapping at the press');
 
 -- ── A PROBLEM is raised to DOWN (D-021) ─────────────────────────────────────
 select tests.authenticate_as(pg_temp.uid('tao'));
@@ -103,6 +125,9 @@ select is(public.engine_mark_engine_back(now() - interval '5 minutes'), 0, 'once
 reset role;
 select is((select count(*)::int from public.incident_events where incident_id = pg_temp.inc('down') and type = 'engine_back'),
   0, 'none on an incident nobody touched by hand');
+set local role authenticated;
+select throws_ok('select public.engine_mark_engine_back(now())', '42501', null, 'only the engine writes the line');
+reset role;
 
 select * from finish();
 rollback;

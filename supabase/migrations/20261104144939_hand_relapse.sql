@@ -30,8 +30,8 @@ declare
   v_ok boolean;
 begin
   select * into v_inc from public.incidents where id = p_incident_id;
-  if not found then
-    raise exception 'incident not found' using errcode = 'P0002';
+  if not found or not private.can_ack(v_inc.site_id) then
+    raise exception 'not allowed' using errcode = '42501';
   end if;
   -- The hand check's rules: may act, a live Tier 1 site, the sweep fault open.
   perform private.hand_check_site(v_inc.site_id);
@@ -61,6 +61,7 @@ begin
   from public.site_status st where st.site_id = v_inc.site_id;
   v_round := coalesce(v_round, v_now);
 
+  perform public.engine_record_flip(v_inc.site_id, v_now, false);
   if v_kind = 'relapse' then
     v_ok := public.engine_relapse_incident(p_incident_id, 'down', 'manual', v_now, v_now, v_round,
                                             v_context, false, true);
@@ -90,7 +91,9 @@ begin
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), 'incident.hand_down', 'incident', p_incident_id,
           jsonb_build_object('state', v_inc.state, 'severity', v_inc.severity),
-          jsonb_build_object('kind', v_kind, 'note', v_note, 'outside_hours', coalesce(p_outside_hours, false)));
+          jsonb_build_object('kind', v_kind, 'note', v_note)
+            || case when v_kind = 'raise' then jsonb_build_object('outside_hours', coalesce(p_outside_hours, false))
+                    else '{}'::jsonb end);
   return v_kind;
 end;
 $$;
@@ -107,15 +110,20 @@ as $$
 declare
   v_count integer;
 begin
+  -- Engine runs overlap: the second "first run after a stop" waits here and then sees the first's lines.
+  perform pg_advisory_xact_lock(hashtext('engine_mark_engine_back'));
   with by_hand as (
-    select e.incident_id, max(e.at) as last_at
-    from public.incident_events e
-    join public.incidents i on i.id = e.incident_id
-    where i.state not in ('resolved', 'in_review', 'closed')
-      and e.at >= p_stopped_since
-      and ((e.type in ('detected', 'relapsed', 'escalated_to_down') and (e.payload ->> 'manual')::boolean)
-           or (e.type in ('step_fired', 'client_update_due') and (e.payload ->> 'byHand')::boolean))
-    group by e.incident_id
+    -- From the open incidents (incidents_one_open_per_site), one (incident_id, at) probe each.
+    select i.id as incident_id, h.last_at
+    from public.incidents i
+    cross join lateral (
+      select max(e.at) as last_at
+      from public.incident_events e
+      where e.incident_id = i.id and e.at >= p_stopped_since
+        and ((e.type in ('detected', 'relapsed', 'escalated_to_down') and e.payload -> 'manual' = 'true'::jsonb)
+             or (e.type in ('step_fired', 'client_update_due') and e.payload -> 'byHand' = 'true'::jsonb))
+    ) h
+    where i.state not in ('resolved', 'in_review', 'closed') and h.last_at is not null
   ), fresh as (
     select b.incident_id from by_hand b
     where not exists (select 1 from public.incident_events x
