@@ -267,10 +267,12 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
 
 describe('handCheckOf — after Down again (D-055 item 7)', () => {
   // INC-0143 opened at 00:00 by the probes; Tao reported it down again at 02:31.
-  const older = { startedAt: at('00:00'), detectedAt: at('00:00'), trigger: 'hard_fail' } as const;
+  // The relapse moves started_at to the press: only the check knows the incident was older.
+  const older = { startedAt: at('02:31'), detectedAt: at('02:31'), trigger: 'manual' } as const;
+  const AGAIN = AFTER.map((c) => (c.siteId === 's-realme.link' ? { ...c, reported: true } : c));
 
   it('the row says it was reported down, not opened, and its buttons go while it is down', () => {
-    const row = handCheckOf(withIncident(inc143(older)), AFTER, tao, FAULT, new Date(at('02:40'))).rows.find(
+    const row = handCheckOf(withIncident(inc143(older)), AGAIN, tao, FAULT, new Date(at('02:40'))).rows.find(
       (r) => r.name === 'realme.link',
     )!;
     expect(row.line.text).toBe('INC-0143 reported down · Tao 02:31');

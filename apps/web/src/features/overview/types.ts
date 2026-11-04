@@ -140,6 +140,8 @@ export interface HandCheckEntry {
   by: string;
   incidentId: string | null;
   incidentNumber: number | null;
+  /** A Down on an incident already open (Down again, D-055 item 7), not one this check opened. */
+  reported?: boolean;
 }
 
 export interface MonitorFault {

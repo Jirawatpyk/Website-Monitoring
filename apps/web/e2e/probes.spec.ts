@@ -164,13 +164,20 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
     await signIn(context, baseURL!, 'tao@example.test');
 
     await page.goto('/');
+    const row = page.locator('[data-site]').filter({ hasText: site }).locator('visible=true').first();
+    await row.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: `test-results/s12b-down-again-row-${info.project.name}.png`,
+      fullPage: true,
+    });
     await page
       .getByRole('button', { name: `Down again · ${site}` })
       .locator('visible=true')
       .click();
     const dialog = page.getByRole('dialog', { name: `Report ${site} down again?` });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/^Posts DOWN AGAIN in INC-\d+'s thread now\.$/)).toBeVisible();
+    await expect(dialog.getByText(/^Posts DOWN AGAIN in INC-\d+’s thread now\.$/)).toBeVisible();
+    await page.screenshot({ path: `test-results/s12b-down-again-dialog-${info.project.name}.png` });
     await dialog.getByLabel(/What did you see/).fill('502 again');
     await dialog.getByRole('button', { name: 'Report down' }).click();
     await expect(dialog).toBeHidden({ timeout: 30_000 });
@@ -178,6 +185,12 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
     await expect(
       page.getByRole('button', { name: `Down again · ${site}` }).locator('visible=true'),
     ).toHaveCount(0, { timeout: 15_000 });
+    // The row says what happened, and focus lands on it (the button that opened the dialog is gone).
+    await expect(row.getByRole('link', { name: /^INC-\d+ reported down · / })).toBeFocused();
+    await page.screenshot({
+      path: `test-results/s12b-down-again-after-${info.project.name}.png`,
+      fullPage: true,
+    });
 
     await page.goto(`/incidents/${incidentId}`);
     await expect(

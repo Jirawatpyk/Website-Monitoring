@@ -95,10 +95,9 @@ export function handCheckOf(
     const last = latest.get(s.id);
     const may = canAck(viewer, s);
     const open = s.incident;
-    // The check's incident, if it is the one still open: opened by that check, or reported down on
-    // it later (Down again, D-055 item 7 — the incident started before the press).
+    // The check's incident, if it is the one still open (opened by that check, or reported down again).
     const mine = open && last?.incidentId === open.id ? open : null;
-    const reported = !!mine && last !== undefined && Date.parse(mine.startedAt) < Date.parse(last.at);
+    const reported = last?.reported === true;
     const line: HandCheckLine =
       last?.outcome === 'down' && last.incidentId && last.incidentNumber !== null
         ? {

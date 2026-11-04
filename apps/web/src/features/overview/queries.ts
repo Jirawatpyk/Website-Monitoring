@@ -332,7 +332,7 @@ async function loadHandChecks(
   const { data, error } = await db
     .from('hand_checks')
     .select(
-      'site_id, outcome, checked_at, incident_id, checker:profiles!hand_checks_checked_by_fkey(display_name), incident:incidents(number)',
+      'site_id, outcome, checked_at, incident_id, checker:profiles!hand_checks_checked_by_fkey(display_name), incident:incidents(number, created_at)',
     )
     .in('site_id', ids)
     .gte('checked_at', since)
@@ -345,6 +345,9 @@ async function loadHandChecks(
     by: h.checker?.display_name ?? 'Someone',
     incidentId: h.incident_id,
     incidentNumber: h.incident?.number ?? null,
+    // Down again (D-055 item 7): the incident was there before the press. A manual open writes both
+    // in one transaction, so its incident is never older than the check.
+    reported: !!h.incident && Date.parse(h.incident.created_at) < Date.parse(h.checked_at),
   }));
 }
 
