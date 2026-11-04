@@ -88,6 +88,8 @@ begin
   delete from public.system_alerts;
   delete from public.verification_jobs;
   delete from public.incident_events;
+  -- S12b: a Down press references its incident (on delete restrict); e2e leaves some behind.
+  delete from public.hand_checks;
   delete from public.incidents;
   delete from public.site_status;
   delete from public.check_results;
