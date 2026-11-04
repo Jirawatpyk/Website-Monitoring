@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache';
 import { isInsideHours } from '@dxt/engine';
 import { createClient } from '@/lib/supabase/server';
-import { serviceDb } from '@/server/db';
 import { loadResponseHours } from '@/server/escalation/response-hours';
 import { flushAfter } from './flush';
 import {
@@ -73,8 +72,9 @@ export async function openManualIncident(input: ManualIncidentInput): Promise<Ma
   const parsed = manualIncidentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]!.message };
   const now = new Date();
-  const hours = await loadResponseHours(serviceDb(), now);
   const supabase = await createClient();
+  // As the user (staff read the hours); a failed read falls back to the seeded hours.
+  const hours = await loadResponseHours(supabase, now);
   const { data, error } = await supabase.rpc('open_manual_incident', {
     p_site_id: parsed.data.siteId,
     p_note: parsed.data.note,

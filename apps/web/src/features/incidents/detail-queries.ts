@@ -336,7 +336,7 @@ export async function loadIncident(
   const checkCols = 'location, outcome, status_code, response_ms, error, checked_at';
   // can_ack's on-call branch (S10, D-048): a Responder holding the shift acts on any Tier 1 incident.
   const askShift = viewer.role === 'responder' && i.sites.tier === 1;
-  const [events, around, latest, onCall] = await Promise.all([
+  const [events, around, latest, onCall, engineRun, admins, hours] = await Promise.all([
     fetchAllPages<EventRow>(
       (from, to) =>
         db
@@ -369,9 +369,7 @@ export async function loadIncident(
           .limit(30)
       : Promise.resolve({ data: [] as CheckRow[], error: null }),
     askShift ? loadOnCallNow(db, now) : Promise.resolve(null),
-  ]);
-  // S12b: the ladder's people and clock, and whether any engine run happened in the last 3 min (D-055).
-  const [engineRun, admins, hours] = await Promise.all([
+    // S12b: the ladder's people and clock, and whether any engine run happened in the last 3 min (D-055).
     db.from('agent_heartbeats').select('last_seen_at').eq('name', 'engine-run').maybeSingle(),
     db
       .from('profiles')
@@ -447,7 +445,7 @@ export async function loadIncident(
       alertedAt: i.alerted_at,
       hours,
       steps: events
-        .filter((e) => e.type === 'step_fired' && e.payload.reminder !== true && e.payload.fyiStep !== true)
+        .filter((e) => e.type === 'step_fired' && e.payload.reminder !== true)
         .map((e) => ({
           level: typeof e.payload.level === 'number' ? e.payload.level : 0,
           at: e.at,
@@ -482,7 +480,8 @@ export async function loadIncident(
         ? {
             to: am ? nameOf(am) : 'the Admins',
             role: am ? 'Site AM' : 'Admin',
-            dueAt: formatTime(new Date(Date.parse(i.started_at) + (i.sites.tier === 1 ? 15 : 60) * 60_000)),
+            dueAt:
+              i.sites.tier === 1 ? formatTime(new Date(Date.parse(i.started_at) + 15 * 60_000)) : 'when sent',
             preFire: true,
           }
         : null;

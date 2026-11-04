@@ -71,7 +71,7 @@ function peopleOf(targets: readonly EscalationTarget[], p: LadderPeople): { name
     if (t === 'backup') return p.backup ? [{ name: p.backup, role: 'backup' }] : [];
     if (t === 'site_am') return p.am ? [{ name: p.am, role: 'Site AM' }] : [];
     if (t === 'ceo') return [{ name: 'CEO', role: 'CEO' }];
-    return p.admins.map((a) => ({ name: a, role: roleWord.admins }));
+    return p.admins.filter((a) => a !== p.owner?.name).map((a) => ({ name: a, role: roleWord.admins }));
   });
 }
 
@@ -141,7 +141,14 @@ export function escalationCardOf(input: {
         tone: 'sent',
       };
     }
-    if (!waiting) return { label: `L${s.level}`, when, who, status: 'Cancelled · acked', tone: 'cancelled' };
+    if (!waiting)
+      return {
+        label: `L${s.level}`,
+        when,
+        who,
+        status: input.acked ? 'Cancelled · acked' : 'Not sent · recovered',
+        tone: 'cancelled',
+      };
     const isNext = s === next;
     if (input.engine.stopped)
       return {
@@ -170,7 +177,7 @@ export function escalationCardOf(input: {
     rows,
     stopped,
     back:
-      !input.engine.stopped && byHand
+      !input.engine.stopped && byHand && !['resolved', 'in_review', 'closed'].includes(input.state)
         ? 'Automatic escalation is running again — levels already sent won’t repeat.'
         : null,
     button:
