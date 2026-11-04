@@ -8,7 +8,14 @@ import {
   type Trigger,
   formatLocations,
 } from '@dxt/shared';
-import { plainName, type ChatMessage, type ChatPerson, type ProblemFacts } from './chat-alerts';
+import {
+  manualCause,
+  plainName,
+  type ChatMessage,
+  type ChatPerson,
+  type ManualOpen,
+  type ProblemFacts,
+} from './chat-alerts';
 import { buildChatTextLine } from './chat-text';
 import { downtime } from './downtime';
 import { formatResume } from './escalation-alerts';
@@ -90,6 +97,8 @@ export interface AgainAlertInput {
   homeBack?: KeyPageFacts | null;
   /** Tier 2–3 outside response hours (S08): when the timers run again. */
   pausedUntil?: Date | null;
+  /** Reported down again by hand from the hand check while the engine was down (D-055 item 7). */
+  manual?: ManualOpen | null;
 }
 
 const STATE_WORDS: Record<string, string> = {
@@ -154,9 +163,14 @@ export function buildAgainAlert(input: AgainAlertInput): ChatMessage {
       ? `${state} · ${site} · was back for ${back.duration} (${back.range})`
       : `${state} · ${site}`;
     const soFar = `Down ${formatDuration(input.minutesSoFar)} so far in this incident.`;
+    // D-055 item 7: no probe saw it — say who reported it and what they saw.
+    const byHand = input.manual
+      ? ` ${manualCause(input.manual)} — no probe check, the status engine is down.`
+      : '';
+    if (input.manual) detail.splice(1, 0, `reported by hand by ${plainName(input.manual.openedBy)}`);
     body = still
-      ? `Still flapping — ${held} ${soFar}`
-      : `Joined ${inc} — no new incident (the incident was still open, in ${where}). ${soFar}${flapNote}`;
+      ? `Still flapping — ${held} ${soFar}${byHand}`
+      : `Joined ${inc} — no new incident (the incident was still open, in ${where}). ${soFar}${flapNote}${byHand}`;
   } else {
     const s = again(input.summary ?? 'problem');
     detail = [s.line, `same incident ${inc}`, ...(still ? ['still flapping'] : [])];

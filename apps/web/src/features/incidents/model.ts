@@ -776,6 +776,13 @@ export interface TimelineIncident {
   recoveredAt: string | null;
 }
 
+/** Down again by hand (D-055 item 7): "Down again, reported by Tao from a hand check · “502 again”". */
+const manualDownTitle = (by: string, payload: Record<string, unknown>) => {
+  const note = typeof payload.note === 'string' && payload.note ? payload.note : null;
+  return `Down again, reported by ${by} from a hand check${note ? ` · “${note}”` : ''}`;
+};
+const MANUAL_DOWN_DETAIL = 'The status engine was down, so there are no probe results';
+
 /**
  * Every event in words (§16.11: rows never disappear), oldest first; the phone shows it reversed
  * (MIncident "Newest first"). `nameOf` maps profile ids to names.
@@ -958,6 +965,11 @@ export function timelineOf(
         return;
       case 'relapsed': {
         const down = e.payload.severity === 'down';
+        // Down again by hand from the hand check (D-055 item 7).
+        if (e.payload.manual === true) {
+          item(e, 'down', manualDownTitle(by, e.payload), MANUAL_DOWN_DETAIL, 'relapse');
+          return;
+        }
         item(
           e,
           down ? 'down' : 'problem',
@@ -968,7 +980,17 @@ export function timelineOf(
         return;
       }
       case 'escalated_to_down':
-        item(e, 'down', 'PROBLEM became DOWN', str(e.payload.cause));
+        if (e.payload.manual === true) item(e, 'down', manualDownTitle(by, e.payload), MANUAL_DOWN_DETAIL);
+        else item(e, 'down', 'PROBLEM became DOWN', str(e.payload.cause));
+        return;
+      // §30.8: the first engine run after a stop, on an incident someone acted on by hand.
+      case 'engine_back':
+        item(
+          e,
+          'ok',
+          'Status engine back — automatic escalation running again',
+          'Levels already sent won’t repeat.',
+        );
         return;
       case 'step_fired': {
         // S08 (D-034): who the step asked (@mentioned) and told FYI, in the thread and by email.

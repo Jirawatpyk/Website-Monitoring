@@ -138,7 +138,72 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
     expect(handCheckOf([open], [], tao, FAULT, new Date(at('02:40'))).rows[0]).toMatchObject({
       canCheck: true,
       canOpen: false,
+      openIncident: { id: 'i-142', label: 'Open INC-0142', downAgain: 'relapse' },
     });
+  });
+
+  it.each([
+    ['a PROBLEM is raised', { severity: 'problem', dropSeverity: 'problem', state: 'unacked' }, 'raise'],
+    [
+      'a DOWN still down has no Down again',
+      { severity: 'down', dropSeverity: 'down', state: 'unacked' },
+      null,
+    ],
+    [
+      'a DOWN whose key page carries on (D-023) relapses',
+      { severity: 'down', dropSeverity: 'problem', state: 'acknowledged' },
+      'relapse',
+    ],
+  ] as const)('Down again (D-055 item 7): %s', (_case, over, expected) => {
+    const s = site('MuvMi', {
+      incident: {
+        id: 'i-142',
+        number: 142,
+        trigger: 'hard_fail',
+        level: 0,
+        startedAt: at('00:00'),
+        detectedAt: at('00:00'),
+        recoveredAt: null,
+        ackedBy: null,
+        cause: null,
+        ...over,
+      },
+    });
+    expect(handCheckOf([s], [], tao, FAULT, new Date(at('02:40'))).rows[0]!.openIncident?.downAgain).toBe(
+      expected,
+    );
+  });
+
+  it('Down again is for those who may act, never on a muted site', () => {
+    const inc = {
+      id: 'i-142',
+      number: 142,
+      state: 'monitoring',
+      severity: 'down',
+      dropSeverity: 'down',
+      trigger: 'hard_fail',
+      level: 0,
+      startedAt: at('00:00'),
+      detectedAt: at('00:00'),
+      recoveredAt: at('00:10'),
+      ackedBy: null,
+      cause: null,
+    } as const;
+    const am = handCheckOf(
+      [site('MuvMi', { incident: inc })],
+      [],
+      { id: 'u-bua', name: 'Bua', kind: 'am' },
+      FAULT,
+    );
+    expect(am.rows[0]!.openIncident?.downAgain).toBeNull();
+    const muted = handCheckOf(
+      [site('MuvMi', { incident: inc, mutedUntil: at('03:00') })],
+      [],
+      tao,
+      FAULT,
+      new Date(at('02:40')),
+    );
+    expect(muted.rows[0]!.openIncident?.downAgain).toBeNull();
   });
 
   it('who presses (§30.3): the AM reads only; a Responder on another site is told who can', () => {

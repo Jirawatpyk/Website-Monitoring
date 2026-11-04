@@ -199,6 +199,7 @@ function againAlert(n: Notification, i: IncidentFacts, now: Date = new Date(n.cr
     homeBack: ctx.homeBackAt ? keyPageOf(ctx.keyPage) : null,
     // S08: a Tier 2–3 DOWN AGAIN outside response hours says the timers are paused (D-034).
     pausedUntil: down && !acked ? (ladderFactsOf(i, now)?.pausedUntil ?? null) : null,
+    manual: manualOf(ctx),
   });
 }
 

@@ -424,6 +424,45 @@ export async function newHandCheckSite(ownerEmail: string, amEmail: string): Pro
   return name;
 }
 
+/**
+ * D-055 item 7: the hand-check site `name` had a probes DOWN 40 min ago that recovered 20 min ago, as
+ * the engine would have recorded it (Monitoring). Returns the incident id.
+ */
+export async function recoveredIncidentOn(name: string): Promise<string> {
+  const [site] = (await admin(
+    `/rest/v1/sites?select=id,monitors(id)&name=eq.${encodeURIComponent(name)}`,
+  )) as { id: string; monitors: { id: string }[] }[];
+  const ago = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+  const id = (await admin('/rest/v1/rpc/engine_open_incident', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_site_id: site!.id,
+      p_monitor_id: site!.monitors[0]?.id ?? null,
+      p_trigger: 'hard_fail',
+      p_severity: 'down',
+      p_started_at: ago(40),
+      p_detected_at: ago(39),
+      p_round_at: ago(40),
+      p_context: { cause: 'HTTP 500 (SIN, TYO)', confirmingLocations: 2 },
+      p_notify: true,
+    }),
+  })) as string;
+  await admin('/rest/v1/rpc/engine_recover_incident', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_incident_id: id,
+      p_from: 'unacked',
+      p_to: 'monitoring',
+      p_recovered_at: ago(20),
+      p_round_at: ago(20),
+      p_context: {},
+      p_notify: true,
+      p_flip_ok: true,
+    }),
+  });
+  return id;
+}
+
 /** The page_baseline.* audit rows of a monitor, oldest first (S09d Done-when 2). */
 export async function baselineAudit(monitorId: string): Promise<string[]> {
   const rows = (await admin(

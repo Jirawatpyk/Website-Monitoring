@@ -34,7 +34,12 @@ export interface HandCheckRow {
   /** Down can't be pressed on a muted site or one in maintenance (§15.1): why. */
   paused: string | null;
   /** An incident the engine opened already: where to act instead of Down. */
-  openIncident: { id: string; label: string } | null;
+  openIncident: {
+    id: string;
+    label: string;
+    /** Down again by hand (D-055 item 7): a recovered incident relapses, a PROBLEM is raised; null = no button. */
+    downAgain: 'relapse' | 'raise' | null;
+  } | null;
 }
 
 export interface HandCheckCard {
@@ -61,6 +66,14 @@ export function sitesOkByHand(checks: readonly HandCheckEntry[], asOf: string | 
   if (!downs.length) return asOf ? `As of ${asOf} · hand-check Tier 1 below` : 'Hand-check Tier 1 below';
   // Newest first: the first is the latest press.
   return `${downs.length} down by hand check ${formatTime(new Date(downs[0]!.at))} · the rest ${rest}`;
+}
+
+/** A recovered DOWN relapses, a PROBLEM is raised to DOWN; a DOWN still down is the alert already. */
+function downAgainOf(inc: NonNullable<OverviewSite['incident']>): 'relapse' | 'raise' | null {
+  if (inc.severity === 'problem') return 'raise';
+  if (inc.state === 'monitoring' || inc.state === 'needs_root_cause' || inc.dropSeverity === 'problem')
+    return 'relapse';
+  return null;
 }
 
 export function handCheckOf(
@@ -115,7 +128,13 @@ export function handCheckOf(
             : null,
       paused: may && !openedByHand ? paused : null,
       openIncident:
-        open && !openedByHand ? { id: open.id, label: `Open ${formatIncidentId(open.number)}` } : null,
+        open && !openedByHand
+          ? {
+              id: open.id,
+              label: `Open ${formatIncidentId(open.number)}`,
+              downAgain: may && !paused ? downAgainOf(open) : null,
+            }
+          : null,
       readOnly: may
         ? null
         : staff && s.ownerName

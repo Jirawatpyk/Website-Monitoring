@@ -62,3 +62,49 @@ describe('timelineOf — a manual incident and the by-hand steps (S12b, spec §3
     expect(t.map((x) => x.title)).toContain('Escalated to L1 — not acknowledged');
   });
 });
+
+describe('timelineOf — Down again by hand and the engine back (D-055 item 7, spec §30.8)', () => {
+  const probes = {
+    severity: 'down' as const,
+    trigger: 'hard_fail' as const,
+    startedAt: at('00:00:00'),
+    recoveredAt: at('00:10:00'),
+  };
+
+  it.each([
+    ['a recovered incident relapses', 'relapsed', { severity: 'down', manual: true, note: '502 again' }],
+    ['a PROBLEM is raised', 'escalated_to_down', { manual: true, note: '502 again' }],
+  ])('%s: who reported it and what they saw', (_case, type, payload) => {
+    const t = timelineOf(probes, [ev(type, '02:40:00', payload, 'u-tao')], nameOf, new Date(at('02:41:00')));
+    const line = t.find((x) => x.title.startsWith('Down again'))!;
+    expect(line).toMatchObject({
+      kind: 'down',
+      title: 'Down again, reported by Tao from a hand check · “502 again”',
+      detail: 'The status engine was down, so there are no probe results',
+    });
+  });
+
+  it('without a note the title stops at the hand check', () => {
+    const t = timelineOf(
+      probes,
+      [ev('relapsed', '02:40:00', { severity: 'down', manual: true }, 'u-tao')],
+      nameOf,
+      new Date(at('02:41:00')),
+    );
+    expect(t.map((x) => x.title)).toContain('Down again, reported by Tao from a hand check');
+  });
+
+  it('the engine back line', () => {
+    const t = timelineOf(
+      probes,
+      [ev('engine_back', '02:44:00', { stoppedSince: at('02:17:00') })],
+      nameOf,
+      new Date(at('02:45:00')),
+    );
+    expect(t.find((x) => x.at === at('02:44:00'))).toMatchObject({
+      kind: 'ok',
+      title: 'Status engine back — automatic escalation running again',
+      detail: 'Levels already sent won’t repeat.',
+    });
+  });
+});

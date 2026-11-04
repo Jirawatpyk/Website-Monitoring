@@ -14,6 +14,8 @@ export type ManualIncidentResult = { ok: true; incidentId: string } | { ok: fals
 export interface HandCheckActions {
   record: (siteId: string) => Promise<HandCheckResult>;
   open: (input: { siteId: string; note?: string }) => Promise<ManualIncidentResult>;
+  /** Down again on the site's open incident (D-055 item 7). */
+  downAgain?: (input: { incidentId: string; note?: string }) => Promise<ManualIncidentResult>;
 }
 
 const FAILED = 'Couldn’t reach the server. Check your connection and try again.';
@@ -117,6 +119,7 @@ export function HandCheckCard({
           open={!!opening}
           onClose={() => setOpening(null)}
           onOpen={actions.open}
+          onDownAgain={actions.downAgain}
         />
       )}
     </Card>
@@ -160,7 +163,7 @@ type RowProps = {
 
 function Buttons({ row, pending, onOk, onDown, phone }: RowProps & { phone: boolean }) {
   if (row.readOnly) return <span className="text-xs text-fg-tertiary">{row.readOnly}</span>;
-  if (!row.canCheck && !row.canOpen) return null;
+  if (!row.canCheck && !row.canOpen && !row.openIncident) return null;
   return (
     <div className={phone ? 'grid grid-cols-2 gap-2' : 'flex flex-wrap items-center justify-end gap-2'}>
       {row.canCheck && (
@@ -187,6 +190,19 @@ function Buttons({ row, pending, onOk, onDown, phone }: RowProps & { phone: bool
         >
           <IconBan />
           {phone ? 'Down…' : 'Down — open incident'}
+        </Button>
+      )}
+      {row.openIncident?.downAgain && (
+        <Button
+          variant="secondary"
+          size={phone ? 'md' : 'sm'}
+          fullWidth={phone}
+          disabled={pending}
+          onClick={() => onDown(row)}
+          aria-label={`Down again · ${row.name}`}
+        >
+          <IconBan />
+          Down again…
         </Button>
       )}
       {row.openIncident && (
@@ -258,6 +274,7 @@ function OpenIncidentDialog({
   open,
   onClose,
   onOpen,
+  onDownAgain,
 }: {
   row: HandCheckRow;
   asOf: string | null;
@@ -266,15 +283,22 @@ function OpenIncidentDialog({
   open: boolean;
   onClose: () => void;
   onOpen: HandCheckActions['open'];
+  onDownAgain?: HandCheckActions['downAgain'];
 }) {
   const router = useRouter();
+  // On a site whose incident is still open: Down again (D-055 item 7).
+  const again = row.openIncident?.downAgain ?? null;
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const submit = () =>
     start(async () => {
       setError(null);
-      const r = await onOpen({ siteId: row.siteId, note }).catch(() => ({
+      const call =
+        again && onDownAgain
+          ? onDownAgain({ incidentId: row.openIncident!.id, note })
+          : onOpen({ siteId: row.siteId, note });
+      const r = await call.catch(() => ({
         ok: false as const,
         message: FAILED,
       }));
@@ -293,7 +317,7 @@ function OpenIncidentDialog({
       open={open}
       onClose={onClose}
       size="sm"
-      title={`Open an incident for ${row.name}?`}
+      title={again ? `Report ${row.name} down again?` : `Open an incident for ${row.name}?`}
       description={`${row.name} · Tier 1 · owner ${row.ownerName ?? '—'}${asOf ? ` · statuses are from ${asOf}` : ''}`}
       footer={
         <div
@@ -306,7 +330,7 @@ function OpenIncidentDialog({
             </Button>
             <Button variant="danger" fullWidth={phone} loading={pending} onClick={submit}>
               <IconBan />
-              Open incident
+              {again ? 'Report down' : 'Open incident'}
             </Button>
           </div>
           {phone && <div className="text-center">{logged}</div>}
@@ -335,7 +359,11 @@ function OpenIncidentDialog({
         />
         <p className="m-0 flex items-start gap-2 text-sm text-fg-secondary">
           <IconInfo aria-hidden className="mt-0.5 shrink-0" />
-          Posts the DOWN alert to the Alerts Space now and starts the client-update clock.
+          {again === 'relapse'
+            ? `Posts DOWN AGAIN in ${row.openIncident!.label.replace('Open ', '')}'s thread now.`
+            : again === 'raise'
+              ? `Raises ${row.openIncident!.label.replace('Open ', '')} to DOWN and posts the alert now.`
+              : 'Posts the DOWN alert to the Alerts Space now and starts the client-update clock.'}
         </p>
       </div>
     </Dialog>

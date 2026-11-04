@@ -18,6 +18,7 @@ import {
   faultyByMinute,
   slowLocationsByMinute,
   historyMs,
+  isEngineStopped,
   NEW_MONITOR,
   UNKNOWN_ROOT_CAUSE,
   type CrawlerFact,
@@ -223,7 +224,7 @@ export async function runEngine(
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
     const verifier = await loadVerifierState(db, now, now);
-    await stampBeat(db, 'engine-run', now);
+    await stampEngineRun(db, now);
     summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations, locationRows, {
       failing: null,
       sites: new Set(),
@@ -251,7 +252,7 @@ export async function runEngine(
     db
       .from('incidents')
       .select(
-        'id, site_id, monitor_id, state, severity, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, is_manual, root_cause_category, notifications(template)',
+        'id, site_id, monitor_id, state, severity, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, is_manual, manual_at, root_cause_category, notifications(template)',
       )
       .in('site_id', siteIds)
       .not('state', 'in', CLOSED_INCIDENT_STATES_IN),
@@ -446,7 +447,7 @@ export async function runEngine(
   // stamps it, the cron's and the one after a Bangkok batch, unless they threw (engine review L1);
   // best effort, never fails the run.
   if (!failures.some((f) => f.startsWith('escalation') || f.startsWith('client update')))
-    await stampBeat(db, 'engine-run', now);
+    await stampEngineRun(db, now);
   summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, locationRows, {
     failing: control,
     sites: controlSites,
@@ -649,12 +650,33 @@ async function loadLocationRows(db: DbClient): Promise<LocationRow[]> {
  */
 export function judgedFrom(
   lastRoundAt: string | null,
-  open: { is_manual: boolean; started_at: string } | undefined,
+  open: { is_manual: boolean; started_at: string; manual_at?: string | null } | undefined,
 ) {
   const stored = lastRoundAt ? Date.parse(lastRoundAt) : null;
-  const opened = open?.is_manual ? Date.parse(open.started_at) : null;
+  // A drop reported by hand (S12b, D-055 item 7): the press; a manual open counts from its start.
+  const pressed = open?.manual_at ?? (open?.is_manual ? open.started_at : null);
+  const opened = pressed ? Date.parse(pressed) : null;
   const at = stored === null ? opened : opened === null ? stored : Math.max(stored, opened);
   return at === null ? null : new Date(at);
+}
+
+/**
+ * The engine ran (D-055 item 1). If no run of any kind had happened for 3 min, the engine is back: each
+ * open incident with a by-hand action during the stop gets its "Status engine back" line (§30.8, item 7).
+ * Best effort, as the beat: a failure is logged and never fails the run.
+ */
+async function stampEngineRun(db: DbClient, now: Date): Promise<void> {
+  const prev = await db
+    .from('agent_heartbeats')
+    .select('last_seen_at')
+    .eq('name', 'engine-run')
+    .maybeSingle();
+  const since = prev.data?.last_seen_at ? new Date(prev.data.last_seen_at) : null;
+  if (since && isEngineStopped(since, now)) {
+    const back = await db.rpc('engine_mark_engine_back', { p_stopped_since: since.toISOString() });
+    if (back.error) console.error(JSON.stringify({ event: 'engine_back_failed', error: back.error.message }));
+  }
+  await stampBeat(db, 'engine-run', now);
 }
 
 /** The active locations whose probe beat in the last 3 min (D-019). */

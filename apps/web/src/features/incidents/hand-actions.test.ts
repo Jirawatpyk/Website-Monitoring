@@ -16,7 +16,7 @@ vi.mock('@/server/notifier/dispatch', () => ({ dispatchNotifications: m.dispatch
 vi.mock('@/server/escalation/response-hours', () => ({ loadResponseHours: m.hours }));
 vi.mock('@/lib/env', () => ({ serverEnv: () => ({}) }));
 
-const { escalateNow, openManualIncident, recordHandCheck, sendClientUpdateReminder } =
+const { escalateNow, openManualIncident, recordHandCheck, reportDownByHand, sendClientUpdateReminder } =
   await import('./hand-actions');
 const SITE = '7c481a3b-6979-4c48-97eb-50a8d27c4e41';
 const INC = '0b6f7c1e-2a7d-4c43-9a4f-9c1d1f7f5a10';
@@ -92,6 +92,39 @@ describe('Down — open incident (§30.2, D-053 item 5)', () => {
       message: 'This site already has an open incident.',
     });
     expect(m.after).not.toHaveBeenCalled();
+  });
+});
+
+describe('Down again by hand (D-055 item 7)', () => {
+  it('reports the open incident down, with the hours verdict, and sends at once', async () => {
+    vi.useFakeTimers({ now: new Date('2026-09-26T02:31:00+07:00') });
+    m.hours.mockResolvedValue(HOURS);
+    m.rpc.mockResolvedValue({ data: 'relapse', error: null });
+    expect(await reportDownByHand({ incidentId: INC, note: ' 502 again ' })).toEqual({
+      ok: true,
+      incidentId: INC,
+    });
+    expect(m.rpc).toHaveBeenCalledWith('report_down_by_hand', {
+      p_incident_id: INC,
+      p_note: '502 again',
+      p_outside_hours: true,
+    });
+    expect(m.after).toHaveBeenCalledTimes(1);
+  });
+
+  it('a DOWN still open is refused in words', async () => {
+    m.hours.mockResolvedValue(HOURS);
+    m.rpc.mockResolvedValue({ data: null, error: { code: '55000', hint: 'not_down_again', message: 'x' } });
+    expect(await reportDownByHand({ incidentId: INC })).toEqual({
+      ok: false,
+      message: 'This incident is down already, or closed.',
+    });
+    expect(m.after).not.toHaveBeenCalled();
+  });
+
+  it('a bad id never reaches the database', async () => {
+    expect((await reportDownByHand({ incidentId: 'nope' })).ok).toBe(false);
+    expect(m.rpc).not.toHaveBeenCalled();
   });
 });
 

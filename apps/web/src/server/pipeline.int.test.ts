@@ -1573,4 +1573,83 @@ describe('monitor fault by hand (S12b, spec §30, D-053 item 5, D-055; Done-when
     );
     expect(rec.map((n) => n.status)).toEqual(['sent']);
   });
+
+  it('Down again by hand (D-055 item 7): DOWN AGAIN goes from the request, an older OK round never recovers it, the engine back writes one line', async () => {
+    const arm = await profileId('arm@example.test');
+    const { siteId, monitorId } = await newSite('Down again', { primary_owner_id: arm });
+    mine.push(siteId);
+    // A probes incident that dropped 40 min ago and recovered 20 min ago (Monitoring).
+    const ago = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+    const incidentId = await must(
+      db.rpc('engine_open_incident', {
+        p_site_id: siteId,
+        p_monitor_id: monitorId,
+        p_trigger: 'hard_fail',
+        p_severity: 'down',
+        p_started_at: ago(40),
+        p_detected_at: ago(39),
+        p_round_at: ago(40),
+        p_context: { cause: 'Hard fail' },
+        p_notify: true,
+      }),
+    );
+    await must(
+      db.rpc('engine_recover_incident', {
+        p_incident_id: incidentId,
+        p_from: 'unacked',
+        p_to: 'monitoring',
+        p_recovered_at: ago(20),
+        p_round_at: ago(20),
+        p_context: {},
+        p_notify: true,
+        p_flip_ok: true,
+      }),
+    );
+
+    await engineDown();
+    const tao = await signedIn('tao@example.test');
+    const down = await tao.rpc('report_down_by_hand', {
+      p_incident_id: incidentId,
+      p_note: '502 again',
+      p_outside_hours: false,
+    });
+    expect(down.error).toBeNull();
+    expect(down.data).toBe('relapse');
+
+    const post = vi.fn(async (_url: string, _msg: { text: string }) => ({
+      ok: true as const,
+      messageName: 'spaces/S/messages/M',
+    }));
+    const deps = {
+      db,
+      webhookUrl: 'https://chat.example.test/webhook',
+      email: undefined,
+      appUrl: 'https://monitor.example.test',
+      post,
+    };
+    // One message per thread per pass, in order: DOWN, RECOVERED, then DOWN AGAIN.
+    for (let pass = 0; pass < 4; pass++)
+      await dispatchNotifications(deps, { incidentId, deadline: Date.now() + 20_000 });
+    const again = await must(
+      db
+        .from('notifications')
+        .select('status')
+        .eq('incident_id', incidentId)
+        .eq('template', 'down_again')
+        .eq('channel', 'google_chat'),
+    );
+    expect(again.map((n) => n.status)).toEqual(['sent']);
+    expect(post.mock.calls.some(([, m]) => m.text.includes('reported by hand by Tao'))).toBe(true);
+
+    // An OK round from before the press; the engine back from the cron and a Bangkok batch at once.
+    await results(monitorId, okRound());
+    await Promise.all([runEngine(db, new Date()), runEngine(db, new Date(Date.now() + 1000))]);
+    const [inc] = await must(db.from('incidents').select('state, recovered_at').eq('id', incidentId));
+    // Still down; the ladder kept its clock from the first drop (D-004), so the engine back escalates it.
+    expect(inc).toMatchObject({ state: 'escalated', recovered_at: null });
+    const back = await must(
+      db.from('incident_events').select('type').eq('incident_id', incidentId).eq('type', 'engine_back'),
+    );
+    expect(back).toHaveLength(1);
+  });
 });

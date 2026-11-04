@@ -53,6 +53,14 @@ export const manualIncidentSchema = z.object({
 
 export type ManualIncidentInput = z.input<typeof manualIncidentSchema>;
 
+/** "Down again" by hand on a site whose incident is still open (D-055 item 7): the note as above. */
+export const downAgainSchema = z.object({
+  incidentId: incidentIdSchema,
+  note: z.string().trim().max(500, 'Keep it under 500 characters').default(''),
+});
+
+export type DownAgainInput = z.input<typeof downAgainSchema>;
+
 /** Escalate now (spec §30.6): the level the person saw on the button (L1–L3). */
 export const escalateNowSchema = z.object({ incidentId: incidentIdSchema, level: z.int().min(1).max(3) });
 

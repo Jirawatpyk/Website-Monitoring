@@ -3,6 +3,7 @@ import { buildDownAlert, type ChatMessage } from './chat-alerts';
 import { buildClientUpdateDueAlert } from './client-update-alerts';
 import { buildClientUpdateDueEmail, buildDownEmail, buildStepEmail } from './email-alerts';
 import { buildStepAlert } from './escalation-alerts';
+import { buildAgainAlert } from './relapse-alerts';
 
 // Spec §30 sample (test data only): realme.link opened by hand as INC-0143 at Sat 26 Sep 02:31 while the
 // status engine was down; Ploy on call, Arm backup, Thee the AM; Escalate now L1 at 02:35 (S12b, D-055).
@@ -226,5 +227,37 @@ describe('a display name can never inject a mention (message check M1)', () => {
     });
     expect(msg.text).not.toContain('<users/all>');
     expect(JSON.stringify(msg.cardsV2)).not.toContain('<users/all>');
+  });
+});
+
+describe('DOWN AGAIN reported by hand (D-055 item 7)', () => {
+  const msg = buildAgainAlert({
+    incidentId: 'i142',
+    incidentNumber: 142,
+    site: 'MuvMi',
+    tier: 1,
+    severity: 'down',
+    trigger: 'manual',
+    mention: arm,
+    ackedBy: null,
+    fromState: 'monitoring',
+    droppedAt: at('2026-09-26T02:40:00'),
+    backSince: at('2026-09-26T00:10:00'),
+    minutesSoFar: 10,
+    nowFlapping: false,
+    flapping: false,
+    manual: { openedBy: 'Tao', note: '502 again' },
+  });
+
+  it('the text line says who reported it', () => {
+    expect(msg.text).toBe(
+      '<users/ARM> DOWN AGAIN · MuvMi (Tier 1) · same incident INC-0142 · reported by hand by Tao',
+    );
+  });
+
+  it('the reply says what they saw and that no probe checked it', () => {
+    expect(JSON.stringify(widgets(msg))).toContain(
+      'Hand check by Tao · “502 again” — no probe check, the status engine is down.',
+    );
   });
 });
