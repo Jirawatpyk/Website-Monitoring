@@ -102,6 +102,19 @@ export async function clearBeat(name: string): Promise<void> {
   });
 }
 
+/**
+ * After a run: the `E2E …` sites the specs made stop being monitored, so the next local run doesn't
+ * render (and the engine doesn't judge) a hundred leftover sites and incidents (S12b retro). Each spec
+ * makes its own sites, so none relies on an earlier run's.
+ */
+export async function retireE2ESites(): Promise<void> {
+  await admin('/rest/v1/sites?name=like.E2E*&is_active=eq.true', {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ is_active: false }),
+  });
+}
+
 /** Sign `email` in and copy the session cookies into the browser context. */
 export async function signIn(context: BrowserContext, baseURL: string, email: string): Promise<void> {
   assertLocal();

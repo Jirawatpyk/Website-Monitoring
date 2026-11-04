@@ -33,7 +33,7 @@
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | Done |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Done |
 | S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | Done |
-| S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | In progress |
+| S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | In review |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Todo |
@@ -638,6 +638,30 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   2. Escalate now sends the next level and the client-update reminder once each; the automatic timers don't repeat them when the engine is back.
   3. spec-checker passes MainFault and the Escalate-now state.
 - **Review:** engine-reviewer, message-checker, spec-checker, security-reviewer.
+- **Decisions:** D-055 (Tao, 4 Nov 2026).
+  - "Nothing escalates on its own" only when no engine run of any kind has happened for 3 min (the new `engine-run` beat).
+  - A manual L0 email keeps D-047's grace.
+  - The reminder can go by hand before it is due.
+  - Left for a follow-up (item 6): a by-hand Down again, and the §30.8 timeline line.
+- **Evidence (`/slice-review`, 4 Nov 2026; staging runs and `/verify` by Claude after Tao ran `/verify`):**
+  1. **Run 1, staging.** Vercel crons were off from 10:26:56 UTC.
+     - Loads OK was recorded at 10:31:07.
+     - Down with a note opened INC-0062 (Manual, started 10:32:21). Its DOWN Chat line was sent at 10:32:22.963 with a message id, from the request. The L0 email was held until 10:37:21 (D-047), then sent.
+     - Tests: pgTAP `hand_check.test.sql` (51); `pipeline.int.test.ts` "monitor fault by hand"; e2e `probes.spec.ts` "Loads OK, Down — open incident, Escalate now · L1" (desktop and phone).
+  2. **Run 2, staging.** `dxt-agent@staging` was also stopped (10:33:14), so no engine ran at all.
+     - Escalate now · L1 at 10:37:10: `step_fired` L1 by hand, Chat plus 2 emails, `down:L1`.
+     - The reminder by hand at 10:37:38: Chat plus the AM's email.
+     - The engine came back at 10:47:24, past both due times (10:47:21). At 10:50:43 there was still one L1 and one `client_update_due`. The incident recovered at 10:49:01 on the first full round after the hand check, and RECOVERED was sent.
+     - Tests: pgTAP shows `engine_fire_step` / `engine_client_update_due` refusing afterwards. The int test runs the engine twice, asserts 1 + 1, then follows a recovery after two OK rounds.
+  3. **Reviews.**
+     - spec-checker on MainFault + MOverview4 and on Incident / MIncident Manual: no High; Mediums fixed or deferred to D-055 item 6.
+     - `/verify` on staging covered:
+       - 1440 light and dark, 820 dark, 390 light;
+       - keyboard: Enter opens the Down dialog with focus in the note, Escape returns focus to the button;
+       - the Escalate-now confirm, the reminder confirm and the engine-back box;
+       - Escalate now absent while a Bangkok-triggered engine runs.
+     - Found and fixed during it: the ladder status squeezing names, the Resolve count, "(by hand)" missing, and "Latest round" showing stale locations.
+     - code-review high: 6 findings, all fixed. security-reviewer: pass. db-reviewer: H1 fixed (`judgedFrom`). engine-reviewer: M1–M3 fixed, M4 deferred. message-checker: M1–M4 fixed.
 
 ### S13 · SSL & domain expiry
 
