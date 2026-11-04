@@ -1504,6 +1504,8 @@ describe('monitor fault by hand (S12b, spec §30, D-053 item 5, D-055; Done-when
       p_incident_id: incidentId,
     });
     expect(reminder.error).toBeNull();
+    // As the actions do: what they queued leaves from the request.
+    await dispatchNotifications(deps, { incidentId, deadline: Date.now() + 20_000 });
 
     // An OK round from before the hand check (2 min ago) never recovers it (db review H1).
     await results(monitorId, okRound());
@@ -1533,5 +1535,42 @@ describe('monitor fault by hand (S12b, spec §30, D-053 item 5, D-055; Done-when
       p_level: 2,
     });
     expect(again.error?.hint).toBe('engine_running');
+
+    // The engine back for real: two OK rounds after the hand check recover it (plan item 4). The
+    // incident is moved back 4 min so those rounds are in the past; the probes beat now.
+    await beat('SIN', new Date());
+    await beat('TYO', new Date());
+    const minute = Math.floor(Date.now() / 60_000) * 60_000;
+    const back = new Date(minute - 4 * 60_000).toISOString();
+    await must(
+      db.from('incidents').update({ started_at: back, detected_at: back }).eq('id', incidentId).select('id'),
+    );
+    for (const m of [3, 2]) {
+      const at = minute - m * 60_000;
+      await results(monitorId, [
+        ['SIN', 'pass', new Date(at + 1000)],
+        ['TYO', 'pass', new Date(at + 2000)],
+      ]);
+    }
+    await runEngine(db, new Date());
+    await runEngine(db, new Date(Date.now() + 1000));
+    const [recovered] = await must(
+      db.from('incidents').select('state, started_at, recovered_at').eq('id', incidentId),
+    );
+    expect(['monitoring', 'needs_root_cause']).toContain(recovered!.state);
+    expect(Date.parse(recovered!.recovered_at!)).toBeGreaterThanOrEqual(Date.parse(recovered!.started_at));
+    // RECOVERED renders from a detected payload with no cause or confirming locations.
+    // A thread leaves one message per pass, in order (claim_notifications): as the notifier cron sweeps.
+    for (let pass = 0; pass < 4; pass++)
+      await dispatchNotifications(deps, { incidentId, deadline: Date.now() + 20_000 });
+    const rec = await must(
+      db
+        .from('notifications')
+        .select('template, status')
+        .eq('incident_id', incidentId)
+        .eq('template', 'recovered')
+        .eq('channel', 'google_chat'),
+    );
+    expect(rec.map((n) => n.status)).toEqual(['sent']);
   });
 });

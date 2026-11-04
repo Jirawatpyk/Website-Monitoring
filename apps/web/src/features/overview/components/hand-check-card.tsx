@@ -203,7 +203,7 @@ function DesktopRow({ row, asOf, ...rest }: RowProps) {
       </span>
       <div role="cell" className="flex flex-col items-start gap-1">
         {row.status ? <SiteStatusBadge status={row.status} /> : <span className="text-fg-tertiary">—</span>}
-        {asOf && <span className="text-xs text-fg-secondary">{`as of ${asOf}`}</span>}
+        {row.status && asOf && <span className="text-xs text-fg-secondary">{`as of ${asOf}`}</span>}
       </div>
       <div role="cell">
         <Line line={row.line} />
