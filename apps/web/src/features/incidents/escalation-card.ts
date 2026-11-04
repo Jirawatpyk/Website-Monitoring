@@ -100,13 +100,20 @@ const buttonWho = (targets: readonly EscalationTarget[], p: LadderPeople) => {
  * site", not met — so the two cards agree. Resolve stays locked by OK-for-2-rounds anyway.
  */
 export function pendingClientUpdate<
-  G extends { conditions: { key: string; met: boolean; detail: string }[]; metCount: number },
+  G extends {
+    conditions: { key: string; met: boolean; detail: string }[];
+    metCount: number;
+    lockedReason: string | null;
+  },
 >(reminder: { dueAt: string } | null, gate: G): G {
   if (!reminder) return gate;
   const conditions = gate.conditions.map((c) =>
     c.key === 'client_update' ? { ...c, met: false, detail: `Due ${reminder.dueAt} · client site` } : c,
   );
-  return { ...gate, conditions, metCount: conditions.filter((c) => c.met).length };
+  const metCount = conditions.filter((c) => c.met).length;
+  // The locked line counts the same conditions as the card's header (staging /verify, 4 Nov).
+  const lockedReason = gate.lockedReason?.replace(/· \d of 3 met/, `· ${metCount} of 3 met`) ?? null;
+  return { ...gate, conditions, metCount, lockedReason };
 }
 
 export function escalationCardOf(input: {

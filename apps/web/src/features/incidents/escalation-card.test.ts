@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EscalationPlan } from '@dxt/shared';
-import { escalationCardOf } from './escalation-card';
+import { escalationCardOf, pendingClientUpdate } from './escalation-card';
 
 // Spec §30.6–8 sample (test data only): realme.link INC-0143 opened by hand Sat 26 Sep 02:31, the
 // engine down since 02:17; Ploy on call (L0), Arm backup, Tao Admin, Thee the AM; L1 sent by hand 02:35.
@@ -137,4 +137,23 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
   it('no plan (an incident from before S08): no card', () => {
     expect(escalationCardOf({ ...base, plan: null })).toBeNull();
   });
+});
+
+describe('pendingClientUpdate — the Resolve card agrees with the pre-fire reminder (D-055 item 3)', () => {
+  const gate = {
+    conditions: [
+      { key: 'recovery', met: false, detail: 'Still down' },
+      { key: 'client_update', met: true, detail: 'Not required — the client-update track didn’t fire' },
+      { key: 'root_cause', met: false, detail: 'Not written yet' },
+    ],
+    metCount: 1,
+    lockedReason: 'Resolve locked · 1 of 3 met — Test target is still down',
+  };
+  it('the condition is due, not met, and the locked line counts the same', () => {
+    const g = pendingClientUpdate({ dueAt: '02:46' }, gate);
+    expect(g.conditions[1]).toMatchObject({ met: false, detail: 'Due 02:46 · client site' });
+    expect(g.metCount).toBe(0);
+    expect(g.lockedReason).toBe('Resolve locked · 0 of 3 met — Test target is still down');
+  });
+  it('no reminder: unchanged', () => expect(pendingClientUpdate(null, gate)).toBe(gate));
 });
