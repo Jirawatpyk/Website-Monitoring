@@ -33,7 +33,7 @@
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | Done |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Done |
 | S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | Done |
-| S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | In review |
+| S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Done |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Todo |
@@ -662,6 +662,8 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
        - Escalate now absent while a Bangkok-triggered engine runs.
      - Found and fixed during it: the ladder status squeezing names, the Resolve count, "(by hand)" missing, and "Latest round" showing stale locations.
      - code-review high: 6 findings, all fixed. security-reviewer: pass. db-reviewer: H1 fixed (`judgedFrom`). engine-reviewer: M1–M3 fixed, M4 deferred. message-checker: M1–M4 fixed.
+
+  Done on 4 Nov 2026, when #174 merged (788c202). The schema had merged in #173 (1ea1436). Production deploy READY, with no runtime errors in its first 15 min.
 
 ### S13 · SSL & domain expiry
 
