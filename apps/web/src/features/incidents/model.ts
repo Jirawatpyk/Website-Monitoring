@@ -456,6 +456,8 @@ export interface ClientUpdateCard {
   dueAt: string;
   /** When the @mention went (the `client_update_due` event): the due time, or a muted incident's late alert. */
   notifiedAt: string;
+  /** Sent by hand while the engine was stopped (§30.7): "Notified 02:36 (by hand)". */
+  byHand: boolean;
   /** "10:03 · Tier 1 down 15 min". */
   dueLine: string;
   status: 'pending' | 'marked' | 'not_needed';
@@ -482,7 +484,8 @@ export function clientUpdateCardOf(input: {
   note: string | null;
   tier: number;
   /** What the `client_update_due` event recorded: whom it told and when (null for an older row). */
-  notified: { am: string | null; at: string } | null;
+  /** `byHand`: sent with "Send client-update reminder now" (S12b, §30.7). */
+  notified: { am: string | null; at: string; byHand?: boolean } | null;
   /** The client's AM now: the fallback when no event was read. */
   am: string | null;
   client: string;
@@ -494,7 +497,8 @@ export function clientUpdateCardOf(input: {
   const am = input.notified ? input.notified.am : input.am;
   const notifiedAt = input.notified?.at ?? input.dueAt;
   const due = formatTime(new Date(input.dueAt));
-  const told = formatTime(new Date(notifiedAt));
+  // §30.7: "Thee notified 02:36 (by hand)".
+  const told = `${formatTime(new Date(notifiedAt))}${input.notified?.byHand ? ' (by hand)' : ''}`;
   const at = input.updatedAt ? formatTime(new Date(input.updatedAt)) : null;
   const status = !input.updatedAt ? 'pending' : input.notNeeded ? 'not_needed' : 'marked';
   const by = input.by ?? 'someone';
@@ -503,6 +507,7 @@ export function clientUpdateCardOf(input: {
     client: input.client,
     dueAt: input.dueAt,
     notifiedAt,
+    byHand: input.notified?.byHand === true,
     dueLine: `${due} · ${clientUpdateWhy(input.tier)}`,
     status,
     stateText:

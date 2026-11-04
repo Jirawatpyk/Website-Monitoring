@@ -610,6 +610,7 @@ function clientUpdateOf(
     ? {
         am: typeof fired.payload.am === 'string' && fired.payload.noAm !== true ? fired.payload.am : null,
         at: fired.at,
+        byHand: fired.payload.byHand === true,
       }
     : null;
   const am = notified ? notified.am : amId ? nameOf(amId) : null;

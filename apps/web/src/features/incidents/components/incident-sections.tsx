@@ -178,17 +178,26 @@ export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
     );
   if (!latest.length) return null;
   const at = latestRoundAt(d);
+  // A location silent for 3 min before the round shown has no result in it (a probe down, a sweep
+  // fault — staging /verify S12b): "No data", not its old pass, and it doesn't count in the verdict.
+  const fresh = (l: (typeof latest)[number]) =>
+    !at || !l.latest?.at || Date.parse(at) - Date.parse(l.latest.at) < STALE_LOCATION_MS;
+  const counted = latest.filter(fresh);
   return (
     <Card
       title={at ? `Latest round · ${formatTimeWithSeconds(new Date(at))}` : 'Latest round'}
       headingLevel={2}
-      description={roundVerdict(latest.map((l) => l.latest!.glyph))}
+      description={roundVerdict(counted.map((l) => l.latest!.glyph))}
     >
       <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
         {latest.map((l) => (
           <li key={l.location} className="flex items-center justify-between gap-3 text-sm">
             <span className="font-medium">{l.location}</span>
-            <CheckText cell={l.latest} location={l.location} />
+            {fresh(l) ? (
+              <CheckText cell={l.latest} location={l.location} />
+            ) : (
+              <CheckText cell={{ text: 'No data', glyph: 'none' }} location={l.location} />
+            )}
           </li>
         ))}
       </ul>
@@ -286,6 +295,9 @@ const LOCATION_LABELS: Record<string, string> = {
 };
 
 /** The newest of the locations' latest checks. */
+/** A location whose newest check is this much older than the round shown is out of it. */
+const STALE_LOCATION_MS = 3 * 60_000;
+
 function latestRoundAt(d: Pick<IncidentDetail, 'locations'>): string | null {
   const times = d.locations.flatMap((l) => (l.latest?.at ? [l.latest.at] : [])).sort();
   return times.at(-1) ?? null;
