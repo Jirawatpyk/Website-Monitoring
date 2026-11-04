@@ -9,6 +9,8 @@ import {
   type PageFact,
   latestPerView,
   decideSite,
+  faultState,
+  probeMissing,
   problemHoldUntil,
   isInsideHours,
   bkkControlDown,
@@ -211,15 +213,16 @@ export async function runEngine(
   if (reminded.error)
     console.error(JSON.stringify({ event: 'engine_window_reminders_failed', error: reminded.error.message }));
   else if (typeof reminded.data === 'number') summary.notified += reminded.data;
-  const [sites, locations, hours] = await Promise.all([
+  const [sites, locationRows, hours] = await Promise.all([
     loadSites(db, now),
-    loadLocations(db, now),
+    loadLocationRows(db),
     loadResponseHours(db, now),
   ]);
+  const locations = beatingOf(locationRows, now);
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
     const verifier = await loadVerifierState(db, now, now);
-    summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations, {
+    summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations, locationRows, {
       failing: null,
       sites: new Set(),
     });
@@ -437,7 +440,7 @@ export async function runEngine(
     failures.push(`client update: ${err instanceof Error ? err.message : String(err)}`);
     console.error(JSON.stringify({ event: 'engine_client_update_failed', error: String(err) }));
   }
-  summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, {
+  summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, locationRows, {
     failing: control,
     sites: controlSites,
   });
@@ -587,16 +590,56 @@ export async function runEngine(
   }
 }
 
-/** The active locations whose probe beat in the last 3 min (D-019). */
-async function loadLocations(db: DbClient, now: Date): Promise<ProbeLocation[]> {
+/**
+ * The one active location missing > 3 min while the others beat (S12a, D-053), and whether the engine
+ * cron's sweep is stale — then the alert is left as it is: an engine run after a BKK ingest must not
+ * clear (and later re-send) it.
+ */
+async function missingLocation(
+  db: DbClient,
+  rows: readonly LocationRow[],
+  now: Date,
+): Promise<{ engineFault: boolean; missing: string | null }> {
+  const sweep = await db
+    .from('agent_heartbeats')
+    .select('last_seen_at')
+    .eq('name', 'engine-sweep')
+    .maybeSingle();
+  if (sweep.error) {
+    // Unknown: hold the alert as during a fault, and let the alerts after it still run (engine review L9).
+    console.error(JSON.stringify({ event: 'engine_sweep_read_failed', error: sweep.error.message }));
+    return { engineFault: true, missing: null };
+  }
+  const state = faultState({
+    sweepAt: sweep.data?.last_seen_at ? new Date(sweep.data.last_seen_at) : null,
+    lastRoundAt: null,
+    locations: rows.map((l) => ({
+      code: l.code,
+      lastBeatAt: l.last_heartbeat_at ? new Date(l.last_heartbeat_at) : null,
+    })),
+    now,
+  });
+  return { engineFault: state.engineFault, missing: probeMissing(state) };
+}
+
+type LocationRow = { code: string; last_heartbeat_at: string | null };
+
+/** The active probe locations with their last beat (one read per run, D-019 and S12a). */
+async function loadLocationRows(db: DbClient): Promise<LocationRow[]> {
   const { data, error } = await db
     .from('probe_locations')
     .select('code, last_heartbeat_at')
     .eq('is_active', true);
   if (error) throw new Error(error.message);
-  return (data ?? [])
+  return data ?? [];
+}
+
+/** The active locations whose probe beat in the last 3 min (D-019). */
+function beatingOf(rows: readonly LocationRow[], now: Date): ProbeLocation[] {
+  return rows
     .filter(
-      (l) => !!l.last_heartbeat_at && now.getTime() - Date.parse(l.last_heartbeat_at) <= HEARTBEAT_FRESH_MS,
+      // `<`: at exactly 3 min a location is missing, as `faultState` says (engine review L4)
+      (l) => !!l.last_heartbeat_at && now.getTime() - Date.parse(l.last_heartbeat_at) < HEARTBEAT_FRESH_MS,
     )
     .map((l) => l.code as ProbeLocation);
 }
@@ -812,6 +855,7 @@ async function adminAlerts(
   verifier: Awaited<ReturnType<typeof loadVerifierState>>,
   unverifiedSites: ReadonlyMap<string, string>,
   locations: readonly ProbeLocation[],
+  locationRows: readonly LocationRow[],
   /**
    * D-028: `bkkControlFailing` (true = failing, false = passing, null = no evidence: leave it) and
    * the sites it left unverified this run.
@@ -858,6 +902,25 @@ async function adminAlerts(
   const low = verifier.openAlerts.get('probe_locations_low');
   if (locations.length < 2 && !low) await open('probe_locations_low', { active: [...locations].sort() });
   else if (locations.length >= 2 && low && settled(low)) await clear('probe_locations_low');
+
+  // S12a (spec §15.3, D-053): one location missing > 3 min while the others beat → the Admins' email,
+  // no page; never during an engine fault (the cron sweep stale) or with two missing (`probe_locations_low`).
+  const { engineFault, missing: missingNow } = await missingLocation(db, locationRows, now);
+  const gone = verifier.openAlerts.get('probe_location_missing');
+  // the email's Since is the location's last report (§15.3: SIN 03:12, emailed 03:15)
+  const missingContext = (code: string) => ({
+    location: code,
+    lastBeatAt: locationRows.find((l) => l.code === code)?.last_heartbeat_at ?? null,
+  });
+  if (engineFault) {
+    // leave it as it is until the sweep is back
+  } else if (missingNow && gone && gone.context.location !== missingNow && settled(gone)) {
+    // another location went missing: the Admins hear about that one too — once the open one is
+    // 10 min old, so two locations taking turns can't email every run (engine review L5)
+    await clear('probe_location_missing');
+    await open('probe_location_missing', missingContext(missingNow));
+  } else if (missingNow && !gone) await open('probe_location_missing', missingContext(missingNow));
+  else if (!missingNow && gone && settled(gone)) await clear('probe_location_missing');
 
   // D-028: the BKK VPS's own network failing its control check — the Admin's to fix. The sites it
   // leaves unverified (D-027) are listed; cleared once it passes again, no sooner than 10 min.

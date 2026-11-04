@@ -18,11 +18,16 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 .ck-re svg{width:12px;height:12px}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1730px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 2040px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
 
 <div style="position: absolute; top: 10px; right: 40px; display: flex; gap: 8px">
+<div style="padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono)">CASE</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Which incident" options="{{caseOpts}}" value="{{caseV}}" on-change="{{setCase}}" size="sm"></x-import>
+</div>
+<sc-if value="{{notManual}}" hint-placeholder-val="{{true}}">
 <div style="padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">
 <span style="font-family: var(--font-mono)">OPENED</span>
 <x-import component-from-global-scope="Aura.SegmentedControl" label="When the incident opened" options="{{openedOpts}}" value="{{opened}}" on-change="{{setOpened}}" size="sm"></x-import>
@@ -31,33 +36,34 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <span style="font-family: var(--font-mono)">STATE</span>
 <x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import>
 </div>
+</sc-if>
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
 <a href="Incidents.dc.html" style="text-decoration: none">Incidents</a>
 <x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
-<span style="font-family: var(--font-mono); font-size: 12px">INC-0142</span>
+<span style="font-family: var(--font-mono); font-size: 12px">{{m.id}}</span>
 </div>
 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 24px">
 <div style="display: flex; flex-direction: column; gap: 10px">
 <div style="display: flex; align-items: center; gap: 16px">
-<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">MuvMi is down</h1>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">{{m.h1}}</h1>
 <x-import component-from-global-scope="Aura.Badge" tone="danger" variant="solid" icon="ban">Down</x-import>
 </div>
 <div style="display: flex; align-items: center; gap: 8px">
 <sc-if value="{{notAcked}}" hint-placeholder-val="{{true}}">
-<x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="arrow-up-right">Escalated · L1</x-import>
-<span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-danger); padding-right: 4px">18 min unacked</span>
+<x-import component-from-global-scope="Aura.Badge" tone="{{m.wfTone}}" variant="outline" icon="{{m.wfIcon}}">{{m.wfLabel}}</x-import>
+<span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-danger); padding-right: 4px">{{m.unacked}}</span>
 </sc-if>
 <sc-if value="{{acked}}" hint-placeholder-val="{{false}}">
 <x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="check">Acknowledged</x-import>
 </sc-if>
 <x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Tier 1</x-import>
-<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Trigger: Hard fail</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Trigger: {{m.trigger}}</x-import>
 </div>
-<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">Primary monitor · HTTP GET / · Timeout &gt; 30 s (BKK, TYO) · HTTP 504 (SIN)</span>
-<sc-if value="{{night}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.5"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="moon" size="sm"></x-import></span><span><b style="font-weight: 600">On call · Ploy</b> (Tier 1, outside response hours) — paged at L0, the person who acts. <span style="color: var(--aura-fg-secondary)">Owner Arm isn’t paged outside response hours.</span></span></span></sc-if>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{m.causeLine}}</span>
+<sc-if value="{{night}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.5"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="moon" size="sm"></x-import></span><span><b style="font-weight: 600">On call · Ploy</b> (Tier 1, outside response hours) — paged at L0, the person who acts. <span style="color: var(--aura-fg-secondary)">Owner {{m.owner}} isn’t paged outside response hours.</span></span></span></sc-if>
 </div>
 <div style="display: flex; align-items: center; gap: 12px">
 <x-import component-from-global-scope="Aura.Button" variant="ghost" icon="pencil" on-click="{{openNote}}">Add note</x-import>
@@ -73,8 +79,8 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </div>
 
 <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius); box-shadow: var(--aura-shadow-enterprise)">
-<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">STARTED</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">09:48:12</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">First failed check</span></div>
-<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">CONFIRMED DOWN</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">09:48:41</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Immediate recheck · MTTD 29 s</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">STARTED</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">{{m.started}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{m.startedSub}}</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">CONFIRMED DOWN</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">{{m.conf}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{m.confSub}}</span></div>
 <div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">DURATION</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--aura-fg-danger)">{{duration}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Still down</span></div>
 <div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ESCALATION</span><span style="font-size: 15px; font-weight: 600">{{escLevel}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{escNext}}</span></div>
 <div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{own.label}}</span><span style="font-size: 15px; font-weight: 600">{{own.name}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{own.sub}}</span></div>
@@ -85,8 +91,8 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 20px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-lg)">
 <span style="display: flex; color: var(--aura-alert-warning-fg); padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="md"></x-import></span>
 <div style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.5">
-<span style="font-size: 16px; font-weight: 600; color: var(--aura-alert-warning-fg)">Client update due 10:03 · Bua notified 10:03 · not marked yet</span>
-<span>Tier 1 down over 15 min, so Bua (AM) was @mentioned in the thread with a draft. Acknowledging does not stop this track — mark it in the Client update card once MuvMi has been told, or mark it “Not needed” with a reason.</span>
+<span style="font-size: 16px; font-weight: 600; color: var(--aura-alert-warning-fg)">{{m.cuTitle}}</span>
+<span>{{m.cuText}}</span>
 </div>
 </div>
 </sc-if>
@@ -95,6 +101,14 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 
 <div style="grid-column: span 2; display: flex; flex-direction: column; gap: 16px; min-width: 0">
 <div class="aura-card">
+<sc-if value="{{m.noEvidence}}" hint-placeholder-val="{{false}}">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Evidence by location</h3>
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="circle-dot-dashed" size="sm"></x-import></span>
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">Opened by hand while the status engine was down — no probe results for this check</span><span style="color: var(--aura-fg-secondary)">What Tao saw: “Home page shows a 502 error” (02:31). Probe evidence starts with the first round after the engine is back.</span></span>
+</div>
+</sc-if>
+<sc-if value="{{notManual}}" hint-placeholder-val="{{true}}">
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
 <h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Evidence by location</h3>
 <span style="font-size: 13px; color: var(--aura-fg-secondary)">3 of 3 locations hard fail on 2 checks in a row → DOWN (2 of 3 needed)</span>
@@ -131,6 +145,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <span style="display: flex"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="image" on-click="{{openShot}}">Open full size</x-import></span>
 </div>
 </div>
+</sc-if>
 </div>
 
 <div class="aura-card">
@@ -158,17 +173,17 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <div class="aura-card">
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
 <h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Client update</h3>
-<sc-if value="{{cuOpen}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="clock">Due 10:03</x-import></sc-if>
+<sc-if value="{{cuOpen}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="clock">Due {{m.cuDue}}</x-import></sc-if>
 <sc-if value="{{cuDone}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="success" variant="outline" icon="circle-check">{{cuBadge}}</x-import></sc-if>
 </div>
 <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
-<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="Bua" size="sm"></x-import><span style="flex-grow: 1"><span style="font-weight: 500">Bua</span> · Account manager</span><span style="color: var(--aura-fg-secondary)">Notified 10:03</span></div>
-<div style="display: flex; justify-content: space-between; gap: 8px"><span style="color: var(--aura-fg-secondary)">Due</span><span>10:03 · Tier 1 down 15 min</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="{{m.am}}" size="sm"></x-import><span style="flex-grow: 1"><span style="font-weight: 500">{{m.am}}</span> · Account manager</span><span style="color: var(--aura-fg-secondary)">{{m.amNote}}</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="color: var(--aura-fg-secondary)">Due</span><span>{{m.cuDueLine}}</span></div>
 <div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary); flex-shrink: 0">State</span><span style="font-weight: 500; text-align: right; color: {{cuColor}}">{{cuState}}</span></div>
 <sc-if value="{{cuHasNote}}" hint-placeholder-val="{{false}}"><div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary); flex-shrink: 0">{{cuNoteLabel}}</span><span style="text-align: right">{{cuNote}}</span></div></sc-if>
 </div>
 <div style="display: flex; align-items: center; justify-content: space-between">
-<span style="font-size: 12px; color: var(--aura-fg-secondary)">Draft for MuvMi</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Draft for {{m.client}}</span>
 <span style="display: flex; align-items: center; gap: 4px"><x-import component-from-global-scope="Aura.IconButton" icon="{{copyIcon}}" label="{{copyLabel}}" size="sm" on-click="{{copy}}"></x-import><x-import component-from-global-scope="Aura.SegmentedControl" label="Language" options="{{langs}}" value="{{lang}}" on-change="{{setLang}}" size="sm"></x-import></span>
 </div>
 <div style="padding: 12px 14px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-sm); font-size: 13px; line-height: 1.7; white-space: pre-line">{{template}}</div>
@@ -177,6 +192,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <sc-if value="{{cuSecondary}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="check" size="sm" on-click="{{markUpdated}}">Mark client updated</x-import></sc-if>
 <sc-if value="{{cuOpen}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{openNn}}">Not needed…</x-import></sc-if>
 </div>
+<sc-if value="{{m.canCu}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5"><span>The engine is down, so the 15-min reminder to {{m.am}} won’t go out on its own.</span><span style="display: flex"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="mail" on-click="{{askCu}}">Send client-update reminder now</x-import></span></div></sc-if>
 <span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{cuFoot}}</span>
 </div>
 
@@ -194,6 +210,8 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </div>
 </sc-for>
 </div>
+<sc-if value="{{m.canEsc}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; gap: 8px"><span style="display: flex; padding-top: 2px; color: var(--aura-alert-danger-fg)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import></span><span><b style="font-weight: 600">Nothing escalates on its own</b> — the status engine is down since 02:17. Send the next level by hand if nobody acknowledges.</span></span><span style="display: flex"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="arrow-up-right" on-click="{{askEsc}}">{{m.escLabel}}</x-import></span></div></sc-if>
+<sc-if value="{{m.engineBack}}" hint-placeholder-val="{{false}}"><div style="display: flex; gap: 8px; padding: 10px 12px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span><span>Automatic escalation is running again — levels already sent won’t repeat.</span></div></sc-if>
 <span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{ladderFoot}}</span>
 </div>
 
@@ -244,12 +262,25 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
 <div role="status" aria-live="polite" style="position: absolute; left: 280px; bottom: 24px; width: 520px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 12px 12px 12px 18px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); line-height: 1.45">
 <span style="display: flex"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
-<span style="flex-grow: 1; display: flex; flex-direction: column; font-size: 13px"><span><span style="font-weight: 600">Acknowledged INC-0142</span> · L1–L2 stopped</span><span style="font-size: 12px; opacity: 0.75">Posting to Chat, email and webhooks in {{left}} s — nothing is sent until then</span></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; font-size: 13px"><span><span style="font-weight: 600">Acknowledged {{m.id}}</span> · {{m.ackStop}}</span><span style="font-size: 12px; opacity: 0.75">Posting to Chat, email and webhooks in {{left}} s — nothing is sent until then</span></span>
 <button type="button" onClick="{{undo}}" style="height: 36px; padding: 0 16px; flex-shrink: 0; border-radius: 9999px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer">Undo · {{left}} s</button>
 </div>
 </sc-if>
 
-<x-import component-from-global-scope="Aura.Dialog" open="{{nnOpen}}" on-close="{{closeNn}}" title="Client update not needed" description="INC-0142 · MuvMi · Tier 1 · AM Bua · due 10:03" size="md" auto-focus="{{no}}">
+<x-import component-from-global-scope="Aura.Dialog" open="{{sendOpen}}" on-close="{{closeSend}}" title="{{send.title}}" description="{{send.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{send.who}}" as="w" hint-placeholder-count="2"><div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: {{w.border}}; font-size: 13px; line-height: 1.4"><x-import component-from-global-scope="Aura.Avatar" name="{{w.n}}" size="sm"></x-import><span style="flex-grow: 1"><b style="font-weight: 600">{{w.n}}</b> <span style="color: var(--aura-fg-secondary)">· {{w.role}}</span></span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{w.how}}</span></div></sc-for>
+</div>
+<div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Sent at once · logged</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeSend}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="{{send.icon}}" on-click="{{doSend}}">{{send.cta}}</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{nnOpen}}" on-close="{{closeNn}}" title="Client update not needed" description="{{m.nnDesc}}" size="md" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
 <x-import component-from-global-scope="Aura.Textarea" label="Reason" required="{{yes}}" rows="{{three}}" value="{{nnReason}}" on-change="{{typeNn}}" placeholder="e.g. MuvMi ops reported it to us first and are on the call" hint="Required. Recorded in the audit log and shown as “Client notified: not needed” in the post-incident review."></x-import>
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
@@ -262,7 +293,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </div>
 </x-import>
 
-<x-import component-from-global-scope="Aura.Dialog" open="{{noteOpen}}" on-close="{{closeNote}}" title="Add note" description="INC-0142 · added to the timeline and the audit log as Tao" size="md" auto-focus="{{no}}">
+<x-import component-from-global-scope="Aura.Dialog" open="{{noteOpen}}" on-close="{{closeNote}}" title="Add note" description="{{m.id}} · added to the timeline and the audit log as Tao" size="md" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
 <x-import component-from-global-scope="Aura.Textarea" label="Note text" required="{{yes}}" rows="{{three}}" value="{{noteText}}" on-change="{{typeNote}}" placeholder="e.g. Arm is checking the hosting panel"></x-import>
 <div style="display: flex; justify-content: flex-end; gap: 12px">
@@ -279,7 +310,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </div>
 </x-import>
 
-<x-import component-from-global-scope="Aura.Dialog" open="{{rcOpen}}" on-close="{{closeRc}}" title="Root cause" description="INC-0142 · MuvMi · Tier 1 · owner Arm · still down" size="md" auto-focus="{{no}}">
+<x-import component-from-global-scope="Aura.Dialog" open="{{rcOpen}}" on-close="{{closeRc}}" title="Root cause" description="{{m.rcDesc}}" size="md" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 18px; padding-top: 4px">
 <x-import component-from-global-scope="Aura.Select" label="Root cause category" options="{{causes}}" placeholder="Choose one" required="{{yes}}" value="{{rcCat}}" on-change="{{setRcCat}}" error="{{rcCatErr}}" hint="{{rcCatHint}}"></x-import>
 <x-import component-from-global-scope="Aura.Textarea" label="What happened" required="{{yes}}" rows="{{three}}" value="{{rcText}}" on-change="{{setRcText}}" error="{{rcTextErr}}" hint="Plain language — this text goes into the weekly summary and the client report."></x-import>
@@ -297,11 +328,11 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </div>
 </x-dc>
 
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1730}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2040}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { opened: 'Inside response hours', view: 'Now · 10:07', acked: false, toast: false, left: 10, updated: false, nn: false, nnOpen: false, nnReason: '', lang: 'TH', rcOpen: false, rcCat: '', rcText: '', rcFix: '', rcTried: false, rc: null, noteOpen: false, noteText: '', notes: [], shotOpen: false, copied: false };
+    this.state = { caseV: 'INC-0142 · probes', escN: 0, cuSent: false, send: null, opened: 'Inside response hours', view: 'Now · 10:07', acked: false, toast: false, left: 10, updated: false, nn: false, nnOpen: false, nnReason: '', lang: 'TH', rcOpen: false, rcCat: '', rcText: '', rcFix: '', rcTried: false, rc: null, noteOpen: false, noteText: '', notes: [], shotOpen: false, copied: false };
   }
   renderVals() {
     var self = this;
@@ -385,7 +416,7 @@ class Component extends DCLogic {
     else if (st.updated) cuState = 'Updated by Tao 10:07';
     else if (nn) { cuState = 'Not needed · Tao 10:07'; cuColor = 'var(--aura-fg-secondary)'; }
     else { cuState = 'Not marked yet'; cuColor = 'var(--aura-alert-warning-fg)'; }
-    return {
+    var RET = {
       yes: true,
       no: false,
       three: 3,
@@ -512,6 +543,80 @@ class Component extends DCLogic {
         ] }
       ]
     };
+    var CASE = st.caseV, MAN = CASE !== 'INC-0142 · probes', BACK = CASE === 'Manual · engine back';
+    RET.caseOpts = ['INC-0142 · probes', 'Manual · engine down', 'Manual · engine back']; RET.caseV = CASE;
+    RET.setCase = function (v) { clearInterval(self._iv); self.setState({ caseV: v, escN: v === 'Manual · engine back' ? 1 : 0, cuSent: false, send: null, acked: false, toast: false, view: 'Now · 10:07' }); };
+    RET.notManual = !MAN;
+    RET.m = { id: 'INC-0142', h1: 'MuvMi is down', wfTone: 'warning', wfIcon: 'arrow-up-right', wfLabel: 'Escalated · L1', unacked: '18 min unacked', trigger: 'Hard fail',
+      causeLine: 'Primary monitor · HTTP GET / · Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)', owner: 'Arm', started: '09:48:12', startedSub: 'First failed check', conf: '09:48:41', confSub: 'Immediate recheck · MTTD 29 s',
+      cuTitle: 'Client update due 10:03 · Bua notified 10:03 · not marked yet', cuText: 'Tier 1 down over 15 min, so Bua (AM) was @mentioned in the thread with a draft. Acknowledging does not stop this track — mark it in the Client update card once MuvMi has been told, or mark it “Not needed” with a reason.',
+      cuDue: '10:03', am: 'Bua', amNote: 'Notified 10:03', cuDueLine: '10:03 · Tier 1 down 15 min', client: 'MuvMi', ackStop: 'L1–L2 stopped', nnDesc: 'INC-0142 · MuvMi · Tier 1 · AM Bua · due 10:03', rcDesc: 'INC-0142 · MuvMi · Tier 1 · owner Arm · still down', noEvidence: false, canEsc: false, engineBack: false, canCu: false, escLabel: '' };
+    if (MAN) {
+      var ack2 = !!st.acked, N = st.escN || 0, HOLD = st.toast;
+      var LV = [
+        { level: 'L0', when: '0 min · 02:31', who: 'Ploy (on call) @mention + Alerts Space · owner Nok not paged at night' },
+        { level: 'L1', when: '+15 min · 02:46', who: 'Arm (backup) + Tao', btn: 'L1 (Arm, backup · Tao)', sendWho: [['Arm', 'backup', 'Chat @mention + email'], ['Tao', 'Admin', 'Chat @mention + email']], tl: 'Arm + Tao — “@Arm please acknowledge · Tao FYI” in the thread + email' },
+        { level: 'L2', when: '+30 min · 03:01', who: 'CEO @mention + email (voice call off until approved)', btn: 'L2 (CEO)', sendWho: [['CEO', 'L2', 'Chat @mention + email']], tl: 'CEO @mention + email' },
+        { level: 'L3', when: '+60 min · 03:31', who: 'CEO + Thee (AM) @mention + email', btn: 'L3 (CEO + Thee, Site AM)', sendWho: [['CEO', 'L3', 'Chat @mention + email'], ['Thee', 'Site AM', 'Chat @mention + email']], tl: 'CEO + Thee (AM) @mention + email' }
+      ];
+      var SENTAT = ['02:31', '02:35', '02:36', '02:37'];
+      RET.ladder = LV.map(function (l, i) {
+        var status, look;
+        if (i === 0) { status = 'Sent 02:31'; look = done; }
+        else if (i <= N) { status = 'Sent ' + SENTAT[i] + ' by Tao'; look = done; }
+        else if (ack2) { status = 'Cancelled · acked'; look = later2; }
+        else if (BACK) { status = i === N + 1 ? 'At ' + l.when.split('· ')[1] + ' if unacked' : 'If still unacked'; look = i === N + 1 ? next : later2; }
+        else { status = i === N + 1 ? 'Waits — engine down' : 'Waits'; look = i === N + 1 ? next : later2; }
+        return Object.assign({ level: l.level, when: l.when, who: l.who, status: status, proposal: false }, look);
+      });
+      var tl = [
+        { at: '02:31:05', icon: 'user', color: 'var(--aura-fg-primary)', title: 'Opened by Tao from a hand check · “Home page shows a 502 error”', detail: 'Trigger: Manual (hand check) · the status engine is down since 02:17, so there are no probe results', scheduled: false },
+        { at: '02:31:08', icon: 'bell', color: 'var(--aura-fg-primary)', title: 'L0 alert sent', detail: '@Ploy (on call) + Alerts Space · Chat + email · Nok (owner) not paged outside response hours · client-update clock started (due 02:46)', scheduled: false }
+      ];
+      for (var k = 1; k <= N; k++) tl.push({ at: SENTAT[k] + ':10', icon: 'arrow-up-right', color: 'var(--aura-alert-warning-fg)', title: 'Escalated to ' + LV[k].level + ' by Tao (engine down)', detail: LV[k].tl, scheduled: false });
+      if (st.cuSent) tl.push({ at: '02:36:40', icon: 'mail', color: 'var(--aura-alert-warning-fg)', title: 'Client-update reminder sent by Tao (engine down)', detail: 'Thee (AM) @mentioned in the thread with a draft client message + email', scheduled: false });
+      if (BACK) tl.push({ at: '02:44:00', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Status engine back — automatic escalation running again', detail: 'Levels already sent won’t repeat. Next: L2 at 03:01 if still unacked.', scheduled: false });
+      if (ack2) tl.push({ at: BACK ? '02:45:00' : '02:38:00', icon: 'check', color: 'var(--aura-fg-positive)', title: 'Acknowledged by Tao (you) · desktop', detail: HOLD ? 'Held — posting to Chat, email and webhooks in ' + st.left + ' s.' : 'Escalation stopped. The client-update track continues.', scheduled: false });
+      RET.timeline = tl;
+      var nxt = LV[N + 1];
+      RET.m = { id: 'INC-0143', h1: 'realme.link is down', wfTone: N ? 'warning' : 'danger', wfIcon: N ? 'arrow-up-right' : 'clock', wfLabel: N ? 'Escalated · ' + LV[N].level : 'Unacked', unacked: (BACK ? '13' : '4') + ' min unacked', trigger: 'Manual (hand check)',
+        causeLine: 'Opened by Tao from a hand check at 02:31 · “Home page shows a 502 error” · no probe check — the status engine is down', owner: 'Nok', started: '02:31', startedSub: 'Opened by hand', conf: '—', confSub: 'No probe check · engine down',
+        cuTitle: st.cuSent ? 'Client update due 02:46 · Thee notified 02:36 by hand · not marked yet' : (BACK ? 'Client update due 02:46 · the reminder goes to Thee automatically at 02:46' : 'Client update due 02:46 · Thee not notified yet'),
+        cuText: BACK ? 'Tier 1 client site: the client-update clock started when the incident was opened (02:31). The engine is back, so the 15-min reminder goes out on time.' : 'Tier 1 client site: the client-update clock started when the incident was opened (02:31). While the engine is down the 15-min reminder won’t go out on its own — send it from the Client update card.',
+        cuDue: '02:46', am: 'Thee', amNote: st.cuSent ? 'Notified 02:36 (by hand)' : (BACK ? 'Reminder at 02:46' : 'Not notified yet'), cuDueLine: '02:46 · 15 min after it was opened', client: 'realme', ackStop: 'escalation stopped', nnDesc: 'INC-0143 · realme.link · Tier 1 · AM Thee · due 02:46', rcDesc: 'INC-0143 · realme.link · Tier 1 · owner Nok · still down', noEvidence: true,
+        canEsc: !BACK && !ack2 && !!nxt, engineBack: BACK, canCu: !BACK && !st.cuSent, escLabel: nxt ? 'Escalate now · ' + nxt.btn : '' };
+      RET.night = true;
+      RET.own = { label: 'PAGED · ON CALL', name: 'Ploy', sub: 'Owner Nok, not paged · AM Thee' };
+      RET.duration = BACK ? '13 min' : '4 min';
+      RET.escLevel = ack2 ? 'Stopped · acked' : (N ? LV[N].level + ' · sent by hand' : 'L0 · Ploy');
+      RET.escNext = ack2 ? 'Acknowledged — nothing more is sent' : (BACK ? 'Running again · next at ' + (nxt ? nxt.when.split('· ')[1] : '—') : 'Engine down — nothing escalates on its own');
+      RET.ackBy = ack2 ? 'Tao (you)' : '—'; RET.ackMeta = ack2 ? (BACK ? '02:45' : '02:38') + ' · desktop' : (BACK ? '13' : '4') + ' min since opened';
+      RET.ladderFoot = ack2 ? 'Acknowledged by Tao (you) → escalation stopped. The client-update track continues.' : 'Acknowledge stops escalation. It does not stop the client update.';
+      RET.latestLabel = '—';
+      RET.conds = [
+        { label: 'OK for 2 rounds', icon: 'circle', color: PEND, state: 'Not met', detail: BACK ? 'Probes running again · earliest ≈ 02:46 if it recovers' : 'No probe results while the engine is down' },
+        st.cuSent ? { label: 'Client update marked', icon: 'circle', color: PEND, state: 'Not met', detail: 'Thee notified 02:36 · not marked yet' } : { label: 'Client update marked', icon: 'circle', color: PEND, state: 'Not met', detail: 'Due 02:46 · Tier 1 client site' },
+        { label: 'Root cause written', icon: 'circle', color: PEND, state: 'Not met', detail: 'Not written yet · can be drafted now' }
+      ];
+      RET.condCount = 0; RET.resolveShort = 'Resolve locked · 0 of 3 conditions met';
+      RET.cuState = st.cuSent ? 'Thee notified 02:36 · not marked' : 'Not notified yet'; RET.cuColor = 'var(--aura-alert-warning-fg)';
+      RET.cuFoot = 'Tier 1 client site: Resolve needs this marked, or marked “Not needed” with a reason.';
+      RET.cuOpen = true; RET.cuDone = false; RET.cuHasNote = false;
+      RET.template = st.lang === 'TH' ? 'เรียนทีม realme\nขณะนี้เว็บไซต์ของท่านไม่สามารถเข้าใช้งานได้ ตั้งแต่เวลา 02:31 น. ทีม DxT ตรวจพบแล้วและกำลังแก้ไข จะแจ้งความคืบหน้าภายใน [ETA] น.\nขออภัยในความไม่สะดวก — Thee, DxT Solutions' : 'Hi realme team,\nYour website has been unavailable since 02:31 (UTC+7). DxT is working on a fix. Next update by [ETA].\nSorry for the disruption — Thee, DxT Solutions';
+      var SD = st.send;
+      RET.sendOpen = !!SD;
+      RET.send = SD === 'esc' && nxt ? { title: 'Send ' + nxt.level + ' now?', desc: 'INC-0143 · realme.link · the engine is down, so this goes out only because you send it.', who: nxt.sendWho.map(function (w, i) { return { n: w[0], role: w[1], how: w[2], border: i ? '1px solid var(--aura-border-subtle)' : 'none' }; }), cta: 'Send ' + nxt.level + ' now', icon: 'arrow-up-right' }
+        : SD === 'cu' ? { title: 'Send the client-update reminder now?', desc: 'INC-0143 · realme.link · the same reminder the engine sends after 15 min DOWN.', who: [{ n: 'Thee', role: 'Site AM', how: 'Chat @mention with the draft + email', border: 'none' }], cta: 'Send reminder', icon: 'mail' }
+        : { title: '', desc: '', who: [], cta: '', icon: 'mail' };
+      RET.askEsc = function () { self.setState({ send: 'esc' }); };
+      RET.askCu = function () { self.setState({ send: 'cu' }); };
+      RET.closeSend = function () { self.setState({ send: null }); };
+      RET.doSend = function () { var s2 = self.state; if (s2.send === 'esc') self.setState({ send: null, escN: (s2.escN || 0) + 1 }); else self.setState({ send: null, cuSent: true }); };
+    } else {
+      RET.sendOpen = false; RET.send = { title: '', desc: '', who: [], cta: '', icon: 'mail' };
+      RET.askEsc = RET.askCu = RET.closeSend = RET.doSend = function () {};
+    }
+    return RET;
   }
 }
 </script>

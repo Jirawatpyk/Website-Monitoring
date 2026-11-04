@@ -124,6 +124,19 @@ export interface OverviewData {
   oncall?: OncallCardData | null;
   /** Recent events lines from windows and mutes (Main3). */
   windowEvents?: { id: string; at: string; text: string }[];
+  /** The engine cron's sweep missed > 3 min (S12a, D-053): the fault banner; null when it runs. */
+  fault?: MonitorFault | null;
+}
+
+export interface MonitorFault {
+  /** The last sweep. */
+  sweepAt: string;
+  /** When Healthchecks alerted: the sweep + the 3-min grace. */
+  alertedAt: string;
+  /** The last complete round: what the statuses below are as of. */
+  asOf: string | null;
+  /** The person on call, whom the VPS watchdog @mentioned; null = nobody on call. */
+  onCallName: string | null;
 }
 
 export interface OverviewMaintenanceCard {

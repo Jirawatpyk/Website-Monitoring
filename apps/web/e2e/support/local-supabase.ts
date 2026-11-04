@@ -85,6 +85,23 @@ export async function setActive(userId: string, isActive: boolean): Promise<void
   });
 }
 
+/** Stamp an `agent_heartbeats` row (S12a): an aged `engine-sweep` puts the Overview in its fault state. */
+export async function setBeat(name: string, at: Date): Promise<void> {
+  await admin('/rest/v1/agent_heartbeats?on_conflict=name', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ name, last_seen_at: at.toISOString() }),
+  });
+}
+
+/** Remove a beat: a sweep that never ran is no fault (the seed state; a fresh stamp would age into one). */
+export async function clearBeat(name: string): Promise<void> {
+  await admin(`/rest/v1/agent_heartbeats?name=eq.${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+    headers: { Prefer: 'return=minimal' },
+  });
+}
+
 /** Sign `email` in and copy the session cookies into the browser context. */
 export async function signIn(context: BrowserContext, baseURL: string, email: string): Promise<void> {
   assertLocal();

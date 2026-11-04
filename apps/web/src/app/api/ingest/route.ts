@@ -5,6 +5,7 @@ import { hasBearer, unauthorized } from '@/lib/auth/bearer';
 import { serviceDb } from '@/server/db';
 import { engineAfterReport } from '@/server/engine/engine-and-deliver';
 import { dueForBangkok, storeBangkokResults } from '@/server/ingest/bangkok';
+import { loadWatchFacts, stampBeat } from '@/server/heartbeats';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -18,13 +19,27 @@ const ENGINE_BUDGET_MS = 50_000;
  * Ingest API for the Bangkok probe on the VPS, bearer INGEST_TOKEN; the VPS never holds a database
  * key (PRD §10). GET: the monitors due this minute. POST: a batch of results, stored as BKK — the
  * location is fixed here, so a leaked token can't speak for Singapore or Tokyo. `?confirm=1`: the agent
- * echoes D-051's confirm flag, so it may be given confirm checks (anything else: none).
+ * echoes D-051's confirm flag, so it may be given confirm checks (anything else: none). The GET also
+ * carries the engine's last cron sweep and who is on call, for the VPS watchdog (S12a, D-053).
  */
 export async function GET(request: Request): Promise<Response> {
   if (!hasBearer(request, serverEnv().INGEST_TOKEN)) return unauthorized();
   const confirms = new URL(request.url).searchParams.get('confirm') === '1';
-  const monitors = await dueForBangkok(serviceDb(), new Date(), confirms);
-  return Response.json({ monitors });
+  const db = serviceDb();
+  const now = new Date();
+  // The watch facts are best effort: a failed read never costs Bangkok its round (the watchdog
+  // then counts the sweep as unknown, not missed).
+  // The agent's loop asks every minute and its watchdog judges right after: this GET is the
+  // watchdog's beat on our side (Probes page; Healthchecks `vps-watchdog` is the outside one).
+  const [monitors, , watch] = await Promise.all([
+    dueForBangkok(db, now, confirms),
+    stampBeat(db, 'vps-watchdog', now),
+    loadWatchFacts(db, now).catch((err: unknown) => {
+      console.warn(JSON.stringify({ event: 'watch_facts_failed', error: String(err) }));
+      return null;
+    }),
+  ]);
+  return Response.json(watch ? { monitors, ...watch } : { monitors });
 }
 
 export async function POST(request: Request): Promise<Response> {

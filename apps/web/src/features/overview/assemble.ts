@@ -1,5 +1,6 @@
+import { isSweepStale, MONITOR_GRACE_MS } from '@dxt/engine';
 import { isTlsChainError, type Role } from '@dxt/shared';
-import type { ProbeHealth, ViewerKind } from './types';
+import type { MonitorFault, ProbeHealth, ViewerKind } from './types';
 
 /**
  * Pure helpers that turn query rows into the Overview's shape (D-032), apart from the queries so
@@ -115,6 +116,32 @@ export function probeHealth(
 }
 
 /** Who is looking (D-032): an AM is a stakeholder who manages at least one client; any other is the CEO. */
+/** The engine cron's sweep is more than 3 min old (S12a, D-053); a sweep that never ran is no fault. */
+export function isEngineFault(sweepAt: string | null, now: Date): boolean {
+  return isSweepStale(sweepAt ? new Date(sweepAt) : null, now);
+}
+
+/**
+ * The Overview's fault banner (spec §14.4, MainFault): since the last sweep, when Healthchecks alerted
+ * (the grace after it), and the statuses' "as of" — the last complete round, which the BKK ingest can
+ * still move while only the sweep is down.
+ */
+export function monitorFaultOf(
+  sweepAt: string | null,
+  lastRoundAt: string | null,
+  now: Date,
+  onCallName: string | null,
+): MonitorFault | null {
+  if (!sweepAt || !isEngineFault(sweepAt, now)) return null;
+  const since = new Date(sweepAt);
+  return {
+    sweepAt,
+    alertedAt: new Date(since.getTime() + MONITOR_GRACE_MS).toISOString(),
+    asOf: lastRoundAt,
+    onCallName,
+  };
+}
+
 export function viewerKindOf(role: Role, managesClients: boolean): ViewerKind {
   if (role === 'admin' || role === 'responder' || role === 'viewer') return role;
   if (role === 'stakeholder') return managesClients ? 'am' : 'ceo';

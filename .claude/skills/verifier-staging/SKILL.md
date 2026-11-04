@@ -238,6 +238,27 @@ select json_agg(w) from (select kind, starts_at, ends_at, approved_at, ended_at,
   from maintenance_windows mw join sites s on s.id = mw.site_id where s.name = 'Test target' order by mw.created_at desc limit 5) w;
 ```
 
+Monitor fault (S12a, D-053, test plan T02 / T04 / T11). Deploy first:
+
+- the migration (`probe_activity`);
+- the web app;
+- `apps/vps-agent/deploy/release.sh staging`, which is when the agent reads `GOOGLE_CHAT_ALERTS_WEBHOOK_URL` and `HEALTHCHECKS_PING_URL_WATCHDOG` from `/etc/dxt-agent/staging.env`.
+
+Each `staging:pause` makes the staging watchdog post one MONITOR FAULT after 3 min; that's expected. So does ageing the beat by hand to see the Overview banner: `update agent_heartbeats set last_seen_at = now() - interval '14 minutes' where name = 'engine-sweep'` holds only until the next cron sweep (~1 min), but the watchdog's next ingest GET sees it and posts to the staging Space (`/verify` 4 Nov 2026). Do it just after a minute's `:01`, or accept the one post. Before T04, wait until the journal shows a round with no `monitor_fault` line after the resume, or the fault from the pause is still "posted" and T04 posts nothing new.
+
+| Run                  | Do                                                                                                | Expect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T02 one probe off    | `sudo systemctl stop dxt-agent@staging` for 5 min, then start it                                  | No DOWN on any site. The probes check every monitor, so SIN + TYO decide. ~3 min after BKK's last beat: `system_alerts` `probe_location_missing` (`context.location = 'BKK'`) and one "PROBE MISSING" email per active Admin. Nothing in Chat. It clears once BKK beats again. Stopping the agent also stops the verifier: after 2 min `verifier_unavailable` opens too, so read only the PROBE MISSING email.                                                                                                                                                                                                                        |
+| T04 / T11 engine off | Tao: Vercel → `dxt-monitor-staging` → Settings → Cron Jobs → **Disable**, ~6 min, then **Enable** | At +3 min the Healthchecks `engine` check goes down: its email to the Admins, and Chat from Healthchecks if configured. The VPS watchdog posts `<users/…> MONITOR FAULT · all sites · heartbeat missed since HH:MM · status unknown, hand-check Tier 1` once (journal: `monitor_fault` `posted`); the mention is the person on call (staging: none → no mention). The Overview shows the fault banner and "statuses as of". `/probes` shows the engine row Down. No PROBE MISSING email during it: SIN / TYO stop too (cron), so that's `probe_locations_low` instead. After Enable: the banner goes, and the watchdog posts nothing. |
+
+```sql
+select json_build_object(
+  'beats', (select json_agg(b) from (select name, last_seen_at from agent_heartbeats order by name) b),
+  'alerts', (select json_agg(a) from (select kind, context, opened_at, cleared_at from system_alerts where opened_at > now() - interval '30 min' order by opened_at) a),
+  'mails', (select json_agg(n) from (select template, status, sent_at from notifications where system_alert_id is not null and created_at > now() - interval '30 min') n)
+) j;
+```
+
 - **Browser pane under width emulation** (`resize_window` 1440 / 820 / 390): clicks by coordinate can miss and screenshots can be stale or half-size (S06b `/verify`: "Acknowledge did nothing"). Check the control is on top with `document.elementFromPoint`, act with a DOM `.click()`, and read layout with `getBoundingClientRect`; screenshots at those widths come from Playwright locally (e2e helpers) or from the pane without emulation. A hidden (not fronted) tab pauses `requestAnimationFrame` and CSS transitions — front it before timing anything.
 
 ## 4. Reset between runs

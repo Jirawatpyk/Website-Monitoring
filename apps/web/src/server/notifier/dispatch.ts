@@ -400,7 +400,7 @@ async function deliverSystemAlert(deps: DispatchDeps, n: Notification, facts: Fa
   const to = n.channel === 'email' && n.user_id ? facts.recipients.get(n.user_id) : undefined;
   if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
   const { apiKey, from } = deps.email!;
-  const message = renderSystemAlertEmail(n, alert, from);
+  const message = renderSystemAlertEmail(n, alert, from, deps.appUrl);
   if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
   const send = deps.send ?? sendEmail;
   const result = await send(message, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });

@@ -32,7 +32,7 @@
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | Done |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Done |
-| S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | In progress |
+| S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | In review |
 | S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Todo |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |

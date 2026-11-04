@@ -87,6 +87,27 @@ describe('pingHealthcheck (PRD §9)', () => {
   });
 });
 
+describe('runCronJob — the in-app beat (S12a, D-053)', () => {
+  it('stamps the beat when the job ran, even with a partial failure; never when it threw', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('OK')),
+    );
+    const beat = vi.fn(async () => {});
+    await runCronJob('engine', ping, async () => ({ ok: false, failures: ['site s1'] }), beat);
+    expect(beat).toHaveBeenCalledTimes(1);
+    await runCronJob(
+      'engine',
+      ping,
+      async () => {
+        throw new Error('boom');
+      },
+      beat,
+    );
+    expect(beat).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('runCronJob', () => {
   it('logs the region, pings ok and returns the summary', async () => {
     vi.stubEnv('VERCEL_REGION', 'sin1');

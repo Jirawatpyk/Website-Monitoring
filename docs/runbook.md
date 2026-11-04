@@ -46,7 +46,15 @@ Each job pings Healthchecks.io. A missed ping alerts by email and in Google Chat
 | `probe-sin`, `probe-tyo` | every minute | That location stops voting; the other two still decide | the same, `/api/cron/probe-sin` / `-tyo` | [Fewer than 2 probe locations](#fewer-than-2-probe-locations) |
 | `probe-bkk` | every minute | Bangkok stops voting; SIN + TYO decide (D-019) | the VPS: `systemctl status dxt-agent@production` | [Restart the VPS agent](#restart-the-vps-agent) |
 | `browser-verifier` | every minute | Blocked sites show PROBLEM (unverified); the Admins also get the system email | the VPS, as above | [Browser verifier](#browser-verifier) |
-| `crawler` | every 30 min | No defacement views; an open crawler PROBLEM holds | `/api/cron/crawler` logs | [Crawler](#crawler-defacement-views-s09c) |
+| `crawler` | every 30 min (grace 15 min) | No defacement views; an open crawler PROBLEM holds | `/api/cron/crawler` logs | [Crawler](#crawler-defacement-views-s09c) |
+| `vps-watchdog` | every minute | The VPS can't speak for a stopped engine: no `MONITOR FAULT` line in the Alerts Space (S12a) | the VPS: `journalctl -u dxt-agent@production` (`monitor_fault` lines) | [Restart the VPS agent](#restart-the-vps-agent) |
+
+**Monitor fault (S12a, D-053).** When the `engine` check goes down, two voices speak, and neither needs the engine:
+
+- Healthchecks emails the Admins.
+- The VPS watchdog posts `MONITOR FAULT · all sites · heartbeat missed since HH:MM · status unknown, hand-check Tier 1` to the Alerts Space, @mentioning the person on call. It fires when the sweep is 3 min old or the Ingest API has been unreachable for 3 min, and posts once per fault.
+
+The Overview shows the fault banner, and `/probes` shows every heartbeat from our own timestamps. A single probe location missing for more than 3 min sends the Admins one email ("PROBE MISSING") and pages nobody. That email is suppressed while the engine itself is down. On staging, every `staging:pause` makes the staging watchdog post one MONITOR FAULT after 3 min: expected.
 
 A check that is **down** but whose job logs show it running usually means the ping URL in the env is wrong or was rotated. Compare the URL in Healthchecks with the env value (names only in chat).
 
@@ -108,7 +116,7 @@ Always: change it at the source, set the new value in Vercel (and on the VPS whe
 | `CRON_SECRET` | Vercel only: Vercel Cron sends it to every cron route | Vercel env (per project) → new value → redeploy | Nothing; Vercel Cron picks up the new value with the deploy |
 | `INGEST_TOKEN` | Vercel + `/etc/dxt-agent/<env>.env` | Vercel env → redeploy → on the VPS `sudoedit /etc/dxt-agent/production.env` → `systemctl restart dxt-agent@production` | 401s in the agent log until both match. Bangkok drops out of the vote for those minutes; SIN + TYO still decide. The token also guards the verifier's `/api/jobs`: do the VPS step straight after the redeploy, or after 2 min "Browser verifier unavailable" emails the Admins (it clears by itself) |
 | `PROBE_SECRET_HEADER_VALUE` | Vercel + both VPS env files; **clients' WAF allowlists** | Agree a time with the WAF owners first, then change it in all three places and redeploy / restart | Sites behind a WAF may show blocked / PROBLEM until their allowlist has the new value |
-| `GOOGLE_CHAT_ALERTS_WEBHOOK_URL` (and `…REPORTS…`) | Vercel | Chat Space → Apps & integrations → Webhooks → new URL → Vercel env → redeploy → remove the old webhook | Chat posts fail until redeploy; failed Chat alerts fall back to email (D-016) |
+| `GOOGLE_CHAT_ALERTS_WEBHOOK_URL` (and `…REPORTS…`) | Vercel; the Alerts one also on the VPS (S12a watchdog) | Chat Space → Apps & integrations → Webhooks → new URL → Vercel env → redeploy → the same environment's `/etc/dxt-agent/<instance>.env` → restart `dxt-agent@<instance>` → remove the old webhook | Chat posts fail until redeploy; failed Chat alerts fall back to email (D-016) |
 | `RESEND_API_KEY` | Vercel | Resend → API keys → new key → Vercel env → redeploy → revoke the old key | Emails fail until redeploy (retried for ~10 min) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Vercel (server only) | Supabase → Project settings → API keys → new secret key → Vercel env → redeploy → revoke the old one | Crons fail until redeploy. Do it in a quiet hour |
 | Healthchecks ping URLs | Vercel + VPS env | Only if a URL leaked: Healthchecks → check → change the ping key → update env → redeploy / restart | That check shows down until updated |

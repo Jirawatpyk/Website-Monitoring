@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buttonClass, PageHeader } from '@jirawatpyk/aura-react';
 import { IconCalendar, IconPlus } from '@jirawatpyk/aura-react/icons';
 import { formatDay, formatTime, formatTimeWithSeconds } from '@dxt/shared';
-import { bannersOf, countsOf, liveIssues, recentEvents, withAck } from '../model';
+import { bannersOf, countsOf, faultBannerOf, liveIssues, recentEvents, withAck } from '../model';
+import { FaultBanner } from './fault-banner';
 import type { OverviewData, ProbeHealth } from '../types';
 import { DesktopBanners, Kpis, LIVE_ISSUES_ID, LiveIssuesTable, RecentEvents, SiteTiles } from './desktop';
 import { PhoneAllSites, PhoneBanners, PhoneCounts, PhoneLiveIssues } from './phone';
@@ -14,13 +15,24 @@ import { OncallCard } from '@/features/oncall';
 import { useLiveRefresh } from '@/components/use-live-refresh';
 import { useAckToast, type AckAction, type UndoAction } from '@/components/use-ack-toast';
 
-/** "Probes 3/3 | BKK · SIN · TYO | Verifier idle" (D-032: no heartbeat age until S12). */
-function ProbePill({ probes, compact = false }: { probes: ProbeHealth; compact?: boolean }) {
-  const allUp = probes.total > 0 && probes.beating.length === probes.total;
+/**
+ * "Probes 3/3 | BKK · SIN · TYO | Verifier idle" (D-032); during a monitor fault (S12a, MainFault)
+ * "| Heartbeat missed 14 min" in the danger colour, and the dot turns red.
+ */
+function ProbePill({
+  probes,
+  heartbeat,
+  compact = false,
+}: {
+  probes: ProbeHealth;
+  heartbeat?: string;
+  compact?: boolean;
+}) {
+  const allUp = !heartbeat && probes.total > 0 && probes.beating.length === probes.total;
   const dot = (
     <span
       aria-hidden
-      className={`size-2 shrink-0 rounded-aura-full ${allUp ? 'bg-fg-positive' : probes.beating.length === 0 ? 'bg-fg-danger' : 'bg-alert-warning-fg'}`}
+      className={`size-2 shrink-0 rounded-aura-full ${allUp ? 'bg-fg-positive' : heartbeat || probes.beating.length === 0 ? 'bg-fg-danger' : 'bg-alert-warning-fg'}`}
     />
   );
   const count = `Probes ${probes.beating.length}/${probes.total}`;
@@ -29,6 +41,7 @@ function ProbePill({ probes, compact = false }: { probes: ProbeHealth; compact?:
       <span className="flex items-center gap-2 text-xs text-fg-secondary">
         {dot}
         {count}
+        {heartbeat && <span className="text-fg-danger">{`· ${heartbeat}`}</span>}
       </span>
     );
   }
@@ -47,7 +60,11 @@ function ProbePill({ probes, compact = false }: { probes: ProbeHealth; compact?:
       <span aria-hidden className="text-fg-tertiary">
         |
       </span>
-      <span className="text-fg-secondary">{`Verifier ${probes.verifier}`}</span>
+      {heartbeat ? (
+        <span className="font-medium text-fg-danger">{heartbeat}</span>
+      ) : (
+        <span className="text-fg-secondary">{`Verifier ${probes.verifier}`}</span>
+      )}
     </span>
   );
 }
@@ -93,7 +110,10 @@ export function OverviewView({
   const banners = bannersOf(sites, now);
   const events = recentEvents(data.events, now, 7, data.windowEvents);
   const isAdmin = data.viewer.kind === 'admin';
-  const meta = `${formatDay(now, { weekday: true, year: true })} · ${formatTimeWithSeconds(now)} (UTC+7)${live ? ' · live' : ''}`;
+  const fault = data.fault ? faultBannerOf(data.fault, data.probes, now) : null;
+  // A fault: what the statuses are as of instead of "live" (MainFault meta line).
+  const metaTail = fault ? (fault.asOf ? ` · ${fault.asOf}` : '') : live ? ' · live' : '';
+  const meta = `${formatDay(now, { weekday: true, year: true })} · ${formatTimeWithSeconds(now)} (UTC+7)${metaTail}`;
 
   return (
     <div className="flex flex-col gap-3 md:gap-6">
@@ -106,7 +126,7 @@ export function OverviewView({
         eyebrow={
           <>
             <span className="max-md:hidden">OVERVIEW</span>
-            <span className="uppercase md:hidden">{`${formatDay(now, { weekday: true })} ${formatTime(now)} · UTC+7`}</span>
+            <span className="uppercase md:hidden">{`${formatDay(now, { weekday: true })} ${formatTime(now)} · ${data.fault?.asOf ? `as of ${formatTime(new Date(data.fault.asOf))}` : 'UTC+7'}`}</span>
           </>
         }
         title={
@@ -119,10 +139,10 @@ export function OverviewView({
         actions={
           <span className="flex flex-wrap items-center gap-3">
             <span className="max-md:hidden">
-              <ProbePill probes={data.probes} />
+              <ProbePill probes={data.probes} heartbeat={fault?.pill} />
             </span>
             <span className="md:hidden">
-              <ProbePill probes={data.probes} compact />
+              <ProbePill probes={data.probes} heartbeat={fault?.pill} compact />
             </span>
             {isAdmin && (
               <Link href="/maintenance" className={`max-md:hidden ${buttonClass({ variant: 'secondary' })}`}>
@@ -142,8 +162,13 @@ export function OverviewView({
 
       {/* desktop and tablet (md up): Main3 / MainDark3 */}
       <div className="flex flex-col gap-6 max-md:hidden">
+        {fault && <FaultBanner banner={fault} />}
         <DesktopBanners {...banners} viewer={data.viewer} onAck={onAck} />
-        <Kpis counts={counts} kpis={data.kpis} />
+        <Kpis
+          counts={counts}
+          kpis={data.kpis}
+          asOf={data.fault?.asOf ? `as of ${formatTime(new Date(data.fault.asOf))}` : null}
+        />
         <LiveIssuesTable
           issues={issues}
           counts={counts}
@@ -164,13 +189,14 @@ export function OverviewView({
           </div>
         )}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_calc(var(--spacing)*90)]">
-          <SiteTiles sites={sites} drafts={data.drafts} now={now} />
+          <SiteTiles sites={sites} drafts={data.drafts} now={now} asOf={fault?.asOf} />
           <RecentEvents events={events} />
         </div>
       </div>
 
       {/* phones (below md): MOverview4 */}
       <div className="flex flex-col gap-3 md:hidden">
+        {fault && <FaultBanner banner={fault} />}
         <PhoneBanners {...banners} />
         <PhoneCounts counts={counts} viewer={data.viewer} issues={issues} uptime30d={data.kpis.uptime30d} />
         <PhoneLiveIssues

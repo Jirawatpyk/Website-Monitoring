@@ -205,6 +205,30 @@ describe('render — PROBLEM rows', () => {
     expect(m.subject).toBe('DxT Monitor · System · Fewer than 2 probe locations · Tue 22 Sep 15:40');
     expect(m.text).toContain('Still reporting: TYO (Tokyo)');
   });
+
+  it('renders the one-probe-missing Admin email with the Probes button (S12a)', () => {
+    const n = {
+      ...row('probe_location_missing'),
+      incident_id: null,
+      system_alert_id: 'a2',
+      channel: 'email',
+    } as Notification;
+    const alert = {
+      id: 'a2',
+      kind: 'probe_location_missing',
+      opened_at: '2026-09-22T08:40:00Z',
+      context: { location: 'SIN' },
+    };
+    const from = 'DxT Monitor <alerts@notify.example.test>';
+    const m = renderSystemAlertEmail(n, alert, from, `${appUrl}/`)!;
+    expect(m.subject).toBe('DxT Monitor · System · One probe location missing · Tue 22 Sep 15:40');
+    expect(m.text).toContain('The SIN probe stopped reporting');
+    expect(m.html).toContain(`${appUrl}/probes`);
+    // An unknown location renders nothing rather than a wrong email.
+    expect(renderSystemAlertEmail(n, { ...alert, context: { location: 'XX' } }, from, appUrl)).toBeNull();
+    // Without an app URL there's no button.
+    expect(renderSystemAlertEmail(n, alert, from)!.html).not.toContain('/probes');
+  });
 });
 
 describe('render — mutes (S09b, §24.4, §24.7)', () => {

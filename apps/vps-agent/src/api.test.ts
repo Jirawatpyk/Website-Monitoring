@@ -34,6 +34,25 @@ describe('createApi — the only way out of the VPS (PRD §10)', () => {
     expect(init.headers).toMatchObject({ authorization: `Bearer ${TOKEN}` });
   });
 
+  it('hands each ingest answer to the watchdog: when, the sweep, who is on call (S12a)', async () => {
+    const onCall = { name: 'Ploy', chatUserId: '1234' };
+    const fetchImpl = vi.fn(async () =>
+      ok({ monitors: [], engineSweepAt: '2026-11-03T08:00:05+00:00', onCall }),
+    );
+    const onContact = vi.fn();
+    const api = createApi('https://monitor.example.test', TOKEN, fetchImpl, onContact);
+    await api.dueMonitors();
+    expect(onContact).toHaveBeenCalledWith({
+      at: expect.any(Number),
+      engineSweepAt: '2026-11-03T08:00:05+00:00',
+      onCall,
+    });
+    // A failed call is no contact.
+    fetchImpl.mockResolvedValueOnce(new Response('', { status: 500 }));
+    await api.dueMonitors().catch(() => {});
+    expect(onContact).toHaveBeenCalledTimes(1);
+  });
+
   it('posts results and leases jobs', async () => {
     const fetchImpl = vi.fn(async (url: URL) =>
       url.pathname === '/api/jobs' ? ok({ jobs: [JOB] }) : ok({ ok: true }),

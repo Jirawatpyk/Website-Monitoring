@@ -155,36 +155,46 @@ const changeOf = (c: OverviewKpis['mttaChange']) =>
     : undefined;
 
 /** The KPI row (§21.3): organisation-wide for every role. */
-export function Kpis({ counts, kpis }: { counts: Counts; kpis: OverviewKpis }) {
+export function Kpis({
+  counts,
+  kpis,
+  asOf,
+}: {
+  counts: Counts;
+  kpis: OverviewKpis;
+  /** During a monitor fault (S12a, spec §30.1): "as of 02:17" on the round-based figures; Open incidents stays live. */
+  asOf?: string | null;
+}) {
   const notEnough = 'Not enough incidents yet';
+  const stale = (caption: string) => (asOf ? `${caption} · ${asOf}` : caption);
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
       <Stat
         label="Sites OK"
         value={counts.ok}
         unit={`/ ${counts.monitored}`}
-        caption={sitesOkCaption(counts)}
+        caption={stale(sitesOkCaption(counts))}
         icon={<IconCircleCheck />}
       />
       <Stat label="Open incidents" value={counts.open} caption={openCaption(counts)} icon={<IconBell />} />
       <Stat
         label="MTTA · 30d"
         value={kpis.enough && kpis.mttaSeconds !== null ? formatDurationSeconds(kpis.mttaSeconds) : '—'}
-        caption={kpis.enough ? 'DOWN, all tiers · target ≤ 15 min' : notEnough}
-        change={kpis.enough ? changeOf(kpis.mttaChange) : undefined}
+        caption={stale(kpis.enough ? 'DOWN, all tiers · target ≤ 15 min' : notEnough)}
+        change={kpis.enough && !asOf ? changeOf(kpis.mttaChange) : undefined}
         icon={<IconClock />}
       />
       <Stat
         label="MTTD · 30d"
         value={kpis.enough && kpis.mttdSeconds !== null ? formatDurationSeconds(kpis.mttdSeconds) : '—'}
-        caption={kpis.enough ? 'DOWN, Tier 1 · target ≤ 3 min' : notEnough}
-        change={kpis.enough ? changeOf(kpis.mttdChange) : undefined}
+        caption={stale(kpis.enough ? 'DOWN, Tier 1 · target ≤ 3 min' : notEnough)}
+        change={kpis.enough && !asOf ? changeOf(kpis.mttdChange) : undefined}
         icon={<IconTrendingDown />}
       />
       <Stat
         label="Uptime · 30d"
         value={formatPercent(kpis.uptime30d)}
-        caption="All sites · only DOWN time counts"
+        caption={stale('All sites · only DOWN time counts')}
         icon={<IconChartColumn />}
       />
     </div>
@@ -499,7 +509,18 @@ export function AllOk({
 const TIERS = ['All', 'Tier 1', 'Tier 2', 'Tier 3'] as const;
 
 /** All sites tiles (§21.6): a glance for the NOC wall; the Tier control filters the tiles only. */
-export function SiteTiles({ sites, drafts, now }: { sites: OverviewSite[]; drafts: number; now: Date }) {
+export function SiteTiles({
+  sites,
+  drafts,
+  now,
+  asOf,
+}: {
+  sites: OverviewSite[];
+  drafts: number;
+  now: Date;
+  /** During a monitor fault (§30.1): "statuses as of 02:17" beside the count. */
+  asOf?: string | null;
+}) {
   const [tier, setTier] = useState<(typeof TIERS)[number]>('All');
   const shown = tier === 'All' ? sites : sites.filter((s) => `Tier ${s.tier}` === tier);
   const ok = sites.filter((s) => s.status === 'ok').length;
@@ -511,7 +532,7 @@ export function SiteTiles({ sites, drafts, now }: { sites: OverviewSite[]; draft
           <h2 id="all-sites-title" className="m-0 text-xl font-semibold">
             All sites
           </h2>
-          <span className="text-sm text-fg-secondary">{`${ok}/${sites.length} OK`}</span>
+          <span className="text-sm text-fg-secondary">{`${ok}/${sites.length} OK${asOf ? ` · ${asOf}` : ''}`}</span>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <SegmentedControl

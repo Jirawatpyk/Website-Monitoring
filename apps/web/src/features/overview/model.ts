@@ -12,8 +12,10 @@ import {
 import { mayAcknowledge } from '@/features/incidents';
 import {
   OVERVIEW_LOCATIONS,
+  type MonitorFault,
   type OverviewEvent,
   type OverviewLocation,
+  type ProbeHealth,
   type OverviewSite,
   type OverviewViewer,
   type ViewerKind,
@@ -501,4 +503,45 @@ export function withAck(sites: readonly OverviewSite[], incidentId: string, by: 
       ? { ...s, incident: { ...s.incident, state: 'acknowledged', ackedBy: by } }
       : s,
   );
+}
+
+/** The fault banner's words (S12a, spec §14.4, MainFault without the S12b hand check). */
+export interface FaultBanner {
+  title: string;
+  cause: string;
+  alerted: string;
+  /** The header pill's part: "Heartbeat missed 14 min". */
+  pill: string;
+  /** The meta line's part: "statuses as of 02:17"; null before any round. */
+  asOf: string | null;
+}
+
+const minutesSince = (iso: string, now: Date) => (now.getTime() - new Date(iso).getTime()) / 60_000;
+
+/**
+ * While the engine cron's sweep is stale. The BKK ingest still runs the engine after each batch
+ * (D-053), so the statuses can be fresher than the sweep: the title says how old they are when they
+ * are (≥ 3 min), else that the sweep stopped — escalations, reminders and deadline-judged rounds wait.
+ */
+export function faultBannerOf(fault: MonitorFault, probes: ProbeHealth, now: Date): FaultBanner {
+  const swept = formatDuration(minutesSince(fault.sweepAt, now));
+  const statusAge = fault.asOf ? minutesSince(fault.asOf, now) : null;
+  const missing = OVERVIEW_LOCATIONS.filter((l) => !probes.beating.includes(l));
+  const where = !missing.length
+    ? ` ${OVERVIEW_LOCATIONS.join(', ').replace(/, (?=[^,]*$)/, ' and ')} still report.`
+    : probes.beating.length
+      ? ` ${probes.beating.join(' and ')} still ${probes.beating.length === 1 ? 'reports' : 'report'}; ${missing.join(' and ')} ${missing.length === 1 ? 'has' : 'have'} no results.`
+      : ' No probe location is reporting.';
+  return {
+    title:
+      statusAge === null || statusAge >= 3
+        ? `Monitoring is degraded — statuses below are ${statusAge === null ? 'not in yet' : `${formatDuration(statusAge)} old`}`
+        : `Monitoring is degraded — the status engine’s sweep stopped ${swept} ago`,
+    cause: `The status engine’s sweep hasn’t run since ${formatTime(new Date(fault.sweepAt))} — escalations, reminders and recoveries wait until it does.${where}`,
+    // Who speaks for it (D-053): the VPS watchdog posts from the 3-min mark, Healthchecks emails a
+    // minute later (period + grace) — so name the fault's time, not a send time we never see (/verify 4 Nov).
+    alerted: `Engine heartbeat missed > 3 min, from ${formatTime(new Date(fault.alertedAt))} → Healthchecks.io emails the Admins and the VPS watchdog posts in the Alerts Space${fault.onCallName ? ` @mentioning ${fault.onCallName} (on call)` : ''}.`,
+    pill: `Heartbeat missed ${swept}`,
+    asOf: fault.asOf ? `statuses as of ${formatTime(new Date(fault.asOf))}` : null,
+  };
 }

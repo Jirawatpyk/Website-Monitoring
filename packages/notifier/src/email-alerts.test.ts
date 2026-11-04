@@ -212,6 +212,31 @@ describe('Admin alert about the browser verifier (D-001, D-019)', () => {
     expect(none.text).toContain('Still reporting: None');
   });
 
+  it('One probe location missing (S12a, spec §15.3): who still votes, no page, the Probes button', () => {
+    const m = alert({
+      kind: 'probe_location_missing',
+      location: 'SIN',
+      sites: [],
+      reason: undefined,
+      probesUrl: 'https://monitor.example.test/probes',
+    });
+    expect(m.subject).toBe('DxT Monitor · System · One probe location missing · Wed 7 Oct 10:14');
+    expect(m.text).toMatch(/^PROBE MISSING — The SIN probe stopped reporting/);
+    expect(m.text).toContain('SIN (Singapore) hasn’t reported for 3 min. BKK and TYO still vote');
+    expect(m.text).toContain('nobody is paged for this');
+    expect(m.text).toContain('Still reporting: BKK (BKK VPS) · TYO (Tokyo)');
+    expect(m.text).toContain(
+      'What to check: The SIN probe (Vercel cron probe-sin) — it reports every minute.',
+    );
+    expect(m.html).toContain('SIN stopped reporting · BKK + TYO keep deciding status · no page');
+    expect(m.html).toContain('href="https://monitor.example.test/probes"');
+    expect(m.html).toContain('Open Probes &amp; heartbeat');
+    const noLink = alert({ kind: 'probe_location_missing', location: 'BKK', sites: [] });
+    expect(noLink.text).toContain('BKK (BKK VPS) hasn’t reported for 3 min. SIN and TYO still vote');
+    expect(noLink.html).not.toContain('<a href');
+    expect(() => alert({ kind: 'probe_location_missing', sites: [] })).toThrow('needs the location');
+  });
+
   it('BKK network check failing (D-028): what it affects and what to check', () => {
     const m = alert({
       kind: 'bkk_control_failing',

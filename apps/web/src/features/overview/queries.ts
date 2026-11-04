@@ -21,7 +21,16 @@ import {
   slowMsOf,
   watchedSince,
 } from '@/features/sites/server';
-import { chainStreakStart, currentDrop, lastRoundP50, probeHealth, seriesOf, viewerKindOf } from './assemble';
+import {
+  chainStreakStart,
+  currentDrop,
+  isEngineFault,
+  lastRoundP50,
+  monitorFaultOf,
+  probeHealth,
+  seriesOf,
+  viewerKindOf,
+} from './assemble';
 import { EVENT_TYPES, reasonOf } from './model';
 import { loadOnCallNow } from '@/features/incidents/server';
 import { loadOncallCard } from '@/features/oncall/server';
@@ -59,24 +68,12 @@ export async function loadOverview(
   const onCallRead = loadOnCallNow(db, now);
   // The "On call" card (§23.8): who responds now, tonight and next week.
   const oncallCardRead = loadOncallCard(db, now);
-  const [
-    sites,
-    checks,
-    series,
-    drops,
-    spans,
-    windowRows,
-    kpiRows,
-    events,
-    probes,
-    verifier,
-    openJobs,
-    managed,
-  ] = await Promise.all([
-    db
-      .from('sites')
-      .select(
-        `id, name, tier, is_active, muted_until, mute_reason, monitoring_started_at, created_at,
+  const [sites, checks, series, drops, spans, windowRows, kpiRows, events, probes, beats, openJobs, managed] =
+    await Promise.all([
+      db
+        .from('sites')
+        .select(
+          `id, name, tier, is_active, muted_until, mute_reason, monitoring_started_at, created_at,
          primary_owner_id, backup_owner_id,
          clients!inner(am_user_id),
          owner:profiles!sites_primary_owner_id_fkey(display_name),
@@ -85,44 +82,45 @@ export async function loadOverview(
          incidents(id, number, state, severity, trigger, escalation_level, started_at, detected_at, recovered_at, l0_user_id,
                    acker:profiles!incidents_acked_by_fkey(display_name),
                    incident_events(type, at, payload))`,
-      )
-      .eq('monitors.is_primary', true)
-      .not('incidents.state', 'in', CLOSED_INCIDENT_STATES_IN)
-      .in('incidents.incident_events.type', ['detected', 'escalated_to_down', 'relapsed'])
-      .order('name'),
-    db.rpc('site_list_locations'),
-    db.rpc('overview_response_24h'),
-    downEpisodesBySite(db, null, from30d),
-    maintenanceSpansBySite(db, null, from30d),
-    loadWindowRows(db, now),
-    db
-      .from('incidents')
-      .select(
-        'severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier), incident_events(type, payload)',
-      )
-      .eq('severity', 'down')
-      .eq('incident_events.type', 'escalated_to_down')
-      // a PROBLEM raised to DOWN may have started before the window its outage falls in
-      .gte('started_at', new Date(now.getTime() - 90 * DAY_MS).toISOString()),
-    db
-      .from('incident_events')
-      .select(
-        `id, type, at, payload, actor:profiles(display_name),
+        )
+        .eq('monitors.is_primary', true)
+        .not('incidents.state', 'in', CLOSED_INCIDENT_STATES_IN)
+        .in('incidents.incident_events.type', ['detected', 'escalated_to_down', 'relapsed'])
+        .order('name'),
+      db.rpc('site_list_locations'),
+      db.rpc('overview_response_24h'),
+      downEpisodesBySite(db, null, from30d),
+      maintenanceSpansBySite(db, null, from30d),
+      loadWindowRows(db, now),
+      db
+        .from('incidents')
+        .select(
+          'severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier), incident_events(type, payload)',
+        )
+        .eq('severity', 'down')
+        .eq('incident_events.type', 'escalated_to_down')
+        // a PROBLEM raised to DOWN may have started before the window its outage falls in
+        .gte('started_at', new Date(now.getTime() - 90 * DAY_MS).toISOString()),
+      db
+        .from('incident_events')
+        .select(
+          `id, type, at, payload, actor:profiles(display_name),
          incidents!inner(number, severity, trigger, auto_resolved, sites!inner(name))`,
-      )
-      .in('type', [...EVENT_TYPES])
-      .order('at', { ascending: false })
-      .limit(EVENT_ROWS),
-    db.from('probe_locations').select('code, is_active, last_heartbeat_at'),
-    db.from('agent_heartbeats').select('last_seen_at').eq('name', 'verifier').maybeSingle(),
-    db
-      .from('verification_jobs')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ['queued', 'leased']),
-    person.role === 'stakeholder'
-      ? db.from('clients').select('id', { count: 'exact', head: true }).eq('am_user_id', person.id)
-      : Promise.resolve({ count: 0, error: null }),
-  ]);
+        )
+        .in('type', [...EVENT_TYPES])
+        .order('at', { ascending: false })
+        .limit(EVENT_ROWS),
+      db.from('probe_locations').select('code, is_active, last_heartbeat_at'),
+      // the verifier's poll, and the engine cron's sweep (S12a: the fault banner, D-053)
+      db.from('agent_heartbeats').select('name, last_seen_at').in('name', ['verifier', 'engine-sweep']),
+      db
+        .from('verification_jobs')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['queued', 'leased']),
+      person.role === 'stakeholder'
+        ? db.from('clients').select('id', { count: 'exact', head: true }).eq('am_user_id', person.id)
+        : Promise.resolve({ count: 0, error: null }),
+    ]);
   for (const [name, r] of Object.entries({
     sites,
     checks,
@@ -130,7 +128,7 @@ export async function loadOverview(
     kpiRows,
     events,
     probes,
-    verifier,
+    beats,
     openJobs,
     managed,
   })) {
@@ -258,6 +256,10 @@ export async function loadOverview(
   }));
 
   const [onCall, oncall] = await Promise.all([onCallRead, oncallCardRead]);
+  const beatAt = (name: string) => beats.data?.find((b) => b.name === name)?.last_seen_at ?? null;
+  // Who the watchdog @mentioned, named in the fault banner; read only while there is a fault.
+  const onCallName =
+    onCall && isEngineFault(beatAt('engine-sweep'), now) ? await personName(db, onCall) : null;
   const rounds = rows
     .map((r) => r.checkedAt)
     .filter((t): t is string => !!t)
@@ -298,9 +300,22 @@ export async function loadOverview(
         ),
       ),
     },
-    probes: probeHealth(probes.data ?? [], verifier.data?.last_seen_at ?? null, openJobs.count ?? 0, now),
+    probes: probeHealth(probes.data ?? [], beatAt('verifier'), openJobs.count ?? 0, now),
     lastRoundAt: rounds.at(-1) ?? null,
+    fault: monitorFaultOf(beatAt('engine-sweep'), rounds.at(-1) ?? null, now, onCallName),
   };
+}
+
+/** A profile's display name (staff read profiles), or null. */
+async function personName(db: DbClient, userId: string): Promise<string | null> {
+  const { data, error } = await db
+    .from('profiles')
+    .select('display_name, google_chat_user_id')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw new Error(`profiles: ${error.message}`);
+  // The watchdog can only @mention someone with a Chat id; without one the banner names nobody (/verify 4 Nov).
+  return data?.google_chat_user_id ? data.display_name : null;
 }
 
 /** The chain error codes as a PostgREST `in` list, from the one list in `@dxt/shared` (D-029). */ const CHAIN_ERRORS = `(${TLS_CHAIN_ERRORS.join(',')})`;

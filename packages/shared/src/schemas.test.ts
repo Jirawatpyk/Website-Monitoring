@@ -1,6 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { PROBE_LOCATIONS, TIER_CONFIG, TRIGGERS, TRIGGER_LABELS } from './domain';
-import { checkResultSchema, ingestBatchSchema } from './schemas';
+import { checkResultSchema, dueMonitorsResponseSchema, ingestBatchSchema } from './schemas';
+
+describe('dueMonitorsResponseSchema (S12a watchdog facts)', () => {
+  it('reads the sweep and the on-call person, and an older server that sends neither', () => {
+    const r = dueMonitorsResponseSchema.parse({
+      monitors: [],
+      engineSweepAt: '2026-11-03T15:32:00.123+00:00',
+      onCall: { name: 'Ploy', chatUserId: '1234' },
+    });
+    expect(r.onCall?.chatUserId).toBe('1234');
+    expect(dueMonitorsResponseSchema.parse({ monitors: [] }).engineSweepAt).toBeUndefined();
+    expect(
+      dueMonitorsResponseSchema.parse({ monitors: [], engineSweepAt: null, onCall: null }).onCall,
+    ).toBeNull();
+  });
+
+  it('refuses a Chat id that isn’t digits (it goes into a <users/…> mention)', () => {
+    const bad = { monitors: [], onCall: { name: 'x', chatUserId: '1>' } };
+    expect(dueMonitorsResponseSchema.safeParse(bad).success).toBe(false);
+  });
+});
 
 const result = {
   monitorId: '6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f',

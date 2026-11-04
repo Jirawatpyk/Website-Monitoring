@@ -79,4 +79,4 @@ Never `systemctl restart 'dxt-agent@*'` for a release: `release.sh` restarts onl
 
 ## Healthchecks
 
-Four checks, each "every 1 min, grace 3 min, email Tao" (spec §15.3): `probe-bkk` and `browser-verifier`, once per environment. A stopped agent leaves SIN and TYO deciding status (D-019); a stopped verifier makes blocked sites PROBLEM (unverified) and emails the Admins (D-001).
+Six checks, each "every 1 min, grace 3 min, email Tao" (spec §15.3): `probe-bkk`, `browser-verifier` and `vps-watchdog` (S12a, `HEALTHCHECKS_PING_URL_WATCHDOG`), once per environment. A stopped agent leaves SIN and TYO deciding status (D-019); a stopped verifier makes blocked sites PROBLEM (unverified) and emails the Admins (D-001).
