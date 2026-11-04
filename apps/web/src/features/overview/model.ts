@@ -249,7 +249,13 @@ export interface Banner {
   /** Unacked for, from "Confirmed down" (§14.3). */
   unackedMinutes: number;
   cause: string | null;
+  /** Opened by hand from the hand check (S12b, §30.2): "02:31"; null for the engine's incidents. */
+  byHandAt: string | null;
 }
+
+/** The banner's title (§30.2): "realme.link is DOWN — opened by hand at 02:31", else "— 32 min". */
+export const bannerTitle = (b: Banner, duration: string) =>
+  `${b.site.name} is DOWN — ${b.byHandAt ? `opened by hand at ${b.byHandAt}` : duration}`;
 
 /**
  * Incident banners (§21.1): one per DOWN incident not yet acknowledged; escalated first, then Tier
@@ -277,6 +283,7 @@ export function bannersOf(
           downMinutes: clockMinutes(new Date(inc.startedAt), now),
           unackedMinutes: minutesBetween(inc.detectedAt, now),
           cause: inc.cause,
+          byHandAt: inc.trigger === 'manual' ? formatTime(new Date(inc.startedAt)) : null,
         },
       ];
     })
@@ -425,6 +432,8 @@ export function eventLine(e: OverviewEvent): string | null {
   const confirmed = `${e.siteName} DOWN confirmed${where ? ` — ${where}/3 locations` : ''}`;
   switch (e.type) {
     case 'detected':
+      // Opened by hand from the hand check (S12b, MainFault Recent events).
+      if (e.trigger === 'manual') return `${inc} ${e.siteName} opened by hand — ${e.actorName ?? 'someone'}`;
       // a PROBLEM opens with its summary; without one (a script-made incident), one never raised to DOWN
       if (typeof e.payload.summary === 'string')
         return `${e.siteName} PROBLEM — ${capitalise(e.payload.summary)}`;

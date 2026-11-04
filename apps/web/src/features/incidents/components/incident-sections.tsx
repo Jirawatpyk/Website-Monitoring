@@ -62,16 +62,22 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
     {
       label: page ? 'FIRST SEEN' : 'STARTED',
       value: [startedOn(d, now), formatTimeWithSeconds(new Date(d.startedAt))].filter(Boolean).join(' '),
-      caption: page ? 'First fetch that differed' : 'First failed check',
+      caption: page
+        ? 'First fetch that differed'
+        : d.trigger === 'manual'
+          ? 'Opened by hand'
+          : 'First failed check',
     },
     {
       label: d.severity === 'down' ? 'CONFIRMED DOWN' : page ? 'CONFIRMED PROBLEM' : 'DETECTED',
-      value: formatTimeWithSeconds(confirmedAt),
+      value: d.trigger === 'manual' ? '—' : formatTimeWithSeconds(confirmedAt),
       caption: page
         ? page.newScript.length
           ? 'New script domain — raised on the first fetch'
           : `Held ${PAGE_CHANGE_HOLD_FETCHES} fetches (1 h)`
-        : `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
+        : d.trigger === 'manual'
+          ? 'No probe check · engine down'
+          : `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
     },
     {
       label: 'DURATION',
@@ -114,7 +120,7 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
         : d.recoveredAt || d.resolvedAt
           ? 'Not acknowledged'
           : `${formatDuration(Math.max(1, Math.round((now.getTime() - confirmedAt.getTime()) / 60_000)))} since ${
-              d.severity === 'down' ? 'confirmed down' : 'detected'
+              d.trigger === 'manual' ? 'opened' : d.severity === 'down' ? 'confirmed down' : 'detected'
             }`,
     },
   ];
@@ -164,19 +170,34 @@ function GlyphLegend() {
 
 export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
   const latest = d.locations.filter((l) => l.latest);
+  if (!latest.length && d.trigger === 'manual')
+    return (
+      <p className="m-0 rounded-aura-md border border-dashed border-border-default p-aura-3 text-sm text-fg-secondary">
+        Opened by hand while the status engine was down — no probe results for this check
+      </p>
+    );
   if (!latest.length) return null;
   const at = latestRoundAt(d);
+  // A location silent for 3 min before the round shown has no result in it (a probe down, a sweep
+  // fault — staging /verify S12b): "No data", not its old pass, and it doesn't count in the verdict.
+  const fresh = (l: (typeof latest)[number]) =>
+    !at || !l.latest?.at || Date.parse(at) - Date.parse(l.latest.at) < STALE_LOCATION_MS;
+  const counted = latest.filter(fresh);
   return (
     <Card
       title={at ? `Latest round · ${formatTimeWithSeconds(new Date(at))}` : 'Latest round'}
       headingLevel={2}
-      description={roundVerdict(latest.map((l) => l.latest!.glyph))}
+      description={roundVerdict(counted.map((l) => l.latest!.glyph))}
     >
       <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
         {latest.map((l) => (
           <li key={l.location} className="flex items-center justify-between gap-3 text-sm">
             <span className="font-medium">{l.location}</span>
-            <CheckText cell={l.latest} location={l.location} />
+            {fresh(l) ? (
+              <CheckText cell={l.latest} location={l.location} />
+            ) : (
+              <CheckText cell={{ text: 'No data', glyph: 'none' }} location={l.location} />
+            )}
           </li>
         ))}
       </ul>
@@ -220,7 +241,14 @@ export function TimelineLines({ items, newestFirst }: { items: TimelineItem[]; n
 /** Evidence by location: first check, recheck and latest per location, with the glyph legend. */
 export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
   if (d.locations.length === 0) {
-    return <p className="m-0 text-sm text-fg-secondary">No checks found around the start.</p>;
+    // Opened by hand while the engine was down (S12b, §30.5): no probe ran for it.
+    return (
+      <p className="m-0 text-sm text-fg-secondary">
+        {d.trigger === 'manual'
+          ? 'Opened by hand while the status engine was down — no probe results for this check. Probe evidence starts with the first round after the engine is back.'
+          : 'No checks found around the start.'}
+      </p>
+    );
   }
   return (
     <>
@@ -267,6 +295,9 @@ const LOCATION_LABELS: Record<string, string> = {
 };
 
 /** The newest of the locations' latest checks. */
+/** A location whose newest check is this much older than the round shown is out of it. */
+const STALE_LOCATION_MS = 3 * 60_000;
+
 function latestRoundAt(d: Pick<IncidentDetail, 'locations'>): string | null {
   const times = d.locations.flatMap((l) => (l.latest?.at ? [l.latest.at] : [])).sort();
   return times.at(-1) ?? null;

@@ -88,7 +88,7 @@ export function ClientUpdateCard({
       doneRef.current?.focus();
     }
   }, [c.status]);
-  const notified = formatTime(new Date(c.notifiedAt));
+  const notified = `${formatTime(new Date(c.notifiedAt))}${c.byHand ? ' (by hand)' : ''}`;
 
   return (
     <div ref={cardRef} className="scroll-mt-4">

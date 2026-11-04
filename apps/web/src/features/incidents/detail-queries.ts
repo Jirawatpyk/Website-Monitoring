@@ -43,6 +43,11 @@ import {
   type TimelineItem,
 } from './model';
 import { loadOnCallNow } from './oncall-now';
+import { isEngineStopped } from '@dxt/engine';
+import { escalationPlanSchema, formatTime } from '@dxt/shared';
+import { loadResponseHours } from '@/server/escalation/response-hours';
+import { escalationCardOf, pendingClientUpdate, type EscalationCardView } from './escalation-card';
+import type { ReminderView } from './components/escalation-card';
 import { incidentIdSchema } from './schemas';
 import { buildIncidentView, canAcknowledge, type IncidentRow, type IncidentView, type Viewer } from './view';
 
@@ -105,6 +110,10 @@ export interface IncidentDetail {
   canAct: boolean;
   /** The Client update card (S11), once the track fired (D-052 item 3); null before or never. */
   clientUpdate: ClientUpdateCard | null;
+  /** The Escalation card (S12b, spec §30.6–8); null for an incident with no plan. */
+  escalation?: EscalationCardView | null;
+  /** "Send client-update reminder now" while the engine is stopped (§30.7, D-055 item 3); else null. */
+  reminder?: ReminderView | null;
   rootCause: { category: string | null; what: string | null; fix: string | null };
   gate: Gate;
   /**
@@ -157,9 +166,10 @@ interface DetailRow extends IncidentRow {
   root_cause: string | null;
   root_cause_fix: string | null;
   alerted_at: string | null;
+  escalation_plan: unknown;
   l0: { is_active: boolean; role: string } | null;
   sites: IncidentRow['sites'] & {
-    clients: { am_user_id: string | null; name: string; language: string } | null;
+    clients: { am_user_id: string | null; name: string; language: string; is_internal: boolean } | null;
   };
 }
 
@@ -293,11 +303,11 @@ export async function loadIncident(
       `id, number, state, severity, trigger, escalation_level, started_at, detected_at, acked_at, acked_by,
        recovered_at, resolved_at, resolved_by, auto_resolved, client_update_required, client_updated_at,
        client_update_due_at, client_updated_by, client_update_note, client_update_not_needed,
-       root_cause_category, root_cause, root_cause_fix, site_id, monitor_id, l0_user_id, alerted_at,
+       root_cause_category, root_cause, root_cause_fix, site_id, monitor_id, l0_user_id, alerted_at, escalation_plan,
        l0:profiles!incidents_l0_user_id_fkey(is_active, role),
        sites!inner(name, tier, primary_owner_id, backup_owner_id,
          monitors(id, url, is_primary, timeout_ms, allowed_redirect_domains),
-         clients(am_user_id, name, language))`,
+         clients(am_user_id, name, language, is_internal))`,
     )
     .eq('id', incidentId)
     .maybeSingle()
@@ -326,7 +336,7 @@ export async function loadIncident(
   const checkCols = 'location, outcome, status_code, response_ms, error, checked_at';
   // can_ack's on-call branch (S10, D-048): a Responder holding the shift acts on any Tier 1 incident.
   const askShift = viewer.role === 'responder' && i.sites.tier === 1;
-  const [events, around, latest, onCall] = await Promise.all([
+  const [events, around, latest, onCall, engineRun, admins, hours] = await Promise.all([
     fetchAllPages<EventRow>(
       (from, to) =>
         db
@@ -359,7 +369,18 @@ export async function loadIncident(
           .limit(30)
       : Promise.resolve({ data: [] as CheckRow[], error: null }),
     askShift ? loadOnCallNow(db, now) : Promise.resolve(null),
+    // S12b: the ladder's people and clock, and whether any engine run happened in the last 3 min (D-055).
+    db.from('agent_heartbeats').select('last_seen_at').eq('name', 'engine-run').maybeSingle(),
+    db
+      .from('profiles')
+      .select('display_name')
+      .eq('role', 'admin')
+      .eq('is_active', true)
+      .order('display_name'),
+    loadResponseHours(db, now),
   ]);
+  if (engineRun.error) throw new Error(`agent_heartbeats: ${engineRun.error.message}`);
+  if (admins.error) throw new Error(`profiles: ${admins.error.message}`);
   if (around.error) throw new Error(`check_results: ${around.error.message}`);
   if (latest.error) throw new Error(`check_results: ${latest.error.message}`);
 
@@ -408,6 +429,67 @@ export async function loadIncident(
     typeof evidenceEvent?.payload.screenshotPath === 'string' ? evidenceEvent.payload.screenshotPath : null;
   const url = shot ? await sign(shot) : null;
 
+  const engineSince = engineRun.data?.last_seen_at ?? null;
+  const stopped = isEngineStopped(engineSince ? new Date(engineSince) : null, now);
+  const open = !['resolved', 'in_review', 'closed'].includes(i.state);
+  const byHand = ((): { escalation: EscalationCardView | null; reminder: ReminderView | null } => {
+    const plan = escalationPlanSchema.safeParse(i.escalation_plan);
+    const canAct = canAcknowledge(actor, i);
+    const escalation = escalationCardOf({
+      plan: plan.success ? plan.data : null,
+      tier: i.sites.tier,
+      severity: i.severity,
+      level: i.escalation_level,
+      state: i.state,
+      detectedAt: i.detected_at,
+      alertedAt: i.alerted_at,
+      hours,
+      steps: events
+        .filter(
+          (e) => e.type === 'step_fired' && e.payload.reminder !== true && e.payload.severity === i.severity,
+        )
+        .map((e) => ({
+          level: typeof e.payload.level === 'number' ? e.payload.level : 0,
+          at: e.at,
+          sentBy: e.payload.byHand === true && e.actor_id ? nameOf(e.actor_id) : null,
+        })),
+      people: {
+        owner: i.l0_user_id
+          ? { name: nameOf(i.l0_user_id), onCall: i.l0_user_id !== i.sites.primary_owner_id }
+          : i.sites.primary_owner_id
+            ? { name: nameOf(i.sites.primary_owner_id), onCall: false }
+            : null,
+        backup: i.sites.backup_owner_id ? nameOf(i.sites.backup_owner_id) : null,
+        am: am ? nameOf(am) : null,
+        admins: (admins.data ?? []).map((a) => a.display_name),
+      },
+      acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by) } : null,
+      engine: { stopped, since: engineSince },
+      canAct,
+    });
+    // §30.7: a Tier 1–2 client site's open DOWN, the track not fired, the engine stopped.
+    const client = i.sites.clients;
+    const reminder =
+      stopped &&
+      open &&
+      canAct &&
+      i.severity === 'down' &&
+      !i.client_update_required &&
+      (i.sites.tier === 1 || i.sites.tier === 2) &&
+      client &&
+      !client.is_internal &&
+      ['unacked', 'escalated', 'acknowledged'].includes(i.state)
+        ? {
+            to: am ? nameOf(am) : 'the Admins',
+            role: am ? 'Site AM' : 'Admin',
+            dueAt:
+              i.sites.tier === 1 ? formatTime(new Date(Date.parse(i.started_at) + 15 * 60_000)) : 'when sent',
+            preFire: true,
+          }
+        : null;
+    return { escalation, reminder };
+  })();
+
   return {
     // §26.3: the header reads "Page title changed on /", not the Chat cause.
     view: pageChange?.rows.length
@@ -449,37 +531,41 @@ export async function loadIncident(
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
     canAct: canAcknowledge(actor, i),
     rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },
-    gate: resolveGate(
-      {
-        siteName: i.sites.name,
-        state: i.state,
-        severity: i.severity,
-        recoveredAt: i.recovered_at,
-        clientUpdateRequired: i.client_update_required,
-        clientUpdatedAt: i.client_updated_at,
-        rootCauseCategory: i.root_cause_category,
-        clientUpdate: {
-          tier: i.sites.tier,
-          dueAt: i.client_update_due_at,
-          by: i.client_updated_by ? nameOf(i.client_updated_by) : null,
-          notNeeded: i.client_update_not_needed,
-          note: i.client_update_note,
+    gate: pendingClientUpdate(
+      byHand.reminder,
+      resolveGate(
+        {
+          siteName: i.sites.name,
+          state: i.state,
+          severity: i.severity,
+          recoveredAt: i.recovered_at,
+          clientUpdateRequired: i.client_update_required,
+          clientUpdatedAt: i.client_updated_at,
+          rootCauseCategory: i.root_cause_category,
+          clientUpdate: {
+            tier: i.sites.tier,
+            dueAt: i.client_update_due_at,
+            by: i.client_updated_by ? nameOf(i.client_updated_by) : null,
+            notNeeded: i.client_update_not_needed,
+            note: i.client_update_note,
+          },
         },
-      },
-      events,
-      nameOf,
-      pageChange
-        ? {
-            admin: viewer.role === 'admin',
-            pendingUntil: pageChange.view.pending?.until ?? null,
-            acceptedAt:
-              pageChange.view.status === 'accepted' ? (pageChange.view.baseline?.acceptedAt ?? null) : null,
-            nextFetchAt: pageChange.view.nextFetchAt,
-            differsSince: pageChange.view.firstSeenAt ?? i.started_at,
-          }
-        : undefined,
+        events,
+        nameOf,
+        pageChange
+          ? {
+              admin: viewer.role === 'admin',
+              pendingUntil: pageChange.view.pending?.until ?? null,
+              acceptedAt:
+                pageChange.view.status === 'accepted' ? (pageChange.view.baseline?.acceptedAt ?? null) : null,
+              nextFetchAt: pageChange.view.nextFetchAt,
+              differsSince: pageChange.view.firstSeenAt ?? i.started_at,
+            }
+          : undefined,
+      ),
     ),
     clientUpdate,
+    ...byHand,
     resolved: resolvedOf(i, events, viewer, nameOf),
     emailed: events.some((e) => e.type === 'alerted' && e.payload.channel === 'email'),
     timeline: timelineOf(
@@ -524,6 +610,7 @@ function clientUpdateOf(
     ? {
         am: typeof fired.payload.am === 'string' && fired.payload.noAm !== true ? fired.payload.am : null,
         at: fired.at,
+        byHand: fired.payload.byHand === true,
       }
     : null;
   const am = notified ? notified.am : amId ? nameOf(amId) : null;

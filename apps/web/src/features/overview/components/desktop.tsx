@@ -71,6 +71,7 @@ import {
   sitesOkCaption,
   tileState,
   type Banner,
+  bannerTitle,
   type Chip,
   type Counts,
   type LiveIssue,
@@ -103,11 +104,15 @@ export function DesktopBanners({
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
             <div className="flex min-w-0 flex-col gap-1">
               <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-base font-semibold text-fg-danger">
-                <span>{`${b.site.name} is DOWN — ${durationText(b.downMinutes)}`}</span>
+                <span>{bannerTitle(b, durationText(b.downMinutes))}</span>
                 {b.escalated && <WorkflowBadge state="escalated" level={b.level} />}
                 <span className="text-sm font-medium">{durationText(b.unackedMinutes, 'unacked')}</span>
               </p>
-              <p className="m-0">{b.cause ?? 'Hard fail'}</p>
+              <p className="m-0">
+                {b.byHandAt
+                  ? `Opened by hand ${b.byHandAt} · ${b.cause ?? 'Manual (hand check)'}`
+                  : (b.cause ?? 'Hard fail')}
+              </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Link href={`/incidents/${b.incidentId}`} className={buttonClass({ variant: 'secondary' })}>
@@ -159,11 +164,14 @@ export function Kpis({
   counts,
   kpis,
   asOf,
+  sitesOkNote,
 }: {
   counts: Counts;
   kpis: OverviewKpis;
   /** During a monitor fault (S12a, spec §30.1): "as of 02:17" on the round-based figures; Open incidents stays live. */
   asOf?: string | null;
+  /** The hand check's Sites OK caption (S12b, §30.1): "1 down by hand check 02:31 · the rest as of 02:17". */
+  sitesOkNote?: string | null;
 }) {
   const notEnough = 'Not enough incidents yet';
   const stale = (caption: string) => (asOf ? `${caption} · ${asOf}` : caption);
@@ -173,7 +181,7 @@ export function Kpis({
         label="Sites OK"
         value={counts.ok}
         unit={`/ ${counts.monitored}`}
-        caption={stale(sitesOkCaption(counts))}
+        caption={sitesOkNote ?? stale(sitesOkCaption(counts))}
         icon={<IconCircleCheck />}
       />
       <Stat label="Open incidents" value={counts.open} caption={openCaption(counts)} icon={<IconBell />} />

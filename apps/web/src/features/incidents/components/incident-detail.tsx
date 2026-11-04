@@ -46,6 +46,7 @@ import { useSecondsLeft } from '@/components/use-seconds-left';
 import { acknowledgeIncident, undoAcknowledge, undoResolve } from '../actions';
 import type { IncidentDetail } from '../detail-queries';
 import { clientUpdateWhy, rootCauseLabel } from '../model';
+import { ClientUpdateReminder, EscalateNow, EscalationCard } from './escalation-card';
 import { ClientUpdateCard } from './client-update-card';
 import type { IncidentSections } from './incident-sections';
 import { AckPanel } from './ack-panel';
@@ -286,11 +287,13 @@ export function IncidentDetailView({
               {[
                 v.cause,
                 // a page change has no failed check: the board shows only its cause (§26.3)
-                stillDown && !d.pageChange
-                  ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
-                  : d.recoveredAt && !resolved
-                    ? `OK since ${formatTime(new Date(d.recoveredAt))}`
-                    : null,
+                d.trigger === 'manual'
+                  ? `${formatTime(new Date(d.startedAt))} · no probe check — the status engine was down`
+                  : stillDown && !d.pageChange
+                    ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
+                    : d.recoveredAt && !resolved
+                      ? `OK since ${formatTime(new Date(d.recoveredAt))}`
+                      : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -390,6 +393,24 @@ export function IncidentDetailView({
                 phone={false}
               />
             )}
+            {d.reminder && (
+              <ClientUpdateReminder
+                reminder={d.reminder}
+                incidentId={v.incidentId}
+                incidentLabel={incidentLabel}
+                siteName={d.siteName}
+                phone={false}
+              />
+            )}
+            {d.escalation && (
+              <EscalationCard
+                card={d.escalation}
+                incidentId={v.incidentId}
+                incidentLabel={incidentLabel}
+                siteName={d.siteName}
+                phone={false}
+              />
+            )}
             {resolveCard(resolveDesktop, true)}
           </div>
         </div>
@@ -401,7 +422,9 @@ export function IncidentDetailView({
           {[
             `${stillDown ? (d.severity === 'down' ? 'Down' : 'Problem') : d.severity === 'down' ? 'Was down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`,
             downRange ? [sections.startedOn, downRange].filter(Boolean).join(' ') : sections.startedOn,
-            `confirmed ${formatTimeWithSeconds(new Date(d.detectedAt))}`,
+            d.trigger === 'manual'
+              ? `opened by hand ${formatTime(new Date(d.startedAt))}`
+              : `confirmed ${formatTimeWithSeconds(new Date(d.detectedAt))}`,
           ]
             .filter(Boolean)
             .join(' · ')}
@@ -450,7 +473,25 @@ export function IncidentDetailView({
             onUndone={() => setFocusResolve(true)}
           />
         )}
+        {d.escalation && (
+          <EscalateNow
+            card={d.escalation}
+            incidentId={v.incidentId}
+            incidentLabel={incidentLabel}
+            siteName={d.siteName}
+            phone
+          />
+        )}
         {whatChanged ?? sections.latestRound}
+        {d.escalation && (d.escalation.stopped || d.escalation.back) && (
+          <EscalationCard
+            card={d.escalation}
+            incidentId={v.incidentId}
+            incidentLabel={incidentLabel}
+            siteName={d.siteName}
+            phone
+          />
+        )}
         {d.clientUpdate && (
           <ClientUpdateCard
             card={d.clientUpdate}
@@ -459,6 +500,15 @@ export function IncidentDetailView({
             siteName={d.siteName}
             tier={d.tier}
             acked={!!d.acked}
+            phone
+          />
+        )}
+        {d.reminder && (
+          <ClientUpdateReminder
+            reminder={d.reminder}
+            incidentId={v.incidentId}
+            incidentLabel={incidentLabel}
+            siteName={d.siteName}
             phone
           />
         )}
@@ -654,7 +704,9 @@ function EvidenceCard({
           </>
         ) : (
           <span className="text-sm text-fg-secondary">
-            No screenshot — the browser verifier takes one after a hard-fail DOWN is confirmed.
+            {d.trigger === 'manual'
+              ? 'No screenshot — the browser verifier takes one only after a probe confirms a DOWN.'
+              : 'No screenshot — the browser verifier takes one after a hard-fail DOWN is confirmed.'}
           </span>
         )}
       </div>

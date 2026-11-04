@@ -243,7 +243,10 @@ export function buildIncidentView(
     confirmedBy: problem
       ? TRIGGER_LABELS[i.trigger]
       : `Confirmed by ${formatConfirmedBy(num(detected?.payload.confirmingLocations) ?? 2, confirmedByWafOf(detected?.payload))}`,
-    cause: str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
+    cause:
+      detected?.payload.manual === true
+        ? `Opened by ${str(detected.payload.openedBy) ?? 'someone'} from a hand check${str(detected.payload.note) ? ` · “${str(detected.payload.note)}”` : ''}`
+        : (str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger]),
     siteUrl: i.sites.monitors.find((m) => m.is_primary)?.url ?? null,
     ack,
   };

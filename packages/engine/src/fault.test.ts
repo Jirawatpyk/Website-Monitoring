@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { faultState, probeMissing, type LocationBeat } from './fault';
+import { faultState, isEngineStopped, probeMissing, type LocationBeat } from './fault';
 
 // Spec §14.4 / §15.3 (MainFault, Probes boards), D-053. Bangkok time.
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
@@ -144,5 +144,19 @@ describe('probeMissing — one location missing > 3 min (spec §15.3, D-053)', (
       }).engineFault;
     expect(at('2026-09-26T02:19:59.999')).toBe(false);
     expect(at('2026-09-26T02:20:00')).toBe(true);
+  });
+});
+
+describe('isEngineStopped — no engine run of any kind (S12b, D-055 item 1)', () => {
+  it.each([
+    ['a Bangkok batch ran the engine 1 min ago: the ladder runs on its own', '2026-09-26T02:30:00', false],
+    ['the last run 02:28, now 02:31: stopped (3 min or more)', '2026-09-26T02:28:00', true],
+    ['2:59.999 since the last run: still running', '2026-09-26T02:28:00.001', false],
+  ] as const)('%s', (_case, runAt, expected) => {
+    expect(isEngineStopped(bkk(runAt), bkk('2026-09-26T02:31:00'))).toBe(expected);
+  });
+
+  it('no run recorded yet (a fresh deploy) is no data, not stopped', () => {
+    expect(isEngineStopped(null, bkk('2026-09-26T02:31:00'))).toBe(false);
   });
 });

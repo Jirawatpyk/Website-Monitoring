@@ -102,6 +102,19 @@ export async function clearBeat(name: string): Promise<void> {
   });
 }
 
+/**
+ * After a run: the `E2E …` sites the specs made stop being monitored, so the next local run doesn't
+ * render (and the engine doesn't judge) a hundred leftover sites and incidents (S12b retro). Each spec
+ * makes its own sites, so none relies on an earlier run's.
+ */
+export async function retireE2ESites(): Promise<void> {
+  await admin('/rest/v1/sites?name=like.E2E*&is_active=eq.true', {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ is_active: false }),
+  });
+}
+
 /** Sign `email` in and copy the session cookies into the browser context. */
 export async function signIn(context: BrowserContext, baseURL: string, email: string): Promise<void> {
   assertLocal();
@@ -374,6 +387,41 @@ export async function openPageChangeIncident(ownerEmail: string): Promise<{
     }),
   })) as string;
   return { incidentId, siteId: site!.id, monitorId: monitor!.id, checkId };
+}
+
+/**
+ * S12b: a live Tier 1 `E2E HC …` site with a home page monitor (a manual incident needs one), on its own
+ * client whose AM is `amEmail`, owned by `ownerEmail` — for the hand check. Returns its name.
+ */
+export async function newHandCheckSite(ownerEmail: string, amEmail: string): Promise<string> {
+  const idOf = async (email: string) =>
+    (
+      (await admin(`/rest/v1/profiles?select=id&email=eq.${encodeURIComponent(email)}`)) as { id: string }[]
+    )[0]!.id;
+  const insert = async (table: string, row: object) =>
+    (
+      (await admin(`/rest/v1/${table}?select=id`, {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(row),
+      })) as { id: string }[]
+    )[0]!.id;
+  const tag = crypto.randomUUID().slice(0, 8);
+  const client = await insert('clients', { name: `E2E HC client ${tag}`, am_user_id: await idOf(amEmail) });
+  const name = `E2E HC ${tag}`;
+  const site = await insert('sites', {
+    client_id: client,
+    name,
+    tier: 1,
+    primary_owner_id: await idOf(ownerEmail),
+  });
+  await insert('monitors', {
+    site_id: site,
+    type: 'http',
+    is_primary: true,
+    url: `https://hc-${tag}.example.test/`,
+  });
+  return name;
 }
 
 /** The page_baseline.* audit rows of a monitor, oldest first (S09d Done-when 2). */

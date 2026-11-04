@@ -1,12 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { after } from 'next/server';
-import { serverEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
-import { serviceDb } from '@/server/db';
-import { notifierDeps } from '@/server/notifier/deps';
-import { dispatchNotifications } from '@/server/notifier/dispatch';
 import {
   clientUpdateSchema,
   incidentIdSchema,
@@ -16,6 +11,7 @@ import {
   type NoteInput,
   type RootCauseInput,
 } from './schemas';
+import { flushAfter } from './flush';
 
 export type AckResult = { ok: true; postsAt: string } | { ok: false; message: string };
 export type UndoResult = { ok: true } | { ok: false; message: string };
@@ -38,7 +34,6 @@ const UNDO_REFUSALS: Record<string, string> = {
   '55000': 'Too late to undo — the acknowledgement has been posted.',
 };
 const FAILED = 'Couldn’t reach the server. Check your connection and try again.';
-const FLUSH_MARGIN_MS = 2_000;
 
 /**
  * Note / root cause / resolve refusals (D-033). The SQL words a condition or a field refusal for
@@ -55,30 +50,6 @@ const UNDO_RESOLVE_REFUSALS: Record<string, string> = {
 };
 const refusal = (error: { code: string; message: string }, table: Record<string, string>) =>
   table[error.code] ?? (error.code === '55000' || error.code === '22023' ? error.message : FAILED);
-
-/**
- * Sends the incident's queued messages from this request once `at` has passed (a held ACKNOWLEDGED /
- * RESOLVED: just after its window; a NOTE: now) — the notifier cron sweeps up anything left.
- */
-function flushAfter(incidentId: string, at: string | null, event: string) {
-  after(async () => {
-    // The claim takes rows whose hold_until <= the database's now: 2 s of margin for clock skew.
-    if (at) {
-      await new Promise((r) =>
-        setTimeout(r, Math.max(0, new Date(at).getTime() - Date.now()) + FLUSH_MARGIN_MS),
-      );
-    }
-    try {
-      // Only this incident's messages, and well inside the page's maxDuration.
-      await dispatchNotifications(notifierDeps(serviceDb(), serverEnv()), {
-        incidentId,
-        deadline: Date.now() + 30_000,
-      });
-    } catch (err) {
-      console.error(JSON.stringify({ event, error: String(err) }));
-    }
-  });
-}
 
 const revalidate = (id: string) => {
   revalidatePath(`/incidents/${id}`);

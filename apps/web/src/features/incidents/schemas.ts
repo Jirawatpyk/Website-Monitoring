@@ -44,3 +44,16 @@ export const clientUpdateSchema = z
   .refine((v) => !v.notNeeded || v.note.length > 0, { message: 'A reason is required.', path: ['note'] });
 
 export type ClientUpdateInput = z.input<typeof clientUpdateSchema>;
+
+/** "Down — open incident" from the hand check (S12b, spec §30.2): what they saw is optional, ≤ 500 characters. */
+export const manualIncidentSchema = z.object({
+  siteId: z.uuid(),
+  note: z.string().trim().max(500, 'Keep it under 500 characters').default(''),
+});
+
+export type ManualIncidentInput = z.input<typeof manualIncidentSchema>;
+
+/** Escalate now (spec §30.6): the level the person saw on the button (L1–L3). */
+export const escalateNowSchema = z.object({ incidentId: incidentIdSchema, level: z.int().min(1).max(3) });
+
+export type EscalateNowInput = z.input<typeof escalateNowSchema>;

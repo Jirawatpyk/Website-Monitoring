@@ -1,8 +1,11 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
 
-/** The Vercel side's own beats (S12a, D-053): the Overview fault banner, Probes and the VPS watchdog read them. */
-export type BeatName = 'engine-sweep' | 'notifier' | 'crawler' | 'vps-watchdog';
+/**
+ * The Vercel side's own beats (S12a, D-053): the Overview fault banner, Probes and the VPS watchdog read
+ * them. `engine-run` is every engine run, the cron's or after a Bangkok batch (S12b, D-055).
+ */
+export type BeatName = 'engine-sweep' | 'engine-run' | 'notifier' | 'crawler' | 'vps-watchdog';
 
 /**
  * Stamps `agent_heartbeats` for a job that just did its work. Best effort, like the Healthchecks ping:

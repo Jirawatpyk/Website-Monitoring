@@ -13,7 +13,7 @@ import {
   type Trigger,
   formatLocations,
 } from '@dxt/shared';
-import type { ProblemFacts } from './chat-alerts';
+import { MANUAL_CONFIRMED_BY, manualCause, type ManualOpen, type ProblemFacts } from './chat-alerts';
 import { downtime } from './downtime';
 import {
   formatResume,
@@ -92,6 +92,8 @@ export interface DownEmailInput extends EmailBaseInput {
   heldUntil?: Date | null;
   /** Someone acknowledged before this email went (D-047: an ack releases the email held for its grace). */
   acknowledged?: { by: string; at: Date } | null;
+  /** Opened by hand from the hand check (S12b, spec §30.5): no probe facts. */
+  manual?: ManualOpen | null;
 }
 
 export interface ProblemEmailInput extends EmailBaseInput {
@@ -359,10 +361,11 @@ export function emailLayout({ subject, why, footer, headers }: Envelope, b: Emai
 const confirmedLabel = (d: Date) => `${formatDay(d, { weekday: true })} ${formatTimeWithSeconds(d)}`;
 
 export function buildDownEmail(input: DownEmailInput): EmailMessage {
-  const { site } = input;
+  const { site, manual } = input;
   const now = input.now ?? input.confirmedAt;
   const acked = input.ackedBy ?? input.acknowledged?.by ?? null;
   const held = acked ? null : heldRow(input.heldUntil, input.ladder, now);
+  const cause = manual ? manualCause(manual) : input.cause;
   return render(input, {
     template: 'down',
     color: C.danger,
@@ -371,8 +374,8 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
     pre: (held
       ? [site, held.pre, ...ladderPre(input.ladder, now)]
       : [
-          `${site} confirmed down ${formatTimeWithSeconds(input.confirmedAt)}`,
-          input.cause,
+          `${site} ${manual ? 'opened by hand' : 'confirmed down'} ${formatTimeWithSeconds(input.confirmedAt)}`,
+          cause,
           ...ladderPre(acked ? null : input.ladder, now),
         ]
     ).join(' · '),
@@ -388,9 +391,12 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
             : 'Nobody has acknowledged yet. The Google Chat alert couldn’t be delivered, so this email is the alert.',
     facts: [
       ...(held ? [held.row] : []),
-      ['Confirmed down', confirmedLabel(input.confirmedAt)],
-      ['Cause', input.cause],
-      ['Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)],
+      [manual ? 'Opened by hand' : 'Confirmed down', confirmedLabel(input.confirmedAt)],
+      ['Cause', cause],
+      [
+        'Confirmed by',
+        manual ? MANUAL_CONFIRMED_BY : formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf),
+      ],
       ...ladderFacts(acked ? null : input.ladder, input.now ?? input.confirmedAt, 'down'),
     ],
     // The board adds [Open incident], but Acknowledge opens that same page (one incident page, D-033).
@@ -1015,6 +1021,8 @@ export interface StepEmailInput extends EmailBaseInput {
   admin?: string | null;
   /** What the ack stopped, for the FYI's Acknowledged row: "L1–L2 stopped". */
   stopped?: string;
+  /** Sent with Escalate now while the engine was stopped (S12b, D-055): who sent it. */
+  byHand?: string | null;
 }
 
 const andList = (names: readonly string[]) =>
@@ -1024,6 +1032,12 @@ const andList = (names: readonly string[]) =>
  * The S10 step emails (EmailAlert "ESCALATED · L2" to the CEO and "FYI · L3" to the CEO and the AM; the
  * Tier 2–3 L2 reminder to the Admin, spec §16.5; the FYI nobody acknowledged is D-048's draft).
  */
+/** Escalate now (S12b, spec §30.6): the level went because someone sent it, not on the engine's clock. */
+const byHandFact = (input: StepEmailInput): [string, string][] =>
+  input.byHand
+    ? [['Sent', `By hand by ${input.byHand} — the status engine is down, so nothing escalates on its own`]]
+    : [];
+
 function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder'): EmailMessage {
   const { site } = input;
   const duration = formatDuration(input.elapsedMin);
@@ -1044,6 +1058,7 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
       // were asked. Open it to see the latest, or call Tao."
       lede: `${site} (Tier ${input.tier}) has been down ${duration} and nobody on the team has acknowledged. ${andList(input.informedRoles ?? informed)} ${informed.length > 1 ? 'were' : 'was'} asked. Open it to see the latest${input.admin ? `, or call ${input.admin}` : ''}.`,
       facts: [
+        ...byHandFact(input),
         downFor,
         ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
         ...(input.alreadyTold ? [['Already told', input.alreadyTold] as [string, string]] : []),
@@ -1073,6 +1088,7 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
         : `${site} still down after ${duration} — not acknowledged yet`,
       lede,
       facts: [
+        ...byHandFact(input),
         downFor,
         ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
         // EmailAlert FYI: "Acknowledged · Arm at 10:07 · L1–L2 stopped".
@@ -1098,7 +1114,11 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
     pre: `${site} down ${duration}, not acknowledged`,
     headline: `${site} still down — ${duration}, no ack`,
     lede: `${site} is still down after ${duration} and nobody has acknowledged. Acknowledge, or make sure the owner has it.`,
-    facts: [downFor, ...(input.cause ? [['Cause', input.cause] as [string, string]] : [])],
+    facts: [
+      ...byHandFact(input),
+      downFor,
+      ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+    ],
     buttons: [
       { label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true },
       { label: 'Open incident', href: input.incidentUrl, primary: false },
@@ -1147,6 +1167,7 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
       : `${site} still has a problem — ${duration}, no ack`,
     lede: ask,
     facts: [
+      ...byHandFact(input),
       [
         down ? 'Down for' : 'Problem for',
         `${sinceDetected} (${down ? 'confirmed down' : 'detected'} ${detected})`,
@@ -1186,6 +1207,8 @@ export interface ClientUpdateDueEmailInput extends EmailBaseInput {
   dueAt?: Date;
   /** Fired in the minute it recovered: "was down", not "has been down". */
   recovered?: boolean;
+  /** Sent by hand while the engine was stopped (S12b, spec §30.7, D-055): who sent it, maybe before 15 min. */
+  byHand?: string | null;
 }
 
 /** "Client update due" to the AM (EmailAlert, spec §14.11): primary "Open draft". S11. */
@@ -1198,16 +1221,20 @@ export function buildClientUpdateDueEmail(input: ClientUpdateDueEmailInput): Ema
       reason: 'step',
       why: input.noAm
         ? `You got this because you’re an Admin and ${client} has no account manager in DxT Monitor.`
-        : `You got this because you’re the AM for ${client} and a Tier ${input.tier} site was down ${wait}.`,
+        : input.byHand
+          ? `You got this because you’re the AM for ${client} and ${input.byHand} sent the reminder by hand while the status engine is down.`
+          : `You got this because you’re the AM for ${client} and a Tier ${input.tier} site was down ${wait}.`,
     },
     {
       template: 'client_update_due',
       color: C.warning,
       bar: C.warning,
       label: 'CLIENT UPDATE DUE',
-      pre: `${site} down ${wait} · draft ready`,
+      pre: input.byHand ? `${site} down · draft ready · sent by hand` : `${site} down ${wait} · draft ready`,
       headline: `Tell ${client} what’s happening`,
-      lede: `${site} (${formatTier(input.tier)}) ${input.recovered ? 'was' : 'has been'} down ${wait}. Please update the client and mark it on the incident page — the incident can’t be resolved until you do.`,
+      lede: input.byHand
+        ? `${site} (${formatTier(input.tier)}) is down. ${input.byHand} sent this reminder by hand because the status engine is down. Please update the client and mark it on the incident page — the incident can’t be resolved until you do.`
+        : `${site} (${formatTier(input.tier)}) ${input.recovered ? 'was' : 'has been'} down ${wait}. Please update the client and mark it on the incident page — the incident can’t be resolved until you do.`,
       facts: [
         [
           'Down for',

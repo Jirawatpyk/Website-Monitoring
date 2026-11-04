@@ -3,11 +3,18 @@ import { Button, Container, EmptyState, PageHeader } from '@jirawatpyk/aura-reac
 import { IconMonitor } from '@jirawatpyk/aura-react/icons';
 import { OverviewView } from '@/features/overview';
 import { getOverview } from '@/features/overview/server';
-import { acknowledgeIncident, undoAcknowledge } from '@/features/incidents/server';
+import {
+  acknowledgeIncident,
+  openManualIncident,
+  recordHandCheck,
+  undoAcknowledge,
+} from '@/features/incidents/server';
 import { SitesEmpty } from '@/features/sites';
 import { chatConnected } from '@/features/sites/server';
 
 export const metadata: Metadata = { title: 'Overview' };
+// A manual incident's DOWN alert leaves from the request, after the response (S12b, D-053 item 5).
+export const maxDuration = 60;
 
 /** `/` — the Overview (spec §21, boards Main3 / MainDark3 / MOverview4). */
 export default async function OverviewPage() {
@@ -38,7 +45,12 @@ export default async function OverviewPage() {
   }
   return (
     <Container>
-      <OverviewView data={data} ackAction={acknowledgeIncident} undoAction={undoAcknowledge} />
+      <OverviewView
+        data={data}
+        ackAction={acknowledgeIncident}
+        undoAction={undoAcknowledge}
+        handActions={{ record: recordHandCheck, open: openManualIncident }}
+      />
     </Container>
   );
 }

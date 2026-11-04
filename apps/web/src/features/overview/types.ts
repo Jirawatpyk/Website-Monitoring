@@ -48,6 +48,8 @@ export interface OverviewSite {
   id: string;
   name: string;
   tier: Tier;
+  /** The primary monitor's URL (the hand check, §30.2). */
+  url?: string | null;
   /** Null before the first round. */
   status: SiteStatus | null;
   /** When the current status started (`site_status.since`). */
@@ -126,6 +128,18 @@ export interface OverviewData {
   windowEvents?: { id: string; at: string; text: string }[];
   /** The engine cron's sweep missed > 3 min (S12a, D-053): the fault banner; null when it runs. */
   fault?: MonitorFault | null;
+  /** The Tier 1 hand checks since the sweep stopped (S12b, §30.2), newest first; empty without a fault. */
+  handChecks?: HandCheckEntry[];
+}
+
+/** One Loads OK / Down press (`hand_checks`). */
+export interface HandCheckEntry {
+  siteId: string;
+  outcome: 'ok' | 'down';
+  at: string;
+  by: string;
+  incidentId: string | null;
+  incidentNumber: number | null;
 }
 
 export interface MonitorFault {

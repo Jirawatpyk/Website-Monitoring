@@ -38,6 +38,16 @@ export function isSweepStale(sweepAt: Date | null, now: Date): boolean {
   return !!sweepAt && missed(sweepAt, now);
 }
 
+/**
+ * Nothing escalates on its own (S12b, spec §30.6, D-055 item 1): no engine run of any kind — the cron
+ * or after a Bangkok batch, both stamp `engine-run` — for 3 min or more. A Bangkok batch still runs the
+ * ladder and the client-update track during a sweep fault, so only then do Escalate now and the
+ * reminder by hand show. No run recorded yet is no data, not stopped.
+ */
+export function isEngineStopped(runAt: Date | null, now: Date): boolean {
+  return !!runAt && missed(runAt, now);
+}
+
 export function faultState(input: {
   sweepAt: Date | null;
   lastRoundAt: Date | null;

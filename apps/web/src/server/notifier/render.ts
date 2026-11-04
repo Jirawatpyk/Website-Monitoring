@@ -14,6 +14,7 @@ import {
   buildResolvedAlert,
   buildResolvedEmail,
   buildDownAlert,
+  manualCause,
   buildDownEmail,
   buildProblemAlert,
   buildProblemEmail,
@@ -264,8 +265,10 @@ const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
 /** The cause line stored when the incident opened (its `detected` event). */
 function causeOf(i: IncidentFacts): string | null {
   const detected = i.incident_events?.find((e) => e.type === 'detected');
-  const cause = detected ? contextOf(detected.payload).cause : undefined;
-  return typeof cause === 'string' ? cause : null;
+  const ctx = detected ? contextOf(detected.payload) : {};
+  const manual = manualOf(ctx);
+  if (manual) return manualCause(manual);
+  return typeof ctx.cause === 'string' ? ctx.cause : null;
 }
 
 /** "3 of 3 locations": where the problem was seen, of the locations reporting when it opened. */
@@ -278,6 +281,15 @@ function seenFrom(ctx: Record<string, unknown>): { count: number; of: number } |
 
 /** The mute's end on an incident's first alert after a mute (§24.7): "Held by a mute until 15:00". */
 const heldUntilOf = (ctx: Record<string, unknown>) => (ctx.afterMute === true ? dateOf(ctx.heldUntil) : null);
+
+/** A manual incident's L0 (S12b, spec §30.5): who opened it from the hand check and what they saw. */
+const manualOf = (ctx: Record<string, unknown>) =>
+  ctx.manual === true
+    ? { openedBy: str(ctx.openedBy, 'Someone'), note: typeof ctx.note === 'string' ? ctx.note : null }
+    : null;
+
+/** Sent with Escalate now / the reminder by hand while the engine was stopped (D-055): who sent it. */
+const byHandOf = (ctx: Record<string, unknown>) => (ctx.byHand === true ? str(ctx.sentBy, 'Someone') : null);
 
 /** The Google Chat message for a claimed row, or null when its template has nothing to say. */
 export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, now: Date): ChatMessage | null {
@@ -303,6 +315,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         // A PROBLEM someone acknowledged, raised to DOWN (D-021), isn't waiting on the ladder.
         ladder: i.state === 'acknowledged' ? null : ladderFactsOf(i, now),
         heldUntil: heldUntilOf(ctx),
+        manual: manualOf(ctx),
       });
     case 'problem':
       return buildProblemAlert({
@@ -358,11 +371,13 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         // Fired in the minute it recovered (a DOWN drop covered the due time): "was down".
         recovered: i.state === 'monitoring' || i.state === 'needs_root_cause',
         draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
+        byHand: byHandOf(ctx),
       });
     case 'step_fired': {
       const named = namedIn(i, n.context);
       const step = stepFactsOf(i, n.context);
       return buildStepAlert({
+        byHand: byHandOf(ctx),
         incidentId: i.id,
         site: i.sites.name,
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
@@ -380,7 +395,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         viewUrl: incidentUrl(appUrl, i.id),
         kind: step.kind,
         // A level promised only while nobody has acknowledged (an ack stops it, §14.1).
-        next: i.state === 'acknowledged' ? null : step.next,
+        next: i.state === 'acknowledged' || byHandOf(ctx) ? null : step.next,
         informed: step.informed,
         acked: step.acked,
       });
@@ -522,6 +537,7 @@ export function renderEmail(
         // The first alert after a mute (§24.17): "Held by a mute — until 15:00 — …".
         heldUntil: heldUntilOf(ctx),
         acknowledged,
+        manual: manualOf(ctx),
       });
     case 'problem':
       return buildProblemEmail({
@@ -544,13 +560,15 @@ export function renderEmail(
         client: clientOf(i),
         confirmedAt: new Date(i.detected_at),
         // From the first failed check (D-002): 15 min on Tier 1; a Tier 2 night counts the wall clock.
-        downMinutes: clockMinutes(new Date(i.started_at), dueAt),
+        // By hand it can go before it fell due (D-055 item 3): how long it was down when it was sent.
+        downMinutes: clockMinutes(new Date(i.started_at), byHandOf(ctx) ? new Date(n.created_at) : dueAt),
         cause: causeOf(i),
         acked: i.acker && i.acked_at ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
         noAm: ctx.noAm === true,
         draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
         dueAt,
         recovered: i.state === 'monitoring' || i.state === 'needs_root_cause',
+        byHand: byHandOf(ctx),
       });
     }
     case 'step_fired': {
@@ -559,16 +577,17 @@ export function renderEmail(
       const step = stepFactsOf(i, n.context);
       return buildStepEmail({
         ...base,
+        byHand: byHandOf(ctx),
         why: stepWhy(i, to.id, level, asFyi, step.kind),
         kind: step.kind,
         readerIs: readerOf(i, to.id),
         informed: step.informed,
         informedRoles: step.informedRoles,
-        alreadyTold: step.alreadyTold,
+        alreadyTold: byHandOf(ctx) ? null : step.alreadyTold,
         admin: step.admin,
         acked: step.acked,
         stopped: step.stopped,
-        nextStep: step.nextStep,
+        nextStep: byHandOf(ctx) ? null : step.nextStep,
         voiceConfigured: step.voiceConfigured,
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
         level,

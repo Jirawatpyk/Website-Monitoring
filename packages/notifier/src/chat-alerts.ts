@@ -79,7 +79,22 @@ export interface DownAlertInput {
   ladder?: LadderFacts | null;
   /** A mute held this first alert back until then (§24.7, D-036): the card says why it's late. */
   heldUntil?: Date | null;
+  /** Opened by hand from the hand check while the engine was down (S12b, spec §30.5): no probe facts. */
+  manual?: ManualOpen | null;
 }
+
+/** Who opened a manual incident (trigger Manual (hand check)) and what they saw. */
+export interface ManualOpen {
+  openedBy: string;
+  note: string | null;
+}
+
+/** The Cause of a manual incident: "Hand check by Tao · “Home page shows a 502 error”". */
+export const manualCause = (m: ManualOpen) =>
+  m.note ? `Hand check by ${plainName(m.openedBy)} · “${m.note}”` : `Hand check by ${plainName(m.openedBy)}`;
+
+/** Its "Confirmed by": nothing the probes saw (spec §30.5). */
+export const MANUAL_CONFIRMED_BY = 'No probe check — opened by hand while the status engine was down';
 
 /** What a PROBLEM's replies need to word it as one (ChatAlert PROBLEM rows, D-022). */
 export interface ProblemFacts {
@@ -185,13 +200,13 @@ const row = (topLabel: string, text: string): ChatWidget => ({
 });
 
 export function buildDownAlert(input: DownAlertInput): ChatMessage {
-  const { tier, confirmedAt, now, owner, backup } = input;
+  const { tier, confirmedAt, now, owner, backup, manual } = input;
   const site = plainName(input.site);
   const subtitle = [
     formatTier(tier),
     formatIncidentId(input.incidentNumber),
     ...(isSameBangkokDay(confirmedAt, now) ? [] : [formatDay(confirmedAt, { weekday: true })]),
-    `Confirmed down ${formatTimeWithSeconds(confirmedAt)} (UTC+7)`,
+    `${manual ? 'Opened by hand' : 'Confirmed down'} ${formatTimeWithSeconds(confirmedAt)} (UTC+7)`,
   ].join(' · ');
   const ownerText = ownerRow(owner, backup, input.ladder);
   const next = nextRow(input.ladder, now, 'down');
@@ -202,7 +217,10 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
       state: 'DOWN',
       site: `${site} (${formatTier(tier)})`,
       mention: mentionOf(owner, input.alsoMention),
-      detail: held?.line ?? ladderLine(input.ladder, now),
+      detail: [
+        ...(manual ? [`opened by hand by ${plainName(manual.openedBy)}`] : []),
+        ...(held?.line ?? ladderLine(input.ladder, now)),
+      ],
     }),
     cardsV2: [
       {
@@ -213,8 +231,13 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
             {
               widgets: [
                 ...(held ? [{ textParagraph: { text: held.card } }] : []),
-                row('Cause', input.cause),
-                row('Confirmed by', formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf)),
+                row('Cause', manual ? manualCause(manual) : input.cause),
+                row(
+                  'Confirmed by',
+                  manual
+                    ? MANUAL_CONFIRMED_BY
+                    : formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf),
+                ),
                 ...whoRows(owner, input.siteOwner, ownerText),
                 ...(next ? [row('Next', next)] : []),
                 {

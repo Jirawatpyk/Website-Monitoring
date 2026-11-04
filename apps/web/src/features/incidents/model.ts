@@ -456,6 +456,8 @@ export interface ClientUpdateCard {
   dueAt: string;
   /** When the @mention went (the `client_update_due` event): the due time, or a muted incident's late alert. */
   notifiedAt: string;
+  /** Sent by hand while the engine was stopped (§30.7): "Notified 02:36 (by hand)". */
+  byHand: boolean;
   /** "10:03 · Tier 1 down 15 min". */
   dueLine: string;
   status: 'pending' | 'marked' | 'not_needed';
@@ -482,7 +484,8 @@ export function clientUpdateCardOf(input: {
   note: string | null;
   tier: number;
   /** What the `client_update_due` event recorded: whom it told and when (null for an older row). */
-  notified: { am: string | null; at: string } | null;
+  /** `byHand`: sent with "Send client-update reminder now" (S12b, §30.7). */
+  notified: { am: string | null; at: string; byHand?: boolean } | null;
   /** The client's AM now: the fallback when no event was read. */
   am: string | null;
   client: string;
@@ -494,7 +497,8 @@ export function clientUpdateCardOf(input: {
   const am = input.notified ? input.notified.am : input.am;
   const notifiedAt = input.notified?.at ?? input.dueAt;
   const due = formatTime(new Date(input.dueAt));
-  const told = formatTime(new Date(notifiedAt));
+  // §30.7: "Thee notified 02:36 (by hand)".
+  const told = `${formatTime(new Date(notifiedAt))}${input.notified?.byHand ? ' (by hand)' : ''}`;
   const at = input.updatedAt ? formatTime(new Date(input.updatedAt)) : null;
   const status = !input.updatedAt ? 'pending' : input.notNeeded ? 'not_needed' : 'marked';
   const by = input.by ?? 'someone';
@@ -503,6 +507,7 @@ export function clientUpdateCardOf(input: {
     client: input.client,
     dueAt: input.dueAt,
     notifiedAt,
+    byHand: input.notified?.byHand === true,
     dueLine: `${due} · ${clientUpdateWhy(input.tier)}`,
     status,
     stateText:
@@ -799,13 +804,15 @@ export function timelineOf(
     if (tag) tags.set(line, tag);
   };
 
-  // The first failed check comes from the incident itself (no event of its own).
-  item(
-    { at: i.startedAt },
-    'failed',
-    i.trigger === 'content_change' ? 'First fetch that differed' : 'First failed check',
-    str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
-  );
+  // The first failed check comes from the incident itself (no event of its own). Opened by hand
+  // (S12b, §30.5) there was none: the detected line says who opened it.
+  if (i.trigger !== 'manual')
+    item(
+      { at: i.startedAt },
+      'failed',
+      i.trigger === 'content_change' ? 'First fetch that differed' : 'First failed check',
+      str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger],
+    );
 
   sorted.forEach((e, n) => {
     const by = nameOf(e.actor_id);
@@ -813,6 +820,17 @@ export function timelineOf(
     switch (e.type) {
       case 'detected': {
         const time = formatTimeWithSeconds(new Date(e.at));
+        // Opened by hand from the hand check (S12b, spec §30.5).
+        if (e.payload.manual === true) {
+          const note = str(e.payload.note);
+          item(
+            e,
+            'down',
+            `Opened by ${by} from a hand check${note ? ` · “${note}”` : ''}`,
+            'Trigger: Manual (hand check) · the status engine was down, so there are no probe results',
+          );
+          return;
+        }
         if (
           typeof e.payload.summary === 'string' ||
           (i.severity === 'problem' && !e.payload.confirmingLocations)
@@ -975,7 +993,15 @@ export function timelineOf(
           ...(asked.length ? ['please acknowledge'] : []),
           ...(fyi.length ? [`${fyi.join(' and ')} FYI`] : []),
         ].join(' · ');
-        item(e, 'escalated', `Escalated to L${level} — not acknowledged`, `“${words}” in the thread + email`);
+        // Escalate now (§30.6): "Escalated to L1 by Tao (engine down)".
+        item(
+          e,
+          'escalated',
+          e.payload.byHand === true
+            ? `Escalated to L${level} by ${by} (engine down)`
+            : `Escalated to L${level} — not acknowledged`,
+          `“${words}” in the thread + email`,
+        );
         return;
       }
       case 'note':
@@ -985,6 +1011,16 @@ export function timelineOf(
       case 'client_update_due': {
         const am = str(e.payload.am);
         const tier = num(e.payload.tier) ?? 1;
+        // Sent by hand while the engine was stopped (§30.7, D-055 item 3).
+        if (e.payload.byHand === true) {
+          item(
+            e,
+            'client_due',
+            `Client-update reminder sent by ${by} (engine down)`,
+            `${am ? `${am} (AM)` : 'The Admins'} @mentioned in the thread with a draft client message + email`,
+          );
+          return;
+        }
         item(
           e,
           'client_due',
