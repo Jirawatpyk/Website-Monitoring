@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-055 | 4 Nov 2026 | S12b hand check: "nothing escalates on its own" means no engine run of any kind for ≥ 3 min (a new `engine-run` beat stamped by every run, cron or after a Bangkok batch) — only then do Escalate now and the client-update reminder show; the ticks never pause; the hand check and the manual incident follow the sweep fault (the banner); a manual incident's L0 email keeps D-047's 5-min grace (Chat leaves from the request); the reminder can be sent by hand before its due time, and the Client update card shows before the track fired for an incident open while the engine is stopped | Spec §15.10 / §30.6 "timers don't run while the heartbeat is missing" (read literally); D-052 item 3 (for that case) |
 | D-054 | 4 Nov 2026 | Healthchecks.io production emails only Tao until the system is stable; the other Admins are added at S19 (go-live readiness). S12a's "Healthchecks reaches both Admins" (Done-when 2) moves there; S12a closes on the rest | S12a Done-when 2 "both Admins" |
 | D-053 | 3 Nov 2026 | Monitor fault (S12): the fault is the engine **cron sweep** stopping (`agent_heartbeats` `engine-sweep` > 3 min), since the engine also runs after every Bangkok ingest; Healthchecks + the VPS watchdog (MONITOR FAULT @on-call, straight to the Alerts Space) speak for it; one probe missing > 3 min is our own Admin email, silent during an engine fault; no "Acknowledge monitor fault"; S12 splits into S12a / S12b (hand check after Claude Design) | PRD risk table watchdog "> 5 min and BKK failing"; MainFault "Healthchecks.io fallback sender", "Acknowledge monitor fault" |
 | D-052 | 3 Nov 2026 | S11 client update: "Mark client updated" opens a small dialog with an optional note; with no active AM at the due time the Admins get the @mention and the email ("no AM"); the Client update card shows only once the track fired (before that Resolve reads "Not required"); the Responder rule is own sites only (not on call); "15 min" is the incident's DOWN minutes added up across drops (Tier 2: inside response hours), from the first alert after a mute | Incident board (Mark saves at once, no note) |
@@ -58,6 +59,43 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-055 — Hand check: when escalation is really stopped, the L0 email, the reminder by hand
+
+**Context.** S12b (spec §30, D-053 item 5) builds the hand check, the manual incident and Escalate now. The sources disagree in three places:
+- **When escalation stops.** Spec §15.10 and §30.6 say timers don't run while the engine heartbeat is missing, and the Incident board says "Nothing escalates on its own". But `engineAfterReport` runs the whole engine after every Bangkok batch, ladder and client-update ticks included, and sends at once. With the Vercel crons off and the VPS agent up (T04), escalation keeps running.
+- **The L0 email.** The board's L0 line says "Chat + email", but D-047 holds every DOWN email 5 min.
+- **The reminder.** The board sends the client-update reminder by hand before it is due and shows the Client update card before the track fired. D-052 item 3 shows the card only after the track fired.
+
+**Decision (Tao, 4 Nov 2026).**
+
+1. **Escalation is stopped only when no engine run of any kind has happened for 3 min or more.**
+   - Every `runEngine` run stamps `agent_heartbeats` `engine-run`, from the cron or after a Bangkok batch.
+   - Escalate now and "Send client-update reminder now" show, and their SQL functions accept, only while that beat is ≥ 3 min old. So "Nothing escalates on its own" is true whenever it shows.
+   - The automatic ticks never pause.
+   - The hand check and "Down — open incident" follow the sweep fault (D-053 item 1), as the Overview banner does: with only Bangkok reporting, nothing can confirm a DOWN.
+   - "Engine back" is the first engine run after a by-hand step.
+2. **A manual incident's L0 email keeps D-047's 5-min grace.**
+   - The L0 Chat line leaves from the request (D-053 item 5).
+   - The email goes when it falls due: the notifier cron, an Acknowledge, or a later flush of that incident.
+   - The timeline names only the channels already sent.
+3. **The client-update reminder can be sent by hand before its due time**, while the engine is stopped. For an incident open while the engine is stopped, the Client update card shows before the track fired ("Not notified yet") to carry the button. Every other incident keeps D-052 item 3.
+4. **The rest follows the spec.**
+   - Who presses the hand check, Escalate now and the reminder is the Acknowledge rule (`private.can_ack`), Admin included on the phone.
+   - Escalate now works on any unacked or escalated incident with a plan, one level per press, and has no undo.
+   - The hand check covers Tier 1 sites only.
+5. **Found in review (4 Nov 2026; nothing Tao decided changes).**
+   - A site that is muted or in maintenance can't be opened by hand: a mute stops new alerts (§15.1). Security review M1.
+   - The engine judges a manual incident only on rounds after it opened. Its first round after the hand check is the first evidence (§30.5), and a round from before it was opened never recovers it. The stored `last_round_at` stays the engine's, so "statuses as of" stays true. db review H1.
+   - Escalate now names the level the person saw. Two people pressing at once send one level.
+6. **Left for a follow-up (Tao, 4 Nov 2026; engine review M4, spec check).**
+   - **"Down again" by hand.** A site with an incident still open (recovered and waiting for its root cause, or a PROBLEM) can't be opened by hand, because one site has one open incident. Its row links that incident instead, and Escalate now works there while it waits for an ack. A by-hand DOWN AGAIN in the same thread comes later.
+   - **The §30.8 timeline line.** "Status engine back — automatic escalation running again" isn't written yet. The Escalation card's "Automatic escalation is running again — levels already sent won't repeat." says the same thing until the engine writes the event.
+
+**Where.**
+- Migration `monitor_fault_hand_check`: `hand_checks`, `record_hand_check`, `open_manual_incident`, `escalate_now`, `send_client_update_reminder`, `private.engine_fault`, `private.engine_stopped`.
+- `isEngineStopped` in `@dxt/engine`; the engine runner's beat.
+- `features/overview`, `features/incidents`.
 
 ## D-054 — Healthchecks emails Tao only until the system is stable
 
