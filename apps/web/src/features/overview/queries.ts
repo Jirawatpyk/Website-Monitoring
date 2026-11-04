@@ -308,9 +308,14 @@ export async function loadOverview(
 
 /** A profile's display name (staff read profiles), or null. */
 async function personName(db: DbClient, userId: string): Promise<string | null> {
-  const { data, error } = await db.from('profiles').select('display_name').eq('id', userId).maybeSingle();
+  const { data, error } = await db
+    .from('profiles')
+    .select('display_name, google_chat_user_id')
+    .eq('id', userId)
+    .maybeSingle();
   if (error) throw new Error(`profiles: ${error.message}`);
-  return data?.display_name ?? null;
+  // The watchdog can only @mention someone with a Chat id; without one the banner names nobody (/verify 4 Nov).
+  return data?.google_chat_user_id ? data.display_name : null;
 }
 
 /** The chain error codes as a PostgREST `in` list, from the one list in `@dxt/shared` (D-029). */ const CHAIN_ERRORS = `(${TLS_CHAIN_ERRORS.join(',')})`;
