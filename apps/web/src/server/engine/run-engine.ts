@@ -55,6 +55,7 @@ import {
 import type { CronJobResult } from '../cron-job';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 import { loadResponseHours } from '../escalation/response-hours';
+import { stampBeat } from '../heartbeats';
 import { clientUpdateTick } from './client-update';
 import { escalationTick } from './ladder';
 import { endedBefore, inWindow, loadWindows, windowHides, type SiteWindows } from './windows';
@@ -222,6 +223,7 @@ export async function runEngine(
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
     const verifier = await loadVerifierState(db, now, now);
+    await stampBeat(db, 'engine-run', now);
     summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations, locationRows, {
       failing: null,
       sites: new Set(),
@@ -249,7 +251,7 @@ export async function runEngine(
     db
       .from('incidents')
       .select(
-        'id, site_id, monitor_id, state, severity, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, root_cause_category, notifications(template)',
+        'id, site_id, monitor_id, state, severity, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, is_manual, root_cause_category, notifications(template)',
       )
       .in('site_id', siteIds)
       .not('state', 'in', CLOSED_INCIDENT_STATES_IN),
@@ -440,6 +442,9 @@ export async function runEngine(
     failures.push(`client update: ${err instanceof Error ? err.message : String(err)}`);
     console.error(JSON.stringify({ event: 'engine_client_update_failed', error: String(err) }));
   }
+  // The ladder and the track ran: nothing waits for Escalate now (S12b, D-055 item 1). Every run
+  // stamps it, the cron's and the one after a Bangkok batch; best effort, never fails the run.
+  await stampBeat(db, 'engine-run', now);
   summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, locationRows, {
     failing: control,
     sites: controlSites,
@@ -478,7 +483,7 @@ export async function runEngine(
       now,
       intervalSec: TIER_CONFIG[site.tier].intervalSec,
       locations,
-      lastRoundAt: status?.last_round_at ? new Date(status.last_round_at) : null,
+      lastRoundAt: judgedFrom(status?.last_round_at ?? null, open),
       okRounds: status?.ok_rounds ?? 0,
       open: open
         ? ({
@@ -632,6 +637,22 @@ async function loadLocationRows(db: DbClient): Promise<LocationRow[]> {
     .eq('is_active', true);
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+/**
+ * Where the site's rounds are judged from. An incident opened by hand (S12b, spec §30.5) is judged only
+ * on rounds after it opened: the rounds the engine missed while it was down are older than what the
+ * person saw and never recover it (db review H1). The stored clock stays the engine's, so the Overview's
+ * "statuses as of" still says when the engine last judged the site.
+ */
+export function judgedFrom(
+  lastRoundAt: string | null,
+  open: { is_manual: boolean; started_at: string } | undefined,
+) {
+  const stored = lastRoundAt ? Date.parse(lastRoundAt) : null;
+  const opened = open?.is_manual ? Date.parse(open.started_at) : null;
+  const at = stored === null ? opened : opened === null ? stored : Math.max(stored, opened);
+  return at === null ? null : new Date(at);
 }
 
 /** The active locations whose probe beat in the last 3 min (D-019). */

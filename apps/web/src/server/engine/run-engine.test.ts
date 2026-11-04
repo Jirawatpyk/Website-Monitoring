@@ -2,7 +2,35 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb as baseFakeDb } from '../../../test/fake-db';
 
-import { runEngine } from './run-engine';
+import { judgedFrom, runEngine } from './run-engine';
+
+describe('judgedFrom — a manual incident is judged on rounds after it opened (S12b, db review H1)', () => {
+  const opened = { is_manual: true, started_at: '2026-09-25T19:31:05Z' };
+  it.each([
+    [
+      'manual, engine last judged 02:17: from the hand check 02:31',
+      '2026-09-25T19:17:00Z',
+      opened,
+      '2026-09-25T19:31:05.000Z',
+    ],
+    [
+      'manual, a later round judged already: that round',
+      '2026-09-25T19:33:00Z',
+      opened,
+      '2026-09-25T19:33:00.000Z',
+    ],
+    [
+      'an engine incident: the stored clock',
+      '2026-09-25T19:17:00Z',
+      { ...opened, is_manual: false },
+      '2026-09-25T19:17:00.000Z',
+    ],
+    ['nothing open: the stored clock', '2026-09-25T19:17:00Z', undefined, '2026-09-25T19:17:00.000Z'],
+  ] as const)('%s', (_case, stored, open, expected) => {
+    expect(judgedFrom(stored, open)?.toISOString()).toBe(expected);
+  });
+  it('no round yet and nothing open: null', () => expect(judgedFrom(null, undefined)).toBeNull());
+});
 
 const now = new Date('2026-10-06T10:01:05Z');
 // Both Vercel locations active and beating, as on staging before Bangkok's agent runs.
@@ -333,7 +361,18 @@ describe('runEngine', () => {
     });
     await runEngine(db, now);
     expect(rpcCalls).toEqual([]);
-    expect(calls.some((c) => c.op === 'upsert')).toBe(false);
+    // Only the run's own beat (S12b, D-055): nothing about the site.
+    expect(calls.filter((c) => c.op === 'upsert').map((c) => c.table)).toEqual(['agent_heartbeats']);
+  });
+
+  it('stamps the engine-run beat every run, after the ladder (S12b, D-055 item 1)', async () => {
+    const { db, calls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: ok },
+    });
+    await runEngine(db, now);
+    const beat = calls.find((c) => c.table === 'agent_heartbeats' && c.op === 'upsert');
+    expect(beat?.values).toEqual({ name: 'engine-run', last_seen_at: now.toISOString() });
   });
 
   it.each([

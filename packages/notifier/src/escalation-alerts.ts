@@ -143,6 +143,8 @@ export interface StepAlertInput {
   acked?: { by: string; at: Date } | null;
   /** The incident page without the ack flow: the CEO / FYI card's "Open incident" (they never ack). */
   viewUrl?: string;
+  /** Sent with Escalate now while the engine was stopped (S12b, D-055): who sent it. */
+  byHand?: string | null;
 }
 
 /** The level as the text line names it: L1–L3 (the SQL keeps levels 0–3). */
@@ -166,6 +168,37 @@ const askedWords = (asked: StepAlertInput['asked']) =>
  * please take it" row, which @mentions the owner and the backup.
  */
 export function buildStepAlert(input: StepAlertInput): ChatMessage {
+  const message = stepAlert(input);
+  if (!input.byHand) return message;
+  // Escalate now (S12b, spec §30.6): the level went because someone sent it, not on the engine's clock.
+  const words = `sent by hand by ${plainName(input.byHand)} (the status engine is down)`;
+  return {
+    text: `${message.text} · ${words}`,
+    cardsV2: message.cardsV2.map(({ cardId, card }) => ({
+      cardId,
+      card: {
+        ...card,
+        sections: card.sections.map((s, i) =>
+          i === 0
+            ? {
+                ...s,
+                widgets: [
+                  {
+                    textParagraph: {
+                      text: `Sent by hand by ${plainName(input.byHand!)} — the status engine is down, so nothing escalates on its own.`,
+                    },
+                  },
+                  ...s.widgets,
+                ],
+              }
+            : s,
+        ),
+      },
+    })),
+  };
+}
+
+function stepAlert(input: StepAlertInput): ChatMessage {
   const site = plainName(input.site);
   const duration = formatDuration(input.elapsedMin);
   const owner = input.owner ? plainName(input.owner.name) : 'Nobody';

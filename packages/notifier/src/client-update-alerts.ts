@@ -57,6 +57,8 @@ export interface ClientUpdateDueAlertInput {
   recovered: boolean;
   /** The incident page's Client update card (`#client-update`). */
   draftUrl: string;
+  /** Sent by hand while the engine was stopped (S12b, spec §30.7, D-055): who sent it, maybe before 15 min. */
+  byHand?: string | null;
 }
 
 /**
@@ -71,13 +73,15 @@ export function buildClientUpdateDueAlert(input: ClientUpdateDueAlertInput): Cha
   return {
     text: buildChatTextLine({
       state: 'CLIENT UPDATE DUE',
-      site: `${site} DOWN ${wait}`,
+      // By hand it can go before the wait is over: no "15 min" it may not have reached.
+      site: input.byHand ? `${site} DOWN` : `${site} DOWN ${wait}`,
       mention: input.people.flatMap((p) => (p.chatUserId ? [p.chatUserId] : [])),
       detail: [
         ...(input.noAm ? [`no account manager for ${plainName(input.client)}`] : []),
         // Someone without a Chat id is named, since a mention can't reach them (S09b).
         ...(unlinked.length ? [`for ${unlinked.join(' and ')}`] : []),
         'draft ready',
+        ...(input.byHand ? [`sent by hand by ${plainName(input.byHand)} (the status engine is down)`] : []),
       ],
     }),
     cardsV2: [
@@ -85,11 +89,22 @@ export function buildClientUpdateDueAlert(input: ClientUpdateDueAlertInput): Cha
         cardId: `client-update-${input.incidentId}`,
         card: {
           header: {
-            title: `CLIENT UPDATE DUE · ${site} ${input.recovered ? 'was down' : 'still down'} · ${wait}`,
+            title: input.byHand
+              ? `CLIENT UPDATE DUE · ${site} still down`
+              : `CLIENT UPDATE DUE · ${site} ${input.recovered ? 'was down' : 'still down'} · ${wait}`,
           },
           sections: [
             {
               widgets: [
+                ...(input.byHand
+                  ? [
+                      {
+                        textParagraph: {
+                          text: `Sent by hand by ${plainName(input.byHand)} — the status engine is down, so this reminder wouldn’t go out on its own.`,
+                        },
+                      },
+                    ]
+                  : []),
                 {
                   textParagraph: {
                     text: input.noAm
