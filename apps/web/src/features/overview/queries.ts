@@ -242,7 +242,8 @@ export async function loadOverview(
     downStartedAt: downStartOf(i.incident_events),
     detectedAt: i.detected_at ? new Date(i.detected_at) : null,
     ackedAt: i.acked_at ? new Date(i.acked_at) : null,
-    isManual: i.is_manual,
+    // A PROBLEM raised to DOWN by hand (D-055 item 7) has no detection to measure either (D-032).
+    isManual: i.is_manual || raisedByHand(i.incident_events),
   }));
   const current = responseKpis(kpiIncidents, from30d, now);
   const previous = responseKpis(kpiIncidents, from60d, from30d);
@@ -420,6 +421,13 @@ function downStartOf(events: readonly { type: string; payload: unknown }[]): Dat
   const p = events.find((e) => e.type === 'escalated_to_down')?.payload as
     Record<string, unknown> | undefined;
   return typeof p?.downStartedAt === 'string' ? new Date(p.downStartedAt) : null;
+}
+
+/** Raised to DOWN by hand from the hand check (D-055 item 7). */
+function raisedByHand(events: readonly { type: string; payload: unknown }[]): boolean {
+  return events.some(
+    (e) => e.type === 'escalated_to_down' && (e.payload as Record<string, unknown> | null)?.manual === true,
+  );
 }
 
 /** `/` for the signed-in person. */

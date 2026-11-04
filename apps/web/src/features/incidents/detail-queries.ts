@@ -760,6 +760,17 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
       return typeof p?.downStartedAt === 'string' ? [[id, p.downStartedAt] as const] : [];
     }),
   );
+  // A PROBLEM raised to DOWN by hand (D-055 item 7): no detection to measure, so out of MTTD (D-032).
+  const raisedByHand = new Set(
+    [...dropEvents].flatMap(([id, events]) =>
+      events.some(
+        (e) =>
+          e.type === 'escalated_to_down' && (e.payload as Record<string, unknown> | null)?.manual === true,
+      )
+        ? [id]
+        : [],
+    ),
+  );
   const dropsOf = (r: ListRow) =>
     episodesFromTimeline(r, dropEvents.get(r.id) ?? []).map((d) => ({
       start: d.start.toISOString(),
@@ -786,7 +797,7 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
       resolvedAt: r.resolved_at,
       autoResolved: r.auto_resolved,
       isFlapping: r.is_flapping,
-      isManual: r.is_manual,
+      isManual: r.is_manual || raisedByHand.has(r.id),
       ownerName: r.sites.owner?.display_name ?? null,
       primaryOwnerId: r.sites.primary_owner_id,
       backupOwnerId: r.sites.backup_owner_id,
