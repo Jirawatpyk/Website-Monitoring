@@ -86,7 +86,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
    - The hand check covers Tier 1 sites only.
 5. **Found in review (4 Nov 2026; nothing Tao decided changes).**
    - A site that is muted or in maintenance can't be opened by hand: a mute stops new alerts (§15.1). Security review M1.
-   - The manual open moves the site's round clock to the hand check. The engine's first round after it is the first evidence (§30.5), and a round from before it was opened never recovers it. db review H1.
+   - The engine judges a manual incident only on rounds after it opened. Its first round after the hand check is the first evidence (§30.5), and a round from before it was opened never recovers it. The stored `last_round_at` stays the engine's, so "statuses as of" stays true. db review H1.
    - Escalate now names the level the person saw. Two people pressing at once send one level.
 
 **Where.**

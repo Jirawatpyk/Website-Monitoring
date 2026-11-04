@@ -7,9 +7,9 @@
 --     only the functions below write it, each with its audit row. Append-only: a row never changes.
 --   · open_manual_incident opens a DOWN with trigger Manual (hand check) and queues L0 as the engine does:
 --     the Chat line with no hold (the action sends it from the request), the emails with D-047's grace
---     (D-055 item 2). Never on a muted site or one in maintenance (§15.1: no new alerts). It moves the
---     site's round clock to the hand check, so the engine's first round after it is the first evidence
---     (§30.5) — an OK round from before it was opened never recovers it (db review H1).
+--     (D-055 item 2). Never on a muted site or one in maintenance (§15.1: no new alerts). The runner
+--     judges it only on rounds after it opened (`judgedFrom`), so the engine's first round after it is
+--     the first evidence (§30.5) and an OK round from before it never recovers it (db review H1).
 --   · escalate_now and send_client_update_reminder write what the engine's own steps write (the level,
 --     the step_fired event, the dedupe keys; client_update_required), so the automatic ticks never
 --     repeat them once the engine is back (S12b Done-when 2), plus who pressed.
@@ -189,20 +189,16 @@ begin
   values (auth.uid(), 'incident.opened', 'incident', v_id,
           jsonb_build_object('state', 'unacked', 'severity', 'down', 'trigger', 'manual',
                              'site_id', p_site_id, 'started_at', v_now, 'note', v_note,
+                             'outside_hours', coalesce(p_outside_hours, false),
                              'l0_user_id', (select l0_user_id from public.incidents where id = v_id)));
 
-  -- The site reads DOWN at once, and its round clock moves to the hand check (site and monitors alike,
-  -- so the runner's carry check sees them in step): the rounds the engine missed are before the incident
-  -- and never recover it; its first round after this one is the first evidence (db review H1).
-  insert into public.site_status as st (site_id, status, since, last_evaluated_at, last_round_at, ok_rounds)
-  values (p_site_id, 'down', v_now, v_now, v_now, 0)
+  -- The site reads DOWN at once. last_round_at stays the engine's: the Overview's "statuses as of" is
+  -- when the engine last judged it. The runner judges a manual incident only on rounds after it opened
+  -- (`judgedFrom`), so a round the engine missed never recovers it (db review H1).
+  insert into public.site_status (site_id, status, since, last_evaluated_at, ok_rounds)
+  values (p_site_id, 'down', v_now, v_now, 0)
   on conflict (site_id) do update
-    set status = 'down', since = v_now, last_evaluated_at = v_now, ok_rounds = 0,
-        last_round_at = greatest(st.last_round_at, v_now);
-  update public.monitor_status ms
-    set last_round_at = greatest(ms.last_round_at, v_now)
-    from public.monitors m
-    where m.id = ms.monitor_id and m.site_id = p_site_id;
+    set status = 'down', since = v_now, last_evaluated_at = v_now, ok_rounds = 0;
 
   -- L0: the Chat line leaves from the request (D-053 item 5); the emails wait out D-047's grace.
   insert into public.notifications (incident_id, channel, template, thread_key, context)

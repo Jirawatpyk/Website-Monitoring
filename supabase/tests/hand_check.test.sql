@@ -133,9 +133,9 @@ select is((select actor_id from public.incident_events where incident_id = pg_te
   pg_temp.uid('tao'), 'the detected event names who opened it');
 select is((select payload ->> 'note' from public.incident_events where incident_id = pg_temp.inc() and type = 'detected'),
   'Home page shows a 502 error', 'with the note, trimmed');
-select is((select status::text || ' ' || (last_round_at = now())::text
+select is((select status::text || ' ' || (last_round_at = now() - interval '14 minutes')::text
            from public.site_status where site_id = pg_temp.site('realme.link')),
-  'down true', 'the site reads DOWN; its round clock moves to the hand check, so an older OK round never recovers it');
+  'down true', 'the site reads DOWN; last_round_at stays the engine''s ("statuses as of")');
 select is((select hold_until from public.notifications
            where incident_id = pg_temp.inc() and channel = 'google_chat' and template = 'down'),
   null, 'the L0 Chat line has no hold: the action sends it now');
