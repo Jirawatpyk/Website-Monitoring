@@ -32,7 +32,7 @@
 | G1 | **MVP gate** | 1 | — | — | S01–S09 (incl. S04a, S04b; S09c Done-when 1, 2, 4) | end 3 (≈ 16–21 Oct) | Todo |
 | S10 | Escalation L2–L3 & on-call | 2 · P1 | L | FR-09b | G1 (waived, D-048) | 4 | Done |
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Done |
-| S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | In review |
+| S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | Done |
 | S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Todo |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
@@ -607,11 +607,27 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - **Depends on:** S06b, S10, S11
 - **Done when:**
   1. **T02:** stopping one probe → no false DOWN on any site and Tao gets the probe email only.
-  2. **T04:** disabling Vercel Cron on staging → Healthchecks alerts reach both Admins and the VPS watchdog posts on its own.
+  2. **T04:** disabling Vercel Cron on staging → Healthchecks alerts reach both Admins and the VPS watchdog posts on its own. (D-054: Healthchecks emails Tao only until the system is stable; "both Admins" moved to S19 Done-when 6.)
   3. **T11:** engine heartbeat off → Tao email + on-call @mention; one probe off → Tao email only.
   4. The Overview shows the fault banner and "as of" data while the engine sweep is stale (desktop and phone).
   5. spec-checker passes Probes; nav "Probes & heartbeat" live.
 - **Review:** engine-reviewer, message-checker, spec-checker, security-reviewer (the ingest response carries the on-call Chat id; the VPS gets a Chat webhook).
+- **Evidence (`/slice-review`, 4 Nov 2026; merged #168 + #169; `/verify` on staging PASS):**
+  1. **T02 on staging** (`dxt-agent@staging` stopped 17:29:30–17:35 UTC, 3 Nov):
+     - `probe_location_missing` {BKK} opened at 17:32:40 (last beat 17:29:01) and cleared at 17:43:02;
+     - one email went at 17:32:41 ("One probe location missing · Wed 4 Nov 00:32", in the inbox);
+     - no incident, the site stayed OK, nothing went to Chat.
+  2. **T04 on staging** (crons off 03:20:35–03:26:27 UTC, 4 Nov):
+     - Healthchecks "DOWN | engine" at 03:24:41;
+     - watchdog journal: `monitor_fault posted` at 03:24:03, then `fault` ×3, so one post;
+     - the sweep was back at 03:28:39 with no further post.
+     - "Both Admins" → S19 (D-054).
+     - Production: `vps-watchdog` is up on its own Healthchecks check, and `dxt-agent@production` runs with the webhook (no `monitor_fault` after the release).
+  3. **T11:** run 2 above, plus run 1 (email only).
+     - Tests: `run-engine.test.ts` covers the alert held while the sweep is stale, a switch of location, and no alert during a fault; `watchdog.test.ts` covers one post per fault and the latch kept on an unknown sweep.
+     - `test:int` 43/43. The staging on-call person has no Chat id, so that post had no mention; the mention is unit-tested.
+  4. **Overview fault state:** e2e `probes.spec.ts` (desktop and mobile). `/verify` on staging shows the phone eyebrow "AS OF 10:35", the pill "Heartbeat missed 14 min" and the banner; at 1440 dark the meta and KPI captions read "· as of 10:36".
+  5. **Probes:** spec-checker passes 1 and 2 have their Mediums fixed or justified in #169 (raw 24 h read measured at 6–13 ms; no live refresh). Nav is live. `layout-consistency` passes, and `/verify` covered 390 / 820 / 1440, light and dark.
 
 ### S12b · Monitor fault: hand check, manual incident, Escalate now
 
@@ -700,6 +716,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   3. All 12 test-plan items (T01–T12) re-run and ticked in `docs/test-plan-results.md`.
   4. `docs/parallel-run-log.md` covers two weeks and shows no incident seen by the hourly monitor that DxT Monitor missed.
   5. The second Admin has run the updated runbook in a drill (engine heartbeat stopped → fault mode → hand check), and a restore from backup into a scratch project succeeded.
+  6. (D-054, from S12a) Every active Admin is an Email integration on the production Healthchecks `engine` check (and the other checks D-053 has emailing the Admins), and each confirmed it by receiving a test notification.
 - **Review:** slice-verifier, Tao sign-off.
 
 ### G2 · Team go-live gate (PRD §12 Phase 2 exit)
