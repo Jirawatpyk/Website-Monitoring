@@ -37,14 +37,22 @@ Secrets live only in Vercel env, `/etc/dxt-agent/<env>.env` on the VPS, and each
 
 ### Healthchecks (dead man's switch)
 
-Each job pings Healthchecks.io. A missed ping alerts by email and in Google Chat, from outside our system, so it still reaches you when DxT Monitor itself is down. Production and staging are separate Healthchecks projects. Treat a staging alert as low priority.
+Each job pings Healthchecks.io. A missed ping alerts from outside our system, so it still reaches you when DxT Monitor itself is down. Production and staging are separate Healthchecks projects. Treat a staging alert as low priority.
+
+Who each check tells, as set on production on 4 Nov 2026 (D-053):
+
+- **Email and Google Chat:** `engine` and `crawler`.
+- **Email only:** `notifier`, `browser-verifier` and `vps-watchdog`.
+- **Dashboard only:** the three `probe-*` checks. A missing location is reported by our own PROBE MISSING email instead, which stays quiet during an engine fault and reports the location once.
+
+Until S19 the emails go to Tao only (D-054).
 
 | Check | Expected | When it goes down | First look | Section |
 | --- | --- | --- | --- | --- |
 | `engine` | every minute | **The sweep stops:** no recoveries, no PROBLEMs, no rounds judged at their deadline. A DOWN can still open, because a probe whose recheck fails runs the engine itself, so a DOWN that arrives is real. The most serious alert. | Vercel → `dxt-monitor` → Cron Jobs → `/api/cron/engine` → View Logs | [Vercel crons and logs](#vercel-crons-and-function-logs) |
 | `notifier` | every minute | Incidents open but Chat and email don't go out (or go late) | the same, `/api/cron/notifier`; then Resend / the Chat webhook | [Rotate](#rotate-a-secret) if a key was revoked |
-| `probe-sin`, `probe-tyo` | every minute | That location stops voting; the other two still decide | the same, `/api/cron/probe-sin` / `-tyo` | [Fewer than 2 probe locations](#fewer-than-2-probe-locations) |
-| `probe-bkk` | every minute | Bangkok stops voting; SIN + TYO decide (D-019) | the VPS: `systemctl status dxt-agent@production` | [Restart the VPS agent](#restart-the-vps-agent) |
+| `probe-sin`, `probe-tyo` | every minute | Dashboard only. That location stops voting and the other two still decide; you hear about it from our PROBE MISSING email after 3 min | the same, `/api/cron/probe-sin` / `-tyo` | [Fewer than 2 probe locations](#fewer-than-2-probe-locations) |
+| `probe-bkk` | every minute | Dashboard only. Bangkok stops voting and SIN + TYO decide (D-019); you hear about it from our PROBE MISSING email after 3 min | the VPS: `systemctl status dxt-agent@production` | [Restart the VPS agent](#restart-the-vps-agent) |
 | `browser-verifier` | every minute | Blocked sites show PROBLEM (unverified); the Admins also get the system email | the VPS, as above | [Browser verifier](#browser-verifier) |
 | `crawler` | every 30 min (grace 15 min) | No defacement views; an open crawler PROBLEM holds | `/api/cron/crawler` logs | [Crawler](#crawler-defacement-views-s09c) |
 | `vps-watchdog` | every minute | The VPS can't speak for a stopped engine: no `MONITOR FAULT` line in the Alerts Space (S12a) | the VPS: `journalctl -u dxt-agent@production` (`monitor_fault` lines) | [Restart the VPS agent](#restart-the-vps-agent) |
