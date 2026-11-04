@@ -165,7 +165,7 @@ export function buildAgainAlert(input: AgainAlertInput): ChatMessage {
     const soFar = `Down ${formatDuration(input.minutesSoFar)} so far in this incident.`;
     // D-055 item 7: no probe saw it — say who reported it and what they saw.
     const byHand = input.manual
-      ? ` ${manualCause(input.manual)} — no probe check, the status engine is down.`
+      ? ` ${manualCause(input.manual)} — no probe check, the status engine was down.`
       : '';
     if (input.manual) detail.splice(1, 0, `reported by hand by ${plainName(input.manual.openedBy)}`);
     body = still

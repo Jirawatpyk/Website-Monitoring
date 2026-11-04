@@ -186,6 +186,8 @@ export async function runEngine(
     alerts: 0,
     escalated: 0,
   };
+  // The engine back after a stop (§30.8): its timeline line goes before anything this run fires.
+  await markEngineBack(db, now);
   // First, before the sites are read: windows that started or ended are logged, and a mute that ran out leaves the site row (D-036).
   // Never holds the run back: the log and the site row's expiry catch up next run.
   const logged = await db.rpc('engine_log_windows', { p_now: now.toISOString() });
@@ -224,7 +226,7 @@ export async function runEngine(
   if (!sites.length) {
     // Nothing to judge, but an open Admin alert still clears / a backlog is still seen.
     const verifier = await loadVerifierState(db, now, now);
-    await stampEngineRun(db, now);
+    await stampBeat(db, 'engine-run', now);
     summary.alerts = await adminAlerts(db, now, verifier, new Map(), locations, locationRows, {
       failing: null,
       sites: new Set(),
@@ -447,7 +449,7 @@ export async function runEngine(
   // stamps it, the cron's and the one after a Bangkok batch, unless they threw (engine review L1);
   // best effort, never fails the run.
   if (!failures.some((f) => f.startsWith('escalation') || f.startsWith('client update')))
-    await stampEngineRun(db, now);
+    await stampBeat(db, 'engine-run', now);
   summary.alerts = await adminAlerts(db, now, verifier, unverifiedSites, locations, locationRows, {
     failing: control,
     sites: controlSites,
@@ -661,11 +663,12 @@ export function judgedFrom(
 }
 
 /**
- * The engine ran (D-055 item 1). If no run of any kind had happened for 3 min, the engine is back: each
- * open incident with a by-hand action during the stop gets its "Status engine back" line (§30.8, item 7).
- * Best effort, as the beat: a failure is logged and never fails the run.
+ * At the start of a run: if no run of any kind had stamped `engine-run` for 3 min, the engine is back —
+ * each open incident with a by-hand action during the stop gets its "Status engine back" line (§30.8,
+ * D-055 item 7), before the ladder fires anything. Once per stop (the SQL dedupes, so a run that fails
+ * before its stamp is harmless). Best effort: a failure is logged and never fails the run.
  */
-async function stampEngineRun(db: DbClient, now: Date): Promise<void> {
+async function markEngineBack(db: DbClient, now: Date): Promise<void> {
   const prev = await db
     .from('agent_heartbeats')
     .select('last_seen_at')
@@ -676,7 +679,6 @@ async function stampEngineRun(db: DbClient, now: Date): Promise<void> {
     const back = await db.rpc('engine_mark_engine_back', { p_stopped_since: since.toISOString() });
     if (back.error) console.error(JSON.stringify({ event: 'engine_back_failed', error: back.error.message }));
   }
-  await stampBeat(db, 'engine-run', now);
 }
 
 /** The active locations whose probe beat in the last 3 min (D-019). */

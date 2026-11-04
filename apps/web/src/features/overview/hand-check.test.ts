@@ -56,6 +56,27 @@ const AFTER: HandCheckEntry[] = [
   },
   { siteId: 's-Taiwan', outcome: 'ok', at: at('02:31'), by: 'Tao', incidentId: null, incidentNumber: null },
 ];
+/** INC-0143 as the Overview loads it once opened by hand at 02:31 (same render as the check). */
+const inc143 = (
+  over: Partial<NonNullable<OverviewSite['incident']>> = {},
+): NonNullable<OverviewSite['incident']> => ({
+  id: 'i-143',
+  number: 143,
+  state: 'unacked',
+  severity: 'down',
+  dropSeverity: 'down',
+  trigger: 'manual',
+  level: 0,
+  startedAt: at('02:31'),
+  detectedAt: at('02:31'),
+  recoveredAt: null,
+  ackedBy: null,
+  cause: null,
+  ...over,
+});
+const withIncident = (inc: NonNullable<OverviewSite['incident']>) =>
+  SITES.map((x) => (x.name === 'realme.link' ? { ...x, incident: inc } : x));
+const SITES_AFTER = withIncident(inc143());
 
 describe('handCheckOf (S12b, spec §30.2–3)', () => {
   it('Before hand check: one row per Tier 1 site, nothing checked, the on-call line', () => {
@@ -73,7 +94,7 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
   });
 
   it('After hand check: the latest per row, the opened incident links, its buttons go', () => {
-    const card = handCheckOf(SITES, AFTER, tao, FAULT, new Date(at('02:40')));
+    const card = handCheckOf(SITES_AFTER, AFTER, tao, FAULT, new Date(at('02:40')));
     expect(card.count).toBe('2 of 5 checked since 02:17');
     expect(card.footer).toBe('Next check due by 03:01 — every 30 min while monitoring is degraded.');
     const realme = card.rows.find((r) => r.name === 'realme.link')!;
@@ -138,7 +159,7 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
     expect(handCheckOf([open], [], tao, FAULT, new Date(at('02:40'))).rows[0]).toMatchObject({
       canCheck: true,
       canOpen: false,
-      openIncident: { id: 'i-142', label: 'Open INC-0142', downAgain: 'relapse' },
+      openIncident: { id: 'i-142', label: 'Open INC-0142', ref: 'INC-0142', downAgain: 'relapse' },
     });
   });
 
@@ -244,6 +265,30 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
   });
 });
 
+describe('handCheckOf — after Down again (D-055 item 7)', () => {
+  // INC-0143 opened at 00:00 by the probes; Tao reported it down again at 02:31.
+  const older = { startedAt: at('00:00'), detectedAt: at('00:00'), trigger: 'hard_fail' } as const;
+
+  it('the row says it was reported down, not opened, and its buttons go while it is down', () => {
+    const row = handCheckOf(withIncident(inc143(older)), AFTER, tao, FAULT, new Date(at('02:40'))).rows.find(
+      (r) => r.name === 'realme.link',
+    )!;
+    expect(row.line.text).toBe('INC-0143 reported down · Tao 02:31');
+    expect(row).toMatchObject({ canCheck: false, canOpen: false, openIncident: null });
+  });
+
+  it('once it recovers the buttons come back, so a later drop can be reported again', () => {
+    const back = inc143({ ...older, state: 'monitoring', recoveredAt: at('02:50') });
+    const row = handCheckOf(withIncident(back), AFTER, tao, FAULT, new Date(at('03:00'))).rows.find(
+      (r) => r.name === 'realme.link',
+    )!;
+    expect(row).toMatchObject({
+      canCheck: true,
+      openIncident: { id: 'i-143', ref: 'INC-0143', downAgain: 'relapse' },
+    });
+  });
+});
+
 describe('sitesOkByHand — the Sites OK caption (§30.1)', () => {
   it.each([
     ['before the check', [], 'As of 02:17 · hand-check Tier 1 below'],
@@ -268,7 +313,7 @@ describe('handCheckOf — paused and overdue (spec check M2, L12)', () => {
     );
   });
   it('opened by hand: the status reads "by hand 02:31", not "as of" the sweep', () => {
-    const row = handCheckOf(SITES, AFTER, tao, FAULT, new Date(at('02:40'))).rows.find(
+    const row = handCheckOf(SITES_AFTER, AFTER, tao, FAULT, new Date(at('02:40'))).rows.find(
       (r) => r.name === 'realme.link',
     )!;
     expect(row.statusNote).toBe('by hand 02:31');

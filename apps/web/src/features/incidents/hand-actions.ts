@@ -108,6 +108,7 @@ export async function reportDownByHand(input: DownAgainInput): Promise<ManualInc
   if (error) return { ok: false, message: refusal(error) };
   flushAfter(parsed.data.incidentId, null, 'down_again_flush_failed');
   revalidatePath('/');
+  revalidatePath('/incidents');
   revalidatePath(`/incidents/${parsed.data.incidentId}`);
   return { ok: true, incidentId: parsed.data.incidentId };
 }

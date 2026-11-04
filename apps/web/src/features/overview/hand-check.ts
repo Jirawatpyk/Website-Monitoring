@@ -37,6 +37,8 @@ export interface HandCheckRow {
   openIncident: {
     id: string;
     label: string;
+    /** "INC-0142". */
+    ref: string;
     /** Down again by hand (D-055 item 7): a recovered incident relapses, a PROBLEM is raised; null = no button. */
     downAgain: 'relapse' | 'raise' | null;
   } | null;
@@ -93,17 +95,23 @@ export function handCheckOf(
     const last = latest.get(s.id);
     const may = canAck(viewer, s);
     const open = s.incident;
+    // The check's incident, if it is the one still open: opened by that check, or reported down on
+    // it later (Down again, D-055 item 7 — the incident started before the press).
+    const mine = open && last?.incidentId === open.id ? open : null;
+    const reported = !!mine && last !== undefined && Date.parse(mine.startedAt) < Date.parse(last.at);
     const line: HandCheckLine =
       last?.outcome === 'down' && last.incidentId && last.incidentNumber !== null
         ? {
             kind: 'incident',
-            text: `${formatIncidentId(last.incidentNumber)} opened · ${last.by} ${formatTime(new Date(last.at))}`,
+            text: `${formatIncidentId(last.incidentNumber)} ${reported ? 'reported down' : 'opened'} · ${last.by} ${formatTime(new Date(last.at))}`,
             incidentId: last.incidentId,
           }
         : last?.outcome === 'ok'
           ? { kind: 'ok', text: `Checked OK · ${last.by} ${formatTime(new Date(last.at))}` }
           : { kind: 'none', text: 'Not checked yet' };
-    const openedByHand = line.kind === 'incident';
+    // Down by hand and still down: the row's buttons go (§30.2). Once that incident recovers or closes
+    // they come back, so a later drop can be reported again.
+    const openedByHand = line.kind === 'incident' && !!mine && downAgainOf(mine) === null;
     const paused =
       s.status === 'maintenance'
         ? 'In maintenance — no alert goes out'
@@ -132,6 +140,7 @@ export function handCheckOf(
           ? {
               id: open.id,
               label: `Open ${formatIncidentId(open.number)}`,
+              ref: formatIncidentId(open.number),
               downAgain: may && !paused ? downAgainOf(open) : null,
             }
           : null,

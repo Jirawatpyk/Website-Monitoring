@@ -72,15 +72,25 @@ describe('timelineOf — Down again by hand and the engine back (D-055 item 7, s
   };
 
   it.each([
-    ['a recovered incident relapses', 'relapsed', { severity: 'down', manual: true, note: '502 again' }],
-    ['a PROBLEM is raised', 'escalated_to_down', { manual: true, note: '502 again' }],
-  ])('%s: who reported it and what they saw', (_case, type, payload) => {
+    [
+      'a recovered incident relapses',
+      'relapsed',
+      { severity: 'down', manual: true, note: '502 again' },
+      'Down again, reported by Tao from a hand check · “502 again”',
+    ],
+    [
+      'a PROBLEM is raised',
+      'escalated_to_down',
+      { manual: true, raised: true, note: '502 again' },
+      'Raised to DOWN by Tao from a hand check · “502 again”',
+    ],
+  ])('%s: who reported it and what they saw', (_case, type, payload, title) => {
     const t = timelineOf(probes, [ev(type, '02:40:00', payload, 'u-tao')], nameOf, new Date(at('02:41:00')));
-    const line = t.find((x) => x.title.startsWith('Down again'))!;
+    const line = t.find((x) => x.at === at('02:40:00'))!;
     expect(line).toMatchObject({
       kind: 'down',
-      title: 'Down again, reported by Tao from a hand check · “502 again”',
-      detail: 'The status engine was down, so there are no probe results',
+      title,
+      detail: 'Reported by hand — no probe round confirms it yet',
     });
   });
 

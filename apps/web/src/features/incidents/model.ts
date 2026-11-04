@@ -777,11 +777,12 @@ export interface TimelineIncident {
 }
 
 /** Down again by hand (D-055 item 7): "Down again, reported by Tao from a hand check · “502 again”". */
-const manualDownTitle = (by: string, payload: Record<string, unknown>) => {
+const manualDownTitle = (by: string, payload: Record<string, unknown>, raised = false) => {
   const note = typeof payload.note === 'string' && payload.note ? payload.note : null;
-  return `Down again, reported by ${by} from a hand check${note ? ` · “${note}”` : ''}`;
+  return `${raised ? 'Raised to DOWN by' : 'Down again, reported by'} ${by} from a hand check${note ? ` · “${note}”` : ''}`;
 };
-const MANUAL_DOWN_DETAIL = 'The status engine was down, so there are no probe results';
+// True in the sweep-only fault too, where probes and Bangkok-batch engine runs still go (D-055 item 1).
+const MANUAL_DOWN_DETAIL = 'Reported by hand — no probe round confirms it yet';
 
 /**
  * Every event in words (§16.11: rows never disappear), oldest first; the phone shows it reversed
@@ -980,7 +981,8 @@ export function timelineOf(
         return;
       }
       case 'escalated_to_down':
-        if (e.payload.manual === true) item(e, 'down', manualDownTitle(by, e.payload), MANUAL_DOWN_DETAIL);
+        if (e.payload.manual === true)
+          item(e, 'down', manualDownTitle(by, e.payload, true), MANUAL_DOWN_DETAIL);
         else item(e, 'down', 'PROBLEM became DOWN', str(e.payload.cause));
         return;
       // §30.8: the first engine run after a stop, on an incident someone acted on by hand.
