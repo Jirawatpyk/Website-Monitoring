@@ -15,6 +15,7 @@ import {
   sinceText,
   thirdCard,
   type Banner,
+  bannerTitle,
   type Counts,
   type LiveIssue,
 } from '../model';
@@ -31,7 +32,7 @@ export function PhoneBanners({ shown, more }: { shown: Banner[]; more: number })
     <section aria-label="Unacknowledged DOWN incidents" className="flex flex-col gap-2">
       {shown.map((b) => {
         const unacked = durationText(b.unackedMinutes, 'unacked');
-        const cause = b.cause ?? 'Hard fail';
+        const cause = b.byHandAt ? 'opened by hand' : (b.cause ?? 'Hard fail');
         // D-032: no escalation step yet, so the cause stays on the escalated line too
         const sub = b.escalated ? `Escalated · L${b.level} · ${unacked} · ${cause}` : `${unacked} · ${cause}`;
         return (
@@ -45,7 +46,9 @@ export function PhoneBanners({ shown, more }: { shown: Banner[]; more: number })
               <IconCircleAlert />
             </span>
             <span className="flex min-w-0 grow flex-col">
-              <span className="font-semibold text-fg-danger">{`${b.site.name} is DOWN — ${durationText(b.downMinutes)}`}</span>
+              <span className="font-semibold text-fg-danger">
+                {bannerTitle(b, durationText(b.downMinutes))}
+              </span>
               <span className="text-sm">{sub}</span>
               <span className="sr-only">{`Open ${formatIncidentId(b.number)}`}</span>
             </span>

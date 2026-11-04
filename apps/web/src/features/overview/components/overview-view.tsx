@@ -7,6 +7,8 @@ import { IconCalendar, IconPlus } from '@jirawatpyk/aura-react/icons';
 import { formatDay, formatTime, formatTimeWithSeconds } from '@dxt/shared';
 import { bannersOf, countsOf, faultBannerOf, liveIssues, recentEvents, withAck } from '../model';
 import { FaultBanner } from './fault-banner';
+import { handCheckAsOf, HandCheckCard, type HandCheckActions } from './hand-check-card';
+import { handCheckOf, sitesOkByHand } from '../hand-check';
 import type { OverviewData, ProbeHealth } from '../types';
 import { DesktopBanners, Kpis, LIVE_ISSUES_ID, LiveIssuesTable, RecentEvents, SiteTiles } from './desktop';
 import { PhoneAllSites, PhoneBanners, PhoneCounts, PhoneLiveIssues } from './phone';
@@ -78,10 +80,13 @@ export function OverviewView({
   data,
   ackAction,
   undoAction,
+  handActions,
 }: {
   data: OverviewData;
   ackAction: AckAction;
   undoAction: UndoAction;
+  /** The hand check's Loads OK / Down (S12b); without them the card isn't drawn. */
+  handActions?: HandCheckActions;
 }) {
   const live = useLiveRefresh();
   const { acked, acknowledge } = useAckToast({ ack: ackAction, undo: undoAction });
@@ -111,6 +116,21 @@ export function OverviewView({
   const events = recentEvents(data.events, now, 7, data.windowEvents);
   const isAdmin = data.viewer.kind === 'admin';
   const fault = data.fault ? faultBannerOf(data.fault, data.probes, now) : null;
+  // The hand check under the fault banner (S12b, spec §30.1–2): Tier 1 only, the Acknowledge rule.
+  const handCheck =
+    data.fault && handActions ? handCheckOf(sites, data.handChecks ?? [], data.viewer, data.fault) : null;
+  const handAsOf = handCheckAsOf(data.fault?.asOf);
+  const handCard = (phone: boolean) =>
+    handCheck &&
+    handActions && (
+      <HandCheckCard
+        card={handCheck}
+        asOf={handAsOf}
+        viewerName={data.viewer.name}
+        actions={handActions}
+        phone={phone}
+      />
+    );
   // A fault: what the statuses are as of instead of "live" (MainFault meta line).
   const metaTail = fault ? (fault.asOf ? ` · ${fault.asOf}` : '') : live ? ' · live' : '';
   const meta = `${formatDay(now, { weekday: true, year: true })} · ${formatTimeWithSeconds(now)} (UTC+7)${metaTail}`;
@@ -163,11 +183,13 @@ export function OverviewView({
       {/* desktop and tablet (md up): Main3 / MainDark3 */}
       <div className="flex flex-col gap-6 max-md:hidden">
         {fault && <FaultBanner banner={fault} />}
+        {handCard(false)}
         <DesktopBanners {...banners} viewer={data.viewer} onAck={onAck} />
         <Kpis
           counts={counts}
           kpis={data.kpis}
           asOf={data.fault?.asOf ? `as of ${formatTime(new Date(data.fault.asOf))}` : null}
+          sitesOkNote={handCheck ? sitesOkByHand(data.handChecks ?? [], handAsOf) : null}
         />
         <LiveIssuesTable
           issues={issues}
@@ -197,6 +219,7 @@ export function OverviewView({
       {/* phones (below md): MOverview4 */}
       <div className="flex flex-col gap-3 md:hidden">
         {fault && <FaultBanner banner={fault} />}
+        {handCard(true)}
         <PhoneBanners {...banners} />
         <PhoneCounts counts={counts} viewer={data.viewer} issues={issues} uptime30d={data.kpis.uptime30d} />
         <PhoneLiveIssues

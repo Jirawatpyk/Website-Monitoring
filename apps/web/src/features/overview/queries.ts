@@ -36,6 +36,7 @@ import { loadOnCallNow } from '@/features/incidents/server';
 import { loadOncallCard } from '@/features/oncall/server';
 import {
   OVERVIEW_LOCATIONS,
+  type HandCheckEntry,
   type OverviewData,
   type OverviewEvent,
   type OverviewIncident,
@@ -78,7 +79,7 @@ export async function loadOverview(
          clients!inner(am_user_id),
          owner:profiles!sites_primary_owner_id_fkey(display_name),
          site_status(status, since, last_round_at),
-         monitors(id, is_primary, thresholds),
+         monitors(id, is_primary, thresholds, url),
          incidents(id, number, state, severity, trigger, escalation_level, started_at, detected_at, recovered_at, l0_user_id,
                    acker:profiles!incidents_acked_by_fkey(display_name),
                    incident_events(type, at, payload))`,
@@ -176,13 +177,16 @@ export async function loadOverview(
           recoveredAt: inc.recovered_at,
           ackedBy: inc.acker?.display_name ?? null,
           l0UserId: inc.l0_user_id ?? null,
-          // a PROBLEM drop's short summary ("slow, p50 5.8 s"); a DOWN's cause in short form (spec §10)
+          // a PROBLEM drop's short summary ("slow, p50 5.8 s"); a DOWN's cause in short form (spec §10);
+          // opened by hand: what the person saw (S12b, spec §30.2)
           cause:
-            drop?.severity === 'problem'
-              ? (summary ?? TRIGGER_LABELS[inc.trigger])
-              : cause
-                ? shortCause(cause)
-                : null,
+            inc.trigger === 'manual'
+              ? manualNote(inc.incident_events)
+              : drop?.severity === 'problem'
+                ? (summary ?? TRIGGER_LABELS[inc.trigger])
+                : cause
+                  ? shortCause(cause)
+                  : null,
         }
       : null;
     const lastRound = OVERVIEW_LOCATIONS.map((l) => {
@@ -199,6 +203,7 @@ export async function loadOverview(
     return {
       id: s.id,
       name: s.name,
+      url: primary?.url ?? null,
       tier,
       status: siteStatus,
       statusSince: status?.since ?? null,
@@ -264,6 +269,7 @@ export async function loadOverview(
     .map((r) => r.checkedAt)
     .filter((t): t is string => !!t)
     .sort();
+  const fault = monitorFaultOf(beatAt('engine-sweep'), rounds.at(-1) ?? null, now, onCallName);
   return {
     nowIso: now.toISOString(),
     viewer: {
@@ -302,8 +308,44 @@ export async function loadOverview(
     },
     probes: probeHealth(probes.data ?? [], beatAt('verifier'), openJobs.count ?? 0, now),
     lastRoundAt: rounds.at(-1) ?? null,
-    fault: monitorFaultOf(beatAt('engine-sweep'), rounds.at(-1) ?? null, now, onCallName),
+    fault,
+    handChecks: fault ? await loadHandChecks(db, rows, fault.sweepAt) : [],
   };
+}
+
+/** "Manual (hand check) · “Home page shows a 502 error”" — Live issues' note for an incident opened by hand. */
+function manualNote(events: readonly { type: string; payload: unknown }[]): string {
+  const detected = events.find((e) => e.type === 'detected')?.payload as { note?: unknown } | undefined;
+  return typeof detected?.note === 'string' && detected.note
+    ? `${TRIGGER_LABELS.manual} · “${detected.note}”`
+    : TRIGGER_LABELS.manual;
+}
+
+/** The Tier 1 hand checks since the sweep stopped (S12b, spec §30.2), newest first. */
+async function loadHandChecks(
+  db: DbClient,
+  sites: readonly OverviewSite[],
+  since: string,
+): Promise<HandCheckEntry[]> {
+  const ids = sites.filter((s) => s.tier === 1).map((s) => s.id);
+  if (!ids.length) return [];
+  const { data, error } = await db
+    .from('hand_checks')
+    .select(
+      'site_id, outcome, checked_at, incident_id, checker:profiles!hand_checks_checked_by_fkey(display_name), incident:incidents(number)',
+    )
+    .in('site_id', ids)
+    .gte('checked_at', since)
+    .order('checked_at', { ascending: false });
+  if (error) throw new Error(`hand_checks: ${error.message}`);
+  return (data ?? []).map((h) => ({
+    siteId: h.site_id,
+    outcome: h.outcome === 'down' ? 'down' : 'ok',
+    at: h.checked_at,
+    by: h.checker?.display_name ?? 'Someone',
+    incidentId: h.incident_id,
+    incidentNumber: h.incident?.number ?? null,
+  }));
 }
 
 /** A profile's display name (staff read profiles), or null. */
