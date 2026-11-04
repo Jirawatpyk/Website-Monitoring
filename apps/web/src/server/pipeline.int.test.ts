@@ -1406,3 +1406,132 @@ describe('mute and maintenance (S09, D-036)', () => {
     expect((await chat(inc!.id)).map((n) => n.template)).toEqual(['down', 'step_fired']);
   });
 });
+describe('monitor fault by hand (S12b, spec §30, D-053 item 5, D-055; Done-when 1, 2)', () => {
+  const PASSWORD = 'int-local-only-Password-1';
+  const profileId = async (address: string) =>
+    (await must(db.from('profiles').select('id').eq('email', address).single())).id;
+  async function signedIn(address: string) {
+    const { error } = await db.auth.admin.updateUserById(await profileId(address), { password: PASSWORD });
+    if (error) throw new Error(error.message);
+    const user = createClient<Database>(URL_, PUBLISHABLE_KEY, {
+      auth: { persistSession: false },
+    });
+    const signIn = await user.auth.signInWithPassword({
+      email: address,
+      password: PASSWORD,
+    });
+    if (signIn.error) throw new Error(signIn.error.message);
+    return user;
+  }
+  /** Both beats 5 min old: the sweep fault and no engine run of any kind (D-055 item 1). */
+  async function engineDown() {
+    const at = new Date(Date.now() - 5 * 60_000).toISOString();
+    const { error } = await db.from('agent_heartbeats').upsert([
+      { name: 'engine-sweep', last_seen_at: at },
+      { name: 'engine-run', last_seen_at: at },
+    ]);
+    if (error) throw new Error(error.message);
+  }
+  const mine: string[] = [];
+  afterAll(async () => {
+    // The beats back to no data (retro 3 Nov: an aged sweep left behind masked other tests).
+    await db.from('agent_heartbeats').delete().in('name', ['engine-sweep', 'engine-run']);
+    await db.from('hand_checks').delete().in('site_id', mine);
+  });
+
+  it('Down — open incident posts L0; Escalate now and the reminder go once; the engine back repeats neither and an older OK round never recovers it', async () => {
+    const arm = await profileId('arm@example.test');
+    const bua = await profileId('bua@example.test');
+    const client = await must(
+      db
+        .from('clients')
+        .insert({ name: `Hand check ${run}`, am_user_id: bua })
+        .select('id')
+        .single(),
+    );
+    created.clients.push(client.id);
+    const { siteId, monitorId } = await newSite('Hand check', {
+      primary_owner_id: arm,
+    });
+    mine.push(siteId);
+    await must(db.from('sites').update({ client_id: client.id }).eq('id', siteId).select('id'));
+
+    await engineDown();
+    const tao = await signedIn('tao@example.test');
+    const opened = await tao.rpc('open_manual_incident', {
+      p_site_id: siteId,
+      p_note: 'Home page shows a 502 error',
+      p_outside_hours: false,
+    });
+    expect(opened.error).toBeNull();
+    const incidentId = opened.data!;
+
+    // Done-when 1: the L0 Chat line goes from the request, while the engine is stopped.
+    const post = vi.fn(async () => ({
+      ok: true as const,
+      messageName: 'spaces/S/messages/M',
+    }));
+    const deps = {
+      db,
+      webhookUrl: 'https://chat.example.test/webhook',
+      email: undefined,
+      appUrl: 'https://monitor.example.test',
+      post,
+    };
+    await dispatchNotifications(deps, {
+      incidentId,
+      deadline: Date.now() + 20_000,
+    });
+    const l0 = await must(
+      db
+        .from('notifications')
+        .select('channel, status, hold_until')
+        .eq('incident_id', incidentId)
+        .eq('template', 'down'),
+    );
+    expect(l0.find((n) => n.channel === 'google_chat')?.status).toBe('sent');
+    // Its emails wait out D-047's grace (D-055 item 2).
+    expect(l0.filter((n) => n.channel === 'email').every((n) => n.status === 'queued')).toBe(true);
+
+    // Done-when 2: L1 and the reminder by hand, once each.
+    const l1 = await tao.rpc('escalate_now', {
+      p_incident_id: incidentId,
+      p_level: 1,
+    });
+    expect(l1.error).toBeNull();
+    expect((l1.data as { level: number }).level).toBe(1);
+    const reminder = await tao.rpc('send_client_update_reminder', {
+      p_incident_id: incidentId,
+    });
+    expect(reminder.error).toBeNull();
+
+    // An OK round from before the hand check (2 min ago) never recovers it (db review H1).
+    await results(monitorId, okRound());
+    // The engine is back: the cron and a Bangkok batch at once.
+    await Promise.all([runEngine(db, new Date()), runEngine(db, new Date(Date.now() + 1000))]);
+
+    const events = await must(
+      db
+        .from('incident_events')
+        .select('type, payload')
+        .eq('incident_id', incidentId)
+        .in('type', ['step_fired', 'client_update_due']),
+    );
+    expect(events.filter((e) => e.type === 'step_fired')).toHaveLength(1);
+    expect(events.filter((e) => e.type === 'client_update_due')).toHaveLength(1);
+    const [inc] = await must(
+      db.from('incidents').select('state, escalation_level, recovered_at').eq('id', incidentId),
+    );
+    expect(inc).toMatchObject({
+      state: 'escalated',
+      escalation_level: 1,
+      recovered_at: null,
+    });
+    // The engine ran: Escalate now is refused again.
+    const again = await tao.rpc('escalate_now', {
+      p_incident_id: incidentId,
+      p_level: 2,
+    });
+    expect(again.error?.hint).toBe('engine_running');
+  });
+});
