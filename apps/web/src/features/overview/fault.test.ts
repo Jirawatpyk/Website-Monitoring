@@ -25,7 +25,7 @@ describe('the monitor fault (S12a, D-053)', () => {
       'The status engine’s sweep hasn’t run since 02:17 — escalations, reminders and recoveries wait until it does. BKK still reports; SIN and TYO have no results.',
     );
     expect(b.alerted).toBe(
-      'Engine heartbeat missed > 3 min → Healthchecks.io alerted at 02:20: email to the Admins + an Alerts Space post @mentioning Ploy (on call).',
+      'Engine heartbeat missed > 3 min, from 02:20 → Healthchecks.io emails the Admins and the VPS watchdog posts in the Alerts Space @mentioning Ploy (on call).',
     );
     expect(b.pill).toBe('Heartbeat missed 14 min');
     expect(b.asOf).toBe('statuses as of 02:17');
@@ -37,7 +37,7 @@ describe('the monitor fault (S12a, D-053)', () => {
     expect(b.title).toBe('Monitoring is degraded — the status engine’s sweep stopped 14 min ago');
     expect(b.cause).not.toContain('no results');
     expect(b.alerted).toBe(
-      'Engine heartbeat missed > 3 min → Healthchecks.io alerted at 02:20: email to the Admins + an Alerts Space post.',
+      'Engine heartbeat missed > 3 min, from 02:20 → Healthchecks.io emails the Admins and the VPS watchdog posts in the Alerts Space.',
     );
   });
 

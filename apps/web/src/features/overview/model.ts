@@ -538,7 +538,9 @@ export function faultBannerOf(fault: MonitorFault, probes: ProbeHealth, now: Dat
         ? `Monitoring is degraded — statuses below are ${statusAge === null ? 'not in yet' : `${formatDuration(statusAge)} old`}`
         : `Monitoring is degraded — the status engine’s sweep stopped ${swept} ago`,
     cause: `The status engine’s sweep hasn’t run since ${formatTime(new Date(fault.sweepAt))} — escalations, reminders and recoveries wait until it does.${where}`,
-    alerted: `Engine heartbeat missed > 3 min → Healthchecks.io alerted at ${formatTime(new Date(fault.alertedAt))}: email to the Admins + an Alerts Space post${fault.onCallName ? ` @mentioning ${fault.onCallName} (on call)` : ''}.`,
+    // Who speaks for it (D-053): the VPS watchdog posts from the 3-min mark, Healthchecks emails a
+    // minute later (period + grace) — so name the fault's time, not a send time we never see (/verify 4 Nov).
+    alerted: `Engine heartbeat missed > 3 min, from ${formatTime(new Date(fault.alertedAt))} → Healthchecks.io emails the Admins and the VPS watchdog posts in the Alerts Space${fault.onCallName ? ` @mentioning ${fault.onCallName} (on call)` : ''}.`,
     pill: `Heartbeat missed ${swept}`,
     asOf: fault.asOf ? `statuses as of ${formatTime(new Date(fault.asOf))}` : null,
   };

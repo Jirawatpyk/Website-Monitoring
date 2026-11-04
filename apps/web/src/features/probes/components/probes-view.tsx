@@ -154,7 +154,8 @@ export function ProbesView({ data }: { data: ProbesData }) {
         headingLevel={2}
         description="Pinged to Healthchecks.io, outside our system · grace and who is alerted per check"
       >
-        <Table caption="Heartbeats" captionHidden stackBelow="md" align="middle" bleed>
+        {/* row cards only on phones: at 820 the card is under 768 px, and six columns fit it (/verify 4 Nov) */}
+        <Table caption="Heartbeats" captionHidden stackBelow="sm" align="middle" bleed>
           <THead>
             <Tr>
               <Th>Check</Th>

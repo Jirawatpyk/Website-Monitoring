@@ -29,7 +29,9 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
       page.getByText(/The status engine’s sweep hasn’t run since \d\d:\d\d/).locator('visible=true'),
     ).toBeVisible();
     await expect(
-      page.getByText(/Healthchecks\.io alerted at \d\d:\d\d/).locator('visible=true'),
+      page
+        .getByText(/missed > 3 min, from \d\d:\d\d → Healthchecks\.io emails the Admins/)
+        .locator('visible=true'),
     ).toBeVisible();
     await expect(page.getByText(/Heartbeat missed 2\d min/).locator('visible=true')).toBeVisible();
     await page.screenshot({
