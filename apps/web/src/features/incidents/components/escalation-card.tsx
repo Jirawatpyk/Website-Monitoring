@@ -150,14 +150,15 @@ export function EscalationCard({
           {card.rows.map((r) => (
             <li
               key={r.label}
-              className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 border-b border-border-subtle py-2 last:border-b-0"
+              className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-3 border-b border-border-subtle py-2 last:border-b-0"
             >
               <span className="font-medium">{r.label}</span>
-              <span className="flex min-w-0 flex-col">
+              {/* The status under the who line: "Sent 17:37 by <a long name>" never squeezes the names (staging /verify). */}
+              <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-xs text-fg-secondary">{r.when}</span>
                 <span className="text-sm">{r.who}</span>
+                <span className={`text-xs ${toneClass[r.tone]}`}>{r.status}</span>
               </span>
-              <span className={`text-right text-xs ${toneClass[r.tone]}`}>{r.status}</span>
             </li>
           ))}
         </ol>
