@@ -395,6 +395,25 @@ describe('handCheckOf — Down again / Report down (spec §31)', () => {
     expect(row).toMatchObject({ canCheck: true, canOpen: false, openIncident: { downAgain: null } });
   });
 
+  it('an open incident nobody checked is not counted as checked (§30.2)', () => {
+    const recovered = inc143({ state: 'monitoring', trigger: 'hard_fail' });
+    const card = handCheckOf(
+      [site('realme.link', { incident: recovered })],
+      [],
+      tao,
+      FAULT,
+      new Date(at('02:40')),
+    );
+    expect(card.count).toBe('0 of 1 checked since 02:17');
+  });
+
+  it('a relapse nobody acked after an escalation goes back to Escalated', () => {
+    const recovered = inc143({ state: 'monitoring', trigger: 'hard_fail', level: 1 });
+    expect(rowOf(site('realme.link', { incident: recovered })).openIncident?.info[1]).toBe(
+      'Levels already reached stay: it goes back to Escalated and doesn’t start over at L0.',
+    );
+  });
+
   it('after Loads OK the incident stays one tap away', () => {
     const recovered = inc143({ state: 'needs_root_cause', trigger: 'hard_fail' });
     const ok: HandCheckEntry = {

@@ -60,7 +60,9 @@ export function HandCheckCard({
     // Once the dialog is closed (it hands focus back first) and the refresh brought the row's line.
     if (!landed || opening) return;
     const links = [
-      ...(list.current?.querySelectorAll<HTMLElement>(`[data-site="${landed}"] [data-hand-line]`) ?? []),
+      ...(list.current?.querySelectorAll<HTMLElement>(
+        `[data-site="${landed}"] [data-hand-line="reported"]`,
+      ) ?? []),
     ];
     const link = links.find((l) => l.getClientRects().length > 0) ?? links[0];
     if (link) {
@@ -163,7 +165,13 @@ const LINK = 'inline-flex min-h-11 items-center gap-2 text-sm underline-offset-2
 function Line({ line }: { line: HandCheckLine }) {
   if (line.kind === 'incident')
     return (
-      <Link href={`/incidents/${line.incidentId}`} data-hand-line className={`${LINK} text-fg-danger`}>
+      // "reported": focus waits for this line once the refresh brings it (after Loads OK the row had
+      // another line, whose node React replaces).
+      <Link
+        href={`/incidents/${line.incidentId}`}
+        data-hand-line="reported"
+        className={`${LINK} text-fg-danger`}
+      >
         <IconBan aria-hidden />
         {line.text}
       </Link>

@@ -91,6 +91,20 @@ describe('Down again by hand (D-055 item 7)', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: /INC-0142 reported down/ })).toHaveFocus());
   });
 
+  it('after Loads OK then Down again, focus waits for the reported line (§31.4)', async () => {
+    const downAgain = vi.fn().mockResolvedValue({ ok: true, incidentId: 'i142' });
+    const checked: HandCheckRow = {
+      ...row('relapse'),
+      line: { kind: 'ok', text: 'Checked OK · Tao 02:35', incident: { id: 'i142', text: 'Open INC-0142' } },
+    };
+    const { rerenderWith } = view(checked, { downAgain });
+    fireEvent.click(screen.getByRole('button', { name: 'Down again · MuvMi' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Report down' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    act(() => rerenderWith(reported));
+    await waitFor(() => expect(screen.getByRole('link', { name: /INC-0142 reported down/ })).toHaveFocus());
+  });
+
   it('a refusal stays in the dialog under “Not reported”', async () => {
     view(row('relapse'), {
       downAgain: vi

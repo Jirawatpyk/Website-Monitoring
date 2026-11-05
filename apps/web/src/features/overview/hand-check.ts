@@ -113,7 +113,7 @@ function infoOf(
     const who = inc.ackedBy ? `${inc.ackedBy} — who acknowledged it` : inc.l0UserId ? onCall : owner;
     return [
       `Posts DOWN AGAIN in ${ref}’s thread now, @mentioning ${who}.`,
-      `Levels already reached stay: it goes back to ${inc.ackedBy ? 'Acknowledged' : 'Unacked'} and doesn’t start over at L0.`,
+      `Levels already reached stay: it goes back to ${inc.ackedBy ? 'Acknowledged' : inc.level > 0 ? 'Escalated' : 'Unacked'} and doesn’t start over at L0.`,
     ];
   }
   // An acknowledged PROBLEM stays acknowledged when raised: no ladder restart (engine_escalate_incident).
@@ -229,7 +229,8 @@ export function handCheckOf(
     };
   });
 
-  const checked = rows.filter((r) => r.line.kind !== 'none').length;
+  // Real hand checks only: an open incident's line is not a check (§30.2, §31.1).
+  const checked = tier1.filter((s) => latest.has(s.id)).length;
   const since = formatTime(new Date(fault.sweepAt));
   // The next round of checks: 30 min after the oldest of each site's latest check.
   const oldest = [...latest.values()]
