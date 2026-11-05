@@ -88,9 +88,14 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
    - A site that is muted or in maintenance can't be opened by hand: a mute stops new alerts (§15.1). Security review M1.
    - The engine judges a manual incident only on rounds after it opened. Its first round after the hand check is the first evidence (§30.5), and a round from before it was opened never recovers it. The stored `last_round_at` stays the engine's, so "statuses as of" stays true. db review H1.
    - Escalate now names the level the person saw. Two people pressing at once send one level.
-6. **Left for a follow-up (Tao, 4 Nov 2026; engine review M4, spec check).**
-   - **"Down again" by hand.** A site with an incident still open (recovered and waiting for its root cause, or a PROBLEM) can't be opened by hand, because one site has one open incident. Its row links that incident instead, and Escalate now works there while it waits for an ack. A by-hand DOWN AGAIN in the same thread comes later.
-   - **The §30.8 timeline line.** "Status engine back — automatic escalation running again" isn't written yet. The Escalation card's "Automatic escalation is running again — levels already sent won't repeat." says the same thing until the engine writes the event.
+6. **Left for a follow-up (Tao, 4 Nov 2026; engine review M4, spec check).** Built in item 7.
+7. **The follow-up (Tao, 4 Nov 2026).**
+   - **"Down again" by hand** (`report_down_by_hand`) during the sweep fault, on a Tier 1 site whose incident is still open:
+     - recovered (Monitoring / Needs root cause) → DOWN AGAIN in its thread, the ladder clock and the levels it reached kept (D-004);
+     - a PROBLEM in any open state → raised to DOWN, the DOWN ladder from the press when nobody acked (D-021);
+     - a DOWN still open → no button: it is the alert already.
+   - The engine's own functions write it, at the site's stored round, so the engine's clock never moves. `incidents.manual_at` is the press, and the runner judges the incident only on rounds after it.
+   - **The engine-back line**: the first engine run after a stop (`engine-run` ≥ 3 min old) writes one `engine_back` event on each open incident with a by-hand action during the stop — a manual open or Down again, Escalate now, the reminder. Untouched incidents get none.
 
 **Where.**
 - Migration `monitor_fault_hand_check`: `hand_checks`, `record_hand_check`, `open_manual_incident`, `escalate_now`, `send_client_update_reminder`, `private.engine_fault`, `private.engine_stopped`.
