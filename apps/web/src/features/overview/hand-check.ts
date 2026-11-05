@@ -110,7 +110,9 @@ function infoOf(
   const onCall = fault.onCallName ? `${fault.onCallName} (on call)` : 'the person on call';
   const owner = s.ownerName ? `${s.ownerName} (owner)` : 'the owner';
   if (kind === 'relapse') {
-    const who = inc.ackedBy ? `${inc.ackedBy} — who acknowledged it` : inc.l0UserId ? onCall : owner;
+    // L0 is who the incident paged first (the person on call then), not who is on call now.
+    const l0 = inc.l0Name ? `${inc.l0Name} (on call)` : onCall;
+    const who = inc.ackedBy ? `${inc.ackedBy} — who acknowledged it` : inc.l0UserId ? l0 : owner;
     return [
       `Posts DOWN AGAIN in ${ref}’s thread now, @mentioning ${who}.`,
       `Levels already reached stay: it goes back to ${inc.ackedBy ? 'Acknowledged' : inc.level > 0 ? 'Escalated' : 'Unacked'} and doesn’t start over at L0.`,

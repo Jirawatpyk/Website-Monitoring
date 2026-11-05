@@ -281,9 +281,16 @@ export async function loadOverview(
     .sort();
   const faultOnly = monitorFaultOf(beatAt('engine-sweep'), rounds.at(-1) ?? null, now, onCallName);
   // Who a DOWN reported by hand pages (§31.3): the hours, read only while there is a fault.
+  // Only those who may press read them: the hours tables are staff-only (RLS), and so is the confirm.
+  const presses = person.role === 'admin' || person.role === 'responder';
   const fault = faultOnly
-    ? { ...faultOnly, outsideHours: !isInsideHours(now, await loadResponseHours(db, now)) }
+    ? {
+        ...faultOnly,
+        ...(presses ? { outsideHours: !isInsideHours(now, await loadResponseHours(db, now)) } : {}),
+      }
     : null;
+  // The person L0 paged on each open Tier 1 incident, named in the Down again confirm (§31.2).
+  if (fault && presses) await fillL0Names(db, rows);
   return {
     nowIso: now.toISOString(),
     viewer: {
@@ -375,6 +382,18 @@ async function loadHandChecks(
 }
 
 /** A profile's display name (staff read profiles), or null. */
+/** Names the L0 person of each open Tier 1 incident that has one (one read for all of them). */
+async function fillL0Names(db: DbClient, sites: OverviewSite[]): Promise<void> {
+  const ids = [
+    ...new Set(sites.flatMap((s) => (s.tier === 1 && s.incident?.l0UserId ? [s.incident.l0UserId] : []))),
+  ];
+  if (!ids.length) return;
+  const { data, error } = await db.from('profiles').select('id, display_name').in('id', ids);
+  if (error) throw new Error(`profiles: ${error.message}`);
+  const names = new Map((data ?? []).map((p) => [p.id, p.display_name]));
+  for (const s of sites) if (s.incident?.l0UserId) s.incident.l0Name = names.get(s.incident.l0UserId) ?? null;
+}
+
 async function personName(db: DbClient, userId: string): Promise<string | null> {
   const { data, error } = await db
     .from('profiles')

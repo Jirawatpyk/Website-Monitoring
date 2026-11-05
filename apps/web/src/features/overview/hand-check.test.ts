@@ -395,6 +395,13 @@ describe('handCheckOf — Down again / Report down (spec §31)', () => {
     expect(row).toMatchObject({ canCheck: true, canOpen: false, openIncident: { downAgain: null } });
   });
 
+  it('a relapse names the person L0 paged, not whoever is on call now', () => {
+    const recovered = inc143({ state: 'monitoring', trigger: 'hard_fail', l0UserId: 'u-nok', l0Name: 'Nok' });
+    expect(rowOf(site('realme.link', { incident: recovered })).openIncident?.info[0]).toBe(
+      'Posts DOWN AGAIN in INC-0143’s thread now, @mentioning Nok (on call).',
+    );
+  });
+
   it('an open incident nobody checked is not counted as checked (§30.2)', () => {
     const recovered = inc143({ state: 'monitoring', trigger: 'hard_fail' });
     const card = handCheckOf(

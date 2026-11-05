@@ -392,10 +392,7 @@ function OpenIncidentDialog({
       }
       description={`${row.name} · Tier 1 · owner ${row.ownerName ?? '—'}${asOf ? ` · statuses are from ${asOf}` : ''}`}
       footer={
-        <div
-          className={phone ? 'flex w-full flex-col gap-2' : 'flex w-full items-center justify-between gap-3'}
-        >
-          {!phone && logged}
+        <div className={phone ? 'flex w-full flex-col gap-2' : 'flex w-full items-center justify-end gap-3'}>
           <div className={phone ? 'grid grid-cols-2 gap-2' : 'flex gap-2'}>
             <Button variant="secondary" fullWidth={phone} onClick={onClose}>
               Cancel
@@ -442,6 +439,8 @@ function OpenIncidentDialog({
             ))}
           </div>
         </div>
+        {/* Desktop: under the info, as MainFault draws it (beside the buttons it wrapped to three lines). */}
+        {!phone && logged}
       </div>
     </Dialog>
   );

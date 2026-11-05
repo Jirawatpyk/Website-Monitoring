@@ -39,6 +39,8 @@ export interface OverviewIncident {
   ackedBy: string | null;
   /** The person L0 paged (S10): the person on call outside response hours, else null (the owner). */
   l0UserId?: string | null;
+  /** That person's name, read during a monitor fault for the Down again confirm (§31.2). */
+  l0Name?: string | null;
   /** The cause in words: DOWN in short form ("Timeout ×2 · 504 ×1"), PROBLEM its summary. */
   cause: string | null;
   /** The drop in progress was reported by hand (S12b, spec §30.2, §31): how, when, what they saw. */
