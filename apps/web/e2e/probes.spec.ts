@@ -166,6 +166,9 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
     await page.goto('/');
     const row = page.locator('[data-site]').filter({ hasText: site }).locator('visible=true').first();
     await row.scrollIntoViewIfNeeded();
+    // §31.1: the open incident is the row's line, beside Loads OK and Down again.
+    await expect(row.getByRole('link', { name: /^Open INC-\d+ · Monitoring$/ })).toBeVisible();
+    await expect(row.getByRole('button', { name: `Loads OK · ${site}` })).toBeVisible();
     await page.screenshot({
       path: `test-results/s12b-down-again-row-${info.project.name}.png`,
       fullPage: true,
@@ -176,7 +179,8 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
       .click();
     const dialog = page.getByRole('dialog', { name: `Report ${site} down again?` });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/^Posts DOWN AGAIN in INC-\d+’s thread now\.$/)).toBeVisible();
+    await expect(dialog.getByText(/^Posts DOWN AGAIN in INC-\d+’s thread now, @mentioning /)).toBeVisible();
+    await expect(dialog.getByText(/^Levels already reached stay: /)).toBeVisible();
     await page.screenshot({ path: `test-results/s12b-down-again-dialog-${info.project.name}.png` });
     await dialog.getByLabel(/What did you see/).fill('502 again');
     await dialog.getByRole('button', { name: 'Report down' }).click();

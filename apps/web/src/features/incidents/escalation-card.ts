@@ -50,6 +50,8 @@ export interface EscalationCardView {
   stopped: string | null;
   /** "Automatic escalation is running again — levels already sent won't repeat." */
   back: string | null;
+  /** While it waits for an ack and the engine runs: "Next: L2 at 03:01 if still unacked." (§30.8, §31.7). */
+  nextLine: string | null;
   button: EscalateButton | null;
   footer: string;
 }
@@ -205,6 +207,10 @@ export function escalationCardOf(input: {
     back:
       !input.engine.stopped && byHand && !['resolved', 'in_review', 'closed'].includes(input.state)
         ? 'Automatic escalation is running again — levels already sent won’t repeat.'
+        : null,
+    nextLine:
+      !input.engine.stopped && waiting && next && due.get(next.level)
+        ? `Next: L${next.level} at ${formatTime(due.get(next.level)!)} if still unacked.`
         : null,
     button:
       stopped && next && input.canAct

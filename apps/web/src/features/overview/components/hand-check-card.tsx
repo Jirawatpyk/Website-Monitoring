@@ -4,13 +4,22 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { Alert, Button, Card, Dialog, Textarea } from '@jirawatpyk/aura-react';
-import { IconBan, IconCheck, IconCircle, IconCircleCheck, IconInfo } from '@jirawatpyk/aura-react/icons';
+import {
+  IconBan,
+  IconCheck,
+  IconCircle,
+  IconCircleCheck,
+  IconInfo,
+  IconTriangleAlert,
+} from '@jirawatpyk/aura-react/icons';
 import { formatTime } from '@dxt/shared';
 import { SiteStatusBadge } from '@/components/status-badges';
 import type { HandCheckCard as Card_, HandCheckLine, HandCheckRow } from '../hand-check';
 
 export type HandCheckResult = { ok: true } | { ok: false; message: string };
-export type ManualIncidentResult = { ok: true; incidentId: string } | { ok: false; message: string };
+/** `stale`: the incident changed before the press (§31.6) — Report down stays disabled. */
+export type ManualIncidentResult =
+  { ok: true; incidentId: string } | { ok: false; message: string; stale?: boolean };
 export interface HandCheckActions {
   record: (siteId: string) => Promise<HandCheckResult>;
   open: (input: { siteId: string; note?: string }) => Promise<ManualIncidentResult>;
@@ -148,28 +157,53 @@ export function HandCheckCard({
   );
 }
 
+const LINK = 'inline-flex min-h-11 items-center gap-2 text-sm underline-offset-2 hover:underline';
+
+/** The row's hand-check line (§30.2, §31.1): focus lands on it after Down / Down again (`data-hand-line`). */
 function Line({ line }: { line: HandCheckLine }) {
   if (line.kind === 'incident')
     return (
-      <Link
-        href={`/incidents/${line.incidentId}`}
-        data-hand-line
-        className="inline-flex min-h-11 items-center gap-2 text-sm text-fg-danger underline-offset-2 hover:underline"
-      >
+      <Link href={`/incidents/${line.incidentId}`} data-hand-line className={`${LINK} text-fg-danger`}>
         <IconBan aria-hidden />
         {line.text}
       </Link>
     );
+  if (line.kind === 'open')
+    return (
+      <Link
+        href={`/incidents/${line.incidentId}`}
+        data-hand-line
+        className={`${LINK} ${line.tone === 'danger' ? 'text-fg-danger' : 'text-alert-warning-fg'}`}
+      >
+        {line.tone === 'danger' ? <IconBan aria-hidden /> : <IconTriangleAlert aria-hidden />}
+        {line.text}
+      </Link>
+    );
+  if (line.kind === 'ok')
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2 text-sm">
+        <span className="inline-flex items-center gap-2 text-fg-positive">
+          <IconCircleCheck aria-hidden />
+          {line.text}
+        </span>
+        {line.incident && (
+          <Link
+            href={`/incidents/${line.incident.id}`}
+            data-hand-line
+            className="inline-flex min-h-11 items-center text-xs text-fg-secondary underline-offset-2 hover:underline"
+          >
+            {line.incident.text}
+          </Link>
+        )}
+      </span>
+    );
   return (
-    <span
-      className={`inline-flex items-center gap-2 text-sm ${line.kind === 'ok' ? 'text-fg-positive' : 'text-fg-tertiary'}`}
-    >
-      {line.kind === 'ok' ? <IconCircleCheck aria-hidden /> : <IconCircle aria-hidden />}
+    <span className="inline-flex items-center gap-2 text-sm text-fg-tertiary">
+      <IconCircle aria-hidden />
       {line.text}
     </span>
   );
 }
-
 const STATUS_WORD: Record<NonNullable<HandCheckRow['status']>, string> = {
   ok: 'OK',
   problem: 'Problem',
@@ -226,16 +260,6 @@ function Buttons({ row, pending, onOk, onDown, phone }: RowProps & { phone: bool
         >
           <IconBan />
           {row.openIncident.downAgain === 'raise' ? 'Report down…' : 'Down again…'}
-        </Button>
-      )}
-      {row.openIncident && (
-        <Button
-          variant="ghost"
-          size={phone ? 'md' : 'sm'}
-          fullWidth={phone}
-          href={`/incidents/${row.openIncident.id}`}
-        >
-          {row.openIncident.label}
         </Button>
       )}
       {row.paused && <span className="text-xs text-fg-secondary">{row.paused}</span>}
@@ -320,6 +344,8 @@ function OpenIncidentDialog({
   const again = row.openIncident?.downAgain ?? null;
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // The incident changed before the press (§31.6): pressing again can't help.
+  const [stale, setStale] = useState(false);
   const [pending, start] = useTransition();
   const submit = () =>
     start(async () => {
@@ -334,6 +360,7 @@ function OpenIncidentDialog({
       }));
       if (!r.ok) {
         setError(r.message);
+        setStale('stale' in r && r.stale === true);
         return;
       }
       onDone?.(row.siteId);
@@ -365,7 +392,7 @@ function OpenIncidentDialog({
             <Button variant="secondary" fullWidth={phone} onClick={onClose}>
               Cancel
             </Button>
-            <Button variant="danger" fullWidth={phone} loading={pending} onClick={submit}>
+            <Button variant="danger" fullWidth={phone} loading={pending} disabled={stale} onClick={submit}>
               <IconBan />
               {again ? 'Report down' : 'Open incident'}
             </Button>
@@ -375,11 +402,6 @@ function OpenIncidentDialog({
       }
     >
       <div className="flex flex-col gap-3">
-        {error && (
-          <Alert tone="danger" title={again ? 'Not reported' : 'Not opened'}>
-            {error}
-          </Alert>
-        )}
         <Textarea
           label="What did you see?"
           optional
@@ -394,14 +416,24 @@ function OpenIncidentDialog({
           }
           hint={`${note.length} / ${NOTE_MAX} · optional — shown on the incident timeline`}
         />
-        <p className="m-0 flex items-start gap-2 text-sm text-fg-secondary">
-          <IconInfo aria-hidden className="mt-0.5 shrink-0" />
-          {again === 'relapse'
-            ? `Posts DOWN AGAIN in ${row.openIncident!.ref}’s thread now.`
-            : again === 'raise'
-              ? `Raises ${row.openIncident!.ref} to DOWN and posts the alert now.`
-              : 'Posts the DOWN alert to the Alerts Space now and starts the client-update clock.'}
-        </p>
+        {error && (
+          <Alert tone="danger" title={again ? 'Not reported' : 'Not opened'}>
+            {stale ? `${error} Close this and look at the row again.` : error}
+          </Alert>
+        )}
+        <div className="flex items-start gap-2 rounded-aura-md bg-bg-canvas p-aura-3 text-sm">
+          <IconInfo aria-hidden className="mt-0.5 shrink-0 text-fg-secondary" />
+          <div className="flex flex-col gap-1">
+            {(again && row.openIncident?.info.length
+              ? row.openIncident.info
+              : ['Posts the DOWN alert to the Alerts Space now and starts the client-update clock.']
+            ).map((t) => (
+              <p key={t} className="m-0">
+                {t}
+              </p>
+            ))}
+          </div>
+        </div>
       </div>
     </Dialog>
   );

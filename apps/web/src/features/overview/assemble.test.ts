@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   chainStreakStart,
+  byHandOf,
   currentDrop,
   lastRoundP50,
   probeHealth,
@@ -191,5 +192,34 @@ describe('viewerKindOf (D-032)', () => {
     ['client', false, 'viewer'],
   ] as const)('%s (manages clients: %s) → %s', (role, manages, kind) => {
     expect(viewerKindOf(role, manages)).toBe(kind);
+  });
+});
+
+describe('byHandOf — the drop in progress was reported by hand (§30.2, §31)', () => {
+  const e = (type: string, at: string, payload: Record<string, unknown> = {}) => ({ type, at, payload });
+  it.each([
+    [
+      [e('detected', '2026-09-26T02:31:00Z', { manual: true, note: ' 502 ' })],
+      { kind: 'opened', note: '502' },
+    ],
+    [
+      [e('detected', '2026-09-26T00:00:00Z'), e('relapsed', '2026-09-26T02:40:00Z', { manual: true })],
+      { kind: 'relapse', note: null },
+    ],
+    [
+      [e('escalated_to_down', '2026-09-26T02:40:00Z', { manual: true, note: 'x' })],
+      { kind: 'raise', note: 'x' },
+    ],
+  ] as const)('%#', (events, expected) => {
+    expect(byHandOf(events)).toMatchObject(expected);
+  });
+  it('the engine found the newest drop: null', () => {
+    expect(
+      byHandOf([
+        e('detected', '2026-09-26T00:00:00Z', { manual: true }),
+        e('relapsed', '2026-09-26T02:40:00Z'),
+      ]),
+    ).toBeNull();
+    expect(byHandOf([])).toBeNull();
   });
 });

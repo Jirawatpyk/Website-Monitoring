@@ -1,4 +1,5 @@
-import { formatIncidentId, formatTime } from '@dxt/shared';
+import { CLIENT_UPDATE_MIN } from '@dxt/engine';
+import { formatIncidentId, formatTime, INCIDENT_STATE_LABELS, TRIGGER_LABELS } from '@dxt/shared';
 import { canAck } from './model';
 import type { HandCheckEntry, MonitorFault, OverviewSite, OverviewViewer } from './types';
 
@@ -13,8 +14,17 @@ export const HAND_CHECK_EVERY_MIN = 30;
 
 export type HandCheckLine =
   | { kind: 'none'; text: 'Not checked yet' }
-  | { kind: 'ok'; text: string }
-  | { kind: 'incident'; text: string; incidentId: string };
+  /** "Checked OK · Tao 02:31", with a small "Open INC-0142" when the site has an open incident (§31.1). */
+  | { kind: 'ok'; text: string; incident?: { id: string; text: string } }
+  /** "INC-0143 opened · Tao 02:31" / "INC-0142 reported down · Tao 02:40": a drop reported here. */
+  | { kind: 'incident'; text: string; incidentId: string }
+  /** "Open INC-0142 · Needs root cause" / "Open INC-0150 · Problem · Slow": the site's open incident. */
+  | {
+      kind: 'open';
+      text: string;
+      incidentId: string;
+      tone: 'warning' | 'danger';
+    };
 
 export interface HandCheckRow {
   siteId: string;
@@ -27,23 +37,23 @@ export interface HandCheckRow {
   canCheck: boolean;
   /** "Down — open incident": none once the site has an open incident. */
   canOpen: boolean;
-  /** Who may press, when this person can't: "Read only" / "Only Arm, the person on call or an Admin". */
+  /** Who may press, when this person can't: "Read only" / "Only Arm or Ploy, the person on call or an Admin". */
   readOnly: string | null;
-  /** Under the status: "as of 02:17", or "by hand 02:31" once opened by hand. */
+  /** Under the status: "as of 02:17", or "by hand 02:31" once reported down by hand. */
   statusNote: string | null;
   /** Down can't be pressed on a muted site or one in maintenance (§15.1): why. */
   paused: string | null;
-  /** An incident the engine opened already: where to act instead of Down. */
+  /** The site's open incident (the row's line links it, §31.1). */
   openIncident: {
     id: string;
-    label: string;
     /** "INC-0142". */
     ref: string;
     /** Down again by hand (D-055 item 7): a recovered incident relapses, a PROBLEM is raised; null = no button. */
     downAgain: 'relapse' | 'raise' | null;
+    /** The confirm's info lines (§31.2–3): who is @mentioned, what happens to the ladder. */
+    info: string[];
   } | null;
 }
-
 export interface HandCheckCard {
   rows: HandCheckRow[];
   /** "2 of 5 checked since 02:17". */
@@ -78,6 +88,46 @@ function downAgainOf(inc: NonNullable<OverviewSite['incident']>): 'relapse' | 'r
   return null;
 }
 
+/** "Needs root cause", "Problem · Slow", "Unacked" — the open incident on the row's line (§31.1). */
+function openLabel(inc: NonNullable<OverviewSite['incident']>): string {
+  return inc.severity === 'problem'
+    ? `Problem · ${TRIGGER_LABELS[inc.trigger]}`
+    : INCIDENT_STATE_LABELS[inc.state];
+}
+
+/**
+ * The confirm's info lines (§31.2–3). A relapse @mentions whoever acknowledged it, else the L0 person
+ * (§19.3); a raise pages L0 — the person on call outside response hours, else the owner.
+ */
+function infoOf(
+  s: OverviewSite,
+  inc: NonNullable<OverviewSite['incident']>,
+  kind: 'relapse' | 'raise',
+  fault: MonitorFault,
+  now: Date,
+): string[] {
+  const ref = formatIncidentId(inc.number);
+  const onCall = fault.onCallName ? `${fault.onCallName} (on call)` : 'the person on call';
+  const owner = s.ownerName ? `${s.ownerName} (owner)` : 'the owner';
+  if (kind === 'relapse') {
+    const who = inc.ackedBy ? `${inc.ackedBy} — who acknowledged it` : inc.l0UserId ? onCall : owner;
+    return [
+      `Posts DOWN AGAIN in ${ref}’s thread now, @mentioning ${who}.`,
+      `Levels already reached stay: it goes back to ${inc.ackedBy ? 'Acknowledged' : 'Unacked'} and doesn’t start over at L0.`,
+    ];
+  }
+  const lines = [
+    `Raises ${ref} to DOWN and posts the DOWN alert now, @mentioning ${fault.outsideHours ? onCall : owner}.`,
+    'The DOWN ladder starts from now — while the engine is down, send each level with Escalate now on the incident.',
+  ];
+  const minutes = CLIENT_UPDATE_MIN[s.tier];
+  if (s.clientSite && minutes !== undefined)
+    lines.push(
+      `Client site: the client-update clock starts now (due ${formatTime(new Date(now.getTime() + minutes * 60_000))}).`,
+    );
+  return lines;
+}
+
 export function handCheckOf(
   sites: readonly OverviewSite[],
   checks: readonly HandCheckEntry[],
@@ -95,28 +145,50 @@ export function handCheckOf(
     const last = latest.get(s.id);
     const may = canAck(viewer, s);
     const open = s.incident;
-    // The check's incident, if it is the one still open (opened by that check, or reported down again).
-    const mine = open && last?.incidentId === open.id ? open : null;
-    const reported = last?.reported === true;
+    const at = (t: string) => formatTime(new Date(t));
+    const reportedHere =
+      last?.outcome === 'down' && last.incidentId && last.incidentNumber !== null ? last : null;
+    // Down by hand and still down: the row's buttons go (§30.2, §31.4). Once that incident recovers or
+    // closes they come back, so a later drop can be reported again.
+    const openedByHand =
+      !!reportedHere && !!open && reportedHere.incidentId === open.id && downAgainOf(open) === null;
+    const openRef = open ? formatIncidentId(open.number) : null;
     const line: HandCheckLine =
-      last?.outcome === 'down' && last.incidentId && last.incidentNumber !== null
+      openedByHand && reportedHere
         ? {
             kind: 'incident',
-            text: `${formatIncidentId(last.incidentNumber)} ${reported ? 'reported down' : 'opened'} · ${last.by} ${formatTime(new Date(last.at))}`,
-            incidentId: last.incidentId,
+            text: `${formatIncidentId(reportedHere.incidentNumber!)} ${reportedHere.reported ? 'reported down' : 'opened'} · ${reportedHere.by} ${at(reportedHere.at)}`,
+            incidentId: reportedHere.incidentId!,
           }
         : last?.outcome === 'ok'
-          ? { kind: 'ok', text: `Checked OK · ${last.by} ${formatTime(new Date(last.at))}` }
-          : { kind: 'none', text: 'Not checked yet' };
-    // Down by hand and still down: the row's buttons go (§30.2). Once that incident recovers or closes
-    // they come back, so a later drop can be reported again.
-    const openedByHand = line.kind === 'incident' && !!mine && downAgainOf(mine) === null;
+          ? {
+              kind: 'ok',
+              text: `Checked OK · ${last.by} ${at(last.at)}`,
+              ...(open && openRef ? { incident: { id: open.id, text: `Open ${openRef}` } } : {}),
+            }
+          : open && openRef
+            ? {
+                kind: 'open',
+                text: `Open ${openRef} · ${openLabel(open)}`,
+                incidentId: open.id,
+                tone: downAgainOf(open) === null ? 'danger' : 'warning',
+              }
+            : reportedHere
+              ? {
+                  kind: 'incident',
+                  text: `${formatIncidentId(reportedHere.incidentNumber!)} ${reportedHere.reported ? 'reported down' : 'opened'} · ${reportedHere.by} ${at(reportedHere.at)}`,
+                  incidentId: reportedHere.incidentId!,
+                }
+              : { kind: 'none', text: 'Not checked yet' };
     const paused =
       s.status === 'maintenance'
         ? 'In maintenance — no alert goes out'
         : s.mutedUntil && new Date(s.mutedUntil) > now
           ? `Muted until ${formatTime(new Date(s.mutedUntil))} — no alert goes out`
           : null;
+    // "Down · by hand 02:40" while a drop reported by hand is still down (§31.4, also a manual open).
+    const downByHand = open?.byHand && downAgainOf(open) === null ? open.byHand : null;
+    const kind = open && may && !paused ? downAgainOf(open) : null;
     return {
       siteId: s.id,
       name: s.name,
@@ -124,29 +196,29 @@ export function handCheckOf(
       ownerName: s.ownerName,
       status: s.status,
       line,
-      // Once opened by hand the row's buttons go (§30.2).
       canCheck: may && !openedByHand,
       canOpen: may && !openedByHand && !open && !paused,
-      statusNote:
-        openedByHand && last
-          ? `by hand ${formatTime(new Date(last.at))}`
+      statusNote: downByHand
+        ? `by hand ${at(downByHand.at)}`
+        : openedByHand && last
+          ? `by hand ${at(last.at)}`
           : fault.asOf
-            ? `as of ${formatTime(new Date(fault.asOf))}`
+            ? `as of ${at(fault.asOf)}`
             : null,
       paused: may && !openedByHand ? paused : null,
       openIncident:
-        open && !openedByHand
+        open && openRef && !openedByHand
           ? {
               id: open.id,
-              label: `Open ${formatIncidentId(open.number)}`,
-              ref: formatIncidentId(open.number),
-              downAgain: may && !paused ? downAgainOf(open) : null,
+              ref: openRef,
+              downAgain: kind,
+              info: kind ? infoOf(s, open, kind, fault, now) : [],
             }
           : null,
       readOnly: may
         ? null
         : staff && s.ownerName
-          ? `Only ${s.ownerName}, the person on call or an Admin`
+          ? `Only ${s.ownerName}${s.backupName ? ` or ${s.backupName}` : ''}, the person on call or an Admin`
           : 'Read only',
     };
   });

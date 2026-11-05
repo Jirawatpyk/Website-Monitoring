@@ -110,7 +110,9 @@ export function DesktopBanners({
               </p>
               <p className="m-0">
                 {b.byHandAt
-                  ? `Opened by hand ${b.byHandAt} · ${b.cause ?? 'Manual (hand check)'}`
+                  ? b.byHandKind && b.byHandKind !== 'opened'
+                    ? (b.cause ?? `Reported down by hand ${b.byHandAt}`)
+                    : `Opened by hand ${b.byHandAt} · ${b.cause ?? 'Manual (hand check)'}`
                   : (b.cause ?? 'Hard fail')}
               </p>
             </div>

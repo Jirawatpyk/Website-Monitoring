@@ -1,5 +1,5 @@
 import 'server-only';
-import { aggregateUptime, kpiChange, responseKpis, siteUptimeOver } from '@dxt/engine';
+import { aggregateUptime, isInsideHours, kpiChange, responseKpis, siteUptimeOver } from '@dxt/engine';
 import { shortCause } from '@dxt/notifier';
 import {
   CLOSED_INCIDENT_STATES_IN,
@@ -13,6 +13,7 @@ import {
 import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { getAccess } from '@/lib/auth/session';
+import { loadResponseHours } from '@/server/escalation/response-hours';
 import { loadWindowRows, overviewOf, phoneLine, windowEvents } from '@/features/maintenance/server';
 import {
   downEpisodesBySite,
@@ -23,6 +24,7 @@ import {
 } from '@/features/sites/server';
 import {
   chainStreakStart,
+  byHandOf,
   currentDrop,
   isEngineFault,
   lastRoundP50,
@@ -76,8 +78,9 @@ export async function loadOverview(
         .select(
           `id, name, tier, is_active, muted_until, mute_reason, monitoring_started_at, created_at,
          primary_owner_id, backup_owner_id,
-         clients!inner(am_user_id),
+         clients!inner(am_user_id, is_internal),
          owner:profiles!sites_primary_owner_id_fkey(display_name),
+         backup:profiles!sites_backup_owner_id_fkey(display_name),
          site_status(status, since, last_round_at),
          monitors(id, is_primary, thresholds, url),
          incidents(id, number, state, severity, trigger, escalation_level, started_at, detected_at, recovered_at, l0_user_id,
@@ -163,6 +166,7 @@ export async function loadOverview(
       : null;
     const cause = drop?.cause ?? null;
     const summary = drop?.summary ?? null;
+    const byHand = inc ? byHandOf(inc.incident_events) : null;
     const incident: OverviewIncident | null = inc
       ? {
           id: inc.id,
@@ -178,15 +182,18 @@ export async function loadOverview(
           ackedBy: inc.acker?.display_name ?? null,
           l0UserId: inc.l0_user_id ?? null,
           // a PROBLEM drop's short summary ("slow, p50 5.8 s"); a DOWN's cause in short form (spec §10);
-          // opened by hand: what the person saw (S12b, spec §30.2)
+          // opened by hand: what the person saw (S12b, spec §30.2); reported down by hand (§31.4)
           cause:
             inc.trigger === 'manual'
               ? manualNote(inc.incident_events)
-              : drop?.severity === 'problem'
-                ? (summary ?? TRIGGER_LABELS[inc.trigger])
-                : cause
-                  ? shortCause(cause)
-                  : null,
+              : byHand && byHand.kind !== 'opened'
+                ? byHandNote(byHand)
+                : drop?.severity === 'problem'
+                  ? (summary ?? TRIGGER_LABELS[inc.trigger])
+                  : cause
+                    ? shortCause(cause)
+                    : null,
+          byHand,
         }
       : null;
     const lastRound = OVERVIEW_LOCATIONS.map((l) => {
@@ -211,7 +218,9 @@ export async function loadOverview(
       ownerId: s.primary_owner_id,
       ownerName: s.owner?.display_name ?? null,
       backupId: s.backup_owner_id,
+      backupName: s.backup?.display_name ?? null,
       amId: s.clients.am_user_id,
+      clientSite: !s.clients.is_internal,
       mutedUntil: s.muted_until,
       muteReason: s.mute_reason,
       incident,
@@ -270,7 +279,11 @@ export async function loadOverview(
     .map((r) => r.checkedAt)
     .filter((t): t is string => !!t)
     .sort();
-  const fault = monitorFaultOf(beatAt('engine-sweep'), rounds.at(-1) ?? null, now, onCallName);
+  const faultOnly = monitorFaultOf(beatAt('engine-sweep'), rounds.at(-1) ?? null, now, onCallName);
+  // Who a DOWN reported by hand pages (§31.3): the hours, read only while there is a fault.
+  const fault = faultOnly
+    ? { ...faultOnly, outsideHours: !isInsideHours(now, await loadResponseHours(db, now)) }
+    : null;
   return {
     nowIso: now.toISOString(),
     viewer: {
@@ -320,6 +333,15 @@ function manualNote(events: readonly { type: string; payload: unknown }[]): stri
   return typeof detected?.note === 'string' && detected.note
     ? `${TRIGGER_LABELS.manual} · “${detected.note}”`
     : TRIGGER_LABELS.manual;
+}
+
+/**
+ * Live issues' note for a drop reported by hand on an open incident (spec §31.4): "Down again — reported
+ * by hand · “502 again”" / "Raised to DOWN by hand · “…”".
+ */
+function byHandNote(b: { kind: 'opened' | 'relapse' | 'raise'; note: string | null }): string {
+  const what = b.kind === 'raise' ? 'Raised to DOWN by hand' : 'Down again — reported by hand';
+  return b.note ? `${what} · “${b.note}”` : what;
 }
 
 /** The Tier 1 hand checks since the sweep stopped (S12b, spec §30.2), newest first. */

@@ -24,7 +24,9 @@ import {
  */
 
 export type HandCheckResult = { ok: true } | { ok: false; message: string };
-export type ManualIncidentResult = { ok: true; incidentId: string } | { ok: false; message: string };
+/** `stale`: the incident changed before the press (Down again, §31.6) — pressing again can't help. */
+export type ManualIncidentResult =
+  { ok: true; incidentId: string } | { ok: false; message: string; stale?: boolean };
 export type EscalateNowResult =
   { ok: true; level: number; notified: number } | { ok: false; message: string };
 export type ReminderResult = { ok: true } | { ok: false; message: string };
@@ -105,7 +107,12 @@ export async function reportDownByHand(input: DownAgainInput): Promise<ManualInc
     p_note: parsed.data.note,
     p_outside_hours: !isInsideHours(now, hours),
   });
-  if (error) return { ok: false, message: refusal(error) };
+  if (error)
+    return {
+      ok: false,
+      message: refusal(error),
+      ...(error.hint === 'not_down_again' ? { stale: true } : {}),
+    };
   flushAfter(parsed.data.incidentId, null, 'down_again_flush_failed');
   revalidatePath('/');
   revalidatePath('/incidents');

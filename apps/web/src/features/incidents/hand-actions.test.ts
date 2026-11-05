@@ -115,9 +115,11 @@ describe('Down again by hand (D-055 item 7)', () => {
   it('a DOWN still open is refused in words', async () => {
     m.hours.mockResolvedValue(HOURS);
     m.rpc.mockResolvedValue({ data: null, error: { code: '55000', hint: 'not_down_again', message: 'x' } });
+    // stale: the dialog keeps Report down disabled (§31.6)
     expect(await reportDownByHand({ incidentId: INC })).toEqual({
       ok: false,
       message: 'This incident is down already, or closed.',
+      stale: true,
     });
     expect(m.after).not.toHaveBeenCalled();
   });

@@ -85,6 +85,27 @@ export function currentDrop(
   return { startedAt: text(p.startedAt) ?? newest.at, severity, ...base };
 }
 
+/**
+ * The drop in progress when someone reported it by hand (S12b, spec §30.2, §31): opened from the hand
+ * check (`detected`), reported down again (`relapsed`) or raised from a PROBLEM (`escalated_to_down`),
+ * each with `manual` in its payload; null when the engine found it.
+ */
+export function byHandOf(
+  events: readonly { type: string; at: string; payload: unknown }[],
+): { kind: 'opened' | 'relapse' | 'raise'; at: string; note: string | null } | null {
+  const newest = [...events]
+    .filter((e) => e.type === 'detected' || e.type === 'escalated_to_down' || e.type === 'relapsed')
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
+  const p = (newest?.payload && typeof newest.payload === 'object' ? newest.payload : {}) as Record<
+    string,
+    unknown
+  >;
+  if (!newest || p.manual !== true) return null;
+  const note = typeof p.note === 'string' && p.note.trim() ? p.note.trim() : null;
+  const kind = newest.type === 'detected' ? 'opened' : newest.type === 'relapsed' ? 'relapse' : 'raise';
+  return { kind, at: newest.at, note };
+}
+
 const PROBE_GRACE_MS = 3 * 60_000;
 const VERIFIER_GRACE_MS = 2 * 60_000;
 

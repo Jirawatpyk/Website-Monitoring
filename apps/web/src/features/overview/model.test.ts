@@ -3,6 +3,7 @@ import {
   allOkLine,
   allSitesRow,
   attnMeta,
+  bannerTitle,
   bannersOf,
   chipOf,
   countsOf,
@@ -22,6 +23,7 @@ import {
   withAck,
 } from './model';
 import type { OverviewEvent, OverviewIncident, OverviewSite, OverviewViewer } from './types';
+import { incidentText } from '@/components/site-cells';
 
 // Main3 / MOverview4 "2 banners + more" at Fri 25 Sep 2026 10:07 (UTC+7, spec §1). Names, times and
 // numbers are the boards' mock data, used here as test fixtures only (spec §21.11).
@@ -305,6 +307,28 @@ describe('Banners (§21.1)', () => {
     expect(bannersOf([relapse], NOW).shown[0]).toMatchObject({ downMinutes: 2, unackedMinutes: 47 });
   });
 
+  it('a PROBLEM raised to DOWN by hand: "reported by hand at", Live issues says so (§31.4)', () => {
+    const raised = site('Fuji', {
+      status: 'down',
+      incident: incident(150, {
+        trigger: 'slow',
+        cause: 'Raised to DOWN by hand · “Booking page times out”',
+        byHand: { kind: 'raise', at: at('10:02'), note: 'Booking page times out' },
+      }),
+    });
+    const b = bannersOf([raised], NOW).shown[0]!;
+    expect(b).toMatchObject({ byHandAt: '10:02', byHandKind: 'raise' });
+    expect(bannerTitle(b, '5 min')).toBe('Fuji is DOWN — reported by hand at 10:02');
+    expect(incidentText(raised.incident!, NOW)).toBe('INC-0150 · Raised by hand · unacked');
+    // an acked relapse reads as any acked incident
+    expect(
+      incidentText(
+        { ...raised.incident!, state: 'acknowledged', ackedBy: 'Arm', byHand: { kind: 'relapse' } },
+        NOW,
+      ),
+    ).toBe('INC-0150 · Acked by Arm');
+  });
+
   it('a PROBLEM and an acked DOWN never get one', () => {
     expect(bannersOf([fuji, cando], NOW).shown).toEqual([]);
   });
@@ -424,6 +448,15 @@ describe('Recent events (§21.6, §16.11, D-032)', () => {
     [ev('relapsed', { payload: { severity: 'problem' } }), 'Cando Asia PROBLEM again'],
     [ev('recovered', { severity: 'problem', autoResolved: true }), null],
     [ev('relapsed'), 'Cando Asia DOWN again'],
+    // §31.4: reported by hand during a monitor fault
+    [
+      ev('relapsed', { actorName: 'Tao', payload: { severity: 'down', manual: true } }),
+      'INC-0140 Cando Asia down again — reported by hand, Tao',
+    ],
+    [
+      ev('escalated_to_down', { actorName: 'Tao', payload: { manual: true } }),
+      'INC-0140 Cando Asia raised to DOWN by hand — Tao',
+    ],
     [ev('google_chat'), null],
     [ev('evidence'), null],
   ])('%#', (e, expected) => {

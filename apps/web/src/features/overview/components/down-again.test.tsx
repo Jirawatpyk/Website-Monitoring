@@ -12,13 +12,24 @@ const row = (downAgain: 'relapse' | 'raise'): HandCheckRow => ({
   url: null,
   ownerName: 'Arm',
   status: 'ok',
-  line: { kind: 'none', text: 'Not checked yet' },
+  line: { kind: 'open', text: 'Open INC-0142 · Needs root cause', incidentId: 'i142', tone: 'warning' },
   canCheck: true,
   canOpen: false,
   readOnly: null,
   statusNote: 'as of 02:17',
   paused: null,
-  openIncident: { id: 'i142', label: 'Open INC-0142', ref: 'INC-0142', downAgain },
+  openIncident: {
+    id: 'i142',
+    ref: 'INC-0142',
+    downAgain,
+    info:
+      downAgain === 'relapse'
+        ? [
+            'Posts DOWN AGAIN in INC-0142’s thread now, @mentioning Arm — who acknowledged it.',
+            'Levels already reached stay: it goes back to Acknowledged and doesn’t start over at L0.',
+          ]
+        : ['Raises INC-0142 to DOWN and posts the DOWN alert now, @mentioning Ploy (on call).'],
+  },
 });
 /** The row after the press, as the refresh brings it: down by hand, its buttons gone. */
 const reported: HandCheckRow = {
@@ -51,7 +62,8 @@ describe('Down again by hand (D-055 item 7)', () => {
     view(row('relapse'), { downAgain, open });
     fireEvent.click(screen.getByRole('button', { name: 'Down again · MuvMi' }));
     const dialog = await screen.findByRole('dialog', { name: 'Report MuvMi down again?' });
-    expect(dialog).toHaveTextContent('Posts DOWN AGAIN in INC-0142’s thread now.');
+    expect(dialog).toHaveTextContent('Posts DOWN AGAIN in INC-0142’s thread now, @mentioning Arm');
+    expect(dialog).toHaveTextContent('Levels already reached stay');
     fireEvent.change(screen.getByLabelText(/What did you see/), { target: { value: '502 again' } });
     fireEvent.click(screen.getByRole('button', { name: 'Report down' }));
     await waitFor(() => expect(downAgain).toHaveBeenCalledWith({ incidentId: 'i142', note: '502 again' }));
@@ -62,7 +74,9 @@ describe('Down again by hand (D-055 item 7)', () => {
     view(row('raise'));
     fireEvent.click(screen.getByRole('button', { name: 'Report down · MuvMi' }));
     const dialog = await screen.findByRole('dialog', { name: 'Report MuvMi down?' });
-    expect(dialog).toHaveTextContent('Raises INC-0142 to DOWN and posts the alert now.');
+    expect(dialog).toHaveTextContent(
+      'Raises INC-0142 to DOWN and posts the DOWN alert now, @mentioning Ploy',
+    );
   });
 
   it('after the press the button is gone: focus moves to the row’s incident link', async () => {
@@ -86,6 +100,33 @@ describe('Down again by hand (D-055 item 7)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Down again · MuvMi' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Report down' }));
     expect(await screen.findByText('Not reported')).toBeInTheDocument();
+    // a network error can be retried
+    expect(screen.getByRole('button', { name: 'Report down' })).toBeEnabled();
+  });
+
+  it('the incident changed before the press (§31.6): refused, and Report down is disabled', async () => {
+    view(row('relapse'), {
+      downAgain: vi
+        .fn()
+        .mockResolvedValue({ ok: false, message: 'This incident is down already, or closed.', stale: true }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Down again · MuvMi' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Report down' }));
+    expect(
+      await screen.findByText(
+        'This incident is down already, or closed. Close this and look at the row again.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Report down' })).toBeDisabled();
+  });
+
+  it('the row links its open incident on the line, beside Loads OK and Down again (§31.1)', () => {
+    view(row('relapse'));
+    expect(screen.getByRole('link', { name: /Open INC-0142 · Needs root cause/ })).toHaveAttribute(
+      'href',
+      '/incidents/i142',
+    );
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Loads OK', 'Down again…']);
   });
 
   it('without the action there is no Down again button', () => {

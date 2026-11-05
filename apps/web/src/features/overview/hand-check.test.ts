@@ -159,7 +159,17 @@ describe('handCheckOf (S12b, spec §30.2–3)', () => {
     expect(handCheckOf([open], [], tao, FAULT, new Date(at('02:40'))).rows[0]).toMatchObject({
       canCheck: true,
       canOpen: false,
-      openIncident: { id: 'i-142', label: 'Open INC-0142', ref: 'INC-0142', downAgain: 'relapse' },
+      // §31.1: the line links the incident; the dialog says who is @mentioned and that levels stay
+      line: { kind: 'open', text: 'Open INC-0142 · Needs root cause', incidentId: 'i-142', tone: 'warning' },
+      openIncident: {
+        id: 'i-142',
+        ref: 'INC-0142',
+        downAgain: 'relapse',
+        info: [
+          'Posts DOWN AGAIN in INC-0142’s thread now, @mentioning Arm — who acknowledged it.',
+          'Levels already reached stay: it goes back to Acknowledged and doesn’t start over at L0.',
+        ],
+      },
     });
   });
 
@@ -319,5 +329,100 @@ describe('handCheckOf — paused and overdue (spec check M2, L12)', () => {
       (r) => r.name === 'realme.link',
     )!;
     expect(row.statusNote).toBe('by hand 02:31');
+  });
+});
+
+describe('handCheckOf — Down again / Report down (spec §31)', () => {
+  // Fuji Links-like sample (test data only): INC-0150 PROBLEM · Slow, a client site, board time 02:40.
+  const problem = inc143({
+    id: 'i-150',
+    number: 150,
+    severity: 'problem',
+    dropSeverity: 'problem',
+    trigger: 'slow',
+  });
+  const rowOf = (s: OverviewSite, fault: MonitorFault = FAULT, checks: HandCheckEntry[] = []) =>
+    handCheckOf([s], checks, tao, fault, new Date(at('02:40'))).rows[0]!;
+
+  it('a PROBLEM: the line names it, Report down pages the person on call at night and starts the client clock', () => {
+    const row = rowOf(site('Fuji', { status: 'problem', incident: problem, clientSite: true }), {
+      ...FAULT,
+      outsideHours: true,
+    });
+    expect(row.line).toEqual({
+      kind: 'open',
+      text: 'Open INC-0150 · Problem · Slow',
+      incidentId: 'i-150',
+      tone: 'warning',
+    });
+    expect(row.openIncident?.info).toEqual([
+      'Raises INC-0150 to DOWN and posts the DOWN alert now, @mentioning Ploy (on call).',
+      'The DOWN ladder starts from now — while the engine is down, send each level with Escalate now on the incident.',
+      'Client site: the client-update clock starts now (due 02:55).',
+    ]);
+  });
+
+  it('inside response hours a raise pages the owner; an internal site has no client clock', () => {
+    const row = rowOf(site('Fuji', { status: 'problem', incident: problem }), {
+      ...FAULT,
+      outsideHours: false,
+    });
+    expect(row.openIncident?.info).toEqual([
+      'Raises INC-0150 to DOWN and posts the DOWN alert now, @mentioning Arm (owner).',
+      'The DOWN ladder starts from now — while the engine is down, send each level with Escalate now on the incident.',
+    ]);
+  });
+
+  it('a relapse nobody acknowledged @mentions L0 and goes back to Unacked', () => {
+    const recovered = inc143({ state: 'monitoring', trigger: 'hard_fail', l0UserId: 'u-ploy' });
+    expect(rowOf(site('realme.link', { incident: recovered })).openIncident?.info).toEqual([
+      'Posts DOWN AGAIN in INC-0143’s thread now, @mentioning Ploy (on call).',
+      'Levels already reached stay: it goes back to Unacked and doesn’t start over at L0.',
+    ]);
+  });
+
+  it('a DOWN still down: the line links it in red, no second button', () => {
+    const row = rowOf(site('realme.link', { status: 'down', incident: inc143({ trigger: 'hard_fail' }) }));
+    expect(row.line).toMatchObject({ kind: 'open', text: 'Open INC-0143 · Unacked', tone: 'danger' });
+    expect(row).toMatchObject({ canCheck: true, canOpen: false, openIncident: { downAgain: null } });
+  });
+
+  it('after Loads OK the incident stays one tap away', () => {
+    const recovered = inc143({ state: 'needs_root_cause', trigger: 'hard_fail' });
+    const ok: HandCheckEntry = {
+      siteId: 's-realme.link',
+      outcome: 'ok',
+      at: at('02:35'),
+      by: 'Tao',
+      incidentId: null,
+      incidentNumber: null,
+    };
+    expect(rowOf(site('realme.link', { incident: recovered }), FAULT, [ok]).line).toEqual({
+      kind: 'ok',
+      text: 'Checked OK · Tao 02:35',
+      incident: { id: 'i-143', text: 'Open INC-0143' },
+    });
+  });
+
+  it('reported down by someone: the status says by hand with the press time (§31.4)', () => {
+    const raised = inc143({
+      id: 'i-150',
+      number: 150,
+      trigger: 'slow',
+      byHand: { kind: 'raise', at: at('02:40'), note: null },
+    });
+    expect(rowOf(site('Fuji', { status: 'down', incident: raised })).statusNote).toBe('by hand 02:40');
+  });
+
+  it('a Responder on another site reads who may press, owner and backup by name (§31.5)', () => {
+    const nok: OverviewViewer = { id: 'u-nok', name: 'Nok', kind: 'responder' };
+    const card = handCheckOf(
+      [site('MuvMi', { backupName: 'Ploy', backupId: 'u-ploy' })],
+      [],
+      nok,
+      FAULT,
+      new Date(at('02:40')),
+    );
+    expect(card.rows[0]!.readOnly).toBe('Only Arm or Ploy, the person on call or an Admin');
   });
 });

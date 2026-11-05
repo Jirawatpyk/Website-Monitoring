@@ -573,6 +573,7 @@ export async function loadIncident(
       events,
       nameOf,
       now,
+      byHand.escalation?.nextLine ?? null,
     ),
     locations: locationsOf(
       around.data ?? [],

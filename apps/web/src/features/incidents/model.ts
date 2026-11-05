@@ -793,6 +793,8 @@ export function timelineOf(
   events: readonly EventRow[],
   nameOf: (id: string | null) => string,
   now: Date,
+  /** The engine-back line's "Next: L2 at 03:01 if still unacked." (§30.8, §31.7); on the latest only. */
+  nextLine: string | null = null,
 ): TimelineItem[] {
   const sorted = [...events].sort(
     (a, b) => a.at.localeCompare(b.at) || (TIE[a.type] ?? 1) - (TIE[b.type] ?? 1),
@@ -835,7 +837,7 @@ export function timelineOf(
             e,
             'down',
             `Opened by ${by} from a hand check${note ? ` · “${note}”` : ''}`,
-            'Trigger: Manual (hand check) · the status engine was down, so there are no probe results',
+            'Trigger: Manual (hand check) · reported by hand — no probe round confirms it yet',
           );
           return;
         }
@@ -986,14 +988,16 @@ export function timelineOf(
         else item(e, 'down', 'PROBLEM became DOWN', str(e.payload.cause));
         return;
       // §30.8: the first engine run after a stop, on an incident someone acted on by hand.
-      case 'engine_back':
+      case 'engine_back': {
+        const latest = !later.some((l) => l.type === 'engine_back');
         item(
           e,
           'ok',
           'Status engine back — automatic escalation running again',
-          'Levels already sent won’t repeat.',
+          `Levels already sent won’t repeat.${latest && nextLine ? ` ${nextLine}` : ''}`,
         );
         return;
+      }
       case 'step_fired': {
         // S08 (D-034): who the step asked (@mentioned) and told FYI, in the thread and by email.
         const ids = (k: string) =>
