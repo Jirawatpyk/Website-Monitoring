@@ -319,7 +319,7 @@ describe('Banners (§21.1)', () => {
     const b = bannersOf([raised], NOW).shown[0]!;
     expect(b).toMatchObject({ byHandAt: '10:02', byHandKind: 'raise' });
     expect(bannerTitle(b, '5 min')).toBe('Fuji is DOWN — reported by hand at 10:02');
-    expect(incidentText(raised.incident!, NOW)).toBe('INC-0150 · Raised by hand · unacked');
+    expect(incidentText(raised.incident!, NOW)).toBe('INC-0150 · Raised by hand · 18 min unacked');
     // an acked relapse reads as any acked incident
     expect(
       incidentText(

@@ -373,6 +373,14 @@ describe('handCheckOf — Down again / Report down (spec §31)', () => {
     ]);
   });
 
+  it('an acknowledged PROBLEM stays acknowledged when raised: no ladder line', () => {
+    const acked = { ...problem, state: 'acknowledged' as const, ackedBy: 'Ploy' };
+    expect(rowOf(site('Fuji', { status: 'problem', incident: acked })).openIncident?.info).toEqual([
+      'Raises INC-0150 to DOWN and posts the DOWN alert now.',
+      'Ploy acknowledged it, so it stays Acknowledged and no DOWN ladder starts.',
+    ]);
+  });
+
   it('a relapse nobody acknowledged @mentions L0 and goes back to Unacked', () => {
     const recovered = inc143({ state: 'monitoring', trigger: 'hard_fail', l0UserId: 'u-ploy' });
     expect(rowOf(site('realme.link', { incident: recovered })).openIncident?.info).toEqual([

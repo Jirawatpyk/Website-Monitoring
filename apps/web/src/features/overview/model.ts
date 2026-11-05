@@ -288,12 +288,9 @@ export function bannersOf(
           downMinutes: clockMinutes(new Date(inc.startedAt), now),
           unackedMinutes: minutesBetween(inc.detectedAt, now),
           cause: inc.cause,
-          byHandAt: inc.byHand
-            ? formatTime(new Date(inc.byHand.at))
-            : inc.trigger === 'manual'
-              ? formatTime(new Date(inc.startedAt))
-              : null,
-          byHandKind: inc.byHand?.kind ?? (inc.trigger === 'manual' ? 'opened' : null),
+          // only while the drop in progress is the one reported by hand (an engine relapse is the engine's)
+          byHandAt: inc.byHand ? formatTime(new Date(inc.byHand.at)) : null,
+          byHandKind: inc.byHand?.kind ?? null,
         },
       ];
     })

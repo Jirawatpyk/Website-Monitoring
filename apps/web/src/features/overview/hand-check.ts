@@ -116,10 +116,16 @@ function infoOf(
       `Levels already reached stay: it goes back to ${inc.ackedBy ? 'Acknowledged' : 'Unacked'} and doesn’t start over at L0.`,
     ];
   }
-  const lines = [
-    `Raises ${ref} to DOWN and posts the DOWN alert now, @mentioning ${fault.outsideHours ? onCall : owner}.`,
-    'The DOWN ladder starts from now — while the engine is down, send each level with Escalate now on the incident.',
-  ];
+  // An acknowledged PROBLEM stays acknowledged when raised: no ladder restart (engine_escalate_incident).
+  const lines = inc.ackedBy
+    ? [
+        `Raises ${ref} to DOWN and posts the DOWN alert now.`,
+        `${inc.ackedBy} acknowledged it, so it stays Acknowledged and no DOWN ladder starts.`,
+      ]
+    : [
+        `Raises ${ref} to DOWN and posts the DOWN alert now, @mentioning ${fault.outsideHours ? onCall : owner}.`,
+        'The DOWN ladder starts from now — while the engine is down, send each level with Escalate now on the incident.',
+      ];
   const minutes = CLIENT_UPDATE_MIN[s.tier];
   if (s.clientSite && minutes !== undefined)
     lines.push(
