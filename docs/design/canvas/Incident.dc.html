@@ -165,6 +165,12 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </div>
 </sc-for>
 </div>
+<sc-if value="{{isManual}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; margin-top: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · TIMELINE LINES FROM A HAND CHECK (§31, D-055 item 7)</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Down again</b> (recovered incident, e.g. INC-0142) — title “Down again, reported by Tao from a hand check · “502 again””, detail “Reported by hand — no probe round confirms it yet”. Status back to Acknowledged; levels already reached stay.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Report down</b> (PROBLEM incident, e.g. INC-0150) — title “Raised to DOWN by Tao from a hand check · “Booking page times out””, same detail. The DOWN ladder and, on a client site, the client-update clock start from that time.</span>
+<span>Opened by hand uses the same detail after “Trigger: Manual (hand check) · ”. Sample names and times are made up.</span>
+</div></sc-if>
 </div>
 </div>
 
@@ -546,7 +552,7 @@ class Component extends DCLogic {
     var CASE = st.caseV, MAN = CASE !== 'INC-0142 · probes', BACK = CASE === 'Manual · engine back';
     RET.caseOpts = ['INC-0142 · probes', 'Manual · engine down', 'Manual · engine back']; RET.caseV = CASE;
     RET.setCase = function (v) { clearInterval(self._iv); self.setState({ caseV: v, escN: v === 'Manual · engine back' ? 1 : 0, cuSent: false, send: null, acked: false, toast: false, view: 'Now · 10:07' }); };
-    RET.notManual = !MAN;
+    RET.notManual = !MAN; RET.isManual = MAN;
     RET.m = { id: 'INC-0142', h1: 'MuvMi is down', wfTone: 'warning', wfIcon: 'arrow-up-right', wfLabel: 'Escalated · L1', unacked: '18 min unacked', trigger: 'Hard fail',
       causeLine: 'Primary monitor · HTTP GET / · Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)', owner: 'Arm', started: '09:48:12', startedSub: 'First failed check', conf: '09:48:41', confSub: 'Immediate recheck · MTTD 29 s',
       cuTitle: 'Client update due 10:03 · Bua notified 10:03 · not marked yet', cuText: 'Tier 1 down over 15 min, so Bua (AM) was @mentioned in the thread with a draft. Acknowledging does not stop this track — mark it in the Client update card once MuvMi has been told, or mark it “Not needed” with a reason.',
@@ -570,7 +576,7 @@ class Component extends DCLogic {
         return Object.assign({ level: l.level, when: l.when, who: l.who, status: status, proposal: false }, look);
       });
       var tl = [
-        { at: '02:31:05', icon: 'user', color: 'var(--aura-fg-primary)', title: 'Opened by Tao from a hand check · “Home page shows a 502 error”', detail: 'Trigger: Manual (hand check) · the status engine is down since 02:17, so there are no probe results', scheduled: false },
+        { at: '02:31:05', icon: 'user', color: 'var(--aura-fg-primary)', title: 'Opened by Tao from a hand check · “Home page shows a 502 error”', detail: 'Trigger: Manual (hand check) · reported by hand — no probe round confirms it yet', scheduled: false },
         { at: '02:31:08', icon: 'bell', color: 'var(--aura-fg-primary)', title: 'L0 alert sent', detail: '@Ploy (on call) + Alerts Space · Chat + email · Nok (owner) not paged outside response hours · client-update clock started (due 02:46)', scheduled: false }
       ];
       for (var k = 1; k <= N; k++) tl.push({ at: SENTAT[k] + ':10', icon: 'arrow-up-right', color: 'var(--aura-alert-warning-fg)', title: 'Escalated to ' + LV[k].level + ' by Tao (engine down)', detail: LV[k].tl, scheduled: false });

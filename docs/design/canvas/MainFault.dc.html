@@ -35,9 +35,10 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 .ov-tile:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px}
 .hc-row{display:grid;grid-template-columns:minmax(0,1fr) 96px 110px minmax(0,1.1fr) auto;align-items:center;gap:16px;padding:12px 20px;border-top:1px solid var(--aura-border-subtle);font-size:13px;line-height:1.4}
 .hc-head{padding:8px 20px;font-family:var(--font-mono);font-size:11px;color:var(--aura-fg-tertiary);text-transform:uppercase}
+[data-hc-line]:focus-visible,[data-hc-line]:focus{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px;border-radius:var(--aura-radius-sm)}
 </style>
 </helmet>
-<div style="width: 1440px; height: 2500px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 2620px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -63,7 +64,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 
 <div style="position: absolute; top: 10px; right: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas); z-index: 5">
 <span style="font-family: var(--font-mono)">STATE</span>
-<x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import>
+<div style="width: 240px"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{viewOpts}}" value="{{view}}" on-change="{{setViewSel}}" size="sm"></x-import></div>
 <span style="font-family: var(--font-mono); padding-left: 8px">VIEW AS</span>
 <x-import component-from-global-scope="Aura.SegmentedControl" label="Preview as role" options="{{roles}}" value="{{role}}" on-change="{{setRole}}" size="sm"></x-import>
 </div>
@@ -97,7 +98,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <x-import component-from-global-scope="Aura.Button" variant="secondary" icon="monitor" href="Probes.dc.html">Open probes &amp; heartbeat</x-import>
 </div>
 
-<section class="aura-card" aria-labelledby="hc-h" style="padding: 0; gap: 0; overflow: hidden">
+<section class="aura-card" aria-labelledby="hc-h" style="padding: 0; gap: 0; overflow: hidden; flex-shrink: 0">
 <div style="padding: 16px 20px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px">
 <div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.5">
 <h2 id="hc-h" style="margin: 0; font-size: 18px; line-height: 1.4; font-weight: 600">Hand check · Tier 1</h2>
@@ -110,17 +111,17 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div class="hc-row">
 <span style="display: flex; flex-direction: column; min-width: 0"><a href="SiteDetail.dc.html" style="font-weight: 500; color: inherit; text-decoration: none">{{h.name}}</a><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{h.url}}</span></span>
 <span style="display: flex; align-items: center; gap: 8px"><x-import component-from-global-scope="Aura.Avatar" name="{{h.owner}}" size="sm"></x-import>{{h.owner}}</span>
-<span style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px"><x-import component-from-global-scope="Aura.Badge" tone="{{h.tone}}" variant="{{h.variant}}" icon="{{h.icon}}">{{h.status}}</x-import><span style="font-size: 11px; color: var(--aura-fg-tertiary)">as of 02:17</span></span>
-<span style="display: flex; align-items: center; gap: 6px; min-width: 0; color: {{h.lineColor}}"><span style="display: flex; flex-shrink: 0"><x-import component-from-global-scope="Aura.Icon" name="{{h.lineIcon}}" size="sm"></x-import></span><sc-if value="{{h.isInc}}" hint-placeholder-val="{{false}}"><a href="Incident.dc.html" style="font-weight: 500; color: var(--aura-alert-danger-fg)">{{h.line}}</a></sc-if><sc-if value="{{h.notInc}}" hint-placeholder-val="{{true}}"><span>{{h.line}}</span></sc-if></span>
+<span style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px"><x-import component-from-global-scope="Aura.Badge" tone="{{h.tone}}" variant="{{h.variant}}" icon="{{h.icon}}">{{h.status}}</x-import><span style="font-size: 11px; color: var(--aura-fg-tertiary)">{{h.statusSub}}</span></span>
+<span data-hc-line="{{h.name}}" tabindex="-1" style="display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; color: {{h.lineColor}}"><span style="display: flex; flex-shrink: 0"><x-import component-from-global-scope="Aura.Icon" name="{{h.lineIcon}}" size="sm"></x-import></span><sc-if value="{{h.isInc}}" hint-placeholder-val="{{false}}"><a href="Incident.dc.html" style="font-weight: 500; color: {{h.linkColor}}">{{h.line}}</a></sc-if><sc-if value="{{h.notInc}}" hint-placeholder-val="{{true}}"><span>{{h.line}}</span></sc-if><sc-if value="{{h.hasSub}}" hint-placeholder-val="{{false}}"><a href="Incident.dc.html" style="font-size: 12px; color: var(--aura-fg-secondary)">{{h.sub}}</a></sc-if></span>
 <span style="width: 316px; display: flex; justify-content: flex-end; gap: 8px">
-<sc-if value="{{h.canAct}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="check" on-click="{{h.ok}}">Loads OK</x-import><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="ban" on-click="{{h.down}}">Down — open incident</x-import></sc-if>
+<sc-if value="{{h.canAct}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="check" on-click="{{h.ok}}">Loads OK</x-import><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="ban" on-click="{{h.down}}">{{h.downLabel}}</x-import></sc-if>
 <sc-if value="{{h.readOnly}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-tertiary)">{{h.roText}}</span></sc-if>
 </span>
 </div>
 </sc-for>
 <div style="padding: 12px 20px; border-top: 1px solid var(--aura-border-subtle); background: var(--aura-bg-canvas); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
 <span>{{hcFootLeft}}</span>
-<span>Tier 2–3 (6 sites): not needed — the hand check covers Tier 1 only.</span>
+<span>{{hcTierLine}}</span>
 </div>
 </section>
 
@@ -333,8 +334,9 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · MONITOR FAULT · HAND CHECK (S12b, D-053)</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Layout.</b> Main3 with the S12a fault banner on top (above any DOWN banners), then the Hand check card, then the usual DOWN banners, KPIs, Live issues and tiles. Header meta ends “· statuses as of 02:17”; the probe pill reads “Probes 1/3 | BKK | Heartbeat missed 14 min” with a red dot. Statuses, KPIs and tiles are the last full sweep (02:17) and say so. There is no “Acknowledge monitor fault” button.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Hand check.</b> Tier 1 sites only, one row each: site, owner, last status (as of 02:17), the last hand check, and two buttons. <b style="color: var(--aura-fg-primary); font-weight: 600">Loads OK</b> records “Checked OK · &lt;name&gt; 02:31” at once (no confirm, no message; logged); it can be pressed again — the line keeps the latest, and the card asks for a check every 30 min. <b style="color: var(--aura-fg-primary); font-weight: 600">Down — open incident</b> opens the confirm (site, optional “What did you see?” ≤ 500 characters, “Posts the DOWN alert to the Alerts Space now and starts the client-update clock”, Open incident danger + Cancel). After it the row reads “INC-0143 opened · &lt;name&gt; 02:31” (links to the incident), the buttons go, and the incident gets its usual DOWN banner and Live issues row. Tier 2–3 get one quiet line under the list, not rows.</span>
-<span><b style="color: var(--aura-fg-primary); font-weight: 600">Who presses.</b> Admin, the person on call, and a Responder on their own sites (the Acknowledge rule). Everyone else sees the same card read-only (“Read only”). VIEW AS: Admin (Tao) · On call (Ploy) · Responder (Nok, owns realme.link) · AM (Bua).</span>
-<span><b style="color: var(--aura-fg-primary); font-weight: 600">STATE.</b> Before hand check · After hand check (Bangkok Airways – Taiwan loads OK, realme.link incident opened) · Open-incident dialog · Sweep only (rounds still arrive: title “Monitoring is degraded — the status engine’s sweep stopped 14 min ago”, probes 3/3). Sample names, times and IDs are made up — compute them; never copy.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Down again / Report down (§31, D-055 item 7).</b> The second button follows the site’s open incident. None → “Down — open incident” (as above). Recovered (Monitoring, Needs root cause, key-page episode) → the row line is “Open INC-… · &lt;state&gt;” and the button is <b style="color: var(--aura-fg-primary); font-weight: 600">Down again…</b>: the confirm posts DOWN AGAIN in that incident’s thread, @mentions whoever acknowledged it, and keeps the levels already reached (back to Acknowledged, not L0). PROBLEM → <b style="color: var(--aura-fg-primary); font-weight: 600">Report down…</b>: raises it to DOWN, posts the DOWN alert now, starts the DOWN ladder from the press (Escalate now while the engine is down) and, on a client site, the client-update clock. Still DOWN → no second button. After: status “Down · by hand 02:40”, line “INC-0142 reported down · Tao 02:40”, buttons gone, focus moves to the line; they come back once it recovers. If the incident changed under you: “Not reported · This incident is down already, or closed.” Not offered on muted or maintenance sites. Fuji Links is Tier 1 in these states only so the sample has a PROBLEM row.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Who presses.</b> Admin, the person on call, and a Responder on sites they own or back up (the Acknowledge rule). Everyone else sees the same card read-only (“Read only”). VIEW AS: Admin (Tao) · On call (Ploy) · Responder (Nok, owns realme.link) · AM (Bua).</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">STATE.</b> Before hand check · After hand check (Bangkok Airways – Taiwan loads OK, realme.link incident opened) · Open-incident dialog · Down again · before / dialog / after / refused · Report down · dialog (board time 02:40) · Sweep only (rounds still arrive: title “Monitoring is degraded — the status engine’s sweep stopped 14 min ago”, probes 3/3). Sample names, times and IDs are made up — compute them; never copy.</span>
 </div>
 
 </main>
@@ -342,11 +344,12 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <x-import component-from-global-scope="Aura.Dialog" open="{{dlgOpen}}" on-close="{{closeDlg}}" title="{{dlg.title}}" description="{{dlg.desc}}" size="sm" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 16px">
 <x-import component-from-global-scope="Aura.Textarea" label="What did you see?" optional="{{yes}}" rows="{{three}}" maxlength="500" placeholder="e.g. Home page shows a 502 error from the hosting provider" value="{{dlg.note}}" on-change="{{setNote}}" hint="{{dlg.hint}}"></x-import>
-<div style="display: flex; gap: 10px; padding: 10px 14px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span>Posts the DOWN alert to the Alerts Space now and starts the client-update clock.</span></div>
+<sc-if value="{{dlg.err}}" hint-placeholder-val="{{false}}"><div role="alert" style="display: flex; gap: 10px; padding: 10px 14px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5; color: var(--aura-alert-danger-fg)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import></span><span><b style="font-weight: 600">Not reported</b> · This incident is down already, or closed. Close this and look at the row again.</span></div></sc-if>
+<div style="display: flex; gap: 10px; padding: 10px 14px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span style="display: flex; flex-direction: column; gap: 4px"><sc-for list="{{dlg.info}}" as="t" hint-placeholder-count="2"><span>{{t}}</span></sc-for></span></div>
 <span style="font-size: 12px; color: var(--aura-fg-secondary); margin-top: -6px">Logged in the audit log as {{me}}.</span>
 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px">
 <x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeDlg}}">Cancel</x-import>
-<x-import component-from-global-scope="Aura.Button" variant="danger" icon="ban" on-click="{{confirmDlg}}">Open incident</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="danger" icon="ban" disabled="{{dlg.err}}" on-click="{{confirmDlg}}">{{dlg.cta}}</x-import>
 </div>
 </div>
 </x-import>
@@ -360,7 +363,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2500}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2620}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -402,6 +405,9 @@ class Component extends DCLogic {
     var three = false, one = false, allOk = true;
     var HC = st.hcs || {};
     var NOW = '02:31';
+    var DA = /^(Down again|Report down)/.test(V);
+    if (DA) NOW = '02:40';
+    var AGE = DA ? 23 : 14;
     var downs = {};
     if (three || one) downs['MuvMi'] = { id: 'INC-0142', min: 19, un: 18, esc: true, cause: 'Timeout ×2 · 504 ×1', line: 'Timeout ×2 · 504 ×1 · L1 (Ploy + Tao) paged 10:03 · CEO step at 10:18 (in 11 min)', at: '09:48' };
     if (three) {
@@ -409,9 +415,13 @@ class Component extends DCLogic {
       downs['Tubtong'] = { id: 'INC-0144', min: 3, un: 3, cause: '503 ×3', line: '503 ×3 · Ploy (owner) notified · L1 at 10:34 if still unacked (in 27 min)', at: '10:04' };
       downs['Cando Asia'] = { id: 'INC-0140', min: 12, ackBy: 'Nok', cause: 'DNS not resolving ×3', at: '09:55' };
     }
-    var IDS = {}, nid = 143;
+    var IDS = {}, nid = DA ? 151 : 143;
     Object.keys(HC).forEach(function (k) { if (HC[k].inc) { IDS[k] = 'INC-0' + (nid++); downs[k] = { id: IDS[k], min: 0, un: 0, manual: true, cause: 'Manual (hand check)' + (HC[k].note ? ' · “' + HC[k].note + '”' : ''), line: 'Opened by hand ' + NOW + ' · Ploy (on call) @mentioned in the Alerts Space · nothing escalates on its own while the engine is down — use Escalate now on the incident', at: NOW }; } });
-    var fuji = three || V === 'None';
+    Object.keys(HC).forEach(function (k) { if (HC[k].rep) { var nt = HC[k].note ? ' · “' + HC[k].note + '”' : '';
+      if (k === 'MuvMi') downs[k] = { id: 'INC-0142', min: 0, un: 0, manual: true, relapse: true, ackBy: 'Arm', cause: 'Down again — reported by hand' + nt, line: 'Down again ' + NOW + ' · Arm @mentioned in INC-0142’s thread · levels already reached stay', at: NOW };
+      else downs[k] = { id: 'INC-0150', min: 0, un: 0, manual: true, raised: true, cause: 'Raised to DOWN by hand' + nt, line: 'Raised to DOWN by hand ' + NOW + ' · Ploy (on call) @mentioned · the DOWN ladder starts now — while the engine is down, use Escalate now on the incident', at: NOW };
+    } });
+    var fuji = three || V === 'None' || DA;
     // name, tier, owner, locations, p50, spark base, muted
     var base = [
       ['MuvMi', 1, 'Arm', [P, P, P], '412 ms', 400],
@@ -419,7 +429,7 @@ class Component extends DCLogic {
       ['Bangkok Airways – Taiwan', 1, 'Arm', [P, P, P], '412 ms', 410],
       ['Bangkok Airways – China', 1, 'Arm', [P, B, B], '688 ms', 680],
       ['ENEOS Industrial', 1, 'Ploy', allOk ? [P, P, P] : [P, T, P], '356 ms', 350],
-      ['Fuji Links', 2, 'Ploy', fuji ? [S, S, S] : [P, P, P], fuji ? '5.8 s' : '1.9 s', fuji ? 2600 : 1900],
+      ['Fuji Links', DA ? 1 : 2, 'Ploy', fuji ? [S, S, S] : [P, P, P], fuji ? '5.8 s' : '1.9 s', fuji ? 2600 : 1900],
       ['ORCA Thailand', 2, 'Tao', [P, P, P], '520 ms', 520],
       ['Tubtong', 2, 'Ploy', [P, P, P], '1.1 s', 1100],
       ['Cando Asia', 2, 'Nok', [P, P, P], '940 ms', 940],
@@ -466,7 +476,7 @@ class Component extends DCLogic {
         o.dur = d.manual ? 'just now' : d.min + ' min'; o.durMin = d.min; o.since = 'since ' + d.at; o.durColor = DANGER; o.durWeight = 600;
         o.ackRank = isAck ? 2 : (d.esc ? 0 : 1);
         o.hasInc = true; o.incHref = 'Incident.dc.html';
-        o.incText = isAck ? d.id + ' · Acked by ' + (d.ackBy || 'Tao') : (d.manual ? d.id + ' · Manual · unacked' : d.id + (d.esc ? ' · Escalated L1 · ' : ' · ') + d.un + ' min unacked');
+        o.incText = isAck ? d.id + ' · Acked by ' + (d.ackBy || 'Tao') : (d.manual ? d.id + (d.raised ? ' · Raised by hand · unacked' : ' · Manual · unacked') : d.id + (d.esc ? ' · Escalated L1 · ' : ' · ') + d.un + ' min unacked');
         o.incColor = isAck ? SEC : DANGER;
         if (isAck) { o.actLink = true; o.actHref = 'Incident.dc.html'; o.actLabel = 'Open ' + d.id; }
         else if (canAck) { o.actAck = true; o.ack = ackFn(d.id); }
@@ -474,10 +484,10 @@ class Component extends DCLogic {
         o.tileLine = isAck ? 'Acked · ' + (d.ackBy || 'Tao') : (d.esc ? 'Escalated L1 · unacked' : 'Unacked');
       } else if (key === 'problem') {
         o.reason = 'problem'; o.note = 'Slow: p50 5.8 s > 5 s'; o.noteColor = WARN;
-        o.dur = '15 min'; o.durMin = 15; o.since = 'since 09:52';
-        o.hasInc = true; o.incText = 'INC-0141 · Acked by Ploy'; o.incHref = 'Incidents.dc.html';
-        o.actLink = true; o.actHref = 'Incidents.dc.html'; o.actLabel = 'Open INC-0141';
-        o.tileLine = 'Slow · 15 min';
+        o.dur = DA ? '35 min' : '15 min'; o.durMin = DA ? 35 : 15; o.since = DA ? 'since 02:05' : 'since 09:52';
+        o.hasInc = true; o.incText = DA ? 'INC-0150 · Unacked' : 'INC-0141 · Acked by Ploy'; o.incHref = 'Incidents.dc.html';
+        o.actLink = true; o.actHref = 'Incidents.dc.html'; o.actLabel = DA ? 'Open INC-0150' : 'Open INC-0141';
+        o.tileLine = DA ? 'Slow · 35 min' : 'Slow · 15 min';
       } else if (name === 'MuvMi') {
         o.reason = 'rootcause'; o.note = 'Back up Fri 10:31 — root cause not added yet';
         o.dur = '16 h'; o.durMin = 960; o.since = 'since Fri 10:31';
@@ -531,7 +541,7 @@ class Component extends DCLogic {
     var q = attn.filter(function (r) { return r.key === 'down' && r.ackRank < 2; });
     var banners = q.slice(0, 2).map(function (r) {
       var d = downs[r.name];
-      return { id: d.id, title: d.manual ? r.name + ' is DOWN — opened by hand at ' + d.at : r.name + ' is DOWN — ' + d.min + ' min', escalated: !!d.esc, escLabel: 'Escalated · L1', unacked: d.manual ? 'Unacked' : d.un + ' min unacked', detail: d.line, ack: ackFn(d.id) };
+      return { id: d.id, title: d.manual ? r.name + ' is DOWN — ' + (d.raised || d.relapse ? 'reported' : 'opened') + ' by hand at ' + d.at : r.name + ' is DOWN — ' + d.min + ' min', escalated: !!d.esc, escLabel: 'Escalated · L1', unacked: d.manual ? 'Unacked' : d.un + ' min unacked', detail: d.line, ack: ackFn(d.id) };
     });
     var more = q.length - banners.length;
     var nUnacked = q.length, nEsc = q.filter(function (r) { return r.ackRank === 0; }).length;
@@ -628,56 +638,89 @@ class Component extends DCLogic {
     };
     // ---- monitor fault (S12b)
     var SWEEP = V === 'Sweep only';
-    var URL = { 'MuvMi': 'muvmi.co', 'realme.link': 'realme.link', 'Bangkok Airways – Taiwan': '[Taiwan site URL]', 'Bangkok Airways – China': '[China site URL]', 'ENEOS Industrial': '[ENEOS site URL]' };
-    function canHC(site, owner) { return ROLE === 'Admin' || ROLE === 'On call' || (ROLE === 'Responder' && owner === ME); }
+    var URL = { 'MuvMi': 'muvmi.co', 'realme.link': 'realme.link', 'Bangkok Airways – Taiwan': '[Taiwan site URL]', 'Bangkok Airways – China': '[China site URL]', 'ENEOS Industrial': '[ENEOS site URL]', 'Fuji Links': '[Fuji Links URL]' };
+    function canHC(site, owner) { return ROLE === 'Admin' || ROLE === 'On call' || (ROLE === 'Responder' && (owner === ME || BACKUP[site] === ME)); }
+    var INC = { 'MuvMi': { id: 'INC-0142', kind: 'relapse', label: 'Needs root cause' } };
+    if (DA) INC['Fuji Links'] = { id: 'INC-0150', kind: 'raise', label: 'Problem · Slow' };
+    var ALL = {}; all.forEach(function (a) { ALL[a.name] = a; });
     var checked = 0;
     var hc = base.filter(function (r) { return r[1] === 1; }).map(function (r) {
       var name = r[0], h = HC[name], can = canHC(name, r[2]);
       var o = { name: name, url: URL[name] || '', owner: r[2], status: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check',
         line: 'Not checked yet', lineIcon: 'circle', lineColor: 'var(--aura-fg-tertiary)', isInc: false, notInc: true,
-        canAct: can, readOnly: !can, roText: ROLE === 'AM' ? 'Read only' : 'Only ' + r[2] + ', the person on call or an Admin',
+        canAct: can, readOnly: !can, roText: ROLE === 'AM' ? 'Read only' : 'Only ' + r[2] + ' or ' + BACKUP[name] + ', the person on call or an Admin', statusSub: 'as of 02:17', linkColor: 'var(--aura-alert-danger-fg)', hasSub: false, sub: '', downLabel: 'Down — open incident',
         ok: function () { var x = Object.assign({}, self.state.hcs); x[name] = { ok: true, who: ME }; self.setState({ hcs: x }); },
         down: function () { self.setState({ dlg: name, note: '' }); } };
-      if (h && h.ok) { checked++; o.line = 'Checked OK · ' + h.who + ' ' + NOW; o.lineIcon = 'circle-check'; o.lineColor = 'var(--aura-fg-positive)'; }
-      if (h && h.inc) { checked++; o.line = IDS[name] + ' opened · ' + h.who + ' ' + NOW; o.lineIcon = 'ban'; o.lineColor = 'var(--aura-alert-danger-fg)'; o.isInc = true; o.notInc = false; o.canAct = false; o.readOnly = false; o.status = 'OK'; }
+      var A = ALL[name], I = INC[name];
+      if (A && A.key === 'problem') { o.status = A.label; o.tone = A.tone; o.variant = A.variant; o.icon = A.icon; }
+      if (I) {
+        o.downLabel = I.kind === 'relapse' ? 'Down again…' : 'Report down…';
+        o.line = 'Open ' + I.id + ' · ' + I.label; o.lineIcon = I.kind === 'raise' ? 'triangle-alert' : 'circle-dot'; o.lineColor = 'var(--aura-alert-warning-fg)';
+        o.isInc = true; o.notInc = false; o.linkColor = 'var(--aura-alert-warning-fg)';
+      }
+      if (h && h.ok) { checked++; o.line = 'Checked OK · ' + h.who + ' ' + NOW; o.lineIcon = 'circle-check'; o.lineColor = 'var(--aura-fg-positive)'; o.isInc = false; o.notInc = true; if (I) { o.hasSub = true; o.sub = 'Open ' + I.id; } }
+      if (h && (h.inc || h.rep)) { checked++; o.line = (h.rep ? I.id + ' reported down · ' : IDS[name] + ' opened · ') + h.who + ' ' + NOW; o.lineIcon = 'ban'; o.lineColor = 'var(--aura-alert-danger-fg)'; o.linkColor = 'var(--aura-alert-danger-fg)'; o.isInc = true; o.notInc = false; o.hasSub = false; o.canAct = false; o.readOnly = false;
+        o.status = 'Down'; o.tone = 'danger'; o.variant = 'solid'; o.icon = 'circle-x'; o.statusSub = 'by hand ' + NOW; }
       return o;
     });
     RET.hc = hc;
     RET.hcCount = checked + ' of ' + hc.length + ' checked since 02:17';
-    RET.hcFootLeft = checked ? 'Next check due by 03:01 — every 30 min while monitoring is degraded.' : 'Nothing checked yet — Ploy (on call) was @mentioned at 02:20.';
+    RET.hcTierLine = 'Tier 2–3 (' + base.filter(function (r) { return r[1] !== 1; }).length + ' sites): not needed — the hand check covers Tier 1 only.';
+    RET.hcFootLeft = checked ? 'Next check due by ' + (DA ? '03:10' : '03:01') + ' — every 30 min while monitoring is degraded.' : 'Nothing checked yet — Ploy (on call) was @mentioned at 02:20.';
     RET.fault = SWEEP ? { title: 'Monitoring is degraded — the status engine’s sweep stopped 14 min ago', cause: 'The status engine’s sweep hasn’t run since 02:17 — escalations, reminders and recoveries wait until it does. BKK, SIN and TYO still report; statuses aren’t updated.', told: 'Engine heartbeat missed > 3 min → Healthchecks.io alerted at 02:20: email to the Admins + an Alerts Space post @mentioning Ploy (on call).' }
-      : { title: 'Monitoring is degraded — statuses below are 14 min old', cause: 'The status engine’s sweep hasn’t run since 02:17 — escalations, reminders and recoveries wait until it does. BKK still reports; SIN and TYO have no results.', told: 'Engine heartbeat missed > 3 min → Healthchecks.io alerted at 02:20: email to the Admins + an Alerts Space post @mentioning Ploy (on call).' };
-    RET.pill = SWEEP ? { probes: 'Probes 3/3', locs: 'BKK · SIN · TYO', hb: 'Heartbeat missed 14 min' } : { probes: 'Probes 1/3', locs: 'BKK', hb: 'Heartbeat missed 14 min' };
+      : { title: 'Monitoring is degraded — statuses below are ' + AGE + ' min old', cause: 'The status engine’s sweep hasn’t run since 02:17 — escalations, reminders and recoveries wait until it does. BKK still reports; SIN and TYO have no results.', told: 'Engine heartbeat missed > 3 min → Healthchecks.io alerted at 02:20: email to the Admins + an Alerts Space post @mentioning Ploy (on call).' };
+    RET.pill = SWEEP ? { probes: 'Probes 3/3', locs: 'BKK · SIN · TYO', hb: 'Heartbeat missed 14 min' } : { probes: 'Probes 1/3', locs: 'BKK', hb: 'Heartbeat missed ' + AGE + ' min' };
     RET.metaLine = 'Sat 26 Sep 2026 · ' + NOW + ' (UTC+7) · statuses as of 02:17';
-    RET.views = ['Before hand check', 'After hand check', 'Open-incident dialog', 'Sweep only'];
+    RET.views = ['Before hand check', 'After hand check', 'Open-incident dialog', 'Down again · before', 'Down again · dialog', 'Report down · dialog', 'Down again · after', 'Down again · refused', 'Sweep only'];
+    RET.viewOpts = RET.views.map(function (v) { return { value: v, label: v }; });
+    RET.setViewSel = function (e) { RET.setView(e && e.target ? e.target.value : e); };
     RET.setView = function (v) {
       clearInterval(self._iv);
-      var x = {}, dlg = null, note = '';
+      var x = {}, dlg = null, note = '', err = false;
       if (v === 'After hand check') { x['Bangkok Airways – Taiwan'] = { ok: true, who: ME }; x['realme.link'] = { inc: true, who: ME, note: 'Home page shows a 502 error' }; }
       if (v === 'Open-incident dialog') { dlg = 'realme.link'; note = 'Home page shows a 502 error'; }
-      self.setState({ view: v, hcs: x, dlg: dlg, note: note, acked: {}, toast: null, legendOpen: false });
+      if (v === 'Down again · dialog' || v === 'Down again · refused') { dlg = 'MuvMi'; note = '502 again'; err = v === 'Down again · refused'; }
+      if (v === 'Report down · dialog') { dlg = 'Fuji Links'; note = 'Booking page times out'; }
+      if (v === 'Down again · after') x['MuvMi'] = { rep: true, who: ME, note: '502 again' };
+      self.setState({ view: v, hcs: x, dlg: dlg, note: note, dlgErr: err, acked: {}, toast: null, legendOpen: false });
     };
     RET.roles = ['Admin', 'On call', 'Responder', 'AM'];
     RET.meLine = ROLE === 'AM' ? 'Account manager · Stakeholder' : (ROLE === 'On call' ? 'Responder · on call' : (ROLE === 'Responder' ? 'Responder' : 'Jirawat Piyakit · Admin'));
     var dn = st.dlg;
     var noteLen = (st.note || '').length;
-    RET.dlgOpen = !!dn;
-    RET.dlg = { title: dn ? 'Open an incident for ' + dn + '?' : '', desc: dn ? dn + ' · Tier 1 · owner ' + ((base.filter(function (r) { return r[0] === dn; })[0] || [])[2] || '') + ' · statuses are from 02:17' : '', note: st.note || '', hint: noteLen + ' / 500 · optional — shown on the incident timeline' };
+    RET.dlgOpen = !!dn && canHC(dn, ((base.filter(function (r) { return r[0] === dn; })[0] || [])[2]));
+    var KIND = dn && INC[dn] ? INC[dn].kind : 'new';
+    var INFO = {
+      'new': ['Posts the DOWN alert to the Alerts Space now and starts the client-update clock.'],
+      relapse: ['Posts DOWN AGAIN in INC-0142’s thread now, @mentioning Arm — who acknowledged it.', 'Levels already reached stay: it goes back to Acknowledged and doesn’t start over at L0.'],
+      raise: ['Raises INC-0150 to DOWN and posts the DOWN alert now, @mentioning Ploy (on call).', 'The DOWN ladder starts from now — while the engine is down, send each level with Escalate now on the incident.', 'Client site: the client-update clock starts now (due 02:55).']
+    };
+    RET.dlg = { kind: KIND, err: !!st.dlgErr, info: INFO[KIND], cta: KIND === 'new' ? 'Open incident' : 'Report down',
+      title: dn ? (KIND === 'relapse' ? 'Report ' + dn + ' down again?' : (KIND === 'raise' ? 'Report ' + dn + ' down?' : 'Open an incident for ' + dn + '?')) : '', desc: dn ? dn + ' · Tier 1 · owner ' + ((base.filter(function (r) { return r[0] === dn; })[0] || [])[2] || '') + ' · statuses are from 02:17' : '', note: st.note || '', hint: noteLen + ' / 500 · optional — shown on the incident timeline' };
     RET.setNote = function (e) { var v = e && e.target ? e.target.value : e; self.setState({ note: String(v).slice(0, 500) }); };
-    RET.closeDlg = function () { self.setState({ dlg: null }); };
-    RET.confirmDlg = function () { var x = Object.assign({}, self.state.hcs); x[self.state.dlg] = { inc: true, who: ME, note: (self.state.note || '').trim() }; self.setState({ hcs: x, dlg: null }); };
+    RET.closeDlg = function () { self.setState({ dlg: null, dlgErr: false }); };
+    RET.confirmDlg = function () {
+      if (self.state.dlgErr) return;
+      var n = self.state.dlg, x = Object.assign({}, self.state.hcs), nt = (self.state.note || '').trim();
+      x[n] = INC[n] ? { rep: true, who: ME, note: nt } : { inc: true, who: ME, note: nt };
+      self.setState({ hcs: x, dlg: null });
+      setTimeout(function () { var el = document.querySelector('[data-hc-line="' + n + '"]'); if (el) el.focus(); }, 60);
+    };
     RET.no = false; RET.three = 3; RET.yes = true;
-    var nMan = Object.keys(IDS).length;
+    var nMan = Object.keys(IDS).length + Object.keys(HC).filter(function (k) { return HC[k].rep; }).length;
+    var probUn = DA && !(HC['Fuji Links'] && HC['Fuji Links'].rep) ? 1 : 0;
     RET.kpis = RET.kpis.map(function (k, i) {
-      if (i === 1) return Object.assign({}, k, { change: undefined });
+      if (i === 1) return Object.assign({}, k, { change: undefined, caption: probUn ? (nUnacked + probUn) + ' unacked' : k.caption });
       if (i === 0) return Object.assign({}, k, { caption: nMan ? nMan + ' down by hand check ' + NOW + ' · the rest as of 02:17' : 'As of 02:17 · hand-check Tier 1 below', change: undefined });
       return Object.assign({}, k, { caption: (k.caption ? k.caption + ' · ' : '') + 'as of 02:17', change: undefined });
     });
     var ev2 = [];
+    hc.forEach(function (h) { var c = HC[h.name]; if (c && c.rep) ev2.push({ t: NOW, text: INC[h.name].kind === 'relapse' ? 'INC-0142 MuvMi down again — reported by hand, ' + c.who : 'INC-0150 Fuji Links raised to DOWN by hand — ' + c.who }); });
     if (checked) hc.forEach(function (h) { if (HC[h.name] && HC[h.name].inc) ev2.push({ t: NOW, text: IDS[h.name] + ' ' + h.name + ' opened by hand — ' + HC[h.name].who }); });
     if (checked) hc.forEach(function (h) { if (HC[h.name] && HC[h.name].ok) ev2.push({ t: NOW, text: 'Hand check: ' + h.name + ' loads OK — ' + HC[h.name].who }); });
     ev2.push({ t: '02:20', text: 'Engine heartbeat missed > 3 min — Admins emailed, Ploy @mentioned' });
     ev2.push({ t: '02:17', text: 'Last full sweep — statuses on this page are from it' });
+    if (DA) ev2.push({ t: '02:05', text: 'INC-0150 Fuji Links PROBLEM — Slow, 3 rounds' });
     ev2.push({ t: 'Fri', text: 'MuvMi back up 10:31 — root cause needed (INC-0142)' });
     RET.events = ev2;
     return RET;
