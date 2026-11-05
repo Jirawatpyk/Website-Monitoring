@@ -218,6 +218,12 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </div>
 </sc-for>
 </div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-lg); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · TIMELINE LINES FROM A HAND CHECK (§31, D-055 item 7)</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Down again</b> (recovered incident, e.g. INC-0142) — title “Down again, reported by Tao from a hand check · “502 again””, detail “Reported by hand — no probe round confirms it yet”. Status back to Acknowledged; levels already reached stay.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Report down</b> (PROBLEM incident, e.g. INC-0150) — title “Raised to DOWN by Tao from a hand check · “Booking page times out””, same detail. The DOWN ladder and, on a client site, the client-update clock start from that time.</span>
+<span>Opened by hand uses the same detail after “Trigger: Manual (hand check) · ”. Sample names and times are made up.</span>
+</div>
 </sc-if>
 </div>
 
@@ -540,11 +546,11 @@ class Component extends DCLogic {
     });
     var tl = [];
     if (ack) tl.push({ at: BACK ? '02:45' : '02:38', icon: 'check', color: 'var(--aura-fg-positive)', title: 'Acknowledged by Ploy', detail: 'Escalation stopped. The client-update track continues.' });
-    if (BACK) tl.push({ at: '02:44', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Status engine back', detail: 'Automatic escalation running again — levels already sent won’t repeat.' });
+    if (BACK) tl.push({ at: '02:44', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Status engine back — automatic escalation running again', detail: 'Levels already sent won’t repeat. Next: L2 at 03:01 if still unacked.' });
     if (st.cuSent) tl.push({ at: '02:36', icon: 'mail', color: 'var(--aura-alert-warning-fg)', title: 'Client-update reminder sent by Ploy (engine down)', detail: 'Thee (AM) @mentioned with a draft + email' });
     for (var k = N; k >= 1; k--) tl.push({ at: AT[k], icon: 'arrow-up-right', color: 'var(--aura-alert-warning-fg)', title: 'Escalated to ' + LV[k].level + ' by ' + (BACK ? 'Tao' : 'Ploy') + ' (engine down)', detail: LV[k].who + ' · Chat @mention + email' });
     tl.push({ at: '02:31', icon: 'bell', color: 'var(--aura-fg-primary)', title: 'L0 alert sent', detail: '@Ploy (on call) + Alerts Space · Nok (owner) not paged at night' });
-    tl.push({ at: '02:31', icon: 'user', color: 'var(--aura-fg-primary)', title: 'Opened by Tao from a hand check · “Home page shows a 502 error”', detail: 'Trigger: Manual (hand check) · no probe results — the engine is down' });
+    tl.push({ at: '02:31', icon: 'user', color: 'var(--aura-fg-primary)', title: 'Opened by Tao from a hand check · “Home page shows a 502 error”', detail: 'Trigger: Manual (hand check) · reported by hand — no probe round confirms it yet' });
     var nxt = LV[N + 1];
     RET.mm = { wfTone: ack ? 'neutral' : (N ? 'warning' : 'danger'), wfIcon: ack ? 'check' : (N ? 'arrow-up-right' : 'clock'), wfLabel: ack ? 'Acknowledged' : (N ? 'Escalated · ' + LV[N].level : 'Unacked'),
       sub: (BACK ? '13' : '4') + ' min · opened by hand 02:31', canEsc: !BACK && !ack && !!nxt, engineBack: BACK, escLabel: nxt ? 'Escalate now · ' + nxt.btn : '',

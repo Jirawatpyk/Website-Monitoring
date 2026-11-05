@@ -1,5 +1,5 @@
 import 'server-only';
-import { aggregateUptime, kpiChange, responseKpis, siteUptimeOver } from '@dxt/engine';
+import { aggregateUptime, isInsideHours, kpiChange, responseKpis, siteUptimeOver } from '@dxt/engine';
 import { shortCause } from '@dxt/notifier';
 import {
   CLOSED_INCIDENT_STATES_IN,
@@ -13,6 +13,7 @@ import {
 import type { DbClient as ServiceDbClient } from '@dxt/db';
 import { createClient } from '@/lib/supabase/server';
 import { getAccess } from '@/lib/auth/session';
+import { loadResponseHours } from '@/server/escalation/response-hours';
 import { loadWindowRows, overviewOf, phoneLine, windowEvents } from '@/features/maintenance/server';
 import {
   downEpisodesBySite,
@@ -23,6 +24,7 @@ import {
 } from '@/features/sites/server';
 import {
   chainStreakStart,
+  byHandOf,
   currentDrop,
   isEngineFault,
   lastRoundP50,
@@ -76,8 +78,9 @@ export async function loadOverview(
         .select(
           `id, name, tier, is_active, muted_until, mute_reason, monitoring_started_at, created_at,
          primary_owner_id, backup_owner_id,
-         clients!inner(am_user_id),
+         clients!inner(am_user_id, is_internal),
          owner:profiles!sites_primary_owner_id_fkey(display_name),
+         backup:profiles!sites_backup_owner_id_fkey(display_name),
          site_status(status, since, last_round_at),
          monitors(id, is_primary, thresholds, url),
          incidents(id, number, state, severity, trigger, escalation_level, started_at, detected_at, recovered_at, l0_user_id,
@@ -163,6 +166,7 @@ export async function loadOverview(
       : null;
     const cause = drop?.cause ?? null;
     const summary = drop?.summary ?? null;
+    const byHand = inc ? byHandOf(inc.incident_events) : null;
     const incident: OverviewIncident | null = inc
       ? {
           id: inc.id,
@@ -178,15 +182,18 @@ export async function loadOverview(
           ackedBy: inc.acker?.display_name ?? null,
           l0UserId: inc.l0_user_id ?? null,
           // a PROBLEM drop's short summary ("slow, p50 5.8 s"); a DOWN's cause in short form (spec §10);
-          // opened by hand: what the person saw (S12b, spec §30.2)
+          // opened by hand: what the person saw (S12b, spec §30.2); reported down by hand (§31.4)
           cause:
             inc.trigger === 'manual'
               ? manualNote(inc.incident_events)
-              : drop?.severity === 'problem'
-                ? (summary ?? TRIGGER_LABELS[inc.trigger])
-                : cause
-                  ? shortCause(cause)
-                  : null,
+              : byHand && byHand.kind !== 'opened'
+                ? byHandNote(byHand)
+                : drop?.severity === 'problem'
+                  ? (summary ?? TRIGGER_LABELS[inc.trigger])
+                  : cause
+                    ? shortCause(cause)
+                    : null,
+          byHand,
         }
       : null;
     const lastRound = OVERVIEW_LOCATIONS.map((l) => {
@@ -211,7 +218,9 @@ export async function loadOverview(
       ownerId: s.primary_owner_id,
       ownerName: s.owner?.display_name ?? null,
       backupId: s.backup_owner_id,
+      backupName: s.backup?.display_name ?? null,
       amId: s.clients.am_user_id,
+      clientSite: !s.clients.is_internal,
       mutedUntil: s.muted_until,
       muteReason: s.mute_reason,
       incident,
@@ -242,7 +251,8 @@ export async function loadOverview(
     downStartedAt: downStartOf(i.incident_events),
     detectedAt: i.detected_at ? new Date(i.detected_at) : null,
     ackedAt: i.acked_at ? new Date(i.acked_at) : null,
-    isManual: i.is_manual,
+    // A PROBLEM raised to DOWN by hand (D-055 item 7) has no detection to measure either (D-032).
+    isManual: i.is_manual || raisedByHand(i.incident_events),
   }));
   const current = responseKpis(kpiIncidents, from30d, now);
   const previous = responseKpis(kpiIncidents, from60d, from30d);
@@ -269,7 +279,18 @@ export async function loadOverview(
     .map((r) => r.checkedAt)
     .filter((t): t is string => !!t)
     .sort();
-  const fault = monitorFaultOf(beatAt('engine-sweep'), rounds.at(-1) ?? null, now, onCallName);
+  const faultOnly = monitorFaultOf(beatAt('engine-sweep'), rounds.at(-1) ?? null, now, onCallName);
+  // Who a DOWN reported by hand pages (§31.3): the hours, read only while there is a fault.
+  // Only those who may press read them: the hours tables are staff-only (RLS), and so is the confirm.
+  const presses = person.role === 'admin' || person.role === 'responder';
+  const fault = faultOnly
+    ? {
+        ...faultOnly,
+        ...(presses ? { outsideHours: !isInsideHours(now, await loadResponseHours(db, now)) } : {}),
+      }
+    : null;
+  // The person L0 paged on each open Tier 1 incident, named in the Down again confirm (§31.2).
+  if (fault && presses) await fillL0Names(db, rows);
   return {
     nowIso: now.toISOString(),
     viewer: {
@@ -321,6 +342,15 @@ function manualNote(events: readonly { type: string; payload: unknown }[]): stri
     : TRIGGER_LABELS.manual;
 }
 
+/**
+ * Live issues' note for a drop reported by hand on an open incident (spec §31.4): "Down again — reported
+ * by hand · “502 again”" / "Raised to DOWN by hand · “…”".
+ */
+function byHandNote(b: { kind: 'opened' | 'relapse' | 'raise'; note: string | null }): string {
+  const what = b.kind === 'raise' ? 'Raised to DOWN by hand' : 'Down again — reported by hand';
+  return b.note ? `${what} · “${b.note}”` : what;
+}
+
 /** The Tier 1 hand checks since the sweep stopped (S12b, spec §30.2), newest first. */
 async function loadHandChecks(
   db: DbClient,
@@ -332,7 +362,7 @@ async function loadHandChecks(
   const { data, error } = await db
     .from('hand_checks')
     .select(
-      'site_id, outcome, checked_at, incident_id, checker:profiles!hand_checks_checked_by_fkey(display_name), incident:incidents(number)',
+      'site_id, outcome, checked_at, incident_id, checker:profiles!hand_checks_checked_by_fkey(display_name), incident:incidents(number, created_at)',
     )
     .in('site_id', ids)
     .gte('checked_at', since)
@@ -345,10 +375,25 @@ async function loadHandChecks(
     by: h.checker?.display_name ?? 'Someone',
     incidentId: h.incident_id,
     incidentNumber: h.incident?.number ?? null,
+    // Down again (D-055 item 7): the incident was there before the press. A manual open writes both
+    // in one transaction, so its incident is never older than the check.
+    reported: !!h.incident && Date.parse(h.incident.created_at) < Date.parse(h.checked_at),
   }));
 }
 
 /** A profile's display name (staff read profiles), or null. */
+/** Names the L0 person of each open Tier 1 incident that has one (one read for all of them). */
+async function fillL0Names(db: DbClient, sites: OverviewSite[]): Promise<void> {
+  const ids = [
+    ...new Set(sites.flatMap((s) => (s.tier === 1 && s.incident?.l0UserId ? [s.incident.l0UserId] : []))),
+  ];
+  if (!ids.length) return;
+  const { data, error } = await db.from('profiles').select('id, display_name').in('id', ids);
+  if (error) throw new Error(`profiles: ${error.message}`);
+  const names = new Map((data ?? []).map((p) => [p.id, p.display_name]));
+  for (const s of sites) if (s.incident?.l0UserId) s.incident.l0Name = names.get(s.incident.l0UserId) ?? null;
+}
+
 async function personName(db: DbClient, userId: string): Promise<string | null> {
   const { data, error } = await db
     .from('profiles')
@@ -417,6 +462,13 @@ function downStartOf(events: readonly { type: string; payload: unknown }[]): Dat
   const p = events.find((e) => e.type === 'escalated_to_down')?.payload as
     Record<string, unknown> | undefined;
   return typeof p?.downStartedAt === 'string' ? new Date(p.downStartedAt) : null;
+}
+
+/** Raised to DOWN by hand from the hand check (D-055 item 7). */
+function raisedByHand(events: readonly { type: string; payload: unknown }[]): boolean {
+  return events.some(
+    (e) => e.type === 'escalated_to_down' && (e.payload as Record<string, unknown> | null)?.manual === true,
+  );
 }
 
 /** `/` for the signed-in person. */

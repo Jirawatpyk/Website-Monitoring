@@ -94,6 +94,9 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
      - recovered (Monitoring / Needs root cause) → DOWN AGAIN in its thread, the ladder clock and the levels it reached kept (D-004);
      - a PROBLEM in any open state → raised to DOWN, the DOWN ladder from the press when nobody acked (D-021);
      - a DOWN still open → no button: it is the alert already.
+   - **Spec §31 (Tao, 5 Nov 2026), two points it left open:**
+     - **Unacked stays DOWN-only (D-032).** §31.1 says the Unacked counts include an unacked PROBLEM; D-032 is kept, so an unacked PROBLEM waits in Live issues without turning the count red.
+     - **Report down on an acknowledged PROBLEM** (not drawn): the engine keeps it Acknowledged, with its level and L0, and no DOWN ladder starts (`engine_escalate_incident`). The confirm says so — "Raises INC-0150 to DOWN and posts the DOWN alert now." / "Ploy acknowledged it, so it stays Acknowledged and no DOWN ladder starts." — in place of §31.3's @mention and ladder lines.
    - The engine's own functions write it, at the site's stored round, so the engine's clock never moves. `incidents.manual_at` is the press, and the runner judges the incident only on rounds after it.
    - **The engine-back line**: the first engine run after a stop (`engine-run` ≥ 3 min old) writes one `engine_back` event on each open incident with a by-hand action during the stop — a manual open or Down again, Escalate now, the reminder. Untouched incidents get none.
 

@@ -32,7 +32,11 @@ export function PhoneBanners({ shown, more }: { shown: Banner[]; more: number })
     <section aria-label="Unacknowledged DOWN incidents" className="flex flex-col gap-2">
       {shown.map((b) => {
         const unacked = durationText(b.unackedMinutes, 'unacked');
-        const cause = b.byHandAt ? 'opened by hand' : (b.cause ?? 'Hard fail');
+        const cause = b.byHandAt
+          ? b.byHandKind && b.byHandKind !== 'opened'
+            ? 'reported by hand'
+            : 'opened by hand'
+          : (b.cause ?? 'Hard fail');
         // D-032: no escalation step yet, so the cause stays on the escalated line too
         const sub = b.escalated ? `Escalated · L${b.level} · ${unacked} · ${cause}` : `${unacked} · ${cause}`;
         return (

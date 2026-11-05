@@ -1573,4 +1573,149 @@ describe('monitor fault by hand (S12b, spec §30, D-053 item 5, D-055; Done-when
     );
     expect(rec.map((n) => n.status)).toEqual(['sent']);
   });
+
+  it('Down again by hand (D-055 item 7): DOWN AGAIN goes from the request, an older OK round never recovers it, the engine back writes one line', async () => {
+    const arm = await profileId('arm@example.test');
+    const { siteId, monitorId } = await newSite('Down again', { primary_owner_id: arm });
+    mine.push(siteId);
+    // A probes incident that dropped 40 min ago and recovered 20 min ago (Monitoring).
+    const ago = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+    const incidentId = await must(
+      db.rpc('engine_open_incident', {
+        p_site_id: siteId,
+        p_monitor_id: monitorId,
+        p_trigger: 'hard_fail',
+        p_severity: 'down',
+        p_started_at: ago(40),
+        p_detected_at: ago(39),
+        p_round_at: ago(40),
+        p_context: { cause: 'Hard fail' },
+        p_notify: true,
+      }),
+    );
+    await must(
+      db.rpc('engine_recover_incident', {
+        p_incident_id: incidentId,
+        p_from: 'unacked',
+        p_to: 'monitoring',
+        p_recovered_at: ago(20),
+        p_round_at: ago(20),
+        p_context: {},
+        p_notify: true,
+        p_flip_ok: true,
+      }),
+    );
+
+    await engineDown();
+    const tao = await signedIn('tao@example.test');
+    const down = await tao.rpc('report_down_by_hand', {
+      p_incident_id: incidentId,
+      p_note: '502 again',
+      p_outside_hours: false,
+    });
+    expect(down.error).toBeNull();
+    expect(down.data).toBe('relapse');
+
+    const post = vi.fn(async (_url: string, _msg: { text: string }) => ({
+      ok: true as const,
+      messageName: 'spaces/S/messages/M',
+    }));
+    const deps = {
+      db,
+      webhookUrl: 'https://chat.example.test/webhook',
+      email: undefined,
+      appUrl: 'https://monitor.example.test',
+      post,
+    };
+    // One message per thread per pass, in order: DOWN, RECOVERED, then DOWN AGAIN.
+    for (let pass = 0; pass < 4; pass++)
+      await dispatchNotifications(deps, { incidentId, deadline: Date.now() + 20_000 });
+    const again = await must(
+      db
+        .from('notifications')
+        .select('status')
+        .eq('incident_id', incidentId)
+        .eq('template', 'down_again')
+        .eq('channel', 'google_chat'),
+    );
+    expect(again.map((n) => n.status)).toEqual(['sent']);
+    const reply = post.mock.calls.find(([, m]) => m.text.includes('reported by hand by Tao'));
+    expect(reply).toBeDefined();
+    // The relapse's facts reach the reply: how long it was back (message check M1).
+    expect(JSON.stringify(reply![1])).toContain('was back for');
+
+    // An OK round from before the press; the engine back.
+    await results(monitorId, okRound());
+    await runEngine(db, new Date());
+    const [inc] = await must(
+      db.from('incidents').select('state, recovered_at, escalation_level').eq('id', incidentId),
+    );
+    // Still down; the ladder kept its clock from the first drop (D-004), so the engine back escalates
+    // it — one level per run.
+    expect(inc).toMatchObject({ state: 'escalated', recovered_at: null, escalation_level: 1 });
+    // The cron and a Bangkok batch at once after that: still one line per stop.
+    await Promise.all([runEngine(db, new Date()), runEngine(db, new Date(Date.now() + 1000))]);
+    const back = await must(
+      db.from('incident_events').select('type, at').eq('incident_id', incidentId).eq('type', 'engine_back'),
+    );
+    expect(back).toHaveLength(1);
+    // §30.8: the engine-back line comes before what that run fired.
+    const [step] = await must(
+      db
+        .from('incident_events')
+        .select('at')
+        .eq('incident_id', incidentId)
+        .eq('type', 'step_fired')
+        .order('at')
+        .limit(1),
+    );
+    expect(Date.parse(back[0]!.at)).toBeLessThanOrEqual(Date.parse(step!.at));
+  });
+
+  it('a run that read the incident before the press never recovers it (engine review M1)', async () => {
+    const arm = await profileId('arm@example.test');
+    const { siteId } = await newSite('Raised', { primary_owner_id: arm });
+    mine.push(siteId);
+    const ago = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+    const incidentId = await must(
+      db.rpc('engine_open_incident', {
+        p_site_id: siteId,
+        p_monitor_id: null as unknown as string,
+        p_trigger: 'slow',
+        p_severity: 'problem',
+        p_started_at: ago(10),
+        p_detected_at: ago(9),
+        p_round_at: ago(10),
+        p_context: { summary: 'slow, p50 5.4 s' },
+        p_notify: true,
+      }),
+    );
+    await engineDown();
+    const tao = await signedIn('tao@example.test');
+    const raised = await tao.rpc('report_down_by_hand', {
+      p_incident_id: incidentId,
+      p_note: null as unknown as string,
+      p_outside_hours: false,
+    });
+    expect(raised.data).toBe('raise');
+    // A run that loaded the unacked incident just before the press judges an OK round from then.
+    const stale = await db.rpc('engine_recover_incident', {
+      p_incident_id: incidentId,
+      p_from: 'unacked',
+      p_to: 'monitoring',
+      p_recovered_at: ago(1),
+      p_round_at: ago(1),
+      p_context: {},
+      p_notify: true,
+    });
+    expect(stale.data).toBe(false);
+    const [inc] = await must(
+      db.from('incidents').select('state, severity, recovered_at').eq('id', incidentId),
+    );
+    expect(inc).toMatchObject({ state: 'unacked', severity: 'down', recovered_at: null });
+    const recovered = await must(
+      db.from('notifications').select('id').eq('incident_id', incidentId).eq('template', 'recovered'),
+    );
+    expect(recovered).toHaveLength(0);
+  });
 });

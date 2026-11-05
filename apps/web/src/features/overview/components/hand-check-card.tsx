@@ -2,18 +2,29 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { Alert, Button, Card, Dialog, Textarea } from '@jirawatpyk/aura-react';
-import { IconBan, IconCheck, IconCircle, IconCircleCheck, IconInfo } from '@jirawatpyk/aura-react/icons';
+import {
+  IconBan,
+  IconCheck,
+  IconCircle,
+  IconCircleCheck,
+  IconInfo,
+  IconTriangleAlert,
+} from '@jirawatpyk/aura-react/icons';
 import { formatTime } from '@dxt/shared';
 import { SiteStatusBadge } from '@/components/status-badges';
 import type { HandCheckCard as Card_, HandCheckLine, HandCheckRow } from '../hand-check';
 
 export type HandCheckResult = { ok: true } | { ok: false; message: string };
-export type ManualIncidentResult = { ok: true; incidentId: string } | { ok: false; message: string };
+/** `stale`: the incident changed before the press (§31.6) — Report down stays disabled. */
+export type ManualIncidentResult =
+  { ok: true; incidentId: string } | { ok: false; message: string; stale?: boolean };
 export interface HandCheckActions {
   record: (siteId: string) => Promise<HandCheckResult>;
   open: (input: { siteId: string; note?: string }) => Promise<ManualIncidentResult>;
+  /** Down again on the site's open incident (D-055 item 7). */
+  downAgain?: (input: { incidentId: string; note?: string }) => Promise<ManualIncidentResult>;
 }
 
 const FAILED = 'Couldn’t reach the server. Check your connection and try again.';
@@ -42,6 +53,23 @@ export function HandCheckCard({
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState<HandCheckRow | null>(null);
+  // After Down / Down again the button that opened the dialog is gone: focus the row's incident link.
+  const [landed, setLanded] = useState<string | null>(null);
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Once the dialog is closed (it hands focus back first) and the refresh brought the row's line.
+    if (!landed || opening) return;
+    const links = [
+      ...(list.current?.querySelectorAll<HTMLElement>(
+        `[data-site="${landed}"] [data-hand-line="reported"]`,
+      ) ?? []),
+    ];
+    const link = links.find((l) => l.getClientRects().length > 0) ?? links[0];
+    if (link) {
+      link.focus();
+      setLanded(null);
+    }
+  }, [landed, opening, card]);
 
   const loadsOk = (row: HandCheckRow) =>
     start(async () => {
@@ -51,10 +79,16 @@ export function HandCheckCard({
       router.refresh();
     });
 
-  const cards = card.rows.map((row) => (
+  // No action to call: no Down again button (D-055 item 7).
+  const shown = actions.downAgain
+    ? card.rows
+    : card.rows.map((r) =>
+        r.openIncident ? { ...r, openIncident: { ...r.openIncident, downAgain: null } } : r,
+      );
+  const cards = shown.map((row) => (
     <PhoneRow key={row.siteId} row={row} pending={pending} onOk={loadsOk} onDown={setOpening} />
   ));
-  const rows = card.rows.map((row) =>
+  const rows = shown.map((row) =>
     phone ? (
       <PhoneRow key={row.siteId} row={row} pending={pending} onOk={loadsOk} onDown={setOpening} />
     ) : (
@@ -79,7 +113,7 @@ export function HandCheckCard({
         </div>
       }
     >
-      <div className="flex flex-col gap-3">
+      <div ref={list} className="flex flex-col gap-3">
         {error && (
           <Alert tone="danger" title="Not recorded">
             {error}
@@ -116,34 +150,68 @@ export function HandCheckCard({
           phone={phone}
           open={!!opening}
           onClose={() => setOpening(null)}
+          onDone={setLanded}
           onOpen={actions.open}
+          onDownAgain={actions.downAgain}
         />
       )}
     </Card>
   );
 }
 
+const LINK = 'inline-flex min-h-11 items-center gap-2 text-sm underline-offset-2 hover:underline';
+
+/** The row's hand-check line (§30.2, §31.1): focus lands on it after Down / Down again (`data-hand-line`). */
 function Line({ line }: { line: HandCheckLine }) {
   if (line.kind === 'incident')
     return (
+      // "reported": focus waits for this line once the refresh brings it (after Loads OK the row had
+      // another line, whose node React replaces).
       <Link
         href={`/incidents/${line.incidentId}`}
-        className="inline-flex min-h-11 items-center gap-2 text-sm text-fg-danger underline-offset-2 hover:underline"
+        data-hand-line="reported"
+        className={`${LINK} text-fg-danger`}
       >
         <IconBan aria-hidden />
         {line.text}
       </Link>
     );
+  if (line.kind === 'open')
+    return (
+      <Link
+        href={`/incidents/${line.incidentId}`}
+        data-hand-line
+        className={`${LINK} ${line.tone === 'danger' ? 'text-fg-danger' : 'text-alert-warning-fg'}`}
+      >
+        {line.tone === 'danger' ? <IconBan aria-hidden /> : <IconTriangleAlert aria-hidden />}
+        {line.text}
+      </Link>
+    );
+  if (line.kind === 'ok')
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2 text-sm">
+        <span className="inline-flex items-center gap-2 text-fg-positive">
+          <IconCircleCheck aria-hidden />
+          {line.text}
+        </span>
+        {line.incident && (
+          <Link
+            href={`/incidents/${line.incident.id}`}
+            data-hand-line
+            className="inline-flex min-h-11 items-center text-xs text-fg-secondary underline-offset-2 hover:underline"
+          >
+            {line.incident.text}
+          </Link>
+        )}
+      </span>
+    );
   return (
-    <span
-      className={`inline-flex items-center gap-2 text-sm ${line.kind === 'ok' ? 'text-fg-positive' : 'text-fg-tertiary'}`}
-    >
-      {line.kind === 'ok' ? <IconCircleCheck aria-hidden /> : <IconCircle aria-hidden />}
+    <span className="inline-flex items-center gap-2 text-sm text-fg-tertiary">
+      <IconCircle aria-hidden />
       {line.text}
     </span>
   );
 }
-
 const STATUS_WORD: Record<NonNullable<HandCheckRow['status']>, string> = {
   ok: 'OK',
   problem: 'Problem',
@@ -160,7 +228,7 @@ type RowProps = {
 
 function Buttons({ row, pending, onOk, onDown, phone }: RowProps & { phone: boolean }) {
   if (row.readOnly) return <span className="text-xs text-fg-tertiary">{row.readOnly}</span>;
-  if (!row.canCheck && !row.canOpen) return null;
+  if (!row.canCheck && !row.canOpen && !row.openIncident?.downAgain) return null;
   return (
     <div className={phone ? 'grid grid-cols-2 gap-2' : 'flex flex-wrap items-center justify-end gap-2'}>
       {row.canCheck && (
@@ -189,14 +257,17 @@ function Buttons({ row, pending, onOk, onDown, phone }: RowProps & { phone: bool
           {phone ? 'Down…' : 'Down — open incident'}
         </Button>
       )}
-      {row.openIncident && (
+      {row.openIncident?.downAgain && (
         <Button
-          variant="ghost"
+          variant="secondary"
           size={phone ? 'md' : 'sm'}
           fullWidth={phone}
-          href={`/incidents/${row.openIncident.id}`}
+          disabled={pending}
+          onClick={() => onDown(row)}
+          aria-label={`${row.openIncident.downAgain === 'raise' ? 'Report down' : 'Down again'} · ${row.name}`}
         >
-          {row.openIncident.label}
+          <IconBan />
+          {row.openIncident.downAgain === 'raise' ? 'Report down…' : 'Down again…'}
         </Button>
       )}
       {row.paused && <span className="text-xs text-fg-secondary">{row.paused}</span>}
@@ -208,6 +279,7 @@ function DesktopRow({ row, ...rest }: RowProps) {
   return (
     <div
       role="row"
+      data-site={row.siteId}
       className="grid grid-cols-[minmax(0,1fr)_calc(var(--spacing)*28)_calc(var(--spacing)*28)_minmax(max-content,1.2fr)_calc(var(--spacing)*80)] items-center gap-4 border-b border-border-subtle py-3 last:border-b-0"
     >
       <div role="cell" className="flex min-w-0 flex-col">
@@ -233,7 +305,10 @@ function DesktopRow({ row, ...rest }: RowProps) {
 
 function PhoneRow({ row, ...rest }: RowProps) {
   return (
-    <li className="flex flex-col gap-2 rounded-aura-md border border-border-subtle p-aura-3">
+    <li
+      data-site={row.siteId}
+      className="flex flex-col gap-2 rounded-aura-md border border-border-subtle p-aura-3"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col">
           <span className="font-medium">{row.name}</span>
@@ -258,6 +333,8 @@ function OpenIncidentDialog({
   open,
   onClose,
   onOpen,
+  onDownAgain,
+  onDone,
 }: {
   row: HandCheckRow;
   asOf: string | null;
@@ -266,22 +343,35 @@ function OpenIncidentDialog({
   open: boolean;
   onClose: () => void;
   onOpen: HandCheckActions['open'];
+  onDownAgain?: HandCheckActions['downAgain'];
+  /** Done: the row whose button is about to go (focus moves to its incident link). */
+  onDone?: (siteId: string) => void;
 }) {
   const router = useRouter();
+  // On a site whose incident is still open: Down again (D-055 item 7).
+  const again = row.openIncident?.downAgain ?? null;
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // The incident changed before the press (§31.6): pressing again can't help.
+  const [stale, setStale] = useState(false);
   const [pending, start] = useTransition();
   const submit = () =>
     start(async () => {
       setError(null);
-      const r = await onOpen({ siteId: row.siteId, note }).catch(() => ({
+      const call =
+        again && onDownAgain
+          ? onDownAgain({ incidentId: row.openIncident!.id, note })
+          : onOpen({ siteId: row.siteId, note });
+      const r = await call.catch(() => ({
         ok: false as const,
         message: FAILED,
       }));
       if (!r.ok) {
         setError(r.message);
+        setStale('stale' in r && r.stale === true);
         return;
       }
+      onDone?.(row.siteId);
       onClose();
       router.refresh();
     });
@@ -293,20 +383,23 @@ function OpenIncidentDialog({
       open={open}
       onClose={onClose}
       size="sm"
-      title={`Open an incident for ${row.name}?`}
+      title={
+        again === 'relapse'
+          ? `Report ${row.name} down again?`
+          : again === 'raise'
+            ? `Report ${row.name} down?`
+            : `Open an incident for ${row.name}?`
+      }
       description={`${row.name} · Tier 1 · owner ${row.ownerName ?? '—'}${asOf ? ` · statuses are from ${asOf}` : ''}`}
       footer={
-        <div
-          className={phone ? 'flex w-full flex-col gap-2' : 'flex w-full items-center justify-between gap-3'}
-        >
-          {!phone && logged}
+        <div className={phone ? 'flex w-full flex-col gap-2' : 'flex w-full items-center justify-end gap-3'}>
           <div className={phone ? 'grid grid-cols-2 gap-2' : 'flex gap-2'}>
             <Button variant="secondary" fullWidth={phone} onClick={onClose}>
               Cancel
             </Button>
-            <Button variant="danger" fullWidth={phone} loading={pending} onClick={submit}>
+            <Button variant="danger" fullWidth={phone} loading={pending} disabled={stale} onClick={submit}>
               <IconBan />
-              Open incident
+              {again ? 'Report down' : 'Open incident'}
             </Button>
           </div>
           {phone && <div className="text-center">{logged}</div>}
@@ -314,11 +407,6 @@ function OpenIncidentDialog({
       }
     >
       <div className="flex flex-col gap-3">
-        {error && (
-          <Alert tone="danger" title="Not opened">
-            {error}
-          </Alert>
-        )}
         <Textarea
           label="What did you see?"
           optional
@@ -333,10 +421,26 @@ function OpenIncidentDialog({
           }
           hint={`${note.length} / ${NOTE_MAX} · optional — shown on the incident timeline`}
         />
-        <p className="m-0 flex items-start gap-2 text-sm text-fg-secondary">
-          <IconInfo aria-hidden className="mt-0.5 shrink-0" />
-          Posts the DOWN alert to the Alerts Space now and starts the client-update clock.
-        </p>
+        {error && (
+          <Alert tone="danger" title={again ? 'Not reported' : 'Not opened'}>
+            {stale ? `${error} Close this and look at the row again.` : error}
+          </Alert>
+        )}
+        <div className="flex items-start gap-2 rounded-aura-md bg-bg-canvas p-aura-3 text-sm">
+          <IconInfo aria-hidden className="mt-0.5 shrink-0 text-fg-secondary" />
+          <div className="flex flex-col gap-1">
+            {(again && row.openIncident?.info.length
+              ? row.openIncident.info
+              : ['Posts the DOWN alert to the Alerts Space now and starts the client-update clock.']
+            ).map((t) => (
+              <p key={t} className="m-0">
+                {t}
+              </p>
+            ))}
+          </div>
+        </div>
+        {/* Desktop: under the info, as MainFault draws it (beside the buttons it wrapped to three lines). */}
+        {!phone && logged}
       </div>
     </Dialog>
   );

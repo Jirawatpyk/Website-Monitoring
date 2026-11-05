@@ -39,8 +39,12 @@ export interface OverviewIncident {
   ackedBy: string | null;
   /** The person L0 paged (S10): the person on call outside response hours, else null (the owner). */
   l0UserId?: string | null;
+  /** That person's name, read during a monitor fault for the Down again confirm (§31.2). */
+  l0Name?: string | null;
   /** The cause in words: DOWN in short form ("Timeout ×2 · 504 ×1"), PROBLEM its summary. */
   cause: string | null;
+  /** The drop in progress was reported by hand (S12b, spec §30.2, §31): how, when, what they saw. */
+  byHand?: { kind: 'opened' | 'relapse' | 'raise'; at: string; note: string | null } | null;
 }
 
 /** One monitored site as the Overview sees it. Drafts never reach the Overview (§21.2). */
@@ -59,8 +63,12 @@ export interface OverviewSite {
   ownerId: string | null;
   ownerName: string | null;
   backupId: string | null;
+  /** The backup's name (the hand check's read-only line, spec §31.5). */
+  backupName?: string | null;
   /** The client's AM (for "Your client"). */
   amId: string | null;
+  /** A real client, not internal: the client-update track runs for it (spec §9; the hand check, §31.3). */
+  clientSite?: boolean;
   mutedUntil: string | null;
   muteReason: string | null;
   incident: OverviewIncident | null;
@@ -140,6 +148,8 @@ export interface HandCheckEntry {
   by: string;
   incidentId: string | null;
   incidentNumber: number | null;
+  /** A Down on an incident already open (Down again, D-055 item 7), not one this check opened. */
+  reported?: boolean;
 }
 
 export interface MonitorFault {
@@ -151,6 +161,8 @@ export interface MonitorFault {
   asOf: string | null;
   /** The person on call, whom the VPS watchdog @mentioned; null = nobody on call. */
   onCallName: string | null;
+  /** Outside response hours now: a DOWN reported by hand pages the person on call, not the owner (§31.3). */
+  outsideHours?: boolean;
 }
 
 export interface OverviewMaintenanceCard {

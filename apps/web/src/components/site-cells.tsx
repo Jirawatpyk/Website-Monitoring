@@ -10,7 +10,7 @@ import {
   IconLock,
   IconShieldAlert,
 } from '@jirawatpyk/aura-react/icons';
-import { formatDay, formatIncidentLine, formatTime, isSameBangkokDay } from '@dxt/shared';
+import { formatDay, formatIncidentId, formatIncidentLine, formatTime, isSameBangkokDay } from '@dxt/shared';
 
 /**
  * Cells a site's status is drawn with on Sites, Site detail and the Overview (spec §11, §20, §21):
@@ -91,6 +91,8 @@ export interface IncidentLinkData {
   level: number;
   detectedAt: string;
   ackedBy: string | null;
+  /** The drop in progress was reported by hand (spec §31.4): the Overview says so while unacked. */
+  byHand?: { kind: 'opened' | 'relapse' | 'raise' } | null;
 }
 
 /** Waiting on someone (unacked, escalated) reads red; a missing root cause amber; the rest quiet. */
@@ -101,13 +103,23 @@ export function incidentTone(state: IncidentLinkData['state']): string {
 }
 
 export function incidentText(i: IncidentLinkData, now: Date): string {
-  return formatIncidentLine({
+  const line = formatIncidentLine({
     number: i.number,
     state: i.state,
     level: i.level,
     minutesOpen: (now.getTime() - new Date(i.detectedAt).getTime()) / 60_000,
     ackedBy: i.ackedBy,
   });
+  // Waiting on an ack after a hand report: "INC-0150 · Raised by hand · unacked just now" (MainFault, §31.4).
+  if (i.state !== 'unacked' || !i.byHand) return line;
+  const id = formatIncidentId(i.number);
+  const how =
+    i.byHand.kind === 'raise'
+      ? 'Raised by hand'
+      : i.byHand.kind === 'opened'
+        ? 'Manual'
+        : 'Down again by hand';
+  return line.replace(`${id} · `, `${id} · ${how} · `);
 }
 
 export function IncidentLink({

@@ -23,6 +23,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 .mo-tile{min-height:60px;box-sizing:border-box;padding:10px 10px;display:flex;flex-direction:column;justify-content:center;gap:4px;border:1px solid;border-radius:var(--aura-radius-md);color:inherit;text-decoration:none;line-height:1.3;font-size:13px}
 .mo-tile:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px}
 .mo-name{flex-grow:1;min-width:0;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+[data-hc-line]:focus-visible,[data-hc-line]:focus{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px;border-radius:var(--aura-radius-sm)}
 </style>
 </helmet>
 <div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
@@ -50,7 +51,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </div>
 <div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; margin-top: -4px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
 <span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">FAULT</span>
-<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Monitor fault state" options="{{faultOpts}}" value="{{fault}}" on-change="{{setFault}}" full-width="{{yes}}" size="sm"></x-import></div>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" aria-label="Monitor fault state" options="{{faultSel}}" value="{{fault}}" on-change="{{setFaultSel}}" size="sm"></x-import></div>
 </div>
 
 <div style="display: flex; align-items: flex-end; justify-content: space-between">
@@ -64,7 +65,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <sc-if value="{{isFault}}" hint-placeholder-val="{{false}}">
 <div role="alert" style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-lg); line-height: 1.45">
 <div style="display: flex; gap: 12px"><span style="display: flex; padding-top: 2px; color: var(--aura-alert-danger-fg)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="md"></x-import></span>
-<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-weight: 600; color: var(--aura-alert-danger-fg)">Monitoring is degraded — statuses below are 14 min old</span>
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-weight: 600; color: var(--aura-alert-danger-fg)">Monitoring is degraded — statuses below are {{age}} min old</span>
 <span style="font-size: 13px">The status engine’s sweep hasn’t run since 02:17 — escalations, reminders and recoveries wait until it does. BKK still reports; SIN and TYO have no results.</span>
 <span style="font-size: 12px; color: var(--aura-fg-secondary)">Engine heartbeat missed > 3 min → Healthchecks.io alerted at 02:20: email to the Admins + an Alerts Space post @mentioning Ploy (on call).</span></div></div>
 <x-import component-from-global-scope="Aura.Button" variant="secondary" icon="monitor" full-width="{{yes}}" href="Probes.dc.html">Open probes &amp; heartbeat</x-import>
@@ -77,18 +78,18 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <sc-for list="{{hc}}" as="h" hint-placeholder-count="5">
 <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--aura-border-subtle)">
 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; line-height: 1.35">
-<span style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 14px; font-weight: 500">{{h.name}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Owner {{h.owner}} · OK as of 02:17</span></span>
-<x-import component-from-global-scope="Aura.Badge" tone="success" icon="circle-check">OK</x-import>
+<span style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 14px; font-weight: 500">{{h.name}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Owner {{h.owner}} · {{h.statusSub}}</span></span>
+<x-import component-from-global-scope="Aura.Badge" tone="{{h.tone}}" variant="{{h.variant}}" icon="{{h.icon}}">{{h.status}}</x-import>
 </div>
-<span style="display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 1.35; color: {{h.lineColor}}"><span style="display: flex; flex-shrink: 0"><x-import component-from-global-scope="Aura.Icon" name="{{h.lineIcon}}" size="sm"></x-import></span><sc-if value="{{h.isInc}}" hint-placeholder-val="{{false}}"><a href="MIncident.dc.html" style="min-height: 44px; display: inline-flex; align-items: center; font-weight: 500; color: var(--aura-alert-danger-fg)">{{h.line}}</a></sc-if><sc-if value="{{h.notInc}}" hint-placeholder-val="{{true}}"><span>{{h.line}}</span></sc-if></span>
+<span data-hc-line="{{h.name}}" tabindex="-1" style="display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; font-size: 13px; line-height: 1.35; color: {{h.lineColor}}"><span style="display: flex; flex-shrink: 0"><x-import component-from-global-scope="Aura.Icon" name="{{h.lineIcon}}" size="sm"></x-import></span><sc-if value="{{h.isInc}}" hint-placeholder-val="{{false}}"><a href="MIncident.dc.html" style="min-height: 44px; display: inline-flex; align-items: center; font-weight: 500; color: {{h.linkColor}}">{{h.line}}</a></sc-if><sc-if value="{{h.notInc}}" hint-placeholder-val="{{true}}"><span>{{h.line}}</span></sc-if><sc-if value="{{h.hasSub}}" hint-placeholder-val="{{false}}"><a href="MIncident.dc.html" style="min-height: 44px; display: inline-flex; align-items: center; font-size: 12px; color: var(--aura-fg-secondary)">{{h.sub}}</a></sc-if></span>
 <sc-if value="{{h.canAct}}" hint-placeholder-val="{{true}}"><div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
 <x-import component-from-global-scope="Aura.Button" variant="secondary" icon="check" full-width="{{yes}}" on-click="{{h.ok}}">Loads OK</x-import>
-<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="ban" full-width="{{yes}}" on-click="{{h.down}}">Down…</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="ban" full-width="{{yes}}" on-click="{{h.down}}">{{h.downLabel}}</x-import>
 </div></sc-if>
 <sc-if value="{{h.readOnly}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-tertiary)">{{h.roText}}</span></sc-if>
 </div>
 </sc-for>
-<div style="padding: 10px 14px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">Tier 2–3 (6 sites): not needed — the hand check covers Tier 1 only.</div>
+<div style="padding: 10px 14px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">{{hcTierLine}}</div>
 </section>
 </sc-if>
 
@@ -142,17 +143,18 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 
 <a href="MSites.dc.html" class="mo-all"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="monitor" size="sm"></x-import></span><span style="flex-grow: 1">All {{monitored}} sites <span style="color: var(--aura-fg-secondary)">· {{okCount}} OK</span></span><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a>
 <a href="MMaintenanceList.dc.html" class="mo-all"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="calendar" size="sm"></x-import></span><span style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.3; padding: 6px 0"><span>Maintenance &amp; mutes</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{mxLine}}</span></span><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></a>
-<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Phone Overview answers three things, in order: anything to do now (banners — same rules as desktop), what is wrong and is it mine (Live issues), and is the rest fine (“x/y OK” in the header, “All N sites” row → Sites). Live issues: same inclusion and sort as desktop; each row = status + one reason + Since; a neutral outline chip with the user icon shows when you own the site (“Yours”) or are its backup (“Backup”) — never accent/violet, which status badges reserve for Maintenance (spec §11). Third count by role: Responder / Admin → “Yours” (Live issues you own or back up; chips “Yours” / “Backup”, user icon) · AM (Stakeholder) → “Your clients” (Live issues on sites of clients you manage; chip “Your client”, users icon) — they act on client updates · CEO (Stakeholder, no clients) and Viewer → “Uptime 30 d”, no chips. Chips are neutral outline, never accent/violet (status badges reserve it for Maintenance, spec §11). Viewer is read-only: banners and rows open the incident without Acknowledge; AM and CEO can acknowledge but don’t need to (spec §18). Use VIEW AS to compare. Not on phones: site tiles, KPIs MTTA / MTTD / uptime, Recent events (Incidents tab), legend, sparklines. All OK → one line “Nothing needs you”. The User guide icon comes back to the top bar with the guide. “Maintenance &amp; mutes · N active · N scheduled ›” under “All N sites” comes with the maintenance slice (§23) and opens the phone Maintenance list; left out when nothing is active or scheduled. Sample viewers: Arm (Responder), Bua (AM: MuvMi, Bangkok Airways, Tubtong, Cando Asia), Mint (Viewer); values are mock data — compute them; never copy. FAULT (S12b): the S12a fault banner sits on top, then “Hand check · Tier 1” — one row per Tier 1 site (owner, OK as of 02:17, last hand check) with Loads OK / Down… as a full-width 44 px pair; Down… opens the same confirm as desktop (optional “What did you see?”, Open incident). Who presses: the person on call, a Responder on own sites, an Admin; others read only. Tier 2–3: one quiet line. The header says “AS OF 02:17” and Probes 1/3 in red. No “Acknowledge monitor fault”.</div>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Phone Overview answers three things, in order: anything to do now (banners — same rules as desktop), what is wrong and is it mine (Live issues), and is the rest fine (“x/y OK” in the header, “All N sites” row → Sites). Live issues: same inclusion and sort as desktop; each row = status + one reason + Since; a neutral outline chip with the user icon shows when you own the site (“Yours”) or are its backup (“Backup”) — never accent/violet, which status badges reserve for Maintenance (spec §11). Third count by role: Responder / Admin → “Yours” (Live issues you own or back up; chips “Yours” / “Backup”, user icon) · AM (Stakeholder) → “Your clients” (Live issues on sites of clients you manage; chip “Your client”, users icon) — they act on client updates · CEO (Stakeholder, no clients) and Viewer → “Uptime 30 d”, no chips. Chips are neutral outline, never accent/violet (status badges reserve it for Maintenance, spec §11). Viewer is read-only: banners and rows open the incident without Acknowledge; AM and CEO can acknowledge but don’t need to (spec §18). Use VIEW AS to compare. Not on phones: site tiles, KPIs MTTA / MTTD / uptime, Recent events (Incidents tab), legend, sparklines. All OK → one line “Nothing needs you”. The User guide icon comes back to the top bar with the guide. “Maintenance &amp; mutes · N active · N scheduled ›” under “All N sites” comes with the maintenance slice (§23) and opens the phone Maintenance list; left out when nothing is active or scheduled. Sample viewers: Arm (Responder), Bua (AM: MuvMi, Bangkok Airways, Tubtong, Cando Asia), Mint (Viewer); values are mock data — compute them; never copy. FAULT (S12b): the S12a fault banner sits on top, then “Hand check · Tier 1” — one row per Tier 1 site (owner, OK as of 02:17, last hand check) with Loads OK / Down… as a full-width 44 px pair; Down… opens the same confirm as desktop (optional “What did you see?”, Open incident). Who presses: the person on call, a Responder on own sites, an Admin; others read only. Tier 2–3: one quiet line. The header says “AS OF 02:17” and Probes 1/3 in red. No “Acknowledge monitor fault”. Down again / Report down (§31, D-055 item 7): the second button follows the open incident — recovered (Monitoring, Needs root cause, key-page episode) → the line is “Open INC-… · &lt;state&gt;” and the button “Down again…” (DOWN AGAIN in its thread, @mentions whoever acked, levels kept); PROBLEM → “Report down…” (raised to DOWN, alert now, DOWN ladder and client-update clock start from the press); still DOWN → no button. After: “Down · by hand 02:40”, “INC-0142 reported down · Arm 02:40”, focus on that line. Refused: “Not reported · This incident is down already, or closed.” Owner or backup, on call, Admin; not on muted or maintenance sites. Fuji Links is Tier 1 in the Down again states only.</div>
 </div>
 
 
 <x-import component-from-global-scope="Aura.Dialog" open="{{dlgOpen}}" on-close="{{closeDlg}}" title="{{dlg.title}}" description="{{dlg.desc}}" size="sm" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 14px">
 <x-import component-from-global-scope="Aura.Textarea" label="What did you see?" optional="{{yes}}" rows="{{three}}" maxlength="500" placeholder="e.g. Home page shows a 502 error" value="{{dlg.note}}" on-change="{{setNote}}" hint="{{dlg.hint}}"></x-import>
-<div style="display: flex; gap: 10px; padding: 10px 12px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span>Posts the DOWN alert to the Alerts Space now and starts the client-update clock.</span></div>
+<sc-if value="{{dlg.err}}" hint-placeholder-val="{{false}}"><div role="alert" style="display: flex; gap: 10px; padding: 10px 12px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5; color: var(--aura-alert-danger-fg)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import></span><span><b style="font-weight: 600">Not reported</b> · This incident is down already, or closed.</span></div></sc-if>
+<div style="display: flex; gap: 10px; padding: 10px 12px; background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span style="display: flex; flex-direction: column; gap: 4px"><sc-for list="{{dlg.info}}" as="t" hint-placeholder-count="2"><span>{{t}}</span></sc-for></span></div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
 <x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{closeDlg}}">Cancel</x-import>
-<x-import component-from-global-scope="Aura.Button" variant="danger" icon="ban" full-width="{{yes}}" on-click="{{confirmDlg}}">Open incident</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="danger" icon="ban" full-width="{{yes}}" disabled="{{dlg.err}}" on-click="{{confirmDlg}}">{{dlg.cta}}</x-import>
 </div>
 <span style="font-size: 12px; text-align: center; color: var(--aura-fg-secondary)">Logged in the audit log as {{me}}.</span>
 </div>
@@ -165,7 +167,16 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { view: '2 + more', tier: 'All', role: 'Responder', fault: 'Off', hcs: {}, dlg: null, note: '' };
+    this.state = { view: '2 + more', tier: 'All', role: 'Responder', fault: 'Off', hcs: {}, dlg: null, note: '', dlgErr: false };
+  }
+  setFault(v) {
+    var x = {}, dlg = null, note = '', err = false, role = this.state.role;
+    if (v === 'After check') { x['Bangkok Airways – Taiwan'] = { ok: true, who: 'Arm' }; x['realme.link'] = { inc: true, who: 'Ploy', note: 'Home page shows a 502 error' }; }
+    if (v === 'Down again · dialog' || v === 'Down again · refused') { dlg = 'MuvMi'; note = '502 again'; err = v === 'Down again · refused'; }
+    if (v === 'Down again · before' || v === 'Down again · dialog' || v === 'Down again · refused' || v === 'Down again · after') role = 'Responder';
+    if (v === 'Report down · dialog') { dlg = 'Fuji Links'; note = 'Booking page times out'; role = 'On call'; }
+    if (v === 'Down again · after') { x['MuvMi'] = { rep: true, who: 'Arm', note: '502 again' }; }
+    this.setState({ fault: v, hcs: x, dlg: dlg, note: note, dlgErr: err, role: role });
   }
   renderVals() {
     var self = this;
@@ -186,15 +197,18 @@ class Component extends DCLogic {
       downs['Tubtong'] = { id: 'INC-0144', min: 3, un: 3, cause: '503 ×3', at: '10:04' };
       downs['Cando Asia'] = { id: 'INC-0140', min: 12, ackBy: 'Nok', cause: 'DNS not resolving ×3', at: '09:55' };
     }
-    var FAULT = st.fault !== 'Off', HC = FAULT ? (st.hcs || {}) : {}, NOW = '02:31';
+    var FAULT = st.fault !== 'Off', HC = FAULT ? (st.hcs || {}) : {}, DA = /^(Down again|Report down)/.test(st.fault), NOW = DA ? '02:40' : '02:31', AGE = DA ? 23 : 14;
     if (FAULT) { three = false; one = false; allOk = true; downs = {}; }
-    var IDS = {}, nid = 143;
+    var IDS = {}, nid = DA ? 151 : 143;
     Object.keys(HC).forEach(function (k) { if (HC[k].inc) { IDS[k] = 'INC-0' + (nid++); downs[k] = { id: IDS[k], min: 0, un: 0, manual: true, cause: 'Manual (hand check)' + (HC[k].note ? ' · “' + HC[k].note + '”' : ''), at: NOW }; } });
-    var fuji = !FAULT && (three || V === 'None');
+    Object.keys(HC).forEach(function (k) { if (HC[k].rep) { var nt = HC[k].note ? ' · “' + HC[k].note + '”' : '';
+      downs[k] = k === 'MuvMi' ? { id: 'INC-0142', min: 0, un: 0, manual: true, relapse: true, ackBy: 'Arm', cause: 'Down again — reported by hand' + nt, at: NOW }
+        : { id: 'INC-0150', min: 0, un: 0, manual: true, raised: true, cause: 'Raised to DOWN by hand' + nt, at: NOW }; } });
+    var fuji = DA || (!FAULT && (three || V === 'None'));
     var base = [
       // name, tier, p50, owner, backup — same owners as the Sites board; the viewer is Arm (Responder)
       ['MuvMi', 1, '412 ms', 'Arm', 'Ploy', 'Bua'], ['realme.link', 1, '241 ms', 'Nok', 'Arm', 'Thee'], ['Bangkok Airways – Taiwan', 1, '412 ms', 'Arm', 'Ploy', 'Bua'], ['Bangkok Airways – China', 1, '688 ms', 'Arm', 'Ploy', 'Bua'],
-      ['ENEOS Industrial', 1, '356 ms', 'Ploy', 'Arm', 'Thee'], ['Fuji Links', 2, fuji ? '5.8 s' : '1.9 s', 'Ploy', 'Nok', 'Thee'], ['ORCA Thailand', 2, '520 ms', 'Tao', 'Nok', 'Thee'], ['Tubtong', 2, '1.1 s', 'Ploy', 'Nok', 'Bua'],
+      ['ENEOS Industrial', 1, '356 ms', 'Ploy', 'Arm', 'Thee'], ['Fuji Links', DA ? 1 : 2, fuji ? '5.8 s' : '1.9 s', 'Ploy', 'Nok', 'Thee'], ['ORCA Thailand', 2, '520 ms', 'Tao', 'Nok', 'Thee'], ['Tubtong', 2, '1.1 s', 'Ploy', 'Nok', 'Bua'],
       ['Cando Asia', 2, '940 ms', 'Nok', 'Ploy', 'Bua'], ['VOCA', 2, '298 ms', 'Ploy', 'Tao', ''], ['DxT Games', 3, '390 ms', 'Tao', 'Nok', '']
     ];
     var ROLE = st.role, ME = ROLE === 'AM' ? 'Bua' : (ROLE === 'Viewer' ? 'Mint' : (ROLE === 'On call' ? 'Ploy' : 'Arm'));
@@ -209,7 +223,7 @@ class Component extends DCLogic {
         o.dur = d.manual ? 'just now' : d.min + ' min'; o.durMin = d.min; o.since = 'since ' + d.at; o.durColor = DANGER; o.durWeight = 600;
         o.ackRank = isAck ? 2 : (d.esc ? 0 : 1); o.href = 'MIncident.dc.html'; o.open = true; o.id = d.id; o.esc = !!d.esc; o.un = d.un;
       } else if (key === 'problem') {
-        o.reason = 'problem'; o.note = 'Slow: p50 5.8 s > 5 s'; o.noteColor = WARN; o.dur = '15 min'; o.durMin = 15; o.since = 'since 09:52'; o.href = 'MIncident.dc.html'; o.open = true;
+        o.reason = 'problem'; o.note = DA ? 'Unacked · Slow: p50 5.8 s > 5 s (INC-0150)' : 'Slow: p50 5.8 s > 5 s'; o.noteColor = WARN; o.dur = DA ? '35 min' : '15 min'; o.durMin = DA ? 35 : 15; o.since = DA ? 'since 02:05' : 'since 09:52'; o.href = 'MIncident.dc.html'; o.open = true;
       } else if (FAULT && name === 'MuvMi') {
         o.reason = 'rootcause'; o.note = 'Root cause not added yet (INC-0142)'; o.noteColor = WARN; o.dur = '16 h'; o.durMin = 960; o.since = 'since Fri 10:31'; o.href = 'MIncident.dc.html'; o.open = true; o.flagInc = true;
       } else if (name === 'ORCA Thailand' && !allOk) {
@@ -232,8 +246,8 @@ class Component extends DCLogic {
     var q = attn.filter(function (r) { return r.key === 'down' && r.ackRank < 2; });
     var banners = q.slice(0, 2).map(function (r) {
       var dd = downs[r.name];
-      var sub = dd.manual ? 'Unacked · opened by hand · nothing escalates on its own while the engine is down' : (r.esc ? 'Escalated · L1 · ' + r.un + ' min unacked · CEO at 10:18' : r.un + ' min unacked · ' + dd.cause);
-    return { title: dd.manual ? r.name + ' is DOWN — opened by hand ' + dd.at : r.name + ' is DOWN — ' + r.durMin + ' min', sub: sub, aria: r.name + ' is DOWN, ' + r.durMin + ' minutes. ' + sub + '. Open ' + r.id };
+      var sub = dd.manual ? 'Unacked · ' + (dd.raised ? 'raised to DOWN' : 'opened') + ' by hand · nothing escalates on its own while the engine is down' : (r.esc ? 'Escalated · L1 · ' + r.un + ' min unacked · CEO at 10:18' : r.un + ' min unacked · ' + dd.cause);
+    return { title: dd.manual ? r.name + ' is DOWN — ' + (dd.raised || dd.relapse ? 'reported' : 'opened') + ' by hand ' + dd.at : r.name + ' is DOWN — ' + r.durMin + ' min', sub: sub, aria: r.name + ' is DOWN, ' + r.durMin + ' minutes. ' + sub + '. Open ' + r.id };
     });
     var more = q.length - banners.length;
     var nEsc = q.filter(function (r) { return r.esc; }).length;
@@ -251,30 +265,53 @@ class Component extends DCLogic {
         aria: r.name + ', ' + r.label + (dn ? ' for ' + r.dur : ', p50 ' + r.p50) + (r.muted ? ', muted' : '') };
     });
     var nOpen = all.filter(function (r) { return r.open; }).length;
-    function canHC(owner) { return ROLE === 'On call' || (ROLE === 'Responder' && owner === ME); }
+    var BK = {}; base.forEach(function (r) { BK[r[0]] = r[4]; });
+    function canHC(owner, site) { return ROLE === 'On call' || (ROLE === 'Responder' && (owner === ME || BK[site] === ME)); }
+    var INC = { 'MuvMi': { id: 'INC-0142', kind: 'relapse', label: 'Needs root cause' } };
+    if (DA) INC['Fuji Links'] = { id: 'INC-0150', kind: 'raise', label: 'Problem · Slow' };
+    var ALL = {}; all.forEach(function (a) { ALL[a.name] = a; });
     var checked = 0;
     var hc = base.filter(function (r) { return r[1] === 1; }).map(function (r) {
-      var name = r[0], h = HC[name], can = canHC(r[3]);
+      var name = r[0], h = HC[name], can = canHC(r[3], name), A = ALL[name], I = INC[name];
       var o = { name: name, owner: r[3], line: 'Not checked yet', lineIcon: 'circle', lineColor: 'var(--aura-fg-tertiary)', isInc: false, notInc: true, canAct: can, readOnly: !can,
-        roText: (ROLE === 'AM' || ROLE === 'Viewer') ? 'Read only' : 'Only ' + r[3] + ', the person on call or an Admin',
+        roText: (ROLE === 'AM' || ROLE === 'Viewer') ? 'Read only' : 'Only ' + r[3] + ' or ' + r[4] + ', the person on call or an Admin', status: 'OK', tone: 'success', variant: 'soft', icon: 'circle-check', statusSub: 'OK as of 02:17', linkColor: 'var(--aura-alert-danger-fg)', hasSub: false, sub: '', downLabel: 'Down…',
         ok: function () { var x = Object.assign({}, self.state.hcs); x[name] = { ok: true, who: ME }; self.setState({ hcs: x }); },
         down: function () { self.setState({ dlg: name, note: '' }); } };
-      if (h && h.ok) { checked++; o.line = 'Checked OK · ' + h.who + ' ' + NOW; o.lineIcon = 'circle-check'; o.lineColor = 'var(--aura-fg-positive)'; }
-      if (h && h.inc) { checked++; o.line = IDS[name] + ' opened · ' + h.who + ' ' + NOW; o.lineIcon = 'ban'; o.lineColor = 'var(--aura-alert-danger-fg)'; o.isInc = true; o.notInc = false; o.canAct = false; o.readOnly = false; }
+      if (A && A.key === 'problem') { o.status = A.label; o.tone = A.tone; o.variant = A.variant; o.icon = A.icon; o.statusSub = 'Problem as of 02:17'; }
+      if (I) { o.downLabel = I.kind === 'relapse' ? 'Down again…' : 'Report down…'; o.line = 'Open ' + I.id + ' · ' + I.label; o.lineIcon = I.kind === 'raise' ? 'triangle-alert' : 'circle-dot'; o.lineColor = 'var(--aura-alert-warning-fg)'; o.linkColor = 'var(--aura-alert-warning-fg)'; o.isInc = true; o.notInc = false; }
+      if (h && h.ok) { checked++; o.line = 'Checked OK · ' + h.who + ' ' + NOW; o.lineIcon = 'circle-check'; o.lineColor = 'var(--aura-fg-positive)'; o.isInc = false; o.notInc = true; if (I) { o.hasSub = true; o.sub = 'Open ' + I.id; } }
+      if (h && (h.inc || h.rep)) { checked++; o.line = (h.rep ? I.id + ' reported down · ' : IDS[name] + ' opened · ') + h.who + ' ' + NOW; o.lineIcon = 'ban'; o.lineColor = 'var(--aura-alert-danger-fg)'; o.linkColor = 'var(--aura-alert-danger-fg)'; o.isInc = true; o.notInc = false; o.hasSub = false; o.canAct = false; o.readOnly = false;
+        o.status = 'Down'; o.tone = 'danger'; o.variant = 'solid'; o.icon = 'ban'; o.statusSub = 'Down by hand ' + NOW; }
       return o;
     });
+    var probUn = DA && !(HC['Fuji Links'] && HC['Fuji Links'].rep) ? 1 : 0;
     var dn = FAULT ? st.dlg : null, nl = (st.note || '').length;
+    var KIND = dn && INC[dn] ? INC[dn].kind : 'new';
+    var INFO = {
+      'new': ['Posts the DOWN alert to the Alerts Space now and starts the client-update clock.'],
+      relapse: ['Posts DOWN AGAIN in INC-0142’s thread now, @mentioning Arm — who acknowledged it.', 'Levels already reached stay: back to Acknowledged, not L0.'],
+      raise: ['Raises INC-0150 to DOWN and posts the DOWN alert now, @mentioning Ploy (on call).', 'The DOWN ladder starts now — while the engine is down, send each level with Escalate now.', 'Client site: the client-update clock starts now (due 02:55).']
+    };
+    var FV = ['Off', 'Before check', 'After check', 'Down again · before', 'Down again · dialog', 'Report down · dialog', 'Down again · after', 'Down again · refused'];
     var ownerOf = {}; base.forEach(function (r) { ownerOf[r[0]] = r[3]; });
     return {
-      isFault: FAULT, faultOpts: ['Off', 'Before check', 'After check'], fault: st.fault,
-      setFault: function (v) { var x = {}; if (v === 'After check') { x['Bangkok Airways – Taiwan'] = { ok: true, who: 'Arm' }; x['realme.link'] = { inc: true, who: 'Ploy', note: 'Home page shows a 502 error' }; } self.setState({ fault: v, hcs: x, dlg: null }); },
+      isFault: FAULT, faultSel: FV.map(function (v) { return { value: v, label: v }; }), fault: st.fault, age: AGE,
+      setFaultSel: function (e) { self.setFault(e && e.target ? e.target.value : e); },
+      hcTierLine: 'Tier 2–3 (' + base.filter(function (r) { return r[1] !== 1; }).length + ' sites): not needed — the hand check covers Tier 1 only.',
       hc: hc, hcCount: checked + ' of ' + hc.length + ' checked',
-      eyebrow: FAULT ? 'SAT 26 SEP 02:31 · AS OF 02:17' : 'FRI 25 SEP 10:07 · UTC+7',
+      eyebrow: FAULT ? 'SAT 26 SEP ' + NOW + ' · AS OF 02:17' : 'FRI 25 SEP 10:07 · UTC+7',
       pillText: FAULT ? 'Probes 1/3' : 'Probes 3/3', pillDot: FAULT ? 'var(--aura-fg-danger)' : 'var(--aura-fg-positive)', pillColor: FAULT ? 'var(--aura-fg-danger)' : 'var(--aura-fg-secondary)',
-      dlgOpen: !!dn, dlg: { title: dn ? 'Open an incident for ' + dn + '?' : '', desc: dn ? dn + ' · Tier 1 · owner ' + ownerOf[dn] + ' · statuses are from 02:17' : '', note: st.note || '', hint: nl + ' / 500 · optional — shown on the incident timeline' },
+      dlgOpen: !!dn && canHC(ownerOf[dn], dn), dlg: { kind: KIND, err: !!st.dlgErr, info: INFO[KIND], cta: KIND === 'new' ? 'Open incident' : 'Report down',
+        title: dn ? (KIND === 'relapse' ? 'Report ' + dn + ' down again?' : (KIND === 'raise' ? 'Report ' + dn + ' down?' : 'Open an incident for ' + dn + '?')) : '', desc: dn ? dn + ' · Tier 1 · owner ' + ownerOf[dn] + ' · statuses are from 02:17' : '', note: st.note || '', hint: nl + ' / 500 · optional — shown on the incident timeline' },
       setNote: function (e) { var v = e && e.target ? e.target.value : e; self.setState({ note: String(v).slice(0, 500) }); },
-      closeDlg: function () { self.setState({ dlg: null }); },
-      confirmDlg: function () { var x = Object.assign({}, self.state.hcs); x[self.state.dlg] = { inc: true, who: ME, note: (self.state.note || '').trim() }; self.setState({ hcs: x, dlg: null }); },
+      closeDlg: function () { self.setState({ dlg: null, dlgErr: false }); },
+      confirmDlg: function () {
+        if (self.state.dlgErr) return;
+        var n = self.state.dlg, x = Object.assign({}, self.state.hcs), nt = (self.state.note || '').trim();
+        x[n] = INC[n] ? { rep: true, who: ME, note: nt } : { inc: true, who: ME, note: nt };
+        self.setState({ hcs: x, dlg: null });
+        setTimeout(function () { var el = document.querySelector('[data-hc-line="' + n + '"]'); if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); } }, 60);
+      },
       no: false, three: 3,
       mxLine: (allOk ? '' : '1 active · ') + '1 scheduled',
       yes: true,
@@ -282,7 +319,7 @@ class Component extends DCLogic {
       setView: function (v) { self.setState({ view: v }); },
       okCount: okCount, monitored: monitored,
       banners: banners, hasMore: more > 0, moreText: 'and ' + more + ' more → Incidents',
-      nOpen: nOpen, nUnacked: q.length, unColor: q.length ? DANGER : 'var(--aura-fg-primary)',
+      nOpen: nOpen, nUnacked: q.length + probUn, unColor: (q.length + probUn) ? DANGER : 'var(--aura-fg-primary)',
       attn: attn, hasAttn: attn.length > 0, noAttn: attn.length === 0,
       attnMeta: attn.length + ' of ' + monitored + ' sites',
       me: ME, roles: ['Responder', 'On call', 'AM', 'Viewer'], role: ROLE,

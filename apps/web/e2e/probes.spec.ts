@@ -3,6 +3,7 @@ import {
   ensureUser,
   localSupabaseEnabled,
   newHandCheckSite,
+  recoveredIncidentOn,
   setBeat,
   signIn,
 } from './support/local-supabase';
@@ -149,5 +150,56 @@ test.describe('monitor fault and Probes (local Supabase)', () => {
       path: `test-results/s12b-escalate-now-${info.project.name}.png`,
       fullPage: true,
     });
+  });
+
+  test('Down again on a recovered incident (D-055 item 7)', async ({ page, context, baseURL }, info) => {
+    test.setTimeout(90_000);
+    const expect = baseExpect.configure({ timeout: 20_000 });
+    await ensureUser('tao@example.test');
+    const site = await newHandCheckSite('arm@example.test', 'bua@example.test');
+    const incidentId = await recoveredIncidentOn(site);
+    const old = new Date(Date.now() - 10 * 60_000);
+    await setBeat('engine-sweep', old);
+    await setBeat('engine-run', old);
+    await signIn(context, baseURL!, 'tao@example.test');
+
+    await page.goto('/');
+    const row = page.locator('[data-site]').filter({ hasText: site }).locator('visible=true').first();
+    await row.scrollIntoViewIfNeeded();
+    // §31.1: the open incident is the row's line, beside Loads OK and Down again.
+    await expect(row.getByRole('link', { name: /^Open INC-\d+ · Monitoring$/ })).toBeVisible();
+    await expect(row.getByRole('button', { name: `Loads OK · ${site}` })).toBeVisible();
+    await page.screenshot({
+      path: `test-results/s12b-down-again-row-${info.project.name}.png`,
+      fullPage: true,
+    });
+    await page
+      .getByRole('button', { name: `Down again · ${site}` })
+      .locator('visible=true')
+      .click();
+    const dialog = page.getByRole('dialog', { name: `Report ${site} down again?` });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/^Posts DOWN AGAIN in INC-\d+’s thread now, @mentioning /)).toBeVisible();
+    await expect(dialog.getByText(/^Levels already reached stay: /)).toBeVisible();
+    await page.screenshot({ path: `test-results/s12b-down-again-dialog-${info.project.name}.png` });
+    await dialog.getByLabel(/What did you see/).fill('502 again');
+    await dialog.getByRole('button', { name: 'Report down' }).click();
+    await expect(dialog).toBeHidden({ timeout: 30_000 });
+    // Down again once: the incident is down, so the button goes.
+    await expect(
+      page.getByRole('button', { name: `Down again · ${site}` }).locator('visible=true'),
+    ).toHaveCount(0, { timeout: 15_000 });
+    // The row says what happened, and focus lands on it (the button that opened the dialog is gone).
+    await expect(row.getByRole('link', { name: /^INC-\d+ reported down · / })).toBeFocused();
+    await page.screenshot({
+      path: `test-results/s12b-down-again-after-${info.project.name}.png`,
+      fullPage: true,
+    });
+
+    await page.goto(`/incidents/${incidentId}`);
+    await expect(
+      page.getByText(/^Down again, reported by .+ from a hand check · “502 again”$/).first(),
+    ).toBeAttached({ timeout: 30_000 });
+    await page.screenshot({ path: `test-results/s12b-down-again-${info.project.name}.png`, fullPage: true });
   });
 });

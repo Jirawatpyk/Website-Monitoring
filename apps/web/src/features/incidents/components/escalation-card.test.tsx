@@ -13,6 +13,7 @@ vi.mock('../hand-actions', () => ({
 // Spec §30.6–7 sample (test fixtures only): INC-0143 realme.link, the engine down since 02:17.
 const card = (over: Partial<EscalationCardView> = {}): EscalationCardView => ({
   title: 'Escalation · Tier 1 DOWN',
+  nextLine: null,
   rows: [
     {
       label: 'L0',

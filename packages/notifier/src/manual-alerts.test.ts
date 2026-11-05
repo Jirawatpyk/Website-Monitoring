@@ -3,6 +3,7 @@ import { buildDownAlert, type ChatMessage } from './chat-alerts';
 import { buildClientUpdateDueAlert } from './client-update-alerts';
 import { buildClientUpdateDueEmail, buildDownEmail, buildStepEmail } from './email-alerts';
 import { buildStepAlert } from './escalation-alerts';
+import { buildAgainAlert } from './relapse-alerts';
 
 // Spec §30 sample (test data only): realme.link opened by hand as INC-0143 at Sat 26 Sep 02:31 while the
 // status engine was down; Ploy on call, Arm backup, Thee the AM; Escalate now L1 at 02:35 (S12b, D-055).
@@ -226,5 +227,109 @@ describe('a display name can never inject a mention (message check M1)', () => {
     });
     expect(msg.text).not.toContain('<users/all>');
     expect(JSON.stringify(msg.cardsV2)).not.toContain('<users/all>');
+  });
+});
+
+describe('DOWN AGAIN reported by hand (D-055 item 7)', () => {
+  const msg = buildAgainAlert({
+    incidentId: 'i142',
+    incidentNumber: 142,
+    site: 'MuvMi',
+    tier: 1,
+    severity: 'down',
+    trigger: 'manual',
+    mention: arm,
+    ackedBy: null,
+    fromState: 'monitoring',
+    droppedAt: at('2026-09-26T02:40:00'),
+    backSince: at('2026-09-26T00:10:00'),
+    minutesSoFar: 10,
+    nowFlapping: false,
+    flapping: false,
+    manual: { openedBy: 'Tao', note: '502 again' },
+  });
+
+  it('the text line says who reported it', () => {
+    expect(msg.text).toBe(
+      '<users/ARM> DOWN AGAIN · MuvMi (Tier 1) · same incident INC-0142 · reported by hand by Tao',
+    );
+  });
+
+  it('the reply says what they saw and that no probe checked it', () => {
+    expect(JSON.stringify(widgets(msg))).toContain(
+      'Hand check by Tao · “502 again” — no probe check, the status engine was down.',
+    );
+  });
+
+  it('the title still says how long it was back', () => {
+    expect(msg.cardsV2[0]!.card.header.title).toMatch(/^DOWN AGAIN · MuvMi · was back for /);
+  });
+
+  it('without a note it names who only', () => {
+    const plain = buildAgainAlert({
+      incidentId: 'i142',
+      incidentNumber: 142,
+      site: 'MuvMi',
+      tier: 1,
+      severity: 'down',
+      trigger: 'manual',
+      mention: arm,
+      ackedBy: null,
+      fromState: 'needs_root_cause',
+      droppedAt: at('2026-09-26T02:40:00'),
+      backSince: null,
+      minutesSoFar: 10,
+      nowFlapping: false,
+      flapping: false,
+      manual: { openedBy: 'Tao', note: null },
+    });
+    expect(JSON.stringify(widgets(plain))).toContain(
+      'in Needs root cause). Down 10 min so far in this incident. Hand check by Tao — no probe check',
+    );
+  });
+});
+
+describe('a PROBLEM raised to DOWN by hand (D-055 item 7)', () => {
+  const raised = { openedBy: 'Tao', note: '502 again', raised: true };
+  const msg = buildDownAlert({
+    incidentId: 'i150',
+    incidentNumber: 150,
+    site: 'MuvMi',
+    tier: 1,
+    confirmedAt: at('2026-09-26T02:40:05'),
+    now: at('2026-09-26T02:40:08'),
+    cause: 'Hard fail',
+    confirmingLocations: 2,
+    owner: arm,
+    backup: ploy,
+    incidentUrl: `${url}?ack=1`,
+    manual: raised,
+  });
+
+  it('says it was reported down by hand, not opened', () => {
+    expect(msg.text).toBe('<users/ARM> DOWN · MuvMi (Tier 1) · reported down by hand by Tao');
+    expect(msg.cardsV2[0]!.card.header.subtitle).toBe(
+      'Tier 1 · INC-0150 · Reported down by hand 02:40:05 (UTC+7)',
+    );
+    expect(rows(msg)).toEqual(
+      expect.arrayContaining([
+        ['Confirmed by', 'No probe check — reported down by hand while the status engine was down'],
+      ]),
+    );
+  });
+
+  it('the email too', () => {
+    const mail = buildDownEmail({
+      ...emailBase,
+      incidentId: 'i150',
+      incidentNumber: 150,
+      site: 'MuvMi',
+      confirmedAt: at('2026-09-26T02:40:05'),
+      cause: 'Hard fail',
+      confirmingLocations: 2,
+      manual: raised,
+    });
+    expect(mail.text).toContain('Reported down by hand');
+    expect(mail.text).not.toContain('Opened by hand');
   });
 });

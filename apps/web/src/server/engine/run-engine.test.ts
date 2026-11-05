@@ -30,6 +30,15 @@ describe('judgedFrom — a manual incident is judged on rounds after it opened (
     expect(judgedFrom(stored, open)?.toISOString()).toBe(expected);
   });
   it('no round yet and nothing open: null', () => expect(judgedFrom(null, undefined)).toBeNull());
+  it('Down again by hand on an engine incident: from the press (D-055 item 7)', () => {
+    expect(
+      judgedFrom('2026-09-25T19:17:00Z', {
+        is_manual: false,
+        started_at: '2026-09-25T10:00:00Z',
+        manual_at: '2026-09-25T19:40:00Z',
+      })?.toISOString(),
+    ).toBe('2026-09-25T19:40:00.000Z');
+  });
 });
 
 const now = new Date('2026-10-06T10:01:05Z');
@@ -363,6 +372,30 @@ describe('runEngine', () => {
     expect(rpcCalls).toEqual([]);
     // Only the run's own beat (S12b, D-055): nothing about the site.
     expect(calls.filter((c) => c.op === 'upsert').map((c) => c.table)).toEqual(['agent_heartbeats']);
+  });
+
+  it('the first run after a stop writes the engine-back lines, then stamps (§30.8, D-055 item 7)', async () => {
+    const stoppedAt = new Date(now.getTime() - 10 * 60_000).toISOString();
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: ok },
+      'agent_heartbeats.select': { data: { last_seen_at: stoppedAt } },
+      'rpc.engine_mark_engine_back': { data: 1 },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_mark_engine_back')?.args).toEqual({
+      p_stopped_since: stoppedAt,
+    });
+  });
+
+  it('a run a minute after the last one writes no engine-back line', async () => {
+    const { db, rpcCalls } = fakeDb({
+      'monitors.select': { data: [monitor()] },
+      'rpc.engine_checks': { data: ok },
+      'agent_heartbeats.select': { data: { last_seen_at: new Date(now.getTime() - 60_000).toISOString() } },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.some((c) => c.name === 'engine_mark_engine_back')).toBe(false);
   });
 
   it('stamps the engine-run beat every run, after the ladder (S12b, D-055 item 1)', async () => {

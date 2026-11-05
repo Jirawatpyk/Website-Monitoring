@@ -249,13 +249,18 @@ export interface Banner {
   /** Unacked for, from "Confirmed down" (§14.3). */
   unackedMinutes: number;
   cause: string | null;
-  /** Opened by hand from the hand check (S12b, §30.2): "02:31"; null for the engine's incidents. */
+  /** Reported by hand (S12b, §30.2, §31.4): "02:31"; null for the engine's drops. */
   byHandAt: string | null;
+  /** Opened from the hand check, or a drop reported on an open incident (relapse / raise). */
+  byHandKind?: 'opened' | 'relapse' | 'raise' | null;
 }
 
-/** The banner's title (§30.2): "realme.link is DOWN — opened by hand at 02:31", else "— 32 min". */
+/**
+ * The banner's title (§30.2, §31.4): "realme.link is DOWN — opened by hand at 02:31", "Fuji Links is DOWN —
+ * reported by hand at 02:40", else "— 32 min".
+ */
 export const bannerTitle = (b: Banner, duration: string) =>
-  `${b.site.name} is DOWN — ${b.byHandAt ? `opened by hand at ${b.byHandAt}` : duration}`;
+  `${b.site.name} is DOWN — ${b.byHandAt ? `${b.byHandKind && b.byHandKind !== 'opened' ? 'reported' : 'opened'} by hand at ${b.byHandAt}` : duration}`;
 
 /**
  * Incident banners (§21.1): one per DOWN incident not yet acknowledged; escalated first, then Tier
@@ -283,7 +288,9 @@ export function bannersOf(
           downMinutes: clockMinutes(new Date(inc.startedAt), now),
           unackedMinutes: minutesBetween(inc.detectedAt, now),
           cause: inc.cause,
-          byHandAt: inc.trigger === 'manual' ? formatTime(new Date(inc.startedAt)) : null,
+          // only while the drop in progress is the one reported by hand (an engine relapse is the engine's)
+          byHandAt: inc.byHand ? formatTime(new Date(inc.byHand.at)) : null,
+          byHandKind: inc.byHand?.kind ?? null,
         },
       ];
     })
@@ -439,6 +446,9 @@ export function eventLine(e: OverviewEvent): string | null {
         return `${e.siteName} PROBLEM — ${capitalise(e.payload.summary)}`;
       return e.severity === 'problem' ? `${e.siteName} PROBLEM — ${TRIGGER_LABELS[e.trigger]}` : confirmed;
     case 'escalated_to_down':
+      // Raised from a PROBLEM by hand (§31.4).
+      if (e.payload.manual === true)
+        return `${inc} ${e.siteName} raised to DOWN by hand — ${e.actorName ?? 'someone'}`;
       return confirmed;
     case 'acknowledged':
       return `${inc} acked by ${e.actorName ?? 'someone'}${e.severity === 'down' ? ' — escalation stopped' : ''}`;
@@ -459,6 +469,9 @@ export function eventLine(e: OverviewEvent): string | null {
       return told ? `${inc} escalated to L${level} — not acknowledged` : null;
     }
     case 'relapsed':
+      // Reported down again by hand (§31.4).
+      if (e.payload.manual === true)
+        return `${inc} ${e.siteName} down again — reported by hand, ${e.actorName ?? 'someone'}`;
       return `${e.siteName} ${dropSeverity(e) === 'down' ? 'DOWN' : 'PROBLEM'} again`;
     default:
       return null;

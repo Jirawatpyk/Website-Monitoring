@@ -7,6 +7,7 @@ import {
   acknowledgeIncident,
   openManualIncident,
   recordHandCheck,
+  reportDownByHand,
   undoAcknowledge,
 } from '@/features/incidents/server';
 import { SitesEmpty } from '@/features/sites';
@@ -49,7 +50,7 @@ export default async function OverviewPage() {
         data={data}
         ackAction={acknowledgeIncident}
         undoAction={undoAcknowledge}
-        handActions={{ record: recordHandCheck, open: openManualIncident }}
+        handActions={{ record: recordHandCheck, open: openManualIncident, downAgain: reportDownByHand }}
       />
     </Container>
   );

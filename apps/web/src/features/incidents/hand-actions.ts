@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/server';
 import { loadResponseHours } from '@/server/escalation/response-hours';
 import { flushAfter } from './flush';
 import {
+  downAgainSchema,
+  type DownAgainInput,
   escalateNowSchema,
   incidentIdSchema,
   manualIncidentSchema,
@@ -22,7 +24,9 @@ import {
  */
 
 export type HandCheckResult = { ok: true } | { ok: false; message: string };
-export type ManualIncidentResult = { ok: true; incidentId: string } | { ok: false; message: string };
+/** `stale`: the incident changed before the press (Down again, §31.6) — pressing again can't help. */
+export type ManualIncidentResult =
+  { ok: true; incidentId: string } | { ok: false; message: string; stale?: boolean };
 export type EscalateNowResult =
   { ok: true; level: number; notified: number } | { ok: false; message: string };
 export type ReminderResult = { ok: true } | { ok: false; message: string };
@@ -46,6 +50,7 @@ const REFUSALS: Record<string, string> = {
   already_sent: 'The client-update reminder went already.',
   not_down: 'The site isn’t down now — the engine sends the reminder if it falls due.',
   no_track: 'This site has no client update.',
+  not_down_again: 'This incident is down already, or closed.',
   no_thread: 'The DOWN alert hasn’t gone out yet — try again in a moment.',
 };
 
@@ -85,6 +90,34 @@ export async function openManualIncident(input: ManualIncidentInput): Promise<Ma
   revalidatePath('/');
   revalidatePath('/incidents');
   return { ok: true, incidentId: data };
+}
+
+/**
+ * Down again by hand (D-055 item 7): a recovered incident relapses in its thread (DOWN AGAIN), a PROBLEM
+ * is raised to DOWN — what the engine would have done, from the press. Sent at once.
+ */
+export async function reportDownByHand(input: DownAgainInput): Promise<ManualIncidentResult> {
+  const parsed = downAgainSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]!.message };
+  const now = new Date();
+  const supabase = await createClient();
+  const hours = await loadResponseHours(supabase, now);
+  const { error } = await supabase.rpc('report_down_by_hand', {
+    p_incident_id: parsed.data.incidentId,
+    p_note: parsed.data.note,
+    p_outside_hours: !isInsideHours(now, hours),
+  });
+  if (error)
+    return {
+      ok: false,
+      message: refusal(error),
+      ...(error.hint === 'not_down_again' ? { stale: true } : {}),
+    };
+  flushAfter(parsed.data.incidentId, null, 'down_again_flush_failed');
+  revalidatePath('/');
+  revalidatePath('/incidents');
+  revalidatePath(`/incidents/${parsed.data.incidentId}`);
+  return { ok: true, incidentId: parsed.data.incidentId };
 }
 
 /** Escalate now (§30.6): the level the person saw, sent at once; the engine never repeats it. */

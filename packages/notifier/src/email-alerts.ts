@@ -13,7 +13,13 @@ import {
   type Trigger,
   formatLocations,
 } from '@dxt/shared';
-import { MANUAL_CONFIRMED_BY, manualCause, type ManualOpen, type ProblemFacts } from './chat-alerts';
+import {
+  manualCause,
+  manualConfirmedBy,
+  manualWhen,
+  type ManualOpen,
+  type ProblemFacts,
+} from './chat-alerts';
 import { downtime } from './downtime';
 import {
   formatResume,
@@ -374,7 +380,7 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
     pre: (held
       ? [site, held.pre, ...ladderPre(input.ladder, now)]
       : [
-          `${site} ${manual ? 'opened by hand' : 'confirmed down'} ${formatTimeWithSeconds(input.confirmedAt)}`,
+          `${site} ${manual ? manualWhen(manual).toLowerCase() : 'confirmed down'} ${formatTimeWithSeconds(input.confirmedAt)}`,
           cause,
           ...ladderPre(acked ? null : input.ladder, now),
         ]
@@ -391,11 +397,13 @@ export function buildDownEmail(input: DownEmailInput): EmailMessage {
             : 'Nobody has acknowledged yet. The Google Chat alert couldn’t be delivered, so this email is the alert.',
     facts: [
       ...(held ? [held.row] : []),
-      [manual ? 'Opened by hand' : 'Confirmed down', confirmedLabel(input.confirmedAt)],
+      [manual ? manualWhen(manual) : 'Confirmed down', confirmedLabel(input.confirmedAt)],
       ['Cause', cause],
       [
         'Confirmed by',
-        manual ? MANUAL_CONFIRMED_BY : formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf),
+        manual
+          ? manualConfirmedBy(manual)
+          : formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf),
       ],
       ...ladderFacts(acked ? null : input.ladder, input.now ?? input.confirmedAt, 'down'),
     ],

@@ -87,7 +87,12 @@ export interface DownAlertInput {
 export interface ManualOpen {
   openedBy: string;
   note: string | null;
+  /** A PROBLEM the engine opened, raised to DOWN by hand (D-055 item 7): "reported down", not "opened". */
+  raised?: boolean;
 }
+
+/** "Opened by hand" / "Reported down by hand" (a raised PROBLEM). */
+export const manualWhen = (m: ManualOpen) => (m.raised ? 'Reported down by hand' : 'Opened by hand');
 
 /** The Cause of a manual incident: "Hand check by Tao · “Home page shows a 502 error”". */
 export const manualCause = (m: ManualOpen) =>
@@ -95,6 +100,10 @@ export const manualCause = (m: ManualOpen) =>
 
 /** Its "Confirmed by": nothing the probes saw (spec §30.5). */
 export const MANUAL_CONFIRMED_BY = 'No probe check — opened by hand while the status engine was down';
+
+/** Its "Confirmed by", opened or raised by hand. */
+export const manualConfirmedBy = (m: ManualOpen) =>
+  m.raised ? 'No probe check — reported down by hand while the status engine was down' : MANUAL_CONFIRMED_BY;
 
 /** What a PROBLEM's replies need to word it as one (ChatAlert PROBLEM rows, D-022). */
 export interface ProblemFacts {
@@ -206,7 +215,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
     formatTier(tier),
     formatIncidentId(input.incidentNumber),
     ...(isSameBangkokDay(confirmedAt, now) ? [] : [formatDay(confirmedAt, { weekday: true })]),
-    `${manual ? 'Opened by hand' : 'Confirmed down'} ${formatTimeWithSeconds(confirmedAt)} (UTC+7)`,
+    `${manual ? manualWhen(manual) : 'Confirmed down'} ${formatTimeWithSeconds(confirmedAt)} (UTC+7)`,
   ].join(' · ');
   const ownerText = ownerRow(owner, backup, input.ladder);
   const next = nextRow(input.ladder, now, 'down');
@@ -218,7 +227,9 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
       site: `${site} (${formatTier(tier)})`,
       mention: mentionOf(owner, input.alsoMention),
       detail: [
-        ...(manual ? [`opened by hand by ${plainName(manual.openedBy)}`] : []),
+        ...(manual
+          ? [`${manual.raised ? 'reported down' : 'opened'} by hand by ${plainName(manual.openedBy)}`]
+          : []),
         ...(held?.line ?? ladderLine(input.ladder, now)),
       ],
     }),
@@ -235,7 +246,7 @@ export function buildDownAlert(input: DownAlertInput): ChatMessage {
                 row(
                   'Confirmed by',
                   manual
-                    ? MANUAL_CONFIRMED_BY
+                    ? manualConfirmedBy(manual)
                     : formatConfirmedBy(input.confirmingLocations, input.confirmedByWaf),
                 ),
                 ...whoRows(owner, input.siteOwner, ownerText),

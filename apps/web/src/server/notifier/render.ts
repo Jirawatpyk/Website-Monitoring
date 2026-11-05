@@ -199,6 +199,7 @@ function againAlert(n: Notification, i: IncidentFacts, now: Date = new Date(n.cr
     homeBack: ctx.homeBackAt ? keyPageOf(ctx.keyPage) : null,
     // S08: a Tier 2–3 DOWN AGAIN outside response hours says the timers are paused (D-034).
     pausedUntil: down && !acked ? (ladderFactsOf(i, now)?.pausedUntil ?? null) : null,
+    manual: manualOf(ctx),
   });
 }
 
@@ -285,7 +286,12 @@ const heldUntilOf = (ctx: Record<string, unknown>) => (ctx.afterMute === true ? 
 /** A manual incident's L0 (S12b, spec §30.5): who opened it from the hand check and what they saw. */
 const manualOf = (ctx: Record<string, unknown>) =>
   ctx.manual === true
-    ? { openedBy: str(ctx.openedBy, 'Someone'), note: typeof ctx.note === 'string' ? ctx.note : null }
+    ? {
+        openedBy: str(ctx.openedBy, 'Someone'),
+        note: typeof ctx.note === 'string' ? ctx.note : null,
+        // D-055 item 7: a PROBLEM raised to DOWN by hand.
+        raised: ctx.raised === true,
+      }
     : null;
 
 /** Sent with Escalate now / the reminder by hand while the engine was stopped (D-055): who sent it. */

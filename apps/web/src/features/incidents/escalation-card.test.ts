@@ -98,6 +98,8 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
     expect(card.button).toBeNull();
     expect(card.stopped).toBeNull();
     expect(card.back).toBe('Automatic escalation is running again — levels already sent won’t repeat.');
+    // the engine-back timeline line ends with it (§30.8, §31.7)
+    expect(card.nextLine).toBe('Next: L2 at 03:01 if still unacked.');
     expect(card.rows.map((r) => r.status)).toEqual([
       'Sent 02:31',
       'Sent 02:35 by Tao',
@@ -128,6 +130,16 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
     const running = escalationCardOf({ ...base, engine: { stopped: false, since: at('02:30') } })!;
     expect(running.button).toBeNull();
     expect(running.back).toBeNull();
+    // nothing to say while the engine is down, or once acknowledged
+    expect(escalationCardOf(base)!.nextLine).toBeNull();
+    expect(
+      escalationCardOf({
+        ...running,
+        ...base,
+        state: 'acknowledged',
+        engine: { stopped: false, since: null },
+      })!.nextLine,
+    ).toBeNull();
   });
 
   it('every level sent: no button', () => {
