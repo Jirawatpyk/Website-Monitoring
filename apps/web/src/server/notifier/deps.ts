@@ -14,5 +14,7 @@ export function notifierDeps(db: DbClient, env: ServerEnv): DispatchDeps {
         ? { apiKey: env.RESEND_API_KEY, from: env.ALERT_EMAIL_FROM }
         : undefined,
     appUrl: appBaseUrl(env.NEXT_PUBLIC_APP_URL),
+    reportsWebhookUrl: env.GOOGLE_CHAT_REPORTS_WEBHOOK_URL,
+    reportsPingUrl: env.HEALTHCHECKS_PING_URL_REPORTS,
   };
 }

@@ -35,7 +35,7 @@
 | S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | Done |
 | S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Done |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
-| S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Todo |
+| S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | In progress |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Todo |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Todo |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Todo |

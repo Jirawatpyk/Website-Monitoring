@@ -238,7 +238,7 @@ const FONT = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 export const EMAIL_FOOTER =
   'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.';
 
-const escapeHtml = (s: string) =>
+export const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export const senderDomain = (from: string) => /@([^>\s]+)>?\s*$/.exec(from)?.[1] ?? 'localhost';

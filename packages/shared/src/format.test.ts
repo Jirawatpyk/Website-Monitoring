@@ -12,6 +12,7 @@ import {
   formatDuration,
   formatDurationSeconds,
   formatWeek,
+  formatDayRange,
   formatWindowLength,
   formatNameList,
   formatIncidentId,
@@ -246,6 +247,26 @@ describe('formatMonth / bangkokMonthStart', () => {
     expect(formatMonth(late)).toBe('October');
     expect(bangkokMonthStart(late).toISOString()).toBe('2026-09-30T17:00:00.000Z');
     expect(formatMonth(new Date('2026-09-25T03:07:00Z'))).toBe('September');
+  });
+});
+
+describe('formatDayRange (WeeklySummary)', () => {
+  const at = (iso: string) => new Date(iso);
+  it('writes a week inside one month as the board does', () => {
+    expect(formatDayRange(at('2026-09-20T17:00:00Z'), at('2026-09-27T16:59:00Z'))).toBe(
+      'Mon 21 – Sun 27 Sep',
+    );
+    expect(formatDayRange(at('2026-09-20T17:00:00Z'), at('2026-09-27T16:59:00Z'), { short: true })).toBe(
+      '21–27 Sep',
+    );
+  });
+  it('names both months across a month end', () => {
+    expect(formatDayRange(at('2026-09-27T17:00:00Z'), at('2026-10-04T16:59:00Z'))).toBe(
+      'Mon 28 Sep – Sun 4 Oct',
+    );
+    expect(formatDayRange(at('2026-09-27T17:00:00Z'), at('2026-10-04T16:59:00Z'), { short: true })).toBe(
+      '28 Sep – 4 Oct',
+    );
   });
 });
 

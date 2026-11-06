@@ -88,6 +88,20 @@ export function formatWeek(w: Week): string {
 }
 
 /**
+ * Two calendar days, both inclusive (WeeklySummary): "Mon 21 – Sun 27 Sep", "Mon 28 Sep – Sun 4 Oct";
+ * `short` drops the weekdays and the first month when it repeats — "21–27 Sep", "28 Sep – 4 Oct".
+ */
+export function formatDayRange(first: Date, last: Date, options: { short?: boolean } = {}): string {
+  const a = formatDay(first).split(' ');
+  const b = formatDay(last).split(' ');
+  const sameMonth = a[1] === b[1];
+  if (options.short) return sameMonth ? `${a[0]}–${b.join(' ')}` : `${a.join(' ')} – ${b.join(' ')}`;
+  const wa = WEEKDAYS[bangkokParts(first).weekday];
+  const wb = WEEKDAYS[bangkokParts(last).weekday];
+  return sameMonth ? `${wa} ${a[0]} – ${wb} ${b.join(' ')}` : `${wa} ${a.join(' ')} – ${wb} ${b.join(' ')}`;
+}
+
+/**
  * When something happened, relative to `now` (spec §13): "Today 10:07", "Yesterday 16:40", else
  * "Mon 14 Sep 21:18". `midSentence` lower-cases Today / Yesterday ("OK since today 10:50").
  */

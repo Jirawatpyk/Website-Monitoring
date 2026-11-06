@@ -1,3 +1,6 @@
+import type { ResponseHours } from '@dxt/shared';
+import { isInsideHours, minutesInsideHours } from './response-hours';
+
 /**
  * Response KPIs for the Overview (spec §21.3, PRD §2, D-032): MTTA and MTTD over DOWN incidents that
  * started in a window. Both are means (PRD §2 "Mean Time to …"):
@@ -54,6 +57,35 @@ export function responseKpis(incidents: readonly MetricIncident[], from: Date, t
     i.tier === 1 && !i.isManual && i.detectedAt ? [seconds(outageStart(i), i.detectedAt)] : [],
   );
   return { downCount: down.length, enough, mttaSeconds: mean(acks), mttdSeconds: mean(detections) };
+}
+
+/**
+ * The weekly summary's "MTTA DOWN (response hours)" (WeeklySummary, spec §15.7, D-056): per tier, the
+ * mean wait from confirmed down to acknowledged over the DOWNs whose outage started in [from, to) —
+ * Tier 1 at any hour (24/7, on the clock); Tier 2–3 only those confirmed down inside response hours,
+ * where the ladder clock starts, and counted in response-hour minutes as their L1 delay is (D-034) —
+ * Fri 17:58 → Mon 09:05 waited 7 min, not 63 h (engine review S14). Null for a tier with none: "— (no
+ * DOWN inside response hours)". No minimum count, unlike the Overview.
+ */
+export function mttaByTier(
+  incidents: readonly MetricIncident[],
+  from: Date,
+  to: Date,
+  tiers: readonly number[],
+  hours: ResponseHours,
+): { tier: number; seconds: number | null }[] {
+  const outageStart = (i: MetricIncident) => i.downStartedAt ?? i.startedAt;
+  return tiers.map((tier) => {
+    const acks = incidents.flatMap((i) => {
+      const start = outageStart(i);
+      if (i.severity !== 'down' || i.tier !== tier || start < from || start >= to) return [];
+      if (!i.detectedAt || !i.ackedAt || i.ackedAt < i.detectedAt) return [];
+      if (tier === 1) return [seconds(i.detectedAt, i.ackedAt)];
+      if (!isInsideHours(i.detectedAt, hours)) return [];
+      return [minutesInsideHours(i.detectedAt, i.ackedAt, hours) * 60];
+    });
+    return { tier, seconds: mean(acks) };
+  });
 }
 
 /** One incident's duration, as MTTR needs it. */

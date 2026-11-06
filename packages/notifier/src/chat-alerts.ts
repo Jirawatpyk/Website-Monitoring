@@ -45,12 +45,13 @@ export interface ChatCard {
   cardId: string;
   card: {
     header: { title: string; subtitle?: string };
-    sections: { widgets: ChatWidget[] }[];
+    /** `header`: a section's title (the reports' "NEEDS SOMEONE"). */
+    sections: { header?: string; widgets: ChatWidget[] }[];
   };
 }
 
 export type ChatWidget =
-  | { decoratedText: { topLabel: string; text: string; wrapText: true } }
+  | { decoratedText: { topLabel: string; text: string; bottomLabel?: string; wrapText: true } }
   | { textParagraph: { text: string } }
   | { buttonList: { buttons: { text: string; onClick: { openLink: { url: string } } }[] } };
 

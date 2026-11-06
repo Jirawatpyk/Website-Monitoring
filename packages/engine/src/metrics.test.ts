@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatDurationSeconds } from '@dxt/shared';
-import { kpiChange, mttrMinutes, responseKpis, type MetricIncident } from './metrics';
+import { kpiChange, mttaByTier, mttrMinutes, responseKpis, type MetricIncident } from './metrics';
 
 // Spec §1: Fri 25 Sep 2026 10:07 (UTC+7). The window is the last 30 days (spec §21.3).
 const NOW = new Date('2026-09-25T03:07:12Z');
@@ -122,6 +122,74 @@ describe('kpiChange ("vs last 30d")', () => {
     [null, 400, null],
   ])('%s vs %s', (current, previous, expected) => {
     expect(kpiChange(current, previous)).toEqual(expected);
+  });
+});
+
+describe('mttaByTier (weekly summary, spec §15.7, D-056)', () => {
+  const at = (s: string) => new Date(`${s}+07:00`);
+  const from = at('2026-09-21T00:00:00');
+  const to = at('2026-09-28T00:00:00');
+  // Mon–Fri 09:00–18:00 Bangkok, the Tier 2–3 response hours (spec §7).
+  const hours = { startMin: 9 * 60, endMin: 18 * 60, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };
+  const down = (tier: number, start: string, ackMin: number | null): MetricIncident => ({
+    severity: 'down',
+    tier,
+    startedAt: at(start),
+    detectedAt: at(start),
+    ackedAt: ackMin === null ? null : new Date(at(start).getTime() + ackMin * 60_000),
+    isManual: false,
+  });
+
+  it.each([
+    // INC-0142 MuvMi (Fri 09:48, acked 19 min later) and a night Tier 1 DOWN: Tier 1 counts every hour.
+    [
+      'Tier 1 counts every hour',
+      [down(1, '2026-09-25T09:48:00', 19), down(1, '2026-09-24T22:14:00', 19)],
+      1,
+      19 * 60,
+    ],
+    // INC-0133 VOCA (Tier 2, Mon 03:12): outside response hours → "— (no DOWN inside response hours)".
+    ['Tier 2 outside response hours only → none', [down(2, '2026-09-21T03:12:00', 50)], 2, null],
+    ['Tier 2 inside response hours counts', [down(2, '2026-09-22T10:00:00', 6)], 2, 6 * 60],
+    ['an unacknowledged DOWN has no MTTA', [down(1, '2026-09-25T09:48:00', null)], 1, null],
+    ['a DOWN outside the week is left out', [down(1, '2026-09-28T09:00:00', 3)], 1, null],
+    [
+      'a PROBLEM is not a DOWN',
+      [{ ...down(1, '2026-09-25T09:48:00', 3), severity: 'problem' as const }],
+      1,
+      null,
+    ],
+    // Confirmed down Fri 17:58 (inside hours), acked Mon 09:05: 2 + 5 = 7 response-hour minutes, as the
+    // L1 delay counts them (D-034) — never the 63 h on the clock (engine review S14, M3).
+    [
+      'Tier 2 waits only response-hour minutes',
+      [
+        {
+          ...down(2, '2026-09-25T17:58:00', null),
+          ackedAt: at('2026-09-28T09:05:00'),
+        },
+      ],
+      2,
+      7 * 60,
+      at('2026-09-29T00:00:00'),
+    ],
+    // First failed check 08:59:30, confirmed down 09:00:10: the ladder ran in hours, so it counts.
+    [
+      'Tier 2 is judged at confirmed down, where the ladder clock starts',
+      [
+        {
+          ...down(2, '2026-09-22T08:59:30', null),
+          detectedAt: at('2026-09-22T09:00:10'),
+          ackedAt: at('2026-09-22T09:06:10'),
+        },
+      ],
+      2,
+      6 * 60,
+    ],
+  ])('%s', (_name, incidents, tier, expected, until = to) => {
+    const rows = mttaByTier(incidents, from, until, [1, 2, 3], hours);
+    expect(rows.map((r) => r.tier)).toEqual([1, 2, 3]);
+    expect(rows.find((r) => r.tier === tier)!.seconds).toBe(expected);
   });
 });
 

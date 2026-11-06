@@ -3,7 +3,8 @@ import type { DbClient } from '@dxt/db';
 import { incidentThreadId, postChatMessage, sendEmail } from '@dxt/notifier';
 import { UNDO_WINDOW_SEC } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
-import { contextOf, loadFacts, type Facts, type Notification } from './facts';
+import { pingHealthcheck } from '../healthchecks';
+import { contextOf, loadFacts, type Facts, type Notification, type ReportRow } from './facts';
 import { renderChat, renderEmail, renderSystemAlertEmail } from './render';
 import { renderWindowChat, renderWindowEmail } from './render-window';
 import { loadOncallFacts } from './oncall-facts';
@@ -23,9 +24,17 @@ export interface DispatchDeps {
   email: EmailConfig | undefined;
   /** Public base URL of this app, for incident links. */
   appUrl: string;
+  /** The DxT Website Reports Space (S14): the digest and the weekly summary post there, never in Alerts. */
+  reportsWebhookUrl?: string;
+  /**
+   * The reports' Healthchecks check (D-056): pinged when the digest's Chat post is sent, `/fail` when a
+   * report's post fails for good — a missing digest means the monitor needs checking.
+   */
+  reportsPingUrl?: string;
   now?: () => Date;
   post?: typeof postChatMessage;
   send?: typeof sendEmail;
+  ping?: typeof pingHealthcheck;
 }
 
 export interface DispatchOptions {
@@ -111,6 +120,8 @@ export async function dispatchNotifications(
       ...(options.incidentId ? { p_incident_id: options.incidentId } : {}),
       // On-call rows too (S10 B2b): this notifier renders them.
       p_oncall: true,
+      // Report rows too (S14).
+      p_reports: true,
     });
     if (claimed.error) throw new Error(`claim_notifications: ${claimed.error.message}`);
     return claimed.data;
@@ -128,6 +139,14 @@ export async function dispatchNotifications(
       facts.oncall = await loadOncallFacts(deps.db, all);
     } catch (err) {
       console.error(JSON.stringify({ event: 'oncall_facts_unreadable', error: String(err) }));
+    }
+  }
+  // Reports (S14): as for on-call, a failed read only retries those rows.
+  if (facts && all.some((n) => n.report_id)) {
+    try {
+      facts.reports = await loadReports(deps.db, all);
+    } catch (err) {
+      console.error(JSON.stringify({ event: 'reports_unreadable', error: String(err) }));
     }
   }
   const [chat, email] = await settled([
@@ -233,6 +252,13 @@ async function dispatchChannel(
     }
     summary[update.status === 'sent' ? 'sent' : update.status === 'queued' ? 'retrying' : 'failed'] += 1;
 
+    // The reports' dead man's switch (D-056): it hears only about a post that really went, or didn't.
+    if (n.report_id && channel === 'google_chat' && update.status !== 'queued') {
+      if (update.status === 'sent' && n.template === 'daily_digest')
+        await (deps.ping ?? pingHealthcheck)(deps.reportsPingUrl, 'ok');
+      if (update.status === 'failed') await (deps.ping ?? pingHealthcheck)(deps.reportsPingUrl, 'fail');
+    }
+
     if (outcome.ok && n.incident_id) {
       const event = await db.from('incident_events').insert({
         incident_id: n.incident_id,
@@ -293,6 +319,7 @@ async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: D
   if (n.system_alert_id) return deliverSystemAlert(deps, n, facts);
   if (n.maintenance_window_id) return deliverWindow(deps, n, facts, now);
   if (n.oncall_event_id) return deliverOncall(deps, n, facts);
+  if (n.report_id) return deliverReport(deps, n, facts);
   const incident = n.incident_id ? facts.incidents.get(n.incident_id) : undefined;
   if (!n.incident_id || !incident) return { ok: false, error: 'Incident not found', retryable: false };
 
@@ -390,6 +417,53 @@ async function deliverOncall(deps: DispatchDeps, n: Notification, facts: Facts):
   if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
   const send = deps.send ?? sendEmail;
   const result = await send(message, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });
+  return result.ok ? { ok: true, providerId: result.id } : result;
+}
+
+/** The reports of these rows, as queued: the card and email rendered at 09:00 (S14). */
+async function loadReports(db: DbClient, rows: readonly Notification[]): Promise<Map<string, ReportRow>> {
+  const ids = [...new Set(rows.flatMap((n) => (n.report_id ? [n.report_id] : [])))];
+  const { data, error } = await db.from('reports').select('id, kind, chat, email').in('id', ids);
+  if (error) throw new Error(`reports: ${error.message}`);
+  return new Map(
+    (data ?? []).map((r) => [
+      r.id,
+      {
+        id: r.id,
+        kind: r.kind as ReportRow['kind'],
+        chat: r.chat as unknown as ReportRow['chat'],
+        email: r.email as unknown as ReportRow['email'],
+      },
+    ]),
+  );
+}
+
+/**
+ * A daily digest or weekly summary (S14, D-056): the card in the DxT Website Reports Space, its own
+ * thread per report; the weekly summary's email to each CEO.
+ */
+async function deliverReport(deps: DispatchDeps, n: Notification, facts: Facts): Promise<Outcome> {
+  if (!facts.reports) return { ok: false, error: 'Reports unreadable', retryable: true };
+  const r = facts.reports.get(n.report_id!);
+  if (!r) return { ok: false, error: 'Report not found', retryable: false };
+  if (n.channel === 'google_chat') {
+    if (!deps.reportsWebhookUrl)
+      return { ok: false, error: 'No Reports Space webhook configured', retryable: false };
+    const post = deps.post ?? postChatMessage;
+    const result = await post(deps.reportsWebhookUrl, r.chat, {
+      threadKey: n.thread_key ?? `report-${r.id}`,
+      messageId: `client-${n.id}`,
+    });
+    return result.ok
+      ? { ok: true, providerId: result.messageName }
+      : { ok: false, error: result.error, retryable: true };
+  }
+  const to = n.user_id ? facts.recipients.get(n.user_id) : undefined;
+  if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
+  if (!r.email) return { ok: false, error: 'Report has no email', retryable: false };
+  const { apiKey, from } = deps.email!;
+  const send = deps.send ?? sendEmail;
+  const result = await send(r.email, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });
   return result.ok ? { ok: true, providerId: result.id } : result;
 }
 
