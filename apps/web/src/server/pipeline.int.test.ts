@@ -146,6 +146,22 @@ afterAll(async () => {
   await db.from('notifications').delete().in('incident_id', ids);
   await db.from('incident_events').delete().in('incident_id', ids);
   await db.from('incidents').delete().in('id', ids);
+  // A window's messages restrict its delete (S14: each series occurrence posts STARTED / ENDED), and one
+  // blocked row would fail the whole site delete below, leaving inactive test sites for the e2e to pick.
+  const windows = await must(db.from('maintenance_windows').select('id').in('site_id', created.sites));
+  const windowIds = windows.map((w) => w.id);
+  if (windowIds.length) {
+    const rows = await must(db.from('notifications').select('id').in('maintenance_window_id', windowIds));
+    await db
+      .from('notification_attempts')
+      .delete()
+      .in(
+        'notification_id',
+        rows.map((r) => r.id),
+      );
+    await db.from('notifications').delete().in('maintenance_window_id', windowIds);
+    await db.from('maintenance_windows').delete().in('id', windowIds);
+  }
   await db.from('check_results').delete().in('monitor_id', created.monitors);
   await db.from('site_status').delete().in('site_id', created.sites);
   await db.from('monitors').delete().in('id', created.monitors);
