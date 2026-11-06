@@ -1,5 +1,7 @@
 # Design brief — Recurring maintenance (FR-10b, D-057)
 
+**Answered:** spec §32 and the MaintenancePage / Maintenance / MMaintenance / MMaintenanceList / ChatAlert boards (Claude Design, 6 Nov 2026).
+
 For Claude Design. Boards to extend:
 - **MaintenancePage** (desktop, from xl)
 - **MMaintenanceList** (phone 390)
