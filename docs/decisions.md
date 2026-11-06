@@ -82,6 +82,12 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - **Overlap:** an occurrence that would overlap another window on the site is skipped and logged on the series. The existing window wins.
 - **Cancelling:** cancelling a series cancels its occurrences that the engine hasn't started, including one whose start time has come but isn't logged yet, without a per-window CANCELLED each. A running occurrence finishes. The series' own CANCELLED line waits for the board.
 
+**Spec §32.11, confirmed by Tao (6 Nov 2026).**
+
+- The weekly summary's Coming up lists a series once ("Tubtong · every Tue 01:00 → 03:00 · next Tue 29 Sep") and one-off windows one by one.
+- Each series has one thread for its own actions, and each window keeps its own thread.
+- Owner and backup get one email when a series is scheduled, approved, declined or cancelled. A series' windows send no STARTED / ENDED email; DIDN'T START still does.
+
 **Impact.** S14 PR 2a is a migration: `maintenance_series`, `maintenance_windows.series_id`, and the RPCs to create, approve, cancel and add occurrences. PR 2b is the code: `occurrencesOf` in `@dxt/engine`, the expansion, and the Done-when 3 test. PR 2c comes after the board: the Repeat control, how occurrences show on the page, and the series messages.
 
 ## D-056 — Digest, weekly summary: who gets them, missing data, how S14 is proved
