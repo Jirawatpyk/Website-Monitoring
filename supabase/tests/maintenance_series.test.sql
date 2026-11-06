@@ -3,7 +3,7 @@
 -- of what hasn't started, who may do what, and one audit row per change.
 begin;
 \ir _helpers.psql
-select plan(33);
+select plan(42);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -115,6 +115,42 @@ select is((select count(*)::int from public.maintenance_series s2, jsonb_array_e
    where s2.id = (select id from s where name = 'overlap') and e ->> 'action' = 'skipped'),
   'and notes each skip only once');
 
+-- ── Who may decide, cancel and expand (security review S14) ──────────────
+select tests.authenticate_as((select id from ids where name = 'mint'));
+select throws_ok($$ select public.decide_maintenance_series((select id from s where name = 'overlap'), false, 'No') $$,
+  '42501', null, 'a Viewer can''t decide a series');
+select throws_ok($$ select public.engine_expand_series(now()) $$, '42501', null, 'nor run the top-up');
+reset role;
+-- Nok asks for a series on a site he doesn't own: refused at create, so give him one as the asker.
+insert into s values ('nok', gen_random_uuid());
+insert into public.maintenance_series (id, site_id, rule, start_time, duration_min, starts_on, reason, created_by)
+values ((select id from s where name = 'nok'), '00000000-0000-0000-0000-0000000000a1', '{"freq":"monthly","day":1}',
+        '03:00', 60, current_date + 1, 'Asked before he moved teams', (select id from ids where name = 'nok'));
+update public.profiles set role = 'viewer' where id = (select id from ids where name = 'nok');
+select tests.authenticate_as((select id from ids where name = 'nok'));
+select throws_ok($$ select public.cancel_maintenance_series((select id from s where name = 'nok'), 'x') $$,
+  '42501', null, 'the asker, no longer a Responder, can''t cancel it');
+reset role;
+update public.profiles set role = 'responder', is_active = false where id = (select id from ids where name = 'nok');
+select tests.authenticate_as((select id from ids where name = 'nok'));
+select throws_ok($$ select public.cancel_maintenance_series((select id from s where name = 'nok'), 'x') $$,
+  '42501', null, 'nor once deactivated');
+reset role;
+update public.profiles set is_active = true where id = (select id from ids where name = 'nok');
+select tests.authenticate_as((select id from ids where name = 'nok'));
+select lives_ok($$ select public.cancel_maintenance_series((select id from s where name = 'nok'), 'Not needed') $$,
+  'an active Responder who asked may withdraw it');
+reset role;
+select tests.as_anon();
+select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
+  '{"freq":"monthly","day":1}', '03:00', 60, current_date + 1, null, 'x') $$, '42501', null, 'anon can''t create one');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
+  '{"freq":"monthly","day":1}', '03:00', 60, current_date + 1, current_date + 1000, 'x') $$,
+  '22023', null, 'days more than two years ahead are refused');
+reset role;
+
 -- ── Cancel: what hasn't started is cancelled quietly ─────────────────────
 select tests.authenticate_as((select id from ids where name = 'arm'));
 select ok(public.cancel_maintenance_series((select id from s where name = 'daily'), 'No longer needed') > 0,
@@ -125,6 +161,14 @@ select ok(not exists (select 1 from public.maintenance_windows
   'its occurrences that hadn''t started are cancelled');
 select is((select count(*)::int from public.notifications n join public.maintenance_windows w on w.id = n.maintenance_window_id
            where w.series_id = (select id from s where name = 'daily')), 0, 'without a message each');
+select is((select jsonb_array_length(after -> 'occurrences_cancelled') from public.audit_log
+           where action = 'maintenance.series_cancel' and entity_id = (select id from s where name = 'daily')),
+  (select count(*)::int from public.maintenance_windows where series_id = (select id from s where name = 'daily')),
+  'the cancel''s audit row lists each occurrence it cancelled');
+select is((select count(*)::int from public.audit_log a join public.maintenance_windows w on w.id = a.entity_id
+           where a.action = 'maintenance.create' and w.series_id = (select id from s where name = 'daily')),
+  (select count(*)::int from public.maintenance_windows where series_id = (select id from s where name = 'daily')),
+  'and each occurrence has its own create row');
 
 select * from finish();
 rollback;

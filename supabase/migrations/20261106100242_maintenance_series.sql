@@ -122,11 +122,18 @@ declare
   s public.maintenance_series%rowtype;
   v_day date;
   v_start timestamptz;
+  v_end timestamptz;
+  v_key text;
+  v_skip boolean;
   v_id uuid;
   v_n integer := 0;
 begin
   select * into s from public.maintenance_series where id = p_series_id for update;
   if not found or s.approved_at is null or s.cancelled_at is not null then
+    return 0;
+  end if;
+  -- A site that stopped monitoring gets no new occurrences (db review S14); they come back with it.
+  if not exists (select 1 from public.sites where id = s.site_id and is_active) then
     return 0;
   end if;
   for v_day in
@@ -137,26 +144,41 @@ begin
   loop
     continue when not private.series_matches(s.rule, v_day);
     v_start := (v_day + s.start_time) at time zone 'Asia/Bangkok';
+    v_end := v_start + make_interval(mins => s.duration_min);
+    -- One spelling of the time whatever the session's TimeZone, so a skip is noted once (db review S14).
+    v_key := to_char(v_start at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI"Z"');
     continue when v_start < p_now + interval '5 minutes';
     continue when exists (select 1 from public.maintenance_windows
                           where series_id = s.id and starts_at = v_start);
-    begin
-      insert into public.maintenance_windows
-        (site_id, kind, starts_at, ends_at, reason, created_by, approved_by, approved_at, series_id)
-      values (s.site_id, 'maintenance', v_start, v_start + make_interval(mins => s.duration_min), s.reason,
-              s.created_by, s.approved_by, s.approved_at, s.id)
-      returning id into v_id;
-      update public.maintenance_windows
-        set log = jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'created', 'series', s.id))
-        where id = v_id;
-      v_n := v_n + 1;
-    exception when exclusion_violation then
-      if not s.log @> jsonb_build_array(jsonb_build_object('action', 'skipped', 'starts_at', v_start)) then
-        s.log := s.log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'skipped',
-          'starts_at', v_start, 'reason', 'overlaps another window'));
-        update public.maintenance_series set log = s.log where id = s.id;
-      end if;
-    end;
+    -- Overlap checked first, so no subtransaction per night for a known clash (db review S14); the
+    -- exception below is only the fallback for a window made meanwhile.
+    if exists (select 1 from public.maintenance_windows w
+               where w.site_id = s.site_id and w.kind = 'maintenance' and w.cancelled_at is null
+                 and tstzrange(w.starts_at, coalesce(w.ended_at, w.ends_at)) && tstzrange(v_start, v_end)) then
+      v_skip := true;
+    else
+      v_skip := false;
+      begin
+        insert into public.maintenance_windows
+          (site_id, kind, starts_at, ends_at, reason, created_by, approved_by, approved_at, series_id, log)
+        values (s.site_id, 'maintenance', v_start, v_end, s.reason, s.created_by, s.approved_by, s.approved_at,
+                s.id, jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'created', 'series', s.id)))
+        returning id into v_id;
+        -- Its own audit row (System): the series' audited create / approve says who and why.
+        insert into public.audit_log (action, entity, entity_id, after)
+        values ('maintenance.create', 'maintenance_window', v_id,
+                jsonb_build_object('site_id', s.site_id, 'starts_at', v_start, 'ends_at', v_end,
+                                   'reason', s.reason, 'approved', true, 'series_id', s.id));
+        v_n := v_n + 1;
+      exception when exclusion_violation then
+        v_skip := true;
+      end;
+    end if;
+    if v_skip and not s.log @> jsonb_build_array(jsonb_build_object('action', 'skipped', 'starts_at', v_key)) then
+      s.log := s.log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'skipped',
+        'starts_at', v_key, 'reason', 'overlaps another window'));
+      update public.maintenance_series set log = s.log where id = s.id;
+    end if;
   end loop;
   return v_n;
 end;
@@ -263,8 +285,13 @@ begin
   if p_until_on is not null and p_until_on < p_starts_on then
     raise exception 'The last day is before the first' using errcode = '22023', hint = 'ends_before_start';
   end if;
+  -- A year ahead at most, each way: the first day, and the last (security review S14, L1).
+  if p_starts_on > (v_now at time zone 'Asia/Bangkok')::date + 366
+     or (p_until_on is not null and p_until_on > p_starts_on + 366 * 2) then
+    raise exception 'Pick days within the next year or two' using errcode = '22023', hint = 'too_far';
+  end if;
   if not exists (select 1 from generate_series(p_starts_on,
-                   coalesce(p_until_on, p_starts_on + 366), interval '1 day') d
+                   least(coalesce(p_until_on, p_starts_on + 366), p_starts_on + 366), interval '1 day') d
                  where private.series_matches(p_rule, d::date)
                    and (d::date + p_start_time) at time zone 'Asia/Bangkok' >= v_now + interval '5 minutes') then
     raise exception 'No occurrence falls between those days — at least 5 min from now'
@@ -342,12 +369,16 @@ declare
   s public.maintenance_series%rowtype;
   v_reason text;
   v_n integer;
+  v_gone jsonb;
 begin
   select * into s from public.maintenance_series where id = p_series_id for update;
   if not found then
     raise exception 'series not found' using errcode = 'P0002';
   end if;
-  if not private.can_pause(s.site_id) and s.created_by is distinct from auth.uid() then
+  -- The site's owner / backup or an Admin; the asker only while still an active Responder (as
+  -- withdraw_request, S09b; security review S14, M1).
+  if not (private.can_pause(s.site_id)
+          or (coalesce(public.current_app_role() = 'responder', false) and s.created_by = auth.uid())) then
     raise exception 'This role can''t cancel this series' using errcode = '42501';
   end if;
   if s.cancelled_at is not null or s.declined_at is not null then
@@ -363,14 +394,15 @@ begin
             'by', (select display_name from public.profiles where id = auth.uid()),
             'reason', v_reason, 'series', s.id))
     where w.series_id = s.id and w.cancelled_at is null and not w.start_logged and w.starts_at > now()
-    returning w.id
+    returning w.id, w.starts_at
   )
-  select count(*) into v_n from gone;
+  select count(*), coalesce(jsonb_agg(jsonb_build_object('id', id, 'starts_at', starts_at)), '[]'::jsonb)
+    into v_n, v_gone from gone;
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), 'maintenance.series_cancel', 'maintenance_series', s.id,
           jsonb_build_object('state', case when s.approved_at is null then 'waiting' else 'approved' end),
           jsonb_build_object('state', 'cancelled', 'site_id', s.site_id, 'reason', v_reason,
-                             'occurrences_cancelled', v_n));
+                             'occurrences_cancelled', v_gone));
   return v_n;
 end;
 $$;
