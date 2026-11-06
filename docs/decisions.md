@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-057 | 6 Nov 2026 | S14 recurring maintenance (FR-10b): a series repeats weekly (chosen weekdays) or monthly (day N, or the 1st–4th weekday), each occurrence ≤ 24 h; occurrences are ordinary approved maintenance windows created 14 days ahead, only for an approved, uncancelled series; the series is approved once (an Admin's on create, a Responder's by an Admin); each occurrence starts, ends and "didn't start" on its own with S09b's messages; the series posts one SCHEDULED; cancelling it cancels the occurrences not yet started, quietly; an occurrence that would overlap another window is skipped and logged | Gap: FR-10b, no board (the UI and the series messages wait for one) |
 | D-056 | 6 Nov 2026 | S14: the daily digest posts to the DxT Website Reports Space only; the weekly summary posts there and is emailed to the CEO. Lines whose data doesn't exist yet (client first to report, reviews waiting sign-off, CEO decisions, SSL / domain expiry) are left out until their slice adds the data. Recurring maintenance is a second PR, and its UI waits for a Claude Design board. Done-when 2 is proved with one staging run plus a skipped run that fires the Healthchecks alert, and three mornings in a row on production after the merge | WeeklySummary board header "+ EMAIL TO CEO" over both cards; board sample lines with no source; plan S14 Done-when 2 "three consecutive staging days" |
 | D-055 | 4 Nov 2026 | S12b hand check: "nothing escalates on its own" means no engine run of any kind for ≥ 3 min (a new `engine-run` beat stamped by every run, cron or after a Bangkok batch) — only then do Escalate now and the client-update reminder show; the ticks never pause; the hand check and the manual incident follow the sweep fault (the banner); a manual incident's L0 email keeps D-047's 5-min grace (Chat leaves from the request); the reminder can be sent by hand before its due time, and the Client update card shows before the track fired for an incident open while the engine is stopped | Spec §15.10 / §30.6 "timers don't run while the heartbeat is missing" (read literally); D-052 item 3 (for that case) |
 | D-054 | 4 Nov 2026 | Healthchecks.io production emails only Tao until the system is stable; the other Admins are added at S19 (go-live readiness). S12a's "Healthchecks reaches both Admins" (Done-when 2) moves there; S12a closes on the rest | S12a Done-when 2 "both Admins" |
@@ -60,6 +61,34 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-057 — Recurring maintenance windows
+
+**Gap.** FR-10b asks for recurring maintenance windows; no board draws them. S09 left `maintenance_windows.rrule` null-only for this slice.
+
+**Decision (Tao, 6 Nov 2026 — every recommended option).**
+
+1. **Messages:** a series posts one MAINTENANCE SCHEDULED ("every Tue 01:00–03:00"). Each occurrence still posts STARTED / ENDED / DIDN'T START in its own thread, as a one-off window does. No 12 h / 1 h reminders, since those are for requests only.
+2. **Rules:** weekly on chosen weekdays, or monthly on day N or the 1st–4th weekday. Each occurrence lasts at most 24 h. Stored as a small rule the boundary validates.
+3. **Approval and outcomes:** an occurrence whose site is DOWN at its start doesn't start, and only that occurrence is affected. The next one starts as planned. A series is approved once: an Admin's on create, a Responder's by an Admin.
+
+**Readings Claude took (to settle the gaps; no board).**
+
+- **Occurrences:** they are ordinary `maintenance_windows` rows (`series_id`, unique with `starts_at`) that copy the series' reason, creator and approver. The engine, uptime, the Maintenance page, the reports and S09b's messages then use them unchanged.
+- **Creation:** they are created 14 days ahead, when the series is created or approved and by a daily top-up, and only for an approved, uncancelled series. A waiting series has no rows, so a waiting series never posts NOT APPROVED or reminders.
+- **No expansion in the engine run:** occurrences exist 13–14 days before their start, and `engine_log_windows` starts a window it logs late. A site that stopped monitoring gets no new occurrences.
+- **Start time:** no "start now" for a series. The first occurrence is at least 5 minutes away, and an occurrence that would start sooner when the series is approved is skipped and noted.
+- **Monthly skips:** a day that doesn't exist that month (31 Apr, 30 Feb) is skipped, not moved to the last day. There is no "last weekday" rule in v1.
+- **Overlap:** an occurrence that would overlap another window on the site is skipped and logged on the series. The existing window wins.
+- **Cancelling:** cancelling a series cancels its occurrences that the engine hasn't started, including one whose start time has come but isn't logged yet, without a per-window CANCELLED each. A running occurrence finishes. The series' own CANCELLED line waits for the board.
+
+**Spec §32.11, confirmed by Tao (6 Nov 2026).**
+
+- The weekly summary's Coming up lists a series once ("Tubtong · every Tue 01:00 → 03:00 · next Tue 29 Sep") and one-off windows one by one.
+- Each series has one thread for its own actions, and each window keeps its own thread.
+- Owner and backup get one email when a series is scheduled, approved, declined or cancelled. A series' windows send no STARTED / ENDED email; DIDN'T START still does.
+
+**Impact.** S14 PR 2a is a migration: `maintenance_series`, `maintenance_windows.series_id`, and the RPCs to create, approve, cancel and add occurrences. PR 2b is the code: `occurrencesOf` in `@dxt/engine`, the expansion, and the Done-when 3 test. PR 2c comes after the board: the Repeat control, how occurrences show on the page, and the series messages.
 
 ## D-056 — Digest, weekly summary: who gets them, missing data, how S14 is proved
 
