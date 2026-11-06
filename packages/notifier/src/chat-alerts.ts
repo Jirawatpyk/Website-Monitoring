@@ -45,7 +45,8 @@ export interface ChatCard {
   cardId: string;
   card: {
     header: { title: string; subtitle?: string };
-    sections: { widgets: ChatWidget[] }[];
+    /** `header`: a section's title (the reports' "NEEDS SOMEONE"). */
+    sections: { header?: string; widgets: ChatWidget[] }[];
   };
 }
 

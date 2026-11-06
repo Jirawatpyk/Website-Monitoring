@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-056 | 6 Nov 2026 | S14: the daily digest posts to the DxT Website Reports Space only; the weekly summary posts there and is emailed to the CEO. Lines whose data doesn't exist yet (client first to report, reviews waiting sign-off, CEO decisions, SSL / domain expiry) are left out until their slice adds the data. Recurring maintenance is a second PR, and its UI waits for a Claude Design board. Done-when 2 is proved with one staging run plus a skipped run that fires the Healthchecks alert, and three mornings in a row on production after the merge | WeeklySummary board header "+ EMAIL TO CEO" over both cards; board sample lines with no source; plan S14 Done-when 2 "three consecutive staging days" |
 | D-055 | 4 Nov 2026 | S12b hand check: "nothing escalates on its own" means no engine run of any kind for ≥ 3 min (a new `engine-run` beat stamped by every run, cron or after a Bangkok batch) — only then do Escalate now and the client-update reminder show; the ticks never pause; the hand check and the manual incident follow the sweep fault (the banner); a manual incident's L0 email keeps D-047's 5-min grace (Chat leaves from the request); the reminder can be sent by hand before its due time, and the Client update card shows before the track fired for an incident open while the engine is stopped | Spec §15.10 / §30.6 "timers don't run while the heartbeat is missing" (read literally); D-052 item 3 (for that case) |
 | D-054 | 4 Nov 2026 | Healthchecks.io production emails only Tao until the system is stable; the other Admins are added at S19 (go-live readiness). S12a's "Healthchecks reaches both Admins" (Done-when 2) moves there; S12a closes on the rest | S12a Done-when 2 "both Admins" |
 | D-053 | 3 Nov 2026 | Monitor fault (S12): the fault is the engine **cron sweep** stopping (`agent_heartbeats` `engine-sweep` > 3 min), since the engine also runs after every Bangkok ingest; Healthchecks + the VPS watchdog (MONITOR FAULT @on-call, straight to the Alerts Space) speak for it; one probe missing > 3 min is our own Admin email, silent during an engine fault; no "Acknowledge monitor fault"; S12 splits into S12a / S12b (hand check after Claude Design) | PRD risk table watchdog "> 5 min and BKK failing"; MainFault "Healthchecks.io fallback sender", "Acknowledge monitor fault" |
@@ -59,6 +60,34 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-056 — Digest, weekly summary: who gets them, missing data, how S14 is proved
+
+**Gap / conflict.** The WeeklySummary board header says "SPACE · DxT WEBSITE REPORTS · + EMAIL TO CEO" above both cards, but its spec note names an email only for the weekly summary. PRD §8 lists "digest" under email. Some lines the board draws have no data in the system yet. FR-10b (recurring windows) has no board. Plan S14 Done-when 2 asks for three staging mornings in a row, but staging is paused between runs to save cost.
+
+**Decision (Tao, 6 Nov 2026 — every recommended option).**
+
+1. **Who gets them.**
+   - The daily digest posts to the DxT Website Reports Space only.
+   - The weekly summary posts there and is emailed to the CEO. The subject is `DxT Monitor · Weekly summary · 21–27 Sep`, and the body is the card (HTML and a plain-text part). The CEO is every active stakeholder who manages no client, the same rule as the `ceo` escalation token (D-032).
+2. **Missing data.** A line is left out until its slice adds the data, which keeps the spec note's rule that an empty section is omitted, not shown as "none":
+   - "Client first to report": nothing records it yet;
+   - reviews waiting sign-off: S22;
+   - CEO decisions: no source;
+   - SSL / domain expiry under "Coming up": S13.
+3. **Readings Claude took (recommended).**
+   - Both reports post every day at 09:00 Bangkok, weekends and holidays too. On Monday the digest posts, then the weekly summary.
+   - "Yesterday" means the incidents that were DOWN or PROBLEM at any time in the previous Bangkok day.
+   - The week is Mon 00:00 to Sun 24:00 Bangkok.
+   - MTTA (response hours) counts only DOWNs that started inside the tier's response hours, from Confirmed down to the first acknowledgement. The target is the policy's L1 delay.
+   - The text line @mentions each named follow-up once.
+   - The Healthchecks check expects a ping by 09:05. The ping goes only once the digest's Chat post is sent; it is `/fail` when the post fails for good.
+4. **Recurring maintenance is a second PR.** The data model, the engine and the Done-when 3 test are built first. The Repeat control, how each occurrence shows and which §24 messages a series posts wait for a Claude Design board (brief by Claude).
+5. **Proof of Done-when 2.**
+   - On staging: one 09:00 run, then a skipped run that fires the Healthchecks alert (the staging check's period is shortened for the test).
+   - On production after the merge: three mornings in a row. S14 stays In review until then.
+
+**Impact.** S14: a `reports` subject for `notifications`, `packages/notifier` digest and weekly builders, a `/api/cron/reports` cron, a new Healthchecks check and env `HEALTHCHECKS_PING_URL_REPORTS`, and the recurring-window migration and engine. S13 and S22 add their lines to the reports.
 
 ## D-055 — Hand check: when escalation is really stopped, the L0 email, the reminder by hand
 
