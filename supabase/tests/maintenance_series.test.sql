@@ -3,7 +3,7 @@
 -- of what hasn't started, who may do what, and one audit row per change.
 begin;
 \ir _helpers.psql
-select plan(44);
+select plan(46);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -156,6 +156,17 @@ select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-
   '22023', null, 'days more than two years ahead are refused');
 reset role;
 
+-- ── A stopped site gets no new occurrences (engine review S14, M3) ───────
+update public.sites set is_active = false where id = '00000000-0000-0000-0000-0000000000a1';
+set local role service_role;
+select is(public.engine_expand_series(now() + interval '3 days'), 0, 'a site that stopped monitoring gets none');
+reset role;
+update public.sites set is_active = true where id = '00000000-0000-0000-0000-0000000000a1';
+-- An occurrence whose start has come but the engine hasn't logged yet (engine review M1).
+update public.maintenance_windows set starts_at = now() - interval '1 minute'
+where id = (select id from public.maintenance_windows where series_id = (select id from s where name = 'daily')
+            order by starts_at limit 1);
+
 -- ── Cancel: what hasn't started is cancelled quietly ─────────────────────
 select tests.authenticate_as((select id from ids where name = 'arm'));
 select ok(public.cancel_maintenance_series((select id from s where name = 'daily'), 'No longer needed') > 0,
@@ -163,7 +174,10 @@ select ok(public.cancel_maintenance_series((select id from s where name = 'daily
 reset role;
 select ok(not exists (select 1 from public.maintenance_windows
                       where series_id = (select id from s where name = 'daily') and cancelled_at is null),
-  'its occurrences that hadn''t started are cancelled');
+  'its occurrences that hadn''t started are cancelled, the one due but not yet started too');
+select ok(not exists (select 1 from public.maintenance_windows
+                      where series_id = (select id from s where name = 'daily') and start_logged),
+  'and none is marked as having run');
 select is((select count(*)::int from public.notifications n join public.maintenance_windows w on w.id = n.maintenance_window_id
            where w.series_id = (select id from s where name = 'daily')), 0, 'without a message each');
 select is((select jsonb_array_length(after -> 'occurrences_cancelled') from public.audit_log

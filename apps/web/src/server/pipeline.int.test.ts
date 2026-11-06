@@ -1460,6 +1460,13 @@ describe('recurring maintenance (S14, FR-10b, D-057; Done-when 3)', () => {
       await results(monitorId, [...okRound(60), ...okRound(120)]);
       await runEngine(db, t(185));
       await runEngine(db, t(1_560)); // the occurrence ended at t(1500)
+      // Between the two: an OK round reads OK again — not a status left over from the window (engine
+      // review S14, M2).
+      await results(monitorId, okRound(1_620));
+      await beat('SIN', t(1_680));
+      await beat('TYO', t(1_680));
+      await runEngine(db, t(1_680));
+      expect((await statusOf(siteId))!.status).toBe('ok');
 
       // 2nd occurrence, a day later: the same.
       const next = DAY;
@@ -1483,14 +1490,18 @@ describe('recurring maintenance (S14, FR-10b, D-057; Done-when 3)', () => {
       await beat('SIN', t(next + 1_865));
       await beat('TYO', t(next + 1_865));
       await runEngine(db, t(next + 1_865));
-      const [inc] = await incidentsOf(siteId);
+      // One incident, the drop after the 2nd occurrence — starting at its own first failed check, not at
+      // a window's end.
+      const incidents = await incidentsOf(siteId);
+      expect(incidents).toHaveLength(1);
+      const [inc] = incidents;
       expect(inc?.state).toBe('unacked');
-      // And no incident message came from inside the occurrences: the only one is this DOWN.
+      expect(new Date(inc!.started_at).getTime()).toBe(t(next + 1_801).getTime());
       expect((await notificationsOf(inc!.id)).map((n) => n.template)).toContain('down');
       const windowLines = await must(
         db
           .from('notifications')
-          .select('template, context')
+          .select('template, context, maintenance_window_id')
           .in(
             'maintenance_window_id',
             (await must(db.from('maintenance_windows').select('id').eq('series_id', series.id))).map(
@@ -1498,11 +1509,31 @@ describe('recurring maintenance (S14, FR-10b, D-057; Done-when 3)', () => {
             ),
           ),
       );
-      // Each occurrence posted its own STARTED / ENDED (S09b), as Tao chose (D-057).
-      expect(windowLines.filter((n) => n.template === 'mw_line').length).toBeGreaterThanOrEqual(4);
+      // Each of the two occurrences posted its own STARTED and ENDED line (S09b), as Tao chose (D-057).
+      for (const o of occurrences) {
+        const id = (
+          await must(
+            db
+              .from('maintenance_windows')
+              .select('id')
+              .eq('series_id', series.id)
+              .eq('starts_at', o.starts_at),
+          )
+        )[0]!.id;
+        const kinds = windowLines
+          .filter((n) => n.maintenance_window_id === id && n.template === 'mw_line')
+          .map((n) => (n.context as { kind?: string }).kind);
+        expect(kinds).toEqual(expect.arrayContaining(['started', 'ended']));
+      }
     } finally {
       await beat('SIN', new Date());
       await beat('TYO', new Date());
+      // The runs a day ahead stamped the engine's beats in the future: put them back to now.
+      const now = new Date().toISOString();
+      await db
+        .from('agent_heartbeats')
+        .update({ last_seen_at: now })
+        .in('name', ['engine-run', 'engine-sweep']);
     }
   });
 });

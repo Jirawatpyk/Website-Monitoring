@@ -110,8 +110,9 @@ create unique index maintenance_windows_series_start on public.maintenance_windo
 alter table public.maintenance_windows drop column rrule;
 
 -- Adds the series' occurrences from `p_now` to 14 days on that don't exist yet: an approved, uncancelled
--- series only, never one starting in the next 5 min (the engine must see it before its start). An overlap
--- with another window skips that occurrence and notes it once on the series. Returns how many it added.
+-- series on a live site only, never one starting in the next 5 min (the rule a series is made with, §32.1:
+-- nobody is surprised by a window starting as they approve; noted on the series). An overlap with another
+-- window skips that occurrence and notes it once on the series. Returns how many it added.
 create function private.expand_series(p_series_id uuid, p_now timestamptz)
 returns integer
 language plpgsql
@@ -147,7 +148,16 @@ begin
     v_end := v_start + make_interval(mins => s.duration_min);
     -- One spelling of the time whatever the session's TimeZone, so a skip is noted once (db review S14).
     v_key := to_char(v_start at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI"Z"');
-    continue when v_start < p_now + interval '5 minutes';
+    continue when v_start <= p_now;
+    -- Too close to start (an approval at 00:57 for 01:00): noted, not silently dropped (engine review L2).
+    if v_start < p_now + interval '5 minutes' then
+      if not s.log @> jsonb_build_array(jsonb_build_object('action', 'skipped', 'starts_at', v_key)) then
+        s.log := s.log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'skipped',
+          'starts_at', v_key, 'reason', 'starts in less than 5 min'));
+        update public.maintenance_series set log = s.log where id = s.id;
+      end if;
+      continue;
+    end if;
     continue when exists (select 1 from public.maintenance_windows
                           where series_id = s.id and starts_at = v_start);
     -- Overlap checked first, so no subtransaction per night for a known clash (db review S14); the
@@ -394,11 +404,14 @@ begin
   perform private.series_log(s.id, 'cancelled', v_reason);
   with gone as (
     update public.maintenance_windows w
-      set cancelled_at = now(), start_logged = true, end_logged = true,
+      -- Only cancelled: every engine loop skips a cancelled row, and start_logged keeps meaning "it ran"
+      -- (engine review S14, L1). "Not started" is the engine's start_logged, not the clock: one whose start
+      -- has come but isn't logged yet is cancelled too (M1); the engine locks a row it is starting.
+      set cancelled_at = now(),
           log = w.log || jsonb_build_array(jsonb_build_object('at', now(), 'action', 'cancelled',
             'by', (select display_name from public.profiles where id = auth.uid()),
             'reason', v_reason, 'series', s.id))
-    where w.series_id = s.id and w.cancelled_at is null and not w.start_logged and w.starts_at > now()
+    where w.series_id = s.id and w.cancelled_at is null and not w.start_logged
     returning w.id, w.starts_at
   )
   select count(*), coalesce(jsonb_agg(jsonb_build_object('id', id, 'starts_at', starts_at)), '[]'::jsonb)

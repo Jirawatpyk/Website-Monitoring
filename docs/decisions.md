@@ -76,11 +76,11 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 - **Occurrences:** they are ordinary `maintenance_windows` rows (`series_id`, unique with `starts_at`) that copy the series' reason, creator and approver. The engine, uptime, the Maintenance page, the reports and S09b's messages then use them unchanged.
 - **Creation:** they are created 14 days ahead, when the series is created or approved and by a daily top-up, and only for an approved, uncancelled series. A waiting series has no rows, so a waiting series never posts NOT APPROVED or reminders.
-- **Expansion runs before the windows are logged** in the same run, so an occurrence never misses its start.
-- **Start time:** no "start now" for a series. The first occurrence is at least 5 minutes away.
+- **No expansion in the engine run:** occurrences exist 13–14 days before their start, and `engine_log_windows` starts a window it logs late. A site that stopped monitoring gets no new occurrences.
+- **Start time:** no "start now" for a series. The first occurrence is at least 5 minutes away, and an occurrence that would start sooner when the series is approved is skipped and noted.
 - **Monthly skips:** a day that doesn't exist that month (31 Apr, 30 Feb) is skipped, not moved to the last day. There is no "last weekday" rule in v1.
 - **Overlap:** an occurrence that would overlap another window on the site is skipped and logged on the series. The existing window wins.
-- **Cancelling:** cancelling a series cancels its occurrences that haven't started, without a per-window CANCELLED each. A running occurrence finishes. The series' own CANCELLED line waits for the board.
+- **Cancelling:** cancelling a series cancels its occurrences that the engine hasn't started, including one whose start time has come but isn't logged yet, without a per-window CANCELLED each. A running occurrence finishes. The series' own CANCELLED line waits for the board.
 
 **Impact.** S14 PR 2a is a migration: `maintenance_series`, `maintenance_windows.series_id`, and the RPCs to create, approve, cancel and add occurrences. PR 2b is the code: `occurrencesOf` in `@dxt/engine`, the expansion, and the Done-when 3 test. PR 2c comes after the board: the Repeat control, how occurrences show on the page, and the series messages.
 
