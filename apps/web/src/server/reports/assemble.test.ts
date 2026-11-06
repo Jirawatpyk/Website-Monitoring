@@ -130,6 +130,19 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
       ),
     };
     expect(reportIncident(byHand, week.from, week.to, now, insideHours)!.cause).toBe('Manual (hand check)');
+    // Down again by hand (a relapse with `manual`) shares the same branch.
+    const downAgain = row({
+      events: [
+        ...voca.events.slice(0, 2),
+        {
+          type: 'relapsed',
+          at: iso('2026-09-21T03:26:00'),
+          payload: { startedAt: iso('2026-09-21T03:25:00'), severity: 'down', manual: true },
+        },
+      ],
+    });
+    expect(causeOf(downAgain, 'down')).toBe('Manual (hand check)');
+    expect(causeOf(downAgain, 'down', bkk('2026-09-21T03:12:00'))).toBe('503 ×3');
   });
 
   it.each([

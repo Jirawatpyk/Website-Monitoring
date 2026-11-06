@@ -112,6 +112,7 @@ journalctl -u dxt-agent@production -f                 # "vps-agent started", the
      ```
      - `queued`: the notifier retries it (30 s / 2 min / 8 min), and the check comes back up once it posts.
      - `failed`: pressing **Run** again does nothing, because the day is queued already (`already_queued`). Fix the cause; the next morning's digest posts and pings as usual. The day's card stays in `reports.chat`.
+  4. A check that has never been pinged is "new" in Healthchecks and doesn't alert. So on the first morning after a new `reports` check, read the log and the Chat row yourself around 09:05; Healthchecks covers the mornings after.
 - **A deploy broke production:** Vercel → Deployments → the last good production deployment → **Promote** (instant rollback). Then fix forward by PR.
 - **An env value was changed:** it takes effect only after a redeploy (Deployments → the current one → Redeploy).
 
