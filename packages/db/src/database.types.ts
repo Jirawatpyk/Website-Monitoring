@@ -1085,6 +1085,11 @@ isOneToOne: false
               "detected_at": string,"incident_id": string,"severity": Database["public"]['Enums']["severity"],"site_id": string,"tier": number
             }[]
                            },
+"engine_sweep_gaps":
+{ Args: { "p_from": string,"p_to": string }; Returns: {
+              "first_minute": string,"gap_end": string,"gap_start": string
+            }[]
+                           },
 "engine_thread_live":
 { Args: { "p_incident_id": string }; Returns: boolean
                            },

@@ -171,21 +171,22 @@ revoke all on public.engine_sweep_minutes from public, anon, authenticated;
 grant select on public.engine_sweep_minutes to authenticated;
 grant all on public.engine_sweep_minutes to service_role;
 
--- Every `engine-sweep` beat (the engine cron's, `stampBeat`) records its minute. Security definer so the
--- beat's writer needs no grant of its own; a failure here never fails the beat's own write (it can't —
--- one statement, `on conflict do nothing`).
+-- Every `engine-sweep` beat (the engine cron's, `stampBeat`) records its minute. It runs as the beat's
+-- writer (only the service role writes `agent_heartbeats`, and it may write this table), so opening the
+-- beats to another role later never writes here with the owner's rights (security review S14, Low).
 create function private.record_engine_sweep()
 returns trigger
 language plpgsql
-security definer
 set search_path = ''
 as $$
 begin
-  if new.name = 'engine-sweep' then
-    insert into public.engine_sweep_minutes (minute)
-    values (date_trunc('minute', new.last_seen_at))
-    on conflict do nothing;
+  -- A beat set back in time (the fault e2e ages it) records nothing: it would fill a gap that was real.
+  if tg_op = 'UPDATE' and new.last_seen_at <= old.last_seen_at then
+    return new;
   end if;
+  insert into public.engine_sweep_minutes (minute)
+  values (date_trunc('minute', new.last_seen_at))
+  on conflict do nothing;
   return new;
 end;
 $$;
@@ -194,7 +195,40 @@ revoke execute on function private.record_engine_sweep() from public, anon, auth
 
 create trigger agent_heartbeats_record_engine_sweep
   after insert or update of last_seen_at on public.agent_heartbeats
-  for each row execute function private.record_engine_sweep();
+  for each row when (new.name = 'engine-sweep')
+  execute function private.record_engine_sweep();
+
+-- The engine's silences over 3 min (the heartbeat grace, spec §15.3) inside [p_from, p_to), clipped to it:
+-- from the last sweep before to the first after (or p_to, still silent). A few rows, never the ~10k minutes
+-- of a week — PostgREST would cut those at 1,000 without a word (db review S14, High). `first_minute` on
+-- every row is the earliest sweep recorded since a day before p_from (null when none): a gap before the
+-- record began isn't one. No gap at all → one row with null gap times.
+create function public.engine_sweep_gaps(p_from timestamptz, p_to timestamptz)
+returns table (first_minute timestamptz, gap_start timestamptz, gap_end timestamptz)
+language sql
+stable
+set search_path = ''
+as $$
+  with m as (
+    select minute from public.engine_sweep_minutes
+    where minute >= p_from - interval '1 day' and minute < p_to
+  ),
+  first as (select min(minute) as at from m),
+  g as (
+    select greatest(prev, p_from) as gap_start, at as gap_end
+    from (
+      select at, lag(at) over (order by at) as prev
+      from (select minute as at from m union all select p_to) pts
+    ) x
+    where prev is not null and at - prev > interval '3 minutes' and at > p_from
+  )
+  select (select at from first), g.gap_start, g.gap_end from g
+  union all
+  select (select at from first), null, null where not exists (select 1 from g)
+$$;
+
+revoke execute on function public.engine_sweep_gaps(timestamptz, timestamptz) from public, anon, authenticated;
+grant execute on function public.engine_sweep_gaps(timestamptz, timestamptz) to service_role;
 
 select cron.schedule(
   'engine-sweep-minutes-retention',
