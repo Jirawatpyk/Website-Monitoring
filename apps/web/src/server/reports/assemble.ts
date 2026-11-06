@@ -76,6 +76,8 @@ export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date):
     ? (opened.find((e) => !!e.at && new Date(e.at) >= dropStart) ?? opened.at(-1))
     : opened.at(-1);
   const p = pick ? payloadOf(pick) : {};
+  // Reported down by hand (D-055 item 7): no probe cause, so never "Hard fail" (/verify S14).
+  if (p.manual === true) return TRIGGER_LABELS.manual;
   if (severity === 'problem' && typeof p.summary === 'string' && p.summary.trim()) return p.summary.trim();
   if (severity === 'down' && typeof p.cause === 'string' && p.cause.trim()) return shortCause(p.cause);
   return severity === 'down' ? TRIGGER_LABELS.hard_fail : TRIGGER_LABELS[row.trigger];

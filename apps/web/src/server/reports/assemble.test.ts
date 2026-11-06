@@ -120,6 +120,16 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
     const reversed = { ...raised, events: [...raised.events].reverse() };
     expect(reportIncident(reversed, week.from, week.to, now, insideHours)!.cause).toBe('Timeout ×2 · 504 ×1');
     expect(causeOf(raised, 'problem')).toBe('Slow, p50 5.8 s');
+    // Raised by hand (D-055 item 7): no probe cause — "Manual (hand check)", never "Hard fail" (/verify S14).
+    const byHand = {
+      ...raised,
+      events: raised.events.map((e) =>
+        e.type === 'escalated_to_down'
+          ? { ...e, payload: { manual: true, raised: true, note: '502 again' } }
+          : e,
+      ),
+    };
+    expect(reportIncident(byHand, week.from, week.to, now, insideHours)!.cause).toBe('Manual (hand check)');
   });
 
   it.each([

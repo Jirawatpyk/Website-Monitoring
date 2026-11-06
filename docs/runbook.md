@@ -103,6 +103,15 @@ journalctl -u dxt-agent@production -f                 # "vps-agent started", the
   ```
 
   `ok:false` (with `failures`) fails the Healthchecks ping. The text names the site or step that failed.
+- **The 09:00 digest didn't arrive** (S14, D-056; Healthchecks `reports` is down):
+  1. Read `"job":"reports"` in the logs.
+  2. `ok:false, reason: no_reports_webhook`: set `GOOGLE_CHAT_REPORTS_WEBHOOK_URL`, then redeploy.
+  3. Otherwise read the report's Chat row:
+     ```sql
+     select status, attempts, error from notifications where report_id = (select id from reports where kind = 'daily' order by created_at desc limit 1);
+     ```
+     - `queued`: the notifier retries it (30 s / 2 min / 8 min), and the check comes back up once it posts.
+     - `failed`: pressing **Run** again does nothing, because the day is queued already (`already_queued`). Fix the cause; the next morning's digest posts and pings as usual. The day's card stays in `reports.chat`.
 - **A deploy broke production:** Vercel → Deployments → the last good production deployment → **Promote** (instant rollback). Then fix forward by PR.
 - **An env value was changed:** it takes effect only after a redeploy (Deployments → the current one → Redeploy).
 
