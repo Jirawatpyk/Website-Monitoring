@@ -1406,6 +1406,106 @@ describe('mute and maintenance (S09, D-036)', () => {
     expect((await chat(inc!.id)).map((n) => n.template)).toEqual(['down', 'step_fired']);
   });
 });
+
+describe('recurring maintenance (S14, FR-10b, D-057; Done-when 3)', () => {
+  const DAY = 86_400;
+  // Bangkok wall-clock parts of a moment (UTC+7 all year).
+  const bkk = (d: Date) => new Date(d.getTime() + 7 * 3_600_000);
+  const isoDow = (d: Date) => ((bkk(d).getUTCDay() + 6) % 7) + 1;
+
+  it('a weekly series suppresses alerts on its next two occurrences, and only inside them', async () => {
+    const { siteId, monitorId } = await newSite('Weekly maintenance');
+    // Occurrences at t(-300) for 30 min, today and tomorrow (two weekdays of a weekly rule).
+    const first = t(-300);
+    const hhmm = bkk(first).toISOString().slice(11, 16);
+    const series = await must(
+      db
+        .from('maintenance_series')
+        .insert({
+          site_id: siteId,
+          rule: { freq: 'weekly', days: [isoDow(first), (isoDow(first) % 7) + 1] },
+          start_time: hhmm,
+          duration_min: 30,
+          starts_on: bkk(first).toISOString().slice(0, 10),
+          reason: 'Weekly plugin updates',
+          approved_at: new Date(first.getTime() - DAY * 1000).toISOString(),
+        })
+        .select('id')
+        .single(),
+    );
+    // The top-up as of an hour before: both occurrences become ordinary approved windows.
+    await must(
+      db.rpc('engine_expand_series', { p_now: new Date(first.getTime() - 3_600_000).toISOString() }),
+    );
+    const occurrences = await must(
+      db
+        .from('maintenance_windows')
+        .select('starts_at, ends_at')
+        .eq('series_id', series.id)
+        .order('starts_at')
+        .limit(2),
+    );
+    expect(occurrences.map((o) => new Date(o.starts_at).getTime())).toEqual([
+      first.getTime(),
+      first.getTime() + DAY * 1000,
+    ]);
+
+    try {
+      // 1st occurrence: the start is logged, then the site fails inside it — Maintenance, no incident.
+      await runEngine(db, t(-240));
+      await results(monitorId, downRound());
+      await runEngine(db, t(65));
+      expect(await incidentsOf(siteId)).toEqual([]);
+      expect((await statusOf(siteId))!.status).toBe('maintenance');
+      await results(monitorId, [...okRound(60), ...okRound(120)]);
+      await runEngine(db, t(185));
+      await runEngine(db, t(1_560)); // the occurrence ended at t(1500)
+
+      // 2nd occurrence, a day later: the same.
+      const next = DAY;
+      await beat('SIN', t(next - 240));
+      await beat('TYO', t(next - 240));
+      await runEngine(db, t(next - 240));
+      await results(monitorId, downRound(next));
+      await beat('SIN', t(next + 65));
+      await beat('TYO', t(next + 65));
+      await runEngine(db, t(next + 65));
+      expect(await incidentsOf(siteId)).toEqual([]);
+      expect((await statusOf(siteId))!.status).toBe('maintenance');
+      await results(monitorId, [...okRound(next + 60), ...okRound(next + 120)]);
+      await runEngine(db, t(next + 185));
+      await beat('SIN', t(next + 1_560));
+      await beat('TYO', t(next + 1_560));
+      await runEngine(db, t(next + 1_560));
+
+      // Outside the occurrences it alerts as ever: the series hides nothing else.
+      await results(monitorId, downRound(next + 1_800));
+      await beat('SIN', t(next + 1_865));
+      await beat('TYO', t(next + 1_865));
+      await runEngine(db, t(next + 1_865));
+      const [inc] = await incidentsOf(siteId);
+      expect(inc?.state).toBe('unacked');
+      // And no incident message came from inside the occurrences: the only one is this DOWN.
+      expect((await notificationsOf(inc!.id)).map((n) => n.template)).toContain('down');
+      const windowLines = await must(
+        db
+          .from('notifications')
+          .select('template, context')
+          .in(
+            'maintenance_window_id',
+            (await must(db.from('maintenance_windows').select('id').eq('series_id', series.id))).map(
+              (w) => w.id,
+            ),
+          ),
+      );
+      // Each occurrence posted its own STARTED / ENDED (S09b), as Tao chose (D-057).
+      expect(windowLines.filter((n) => n.template === 'mw_line').length).toBeGreaterThanOrEqual(4);
+    } finally {
+      await beat('SIN', new Date());
+      await beat('TYO', new Date());
+    }
+  });
+});
 describe('monitor fault by hand (S12b, spec §30, D-053 item 5, D-055; Done-when 1, 2)', () => {
   const PASSWORD = 'int-local-only-Password-1';
   const profileId = async (address: string) =>

@@ -319,16 +319,54 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"maintenance_windows": {
+                },"maintenance_series": {
                   Row: {
-                    "approved_at": string | null,"approved_by": string | null,"cancelled_at": string | null,"created_at": string,"created_by": string | null,"end_logged": boolean,"end_reason": string | null,"ended_at": string | null,"ended_by": string | null,"ends_at": string,"id": string,"kind": string,"log": NonNullable<Json>,"outcome": string | null,"outcome_detail": string | null,"reason": string,"reminded_12h_at": string | null,"reminded_1h_at": string | null,"rrule": string | null,"site_id": string,"start_logged": boolean,"starts_at": string,"undo_action": string | null,"undo_before": Json | null,"undo_by": string | null,"undo_key": string | null,"undo_until": string | null,"updated_at": string
+                    "approved_at": string | null,"approved_by": string | null,"cancelled_at": string | null,"cancelled_by": string | null,"created_at": string,"created_by": string | null,"declined_at": string | null,"duration_min": number,"id": string,"log": NonNullable<Json>,"reason": string,"rule": NonNullable<Json>,"site_id": string,"start_time": string,"starts_on": string,"until_on": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_logged"?: boolean,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"ends_at": string,"id"?: string,"kind": string,"log"?: NonNullable<Json>,"outcome"?: string | null,"outcome_detail"?: string | null,"reason": string,"reminded_12h_at"?: string | null,"reminded_1h_at"?: string | null,"rrule"?: string | null,"site_id": string,"start_logged"?: boolean,"starts_at": string,"undo_action"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_key"?: string | null,"undo_until"?: string | null,"updated_at"?: string
+                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"declined_at"?: string | null,"duration_min": number,"id"?: string,"log"?: NonNullable<Json>,"reason": string,"rule": NonNullable<Json>,"site_id": string,"start_time": string,"starts_on": string,"until_on"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_logged"?: boolean,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"ends_at"?: string,"id"?: string,"kind"?: string,"log"?: NonNullable<Json>,"outcome"?: string | null,"outcome_detail"?: string | null,"reason"?: string,"reminded_12h_at"?: string | null,"reminded_1h_at"?: string | null,"rrule"?: string | null,"site_id"?: string,"start_logged"?: boolean,"starts_at"?: string,"undo_action"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_key"?: string | null,"undo_until"?: string | null,"updated_at"?: string
+                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"declined_at"?: string | null,"duration_min"?: number,"id"?: string,"log"?: NonNullable<Json>,"reason"?: string,"rule"?: NonNullable<Json>,"site_id"?: string,"start_time"?: string,"starts_on"?: string,"until_on"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "maintenance_series_approved_by_fkey"
+      columns: ["approved_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenance_series_cancelled_by_fkey"
+      columns: ["cancelled_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenance_series_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenance_series_site_id_fkey"
+      columns: ["site_id"]
+isOneToOne: false
+      referencedRelation: "sites"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"maintenance_windows": {
+                  Row: {
+                    "approved_at": string | null,"approved_by": string | null,"cancelled_at": string | null,"created_at": string,"created_by": string | null,"end_logged": boolean,"end_reason": string | null,"ended_at": string | null,"ended_by": string | null,"ends_at": string,"id": string,"kind": string,"log": NonNullable<Json>,"outcome": string | null,"outcome_detail": string | null,"reason": string,"reminded_12h_at": string | null,"reminded_1h_at": string | null,"series_id": string | null,"site_id": string,"start_logged": boolean,"starts_at": string,"undo_action": string | null,"undo_before": Json | null,"undo_by": string | null,"undo_key": string | null,"undo_until": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_logged"?: boolean,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"ends_at": string,"id"?: string,"kind": string,"log"?: NonNullable<Json>,"outcome"?: string | null,"outcome_detail"?: string | null,"reason": string,"reminded_12h_at"?: string | null,"reminded_1h_at"?: string | null,"series_id"?: string | null,"site_id": string,"start_logged"?: boolean,"starts_at": string,"undo_action"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_key"?: string | null,"undo_until"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_logged"?: boolean,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"ends_at"?: string,"id"?: string,"kind"?: string,"log"?: NonNullable<Json>,"outcome"?: string | null,"outcome_detail"?: string | null,"reason"?: string,"reminded_12h_at"?: string | null,"reminded_1h_at"?: string | null,"series_id"?: string | null,"site_id"?: string,"start_logged"?: boolean,"starts_at"?: string,"undo_action"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_key"?: string | null,"undo_until"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -348,6 +386,12 @@ isOneToOne: false
       columns: ["ended_by"]
 isOneToOne: false
       referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenance_windows_series_id_fkey"
+      columns: ["series_id"]
+isOneToOne: false
+      referencedRelation: "maintenance_series"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "maintenance_windows_site_id_fkey"
@@ -837,6 +881,9 @@ isOneToOne: false
 "approve_maintenance":
 { Args: { "p_ends_at": string,"p_window_id": string }; Returns: undefined
                            },
+"cancel_maintenance_series":
+{ Args: { "p_reason": string,"p_series_id": string }; Returns: number
+                           },
 "cancel_window":
 { Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
                            },
@@ -936,11 +983,17 @@ isOneToOne: false
 "create_maintenance":
 { Args: { "p_ends_at": string,"p_reason": string,"p_site_id": string,"p_starts_at": string }; Returns: string
                            },
+"create_maintenance_series":
+{ Args: { "p_duration_min": number,"p_reason": string,"p_rule": Json,"p_site_id": string,"p_start_time": string,"p_starts_on": string,"p_until_on": string }; Returns: string
+                           },
 "create_site":
 { Args: { "p_monitors": Json,"p_site": Json,"p_start"?: boolean }; Returns: string
                            },
 "current_app_role":
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
+                           },
+"decide_maintenance_series":
+{ Args: { "p_approve": boolean,"p_reason": string,"p_series_id": string }; Returns: undefined
                            },
 "decide_oncall_swap":
 { Args: { "p_approve": boolean,"p_note"?: string,"p_swap_id": string }; Returns: undefined
@@ -1004,6 +1057,9 @@ isOneToOne: false
                            },
 "engine_escalate_incident":
 { Args: { "p_context": Json,"p_detected_at": string,"p_flapping"?: boolean,"p_incident_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_outside_hours"?: boolean,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"] }; Returns: boolean
+                           },
+"engine_expand_series":
+{ Args: { "p_now": string }; Returns: number
                            },
 "engine_fire_step":
 { Args: { "p_context"?: Json,"p_due_at": string,"p_incident_id": string,"p_level": number }; Returns: boolean
@@ -1275,6 +1331,9 @@ isOneToOne: false
                            },
 "update_site":
 { Args: { "p_site": Json,"p_site_id": string }; Returns: undefined
+                           },
+"valid_series_rule":
+{ Args: { "p_rule": Json }; Returns: boolean
                            },
 "window_state":
 { Args: { "p_at"?: string,"w": Omit<Database["public"]['Tables']["maintenance_windows"]['Row'], Database["public"]['Tables']["maintenance_windows"]['ComputedFields']> }; Returns: string
