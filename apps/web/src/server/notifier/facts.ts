@@ -1,10 +1,19 @@
 import 'server-only';
 import type { Database, DbClient, Json } from '@dxt/db';
+import type { ChatMessage, EmailMessage } from '@dxt/notifier';
 import type { ResponseHours, Trigger } from '@dxt/shared';
 import { loadResponseHours } from '../escalation/response-hours';
 import type { OncallEventFacts } from './oncall-facts';
 
 export type Notification = Database['public']['Tables']['notifications']['Row'];
+
+/** A daily digest or weekly summary as queued (S14, D-056): sent as stored, never re-rendered. */
+export interface ReportRow {
+  id: string;
+  kind: 'daily' | 'weekly';
+  chat: ChatMessage;
+  email: EmailMessage | null;
+}
 
 export interface Owner {
   id: string;
@@ -99,6 +108,8 @@ export interface Facts {
   firstEmail: Map<string, { id: string }>;
   /** On-call events (S10 B2b), attached by the dispatcher. */
   oncall?: Map<string, OncallEventFacts>;
+  /** Reports (S14): the card and email rendered at 09:00, attached by the dispatcher. */
+  reports?: Map<string, ReportRow>;
 }
 
 /** Loads the incidents, system alerts and email recipients of a batch of claimed messages. */

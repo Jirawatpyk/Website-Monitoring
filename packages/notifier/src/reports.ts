@@ -245,10 +245,13 @@ function monitorRows(m: MonitorFacts): Row[] {
 export function digestModel(f: DigestFacts): ReportModel {
   const day = formatDay(f.at, { weekday: true });
   const time = formatTime(f.at);
+  // A site in a running window isn't OK, DOWN or PROBLEM: it is counted as in maintenance.
+  const running = f.maintenance.filter((w) => w.start <= f.at);
   const status = [
     `${f.sitesOk}/${f.sitesTotal} OK`,
     ...(f.down.length ? [`${f.down.length} DOWN`] : []),
     ...(f.problem.length ? [`${f.problem.length} PROBLEM`] : []),
+    ...(running.length ? [`${running.length} in maintenance`] : []),
     ...(f.muted.length ? [`${f.muted.length} muted`] : []),
   ];
   const nowLine = [
@@ -256,6 +259,9 @@ export function digestModel(f: DigestFacts): ReportModel {
     ...(f.down.length ? [`${f.down.length} DOWN (${f.down.map((d) => plainName(d.site)).join(', ')})`] : []),
     ...(f.problem.length
       ? [`${f.problem.length} PROBLEM (${f.problem.map((d) => plainName(d.site)).join(', ')})`]
+      : []),
+    ...(running.length
+      ? [`${running.length} in maintenance (${running.map((w) => plainName(w.site)).join(', ')})`]
       : []),
     ...(f.muted.length
       ? [`${f.muted.length} muted (${f.muted.map((d) => plainName(d.site)).join(', ')})`]

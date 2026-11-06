@@ -56,6 +56,37 @@ export function responseKpis(incidents: readonly MetricIncident[], from: Date, t
   return { downCount: down.length, enough, mttaSeconds: mean(acks), mttdSeconds: mean(detections) };
 }
 
+/**
+ * The weekly summary's "MTTA DOWN (response hours)" (WeeklySummary, spec §15.7, D-056): per tier, the
+ * mean seconds from confirmed down to acknowledged over the DOWNs whose outage started in [from, to) —
+ * Tier 1 at any hour (24/7), Tier 2–3 only those that started inside response hours (`inside`). Null
+ * for a tier with none: "— (no DOWN inside response hours)". No minimum count, unlike the Overview.
+ */
+export function mttaByTier(
+  incidents: readonly MetricIncident[],
+  from: Date,
+  to: Date,
+  tiers: readonly number[],
+  inside: (at: Date) => boolean,
+): { tier: number; seconds: number | null }[] {
+  const outageStart = (i: MetricIncident) => i.downStartedAt ?? i.startedAt;
+  return tiers.map((tier) => {
+    const acks = incidents.flatMap((i) => {
+      const start = outageStart(i);
+      const counts =
+        i.severity === 'down' &&
+        i.tier === tier &&
+        start >= from &&
+        start < to &&
+        (tier === 1 || inside(start));
+      return counts && i.detectedAt && i.ackedAt && i.ackedAt >= i.detectedAt
+        ? [seconds(i.detectedAt, i.ackedAt)]
+        : [];
+    });
+    return { tier, seconds: mean(acks) };
+  });
+}
+
 /** One incident's duration, as MTTR needs it. */
 export interface DurationRow {
   severity: 'down' | 'problem';

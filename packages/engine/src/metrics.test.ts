@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatDurationSeconds } from '@dxt/shared';
-import { kpiChange, mttrMinutes, responseKpis, type MetricIncident } from './metrics';
+import { kpiChange, mttaByTier, mttrMinutes, responseKpis, type MetricIncident } from './metrics';
 
 // Spec §1: Fri 25 Sep 2026 10:07 (UTC+7). The window is the last 30 days (spec §21.3).
 const NOW = new Date('2026-09-25T03:07:12Z');
@@ -122,6 +122,50 @@ describe('kpiChange ("vs last 30d")', () => {
     [null, 400, null],
   ])('%s vs %s', (current, previous, expected) => {
     expect(kpiChange(current, previous)).toEqual(expected);
+  });
+});
+
+describe('mttaByTier (weekly summary, spec §15.7, D-056)', () => {
+  const at = (s: string) => new Date(`${s}+07:00`);
+  const from = at('2026-09-21T00:00:00');
+  const to = at('2026-09-28T00:00:00');
+  // Mon–Fri 09:00–18:00 Bangkok, as the Tier 2–3 response hours.
+  const inside = (d: Date) => {
+    const b = new Date(d.getTime() + 7 * 3_600_000);
+    return b.getUTCDay() >= 1 && b.getUTCDay() <= 5 && b.getUTCHours() >= 9 && b.getUTCHours() < 18;
+  };
+  const down = (tier: number, start: string, ackMin: number | null): MetricIncident => ({
+    severity: 'down',
+    tier,
+    startedAt: at(start),
+    detectedAt: at(start),
+    ackedAt: ackMin === null ? null : new Date(at(start).getTime() + ackMin * 60_000),
+    isManual: false,
+  });
+
+  it.each([
+    // INC-0142 MuvMi (Fri 09:48, acked 19 min later) and a night Tier 1 DOWN: Tier 1 counts every hour.
+    [
+      'Tier 1 counts every hour',
+      [down(1, '2026-09-25T09:48:00', 19), down(1, '2026-09-24T22:14:00', 19)],
+      1,
+      19 * 60,
+    ],
+    // INC-0133 VOCA (Tier 2, Mon 03:12): outside response hours → "— (no DOWN inside response hours)".
+    ['Tier 2 outside response hours only → none', [down(2, '2026-09-21T03:12:00', 50)], 2, null],
+    ['Tier 2 inside response hours counts', [down(2, '2026-09-22T10:00:00', 6)], 2, 6 * 60],
+    ['an unacknowledged DOWN has no MTTA', [down(1, '2026-09-25T09:48:00', null)], 1, null],
+    ['a DOWN outside the week is left out', [down(1, '2026-09-28T09:00:00', 3)], 1, null],
+    [
+      'a PROBLEM is not a DOWN',
+      [{ ...down(1, '2026-09-25T09:48:00', 3), severity: 'problem' as const }],
+      1,
+      null,
+    ],
+  ])('%s', (_name, incidents, tier, expected) => {
+    const rows = mttaByTier(incidents, from, to, [1, 2, 3], inside);
+    expect(rows.map((r) => r.tier)).toEqual([1, 2, 3]);
+    expect(rows.find((r) => r.tier === tier)!.seconds).toBe(expected);
   });
 });
 

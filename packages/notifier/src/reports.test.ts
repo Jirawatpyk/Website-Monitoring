@@ -109,7 +109,7 @@ describe('daily digest (WeeklySummary "Daily digest")', () => {
   it('shows what is true at 09:00: a running window, a DOWN and a PROBLEM now', () => {
     const m = digestModel(
       digest({
-        sitesOk: 15,
+        sitesOk: 14,
         down: [
           { site: 'MuvMi', since: bkk('2026-09-25T08:48:00'), cause: 'Timeout ×2 · 504 ×1', number: 142 },
         ],
@@ -130,8 +130,12 @@ describe('daily digest (WeeklySummary "Daily digest")', () => {
         yesterday: [],
       }),
     );
-    expect(m.textLine).toBe('Website status Fri 25 Sep 09:00 · 15/17 OK · 1 DOWN · 1 PROBLEM');
-    expect(m.lines).toEqual(['Now: 15/17 OK · 1 DOWN (MuvMi) · 1 PROBLEM (Fuji Links)']);
+    expect(m.textLine).toBe(
+      'Website status Fri 25 Sep 09:00 · 14/17 OK · 1 DOWN · 1 PROBLEM · 1 in maintenance',
+    );
+    expect(m.lines).toEqual([
+      'Now: 14/17 OK · 1 DOWN (MuvMi) · 1 PROBLEM (Fuji Links) · 1 in maintenance (Bangkok Airways – China)',
+    ]);
     expect(m.sections[0]!.rows).toEqual([
       { label: 'DOWN', text: 'MuvMi — since 08:48 · Timeout ×2 · 504 ×1 · INC-0142' },
       { label: 'PROBLEM', text: 'Fuji Links — since Thu 24 Sep 20:00 · Slow · INC-0143' },

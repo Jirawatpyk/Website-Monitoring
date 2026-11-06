@@ -14,6 +14,7 @@
     { "path": "/api/cron/engine", "schedule": "* * * * *" },
     { "path": "/api/cron/notifier", "schedule": "* * * * *" },
     { "path": "/api/cron/crawler", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/housekeeping", "schedule": "30 20 * * *" }
+    { "path": "/api/cron/housekeeping", "schedule": "30 20 * * *" },
+    { "path": "/api/cron/reports", "schedule": "0 2 * * *" }
   ]
 }
