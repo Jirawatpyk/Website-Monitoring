@@ -36,6 +36,11 @@ export const VERCEL_TEAM = 'team_KLEKhF6PuSAbJSmgDpyEXES4';
 export const NO_DEPLOY_AFTER_MS = 4 * 60_000;
 /** Give up waiting for a deployment that started but never finished. */
 export const DEPLOY_TIMEOUT_MS = 15 * 60_000;
+/**
+ * Give up waiting for migrate-production. It starts only once `check` and `db` on main pass (~15–20 min on
+ * 6 Nov, #178 / #180), so 15 min said "never started" while it was simply queued behind them (retro S14).
+ */
+export const MIGRATE_TIMEOUT_MS = 40 * 60_000;
 
 /**
  * Where production stands for the merge commit. `deployments` are Vercel's production deployments of
@@ -62,10 +67,12 @@ export function deployVerdict({
     return { kind: 'failed', why: `migrate-production ended ${migrate.conclusion}` };
   }
   if (migrate?.status !== 'completed') {
-    if (elapsedMs >= DEPLOY_TIMEOUT_MS)
+    if (elapsedMs >= MIGRATE_TIMEOUT_MS)
       return {
         kind: 'failed',
-        why: `migrate-production ${migrate ? 'still running' : 'never started'} after 15 min`,
+        why: migrate
+          ? `migrate-production still ${migrate.status} after 40 min`
+          : 'migrate-production never started after 40 min — check / db on main may be stuck or failed',
       };
     return { kind: 'waiting' };
   }

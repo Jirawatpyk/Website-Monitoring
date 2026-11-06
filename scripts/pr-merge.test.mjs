@@ -7,6 +7,7 @@ import {
   deployVerdict,
   mergeBlockers,
   DEPLOY_TIMEOUT_MS,
+  MIGRATE_TIMEOUT_MS,
   NO_DEPLOY_AFTER_MS,
   WORKFLOW_FLAG,
   SCHEMA_FLAG,
@@ -205,7 +206,7 @@ test('deployVerdict: production counts only once migrate-production succeeded (1
   });
   assert.equal(skipped.kind, 'failed');
   assert.match(skipped.why, /didn't run.*billing/);
-  // Deployed but the migration is still running (or hasn't started): keep waiting, then fail at 15 min.
+  // Deployed but the migration is still running (or hasn't started): keep waiting, then fail at 40 min.
   assert.equal(
     deployVerdict({ migrate: migrate('in_progress'), deployments: [redeployed], elapsedMs: 0 }).kind,
     'waiting',
@@ -214,9 +215,27 @@ test('deployVerdict: production counts only once migrate-production succeeded (1
     deployVerdict({ migrate: null, deployments: [redeployed], elapsedMs: minute }).kind,
     'waiting',
   );
+  // 6 Nov (#178, #180): queued behind check / db on main for ~20 min is normal, not a failure.
+  assert.equal(
+    deployVerdict({ migrate: null, deployments: [redeployed], elapsedMs: 20 * minute }).kind,
+    'waiting',
+  );
+  assert.equal(
+    deployVerdict({ migrate: migrate('queued'), deployments: [redeployed], elapsedMs: DEPLOY_TIMEOUT_MS })
+      .kind,
+    'waiting',
+  );
   assert.match(
-    deployVerdict({ migrate: null, deployments: [redeployed], elapsedMs: DEPLOY_TIMEOUT_MS }).why,
-    /never started/,
+    deployVerdict({ migrate: null, deployments: [redeployed], elapsedMs: MIGRATE_TIMEOUT_MS }).why,
+    /never started after 40 min/,
+  );
+  assert.match(
+    deployVerdict({
+      migrate: migrate('in_progress'),
+      deployments: [redeployed],
+      elapsedMs: MIGRATE_TIMEOUT_MS,
+    }).why,
+    /still in_progress after 40 min/,
   );
   assert.equal(deployVerdict({ migrate: migrated, deployments: [redeployed], elapsedMs: 0 }).kind, 'ready');
   assert.equal(
