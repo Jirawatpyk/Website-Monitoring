@@ -20,22 +20,26 @@ language sql
 immutable
 set search_path = ''
 as $$
-  select case p_rule ->> 'freq'
-    when 'weekly' then
-      jsonb_typeof(p_rule -> 'days') = 'array'
-      and jsonb_array_length(p_rule -> 'days') between 1 and 7
-      and not exists (select 1 from jsonb_array_elements(p_rule -> 'days') d
-                      where jsonb_typeof(d) <> 'number' or (d #>> '{}')::numeric not in (1, 2, 3, 4, 5, 6, 7))
-      and (select count(distinct d) = count(*) from jsonb_array_elements(p_rule -> 'days') d)
-      and (select count(*) from jsonb_object_keys(p_rule)) = 2
-    when 'monthly' then
+  -- No casts: values are compared as jsonb with the allowed numbers, so a string ("1", "abc") is simply
+  -- false — SQL may evaluate either side of an AND first, and a cast could raise instead (code review S14).
+  -- CASE guards whatever needs an array or an object.
+  select case
+    when jsonb_typeof(p_rule) <> 'object' then false
+    when p_rule ->> 'freq' = 'weekly' then
+      case when jsonb_typeof(p_rule -> 'days') <> 'array' then false
+      else jsonb_array_length(p_rule -> 'days') between 1 and 7
+        and (select bool_and(d = any (select to_jsonb(g) from generate_series(1, 7) g))
+             from jsonb_array_elements(p_rule -> 'days') d)
+        and (select count(distinct d) = count(*) from jsonb_array_elements(p_rule -> 'days') d)
+        and (select count(*) from jsonb_object_keys(p_rule)) = 2
+      end
+    when p_rule ->> 'freq' = 'monthly' then
       (p_rule ? 'day' and not p_rule ? 'nth' and not p_rule ? 'weekday'
-        and jsonb_typeof(p_rule -> 'day') = 'number' and (p_rule ->> 'day')::numeric between 1 and 31
-        and (p_rule ->> 'day')::numeric = trunc((p_rule ->> 'day')::numeric)
+        and (p_rule -> 'day') = any (select to_jsonb(g) from generate_series(1, 31) g)
         and (select count(*) from jsonb_object_keys(p_rule)) = 2)
       or (p_rule ? 'nth' and p_rule ? 'weekday' and not p_rule ? 'day'
-        and jsonb_typeof(p_rule -> 'nth') = 'number' and (p_rule ->> 'nth')::numeric in (1, 2, 3, 4)
-        and jsonb_typeof(p_rule -> 'weekday') = 'number' and (p_rule ->> 'weekday')::numeric in (1, 2, 3, 4, 5, 6, 7)
+        and (p_rule -> 'nth') = any (select to_jsonb(g) from generate_series(1, 4) g)
+        and (p_rule -> 'weekday') = any (select to_jsonb(g) from generate_series(1, 7) g)
         and (select count(*) from jsonb_object_keys(p_rule)) = 3)
     else false
   end;

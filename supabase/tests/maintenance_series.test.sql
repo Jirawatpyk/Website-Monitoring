@@ -3,7 +3,7 @@
 -- of what hasn't started, who may do what, and one audit row per change.
 begin;
 \ir _helpers.psql
-select plan(46);
+select plan(54);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -30,6 +30,25 @@ select ok(not public.valid_series_rule('{"freq":"weekly","days":[8]}'), 'weekday
 select ok(not public.valid_series_rule('{"freq":"monthly","nth":5,"weekday":1}'), 'a 5th weekday is refused (v1)');
 select ok(not public.valid_series_rule('{"freq":"monthly","day":15,"nth":1}'), 'day and nth together are refused');
 select ok(not public.valid_series_rule('{"freq":"daily"}'), 'another frequency is refused');
+select ok(not public.valid_series_rule('{"freq":"monthly","day":"abc"}'), 'a string value is false, not an error');
+select ok(not public.valid_series_rule('{"freq":"weekly","days":["1"]}'), 'a string weekday is false too');
+select ok(not public.valid_series_rule('{"freq":"weekly","days":2}'), 'days that isn''t a list is false');
+select ok(not public.valid_series_rule('[1]'), 'a rule that isn''t an object is false');
+select ok(not public.valid_series_rule('{"freq":"monthly","day":1.5}'), 'a fractional day is false');
+
+-- ── The table: staff read, others refused (RLS) ──────────────────────────
+insert into public.maintenance_series (site_id, rule, start_time, duration_min, starts_on, reason)
+values ('00000000-0000-0000-0000-0000000000a1', '{"freq":"monthly","day":1}', '03:00', 60, current_date + 1, 'RLS row');
+select tests.authenticate_as((select id from ids where name = 'mint'));
+select is((select count(*)::int from public.maintenance_series where reason = 'RLS row'), 1, 'a Viewer (staff) reads series');
+select throws_ok($$ insert into public.maintenance_series (site_id, rule, start_time, duration_min, starts_on, reason)
+  values ('00000000-0000-0000-0000-0000000000a1', '{"freq":"monthly","day":1}', '03:00', 60, current_date + 1, 'x') $$,
+  '42501', null, 'but writes none directly');
+reset role;
+select tests.as_anon();
+select throws_ok($$ select count(*) from public.maintenance_series $$, '42501', null, 'anon can''t read them');
+reset role;
+delete from public.maintenance_series where reason = 'RLS row';
 
 -- ── The days it falls on (Bangkok calendar) ──────────────────────────────
 select is((select count(*)::int from generate_series('2026-11-01'::date, '2026-11-30', '1 day') d
