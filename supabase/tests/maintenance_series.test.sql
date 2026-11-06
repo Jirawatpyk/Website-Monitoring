@@ -3,7 +3,7 @@
 -- of what hasn't started, who may do what, and one audit row per change.
 begin;
 \ir _helpers.psql
-select plan(42);
+select plan(44);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -141,6 +141,11 @@ select tests.authenticate_as((select id from ids where name = 'nok'));
 select lives_ok($$ select public.cancel_maintenance_series((select id from s where name = 'nok'), 'Not needed') $$,
   'an active Responder who asked may withdraw it');
 reset role;
+select is((select action from public.audit_log where entity_id = (select id from s where name = 'nok')),
+  'maintenance.series_withdraw', 'logged as a withdraw (§32.13)');
+select ok(exists (select 1 from public.audit_log where action = 'maintenance.occurrence_skip'
+                  and entity_id = (select id from s where name = 'overlap')),
+  'each skipped window has its own audit row (§32.13)');
 select tests.as_anon();
 select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
   '{"freq":"monthly","day":1}', '03:00', 60, current_date + 1, null, 'x') $$, '42501', null, 'anon can''t create one');

@@ -178,6 +178,11 @@ begin
       s.log := s.log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'skipped',
         'starts_at', v_key, 'reason', 'overlaps another window'));
       update public.maintenance_series set log = s.log where id = s.id;
+      -- §32.13: one System row per skipped window.
+      insert into public.audit_log (action, entity, entity_id, after)
+      values ('maintenance.occurrence_skip', 'maintenance_series', s.id,
+              jsonb_build_object('site_id', s.site_id, 'starts_at', v_start, 'ends_at', v_end,
+                                 'reason', 'overlaps another window'));
     end if;
   end loop;
   return v_n;
@@ -399,7 +404,11 @@ begin
   select count(*), coalesce(jsonb_agg(jsonb_build_object('id', id, 'starts_at', starts_at)), '[]'::jsonb)
     into v_n, v_gone from gone;
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
-  values (auth.uid(), 'maintenance.series_cancel', 'maintenance_series', s.id,
+  -- §32.7 / §32.13: the asker taking back a series still waiting withdraws it; anything else cancels.
+  values (auth.uid(),
+          case when s.approved_at is null and s.created_by = auth.uid() then 'maintenance.series_withdraw'
+               else 'maintenance.series_cancel' end,
+          'maintenance_series', s.id,
           jsonb_build_object('state', case when s.approved_at is null then 'waiting' else 'approved' end),
           jsonb_build_object('state', 'cancelled', 'site_id', s.site_id, 'reason', v_reason,
                              'occurrences_cancelled', v_gone));
