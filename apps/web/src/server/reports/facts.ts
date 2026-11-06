@@ -27,7 +27,7 @@ import {
 } from '@dxt/shared';
 import { downEpisodesBySite, maintenanceSpansBySite, watchedSince } from '@/features/sites/server';
 import { loadResponseHours } from '../escalation/response-hours';
-import { reportIncident, roundsOf, type IncidentRow } from './assemble';
+import { causeOf, reportIncident, roundsOf, type IncidentRow } from './assemble';
 
 /**
  * What the daily digest and the weekly summary say (S14, FR-12, D-056), read as the service role at
@@ -63,36 +63,40 @@ type LoadedIncident = IncidentRow & {
 /** Every incident with a drop that may touch [from, to): started before `to`, not resolved before `from`. */
 async function loadIncidents(db: DbClient, from: Date, to: Date): Promise<LoadedIncident[]> {
   const data = must(
-    await db
-      .from('incidents')
-      .select(INCIDENT_COLUMNS)
-      .in('incident_events.type', EPISODE_EVENTS)
+    await incidentQuery(db)
       .lt('started_at', to.toISOString())
       .or(`resolved_at.is.null,resolved_at.gte.${from.toISOString()}`)
       .order('started_at'),
     'incidents',
   );
-  return (data ?? []).map((i) => ({
-    number: i.number,
-    state: i.state,
-    severity: i.severity,
-    trigger: i.trigger,
-    started_at: i.started_at,
-    resolved_at: i.resolved_at,
-    detected_at: i.detected_at,
-    acked_at: i.acked_at,
-    is_manual: i.is_manual,
-    escalation_level: i.escalation_level,
-    client_updated_at: i.client_updated_at,
-    client_update_not_needed: i.client_update_not_needed,
-    site: { name: i.sites.name, tier: i.sites.tier, owner: person(i.sites.owner) },
-    siteId: i.sites.id,
-    siteActive: i.sites.is_active,
-    acker: i.acker,
-    updater: i.updater,
-    events: i.incident_events,
-  }));
+  return (data ?? []).map(toLoaded);
 }
+
+type IncidentQueryRow = NonNullable<Awaited<ReturnType<typeof incidentQuery>>['data']>[number];
+
+const incidentQuery = (db: DbClient) =>
+  db.from('incidents').select(INCIDENT_COLUMNS).in('incident_events.type', EPISODE_EVENTS);
+
+const toLoaded = (i: IncidentQueryRow): LoadedIncident => ({
+  number: i.number,
+  state: i.state,
+  severity: i.severity,
+  trigger: i.trigger,
+  started_at: i.started_at,
+  resolved_at: i.resolved_at,
+  detected_at: i.detected_at,
+  acked_at: i.acked_at,
+  is_manual: i.is_manual,
+  escalation_level: i.escalation_level,
+  client_updated_at: i.client_updated_at,
+  client_update_not_needed: i.client_update_not_needed,
+  site: { name: i.sites.name, tier: i.sites.tier, owner: person(i.sites.owner) },
+  siteId: i.sites.id,
+  siteActive: i.sites.is_active,
+  acker: i.acker,
+  updater: i.updater,
+  events: i.incident_events,
+});
 
 /** "Inside response hours" for an incident's start: Tier 1 is 24/7, Tier 2–3 per the organisation's hours. */
 async function insideFor(db: DbClient, now: Date) {
@@ -239,8 +243,15 @@ export async function loadDigestFacts(db: DbClient, now: Date, appUrl: string): 
     sites.flatMap((s) => {
       const i = open.get(s.id);
       if (s.site_status?.status !== status || !i) return [];
-      const r = reportIncident(i, new Date(0), now, now, inside);
-      return [{ site: s.name, since: latestDropStart(i), cause: r?.cause ?? '', number: i.number }];
+      // The drop in progress: its own start and cause (a relapse isn't worded as the first drop).
+      return [
+        {
+          site: s.name,
+          since: latestDropStart(i),
+          cause: causeOf(i, status, { latest: true }),
+          number: i.number,
+        },
+      ];
     });
   const yesterdayList = incidents
     .filter((i) => i.siteActive)
@@ -361,7 +372,8 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
   }));
   const mtta = mttaByTier(metric, weekStart, weekEndExclusive, tiers, inside).map((m) => ({
     ...m,
-    targetMin: targets.get(m.tier) ?? 15,
+    // No L1 step on that tier's DOWN policy: no target to compare with (code review S14).
+    targetMin: targets.get(m.tier) ?? null,
   }));
 
   // Needs someone: DOWN without a root cause (any week), maintenance requests, unanswered swaps.
@@ -449,37 +461,13 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
 /** Open DOWN incidents that recovered but have no root cause yet (Monitoring / Needs root cause). */
 async function loadOpenDowns(db: DbClient): Promise<LoadedIncident[]> {
   const data = must(
-    await db
-      .from('incidents')
-      .select(INCIDENT_COLUMNS)
-      .in('incident_events.type', EPISODE_EVENTS)
+    await incidentQuery(db)
       .eq('severity', 'down')
       .in('state', ['monitoring', 'needs_root_cause'])
       .order('started_at'),
     'incidents',
   );
-  return (data ?? [])
-    .filter((i) => i.sites.is_active)
-    .map((i) => ({
-      number: i.number,
-      state: i.state,
-      severity: i.severity,
-      trigger: i.trigger,
-      started_at: i.started_at,
-      resolved_at: i.resolved_at,
-      detected_at: i.detected_at,
-      acked_at: i.acked_at,
-      is_manual: i.is_manual,
-      escalation_level: i.escalation_level,
-      client_updated_at: i.client_updated_at,
-      client_update_not_needed: i.client_update_not_needed,
-      site: { name: i.sites.name, tier: i.sites.tier, owner: person(i.sites.owner) },
-      siteId: i.sites.id,
-      siteActive: true,
-      acker: i.acker,
-      updater: i.updater,
-      events: i.incident_events,
-    }));
+  return (data ?? []).map(toLoaded).filter((i) => i.siteActive);
 }
 
 /** The CEO (D-032, D-056): every active stakeholder who manages no client — the weekly email's recipients. */

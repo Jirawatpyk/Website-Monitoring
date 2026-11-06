@@ -13,7 +13,11 @@ import {
 } from '@dxt/shared';
 import { plainName, type ChatMessage, type ChatPerson, type ChatWidget } from './chat-alerts';
 import { chatMention } from './chat-text';
-import { EMAIL_COLORS, type EmailMessage } from './email-alerts';
+import { EMAIL_COLORS, escapeHtml, type EmailMessage } from './email-alerts';
+
+/** A row's words with its follow-up and figure: "… — Arm", "… — 43 min". */
+const rowText = (r: { text: string; who?: string; trail?: string }) =>
+  [r.text, r.who, r.trail].filter(Boolean).join(' — ');
 
 /**
  * The daily digest and the weekly summary (FR-12, WeeklySummary board, spec §10, §15.7, D-056). Both
@@ -118,7 +122,7 @@ export interface WeeklyFacts {
     who: readonly ReportPerson[];
   }[];
   /** MTTA of DOWNs inside response hours per tier, in seconds (null: none), and its target. */
-  mtta: readonly { tier: number; seconds: number | null; targetMin: number }[];
+  mtta: readonly { tier: number; seconds: number | null; targetMin: number | null }[];
   /** Every window and mute in the week. */
   planned: readonly ReportWindow[];
   /** Windows in the next 7 days. */
@@ -137,6 +141,8 @@ interface Row {
   text: string;
   /** Whose follow-up it is, shown at the end. */
   who?: string;
+  /** A figure at the end of the row (an incident's down time), plain. */
+  trail?: string;
   warning?: boolean;
 }
 
@@ -211,7 +217,7 @@ function yesterdayLine(i: ReportIncident): { row: Row; who: ReportPerson | null 
 
 function roundsLine(m: MonitorFacts, withGaps: boolean): string | null {
   if (m.roundsShare === null) return null;
-  const share = `${Math.floor(m.roundsShare * 1000) / 10}%`;
+  const share = formatPercent(m.roundsShare);
   if (!withGaps || !m.engineGaps.length) return `Monitor ran ${share} of rounds on time.`;
   const gaps = m.engineGaps
     .map(
@@ -367,7 +373,7 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
         ? 'Was down'
         : 'Was problem',
     text: `${plainName(i.site)} · ${weeklyWhat(i)}`,
-    who: formatDuration(i.minutes),
+    trail: formatDuration(i.minutes),
   }));
 
   const mttaValue = f.mtta
@@ -377,12 +383,16 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
     .map((m) =>
       m.seconds === null
         ? `Tier ${m.tier} — (no DOWN inside response hours)`
-        : m.seconds > m.targetMin * 60
-          ? `Tier ${m.tier} over the ${m.targetMin} min target`
-          : `Tier ${m.tier} within the ${m.targetMin} min target`,
+        : m.targetMin === null
+          ? `Tier ${m.tier} — no L1 step to compare with`
+          : m.seconds > m.targetMin * 60
+            ? `Tier ${m.tier} over the ${m.targetMin} min target`
+            : `Tier ${m.tier} within the ${m.targetMin} min target`,
     )
     .join(' · ');
-  const overTarget = f.mtta.some((m) => m.seconds !== null && m.seconds > m.targetMin * 60);
+  const overTarget = f.mtta.some(
+    (m) => m.seconds !== null && m.targetMin !== null && m.seconds > m.targetMin * 60,
+  );
 
   const planned: Row[] = f.planned.map((w) => ({
     label: w.kind === 'mute' ? 'Muted' : 'Maintenance',
@@ -458,7 +468,7 @@ const chatText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').r
 export function reportChat(m: ReportModel, cardId: string): ChatMessage {
   // Card text is Chat's small HTML subset: a reason someone typed stays text.
   const widget = (r: Row): ChatWidget => {
-    const text = chatText(r.who ? `${r.text} — ${r.who}` : r.text);
+    const text = chatText(rowText(r));
     return r.label
       ? { decoratedText: { topLabel: r.label, text, wrapText: true } }
       : { textParagraph: { text } };
@@ -503,8 +513,7 @@ export function reportChat(m: ReportModel, cardId: string): ChatMessage {
 
 const C = EMAIL_COLORS;
 const FONT = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+const esc = escapeHtml;
 
 export const REPORT_EMAIL_FOOTER =
   'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. The same summary is in the DxT Website Reports Space.';
@@ -521,6 +530,7 @@ export function weeklyEmail(m: ReportModel, f: Pick<WeeklyFacts, 'weekStart' | '
     (r.label ? `<b style="font-weight:600">${esc(r.label)}</b> · ` : '') +
     esc(r.text) +
     (r.who ? ` <b style="font-weight:600">— ${esc(r.who)}</b>` : '') +
+    (r.trail ? ` — ${esc(r.trail)}` : '') +
     '</td></tr>';
   const section = (s: Section) =>
     `<tr><td style="padding:18px 0 4px">${
@@ -557,7 +567,7 @@ ${buttons ? `<div style="margin-top:18px">${buttons}</div>` : ''}
     ...m.sections.flatMap((s) => [
       '',
       ...(s.title ? [s.title] : []),
-      ...s.rows.map((r) => `${r.label ? `${r.label} · ` : ''}${r.text}${r.who ? ` — ${r.who}` : ''}`),
+      ...s.rows.map((r) => `${r.label ? `${r.label} · ` : ''}${rowText(r)}`),
     ]),
     '',
     ...m.buttons.map((b) => `${b.text}: ${b.url}`),

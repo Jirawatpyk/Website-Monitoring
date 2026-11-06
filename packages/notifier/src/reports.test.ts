@@ -102,7 +102,7 @@ describe('daily digest (WeeklySummary "Daily digest")', () => {
       'ORCA Thailand DOWN 8 min (22:14, hard fail, outside response hours) — needs a root cause, Tao',
       'Tubtong PROBLEM 12 min (14:02, blocked, not verified) — resolved',
       'DxT AI PROBLEM (SSL expiring, since Wed 23 Sep 09:00) — resolved',
-      'Monitor ran 100% of rounds. A missing digest means the monitor itself needs checking.',
+      'Monitor ran 100.00% of rounds. A missing digest means the monitor itself needs checking.',
     ]);
   });
 
@@ -313,17 +313,17 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
       {
         label: 'Was down',
         text: 'MuvMi · Fri 25 Sep 09:48 · Timeout ×2 · 504 ×1 · reached L1, acked by Arm 10:07 · client updated by Bua 10:12 · no root cause yet',
-        who: '43 min',
+        trail: '43 min',
       },
       {
         label: 'Was down',
         text: 'VOCA · Mon 21 Sep 03:12 · Hard fail, flapped ×4 · outside response hours',
-        who: '41 min',
+        trail: '41 min',
       },
       {
         label: 'Was problem',
         text: 'Fuji Links · Fri 25 Sep 09:52 · Slow, p50 5.8 s · acked by Ploy 09:58',
-        who: '22 min',
+        trail: '22 min',
       },
     ]);
   });
@@ -358,7 +358,7 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     expect(rows('THE MONITOR ITSELF')).toEqual([
       [
         undefined,
-        'Monitor ran 99.7% of rounds on time · 1 gap Sat 26 Sep 02:17–02:43 (26 min) — stored as no data, not downtime.',
+        'Monitor ran 99.74% of rounds on time · 1 gap Sat 26 Sep 02:17–02:43 (26 min) — stored as no data, not downtime.',
       ],
       [
         undefined,

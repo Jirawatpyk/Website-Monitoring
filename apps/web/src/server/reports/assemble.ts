@@ -33,11 +33,15 @@ const clipMinutes = (e: Episode, from: Date, to: Date, now: Date) => {
 };
 
 /** The cause of the incident's first drop in the period, in its short form ("Timeout ×2 · 504 ×1"). */
-function causeOf(row: IncidentRow, severity: Severity): string {
+export function causeOf(row: IncidentRow, severity: Severity, { latest = false } = {}): string {
   if (row.trigger === 'manual') return TRIGGER_LABELS.manual;
-  const drops = row.events
+  const ordered = row.events
     .filter((e) => ['detected', 'relapsed', 'escalated_to_down'].includes(e.type))
-    .map((e) => (e.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : {}));
+    .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''));
+  // The drop in progress (the digest's "now" rows) reads the newest drop first (code review S14).
+  const drops = (latest ? ordered.reverse() : ordered).map((e) =>
+    e.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : {},
+  );
   for (const p of drops) {
     if (severity === 'problem' && typeof p.summary === 'string' && p.summary.trim()) return p.summary.trim();
     if (severity === 'down' && typeof p.cause === 'string' && p.cause.trim()) return shortCause(p.cause);
