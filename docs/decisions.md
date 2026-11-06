@@ -79,7 +79,8 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
    - Both reports post every day at 09:00 Bangkok, weekends and holidays too. On Monday the digest posts, then the weekly summary.
    - "Yesterday" means the incidents that were DOWN or PROBLEM at any time in the previous Bangkok day.
    - The week is Mon 00:00 to Sun 24:00 Bangkok.
-   - MTTA (response hours) counts only DOWNs that started inside the tier's response hours, from Confirmed down to the first acknowledgement. The target is the policy's L1 delay.
+   - MTTA (response hours) runs from Confirmed down to the first acknowledgement. Tier 1 is counted on the clock at any hour (24/7). Tier 2–3 count only DOWNs confirmed inside response hours, and only the response-hour minutes, as their L1 delay is counted (D-034). Fri 17:58 → Mon 09:05 waited 7 min, not 63 h (engine review S14). The target is the policy's L1 delay; with no L1 step there is no target to compare with. A tier with no DOWN reads "— (no DOWN inside response hours)", or "— (no DOWN)" for Tier 1.
+   - A resolved incident is worded by its root cause ("cert renewed, resolved"): what fixed it, else what happened, in a few words. A DOWN in Monitoring or Needs root cause with no category listed under Needs someone.
    - The text line @mentions each named follow-up once.
    - The Healthchecks check expects a ping by 09:05. The ping goes only once the digest's Chat post is sent; it is `/fail` when the post fails for good.
 4. **Recurring maintenance is a second PR.** The data model, the engine and the Done-when 3 test are built first. The Repeat control, how each occurrence shows and which §24 messages a series posts wait for a Claude Design board (brief by Claude).

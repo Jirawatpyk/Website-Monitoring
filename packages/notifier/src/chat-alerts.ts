@@ -51,7 +51,7 @@ export interface ChatCard {
 }
 
 export type ChatWidget =
-  | { decoratedText: { topLabel: string; text: string; wrapText: true } }
+  | { decoratedText: { topLabel: string; text: string; bottomLabel?: string; wrapText: true } }
   | { textParagraph: { text: string } }
   | { buttonList: { buttons: { text: string; onClick: { openLink: { url: string } } }[] } };
 

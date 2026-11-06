@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reportIncident, roundsOf, type IncidentRow } from './assemble';
+import { causeOf, reportIncident, rootCauseOf, roundsOf, type IncidentRow } from './assemble';
 
 // Spec examples as test data (INC-0133 VOCA, INC-0142 MuvMi) — never product code.
 const bkk = (s: string) => new Date(`${s}+07:00`);
@@ -91,7 +91,12 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
       started_at: iso('2026-09-25T09:30:00'),
       site: { name: 'MuvMi', tier: 1, owner: null },
       events: [
-        { type: 'detected', at: iso('2026-09-25T09:31:00'), payload: { summary: 'Slow, p50 5.8 s' } },
+        // As the engine writes a PROBLEM: both a cause and a summary (engine review S14, M1).
+        {
+          type: 'detected',
+          at: iso('2026-09-25T09:31:00'),
+          payload: { cause: 'Slow: p50 5.8 s (BKK, SIN, TYO)', summary: 'Slow, p50 5.8 s' },
+        },
         {
           type: 'escalated_to_down',
           at: iso('2026-09-25T09:48:41'),
@@ -111,6 +116,36 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
       cause: 'Timeout ×2 · 504 ×1',
       outsideHours: false,
     });
+    // The embed has no order: the same in reverse.
+    const reversed = { ...raised, events: [...raised.events].reverse() };
+    expect(reportIncident(reversed, week.from, week.to, now, insideHours)!.cause).toBe('Timeout ×2 · 504 ×1');
+    expect(causeOf(raised, 'problem')).toBe('Slow, p50 5.8 s');
+  });
+
+  it.each([
+    [
+      'what fixed it first',
+      { root_cause_category: 'ssl', root_cause: 'Cert expired', root_cause_fix: 'cert renewed' },
+      'cert renewed',
+    ],
+    [
+      'else what happened, first sentence',
+      { root_cause_category: 'hosting', root_cause: 'Provider reboot. Then more.' },
+      'Provider reboot',
+    ],
+    ['none while unknown', { root_cause_category: 'unknown', root_cause: 'Still looking' }, null],
+    ['none without a category', { root_cause: 'x' }, null],
+    [
+      'long text cut at a word',
+      {
+        root_cause_category: 'deploy',
+        root_cause:
+          'A deploy at 22:10 replaced the nginx config with one missing the upstream block for the API',
+      },
+      'A deploy at 22:10 replaced the nginx config with one…',
+    ],
+  ])('rootCauseOf: %s', (_n, over, expected) => {
+    expect(rootCauseOf(row(over))).toBe(expected);
   });
 
   it('an open drop runs to now (still failing), and names who acked and updated the client', () => {

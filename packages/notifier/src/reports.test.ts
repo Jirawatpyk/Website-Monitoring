@@ -40,6 +40,7 @@ const incident = (over: Partial<ReportIncident>): ReportIncident => ({
   level: 0,
   acked: null,
   clientUpdate: null,
+  rootCause: null,
   ...over,
 });
 
@@ -144,7 +145,10 @@ describe('daily digest (WeeklySummary "Daily digest")', () => {
         text: 'Bangkok Airways – China — Running now until Sun 27 Sep 22:00 · new hosting provider · not counted',
       },
     ]);
-    expect(m.sections[1]!.rows[0]!.text).toBe('No incidents.');
+    // No incident yesterday: only the monitor line — never "none" (spec note).
+    expect(m.sections[1]!.rows.map((r) => r.text)).toEqual([
+      'Monitor ran 100.00% of rounds. A missing digest means the monitor itself needs checking.',
+    ]);
   });
 
   it('leaves out the "now" rows when there are none, and the rounds share without a record', () => {
@@ -332,7 +336,8 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     const row = weeklyModel(weekly()).sections.find((x) => x.rows[0]?.label?.startsWith('MTTA'))!.rows[0]!;
     expect(row).toEqual({
       label: 'MTTA DOWN (response hours)',
-      text: 'Tier 1 19 min · Tier 2 — — Tier 1 over the 15 min target · Tier 2 — (no DOWN inside response hours)',
+      text: 'Tier 1 19 min · Tier 2 —',
+      note: 'Tier 1 over the 15 min target · Tier 2 — (no DOWN inside response hours)',
       warning: true,
     });
   });
@@ -388,6 +393,43 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     const s = m.sections.find((x) => x.title?.startsWith('INCIDENTS'))!;
     expect(s.title).toBe('INCIDENTS · 1 NOT RECOVERED');
     expect(s.rows[0]!.label).toBe('Down');
+  });
+});
+
+describe('root cause and the MTTA note (message-checker S14)', () => {
+  it('words a resolved incident by its root cause, as the board does', () => {
+    const d = digestModel(digest({ yesterday: [incident({ rootCause: 'cert renewed' })] }));
+    expect(d.sections[1]!.rows[0]!.text).toBe(
+      'ORCA Thailand DOWN 8 min (22:14, hard fail) — cert renewed, resolved',
+    );
+    const w = weeklyModel(weekly({ incidents: [incident({ rootCause: 'provider reboot' })] }));
+    expect(w.sections.find((x) => x.title?.startsWith('INCIDENTS'))!.rows[0]!.text).toBe(
+      'ORCA Thailand · Thu 24 Sep 22:14 · Hard fail · provider reboot',
+    );
+  });
+
+  it('Tier 1 with no DOWN says so without "outside response hours" (it is 24/7)', () => {
+    const row = weeklyModel(
+      weekly({
+        mtta: [
+          { tier: 1, seconds: null, targetMin: 15 },
+          { tier: 3, seconds: 420, targetMin: null },
+        ],
+      }),
+    ).sections.find((x) => x.rows[0]?.label?.startsWith('MTTA'))!.rows[0]!;
+    expect(row.text).toBe('Tier 1 — · Tier 3 7 min');
+    expect(row.note).toBe('Tier 1 — (no DOWN) · Tier 3 — no L1 step to compare with');
+  });
+
+  it('puts the note under the value in Chat, never joined by a second dash', () => {
+    const msg = reportChat(weeklyModel(weekly()), 'weekly');
+    const widget = msg.cardsV2[0]!.card.sections.flatMap((s) => s.widgets).find(
+      (w) => 'decoratedText' in w && w.decoratedText.topLabel.startsWith('MTTA'),
+    ) as { decoratedText: { text: string; bottomLabel?: string } };
+    expect(widget.decoratedText.text).toBe('Tier 1 19 min · Tier 2 —');
+    expect(widget.decoratedText.bottomLabel).toBe(
+      'Tier 1 over the 15 min target · Tier 2 — (no DOWN inside response hours)',
+    );
   });
 });
 

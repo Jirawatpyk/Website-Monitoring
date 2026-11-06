@@ -55,6 +55,8 @@ export interface ReportIncident {
   level: number;
   acked: { by: string; at: Date } | null;
   clientUpdate: { by: string; at: Date } | null;
+  /** The root cause in a few words ("cert renewed"); null while there is none. */
+  rootCause: string | null;
 }
 
 export interface ReportWindow {
@@ -143,6 +145,8 @@ interface Row {
   who?: string;
   /** A figure at the end of the row (an incident's down time), plain. */
   trail?: string;
+  /** A second line under the row (the MTTA notes). */
+  note?: string;
   warning?: boolean;
 }
 
@@ -186,7 +190,8 @@ const counted = (w: ReportWindow) => (w.kind === 'mute' ? 'still counted' : 'not
 
 /** The incident's outcome, for the digest's Yesterday line. */
 function outcome(i: ReportIncident): { text: string; who: ReportPerson | null } {
-  if (RESOLVED.includes(i.state)) return { text: 'resolved', who: null };
+  if (RESOLVED.includes(i.state))
+    return { text: i.rootCause ? `${i.rootCause}, resolved` : 'resolved', who: null };
   if (i.state === 'needs_root_cause')
     return { text: `needs a root cause${i.owner ? `, ${plainName(i.owner.name)}` : ''}`, who: i.owner };
   if (i.state === 'monitoring') return { text: 'recovered', who: null };
@@ -319,7 +324,7 @@ export function digestModel(f: DigestFacts): ReportModel {
       {
         title: `Yesterday · ${formatDay(yesterday, { weekday: true })}`,
         rows: [
-          ...(lines.length ? lines.map((l) => l.row) : [{ text: 'No incidents.' }]),
+          ...lines.map((l) => l.row),
           {
             text: `${rounds ? `${rounds.replace(' on time.', '.')} ` : ''}A missing digest means the monitor itself needs checking.`,
           },
@@ -327,7 +332,7 @@ export function digestModel(f: DigestFacts): ReportModel {
       },
     ],
     buttons: [],
-    textLine: `Website status ${day} ${time} · ${status.join(' · ')}${mention ? ` · follow-up: ${mention}` : ''}`,
+    textLine: `Website status ${day} ${time} · ${status.join(' · ')}${mention ? ` · ${mention.includes(' ') ? 'follow-ups' : 'follow-up'}: ${mention}` : ''}`,
   };
 }
 
@@ -348,7 +353,8 @@ function weeklyWhat(i: ReportIncident): string {
   if (reached || acked) parts.push([reached, acked].filter(Boolean).join(', '));
   if (i.clientUpdate)
     parts.push(`client updated by ${plainName(i.clientUpdate.by)} ${formatTime(i.clientUpdate.at)}`);
-  if (i.state === 'needs_root_cause') parts.push('no root cause yet');
+  if (i.rootCause) parts.push(i.rootCause);
+  else if (i.state === 'needs_root_cause' || i.state === 'monitoring') parts.push('no root cause yet');
   return parts.join(' · ');
 }
 
@@ -382,7 +388,9 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
   const mttaNote = f.mtta
     .map((m) =>
       m.seconds === null
-        ? `Tier ${m.tier} — (no DOWN inside response hours)`
+        ? m.tier === 1
+          ? `Tier 1 — (no DOWN)`
+          : `Tier ${m.tier} — (no DOWN inside response hours)`
         : m.targetMin === null
           ? `Tier ${m.tier} — no L1 step to compare with`
           : m.seconds > m.targetMin * 60
@@ -439,7 +447,8 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
               rows: [
                 {
                   label: 'MTTA DOWN (response hours)',
-                  text: `${mttaValue} — ${mttaNote}`,
+                  text: mttaValue,
+                  note: mttaNote,
                   warning: overTarget,
                 },
               ],
@@ -470,7 +479,14 @@ export function reportChat(m: ReportModel, cardId: string): ChatMessage {
   const widget = (r: Row): ChatWidget => {
     const text = chatText(rowText(r));
     return r.label
-      ? { decoratedText: { topLabel: r.label, text, wrapText: true } }
+      ? {
+          decoratedText: {
+            topLabel: r.label,
+            text,
+            ...(r.note ? { bottomLabel: chatText(r.note) } : {}),
+            wrapText: true,
+          },
+        }
       : { textParagraph: { text } };
   };
   return {
@@ -531,6 +547,7 @@ export function weeklyEmail(m: ReportModel, f: Pick<WeeklyFacts, 'weekStart' | '
     esc(r.text) +
     (r.who ? ` <b style="font-weight:600">— ${esc(r.who)}</b>` : '') +
     (r.trail ? ` — ${esc(r.trail)}` : '') +
+    (r.note ? `<br><span style="font-size:12px">${esc(r.note)}</span>` : '') +
     '</td></tr>';
   const section = (s: Section) =>
     `<tr><td style="padding:18px 0 4px">${
@@ -567,7 +584,7 @@ ${buttons ? `<div style="margin-top:18px">${buttons}</div>` : ''}
     ...m.sections.flatMap((s) => [
       '',
       ...(s.title ? [s.title] : []),
-      ...s.rows.map((r) => `${r.label ? `${r.label} · ` : ''}${rowText(r)}`),
+      ...s.rows.map((r) => `${r.label ? `${r.label} · ` : ''}${rowText(r)}${r.note ? `\n  ${r.note}` : ''}`),
     ]),
     '',
     ...m.buttons.map((b) => `${b.text}: ${b.url}`),

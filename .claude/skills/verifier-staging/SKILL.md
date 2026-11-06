@@ -278,6 +278,23 @@ select json_build_object(
 ) j;
 ```
 
+Daily digest and weekly summary (S14, D-056). Needs on `dxt-monitor-staging`: `GOOGLE_CHAT_REPORTS_WEBHOOK_URL` (a staging Reports Space, Tao's) and `HEALTHCHECKS_PING_URL_REPORTS` (a staging check: cron `0 9 * * *` Asia/Bangkok, grace 5 min), then a redeploy.
+
+| Do                                                                                                                   | Expect                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Press **Run** next to `/api/cron/reports` (Vercel → `dxt-monitor-staging` → Settings → Cron Jobs), or wait for 09:00 | one `reports` row (`daily`, today's Bangkok date); its Chat row `sent` with a `provider_message_id`; the card `Website status <day> 09:00 · n/n OK …` in the Reports Space (never the Alerts Space); the Healthchecks check green |
+| Run it again                                                                                                         | nothing new (`queue_report` returns null; the summary says `already_queued`)                                                                                                                                                      |
+| On a Monday, or run once with `now` faked in a local `test:int`                                                      | also `weekly`, the card `Website week …`, and the CEO email `DxT Monitor · Weekly summary · …` to each active stakeholder who manages no client                                                                                   |
+| Skip a day: set the check's period short (e.g. 10 min, grace 1 min) and don't run it                                 | Healthchecks emails Tao that the check is down; put the schedule back after                                                                                                                                                       |
+
+```sql
+select json_build_object(
+  'reports', (select json_agg(r) from (select kind, period_start, chat->>'text' as text, created_at from reports order by created_at desc limit 4) r),
+  'rows', (select json_agg(n) from (select template, channel, status, sent_at, provider_message_id, error from notifications where report_id is not null order by created_at desc limit 6) n),
+  'sweeps', (select count(*) from engine_sweep_minutes where minute > now() - interval '1 day')
+) j;
+```
+
 - **Browser pane under width emulation** (`resize_window` 1440 / 820 / 390): clicks by coordinate can miss and screenshots can be stale or half-size (S06b `/verify`: "Acknowledge did nothing"). Check the control is on top with `document.elementFromPoint`, act with a DOM `.click()`, and read layout with `getBoundingClientRect`; screenshots at those widths come from Playwright locally (e2e helpers) or from the pane without emulation. A hidden (not fronted) tab pauses `requestAnimationFrame` and CSS transitions — front it before timing anything.
 
 ## 4. Reset between runs

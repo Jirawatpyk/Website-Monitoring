@@ -47,7 +47,7 @@ const person = (
 ): ReportPerson | null => (p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null);
 
 const INCIDENT_COLUMNS = `number, state, severity, trigger, started_at, resolved_at, detected_at, acked_at, is_manual,
-  escalation_level, client_updated_at, client_update_not_needed,
+  escalation_level, client_updated_at, client_update_not_needed, root_cause_category, root_cause, root_cause_fix,
   sites!inner(id, name, tier, is_active, owner:profiles!sites_primary_owner_id_fkey(display_name, google_chat_user_id)),
   acker:profiles!incidents_acked_by_fkey(display_name),
   updater:profiles!incidents_client_updated_by_fkey(display_name),
@@ -90,6 +90,9 @@ const toLoaded = (i: IncidentQueryRow): LoadedIncident => ({
   escalation_level: i.escalation_level,
   client_updated_at: i.client_updated_at,
   client_update_not_needed: i.client_update_not_needed,
+  root_cause_category: i.root_cause_category,
+  root_cause: i.root_cause,
+  root_cause_fix: i.root_cause_fix,
   site: { name: i.sites.name, tier: i.sites.tier, owner: person(i.sites.owner) },
   siteId: i.sites.id,
   siteActive: i.sites.is_active,
@@ -101,7 +104,7 @@ const toLoaded = (i: IncidentQueryRow): LoadedIncident => ({
 /** "Inside response hours" for an incident's start: Tier 1 is 24/7, Tier 2–3 per the organisation's hours. */
 async function insideFor(db: DbClient, now: Date) {
   const hours = await loadResponseHours(db, now);
-  return (at: Date) => isInsideHours(at, hours);
+  return Object.assign((at: Date) => isInsideHours(at, hours), { hours });
 }
 
 interface WindowRow {
@@ -248,7 +251,7 @@ export async function loadDigestFacts(db: DbClient, now: Date, appUrl: string): 
         {
           site: s.name,
           since: latestDropStart(i),
-          cause: causeOf(i, status, { latest: true }),
+          cause: causeOf(i, status),
           number: i.number,
         },
       ];
@@ -370,7 +373,7 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
     ackedAt: i.acked_at ? new Date(i.acked_at) : null,
     isManual: i.is_manual,
   }));
-  const mtta = mttaByTier(metric, weekStart, weekEndExclusive, tiers, inside).map((m) => ({
+  const mtta = mttaByTier(metric, weekStart, weekEndExclusive, tiers, inside.hours).map((m) => ({
     ...m,
     // No L1 step on that tier's DOWN policy: no target to compare with (code review S14).
     targetMin: targets.get(m.tier) ?? null,
@@ -458,7 +461,10 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
   };
 }
 
-/** Open DOWN incidents that recovered but have no root cause yet (Monitoring / Needs root cause). */
+/**
+ * Open DOWN incidents that recovered and have no root cause yet: Needs root cause, or Monitoring with no
+ * category (one with a root cause stays in Monitoring after it settles — engine review S14, M2).
+ */
 async function loadOpenDowns(db: DbClient): Promise<LoadedIncident[]> {
   const data = must(
     await incidentQuery(db)
@@ -467,7 +473,9 @@ async function loadOpenDowns(db: DbClient): Promise<LoadedIncident[]> {
       .order('started_at'),
     'incidents',
   );
-  return (data ?? []).map(toLoaded).filter((i) => i.siteActive);
+  return (data ?? [])
+    .map(toLoaded)
+    .filter((i) => i.siteActive && (!i.root_cause_category || i.root_cause_category === 'unknown'));
 }
 
 /** The CEO (D-032, D-056): every active stakeholder who manages no client — the weekly email's recipients. */

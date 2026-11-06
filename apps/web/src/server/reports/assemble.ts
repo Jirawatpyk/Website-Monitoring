@@ -19,6 +19,9 @@ export interface IncidentRow {
   escalation_level: number;
   client_updated_at: string | null;
   client_update_not_needed?: boolean | null;
+  root_cause_category?: string | null;
+  root_cause?: string | null;
+  root_cause_fix?: string | null;
   site: { name: string; tier: number; owner: ReportPerson | null };
   acker: { display_name: string } | null;
   updater: { display_name: string } | null;
@@ -32,20 +35,49 @@ const clipMinutes = (e: Episode, from: Date, to: Date, now: Date) => {
   return end > start ? clockMinutes(start, end) : 0;
 };
 
-/** The cause of the incident's first drop in the period, in its short form ("Timeout ×2 · 504 ×1"). */
-export function causeOf(row: IncidentRow, severity: Severity, { latest = false } = {}): string {
+const ROOT_CAUSE_WORDS = 60;
+
+/**
+ * The root cause in a few words, as the board's "cert renewed", "provider reboot": what fixed it, else
+ * what happened, cut at a word to about 60 characters. None while the category is unknown or unset.
+ */
+export function rootCauseOf(row: IncidentRow): string | null {
+  if (!row.root_cause_category || row.root_cause_category === 'unknown') return null;
+  const words = (row.root_cause_fix?.trim() || row.root_cause?.trim() || '').split(/\s+/).join(' ');
+  if (!words) return null;
+  const first = words.split(/(?<=[.!?])\s/)[0]!.replace(/[.!?]$/, '');
+  if (first.length <= ROOT_CAUSE_WORDS) return first;
+  const cut = first.slice(0, ROOT_CAUSE_WORDS);
+  return `${cut.slice(0, cut.lastIndexOf(' ') > 20 ? cut.lastIndexOf(' ') : ROOT_CAUSE_WORDS)}…`;
+}
+
+const payloadOf = (e: IncidentEventRow) =>
+  e.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : {};
+
+/**
+ * The cause of a drop of `severity`, in its short form ("Timeout ×2 · 504 ×1", "Slow, p50 5.8 s"): the
+ * drop that started at `dropStart` (its opening event is the first one confirmed at or after it), or with
+ * no `dropStart` the newest (the digest's "now" rows). Only events that opened a drop of that severity
+ * count: a PROBLEM raised to DOWN is worded by its `escalated_to_down`, never by the PROBLEM's
+ * `detected` (engine review S14, M1). Events are sorted here: the embed has no order.
+ */
+export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date): string {
   if (row.trigger === 'manual') return TRIGGER_LABELS.manual;
-  const ordered = row.events
-    .filter((e) => ['detected', 'relapsed', 'escalated_to_down'].includes(e.type))
+  const raised = row.events.some((e) => e.type === 'escalated_to_down');
+  const opened = row.events
+    .filter((e) => {
+      if (e.type === 'escalated_to_down') return severity === 'down';
+      if (e.type === 'relapsed') return payloadOf(e).severity === severity;
+      if (e.type === 'detected') return (raised ? 'problem' : row.severity) === severity;
+      return false;
+    })
     .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''));
-  // The drop in progress (the digest's "now" rows) reads the newest drop first (code review S14).
-  const drops = (latest ? ordered.reverse() : ordered).map((e) =>
-    e.payload && typeof e.payload === 'object' ? (e.payload as Record<string, unknown>) : {},
-  );
-  for (const p of drops) {
-    if (severity === 'problem' && typeof p.summary === 'string' && p.summary.trim()) return p.summary.trim();
-    if (severity === 'down' && typeof p.cause === 'string' && p.cause.trim()) return shortCause(p.cause);
-  }
+  const pick = dropStart
+    ? (opened.find((e) => !!e.at && new Date(e.at) >= dropStart) ?? opened.at(-1))
+    : opened.at(-1);
+  const p = pick ? payloadOf(pick) : {};
+  if (severity === 'problem' && typeof p.summary === 'string' && p.summary.trim()) return p.summary.trim();
+  if (severity === 'down' && typeof p.cause === 'string' && p.cause.trim()) return shortCause(p.cause);
   return severity === 'down' ? TRIGGER_LABELS.hard_fail : TRIGGER_LABELS[row.trigger];
 }
 
@@ -78,8 +110,9 @@ export function reportIncident(
     minutes: drops.reduce((sum, e) => sum + clipMinutes(e, from, to, now), 0),
     drops: drops.length,
     failing: last.end === null,
-    cause: causeOf(row, severity),
+    cause: causeOf(row, severity, first.start),
     outsideHours: !inside(first.start),
+    rootCause: rootCauseOf(row),
     state: row.state,
     owner: row.site.owner,
     level: row.escalation_level,

@@ -129,11 +129,8 @@ describe('mttaByTier (weekly summary, spec §15.7, D-056)', () => {
   const at = (s: string) => new Date(`${s}+07:00`);
   const from = at('2026-09-21T00:00:00');
   const to = at('2026-09-28T00:00:00');
-  // Mon–Fri 09:00–18:00 Bangkok, as the Tier 2–3 response hours.
-  const inside = (d: Date) => {
-    const b = new Date(d.getTime() + 7 * 3_600_000);
-    return b.getUTCDay() >= 1 && b.getUTCDay() <= 5 && b.getUTCHours() >= 9 && b.getUTCHours() < 18;
-  };
+  // Mon–Fri 09:00–18:00 Bangkok, the Tier 2–3 response hours (spec §7).
+  const hours = { startMin: 9 * 60, endMin: 18 * 60, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };
   const down = (tier: number, start: string, ackMin: number | null): MetricIncident => ({
     severity: 'down',
     tier,
@@ -162,8 +159,35 @@ describe('mttaByTier (weekly summary, spec §15.7, D-056)', () => {
       1,
       null,
     ],
-  ])('%s', (_name, incidents, tier, expected) => {
-    const rows = mttaByTier(incidents, from, to, [1, 2, 3], inside);
+    // Confirmed down Fri 17:58 (inside hours), acked Mon 09:05: 2 + 5 = 7 response-hour minutes, as the
+    // L1 delay counts them (D-034) — never the 63 h on the clock (engine review S14, M3).
+    [
+      'Tier 2 waits only response-hour minutes',
+      [
+        {
+          ...down(2, '2026-09-25T17:58:00', null),
+          ackedAt: at('2026-09-28T09:05:00'),
+        },
+      ],
+      2,
+      7 * 60,
+      at('2026-09-29T00:00:00'),
+    ],
+    // First failed check 08:59:30, confirmed down 09:00:10: the ladder ran in hours, so it counts.
+    [
+      'Tier 2 is judged at confirmed down, where the ladder clock starts',
+      [
+        {
+          ...down(2, '2026-09-22T08:59:30', null),
+          detectedAt: at('2026-09-22T09:00:10'),
+          ackedAt: at('2026-09-22T09:06:10'),
+        },
+      ],
+      2,
+      6 * 60,
+    ],
+  ])('%s', (_name, incidents, tier, expected, until = to) => {
+    const rows = mttaByTier(incidents, from, until, [1, 2, 3], hours);
     expect(rows.map((r) => r.tier)).toEqual([1, 2, 3]);
     expect(rows.find((r) => r.tier === tier)!.seconds).toBe(expected);
   });
