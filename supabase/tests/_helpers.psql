@@ -85,6 +85,8 @@ set search_path = ''
 as $$
 begin
   delete from public.notifications;
+  -- S14: a report's messages went above; the reports cron may have left rows on a used stack.
+  delete from public.reports;
   delete from public.system_alerts;
   delete from public.verification_jobs;
   delete from public.incident_events;

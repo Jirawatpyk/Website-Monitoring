@@ -163,6 +163,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"engine_sweep_minutes": {
+                  Row: {
+                    "minute": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "minute": string
+                  }
+                  Update: {
+                    "minute"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"escalation_policies": {
                   Row: {
                     "created_at": string,"id": string,"severity": Database["public"]['Enums']["severity"],"tier": number | null,"updated_at": string
@@ -417,14 +431,14 @@ isOneToOne: false
                   ]
                 },"notifications": {
                   Row: {
-                    "attempts": number,"channel": Database["public"]['Enums']["notification_channel"],"context": NonNullable<Json>,"created_at": string,"dedupe_key": string,"error": string | null,"hold_until": string | null,"id": string,"incident_id": string | null,"maintenance_window_id": string | null,"next_retry_at": string | null,"oncall_event_id": string | null,"provider_message_id": string | null,"sent_at": string | null,"status": Database["public"]['Enums']["notification_status"],"system_alert_id": string | null,"template": string,"thread_key": string | null,"updated_at": string,"user_id": string | null
+                    "attempts": number,"channel": Database["public"]['Enums']["notification_channel"],"context": NonNullable<Json>,"created_at": string,"dedupe_key": string,"error": string | null,"hold_until": string | null,"id": string,"incident_id": string | null,"maintenance_window_id": string | null,"next_retry_at": string | null,"oncall_event_id": string | null,"provider_message_id": string | null,"report_id": string | null,"sent_at": string | null,"status": Database["public"]['Enums']["notification_status"],"system_alert_id": string | null,"template": string,"thread_key": string | null,"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "attempts"?: number,"channel": Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"maintenance_window_id"?: string | null,"next_retry_at"?: string | null,"oncall_event_id"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template": string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "attempts"?: number,"channel": Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"maintenance_window_id"?: string | null,"next_retry_at"?: string | null,"oncall_event_id"?: string | null,"provider_message_id"?: string | null,"report_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template": string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "attempts"?: number,"channel"?: Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"maintenance_window_id"?: string | null,"next_retry_at"?: string | null,"oncall_event_id"?: string | null,"provider_message_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template"?: string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "attempts"?: number,"channel"?: Database["public"]['Enums']["notification_channel"],"context"?: NonNullable<Json>,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"hold_until"?: string | null,"id"?: string,"incident_id"?: string | null,"maintenance_window_id"?: string | null,"next_retry_at"?: string | null,"oncall_event_id"?: string | null,"provider_message_id"?: string | null,"report_id"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"system_alert_id"?: string | null,"template"?: string,"thread_key"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -444,6 +458,12 @@ isOneToOne: false
       columns: ["oncall_event_id"]
 isOneToOne: false
       referencedRelation: "oncall_events"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "notifications_report_id_fkey"
+      columns: ["report_id"]
+isOneToOne: false
+      referencedRelation: "reports"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "notifications_system_alert_id_fkey"
@@ -687,6 +707,20 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"reports": {
+                  Row: {
+                    "chat": NonNullable<Json>,"created_at": string,"email": Json | null,"id": string,"kind": string,"period_start": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "chat": NonNullable<Json>,"created_at"?: string,"email"?: Json | null,"id"?: string,"kind": string,"period_start": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "chat"?: NonNullable<Json>,"created_at"?: string,"email"?: Json | null,"id"?: string,"kind"?: string,"period_start"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"site_status": {
                   Row: {
                     "created_at": string,"flip_ok": boolean | null,"flips": (string)[],"last_evaluated_at": string | null,"last_round_at": string | null,"note": string | null,"ok_rounds": number,"since": string,"site_id": string,"status": Database["public"]['Enums']["site_state"],"updated_at": string
@@ -807,7 +841,7 @@ isOneToOne: false
 { Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
                            },
 "claim_notifications":
-{ Args: { "p_channel": Database["public"]['Enums']["notification_channel"],"p_incident_id"?: string,"p_limit"?: number,"p_oncall"?: boolean }; Returns: {
+{ Args: { "p_channel": Database["public"]['Enums']["notification_channel"],"p_incident_id"?: string,"p_limit"?: number,"p_oncall"?: boolean,"p_reports"?: boolean }; Returns: {
               "attempts": number,
 "channel": Database["public"]['Enums']["notification_channel"],
 "context": NonNullable<Json>,
@@ -821,6 +855,7 @@ isOneToOne: false
 "next_retry_at": string | null,
 "oncall_event_id": string | null,
 "provider_message_id": string | null,
+"report_id": string | null,
 "sent_at": string | null,
 "status": Database["public"]['Enums']["notification_status"],
 "system_alert_id": string | null,
@@ -1050,6 +1085,11 @@ isOneToOne: false
               "detected_at": string,"incident_id": string,"severity": Database["public"]['Enums']["severity"],"site_id": string,"tier": number
             }[]
                            },
+"engine_sweep_gaps":
+{ Args: { "p_from": string,"p_to": string }; Returns: {
+              "first_minute": string,"gap_end": string,"gap_start": string
+            }[]
+                           },
 "engine_thread_live":
 { Args: { "p_incident_id": string }; Returns: boolean
                            },
@@ -1163,6 +1203,9 @@ isOneToOne: false
                            },
 "queue_fallback_emails":
 { Args: { "p_notification_id": string }; Returns: number
+                           },
+"queue_report":
+{ Args: { "p_chat": Json,"p_email": Json,"p_kind": string,"p_period_start": string,"p_recipients": (string)[] }; Returns: string
                            },
 "record_hand_check":
 { Args: { "p_site_id": string }; Returns: string
