@@ -349,12 +349,12 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
       {
         label: 'Below target',
         text: 'MuvMi · Tier 1 · 30 d 99.90% · target 99.95% · this week 99.57%',
-        trail: '43 min down · 22 min allowed',
+        trail: '43 min down · 21 min allowed',
         warning: true,
       },
       {
         label: 'On target',
-        text: 'VOCA · Tier 2 · 30 d 99.91% · target 99.90%',
+        text: 'VOCA · Tier 2 · 30 d 99.90% · target 99.90%',
         trail: '41 min down',
         warning: false,
       },
@@ -382,6 +382,30 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     const none = weeklyModel(weekly({ sites: [] }));
     expect(none.sections.some((x) => x.title?.startsWith('UPTIME'))).toBe(false);
     expect(none.lines[1]).toBe('Uptime all sites 99.95% · 2 DOWN · 1 PROBLEM · maintenance excluded');
+  });
+
+  // Code review: a site just under its target never reads the target's figure, nor equal minutes.
+  it('a site just under its target reads below it: 99.94%, 23 min down · 21 min allowed', () => {
+    const rows = weeklyModel(
+      weekly({
+        sites: [site({ site: 'realme.link', tier: 1, target: 0.9995, downMinutes: 23, week: null })],
+      }),
+    ).sections.find((x) => x.title?.startsWith('UPTIME'))!.rows;
+    expect(rows[0]).toEqual({
+      label: 'Below target',
+      text: 'realme.link · Tier 1 · 30 d 99.94% · target 99.95%',
+      trail: '23 min down · 21 min allowed',
+      warning: true,
+    });
+    const hair = weeklyModel(
+      weekly({ sites: [site({ site: 'X', tier: 1, target: 0.9995, downMinutes: 21.7 })] }),
+    ).sections.find((x) => x.title?.startsWith('UPTIME'))!.rows[0]!;
+    expect(hair.trail).toBe('22 min down · 21 min allowed');
+    const exact = weeklyModel(
+      weekly({ sites: [site({ site: 'Y', tier: 2, target: 0.999, downMinutes: 43.2 })] }),
+    ).sections.find((x) => x.title?.startsWith('UPTIME'))!.rows[0]!;
+    expect(exact.label).toBe('On target');
+    expect(exact.text).toBe('Y · Tier 2 · 30 d 99.90% · target 99.90%');
   });
 
   it('puts the furthest below first', () => {

@@ -383,7 +383,8 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
         target: TIER_CONFIG[tier]?.uptimeTarget ?? TIER_CONFIG[3].uptimeTarget,
         uptime: u.uptime,
         downMinutes: u.downMinutes,
-        windowMinutes: u.windowMinutes,
+        // The minutes judged, as `uptime` counts them (code review: the allowance must match the verdict).
+        windowMinutes: u.windowMinutes - u.maintenanceMinutes,
         // Watched for less than the 30 days: the words say since when.
         since: u.windowMinutes < MONTH_DAYS * 1440 && since ? since : null,
         week: weekOf.get(s.id) ?? null,

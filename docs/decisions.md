@@ -87,7 +87,7 @@ The summary gave one figure for all sites ("Uptime all sites 99.98%"), and no so
 - **The words:**
   - The header gains "· 15/17 sites on target (30 d)".
   - A new section after INCIDENTS, "UPTIME BY SITE · 2 BELOW TARGET" or "· ALL ON TARGET", lists every site.
-  - Sites below target come first, the furthest below first: `Below target` · "realme.link · Tier 1 · 30 d 99.91% · target 99.95% · this week 99.90%" — "41 min down · 22 min allowed".
+  - Sites below target come first, the furthest below first: `Below target` · "realme.link · Tier 1 · 30 d 99.90% · target 99.95% · this week 99.59%" — "41 min down · 21 min allowed". The figures round toward the verdict: the uptime and the allowance down, the down minutes up, so a site just under its target never shows the target's own figure (99.949% reads 99.94%).
   - The rest follow by tier, closest to its target first: `On target` · "MuvMi · Tier 1 · 30 d 100.00% · target 99.95%" — "0 min down".
   - No board draws this section; Tao asked for it in the summary's existing row style.
 

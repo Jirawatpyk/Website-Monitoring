@@ -121,6 +121,7 @@ export interface ReportSiteUptime {
   /** Uptime over the window, maintenance excluded. */
   uptime: number;
   downMinutes: number;
+  /** The minutes judged: the window less its maintenance, as \`uptime\` counts them. */
   windowMinutes: number;
   /** When monitoring began, if the window is shorter than 30 days ("since Wed 28 Oct"). */
   since: Date | null;
@@ -389,16 +390,19 @@ function uptimeRows(sites: readonly ReportSiteUptime[]): { rows: Row[]; below: n
   const met = sites.filter((s) => s.uptime >= s.target);
   below.sort((a, b) => b.target - b.uptime - (a.target - a.uptime) || a.site.localeCompare(b.site));
   met.sort((a, b) => a.tier - b.tier || a.uptime - b.uptime || a.site.localeCompare(b.site));
+  // Shown rounded down, so a site just under its target never reads the target's own figure (99.949%
+  // is "99.94%", not "99.95%"); the targets have two decimals, so on target never reads below it.
+  const pct = (u: number) => formatPercent(Math.floor(u * 10_000 + 1e-6) / 10_000);
   const row = (s: ReportSiteUptime, isBelow: boolean): Row => {
     const period = s.since ? `since ${formatDay(s.since, { weekday: true })}` : '30 d';
-    const week = isBelow && s.week !== null ? ` · this week ${formatPercent(s.week)}` : '';
-    const down = `${formatDuration(Math.round(s.downMinutes))} down`;
+    const week = isBelow && s.week !== null ? ` · this week ${pct(s.week)}` : '';
     return {
       label: isBelow ? 'Below target' : 'On target',
-      text: `${plainName(s.site)} · Tier ${s.tier} · ${period} ${formatPercent(s.uptime)} · target ${formatPercent(s.target)}${week}`,
+      text: `${plainName(s.site)} · Tier ${s.tier} · ${period} ${pct(s.uptime)} · target ${formatPercent(s.target)}${week}`,
+      // Below target: the down minutes rounded up, the allowance down, so the trail never reads equal.
       trail: isBelow
-        ? `${down} · ${formatDuration(Math.round(allowedDownMinutes(s.target, s.windowMinutes)))} allowed`
-        : down,
+        ? `${formatDuration(Math.ceil(s.downMinutes - 1e-6))} down · ${formatDuration(Math.floor(allowedDownMinutes(s.target, s.windowMinutes) + 1e-6))} allowed`
+        : `${formatDuration(Math.round(s.downMinutes))} down`,
       warning: isBelow,
     };
   };
