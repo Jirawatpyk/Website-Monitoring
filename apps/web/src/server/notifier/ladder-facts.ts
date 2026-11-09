@@ -1,8 +1,7 @@
 import 'server-only';
 import {
-  episodesFromTimeline,
+  incidentLadderClock,
   isInsideHours,
-  ladderClockOf,
   ladderClockStart,
   nextOpening,
   problemHoldUntil,
@@ -253,13 +252,7 @@ function clockOf(i: IncidentFacts): Date {
  * incident was down (D-058), as the runner fires it (`server/engine/ladder.ts`).
  */
 function ladderClock(i: IncidentFacts, plan: EscalationPlan, hours: ResponseHours) {
-  const { detectedAt, carriedMin } = ladderClockOf({
-    episodes: episodesFromTimeline(i, i.incident_events ?? []),
-    severity: plan.severity,
-    clockStart: clockOf(i),
-    tier: plan.tier,
-    hours,
-  });
+  const { detectedAt, carriedMin } = incidentLadderClock(i, i.incident_events ?? [], plan, hours);
   return { detectedAt, carriedMin };
 }
 

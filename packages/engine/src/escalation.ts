@@ -3,9 +3,10 @@ import {
   type EscalationPlan,
   type IncidentState,
   type ResponseHours,
+  type Severity,
   type Tier,
 } from '@dxt/shared';
-import type { Episode } from './lifecycle';
+import { episodesFromTimeline, type Episode, type IncidentEventRow } from './lifecycle';
 import { addInsideMinutes, isInsideHours, minutesInsideHours, nextOpening } from './response-hours';
 
 /**
@@ -99,9 +100,42 @@ export function ladderClockOf(input: {
   for (const d of drops.slice(0, -1)) {
     const end = d.end ?? last.start;
     carriedMin += minutesBetween(input.tier, d.start, end, input.hours);
-    carriedWallMin += minutesBetween(1, d.start, end, input.hours);
+    // A Tier 2–3 PROBLEM held overnight was told at the opening: its words count from then (D-034).
+    const told =
+      input.severity === 'problem'
+        ? (problemHoldUntil(input.tier as Tier, d.start, input.hours) ?? d.start)
+        : d.start;
+    carriedWallMin += minutesBetween(1, told, end, input.hours);
   }
   return { detectedAt: last.start, carriedMin, carriedWallMin };
+}
+
+/**
+ * `ladderClockOf` for a stored incident and its timeline rows: the one way the runner and the
+ * messages build the clock, so "acknowledge by HH:MM" promises the time the level fires (D-058).
+ */
+export function incidentLadderClock(
+  incident: {
+    started_at: string;
+    severity: Severity;
+    resolved_at?: string | null;
+    detected_at: string;
+    alerted_at?: string | null;
+  },
+  events: readonly IncidentEventRow[],
+  plan: Pick<EscalationPlan, 'severity' | 'tier'>,
+  hours: ResponseHours,
+): { detectedAt: Date; carriedMin: number; carriedWallMin: number } {
+  return ladderClockOf({
+    episodes: episodesFromTimeline(incident, events),
+    severity: plan.severity,
+    clockStart: ladderClockStart({
+      detectedAt: new Date(incident.detected_at),
+      alertedAt: incident.alerted_at ? new Date(incident.alerted_at) : null,
+    }),
+    tier: plan.tier,
+    hours,
+  });
 }
 
 /**

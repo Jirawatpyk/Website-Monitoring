@@ -2,6 +2,7 @@ import type { EscalationPlan } from '@dxt/shared';
 import { describe, expect, it } from 'vitest';
 import {
   firstReminderOf,
+  incidentLadderClock,
   ladderClockOf,
   ladderClockStart,
   ladderDue,
@@ -479,6 +480,60 @@ describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () =>
       // …and 40 on the wall clock, for the words.
       carriedWallMin: 40,
     });
+  });
+});
+
+describe('ladderClockOf — the words of a held PROBLEM (D-034, D-058; code review)', () => {
+  it('a Tier 2 PROBLEM flagged Thu 22:00, told Fri 09:00, cleared 09:10: 10 min carried, on both clocks', () => {
+    const episodes: Episode[] = [
+      {
+        start: bkk('2026-09-24T22:00:00'),
+        confirmedAt: bkk('2026-09-24T22:00:00'),
+        end: bkk('2026-09-25T09:10:00'),
+        severity: 'problem',
+      },
+      {
+        start: bkk('2026-09-28T10:00:00'),
+        confirmedAt: bkk('2026-09-28T10:00:00'),
+        end: null,
+        severity: 'problem',
+      },
+    ];
+    expect(
+      ladderClockOf({
+        episodes,
+        severity: 'problem',
+        clockStart: bkk('2026-09-24T22:00:00'),
+        tier: 2,
+        hours: HOURS,
+      }),
+    ).toEqual({ detectedAt: bkk('2026-09-28T10:00:00'), carriedMin: 10, carriedWallMin: 10 });
+  });
+});
+
+describe('incidentLadderClock — a stored incident and its timeline (D-058)', () => {
+  it('reads the drops from the rows, from Confirmed down', () => {
+    expect(
+      incidentLadderClock(
+        {
+          started_at: '2026-11-02T02:59:00Z',
+          severity: 'down',
+          detected_at: '2026-11-02T03:00:00Z',
+          alerted_at: null,
+        },
+        [
+          { type: 'detected', at: '2026-11-02T03:00:00Z', payload: {} },
+          { type: 'recovered', at: '2026-11-02T03:05:00Z', payload: {} },
+          {
+            type: 'relapsed',
+            at: '2026-11-04T00:44:00Z',
+            payload: { startedAt: '2026-11-04T00:43:00Z', severity: 'down' },
+          },
+        ],
+        full(1),
+        HOURS,
+      ),
+    ).toEqual({ detectedAt: new Date('2026-11-04T00:44:00Z'), carriedMin: 5, carriedWallMin: 5 });
   });
 });
 

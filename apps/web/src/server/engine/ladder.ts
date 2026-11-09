@@ -1,12 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import {
-  episodesFromTimeline,
-  ladderClockOf,
-  ladderClockStart,
-  ladderDue,
-  problemHoldUntil,
-} from '@dxt/engine';
+import { incidentLadderClock, ladderDue, problemHoldUntil } from '@dxt/engine';
 import {
   escalationPlanSchema,
   type IncidentState,
@@ -64,19 +58,12 @@ export async function escalationTick(
     try {
       // Confirmed down — or when a mute that silenced it was over and its first alert went (D-036) —
       // then only the minutes it was down: a recovery pauses the clock, a relapse resumes it (D-058).
-      const clock = ladderClockOf({
-        episodes: episodesFromTimeline(
-          { started_at: inc.started_at, severity: inc.severity as Severity, resolved_at: inc.resolved_at },
-          events.filter((e) => e.incident_id === inc.id),
-        ),
-        severity: plan.data.severity,
-        clockStart: ladderClockStart({
-          detectedAt: new Date(inc.detected_at),
-          alertedAt: inc.alerted_at ? new Date(inc.alerted_at) : null,
-        }),
-        tier: plan.data.tier,
+      const clock = incidentLadderClock(
+        { ...inc, severity: inc.severity as Severity },
+        events.filter((e) => e.incident_id === inc.id),
+        plan.data,
         hours,
-      });
+      );
       queued += await tick(db, inc.id, clock.carriedWallMin, {
         plan: plan.data,
         detectedAt: clock.detectedAt,
