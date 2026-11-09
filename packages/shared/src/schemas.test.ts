@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROBE_LOCATIONS, TIER_CONFIG, TRIGGERS, TRIGGER_LABELS } from './domain';
+import { allowedDownMinutes, PROBE_LOCATIONS, TIER_CONFIG, TRIGGERS, TRIGGER_LABELS } from './domain';
 import { checkResultSchema, dueMonitorsResponseSchema, ingestBatchSchema } from './schemas';
 
 describe('dueMonitorsResponseSchema (S12a watchdog facts)', () => {
@@ -77,5 +77,19 @@ describe('domain constants', () => {
     expect(TIER_CONFIG[1].roundWindowSec).toBe(90);
     expect(TIER_CONFIG[2].roundWindowSec).toBe(TIER_CONFIG[2].intervalSec + 30);
     expect(PROBE_LOCATIONS).toEqual(['BKK', 'SIN', 'TYO']);
+  });
+
+  // D-059: the CEO's standard table — 99.9% is ~43 min down a month.
+  it.each([
+    [1, 0.9995, 21.6],
+    [2, 0.999, 43.2],
+    [3, 0.995, 216],
+  ] as const)('Tier %i targets %d uptime: %d min allowed in 30 days', (tier, target, minutes) => {
+    expect(TIER_CONFIG[tier].uptimeTarget).toBe(target);
+    expect(allowedDownMinutes(target, 30 * 1440)).toBeCloseTo(minutes, 6);
+  });
+
+  it('allows nothing on an empty window', () => {
+    expect(allowedDownMinutes(0.999, 0)).toBe(0);
   });
 });

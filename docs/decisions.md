@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-059 | 9 Nov 2026 | The weekly summary judges each site against an uptime target by tier — Tier 1 99.95%, Tier 2 99.9%, Tier 3 99.5% (the CEO's standard table) — over the 30 days ending with the week, with this week's figure beside it, in a new UPTIME BY SITE section and a "sites on target" count in the header; a per-site target waits for S17 | Gap — no source set an uptime target; the summary gave one figure for all sites |
 | D-058 | 9 Nov 2026 | The escalation clock counts only the minutes an incident is down: a recovery pauses it, a relapse resumes it with the earlier drops' minutes, and levels already fired stay fired (as the client-update track counts, D-052 item 5). ESCALATED / STILL … say those down minutes | D-034 "a level that came due while the site was up fires on the relapse"; D-004 "escalation keeps its original clock" (now: keeps its minutes) |
 | D-057 | 6 Nov 2026 | S14 recurring maintenance (FR-10b): a series repeats weekly (chosen weekdays) or monthly (day N, or the 1st–4th weekday), each occurrence ≤ 24 h; occurrences are ordinary approved maintenance windows created 14 days ahead, only for an approved, uncancelled series; the series is approved once (an Admin's on create, a Responder's by an Admin); each occurrence starts, ends and "didn't start" on its own with S09b's messages; the series posts one SCHEDULED; cancelling it cancels the occurrences not yet started, quietly; an occurrence that would overlap another window is skipped and logged | Gap: FR-10b, no board (the UI and the series messages wait for one) |
 | D-056 | 6 Nov 2026 | S14: the daily digest posts to the DxT Website Reports Space only; the weekly summary posts there and is emailed to the CEO. Lines whose data doesn't exist yet (client first to report, reviews waiting sign-off, CEO decisions, SSL / domain expiry) are left out until their slice adds the data. Recurring maintenance is a second PR, and its UI waits for a Claude Design board. Done-when 2 is proved with one staging run plus a skipped run that fires the Healthchecks alert, and three mornings in a row on production after the merge | WeeklySummary board header "+ EMAIL TO CEO" over both cards; board sample lines with no source; plan S14 Done-when 2 "three consecutive staging days" |
@@ -62,6 +63,35 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-059 — Uptime by site against a target
+
+**Problem.** The CEO read the first weekly summary (9 Nov 2026), asked to "evaluate site by site not overall", and sent a standard:
+
+| Uptime | Down a month | What it fits |
+|---|---|---|
+| 99.5% | ~3.6 h | internal tools, low-traffic sites |
+| 99.9% | ~43 min | corporate and business sites |
+| 99.95% | ~22 min | e-commerce, SaaS, client portals |
+| 99.99% | ~4 min | payments, critical platforms |
+
+The summary gave one figure for all sites ("Uptime all sites 99.98%"), and no source set a target for a site.
+
+**Decision (Tao, 9 Nov 2026).**
+- **Targets by tier** (`TIER_CONFIG.uptimeTarget`):
+  - Tier 1 is 99.95% (~22 min a month).
+  - Tier 2 is 99.9% (~43 min).
+  - Tier 3 is 99.5% (~3.6 h).
+  - A target per site waits for Settings (S17).
+- **What is judged:** each site's uptime over the 30 days ending with the week, maintenance excluded, as the table counts a month. A site watched for less than that is judged since it started ("since Wed 28 Oct"). This week's figure is shown beside a site below target, not judged on its own: Tier 1's week allows only ~5 min.
+- **The words:**
+  - The header gains "· 15/17 sites on target (30 d)".
+  - A new section after INCIDENTS, "UPTIME BY SITE · 2 BELOW TARGET" or "· ALL ON TARGET", lists every site.
+  - Sites below target come first, the furthest below first: `Below target` · "realme.link · Tier 1 · 30 d 99.91% · target 99.95% · this week 99.90%" — "41 min down · 22 min allowed".
+  - The rest follow by tier, closest to its target first: `On target` · "MuvMi · Tier 1 · 30 d 100.00% · target 99.95%" — "0 min down".
+  - No board draws this section; Tao asked for it in the summary's existing row style.
+
+**Why.** It answers the CEO in his own terms with no new setting to fill in. Judging on 30 days matches the table and keeps one short drop from failing a site for a week. Listing every site, not only the failures, is what "site by site" asks.
 
 ## D-058 — The escalation clock pauses while the site is up
 

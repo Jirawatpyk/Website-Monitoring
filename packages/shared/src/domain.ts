@@ -150,13 +150,23 @@ export interface TierConfig {
   slowThresholdMs: number;
   /** Tier 1 responds 24/7; Tier 2–3 share one response-hours setting (spec §7, §14.14). */
   alwaysOn: boolean;
+  /**
+   * The uptime a site of this tier should keep over 30 days (D-059, the CEO's standard table): Tier 1
+   * 99.95% (~22 min down a month), Tier 2 99.9% (~43 min), Tier 3 99.5% (~3.6 h).
+   */
+  uptimeTarget: number;
 }
 
 export const TIER_CONFIG: Record<Tier, TierConfig> = {
-  1: { intervalSec: 60, roundWindowSec: 90, slowThresholdMs: 3_000, alwaysOn: true },
-  2: { intervalSec: 180, roundWindowSec: 210, slowThresholdMs: 5_000, alwaysOn: false },
-  3: { intervalSec: 300, roundWindowSec: 330, slowThresholdMs: 5_000, alwaysOn: false },
+  1: { intervalSec: 60, roundWindowSec: 90, slowThresholdMs: 3_000, alwaysOn: true, uptimeTarget: 0.9995 },
+  2: { intervalSec: 180, roundWindowSec: 210, slowThresholdMs: 5_000, alwaysOn: false, uptimeTarget: 0.999 },
+  3: { intervalSec: 300, roundWindowSec: 330, slowThresholdMs: 5_000, alwaysOn: false, uptimeTarget: 0.995 },
 };
+
+/** The down minutes a target allows over a window (D-059): 99.9% of 30 days = 43.2 min. */
+export function allowedDownMinutes(target: number, windowMinutes: number): number {
+  return Math.max(0, windowMinutes * (1 - target));
+}
 
 /** Identifying User-Agent every probe sends (PRD §9). */
 export const PROBE_USER_AGENT = 'DxT-Monitor/1.0';

@@ -7,6 +7,7 @@ import {
   type DigestFacts,
   type MonitorFacts,
   type ReportIncident,
+  type ReportSiteUptime,
   type WeeklyFacts,
 } from './reports';
 
@@ -184,6 +185,21 @@ describe('daily digest (WeeklySummary "Daily digest")', () => {
   });
 });
 
+const site = (
+  over: Partial<ReportSiteUptime> & Pick<ReportSiteUptime, 'site' | 'tier' | 'target'>,
+): ReportSiteUptime => {
+  const windowMinutes = over.windowMinutes ?? 30 * 1440;
+  const downMinutes = over.downMinutes ?? 0;
+  return {
+    uptime: 1 - downMinutes / windowMinutes,
+    downMinutes,
+    windowMinutes,
+    since: null,
+    week: 1,
+    ...over,
+  };
+};
+
 const weekly = (over: Partial<WeeklyFacts> = {}): WeeklyFacts => ({
   at: bkk('2026-09-28T09:00:00'),
   weekStart: bkk('2026-09-21T00:00:00'),
@@ -217,6 +233,21 @@ const weekly = (over: Partial<WeeklyFacts> = {}): WeeklyFacts => ({
       minutes: 22,
       cause: 'Slow, p50 5.8 s',
       acked: { by: 'Ploy', at: bkk('2026-09-25T09:58:00') },
+    }),
+  ],
+  // D-059: 30 days = 43,200 min. MuvMi (Tier 1, 99.95%: 21.6 min allowed) was down 43 min — below;
+  // VOCA (Tier 2, 99.9%: 43.2 min) 41 min — on target; DxT AI watched since Wed 16 Sep only.
+  sites: [
+    site({ site: 'VOCA', tier: 2, target: 0.999, downMinutes: 41, week: 1 - 41 / 10_080 }),
+    site({ site: 'MuvMi', tier: 1, target: 0.9995, downMinutes: 43, week: 1 - 43 / 10_080 }),
+    site({ site: 'ORCA Thailand', tier: 2, target: 0.999, downMinutes: 0 }),
+    site({
+      site: 'DxT AI',
+      tier: 3,
+      target: 0.995,
+      downMinutes: 0,
+      windowMinutes: 12 * 1440,
+      since: bkk('2026-09-16T10:00:00'),
     }),
   ],
   needsSomeone: [
@@ -306,8 +337,70 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     expect(m.title).toBe('Website week · Mon 21 – Sun 27 Sep');
     expect(m.lines).toEqual([
       'Week: 14/17 sites had no downtime',
-      'Uptime all sites 99.95% · 2 DOWN · 1 PROBLEM · maintenance excluded',
+      'Uptime all sites 99.95% · 3/4 sites on target (30 d) · 2 DOWN · 1 PROBLEM · maintenance excluded',
     ]);
+  });
+
+  // D-059 (the CEO, 9 Nov): every site against its tier's target, the furthest below first.
+  it('judges each site against its tier target: below first, then the rest by tier', () => {
+    const s = weeklyModel(weekly()).sections.find((x) => x.title?.startsWith('UPTIME BY SITE'))!;
+    expect(s.title).toBe('UPTIME BY SITE · 1 BELOW TARGET');
+    expect(s.rows).toEqual([
+      {
+        label: 'Below target',
+        text: 'MuvMi · Tier 1 · 30 d 99.90% · target 99.95% · this week 99.57%',
+        trail: '43 min down · 22 min allowed',
+        warning: true,
+      },
+      {
+        label: 'On target',
+        text: 'VOCA · Tier 2 · 30 d 99.91% · target 99.90%',
+        trail: '41 min down',
+        warning: false,
+      },
+      {
+        label: 'On target',
+        text: 'ORCA Thailand · Tier 2 · 30 d 100.00% · target 99.90%',
+        trail: '0 min down',
+        warning: false,
+      },
+      {
+        label: 'On target',
+        text: 'DxT AI · Tier 3 · since Wed 16 Sep 100.00% · target 99.50%',
+        trail: '0 min down',
+        warning: false,
+      },
+    ]);
+  });
+
+  it('says ALL ON TARGET when every site meets it, and leaves the count out with no sites', () => {
+    const all = weeklyModel(weekly({ sites: [site({ site: 'MuvMi', tier: 1, target: 0.9995 })] }));
+    expect(all.sections.find((x) => x.title?.startsWith('UPTIME'))!.title).toBe(
+      'UPTIME BY SITE · ALL ON TARGET',
+    );
+    expect(all.lines[1]).toContain('· 1/1 sites on target (30 d) ·');
+    const none = weeklyModel(weekly({ sites: [] }));
+    expect(none.sections.some((x) => x.title?.startsWith('UPTIME'))).toBe(false);
+    expect(none.lines[1]).toBe('Uptime all sites 99.95% · 2 DOWN · 1 PROBLEM · maintenance excluded');
+  });
+
+  it('puts the furthest below first', () => {
+    const rows = weeklyModel(
+      weekly({
+        sites: [
+          site({ site: 'A', tier: 2, target: 0.999, downMinutes: 50 }),
+          site({ site: 'B', tier: 1, target: 0.9995, downMinutes: 200 }),
+        ],
+      }),
+    ).sections.find((x) => x.title?.startsWith('UPTIME'))!.rows;
+    expect(rows.map((r) => r.text.split(' · ')[0])).toEqual(['B', 'A']);
+  });
+
+  it('renders the section in the Chat card and the email', () => {
+    const m = weeklyModel(weekly());
+    expect(JSON.stringify(reportChat(m, 'weekly'))).toContain('UPTIME BY SITE · 1 BELOW TARGET');
+    const email = weeklyEmail(m, weekly());
+    expect(email.text).toContain('MuvMi · Tier 1 · 30 d 99.90% · target 99.95% · this week 99.57%');
   });
 
   it('lists incidents with their down time, outline severity and the ladder', () => {
@@ -395,6 +488,7 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     const m = weeklyModel(
       weekly({
         incidents: [],
+        sites: [],
         needsSomeone: [],
         planned: [],
         comingUp: [],
