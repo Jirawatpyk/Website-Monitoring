@@ -1,4 +1,4 @@
-import { ladderClockStart, scheduleOf } from '@dxt/engine';
+import { ladderClockOf, ladderClockStart, scheduleOf, type Episode } from '@dxt/engine';
 import { formatTime, type EscalationPlan, type EscalationTarget, type ResponseHours } from '@dxt/shared';
 
 /**
@@ -126,6 +126,8 @@ export function escalationCardOf(input: {
   state: string;
   detectedAt: string;
   alertedAt: string | null;
+  /** The incident's drops: the clock counts only the minutes it was down (D-058). */
+  episodes?: readonly Episode[];
   hours: ResponseHours;
   steps: readonly StepSent[];
   people: LadderPeople;
@@ -140,8 +142,18 @@ export function escalationCardOf(input: {
     detectedAt: new Date(input.detectedAt),
     alertedAt: input.alertedAt ? new Date(input.alertedAt) : null,
   });
+  // After a relapse the levels still to come count from it, with the earlier drops' minutes (D-058).
+  const clock = ladderClockOf({
+    episodes: input.episodes ?? [],
+    severity: plan.severity,
+    clockStart: start,
+    tier: plan.tier,
+    hours: input.hours,
+  });
   const due = new Map(
-    scheduleOf({ plan, detectedAt: start, hours: input.hours }).map((s) => [s.level, s.dueAt]),
+    scheduleOf({ plan, detectedAt: clock.detectedAt, carriedMin: clock.carriedMin, hours: input.hours }).map(
+      (s) => [s.level, s.dueAt],
+    ),
   );
   const waiting = WAITING.has(input.state);
   const steps = [...plan.steps].sort((a, b) => a.level - b.level);
@@ -150,7 +162,8 @@ export function escalationCardOf(input: {
   const next = steps.find((s) => s.level > input.level && !sentAt.has(s.level));
 
   const rows = steps.map((s): LadderRow => {
-    const at = due.get(s.level)!;
+    // L0 went with the first alert, whatever drop the incident is in now.
+    const at = s.level === 0 ? start : due.get(s.level)!;
     const when = s.level === 0 ? `0 min · ${formatTime(at)}` : `+${s.delayMin} min · ${formatTime(at)}`;
     const who = whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'));
     const sent = s.level === 0 ? { at: start.toISOString(), sentBy: null } : sentAt.get(s.level);

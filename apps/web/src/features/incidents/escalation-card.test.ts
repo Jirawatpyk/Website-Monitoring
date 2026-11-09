@@ -169,3 +169,25 @@ describe('pendingClientUpdate — the Resolve card agrees with the pre-fire remi
   });
   it('no reminder: unchanged', () => expect(pendingClientUpdate(null, gate)).toBe(gate));
 });
+
+describe('escalationCardOf — after a relapse (D-058)', () => {
+  it('down 5 min at 02:31, back, down again 08:00: L1 at 08:10, L0 stays at its first alert', () => {
+    const drop = (start: string, confirmed: string, end: string | null) => ({
+      start: new Date(at(start)),
+      confirmedAt: new Date(at(confirmed)),
+      end: end ? new Date(at(end)) : null,
+      severity: 'down' as const,
+    });
+    const card = escalationCardOf({
+      ...base,
+      engine: { stopped: false, since: at('08:00') },
+      episodes: [drop('02:30', '02:31', '02:36'), drop('07:59', '08:00', null)],
+    })!;
+    expect(card.rows.map((r) => [r.label, r.when])).toEqual([
+      ['L0', '0 min · 02:31'],
+      ['L1', '+15 min · 08:10'],
+      ['L2', '+30 min · 08:25'],
+      ['L3', '+60 min · 08:55'],
+    ]);
+  });
+});

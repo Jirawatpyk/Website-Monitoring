@@ -443,6 +443,7 @@ export async function loadIncident(
       state: i.state,
       detectedAt: i.detected_at,
       alertedAt: i.alerted_at,
+      episodes: episodesFromTimeline(i, events),
       hours,
       steps: events
         .filter(
