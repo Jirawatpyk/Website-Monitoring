@@ -332,6 +332,24 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     ]);
   });
 
+  it('puts the worst first, as the board: DOWN before PROBLEM, then the longest; a tie by start', () => {
+    const order = weeklyModel(
+      weekly({
+        incidents: [
+          incident({ site: 'Fuji Links', severity: 'problem', minutes: 22 }),
+          incident({ site: 'ORCA Thailand', minutes: 8 }),
+          incident({ site: 'DxT AI', severity: 'problem', minutes: 26 * 60 }),
+          incident({ site: 'VOCA', minutes: 41, startedAt: bkk('2026-09-21T03:12:00') }),
+          incident({ site: 'MuvMi', minutes: 43, startedAt: bkk('2026-09-25T09:48:00') }),
+          incident({ site: 'Tubtong', minutes: 41, startedAt: bkk('2026-09-20T10:00:00') }),
+        ],
+      }),
+    )
+      .sections.find((x) => x.title?.startsWith('INCIDENTS'))!
+      .rows.map((r) => r.text.split(' · ')[0]);
+    expect(order).toEqual(['MuvMi', 'Tubtong', 'VOCA', 'ORCA Thailand', 'DxT AI', 'Fuji Links']);
+  });
+
   it('says "— (no DOWN inside response hours)" for a tier with none (spec §15.7)', () => {
     const row = weeklyModel(weekly()).sections.find((x) => x.rows[0]?.label?.startsWith('MTTA'))!.rows[0]!;
     expect(row).toEqual({
