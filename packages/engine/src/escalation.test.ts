@@ -438,7 +438,8 @@ describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () =>
       4,
     ],
   ])('%s', (_name, episodes, detectedAt, carriedMin) => {
-    expect(clock(episodes)).toEqual({ detectedAt, carriedMin });
+    // Tier 1: the wall minutes are the clock minutes.
+    expect(clock(episodes)).toEqual({ detectedAt, carriedMin, carriedWallMin: carriedMin });
   });
 
   it('D-021: the PROBLEM time before the raise isn’t on the DOWN clock (it starts at the raise)', () => {
@@ -449,6 +450,7 @@ describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () =>
     expect(clock(raised, { clockStart: bkk('2026-11-02T10:00:40') })).toEqual({
       detectedAt: bkk('2026-11-02T10:00:40'),
       carriedMin: 0,
+      carriedWallMin: 0,
     });
   });
 
@@ -458,7 +460,11 @@ describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () =>
       drop('2026-11-02T09:55:00', '2026-11-02T09:56:00', '2026-11-02T10:12:00'),
       drop('2026-11-02T12:00:00', '2026-11-02T12:01:00', null),
     ];
-    expect(clock(episodes)).toEqual({ detectedAt: bkk('2026-11-02T12:01:00'), carriedMin: 12 });
+    expect(clock(episodes)).toEqual({
+      detectedAt: bkk('2026-11-02T12:01:00'),
+      carriedMin: 12,
+      carriedWallMin: 12,
+    });
   });
 
   it('Tier 2–3 carry response-hours minutes only', () => {
@@ -470,6 +476,8 @@ describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () =>
     expect(clock(episodes, { tier: 2, clockStart: bkk('2026-09-24T17:50:00') })).toEqual({
       detectedAt: bkk('2026-09-28T09:01:00'),
       carriedMin: 10,
+      // …and 40 on the wall clock, for the words.
+      carriedWallMin: 40,
     });
   });
 });

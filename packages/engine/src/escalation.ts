@@ -77,6 +77,8 @@ function minutesBetween(tier: number, from: Date, to: Date, hours: ResponseHours
  * down, or the late alert after a mute; a D-021 raise resets it), and nothing before it counts — so the
  * PROBLEM time before a raise and a D-023 key-page PROBLEM drop on a DOWN incident stay off the DOWN
  * clock. One drop: `{ detectedAt: clockStart, carriedMin: 0 }`, the clock as it always was.
+ * `carriedWallMin` is the same drops on the wall clock, for the words ("ESCALATED · L1 · 15 min, not
+ * acknowledged" — D-034 words Tier 2–3 on the wall clock too); equal to `carriedMin` on Tier 1.
  */
 export function ladderClockOf(input: {
   episodes: readonly Episode[];
@@ -84,19 +86,22 @@ export function ladderClockOf(input: {
   clockStart: Date;
   tier: number;
   hours: ResponseHours;
-}): { detectedAt: Date; carriedMin: number } {
+}): { detectedAt: Date; carriedMin: number; carriedWallMin: number } {
   const from = input.clockStart.getTime();
   const drops = input.episodes
     .filter((e) => e.severity === input.severity && (e.end === null || e.end.getTime() > from))
     .map((e) => ({ start: new Date(Math.max((e.confirmedAt ?? e.start).getTime(), from)), end: e.end }))
     .sort((a, b) => a.start.getTime() - b.start.getTime());
   const last = drops.at(-1);
-  if (!last) return { detectedAt: input.clockStart, carriedMin: 0 };
+  if (!last) return { detectedAt: input.clockStart, carriedMin: 0, carriedWallMin: 0 };
   let carriedMin = 0;
+  let carriedWallMin = 0;
   for (const d of drops.slice(0, -1)) {
-    carriedMin += minutesBetween(input.tier, d.start, d.end ?? last.start, input.hours);
+    const end = d.end ?? last.start;
+    carriedMin += minutesBetween(input.tier, d.start, end, input.hours);
+    carriedWallMin += minutesBetween(1, d.start, end, input.hours);
   }
-  return { detectedAt: last.start, carriedMin };
+  return { detectedAt: last.start, carriedMin, carriedWallMin };
 }
 
 /**

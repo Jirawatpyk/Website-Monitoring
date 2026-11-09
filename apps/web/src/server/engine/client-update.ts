@@ -2,10 +2,7 @@ import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { clientUpdateDueAt, episodesFromTimeline } from '@dxt/engine';
 import type { ResponseHours, Severity, Tier } from '@dxt/shared';
-import { fetchAllPages } from '@/lib/csv';
-
-/** The timeline rows a drop is read from (`episodesFromTimeline`). */
-const DROP_EVENTS = ['detected', 'relapsed', 'escalated_to_down', 'recovered'];
+import { loadDropEvents } from './drops';
 
 /**
  * The client-update track's tick (S11, FR-20, spec §9), once per engine run after the ladder: every
@@ -37,26 +34,11 @@ export async function clientUpdateTick(
   );
   if (candidates.length === 0) return { queued: 0, failed: [] };
 
-  // Paged: PostgREST answers at most 1,000 rows, silently — a flapping incident's drops could push
-  // another incident's `detected` row out (code review, S11).
   const events = {
-    data: await fetchAllPages(
-      (from, to) =>
-        db
-          .from('incident_events')
-          .select('incident_id, type, at, payload')
-          .in(
-            'incident_id',
-            candidates.map((i) => i.id),
-          )
-          .in('type', DROP_EVENTS)
-          .order('at')
-          .order('id')
-          .range(from, to),
-      { max: 50_000 },
-    ).catch((err: Error) => {
-      throw new Error(`incident_events: ${err.message}`);
-    }),
+    data: await loadDropEvents(
+      db,
+      candidates.map((i) => i.id),
+    ),
   };
 
   let queued = 0;
