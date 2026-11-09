@@ -11,7 +11,9 @@ import type { ChatPerson, LadderFacts, LadderStopped } from '@dxt/notifier';
 import {
   escalationPlanSchema,
   formatDuration,
+  formatDay,
   formatTime,
+  isSameBangkokDay,
   TIER_CONFIG,
   type EscalationPlan,
   type EscalationTarget,
@@ -202,12 +204,18 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
           );
   const informed = [...told.keys()];
   const toldAt = plan && hours ? toldTimesOf(i, plan, hours) : new Map<number, Date>();
+  // A level told on an earlier day (a relapse, D-058) carries its day: "Arm Mon 2 Nov 10:00".
+  const sentOn = typeof ctx.dueAt === 'string' ? new Date(ctx.dueAt) : null;
+  const toldWhen = (at: Date) =>
+    !sentOn || isSameBangkokDay(at, sentOn)
+      ? formatTime(at)
+      : `${formatDay(at, { weekday: true })} ${formatTime(at)}`;
   // "Arm 09:48 · Ploy + Tao 10:03" (EmailAlert L2 "Already told").
   const alreadyTold = earlier
     .map((s) => {
       const names = [...new Set(s.targets.flatMap((t) => tokenWords(i, t)))].filter((n) => !own.has(n));
       const at = toldAt.get(s.level);
-      return names.length && at ? `${names.join(' + ')} ${formatTime(at)}` : null;
+      return names.length && at ? `${names.join(' + ')} ${toldWhen(at)}` : null;
     })
     .filter((x): x is string => !!x)
     .join(' · ');

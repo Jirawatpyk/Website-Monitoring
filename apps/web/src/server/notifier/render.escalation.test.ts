@@ -380,7 +380,11 @@ describe('render — the ladder after a relapse (D-058)', () => {
       '<users/PLOY> ESCALATED · L1 · MuvMi DOWN 15 min, not acknowledged · please acknowledge · Tao FYI',
     );
     const email = renderEmail(
-      row('step_fired', { ...ctx, asFyi: false }, { channel: 'email', user_id: 'u-ploy' }),
+      row(
+        'step_fired',
+        { ...ctx, asFyi: false },
+        { channel: 'email', user_id: 'u-ploy', created_at: '2026-11-04T00:54:01Z' },
+      ),
       fired,
       { id: 'u-ploy', email: 'ploy@example.test', display_name: 'Ploy' },
       appUrl,
@@ -388,7 +392,9 @@ describe('render — the ladder after a relapse (D-058)', () => {
     )!;
     // Sent Wed 07:54; without its due time the email would place it 15 min after Monday's alert.
     expect(email.text).toContain('Already told');
-    expect(email.text).not.toContain('10:15');
+    expect(email.text).not.toContain('1 d 21 h');
+    expect(email.text).toContain('15 min (down again 07:44:00)');
+    expect(email.text).toContain('Arm — Chat + email Mon 2 Nov 10:00');
   });
 
   it('the L2 email’s "Already told" gives when each level really went', () => {
@@ -416,13 +422,14 @@ describe('render — the ladder after a relapse (D-058)', () => {
       row(
         'step_fired',
         { level: 2, severity: 'down', elapsedMin: 30, dueAt: '2026-11-04T01:09:00Z', mentioned: ['u-ceo'] },
-        { channel: 'email', user_id: 'u-ceo' },
+        { channel: 'email', user_id: 'u-ceo', created_at: '2026-11-04T01:09:01Z' },
       ),
       atL2,
       { id: 'u-ceo', email: 'ceo@example.test', display_name: 'CEO' },
       appUrl,
       thread,
     )!;
-    expect(email.text).toContain('Arm 10:00 · Ploy + Tao 07:54');
+    expect(email.text).toContain('Arm Mon 2 Nov 10:00 · Ploy + Tao 07:54');
+    expect(email.text).toContain('30 min (down again 07:44:00)');
   });
 });
