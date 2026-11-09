@@ -191,8 +191,18 @@ describe('downEpisodesFromTimeline (D-021: PROBLEM time before the escalation is
       { type: 'recovered', at: '2026-09-25T10:10:00+07:00', payload: {} },
     ]);
     expect(drops).toEqual([
-      { start: at('2026-09-25T09:30:00'), end: at('2026-09-25T10:00:00'), severity: 'problem' },
-      { start: at('2026-09-25T10:00:00'), end: at('2026-09-25T10:10:00'), severity: 'down' },
+      {
+        start: at('2026-09-25T09:30:00'),
+        end: at('2026-09-25T10:00:00'),
+        severity: 'problem',
+        confirmedAt: at('2026-09-25T09:31:00'),
+      },
+      {
+        start: at('2026-09-25T10:00:00'),
+        end: at('2026-09-25T10:10:00'),
+        severity: 'down',
+        confirmedAt: at('2026-09-25T10:00:40'),
+      },
     ]);
   });
 

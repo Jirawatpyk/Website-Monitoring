@@ -1,7 +1,14 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { ladderClockStart, ladderDue, problemHoldUntil } from '@dxt/engine';
-import { escalationPlanSchema, type IncidentState, type ResponseHours, type Tier } from '@dxt/shared';
+import { incidentLadderClock, ladderDue, problemHoldUntil } from '@dxt/engine';
+import {
+  escalationPlanSchema,
+  type IncidentState,
+  type ResponseHours,
+  type Severity,
+  type Tier,
+} from '@dxt/shared';
+import { loadDropEvents } from './drops';
 
 /**
  * The escalation ladder's tick (S08, D-034), once per engine run after the sites are judged: every
@@ -20,7 +27,7 @@ export async function escalationTick(
   const { data, error } = await db
     .from('incidents')
     .select(
-      'id, state, severity, episode_severity, detected_at, alerted_at, escalation_level, escalation_plan',
+      'id, state, severity, episode_severity, started_at, resolved_at, detected_at, alerted_at, escalation_level, escalation_plan',
     )
     // Acknowledged too, but only Tier 1 DOWN: its FYI step still goes while the site is down (S10,
     // spec §14.1); no other plan fires anything after an ack.
@@ -29,6 +36,12 @@ export async function escalationTick(
     )
     .not('escalation_plan', 'is', null);
   if (error) throw new Error(`incidents: ${error.message}`);
+
+  // The drops of every waiting incident: the clock counts only the minutes it was down (D-058).
+  const events = await loadDropEvents(
+    db,
+    data.filter((i) => i.escalation_plan != null).map((i) => i.id),
+  );
 
   let queued = 0;
   const failed: string[] = [];
@@ -43,13 +56,19 @@ export async function escalationTick(
       continue;
     }
     try {
-      queued += await tick(db, inc.id, {
+      // Confirmed down — or when a mute that silenced it was over and its first alert went (D-036) —
+      // then only the minutes it was down: a recovery pauses the clock, a relapse resumes it (D-058).
+      const clock = incidentLadderClock(
+        { ...inc, severity: inc.severity as Severity },
+        events.filter((e) => e.incident_id === inc.id),
+        plan.data,
+        hours,
+      );
+      queued += await tick(db, inc.id, clock.carriedWallMin, {
         plan: plan.data,
-        // Confirmed down — or when a mute that silenced it was over and its first alert went (D-036).
-        detectedAt: ladderClockStart({
-          detectedAt: new Date(inc.detected_at),
-          alertedAt: inc.alerted_at ? new Date(inc.alerted_at) : null,
-        }),
+        detectedAt: clock.detectedAt,
+        carriedMin: clock.carriedMin,
+        upSince: clock.upSince,
         level: inc.escalation_level,
         state: inc.state as IncidentState,
         hours,
@@ -65,18 +84,23 @@ export async function escalationTick(
 async function tick(
   db: DbClient,
   incidentId: string,
+  carriedWallMin: number,
   input: Parameters<typeof ladderDue>[0],
 ): Promise<number> {
   const due = ladderDue(input);
   // How long it has gone unacknowledged since the owner was told: a DOWN at confirm ("11 h" after a
   // night — L0 posted at 22:14), a Tier 2–3 PROBLEM held overnight at the opening ("60 min" at 10:00,
   // not "11 h 46 min"; message-check round 2 asked for response-hours minutes — D-034 keeps the wall
-  // clock so a DOWN from the night stays honest).
+  // clock so a DOWN from the night stays honest). After a relapse: this drop since its confirm plus the
+  // earlier drops' minutes, never the days the site was up in between (D-058).
   const toldAt =
     input.plan.severity === 'problem'
       ? (problemHoldUntil(input.plan.tier as Tier, input.detectedAt, input.hours) ?? input.detectedAt)
       : input.detectedAt;
-  const elapsedMin = Math.max(0, Math.floor((input.now.getTime() - toldAt.getTime()) / 60_000));
+  const elapsedMin = Math.max(
+    0,
+    Math.floor(carriedWallMin + (input.now.getTime() - toldAt.getTime()) / 60_000),
+  );
   let queued = 0;
   if (due.step) {
     const fired = await db.rpc('engine_fire_step', {

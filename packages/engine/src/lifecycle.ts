@@ -181,6 +181,11 @@ export interface Episode {
   start: Date;
   end: Date | null;
   severity: Severity;
+  /**
+   * When the drop was confirmed at this severity (the event that opened it, or the D-021 raise that made
+   * it DOWN): the escalation ladder counts from here (D-034, D-058), not from the first failed check.
+   */
+  confirmedAt?: Date;
 }
 
 /** An incident's timeline events, as the episodes are read from them. */
@@ -212,9 +217,15 @@ export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
         const at = e.startedAt ?? e.at;
         if (e.severity === 'down' && last.severity === 'problem' && at > last.start) {
           last.end = at;
-          out.push({ start: at, end: null, severity: 'down' });
-        } else if (e.severity === 'down') {
+          out.push({ start: at, end: null, severity: 'down', confirmedAt: e.at });
+        } else if (e.severity === 'down' && last.severity !== 'down') {
           last.severity = 'down';
+          last.confirmedAt = e.at;
+        } else if (e.type === 'relapsed' && e.severity === last.severity && at > last.start) {
+          // A relapse with no recovery before it (a lost or late `recovered` row): the open drop ends
+          // where the new one starts, so the ladder's clock never reads the days between (D-058).
+          last.end = at;
+          out.push({ start: at, end: null, severity: last.severity, confirmedAt: e.at });
         }
         continue;
       }
@@ -224,6 +235,7 @@ export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
         start: last?.end && start < last.end ? last.end : start,
         end: null,
         severity: e.severity ?? 'down',
+        confirmedAt: e.at,
       });
     } else if (e.type === 'escalated_to_down' && last) {
       // D-021 while the PROBLEM drop is still open: the PROBLEM ends where the outage starts and a DOWN
@@ -231,9 +243,10 @@ export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
       const at = e.startedAt ?? e.at;
       if (last.severity === 'problem' && at > last.start) {
         last.end = at;
-        out.push({ start: at, end: null, severity: 'down' });
-      } else {
+        out.push({ start: at, end: null, severity: 'down', confirmedAt: e.at });
+      } else if (last.severity !== 'down') {
         last.severity = 'down';
+        last.confirmedAt = e.at;
       }
     } else if (e.type === 'recovered' && open && last) {
       last.end = e.at;

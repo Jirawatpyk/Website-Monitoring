@@ -176,3 +176,52 @@ describe('escalationTick (S08, D-034)', () => {
     await expect(escalationTick(db, bkk('2026-09-25T10:05:00'), HOURS)).rejects.toThrow('incidents: down');
   });
 });
+
+// D-058: ENEOS, 4 Nov — down 5 min on Mon 2 Nov, nobody acked, back up; down again Wed 07:44. The old
+// wall clock found L1 overdue at the relapse; the paused clock fires it at 07:54 (5 + 10 min down).
+describe('escalationTick — a relapse resumes the clock (D-058)', () => {
+  const relapsed = inc0142({
+    id: 'eneos',
+    started_at: bkk('2026-11-02T09:59:00').toISOString(),
+    detected_at: bkk('2026-11-02T10:00:00').toISOString(),
+    severity: 'down',
+  });
+  const drops = [
+    { incident_id: 'eneos', type: 'detected', at: bkk('2026-11-02T10:00:00').toISOString(), payload: {} },
+    { incident_id: 'eneos', type: 'recovered', at: bkk('2026-11-02T10:05:00').toISOString(), payload: {} },
+    {
+      incident_id: 'eneos',
+      type: 'relapsed',
+      at: bkk('2026-11-04T07:44:00').toISOString(),
+      payload: { startedAt: bkk('2026-11-04T07:43:00').toISOString(), severity: 'down' },
+    },
+  ];
+  const db = () =>
+    fakeDb({
+      'incidents.select': { data: [relapsed] },
+      'incident_events.select': { data: drops },
+      'rpc.engine_fire_step': { data: true },
+    });
+
+  it('fires nothing at the relapse', async () => {
+    const { db: d, rpcCalls } = db();
+    expect((await escalationTick(d, bkk('2026-11-04T07:44:30'), HOURS)).queued).toBe(0);
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it('fires L1 once 15 min of down time are reached, and says 15 min', async () => {
+    const { db: d, rpcCalls } = db();
+    expect((await escalationTick(d, bkk('2026-11-04T07:54:00'), HOURS)).queued).toBe(1);
+    expect(rpcCalls).toEqual([
+      {
+        name: 'engine_fire_step',
+        args: {
+          p_incident_id: 'eneos',
+          p_level: 1,
+          p_due_at: bkk('2026-11-04T07:54:00').toISOString(),
+          p_context: { elapsedMin: 15 },
+        },
+      },
+    ]);
+  });
+});

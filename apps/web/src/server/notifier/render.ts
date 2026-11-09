@@ -109,6 +109,16 @@ function dropsOf(i: IncidentFacts): Episode[] {
   return episodesFromTimeline(i, i.incident_events ?? []);
 }
 
+/**
+ * When the incident's latest drop of this severity was confirmed, if it isn't the first one (D-058):
+ * a step after a relapse says "Down for 15 min (down again 07:44)", not the days since the first drop.
+ */
+function againAtOf(i: IncidentFacts, severity: 'down' | 'problem'): Date | null {
+  const drops = dropsOf(i).filter((d) => d.severity === severity);
+  const last = drops.at(-1);
+  return drops.length > 1 && last ? (last.confirmedAt ?? last.start) : null;
+}
+
 /** How long it had been down at `at` (D-033's one number: DOWN drops only), for ACKNOWLEDGED "so far". */
 function outageAt(i: IncidentFacts, at: Date): number | null {
   const upTo = dropsOf(i)
@@ -598,6 +608,9 @@ export function renderEmail(
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
         level,
         elapsedMin: num(ctx.elapsedMin, 15),
+        // When it was queued: after a relapse the elapsed minutes are the down minutes only (D-058).
+        sentAt: new Date(n.created_at),
+        downAgainAt: againAtOf(i, ctx.severity === 'problem' ? 'problem' : 'down'),
         confirmedAt: new Date(i.detected_at),
         owner: l0Of(i)?.display_name ?? null,
         asFyi,

@@ -1,5 +1,12 @@
-import { ladderClockStart, scheduleOf } from '@dxt/engine';
-import { formatTime, type EscalationPlan, type EscalationTarget, type ResponseHours } from '@dxt/shared';
+import { ladderClockOf, ladderClockStart, scheduleOf, type Episode } from '@dxt/engine';
+import {
+  formatTime,
+  formatWhen,
+  isSameBangkokDay,
+  type EscalationPlan,
+  type EscalationTarget,
+  type ResponseHours,
+} from '@dxt/shared';
 
 /**
  * The Escalation card (S12b, spec §8, §30.6–8; Incident / MIncident CASE Manual): the incident's ladder,
@@ -126,6 +133,10 @@ export function escalationCardOf(input: {
   state: string;
   detectedAt: string;
   alertedAt: string | null;
+  /** The incident's drops: the clock counts only the minutes it was down (D-058). */
+  episodes?: readonly Episode[];
+  /** The page's time: a time on another day carries its day ("Yesterday 10:15", spec §13). */
+  now?: Date;
   hours: ResponseHours;
   steps: readonly StepSent[];
   people: LadderPeople;
@@ -140,22 +151,39 @@ export function escalationCardOf(input: {
     detectedAt: new Date(input.detectedAt),
     alertedAt: input.alertedAt ? new Date(input.alertedAt) : null,
   });
+  // After a relapse the levels still to come count from it, with the earlier drops' minutes (D-058).
+  const clock = ladderClockOf({
+    episodes: input.episodes ?? [],
+    severity: plan.severity,
+    clockStart: start,
+    tier: plan.tier,
+    hours: input.hours,
+  });
   const due = new Map(
-    scheduleOf({ plan, detectedAt: start, hours: input.hours }).map((s) => [s.level, s.dueAt]),
+    scheduleOf({ plan, detectedAt: clock.detectedAt, carriedMin: clock.carriedMin, hours: input.hours }).map(
+      (s) => [s.level, s.dueAt],
+    ),
   );
-  const waiting = WAITING.has(input.state);
+  // The drop is over (a D-023 key-page drop on a DOWN incident): the DOWN levels wait (D-058).
+  const waiting = WAITING.has(input.state) && !clock.upSince;
   const steps = [...plan.steps].sort((a, b) => a.level - b.level);
   const sentAt = new Map(input.steps.map((s) => [s.level, s]));
   const byHand = input.steps.some((s) => s.sentBy);
   const next = steps.find((s) => s.level > input.level && !sentAt.has(s.level));
 
+  // After a relapse days later a level of the first drop went on another day (spec §13, D-058).
+  const now = input.now;
+  const hhmm = (d: Date) => (now && !isSameBangkokDay(d, now) ? formatWhen(d, now) : formatTime(d));
   const rows = steps.map((s): LadderRow => {
-    const at = due.get(s.level)!;
-    const when = s.level === 0 ? `0 min · ${formatTime(at)}` : `+${s.delayMin} min · ${formatTime(at)}`;
-    const who = whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'));
     const sent = s.level === 0 ? { at: start.toISOString(), sentBy: null } : sentAt.get(s.level);
+    // L0 went with the first alert. A level whose minute an earlier drop reached shows when it went
+    // (D-058: the schedule would say the relapse); otherwise the schedule, even when sent early by hand.
+    const at =
+      s.level === 0 ? start : sent && s.delayMin <= clock.carriedMin ? new Date(sent.at) : due.get(s.level)!;
+    const when = s.level === 0 ? `0 min · ${hhmm(at)}` : `+${s.delayMin} min · ${hhmm(at)}`;
+    const who = whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'));
     if (sent || (s.level > 0 && s.level <= input.level)) {
-      const t = sent ? formatTime(new Date(sent.at)) : null;
+      const t = sent ? hhmm(new Date(sent.at)) : null;
       return {
         label: `L${s.level}`,
         when,
@@ -165,7 +193,8 @@ export function escalationCardOf(input: {
       };
     }
     // The Tier 1 CEO + AM FYI still goes after an ack while the drop is DOWN (§14.1, D-048).
-    if (!waiting && s.fyi && input.state === 'acknowledged' && input.severity === 'down')
+    // Not while the drop is over (a D-023 key-page drop): the clock stands still (D-058).
+    if (!waiting && !clock.upSince && s.fyi && input.state === 'acknowledged' && input.severity === 'down')
       return input.engine.stopped
         ? { label: `L${s.level}`, when, who, status: 'Waits — engine down', tone: 'waits' }
         : { label: `L${s.level}`, when, who, status: `At ${formatTime(at)} · FYI`, tone: 'waits' };
@@ -174,7 +203,13 @@ export function escalationCardOf(input: {
         label: `L${s.level}`,
         when,
         who,
-        status: input.acked ? 'Cancelled · acked' : 'Not sent · recovered',
+        // MIncident: "Not sent · recovered 10:31" — an FYI the ack didn't stop says the recovery too.
+        status:
+          clock.upSince && (!input.acked || s.fyi)
+            ? `Not sent · recovered ${hhmm(clock.upSince)}`
+            : input.acked
+              ? 'Cancelled · acked'
+              : 'Not sent · recovered',
         tone: 'cancelled',
       };
     const isNext = s === next;

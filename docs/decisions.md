@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-058 | 9 Nov 2026 | The escalation clock counts only the minutes an incident is down: a recovery pauses it, a relapse resumes it with the earlier drops' minutes, and levels already fired stay fired (as the client-update track counts, D-052 item 5). ESCALATED / STILL … say those down minutes | D-034 "a level that came due while the site was up fires on the relapse"; D-004 "escalation keeps its original clock" (now: keeps its minutes) |
 | D-057 | 6 Nov 2026 | S14 recurring maintenance (FR-10b): a series repeats weekly (chosen weekdays) or monthly (day N, or the 1st–4th weekday), each occurrence ≤ 24 h; occurrences are ordinary approved maintenance windows created 14 days ahead, only for an approved, uncancelled series; the series is approved once (an Admin's on create, a Responder's by an Admin); each occurrence starts, ends and "didn't start" on its own with S09b's messages; the series posts one SCHEDULED; cancelling it cancels the occurrences not yet started, quietly; an occurrence that would overlap another window is skipped and logged | Gap: FR-10b, no board (the UI and the series messages wait for one) |
 | D-056 | 6 Nov 2026 | S14: the daily digest posts to the DxT Website Reports Space only; the weekly summary posts there and is emailed to the CEO. Lines whose data doesn't exist yet (client first to report, reviews waiting sign-off, CEO decisions, SSL / domain expiry) are left out until their slice adds the data. Recurring maintenance is a second PR, and its UI waits for a Claude Design board. Done-when 2 is proved with one staging run plus a skipped run that fires the Healthchecks alert, and three mornings in a row on production after the merge | WeeklySummary board header "+ EMAIL TO CEO" over both cards; board sample lines with no source; plan S14 Done-when 2 "three consecutive staging days" |
 | D-055 | 4 Nov 2026 | S12b hand check: "nothing escalates on its own" means no engine run of any kind for ≥ 3 min (a new `engine-run` beat stamped by every run, cron or after a Bangkok batch) — only then do Escalate now and the client-update reminder show; the ticks never pause; the hand check and the manual incident follow the sweep fault (the banner); a manual incident's L0 email keeps D-047's 5-min grace (Chat leaves from the request); the reminder can be sent by hand before its due time, and the Client update card shows before the track fired for an incident open while the engine is stopped | Spec §15.10 / §30.6 "timers don't run while the heartbeat is missing" (read literally); D-052 item 3 (for that case) |
@@ -61,6 +62,35 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-058 — The escalation clock pauses while the site is up
+
+**Problem.** D-004 keeps a relapsing incident's escalation clock, and D-034 read that as the wall clock from Confirmed down: "a level that came due while the site was up fires on the relapse". On 4 Nov 2026 at 07:44, ENEOS Industrial dropped again days after its incident first went down. Every level was long overdue, so the ladder fired L1, L2 and L3 within 21 s, one per engine run. The CEO got the L2 and L3 emails, then RECOVERED, for a short blip.
+
+**Decision (Tao, 9 Nov 2026).**
+- **What counts.** The ladder clock counts only the minutes the incident is down at the plan's severity, from each drop's confirm to its recovery.
+  - A recovery pauses the clock; a relapse resumes it with the earlier drops' minutes carried.
+  - Levels already fired stay fired (D-004).
+  - Tier 2–3 still count only response-hours minutes, and a paused clock (outside hours) fires nothing (D-034).
+  - Example: the first drop was down 5 min and nobody acked. L1 (+15) fires 10 min into the relapse, not at once.
+- **Where the clock starts.**
+  - The first drop counts from `ladderClockStart`: Confirmed down, or the late alert after a mute (D-036).
+  - A D-021 raise starts the DOWN clock afresh, as before.
+  - A D-023 key-page PROBLEM drop on a DOWN incident stays off the DOWN clock.
+- **Edge cases.**
+  - A level whose minute was reached in an earlier drop but never fired goes at the relapse.
+  - A reminder minute already reached isn't sent again.
+  - Once the latest drop is over, the clock stands still and nothing fires (`upSince`), whatever the state says: a waiting incident whose `recovered` row sorts after its relapse, and a D-023 key-page drop on a DOWN incident (engine review M1).
+  - A `relapsed` row with no `recovered` before it starts a new drop, so a lost row can't bring the wall clock back.
+  - The Escalation card waits during a D-023 key-page drop: its DOWN levels read "Not sent · recovered" and Escalate now isn't offered while the home page is back.
+  - The card's schedule column keeps each level's time on the clock. Only a level whose minute an earlier drop reached shows the time it really went.
+- **Words.**
+  - ESCALATED / STILL … say the unacknowledged down minutes on the wall clock: this drop since it was confirmed plus the earlier drops. The days the site was up in between are not counted.
+  - A step email takes its sent time from when it was queued, and after a relapse says "Down for 15 min (down again 07:44)"; a time on an earlier day carries its day ("Arm Mon 2 Nov 10:00").
+  - "Already told" names when each level really went (its `step_fired` event).
+- **Same rule everywhere.** The runner (`escalationTick`), the ladder's words (`ladder-facts.ts`) and the incident page's Escalation card read the same clock (`ladderClockOf` in `@dxt/engine`, over the incident's drops). The by-hand Down again (D-055 item 7) relapses through the same function, so it follows too.
+
+**Why.** It is the rule the client-update track already uses (D-052 item 5: "a recovery pauses the count, a relapse goes on with it"). It needs no threshold for "a long gap", and nobody is paged for minutes a site was up. Restarting the clock at every relapse was the other option (Tao chose against it): a site dropping 4 × 10 min with nobody acknowledging would never reach L1.
 
 ## D-057 — Recurring maintenance windows
 

@@ -1007,6 +1007,16 @@ export interface StepEmailInput extends EmailBaseInput {
   cause?: string | null;
   /** When the owner was told (a PROBLEM held for response hours: the opening, not detection). */
   toldAt?: Date;
+  /**
+   * When this step went. After a relapse `elapsedMin` counts only the down minutes (D-058), so
+   * `toldAt + elapsedMin` no longer says when it was sent; without it, that sum is used.
+   */
+  sentAt?: Date | null;
+  /**
+   * When this drop was confirmed, for an incident down again (D-058): "Down for" then says the down
+   * minutes (`elapsedMin`) "(down again 07:44)", not the days since the first drop.
+   */
+  downAgainAt?: Date | null;
   /** The Chat reply couldn't be delivered: this email is the alert (D-016 fallback). */
   fallback?: boolean;
   /** S10: what the step is — as `StepAlertInput.kind` (default `ask`). */
@@ -1050,9 +1060,15 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
   const { site } = input;
   const duration = formatDuration(input.elapsedMin);
   const informed = input.informed ?? [];
-  const sentAt = new Date((input.toldAt ?? input.confirmedAt).getTime() + input.elapsedMin * 60_000);
+  const sentAt =
+    input.sentAt ?? new Date((input.toldAt ?? input.confirmedAt).getTime() + input.elapsedMin * 60_000);
   const detected = withDayIfNot(input.confirmedAt, sentAt, formatTimeWithSeconds);
-  const downFor: [string, string] = ['Down for', `${duration} (confirmed down ${detected})`];
+  const downFor: [string, string] = [
+    'Down for',
+    input.downAgainAt
+      ? `${duration} (down again ${withDayIfNot(input.downAgainAt, sentAt, formatTimeWithSeconds)})`
+      : `${duration} (confirmed down ${detected})`,
+  ];
   const open = [{ label: 'Open incident', href: input.incidentUrl, primary: kind === 'ceo' }];
   if (kind === 'ceo') {
     return render(input, {
@@ -1148,7 +1164,8 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
   const down = input.severity === 'down';
   const owner = input.owner ?? 'The owner';
   // Sent `elapsedMin` after the owner was told: INC-0139's L1 at Fri 09:15 says "confirmed down Thu 24 Sep 22:14".
-  const sentAt = new Date((input.toldAt ?? input.confirmedAt).getTime() + input.elapsedMin * 60_000);
+  const sentAt =
+    input.sentAt ?? new Date((input.toldAt ?? input.confirmedAt).getTime() + input.elapsedMin * 60_000);
   const detected = withDayIfNot(input.confirmedAt, sentAt, formatTimeWithSeconds);
   // "Down for" / "Problem for" is how long it has been wrong, on the wall clock from detection — a held
   // PROBLEM's L1 at 10:00 says "11 h 46 min", as its ACK email does 5 min later (message-check round 3).
@@ -1178,14 +1195,20 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
       ...byHandFact(input),
       [
         down ? 'Down for' : 'Problem for',
-        `${sinceDetected} (${down ? 'confirmed down' : 'detected'} ${detected})`,
+        input.downAgainAt
+          ? `${duration} (${down ? 'down again' : 'again'} ${withDayIfNot(input.downAgainAt, sentAt, formatTimeWithSeconds)})`
+          : `${sinceDetected} (${down ? 'confirmed down' : 'detected'} ${detected})`,
       ],
       ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
       ...(input.owner
         ? [
             [
               'Already told',
-              `${input.owner} — Chat + email ${formatResume(input.toldAt ?? input.confirmedAt, input.confirmedAt)}`,
+              `${input.owner} — Chat + email ${
+                input.downAgainAt
+                  ? withDayIfNot(input.toldAt ?? input.confirmedAt, sentAt, formatTime)
+                  : formatResume(input.toldAt ?? input.confirmedAt, input.confirmedAt)
+              }`,
             ] as [string, string],
           ]
         : []),

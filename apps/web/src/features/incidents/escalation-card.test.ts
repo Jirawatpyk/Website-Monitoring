@@ -69,6 +69,8 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
       steps: [{ level: 1, at: at('02:35'), sentBy: 'Tao' }],
     })!;
     expect(l1.rows[1]!.status).toBe('Sent 02:35 by Tao');
+    // Sent early by hand: the schedule column keeps its +15 time (D-058 review).
+    expect(l1.rows[1]!.when).toBe('+15 min · 02:46');
     expect(l1.rows[2]!.status).toBe('Waits — engine down');
     expect(l1.button?.label).toBe('Escalate now · L2 (CEO)');
     const l2 = escalationCardOf({
@@ -168,4 +170,133 @@ describe('pendingClientUpdate — the Resolve card agrees with the pre-fire remi
     expect(g.lockedReason).toBe('Resolve locked · 0 of 3 met — Test target is still down');
   });
   it('no reminder: unchanged', () => expect(pendingClientUpdate(null, gate)).toBe(gate));
+});
+
+describe('escalationCardOf — after a relapse (D-058)', () => {
+  it('down 5 min at 02:31, back, down again 08:00: L1 at 08:10, L0 stays at its first alert', () => {
+    const drop = (start: string, confirmed: string, end: string | null) => ({
+      start: new Date(at(start)),
+      confirmedAt: new Date(at(confirmed)),
+      end: end ? new Date(at(end)) : null,
+      severity: 'down' as const,
+    });
+    const card = escalationCardOf({
+      ...base,
+      engine: { stopped: false, since: at('08:00') },
+      episodes: [drop('02:30', '02:31', '02:36'), drop('07:59', '08:00', null)],
+    })!;
+    expect(card.rows.map((r) => [r.label, r.when])).toEqual([
+      ['L0', '0 min · 02:31'],
+      ['L1', '+15 min · 08:10'],
+      ['L2', '+30 min · 08:25'],
+      ['L3', '+60 min · 08:55'],
+    ]);
+  });
+
+  it('L1 sent in the first drop keeps its time; L2 counts on from the relapse (engine review L1)', () => {
+    const drop = (start: string, confirmed: string, end: string | null) => ({
+      start: new Date(at(start)),
+      confirmedAt: new Date(at(confirmed)),
+      end: end ? new Date(at(end)) : null,
+      severity: 'down' as const,
+    });
+    const card = escalationCardOf({
+      ...base,
+      level: 1,
+      state: 'escalated',
+      steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+      engine: { stopped: false, since: at('08:00') },
+      episodes: [drop('02:30', '02:31', '02:50'), drop('07:59', '08:00', null)],
+    })!;
+    expect(card.rows.map((r) => [r.label, r.when, r.status])).toEqual([
+      ['L0', '0 min · 02:31', 'Sent 02:31'],
+      ['L1', '+15 min · 02:46', 'Sent 02:46'],
+      ['L2', '+30 min · 08:11', 'At 08:11 if unacked'],
+      ['L3', '+60 min · 08:41', 'If still unacked'],
+    ]);
+  });
+
+  it('a D-023 key-page drop on a DOWN incident: the DOWN levels wait, nothing promised (engine review L2)', () => {
+    const card = escalationCardOf({
+      ...base,
+      engine: { stopped: false, since: at('03:00') },
+      episodes: [
+        {
+          start: new Date(at('02:30')),
+          confirmedAt: new Date(at('02:31')),
+          end: new Date(at('02:40')),
+          severity: 'down',
+        },
+        { start: new Date(at('02:40')), confirmedAt: new Date(at('02:40')), end: null, severity: 'problem' },
+      ],
+    })!;
+    expect(card.rows.slice(1).every((r) => r.tone === 'cancelled')).toBe(true);
+    expect(card.nextLine).toBeNull();
+    expect(card.rows[1]!.status).toBe('Not sent · recovered 02:40');
+  });
+
+  // spec-check, D-058: a key-page drop with the home page back.
+  const keyPageDrop = [
+    {
+      start: new Date(at('02:30')),
+      confirmedAt: new Date(at('02:31')),
+      end: new Date(at('02:40')),
+      severity: 'down' as const,
+    },
+    {
+      start: new Date(at('02:40')),
+      confirmedAt: new Date(at('02:40')),
+      end: null,
+      severity: 'problem' as const,
+    },
+  ];
+
+  it('…with the engine down: no danger note, no Escalate now', () => {
+    const card = escalationCardOf({ ...base, episodes: keyPageDrop })!;
+    expect(card.stopped).toBeNull();
+    expect(card.button).toBeNull();
+  });
+
+  it.each([
+    ['engine running', { stopped: false, since: at('03:00') }],
+    ['engine down', { stopped: true, since: at('02:17') }],
+  ])('acknowledged, %s: the L3 FYI promises nothing — "Not sent · recovered 02:40"', (_n, engine) => {
+    const card = escalationCardOf({
+      ...base,
+      level: 1,
+      state: 'acknowledged',
+      acked: { by: 'Ploy' },
+      steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+      engine,
+      episodes: keyPageDrop,
+    })!;
+    expect(card.rows[3]!.status).toBe('Not sent · recovered 02:40');
+    expect(card.rows[2]!.status).toBe('Cancelled · acked');
+  });
+
+  it('a level that went in a drop two days ago carries its day (spec §13)', () => {
+    const drop = (start: string, confirmed: string, end: string | null) => ({
+      start: new Date(start),
+      confirmedAt: new Date(confirmed),
+      end: end ? new Date(end) : null,
+      severity: 'down' as const,
+    });
+    const card = escalationCardOf({
+      ...base,
+      level: 1,
+      state: 'escalated',
+      steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+      engine: { stopped: false, since: '2026-09-28T08:00:00+07:00' },
+      episodes: [
+        drop(at('02:30'), at('02:31'), at('02:50')),
+        drop('2026-09-28T07:59:00+07:00', '2026-09-28T08:00:00+07:00', null),
+      ],
+      now: new Date('2026-09-28T08:01:00+07:00'),
+    })!;
+    expect(card.rows.slice(0, 2).map((r) => [r.when, r.status])).toEqual([
+      ['0 min · Sat 26 Sep 02:31', 'Sent Sat 26 Sep 02:31'],
+      ['+15 min · Sat 26 Sep 02:46', 'Sent Sat 26 Sep 02:46'],
+    ]);
+    expect(card.rows[2]!.when).toBe('+30 min · 08:11');
+  });
 });
