@@ -370,7 +370,15 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
     text: n.text,
     who: n.who.map((p) => plainName(p.name)).join(', '),
   }));
-  const incidents: Row[] = f.incidents.map((i) => ({
+  // WeeklySummary: the worst first — DOWN before PROBLEM, then the longest (MuvMi 43 min, VOCA 41 min,
+  // ORCA 8 min; DxT AI 1 d 2 h, …); an equal time goes by when it started.
+  const ordered = [...f.incidents].sort(
+    (a, b) =>
+      Number(b.severity === 'down') - Number(a.severity === 'down') ||
+      b.minutes - a.minutes ||
+      a.startedAt.getTime() - b.startedAt.getTime(),
+  );
+  const incidents: Row[] = ordered.map((i) => ({
     label: i.failing
       ? i.severity === 'down'
         ? 'Down'
