@@ -176,6 +176,8 @@ interface Row {
 interface Section {
   title?: string;
   rows: Row[];
+  /** Chat folds the rows after this many (the on-target sites under the ones below target). */
+  collapseAfter?: number;
 }
 
 export interface ReportModel {
@@ -394,15 +396,18 @@ function uptimeRows(sites: readonly ReportSiteUptime[]): { rows: Row[]; below: n
   // is "99.94%", not "99.95%"); the targets have two decimals, so on target never reads below it.
   const pct = (u: number) => formatPercent(Math.floor(u * 10_000 + 1e-6) / 10_000);
   const row = (s: ReportSiteUptime, isBelow: boolean): Row => {
-    const period = s.since ? `since ${formatDay(s.since, { weekday: true })}` : '30 d';
+    const figure = s.since
+      ? `${pct(s.uptime)} since ${formatDay(s.since, { weekday: true })}`
+      : `30 d ${pct(s.uptime)}`;
     const week = isBelow && s.week !== null ? ` · this week ${pct(s.week)}` : '';
+    const allowed = `${formatDuration(Math.floor(allowedDownMinutes(s.target, s.windowMinutes) + 1e-6))} allowed`;
     return {
       label: isBelow ? 'Below target' : 'On target',
-      text: `${plainName(s.site)} · Tier ${s.tier} · ${period} ${pct(s.uptime)} · target ${formatPercent(s.target)}${week}`,
+      text: `${plainName(s.site)} · Tier ${s.tier} · ${figure} · target ${formatPercent(s.target)}${week}`,
       // Below target: the down minutes rounded up, the allowance down, so the trail never reads equal.
       trail: isBelow
-        ? `${formatDuration(Math.ceil(s.downMinutes - 1e-6))} down · ${formatDuration(Math.floor(allowedDownMinutes(s.target, s.windowMinutes) + 1e-6))} allowed`
-        : `${formatDuration(Math.round(s.downMinutes))} down`,
+        ? `${formatDuration(Math.ceil(s.downMinutes - 1e-6))} down · ${allowed}`
+        : `${formatDuration(Math.floor(s.downMinutes + 1e-6))} down · ${allowed}`,
       warning: isBelow,
     };
   };
@@ -490,9 +495,10 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
     title: `Website week · ${range}`,
     lines: [
       `Week: ${f.sitesWithoutDowntime}/${f.sitesTotal} sites had no downtime`,
-      `Uptime all sites ${formatPercent(f.uptime)}${
-        f.sites.length ? ` · ${f.sites.length - byUptime.below}/${f.sites.length} sites on target (30 d)` : ''
-      } · ${downs} DOWN · ${problems} PROBLEM · maintenance excluded`,
+      `Uptime all sites ${formatPercent(f.uptime)} · ${downs} DOWN · ${problems} PROBLEM · maintenance excluded`,
+      ...(f.sites.length
+        ? [`Last 30 days: ${f.sites.length - byUptime.below}/${f.sites.length} sites on their uptime target`]
+        : []),
     ],
     sections: [
       ...(needs.length ? [{ title: 'NEEDS SOMEONE', rows: needs }] : []),
@@ -511,6 +517,7 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
                 ? `UPTIME BY SITE · ${byUptime.below} BELOW TARGET`
                 : 'UPTIME BY SITE · ALL ON TARGET',
               rows: byUptime.rows,
+              collapseAfter: byUptime.below,
             },
           ]
         : []),
@@ -575,6 +582,9 @@ export function reportChat(m: ReportModel, cardId: string): ChatMessage {
               : []),
             ...m.sections.map((s) => ({
               ...(s.title ? { header: s.title } : {}),
+              ...(s.collapseAfter !== undefined && s.rows.length > Math.max(1, s.collapseAfter)
+                ? { collapsible: true, uncollapsibleWidgetsCount: Math.max(1, s.collapseAfter) }
+                : {}),
               widgets: s.rows.map(widget),
             })),
             ...(m.buttons.length

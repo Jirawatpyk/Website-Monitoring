@@ -85,10 +85,10 @@ The summary gave one figure for all sites ("Uptime all sites 99.98%"), and no so
   - A target per site waits for Settings (S17).
 - **What is judged:** each site's uptime over the 30 days ending with the week, maintenance excluded, as the table counts a month. A site watched for less than that is judged since it started ("since Wed 28 Oct"). This week's figure is shown beside a site below target, not judged on its own: Tier 1's week allows only ~5 min.
 - **The words:**
-  - The header gains "· 15/17 sites on target (30 d)".
+  - The header gains its own line, "Last 30 days: 15/17 sites on their uptime target". It isn't mixed into the line of this week's figures (message check).
   - A new section after INCIDENTS, "UPTIME BY SITE · 2 BELOW TARGET" or "· ALL ON TARGET", lists every site.
   - Sites below target come first, the furthest below first: `Below target` · "realme.link · Tier 1 · 30 d 99.90% · target 99.95% · this week 99.59%" — "41 min down · 21 min allowed". The figures round toward the verdict: the uptime and the allowance down, the down minutes up, so a site just under its target never shows the target's own figure (99.949% reads 99.94%).
-  - The rest follow by tier, closest to its target first: `On target` · "MuvMi · Tier 1 · 30 d 100.00% · target 99.95%" — "0 min down".
+  - The rest follow by tier, closest to its target first: `On target` · "MuvMi · Tier 1 · 30 d 100.00% · target 99.95%" — "0 min down · 21 min allowed". A site watched less than 30 days reads "100.00% since Wed 28 Oct". In Chat the on-target rows fold under the ones below target.
   - No board draws this section; Tao asked for it in the summary's existing row style.
 
 **Why.** It answers the CEO in his own terms with no new setting to fill in. Judging on 30 days matches the table and keeps one short drop from failing a site for a week. Listing every site, not only the failures, is what "site by site" asks.

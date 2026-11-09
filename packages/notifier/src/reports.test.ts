@@ -337,7 +337,8 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     expect(m.title).toBe('Website week · Mon 21 – Sun 27 Sep');
     expect(m.lines).toEqual([
       'Week: 14/17 sites had no downtime',
-      'Uptime all sites 99.95% · 3/4 sites on target (30 d) · 2 DOWN · 1 PROBLEM · maintenance excluded',
+      'Uptime all sites 99.95% · 2 DOWN · 1 PROBLEM · maintenance excluded',
+      'Last 30 days: 3/4 sites on their uptime target',
     ]);
   });
 
@@ -355,19 +356,19 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
       {
         label: 'On target',
         text: 'VOCA · Tier 2 · 30 d 99.90% · target 99.90%',
-        trail: '41 min down',
+        trail: '41 min down · 43 min allowed',
         warning: false,
       },
       {
         label: 'On target',
         text: 'ORCA Thailand · Tier 2 · 30 d 100.00% · target 99.90%',
-        trail: '0 min down',
+        trail: '0 min down · 43 min allowed',
         warning: false,
       },
       {
         label: 'On target',
-        text: 'DxT AI · Tier 3 · since Wed 16 Sep 100.00% · target 99.50%',
-        trail: '0 min down',
+        text: 'DxT AI · Tier 3 · 100.00% since Wed 16 Sep · target 99.50%',
+        trail: '0 min down · 1 h 26 min allowed',
         warning: false,
       },
     ]);
@@ -378,10 +379,10 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     expect(all.sections.find((x) => x.title?.startsWith('UPTIME'))!.title).toBe(
       'UPTIME BY SITE · ALL ON TARGET',
     );
-    expect(all.lines[1]).toContain('· 1/1 sites on target (30 d) ·');
+    expect(all.lines[2]).toBe('Last 30 days: 1/1 sites on their uptime target');
     const none = weeklyModel(weekly({ sites: [] }));
     expect(none.sections.some((x) => x.title?.startsWith('UPTIME'))).toBe(false);
-    expect(none.lines[1]).toBe('Uptime all sites 99.95% · 2 DOWN · 1 PROBLEM · maintenance excluded');
+    expect(none.lines).toHaveLength(2);
   });
 
   // Code review: a site just under its target never reads the target's figure, nor equal minutes.
@@ -406,6 +407,19 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     ).sections.find((x) => x.title?.startsWith('UPTIME'))!.rows[0]!;
     expect(exact.label).toBe('On target');
     expect(exact.text).toBe('Y · Tier 2 · 30 d 99.90% · target 99.90%');
+  });
+
+  it('folds the on-target sites in Chat under the ones below target (message check)', () => {
+    const card = reportChat(weeklyModel(weekly()), 'weekly').cardsV2[0]!.card as {
+      sections: { header?: string; collapsible?: boolean; uncollapsibleWidgetsCount?: number }[];
+    };
+    const sec = card.sections.find((x) => x.header?.startsWith('UPTIME BY SITE'))!;
+    expect(sec).toMatchObject({ collapsible: true, uncollapsibleWidgetsCount: 1 });
+    const one = reportChat(
+      weeklyModel(weekly({ sites: [site({ site: 'MuvMi', tier: 1, target: 0.9995 })] })),
+      'weekly',
+    ).cardsV2[0]!.card as typeof card;
+    expect(one.sections.find((x) => x.header?.startsWith('UPTIME'))!.collapsible).toBeUndefined();
   });
 
   it('puts the furthest below first', () => {
