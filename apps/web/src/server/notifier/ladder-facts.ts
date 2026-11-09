@@ -1,12 +1,22 @@
 import 'server-only';
-import { isInsideHours, ladderClockStart, nextOpening, problemHoldUntil, scheduleOf } from '@dxt/engine';
+import {
+  episodesFromTimeline,
+  isInsideHours,
+  ladderClockOf,
+  ladderClockStart,
+  nextOpening,
+  problemHoldUntil,
+  scheduleOf,
+} from '@dxt/engine';
 import type { ChatPerson, LadderFacts, LadderStopped } from '@dxt/notifier';
 import {
   escalationPlanSchema,
   formatDuration,
   formatTime,
   TIER_CONFIG,
+  type EscalationPlan,
   type EscalationTarget,
+  type ResponseHours,
   type Tier,
 } from '@dxt/shared';
 import { contextOf, l0IsOnCall, l0Of, type IncidentFacts, type Owner } from './facts';
@@ -93,7 +103,7 @@ export function ladderFactsOf(i: IncidentFacts, at: Date): LadderFacts | null {
   // A card sent after the incident moved on (acknowledged, recovered) promises nothing.
   if (!plan || !hours || !['unacked', 'escalated'].includes(i.state)) return null;
   const level = (i.escalation_level ?? 0) + 1;
-  const due = scheduleOf({ plan, detectedAt: clockOf(i), hours }).find((s) => s.level === level);
+  const due = scheduleOf({ plan, ...ladderClock(i, plan, hours), hours }).find((s) => s.level === level);
   const people = stepPeople(i, level);
   const paused = !alwaysOn(plan.tier) && !isInsideHours(at, hours) ? nextOpening(at, hours) : null;
   return {
@@ -118,7 +128,8 @@ export function stoppedOf(i: IncidentFacts, ctx: Record<string, unknown>): Ladde
   const hours = i.ladder?.hours;
   const fyiAt =
     fyiStep && hours
-      ? scheduleOf({ plan, detectedAt: clockOf(i), hours }).find((s) => s.level === fyiStep.level)?.dueAt
+      ? scheduleOf({ plan, ...ladderClock(i, plan, hours), hours }).find((s) => s.level === fyiStep.level)
+          ?.dueAt
       : undefined;
   const ackedAt = typeof ctx.ackedAt === 'string' ? new Date(ctx.ackedAt) : null;
   const fired = typeof ctx.escalationLevel === 'number' ? ctx.escalationLevel : 0;
@@ -170,7 +181,8 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
   const after = plan?.steps.find((s) => s.level === level + 1);
   const afterAt =
     plan && after && hours
-      ? scheduleOf({ plan, detectedAt: clockOf(i), hours }).find((s) => s.level === after.level)?.dueAt
+      ? scheduleOf({ plan, ...ladderClock(i, plan, hours), hours }).find((s) => s.level === after.level)
+          ?.dueAt
       : undefined;
   // Everyone told before this step, minus this step's own people (the CEO isn't "informed" in the
   // FYI the CEO receives — message-check 8), each with the role the EmailAlert L2 lede names.
@@ -190,12 +202,12 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
                 : name,
           );
   const informed = [...told.keys()];
-  const schedule = plan && hours ? scheduleOf({ plan, detectedAt: clockOf(i), hours }) : [];
+  const toldAt = plan && hours ? toldTimesOf(i, plan, hours) : new Map<number, Date>();
   // "Arm 09:48 · Ploy + Tao 10:03" (EmailAlert L2 "Already told").
   const alreadyTold = earlier
     .map((s) => {
       const names = [...new Set(s.targets.flatMap((t) => tokenWords(i, t)))].filter((n) => !own.has(n));
-      const at = schedule.find((x) => x.level === s.level)?.dueAt;
+      const at = toldAt.get(s.level);
       return names.length && at ? `${names.join(' + ')} ${formatTime(at)}` : null;
     })
     .filter((x): x is string => !!x)
@@ -234,6 +246,41 @@ function clockOf(i: IncidentFacts): Date {
     detectedAt: new Date(i.detected_at),
     alertedAt: i.alerted_at ? new Date(i.alerted_at) : null,
   });
+}
+
+/**
+ * Where the ladder's clock stands for the "next level at …" words: it counts only the minutes the
+ * incident was down (D-058), as the runner fires it (`server/engine/ladder.ts`).
+ */
+function ladderClock(i: IncidentFacts, plan: EscalationPlan, hours: ResponseHours) {
+  const { detectedAt, carriedMin } = ladderClockOf({
+    episodes: episodesFromTimeline(i, i.incident_events ?? []),
+    severity: plan.severity,
+    clockStart: clockOf(i),
+    tier: plan.tier,
+    hours,
+  });
+  return { detectedAt, carriedMin };
+}
+
+/**
+ * When each level of this severity really went: L0 at the clock start, a step at its `step_fired`
+ * event (D-058: after a relapse the schedule no longer says when an earlier level went). A level with
+ * no event in the facts falls back to the first drop's schedule, as it read before.
+ */
+function toldTimesOf(i: IncidentFacts, plan: EscalationPlan, hours: ResponseHours): Map<number, Date> {
+  const out = new Map(scheduleOf({ plan, detectedAt: clockOf(i), hours }).map((s) => [s.level, s.dueAt]));
+  const fired = (i.incident_events ?? [])
+    .filter((e) => e.type === 'step_fired' && e.at)
+    .sort((a, b) => Date.parse(a.at!) - Date.parse(b.at!))
+    .reverse();
+  for (const e of fired) {
+    const p = contextOf(e.payload as never);
+    if (p.reminder === true || p.severity !== plan.severity || typeof p.level !== 'number') continue;
+    // Oldest last, so the first time a level went wins.
+    out.set(p.level, new Date(e.at!));
+  }
+  return out;
 }
 
 /**

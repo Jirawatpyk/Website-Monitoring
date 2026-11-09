@@ -598,6 +598,8 @@ export function renderEmail(
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
         level,
         elapsedMin: num(ctx.elapsedMin, 15),
+        // The step's due time: after a relapse the elapsed minutes are the down minutes only (D-058).
+        sentAt: dateOf(ctx.dueAt),
         confirmedAt: new Date(i.detected_at),
         owner: l0Of(i)?.display_name ?? null,
         asFyi,

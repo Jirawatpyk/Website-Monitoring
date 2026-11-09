@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { IncidentFacts, Notification } from './facts';
-import { toldAtOf } from './ladder-facts';
+import { ladderFactsOf, toldAtOf } from './ladder-facts';
 import { renderChat, renderEmail } from './render';
 
 // INC-0142 MuvMi (Tier 1): confirmed 09:48:41 Bangkok; Arm owns, Ploy backs up, Tao the Admin (spec §4).
@@ -336,5 +336,93 @@ describe('render — the ladder (S08, D-034)', () => {
     );
     // Tao owns it, so L1 asks Ploy alone — the Admin was already told at L0.
     expect(JSON.stringify(m.cardsV2)).toContain('L1 at 09:15 if not acknowledged — Ploy');
+  });
+});
+
+// D-058: the ladder's words after a relapse read the paused clock. MuvMi was down 5 min on Mon 2 Nov
+// (10:00–10:05, nobody acked) and drops again Wed 4 Nov, confirmed 07:44.
+describe('render — the ladder after a relapse (D-058)', () => {
+  const relapsed: IncidentFacts = {
+    ...incident,
+    started_at: '2026-11-02T02:59:30Z',
+    detected_at: '2026-11-02T03:00:00Z',
+    incident_events: [
+      { type: 'detected', payload: {}, at: '2026-11-02T03:00:00Z' },
+      { type: 'recovered', payload: {}, at: '2026-11-02T03:05:00Z' },
+      {
+        type: 'relapsed',
+        payload: { startedAt: '2026-11-04T00:43:30Z', severity: 'down' },
+        at: '2026-11-04T00:44:00Z',
+      },
+    ],
+  };
+
+  it('after the relapse the next level is L1 at 07:54 (5 + 10 min down), not at once', () => {
+    expect(ladderFactsOf(relapsed, new Date('2026-11-04T00:44:05Z'))?.next).toEqual({
+      level: 1,
+      at: new Date('2026-11-04T00:54:00Z'),
+      ask: ['Ploy'],
+      fyi: ['Tao'],
+    });
+  });
+
+  it('ESCALATED · L1 says 15 min, and its email the time it went', () => {
+    const ctx = {
+      level: 1,
+      severity: 'down',
+      elapsedMin: 15,
+      dueAt: '2026-11-04T00:54:00Z',
+      mentioned: ['u-ploy'],
+      fyi: ['u-tao'],
+    };
+    const fired = { ...relapsed, state: 'escalated' as const, escalation_level: 1 };
+    expect(renderChat(row('step_fired', ctx), fired, appUrl, new Date('2026-11-04T00:54:01Z'))!.text).toBe(
+      '<users/PLOY> ESCALATED · L1 · MuvMi DOWN 15 min, not acknowledged · please acknowledge · Tao FYI',
+    );
+    const email = renderEmail(
+      row('step_fired', { ...ctx, asFyi: false }, { channel: 'email', user_id: 'u-ploy' }),
+      fired,
+      { id: 'u-ploy', email: 'ploy@example.test', display_name: 'Ploy' },
+      appUrl,
+      thread,
+    )!;
+    // Sent Wed 07:54; without its due time the email would place it 15 min after Monday's alert.
+    expect(email.text).toContain('Already told');
+    expect(email.text).not.toContain('10:15');
+  });
+
+  it('the L2 email’s "Already told" gives when each level really went', () => {
+    const ceo = { id: 'u-ceo', display_name: 'CEO', google_chat_user_id: 'CEO' };
+    const full = {
+      ...plan,
+      steps: [...plan.steps, { level: 2, delayMin: 30, targets: ['ceo'], channels: ['chat', 'email'] }],
+    };
+    const atL2: IncidentFacts = {
+      ...relapsed,
+      state: 'escalated',
+      escalation_level: 2,
+      escalation_plan: full,
+      ladder: { admins: [tao], ceo: [ceo], hours: HOURS },
+      incident_events: [
+        ...relapsed.incident_events!,
+        {
+          type: 'step_fired',
+          payload: { level: 1, severity: 'down', reminder: false },
+          at: '2026-11-04T00:54:00Z',
+        },
+      ],
+    };
+    const email = renderEmail(
+      row(
+        'step_fired',
+        { level: 2, severity: 'down', elapsedMin: 30, dueAt: '2026-11-04T01:09:00Z', mentioned: ['u-ceo'] },
+        { channel: 'email', user_id: 'u-ceo' },
+      ),
+      atL2,
+      { id: 'u-ceo', email: 'ceo@example.test', display_name: 'CEO' },
+      appUrl,
+      thread,
+    )!;
+    expect(email.text).toContain('Arm 10:00 · Ploy + Tao 07:54');
   });
 });
