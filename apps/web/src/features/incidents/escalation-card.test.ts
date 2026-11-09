@@ -232,5 +232,71 @@ describe('escalationCardOf — after a relapse (D-058)', () => {
     })!;
     expect(card.rows.slice(1).every((r) => r.tone === 'cancelled')).toBe(true);
     expect(card.nextLine).toBeNull();
+    expect(card.rows[1]!.status).toBe('Not sent · recovered 02:40');
+  });
+
+  // spec-check, D-058: a key-page drop with the home page back.
+  const keyPageDrop = [
+    {
+      start: new Date(at('02:30')),
+      confirmedAt: new Date(at('02:31')),
+      end: new Date(at('02:40')),
+      severity: 'down' as const,
+    },
+    {
+      start: new Date(at('02:40')),
+      confirmedAt: new Date(at('02:40')),
+      end: null,
+      severity: 'problem' as const,
+    },
+  ];
+
+  it('…with the engine down: no danger note, no Escalate now', () => {
+    const card = escalationCardOf({ ...base, episodes: keyPageDrop })!;
+    expect(card.stopped).toBeNull();
+    expect(card.button).toBeNull();
+  });
+
+  it.each([
+    ['engine running', { stopped: false, since: at('03:00') }],
+    ['engine down', { stopped: true, since: at('02:17') }],
+  ])('acknowledged, %s: the L3 FYI promises nothing — "Not sent · recovered 02:40"', (_n, engine) => {
+    const card = escalationCardOf({
+      ...base,
+      level: 1,
+      state: 'acknowledged',
+      acked: { by: 'Ploy' },
+      steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+      engine,
+      episodes: keyPageDrop,
+    })!;
+    expect(card.rows[3]!.status).toBe('Not sent · recovered 02:40');
+    expect(card.rows[2]!.status).toBe('Cancelled · acked');
+  });
+
+  it('a level that went in a drop two days ago carries its day (spec §13)', () => {
+    const drop = (start: string, confirmed: string, end: string | null) => ({
+      start: new Date(start),
+      confirmedAt: new Date(confirmed),
+      end: end ? new Date(end) : null,
+      severity: 'down' as const,
+    });
+    const card = escalationCardOf({
+      ...base,
+      level: 1,
+      state: 'escalated',
+      steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+      engine: { stopped: false, since: '2026-09-28T08:00:00+07:00' },
+      episodes: [
+        drop(at('02:30'), at('02:31'), at('02:50')),
+        drop('2026-09-28T07:59:00+07:00', '2026-09-28T08:00:00+07:00', null),
+      ],
+      now: new Date('2026-09-28T08:01:00+07:00'),
+    })!;
+    expect(card.rows.slice(0, 2).map((r) => [r.when, r.status])).toEqual([
+      ['0 min · Sat 26 Sep 02:31', 'Sent Sat 26 Sep 02:31'],
+      ['+15 min · Sat 26 Sep 02:46', 'Sent Sat 26 Sep 02:46'],
+    ]);
+    expect(card.rows[2]!.when).toBe('+30 min · 08:11');
   });
 });

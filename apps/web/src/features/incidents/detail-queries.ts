@@ -444,6 +444,7 @@ export async function loadIncident(
       detectedAt: i.detected_at,
       alertedAt: i.alerted_at,
       episodes: episodesFromTimeline(i, events),
+      now,
       hours,
       steps: events
         .filter(
