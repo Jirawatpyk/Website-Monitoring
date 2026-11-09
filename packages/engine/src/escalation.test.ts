@@ -2,12 +2,15 @@ import type { EscalationPlan } from '@dxt/shared';
 import { describe, expect, it } from 'vitest';
 import {
   firstReminderOf,
+  ladderClockOf,
   ladderClockStart,
   ladderDue,
   problemHoldUntil,
   scheduleOf,
+  type LadderDue,
   type LadderInput,
 } from './escalation';
+import type { Episode } from './lifecycle';
 
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
 
@@ -370,5 +373,186 @@ describe('ladderClockStart — an incident a mute silenced (D-036)', () => {
       alertedAt: bkk('2026-09-24T19:00:00'),
     });
     expect(problemHoldUntil(2, start, HOURS)).toEqual(bkk('2026-09-25T09:00:00'));
+  });
+});
+
+// D-058 (Tao, 9 Nov 2026): the clock counts only the minutes the incident is down; a recovery pauses
+// it, a relapse resumes it, fired levels stay fired. ENEOS 4 Nov 07:44 fired L1–L3 in 21 s on the old
+// wall clock (its first drop was days earlier).
+describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () => {
+  const drop = (
+    start: string,
+    confirmed: string,
+    end: string | null,
+    severity: 'down' | 'problem' = 'down',
+  ): Episode => ({
+    start: bkk(start),
+    confirmedAt: bkk(confirmed),
+    end: end ? bkk(end) : null,
+    severity,
+  });
+  const clock = (episodes: Episode[], over: Partial<Parameters<typeof ladderClockOf>[0]> = {}) =>
+    ladderClockOf({
+      episodes,
+      severity: 'down',
+      clockStart: bkk('2026-11-02T10:00:00'),
+      tier: 1,
+      hours: HOURS,
+      ...over,
+    });
+
+  it.each<[string, Episode[], Date, number]>([
+    ['no drops read: the clock start', [], bkk('2026-11-02T10:00:00'), 0],
+    [
+      'one drop: the clock start, nothing carried',
+      [drop('2026-11-02T09:59:00', '2026-11-02T10:00:00', null)],
+      bkk('2026-11-02T10:00:00'),
+      0,
+    ],
+    [
+      'a relapse days later: from its confirm, the first drop’s 5 min carried',
+      [
+        drop('2026-11-02T09:59:00', '2026-11-02T10:00:00', '2026-11-02T10:05:00'),
+        drop('2026-11-04T07:43:00', '2026-11-04T07:44:00', null),
+      ],
+      bkk('2026-11-04T07:44:00'),
+      5,
+    ],
+    [
+      'D-023: a key-page PROBLEM drop on a DOWN incident doesn’t count',
+      [
+        drop('2026-11-02T09:59:00', '2026-11-02T10:00:00', '2026-11-02T10:20:00'),
+        drop('2026-11-02T10:20:00', '2026-11-02T10:20:00', '2026-11-02T10:29:00', 'problem'),
+        drop('2026-11-02T10:29:00', '2026-11-02T10:30:00', null),
+      ],
+      bkk('2026-11-02T10:30:00'),
+      20,
+    ],
+    [
+      'a drop without its confirm counts from its start',
+      [
+        { start: bkk('2026-11-02T10:00:00'), end: bkk('2026-11-02T10:04:00'), severity: 'down' },
+        { start: bkk('2026-11-02T11:00:00'), end: null, severity: 'down' },
+      ],
+      bkk('2026-11-02T11:00:00'),
+      4,
+    ],
+  ])('%s', (_name, episodes, detectedAt, carriedMin) => {
+    expect(clock(episodes)).toEqual({ detectedAt, carriedMin });
+  });
+
+  it('D-021: the PROBLEM time before the raise isn’t on the DOWN clock (it starts at the raise)', () => {
+    const raised = [
+      drop('2026-11-02T09:00:00', '2026-11-02T09:01:00', '2026-11-02T10:00:00', 'problem'),
+      drop('2026-11-02T10:00:00', '2026-11-02T10:00:40', null),
+    ];
+    expect(clock(raised, { clockStart: bkk('2026-11-02T10:00:40') })).toEqual({
+      detectedAt: bkk('2026-11-02T10:00:40'),
+      carriedMin: 0,
+    });
+  });
+
+  it('after a mute: the first drop counts from its late alert (D-036); a drop over before it doesn’t count', () => {
+    const episodes = [
+      drop('2026-11-02T08:00:00', '2026-11-02T08:01:00', '2026-11-02T08:30:00'),
+      drop('2026-11-02T09:55:00', '2026-11-02T09:56:00', '2026-11-02T10:12:00'),
+      drop('2026-11-02T12:00:00', '2026-11-02T12:01:00', null),
+    ];
+    expect(clock(episodes)).toEqual({ detectedAt: bkk('2026-11-02T12:01:00'), carriedMin: 12 });
+  });
+
+  it('Tier 2–3 carry response-hours minutes only', () => {
+    // Thu 17:50 → 18:30 is 10 minutes inside 09:00–18:00.
+    const episodes = [
+      drop('2026-09-24T17:49:00', '2026-09-24T17:50:00', '2026-09-24T18:30:00'),
+      drop('2026-09-28T09:00:00', '2026-09-28T09:01:00', null),
+    ];
+    expect(clock(episodes, { tier: 2, clockStart: bkk('2026-09-24T17:50:00') })).toEqual({
+      detectedAt: bkk('2026-09-28T09:01:00'),
+      carriedMin: 10,
+    });
+  });
+});
+
+describe('ladderDue — a relapse resumes the clock (D-058)', () => {
+  // ENEOS-style, Tier 1 with L1 +15, L2 +30, L3 +60 (FYI): the first drop was down 5 min, unacked;
+  // the relapse was confirmed Wed 4 Nov 07:44.
+  const relapse = (now: string, over: Partial<LadderInput> = {}): LadderInput => ({
+    plan: full(1),
+    detectedAt: bkk('2026-11-04T07:44:00'),
+    carriedMin: 5,
+    level: 0,
+    state: 'unacked',
+    hours: HOURS,
+    now: bkk(now),
+    ...over,
+  });
+
+  it.each<[string, LadderInput, LadderDue['step'], LadderDue['reminder']]>([
+    ['07:44:30, at the relapse: nothing is due yet', relapse('2026-11-04T07:44:30'), undefined, undefined],
+    ['07:53:59: still nothing', relapse('2026-11-04T07:53:59'), undefined, undefined],
+    [
+      '07:54: L1 (5 + 10 = 15 min down)',
+      relapse('2026-11-04T07:54:00'),
+      { level: 1, dueAt: bkk('2026-11-04T07:54:00') },
+      undefined,
+    ],
+    [
+      '08:09: L2 (30 min down)',
+      relapse('2026-11-04T08:09:00', { level: 1, state: 'escalated' }),
+      { level: 2, dueAt: bkk('2026-11-04T08:09:00') },
+      undefined,
+    ],
+    [
+      '08:24, L2 fired: the +45 reminder',
+      relapse('2026-11-04T08:24:00', { level: 2, state: 'escalated' }),
+      undefined,
+      { afterMin: 45, dueAt: bkk('2026-11-04T08:24:00') },
+    ],
+  ])('%s', (_name, input, step, reminder) => {
+    const due = ladderDue(input);
+    expect(due.step).toEqual(step);
+    expect(due.reminder).toEqual(reminder);
+  });
+
+  it('a level that came due in an earlier drop but never fired goes at the relapse', () => {
+    const due = ladderDue(relapse('2026-11-04T07:44:10', { carriedMin: 16 }));
+    expect(due.step).toEqual({ level: 1, dueAt: bkk('2026-11-04T07:44:00') });
+  });
+
+  it('a reminder minute already reached in an earlier drop is not sent again', () => {
+    // 20 min carried, L1 fired at 15: a minute into the relapse the clock reads 21 — nothing new is
+    // due until L2 at 30.
+    const due = ladderDue(relapse('2026-11-04T07:45:00', { carriedMin: 20, level: 1, state: 'escalated' }));
+    expect(due).toEqual({});
+  });
+
+  it('scheduleOf and firstReminderOf read the same clock', () => {
+    const input = { plan: full(1), detectedAt: bkk('2026-11-04T07:44:00'), carriedMin: 5, hours: HOURS };
+    expect(scheduleOf(input).map((s) => s.dueAt)).toEqual([
+      bkk('2026-11-04T07:44:00'),
+      bkk('2026-11-04T07:54:00'),
+      bkk('2026-11-04T08:09:00'),
+      bkk('2026-11-04T08:39:00'),
+    ]);
+    expect(firstReminderOf(input)).toEqual({ afterMin: 45, dueAt: bkk('2026-11-04T08:24:00') });
+  });
+
+  it('Tier 2: the carried minutes, then the rest inside response hours', () => {
+    // 10 inside minutes carried; the relapse confirmed Mon 08:30 (closed) → L1 at 09:05.
+    const input = (now: string): LadderInput => ({
+      plan: down(2),
+      detectedAt: bkk('2026-09-28T08:30:00'),
+      carriedMin: 10,
+      level: 0,
+      state: 'unacked',
+      hours: HOURS,
+      now: bkk(now),
+    });
+    expect(ladderDue(input('2026-09-28T09:04:59')).step).toBeUndefined();
+    expect(ladderDue(input('2026-09-28T09:05:00')).step).toEqual({
+      level: 1,
+      dueAt: bkk('2026-09-28T09:05:00'),
+    });
   });
 });

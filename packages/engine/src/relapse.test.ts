@@ -133,9 +133,9 @@ describe('lifecycle — relapse state, auto-resolve event, episodes (D-004, spec
       { type: 'recovered', at: T('10:40', '25') },
     ]);
     expect(episodes).toEqual([
-      { start: T('10:00', '25'), end: T('10:21', '25'), severity: 'down' },
-      { start: T('10:21', '25'), end: T('10:29', '25'), severity: 'problem' },
-      { start: T('10:29', '25'), end: T('10:40', '25'), severity: 'down' },
+      { start: T('10:00', '25'), end: T('10:21', '25'), severity: 'down', confirmedAt: T('10:01', '25') },
+      { start: T('10:21', '25'), end: T('10:29', '25'), severity: 'problem', confirmedAt: T('10:21', '25') },
+      { start: T('10:29', '25'), end: T('10:40', '25'), severity: 'down', confirmedAt: T('10:30', '25') },
     ]);
   });
 
@@ -148,9 +148,9 @@ describe('lifecycle — relapse state, auto-resolve event, episodes (D-004, spec
     ]);
     // D-021 while the PROBLEM drop is open: the PROBLEM ends at the outage's start (S06 engine review)
     expect(episodes).toEqual([
-      { start: T('09:58'), end: T('10:02'), severity: 'problem' },
-      { start: T('10:02'), end: T('10:05'), severity: 'down' },
-      { start: T('10:20'), end: null, severity: 'down' },
+      { start: T('09:58'), end: T('10:02'), severity: 'problem', confirmedAt: T('10:00') },
+      { start: T('10:02'), end: T('10:05'), severity: 'down', confirmedAt: T('10:02') },
+      { start: T('10:20'), end: null, severity: 'down', confirmedAt: T('10:20') },
     ]);
     // DOWN drops only (D-033): 10:02–10:05 + 10:20–now = 3 + 10; the PROBLEM's 4 min aren't an outage
     expect(outageMinutes(episodes, T('10:30'))).toBe(13);

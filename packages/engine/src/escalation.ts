@@ -5,6 +5,7 @@ import {
   type ResponseHours,
   type Tier,
 } from '@dxt/shared';
+import type { Episode } from './lifecycle';
 import { addInsideMinutes, isInsideHours, minutesInsideHours, nextOpening } from './response-hours';
 
 /**
@@ -14,8 +15,10 @@ import { addInsideMinutes, isInsideHours, minutesInsideHours, nextOpening } from
  *   · The clock starts at "Confirmed down" (`detectedAt`; a PROBLEM's flag time). Tier 1 runs 24/7,
  *     Tier 2–3 count only minutes inside response hours (INC-0139: Thu 22:14 → L1 Fri 09:15).
  *   · Timers run only while the incident waits for an ack (Unacked / Escalated): an ack stops the
- *     ladder and the reminders, and so does recovery. A relapse keeps the clock and the fired level
- *     (D-004), so a level that came due while the site was up fires on the relapse.
+ *     ladder and the reminders, and so does recovery. The clock counts only the minutes the incident
+ *     is down (D-058): a recovery pauses it, a relapse resumes it with the minutes carried
+ *     (`ladderClockOf` → `carriedMin`) and the fired level kept (D-004). ENEOS, 4 Nov: a relapse
+ *     days after the first drop no longer finds every level overdue.
  *   · Reminders fall due every `reminderMin` from the clock start, skipped on a step's minute.
  *   · The Tier 1 FYI step (CEO + Site AM, S10) also comes due while Acknowledged — the site is still
  *     DOWN then (§14.1: "Acknowledge stops L1 and L2"); recovered by then → nothing is sent.
@@ -26,7 +29,10 @@ const WAITING: readonly IncidentState[] = ['unacked', 'escalated'];
 
 export interface LadderInput {
   plan: EscalationPlan;
+  /** Where this drop's clock runs from: the clock start, or the relapse's confirm (`ladderClockOf`). */
   detectedAt: Date;
+  /** The clock minutes the incident's earlier drops used up (D-058); 0 / absent for the first drop. */
+  carriedMin?: number;
   /** `incidents.escalation_level`: the highest level fired (0 = only L0). */
   level: number;
   state: IncidentState;
@@ -55,22 +61,63 @@ export function ladderClockStart(i: { detectedAt: Date; alertedAt?: Date | null 
   return i.alertedAt && i.alertedAt > i.detectedAt ? i.alertedAt : i.detectedAt;
 }
 
-/** When `minutes` on the incident's escalation clock have passed. */
-function clockAt(input: Pick<LadderInput, 'plan' | 'detectedAt' | 'hours'>, minutes: number): Date {
+type ClockInput = Pick<LadderInput, 'plan' | 'detectedAt' | 'carriedMin' | 'hours'>;
+
+/** Minutes on the clock between two times: wall minutes for Tier 1, response-hours minutes else. */
+function minutesBetween(tier: number, from: Date, to: Date, hours: ResponseHours): number {
+  return alwaysOn(tier)
+    ? Math.max(0, (to.getTime() - from.getTime()) / MINUTE)
+    : minutesInsideHours(from, to, hours);
+}
+
+/**
+ * Where an incident's ladder clock stands (D-058): it counts only the minutes the incident was down at
+ * the plan's severity. The latest drop runs from its confirm (`detectedAt`); the earlier drops' minutes
+ * are carried (`carriedMin`). The first drop counts from `clockStart` (`ladderClockStart`: Confirmed
+ * down, or the late alert after a mute; a D-021 raise resets it), and nothing before it counts — so the
+ * PROBLEM time before a raise and a D-023 key-page PROBLEM drop on a DOWN incident stay off the DOWN
+ * clock. One drop: `{ detectedAt: clockStart, carriedMin: 0 }`, the clock as it always was.
+ */
+export function ladderClockOf(input: {
+  episodes: readonly Episode[];
+  severity: EscalationPlan['severity'];
+  clockStart: Date;
+  tier: number;
+  hours: ResponseHours;
+}): { detectedAt: Date; carriedMin: number } {
+  const from = input.clockStart.getTime();
+  const drops = input.episodes
+    .filter((e) => e.severity === input.severity && (e.end === null || e.end.getTime() > from))
+    .map((e) => ({ start: new Date(Math.max((e.confirmedAt ?? e.start).getTime(), from)), end: e.end }))
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  const last = drops.at(-1);
+  if (!last) return { detectedAt: input.clockStart, carriedMin: 0 };
+  let carriedMin = 0;
+  for (const d of drops.slice(0, -1)) {
+    carriedMin += minutesBetween(input.tier, d.start, d.end ?? last.start, input.hours);
+  }
+  return { detectedAt: last.start, carriedMin };
+}
+
+/**
+ * When `minutes` on the incident's escalation clock have passed. A minute the earlier drops already
+ * reached is due at this drop's start (D-058: a level due then that never fired goes at the relapse).
+ */
+function clockAt(input: ClockInput, minutes: number): Date {
+  const left = minutes - (input.carriedMin ?? 0);
+  if (left <= 0) return input.detectedAt;
   return alwaysOn(input.plan.tier)
-    ? new Date(input.detectedAt.getTime() + minutes * MINUTE)
-    : addInsideMinutes(input.detectedAt, minutes, input.hours);
+    ? new Date(input.detectedAt.getTime() + left * MINUTE)
+    : addInsideMinutes(input.detectedAt, left, input.hours);
 }
 
 /** Minutes on the escalation clock at `now`. */
 function clockMinutesAt(input: LadderInput): number {
-  return alwaysOn(input.plan.tier)
-    ? Math.max(0, (input.now.getTime() - input.detectedAt.getTime()) / MINUTE)
-    : minutesInsideHours(input.detectedAt, input.now, input.hours);
+  return (input.carriedMin ?? 0) + minutesBetween(input.plan.tier, input.detectedAt, input.now, input.hours);
 }
 
 /** When each step fires if nobody acknowledges — the preview, the incident card. */
-export function scheduleOf(input: Pick<LadderInput, 'plan' | 'detectedAt' | 'hours'>) {
+export function scheduleOf(input: ClockInput) {
   return (
     [...input.plan.steps]
       .sort((a, b) => a.level - b.level)
@@ -86,13 +133,12 @@ const stepMinutesOf = (plan: EscalationPlan) => new Set(plan.steps.map((s) => s.
  * The first reminder if nobody acknowledges (the preview's "Reminder in the thread" row): the same skip
  * rule as `ladderDue` — DOWN L1 +15, every 15 → +30; PROBLEM L1 +60, every 60 → +120.
  */
-export function firstReminderOf(
-  input: Pick<LadderInput, 'plan' | 'detectedAt' | 'hours'>,
-): { afterMin: number; dueAt: Date } | null {
+export function firstReminderOf(input: ClockInput): { afterMin: number; dueAt: Date } | null {
   const every = input.plan.reminderMin;
   if (!(every > 0)) return null;
   const steps = stepMinutesOf(input.plan);
-  let k = 1;
+  // After a relapse: the first reminder minute this drop reaches (D-058).
+  let k = Math.floor((input.carriedMin ?? 0) / every + 1e-9) + 1;
   while (steps.has(k * every)) k++;
   return { afterMin: k * every, dueAt: clockAt(input, k * every) };
 }
@@ -124,8 +170,11 @@ export function ladderDue(input: LadderInput): LadderDue {
   const stepMinutes = stepMinutesOf(input.plan);
   let k = Math.floor(clockMinutesAt(input) / every + 1e-9);
   while (k > 0 && stepMinutes.has(k * every)) k--;
-  // A step firing now is the reminder for this tick.
-  if (k > 0 && !due.step) due.reminder = { afterMin: k * every, dueAt: clockAt(input, k * every) };
+  // A step firing now is the reminder for this tick. A minute an earlier drop already reached was
+  // reminded (or skipped) then: no second STILL DOWN at the relapse (D-058).
+  if (k > 0 && k * every > (input.carriedMin ?? 0) && !due.step) {
+    due.reminder = { afterMin: k * every, dueAt: clockAt(input, k * every) };
+  }
   return due;
 }
 
