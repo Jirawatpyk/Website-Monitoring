@@ -46,6 +46,8 @@ const REFUSALS: Record<string, string> = {
   level_moved: 'Someone else escalated it a moment ago — the page now shows the next level.',
   not_waiting: 'It was acknowledged — escalation has stopped.',
   no_level: 'Every level has been sent.',
+  // D-058: a key-page drop with the home page back (D-023).
+  home_back: 'The home page is back — the DOWN ladder waits.',
   not_sent: 'That level couldn’t be sent — the DOWN alert hasn’t gone out yet.',
   already_sent: 'The client-update reminder went already.',
   not_down: 'The site isn’t down now — the engine sends the reminder if it falls due.',

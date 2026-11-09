@@ -146,6 +146,14 @@ describe('Escalate now and the reminder (§30.6–7, D-055)', () => {
     });
   });
 
+  it('the home page came back while the page was open: the DOWN ladder waits (D-058)', async () => {
+    m.rpc.mockResolvedValue({ data: null, error: { code: '55000', hint: 'home_back', message: 'x' } });
+    expect(await escalateNow({ incidentId: INC, level: 1 })).toEqual({
+      ok: false,
+      message: 'The home page is back — the DOWN ladder waits.',
+    });
+  });
+
   it('a level outside L1–L3 never reaches the database', async () => {
     expect((await escalateNow({ incidentId: INC, level: 4 })).ok).toBe(false);
     expect(m.rpc).not.toHaveBeenCalled();

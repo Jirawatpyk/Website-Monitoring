@@ -5,7 +5,7 @@
 -- steps never repeat them (Done-when 2).
 begin;
 \ir _helpers.psql
-select plan(51);
+select plan(52);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -164,6 +164,14 @@ select pg_temp.beat('engine-run', '4 minutes');
 select tests.authenticate_as(pg_temp.uid('thee'));
 select throws_ok(format('select public.escalate_now(%L, 1::smallint)', pg_temp.inc()), '42501', 'not allowed',
   'the AM can''t escalate');
+-- D-058: the home page is back and only a key page fails (D-023): the DOWN ladder waits.
+reset role;
+update public.incidents set episode_severity = 'problem' where id = pg_temp.inc();
+select tests.authenticate_as(pg_temp.uid('tao'));
+select throws_ok(format('select public.escalate_now(%L, 1::smallint)', pg_temp.inc()), '55000',
+  'the home page is back: the DOWN ladder waits', 'no Escalate now during a key-page drop (D-058)');
+reset role;
+update public.incidents set episode_severity = 'down' where id = pg_temp.inc();
 select tests.authenticate_as(pg_temp.uid('tao'));
 select is(public.escalate_now(pg_temp.inc(), 1::smallint) ->> 'level', '1', 'Escalate now sends L1');
 select throws_ok(format('select public.escalate_now(%L, 1::smallint)', pg_temp.inc()), '55000', 'the incident moved on',
