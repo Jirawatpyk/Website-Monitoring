@@ -440,7 +440,7 @@ describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () =>
     ],
   ])('%s', (_name, episodes, detectedAt, carriedMin) => {
     // Tier 1: the wall minutes are the clock minutes.
-    expect(clock(episodes)).toEqual({ detectedAt, carriedMin, carriedWallMin: carriedMin });
+    expect(clock(episodes)).toEqual({ detectedAt, carriedMin, carriedWallMin: carriedMin, upSince: null });
   });
 
   it('D-021: the PROBLEM time before the raise isn’t on the DOWN clock (it starts at the raise)', () => {
@@ -452,6 +452,7 @@ describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () =>
       detectedAt: bkk('2026-11-02T10:00:40'),
       carriedMin: 0,
       carriedWallMin: 0,
+      upSince: null,
     });
   });
 
@@ -465,6 +466,7 @@ describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () =>
       detectedAt: bkk('2026-11-02T12:01:00'),
       carriedMin: 12,
       carriedWallMin: 12,
+      upSince: null,
     });
   });
 
@@ -479,6 +481,7 @@ describe('ladderClockOf — the paused clock across drops (D-004, D-058)', () =>
       carriedMin: 10,
       // …and 40 on the wall clock, for the words.
       carriedWallMin: 40,
+      upSince: null,
     });
   });
 });
@@ -507,7 +510,7 @@ describe('ladderClockOf — the words of a held PROBLEM (D-034, D-058; code revi
         tier: 2,
         hours: HOURS,
       }),
-    ).toEqual({ detectedAt: bkk('2026-09-28T10:00:00'), carriedMin: 10, carriedWallMin: 10 });
+    ).toEqual({ detectedAt: bkk('2026-09-28T10:00:00'), carriedMin: 10, carriedWallMin: 10, upSince: null });
   });
 });
 
@@ -533,7 +536,12 @@ describe('incidentLadderClock — a stored incident and its timeline (D-058)', (
         full(1),
         HOURS,
       ),
-    ).toEqual({ detectedAt: new Date('2026-11-04T00:44:00Z'), carriedMin: 5, carriedWallMin: 5 });
+    ).toEqual({
+      detectedAt: new Date('2026-11-04T00:44:00Z'),
+      carriedMin: 5,
+      carriedWallMin: 5,
+      upSince: null,
+    });
   });
 });
 
@@ -617,5 +625,48 @@ describe('ladderDue — a relapse resumes the clock (D-058)', () => {
       level: 1,
       dueAt: bkk('2026-09-28T09:05:00'),
     });
+  });
+});
+
+describe('the clock never reads the days between drops (D-058, engine review M1)', () => {
+  it('a relapse with no recovered row before it starts a new drop', () => {
+    const clock = incidentLadderClock(
+      { started_at: '2026-11-02T02:59:00Z', severity: 'down', detected_at: '2026-11-02T03:00:00Z' },
+      [
+        { type: 'detected', at: '2026-11-02T03:00:00Z', payload: {} },
+        {
+          type: 'relapsed',
+          at: '2026-11-04T00:44:00Z',
+          payload: { startedAt: '2026-11-04T00:43:00Z', severity: 'down' },
+        },
+      ],
+      full(1),
+      HOURS,
+    );
+    expect(clock.detectedAt).toEqual(new Date('2026-11-04T00:44:00Z'));
+    expect(clock.upSince).toBeNull();
+  });
+
+  it('a waiting incident whose drop is over fires nothing, days later', () => {
+    const clock = incidentLadderClock(
+      { started_at: '2026-11-02T02:59:00Z', severity: 'down', detected_at: '2026-11-02T03:00:00Z' },
+      [
+        { type: 'detected', at: '2026-11-02T03:00:00Z', payload: {} },
+        { type: 'recovered', at: '2026-11-02T03:05:00Z', payload: {} },
+      ],
+      full(1),
+      HOURS,
+    );
+    expect(clock.upSince).toEqual(new Date('2026-11-02T03:05:00Z'));
+    expect(
+      ladderDue({
+        plan: full(1),
+        ...clock,
+        level: 0,
+        state: 'unacked',
+        hours: HOURS,
+        now: new Date('2026-11-04T00:44:00Z'),
+      }),
+    ).toEqual({});
   });
 });

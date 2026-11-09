@@ -34,6 +34,12 @@ export interface LadderInput {
   detectedAt: Date;
   /** The clock minutes the incident's earlier drops used up (D-058); 0 / absent for the first drop. */
   carriedMin?: number;
+  /**
+   * The latest drop of the plan's severity ended here: the site is up and the clock stands still, so
+   * nothing fires (D-058) — a waiting incident whose `recovered` row sorts after its relapse, or a D-023
+   * key-page drop on a DOWN incident. Null / absent while the drop is open.
+   */
+  upSince?: Date | null;
   /** `incidents.escalation_level`: the highest level fired (0 = only L0). */
   level: number;
   state: IncidentState;
@@ -81,20 +87,29 @@ function minutesBetween(tier: number, from: Date, to: Date, hours: ResponseHours
  * `carriedWallMin` is the same drops on the wall clock, for the words ("ESCALATED · L1 · 15 min, not
  * acknowledged" — D-034 words Tier 2–3 on the wall clock too); equal to `carriedMin` on Tier 1.
  */
+/** Where an incident's ladder clock stands (`ladderClockOf`). */
+export interface LadderClock {
+  detectedAt: Date;
+  carriedMin: number;
+  carriedWallMin: number;
+  /** The latest drop of the plan's severity is over: nothing fires until the next one (D-058). */
+  upSince: Date | null;
+}
+
 export function ladderClockOf(input: {
   episodes: readonly Episode[];
   severity: EscalationPlan['severity'];
   clockStart: Date;
   tier: number;
   hours: ResponseHours;
-}): { detectedAt: Date; carriedMin: number; carriedWallMin: number } {
+}): LadderClock {
   const from = input.clockStart.getTime();
   const drops = input.episodes
     .filter((e) => e.severity === input.severity && (e.end === null || e.end.getTime() > from))
     .map((e) => ({ start: new Date(Math.max((e.confirmedAt ?? e.start).getTime(), from)), end: e.end }))
     .sort((a, b) => a.start.getTime() - b.start.getTime());
   const last = drops.at(-1);
-  if (!last) return { detectedAt: input.clockStart, carriedMin: 0, carriedWallMin: 0 };
+  if (!last) return { detectedAt: input.clockStart, carriedMin: 0, carriedWallMin: 0, upSince: null };
   let carriedMin = 0;
   let carriedWallMin = 0;
   for (const d of drops.slice(0, -1)) {
@@ -107,7 +122,7 @@ export function ladderClockOf(input: {
         : d.start;
     carriedWallMin += minutesBetween(1, told, end, input.hours);
   }
-  return { detectedAt: last.start, carriedMin, carriedWallMin };
+  return { detectedAt: last.start, carriedMin, carriedWallMin, upSince: last.end };
 }
 
 /**
@@ -125,7 +140,7 @@ export function incidentLadderClock(
   events: readonly IncidentEventRow[],
   plan: Pick<EscalationPlan, 'severity' | 'tier'>,
   hours: ResponseHours,
-): { detectedAt: Date; carriedMin: number; carriedWallMin: number } {
+): LadderClock {
   return ladderClockOf({
     episodes: episodesFromTimeline(incident, events),
     severity: plan.severity,
@@ -190,6 +205,8 @@ export function ladderDue(input: LadderInput): LadderDue {
   // Paused (Tier 2–3 outside response hours): nothing fires now, not even a level that came due
   // earlier while the site was up — it waits for the next opening (engine review round 2, D-034).
   if (due.pausedUntil) return due;
+  // The drop is over (D-058): the clock stands still until the next one, whatever the state says.
+  if (input.upSince) return due;
   const acked = input.state === 'acknowledged';
   if (!WAITING.includes(input.state) && !acked) return due;
 

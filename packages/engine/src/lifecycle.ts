@@ -221,6 +221,11 @@ export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
         } else if (e.severity === 'down' && last.severity !== 'down') {
           last.severity = 'down';
           last.confirmedAt = e.at;
+        } else if (e.type === 'relapsed' && e.severity === last.severity && at > last.start) {
+          // A relapse with no recovery before it (a lost or late `recovered` row): the open drop ends
+          // where the new one starts, so the ladder's clock never reads the days between (D-058).
+          last.end = at;
+          out.push({ start: at, end: null, severity: last.severity, confirmedAt: e.at });
         }
         continue;
       }

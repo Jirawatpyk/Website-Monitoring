@@ -155,18 +155,19 @@ export function escalationCardOf(input: {
       (s) => [s.level, s.dueAt],
     ),
   );
-  const waiting = WAITING.has(input.state);
+  // The drop is over (a D-023 key-page drop on a DOWN incident): the DOWN levels wait (D-058).
+  const waiting = WAITING.has(input.state) && !clock.upSince;
   const steps = [...plan.steps].sort((a, b) => a.level - b.level);
   const sentAt = new Map(input.steps.map((s) => [s.level, s]));
   const byHand = input.steps.some((s) => s.sentBy);
   const next = steps.find((s) => s.level > input.level && !sentAt.has(s.level));
 
   const rows = steps.map((s): LadderRow => {
-    // L0 went with the first alert, whatever drop the incident is in now.
-    const at = s.level === 0 ? start : due.get(s.level)!;
+    const sent = s.level === 0 ? { at: start.toISOString(), sentBy: null } : sentAt.get(s.level);
+    // L0 went with the first alert; a level already sent shows when it went, in whatever drop (D-058).
+    const at = s.level === 0 ? start : sent ? new Date(sent.at) : due.get(s.level)!;
     const when = s.level === 0 ? `0 min · ${formatTime(at)}` : `+${s.delayMin} min · ${formatTime(at)}`;
     const who = whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'));
-    const sent = s.level === 0 ? { at: start.toISOString(), sentBy: null } : sentAt.get(s.level);
     if (sent || (s.level > 0 && s.level <= input.level)) {
       const t = sent ? formatTime(new Date(sent.at)) : null;
       return {

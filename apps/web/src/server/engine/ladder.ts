@@ -68,6 +68,7 @@ export async function escalationTick(
         plan: plan.data,
         detectedAt: clock.detectedAt,
         carriedMin: clock.carriedMin,
+        upSince: clock.upSince,
         level: inc.escalation_level,
         state: inc.state as IncidentState,
         hours,

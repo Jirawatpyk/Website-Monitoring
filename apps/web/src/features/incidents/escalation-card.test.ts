@@ -190,4 +190,45 @@ describe('escalationCardOf — after a relapse (D-058)', () => {
       ['L3', '+60 min · 08:55'],
     ]);
   });
+
+  it('L1 sent in the first drop keeps its time; L2 counts on from the relapse (engine review L1)', () => {
+    const drop = (start: string, confirmed: string, end: string | null) => ({
+      start: new Date(at(start)),
+      confirmedAt: new Date(at(confirmed)),
+      end: end ? new Date(at(end)) : null,
+      severity: 'down' as const,
+    });
+    const card = escalationCardOf({
+      ...base,
+      level: 1,
+      state: 'escalated',
+      steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+      engine: { stopped: false, since: at('08:00') },
+      episodes: [drop('02:30', '02:31', '02:50'), drop('07:59', '08:00', null)],
+    })!;
+    expect(card.rows.map((r) => [r.label, r.when, r.status])).toEqual([
+      ['L0', '0 min · 02:31', 'Sent 02:31'],
+      ['L1', '+15 min · 02:46', 'Sent 02:46'],
+      ['L2', '+30 min · 08:11', 'At 08:11 if unacked'],
+      ['L3', '+60 min · 08:41', 'If still unacked'],
+    ]);
+  });
+
+  it('a D-023 key-page drop on a DOWN incident: the DOWN levels wait, nothing promised (engine review L2)', () => {
+    const card = escalationCardOf({
+      ...base,
+      engine: { stopped: false, since: at('03:00') },
+      episodes: [
+        {
+          start: new Date(at('02:30')),
+          confirmedAt: new Date(at('02:31')),
+          end: new Date(at('02:40')),
+          severity: 'down',
+        },
+        { start: new Date(at('02:40')), confirmedAt: new Date(at('02:40')), end: null, severity: 'problem' },
+      ],
+    })!;
+    expect(card.rows.slice(1).every((r) => r.tone === 'cancelled')).toBe(true);
+    expect(card.nextLine).toBeNull();
+  });
 });
