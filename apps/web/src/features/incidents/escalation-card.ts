@@ -164,8 +164,10 @@ export function escalationCardOf(input: {
 
   const rows = steps.map((s): LadderRow => {
     const sent = s.level === 0 ? { at: start.toISOString(), sentBy: null } : sentAt.get(s.level);
-    // L0 went with the first alert; a level already sent shows when it went, in whatever drop (D-058).
-    const at = s.level === 0 ? start : sent ? new Date(sent.at) : due.get(s.level)!;
+    // L0 went with the first alert. A level whose minute an earlier drop reached shows when it went
+    // (D-058: the schedule would say the relapse); otherwise the schedule, even when sent early by hand.
+    const at =
+      s.level === 0 ? start : sent && s.delayMin <= clock.carriedMin ? new Date(sent.at) : due.get(s.level)!;
     const when = s.level === 0 ? `0 min · ${formatTime(at)}` : `+${s.delayMin} min · ${formatTime(at)}`;
     const who = whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'));
     if (sent || (s.level > 0 && s.level <= input.level)) {

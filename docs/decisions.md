@@ -80,9 +80,13 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - **Edge cases.**
   - A level whose minute was reached in an earlier drop but never fired goes at the relapse.
   - A reminder minute already reached isn't sent again.
+  - Once the latest drop is over, the clock stands still and nothing fires (`upSince`), whatever the state says: a waiting incident whose `recovered` row sorts after its relapse, and a D-023 key-page drop on a DOWN incident (engine review M1).
+  - A `relapsed` row with no `recovered` before it starts a new drop, so a lost row can't bring the wall clock back.
+  - The Escalation card waits during a D-023 key-page drop: its DOWN levels read "Not sent · recovered" and Escalate now isn't offered while the home page is back.
+  - The card's schedule column keeps each level's time on the clock. Only a level whose minute an earlier drop reached shows the time it really went.
 - **Words.**
   - ESCALATED / STILL … say the unacknowledged down minutes on the wall clock: this drop since it was confirmed plus the earlier drops. The days the site was up in between are not counted.
-  - A step email takes its sent time from the step's due time.
+  - A step email takes its sent time from when it was queued, and after a relapse says "Down for 15 min (down again 07:44)"; a time on an earlier day carries its day ("Arm Mon 2 Nov 10:00").
   - "Already told" names when each level really went (its `step_fired` event).
 - **Same rule everywhere.** The runner (`escalationTick`), the ladder's words (`ladder-facts.ts`) and the incident page's Escalation card read the same clock (`ladderClockOf` in `@dxt/engine`, over the incident's drops). The by-hand Down again (D-055 item 7) relapses through the same function, so it follows too.
 

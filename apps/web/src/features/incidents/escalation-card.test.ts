@@ -69,6 +69,8 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
       steps: [{ level: 1, at: at('02:35'), sentBy: 'Tao' }],
     })!;
     expect(l1.rows[1]!.status).toBe('Sent 02:35 by Tao');
+    // Sent early by hand: the schedule column keeps its +15 time (D-058 review).
+    expect(l1.rows[1]!.when).toBe('+15 min · 02:46');
     expect(l1.rows[2]!.status).toBe('Waits — engine down');
     expect(l1.button?.label).toBe('Escalate now · L2 (CEO)');
     const l2 = escalationCardOf({
