@@ -147,11 +147,13 @@ function Logs({ lines }: { lines: string[] }) {
   ));
 }
 
-/** "Sat 26 Sep 22:00 → Tue 29 Sep 22:00", broken only after the arrow. */
 /** One empty list, so the focus effect sees "no change" between renders (not a new [] each time). */
 const NO_SERIES: SeriesRow[] = [];
 
-/** A series' rule may wrap ("Every Mon, Tue, Wed, Thu, Fri 01:00"); only its times keep one line. */
+/**
+ * "Sat 26 Sep 22:00 → Tue 29 Sep 22:00", broken only after the arrow. A series' rule may wrap ("Every Mon,
+ * Tue, Wed, Thu, Fri 01:00"); only its end time keeps one line.
+ */
 function When({ text, wrap = false }: { text: string; wrap?: boolean }) {
   const [a, b] = text.split(' → ');
   return (
@@ -275,8 +277,8 @@ function columns(recent: boolean, open: Show, openSeries: ShowSeries): DataTable
           <span className="flex min-w-0 flex-col py-1 leading-snug">
             <span>{p.why}</span>
             <span className="text-xs text-fg-secondary">{p.whySub}</span>
-            {!recent && <Logs lines={p.logs} />}
             {!recent && <Skips lines={p.skips} />}
+            {!recent && <Logs lines={p.logs} />}
           </span>
         );
       },

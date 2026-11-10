@@ -118,7 +118,7 @@ export function DeclineSeriesDialog({
       onClose={onClose}
       size="sm"
       dismissOnScrim={false}
-      title={`Decline ${r.byName ?? 'this'}’s series?`}
+      title={r.byName ? `Decline ${r.byName}’s series?` : 'Decline this series?'}
       description={seriesDescription(r)}
       footer={
         <>

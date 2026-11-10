@@ -104,6 +104,18 @@ describe('the Repeat control (§32.2)', () => {
     expect(screen.getByRole('button', { name: 'Schedule series' }).className).not.toContain('max-md:hidden');
   });
 
+  it('switching Repeat keeps focus on the Repeat control — it never unmounts (WCAG 2.4.3)', async () => {
+    const user = userEvent.setup();
+    dialog(true);
+    const group = screen.getAllByRole('radiogroup', { name: 'Repeat' })[0]!;
+    await user.click(within(group as HTMLElement).getByRole('radio', { name: 'Weekly' }));
+    const after = screen.getAllByRole('radiogroup', { name: 'Repeat' })[0]!;
+    expect(after).toBe(group);
+    expect(within(after as HTMLElement).getByRole('radio', { name: 'Weekly' })).toHaveFocus();
+    await user.click(within(after as HTMLElement).getByRole('radio', { name: 'Does not repeat' }));
+    expect(within(group as HTMLElement).getByRole('radio', { name: 'Does not repeat' })).toHaveFocus();
+  });
+
   it('the default chip is From’s weekday until one is pressed (§32.2)', () => {
     const plan = (days: number[] | null) =>
       daysOf({

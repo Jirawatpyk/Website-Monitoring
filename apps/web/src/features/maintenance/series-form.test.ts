@@ -72,7 +72,7 @@ describe('the monthly choice (§32.2)', () => {
       {
         value: 'day',
         label: 'Day 29 of each month',
-        description: 'Same date every month. A month without day 29 is skipped.',
+        description: 'A month without day 29 is skipped.',
       },
     ]);
   });

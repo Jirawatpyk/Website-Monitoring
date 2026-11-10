@@ -1,7 +1,7 @@
 'use client';
 
 import type { WindowKind } from '@dxt/engine';
-import { formatDay, formatIncidentId, formatTier, formatTime, formatWhen } from '@dxt/shared';
+import { formatDay, formatIncidentId, formatNameList, formatTier, formatTime, formatWhen } from '@dxt/shared';
 import {
   Alert,
   Button,
@@ -18,7 +18,15 @@ import { APPROVAL_OVER_MIN } from '@dxt/engine';
 import { useNow } from '@/components/use-now';
 import { loadAdminNames, muteSite, scheduleMaintenance, scheduleSeries } from '../actions';
 import { postPendingNow } from './window-dialogs';
-import { daysOf, RepeatControl, RepeatFields, type RepeatState } from './repeat-fields';
+import {
+  daysOf,
+  RepeatControl,
+  RepeatLength,
+  RepeatRest,
+  RepeatStart,
+  RepeatWhen,
+  type RepeatState,
+} from './repeat-fields';
 import { repeatPlanOf, SERIES_DURATIONS, seriesDoneOf, type Repeat } from '../series-form';
 import {
   DURATIONS,
@@ -419,14 +427,14 @@ export function MaintenanceDialog({
             </div>
           )}
 
-          {repeating && repPlan && (
-            <RepeatFields
-              state={rep}
-              set={(p) => (p.repeat ? turnRepeat(p.repeat) : patchRep(p))}
-              plan={repPlan}
-              now={now}
-            />
+          {/* A series, desktop: Start · From | Time, then Window length (both widths); phones: From | Time after Repeat. */}
+          {repeating && (
+            <div className="flex flex-col gap-5 max-md:hidden">
+              <RepeatStart />
+              <RepeatWhen state={rep} set={patchRep} now={now} />
+            </div>
           )}
+          {repeating && <RepeatLength state={rep} set={patchRep} />}
           {!repeating && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Duration</span>
@@ -460,7 +468,14 @@ export function MaintenanceDialog({
               </span>
             </div>
           )}
-          {kind === 'maintenance' && !repeating && <RepeatControl value={rep.repeat} onChange={turnRepeat} />}
+          {/* One Repeat control in a fixed slot: switching it never unmounts it (focus stays). */}
+          {kind === 'maintenance' && <RepeatControl value={rep.repeat} onChange={turnRepeat} />}
+          {repeating && (
+            <span className="md:hidden">
+              <RepeatWhen state={rep} set={patchRep} now={now} />
+            </span>
+          )}
+          {repeating && repPlan && <RepeatRest state={rep} set={patchRep} plan={repPlan} />}
 
           {repeating && !isAdmin && (
             // Phones: the approval warning comes before Reason (§32.3); desktop after it (board).
@@ -551,7 +566,7 @@ export function MaintenanceDialog({
 function SeriesApproval({ admins }: { admins: string[] | null }) {
   return (
     <Alert tone="warning" title="Needs an Admin’s approval">
-      {`An Admin approves the series once; nothing is scheduled until then.${admins?.length ? ` ${admins.join(', ')} ${admins.length === 1 ? 'gets' : 'get'} the request now.` : ''}`}
+      {`An Admin approves the series once; nothing is scheduled until then.${admins?.length ? ` ${formatNameList(admins)} ${admins.length === 1 ? 'gets' : 'get'} the request now.` : ''}`}
     </Alert>
   );
 }

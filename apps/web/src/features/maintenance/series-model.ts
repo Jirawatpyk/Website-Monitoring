@@ -185,7 +185,9 @@ function seriesLogLine(
       if (state === 'withdrawn' || !r.approvedAt)
         return `Withdrawn ${when}${by}${why} · nothing was scheduled`;
       const n = r.cancelledWindows.length;
-      const gone = n ? ` · ${n} not started cancelled (${r.cancelledWindows.map(day).join(', ')})` : '';
+      const gone = n
+        ? ` · ${n} not started cancelled (${r.cancelledWindows.map(day).join(', ')})`
+        : ' · none scheduled';
       return `Series cancelled ${when}${by}${why}${undone ? '' : gone}`;
     }
     case 'not_approved':
@@ -268,7 +270,7 @@ function whoNote(r: SeriesRow, v: Viewer): string | null {
 function approvedText(r: SeriesRow, now: Date): string {
   if (!r.approverName || !r.approvedAt) return '';
   const at = new Date(r.approvedAt);
-  return ` · approved by ${r.approverName} ${isSameBangkokDay(at, now) ? `today ${formatTime(at)}` : formatDay(at, { weekday: true })}`;
+  return ` · approved by ${r.approverName} ${isSameBangkokDay(at, now) ? formatTime(at) : formatDay(at, { weekday: true })}`;
 }
 
 export function seriesPageRow(
@@ -393,17 +395,20 @@ const emailText = (to: string[]) => `${formatNameList(to)} ${to.length === 1 ? '
 
 /** The dialogs' description: "Every Mon, Thu 22:00 → 23:00 · Plugin updates · asked by Arm". */
 export function seriesDescription(r: SeriesRow): string {
-  const asked = !r.approvedAt || (!!r.createdById && r.approvedById !== r.createdById);
-  return `${seriesWhen(r)} · ${r.reason} · ${asked ? 'asked by' : 'by'} ${r.byName ?? 'someone'}`;
+  // Board: "asked by Arm" while it waits, "by Ploy" once approved.
+  return `${seriesWhen(r)} · ${r.reason} · ${r.approvedAt ? 'by' : 'asked by'} ${r.byName ?? 'someone'}`;
 }
 
-/** The windows an approval makes now: the rule's starts inside the 14 days (overlaps are SQL's). */
+/**
+ * The windows an approval makes now: every start of the rule inside the 14 days (a daily series makes
+ * 14, not the board's sample four; overlaps are SQL's).
+ */
 export function approvalPreview(r: SeriesRow, now: Date): Date[] {
   const rule = ruleOf(r);
   if (!rule) return [];
   return nextOccurrences(
     { rule, startTime: r.startTime, startsOn: r.startsOn, untilOn: r.untilOn },
-    4,
+    15,
     now,
   ).filter((d) => d.getTime() <= now.getTime() + HORIZON_MS);
 }

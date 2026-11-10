@@ -109,7 +109,8 @@ test.describe('repeating maintenance (local Supabase)', () => {
     const mine = page
       .getByRole('region', { name: 'Waiting for approval' })
       .getByRole('row', { name: new RegExp(site.name) });
-    await expect(mine.getByRole('button', { name: 'Withdraw…' })).toBeVisible();
+    // The row arrives with the page's refresh after Done: slow with many E2E rows and parallel workers.
+    await expect(mine.getByRole('button', { name: 'Withdraw…' })).toBeVisible({ timeout: 15_000 });
 
     const tao = await browser.newContext();
     await signIn(tao, baseURL!, 'tao@example.test');

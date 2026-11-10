@@ -1,5 +1,5 @@
 import { bangkokDayOf, isoWeekdayOf, nextOccurrences } from '@dxt/engine';
-import { formatDay, formatSeriesRule, type SeriesRule } from '@dxt/shared';
+import { formatDay, formatNameList, formatSeriesRule, type SeriesRule } from '@dxt/shared';
 
 /**
  * The Schedule dialog's Repeat (boards Maintenance STATE › Weekly · Admin / Monthly · Admin / Weekly ·
@@ -60,8 +60,7 @@ export function monthOptions(from: string): { value: 'day' | 'nth'; label: strin
     {
       value: 'day',
       label: `Day ${dom} of each month`,
-      description:
-        dom > 28 ? `Same date every month. A month without day ${dom} is skipped.` : 'Same date every month.',
+      description: dom > 28 ? `A month without day ${dom} is skipped.` : 'Same date every month.',
     },
     ...(nth <= 4
       ? [
@@ -101,7 +100,7 @@ export interface RepeatPlan {
 
 /** "Tue 29 Sep", with the year when it isn’t this year's (Ends on can be two years out). */
 const dayIn = (now: Date) => (d: Date) =>
-  formatDay(d, { weekday: true, year: d.getUTCFullYear() !== now.getUTCFullYear() });
+  formatDay(d, { weekday: true, year: bangkokDayOf(d).slice(0, 4) !== bangkokDayOf(now).slice(0, 4) });
 const day = (d: Date) => formatDay(d, { weekday: true });
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -171,7 +170,7 @@ export function seriesDoneOf(o: {
   const head = `${o.words}${o.first ? ` · from ${day(o.first)}` : ''}`;
   const why = `Reason: “${o.reason.trim()}”.`;
   if (o.waiting) {
-    const who = o.admins?.length ? o.admins.join(', ') : 'the Admins';
+    const who = o.admins?.length ? formatNameList(o.admins) : 'the Admins';
     return {
       title: `Series request sent to ${who} · ${o.site}`,
       text: `${head} · waiting for an Admin — nothing is scheduled until it’s approved. Recorded in the audit log as ${o.viewer}. ${why} Follow it under Waiting for approval on Maintenance & mutes.`,
