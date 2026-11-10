@@ -28,7 +28,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 .mt-h2:focus{outline:2px solid var(--aura-focus-ring, var(--aura-border-strong));outline-offset:4px;border-radius:4px}
 </style>
 </helmet>
-<div style="width: 1440px; height: 2880px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 3220px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -138,7 +138,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Approval.</b> Asked for in the Maintenance dialog (Responder, over 24 h → “Ask for approval”). Maintenance longer than 24 h asked for by a Responder waits for an Admin (an Admin’s own starts as scheduled). Approve → moves to Scheduled, the asker gets a Chat message. Decline needs a reason → Recent “Declined”, the asker gets the reason. Nobody approves before the start → it doesn’t start; Recent “Not approved — didn’t start”. Mutes never need approval (max 24 h, start now, stop new alerts only — an open incident keeps escalating).</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Roles.</b> Admin: every action on every site; on a request only Approve or Decline (to ask for changes, decline with a reason). Responder: End now and Edit on sites they own or back up, and Edit / withdraw on their own requests; other rows say who can act. AM, CEO and Viewer: read only — no row actions, no Schedule button (STATE › Read only). A running window or mute is changed with “Edit end” or stopped with End now; “Cancel” exists only before it starts. Every action adds a log line; lines are never replaced.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Uptime line.</b> Maintenance: “Not counted in uptime” (removed from the window, client status page shows “Planned maintenance”). Mute: “Still counted in uptime”. Times are site-local Thailand time; past rows keep their log line (who, when, reason).</span>
-<span><b style="color: var(--aura-fg-primary); font-weight: 600">Repeating series (FR-10b, D-057, STATE › Series …).</b> A series is a rule; its occurrences are ordinary windows, created 14 days ahead and listed under Scheduled / Recent with a “Part of a series” tag (each keeps Edit / cancel for that one window). Series rows sit in their own section “Repeating series” after Scheduled: status “Repeating” (neutral outline), When = the rule (“Every Tue 01:00 → 03:00”, “Monthly on day 6 · 20:00 → 22:00”) + length · from · end · next, and the only action “Cancel series…” (reason; cancels the occurrences that haven’t started, a running one finishes; the series moves to Recent as Cancelled with one log line). No Edit series in v1 — cancel and make a new one. A Responder’s series waits under Waiting for approval (Needs approval + Repeating): Admin Approve / Decline like a request; the asker Withdraw…; nothing is created until approved. Skipped occurrences (overlap) show as an amber note on the series row, not as rows. No series → the section is left out.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Repeating series (FR-10b, D-057, STATE › Series …).</b> A series is a rule; its occurrences are ordinary windows, created 14 days ahead and listed under Scheduled / Recent with a “Part of a series” tag (each keeps Edit / cancel for that one window). Series rows sit in their own section “Repeating series” after Scheduled: status “Repeating” (neutral outline), When = the rule (“Every Tue 01:00 → 03:00”, “Monthly on day 6 · 20:00 → 22:00”) + length · from · end · next, and the only action “Cancel series…” (reason; cancels the occurrences that haven’t started, a running one finishes; the series moves to Recent as Cancelled with one log line). No Edit series in v1 — cancel and make a new one. A Responder’s series waits under Waiting for approval (Needs approval + Repeating): Admin Approve / Decline like a request; the asker Withdraw…; nothing is created until approved. Skipped occurrences (overlap) show as an amber note on the series row, not as rows. No series → the section is left out. Every series action — approve, decline, withdraw, cancel — gets the 10 s Undo toast (“Bangkok Airways – Taiwan series approved · 4 windows scheduled” · Undo → “… series approval undone · Nothing was posted and no windows were scheduled. It’s waiting for approval again.”; too late → “Too late to undo — it has been posted”, STATE › Undo · too late). Ended without running → Recent: Declined / Withdrawn / Not approved (rotate-ccw, the reason or “nobody approved before the first window”, “nothing was scheduled”); an ended series shows no skipped note.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Sample data.</b> Fri 25 Sep 10:07 (14:40 in STATE › End mute · open incident); sites, people, times and reasons are mock data — compute them; never copy.</span>
 </div>
 
@@ -224,7 +224,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </x-import>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2880}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3220}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -234,13 +234,15 @@ class Component extends DCLogic {
     clearInterval(this._iv);
     var dlg = { 'Approve confirm': 'bac', 'End mute · open incident': 'bat', 'Approve series': 'sbat', 'Cancel series': 'stub' }[v] || '';
     var kind = { 'Approve confirm': 'approve', 'End mute · open incident': 'end', 'Approve series': 'approve', 'Cancel series': 'series' }[v] || '';
+    if (v === 'Undo · too late') { this.setState({ view: v, ov: { sbat: { approved: true, logs: ['Approved 10:07 by Tao · 4 windows created, to Thu 8 Oct · Arm told in Chat (posted 10:07:10)'] } }, dlg: '', dlgKind: '', toastHidden: false,
+      toast: { k: 'sbat', phase: 'late', title: 'Bangkok Airways – Taiwan series approved · 4 windows scheduled', chan: 'Chat and email', left: 0, lateLine: 'Bangkok Airways – Taiwan series approved — posted 10:07:10. To take it back, cancel the series.' } }); return; }
     this.setState({ toast: false, toastHidden: false, view: v, ov: {}, dlg: dlg, dlgKind: kind, endReason: '', serReason: v === 'Cancel series' ? 'Plugins now update automatically' : '', cancelling: false });
   }
   renderVals() {
     var self = this;
     var st = this.state;
     var view = st.view;
-    var SER = /^(Series|Approve series|Cancel series)/.test(view);
+    var SER = /^(Series|Approve series|Cancel series|Undo · too late)/.test(view);
     var ROLE = (view === 'Responder' || view === 'Series · Responder') ? 'resp' : (view === 'Read only' ? 'ro' : 'admin');
     var ADMIN = ROLE === 'admin';
     var ME = ADMIN ? 'Tao' : (ROLE === 'resp' ? 'Arm' : 'Mint');
@@ -351,8 +353,11 @@ class Component extends DCLogic {
       EM ? R('calendar', 'Ended', 'WeCare Studio', 'Tier 2 · Nok · backup Ploy', 'Today 09:30 → 14:00', 'Maintenance · 4 h 30 min', 'CMS upgrade', 'by Nok', 'Ended on time 14:00') : null,
       R('calendar', 'Ended', 'ORCA Thailand', 'Tier 2 · Tao · backup Nok', 'Tue 22 Sep 20:00 → 22:00', 'Maintenance · 2 h', 'Hosting plan upgrade', 'by Tao', 'Ended on time 22:00'),
       SER ? Object.assign(R('calendar', 'Ended', 'Tubtong', 'Tier 2 · Ploy · backup Nok', 'Tue 22 Sep 01:00 → 03:00', 'Maintenance · 2 h', 'WordPress plugin updates', 'by Ploy', 'Ended on time 03:00'), { ser2: true, ser2Label: 'Part of a series' }) : null,
+      SER ? R('rotate-ccw', 'Declined', 'VOCA', 'Tier 2 · Ploy · backup Tao', 'Every Sat 22:00 → 23:00', 'Series · 1 h · from Sat 26 Sep · nothing scheduled', 'Theme cache rebuild', 'asked by Ploy · Mon 21 Sep 14:00', 'Declined Mon 21 Sep 16:05 by Tao · “Make it monthly instead” · nothing was scheduled · Ploy told in Chat') : null,
       R('eye-off', 'Ended early', 'Cando Asia', 'Tier 2 · Nok · backup Ploy', 'Mon 21 Sep 10:15 → 11:40', 'Mute · 1 h 25 min', 'Client changing DNS', 'by Nok', 'Ended early 11:40 by Nok · “DNS change confirmed”'),
+      SER ? R('rotate-ccw', 'Not approved', 'WeCare Asia', 'Tier 2 · Nok · backup Ploy', 'Monthly on day 19 · 22:00 → 23:00', 'Series · 1 h · first window Sat 19 Sep 22:00 · didn’t start', 'Database backup check', 'asked by Nok · Fri 18 Sep 17:40', 'Not approved — nothing scheduled · nobody approved before the first window, Sat 19 Sep 22:00 · ask again on Maintenance & mutes') : null,
       R('calendar', 'Cancelled', 'EQHO', 'Tier 2 · Tao · backup Nok', 'Sat 19 Sep 09:00 → 12:00', 'Maintenance · 3 h · didn’t start', 'Theme update', 'by Tao', 'Cancelled Fri 18 Sep 16:20 by Tao · “Client moved the launch”'),
+      SER ? R('rotate-ccw', 'Withdrawn', 'Cando Asia', 'Tier 2 · Nok · backup Ploy', 'Every Mon, Wed 21:00 → 22:00', 'Series · 1 h · from Mon 21 Sep · nothing scheduled', 'Log rotation', 'asked by Nok · Thu 17 Sep 10:00', 'Withdrawn Thu 17 Sep 15:30 by Nok · “Host does it now” · nothing was scheduled') : null,
       R('calendar', 'Not approved', 'Fuji Links', 'Tier 2 · Ploy · backup Nok', 'Sat 12 Sep 22:00 → Mon 14 Sep 22:00', 'Maintenance · 2 days · didn’t start', 'Server OS upgrade', 'asked by Ploy', 'Not approved — didn’t start · nobody approved before Sat 12 Sep 22:00'),
       SER ? Object.assign(R('calendar', 'Ended', 'ORCA Thailand', 'Tier 2 · Tao · backup Nok', 'Sun 6 Sep 20:00 → 22:00', 'Maintenance · 2 h', 'Hosting security patches', 'by Tao', 'Ended on time 22:00'), { ser2: true, ser2Label: 'Part of a series' }) : null
     ].filter(Boolean));
@@ -381,7 +386,7 @@ class Component extends DCLogic {
     function act(k, v, line, title, chan, extra) {
       clearInterval(self._iv);
       var prev = flushOv(); // a still-pending earlier action posts now; it can no longer be undone
-      self.setState(Object.assign({ prevOv: prev, ov: push(prev, k, v, line), toast: { k: k, line: line, title: title, chan: chan, phase: 'pending', left: 10 }, toastHidden: false, dlgKind: '', cancelling: false }, extra || {}));
+      self.setState(Object.assign({ prevOv: prev, ov: push(prev, k, v, line), toast: Object.assign({ k: k, line: line, title: title, chan: chan, phase: 'pending', left: 10 }, (extra && extra._tx) || {}), toastHidden: false, dlgKind: '', cancelling: false }, extra || {}));
       self._iv = setInterval(function () {
         var t = self.state.toast; if (!t || t.phase !== 'pending') { clearInterval(self._iv); return; }
         if (t.left > 1) { self.setState({ toast: Object.assign({}, t, { left: t.left - 1 }) }); return; }
@@ -406,8 +411,8 @@ class Component extends DCLogic {
     var cancelCta = pendingD ? 'Withdraw request' : 'Cancel maintenance';
     var cancelText = pendingD ? 'Withdraws the request — nothing is scheduled; Tao’s request thread gets REQUEST WITHDRAWN in Chat and email, Ploy is told by email, and the reminders stop. Logged as ' + ME + '.' : ('It hasn’t started, so cancelling removes it' + (D.of ? ' — only this window; the series keeps going' : '') + '. ' + D.owner + ' and ' + D.backup + ' get an email; the Alerts Space gets a line. Logged as ' + ME + '.');
     return {
-      views: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm', 'End mute · open incident', 'Series', 'Series · Responder', 'Approve series', 'Cancel series'], view: view,
-      viewOpts: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm', 'End mute · open incident', 'Series', 'Series · Responder', 'Approve series', 'Cancel series'].map(function (v) { return { value: v, label: v }; }),
+      views: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm', 'End mute · open incident', 'Series', 'Series · Responder', 'Approve series', 'Cancel series', 'Undo · too late'], view: view,
+      viewOpts: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm', 'End mute · open incident', 'Series', 'Series · Responder', 'Approve series', 'Cancel series', 'Undo · too late'].map(function (v) { return { value: v, label: v }; }),
       setViewSel: function (e) { self._setView(e && e.target ? e.target.value : e); },
       setView: function (v) { self._setView(v); },
       me: ME, meLine: ADMIN ? 'Jirawat Piyakit · Admin' : (ROLE === 'resp' ? 'Responder' : 'Viewer · read only'),
@@ -447,7 +452,7 @@ class Component extends DCLogic {
       heldVars: ['Tier 1', 'Tier 2–3', 'Outside hours'], heldVar: st.heldVar || 'Tier 1',
       setHeldVar: function (v) { self.setState({ heldVar: v }); },
       toast: !!st.toast && !st.toastHidden && st.dlgKind === '',
-      t: st.toast ? { title: st.toast.phase === 'undone' ? st.toast.title + ' — undone' : st.toast.title, line: st.toast.phase === 'pending' ? 'Posting to ' + st.toast.chan + ' in ' + st.toast.left + ' s — nothing is sent until then' : (st.toast.phase === 'posted' ? 'Posted to ' + st.toast.chan + '.' : 'Nothing was posted.'), left: st.toast.left, pending: st.toast.phase === 'pending' } : { title: '', line: '', left: 10, pending: false },
+      t: st.toast ? { title: st.toast.phase === 'late' ? 'Too late to undo — it has been posted' : (st.toast.phase === 'undone' ? (st.toast.undoneTitle || st.toast.title + ' — undone') : st.toast.title), line: st.toast.phase === 'late' ? st.toast.lateLine : st.toast.phase === 'pending' ? 'Posting to ' + st.toast.chan + ' in ' + st.toast.left + ' s — nothing is sent until then' : (st.toast.phase === 'posted' ? 'Posted to ' + st.toast.chan + '.' : (st.toast.undoneLine || 'Nothing was posted.')), left: st.toast.left, pending: st.toast.phase === 'pending' } : { title: '', line: '', left: 10, pending: false },
       undo: function () {
         clearInterval(self._iv);
         var t = self.state.toast; if (!t) return;
@@ -464,8 +469,8 @@ class Component extends DCLogic {
       serBlocked: !(st.serReason || '').trim(),
       serHint: (st.serReason || '').trim() ? 'Shown in the digest and the audit log.' : 'Required — type a reason to continue. Shown in the digest and the audit log.',
       confirmSeries: function () { var r = (self.state.serReason || '').trim(); if (!r) return;
-        if (pendingD) act(dk, { st: 'withdrawn' }, 'Withdrawn ' + TS + ' by ' + ME + ' · “' + r + '”', D.site + ' series request withdrawn', 'Chat and email');
-        else act(dk, { st: 'cancelled' }, 'Series cancelled ' + TS + ' by ' + ME + ' · “' + r + '” · ' + (occLeft.length ? occLeft.length + ' not started cancelled (' + occDays.join(', ') + ')' : 'none scheduled'), D.site + ' series cancelled', 'Chat and email', { view: self.state.view === 'Cancel series' ? 'Series' : self.state.view }); },
+        if (pendingD) act(dk, { st: 'withdrawn' }, 'Withdrawn ' + TS + ' by ' + ME + ' · “' + r + '” · nothing was scheduled', D.site + ' series request withdrawn', 'Chat and email', { _tx: { undoneLine: 'Nothing was posted. It’s waiting for approval again.' } });
+        else act(dk, { st: 'cancelled' }, 'Series cancelled ' + TS + ' by ' + ME + ' · “' + r + '” · ' + (occLeft.length ? occLeft.length + ' not started cancelled (' + occDays.join(', ') + ')' : 'none scheduled'), D.site + ' series cancelled' + (occLeft.length ? ' · ' + occLeft.length + (occLeft.length === 1 ? ' window' : ' windows') + ' cancelled' : ''), 'Chat and email', { view: self.state.view === 'Cancel series' ? 'Series' : self.state.view, _tx: { undoneTitle: D.site + ' series cancelled — undone', undoneLine: 'Nothing was posted. The series' + (occLeft.length ? ' and its ' + (occLeft.length === 1 ? 'window are' : occLeft.length + ' windows are') : ' is') + ' back.' } }); },
       endOpen: st.dlgKind === 'end',
       editOpen: st.dlgKind === 'edit',
       approveOpen: approveOpen,
@@ -493,12 +498,12 @@ class Component extends DCLogic {
         if (self.state.cancelling) act(dk, { st: pendingD ? 'withdrawn' : 'cancelled' }, (pendingD ? 'Withdrawn' : 'Cancelled') + ' ' + TS + ' by ' + ME + ' · “' + r + '”', D.site + (pendingD ? ' request withdrawn' : ' maintenance cancelled'), 'Chat and email');
         else act(dk, { end: self.state.editEnd }, 'End changed ' + TS + ' by ' + ME + ' · ' + curEnd + ' → ' + self.state.editEnd + ' · “' + r + '”', D.site + (D.kind === 'mute' ? ' mute' : ' maintenance') + ' end changed', D.kind === 'mute' ? 'Chat' : 'Chat and email');
       },
-      confirmApprove: function () { var v = self.state.view; act(dk, { approved: true }, 'Approved ' + TS + ' by Tao · ' + (isSer ? '4 windows created, to Thu 8 Oct · ' : '') + 'Arm told in Chat', D.site + (isSer ? ' series approved' : ' maintenance approved'), 'Chat and email', { view: v === 'Approve confirm' ? 'Default' : (v === 'Approve series' ? 'Series' : v) }); },
+      confirmApprove: function () { var v = self.state.view; act(dk, { approved: true }, 'Approved ' + TS + ' by Tao · ' + (isSer ? '4 windows created, to Thu 8 Oct · ' : '') + 'Arm told in Chat', D.site + (isSer ? ' series approved · 4 windows scheduled' : ' maintenance approved'), 'Chat and email', { view: v === 'Approve confirm' ? 'Default' : (v === 'Approve series' ? 'Series' : v), _tx: isSer ? { undoneTitle: D.site + ' series approval undone', undoneLine: 'Nothing was posted and no windows were scheduled. It’s waiting for approval again.' } : {} }); },
       declineReason: st.declineReason,
       setDeclineReason: function (e) { self.setState({ declineReason: e && e.target ? e.target.value : e }); },
       declineBlocked: !(st.declineReason || '').trim(),
       declineHint: 'Required. Arm gets it in a Chat message; Arm and Ploy get an email; the request moves to Recent as Declined.',
-      confirmDecline: function () { var r = (self.state.declineReason || '').trim(); if (!r) return; act(dk, { st: 'declined' }, 'Declined ' + TS + ' by Tao · “' + r + '” · Arm told in Chat', D.site + (isSer ? ' series declined' : ' request declined'), 'Chat and email'); },
+      confirmDecline: function () { var r = (self.state.declineReason || '').trim(); if (!r) return; act(dk, { st: 'declined' }, 'Declined ' + TS + ' by Tao · “' + r + '” · ' + (isSer ? 'nothing was scheduled · ' : '') + 'Arm told in Chat', D.site + (isSer ? ' series declined' : ' request declined'), 'Chat and email', isSer ? { _tx: { undoneLine: 'Nothing was posted. It’s waiting for approval again.' } } : {}); },
       nav: [
         { items: [
           { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },

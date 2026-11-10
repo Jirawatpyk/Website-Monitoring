@@ -22,6 +22,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}
 .mx-chip{min-width:44px;height:44px;padding:0 10px;border:1px solid var(--aura-border-control);border-radius:9999px;background:var(--aura-bg-surface);color:var(--aura-fg-primary);font:inherit;font-size:13px;font-weight:500;cursor:pointer}
 .mx-chip[aria-pressed="true"]{background:var(--aura-fg-primary);border-color:var(--aura-fg-primary);color:var(--aura-bg-surface)}
+.aura-datepicker,.aura-date__control,.aura-input__control{min-height:44px}
 .mx-chip:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px}
 </style>
 </helmet>
@@ -53,8 +54,12 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <sc-if value="{{isMaintOpen}}" hint-placeholder-val="{{false}}">
 <x-import component-from-global-scope="Aura.Select" label="Repeat" options="{{repeats}}" value="{{repeat}}" on-change="{{setRepeat}}"></x-import>
 </sc-if>
-<sc-if value="{{showStarts}}" hint-placeholder-val="{{false}}">
+<sc-if value="{{showStartsOne}}" hint-placeholder-val="{{false}}">
 <x-import component-from-global-scope="Aura.Select" label="{{startsLabel}}" options="{{startOpts}}" value="{{startAt}}" on-change="{{setStartAt}}"></x-import>
+</sc-if>
+<sc-if value="{{isRepeat}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.DatePicker" label="From" required="{{yes}}" clearable="{{no}}" value="{{fromIso}}" min="2026-09-25" max="2027-09-25" today="2026-09-25" on-change="{{setFrom}}" error="{{fromErr}}" hint="Today to a year ahead."></x-import>
+<x-import component-from-global-scope="Aura.TimePicker" label="Time" value="{{time}}" on-change="{{setTime}}" step="{{step}}"></x-import>
 </sc-if>
 <sc-if value="{{isWeekly}}" hint-placeholder-val="{{false}}">
 <div style="display: flex; flex-direction: column; gap: 6px">
@@ -67,7 +72,8 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <x-import component-from-global-scope="Aura.RadioGroup" label="On" options="{{monthOpts}}" value="{{monthMode}}" on-change="{{setMonthMode}}"></x-import>
 </sc-if>
 <sc-if value="{{isRepeat}}" hint-placeholder-val="{{false}}">
-<x-import component-from-global-scope="Aura.Select" label="Ends on" optional="{{yes}}" options="{{endOpts}}" value="{{endOn}}" on-change="{{setEndOn}}"></x-import>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 11px; color: var(--aura-fg-secondary)"><span style="font-family: var(--font-mono)">BOARD ONLY · ENDS ON</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Ends on preview" options="{{endVars}}" value="{{endVar}}" on-change="{{setEndVar}}" full-width="{{yes}}" size="sm"></x-import></div>
+<x-import component-from-global-scope="Aura.DatePicker" label="Ends on" optional="{{yes}}" clearable="{{yes}}" placeholder="No end date" value="{{endIso}}" min="{{fromIso}}" max="{{endMax}}" today="2026-09-25" on-change="{{setEndIso}}" error="{{endErr}}" hint="{{endHint}}"></x-import>
 <div style="display: flex; gap: 10px; padding: 10px 12px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.45"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="rotate-ccw" size="sm"></x-import></span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">{{summary}}</span><span style="color: var(--aura-fg-secondary)">Windows are created 14 days ahead; one that overlaps another window on this site is skipped.</span></span></div>
 <x-import component-from-global-scope="Aura.Alert" tone="warning" title="Needs an Admin’s approval">An Admin approves the series once; nothing is scheduled until then.</x-import>
 </sc-if>
@@ -116,21 +122,29 @@ class Component extends DCLogic {
     var ORD = ['1st', '2nd', '3rd', '4th', '5th'], WDL = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
     var SOPT = { 'Mon 28 Sep 22:00': 3, 'Tue 29 Sep 01:00': 4, 'Sat 26 Sep 22:00': 1 };
     var sAt = isRep ? (SOPT[st.repAt] !== undefined ? st.repAt : 'Mon 28 Sep 22:00') : st.startAt;
-    var first = new Date(2026, 8, 25 + (SOPT[sAt] || 0)), sWd = WDN[first.getDay()], sDay = first.getDate(), sNth = Math.ceil(sDay / 7);
-    var TIME = sAt.slice(-5), TM = +TIME.slice(0, 2) * 60 + +TIME.slice(3, 5);
+    function iso(dt) { return dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2); }
+    function pIso(v) { var p = String(v || '').split('-'); return p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : null; }
+    var FROM_ISO = st.fromIso || '2026-09-28', FROM_DT = pIso(FROM_ISO);
+    var END_ISO = st.endIso || '', END_DT = pIso(END_ISO);
+    var MAXEND = new Date(FROM_DT.getFullYear() + 2, FROM_DT.getMonth(), FROM_DT.getDate());
+    var fromErr = isRep && (FROM_DT < new Date(2026, 8, 25) || FROM_DT > new Date(2027, 8, 25)) ? 'Pick a day from today to a year ahead.' : '';
+    var endErr = isRep && END_DT ? (END_DT < FROM_DT ? 'The last day is before the first.' : (END_DT > MAXEND ? 'Up to two years after From.' : '')) : '';
+    var first = isRep ? FROM_DT : new Date(2026, 8, 25 + (SOPT[sAt] || 0)), sWd = WDN[first.getDay()], sDay = first.getDate(), sNth = Math.ceil(sDay / 7);
+    var TIME = isRep ? (st.time || '22:00') : sAt.slice(-5), TM = +TIME.slice(0, 2) * 60 + +TIME.slice(3, 5);
     var DM = { '1 h': 60, '2 h': 120, '4 h': 240, '8 h': 480, '24 h': 1440 };
     function hm(m) { var x = m % 1440; return ('0' + Math.floor(x / 60)).slice(-2) + ':' + ('0' + x % 60).slice(-2) + (m >= 1440 ? ' next day' : ''); }
     var WDS = st.wds || [sWd], MM = st.monthMode || 'day'; if (MM === 'nth' && sNth > 4) MM = 'day';
-    var ENDON = st.endOn || 'none', ENDLAB = { none: 'No end date', oct: 'Sat 31 Oct', dec: 'Thu 31 Dec' }, ENDDT = { none: null, oct: new Date(2026, 9, 31), dec: new Date(2026, 11, 31) };
+    var ENDON = END_DT ? 'set' : 'none', ENDLAB = { none: 'No end date', oct: 'Sat 31 Oct', dec: 'Thu 31 Dec' }, ENDDT = { none: null, oct: new Date(2026, 9, 31), dec: new Date(2026, 11, 31) };
     var ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     function lab(dt) { return WDN[dt.getDay()] + ' ' + dt.getDate() + ' ' + MON[dt.getMonth()]; }
-    function occ(n) { var out = [], lim = ENDDT[ENDON]; for (var o = 0; o < 400 && out.length < n; o++) { var dt = new Date(2026, first.getMonth(), first.getDate() + o); if (lim && dt > lim) break;
+    function occ(n) { var out = [], lim = END_DT; for (var o = 0; o < 400 && out.length < n; o++) { var dt = new Date(2026, first.getMonth(), first.getDate() + o); if (lim && dt > lim) break;
+      if (Math.round((dt - new Date(2026, 8, 25)) / 86400000) * 1440 + TM < 612) continue;
       if (REP === 'Weekly' ? WDS.indexOf(WDN[dt.getDay()]) >= 0 : (MM === 'day' ? dt.getDate() === sDay : (WDN[dt.getDay()] === sWd && Math.ceil(dt.getDate() / 7) === sNth))) out.push(dt); } return out; }
     var noDays = REP === 'Weekly' && !WDS.length;
     var wdS = ORDER.filter(function (w) { return WDS.indexOf(w) >= 0; });
     var ruleTxt = REP === 'Weekly' ? (wdS.length === 7 ? 'Every day' : 'Every ' + wdS.join(', ')) : (MM === 'day' ? 'Monthly on day ' + sDay + ' ·' : 'Monthly on the ' + ORD[sNth - 1] + ' ' + WDL[sWd] + ' ·');
     var rr = ruleTxt + ' ' + TIME + ' → ' + hm(TM + (DM[dur] || 60));
-    var summary = noDays ? 'Pick at least one day.' : rr + ' · from ' + lab(first) + (ENDON !== 'none' ? ' · until ' + ENDLAB[ENDON] : '') + ' · next 2: ' + occ(2).map(lab).join(', ');
+    var summary = noDays ? 'Pick at least one day.' : endErr ? 'Fix Ends on — the last day is before the first.' : rr + ' · from ' + lab(first) + (END_DT && !endErr ? ' · until ' + lab(END_DT) : ' · no end date') + ' · next 2: ' + occ(2).map(lab).join(', ');
     var ENDT = { '1 h': '11:07', '4 h': '14:07', '8 h': '18:07', '24 h': 'Sat 26 Sep 10:07', '3 days': 'Mon 28 Sep 10:07' };
     var END = mute
       ? { '1 h': 'Unmutes itself at 11:07 today', '4 h': 'Unmutes itself at 14:07 today', '8 h': 'Unmutes itself at 18:07 today', '24 h': 'Unmutes itself Sat 26 Sep 10:07 (max 24 h)' }
@@ -150,13 +164,22 @@ class Component extends DCLogic {
       setRepeat: function (e) { self.setState({ repeat: e && e.target ? e.target.value : e }); },
       isRepeat: isRep && !st.done, isWeekly: REP === 'Weekly' && !st.done, isMonthly: REP === 'Monthly' && !st.done,
       wd: ORDER.map(function (w) { var on = WDS.indexOf(w) >= 0; return { l: w, on: on, toggle: function () { var x = WDS.slice(), i = x.indexOf(w); if (i >= 0) x.splice(i, 1); else x.push(w); self.setState({ wds: x }); } }; }),
-      wdHint: noDays ? 'Pick at least one day.' : 'From the first chosen day on or after the first date.',
+      wdHint: noDays ? 'Pick at least one day.' : 'From the first chosen day on or after From.',
       wdHintColor: noDays ? 'var(--aura-fg-danger)' : 'var(--aura-fg-secondary)',
       monthOpts: [{ value: 'day', label: 'Day ' + sDay + ' of each month', description: sDay > 28 ? 'A month without day ' + sDay + ' is skipped.' : '' }].concat(sNth <= 4 ? [{ value: 'nth', label: 'The ' + ORD[sNth - 1] + ' ' + WDL[sWd] }] : []),
       monthMode: MM, setMonthMode: function (v) { self.setState({ monthMode: v && v.target ? v.target.value : v }); },
       endOpts: Object.keys(ENDLAB).map(function (k) { return { value: k, label: ENDLAB[k] }; }), endOn: ENDON,
       setEndOn: function (e) { self.setState({ endOn: e && e.target ? e.target.value : e }); },
       summary: summary,
+      fromIso: FROM_ISO, fromErr: fromErr,
+      setFrom: function (v) { var x = v && v.target ? v.target.value : v; if (x) self.setState({ fromIso: x }); },
+      time: TIME, step: 15, setTime: function (v) { var t = v && v.target ? v.target.value : v; if (t) self.setState({ time: t }); },
+      endIso: END_ISO, endErr: endErr, endMax: iso(MAXEND),
+      endHint: endErr ? '' : (END_DT ? 'Last day a window can start. Clear it (×) for no end date.' : 'No end date — repeats until cancelled.'),
+      setEndIso: function (v) { var x = v && v.target ? v.target.value : v; self.setState({ endIso: x || '' }); },
+      endVars: ['No end date', 'Set', 'Before From'], endVar: !END_DT ? 'No end date' : (endErr ? 'Before From' : 'Set'),
+      setEndVar: function (v) { if (v === 'No end date') self.setState({ endIso: '', fromIso: '2026-09-28' }); else if (v === 'Set') self.setState({ endIso: '2026-12-31', fromIso: '2026-09-28' }); else self.setState({ fromIso: '2026-10-05', endIso: '2026-09-30', wds: null }); },
+      showStartsOne: needsOk && !blocked && !st.done && !isRep,
       showStarts: (needsOk || isRep) && !blocked && !st.done, startsLabel: isRep ? 'First window' : 'Starts',
       kind: st.kind,
       types: ['Mute', 'Maintenance'],
@@ -180,7 +203,7 @@ class Component extends DCLogic {
       setReason: function (e) { self.setState({ reason: e && e.target ? e.target.value : e }); },
       reasonHint: mute ? (down ? 'e.g. Known outage, host restarting' : 'e.g. Investigating slow booking page') : 'e.g. Emergency hotfix deploy',
       reasonNote: noReason ? 'Type a reason to continue — it shows in the digest and the audit log.' : 'Shows in the digest and the audit log.',
-      noReason: noReason || noDays,
+      noReason: noReason || noDays || !!endErr || !!fromErr,
       effect: isRep ? 'Each window: no alerts, checks keep running, not counted in uptime. The status page shows “Planned maintenance”.' : mute
         ? (down
           ? 'New alerts for MuvMi stop until ' + ENDT[dur] + '. INC-0142 stays open and keeps escalating. The site keeps its real status with a “Muted” tag and still counts toward uptime.'

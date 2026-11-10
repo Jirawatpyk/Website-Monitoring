@@ -1,5 +1,7 @@
 # Design brief — Repeating maintenance: three gaps before the build (S14 PR 2c, D-057)
 
+**Answered:** spec §32 items 2–3 (date pickers), 7a (Undo toasts) and 7b (ended series), and the refreshed boards (Claude Design, 10 Nov).
+
 For Claude Design. Spec §32 and the boards of 6 Nov (MaintenancePage, Maintenance, MMaintenance, MMaintenanceList, ChatAlert) cover almost all of PR 2c. Three things were decided afterwards (Tao, 10 Nov) and aren't drawn yet. Sample data is test data only.
 
 ## 1. From and Ends on: date pickers, not a list of dates
