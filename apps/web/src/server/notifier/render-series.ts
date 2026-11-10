@@ -7,7 +7,6 @@ import {
   SERIES_DMS,
   SERIES_EMAIL_ROLES,
   type ChatMessage,
-  type ChatPerson,
   type EmailMessage,
   type SeriesEvent,
   type SeriesFacts as SeriesWords,
@@ -16,7 +15,7 @@ import {
 import type { Json } from '@dxt/db';
 import { seriesRuleSchema } from '@dxt/shared';
 import { contextOf, type Notification, type Owner, type Recipient } from './facts';
-import { maintenanceUrl } from './render-window';
+import { dateOf, maintenanceUrl, person, pick, str } from './render-window';
 import type { SeriesFacts, SeriesFactsRow } from './series-facts';
 
 /**
@@ -25,15 +24,8 @@ import type { SeriesFacts, SeriesFactsRow } from './series-facts';
  * is now and the action the RPC or the engine stored with the row (`context`).
  */
 
-const person = (p: Owner | null): ChatPerson | null =>
-  p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
-const dateOf = (v: unknown): Date | null =>
-  typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : null;
 const dates = (v: Json | undefined): Date[] =>
   Array.isArray(v) ? v.flatMap((x) => (dateOf(x) ? [dateOf(x)!] : [])) : [];
-const str = (v: unknown) => (typeof v === 'string' ? v : null);
-const pick = <T extends string>(v: unknown, of: readonly T[]): T | null =>
-  typeof v === 'string' && (of as readonly string[]).includes(v) ? (v as T) : null;
 
 /** The series in the notifier's words, or null when its stored rule can't be read. */
 function seriesWords(s: SeriesFactsRow, admins: Owner[], appUrl: string): SeriesWords | null {

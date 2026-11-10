@@ -247,7 +247,12 @@ export function buildSeriesDm(
                 `Approve before the first window, ${deadline(f)} — otherwise nothing is scheduled`,
               ),
               openLink(f.pageUrl, 'Review on Maintenance & mutes'),
-              para('Approve once. Its windows don’t ask again; they are created 14 days ahead.'),
+              // As drawn: "Approve once." in bold — fixed words, so the markup is ours.
+              {
+                textParagraph: {
+                  text: '<b>Approve once.</b> Its windows don’t ask again; they are created 14 days ahead.',
+                },
+              },
             ],
             `${formatTier(f.tier)} · asked by ${asker} · ${full(f.createdAt)} (UTC+7)`,
           ),
@@ -375,6 +380,10 @@ export function buildSeriesEmail(input: SeriesEmailInput): EmailMessage {
   ];
   const why = 'reason' in e && e.reason ? ` · ${quoted(e.reason)}` : '';
   const asAsker = input.toIsAsker && role !== 'admin';
+  const people = [
+    `owner ${f.owner ? plainName(f.owner.name) : '—'}`,
+    ...(f.backup ? [`backup ${plainName(f.backup.name)}`] : []),
+  ].join(', ');
 
   const body = (() => {
     switch (e.action) {
@@ -385,7 +394,7 @@ export function buildSeriesEmail(input: SeriesEmailInput): EmailMessage {
           headline: `${asker} asks for repeating maintenance`,
           lede: `${asker} asked for a repeating window on ${site}. Approve it once on Maintenance & mutes — its windows don’t ask again. Declining needs a reason, which ${asker} gets.`,
           facts: [
-            ['Site', `${site} · ${formatTier(f.tier)}`] as [string, string],
+            ['Site', `${site} · ${formatTier(f.tier)} · ${people}`] as [string, string],
             repeats,
             fromRow,
             reasonRow,
@@ -403,7 +412,7 @@ export function buildSeriesEmail(input: SeriesEmailInput): EmailMessage {
           color: C.warning,
           pre: `${site} · first window in ${h} h (${deadline(f)}) · asked by ${asker}`,
           headline: `Still waiting — first window in ${h} h`,
-          lede: `Nobody has approved or declined ${asker}’s series yet. A last reminder comes by Chat an hour before.`,
+          lede: `Nobody has approved or declined ${asker}’s series yet. A last reminder comes by Chat${f.firstStartsAt ? ` at ${formatTime(new Date(f.firstStartsAt.getTime() - 3_600_000))}` : ' an hour before'}.`,
           facts: [
             repeats,
             fromRow,
@@ -422,7 +431,13 @@ export function buildSeriesEmail(input: SeriesEmailInput): EmailMessage {
           pre: `${site} · ${rule(f)} · by ${asker}`,
           headline: `${site} maintenance ${repeat(f)}`,
           lede: `${asker} set up repeating maintenance on ${site}. Nothing to do — there are no alerts for ${site} during its windows. You get no email per window; only one that can’t start because the site is down.`,
-          facts: [repeats, fromRow, reasonRow, effect],
+          facts: [
+            repeats,
+            fromRow,
+            reasonRow,
+            ['Scheduled by', `${asker} · ${full(f.createdAt)}`] as [string, string],
+            effect,
+          ],
           buttons: [page()],
         };
       case 'approved':
