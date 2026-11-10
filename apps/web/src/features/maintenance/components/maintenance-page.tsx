@@ -616,7 +616,8 @@ function SectionView({ s, open, openSeries }: { s: Section; open: Show; openSeri
               key={id}
               type="button"
               onClick={() => (item.kind === 'window' ? open('view', item.p) : openSeries('view', item.s))}
-              aria-label={`${p.siteName}, ${p.badge?.label ?? (status ? STATUS_WORD[status] : '')}${'mutedLabel' in p && p.mutedLabel ? `, ${p.mutedLabel}` : ''}, ${p.line}`}
+              // A window of a series says so (its "Series" badge is otherwise only seen, /verify 10 Nov).
+              aria-label={`${p.siteName}, ${p.badge?.label ?? (status ? STATUS_WORD[status] : '')}${'mutedLabel' in p && p.mutedLabel ? `, ${p.mutedLabel}` : ''}${item.kind === 'window' && item.p.tag ? `, ${item.p.tag}` : ''}, ${p.line}`}
               className={`flex min-h-16 w-full items-center gap-2.5 border-0 border-b border-border-subtle bg-transparent py-2.5 pr-2 pl-3.5 text-left last:border-b-0 hover:bg-bg-surface-hover ${FOCUS}`}
             >
               <span className="w-30 shrink-0">
