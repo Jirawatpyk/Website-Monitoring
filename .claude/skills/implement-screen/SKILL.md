@@ -8,7 +8,7 @@ argument-hint: <BoardName>
 
 1. **Locate.** Find `$ARGUMENTS` in `docs/design/screens.md` → route, phase, slice, spec sections, PRD FRs. Screens are built inside their slice: if no `/slice` is in progress for that slice, or its dependencies aren't Done in `docs/implementation-plan.md`, say so and confirm before building. If it's a "Not a route" board, implement it in the package named there instead.
 2. **Read the sources.**
-   - `docs/design/canvas/$ARGUMENTS.dc.html` — layout, exact copy, every state in `renderVals()`, which `Aura.<Component>` sits where. The matching mobile board too (M-prefix), since the route is responsive.
+   - `docs/design/canvas/$ARGUMENTS.dc.html` — layout, exact copy, every state in `renderVals()`, which `Aura.<Component>` sits where. The matching mobile board too (M-prefix), since the route is responsive. Before writing a dialog, sheet or toast, copy its effect lines, button labels and field order (per width) from `renderVals()` into the feature's model test as expectations. Put the words in a pure model, not the component. The spec's one-line summary of a dialog is not its copy (retro 10 Nov, S14 PR 2c-2).
    - Every spec section listed, plus §11, §13, §14.15–17. Later sections win.
    - The PRD FR rows for scope and data fields.
    - AURA component cards you'll use (AURA artifact `project/api/components/<Name>.md`) or the types in `node_modules/@jirawatpyk/aura-react`.

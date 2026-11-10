@@ -175,6 +175,13 @@ The summary gave one figure for all sites ("Uptime all sites 99.98%"), and no so
   - When someone else acts on the series inside the first person's 10 s, that first Undo gets "Only the person who did it". Their action has already posted.
   - An approval can't be undone once one of its windows has messages, even if they were Undone. A window with messages can't be deleted (FK).
   - A Responder's cancel-Undo applies the 24 h chain rule to the whole series, as `undo_window_action` does. An Admin-made daily series of near-24 h windows can be undone only by an Admin.
+- **Board gaps in the UI (spec-checks of PR 2c-2, 10 Nov; the spec or the code wins, Claude's reading):**
+  - Withdraw tells the Admins only (§32.11, as the notifier sends), not "Ploy is told by email" as the board draws it.
+  - The dialog's title is "Schedule repeating maintenance" at every width (one dialog since D-036), not the phone board's "Repeating maintenance".
+  - The summary's "from" is the first window's day and "next N" counts what falls before Ends on (the spec's own example), not the From date and always "next 2".
+  - A series whose Ends on has passed shows under Recent as "Ended"; no board draws it.
+  - The phone waiting row keeps "· first Mon 28 Sep" (the deadline), as the desktop row does.
+  - The approval warning is drawn twice (before Reason on phones, after it from md), one hidden per width.
 
 **Impact.**
 - **PR 2a** was the migration: `maintenance_series`, `maintenance_windows.series_id`, the RPCs that create, approve and cancel a series, and the occurrences made in SQL. It also carried the Done-when 3 test.
