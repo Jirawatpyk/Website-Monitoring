@@ -37,6 +37,8 @@ export type ChatState =
   | 'REQUEST CHANGED'
   | 'MAINTENANCE CHANGED'
   | 'MAINTENANCE CANCELLED'
+  // A series' window that would overlap another (S14, spec §32.8).
+  | 'MAINTENANCE SKIPPED'
   | 'MAINTENANCE STARTED'
   | 'MAINTENANCE ENDED'
   | 'MAINTENANCE ENDED EARLY'

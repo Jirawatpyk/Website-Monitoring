@@ -25,6 +25,7 @@ import {
   type WindowFactsRow,
 } from './facts';
 import { incidentUrl } from './render';
+import { repeatWordsOf } from './series-facts';
 
 /**
  * A maintenance window's messages (S09b, spec §24, D-037): `mw_line` (the action's Space line),
@@ -32,12 +33,13 @@ import { incidentUrl } from './render';
  * action the RPC or the engine stored with the row (`context`).
  */
 
-const person = (p: Owner | null): ChatPerson | null =>
+// Shared with the series messages (render-series.ts).
+export const person = (p: Owner | null): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
-const dateOf = (v: unknown): Date | null =>
+export const dateOf = (v: unknown): Date | null =>
   typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : null;
-const str = (v: unknown) => (typeof v === 'string' ? v : null);
-const pick = <T extends string>(v: unknown, of: readonly T[]): T | null =>
+export const str = (v: unknown) => (typeof v === 'string' ? v : null);
+export const pick = <T extends string>(v: unknown, of: readonly T[]): T | null =>
   typeof v === 'string' && (of as readonly string[]).includes(v) ? (v as T) : null;
 
 export const maintenanceUrl = (appUrl: string) => new URL('/maintenance', appUrl).toString();
@@ -58,6 +60,7 @@ function windowFacts(w: WindowFactsRow, env: Facts['windowEnv'], appUrl: string)
     backup: person(w.sites.backup),
     admins: (env?.admins ?? []).map((a) => person(a)!),
     pageUrl: maintenanceUrl(appUrl),
+    series: repeatWordsOf(w.series?.rule),
   };
 }
 

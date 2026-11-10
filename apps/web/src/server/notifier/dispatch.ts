@@ -8,6 +8,8 @@ import { contextOf, loadFacts, type Facts, type Notification, type ReportRow } f
 import { renderChat, renderEmail, renderSystemAlertEmail } from './render';
 import { renderWindowChat, renderWindowEmail } from './render-window';
 import { loadOncallFacts } from './oncall-facts';
+import { renderSeriesChat, renderSeriesEmail } from './render-series';
+import { loadSeriesFacts } from './series-facts';
 import { renderOncallChat, renderOncallEmail } from './render-oncall';
 
 export interface EmailConfig {
@@ -122,6 +124,8 @@ export async function dispatchNotifications(
       p_oncall: true,
       // Report rows too (S14).
       p_reports: true,
+      // And repeating series' rows (S14 PR 2b).
+      p_series: true,
     });
     if (claimed.error) throw new Error(`claim_notifications: ${claimed.error.message}`);
     return claimed.data;
@@ -147,6 +151,14 @@ export async function dispatchNotifications(
       facts.reports = await loadReports(deps.db, all);
     } catch (err) {
       console.error(JSON.stringify({ event: 'reports_unreadable', error: String(err) }));
+    }
+  }
+  // Repeating series (S14): as for on-call, a failed read only retries those rows.
+  if (facts && all.some((n) => n.maintenance_series_id)) {
+    try {
+      facts.series = await loadSeriesFacts(deps.db, all);
+    } catch (err) {
+      console.error(JSON.stringify({ event: 'series_facts_unreadable', error: String(err) }));
     }
   }
   const [chat, email] = await settled([
@@ -319,6 +331,7 @@ async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: D
   if (n.system_alert_id) return deliverSystemAlert(deps, n, facts);
   if (n.maintenance_window_id) return deliverWindow(deps, n, facts, now);
   if (n.oncall_event_id) return deliverOncall(deps, n, facts);
+  if (n.maintenance_series_id) return deliverSeries(deps, n, facts);
   if (n.report_id) return deliverReport(deps, n, facts);
   const incident = n.incident_id ? facts.incidents.get(n.incident_id) : undefined;
   if (!n.incident_id || !incident) return { ok: false, error: 'Incident not found', retryable: false };
@@ -377,6 +390,48 @@ async function deliverWindow(deps: DispatchDeps, n: Notification, facts: Facts, 
   const { apiKey, from } = deps.email!;
   const first = facts.firstEmail.get(`${w.id}:${to.id}`);
   const message = renderWindowEmail(n, w, facts, deps.appUrl, {
+    from,
+    startsThread: !first || first.id === n.id,
+    now,
+  });
+  if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
+  const send = deps.send ?? sendEmail;
+  const result = await send(message, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });
+  return result.ok ? { ok: true, providerId: result.id } : result;
+}
+
+/**
+ * A repeating series' message (S14, D-057): its line or a mention reply in the series' own Space thread
+ * (`ms-<id>`), or an email in its own mail thread. No email fallback for a failed line, as for windows.
+ */
+async function deliverSeries(deps: DispatchDeps, n: Notification, facts: Facts): Promise<Outcome> {
+  if (!facts.series) return { ok: false, error: 'Series facts unreadable', retryable: true };
+  const s = facts.series.series.get(n.maintenance_series_id!);
+  if (!s) return { ok: false, error: 'Maintenance series not found', retryable: false };
+  const now = (deps.now ?? (() => new Date()))();
+  if (n.channel === 'google_chat') {
+    const message = renderSeriesChat(
+      n,
+      s,
+      { series: facts.series, recipients: facts.recipients },
+      deps.appUrl,
+      now,
+    );
+    if (!message) return { ok: false, error: `Can't render template ${n.template}`, retryable: false };
+    const post = deps.post ?? postChatMessage;
+    const result = await post(deps.webhookUrl!, message, {
+      threadKey: n.thread_key ?? `ms-${s.id}`,
+      messageId: `client-${n.id}`,
+    });
+    return result.ok
+      ? { ok: true, providerId: result.messageName }
+      : { ok: false, error: result.error, retryable: true };
+  }
+  const to = n.user_id ? facts.recipients.get(n.user_id) : undefined;
+  if (!to) return { ok: false, error: 'Recipient not found or inactive', retryable: false };
+  const { apiKey, from } = deps.email!;
+  const first = facts.series.firstEmail.get(`${s.id}:${to.id}`);
+  const message = renderSeriesEmail(n, s, { series: facts.series }, deps.appUrl, {
     from,
     startsThread: !first || first.id === n.id,
     now,

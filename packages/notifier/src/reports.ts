@@ -70,6 +70,8 @@ export interface ReportWindow {
   reason: string;
   /** Who asked for it (Coming up names them). */
   by: string | null;
+  /** A series' window (S14, §32.11): Coming up lists the series once, "every Tue 01:00 → 03:00". */
+  series?: { id: string; words: string } | null;
 }
 
 export interface ProbeGap {
@@ -483,10 +485,20 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
       text: `On call this week (Tier 1 nights and weekends): ${plainName(oc.thisWeek.name)}, ${formatWeek(oc.thisWeek.week)}.${next}`,
     });
   }
-  for (const w of f.comingUp)
-    coming.push({
-      text: `Maintenance: ${plainName(w.site)} ${windowSpan(w, true)} · ${w.reason}${w.by ? ` · ${plainName(w.by)}` : ''}`,
-    });
+  // A series once, at its next window (§32.11); one-off windows one by one. `comingUp` is in start order.
+  const seriesListed = new Set<string>();
+  for (const w of f.comingUp) {
+    const by = w.by ? ` · ${plainName(w.by)}` : '';
+    if (w.series) {
+      if (seriesListed.has(w.series.id)) continue;
+      seriesListed.add(w.series.id);
+      coming.push({
+        text: `Maintenance: ${plainName(w.site)} ${w.series.words} · next ${formatDay(w.start, { weekday: true })} · ${w.reason}${by}`,
+      });
+      continue;
+    }
+    coming.push({ text: `Maintenance: ${plainName(w.site)} ${windowSpan(w, true)} · ${w.reason}${by}` });
+  }
 
   const monitor = monitorRows(f.monitor);
   const mention = mentions(f.needsSomeone.flatMap((n) => n.who));

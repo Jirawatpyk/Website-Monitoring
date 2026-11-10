@@ -1,4 +1,5 @@
 import 'server-only';
+import type { SeriesFacts } from './series-facts';
 import type { Database, DbClient, Json } from '@dxt/db';
 import type { ChatMessage, EmailMessage } from '@dxt/notifier';
 import type { ResponseHours, Trigger } from '@dxt/shared';
@@ -94,6 +95,8 @@ export interface WindowFactsRow {
   creator: { display_name: string } | null;
   approver: { display_name: string } | null;
   sites: { name: string; tier: number; primary: Owner | null; backup: Owner | null };
+  /** The series it belongs to (S14): its rule words the "· series every Tue" tag. */
+  series?: { rule: Json } | null;
 }
 
 export interface Facts {
@@ -110,6 +113,8 @@ export interface Facts {
   oncall?: Map<string, OncallEventFacts>;
   /** Reports (S14): the card and email rendered at 09:00, attached by the dispatcher. */
   reports?: Map<string, ReportRow>;
+  /** Repeating series (S14, D-057), attached by the dispatcher. */
+  series?: SeriesFacts;
 }
 
 /** Loads the incidents, system alerts and email recipients of a batch of claimed messages. */
@@ -171,6 +176,7 @@ export async function loadFacts(
             `id, kind, starts_at, ends_at, reason, created_at, created_by, approved_at,
              creator:profiles!maintenance_windows_created_by_fkey(display_name),
              approver:profiles!maintenance_windows_approved_by_fkey(display_name),
+             series:maintenance_series!maintenance_windows_series_id_fkey(rule),
              sites!inner(name, tier,
                primary:profiles!sites_primary_owner_id_fkey(id, display_name, google_chat_user_id),
                backup:profiles!sites_backup_owner_id_fkey(id, display_name, google_chat_user_id))`,

@@ -4,13 +4,26 @@ import {
   formatNameList,
   formatTier,
   formatTime,
-  formatWindowLength,
   isSameBangkokDay,
 } from '@dxt/shared';
 import { plainName, type ChatMessage, type ChatPerson, type ChatWidget } from './chat-alerts';
 import { buildChatTextLine, type ChatState } from './chat-text';
 import { EMAIL_COLORS, emailLayout, senderDomain, type EmailMessage, type Envelope } from './email-alerts';
 import { formatResume } from './escalation-alerts';
+import {
+  at,
+  card,
+  full,
+  hoursTo,
+  lengthOf,
+  mention,
+  openLink,
+  para,
+  quoted,
+  row,
+  span,
+  who,
+} from './maintenance-words';
 
 /**
  * Maintenance and mute messages (S09b, spec §24, D-037; ChatAlert STATE "Maintenance · …", EmailAlert
@@ -77,6 +90,11 @@ export interface WindowFacts {
   admins: readonly ChatPerson[];
   /** Maintenance & mutes (`/maintenance`). */
   pageUrl: string;
+  /**
+   * The window belongs to a series: its repeat words ("every Tue", "monthly on day 6"). Its first line —
+   * STARTED or DIDN'T START — ends "· series every Tue", since it has no SCHEDULED line (§32.10).
+   */
+  series?: string | null;
 }
 
 /** The incident a window couldn't start over, or that posts when a mute ends. */
@@ -105,23 +123,11 @@ export interface WindowEvent {
 }
 
 // ── Words ──────────────────────────────────────────────────────────────
-const full = (d: Date) => `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
-/** "22:00" today, else "Sat 26 Sep 22:00" (§24.4: a date only when it isn't today). */
-const at = (d: Date, now: Date) => (isSameBangkokDay(d, now) ? formatTime(d) : full(d));
-/** "Tue 29 Sep 01:00 → 03:00": the end's date only when it is another day than the start. */
-const span = (start: Date, end: Date, startText: string) =>
-  `${startText} → ${isSameBangkokDay(start, end) ? formatTime(end) : full(end)}`;
-const lengthOf = (start: Date, end: Date) => formatWindowLength((end.getTime() - start.getTime()) / 60_000);
 /** "(was 03:00)", "(was Tue 29 Sep)", "(was Mon 28 Sep 21:00)": only what differs. */
 function was(from: Date, to: Date) {
   if (isSameBangkokDay(from, to)) return formatTime(from);
   return formatTime(from) === formatTime(to) ? formatDay(from, { weekday: true }) : full(from);
 }
-/** Names and reasons are people's words: no `<` / `>`, so no mention or markup can be slipped in. */
-const quoted = (reason: string | null | undefined) => `“${plainName(reason ?? '')}”`;
-const who = (name: string | null | undefined) => plainName(name ?? 'System');
-const hoursTo = (start: Date, now: Date) =>
-  Math.max(1, Math.round((start.getTime() - now.getTime()) / 3_600_000));
 /** "DOWN" unless the incident it is about is a PROBLEM. */
 const severityWord = (i: WindowIncident | null | undefined) =>
   i?.severity === 'problem' ? 'PROBLEM' : 'DOWN';
@@ -165,6 +171,7 @@ function lineDetail(f: WindowFacts, e: WindowEvent, now: Date): string[] {
       return [`${label} posts ${formatResume(i.pausedUntil, now)}${since}`];
     return [`${label} posted${since}`];
   };
+  const series = f.series ? [`series ${f.series}`] : [];
   switch (e.action) {
     case 'requested':
       return [`${when} (${len})`, quoted(f.reason), `by ${who(f.createdBy)}`, 'waiting for an Admin'];
@@ -183,7 +190,7 @@ function lineDetail(f: WindowFacts, e: WindowEvent, now: Date): string[] {
     case 'cancelled':
       return [`${when} (${len})`, quoted(e.reason), by];
     case 'started':
-      return [`until ${at(f.endsAt, now)}`, 'no alerts, not counted in uptime'];
+      return [`until ${at(f.endsAt, now)}`, 'no alerts, not counted in uptime', ...series];
     case 'ended':
       return [`ended on time ${formatTime(f.endsAt)}`, 'alerts back on'];
     case 'ended_early':
@@ -193,6 +200,7 @@ function lineDetail(f: WindowFacts, e: WindowEvent, now: Date): string[] {
       return [
         `site ${siteWas(e.incident)} at ${formatTime(f.startsAt)}${label ? ` (${label})` : ''}`,
         'reschedule on Maintenance & mutes',
+        ...series,
       ];
     }
     case 'not_approved':
@@ -216,23 +224,7 @@ function endChange(f: WindowFacts, e: WindowEvent, now: Date): string[] {
   return [`ends ${at(to, now)}${e.from ? ` (was ${was(e.from, to)})` : ''}`];
 }
 
-const openPage = (f: WindowFacts, text = 'Open Maintenance & mutes'): ChatWidget => ({
-  buttonList: { buttons: [{ text, onClick: { openLink: { url: f.pageUrl } } }] },
-});
-const row = (topLabel: string, text: string): ChatWidget => ({
-  decoratedText: { topLabel, text: text.replace(/</g, '&lt;'), wrapText: true },
-});
-const para = (text: string): ChatWidget => ({ textParagraph: { text: text.replace(/</g, '&lt;') } });
-const card = (
-  id: string,
-  title: string,
-  widgets: ChatWidget[],
-  subtitle?: string,
-): ChatMessage['cardsV2'][number] => ({
-  cardId: id,
-  card: { header: subtitle ? { title, subtitle } : { title }, sections: [{ widgets }] },
-});
-const mention = (p: ChatPerson | null | undefined) => (p?.chatUserId ? [p.chatUserId] : []);
+const openPage = (f: WindowFacts, text?: string): ChatWidget => openLink(f.pageUrl, text);
 
 /**
  * The action's line in the window's Space thread (ChatAlert "Maintenance · Alerts Space thread").
