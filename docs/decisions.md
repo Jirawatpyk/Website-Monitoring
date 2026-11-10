@@ -148,7 +148,22 @@ The summary gave one figure for all sites ("Uptime all sites 99.98%"), and no so
 - Each series has one thread for its own actions, and each window keeps its own thread.
 - Owner and backup get one email when a series is scheduled, approved, declined or cancelled. A series' windows send no STARTED / ENDED email; DIDN'T START still does.
 
-**Impact.** S14 PR 2a is a migration: `maintenance_series`, `maintenance_windows.series_id`, and the RPCs to create, approve, cancel and add occurrences. PR 2b is the code: `occurrencesOf` in `@dxt/engine`, the expansion, and the Done-when 3 test. PR 2c comes after the board: the Repeat control, how occurrences show on the page, and the series messages.
+**Amended (Tao, 10 Nov 2026, with the ChatAlert board "Maintenance · repeating series").**
+
+- **A waiting series follows the request pattern (§32.7).** This replaces the reading above that a waiting series never posts.
+  - Reminders go out 12 h and 1 h before its first window: Chat and email to the Admins, STILL WAITING to the asker.
+  - At that window's start, nobody having approved it, it becomes NOT APPROVED. Nothing is scheduled, and a later approval is refused ("ask again").
+  - `maintenance_series.first_starts_at` holds that start, and the audit row is `maintenance.series_not_approved`.
+- **"· series every Tue" goes on a window's first line only,** STARTED or DIDN'T START. Later replies are unchanged, as the board draws it. Tao first picked every line, before the board was read, then took the recommendation.
+- **SKIPPED posts only for an overlap.** A window skipped as "under 5 min" is named on the APPROVED line.
+- **Undo of a series action** comes with its dialog in PR 2c. Until then a series' rows aren't held.
+
+**Impact.**
+- **PR 2a** was the migration: `maintenance_series`, `maintenance_windows.series_id`, the RPCs that create, approve and cancel a series, and the occurrences made in SQL. It also carried the Done-when 3 test.
+- **PR 2b** is the series messages.
+  - **2b-1 (migration):** the `maintenance_series_id` subject, `engine_queue_series_messages`, the reminders and the expiry, and no STARTED / ENDED email for a series' window.
+  - **2b-2 (code):** the notifier words, the "series every Tue" tag, and Coming up listing a series once.
+- **PR 2c** is the UI from the boards: the Repeat control, the Repeating series section, the series dialogs and their Undo.
 
 ## D-056 — Digest, weekly summary: who gets them, missing data, how S14 is proved
 

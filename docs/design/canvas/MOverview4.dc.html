@@ -278,7 +278,7 @@ class Component extends DCLogic {
         ok: function () { var x = Object.assign({}, self.state.hcs); x[name] = { ok: true, who: ME }; self.setState({ hcs: x }); },
         down: function () { self.setState({ dlg: name, note: '' }); } };
       if (A && A.key === 'problem') { o.status = A.label; o.tone = A.tone; o.variant = A.variant; o.icon = A.icon; o.statusSub = 'Problem as of 02:17'; }
-      if (I) { o.downLabel = I.kind === 'relapse' ? 'Down again…' : 'Report down…'; o.line = 'Open ' + I.id + ' · ' + I.label; o.lineIcon = I.kind === 'raise' ? 'triangle-alert' : 'circle-dot'; o.lineColor = 'var(--aura-alert-warning-fg)'; o.linkColor = 'var(--aura-alert-warning-fg)'; o.isInc = true; o.notInc = false; }
+      if (I) { o.downLabel = I.kind === 'relapse' ? 'Down again…' : 'Report down…'; o.line = 'Open ' + I.id + ' · ' + I.label; o.lineIcon = I.kind === 'raise' ? 'triangle-alert' : 'rotate-ccw'; o.lineColor = 'var(--aura-alert-warning-fg)'; o.linkColor = 'var(--aura-alert-warning-fg)'; o.isInc = true; o.notInc = false; }
       if (h && h.ok) { checked++; o.line = 'Checked OK · ' + h.who + ' ' + NOW; o.lineIcon = 'circle-check'; o.lineColor = 'var(--aura-fg-positive)'; o.isInc = false; o.notInc = true; if (I) { o.hasSub = true; o.sub = 'Open ' + I.id; } }
       if (h && (h.inc || h.rep)) { checked++; o.line = (h.rep ? I.id + ' reported down · ' : IDS[name] + ' opened · ') + h.who + ' ' + NOW; o.lineIcon = 'ban'; o.lineColor = 'var(--aura-alert-danger-fg)'; o.linkColor = 'var(--aura-alert-danger-fg)'; o.isInc = true; o.notInc = false; o.hasSub = false; o.canAct = false; o.readOnly = false;
         o.status = 'Down'; o.tone = 'danger'; o.variant = 'solid'; o.icon = 'ban'; o.statusSub = 'Down by hand ' + NOW; }
