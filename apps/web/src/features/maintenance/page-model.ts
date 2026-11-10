@@ -20,6 +20,7 @@ import {
   type Tier,
 } from '@dxt/shared';
 import { whenText } from './model';
+import { seriesPageRow, seriesSettledAt, type SeriesPageRow, type SeriesRow } from './series-model';
 
 /**
  * `/maintenance` (boards MaintenancePage, MMaintenanceList; spec §23; D-036), the Overview card and the
@@ -211,6 +212,8 @@ export interface PageRow {
   mutedLabel: string | null;
   /** The phone row's short overlay word ("Muted", MMaintenanceList). */
   mutedShort: string | null;
+  /** "Part of a series" on a series' window (§32.4); the phone row says "Series" (§32.9). */
+  tag: string | null;
   /** The sheet: "By" / "Asked by" and the name (with when it was asked). */
   by: { label: string; value: string };
   /** The sheet's Uptime fact: counted, not counted, or not affected (it never ran). */
@@ -284,6 +287,7 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
     note: null,
     line: '',
     mutedShort: null,
+    tag: r.seriesId ? 'Part of a series' : null,
     by: asked
       ? {
           label: 'Asked by',
@@ -363,16 +367,30 @@ export function pageRow(r: WindowRow, v: Viewer, now: Date): PageRow {
   return base;
 }
 
+/** One row of a section: a window (or mute), or a repeating series (§32.4). */
+export type SectionItem = { kind: 'window'; p: PageRow } | { kind: 'series'; s: SeriesPageRow };
+
 export interface Section {
-  key: 'active' | 'waiting' | 'scheduled' | 'recent';
+  key: 'active' | 'waiting' | 'scheduled' | 'series' | 'recent';
   title: string;
   hint: string;
+  /** The windows of the section (tests and the Overview read these). */
   rows: PageRow[];
+  /** Everything in the section, in the page's order — windows and series together. */
+  items: SectionItem[];
 }
 
-/** The page's sections in order (§23.2); an empty one is left out, except Recent. */
-export function sectionsOf(rows: readonly WindowRow[], v: Viewer, now: Date): Section[] {
+const windowItems = (rows: PageRow[]): SectionItem[] => rows.map((p) => ({ kind: 'window', p }));
+
+/** The page's sections in order (§23.2, §32.4); an empty one is left out, except Recent. */
+export function sectionsOf(
+  rows: readonly WindowRow[],
+  v: Viewer,
+  now: Date,
+  seriesRows: readonly SeriesRow[] = [],
+): Section[] {
   const all = rows.map((r) => pageRow(r, v, now));
+  const series = seriesRows.map((r) => seriesPageRow(r, rows, v, now));
   const of = (s: WindowState[]) => all.filter((p) => s.includes(p.state));
   const active = of(['active']).sort((a, b) => Date.parse(a.row.endsAt) - Date.parse(b.row.endsAt));
   const waiting = of(['waiting']).sort((a, b) => Date.parse(a.row.startsAt) - Date.parse(b.row.startsAt));
@@ -381,6 +399,27 @@ export function sectionsOf(rows: readonly WindowRow[], v: Viewer, now: Date): Se
   const recent = of(['ended', 'cancelled', 'declined', 'withdrawn', 'not_approved', 'didnt_start'])
     .filter((p) => settledAt(p) >= now.getTime() - 30 * DAY * MINUTE)
     .sort((a, b) => settledAt(b) - settledAt(a));
+  const waitingSeries = series.filter((s) => s.state === 'waiting');
+  const repeating = series.filter((s) => s.state === 'repeating');
+  const endedSeries = series.filter(
+    (s) =>
+      !['waiting', 'repeating'].includes(s.state) &&
+      seriesSettledAt(s.series) >= now.getTime() - 30 * DAY * MINUTE,
+  );
+  // Waiting: windows and series by their first start; Recent: everything by when it settled, newest first.
+  const firstAt = (s: SeriesPageRow) => Date.parse(s.series.firstStartsAt ?? s.series.createdAt);
+  const waitingItems: SectionItem[] = [
+    ...waiting.map((p) => ({ at: Date.parse(p.row.startsAt), i: { kind: 'window', p } as SectionItem })),
+    ...waitingSeries.map((s) => ({ at: firstAt(s), i: { kind: 'series', s } as SectionItem })),
+  ]
+    .sort((a, b) => a.at - b.at)
+    .map((x) => x.i);
+  const recentItems: SectionItem[] = [
+    ...recent.map((p) => ({ at: settledAt(p), i: { kind: 'window', p } as SectionItem })),
+    ...endedSeries.map((s) => ({ at: seriesSettledAt(s.series), i: { kind: 'series', s } as SectionItem })),
+  ]
+    .sort((a, b) => b.at - a.at)
+    .map((x) => x.i);
   const out: Section[] = [];
   if (active.length)
     out.push({
@@ -388,13 +427,17 @@ export function sectionsOf(rows: readonly WindowRow[], v: Viewer, now: Date): Se
       title: 'Active now',
       hint: `${active.length} · alerts off or muted, checks still run`,
       rows: active,
+      items: windowItems(active),
     });
-  if (waiting.length)
+  if (waitingItems.length)
     out.push({
       key: 'waiting',
       title: 'Waiting for approval',
-      hint: `${waiting.length} · over 24 h, asked by a Responder — doesn’t start unless an Admin approves`,
+      hint: waitingSeries.length
+        ? `${waitingItems.length} · over 24 h or repeating, asked by a Responder — nothing is scheduled unless an Admin approves`
+        : `${waiting.length} · over 24 h, asked by a Responder — doesn’t start unless an Admin approves`,
       rows: waiting,
+      items: waitingItems,
     });
   if (scheduled.length)
     out.push({
@@ -402,25 +445,39 @@ export function sectionsOf(rows: readonly WindowRow[], v: Viewer, now: Date): Se
       title: 'Scheduled',
       hint: `${scheduled.length} · approved, starts on its own`,
       rows: scheduled,
+      items: windowItems(scheduled),
     });
-  const kinds = [...new Set(recent.map((p) => p.badge!.label.toLowerCase()))];
-  if (recent.length)
+  if (repeating.length)
+    out.push({
+      key: 'series',
+      title: 'Repeating series',
+      hint: `${repeating.length} · each creates its windows 14 days ahead; one that overlaps another window on the site is skipped`,
+      rows: [],
+      items: repeating.map((s) => ({ kind: 'series', s })),
+    });
+  const labels = recentItems.map((x) =>
+    (x.kind === 'window' ? x.p.badge!.label : x.s.badge.label).toLowerCase(),
+  );
+  const kinds = [...new Set(labels)];
+  if (recentItems.length)
     out.push({
       key: 'recent',
       title: 'Recent · last 30 days',
-      hint: `${recent.length} · ${kinds.join(', ')}`,
+      hint: `${recentItems.length} · ${kinds.join(', ')}`,
       rows: recent,
+      items: recentItems,
     });
   return out;
 }
 
-/** "2 active · 1 scheduled · 1 waiting for approval"; nothing → "Nothing active, scheduled or waiting". */
+/** "2 active · 1 scheduled · 1 waiting for approval · 2 repeating"; nothing → "Nothing active, scheduled or waiting". */
 export function metaOf(sections: readonly Section[]): string {
-  const n = (k: Section['key']) => sections.find((s) => s.key === k)?.rows.length ?? 0;
+  const n = (k: Section['key']) => sections.find((s) => s.key === k)?.items.length ?? 0;
   const parts = [
     n('active') && `${n('active')} active`,
     n('scheduled') && `${n('scheduled')} scheduled`,
     n('waiting') && `${n('waiting')} waiting for approval`,
+    n('series') && `${n('series')} repeating`,
   ].filter(Boolean);
   return parts.length ? parts.join(' · ') : 'Nothing active, scheduled or waiting';
 }

@@ -1,6 +1,6 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
-import { loadPausableSites, loadWindowRows } from './queries';
+import { loadPausableSites, loadSeriesRows, loadWindowRows } from './queries';
 
 export { loadWindowRows } from './queries';
 export {
@@ -15,9 +15,10 @@ export {
 export async function getMaintenancePage(now = new Date(), withSites = true) {
   const db = await createClient();
   // A read-only viewer never opens the dialog: skip the sites read (it joins every open incident).
-  const [rows, sites] = await Promise.all([
+  const [rows, series, sites] = await Promise.all([
     loadWindowRows(db, now),
+    loadSeriesRows(db, now),
     withSites ? loadPausableSites(db) : Promise.resolve([]),
   ]);
-  return { rows, sites };
+  return { rows, series, sites };
 }
