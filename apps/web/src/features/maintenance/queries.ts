@@ -150,13 +150,15 @@ export async function loadSeriesRows(db: DbClient, now: Date): Promise<SeriesRow
       running: windows.some(
         (w) => w.start_logged && !w.cancelled_at && Date.parse(w.ended_at ?? w.ends_at) > now.getTime(),
       ),
-      // Made in the approval's own transaction: the same `now()` as approved_at.
-      approvalWindows: s.approved_at
-        ? windows
-            .filter((w) => Date.parse(w.created_at) === Date.parse(s.approved_at!))
-            .map((w) => w.starts_at)
-            .sort()
-        : [],
+      // Made in the approval's own transaction: the same `now()` as approved_at. Only for an approval inside
+      // the 30 days the windows are read for — an older one's windows have dropped out, so no count at all.
+      approvalWindows:
+        s.approved_at && Date.parse(s.approved_at) >= Date.parse(since)
+          ? windows
+              .filter((w) => Date.parse(w.created_at) === Date.parse(s.approved_at!))
+              .map((w) => w.starts_at)
+              .sort()
+          : [],
       cancelledWindows: s.cancelled_at
         ? windows
             .filter((w) => w.cancelled_at === s.cancelled_at)

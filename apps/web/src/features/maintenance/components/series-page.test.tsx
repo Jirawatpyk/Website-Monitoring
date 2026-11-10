@@ -186,6 +186,44 @@ describe('series on /maintenance (§32.4)', () => {
     ).toBeInTheDocument();
   });
 
+  it('after Approve, focus lands on Repeating series; after its Undo, back on Waiting for approval', async () => {
+    const user = userEvent.setup();
+    const props = {
+      rows: [],
+      sites: [],
+      viewer: { id: 'u-tao', name: 'Tao', role: 'admin' as const },
+      viewerEmail: 'x@example.test',
+      nowIso: NOW,
+    };
+    const { rerender } = render(
+      <>
+        <MaintenancePageView {...props} series={[asked]} />
+        <Toaster />
+      </>,
+    );
+    await user.click(within(table('Waiting for approval')).getAllByRole('button', { name: 'Approve' })[0]!);
+    const d = await screen.findByRole('dialog', { name: 'Approve the Bangkok Airways – Taiwan series?' });
+    await user.click(within(d).getByRole('button', { name: 'Approve series' }));
+    await waitFor(() => expect(actions.decideSeries).toHaveBeenCalled());
+    const approved = { ...asked, approvedAt: NOW, approvedById: 'u-tao', approverName: 'Tao' };
+    rerender(
+      <>
+        <MaintenancePageView {...props} series={[approved]} />
+        <Toaster />
+      </>,
+    );
+    await waitFor(() => expect(document.getElementById('mt-series')).toHaveFocus());
+    await user.click(await screen.findByRole('button', { name: /Undo/ }));
+    await waitFor(() => expect(actions.undoSeriesAction).toHaveBeenCalled());
+    rerender(
+      <>
+        <MaintenancePageView {...props} series={[asked]} />
+        <Toaster />
+      </>,
+    );
+    await waitFor(() => expect(document.getElementById('mt-waiting')).toHaveFocus());
+  });
+
   it('after a series cancel, focus lands on Recent where it went (board, spec-check)', async () => {
     const user = userEvent.setup();
     const props = {

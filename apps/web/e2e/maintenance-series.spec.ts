@@ -32,10 +32,21 @@ test.describe('repeating maintenance (local Supabase)', () => {
     await expect(
       dialog.getByText(/^Every \w{3} \d{2}:\d{2} → \d{2}:\d{2}( next day)? \(UTC\+7\) · from /),
     ).toBeVisible();
+    // Weekdays too, so the row's When is a long rule ("Every Mon, Tue, Wed, Thu, Fri …") that must wrap.
+    for (const d of ['Mon', 'Tue', 'Thu', 'Fri']) {
+      const chip = dialog.getByRole('button', { name: d, exact: true });
+      if ((await chip.getAttribute('aria-pressed')) !== 'true') await chip.click();
+    }
+    await expect(dialog.getByText(/^Every Mon, Tue, \w{3}/)).toBeVisible();
     await page.screenshot({
       path: `test-results/s14-series-dialog-${info.project.name}.png`,
       fullPage: true,
     });
+    await page.emulateMedia({ colorScheme: 'dark' });
+    // Let the colour transitions finish before the capture.
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `test-results/s14-series-dialog-${info.project.name}-dark.png` });
+    await page.emulateMedia({ colorScheme: 'light' });
     await dialog.getByLabel(/Reason/).fill(`E2E series ${info.project.name}`);
     await dialog.getByRole('button', { name: 'Schedule series' }).click();
     await expect(dialog.getByText(`Series scheduled · ${site.name}`)).toBeVisible();
@@ -49,6 +60,17 @@ test.describe('repeating maintenance (local Supabase)', () => {
       ).first(),
     ).toBeVisible();
     await page.screenshot({ path: `test-results/s14-series-page-${info.project.name}.png`, fullPage: true });
+    if (info.project.name === 'desktop') {
+      // Dark, and the 820 phone list (below xl the row cards show).
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await series.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: 'test-results/s14-series-page-desktop-dark.png' });
+      await page.setViewportSize({ width: 820, height: 1100 });
+      await series.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: 'test-results/s14-series-page-820-dark.png' });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.emulateMedia({ colorScheme: 'light' });
+    }
     if (info.project.name === 'mobile') {
       await series
         .getByRole('button', { name: new RegExp(site.name) })
