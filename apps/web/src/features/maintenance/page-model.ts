@@ -39,6 +39,8 @@ export interface LogEntry {
   posts_at?: string;
   /** `undone`: the action it took back. */
   undid?: string;
+  /** A series' `skipped` line: the window it didn't make (D-057). */
+  starts_at?: string;
 }
 
 export interface WindowRow {
@@ -69,6 +71,8 @@ export interface WindowRow {
   ownerIsAdmin?: boolean;
   backupIsAdmin?: boolean;
   log: LogEntry[];
+  /** A window of a repeating series: tagged "Part of a series" (§32.4). */
+  seriesId?: string | null;
   /** A mute: the incident it silenced, if any — ending it posts that alert (§24.9). */
   silenced?: {
     number: number;
@@ -195,7 +199,7 @@ export function logLine(e: LogEntry, now: Date, opts: LogOptions = {}): string |
 export interface Badge {
   tone: 'accent' | 'neutral';
   variant: 'soft' | 'outline';
-  icon: 'calendar' | 'eye-off' | 'clock';
+  icon: 'calendar' | 'eye-off' | 'clock' | 'rotate-ccw';
   label: string;
 }
 

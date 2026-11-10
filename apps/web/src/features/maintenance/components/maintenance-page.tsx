@@ -21,6 +21,7 @@ import {
   IconFileText,
   IconPencil,
   IconPlus,
+  IconRotateCcw,
 } from '@jirawatpyk/aura-react/icons';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -33,7 +34,12 @@ import { MaintenanceDialog } from './maintenance-dialog';
 import { ApproveDialog, DeclineDialog, EditDialog, EndDialog, postPendingNow } from './window-dialogs';
 import { phoneHeader } from '@/components/phone-header';
 
-const ICONS = { calendar: <IconCalendar />, 'eye-off': <IconEyeOff />, clock: <IconClock /> };
+const ICONS = {
+  calendar: <IconCalendar />,
+  'eye-off': <IconEyeOff />,
+  clock: <IconClock />,
+  'rotate-ccw': <IconRotateCcw />,
+};
 const STATUS_WORD: Record<SiteStatus, string> = {
   ok: 'OK',
   problem: 'Problem',
