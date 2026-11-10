@@ -4,7 +4,7 @@
 -- approve → Undo → approve posts SKIPPED once; post-now ends the 10 s; the engine waits out an Undo.
 begin;
 \ir _helpers.psql
-select plan(36);
+select plan(39);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -103,6 +103,14 @@ reset role;
 select ok((select bool_and(hold_until <= now()) from public.notifications
            where maintenance_series_id = (select id from s where name = 'daily') and status = 'queued'),
   'its rows are due at once');
+select ok((select (e ->> 'posts_at')::timestamptz = now()
+           from public.maintenance_series m, jsonb_array_elements(m.log) with ordinality x(e, ord)
+           where m.id = (select id from s where name = 'daily') and e ->> 'action' = 'approved'
+           order by ord desc limit 1),
+  'and its log line says it posted now');
+select is((select jsonb_array_length(after -> 'windows_removed') > 0 from public.audit_log
+           where entity_id = (select id from s where name = 'daily') and action = 'maintenance.series_undo'),
+  true, 'the approval''s Undo listed the windows it removed in its audit row');
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select throws_ok($$ select public.undo_series_action((select id from s where name = 'daily')) $$,
   '22023', 'Too late to undo — it has been posted', 'Undo is too late after post-now');
@@ -240,6 +248,10 @@ select ok((select bool_and(hold_until <= now()) from public.notifications
            where maintenance_series_id = (select id from s where name = 'm2') and context ->> 'kind' = 'approved'
              and status = 'queued'),
   'a cancel inside the approval''s 10 s posts the approval at once');
+select ok((select (e ->> 'posts_at')::timestamptz = now()
+           from public.maintenance_series m, jsonb_array_elements(m.log) e
+           where m.id = (select id from s where name = 'm2') and e ->> 'action' = 'approved'),
+  'and its log line says so');
 
 -- Engine L5: an approval whose window was changed on its own since can't be undone (its own words).
 update public.maintenance_series set cancelled_at = null, cancelled_by = null, undo_until = null

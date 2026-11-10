@@ -171,6 +171,10 @@ The summary gave one figure for all sites ("Uptime all sites 99.98%"), and no so
   - A window edited before it starts opens its thread with CHANGED, yet STARTED still carries the tag.
   - A series' window ended early by a person still emails owner and backup, as a person's action.
   - SKIPPED's "next" is the rule's next day, even if that one is skipped too.
+- **Accepted as they are (Undo reviews, 10 Nov):**
+  - When someone else acts on the series inside the first person's 10 s, that first Undo gets "Only the person who did it". Their action has already posted.
+  - An approval can't be undone once one of its windows has messages, even if they were Undone. A window with messages can't be deleted (FK).
+  - A Responder's cancel-Undo applies the 24 h chain rule to the whole series, as `undo_window_action` does. An Admin-made daily series of near-24 h windows can be undone only by an Admin.
 
 **Impact.**
 - **PR 2a** was the migration: `maintenance_series`, `maintenance_windows.series_id`, the RPCs that create, approve and cancel a series, and the occurrences made in SQL. It also carried the Done-when 3 test.

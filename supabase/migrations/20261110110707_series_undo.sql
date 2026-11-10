@@ -53,6 +53,13 @@ begin
       set hold_until = p_at
       where maintenance_series_id = s.id and (dedupe_key = s.undo_key or dedupe_key like s.undo_key || ':%')
         and status = 'queued';
+    -- Its log line says it posted now, as post_series_action_now would (engine re-review L2).
+    update public.maintenance_series m
+      set log = coalesce((select jsonb_set(m.log, array[(max(e.ord)::int - 1)::text, 'posts_at'], to_jsonb(p_at))
+                          from jsonb_array_elements(m.log) with ordinality as e(v, ord)
+                          where e.v ? 'posts_at' having max(e.ord) is not null), m.log)
+      where id = s.id;
+    s.log := (select log from public.maintenance_series where id = s.id);
   end if;
   update public.maintenance_series
     set undo_until = p_at + interval '10 seconds', undo_by = auth.uid(), undo_action = p_action, undo_key = v_key,
@@ -293,9 +300,11 @@ begin
   update public.notifications n
     set hold_until = now()
     from public.maintenance_windows w
-    where n.maintenance_window_id = w.id and w.series_id = s.id and w.undo_until > now()
+    where n.maintenance_window_id = w.id and w.series_id = s.id and w.undo_until > now() and not w.start_logged
       and n.dedupe_key = w.undo_key and n.status = 'queued';
-  update public.maintenance_windows set undo_until = now() where series_id = s.id and undo_until > now();
+  -- Only windows this cancel takes (not started); a running window's own End now / Edit keeps its Undo.
+  update public.maintenance_windows set undo_until = now()
+    where series_id = s.id and undo_until > now() and not start_logged;
   with gone as (
     update public.maintenance_windows w
       -- Only cancelled: every engine loop skips a cancelled row, and start_logged keeps meaning "it ran"
