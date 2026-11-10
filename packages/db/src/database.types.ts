@@ -321,14 +321,14 @@ isOneToOne: false
                   ]
                 },"maintenance_series": {
                   Row: {
-                    "approved_at": string | null,"approved_by": string | null,"cancelled_at": string | null,"cancelled_by": string | null,"created_at": string,"created_by": string | null,"declined_at": string | null,"duration_min": number,"first_starts_at": string | null,"id": string,"log": NonNullable<Json>,"outcome": string | null,"reason": string,"reminded_12h_at": string | null,"reminded_1h_at": string | null,"rule": NonNullable<Json>,"site_id": string,"start_time": string,"starts_on": string,"until_on": string | null,"updated_at": string
+                    "approved_at": string | null,"approved_by": string | null,"cancelled_at": string | null,"cancelled_by": string | null,"created_at": string,"created_by": string | null,"declined_at": string | null,"duration_min": number,"first_starts_at": string | null,"id": string,"log": NonNullable<Json>,"outcome": string | null,"reason": string,"reminded_12h_at": string | null,"reminded_1h_at": string | null,"rule": NonNullable<Json>,"site_id": string,"start_time": string,"starts_on": string,"undo_action": string | null,"undo_before": Json | null,"undo_by": string | null,"undo_key": string | null,"undo_until": string | null,"until_on": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"declined_at"?: string | null,"duration_min": number,"first_starts_at"?: string | null,"id"?: string,"log"?: NonNullable<Json>,"outcome"?: string | null,"reason": string,"reminded_12h_at"?: string | null,"reminded_1h_at"?: string | null,"rule": NonNullable<Json>,"site_id": string,"start_time": string,"starts_on": string,"until_on"?: string | null,"updated_at"?: string
+                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"declined_at"?: string | null,"duration_min": number,"first_starts_at"?: string | null,"id"?: string,"log"?: NonNullable<Json>,"outcome"?: string | null,"reason": string,"reminded_12h_at"?: string | null,"reminded_1h_at"?: string | null,"rule": NonNullable<Json>,"site_id": string,"start_time": string,"starts_on": string,"undo_action"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_key"?: string | null,"undo_until"?: string | null,"until_on"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"declined_at"?: string | null,"duration_min"?: number,"first_starts_at"?: string | null,"id"?: string,"log"?: NonNullable<Json>,"outcome"?: string | null,"reason"?: string,"reminded_12h_at"?: string | null,"reminded_1h_at"?: string | null,"rule"?: NonNullable<Json>,"site_id"?: string,"start_time"?: string,"starts_on"?: string,"until_on"?: string | null,"updated_at"?: string
+                    "approved_at"?: string | null,"approved_by"?: string | null,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"declined_at"?: string | null,"duration_min"?: number,"first_starts_at"?: string | null,"id"?: string,"log"?: NonNullable<Json>,"outcome"?: string | null,"reason"?: string,"reminded_12h_at"?: string | null,"reminded_1h_at"?: string | null,"rule"?: NonNullable<Json>,"site_id"?: string,"start_time"?: string,"starts_on"?: string,"undo_action"?: string | null,"undo_before"?: Json | null,"undo_by"?: string | null,"undo_key"?: string | null,"undo_until"?: string | null,"until_on"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -354,6 +354,12 @@ isOneToOne: false
       columns: ["site_id"]
 isOneToOne: false
       referencedRelation: "sites"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenance_series_undo_by_fkey"
+      columns: ["undo_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
       referencedColumns: ["id"]
     }
                   ]
@@ -1254,6 +1260,9 @@ isOneToOne: false
 "owns_site":
 { Args: { "p_site_id": string }; Returns: boolean
                            },
+"post_series_action_now":
+{ Args: { "p_series_id": string }; Returns: undefined
+                           },
 "post_window_action_now":
 { Args: { "p_window_id": string }; Returns: undefined
                            },
@@ -1335,6 +1344,9 @@ isOneToOne: false
                            },
 "undo_resolve":
 { Args: { "p_incident_id": string }; Returns: undefined
+                           },
+"undo_series_action":
+{ Args: { "p_series_id": string }; Returns: undefined
                            },
 "undo_window_action":
 { Args: { "p_window_id": string }; Returns: undefined

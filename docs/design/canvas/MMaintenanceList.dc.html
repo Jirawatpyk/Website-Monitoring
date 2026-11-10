@@ -241,11 +241,14 @@ class Component extends DCLogic {
     var PAST = [
       P('calendar', 'Ended', 'ORCA Thailand', 'Tue 22 Sep 20:00 → 22:00 · 2 h', [{ k: 'Reason', v: 'Hosting plan upgrade' }, { k: 'By', v: 'Tao' }], 'Ended on time 22:00'),
       SER ? Object.assign(P('calendar', 'Ended', 'Tubtong', 'Tue 22 Sep 01:00 → 03:00 · 2 h', [{ k: 'Series', v: 'Every Tue 01:00 → 03:00' }, { k: 'Reason', v: 'WordPress plugin updates' }, { k: 'By', v: 'Ploy' }], 'Ended on time 03:00'), { ser2: true, ser2Short: 'Series', ser2Label: 'Part of a series' }) : null,
+      SER ? Object.assign(P('rotate-ccw', 'Declined', 'VOCA', 'Every Sat 22:00 → 23:00 · declined', [{ k: 'Repeats', v: 'Every Sat 22:00 → 23:00 · from Sat 26 Sep' }, { k: 'Reason', v: 'Theme cache rebuild' }, { k: 'Asked by', v: 'Ploy · Mon 21 Sep 14:00' }], 'Declined Mon 21 Sep 16:05 by Tao · “Make it monthly instead” · nothing was scheduled · Ploy told in Chat'), { ser2: true, ser2Short: 'Series', ser2Label: 'Series' }) : null,
       P('eye-off', 'Ended early', 'Cando Asia', 'Mon 21 Sep 10:15 → 11:40 · mute', [{ k: 'Reason', v: 'Client changing DNS' }, { k: 'By', v: 'Nok' }], 'Ended early 11:40 by Nok · “DNS change confirmed”'),
+      SER ? Object.assign(P('rotate-ccw', 'Not approved', 'WeCare Asia', 'Monthly on day 19 · nothing scheduled', [{ k: 'Repeats', v: 'Monthly on day 19 · 22:00 → 23:00 · first Sat 19 Sep' }, { k: 'Reason', v: 'Database backup check' }, { k: 'Asked by', v: 'Nok · Fri 18 Sep 17:40' }], 'Not approved — nothing scheduled · nobody approved before the first window, Sat 19 Sep 22:00 · ask again on Maintenance & mutes'), { ser2: true, ser2Short: 'Series', ser2Label: 'Series' }) : null,
       P('calendar', 'Cancelled', 'EQHO', 'Sat 19 Sep 09:00 → 12:00 · didn’t start', [{ k: 'Reason', v: 'Theme update' }, { k: 'By', v: 'Tao' }], 'Cancelled Fri 18 Sep 16:20 by Tao · “Client moved the launch”'),
+      SER ? Object.assign(P('rotate-ccw', 'Withdrawn', 'Cando Asia', 'Every Mon, Wed 21:00 → 22:00 · withdrawn', [{ k: 'Repeats', v: 'Every Mon, Wed 21:00 → 22:00 · from Mon 21 Sep' }, { k: 'Reason', v: 'Log rotation' }, { k: 'Asked by', v: 'Nok · Thu 17 Sep 10:00' }], 'Withdrawn Thu 17 Sep 15:30 by Nok · “Host does it now” · nothing was scheduled'), { ser2: true, ser2Short: 'Series', ser2Label: 'Series' }) : null,
       P('calendar', 'Not approved', 'Fuji Links', 'Sat 12 → Mon 14 Sep · 2 days · didn’t start', [{ k: 'Reason', v: 'Server OS upgrade' }, { k: 'Asked by', v: 'Ploy' }], 'Not approved — didn’t start · nobody approved before Sat 12 Sep 22:00')
     ];
-    PAST.filter(Boolean).forEach(function (p) { rows['p:' + p.site] = p; G.recent.push(p); });
+    PAST.filter(Boolean).forEach(function (p) { var id = 'p:' + p.site + ':' + p.label; p.open = function () { self.setState({ open: id, mode: 'view' }); }; rows[id] = p; G.recent.push(p); });
     var groups = []; self._secOf = {};
     [['active', 'mm-active'], ['wait', 'mm-wait'], ['sched', 'mm-sched'], ['series', 'mm-series'], ['recent', 'mm-recent']].forEach(function (p) { G[p[0]].forEach(function (x) { if (x.k) self._secOf[x.k] = p[1]; }); });
     if (G.active.length) groups.push({ id: 'mm-active', title: 'ACTIVE NOW · ' + G.active.length, rows: G.active });
@@ -260,11 +263,11 @@ class Component extends DCLogic {
     var mode = st.mode;
     var curEnd = key ? S(key).end : '';
     var noun = cur.mute ? 'mute' : 'maintenance';
-    function act(v, line, title, chan) {
+    function act(v, line, title, chan, tx) {
       clearInterval(self._iv);
       var k = key;
       var prev = flushOv(); // a still-pending earlier action posts now; it can no longer be undone
-      self.setState({ prevOv: prev, ov: push(prev, v, line), open: '', mode: 'view', toast: { k: k, line: line, title: title, chan: chan, phase: 'pending', left: 10 } });
+      self.setState({ prevOv: prev, ov: push(prev, v, line), open: '', mode: 'view', toast: Object.assign({ k: k, line: line, title: title, chan: chan, phase: 'pending', left: 10 }, tx || {}) });
       self._iv = setInterval(function () {
         var t = self.state.toast; if (!t || t.phase !== 'pending') { clearInterval(self._iv); return; }
         if (t.left > 1) { self.setState({ toast: Object.assign({}, t, { left: t.left - 1 }) }); return; }
@@ -310,7 +313,7 @@ class Component extends DCLogic {
       empty: !G.active.length && !G.wait.length && !G.sched.length && !G.series.length,
       groups: groups,
       toast: !!st.toast && !st.open,
-      t: st.toast ? { title: st.toast.phase === 'undone' ? st.toast.title + ' — undone' : st.toast.title, line: st.toast.phase === 'pending' ? 'Posting to ' + st.toast.chan + ' in ' + st.toast.left + ' s — nothing is sent until then' : (st.toast.phase === 'posted' ? 'Posted to ' + st.toast.chan + '.' : 'Nothing was posted.'), left: st.toast.left, pending: st.toast.phase === 'pending', done: st.toast.phase !== 'pending' } : { title: '', line: '', left: 10, pending: false, done: false },
+      t: st.toast ? { title: st.toast.phase === 'undone' ? (st.toast.undoneTitle || st.toast.title + ' — undone') : st.toast.title, line: st.toast.phase === 'pending' ? 'Posting to ' + st.toast.chan + ' in ' + st.toast.left + ' s — nothing is sent until then' : (st.toast.phase === 'posted' ? 'Posted to ' + st.toast.chan + '.' : (st.toast.undoneLine || 'Nothing was posted.')), left: st.toast.left, pending: st.toast.phase === 'pending', done: st.toast.phase !== 'pending' } : { title: '', line: '', left: 10, pending: false, done: false },
       undo: function () {
         clearInterval(self._iv);
         var t = self.state.toast; if (!t) return;
@@ -333,7 +336,7 @@ class Component extends DCLogic {
       goEnd: function () { self.setState({ mode: 'end', reason: '' }); },
       goEdit: function () { self.setState({ mode: 'edit', reason: '', editKind: 'Change end', editEnd: curEnd }); },
       back: function () { self.setState({ mode: 'view' }); },
-      doApprove: function () { act({ approved: true }, 'Approved 10:07 by Tao · ' + (isSer ? '4 windows created, to Thu 8 Oct · ' : '') + 'Arm told in Chat', cur.site + (isSer ? ' series approved' : ' maintenance approved'), 'Chat and email'); },
+      doApprove: function () { act({ approved: true }, 'Approved 10:07 by Tao · ' + (isSer ? '4 windows created, to Thu 8 Oct · ' : '') + 'Arm told in Chat', cur.site + (isSer ? ' series approved · 4 windows scheduled' : ' maintenance approved'), 'Chat and email', isSer ? { undoneTitle: cur.site + ' series approval undone', undoneLine: 'Nothing was posted and no windows were scheduled. It’s waiting for approval again.' } : null); },
       showKinds: !cur.running,
       editKinds: ['Change end', cancelWord + ' it'], editKind: st.editKind,
       setEditKind: function (v) { self.setState({ editKind: v }); },
@@ -345,14 +348,14 @@ class Component extends DCLogic {
       reasonBlocked: !rOk || (mode === 'edit' && !cancelMode && (st.editEnd || curEnd) === curEnd),
       doReason: function () {
         var r = (self.state.reason || '').trim(); if (!r) return;
-        var v, line;
+        var v, line, tx = null;
         var title, nm = cur.site + (cur.mute ? ' mute' : ' maintenance'), ch = cur.mute ? 'Chat' : 'Chat and email';
-        if (mode === 'series') { v = { st: serPend ? 'withdrawn' : 'cancelled' }; line = (serPend ? 'Withdrawn' : 'Series cancelled') + ' 10:07 by ' + ME + ' · “' + r + '”' + (serPend ? '' : ' · ' + (occLeft.length ? occLeft.length + ' not started cancelled (' + occDays.join(', ') + ')' : 'none scheduled')); title = cur.site + (serPend ? ' series request withdrawn' : ' series cancelled'); ch = 'Chat and email'; }
+        if (mode === 'series') { v = { st: serPend ? 'withdrawn' : 'cancelled' }; line = (serPend ? 'Withdrawn' : 'Series cancelled') + ' 10:07 by ' + ME + ' · “' + r + '”' + (serPend ? '' : ' · ' + (occLeft.length ? occLeft.length + ' not started cancelled (' + occDays.join(', ') + ')' : 'none scheduled')); title = cur.site + (serPend ? ' series request withdrawn' : ' series cancelled' + (occLeft.length ? ' · ' + occLeft.length + ' windows cancelled' : '')); ch = 'Chat and email'; if (serPend) line += ' · nothing was scheduled'; tx = serPend ? { undoneLine: 'Nothing was posted. It’s waiting for approval again.' } : { undoneTitle: cur.site + ' series cancelled — undone', undoneLine: 'Nothing was posted. The series' + (occLeft.length ? ' and its ' + occLeft.length + ' windows are' : ' is') + ' back.' }; }
         else if (mode === 'end') { v = { st: 'ended' }; line = 'Ended early 10:07 by ' + ME + ' · “' + r + '”'; title = nm + ' ended'; }
-        else if (mode === 'decline') { v = { st: 'declined' }; line = 'Declined 10:07 by Tao · “' + r + '” · Arm told in Chat'; title = cur.site + (isSer ? ' series declined' : ' request declined'); }
+        else if (mode === 'decline') { v = { st: 'declined' }; line = 'Declined 10:07 by Tao · “' + r + '” · ' + (isSer ? 'nothing was scheduled · ' : '') + 'Arm told in Chat'; title = cur.site + (isSer ? ' series declined' : ' request declined'); if (isSer) tx = { undoneLine: 'Nothing was posted. It’s waiting for approval again.' }; }
         else if (cancelMode) { v = { st: cur.pending ? 'withdrawn' : 'cancelled' }; line = (cur.pending ? 'Withdrawn' : 'Cancelled') + ' 10:07 by ' + ME + ' · “' + r + '”'; title = cur.site + (cur.pending ? ' request withdrawn' : ' maintenance cancelled'); }
         else { v = { end: self.state.editEnd }; line = 'End changed 10:07 by ' + ME + ' · ' + curEnd + ' → ' + self.state.editEnd + ' · “' + r + '”'; title = nm + ' end changed'; }
-        act(v, line, title, ch);
+        act(v, line, title, ch, tx);
       },
       bottom: [
         { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },

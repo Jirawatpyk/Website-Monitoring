@@ -105,7 +105,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 </sc-if>
 <sc-if value="{{later}}" hint-placeholder-val="{{true}}">
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
-<x-import component-from-global-scope="Aura.Select" label="{{dayLabel}}" options="{{days}}" value="{{day}}" on-change="{{setDay}}"></x-import>
+<sc-if value="{{notRep}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Select" label="{{dayLabel}}" options="{{days}}" value="{{day}}" on-change="{{setDay}}"></x-import></sc-if><sc-if value="{{isRepeat}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.DatePicker" label="From" required="{{yes}}" clearable="{{no}}" value="{{fromIso}}" min="2026-09-25" max="2027-09-25" today="2026-09-25" on-change="{{setFrom}}" error="{{fromErr}}" hint="{{fromHint}}"></x-import></sc-if>
 <x-import component-from-global-scope="Aura.TimePicker" label="{{timeLabel}}" value="{{time}}" on-change="{{setTime}}" step="{{step}}"></x-import>
 </div>
 </sc-if>
@@ -133,7 +133,7 @@ a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
 <x-import component-from-global-scope="Aura.RadioGroup" label="On" options="{{monthOpts}}" value="{{monthMode}}" on-change="{{setMonthMode}}"></x-import>
 </sc-if>
 <sc-if value="{{isRepeat}}" hint-placeholder-val="{{false}}">
-<div style="width: 50%"><x-import component-from-global-scope="Aura.Select" label="Ends on" optional="{{yes}}" options="{{endOpts}}" value="{{endOn}}" on-change="{{setEndOn}}"></x-import></div>
+<div style="width: 50%"><x-import component-from-global-scope="Aura.DatePicker" label="Ends on" optional="{{yes}}" clearable="{{yes}}" placeholder="No end date" value="{{endIso}}" min="{{fromIso}}" max="{{endMax}}" today="2026-09-25" on-change="{{setEndIso}}" error="{{endErr}}" hint="{{endHint}}"></x-import></div>
 <div style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="rotate-ccw" size="sm"></x-import></span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">{{summary}}</span><span style="color: var(--aura-fg-secondary)">Each window is an ordinary maintenance window, created 14 days ahead. One that overlaps another window on this site is skipped and noted on the series; one that would start while the site is DOWN doesn’t start.</span></span></div>
 </sc-if>
 </div>
@@ -225,21 +225,31 @@ class Component extends DCLogic {
     var ORD = ['1st', '2nd', '3rd', '4th', '5th'], WDL = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
     function dOf(off) { return new Date(2026, 8, 25 + off); }
     function lab(dt) { return WDN[dt.getDay()] + ' ' + dt.getDate() + ' ' + MON[dt.getMonth()]; }
-    var first = dOf(dIdx), sWd = WDN[first.getDay()], sDay = first.getDate(), sNth = Math.ceil(sDay / 7);
+    function iso(dt) { return dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2); }
+    function pIso(v) { var p = String(v || '').split('-'); return p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : null; }
+    var FROM_ISO = this.state.fromIso || iso(dOf(dIdx));
+    var FROM_DT = pIso(FROM_ISO) || dOf(dIdx);
+    var END_ISO = this.state.endIso || '';
+    var END_DT = pIso(END_ISO);
+    var MAXEND = new Date(FROM_DT.getFullYear() + 2, FROM_DT.getMonth(), FROM_DT.getDate());
+    var fromErr = isRep && (FROM_DT < dOf(0) || FROM_DT > new Date(2027, 8, 25)) ? 'Pick a day from today to a year ahead.' : '';
+    var endErr = isRep && END_DT ? (END_DT < FROM_DT ? 'The last day is before the first.' : (END_DT > MAXEND ? 'Pick a day up to two years after the first.' : '')) : '';
+    var first = isRep ? FROM_DT : dOf(dIdx), sWd = WDN[first.getDay()], sDay = first.getDate(), sNth = Math.ceil(sDay / 7);
     var WDS = this.state.wds || [sWd];
     var MM = this.state.monthMode || 'day';
     if (MM === 'nth' && sNth > 4) MM = 'day';
-    var ENDON = this.state.endOn || 'none';
+    var ENDON = END_DT ? 'set' : 'none';
     var ENDLAB = { none: 'No end date', oct: 'Sat 31 Oct', dec: 'Thu 31 Dec', jan: 'Sun 31 Jan 2027' };
     var ENDDT = { none: null, oct: new Date(2026, 9, 31), dec: new Date(2026, 11, 31), jan: new Date(2027, 0, 31) };
     function occ(n) {
-      var out = [], lim = ENDDT[ENDON];
+      var out = [], lim = END_DT;
       for (var o = 0; o < 400 && out.length < n; o++) {
         var dt = new Date(first.getFullYear(), first.getMonth(), first.getDate() + o);
         if (lim && dt > lim) break;
         var ok = REP === 'Weekly' ? WDS.indexOf(WDN[dt.getDay()]) >= 0
           : (MM === 'day' ? dt.getDate() === sDay : (WDN[dt.getDay()] === sWd && Math.ceil(dt.getDate() / 7) === sNth));
-        if (ok) out.push({ dt: dt, off: Math.round((dt - dOf(0)) / 86400000) });
+        var offD = Math.round((dt - dOf(0)) / 86400000);
+        if (ok && offD * 1440 + TM >= 612) out.push({ dt: dt, off: offD }); // first window at least 5 min after now (Fri 25 Sep 10:07)
       }
       return out;
     }
@@ -250,10 +260,10 @@ class Component extends DCLogic {
     var ruleTxt = REP === 'Weekly' ? (wdSorted.length === 7 ? 'Every day' : 'Every ' + wdSorted.join(', ')) : (MM === 'day' ? 'Monthly on day ' + sDay + ' ·' : 'Monthly on the ' + ORD[sNth - 1] + ' ' + WDL[sWd] + ' ·');
     var next2 = occ(2);
     var noDays = REP === 'Weekly' && !WDS.length;
-    var summary = noDays ? 'Pick at least one day.' : ruleTxt + ' ' + TIME + ' → ' + endHM + ' (UTC+7) · from ' + lab(first) + (ENDON !== 'none' ? ' · until ' + ENDLAB[ENDON] : '') + ' · next 2: ' + next2.map(function (x) { return lab(x.dt); }).join(', ');
+    var summary = noDays ? 'Pick at least one day.' : endErr ? 'Fix Ends on — the last day is before the first.' : ruleTxt + ' ' + TIME + ' → ' + endHM + ' (UTC+7) · from ' + lab(first) + (END_DT && !endErr ? ' · until ' + lab(END_DT) + (END_DT.getFullYear() > 2026 ? ' ' + END_DT.getFullYear() : '') : ' · no end date') + ' · next 2: ' + next2.map(function (x) { return lab(x.dt); }).join(', ');
     var inHorizon = occ(20).filter(function (x) { return x.off * 1440 + TM < 14 * 1440 + 607; });
     var repResp = isRep && RESP;
-    var P = { 'New · site empty': { kind: 'maint', dur: '4 h', start: 'Later', site: '', role: 'admin' }, 'Default': { kind: 'maint', dur: '4 h', start: 'Later', site: 'Bangkok Airways – Taiwan', role: 'admin' }, 'Guard · MuvMi down': { kind: 'maint', dur: '4 h', start: 'Now', site: 'MuvMi', role: 'admin' }, 'Mute · open incident': { kind: 'mute', dur: '4 h', start: 'Now', site: 'MuvMi', role: 'admin' }, 'Admin · 3 days': { kind: 'maint', dur: '3 days', start: 'Later', site: 'Bangkok Airways – Taiwan', role: 'admin' }, 'Responder · 3 days': { kind: 'maint', dur: '3 days', start: 'Later', site: 'Bangkok Airways – China', role: 'resp' }, 'Weekly · Admin': { kind: 'maint', dur: '2 h', start: 'Later', site: 'Tubtong', role: 'admin', repeat: 'Weekly', day: 'tue', time: '01:00', wds: ['Tue'] }, 'Monthly · Admin': { kind: 'maint', dur: '2 h', start: 'Later', site: 'ORCA Thailand', role: 'admin', repeat: 'Monthly', day: 'sat', time: '20:00', monthMode: 'nth', endOn: 'dec' }, 'Weekly · Responder': { kind: 'maint', dur: '1 h', start: 'Later', site: 'Bangkok Airways – Taiwan', role: 'resp', repeat: 'Weekly', day: 'mon', time: '22:00', wds: ['Mon', 'Thu'] } };
+    var P = { 'New · site empty': { kind: 'maint', dur: '4 h', start: 'Later', site: '', role: 'admin' }, 'Default': { kind: 'maint', dur: '4 h', start: 'Later', site: 'Bangkok Airways – Taiwan', role: 'admin' }, 'Guard · MuvMi down': { kind: 'maint', dur: '4 h', start: 'Now', site: 'MuvMi', role: 'admin' }, 'Mute · open incident': { kind: 'mute', dur: '4 h', start: 'Now', site: 'MuvMi', role: 'admin' }, 'Admin · 3 days': { kind: 'maint', dur: '3 days', start: 'Later', site: 'Bangkok Airways – Taiwan', role: 'admin' }, 'Responder · 3 days': { kind: 'maint', dur: '3 days', start: 'Later', site: 'Bangkok Airways – China', role: 'resp' }, 'Weekly · Admin': { kind: 'maint', dur: '2 h', start: 'Later', site: 'Tubtong', role: 'admin', repeat: 'Weekly', day: 'tue', time: '01:00', wds: ['Tue'], fromIso: '2026-09-29' }, 'Weekly · Ends on set': { kind: 'maint', dur: '2 h', start: 'Later', site: 'Tubtong', role: 'admin', repeat: 'Weekly', day: 'tue', time: '01:00', wds: ['Tue'], fromIso: '2026-09-29', endIso: '2026-12-29' }, 'Weekly · Ends before From': { kind: 'maint', dur: '2 h', start: 'Later', site: 'Tubtong', role: 'admin', repeat: 'Weekly', day: 'tue', time: '01:00', wds: ['Tue'], fromIso: '2026-10-06', endIso: '2026-09-30' }, 'Monthly · Admin': { kind: 'maint', dur: '2 h', start: 'Later', site: 'ORCA Thailand', role: 'admin', repeat: 'Monthly', day: 'sat', time: '20:00', monthMode: 'nth', fromIso: '2026-09-26', endIso: '2026-12-31' }, 'Weekly · Responder': { kind: 'maint', dur: '1 h', start: 'Later', site: 'Bangkok Airways – Taiwan', role: 'resp', repeat: 'Weekly', day: 'mon', time: '22:00', wds: ['Mon', 'Thu'], fromIso: '2026-09-28' } };
     var noReason = !(this.state.reason || '').trim();
     var muteOnInc = !isMaint && !!guard;
     var PEOPLE = { 'Bangkok Airways – Taiwan': ['Bangkok Airways · Bua', 'Arm · Ploy'], 'Bangkok Airways – China': ['Bangkok Airways · Bua', 'Arm · Ploy'], 'ENEOS Industrial': ['ENEOS · Thee', 'Ploy · Arm'], 'MuvMi': ['MuvMi · Bua', 'Arm · Ploy'], 'realme.link': ['realme · Thee', 'Nok · Arm'], 'Fuji Links': ['Fuji Links · Thee', 'Ploy · Nok'], 'WeCare Studio': ['WeCare · Bua', 'Nok · Ploy'], 'Tubtong': ['Tubtong · Bua', 'Ploy · Nok'], 'Cando Asia': ['Cando Asia · Bua', 'Nok · Ploy'], 'ORCA Thailand': ['ORCA · Thee', 'Tao · Nok'], 'WeCare Asia': ['WeCare · Bua', 'Nok · Ploy'], 'VOCA': ['Internal', 'Ploy · Tao'] };
@@ -261,7 +271,7 @@ class Component extends DCLogic {
     var BADGE = { 'MuvMi': ['Down', 'danger', 'solid', 'ban', 'Down since 09:48 · 19 min'], 'Fuji Links': ['Problem', 'warning', 'soft', 'triangle-alert', 'Problem since 09:52 · Slow'] };
     var bb = BADGE[cur[0]] || ['OK', 'success', 'soft', 'circle-check', cur[0] === 'Bangkok Airways – Taiwan' ? 'OK since Mon 14 Sep 21:18 · 10 d 13 h' : 'OK · last checked Today 10:07'];
     var INC = { 'MuvMi': 'INC-0142 · Escalated · L1, 18 min unacked', 'Fuji Links': 'INC-0141 · Acknowledged by Ploy 09:58' };
-    var preset = Object.keys(P).filter(function (k) { var p = P[k]; return p.kind === self.state.kind && p.dur === self.state.dur && p.start === self.state.start && p.site === self.state.site && p.role === self.state.role && (p.repeat || 'Does not repeat') === (self.state.repeat || 'Does not repeat'); })[0] || '';
+    var preset = Object.keys(P).filter(function (k) { var p = P[k]; return p.kind === self.state.kind && p.dur === self.state.dur && p.start === self.state.start && p.site === self.state.site && p.role === self.state.role && (p.repeat || 'Does not repeat') === (self.state.repeat || 'Does not repeat') && (!p.repeat || ((p.fromIso || '') === (self.state.fromIso || '') && (p.endIso || '') === (self.state.endIso || ''))); })[0] || '';
     var endText = (later ? ENDS_LATER : ENDS_NOW)[dur];
     var needsOk = RESP && isMaint && dur === '3 days' && !isRep;
     var submitLabel = (needsOk || repResp) ? 'Ask for approval' : isRep ? 'Schedule series' : (isMaint ? (later ? 'Schedule' : 'Start now') : 'Mute for ' + dur);
@@ -272,27 +282,32 @@ class Component extends DCLogic {
       reason: this.state.reason,
       setReason: function (e) { self.setState({ reason: e && e.target ? e.target.value : e }); },
       reasonNote: noReason ? 'Required — type a reason to enable “' + submitLabel + '”. Shown on the dashboard, in the digest and in the audit log.' : 'Shown on the dashboard, in the digest and in the audit log.',
-      cantSubmit: blocked || noReason || !picked || noDays,
+      cantSubmit: blocked || noReason || !picked || noDays || !!fromErr || !!endErr,
       muteOnInc: muteOnInc,
       muteRuleTitle: guard ? 'Mute stops new alerts only — ' + guard[1] + (cur[0] === 'MuvMi' ? ' keeps escalating until someone acknowledges.' : ' stays open until it is resolved.') : '',
       muteRuleText: cur[0] === 'MuvMi' ? 'Its escalation ladder (CEO at 10:18), the L3 FYI and the client-update track all continue. Muting is not an acknowledgement.' : 'Already acknowledged by Ploy 09:58. Muting is not an acknowledgement and doesn’t resolve it.',
       muteInsteadNote: guard ? 'Mute stops new alerts only — ' + guard[1] + ' keeps escalating until someone acknowledges.' : '',
       presets: Object.keys(P),
       preset: preset,
-      pickPreset: function (k) { self.setState(Object.assign({ open: true, done: null, reason: '', day: 'sat', repeat: 'Does not repeat', time: '22:00', wds: null, monthMode: 'day', endOn: 'none' }, P[k], { mw: null, mutedHdr: null })); },
+      pickPreset: function (k) { self.setState(Object.assign({ open: true, done: null, reason: '', day: 'sat', repeat: 'Does not repeat', time: '22:00', wds: null, monthMode: 'day', fromIso: '', endIso: '' }, P[k], { mw: null, mutedHdr: null })); },
       presetOpts: [{ value: '', label: 'Custom' }].concat(Object.keys(P).map(function (k) { return { value: k, label: k }; })),
-      pickPresetSel: function (e) { var k = e && e.target ? e.target.value : e; if (P[k]) self.setState(Object.assign({ open: true, done: null, reason: '', day: 'sat', repeat: 'Does not repeat', time: '22:00', wds: null, monthMode: 'day', endOn: 'none' }, P[k], { mw: null, mutedHdr: null })); },
+      pickPresetSel: function (e) { var k = e && e.target ? e.target.value : e; if (P[k]) self.setState(Object.assign({ open: true, done: null, reason: '', day: 'sat', repeat: 'Does not repeat', time: '22:00', wds: null, monthMode: 'day', fromIso: '', endIso: '' }, P[k], { mw: null, mutedHdr: null })); },
       repeats: ['Does not repeat', 'Weekly', 'Monthly'], repeat: REP,
-      setRepeat: function (v) { self.setState({ repeat: v, start: v === 'Does not repeat' ? self.state.start : 'Later' }); },
+      setRepeat: function (v) { self.setState({ fromIso: self.state.fromIso || '', repeat: v, start: v === 'Does not repeat' ? self.state.start : 'Later' }); },
       notRep: !isRep, isRepeat: isRep, isWeekly: REP === 'Weekly', isMonthly: REP === 'Monthly', repResp: repResp,
       wd: ORDER.map(function (w) { var on = WDS.indexOf(w) >= 0; return { l: w, on: on, toggle: function () { var x = WDS.slice(); var i = x.indexOf(w); if (i >= 0) x.splice(i, 1); else x.push(w); self.setState({ wds: x }); } }; }),
-      wdHint: noDays ? 'Pick at least one day.' : 'The first window is the first chosen day on or after the start date.',
+      wdHint: noDays ? 'Pick at least one day.' : 'The first window is the first chosen day on or after From.',
       wdHintColor: noDays ? 'var(--aura-fg-danger)' : 'var(--aura-fg-secondary)',
       monthOpts: [{ value: 'day', label: 'Day ' + sDay + ' of each month', description: sDay > 28 ? 'A month without day ' + sDay + ' is skipped.' : 'Same date every month.' }].concat(sNth <= 4 ? [{ value: 'nth', label: 'The ' + ORD[sNth - 1] + ' ' + WDL[sWd] + ' of each month', description: 'Same weekday every month.' }] : []),
       monthMode: MM, setMonthMode: function (v) { self.setState({ monthMode: v && v.target ? v.target.value : v }); },
       endOpts: Object.keys(ENDLAB).map(function (k) { return { value: k, label: ENDLAB[k] }; }), endOn: ENDON,
       setEndOn: function (e) { self.setState({ endOn: e && e.target ? e.target.value : e }); },
       summary: summary,
+      fromIso: FROM_ISO, fromErr: fromErr, fromHint: fromErr ? '' : 'The first day the series may start — today to a year ahead (UTC+7).',
+      setFrom: function (v) { var x = v && v.target ? v.target.value : v; if (x) self.setState({ fromIso: x }); },
+      endIso: END_ISO, endErr: endErr, endMax: iso(MAXEND),
+      endHint: endErr ? '' : (END_DT ? 'Last day a window can start. Clear it (×) for no end date.' : 'No end date — it repeats until cancelled. Up to two years after From.'),
+      setEndIso: function (v) { var x = v && v.target ? v.target.value : v; self.setState({ endIso: x || '' }); },
       time: TIME, setTime: function (v) { var t = v && v.target ? v.target.value : v; if (t) self.setState({ time: t }); },
       timeLabel: isRep ? 'Time' : 'Start time', dayLabel: isRep ? 'From' : 'Start date',
       hasMutedHdr: !!this.state.mutedHdr,
