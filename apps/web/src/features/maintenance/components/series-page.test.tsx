@@ -108,7 +108,9 @@ describe('series on /maintenance (§32.4)', () => {
     await user.click(within(table('Waiting for approval')).getAllByRole('button', { name: 'Approve' })[0]!);
     const d = await screen.findByRole('dialog', { name: 'Approve the Bangkok Airways – Taiwan series?' });
     expect(
-      within(d).getByText(/The first 4 now: Mon 28 Sep, Thu 1 Oct, Mon 5 Oct, Thu 8 Oct\./),
+      within(d).getByText(
+        /Windows are created 14 days ahead — the first 4 now: Mon 28 Sep, Thu 1 Oct, Mon 5 Oct, Thu 8 Oct\./,
+      ),
     ).toBeInTheDocument();
     await user.click(within(d).getByRole('button', { name: 'Approve series' }));
     await waitFor(() =>
@@ -147,7 +149,9 @@ describe('series on /maintenance (§32.4)', () => {
       ),
     ).toBeInTheDocument();
     expect(
-      within(d).getByText('Nok gets an email; the Alerts Space gets one line for the series.'),
+      within(d).getByText(
+        'Nok gets an email; the Alerts Space gets one line for the series. Logged in the audit log as Ploy.',
+      ),
     ).toBeInTheDocument();
     const go = within(d).getByRole('button', { name: 'Cancel series' });
     expect(go).toBeDisabled();
@@ -161,6 +165,48 @@ describe('series on /maintenance (§32.4)', () => {
       }),
     );
     expect(await screen.findByText('Tubtong series cancelled · 2 windows cancelled')).toBeInTheDocument();
+  });
+
+  it('Undo too late: the neutral toast with when it posted and what to do instead (§32 7a)', async () => {
+    const user = userEvent.setup();
+    actions.undoSeriesAction.mockResolvedValueOnce({
+      ok: false,
+      message: 'Too late to undo — it has been posted.',
+    } as never);
+    view('admin');
+    await user.click(within(table('Waiting for approval')).getAllByRole('button', { name: 'Approve' })[0]!);
+    const d = await screen.findByRole('dialog', { name: 'Approve the Bangkok Airways – Taiwan series?' });
+    await user.click(within(d).getByRole('button', { name: 'Approve series' }));
+    await user.click(await screen.findByRole('button', { name: /Undo/ }));
+    expect(await screen.findByText('Too late to undo — it has been posted')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /^Bangkok Airways – Taiwan series approved — posted \d{2}:\d{2}:\d{2}\. To take it back, cancel the series\.$/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('after a series cancel, focus lands on Recent where it went (board, spec-check)', async () => {
+    const user = userEvent.setup();
+    const props = {
+      rows: [],
+      sites: [],
+      viewer: { id: 'u-tao', name: 'Tao', role: 'admin' as const },
+      viewerEmail: 'x@example.test',
+      nowIso: NOW,
+    };
+    const { rerender } = render(<MaintenancePageView {...props} series={[tubtong]} />);
+    await user.click(
+      within(table('Repeating series')).getAllByRole('button', { name: 'Cancel series…' })[0]!,
+    );
+    const d = await screen.findByRole('dialog', { name: 'Cancel the Tubtong series?' });
+    await user.click(within(d).getByRole('textbox', { name: /Reason/ }));
+    await user.paste('Not needed');
+    await user.click(within(d).getByRole('button', { name: 'Cancel series' }));
+    await waitFor(() => expect(actions.cancelSeries).toHaveBeenCalled());
+    const ended = { ...tubtong, cancelledAt: '2026-09-25T03:07:00Z', log: [] };
+    rerender(<MaintenancePageView {...props} series={[ended]} />);
+    await waitFor(() => expect(document.getElementById('mt-recent')).toHaveFocus());
   });
 
   it('the asker withdraws a waiting series; a Decline needs a reason', async () => {

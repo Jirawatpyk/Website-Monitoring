@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PausableSite } from '../model';
 import { MaintenanceDialog } from './maintenance-dialog';
+import { daysOf } from './repeat-fields';
 
 // Maintenance STATE › Weekly · Admin / Weekly · Responder (spec §32.2): the Repeat control in the dialog.
 const actions = vi.hoisted(() => ({
@@ -63,7 +64,7 @@ describe('the Repeat control (§32.2)', () => {
     expect(screen.getByRole('button', { name: 'Schedule series' })).toBeDisabled();
   });
 
-  it('an Admin schedules the series: the rule, the time, the length, no end', async () => {
+  it('an Admin schedules the series: the window’s time and length carry over, no end', async () => {
     const user = userEvent.setup();
     dialog(true);
     await repeatWeekly(user);
@@ -73,19 +74,56 @@ describe('the Repeat control (§32.2)', () => {
     expect(actions.scheduleSeries.mock.calls[0]![0]).toMatchObject({
       siteId: tubtong.id,
       rule: { freq: 'weekly' },
-      startTime: '01:00',
-      durationMin: 120,
+      startTime: '22:00',
+      durationMin: 240,
       untilOn: null,
       reason: 'WordPress plugin updates',
     });
     expect(await screen.findByText('Series scheduled · Tubtong')).toBeInTheDocument();
   });
 
+  it('on a DOWN site the series’ submit stays on phones — a series has no Start now (spec-check H1)', async () => {
+    const user = userEvent.setup();
+    render(
+      <MaintenanceDialog
+        open
+        onClose={() => {}}
+        sites={[{ ...tubtong, status: 'down' }]}
+        siteId={tubtong.id}
+        kind="maintenance"
+        isAdmin
+        viewerName="Tao"
+        viewerEmail="x@example.test"
+      />,
+    );
+    // Start Now on a DOWN site: the guard hides the one-off submit on phones…
+    await user.click(screen.getAllByRole('radio', { name: 'Now' })[0]!);
+    expect(screen.getByRole('button', { name: 'Start now' }).className).toContain('max-md:hidden');
+    // …a series has no Start now, so its submit shows.
+    await repeatWeekly(user);
+    expect(screen.getByRole('button', { name: 'Schedule series' }).className).not.toContain('max-md:hidden');
+  });
+
+  it('the default chip is From’s weekday until one is pressed (§32.2)', () => {
+    const plan = (days: number[] | null) =>
+      daysOf({
+        repeat: 'weekly',
+        from: '2026-09-28',
+        time: '01:00',
+        duration: '2 h',
+        days,
+        monthMode: 'day',
+        untilOn: null,
+      });
+    expect(plan(null)).toEqual([1]);
+    expect(plan([2, 4])).toEqual([2, 4]);
+  });
+
   it('a Responder asks for approval, told an Admin approves once', async () => {
     const user = userEvent.setup();
     dialog(false);
     await repeatWeekly(user);
-    expect(screen.getByText('Needs an Admin’s approval')).toBeInTheDocument();
+    expect(screen.getAllByText('Needs an Admin’s approval').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Ask for approval' })).toBeInTheDocument();
   });
 });

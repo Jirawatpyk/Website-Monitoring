@@ -1,10 +1,13 @@
 'use client';
 
-import { DatePicker, RadioGroup, SegmentedControl, Select, TimePicker } from '@jirawatpyk/aura-react';
+import { DatePicker, RadioGroup, SegmentedControl, Select, Tag, TimePicker } from '@jirawatpyk/aura-react';
 import { IconRotateCcw } from '@jirawatpyk/aura-react/icons';
+import { seriesTimeText } from '@dxt/shared';
+import { useId } from 'react';
 import {
   bangkokToday,
   fromMax,
+  isoWeekdayOf,
   monthOptions,
   REPEATS,
   SERIES_DURATIONS,
@@ -19,17 +22,33 @@ export interface RepeatState {
   from: string;
   time: string;
   duration: string;
-  days: number[];
+  /** null until a chip is pressed: From's weekday is the default and follows From (§32.2). */
+  days: number[] | null;
   monthMode: 'day' | 'nth';
   untilOn: string | null;
 }
 
-const FOCUS = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring';
+/** The weekdays in force: the ones picked, else From's (§32.2). */
+export const daysOf = (s: RepeatState) => s.days ?? [isoWeekdayOf(s.from)];
 
-/** The Repeat control itself (§32.2): a segmented control on desktop, a select on phones (§32.3). */
-export function RepeatControl({ value, onChange }: { value: Repeat; onChange: (r: Repeat) => void }) {
+/**
+ * The Repeat control (§32.2): a labelled segmented control from md, a select on phones (§32.3). It sits
+ * after Duration; `className` places it among the repeating fields.
+ */
+export function RepeatControl({
+  value,
+  onChange,
+  className = '',
+}: {
+  value: Repeat;
+  onChange: (r: Repeat) => void;
+  className?: string;
+}) {
   return (
-    <>
+    <div className={`flex flex-col gap-2 ${className}`}>
+      <span className="text-sm font-medium max-md:hidden" aria-hidden>
+        Repeat
+      </span>
       <span className="max-md:hidden">
         <SegmentedControl
           touchHeight
@@ -49,13 +68,14 @@ export function RepeatControl({ value, onChange }: { value: Repeat; onChange: (r
           onChange={(e) => onChange(e.target.value as Repeat)}
         />
       </span>
-    </>
+    </div>
   );
 }
 
 /**
- * A repeating window's fields (boards Maintenance, MMaintenance; §32.2–3): Window length, From, Time, the
- * weekday chips or the monthly choice, Ends on, and the summary box.
+ * A repeating window's fields (boards Maintenance, MMaintenance; §32.2–3), in each board's order:
+ * desktop Start text · From | Time · Window length · Repeat · On · Ends on · summary; phones Window length ·
+ * Repeat · From · Time · On · Ends on · summary. One tree, placed with `order` per width.
  */
 export function RepeatFields({
   state,
@@ -68,37 +88,21 @@ export function RepeatFields({
   plan: RepeatPlan;
   now: Date;
 }) {
-  const toggle = (d: number) =>
-    set({ days: state.days.includes(d) ? state.days.filter((x) => x !== d) : [...state.days, d] });
+  const hintId = useId();
+  const days = daysOf(state);
+  const toggle = (d: number) => set({ days: days.includes(d) ? days.filter((x) => x !== d) : [...days, d] });
+  const minutes = SERIES_DURATIONS.find((d) => d.label === state.duration)?.minutes ?? 120;
+  const span = seriesTimeText(state.time, minutes);
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Window length</span>
-        <span className="max-md:hidden">
-          <SegmentedControl
-            touchHeight
-            label="Window length"
-            size="sm"
-            options={SERIES_DURATIONS.map((d) => d.label)}
-            value={state.duration}
-            onChange={(v) => set({ duration: v })}
-          />
-        </span>
-        <span className="md:hidden">
-          <SegmentedControl
-            touchHeight
-            label="Window length"
-            options={SERIES_DURATIONS.map((d) => d.label)}
-            value={state.duration}
-            onChange={(v) => set({ duration: v })}
-            fullWidth
-          />
+      <div className="flex flex-col gap-2 max-md:hidden md:order-1">
+        <span className="text-sm font-medium">Start</span>
+        <span className="text-sm text-fg-secondary">
+          A series can’t start now — its first window is at least 5 min away. Pick the first date and the time
+          below.
         </span>
       </div>
-      <p className="m-0 text-sm text-fg-secondary">
-        A series can’t start now — its first window is at least 5 min away.
-      </p>
-      <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
+      <div className="order-3 grid grid-cols-2 gap-4 max-md:grid-cols-1 md:order-2">
         <DatePicker
           touchHeight
           label="From"
@@ -110,65 +114,108 @@ export function RepeatFields({
           weekStartsOn={1}
           value={state.from}
           onChange={(v) => v && set({ from: v })}
+          hint="The first day the series may start — today to a year ahead (UTC+7)."
         />
-        <TimePicker label="Time" step={15} value={state.time} onChange={(v) => v && set({ time: v })} />
-      </div>
-      {state.repeat === 'weekly' ? (
-        <div className="flex flex-col gap-2">
-          <span id="repeat-on" className="text-sm font-medium">
-            On
-          </span>
-          <div role="group" aria-labelledby="repeat-on" className="flex flex-wrap gap-1.5">
-            {WEEKDAYS.map((w, i) => {
-              const on = state.days.includes(i + 1);
-              return (
-                <button
-                  key={w}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggle(i + 1)}
-                  className={`min-h-11 min-w-11 cursor-pointer rounded-aura-full border px-2.5 text-sm font-medium ${FOCUS} ${
-                    on
-                      ? 'border-fg-primary bg-fg-primary text-bg-surface'
-                      : 'border-border-control bg-bg-surface text-fg-primary hover:bg-bg-surface-hover'
-                  }`}
-                >
-                  {w}
-                </button>
-              );
-            })}
-          </div>
-          <span className={`text-xs ${plan.daysError ? 'text-fg-danger' : 'text-fg-secondary'}`}>
-            {plan.daysError ?? 'From the first chosen day on or after From.'}
-          </span>
-        </div>
-      ) : (
-        <RadioGroup
+        <TimePicker
           touchHeight
-          label="On"
-          options={monthOptions(state.from)}
-          value={monthOptions(state.from).some((o) => o.value === state.monthMode) ? state.monthMode : 'day'}
-          onChange={(v) => set({ monthMode: v as 'day' | 'nth' })}
+          clearable={false}
+          label="Time"
+          step={15}
+          value={state.time}
+          onChange={(v) => v && set({ time: v })}
         />
-      )}
-      <DatePicker
-        touchHeight
-        label="Ends on"
-        placeholder="No end date"
-        min={state.from}
-        max={untilMax(state.from)}
-        timeZone="Asia/Bangkok"
-        weekStartsOn={1}
-        value={state.untilOn}
-        onChange={(v) => set({ untilOn: v })}
-        hint={
-          state.untilOn
-            ? 'Last day a window can start. Clear it (×) for no end date.'
-            : 'No end date — it repeats until cancelled. Up to two years after From.'
-        }
-        error={plan.untilError ?? undefined}
+      </div>
+      <div className="order-1 flex flex-col gap-2 md:order-3">
+        <span className="text-sm font-medium" aria-hidden>
+          Window length
+        </span>
+        <span className="flex flex-wrap items-center gap-4">
+          <span className="max-md:hidden">
+            <SegmentedControl
+              touchHeight
+              label="Window length"
+              size="sm"
+              options={SERIES_DURATIONS.map((d) => d.label)}
+              value={state.duration}
+              onChange={(v) => set({ duration: v })}
+            />
+          </span>
+          <span className="w-full md:hidden">
+            <SegmentedControl
+              touchHeight
+              label="Window length"
+              options={SERIES_DURATIONS.map((d) => d.label)}
+              value={state.duration}
+              onChange={(v) => set({ duration: v })}
+              fullWidth
+            />
+          </span>
+          <span className="text-sm text-fg-secondary">{`Each window lasts ${state.duration} (max 24 h) · ${span}`}</span>
+        </span>
+      </div>
+      <RepeatControl
+        className="order-2 md:order-4"
+        value={state.repeat}
+        onChange={(r) => set({ repeat: r })}
       />
-      <div className="flex items-start gap-2.5 rounded-aura-md border border-border-default bg-bg-canvas p-3 text-sm">
+      <div className="order-5">
+        {state.repeat === 'weekly' ? (
+          <div className="flex flex-col gap-2">
+            <span id={`${hintId}-on`} className="text-sm font-medium">
+              On
+            </span>
+            <div
+              role="group"
+              aria-labelledby={`${hintId}-on`}
+              aria-describedby={hintId}
+              className="flex flex-wrap gap-1.5"
+            >
+              {WEEKDAYS.map((w, i) => (
+                <Tag key={w} touchHeight selected={days.includes(i + 1)} onClick={() => toggle(i + 1)}>
+                  {w}
+                </Tag>
+              ))}
+            </div>
+            <span
+              id={hintId}
+              className={`text-xs ${plan.daysError ? 'text-fg-danger' : 'text-fg-secondary'}`}
+            >
+              {plan.daysError ?? 'The first window is the first chosen day on or after From.'}
+            </span>
+          </div>
+        ) : (
+          <RadioGroup
+            touchHeight
+            label="On"
+            options={monthOptions(state.from)}
+            value={
+              monthOptions(state.from).some((o) => o.value === state.monthMode) ? state.monthMode : 'day'
+            }
+            onChange={(v) => set({ monthMode: v as 'day' | 'nth' })}
+          />
+        )}
+      </div>
+      <div className="order-6 grid grid-cols-2 gap-4 max-md:grid-cols-1">
+        <DatePicker
+          touchHeight
+          optional
+          label="Ends on"
+          placeholder="No end date"
+          min={state.from}
+          max={untilMax(state.from)}
+          timeZone="Asia/Bangkok"
+          weekStartsOn={1}
+          value={state.untilOn}
+          onChange={(v) => set({ untilOn: v })}
+          hint={
+            state.untilOn
+              ? 'Last day a window can start. Clear it (×) for no end date.'
+              : 'No end date — it repeats until cancelled. Up to two years after From.'
+          }
+          error={plan.untilError ?? undefined}
+        />
+      </div>
+      <div className="order-7 flex items-start gap-2.5 rounded-aura-md border border-border-default bg-bg-canvas p-3 text-sm">
         <span className="flex pt-0.5 text-fg-secondary">
           <IconRotateCcw size="sm" />
         </span>

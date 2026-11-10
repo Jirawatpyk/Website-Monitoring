@@ -16,6 +16,7 @@ import {
   undoWindowAction,
   withdrawRequest,
 } from '../actions';
+import { PROBLEM_WORDS } from '../model';
 import {
   approveEffects,
   approveTitle,
@@ -48,6 +49,8 @@ export interface Held {
   series?: boolean;
   /** What Undo says when it worked (§32 7a); defaults to "<title> — undone · Nothing was posted." */
   undone?: { title: string; text: string };
+  /** A series: the Too late line, from when it posted (§32 7a). */
+  late?: (postedAt: string) => string;
 }
 
 const postNow = (h: Held) =>
@@ -158,6 +161,15 @@ function showUndo(held: Held, postsAt: string, undone: () => void) {
         duration: 4000,
       });
       undone();
+    } else if (held.late && r.message === PROBLEM_WORDS.undo_expired) {
+      // It went out between the tap and the server (§32 7a, MaintenancePage STATE › Undo · too late).
+      if (heldAction?.windowId === windowId) heldAction = null;
+      toast({
+        id,
+        title: 'Too late to undo — it has been posted',
+        description: held.late(postsAt),
+        duration: 8000,
+      });
     } else {
       toast.error(`Couldn’t undo · ${site}`, { id, description: r.message });
     }

@@ -102,7 +102,7 @@ export async function loadSeriesRows(db: DbClient, now: Date): Promise<SeriesRow
                    owner:profiles!sites_primary_owner_id_fkey(display_name, role),
                    backup:profiles!sites_backup_owner_id_fkey(display_name, role),
                    site_status(status)),
-       maintenance_windows(starts_at, ends_at, ended_at, cancelled_at, start_logged)`,
+       maintenance_windows(starts_at, ends_at, ended_at, cancelled_at, start_logged, created_at)`,
     )
     // Live series, and those that ended (cancelled, declined, or past their last day) in the 30 days;
     // only the windows of those 30 days and after — a no-end series keeps adding them (code review).
@@ -150,6 +150,13 @@ export async function loadSeriesRows(db: DbClient, now: Date): Promise<SeriesRow
       running: windows.some(
         (w) => w.start_logged && !w.cancelled_at && Date.parse(w.ended_at ?? w.ends_at) > now.getTime(),
       ),
+      // Made in the approval's own transaction: the same `now()` as approved_at.
+      approvalWindows: s.approved_at
+        ? windows
+            .filter((w) => Date.parse(w.created_at) === Date.parse(s.approved_at!))
+            .map((w) => w.starts_at)
+            .sort()
+        : [],
       cancelledWindows: s.cancelled_at
         ? windows
             .filter((w) => w.cancelled_at === s.cancelled_at)

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { metaOf, sectionsOf, type Viewer, type WindowRow } from './page-model';
-import { seriesPageRow, type SeriesRow } from './series-model';
+import { cancelText, metaOf, sectionsOf, type Viewer, type WindowRow } from './page-model';
+import {
+  approvalPreview,
+  approveSeriesEffects,
+  declineSeriesEffects,
+  endSeriesEffects,
+  seriesPageRow,
+  seriesToast,
+  type SeriesRow,
+} from './series-model';
 
 // MaintenancePage STATE › Series / Series · Responder, MMaintenanceList, spec §32.4–9, 7b. The samples
 // are the boards' (made up); the words are the boards'.
@@ -121,7 +129,7 @@ describe('a repeating series row (§32.4)', () => {
       badge: { icon: 'rotate-ccw', label: 'Repeating' },
       when: 'Every Tue 01:00 → 03:00',
       whenSub: 'Series · 2 h · from Tue 15 Sep · no end date · next Tue 29 Sep',
-      whySub: 'asked by Ploy · approved by Tao Mon 14 Sep 11:20 · not counted in uptime',
+      whySub: 'by Ploy · approved by Tao Mon 14 Sep · not counted in uptime',
       endLabel: 'Cancel series…',
       line: 'Every Tue 01:00 → 03:00 · next Tue 29 Sep',
     });
@@ -186,12 +194,12 @@ describe('a waiting series (§32.7)', () => {
   it('the phone sheet’s facts come from the row’s parts (§32.9)', () => {
     expect(seriesPageRow(base, [], tao, NOW).facts).toEqual([
       ['Repeats', 'Every Tue 01:00 → 03:00'],
-      ['Each window', '2 h'],
+      ['Each window', '2 h · not counted in uptime'],
       ['From', 'Tue 15 Sep'],
       ['Ends', 'No end date'],
       ['Next', 'Tue 29 Sep'],
       ['Reason', 'WordPress plugin updates'],
-      ['By', 'asked by Ploy · approved by Tao Mon 14 Sep 11:20'],
+      ['By', 'Ploy · approved by Tao Mon 14 Sep'],
       ['Site', 'Tier 2 · Ploy · backup Nok'],
     ]);
   });
@@ -288,5 +296,72 @@ describe('the page with series (§32.4)', () => {
     };
     const s = sectionsOf([w], tao, NOW);
     expect(s[0]!.rows[0]!.tag).toBe('Part of a series');
+    // Cancelling one window of it: only this one (§32.6).
+    expect(cancelText(w, 'scheduled', 'Tao')).toContain(
+      'cancelling removes it — only this window; the series keeps going.',
+    );
+  });
+});
+
+describe('the series dialogs’ words (board MaintenancePage › Approve series / Cancel series, §32.6–7, 7a)', () => {
+  it('Approve: the rule, the first windows inside 14 days, what each does, who hears', () => {
+    expect(approveSeriesEffects(waiting, 'Tao', NOW)).toEqual([
+      'Every Mon, Thu 22:00 → 23:00 (1 h), from Mon 28 Sep, no end date. Bangkok Airways – Taiwan is Tier 1.',
+      'Windows are created 14 days ahead — the first 4 now: Mon 28 Sep, Thu 1 Oct, Mon 5 Oct, Thu 8 Oct. One that overlaps another window on this site is skipped and noted on the series.',
+      'Each one: no alerts, checks still run, not counted in uptime. It doesn’t start if the site is DOWN or has an open incident — Arm, Nok and Tao are told.',
+      'You approve the series once; its windows don’t ask again. Arm gets a Chat message, Arm and Nok an email, and the Alerts Space one line for the series. Logged in the audit log as Tao.',
+    ]);
+    // Monthly on day 20 from 25 Sep: Tue 20 Oct is 25 days out, so nothing is made now.
+    expect(
+      approvalPreview({ ...waiting, rule: { freq: 'monthly', day: 20 }, startsOn: '2026-09-25' }, NOW),
+    ).toEqual([]);
+  });
+  it('Decline names the Chat message and the emails', () => {
+    expect(declineSeriesEffects(waiting, 'Tao')).toEqual([
+      'Nothing is scheduled; the request moves to Recent as Declined.',
+      'Arm gets your reason in a Chat message; Arm and Nok get an email. Logged in the audit log as Tao.',
+    ]);
+  });
+  it('Cancel words one occurrence and none, and its toast (§32 7a)', () => {
+    expect(endSeriesEffects({ ...base, upcoming: ['2026-09-28T18:00:00Z'] }, 'Tao', false)[0]).toBe(
+      'Cancels the occurrence that hasn’t started (Tue 29 Sep). Nothing is running now.',
+    );
+    expect(endSeriesEffects({ ...base, upcoming: [] }, 'Tao', false)[0]).toBe(
+      'No occurrence is scheduled yet. Nothing is running now.',
+    );
+    expect(seriesToast(base, 'cancelled', 0)).toMatchObject({
+      title: 'Tubtong series cancelled',
+      undone: { text: 'Nothing was posted. The series is back.' },
+    });
+    expect(seriesToast(base, 'cancelled', 1).undone.text).toBe(
+      'Nothing was posted. The series and its window are back.',
+    );
+    expect(seriesToast(base, 'approved', 4).late('2026-09-25T03:07:10Z')).toBe(
+      'Tubtong series approved — posted 10:07:10. To take it back, cancel the series.',
+    );
+  });
+  it('the APPROVED line: the windows it made, one too close to start, the asker told (D-057)', () => {
+    const approved: SeriesRow = {
+      ...waiting,
+      approvedAt: '2026-09-25T03:07:00Z',
+      approvedById: 'u-tao',
+      approverName: 'Tao',
+      approvalWindows: ['2026-09-28T15:00:00Z', '2026-10-08T15:00:00Z'],
+      upcoming: ['2026-09-28T15:00:00Z', '2026-10-08T15:00:00Z'],
+      log: [
+        {
+          at: '2026-09-25T03:07:00Z',
+          action: 'skipped',
+          starts_at: '2026-10-01T15:00:00Z',
+          reason: 'starts in less than 5 min',
+        },
+        { at: '2026-09-25T03:07:00Z', action: 'approved', by: 'Tao', posts_at: '2026-09-25T03:07:10Z' },
+      ],
+    };
+    const row = seriesPageRow(approved, [], tao, new Date('2026-09-25T03:08:00Z'));
+    expect(row.logs).toEqual([
+      'Approved 10:07 by Tao · 2 windows created, to Thu 8 Oct · Thu 1 Oct too close to start, not created · Arm told in Chat (posted 10:07:10)',
+    ]);
+    expect(row.skips).toEqual([]);
   });
 });

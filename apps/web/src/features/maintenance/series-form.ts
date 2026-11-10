@@ -40,16 +40,19 @@ export interface RepeatInput {
 }
 
 export { isoWeekdayOf };
-const addDays = (day: string, n: number) =>
-  new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 /** Today, in Bangkok. */
 export const bangkokToday = bangkokDayOf;
-/** From: today to a year ahead; Ends on: From to two years after it (§32.2, as the SQL allows). */
-export const fromMax = (now: Date) => addDays(bangkokToday(now), 366);
-export const untilMax = (from: string) => addDays(from, 366 * 2);
+/** The same date n years on; 29 Feb falls back to 28 Feb in a year without it. */
+const addYears = (day: string, n: number) => {
+  const out = `${Number(day.slice(0, 4)) + n}${day.slice(4)}`;
+  return new Date(`${out}T00:00:00Z`).toISOString().slice(0, 10) === out ? out : `${out.slice(0, 8)}28`;
+};
+/** From: today to a year ahead; Ends on: From to two years after it (§32.2; the SQL allows a day or two more). */
+export const fromMax = (now: Date) => addYears(bangkokToday(now), 1);
+export const untilMax = (from: string) => addYears(from, 2);
 
 /** The monthly choice from the From date (§32.2): day N, or the Nth weekday (none for a 5th). */
-export function monthOptions(from: string): { value: 'day' | 'nth'; label: string; description?: string }[] {
+export function monthOptions(from: string): { value: 'day' | 'nth'; label: string; description: string }[] {
   const dom = Number(from.slice(8, 10));
   const nth = Math.ceil(dom / 7);
   const wd = isoWeekdayOf(from);
@@ -57,10 +60,17 @@ export function monthOptions(from: string): { value: 'day' | 'nth'; label: strin
     {
       value: 'day',
       label: `Day ${dom} of each month`,
-      ...(dom > 28 ? { description: `A month without day ${dom} is skipped.` } : {}),
+      description:
+        dom > 28 ? `Same date every month. A month without day ${dom} is skipped.` : 'Same date every month.',
     },
     ...(nth <= 4
-      ? [{ value: 'nth' as const, label: `The ${ORDINAL[nth - 1]} ${LONG[wd - 1]} of each month` }]
+      ? [
+          {
+            value: 'nth' as const,
+            label: `The ${ORDINAL[nth - 1]} ${LONG[wd - 1]} of each month`,
+            description: 'Same weekday every month.',
+          },
+        ]
       : []),
   ];
 }
@@ -85,25 +95,37 @@ export interface RepeatPlan {
   blocked: boolean;
   /** The windows the summary names. */
   next: Date[];
+  /** "Every Tue 01:00 → 03:00" (the success line). */
+  words: string;
 }
 
+/** "Tue 29 Sep", with the year when it isn’t this year's (Ends on can be two years out). */
+const dayIn = (now: Date) => (d: Date) =>
+  formatDay(d, { weekday: true, year: d.getUTCFullYear() !== now.getUTCFullYear() });
 const day = (d: Date) => formatDay(d, { weekday: true });
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function repeatPlanOf(i: RepeatInput): RepeatPlan {
   const rule = ruleOf(i);
   const daysError = i.repeat === 'weekly' && !i.days.length ? 'Pick at least one day.' : null;
-  const untilError = i.untilOn && i.untilOn < i.from ? 'The last day is before the first.' : null;
+  const untilError = !i.untilOn
+    ? null
+    : i.untilOn < i.from
+      ? 'The last day is before the first.'
+      : i.untilOn > untilMax(i.from)
+        ? 'Pick a day up to two years after the first.'
+        : null;
+  const none = { next: [], words: '' };
   if (!rule || daysError)
-    return { rule, daysError, untilError, summary: 'Pick at least one day.', blocked: true, next: [] };
+    return { rule, daysError, untilError, summary: 'Pick at least one day.', blocked: true, ...none };
   if (untilError)
     return {
       rule,
       daysError,
       untilError,
-      summary: 'Fix Ends on — the last day is before the first.',
+      summary: `Fix Ends on — ${untilError.charAt(0).toLowerCase()}${untilError.slice(1)}`,
       blocked: true,
-      next: [],
+      ...none,
     };
   const next = nextOccurrences({ rule, startTime: i.time, startsOn: i.from, untilOn: i.untilOn }, 2, i.now);
   if (!next.length)
@@ -114,44 +136,53 @@ export function repeatPlanOf(i: RepeatInput): RepeatPlan {
       summary: 'No window falls between those days — at least 5 min from now.',
       blocked: true,
       next,
+      words: '',
     };
   const words = capital(
     formatSeriesRule({ rule, startTime: i.time, durationMin: i.durationMin }, { length: false }),
   );
-  const until = i.untilOn ? ` · until ${day(new Date(`${i.untilOn}T12:00:00+07:00`))}` : '';
+  const d = dayIn(i.now);
+  // "· no end date" or "· until Tue 29 Dec" (§32.2).
+  const until = i.untilOn ? ` · until ${d(new Date(`${i.untilOn}T12:00:00+07:00`))}` : ' · no end date';
   return {
     rule,
     daysError,
     untilError,
-    summary: `${words} (UTC+7) · from ${day(next[0]!)}${until} · next ${next.length}: ${next.map(day).join(', ')}`,
+    summary: `${words} (UTC+7) · from ${d(next[0]!)}${until} · next ${next.length}: ${next.map(d).join(', ')}`,
     blocked: false,
     next,
+    words,
   };
 }
 
-/** The success line (§32.2): an Admin's series with the windows made now; a Responder's request. */
+/** The success line (§32.2, board Maintenance): the rule, the first day, what was made, the audit and the reason. */
 export function seriesDoneOf(o: {
   site: string;
   waiting: boolean;
   windows: string[];
   admins: string[] | null | undefined;
-  summary: string;
-  /** Its first window by the rule: named when none is made yet (more than 14 days away). */
+  /** "Every Tue 01:00 → 03:00". */
+  words: string;
+  /** Its first window by the rule. */
   first?: Date;
+  reason: string;
+  viewer: string;
 }): { title: string; text: string } {
+  const head = `${o.words}${o.first ? ` · from ${day(o.first)}` : ''}`;
+  const why = `Reason: “${o.reason.trim()}”.`;
   if (o.waiting) {
     const who = o.admins?.length ? o.admins.join(', ') : 'the Admins';
     return {
       title: `Series request sent to ${who} · ${o.site}`,
-      text: `${o.summary.split(' · next')[0]}. Waiting for an Admin — nothing is scheduled until it’s approved. Withdraw it any time from Maintenance & mutes.`,
+      text: `${head} · waiting for an Admin — nothing is scheduled until it’s approved. Recorded in the audit log as ${o.viewer}. ${why} Follow it under Waiting for approval on Maintenance & mutes.`,
     };
   }
   const n = o.windows.length;
   const made = n
-    ? `${n} window${n === 1 ? '' : 's'} scheduled now (${o.windows.map((w) => day(new Date(w))).join(', ')}); the rest are added 14 days ahead.`
-    : `Its first window${o.first ? `, ${day(o.first)},` : ''} is added 14 days before it starts.`;
+    ? `${n} window${n === 1 ? '' : 's'} scheduled now (${o.windows.map((w) => day(new Date(w))).join(', ')})`
+    : 'no window in the next 14 days yet';
   return {
     title: `Series scheduled · ${o.site}`,
-    text: `${made} Cancel it any time from Maintenance & mutes.`,
+    text: `${head} · ${made}; the rest are added 14 days ahead · not counted in uptime · recorded in the audit log as ${o.viewer}. ${why} Cancel the series, or edit or cancel one window, on Maintenance & mutes (sidebar › Maintenance).`,
   };
 }

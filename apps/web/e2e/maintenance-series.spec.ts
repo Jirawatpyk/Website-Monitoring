@@ -28,7 +28,10 @@ test.describe('repeating maintenance (local Supabase)', () => {
       await dialog.getByRole('radio', { name: 'Weekly' }).click();
     }
     await expect(page.getByRole('dialog', { name: 'Schedule repeating maintenance' })).toBeVisible();
-    await expect(dialog.getByText(/^Every \w{3} 01:00 → 03:00 \(UTC\+7\) · from /)).toBeVisible();
+    // The window's 22:00 / 4 h carry over to the series (board Maintenance).
+    await expect(
+      dialog.getByText(/^Every \w{3} \d{2}:\d{2} → \d{2}:\d{2}( next day)? \(UTC\+7\) · from /),
+    ).toBeVisible();
     await page.screenshot({
       path: `test-results/s14-series-dialog-${info.project.name}.png`,
       fullPage: true,
@@ -95,7 +98,10 @@ test.describe('repeating maintenance (local Supabase)', () => {
     await dialog.getByRole('combobox', { name: 'Site' }).click();
     await page.getByRole('option', { name: new RegExp(`^${site.name} · Tier`) }).click();
     await dialog.getByRole('radio', { name: 'Weekly' }).click();
-    await expect(dialog.getByText('Needs an Admin’s approval', { exact: true })).toBeVisible();
+    // One warning per width: before Reason on phones, after it from md (§32.3, board).
+    await expect(
+      dialog.getByText('Needs an Admin’s approval', { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
     await dialog.getByLabel(/Reason/).fill('E2E series request');
     await dialog.getByRole('button', { name: 'Ask for approval' }).click();
     await expect(dialog.getByText(new RegExp(`^Series request sent to .* · ${site.name}$`))).toBeVisible();
@@ -114,7 +120,7 @@ test.describe('repeating maintenance (local Supabase)', () => {
       .getByRole('row', { name: new RegExp(site.name) });
     await row.getByRole('button', { name: 'Approve' }).click();
     const confirm = admin.getByRole('dialog', { name: `Approve the ${site.name} series?` });
-    await expect(confirm.getByText(/^The first \d now: /)).toBeVisible();
+    await expect(confirm.getByText(/^Windows are created 14 days ahead — the first \d now: /)).toBeVisible();
     await confirm.getByRole('button', { name: 'Approve series' }).click();
     await admin.getByRole('button', { name: /^Undo · \d+ s$/ }).click();
     await expect(admin.getByText(`${site.name} series approval undone`)).toBeVisible();

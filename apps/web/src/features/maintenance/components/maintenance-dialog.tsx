@@ -18,8 +18,8 @@ import { APPROVAL_OVER_MIN } from '@dxt/engine';
 import { useNow } from '@/components/use-now';
 import { loadAdminNames, muteSite, scheduleMaintenance, scheduleSeries } from '../actions';
 import { postPendingNow } from './window-dialogs';
-import { RepeatControl, RepeatFields, type RepeatState } from './repeat-fields';
-import { isoWeekdayOf, repeatPlanOf, SERIES_DURATIONS, seriesDoneOf } from '../series-form';
+import { daysOf, RepeatControl, RepeatFields, type RepeatState } from './repeat-fields';
+import { repeatPlanOf, SERIES_DURATIONS, seriesDoneOf, type Repeat } from '../series-form';
 import {
   DURATIONS,
   EFFECT,
@@ -103,7 +103,7 @@ export function MaintenanceDialog({
     from: days[1]!.value,
     time: '01:00',
     duration: '2 h',
-    days: [isoWeekdayOf(days[1]!.value)],
+    days: null,
     monthMode: 'day',
     untilOn: null,
   }));
@@ -162,11 +162,22 @@ export function MaintenanceDialog({
           untilOn: rep.untilOn,
           time: rep.time,
           durationMin: seriesMin,
-          days: rep.days,
+          days: daysOf(rep),
           monthMode: rep.monthMode,
           now,
         });
   const seriesSubmit = isAdmin ? 'Schedule series' : 'Ask for approval';
+  const submitLabel = repeating ? seriesSubmit : plan.submit;
+  const turnRepeat = (r: Repeat) =>
+    patchRep({
+      repeat: r,
+      ...(rep.repeat === 'none' && r !== 'none'
+        ? {
+            duration: SERIES_DURATIONS.some((d) => d.label === dur) ? dur : '24 h',
+            ...(later ? { from: startDate, time: startTime } : {}),
+          }
+        : {}),
+    });
 
   const switchKind = (v: string) => {
     setKind(v as WindowKind);
@@ -205,8 +216,10 @@ export function MaintenanceDialog({
             waiting: r.waiting ?? !isAdmin,
             windows: r.windows ?? [],
             admins: r.admins ?? admins,
-            summary: repPlan.summary,
+            words: repPlan.words,
             first: repPlan.next[0],
+            reason,
+            viewer: viewerName,
           }),
         );
         return;
@@ -288,7 +301,7 @@ export function MaintenanceDialog({
             <Button
               variant="primary"
               // Phones: Mute instead is the one primary while the guard blocks (MMaintenance, §13).
-              className={plan.blocked && picked && !mutedUntil ? 'max-md:hidden' : undefined}
+              className={plan.blocked && picked && !mutedUntil && !repeating ? 'max-md:hidden' : undefined}
               icon={kind === 'mute' ? <IconEyeOff /> : <IconCalendar />}
               disabled={
                 !picked || (repeating ? !!repPlan?.blocked || !reason.trim() : plan.problems.length > 0)
@@ -296,7 +309,7 @@ export function MaintenanceDialog({
               loading={pending}
               onClick={submit}
             >
-              {repeating ? seriesSubmit : plan.submit}
+              {submitLabel}
             </Button>
           </>
         )
@@ -406,10 +419,14 @@ export function MaintenanceDialog({
             </div>
           )}
 
-          {kind === 'maintenance' && (
-            <RepeatControl value={rep.repeat} onChange={(r) => patchRep({ repeat: r })} />
+          {repeating && repPlan && (
+            <RepeatFields
+              state={rep}
+              set={(p) => (p.repeat ? turnRepeat(p.repeat) : patchRep(p))}
+              plan={repPlan}
+              now={now}
+            />
           )}
-          {repeating && repPlan && <RepeatFields state={rep} set={patchRep} plan={repPlan} now={now} />}
           {!repeating && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Duration</span>
@@ -443,6 +460,14 @@ export function MaintenanceDialog({
               </span>
             </div>
           )}
+          {kind === 'maintenance' && !repeating && <RepeatControl value={rep.repeat} onChange={turnRepeat} />}
+
+          {repeating && !isAdmin && (
+            // Phones: the approval warning comes before Reason (§32.3); desktop after it (board).
+            <span className="md:hidden">
+              <SeriesApproval admins={admins} />
+            </span>
+          )}
 
           {kind === 'mute' && incident && rule && (
             <Alert tone="warning" role="status" title={rule.title}>
@@ -466,8 +491,8 @@ export function MaintenanceDialog({
             onChange={(e) => setReason(e.target.value)}
             hint={
               picked
-                ? reasonHint(reason, plan.submit)
-                : `Choose a site and type a reason to enable “${plan.submit}”.`
+                ? reasonHint(reason, submitLabel)
+                : `Choose a site and type a reason to enable “${submitLabel}”.`
             }
           />
           {error && (
@@ -475,20 +500,20 @@ export function MaintenanceDialog({
               {error}
             </Alert>
           )}
-          {plan.notice && picked && !error && (
+          {plan.notice && picked && !error && !repeating && (
             <Alert tone="warning" role="status">
               {plan.notice}
             </Alert>
           )}
           {/* §23.10: starting maintenance ends the site's running mute (D-036). */}
-          {kind === 'maintenance' && mutedUntil && plan.startsAt < mutedUntil && (
+          {kind === 'maintenance' && !repeating && mutedUntil && plan.startsAt < mutedUntil && (
             <p className="m-0 text-sm text-fg-secondary">Starting this window ends the mute.</p>
           )}
 
           {repeating && !isAdmin && (
-            <Alert tone="warning" title="Needs an Admin’s approval">
-              {`An Admin approves the series once; nothing is scheduled until then.${admins?.length ? ` ${admins.join(', ')} ${admins.length === 1 ? 'gets' : 'get'} the request now.` : ''}`}
-            </Alert>
+            <span className="max-md:hidden">
+              <SeriesApproval admins={admins} />
+            </span>
           )}
           {kind === 'maintenance' &&
             !repeating &&
@@ -519,5 +544,14 @@ export function MaintenanceDialog({
         </div>
       )}
     </Dialog>
+  );
+}
+
+/** A Responder's series waits for an Admin (§32.2): who gets the request. */
+function SeriesApproval({ admins }: { admins: string[] | null }) {
+  return (
+    <Alert tone="warning" title="Needs an Admin’s approval">
+      {`An Admin approves the series once; nothing is scheduled until then.${admins?.length ? ` ${admins.join(', ')} ${admins.length === 1 ? 'gets' : 'get'} the request now.` : ''}`}
+    </Alert>
   );
 }

@@ -22,6 +22,7 @@ import {
   IconPencil,
   IconPlus,
   IconRotateCcw,
+  IconTrash2,
   IconTriangleAlert,
 } from '@jirawatpyk/aura-react/icons';
 import Link from 'next/link';
@@ -76,7 +77,7 @@ type OpenSeries = {
 } | null;
 type ShowSeries = (kind: SeriesKind, s: SeriesPageRow, fromSheet?: boolean) => void;
 
-function StatusCell({ p, short = false }: { p: PageRow; short?: boolean }) {
+function StatusCell({ p, short = false, phone = false }: { p: PageRow; short?: boolean; phone?: boolean }) {
   const muted = short ? p.mutedShort : p.mutedLabel;
   return (
     <span className="flex flex-col items-start gap-1">
@@ -92,21 +93,22 @@ function StatusCell({ p, short = false }: { p: PageRow; short?: boolean }) {
           {muted}
         </Badge>
       )}
-      <SeriesTag p={p} short={short} />
+      <SeriesTag p={p} short={phone} />
     </span>
   );
 }
 
 /** A series row's badges (§32.4, 7): Needs approval + Repeating, Repeating, or how it ended. */
-function SeriesStatus({ s }: { s: SeriesPageRow }) {
+function SeriesStatus({ s, phone = false }: { s: SeriesPageRow; phone?: boolean }) {
+  const tag = s.tag ?? (phone ? s.phoneTag : null);
   return (
     <span className="flex flex-col items-start gap-1">
       <Badge tone={s.badge.tone} variant={s.badge.variant} icon={ICONS[s.badge.icon]}>
         {s.badge.label}
       </Badge>
-      {s.tag && (
+      {tag && (
         <Badge tone="neutral" variant="outline" icon={<IconRotateCcw />}>
-          {s.tag}
+          {tag}
         </Badge>
       )}
     </span>
@@ -146,11 +148,15 @@ function Logs({ lines }: { lines: string[] }) {
 }
 
 /** "Sat 26 Sep 22:00 → Tue 29 Sep 22:00", broken only after the arrow. */
-function When({ text }: { text: string }) {
+/** One empty list, so the focus effect sees "no change" between renders (not a new [] each time). */
+const NO_SERIES: SeriesRow[] = [];
+
+/** A series' rule may wrap ("Every Mon, Tue, Wed, Thu, Fri 01:00"); only its times keep one line. */
+function When({ text, wrap = false }: { text: string; wrap?: boolean }) {
   const [a, b] = text.split(' → ');
   return (
     <span className="tabular-nums">
-      <span className="whitespace-nowrap">{a}</span>
+      <span className={wrap ? undefined : 'whitespace-nowrap'}>{a}</span>
       {b !== undefined && (
         <>
           {' → '}
@@ -203,7 +209,7 @@ function SeriesActions({ s, open }: { s: SeriesPageRow; open: ShowSeries }) {
         </>
       )}
       {s.endLabel && (
-        <Button variant="ghost" size="sm" onClick={() => open('end', s)}>
+        <Button variant="ghost" size="sm" icon={<IconTrash2 />} onClick={() => open('end', s)}>
           {s.endLabel}
         </Button>
       )}
@@ -254,7 +260,7 @@ function columns(recent: boolean, open: Show, openSeries: ShowSeries): DataTable
         const p = fieldsOf(item);
         return (
           <span className="flex flex-col py-1 leading-snug">
-            <When text={p.when} />
+            <When text={p.when} wrap={item.kind === 'series'} />
             <span className="text-xs text-fg-secondary">{p.whenSub}</span>
           </span>
         );
@@ -308,7 +314,7 @@ function columns(recent: boolean, open: Show, openSeries: ShowSeries): DataTable
  */
 export function MaintenancePageView({
   rows,
-  series = [],
+  series = NO_SERIES,
   sites,
   viewer,
   viewerEmail,
@@ -355,29 +361,31 @@ export function MaintenancePageView({
    * Scheduled once approved) and its button with it, so focus goes to that section's heading once the
    * new rows arrive, not to the page body (spec-check).
    */
-  const landing = useRef<{ key: Section['key']; before: WindowRow[] } | null>(null);
+  const landing = useRef<{ key: Section['key']; before: WindowRow[]; beforeS: SeriesRow[] } | null>(null);
   const done = (landed?: 'recent') => {
     const key = landed ?? (open?.kind === 'approve' ? 'scheduled' : open?.kind === 'edit' ? null : 'recent');
-    landing.current = key ? { key, before: rows } : null;
+    landing.current = key ? { key, before: rows, beforeS: series } : null;
     setOpen((o) => (o ? { ...o, shown: false } : o));
   };
   // An Undo puts the row back where it was: focus goes to that section once it is there (spec-check).
   const latest = useRef(rows);
+  const latestS = useRef(series);
   useEffect(() => {
     latest.current = rows;
-  }, [rows]);
+    latestS.current = series;
+  }, [rows, series]);
   const undone = (p: PageRow) => {
     const key: Section['key'] =
       p.state === 'active' ? 'active' : p.state === 'waiting' ? 'waiting' : 'scheduled';
-    landing.current = { key, before: latest.current };
+    landing.current = { key, before: latest.current, beforeS: latestS.current };
   };
   useEffect(() => {
     // Only once the refreshed rows are in (the closing dialog has handed focus back by then).
     const l = landing.current;
-    if (!l || rows === l.before) return;
+    if (!l || (rows === l.before && series === l.beforeS)) return;
     landing.current = null;
     document.getElementById(`mt-${l.key}`)?.focus();
-  }, [rows]);
+  }, [rows, series]);
   const shown = (k: Kind) => !!open?.shown && open.kind === k;
   // A series' dialog or sheet (§32.6–7, 9).
   const [openS, setOpenS] = useState<OpenSeries>(null);
@@ -394,7 +402,17 @@ export function MaintenancePageView({
           : { ...o, shown: false }
         : o,
     );
-  const doneS = () => setOpenS((o) => (o ? { ...o, shown: false } : o));
+  /** Approved → Repeating series; declined, withdrawn or cancelled → Recent. */
+  const doneS = () => {
+    const key: Section['key'] = openS?.kind === 'approve' ? 'series' : 'recent';
+    landing.current = { key, before: rows, beforeS: series };
+    setOpenS((o) => (o ? { ...o, shown: false } : o));
+  };
+  /** Undo puts the series back where it was. */
+  const undoneS = (s: SeriesPageRow) => {
+    const key: Section['key'] = s.state === 'waiting' ? 'waiting' : 'series';
+    landing.current = { key, before: latest.current, beforeS: latestS.current };
+  };
   const shownS = (k: SeriesKind) => !!openS?.shown && openS.kind === k;
   const openSchedule = () => {
     void postPendingNow();
@@ -437,7 +455,7 @@ export function MaintenancePageView({
           <EmptyState
             icon={<IconCalendar />}
             title="Nothing active or scheduled"
-            description="Maintenance windows and mutes show here while they run, before they start and while they wait for approval. Finished ones stay under Recent for 30 days."
+            description="Maintenance windows, repeating series and mutes show here while they run, before they start and while they wait for approval. Finished ones stay under Recent for 30 days."
             action={
               canSchedule ? (
                 <span className="max-md:hidden">
@@ -519,6 +537,7 @@ export function MaintenancePageView({
           <ApproveSeriesDialog
             key={`sa${openS.n}`}
             s={openS.s}
+            onUndone={() => undoneS(openS.s)}
             viewer={viewer.name}
             now={now}
             open={shownS('approve')}
@@ -528,6 +547,7 @@ export function MaintenancePageView({
           <DeclineSeriesDialog
             key={`sd${openS.n}`}
             s={openS.s}
+            onUndone={() => undoneS(openS.s)}
             viewer={viewer.name}
             now={now}
             open={shownS('decline')}
@@ -537,6 +557,7 @@ export function MaintenancePageView({
           <EndSeriesDialog
             key={`se${openS.n}`}
             s={openS.s}
+            onUndone={() => undoneS(openS.s)}
             viewer={viewer.name}
             now={now}
             open={shownS('end')}
@@ -597,7 +618,11 @@ function SectionView({ s, open, openSeries }: { s: Section; open: Show; openSeri
               className={`flex min-h-16 w-full items-center gap-2.5 border-0 border-b border-border-subtle bg-transparent py-2.5 pr-2 pl-3.5 text-left last:border-b-0 hover:bg-bg-surface-hover ${FOCUS}`}
             >
               <span className="w-30 shrink-0">
-                {item.kind === 'window' ? <StatusCell p={item.p} short /> : <SeriesStatus s={item.s} />}
+                {item.kind === 'window' ? (
+                  <StatusCell p={item.p} short phone />
+                ) : (
+                  <SeriesStatus s={item.s} phone />
+                )}
               </span>
               <span className="flex min-w-0 grow flex-col gap-0.5 leading-tight">
                 <span className="text-sm font-medium">{p.siteName}</span>
@@ -702,10 +727,10 @@ function SeriesSheet({
       onClose={onClose}
       size="sm"
       title={r.siteName}
-      description={`Series · Tier ${r.tier}`}
+      description={`Repeating series · Tier ${r.tier}`}
     >
       <div className="flex flex-col gap-3.5">
-        <SeriesStatus s={s} />
+        <SeriesStatus s={s} phone />
         <dl className="m-0 flex flex-col gap-1.5 text-sm">
           {s.facts.map(([k, v]) => (
             <div key={k} className="flex justify-between gap-3">
@@ -727,7 +752,7 @@ function SeriesSheet({
           </>
         )}
         {s.endLabel && (
-          <Button variant="secondary" fullWidth onClick={() => act('end', s)}>
+          <Button variant="secondary" icon={<IconTrash2 />} fullWidth onClick={() => act('end', s)}>
             {s.endLabel}
           </Button>
         )}

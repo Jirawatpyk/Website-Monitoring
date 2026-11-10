@@ -613,7 +613,9 @@ export function cancelText(r: WindowRow, state: WindowState, viewer: string): st
     const told = to.length ? ` ${formatNameList(to)} ${to.length === 1 ? 'is' : 'are'} told by email,` : '';
     return `Withdraws the request — nothing is scheduled; the Admins’ request thread gets REQUEST WITHDRAWN in Chat and email,${told} and the reminders stop. Logged as ${viewer}.`;
   }
-  return `It hasn’t started, so cancelling removes it. ${emailAndSpace(r, viewer)} Logged as ${viewer}.`;
+  // A window of a series: only this one goes (§32.6).
+  const only = r.seriesId ? ' — only this window; the series keeps going' : '';
+  return `It hasn’t started, so cancelling removes it${only}. ${emailAndSpace(r, viewer)} Logged as ${viewer}.`;
 }
 
 // ── Overview (§23.8) ─────────────────────────────────────────────────────
