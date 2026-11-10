@@ -25,6 +25,7 @@ import {
   type WindowFactsRow,
 } from './facts';
 import { incidentUrl } from './render';
+import { repeatWordsOf } from './series-facts';
 
 /**
  * A maintenance window's messages (S09b, spec §24, D-037): `mw_line` (the action's Space line),
@@ -58,6 +59,7 @@ function windowFacts(w: WindowFactsRow, env: Facts['windowEnv'], appUrl: string)
     backup: person(w.sites.backup),
     admins: (env?.admins ?? []).map((a) => person(a)!),
     pageUrl: maintenanceUrl(appUrl),
+    series: repeatWordsOf(w.series?.rule),
   };
 }
 
