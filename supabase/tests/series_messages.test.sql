@@ -4,7 +4,7 @@
 -- series' window, and claim_notifications holding series rows for a notifier that renders them.
 begin;
 \ir _helpers.psql
-select plan(45);
+select plan(50);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -186,6 +186,39 @@ select is((select count(*)::int from public.claim_notifications('google_chat', 2
 select ok((select count(*)::int from public.claim_notifications('google_chat', 200, null, true, true, true)
            where maintenance_series_id is not null) > 0, 'with it, they are');
 reset role;
+
+-- ── Review fixes: who may end a waiting series, the deadline, a late decision ──
+select tests.authenticate_as((select id from ids where name = 'nok'));
+insert into s values ('wait', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
+  '{"freq":"monthly","day":25}', '05:00', 60, current_date + 2, null, 'Waiting one'));
+reset role;
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select throws_ok($$ select public.cancel_maintenance_series((select id from s where name = 'wait'), 'Not mine') $$,
+  '42501', 'A waiting series is withdrawn by whoever asked for it, or declined by an Admin',
+  'the owner can''t cancel someone else''s waiting series');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok($$ select public.cancel_maintenance_series((select id from s where name = 'wait'), 'Admin') $$,
+  '42501', null, 'nor can an Admin: an Admin declines it');
+reset role;
+update public.maintenance_series set first_starts_at = now() - interval '1 minute'
+where id = (select id from s where name = 'wait');
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select throws_ok($$ select public.decide_maintenance_series((select id from s where name = 'wait'), false, 'Too late') $$,
+  '22023', 'Nobody approved it before its first window — ask again', 'a decline after the deadline is refused too');
+reset role;
+select tests.authenticate_as((select id from ids where name = 'nok'));
+select throws_ok($$ select public.cancel_maintenance_series((select id from s where name = 'wait'), 'Too late') $$,
+  '22023', 'Nobody approved it before its first window — ask again', 'and so is a withdraw: NOT APPROVED wins');
+-- The deadline skips a first window that already overlaps another: Site A's 'req' series holds 03:00 Tue/Thu.
+insert into s values ('dead', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '03:00', 30, current_date + 2, null, 'Deadline'));
+reset role;
+select ok((select not exists (select 1 from public.maintenance_windows w
+                              where w.site_id = '00000000-0000-0000-0000-0000000000a1' and w.cancelled_at is null
+                                and tstzrange(w.starts_at, w.ends_at) && tstzrange(m.first_starts_at, m.first_starts_at + interval '30 minutes'))
+           from public.maintenance_series m where m.id = (select id from s where name = 'dead')),
+  'a waiting series'' deadline is its first window that overlaps nothing');
 
 -- ── Only the service role (and the RPCs) queue or claim series messages ──
 select ok(not has_function_privilege('authenticated', 'public.engine_queue_series_messages(uuid,text,uuid,timestamptz,text,jsonb)', 'execute')

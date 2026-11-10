@@ -151,12 +151,19 @@ The summary gave one figure for all sites ("Uptime all sites 99.98%"), and no so
 **Amended (Tao, 10 Nov 2026, with the ChatAlert board "Maintenance · repeating series").**
 
 - **A waiting series follows the request pattern (§32.7).** This replaces the reading above that a waiting series never posts.
-  - Reminders go out 12 h and 1 h before its first window: Chat and email to the Admins, STILL WAITING to the asker.
+  - Reminders go out 12 h before its first window (Chat and email to the Admins, STILL WAITING to the asker) and 1 h before (Chat only, to the Admins), as for one window.
+  - Its first window, the deadline, is the first one by the rule that doesn't already overlap another window on the site. One that would be skipped can't be the deadline (engine review).
+  - Only the asker withdraws it, and an Admin approves or declines it. Owner, backup and other Admins can't cancel it (§32.7: "Waiting for an Admin"). Once its first window has come, nothing but NOT APPROVED applies.
   - At that window's start, nobody having approved it, it becomes NOT APPROVED. Nothing is scheduled, and a later approval is refused ("ask again").
   - `maintenance_series.first_starts_at` holds that start, and the audit row is `maintenance.series_not_approved`.
 - **"· series every Tue" goes on a window's first line only,** STARTED or DIDN'T START. Later replies are unchanged, as the board draws it. Tao first picked every line, before the board was read, then took the recommendation.
 - **SKIPPED posts only for an overlap.** A window skipped as "under 5 min" is named on the APPROVED line.
 - **Undo of a series action** comes with its dialog in PR 2c. Until then a series' rows aren't held.
+- **Accepted as they are (reviews, 10 Nov):**
+  - The weekly Coming up writes a series "every Tue 01:00 → 03:00" (§32.11), beside the one-off rows' "Tue 29 Sep 01:00–03:00".
+  - A window edited before it starts opens its thread with CHANGED, yet STARTED still carries the tag.
+  - A series' window ended early by a person still emails owner and backup, as a person's action.
+  - SKIPPED's "next" is the rule's next day, even if that one is skipped too.
 
 **Impact.**
 - **PR 2a** was the migration: `maintenance_series`, `maintenance_windows.series_id`, the RPCs that create, approve and cancel a series, and the occurrences made in SQL. It also carried the Done-when 3 test.
