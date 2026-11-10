@@ -678,7 +678,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
 ### S14 · Digest, weekly summary & recurring maintenance
 
-- **Scope:** FR-12 daily digest at 09:00 and Monday weekly summary to "DxT Website Reports" (CEO format + Overall X/17), with a Healthchecks check so a missing digest raises an alarm (PRD §13). FR-10b recurring windows (RRULE).
+- **Scope:** FR-12 daily digest at 09:00 and Monday weekly summary to "DxT Website Reports" (CEO format + Overall X/17), with a Healthchecks check so a missing digest raises an alarm (PRD §13). FR-10b recurring windows (RRULE). D-059 (CEO feedback, 9 Nov): the weekly summary judges each site against its tier's uptime target over 30 days (UPTIME BY SITE).
 - **Boards:** WeeklySummary
 - **Depends on:** S09, S11
 - **Done when:**

@@ -14,6 +14,7 @@ import type {
   ProbeGap,
   ReportIncident,
   ReportPerson,
+  ReportSiteUptime,
   ReportWindow,
   WeeklyFacts,
 } from '@dxt/notifier';
@@ -24,6 +25,8 @@ import {
   formatTime,
   formatWeek,
   isSameBangkokDay,
+  TIER_CONFIG,
+  type Tier,
 } from '@dxt/shared';
 import { downEpisodesBySite, maintenanceSpansBySite, watchedSince } from '@/features/sites/server';
 import { loadResponseHours } from '../escalation/response-hours';
@@ -35,6 +38,8 @@ import { causeOf, reportIncident, roundsOf, type IncidentRow } from './assemble'
  */
 
 const DAY_MS = 86_400_000;
+/** The window a site is judged on against its uptime target (D-059): the standard table is per month. */
+const MONTH_DAYS = 30;
 const EPISODE_EVENTS = ['detected', 'relapsed', 'escalated_to_down', 'recovered'];
 
 const must = <T>(r: { data: T | null; error: { message: string } | null }, what: string): T => {
@@ -286,6 +291,7 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
   const weekEndExclusive = bangkokDayStart(now);
   const weekStart = new Date(weekEndExclusive.getTime() - 7 * DAY_MS);
   const weekEnd = new Date(weekEndExclusive.getTime() - 60_000);
+  const monthStart = new Date(weekEndExclusive.getTime() - MONTH_DAYS * DAY_MS);
   const [
     sites,
     incidents,
@@ -307,8 +313,9 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
     loadWindows(db, now, new Date(now.getTime() + 7 * DAY_MS)),
     loadMonitor(db, weekStart, weekEndExclusive),
     insideFor(db, now),
-    downEpisodesBySite(db, null, weekStart),
-    maintenanceSpansBySite(db, null, weekStart),
+    // 30 days back: each site is judged against its target over a month (D-059).
+    downEpisodesBySite(db, null, monthStart),
+    maintenanceSpansBySite(db, null, monthStart),
     db
       .from('escalation_policies')
       .select('tier, severity, escalation_steps(level, delay_min)')
@@ -356,6 +363,34 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
     return u ? [{ siteId: s.id, ...u }] : [];
   });
   const withDowntime = new Set(windowsUp.filter((u) => u.downMinutes > 0).map((u) => u.siteId));
+
+  // Site by site against its tier's target over the 30 days ending with the week (D-059, the CEO).
+  const weekOf = new Map(windowsUp.map((u) => [u.siteId, u.uptime]));
+  const siteUptimes: ReportSiteUptime[] = sites.flatMap((s) => {
+    const since = watchedSince(s);
+    const u = siteUptimeOver(drops.get(s.id) ?? [], {
+      now: weekEndExclusive,
+      rangeMinutes: MONTH_DAYS * 1440,
+      monitoringStartedAt: since,
+      maintenance: spans.get(s.id) ?? [],
+    });
+    if (!u) return [];
+    const tier = s.tier as Tier;
+    return [
+      {
+        site: s.name,
+        tier,
+        target: TIER_CONFIG[tier]?.uptimeTarget ?? TIER_CONFIG[3].uptimeTarget,
+        uptime: u.uptime,
+        downMinutes: u.downMinutes,
+        // The minutes judged, as `uptime` counts them (code review: the allowance must match the verdict).
+        windowMinutes: u.windowMinutes - u.maintenanceMinutes,
+        // Watched for less than the 30 days: the words say since when.
+        since: u.windowMinutes < MONTH_DAYS * 1440 && since ? since : null,
+        week: weekOf.get(s.id) ?? null,
+      },
+    ];
+  });
 
   const targets = new Map(
     must(policies, 'escalation_policies').flatMap((p) => {
@@ -443,6 +478,7 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
     sitesWithoutDowntime: sites.filter((s) => !withDowntime.has(s.id)).length,
     uptime: aggregateUptime(windowsUp),
     incidents: list,
+    sites: siteUptimes,
     needsSomeone: [...rootCause, ...requestRows, ...swapRows],
     mtta,
     planned: planned.map(toWindow),

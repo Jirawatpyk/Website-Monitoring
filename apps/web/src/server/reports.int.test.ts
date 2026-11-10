@@ -8,6 +8,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Database, DbClient } from '@dxt/db';
+import { TIER_CONFIG, type Tier } from '@dxt/shared';
+import { loadWeeklyFacts } from './reports/facts';
 import { runReports } from './reports/run-reports';
 
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
@@ -107,6 +109,21 @@ describe('reports cron (S14)', () => {
     const second = await runReports(deps, new Date(monday.getTime() + 60_000));
     expect(second).toMatchObject({ ok: true, daily: 'already_queued', weekly: 'already_queued' });
     expect(post).toHaveBeenCalledTimes(texts.length);
+  });
+
+  // D-059: every monitored site judged against its tier's target over 30 days, read from the real schema.
+  it('the weekly facts carry each active site against its tier target over 30 days', async () => {
+    const f = await loadWeeklyFacts(db, monday, 'https://monitor.example.test');
+    const active = (await db.from('sites').select('name, tier').eq('is_active', true)).data ?? [];
+    expect(f.sites.length).toBeGreaterThan(0);
+    for (const s of f.sites) {
+      const site = active.find((a) => a.name === s.site)!;
+      expect(site).toBeDefined();
+      expect(s.target).toBe(TIER_CONFIG[site.tier as Tier].uptimeTarget);
+      expect(s.windowMinutes).toBeLessThanOrEqual(30 * 1440);
+      expect(s.uptime).toBeGreaterThanOrEqual(0);
+      expect(s.uptime).toBeLessThanOrEqual(1);
+    }
   });
 
   it('refuses to run without a Reports Space webhook (the Healthchecks check then alarms)', async () => {

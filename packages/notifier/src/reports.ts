@@ -1,4 +1,5 @@
 import {
+  allowedDownMinutes,
   formatDay,
   formatDayRange,
   formatDuration,
@@ -108,6 +109,26 @@ export interface DigestFacts {
   appUrl: string;
 }
 
+/**
+ * One site against its tier's uptime target (D-059, the CEO's standard table): judged on the 30 days
+ * ending with the week, or since monitoring began when that is shorter; this week shown beside it.
+ */
+export interface ReportSiteUptime {
+  site: string;
+  tier: number;
+  /** `TIER_CONFIG[tier].uptimeTarget`: 0.9995, 0.999, 0.995. */
+  target: number;
+  /** Uptime over the window, maintenance excluded. */
+  uptime: number;
+  downMinutes: number;
+  /** The minutes judged: the window less its maintenance, as \`uptime\` counts them. */
+  windowMinutes: number;
+  /** When monitoring began, if the window is shorter than 30 days ("since Wed 28 Oct"). */
+  since: Date | null;
+  /** This week's uptime; null when the site wasn't monitored in it. */
+  week: number | null;
+}
+
 export interface WeeklyFacts {
   at: Date;
   /** Monday 00:00 and Sunday 23:59 Bangkok of the week reported. */
@@ -118,6 +139,8 @@ export interface WeeklyFacts {
   /** All sites, maintenance excluded (`aggregateUptime`). */
   uptime: number;
   incidents: readonly ReportIncident[];
+  /** Every monitored site against its target (D-059). */
+  sites: readonly ReportSiteUptime[];
   needsSomeone: readonly {
     kind: 'root_cause' | 'request' | 'swap';
     text: string;
@@ -153,6 +176,8 @@ interface Row {
 interface Section {
   title?: string;
   rows: Row[];
+  /** Chat folds the rows after this many (the on-target sites under the ones below target). */
+  collapseAfter?: number;
 }
 
 export interface ReportModel {
@@ -358,6 +383,37 @@ function weeklyWhat(i: ReportIncident): string {
   return parts.join(' · ');
 }
 
+/**
+ * Site by site against the standard (D-059, the CEO, 9 Nov): below target first, the furthest below
+ * first; then the rest by tier, closest to its target first.
+ */
+function uptimeRows(sites: readonly ReportSiteUptime[]): { rows: Row[]; below: number } {
+  const below = sites.filter((s) => s.uptime < s.target);
+  const met = sites.filter((s) => s.uptime >= s.target);
+  below.sort((a, b) => b.target - b.uptime - (a.target - a.uptime) || a.site.localeCompare(b.site));
+  met.sort((a, b) => a.tier - b.tier || a.uptime - b.uptime || a.site.localeCompare(b.site));
+  // Shown rounded down, so a site just under its target never reads the target's own figure (99.949%
+  // is "99.94%", not "99.95%"); the targets have two decimals, so on target never reads below it.
+  const pct = (u: number) => formatPercent(Math.floor(u * 10_000 + 1e-6) / 10_000);
+  const row = (s: ReportSiteUptime, isBelow: boolean): Row => {
+    const figure = s.since
+      ? `${pct(s.uptime)} since ${formatDay(s.since, { weekday: true })}`
+      : `30 d ${pct(s.uptime)}`;
+    const week = isBelow && s.week !== null ? ` · this week ${pct(s.week)}` : '';
+    const allowed = `${formatDuration(Math.floor(allowedDownMinutes(s.target, s.windowMinutes) + 1e-6))} allowed`;
+    return {
+      label: isBelow ? 'Below target' : 'On target',
+      text: `${plainName(s.site)} · Tier ${s.tier} · ${figure} · target ${formatPercent(s.target)}${week}`,
+      // Below target: the down minutes rounded up, the allowance down, so the trail never reads equal.
+      trail: isBelow
+        ? `${formatDuration(Math.ceil(s.downMinutes - 1e-6))} down · ${allowed}`
+        : `${formatDuration(Math.floor(s.downMinutes + 1e-6))} down · ${allowed}`,
+      warning: isBelow,
+    };
+  };
+  return { rows: [...below.map((s) => row(s, true)), ...met.map((s) => row(s, false))], below: below.length };
+}
+
 /** The Monday weekly summary (WeeklySummary "Weekly summary"). */
 export function weeklyModel(f: WeeklyFacts): ReportModel {
   const range = formatDayRange(f.weekStart, f.weekEnd);
@@ -389,6 +445,8 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
     text: `${plainName(i.site)} · ${weeklyWhat(i)}`,
     trail: formatDuration(i.minutes),
   }));
+
+  const byUptime = uptimeRows(f.sites);
 
   const mttaValue = f.mtta
     .map((m) => `Tier ${m.tier} ${m.seconds === null ? '—' : formatDurationSeconds(m.seconds)}`)
@@ -438,6 +496,9 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
     lines: [
       `Week: ${f.sitesWithoutDowntime}/${f.sitesTotal} sites had no downtime`,
       `Uptime all sites ${formatPercent(f.uptime)} · ${downs} DOWN · ${problems} PROBLEM · maintenance excluded`,
+      ...(f.sites.length
+        ? [`Last 30 days: ${f.sites.length - byUptime.below}/${f.sites.length} sites on their uptime target`]
+        : []),
     ],
     sections: [
       ...(needs.length ? [{ title: 'NEEDS SOMEONE', rows: needs }] : []),
@@ -446,6 +507,17 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
             {
               title: failing ? `INCIDENTS · ${failing} NOT RECOVERED` : 'INCIDENTS · ALL RECOVERED',
               rows: incidents,
+            },
+          ]
+        : []),
+      ...(byUptime.rows.length
+        ? [
+            {
+              title: byUptime.below
+                ? `UPTIME BY SITE · ${byUptime.below} BELOW TARGET`
+                : 'UPTIME BY SITE · ALL ON TARGET',
+              rows: byUptime.rows,
+              collapseAfter: byUptime.below,
             },
           ]
         : []),
@@ -510,6 +582,9 @@ export function reportChat(m: ReportModel, cardId: string): ChatMessage {
               : []),
             ...m.sections.map((s) => ({
               ...(s.title ? { header: s.title } : {}),
+              ...(s.collapseAfter !== undefined && s.rows.length > Math.max(1, s.collapseAfter)
+                ? { collapsible: true, uncollapsibleWidgetsCount: Math.max(1, s.collapseAfter) }
+                : {}),
               widgets: s.rows.map(widget),
             })),
             ...(m.buttons.length
