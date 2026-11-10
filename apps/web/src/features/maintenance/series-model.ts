@@ -52,6 +52,8 @@ export interface SeriesRow {
   upcoming: string[];
   /** The windows its cancel took ("2 not started cancelled (Tue 29 Sep, Tue 6 Oct)"). */
   cancelledWindows: string[];
+  /** One of its windows is running now: a cancel lets it finish (§32.6). */
+  running?: boolean;
 }
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

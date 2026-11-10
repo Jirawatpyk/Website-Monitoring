@@ -66,6 +66,7 @@ describe('series mutations (D-057)', () => {
       ok: true,
       id: SER,
       postsAt: '2026-09-25T07:07:10.000Z',
+      windows: ['2026-09-28T18:00:00Z'],
     });
     expect(a.rpc).toHaveBeenCalledWith('decide_maintenance_series', {
       p_series_id: SER,

@@ -102,7 +102,7 @@ export async function loadSeriesRows(db: DbClient, now: Date): Promise<SeriesRow
                    owner:profiles!sites_primary_owner_id_fkey(display_name, role),
                    backup:profiles!sites_backup_owner_id_fkey(display_name, role),
                    site_status(status)),
-       maintenance_windows(starts_at, cancelled_at, start_logged)`,
+       maintenance_windows(starts_at, ends_at, ended_at, cancelled_at, start_logged)`,
     )
     .or(`and(cancelled_at.is.null,declined_at.is.null),cancelled_at.gte.${since},declined_at.gte.${since}`)
     .order('created_at');
@@ -142,6 +142,9 @@ export async function loadSeriesRows(db: DbClient, now: Date): Promise<SeriesRow
         .filter((w) => !w.cancelled_at && !w.start_logged && Date.parse(w.starts_at) > now.getTime())
         .map((w) => w.starts_at)
         .sort(),
+      running: windows.some(
+        (w) => w.start_logged && !w.cancelled_at && Date.parse(w.ended_at ?? w.ends_at) > now.getTime(),
+      ),
       cancelledWindows: s.cancelled_at
         ? windows
             .filter((w) => w.cancelled_at === s.cancelled_at)

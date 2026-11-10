@@ -10,7 +10,9 @@ import {
   declineMaintenance,
   editWindowEnd,
   endWindowEarly,
+  postSeriesActionNow,
   postWindowActionNow,
+  undoSeriesAction,
   undoWindowAction,
   withdrawRequest,
 } from '../actions';
@@ -31,19 +33,31 @@ import {
 const FAILED = 'Couldn’t save. Check your connection and try again.';
 const UNDO_FAILED = 'Couldn’t reach the server. Check your connection and try again.';
 const HINT = 'Shown in the audit log.';
-const hintFor = (reason: string) => (reason.trim() ? HINT : `Required — type a reason to continue. ${HINT}`);
+export const hintFor = (reason: string) =>
+  reason.trim() ? HINT : `Required — type a reason to continue. ${HINT}`;
 
-type Result = { ok: true; postsAt?: string } | { ok: false; message: string };
+type Result = { ok: true; postsAt?: string; windows?: string[] } | { ok: false; message: string };
 
-interface Held {
+export interface Held {
+  /** The window's id, or the series' when `series` (§32 7a). */
   windowId: string;
   title: string;
   site: string;
   chatOnly?: boolean;
+  /** A series action: undone and posted through the series RPCs. */
+  series?: boolean;
+  /** What Undo says when it worked (§32 7a); defaults to "<title> — undone · Nothing was posted." */
+  undone?: { title: string; text: string };
 }
+
+const postNow = (h: Held) =>
+  h.series ? postSeriesActionNow({ seriesId: h.windowId }) : postWindowActionNow({ windowId: h.windowId });
+const undoIt = (h: Held) =>
+  h.series ? undoSeriesAction({ seriesId: h.windowId }) : undoWindowAction({ windowId: h.windowId });
 
 /** The one action still inside its 10 s on this page (§24.12). */
 let heldAction: (Held & { postsAt: string }) | null = null;
+const toastId = (h: Held) => `${h.series ? 'series' : 'window'}-${h.windowId}`;
 const channelsOf = (h: Held) => (h.chatOnly ? 'Chat' : 'Chat and email');
 /** Toasts still on screen: one the person dismissed with × doesn't come back as "Posted" (code review). */
 const shown = new Set<string>();
@@ -66,10 +80,10 @@ export async function postPendingNow(): Promise<void> {
   const p = heldAction;
   heldAction = null;
   if (!p || Date.parse(p.postsAt) <= Date.now()) return;
-  const r = await postWindowActionNow({ windowId: p.windowId }).catch(() => null);
-  if (r?.ok && shown.has(`window-${p.windowId}`)) {
+  const r = await postNow(p).catch(() => null);
+  if (r?.ok && shown.has(toastId(p))) {
     toast.success(p.title, {
-      id: `window-${p.windowId}`,
+      id: toastId(p),
       description: `Posted to ${channelsOf(p)}.`,
       duration: Infinity,
     });
@@ -77,7 +91,7 @@ export async function postPendingNow(): Promise<void> {
 }
 
 /** A dialog that opens posts the pending action first (§24.12). */
-function usePostPendingOnOpen(open: boolean) {
+export function usePostPendingOnOpen(open: boolean) {
   useEffect(() => {
     if (open) void postPendingNow();
   }, [open]);
@@ -102,10 +116,11 @@ interface DialogProps {
  * next server action (posting a pending one now, §24.12) in Next's action queue until it finished
  * (S09b follow-up /verify: post-now landed ~10 s after the save).
  */
-function useSubmit(onDone: () => void, onUndone?: () => void) {
+export function useSubmit(onDone: () => void, onUndone?: () => void) {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const run = (fn: () => Promise<Result>, held?: Held) =>
+  // `held` may read the result: a series approval's toast counts the windows it made (§32 7a).
+  const run = (fn: () => Promise<Result>, held?: Held | ((r: Result & { ok: true }) => Held)) =>
     start(async () => {
       setError(null);
       await postPendingNow();
@@ -115,7 +130,8 @@ function useSubmit(onDone: () => void, onUndone?: () => void) {
         return;
       }
       onDone();
-      if (held && r.postsAt) showUndo(held, r.postsAt, () => onUndone?.());
+      const h = typeof held === 'function' ? held(r) : held;
+      if (h && r.postsAt) showUndo(h, r.postsAt, () => onUndone?.());
     });
   return { error, pending, run };
 }
@@ -126,16 +142,21 @@ function useSubmit(onDone: () => void, onUndone?: () => void) {
  */
 function showUndo(held: Held, postsAt: string, undone: () => void) {
   const { windowId, title, site, chatOnly } = held;
-  const id = `window-${windowId}`;
+  const id = toastId(held);
   heldAction = { ...held, postsAt };
   const onUndo = async () => {
-    const r = await undoWindowAction({ windowId }).catch(() => ({
+    const r = await undoIt(held).catch(() => ({
       ok: false as const,
       message: UNDO_FAILED,
     }));
     if (r.ok) {
       if (heldAction?.windowId === windowId) heldAction = null;
-      toast({ id, title: `${title} — undone`, description: 'Nothing was posted.', duration: 4000 });
+      toast({
+        id,
+        title: held.undone?.title ?? `${title} — undone`,
+        description: held.undone?.text ?? 'Nothing was posted.',
+        duration: 4000,
+      });
       undone();
     } else {
       toast.error(`Couldn’t undo · ${site}`, { id, description: r.message });
@@ -151,7 +172,7 @@ function showUndo(held: Held, postsAt: string, undone: () => void) {
   });
 }
 
-function Refusal({ error }: { error: string | null }) {
+export function Refusal({ error }: { error: string | null }) {
   return error ? (
     <Alert tone="danger" role="alert">
       {error}

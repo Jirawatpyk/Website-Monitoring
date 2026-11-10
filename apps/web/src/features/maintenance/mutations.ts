@@ -34,7 +34,15 @@ export interface MaintenanceDeps {
  * to it and offers Undo; create and mute post at once.
  */
 export type WindowResult =
-  | { ok: true; id?: string; waiting?: boolean; postsAt?: string; admins?: string[] }
+  | {
+      ok: true;
+      id?: string;
+      waiting?: boolean;
+      postsAt?: string;
+      admins?: string[];
+      /** A series: the windows it has now (create, approve — §32.2, 7a). */
+      windows?: string[];
+    }
   | { ok: false; message: string };
 
 /** When an undoable action's held messages go: the window's `undo_until`, set by the RPC. */
@@ -279,9 +287,16 @@ export async function decideSeries(
     p_approve: p.data.approve,
     p_reason: p.data.reason,
   });
-  return error
-    ? refusal(error, 'Only an Admin can approve or decline a series.')
-    : heldSeries(db, p.data.seriesId);
+  if (error) return refusal(error, 'Only an Admin can approve or decline a series.');
+  const held = await heldSeries(db, p.data.seriesId);
+  if (!p.data.approve || !held.ok) return held;
+  // The toast says how many windows the approval made ("… · 4 windows scheduled", §32 7a).
+  const { data } = await db
+    .from('maintenance_windows')
+    .select('starts_at')
+    .eq('series_id', p.data.seriesId)
+    .order('starts_at');
+  return { ...held, windows: (data ?? []).map((w) => w.starts_at) };
 }
 
 /** Cancel a series, or withdraw a waiting one (the asker) — the RPC tells the two apart. */

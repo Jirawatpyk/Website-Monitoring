@@ -31,7 +31,7 @@ export default async function MaintenancePage() {
   const { profile } = access;
   const now = new Date();
   const editor = profile.role === 'admin' || profile.role === 'responder';
-  const { rows, sites } = await getMaintenancePage(now, editor);
+  const { rows, series, sites } = await getMaintenancePage(now, editor);
   const viewer: Viewer = {
     id: profile.id,
     name: profile.displayName,
@@ -45,6 +45,7 @@ export default async function MaintenancePage() {
     <Container>
       <MaintenancePageView
         rows={rows}
+        series={series}
         sites={pausable}
         viewer={viewer}
         viewerEmail={profile.email}
