@@ -71,25 +71,29 @@ test.describe('repeating maintenance (local Supabase)', () => {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.emulateMedia({ colorScheme: 'light' });
     }
-    if (info.project.name === 'mobile') {
-      await series
-        .getByRole('button', { name: new RegExp(site.name) })
-        .first()
-        .click();
-      await page
-        .getByRole('dialog', { name: site.name })
-        .getByRole('button', { name: 'Cancel series…' })
-        .click();
-    } else {
-      await series
-        .getByRole('row', { name: new RegExp(site.name) })
-        .getByRole('button', { name: 'Cancel series…' })
-        .click();
-    }
-    const cancel = page.getByRole('dialog', { name: `Cancel the ${site.name} series?` });
-    await expect(cancel.getByText(/^Cancels the \d+ occurrences? that haven’t started/)).toBeVisible();
-    await cancel.getByLabel(/Reason/).fill('E2E: not needed');
-    await cancel.getByRole('button', { name: 'Cancel series' }).click();
+    // Cancel series… from the row (desktop) or the sheet (phones), with a reason.
+    const cancelIt = async (reason: string) => {
+      if (info.project.name === 'mobile') {
+        await series
+          .getByRole('button', { name: new RegExp(site.name) })
+          .first()
+          .click();
+        await page
+          .getByRole('dialog', { name: site.name })
+          .getByRole('button', { name: 'Cancel series…' })
+          .click();
+      } else {
+        await series
+          .getByRole('row', { name: new RegExp(site.name) })
+          .getByRole('button', { name: 'Cancel series…' })
+          .click();
+      }
+      const cancel = page.getByRole('dialog', { name: `Cancel the ${site.name} series?` });
+      await expect(cancel.getByText(/^Cancels the \d+ occurrences? that haven’t started/)).toBeVisible();
+      await cancel.getByLabel(/Reason/).fill(reason);
+      await cancel.getByRole('button', { name: 'Cancel series' }).click();
+    };
+    await cancelIt('E2E: not needed');
     await expect(
       page.getByText(new RegExp(`^${site.name} series cancelled · \\d+ windows? cancelled$`)),
     ).toBeVisible();
@@ -100,6 +104,11 @@ test.describe('repeating maintenance (local Supabase)', () => {
         ? series.getByRole('button', { name: new RegExp(site.name) })
         : series.getByRole('row', { name: new RegExp(site.name) })
       ).first(),
+    ).toBeVisible();
+    // Leave nothing running: cancel it for good (no Undo).
+    await cancelIt('E2E: clean up');
+    await expect(
+      page.getByText(new RegExp(`^${site.name} series cancelled · \\d+ windows? cancelled$`)).last(),
     ).toBeVisible();
   });
 

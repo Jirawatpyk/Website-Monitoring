@@ -173,22 +173,25 @@ function seriesLogLine(
           ? [`${plural(made.length, 'window')} created, to ${day(made[made.length - 1]!)}`]
           : []),
         ...tooClose.map((x) => `${day(x.starts_at!)} too close to start, not created`),
-        ...(asker && !undone ? [`${asker} told in Chat`] : []),
+        // An undone action keeps its line as it was (§32 7a). The windows an undone approval made are
+        // deleted with it, so only its count can't be shown.
+        ...(asker ? [`${asker} told in Chat`] : []),
       ]
         .join(' · ')
         .concat(posted ? ` (posted ${formatTimeWithSeconds(new Date(e.posts_at!))})` : '');
     }
     case 'declined':
-      return `Declined ${when}${by}${why} · nothing was scheduled${r.byName && !undone ? ` · ${r.byName} told in Chat` : ''}`;
+      return `Declined ${when}${by}${why} · nothing was scheduled${r.byName ? ` · ${r.byName} told in Chat` : ''}`;
     case 'cancelled': {
       // Never approved: a withdraw, also once it was undone and the series waits again.
       if (state === 'withdrawn' || !r.approvedAt)
         return `Withdrawn ${when}${by}${why} · nothing was scheduled`;
-      const n = r.cancelledWindows.length;
-      const gone = n
-        ? ` · ${n} not started cancelled (${r.cancelledWindows.map(day).join(', ')})`
+      // Undone, its windows are back: the ones it took are those still to start that were then ahead.
+      const took = undone ? r.upcoming.filter((s) => Date.parse(s) > Date.parse(e.at)) : r.cancelledWindows;
+      const gone = took.length
+        ? ` · ${took.length} not started cancelled (${took.map(day).join(', ')})`
         : ' · none scheduled';
-      return `Series cancelled ${when}${by}${why}${undone ? '' : gone}`;
+      return `Series cancelled ${when}${by}${why}${gone}`;
     }
     case 'not_approved':
       return `Not approved — nothing scheduled · nobody approved before the first window, ${r.firstStartsAt ? whenText(new Date(r.firstStartsAt), now) : '—'} · ask again on Maintenance & mutes`;
@@ -233,8 +236,17 @@ type Fact = [string, string];
 /** The sheet's facts, from the row's own parts — never parsed back out of its sentences. */
 function factsOf(row: SeriesPageRow, len: string, by: Fact, next: string | null): Fact[] {
   const r = row.series;
-  if (row.state !== 'waiting' && row.state !== 'repeating')
-    return [['Repeats', row.when], ['Reason', r.reason], by];
+  // Ended (MMaintenanceList): Repeats carries where it stopped — "· from Sat 26 Sep" (declined /
+  // withdrawn), "· first Sat 19 Sep" (not approved).
+  if (row.state !== 'waiting' && row.state !== 'repeating') {
+    const where =
+      row.state === 'not_approved'
+        ? ` · first ${fromText(r)}`
+        : row.state === 'declined' || row.state === 'withdrawn'
+          ? ` · from ${fromText(r)}`
+          : '';
+    return [['Repeats', `${row.when}${where}`], ['Reason', r.reason], by];
+  }
   return [
     ['Repeats', row.when],
     ['Each window', `${len} · not counted in uptime`],
@@ -369,7 +381,8 @@ export function seriesPageRow(
           : base,
     whySub: asked ? `asked by ${by} · ${askedWhen}` : `by ${by}`,
     logs: logs.slice(-1),
-    line: `${when} · ${label.toLowerCase()}`,
+    // Phone row (MMaintenanceList): "Every Sat 22:00 → 23:00 · declined"; not approved: "· nothing scheduled".
+    line: `${when} · ${state === 'not_approved' ? 'nothing scheduled' : label.toLowerCase()}`,
   });
   row.facts = factsOf(row, len, asked ? ['Asked by', `${by} · ${askedWhen}`] : ['By', by], null);
   return row;

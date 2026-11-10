@@ -70,6 +70,16 @@ export function RepeatControl({ value, onChange }: { value: Repeat; onChange: (r
  * moves (focus stays on it, WCAG 2.4.3): desktop Start · From | Time · Window length · Repeat · On · Ends on ·
  * summary; phones Window length · Repeat · From | Time · On · Ends on · summary.
  */
+/** Each board's words: the desktop board's from md, the phone board's below it. */
+function ByWidth({ desk, phone }: { desk: string; phone: string }) {
+  return (
+    <>
+      <span className="max-md:hidden">{desk}</span>
+      <span className="md:hidden">{phone}</span>
+    </>
+  );
+}
+
 interface Piece {
   state: RepeatState;
   set: (patch: Partial<RepeatState>) => void;
@@ -104,7 +114,12 @@ export function RepeatWhen({ state, set, now }: Piece) {
         weekStartsOn={1}
         value={state.from}
         onChange={(v) => v && set({ from: v })}
-        hint="The first day the series may start — today to a year ahead (UTC+7)."
+        hint={
+          <ByWidth
+            desk="The first day the series may start — today to a year ahead (UTC+7)."
+            phone="Today to a year ahead."
+          />
+        }
       />
       <TimePicker
         touchHeight
@@ -118,19 +133,19 @@ export function RepeatWhen({ state, set, now }: Piece) {
   );
 }
 
-/** Window length, with each window's span. */
+/** The series' length — "Duration" on desktop, "Window length" on phones — with each window's span. */
 export function RepeatLength({ state, set }: Omit<Piece, 'now'>) {
   const minutes = SERIES_DURATIONS.find((d) => d.label === state.duration)?.minutes ?? 120;
   return (
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium" aria-hidden>
-        Window length
+        <ByWidth desk="Duration" phone="Window length" />
       </span>
       <span className="flex flex-wrap items-center gap-4">
         <span className="max-md:hidden">
           <SegmentedControl
             touchHeight
-            label="Window length"
+            label="Duration"
             size="sm"
             options={SERIES_DURATIONS.map((d) => d.label)}
             value={state.duration}
@@ -147,7 +162,12 @@ export function RepeatLength({ state, set }: Omit<Piece, 'now'>) {
             fullWidth
           />
         </span>
-        <span className="text-sm text-fg-secondary">{`Each window lasts ${state.duration} (max 24 h) · ${seriesTimeText(state.time, minutes)}`}</span>
+        <span className="text-sm text-fg-secondary">
+          <ByWidth
+            desk={`Each window lasts ${state.duration} (max 24 h) · ${seriesTimeText(state.time, minutes)}`}
+            phone={`Each window ${state.duration} (max 24 h) · ${seriesTimeText(state.time, minutes)}`}
+          />
+        </span>
       </span>
     </div>
   );
@@ -181,7 +201,12 @@ export function RepeatRest({ state, set, plan }: Omit<Piece, 'now'> & { plan: Re
             ))}
           </div>
           <span id={hintId} className={`text-xs ${plan.daysError ? 'text-fg-danger' : 'text-fg-secondary'}`}>
-            {plan.daysError ?? 'The first window is the first chosen day on or after From.'}
+            {plan.daysError ?? (
+              <ByWidth
+                desk="The first window is the first chosen day on or after From."
+                phone="From the first chosen day on or after From."
+              />
+            )}
           </span>
         </div>
       ) : (
@@ -220,9 +245,10 @@ export function RepeatRest({ state, set, plan }: Omit<Piece, 'now'> & { plan: Re
         <span className="flex flex-col gap-0.5">
           <span className="font-medium">{plan.summary}</span>
           <span className="text-fg-secondary">
-            Each window is an ordinary maintenance window, created 14 days ahead. One that overlaps another
-            window on this site is skipped and noted on the series; one that would start while the site is
-            DOWN doesn’t start.
+            <ByWidth
+              desk="Each window is an ordinary maintenance window, created 14 days ahead. One that overlaps another window on this site is skipped and noted on the series; one that would start while the site is DOWN doesn’t start."
+              phone="Windows are created 14 days ahead; one that overlaps another window on this site is skipped."
+            />
           </span>
         </span>
       </div>

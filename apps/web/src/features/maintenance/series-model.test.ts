@@ -340,6 +340,43 @@ describe('the series dialogs’ words (board MaintenancePage › Approve series 
       'Tubtong series approved — posted 10:07:10. To take it back, cancel the series.',
     );
   });
+  it('an undone action keeps its line as it was (§32 7a): the windows a cancel took, the asker told', () => {
+    const cancel = {
+      ...base,
+      log: [
+        { at: '2026-09-25T03:00:00Z', action: 'cancelled', by: 'Tao', reason: 'Not needed' },
+        { at: '2026-09-25T03:00:05Z', action: 'undone', by: 'Tao', undid: 'cancelled' },
+      ],
+    } satisfies SeriesRow;
+    expect(seriesPageRow(cancel, [], tao, NOW).logs[0]).toBe(
+      'Series cancelled 10:00 by Tao · “Not needed” · 2 not started cancelled (Tue 29 Sep, Tue 6 Oct)',
+    );
+    const decline = {
+      ...waiting,
+      log: [
+        { at: '2026-09-25T03:00:00Z', action: 'declined', by: 'Tao', reason: 'Monthly instead' },
+        { at: '2026-09-25T03:00:05Z', action: 'undone', by: 'Tao', undid: 'declined' },
+      ],
+    } satisfies SeriesRow;
+    expect(seriesPageRow(decline, [], tao, NOW).logs[0]).toBe(
+      'Declined 10:00 by Tao · “Monthly instead” · nothing was scheduled · Arm told in Chat',
+    );
+  });
+  it('an ended series on the phone: "· nothing scheduled" when not approved, Repeats with where it stopped', () => {
+    const notApproved = {
+      ...waiting,
+      cancelledAt: '2026-09-28T15:00:00Z',
+      outcome: 'not_approved',
+    } satisfies SeriesRow;
+    const row = seriesPageRow(notApproved, [], tao, NOW);
+    expect(row.line).toBe('Every Mon, Thu 22:00 → 23:00 · nothing scheduled');
+    expect(row.facts[0]).toEqual(['Repeats', 'Every Mon, Thu 22:00 → 23:00 · first Mon 28 Sep']);
+    const declined = { ...waiting, declinedAt: '2026-09-25T03:00:00Z' } satisfies SeriesRow;
+    expect(seriesPageRow(declined, [], tao, NOW).facts[0]).toEqual([
+      'Repeats',
+      'Every Mon, Thu 22:00 → 23:00 · from Mon 28 Sep',
+    ]);
+  });
   it('the APPROVED line: the windows it made, one too close to start, the asker told (D-057)', () => {
     const approved: SeriesRow = {
       ...waiting,
