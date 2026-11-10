@@ -6,9 +6,14 @@
 --   · `undo_series_action` (the actor, inside 10 s, nothing claimed): an approval's windows are deleted
 --     (none has started or posted: the first is ≥ 5 min away) and its skips taken out of the log, so a new
 --     approval notes and posts them again; a cancel's windows come back, against today's rules (an overlap
---     made meanwhile, a site no longer live). The held rows are cancelled ('Undone').
---   · `post_series_action_now` posts a held action at once (the actor moved on), as for windows.
---   · The engine leaves a series inside its Undo alone (reminders, NOT APPROVED).
+--     made meanwhile, a site no longer live, a Responder's chain past 24 h). The held rows are cancelled
+--     ('Undone'); the audit row lists the windows an approval's Undo removed.
+--   · A second action inside the first one's 10 s takes over the Undo and posts the first at once; a series
+--     cancel ends any window-level Undo on its windows (engine review M1, M2).
+--   · `post_series_action_now` posts a held action at once (the actor moved on), as for windows; the log
+--     line carries `posts_at` (`private.series_log_at`).
+--   · The nightly top-up waits out an Undo. The reminder loops' Undo guard is defensive: a series inside
+--     its Undo is never waiting (approve / decline / withdraw all decide it).
 --   · `maintenance_series` joins the Realtime publication, so /maintenance refreshes.
 set local lock_timeout = '5s';
 
@@ -41,6 +46,14 @@ as $$
 declare
   v_key text := gen_random_uuid()::text;
 begin
+  -- An earlier action still inside its 10 s posts now: a second action takes over the Undo, and the
+  -- first one's rows must not wait under a key nobody can reach any more (§24.12; engine review M2).
+  if s.undo_until > p_at then
+    update public.notifications
+      set hold_until = p_at
+      where maintenance_series_id = s.id and (dedupe_key = s.undo_key or dedupe_key like s.undo_key || ':%')
+        and status = 'queued';
+  end if;
   update public.maintenance_series
     set undo_until = p_at + interval '10 seconds', undo_by = auth.uid(), undo_action = p_action, undo_key = v_key,
         undo_before = jsonb_build_object(
@@ -54,6 +67,24 @@ $$;
 
 revoke execute on function private.series_undo_begin(public.maintenance_series, text, timestamptz)
   from public, anon, authenticated;
+
+-- A held action's log line, with when it posts (§24.12 "posted 10:07:10"; engine review L4) — as
+-- private.window_log's `posts_at`. post_series_action_now re-stamps it.
+create function private.series_log_at(p_series_id uuid, p_action text, p_reason text, p_posts_at timestamptz)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.maintenance_series
+    set log = log || jsonb_build_array(
+      jsonb_build_object('at', now(), 'action', p_action, 'posts_at', p_posts_at,
+                         'by', (select display_name from public.profiles where id = auth.uid()))
+      || case when p_reason is null then '{}'::jsonb else jsonb_build_object('reason', p_reason) end)
+    where id = p_series_id;
+$$;
+
+revoke execute on function private.series_log_at(uuid, text, text, timestamptz) from public, anon, authenticated;
 
 -- ── SKIPPED, held with an action ────────────────────────────────────────────────────────────────────
 -- 20261110072404 bodies, plus a hold and a key: an approval's skips wait out its Undo under
@@ -186,7 +217,7 @@ begin
         approved_by = case when p_approve then auth.uid() end,
         declined_at = case when p_approve then null else v_now end
     where id = s.id;
-  perform private.series_log(s.id, case when p_approve then 'approved' else 'declined' end, v_reason);
+  perform private.series_log_at(s.id, case when p_approve then 'approved' else 'declined' end, v_reason, v_hold);
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), case when p_approve then 'maintenance.series_approve' else 'maintenance.series_decline' end,
           'maintenance_series', s.id, jsonb_build_object('state', 'waiting'),
@@ -256,7 +287,15 @@ begin
   v_withdraw := s.approved_at is null;
   v_key := private.series_undo_begin(s, case when v_withdraw then 'withdrawn' else 'cancelled' end, now());
   update public.maintenance_series set cancelled_at = now(), cancelled_by = auth.uid() where id = s.id;
-  perform private.series_log(s.id, 'cancelled', v_reason);
+  perform private.series_log_at(s.id, 'cancelled', v_reason, now() + interval '10 seconds');
+  -- A window of the series still inside its own 10 s Undo posts now and can't be undone any more: undoing
+  -- it would bring back a window this cancel takes (engine review S14 PR 2c-1, M1).
+  update public.notifications n
+    set hold_until = now()
+    from public.maintenance_windows w
+    where n.maintenance_window_id = w.id and w.series_id = s.id and w.undo_until > now()
+      and n.dedupe_key = w.undo_key and n.status = 'queued';
+  update public.maintenance_windows set undo_until = now() where series_id = s.id and undo_until > now();
   with gone as (
     update public.maintenance_windows w
       -- Only cancelled: every engine loop skips a cancelled row, and start_logged keeps meaning "it ran"
@@ -370,6 +409,32 @@ begin
 end;
 $$;
 
+-- ── engine_expand_series: 20261106100242 body, waiting out an Undo ───────────────────────────────
+-- The nightly top-up leaves a series inside its 10 s alone (db review L1, engine review L2): a skip it
+-- posted would carry no Undo key and outlive an undone approval. A night's top-up missed is harmless —
+-- 13 days of windows already exist.
+create or replace function public.engine_expand_series(p_now timestamptz)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_n integer := 0;
+begin
+  for v_id in
+    select id from public.maintenance_series
+    where approved_at is not null and cancelled_at is null
+      and (until_on is null or until_on >= (p_now at time zone 'Asia/Bangkok')::date)
+      and (undo_until is null or undo_until <= p_now)
+  loop
+    v_n := v_n + private.expand_series(v_id, p_now);
+  end loop;
+  return v_n;
+end;
+$$;
+
 -- ── Undo ────────────────────────────────────────────────────────────────────────────────────────────
 -- Undo the last held action on a series: only the person who did it, inside its 10 s, before the
 -- notifier took any of its messages. The series goes back as it was; its log and the audit trail gain a
@@ -386,6 +451,7 @@ declare
   v_key text;
   v_action text;
   v_at timestamptz;
+  v_removed jsonb;
 begin
   select * into s from public.maintenance_series where id = p_series_id for update;
   if not found then
@@ -414,27 +480,47 @@ begin
     -- The windows it made: none has started (the first is ≥ 5 min away) nor posted (a series' window says
     -- nothing before it starts). Every window of the series goes — it had none while waiting — so a
     -- nightly top-up inside the 10 s goes too.
-    if exists (select 1 from public.maintenance_windows w
-               where w.series_id = s.id and (w.start_logged or exists (
-                 select 1 from public.notifications n where n.maintenance_window_id = w.id))) then
+    if exists (select 1 from public.maintenance_windows w where w.series_id = s.id and w.start_logged) then
       raise exception 'Too late to undo — a window has started' using errcode = '22023', hint = 'undo_expired';
     end if;
-    delete from public.maintenance_windows where series_id = s.id;
-  elsif v_action in ('cancelled', 'withdrawn') then
+    -- One of its windows was changed or cancelled on its own meanwhile (engine review L5).
+    if exists (select 1 from public.maintenance_windows w where w.series_id = s.id
+               and exists (select 1 from public.notifications n where n.maintenance_window_id = w.id)) then
+      raise exception 'One of its windows was changed since — it can''t be undone; cancel the series instead'
+        using errcode = '22023', hint = 'undo_window_changed';
+    end if;
+    -- The audit row lists what goes (security review L1, db review L2).
+    with gone as (
+      delete from public.maintenance_windows where series_id = s.id returning id, starts_at
+    )
+    select coalesce(jsonb_agg(jsonb_build_object('id', id, 'starts_at', starts_at) order by starts_at), '[]'::jsonb)
+      into v_removed from gone;
+  elsif v_action = 'cancelled' then
     if not exists (select 1 from public.sites where id = s.site_id and is_active) then
       raise exception 'The site stopped monitoring — it can''t be undone'
         using errcode = '22023', hint = 'site_not_live';
     end if;
     begin
+      -- Only those still ahead come back; one whose time ran out meanwhile stays cancelled (engine review L3).
       update public.maintenance_windows w
         set cancelled_at = null,
             log = w.log || jsonb_build_array(jsonb_build_object('at', now(), 'action', 'undone', 'series', s.id))
-        where w.series_id = s.id
+        where w.series_id = s.id and coalesce(w.ended_at, w.ends_at) > now()
           and w.id in (select (x #>> '{}')::uuid from jsonb_array_elements(coalesce(b -> 'windows', '[]'::jsonb)) x);
     exception when exclusion_violation then
       raise exception 'Another window now overlaps one of its windows — it can''t be undone'
         using errcode = '22023', hint = 'undo_overlap';
     end;
+    -- Today's 24 h rule for a Responder, as undo_window_action: a window put next to a cancelled one in the
+    -- 10 s must not end up chained past 24 h without an Admin (security review M1).
+    if not coalesce(public.current_app_role() = 'admin', false) and exists (
+      select 1 from public.maintenance_windows w
+      where w.series_id = s.id and w.cancelled_at is null and w.outcome is null
+        and w.id in (select (x #>> '{}')::uuid from jsonb_array_elements(coalesce(b -> 'windows', '[]'::jsonb)) x)
+        and private.chained_minutes(w.site_id, w.starts_at, coalesce(w.ended_at, w.ends_at), w.id) > 24 * 60) then
+      raise exception 'Over 24 h with the windows next to it — it can''t be undone; ask an Admin'
+        using errcode = '22023', hint = 'undo_needs_admin';
+    end if;
   end if;
 
   update public.maintenance_series
@@ -458,7 +544,9 @@ begin
       and status = 'queued';
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
   values (auth.uid(), 'maintenance.series_undo', 'maintenance_series', s.id,
-          jsonb_build_object('action', v_action), b || jsonb_build_object('undid', v_action));
+          jsonb_build_object('action', v_action),
+          b || jsonb_build_object('undid', v_action)
+            || case when v_removed is null then '{}'::jsonb else jsonb_build_object('windows_removed', v_removed) end);
 end;
 $$;
 
@@ -489,7 +577,14 @@ begin
     set hold_until = v_now
     where maintenance_series_id = s.id and (dedupe_key = s.undo_key or dedupe_key like s.undo_key || ':%')
       and status = 'queued';
-  update public.maintenance_series set undo_until = v_now where id = s.id;
+  -- The 10 s end now; the held action's log line (the last with a posting time) says when it really
+  -- posted (engine review L4).
+  update public.maintenance_series m
+    set undo_until = v_now,
+        log = coalesce((select jsonb_set(m.log, array[(max(e.ord)::int - 1)::text, 'posts_at'], to_jsonb(v_now))
+                        from jsonb_array_elements(m.log) with ordinality as e(v, ord)
+                        where e.v ? 'posts_at' having max(e.ord) is not null), m.log)
+    where id = s.id;
 end;
 $$;
 

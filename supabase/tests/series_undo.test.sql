@@ -4,7 +4,7 @@
 -- approve → Undo → approve posts SKIPPED once; post-now ends the 10 s; the engine waits out an Undo.
 begin;
 \ir _helpers.psql
-select plan(29);
+select plan(36);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -162,18 +162,110 @@ select throws_ok($$ select public.undo_series_action((select id from s where nam
   '22023', 'Too late to undo — it has been posted', 'nor after its 10 s');
 reset role;
 
--- ── The engine waits out an Undo ─────────────────────────────────────────
+-- ── A decline undone past the deadline: the engine then marks it Not approved ──
 select tests.authenticate_as((select id from ids where name = 'nok'));
 insert into s values ('late', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
   '{"freq":"monthly","day":21}', '03:00', 30, current_date + 2, null, 'Late'));
 reset role;
-update public.maintenance_series set first_starts_at = now() - interval '1 minute', undo_until = now() + interval '5 seconds'
-where id = (select id from s where name = 'late');
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select public.decide_maintenance_series((select id from s where name = 'late'), false, 'No');
+select public.undo_series_action((select id from s where name = 'late'));
+reset role;
+update public.maintenance_series set first_starts_at = now() - interval '1 minute' where id = (select id from s where name = 'late');
 set local role service_role;
 select public.engine_window_reminders(now());
 reset role;
-select ok((select outcome is null from public.maintenance_series where id = (select id from s where name = 'late')),
-  'a series inside an Undo isn''t marked Not approved yet');
+select ok((select outcome = 'not_approved' from public.maintenance_series where id = (select id from s where name = 'late'))
+      and (select n = undone from pg_temp.held('late', 'declined')),
+  'an undone decline past the deadline lapses to Not approved; its DECLINED rows stay Undone');
+
+-- More sites for the review cases (security M1, engine M1, M2, L4, L5; db L1).
+insert into public.sites (id, client_id, name, tier, primary_owner_id, backup_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000c1', 'Site B', 2,
+   (select id from ids where name = 'arm'), (select id from ids where name = 'nok'), true),
+  ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000c1', 'Site C', 2,
+   (select id from ids where name = 'arm'), (select id from ids where name = 'nok'), true),
+  ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000c1', 'Site D', 2,
+   (select id from ids where name = 'arm'), (select id from ids where name = 'nok'), true);
+
+-- Security M1: a Responder cancels, puts a window next to one, and can't undo into a chain over 24 h.
+select tests.authenticate_as((select id from ids where name = 'tao'));
+insert into s values ('chain', public.create_maintenance_series('00000000-0000-0000-0000-0000000000b1',
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '08:00', 720, current_date + 2, null, 'Long days'));
+reset role;
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select public.cancel_maintenance_series((select id from s where name = 'chain'), 'Pause');
+select public.create_maintenance('00000000-0000-0000-0000-0000000000b1',
+  ((current_date + 2) + time '20:00') at time zone 'Asia/Bangkok',
+  ((current_date + 3) + time '08:00') at time zone 'Asia/Bangkok', 'Night work');
+select throws_ok($$ select public.undo_series_action((select id from s where name = 'chain')) $$,
+  '22023', 'Over 24 h with the windows next to it — it can''t be undone; ask an Admin',
+  'a Responder''s Undo can''t chain windows past 24 h');
+reset role;
+
+-- Engine M1: a window's own Undo can't bring a window back under a cancelled series.
+select tests.authenticate_as((select id from ids where name = 'tao'));
+insert into s values ('m1', public.create_maintenance_series('00000000-0000-0000-0000-0000000000b2',
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '03:00', 30, current_date + 2, null, 'Patches'));
+reset role;
+create temp table w1 on commit drop as
+  select id from public.maintenance_windows where series_id = (select id from s where name = 'm1') order by starts_at limit 1;
+grant select on w1 to authenticated;
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select public.cancel_window((select id from w1), 'Skip this one');
+select public.cancel_maintenance_series((select id from s where name = 'm1'), 'Stop');
+select throws_ok($$ select public.undo_window_action((select id from w1)) $$,
+  '22023', 'Too late to undo — it has been posted', 'the window''s own Undo is over once its series is cancelled');
+reset role;
+select ok((select cancelled_at is not null from public.maintenance_windows where id = (select id from w1)),
+  'and the window stays cancelled');
+
+-- Engine M2 and L4: a second action inside the first one's 10 s posts the first at once; the log line
+-- carries when it posts.
+select tests.authenticate_as((select id from ids where name = 'nok'));
+insert into s values ('m2', public.create_maintenance_series('00000000-0000-0000-0000-0000000000b3',
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '03:00', 30, current_date + 2, null, 'Asked'));
+reset role;
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select public.decide_maintenance_series((select id from s where name = 'm2'), true, null);
+reset role;
+select ok((select (e ->> 'posts_at')::timestamptz = now() + interval '10 seconds'
+           from public.maintenance_series m, jsonb_array_elements(m.log) e
+           where m.id = (select id from s where name = 'm2') and e ->> 'action' = 'approved'),
+  'the approval''s log line says when it posts');
+select tests.authenticate_as((select id from ids where name = 'nok'));
+select public.cancel_maintenance_series((select id from s where name = 'm2'), 'Changed my mind');
+reset role;
+select ok((select bool_and(hold_until <= now()) from public.notifications
+           where maintenance_series_id = (select id from s where name = 'm2') and context ->> 'kind' = 'approved'
+             and status = 'queued'),
+  'a cancel inside the approval''s 10 s posts the approval at once');
+
+-- Engine L5: an approval whose window was changed on its own since can't be undone (its own words).
+update public.maintenance_series set cancelled_at = null, cancelled_by = null, undo_until = null
+where id = (select id from s where name = 'm2');
+update public.maintenance_series set approved_at = null, approved_by = null where id = (select id from s where name = 'm2');
+delete from public.notifications where maintenance_window_id in
+  (select id from public.maintenance_windows where series_id = (select id from s where name = 'm2'));
+delete from public.maintenance_windows where series_id = (select id from s where name = 'm2');
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select public.decide_maintenance_series((select id from s where name = 'm2'), true, null);
+select public.cancel_window((select id from public.maintenance_windows where series_id = (select id from s where name = 'm2')
+                             order by starts_at limit 1), 'Not this one');
+select throws_ok($$ select public.undo_series_action((select id from s where name = 'm2')) $$,
+  '22023', 'One of its windows was changed since — it can''t be undone; cancel the series instead',
+  'an approval whose window was changed on its own can''t be undone');
+reset role;
+
+-- db L1 / engine L2: the nightly top-up waits out an Undo.
+update public.maintenance_series set undo_until = now() + interval '2 days' where id = (select id from s where name = 'm2');
+create temp table before_nightly on commit drop as
+  select count(*)::int as n from public.maintenance_windows where series_id = (select id from s where name = 'm2');
+set local role service_role;
+select public.engine_expand_series(now() + interval '1 day');
+reset role;
+select is((select count(*)::int from public.maintenance_windows where series_id = (select id from s where name = 'm2')),
+  (select n from before_nightly), 'the nightly top-up leaves a series inside its Undo alone');
 
 select ok(has_function_privilege('authenticated', 'public.undo_series_action(uuid)', 'execute')
       and not has_function_privilege('anon', 'public.undo_series_action(uuid)', 'execute')
