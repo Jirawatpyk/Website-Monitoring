@@ -301,8 +301,8 @@ select is((select context ->> 'running' from public.notifications
 select ok(not has_function_privilege('authenticated', 'public.engine_queue_series_messages(uuid,text,uuid,timestamptz,text,jsonb)', 'execute')
       and not has_function_privilege('anon', 'public.engine_queue_series_messages(uuid,text,uuid,timestamptz,text,jsonb)', 'execute')
       and not has_function_privilege('authenticated', 'public.claim_notifications(public.notification_channel,integer,uuid,boolean,boolean,boolean)', 'execute')
-      and not has_function_privilege('authenticated', 'private.queue_series_skip(uuid,timestamptz)', 'execute')
-      and not has_function_privilege('authenticated', 'private.queue_series_skips_at(uuid,timestamptz)', 'execute')
+      and not has_function_privilege('authenticated', 'private.queue_series_skip(uuid,timestamptz,timestamptz,text)', 'execute')
+      and not has_function_privilege('authenticated', 'private.queue_series_skips_at(uuid,timestamptz,timestamptz,text)', 'execute')
       and not has_function_privilege('authenticated', 'private.expand_series(uuid,timestamptz,boolean)', 'execute'),
   'the series message helpers are service role only');
 

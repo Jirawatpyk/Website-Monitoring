@@ -272,8 +272,12 @@ describe('a repeating series’ messages (S14, D-057, spec §32.10–11)', () =>
       (await admin.rpc('decide_maintenance_series', { p_series_id: id, p_approve: true, p_reason: '' }))
         .error,
     ).toBeNull();
+    // Held 10 s for its Undo (PR 2c-1): nothing is due yet; posting it now releases it.
     post = okPost();
     send = okSend();
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
+    expect(post).not.toHaveBeenCalled();
+    expect((await admin.rpc('post_series_action_now', { p_series_id: id })).error).toBeNull();
     await drain(post, send);
     lines = sent(post);
     expect(lines[0]?.text).toMatch(
@@ -295,6 +299,7 @@ describe('a repeating series’ messages (S14, D-057, spec §32.10–11)', () =>
     expect(
       (await asker.rpc('cancel_maintenance_series', { p_series_id: id, p_reason: 'Automatic now' })).error,
     ).toBeNull();
+    expect((await asker.rpc('post_series_action_now', { p_series_id: id })).error).toBeNull();
     post = okPost();
     send = okSend();
     await drain(post, send);
