@@ -159,6 +159,20 @@ select json_agg(x) from (select n.template, n.channel, n.status, n.user_id is no
   where s.name = 'Test target' and n.created_at > now() - interval '1 hour' order by n.created_at) x;
 ```
 
+Repeating series (S14 PR 2b, D-057, §32.10). Until PR 2c ships the Repeat control, drive the RPCs from the staging SQL editor as Tao. In the editor, run `select set_config('request.jwt.claims', json_build_object('sub', '<Tao''s profile id>', 'role', 'authenticated')::text, true); set local role authenticated;` first, then `select public.create_maintenance_series(<Test target site id>, '{"freq":"weekly","days":[<tomorrow's ISO weekday>]}', '01:00', 60, current_date + 1, null, 'Series check');`. Then `select public.cancel_maintenance_series(<id>, 'Series check over');`.
+
+| Do                            | Expect                                                                                                                                                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create a weekly series as Tao | a new Space thread `ms-<id>`: `MAINTENANCE SCHEDULED · Test target · every <day> 01:00 → 02:00 (1 h) · from … · “Series check” · by Tao`; no email to Tao (the actor); one window row per day matched |
+| Cancel it                     | `MAINTENANCE CANCELLED · Test target · series every <day> 01:00 → 02:00 · 1 not started cancelled (…) · “Series check over” · by Tao` in the same thread; no line in the window's own thread          |
+
+The Responder → Admin path (REQUESTED, the reminders, NOT APPROVED) is proved locally: staging has one person (D-007).
+
+```sql
+select json_agg(x) from (select n.template, n.channel, n.status, n.thread_key, n.context->>'kind' kind, n.sent_at
+  from notifications n where n.maintenance_series_id is not null and n.created_at > now() - interval '1 hour' order by n.created_at) x;
+```
+
 Escalation L0–L1 (S08, D-034). The Test target is Tier 1, so its ladder runs 24/7. L1 needs a backup with a Google Chat id: the test site's backup must be a second linked person, re-run `staging/test-target.sql` with one if needed. If Tao owns the site, L1 asks the backup alone, because Tao was already told at L0. Start clean (`reset-test-incident.sql`), drive `error`, and **don't acknowledge**:
 
 | Do                                      | Expect                                                                                                                                                                                                                                              |

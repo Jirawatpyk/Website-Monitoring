@@ -491,6 +491,37 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     });
   });
 
+  it('lists a series once in Coming up, at its next window; one-off windows one by one (§32.11)', () => {
+    const tub = {
+      kind: 'maintenance' as const,
+      site: 'Tubtong',
+      endedEarly: false,
+      reason: 'WordPress plugin updates',
+      by: 'Ploy',
+    };
+    const series = { id: 's1', words: 'every Tue 01:00 → 03:00' };
+    const m = weeklyModel(
+      weekly({
+        comingUp: [
+          { ...tub, start: bkk('2026-09-29T01:00:00'), end: bkk('2026-09-29T03:00:00'), series },
+          {
+            ...tub,
+            start: bkk('2026-09-30T20:00:00'),
+            end: bkk('2026-09-30T21:00:00'),
+            reason: 'Hotfix',
+            by: 'Arm',
+          },
+          { ...tub, start: bkk('2026-10-06T01:00:00'), end: bkk('2026-10-06T03:00:00'), series },
+        ],
+      }),
+    );
+    const rows = m.sections.find((x) => x.title === 'COMING UP')!.rows.map((r) => r.text);
+    expect(rows.filter((t) => t.startsWith('Maintenance'))).toEqual([
+      'Maintenance: Tubtong every Tue 01:00 → 03:00 · next Tue 29 Sep · WordPress plugin updates · Ploy',
+      'Maintenance: Tubtong Wed 30 Sep 20:00–21:00 · Hotfix · Arm',
+    ]);
+  });
+
   it('words planned & quiet, coming up and the monitor itself', () => {
     const m = weeklyModel(weekly());
     const rows = (t: string) => m.sections.find((x) => x.title === t)!.rows.map((r) => [r.label, r.text]);

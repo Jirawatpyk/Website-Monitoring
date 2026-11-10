@@ -104,6 +104,22 @@ afterAll(async () => {
   const ids = windows.map((w) => w.id);
   await db.from('notifications').delete().in('maintenance_window_id', ids);
   await db.from('maintenance_windows').delete().in('id', ids);
+  // S14: a series' messages hold its row (on delete restrict); then the series goes with the site.
+  const series = await must(db.from('maintenance_series').select('id').in('site_id', created.sites));
+  await db
+    .from('notifications')
+    .delete()
+    .in(
+      'maintenance_series_id',
+      series.map((s) => s.id),
+    );
+  await db
+    .from('maintenance_series')
+    .delete()
+    .in(
+      'id',
+      series.map((s) => s.id),
+    );
   await db.from('sites').delete().in('id', created.sites);
   await db.from('clients').delete().in('id', created.clients);
 });
@@ -188,5 +204,112 @@ describe('maintenance messages (S09b, spec §24, D-037)', () => {
     expect((await rowsOf(id)).filter((r) => r.status === 'queued')).toEqual([]);
     const w = await must(db.from('maintenance_windows').select('cancelled_at').eq('id', id).single());
     expect(w.cancelled_at).toBeNull();
+  });
+});
+
+describe('a repeating series’ messages (S14, D-057, spec §32.10–11)', () => {
+  // Keep the run to this series' rows (its windows send nothing until they start).
+  const onlySeries = async (seriesId: string) => {
+    const { error } = await db
+      .from('notifications')
+      .update({ status: 'cancelled' })
+      .eq('status', 'queued')
+      .or(`maintenance_series_id.is.null,maintenance_series_id.neq.${seriesId}`);
+    if (error) throw new Error(error.message);
+  };
+  const sent = (post: ReturnType<typeof okPost>) =>
+    (post.mock.calls as unknown as [string, { text: string }, { threadKey: string }][]).map(([, m, o]) => ({
+      text: m.text,
+      thread: o.threadKey,
+    }));
+  // A thread leaves in order, one due row after another: pass until nothing more goes (at most 10).
+  const drain = async (post: ReturnType<typeof okPost>, send: ReturnType<typeof okSend>) => {
+    for (let i = 0; i < 10; i++) {
+      const before = post.mock.calls.length + send.mock.calls.length;
+      await dispatchNotifications({ db, webhookUrl, email, appUrl, post, send });
+      if (post.mock.calls.length + send.mock.calls.length === before) return;
+    }
+  };
+  const mailedTo = (send: ReturnType<typeof okSend>) =>
+    (send.mock.calls as unknown as [{ subject: string }, { to: string }][]).map(
+      ([m, o]) => `${o.to}|${m.subject}`,
+    );
+
+  it('REQUESTED to the Admins, APPROVED to owner and backup, one CANCELLED line — all in the series’ thread', async () => {
+    const day = new Date(Date.now() + 3 * 86_400_000 + 7 * 3_600_000).toISOString().slice(0, 10);
+    const asker = await signedIn('arm@example.test');
+    const { data: seriesId, error } = await asker.rpc('create_maintenance_series', {
+      p_site_id: siteId,
+      p_rule: { freq: 'weekly', days: [1, 2, 3, 4, 5, 6, 7] },
+      p_start_time: '01:00',
+      p_duration_min: 120,
+      p_starts_on: day,
+      p_until_on: null as unknown as string,
+      p_reason: 'WordPress plugin updates',
+    });
+    expect(error).toBeNull();
+    const id = seriesId as string;
+    await onlySeries(id);
+
+    let post = okPost();
+    let send = okSend();
+    await drain(post, send);
+    let lines = sent(post);
+    expect(lines[0]?.text).toMatch(
+      /^MAINTENANCE REQUESTED · Window .* · every day 01:00 → 03:00 \(2 h\) · from .* · “WordPress plugin updates” · by Arm · waiting for an Admin$/,
+    );
+    expect(lines.filter((l) => l.text.includes('approve before'))).toHaveLength(admins.length);
+    expect(new Set(lines.map((l) => l.thread))).toEqual(new Set([`ms-${id}`]));
+    expect(
+      mailedTo(send)
+        .map((t) => t.split('|')[0])
+        .sort(),
+    ).toEqual(admins.map((a) => a.email).sort());
+    expect(mailedTo(send)[0]).toMatch(/\|DxT Monitor · Maintenance request · Window .* · series every day$/);
+
+    const admin = await signedIn(admins[0]!.email);
+    expect(
+      (await admin.rpc('decide_maintenance_series', { p_series_id: id, p_approve: true, p_reason: '' }))
+        .error,
+    ).toBeNull();
+    post = okPost();
+    send = okSend();
+    await drain(post, send);
+    lines = sent(post);
+    expect(lines[0]?.text).toMatch(
+      /^MAINTENANCE APPROVED · Window .* · series every day · by .* · \d+ windows scheduled, to /,
+    );
+    expect(lines.some((l) => l.text.startsWith('<users/') && l.text.includes(' APPROVED · '))).toBe(true);
+    expect(
+      mailedTo(send)
+        .map((t) => t.split('|')[0])
+        .sort(),
+    ).toEqual(['arm@example.test', 'ploy@example.test']);
+    // The windows the earlier tests left on this site overlap some days: those are skipped, each with one
+    // SKIPPED line after the APPROVED line (Chat only).
+    const skipped = lines.filter((l) => l.text.startsWith('MAINTENANCE SKIPPED'));
+    expect(skipped.length).toBeGreaterThan(0);
+    expect(skipped.every((l) => /· overlaps the .* window \(“.*”\) · next /.test(l.text))).toBe(true);
+    expect(lines.findIndex((l) => l.text.startsWith('MAINTENANCE SKIPPED'))).toBeGreaterThan(0);
+
+    expect(
+      (await asker.rpc('cancel_maintenance_series', { p_series_id: id, p_reason: 'Automatic now' })).error,
+    ).toBeNull();
+    post = okPost();
+    send = okSend();
+    await drain(post, send);
+    lines = sent(post);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.text).toMatch(
+      /^MAINTENANCE CANCELLED · Window .* · series every day 01:00 → 03:00 · \d+ not started cancelled \(.*\) · “Automatic now” · by Arm$/,
+    );
+    expect(mailedTo(send).map((t) => t.split('|')[0])).toEqual(['ploy@example.test']);
+    const windowRows = await must(
+      db
+        .from('notifications')
+        .select('id, maintenance_windows!inner(series_id)')
+        .eq('maintenance_windows.series_id', id),
+    );
+    expect(windowRows).toEqual([]);
   });
 });

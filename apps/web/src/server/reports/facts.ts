@@ -22,9 +22,11 @@ import {
   bangkokDayStart,
   formatDay,
   formatDuration,
+  formatSeriesRule,
   formatTime,
   formatWeek,
   isSameBangkokDay,
+  seriesRuleSchema,
   TIER_CONFIG,
   type Tier,
 } from '@dxt/shared';
@@ -124,6 +126,22 @@ interface WindowRow {
   reason: string;
   sites: { name: string };
   creator: { display_name: string } | null;
+  series_id?: string | null;
+  series?: { rule: unknown; start_time: string; duration_min: number } | null;
+}
+
+/** A series' window: its id and "every Tue 01:00 → 03:00", for Coming up (§32.11). */
+function seriesOf(w: WindowRow): ReportWindow['series'] {
+  if (!w.series_id || !w.series) return null;
+  const rule = seriesRuleSchema.safeParse(w.series.rule);
+  if (!rule.success) return null;
+  return {
+    id: w.series_id,
+    words: formatSeriesRule(
+      { rule: rule.data, startTime: w.series.start_time, durationMin: w.series.duration_min },
+      { length: false },
+    ),
+  };
 }
 
 const toWindow = (w: WindowRow): ReportWindow => {
@@ -137,6 +155,7 @@ const toWindow = (w: WindowRow): ReportWindow => {
     endedEarly: end.getTime() < new Date(w.ends_at).getTime(),
     reason: w.reason,
     by: w.creator?.display_name ?? null,
+    series: seriesOf(w),
   };
 };
 
@@ -146,7 +165,7 @@ async function loadWindows(db: DbClient, from: Date, to: Date): Promise<WindowRo
     await db
       .from('maintenance_windows')
       .select(
-        'site_id, kind, starts_at, ends_at, ended_at, cancelled_at, approved_at, outcome, reason, sites!inner(name), creator:profiles!maintenance_windows_created_by_fkey(display_name)',
+        'site_id, kind, starts_at, ends_at, ended_at, cancelled_at, approved_at, outcome, reason, series_id, sites!inner(name), creator:profiles!maintenance_windows_created_by_fkey(display_name), series:maintenance_series!maintenance_windows_series_id_fkey(rule, start_time, duration_min)',
       )
       .lt('starts_at', to.toISOString())
       .gt('ends_at', from.toISOString())
