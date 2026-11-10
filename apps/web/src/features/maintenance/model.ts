@@ -37,6 +37,8 @@ const H = 60;
 export const DURATIONS: Record<WindowKind, Duration[]> = {
   maintenance: [
     { label: '1 h', minutes: H },
+    // §32.2: "2 h" is offered for one window too.
+    { label: '2 h', minutes: 2 * H },
     { label: '4 h', minutes: 4 * H },
     { label: '8 h', minutes: 8 * H },
     { label: '24 h', minutes: 24 * H },
