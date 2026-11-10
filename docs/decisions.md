@@ -152,8 +152,9 @@ The summary gave one figure for all sites ("Uptime all sites 99.98%"), and no so
 
 - **A waiting series follows the request pattern (§32.7).** This replaces the reading above that a waiting series never posts.
   - Reminders go out 12 h before its first window (Chat and email to the Admins, STILL WAITING to the asker) and 1 h before (Chat only, to the Admins), as for one window.
-  - Its first window, the deadline, is the first one by the rule that doesn't already overlap another window on the site. One that would be skipped can't be the deadline (engine review).
-  - Only the asker withdraws it, and an Admin approves or declines it. Owner, backup and other Admins can't cancel it (§32.7: "Waiting for an Admin"). Once its first window has come, nothing but NOT APPROVED applies.
+  - **Readings Claude took (10 Nov, from the reviews; built, for Tao to confirm):**
+    - Its first window, the deadline, is the first by the rule that doesn't already overlap another window on the site, since one that would be skipped can't be the deadline (engine review). Series made before this reading keep the first by the rule (the backfill).
+    - Only the asker withdraws it, and an Admin approves or declines it. This narrows PR 2a, where owner, backup or an Admin could cancel a waiting series (§32.7: "Others: Waiting for an Admin"). Once its first window has come, only NOT APPROVED applies.
   - At that window's start, nobody having approved it, it becomes NOT APPROVED. Nothing is scheduled, and a later approval is refused ("ask again").
   - `maintenance_series.first_starts_at` holds that start, and the audit row is `maintenance.series_not_approved`.
 - **"· series every Tue" goes on a window's first line only,** STARTED or DIDN'T START. Later replies are unchanged, as the board draws it. Tao first picked every line, before the board was read, then took the recommendation.

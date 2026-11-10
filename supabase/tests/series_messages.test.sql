@@ -4,7 +4,7 @@
 -- series' window, and claim_notifications holding series rows for a notifier that renders them.
 begin;
 \ir _helpers.psql
-select plan(50);
+select plan(52);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -210,15 +210,56 @@ reset role;
 select tests.authenticate_as((select id from ids where name = 'nok'));
 select throws_ok($$ select public.cancel_maintenance_series((select id from s where name = 'wait'), 'Too late') $$,
   '22023', 'Nobody approved it before its first window — ask again', 'and so is a withdraw: NOT APPROVED wins');
--- The deadline skips a first window that already overlaps another: Site A's 'req' series holds 03:00 Tue/Thu.
-insert into s values ('dead', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '03:00', 30, current_date + 2, null, 'Deadline'));
 reset role;
-select ok((select not exists (select 1 from public.maintenance_windows w
-                              where w.site_id = '00000000-0000-0000-0000-0000000000a1' and w.cancelled_at is null
-                                and tstzrange(w.starts_at, w.ends_at) && tstzrange(m.first_starts_at, m.first_starts_at + interval '30 minutes'))
-           from public.maintenance_series m where m.id = (select id from s where name = 'dead')),
-  'a waiting series'' deadline is its first window that overlaps nothing');
+
+-- Site B, empty, for the deadline and the top-up.
+insert into public.sites (id, client_id, name, tier, primary_owner_id, backup_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000c1', 'Site B', 2,
+   (select id from ids where name = 'arm'), (select id from ids where name = 'nok'), true);
+-- The deadline skips a first window that already overlaps one: a one-off window holds day 2 at 07:00.
+insert into public.maintenance_windows (site_id, kind, starts_at, ends_at, reason, approved_at)
+values ('00000000-0000-0000-0000-0000000000b1', 'maintenance',
+        ((current_date + 2) + time '06:30') at time zone 'Asia/Bangkok',
+        ((current_date + 2) + time '08:00') at time zone 'Asia/Bangkok', 'Data-centre move', now());
+select tests.authenticate_as((select id from ids where name = 'arm'));
+insert into s values ('dead', public.create_maintenance_series('00000000-0000-0000-0000-0000000000b1',
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '07:00', 30, current_date + 2, null, 'Deadline'));
+reset role;
+select is((select first_starts_at from public.maintenance_series where id = (select id from s where name = 'dead')),
+  ((current_date + 3) + time '07:00') at time zone 'Asia/Bangkok',
+  'a waiting series'' deadline is its first window that overlaps nothing — the next day here');
+
+-- The nightly top-up meets a window it made earlier starting in under 5 min: not a skip (engine review M3).
+with x as (
+  insert into public.maintenance_series (site_id, rule, start_time, duration_min, starts_on, reason, approved_at, approved_by)
+  values ('00000000-0000-0000-0000-0000000000b1', '{"freq":"weekly","days":[1,2,3,4,5,6,7]}',
+          (date_trunc('minute', now() + interval '3 minutes') at time zone 'Asia/Bangkok')::time, 20,
+          (date_trunc('minute', now() + interval '3 minutes') at time zone 'Asia/Bangkok')::date, 'Soon',
+          now(), (select id from ids where name = 'tao'))
+  returning id)
+insert into s select 'soon', id from x;
+insert into public.maintenance_windows (site_id, kind, starts_at, ends_at, reason, approved_at, series_id)
+values ('00000000-0000-0000-0000-0000000000b1', 'maintenance', date_trunc('minute', now() + interval '3 minutes'),
+        date_trunc('minute', now() + interval '23 minutes'), 'Soon', now(), (select id from s where name = 'soon'));
+set local role service_role;
+select public.engine_expand_series(now());
+reset role;
+select ok(not exists (select 1 from public.maintenance_series m, jsonb_array_elements(m.log) e
+                      where m.id = (select id from s where name = 'soon') and e ->> 'action' = 'skipped'),
+  'a window that exists isn''t logged as skipped');
+
+-- Cancel while a window's end has passed but the engine hasn't logged it: not "running" (engine review L2).
+update public.maintenance_windows set starts_at = now() - interval '30 minutes', ends_at = now() - interval '1 minute',
+  start_logged = true
+where id = (select id from public.maintenance_windows where series_id = (select id from s where name = 'soon')
+            order by starts_at limit 1);
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select public.cancel_maintenance_series((select id from s where name = 'soon'), 'Done');
+reset role;
+select is((select context ->> 'running' from public.notifications
+           where template = 'ms_line' and context ->> 'kind' = 'cancelled'
+             and maintenance_series_id = (select id from s where name = 'soon')),
+  'false', 'a window past its end isn''t called running');
 
 -- ── Only the service role (and the RPCs) queue or claim series messages ──
 select ok(not has_function_privilege('authenticated', 'public.engine_queue_series_messages(uuid,text,uuid,timestamptz,text,jsonb)', 'execute')
