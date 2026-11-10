@@ -667,14 +667,16 @@ begin
   -- Not approved by its first window: nothing was scheduled, and it can't be approved now (§32.7).
   if s.outcome = 'not_approved'
      or (p_approve and s.approved_at is null and s.cancelled_at is null and s.declined_at is null
-         and s.first_starts_at <= v_now) then
+         and coalesce(s.first_starts_at, s.created_at) <= v_now) then
     raise exception 'Nobody approved it before its first window — ask again'
       using errcode = '22023', hint = 'not_approved';
   end if;
   if s.approved_at is not null or s.declined_at is not null or s.cancelled_at is not null then
     raise exception 'This series was decided already' using errcode = '22023', hint = 'already_decided';
   end if;
-  if not p_approve then
+  -- A reason is required to decline; an approval's optional note has the same 500-character cap
+  -- (security review S14 PR 2b, L2).
+  if not p_approve or v_reason is not null then
     v_reason := private.require_reason(p_reason);
   end if;
   update public.maintenance_series
@@ -812,10 +814,10 @@ begin
   -- A waiting series nobody approved by its first window: over, nothing scheduled (ask again).
   for ms in
     update public.maintenance_series m
-      set cancelled_at = m.first_starts_at, outcome = 'not_approved',
+      set cancelled_at = coalesce(m.first_starts_at, p_now), outcome = 'not_approved',
           log = m.log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'not_approved'))
     where m.approved_at is null and m.declined_at is null and m.cancelled_at is null
-      and m.first_starts_at <= p_now
+      and coalesce(m.first_starts_at, m.created_at) <= p_now
     returning m.*
   loop
     insert into public.audit_log (action, entity, entity_id, before, after)

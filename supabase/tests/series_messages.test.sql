@@ -4,7 +4,7 @@
 -- series' window, and claim_notifications holding series rows for a notifier that renders them.
 begin;
 \ir _helpers.psql
-select plan(43);
+select plan(45);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -186,6 +186,28 @@ select is((select count(*)::int from public.claim_notifications('google_chat', 2
 select ok((select count(*)::int from public.claim_notifications('google_chat', 200, null, true, true, true)
            where maintenance_series_id is not null) > 0, 'with it, they are');
 reset role;
+
+-- ── Only the service role (and the RPCs) queue or claim series messages ──
+select ok(not has_function_privilege('authenticated', 'public.engine_queue_series_messages(uuid,text,uuid,timestamptz,text,jsonb)', 'execute')
+      and not has_function_privilege('anon', 'public.engine_queue_series_messages(uuid,text,uuid,timestamptz,text,jsonb)', 'execute')
+      and not has_function_privilege('authenticated', 'public.claim_notifications(public.notification_channel,integer,uuid,boolean,boolean,boolean)', 'execute')
+      and not has_function_privilege('authenticated', 'private.queue_series_skip(uuid,timestamptz)', 'execute')
+      and not has_function_privilege('authenticated', 'private.queue_series_skips_at(uuid,timestamptz)', 'execute')
+      and not has_function_privilege('authenticated', 'private.expand_series(uuid,timestamptz,boolean)', 'execute'),
+  'the series message helpers are service role only');
+
+-- ── A waiting series with no first window known still lapses (db review L2) ──
+select tests.authenticate_as((select id from ids where name = 'nok'));
+insert into s values ('nofirst', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
+  '{"freq":"monthly","day":26}', '05:00', 60, current_date + 2, null, 'Old request'));
+reset role;
+update public.maintenance_series set first_starts_at = null, created_at = now() - interval '1 day'
+where id = (select id from s where name = 'nofirst');
+set local role service_role;
+select public.engine_window_reminders(now());
+reset role;
+select is((select outcome from public.maintenance_series where id = (select id from s where name = 'nofirst')),
+  'not_approved', 'it lapses rather than waiting forever');
 
 select * from finish();
 rollback;
