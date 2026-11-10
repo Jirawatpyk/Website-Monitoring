@@ -20,6 +20,9 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 .aura-input{min-height:44px;box-sizing:border-box}
 .aura-input__control{min-height:44px;box-sizing:border-box}
 a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}
+.mx-chip{min-width:44px;height:44px;padding:0 10px;border:1px solid var(--aura-border-control);border-radius:9999px;background:var(--aura-bg-surface);color:var(--aura-fg-primary);font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.mx-chip[aria-pressed="true"]{background:var(--aura-fg-primary);border-color:var(--aura-fg-primary);color:var(--aura-bg-surface)}
+.mx-chip:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px}
 </style>
 </helmet>
 <div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
@@ -47,8 +50,26 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <x-import component-from-global-scope="Aura.SegmentedControl" label="Duration" options="{{durations}}" value="{{dur}}" on-change="{{setDur}}" full-width="{{yes}}" size="sm"></x-import>
 <span style="font-size: 12px; color: var(--aura-fg-secondary)">{{ends}}</span>
 </div>
-<sc-if value="{{needsOk}}" hint-placeholder-val="{{false}}">
-<x-import component-from-global-scope="Aura.Select" label="Starts" options="{{startOpts}}" value="{{startAt}}" on-change="{{setStartAt}}"></x-import>
+<sc-if value="{{isMaintOpen}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Select" label="Repeat" options="{{repeats}}" value="{{repeat}}" on-change="{{setRepeat}}"></x-import>
+</sc-if>
+<sc-if value="{{showStarts}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Select" label="{{startsLabel}}" options="{{startOpts}}" value="{{startAt}}" on-change="{{setStartAt}}"></x-import>
+</sc-if>
+<sc-if value="{{isWeekly}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span id="mx-on" style="font-size: 13px; font-weight: 500">On</span>
+<div role="group" aria-labelledby="mx-on" style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{wd}}" as="w" hint-placeholder-count="7"><button type="button" class="mx-chip" aria-pressed="{{w.on}}" onClick="{{w.toggle}}">{{w.l}}</button></sc-for></div>
+<span style="font-size: 12px; color: {{wdHintColor}}">{{wdHint}}</span>
+</div>
+</sc-if>
+<sc-if value="{{isMonthly}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.RadioGroup" label="On" options="{{monthOpts}}" value="{{monthMode}}" on-change="{{setMonthMode}}"></x-import>
+</sc-if>
+<sc-if value="{{isRepeat}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Select" label="Ends on" optional="{{yes}}" options="{{endOpts}}" value="{{endOn}}" on-change="{{setEndOn}}"></x-import>
+<div style="display: flex; gap: 10px; padding: 10px 12px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.45"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="rotate-ccw" size="sm"></x-import></span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">{{summary}}</span><span style="color: var(--aura-fg-secondary)">Windows are created 14 days ahead; one that overlaps another window on this site is skipped.</span></span></div>
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="Needs an Admin’s approval">An Admin approves the series once; nothing is scheduled until then.</x-import>
 </sc-if>
 <sc-if value="{{muteOnIncident}}" hint-placeholder-val="{{false}}">
 <x-import component-from-global-scope="Aura.Alert" tone="warning" title="Mute stops new alerts only — INC-0142 keeps escalating until someone acknowledges">The open incident keeps its escalation ladder, the L3 FYI to CEO + Bua and the client update. Muting is not an acknowledgement.</x-import>
@@ -86,7 +107,30 @@ class Component extends DCLogic {
     var blocked = !mute && down;
     var dur = st.dur;
     if (mute && dur === '3 days') dur = '24 h';
+    var REP = (!mute && !blocked) ? (st.repeat || 'Does not repeat') : 'Does not repeat';
+    var isRep = REP !== 'Does not repeat';
+    if (isRep && dur === '3 days') dur = '24 h';
     var needsOk = !mute && dur === '3 days';
+    // repeat (D-057) — dates from Fri 25 Sep 2026
+    var WDN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var ORD = ['1st', '2nd', '3rd', '4th', '5th'], WDL = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+    var SOPT = { 'Mon 28 Sep 22:00': 3, 'Tue 29 Sep 01:00': 4, 'Sat 26 Sep 22:00': 1 };
+    var sAt = isRep ? (SOPT[st.repAt] !== undefined ? st.repAt : 'Mon 28 Sep 22:00') : st.startAt;
+    var first = new Date(2026, 8, 25 + (SOPT[sAt] || 0)), sWd = WDN[first.getDay()], sDay = first.getDate(), sNth = Math.ceil(sDay / 7);
+    var TIME = sAt.slice(-5), TM = +TIME.slice(0, 2) * 60 + +TIME.slice(3, 5);
+    var DM = { '1 h': 60, '2 h': 120, '4 h': 240, '8 h': 480, '24 h': 1440 };
+    function hm(m) { var x = m % 1440; return ('0' + Math.floor(x / 60)).slice(-2) + ':' + ('0' + x % 60).slice(-2) + (m >= 1440 ? ' next day' : ''); }
+    var WDS = st.wds || [sWd], MM = st.monthMode || 'day'; if (MM === 'nth' && sNth > 4) MM = 'day';
+    var ENDON = st.endOn || 'none', ENDLAB = { none: 'No end date', oct: 'Sat 31 Oct', dec: 'Thu 31 Dec' }, ENDDT = { none: null, oct: new Date(2026, 9, 31), dec: new Date(2026, 11, 31) };
+    var ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    function lab(dt) { return WDN[dt.getDay()] + ' ' + dt.getDate() + ' ' + MON[dt.getMonth()]; }
+    function occ(n) { var out = [], lim = ENDDT[ENDON]; for (var o = 0; o < 400 && out.length < n; o++) { var dt = new Date(2026, first.getMonth(), first.getDate() + o); if (lim && dt > lim) break;
+      if (REP === 'Weekly' ? WDS.indexOf(WDN[dt.getDay()]) >= 0 : (MM === 'day' ? dt.getDate() === sDay : (WDN[dt.getDay()] === sWd && Math.ceil(dt.getDate() / 7) === sNth))) out.push(dt); } return out; }
+    var noDays = REP === 'Weekly' && !WDS.length;
+    var wdS = ORDER.filter(function (w) { return WDS.indexOf(w) >= 0; });
+    var ruleTxt = REP === 'Weekly' ? (wdS.length === 7 ? 'Every day' : 'Every ' + wdS.join(', ')) : (MM === 'day' ? 'Monthly on day ' + sDay + ' ·' : 'Monthly on the ' + ORD[sNth - 1] + ' ' + WDL[sWd] + ' ·');
+    var rr = ruleTxt + ' ' + TIME + ' → ' + hm(TM + (DM[dur] || 60));
+    var summary = noDays ? 'Pick at least one day.' : rr + ' · from ' + lab(first) + (ENDON !== 'none' ? ' · until ' + ENDLAB[ENDON] : '') + ' · next 2: ' + occ(2).map(lab).join(', ');
     var ENDT = { '1 h': '11:07', '4 h': '14:07', '8 h': '18:07', '24 h': 'Sat 26 Sep 10:07', '3 days': 'Mon 28 Sep 10:07' };
     var END = mute
       ? { '1 h': 'Unmutes itself at 11:07 today', '4 h': 'Unmutes itself at 14:07 today', '8 h': 'Unmutes itself at 18:07 today', '24 h': 'Unmutes itself Sat 26 Sep 10:07 (max 24 h)' }
@@ -101,6 +145,19 @@ class Component extends DCLogic {
       site: st.site,
       sites: ['Bangkok Airways – Taiwan', 'Bangkok Airways – China', 'MuvMi'],
       setSite: function (e) { self.setState({ site: e && e.target ? e.target.value : e, done: false }); },
+      isMaintOpen: !mute && !blocked && !st.done,
+      repeats: ['Does not repeat', 'Weekly', 'Monthly'].map(function (v) { return { value: v, label: v }; }), repeat: REP,
+      setRepeat: function (e) { self.setState({ repeat: e && e.target ? e.target.value : e }); },
+      isRepeat: isRep && !st.done, isWeekly: REP === 'Weekly' && !st.done, isMonthly: REP === 'Monthly' && !st.done,
+      wd: ORDER.map(function (w) { var on = WDS.indexOf(w) >= 0; return { l: w, on: on, toggle: function () { var x = WDS.slice(), i = x.indexOf(w); if (i >= 0) x.splice(i, 1); else x.push(w); self.setState({ wds: x }); } }; }),
+      wdHint: noDays ? 'Pick at least one day.' : 'From the first chosen day on or after the first date.',
+      wdHintColor: noDays ? 'var(--aura-fg-danger)' : 'var(--aura-fg-secondary)',
+      monthOpts: [{ value: 'day', label: 'Day ' + sDay + ' of each month', description: sDay > 28 ? 'A month without day ' + sDay + ' is skipped.' : '' }].concat(sNth <= 4 ? [{ value: 'nth', label: 'The ' + ORD[sNth - 1] + ' ' + WDL[sWd] }] : []),
+      monthMode: MM, setMonthMode: function (v) { self.setState({ monthMode: v && v.target ? v.target.value : v }); },
+      endOpts: Object.keys(ENDLAB).map(function (k) { return { value: k, label: ENDLAB[k] }; }), endOn: ENDON,
+      setEndOn: function (e) { self.setState({ endOn: e && e.target ? e.target.value : e }); },
+      summary: summary,
+      showStarts: (needsOk || isRep) && !blocked && !st.done, startsLabel: isRep ? 'First window' : 'Starts',
       kind: st.kind,
       types: ['Mute', 'Maintenance'],
       setKind: function (v) { self.setState({ kind: v, done: false }); },
@@ -109,31 +166,31 @@ class Component extends DCLogic {
       open: !blocked && !st.done,
       done: !blocked && st.done,
       muteInstead: function () { self.setState({ kind: 'Mute' }); },
-      title: mute ? 'Mute alerts' : 'Start maintenance',
+      title: mute ? 'Mute alerts' : (isRep ? 'Repeating maintenance' : 'Start maintenance'),
       durLabel: mute ? 'Mute for' : 'Window length',
-      durations: mute ? ['1 h', '4 h', '8 h', '24 h'] : ['1 h', '4 h', '8 h', '24 h', '3 days'],
-      needsOk: needsOk && !blocked && !st.done,
-      startOpts: ['Sat 26 Sep 22:00', 'Sun 27 Sep 22:00'], startAt: st.startAt,
-      setStartAt: function (e) { self.setState({ startAt: e && e.target ? e.target.value : e }); },
+      durations: mute ? ['1 h', '4 h', '8 h', '24 h'] : (isRep ? ['1 h', '2 h', '4 h', '8 h', '24 h'] : ['1 h', '4 h', '8 h', '24 h', '3 days']),
+      needsOk: needsOk && !blocked && !st.done && !isRep,
+      startOpts: isRep ? Object.keys(SOPT) : ['Sat 26 Sep 22:00', 'Sun 27 Sep 22:00'], startAt: sAt,
+      setStartAt: function (e) { var v = e && e.target ? e.target.value : e; if (isRep) self.setState({ repAt: v, wds: null }); else self.setState({ startAt: v }); },
       okText: 'Tao gets a request now; it starts only if approved before ' + st.startAt + '.',
       dur: dur,
       setDur: function (v) { self.setState({ dur: v }); },
-      ends: needsOk ? 'Starts ' + st.startAt + ' if approved before then · ends ' + (st.startAt === 'Sat 26 Sep 22:00' ? 'Tue 29 Sep 22:00' : 'Wed 30 Sep 22:00') + ' (3 days)' : END[dur],
+      ends: isRep ? 'Each window ' + dur + ' (max 24 h) · ' + TIME + ' → ' + hm(TM + (DM[dur] || 60)) : needsOk ? 'Starts ' + st.startAt + ' if approved before then · ends ' + (st.startAt === 'Sat 26 Sep 22:00' ? 'Tue 29 Sep 22:00' : 'Wed 30 Sep 22:00') + ' (3 days)' : END[dur],
       reason: st.reason,
       setReason: function (e) { self.setState({ reason: e && e.target ? e.target.value : e }); },
       reasonHint: mute ? (down ? 'e.g. Known outage, host restarting' : 'e.g. Investigating slow booking page') : 'e.g. Emergency hotfix deploy',
       reasonNote: noReason ? 'Type a reason to continue — it shows in the digest and the audit log.' : 'Shows in the digest and the audit log.',
-      noReason: noReason,
-      effect: mute
+      noReason: noReason || noDays,
+      effect: isRep ? 'Each window: no alerts, checks keep running, not counted in uptime. The status page shows “Planned maintenance”.' : mute
         ? (down
           ? 'New alerts for MuvMi stop until ' + ENDT[dur] + '. INC-0142 stays open and keeps escalating. The site keeps its real status with a “Muted” tag and still counts toward uptime.'
           : 'New alerts stop until ' + ENDT[dur] + ', including DOWN alerts to on-call. The site keeps its real status with a “Muted” tag and still counts toward uptime.')
         : 'No alerts during the window, and it isn’t counted in uptime. Checks keep running. The status page shows “Planned maintenance”.',
-      submit: mute ? 'Mute for ' + dur : (needsOk ? 'Ask for approval' : 'Start maintenance'),
+      submit: mute ? 'Mute for ' + dur : ((needsOk || isRep) ? 'Ask for approval' : 'Start maintenance'),
       submitIcon: mute ? 'eye-off' : 'calendar',
       submitIt: function () { self.setState({ done: true }); },
-      doneTitle: mute ? st.site + ' muted until ' + ENDT[dur] : (needsOk ? 'Request sent to Tao · ' + st.site : 'Maintenance started · ' + st.site + ' · ends ' + ENDT[dur]),
-      doneText: (needsOk ? 'Waiting for an Admin — nothing changes until it’s approved. Recorded as Arm: “' : 'Takes effect now. Recorded as Arm: “') + st.reason.trim() + '”.' + (mute && down ? ' INC-0142 is still escalating — acknowledge it to stop L1–L2.' : '') + (needsOk ? ' Withdraw it any time from Maintenance & mutes.' : ' End or change it from Maintenance & mutes.'),
+      doneTitle: isRep ? 'Series request sent to Tao · ' + st.site : mute ? st.site + ' muted until ' + ENDT[dur] : (needsOk ? 'Request sent to Tao · ' + st.site : 'Maintenance started · ' + st.site + ' · ends ' + ENDT[dur]),
+      doneText: isRep ? rr + ' · from ' + lab(first) + '. Waiting for an Admin — nothing is scheduled until it’s approved. Recorded as Arm: “' + st.reason.trim() + '”. Withdraw it any time from Maintenance & mutes.' : (needsOk ? 'Waiting for an Admin — nothing changes until it’s approved. Recorded as Arm: “' : 'Takes effect now. Recorded as Arm: “') + st.reason.trim() + '”.' + (mute && down ? ' INC-0142 is still escalating — acknowledge it to stop L1–L2.' : '') + (needsOk ? ' Withdraw it any time from Maintenance & mutes.' : ' End or change it from Maintenance & mutes.'),
       back: back
     };
   }

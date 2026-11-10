@@ -31,7 +31,7 @@
       "is_interactive": true,
       "title": "Audit log",
       "w": 1440,
-      "x": 4560,
+      "x": 6080,
       "y": 14216
     },
     "ChatAlert.dc.html": {
@@ -232,9 +232,9 @@
       "y": 0
     },
     "Maintenance.dc.html": {
-      "h": 1240,
+      "h": 1320,
       "is_interactive": true,
-      "title": "Maintenance / mute dialog",
+      "title": "Maintenance / mute dialog (+ Repeat)",
       "w": 1440,
       "x": 1520,
       "y": 12036
@@ -405,9 +405,9 @@
       "y": 16629
     },
     "MaintenancePage.dc.html": {
-      "h": 1790,
+      "h": 2880,
       "is_interactive": true,
-      "title": "Maintenance & mutes — /maintenance",
+      "title": "Maintenance & mutes — /maintenance (+ repeating series, D-057)",
       "w": 1440,
       "x": 4560,
       "y": 12036
@@ -528,7 +528,7 @@
     },
     "row4": {
       "kind": "title1",
-      "maxW": 6000,
+      "maxW": 7520,
       "text": "Operations & governance · web",
       "w": 240,
       "x": 0,

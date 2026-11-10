@@ -40,7 +40,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 
 <div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
 <span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
-<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" full-width="{{yes}}" size="sm"></x-import></div>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{viewOpts}}" value="{{view}}" on-change="{{setViewSel}}" size="sm"></x-import></div>
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.4">
@@ -66,7 +66,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
 <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="2">
 <button type="button" class="mm-row" aria-label="{{r.aria}}" onClick="{{r.open}}">
-<span style="width: 118px; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px"><x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.label}}</x-import><sc-if value="{{r.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">{{r.mutedShort}}</x-import></sc-if></span>
+<span style="width: 118px; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px"><x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.label}}</x-import><sc-if value="{{r.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">{{r.mutedShort}}</x-import></sc-if><sc-if value="{{r.ser2}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="rotate-ccw">{{r.ser2Short}}</x-import></sc-if></span>
 <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; gap: 2px">
 <span style="font-size: 14px; font-weight: 500">{{r.site}}</span>
 <span style="font-size: 12px; color: var(--aura-fg-secondary)">{{r.line}}</span>
@@ -78,7 +78,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </div>
 </sc-for>
 
-<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Phone version of /maintenance (spec §22, §23). Same sections and rules as the desktop page: Active now · Waiting for approval · Scheduled · Recent. Each row = status badge + site + one line; tapping it opens a sheet with the details and only the actions this person may take (End now · Edit / cancel · Approve / Decline) — End, cancel and Decline ask for a reason inside the sheet. Entry: the “Maintenance & mutes” row on the phone Overview (MOverview4) and the success screen of the Maintenance sheet. “Schedule maintenance or mute” opens the phone sheet (MMaintenance). A running window or mute offers only End now and Change end; Cancel exists only before it starts. Every action adds a log line. STATE: Admin (Tao) · Responder (Arm, acts only on sites he owns or backs up and on his own request) · Viewer (read only, no Schedule button) · Empty. Mock data — compute it.</div>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Phone version of /maintenance (spec §22, §23). Same sections and rules as the desktop page: Active now · Waiting for approval · Scheduled · Repeating series · Recent. Series (STATE › Series, D-057): occurrences are ordinary rows with a “Series” tag; a series row = “Repeating” + the rule + next; its sheet shows the rule, from, end, next, skipped windows and one action, “Cancel series…” (reason; cancels the occurrences that haven’t started). A Responder’s series waits under Waiting for approval (Approve / Decline for Admins, “Withdraw request…” for the asker). Each row = status badge + site + one line; tapping it opens a sheet with the details and only the actions this person may take (End now · Edit / cancel · Approve / Decline) — End, cancel and Decline ask for a reason inside the sheet. Entry: the “Maintenance & mutes” row on the phone Overview (MOverview4) and the success screen of the Maintenance sheet. “Schedule maintenance or mute” opens the phone sheet (MMaintenance). A running window or mute offers only End now and Change end; Cancel exists only before it starts. Every action adds a log line. STATE: Admin (Tao) · Responder (Arm, acts only on sites he owns or backs up and on his own request) · Viewer (read only, no Schedule button) · Empty · Series · Series · Responder. Mock data — compute it.</div>
 </div>
 
 <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
@@ -93,10 +93,11 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <x-import component-from-global-scope="Aura.Dialog" open="{{sheetOpen}}" on-close="{{close}}" title="{{s.title}}" description="{{s.desc}}" size="sm" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 14px">
 <sc-if value="{{modeView}}" hint-placeholder-val="{{true}}">
-<div style="display: flex; flex-wrap: wrap; gap: 6px"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import><sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">{{s.mutedLabel}}</x-import></sc-if></div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><x-import component-from-global-scope="Aura.Badge" tone="{{s.tone}}" variant="{{s.variant}}" icon="{{s.icon}}">{{s.label}}</x-import><sc-if value="{{s.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">{{s.mutedLabel}}</x-import></sc-if><sc-if value="{{s.ser2}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="rotate-ccw">{{s.ser2Label}}</x-import></sc-if></div>
 <div style="display: flex; flex-direction: column; gap: 6px">
 <sc-for list="{{s.kv}}" as="x" hint-placeholder-count="5"><div class="mm-kv"><span>{{x.k}}</span><span>{{x.v}}</span></div></sc-for>
 </div>
+<sc-for list="{{s.skips}}" as="l" hint-placeholder-count="0"><span style="display: flex; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-alert-warning-fg)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span>{{l.t}}</span></span></sc-for>
 <sc-for list="{{s.logs}}" as="l" hint-placeholder-count="0"><span style="display: flex; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="file-text" size="sm"></x-import></span><span>{{l.t}}</span></span></sc-for>
 <sc-if value="{{s.canApprove}}" hint-placeholder-val="{{false}}">
 <x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" full-width="{{yes}}" on-click="{{goApprove}}">Approve</x-import>
@@ -104,6 +105,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </sc-if>
 <sc-if value="{{s.canEnd}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{goEnd}}">{{s.endCta}}</x-import></sc-if>
 <sc-if value="{{s.canEdit}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="pencil" full-width="{{yes}}" on-click="{{goEdit}}">{{s.editLabel}}</x-import></sc-if>
+<sc-if value="{{s.canCancelSeries}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="trash-2" full-width="{{yes}}" on-click="{{goSeries}}">{{s.cancelSeriesLabel}}</x-import></sc-if>
 <sc-if value="{{s.hasNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; line-height: 1.45; color: var(--aura-fg-secondary); text-align: center">{{s.note}}</span></sc-if>
 </sc-if>
 
@@ -138,7 +140,8 @@ class Component extends DCLogic {
   renderVals() {
     var self = this;
     var st = this.state;
-    var ROLE = st.view === 'Responder' ? 'resp' : (st.view === 'Viewer' ? 'ro' : 'admin');
+    var SER = /^Series/.test(st.view);
+    var ROLE = (st.view === 'Responder' || st.view === 'Series · Responder') ? 'resp' : (st.view === 'Viewer' ? 'ro' : 'admin');
     var ADMIN = ROLE === 'admin';
     var ME = ADMIN ? 'Tao' : (ROLE === 'resp' ? 'Arm' : 'Mint');
     var NOWABS = 10 * 60 + 7;
@@ -152,8 +155,19 @@ class Component extends DCLogic {
       games: { kind: 'mute', site: 'DxT Games', tier: 3, owner: 'Tao', backup: 'Nok', start: '08:40', end: '18:00', ends: ['11:00', '14:00', '18:00'], why: 'Redeploying build', by: 'Tao', running: true,
         endEffect: 'Alerts resume now for Tao and the Alerts Space. Uptime is unaffected — muted time was already counted.' },
       bac: { kind: 'maint', site: 'Bangkok Airways – China', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Sat 26 Sep 22:00', short: 'Sat 26', fromAbs: 1440 + 22 * 60, end: 'Tue 29 Sep 22:00', ends: ['Mon 28 Sep 22:00', 'Tue 29 Sep 22:00'], why: 'Move to a new hosting provider', by: 'Arm', asked: 'today 09:20', request: true },
-      tub: { kind: 'maint', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', from: 'Tue 29 Sep 01:00', fromAbs: 4 * 1440 + 60, end: '03:00', ends: ['02:00', '03:00', '04:00'], why: 'WordPress plugin updates', by: 'Ploy' }
+      tub: { kind: 'maint', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', from: 'Tue 29 Sep 01:00', fromAbs: 4 * 1440 + 60, end: '03:00', ends: ['02:00', '03:00', '04:00'], why: 'WordPress plugin updates', by: 'Ploy' },
+      // repeating series (STATE › Series) — same sample as the desktop page
+      stub: { ser: true, kind: 'series', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', rule: 'Every Tue 01:00 → 03:00', len: '2 h', from: 'Tue 15 Sep', until: 'No end date', next: 'Tue 29 Sep', why: 'WordPress plugin updates', by: 'Ploy', okBy: 'Approved by Tao Mon 14 Sep', occ: ['tub', 'tub2'] },
+      sorca: { ser: true, kind: 'series', site: 'ORCA Thailand', tier: 2, owner: 'Tao', backup: 'Nok', rule: 'Monthly on day 6 · 20:00 → 22:00', len: '2 h', from: 'Sun 6 Sep', until: 'Thu 31 Dec', next: 'Fri 6 Nov', why: 'Hosting security patches', by: 'Tao', occ: [], skip: 'Skipped Tue 6 Oct — overlaps the 18:00 → 23:00 window (Data-centre move)' },
+      sbat: { ser: true, kind: 'series', request: true, site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', rule: 'Every Mon, Thu 22:00 → 23:00', len: '1 h', from: 'Mon 28 Sep', until: 'No end date', next: 'Mon 28 Sep', why: 'Cache purge and log rotation', by: 'Arm', asked: 'today 09:50', occ: ['bt1', 'bt2', 'bt3', 'bt4'] },
+      tub2: { ser: true, of: 'stub', kind: 'maint', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', from: 'Tue 6 Oct 01:00', fromAbs: 11 * 1440 + 60, end: '03:00', ends: ['02:00', '03:00', '04:00'], why: 'WordPress plugin updates', by: 'Ploy' },
+      orca1: { ser: true, kind: 'maint', site: 'ORCA Thailand', tier: 2, owner: 'Tao', backup: 'Nok', from: 'Tue 6 Oct 18:00', fromAbs: 11 * 1440 + 18 * 60, end: '23:00', ends: ['22:00', '23:00', '23:30'], why: 'Data-centre move', by: 'Tao' },
+      bt1: { ser: true, of: 'sbat', kind: 'maint', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Mon 28 Sep 22:00', fromAbs: 3 * 1440 + 22 * 60, end: '23:00', ends: ['22:30', '23:00', '23:30'], why: 'Cache purge and log rotation', by: 'Arm' },
+      bt2: { ser: true, of: 'sbat', kind: 'maint', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Thu 1 Oct 22:00', fromAbs: 6 * 1440 + 22 * 60, end: '23:00', ends: ['22:30', '23:00', '23:30'], why: 'Cache purge and log rotation', by: 'Arm' },
+      bt3: { ser: true, of: 'sbat', kind: 'maint', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Mon 5 Oct 22:00', fromAbs: 10 * 1440 + 22 * 60, end: '23:00', ends: ['22:30', '23:00', '23:30'], why: 'Cache purge and log rotation', by: 'Arm' },
+      bt4: { ser: true, of: 'sbat', kind: 'maint', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Thu 8 Oct 22:00', fromAbs: 13 * 1440 + 22 * 60, end: '23:00', ends: ['22:30', '23:00', '23:30'], why: 'Cache purge and log rotation', by: 'Arm' }
     };
+    if (SER) DEF.tub = Object.assign({}, DEF.tub, { ser: true, of: 'stub' });
     var BACLEN = { 'Mon 28 Sep 22:00': '2 days', 'Tue 29 Sep 22:00': '3 days' };
     var ov = st.view === 'Empty' ? { wecare: { st: 'gone' }, games: { st: 'gone' }, bac: { st: 'gone' }, tub: { st: 'gone' } } : st.ov;
     function S(k) { var o = ov[k] || {}; return { st: o.st || 'on', approved: !!o.approved, end: o.end || DEF[k].end, logs: o.logs || [] }; }
@@ -163,16 +177,37 @@ class Component extends DCLogic {
     function L(a) { return a.map(function (t) { return { t: t }; }); }
     function lenOf(k, s) { return k === 'bac' ? BACLEN[s.end] : dur(mins(s.end) - mins(DEF[k].from.slice(-5))); }
     var rows = {};
-    var G = { active: [], wait: [], sched: [], recent: [] };
+    var G = { active: [], wait: [], sched: [], series: [], recent: [] };
     Object.keys(DEF).forEach(function (k) {
       var d = DEF[k], s = S(k); if (s.st === 'gone') return;
+      if (d.ser && !SER) return;
+      if (d.of) { var ps = S(d.of); if (ps.st !== 'on' || (DEF[d.of].request && !ps.approved)) return; }
       var mute = d.kind === 'mute', pending = d.request && !s.approved;
       var r = { k: k, site: d.site, muted: false, mutedShort: '', mutedLabel: '', logs: L(s.logs), canApprove: false, canEnd: false, canEdit: false, hasNote: false, note: '', ends: d.ends, endEffect: d.endEffect || '', mute: mute, running: !!d.running, pending: pending,
-        editLabel: d.running ? 'Change end' : (pending ? 'Edit / withdraw' : 'Edit / cancel') };
+        editLabel: d.running ? 'Change end' : (pending ? 'Edit / withdraw' : 'Edit / cancel'), ser2: !!d.of, ser2Short: 'Series', ser2Label: 'Part of a series', skips: [], canCancelSeries: false, cancelSeriesLabel: '', isSer: d.kind === 'series' };
+      if (d.kind === 'series') {
+        r.kv = [{ k: 'Repeats', v: d.rule }, { k: 'Each window', v: d.len + ' · not counted in uptime' }, { k: 'From', v: d.from }, { k: 'Ends', v: d.until }, { k: 'Next', v: d.next }, { k: 'Reason', v: d.why }, { k: d.request ? 'Asked by' : 'By', v: d.request ? 'Arm · ' + d.asked : d.by + (d.okBy ? ' · ' + d.okBy.toLowerCase() : '') }, { k: 'Site', v: 'Tier ' + d.tier + ' · ' + d.owner + ' · backup ' + d.backup }];
+        r.skips = d.skip ? L([d.skip]) : [];
+        var sec2;
+        if (s.st !== 'on') { var lb = { cancelled: 'Cancelled', declined: 'Declined', withdrawn: 'Withdrawn' }[s.st]; Object.assign(r, nb('rotate-ccw', lb), { line: lb + ' 10:07 · ' + d.rule, skips: [] }); r.kv[4].v = '—'; sec2 = 'recent'; }
+        else if (d.request && !s.approved) {
+          Object.assign(r, nb('clock', 'Needs approval'), { ser2: true, ser2Short: 'Repeating', ser2Label: 'Repeating', line: d.rule + ' · Arm' });
+          if (ADMIN) r.canApprove = true; else { r.hasNote = true; r.note = 'Waiting for an Admin to approve.'; if (ME === d.by) { r.canCancelSeries = true; r.cancelSeriesLabel = 'Withdraw request…'; } }
+          sec2 = 'wait';
+        } else {
+          Object.assign(r, nb('rotate-ccw', 'Repeating'), { line: d.rule + ' · next ' + d.next + (d.skip ? ' · 1 skipped' : '') });
+          if (s.approved) r.kv[6].v = d.by + ' · approved by Tao 10:07';
+          if (can(d)) { r.canCancelSeries = true; r.cancelSeriesLabel = 'Cancel series…'; } else if (ROLE !== 'ro') { r.hasNote = true; r.note = who(d); }
+          sec2 = 'series';
+        }
+        r.aria = d.site + ', ' + r.label + ', ' + r.line;
+        r.open = function () { self.setState({ open: k, mode: 'view', reason: '' }); };
+        rows[k] = r; G[sec2].push(r); return;
+      }
       var whenTxt = d.running ? 'Today ' + d.start + ' → ' + s.end : d.from + ' → ' + s.end;
       var lenTxt = d.running ? (mute ? 'until ' + s.end + ' (max 24 h) · ' : dur(mins(s.end) - mins(d.start)) + ' · ') + dur(NOWABS - mins(d.start)) + ' in' : lenOf(k, s) + ' · starts in ' + inFmt(d.fromAbs - NOWABS);
       var shortWhen = d.running ? (mute ? 'Until ' + s.end : d.start + ' → ' + s.end) : (k === 'bac' ? d.short + ' → ' + s.end.slice(0, 6) + ' · ' + lenOf(k, s) : d.from + ' → ' + s.end);
-      r.kv = [{ k: 'When', v: whenTxt }, { k: 'Length', v: lenTxt }, { k: 'Reason', v: d.why }, { k: d.request ? 'Asked by' : 'By', v: d.request ? 'Arm · ' + d.asked : d.by }, { k: 'Uptime', v: mute ? 'Still counted' : 'Not counted' }, { k: 'Site', v: 'Tier ' + d.tier + ' · ' + d.owner + ' · backup ' + d.backup }];
+      r.kv = (d.of ? [{ k: 'Series', v: DEF[d.of].rule }] : []).concat([{ k: 'When', v: whenTxt }, { k: 'Length', v: lenTxt }, { k: 'Reason', v: d.why }, { k: d.request ? 'Asked by' : 'By', v: d.request ? 'Arm · ' + d.asked : d.by }, { k: 'Uptime', v: mute ? 'Still counted' : 'Not counted' }, { k: 'Site', v: 'Tier ' + d.tier + ' · ' + d.owner + ' · backup ' + d.backup }]);
       var sec;
       if (s.st !== 'on') {
         var lab = { ended: 'Ended early', cancelled: 'Cancelled', declined: 'Declined', withdrawn: 'Withdrawn' }[s.st];
@@ -202,21 +237,23 @@ class Component extends DCLogic {
     });
     G.active.sort(function (a, b) { return a.sortKey - b.sortKey; });
     G.sched.sort(function (a, b) { return a.sortKey - b.sortKey; });
-    function P(icon, label, site, line, kv, log) { return Object.assign(nb(icon, label), { site: site, line: line, kv: kv, logs: [{ t: log }], muted: false, canApprove: false, canEnd: false, canEdit: false, hasNote: false, aria: site + ', ' + label + ', ' + line, open: function () { self.setState({ open: 'p:' + site, mode: 'view' }); } }); }
+    function P(icon, label, site, line, kv, log) { return Object.assign(nb(icon, label), { site: site, line: line, kv: kv, logs: [{ t: log }], muted: false, canApprove: false, canEnd: false, canEdit: false, hasNote: false, skips: [], ser2: false, canCancelSeries: false, aria: site + ', ' + label + ', ' + line, open: function () { self.setState({ open: 'p:' + site, mode: 'view' }); } }); }
     var PAST = [
       P('calendar', 'Ended', 'ORCA Thailand', 'Tue 22 Sep 20:00 → 22:00 · 2 h', [{ k: 'Reason', v: 'Hosting plan upgrade' }, { k: 'By', v: 'Tao' }], 'Ended on time 22:00'),
+      SER ? Object.assign(P('calendar', 'Ended', 'Tubtong', 'Tue 22 Sep 01:00 → 03:00 · 2 h', [{ k: 'Series', v: 'Every Tue 01:00 → 03:00' }, { k: 'Reason', v: 'WordPress plugin updates' }, { k: 'By', v: 'Ploy' }], 'Ended on time 03:00'), { ser2: true, ser2Short: 'Series', ser2Label: 'Part of a series' }) : null,
       P('eye-off', 'Ended early', 'Cando Asia', 'Mon 21 Sep 10:15 → 11:40 · mute', [{ k: 'Reason', v: 'Client changing DNS' }, { k: 'By', v: 'Nok' }], 'Ended early 11:40 by Nok · “DNS change confirmed”'),
       P('calendar', 'Cancelled', 'EQHO', 'Sat 19 Sep 09:00 → 12:00 · didn’t start', [{ k: 'Reason', v: 'Theme update' }, { k: 'By', v: 'Tao' }], 'Cancelled Fri 18 Sep 16:20 by Tao · “Client moved the launch”'),
       P('calendar', 'Not approved', 'Fuji Links', 'Sat 12 → Mon 14 Sep · 2 days · didn’t start', [{ k: 'Reason', v: 'Server OS upgrade' }, { k: 'Asked by', v: 'Ploy' }], 'Not approved — didn’t start · nobody approved before Sat 12 Sep 22:00')
     ];
-    PAST.forEach(function (p) { rows['p:' + p.site] = p; G.recent.push(p); });
+    PAST.filter(Boolean).forEach(function (p) { rows['p:' + p.site] = p; G.recent.push(p); });
     var groups = []; self._secOf = {};
-    [['active', 'mm-active'], ['wait', 'mm-wait'], ['sched', 'mm-sched'], ['recent', 'mm-recent']].forEach(function (p) { G[p[0]].forEach(function (x) { if (x.k) self._secOf[x.k] = p[1]; }); });
+    [['active', 'mm-active'], ['wait', 'mm-wait'], ['sched', 'mm-sched'], ['series', 'mm-series'], ['recent', 'mm-recent']].forEach(function (p) { G[p[0]].forEach(function (x) { if (x.k) self._secOf[x.k] = p[1]; }); });
     if (G.active.length) groups.push({ id: 'mm-active', title: 'ACTIVE NOW · ' + G.active.length, rows: G.active });
     if (G.wait.length) groups.push({ id: 'mm-wait', title: 'WAITING FOR APPROVAL · ' + G.wait.length, rows: G.wait });
     if (G.sched.length) groups.push({ id: 'mm-sched', title: 'SCHEDULED · ' + G.sched.length, rows: G.sched });
+    if (G.series.length) groups.push({ id: 'mm-series', title: 'REPEATING SERIES · ' + G.series.length, rows: G.series });
     groups.push({ id: 'mm-recent', title: 'RECENT · LAST 30 DAYS · ' + G.recent.length, rows: G.recent });
-    var mp = []; if (G.active.length) mp.push(G.active.length + ' active'); if (G.sched.length) mp.push(G.sched.length + ' scheduled'); if (G.wait.length) mp.push(G.wait.length + ' waiting for approval');
+    var mp = []; if (G.active.length) mp.push(G.active.length + ' active'); if (G.sched.length) mp.push(G.sched.length + ' scheduled'); if (G.wait.length) mp.push(G.wait.length + ' waiting for approval'); if (G.series.length) mp.push(G.series.length + ' repeating');
     var cur = rows[st.open] || G.recent[0];
     var key = cur.k;
     var D = key ? DEF[key] : null;
@@ -245,27 +282,32 @@ class Component extends DCLogic {
     }
     function push(base, v, line) { var n = Object.assign({}, base); var c = n[key] || {}; n[key] = Object.assign({}, c, v, { logs: (c.logs || []).concat([line]) }); return n; }
     var cancelMode = mode === 'edit' && !cur.running && st.editKind !== 'Change end';
+    var isSer = !!(D && D.kind === 'series'), serPend = isSer && D.request && !S(key).approved;
+    var occLeft = isSer ? D.occ.filter(function (o) { return S(o).st === 'on'; }) : [];
+    var occDays = occLeft.map(function (o) { return DEF[o].from.slice(0, -6); });
     var cancelWord = cur.pending ? 'Withdraw' : 'Cancel';
     var baEnd = S('bac').end, baLen = BACLEN[baEnd];
     var s = Object.assign({}, cur, {
       title: cur.site,
-      desc: mode === 'view' ? (key ? (cur.mute ? 'Mute' : 'Maintenance') + ' · Tier ' + D.tier : 'Recent') : ({ end: 'End now?', approve: 'Approve ' + baLen + ' of maintenance?', decline: 'Decline Arm’s request?', edit: cur.running ? 'Change end' : (cur.pending ? 'Edit or withdraw' : 'Edit or cancel') })[mode],
+      desc: mode === 'view' ? (key ? (isSer ? 'Repeating series' : (cur.mute ? 'Mute' : 'Maintenance')) + ' · Tier ' + D.tier : 'Recent') : ({ series: serPend ? 'Withdraw your series request?' : 'Cancel this series?', end: 'End now?', approve: isSer ? 'Approve this series?' : 'Approve ' + baLen + ' of maintenance?', decline: isSer ? 'Decline Arm’s series?' : 'Decline Arm’s request?', edit: cur.running ? 'Change end' : (cur.pending ? 'Edit or withdraw' : 'Edit or cancel') })[mode],
       endCta: cur.mute ? 'End mute now' : 'End maintenance now',
       ends: (cur.ends || []).map(function (e) { return { value: e, label: e + (e === curEnd ? ' (current)' : '') }; }),
-      effect: mode === 'end' ? cur.endEffect : mode === 'decline' ? 'Arm gets your reason in a Chat message; Arm and Ploy get an email. The request moves to Recent as Declined.' : cancelMode ? (cur.pending ? 'Withdraws the request — nothing is scheduled. Tao is told in Chat and email, and Ploy by email; the reminders stop.' : 'It hasn’t started, so cancelling removes it. The owner and backup get an email; the Alerts Space gets a line.') : 'Change when it ends. Everyone sees the new end time.',
-      reasonLabel: mode === 'end' ? 'Reason for ending early' : mode === 'decline' ? 'Reason' : 'Reason for the change',
+      effect: mode === 'series' ? (serPend ? 'Nothing was scheduled, so nothing is cancelled. Tao’s request thread gets REQUEST WITHDRAWN; Ploy is told by email.' : (occLeft.length ? 'Cancels the ' + occLeft.length + ' occurrences that haven’t started (' + occDays.join(', ') + '). Nothing is running now. ' : 'No occurrence is scheduled yet. ') + 'Past ones stay under Recent. ' + D.owner + ' and ' + D.backup + ' get an email; the Alerts Space gets one line.') : mode === 'end' ? cur.endEffect : mode === 'decline' ? 'Arm gets your reason in a Chat message; Arm and Ploy get an email. The request moves to Recent as Declined.' : cancelMode ? (cur.pending ? 'Withdraws the request — nothing is scheduled. Tao is told in Chat and email, and Ploy by email; the reminders stop.' : 'It hasn’t started, so cancelling removes it' + (D && D.of ? ' — only this window; the series keeps going' : '') + '. The owner and backup get an email; the Alerts Space gets a line.') : 'Change when it ends. Everyone sees the new end time.',
+      reasonLabel: mode === 'end' ? 'Reason for ending early' : (mode === 'decline' || mode === 'series') ? 'Reason' : 'Reason for the change',
       reasonPh: mode === 'decline' ? 'e.g. Split it into two nights' : 'e.g. Upgrade finished early',
-      reasonCta: mode === 'end' ? (cur.mute ? 'End mute now' : 'End maintenance now') : mode === 'decline' ? 'Decline request' : cancelMode ? (cur.pending ? 'Withdraw request' : 'Cancel ' + noun) : 'Save end time'
+      reasonCta: mode === 'series' ? (serPend ? 'Withdraw request' : 'Cancel series') : mode === 'end' ? (cur.mute ? 'End mute now' : 'End maintenance now') : mode === 'decline' ? 'Decline request' : cancelMode ? (cur.pending ? 'Withdraw request' : 'Cancel ' + noun) : 'Save end time'
     });
     var rOk = !!(st.reason || '').trim();
     return {
       yes: true, no: false,
-      views: ['Admin', 'Responder', 'Viewer', 'Empty'], view: st.view,
+      views: ['Admin', 'Responder', 'Viewer', 'Empty', 'Series', 'Series · Responder'], view: st.view,
+      viewOpts: ['Admin', 'Responder', 'Viewer', 'Empty', 'Series', 'Series · Responder'].map(function (v) { return { value: v, label: v }; }),
+      setViewSel: function (e) { var v = e && e.target ? e.target.value : e; clearInterval(self._iv); self.setState({ view: v, ov: {}, open: '', toast: false }); },
       setView: function (v) { clearInterval(self._iv); self.setState({ view: v, ov: {}, open: '', toast: false }); },
       me: ME,
       meta: mp.length ? mp.join(' · ') : 'Nothing active, scheduled or waiting',
       canSchedule: ROLE !== 'ro',
-      empty: !G.active.length && !G.wait.length && !G.sched.length,
+      empty: !G.active.length && !G.wait.length && !G.sched.length && !G.series.length,
       groups: groups,
       toast: !!st.toast && !st.open,
       t: st.toast ? { title: st.toast.phase === 'undone' ? st.toast.title + ' — undone' : st.toast.title, line: st.toast.phase === 'pending' ? 'Posting to ' + st.toast.chan + ' in ' + st.toast.left + ' s — nothing is sent until then' : (st.toast.phase === 'posted' ? 'Posted to ' + st.toast.chan + '.' : 'Nothing was posted.'), left: st.toast.left, pending: st.toast.phase === 'pending', done: st.toast.phase !== 'pending' } : { title: '', line: '', left: 10, pending: false, done: false },
@@ -282,15 +324,16 @@ class Component extends DCLogic {
       sheetOpen: !!st.open,
       close: function () { self.setState({ open: '', mode: 'view' }); },
       s: s,
-      modeView: mode === 'view', modeApprove: mode === 'approve', modeReason: mode === 'end' || mode === 'decline' || mode === 'edit', modeEdit: mode === 'edit',
-      apEffects: L(['Starts Sat 26 Sep 22:00, ends ' + baEnd + ' (' + baLen + '). Tier 1.', 'No alerts for this site during the window; checks still run.', 'Not counted in uptime; the client status page shows “Planned maintenance”.', 'If the site is DOWN or has an open incident at the start, it doesn’t start — Arm, Ploy and Tao are told.', 'Arm gets a Chat message, Arm and Ploy an email, and the Alerts Space a line. Logged as Tao.']),
-      apCta: 'Approve ' + baLen,
+      modeView: mode === 'view', modeApprove: mode === 'approve', modeReason: mode === 'end' || mode === 'decline' || mode === 'edit' || mode === 'series', modeEdit: mode === 'edit',
+      goSeries: function () { self.setState({ mode: 'series', reason: '' }); },
+      apEffects: isSer ? L(['Every Mon, Thu 22:00 → 23:00 (1 h), from Mon 28 Sep, no end date. Tier 1.', 'Windows are created 14 days ahead — the first 4 now: Mon 28 Sep, Thu 1 Oct, Mon 5 Oct, Thu 8 Oct. An overlapping one is skipped.', 'Each one: no alerts, checks still run, not counted in uptime; it doesn’t start if the site is DOWN.', 'You approve the series once. Arm gets a Chat message, Arm and Ploy an email, the Alerts Space one line. Logged as Tao.']) : L(['Starts Sat 26 Sep 22:00, ends ' + baEnd + ' (' + baLen + '). Tier 1.', 'No alerts for this site during the window; checks still run.', 'Not counted in uptime; the client status page shows “Planned maintenance”.', 'If the site is DOWN or has an open incident at the start, it doesn’t start — Arm, Ploy and Tao are told.', 'Arm gets a Chat message, Arm and Ploy an email, and the Alerts Space a line. Logged as Tao.']),
+      apCta: isSer ? 'Approve series' : 'Approve ' + baLen,
       goApprove: function () { self.setState({ mode: 'approve' }); },
       goDecline: function () { self.setState({ mode: 'decline', reason: '' }); },
       goEnd: function () { self.setState({ mode: 'end', reason: '' }); },
       goEdit: function () { self.setState({ mode: 'edit', reason: '', editKind: 'Change end', editEnd: curEnd }); },
       back: function () { self.setState({ mode: 'view' }); },
-      doApprove: function () { act({ approved: true }, 'Approved 10:07 by Tao · Arm told in Chat', cur.site + ' maintenance approved', 'Chat and email'); },
+      doApprove: function () { act({ approved: true }, 'Approved 10:07 by Tao · ' + (isSer ? '4 windows created, to Thu 8 Oct · ' : '') + 'Arm told in Chat', cur.site + (isSer ? ' series approved' : ' maintenance approved'), 'Chat and email'); },
       showKinds: !cur.running,
       editKinds: ['Change end', cancelWord + ' it'], editKind: st.editKind,
       setEditKind: function (v) { self.setState({ editKind: v }); },
@@ -304,8 +347,9 @@ class Component extends DCLogic {
         var r = (self.state.reason || '').trim(); if (!r) return;
         var v, line;
         var title, nm = cur.site + (cur.mute ? ' mute' : ' maintenance'), ch = cur.mute ? 'Chat' : 'Chat and email';
-        if (mode === 'end') { v = { st: 'ended' }; line = 'Ended early 10:07 by ' + ME + ' · “' + r + '”'; title = nm + ' ended'; }
-        else if (mode === 'decline') { v = { st: 'declined' }; line = 'Declined 10:07 by Tao · “' + r + '” · Arm told in Chat'; title = cur.site + ' request declined'; }
+        if (mode === 'series') { v = { st: serPend ? 'withdrawn' : 'cancelled' }; line = (serPend ? 'Withdrawn' : 'Series cancelled') + ' 10:07 by ' + ME + ' · “' + r + '”' + (serPend ? '' : ' · ' + (occLeft.length ? occLeft.length + ' not started cancelled (' + occDays.join(', ') + ')' : 'none scheduled')); title = cur.site + (serPend ? ' series request withdrawn' : ' series cancelled'); ch = 'Chat and email'; }
+        else if (mode === 'end') { v = { st: 'ended' }; line = 'Ended early 10:07 by ' + ME + ' · “' + r + '”'; title = nm + ' ended'; }
+        else if (mode === 'decline') { v = { st: 'declined' }; line = 'Declined 10:07 by Tao · “' + r + '” · Arm told in Chat'; title = cur.site + (isSer ? ' series declined' : ' request declined'); }
         else if (cancelMode) { v = { st: cur.pending ? 'withdrawn' : 'cancelled' }; line = (cur.pending ? 'Withdrawn' : 'Cancelled') + ' 10:07 by ' + ME + ' · “' + r + '”'; title = cur.site + (cur.pending ? ' request withdrawn' : ' maintenance cancelled'); }
         else { v = { end: self.state.editEnd }; line = 'End changed 10:07 by ' + ME + ' · ' + curEnd + ' → ' + self.state.editEnd + ' · “' + r + '”'; title = nm + ' end changed'; }
         act(v, line, title, ch);

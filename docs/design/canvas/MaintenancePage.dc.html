@@ -28,7 +28,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 .mt-h2:focus{outline:2px solid var(--aura-focus-ring, var(--aura-border-strong));outline-offset:4px;border-radius:4px}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1790px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 2880px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -54,7 +54,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 
 <div style="position: absolute; top: 10px; right: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas); z-index: 5">
 <span style="font-family: var(--font-mono)">STATE</span>
-<x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import>
+<div style="width: 260px"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{viewOpts}}" value="{{view}}" on-change="{{setViewSel}}" size="sm"></x-import></div>
 </div>
 
 <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-top: 16px">
@@ -71,7 +71,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div class="aura-empty is-sm">
 <span class="aura-empty__icon"><x-import component-from-global-scope="Aura.Icon" name="calendar" size="md"></x-import></span>
 <h3 class="aura-empty__title">Nothing active or scheduled</h3>
-<p class="aura-empty__text">Maintenance windows and mutes show here while they run, before they start and while they wait for approval. Finished ones stay under Recent for 30 days.</p>
+<p class="aura-empty__text">Maintenance windows, repeating series and mutes show here while they run, before they start and while they wait for approval. Finished ones stay under Recent for 30 days.</p>
 </div>
 <sc-if value="{{canSchedule}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="plus" href="Maintenance.dc.html#new">Schedule maintenance or mute</x-import></sc-if>
 </div>
@@ -99,6 +99,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div class="aura-table__td" style="width: 170px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px">
 <x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.label}}</x-import>
 <sc-if value="{{r.muted}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="eye-off">{{r.mutedLabel}}</x-import></sc-if>
+<sc-if value="{{r.ser2}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="rotate-ccw">{{r.ser2Label}}</x-import></sc-if>
 </div>
 <div class="aura-table__td mt-col" style="flex: 1 1 0">
 <a href="SiteDetail.dc.html" style="font-weight: 500; color: inherit; text-decoration: none">{{r.site}}</a>
@@ -111,12 +112,14 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <div class="aura-table__td mt-col" style="flex: 1.2 1 0">
 <span>{{r.why}}</span>
 <span class="mt-sub">{{r.whySub}}</span>
+<sc-for list="{{r.skips}}" as="l" hint-placeholder-count="0"><span class="mt-sub" style="display: flex; align-items: flex-start; gap: 6px; padding-top: 2px; color: var(--aura-alert-warning-fg)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span>{{l.t}}</span></span></sc-for>
 <sc-for list="{{r.logs}}" as="l" hint-placeholder-count="0"><span class="mt-sub" style="display: flex; align-items: flex-start; gap: 6px; padding-top: 2px"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="file-text" size="sm"></x-import></span><span>{{l.t}}</span></span></sc-for>
 </div>
 <div class="aura-table__td" style="width: 260px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap">
 <sc-if value="{{r.canApprove}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="check" on-click="{{r.approve}}">Approve</x-import><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" on-click="{{r.decline}}">Decline</x-import></sc-if>
 <sc-if value="{{r.canEnd}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" on-click="{{r.end}}">End now</x-import></sc-if>
 <sc-if value="{{r.canEdit}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="pencil" on-click="{{r.edit}}">{{r.editLabel}}</x-import></sc-if>
+<sc-if value="{{r.canCancelSeries}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="trash-2" on-click="{{r.cancelSeries}}">{{r.cancelSeriesLabel}}</x-import></sc-if>
 <sc-if value="{{r.hasNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.4; color: var(--aura-fg-secondary); text-align: right">{{r.note}}</span></sc-if>
 <sc-if value="{{r.logCol}}" hint-placeholder-val="{{false}}"><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary); white-space: normal"><sc-for list="{{r.colLogs}}" as="l" hint-placeholder-count="1"><span style="display: flex; align-items: flex-start; gap: 6px"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="file-text" size="sm"></x-import></span><span>{{l.t}}</span></span></sc-for></span></sc-if>
 </div>
@@ -135,6 +138,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Approval.</b> Asked for in the Maintenance dialog (Responder, over 24 h → “Ask for approval”). Maintenance longer than 24 h asked for by a Responder waits for an Admin (an Admin’s own starts as scheduled). Approve → moves to Scheduled, the asker gets a Chat message. Decline needs a reason → Recent “Declined”, the asker gets the reason. Nobody approves before the start → it doesn’t start; Recent “Not approved — didn’t start”. Mutes never need approval (max 24 h, start now, stop new alerts only — an open incident keeps escalating).</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Roles.</b> Admin: every action on every site; on a request only Approve or Decline (to ask for changes, decline with a reason). Responder: End now and Edit on sites they own or back up, and Edit / withdraw on their own requests; other rows say who can act. AM, CEO and Viewer: read only — no row actions, no Schedule button (STATE › Read only). A running window or mute is changed with “Edit end” or stopped with End now; “Cancel” exists only before it starts. Every action adds a log line; lines are never replaced.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Uptime line.</b> Maintenance: “Not counted in uptime” (removed from the window, client status page shows “Planned maintenance”). Mute: “Still counted in uptime”. Times are site-local Thailand time; past rows keep their log line (who, when, reason).</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Repeating series (FR-10b, D-057, STATE › Series …).</b> A series is a rule; its occurrences are ordinary windows, created 14 days ahead and listed under Scheduled / Recent with a “Part of a series” tag (each keeps Edit / cancel for that one window). Series rows sit in their own section “Repeating series” after Scheduled: status “Repeating” (neutral outline), When = the rule (“Every Tue 01:00 → 03:00”, “Monthly on day 6 · 20:00 → 22:00”) + length · from · end · next, and the only action “Cancel series…” (reason; cancels the occurrences that haven’t started, a running one finishes; the series moves to Recent as Cancelled with one log line). No Edit series in v1 — cancel and make a new one. A Responder’s series waits under Waiting for approval (Needs approval + Repeating): Admin Approve / Decline like a request; the asker Withdraw…; nothing is created until approved. Skipped occurrences (overlap) show as an amber note on the series row, not as rows. No series → the section is left out.</span>
 <span><b style="color: var(--aura-fg-primary); font-weight: 600">Sample data.</b> Fri 25 Sep 10:07 (14:40 in STATE › End mute · open incident); sites, people, times and reasons are mock data — compute them; never copy.</span>
 </div>
 
@@ -205,19 +209,39 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </div>
 </div>
 </x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{seriesOpen}}" on-close="{{closeDlg}}" title="{{d.serTitle}}" description="{{d.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<sc-for list="{{d.serEffects}}" as="x" hint-placeholder-count="3"><li>{{x.t}}</li></sc-for>
+</ul>
+<x-import component-from-global-scope="Aura.TextField" label="Reason" required="{{yes}}" placeholder="e.g. Plugins now update automatically" value="{{serReason}}" on-change="{{setSerReason}}" hint="{{serHint}}"></x-import>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeDlg}}">Keep it</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" disabled="{{serBlocked}}" on-click="{{confirmSeries}}">{{d.serCta}}</x-import>
+</div>
+</div>
+</x-import>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1790}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2880}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
     this.state = { view: 'Default', ov: {}, dlg: '', dlgKind: '', endReason: '', editEnd: '', editReason: '', cancelling: false, declineReason: '' };
   }
+  _setView(v) {
+    clearInterval(this._iv);
+    var dlg = { 'Approve confirm': 'bac', 'End mute · open incident': 'bat', 'Approve series': 'sbat', 'Cancel series': 'stub' }[v] || '';
+    var kind = { 'Approve confirm': 'approve', 'End mute · open incident': 'end', 'Approve series': 'approve', 'Cancel series': 'series' }[v] || '';
+    this.setState({ toast: false, toastHidden: false, view: v, ov: {}, dlg: dlg, dlgKind: kind, endReason: '', serReason: v === 'Cancel series' ? 'Plugins now update automatically' : '', cancelling: false });
+  }
   renderVals() {
     var self = this;
     var st = this.state;
     var view = st.view;
-    var ROLE = view === 'Responder' ? 'resp' : (view === 'Read only' ? 'ro' : 'admin');
+    var SER = /^(Series|Approve series|Cancel series)/.test(view);
+    var ROLE = (view === 'Responder' || view === 'Series · Responder') ? 'resp' : (view === 'Read only' ? 'ro' : 'admin');
     var ADMIN = ROLE === 'admin';
     var ME = ADMIN ? 'Tao' : (ROLE === 'resp' ? 'Arm' : 'Mint');
     var EM = view === 'End mute · open incident';
@@ -236,8 +260,19 @@ class Component extends DCLogic {
       bat: { kind: 'mute', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', start: '13:00', end: '15:00', day: 'Today ', why: 'Investigating slow booking page', by: 'Arm', ends: ['15:00', '16:00'], running: true, only: 'End mute · open incident', now: 14 * 60 + 40, realDown: true,
         endEffects: ['INC-0154 (DOWN since 14:20, held by this mute) posts its first alert now and starts escalating — L1 at about 14:56 if nobody acknowledges.', 'Alerts resume now for Arm (owner) and the Alerts Space.', 'Uptime is unaffected — muted time was already counted.', 'Logged in the audit log as ' + ME + '.'] },
       bac: { kind: 'maint', site: 'Bangkok Airways – China', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Sat 26 Sep 22:00', fromAbs: 1440 + 22 * 60, end: 'Tue 29 Sep 22:00', day: '', why: 'Move to a new hosting provider', by: 'Arm', asked: 'today 09:20', ends: ['Mon 28 Sep 22:00', 'Tue 29 Sep 22:00'], request: true },
-      tub: { kind: 'maint', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', from: 'Tue 29 Sep 01:00', fromAbs: 4 * 1440 + 60, end: '03:00', day: 'Tue 29 Sep ', why: 'WordPress plugin updates', by: 'Ploy', ends: ['02:00', '03:00', '04:00'] }
+      tub: { kind: 'maint', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', from: 'Tue 29 Sep 01:00', fromAbs: 4 * 1440 + 60, end: '03:00', day: 'Tue 29 Sep ', why: 'WordPress plugin updates', by: 'Ploy', ends: ['02:00', '03:00', '04:00'] },
+      // ---- repeating series (STATE › Series …) — D-057
+      stub: { ser: true, kind: 'series', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', rule: 'Every Tue', start: '01:00', end: '03:00', len: '2 h', from: 'Tue 15 Sep', until: 'no end date', next: 'Tue 29 Sep', why: 'WordPress plugin updates', by: 'Ploy', okBy: 'approved by Tao Mon 14 Sep', occ: ['tub', 'tub2'], sortKey: 4 * 1440 + 60 },
+      sorca: { ser: true, kind: 'series', site: 'ORCA Thailand', tier: 2, owner: 'Tao', backup: 'Nok', rule: 'Monthly on day 6 ·', start: '20:00', end: '22:00', len: '2 h', from: 'Sun 6 Sep', until: 'ends Thu 31 Dec', next: 'Fri 6 Nov', why: 'Hosting security patches', by: 'Tao', okBy: '', occ: [], skip: 'Skipped Tue 6 Oct — overlaps the 18:00 → 23:00 window (Data-centre move)', sortKey: 42 * 1440 + 20 * 60 },
+      sbat: { ser: true, kind: 'series', request: true, site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', rule: 'Every Mon, Thu', start: '22:00', end: '23:00', len: '1 h', from: 'Mon 28 Sep', until: 'no end date', next: 'Mon 28 Sep', why: 'Cache purge and log rotation', by: 'Arm', asked: 'today 09:50', occ: ['bt1', 'bt2', 'bt3', 'bt4'], fromAbs: 3 * 1440 + 22 * 60, sortKey: 3 * 1440 + 22 * 60 },
+      tub2: { ser: true, of: 'stub', kind: 'maint', site: 'Tubtong', tier: 2, owner: 'Ploy', backup: 'Nok', from: 'Tue 6 Oct 01:00', fromAbs: 11 * 1440 + 60, end: '03:00', day: 'Tue 6 Oct ', why: 'WordPress plugin updates', by: 'Ploy', ends: ['02:00', '03:00', '04:00'] },
+      orca1: { ser: true, kind: 'maint', site: 'ORCA Thailand', tier: 2, owner: 'Tao', backup: 'Nok', from: 'Tue 6 Oct 18:00', fromAbs: 11 * 1440 + 18 * 60, end: '23:00', day: 'Tue 6 Oct ', why: 'Data-centre move', by: 'Tao', ends: ['22:00', '23:00', '23:30'] },
+      bt1: { ser: true, of: 'sbat', kind: 'maint', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Mon 28 Sep 22:00', fromAbs: 3 * 1440 + 22 * 60, end: '23:00', day: 'Mon 28 Sep ', why: 'Cache purge and log rotation', by: 'Arm', ends: ['22:30', '23:00', '23:30'] },
+      bt2: { ser: true, of: 'sbat', kind: 'maint', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Thu 1 Oct 22:00', fromAbs: 6 * 1440 + 22 * 60, end: '23:00', day: 'Thu 1 Oct ', why: 'Cache purge and log rotation', by: 'Arm', ends: ['22:30', '23:00', '23:30'] },
+      bt3: { ser: true, of: 'sbat', kind: 'maint', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Mon 5 Oct 22:00', fromAbs: 10 * 1440 + 22 * 60, end: '23:00', day: 'Mon 5 Oct ', why: 'Cache purge and log rotation', by: 'Arm', ends: ['22:30', '23:00', '23:30'] },
+      bt4: { ser: true, of: 'sbat', kind: 'maint', site: 'Bangkok Airways – Taiwan', tier: 1, owner: 'Arm', backup: 'Ploy', from: 'Thu 8 Oct 22:00', fromAbs: 13 * 1440 + 22 * 60, end: '23:00', day: 'Thu 8 Oct ', why: 'Cache purge and log rotation', by: 'Arm', ends: ['22:30', '23:00', '23:30'] }
     };
+    if (SER) DEF.tub = Object.assign({}, DEF.tub, { ser: true, of: 'stub' });
     var BACLEN = { 'Mon 28 Sep 22:00': '2 days', 'Tue 29 Sep 22:00': '3 days' };
     var ov = view === 'Empty' ? { wecare: { st: 'gone' }, games: { st: 'gone' }, bac: { st: 'gone' }, tub: { st: 'gone' } } : st.ov;
     function S(k) { var o = ov[k] || {}; return { st: o.st || 'on', approved: !!o.approved, end: o.end || DEF[k].end, logs: o.logs || [] }; }
@@ -246,10 +281,12 @@ class Component extends DCLogic {
     function past(icon, label) { return { tone: 'neutral', variant: 'outline', icon: icon, label: label }; }
     function L(arr) { return arr.map(function (t) { return { t: t }; }); }
     function lenOf(k, s) { var d = DEF[k]; return k === 'bac' ? BACLEN[s.end] : dur(mins(s.end) - mins(d.from.slice(-5))); }
-    var active = [], wait = [], sched = [], recentNew = [];
+    var active = [], wait = [], sched = [], recentNew = [], series = [];
     Object.keys(DEF).forEach(function (k) {
       var d = DEF[k], s = S(k);
       if (s.st === 'gone' || (d.only && d.only !== view)) return;
+      if (d.ser && !SER) return;
+      if (d.of) { var ps = S(d.of); if (ps.st !== 'on' || (DEF[d.of].request && !ps.approved)) return; }
       if (EM && k === 'wecare') return; // ended on time at 14:00 — shown under Recent
       var NOWD = d.now || NOWABS;
       var pending = d.request && !s.approved;
@@ -258,7 +295,29 @@ class Component extends DCLogic {
         end: function () { self.setState({ dlg: k, dlgKind: 'end', endReason: '' }); },
         edit: function () { self.setState({ dlg: k, dlgKind: 'edit', editEnd: S(k).end, editReason: '', cancelling: false }); },
         approve: function () { self.setState({ dlg: k, dlgKind: 'approve' }); },
-        decline: function () { self.setState({ dlg: k, dlgKind: 'decline', declineReason: '' }); } };
+        decline: function () { self.setState({ dlg: k, dlgKind: 'decline', declineReason: '' }); },
+        cancelSeries: function () { self.setState({ dlg: k, dlgKind: 'series', serReason: '' }); },
+        canCancelSeries: false, cancelSeriesLabel: '', skips: [], ser2: !!d.of, ser2Label: 'Part of a series' };
+      if (d.kind === 'series') {
+        var spend = d.request && !s.approved;
+        r.skips = d.skip ? L([d.skip]) : [];
+        Object.assign(r, { when: d.rule + ' ' + d.start + ' → ' + d.end, whenSub: 'Series · ' + d.len + ' · from ' + d.from + ' · ' + d.until });
+        if (s.st !== 'on') {
+          Object.assign(r, past('rotate-ccw', { cancelled: 'Cancelled', declined: 'Declined', withdrawn: 'Withdrawn' }[s.st]), { whySub: d.request ? 'asked by ' + d.by + ' · ' + d.asked : 'by ' + d.by, skips: [] });
+          r.sortKey = 0; recentNew.push(r); return;
+        }
+        if (spend) {
+          Object.assign(r, past('clock', 'Needs approval'), { ser2: true, ser2Label: 'Repeating', whySub: 'asked by ' + d.by + ' · ' + d.asked });
+          r.whenSub += ' · first ' + d.next;
+          if (ADMIN) r.canApprove = true;
+          else { r.hasNote = true; r.note = 'Waiting for an Admin'; if (ME === d.by) { r.canCancelSeries = true; r.cancelSeriesLabel = 'Withdraw…'; } }
+          r.sortKey = d.fromAbs; wait.push(r); return;
+        }
+        Object.assign(r, past('rotate-ccw', 'Repeating'), { whySub: 'by ' + d.by + (s.approved ? ' · approved by Tao 10:07' : (d.okBy ? ' · ' + d.okBy : '')) + ' · not counted in uptime' });
+        r.whenSub += ' · next ' + d.next;
+        if (can(d)) { r.canCancelSeries = true; r.cancelSeriesLabel = 'Cancel series…'; } else if (ROLE !== 'ro') { r.hasNote = true; r.note = who(d); }
+        series.push(r); return;
+      }
       var noun = d.kind === 'mute' ? 'Mute' : 'Maintenance';
       var icon = d.kind === 'mute' ? 'eye-off' : 'calendar';
       if (s.st !== 'on') {
@@ -278,7 +337,7 @@ class Component extends DCLogic {
         Object.assign(r, past('clock', 'Needs approval'), { whySub: 'asked by Arm · ' + d.asked });
         if (ADMIN) r.canApprove = true;
         else { r.hasNote = true; r.note = 'Waiting for an Admin'; if (can(d)) r.canEdit = true; }
-        wait.push(r); return;
+        r.sortKey = d.fromAbs; wait.push(r); return;
       }
       Object.assign(r, past('calendar', 'Scheduled'), { whySub: (d.request ? 'asked by Arm' : 'by ' + d.by) + ' · not counted in uptime' });
       if (can(d)) r.canEdit = true; else if (ROLE !== 'ro') { r.hasNote = true; r.note = who(d); }
@@ -286,29 +345,37 @@ class Component extends DCLogic {
     });
     active.sort(function (a, b) { return a.sortKey - b.sortKey; });
     sched.sort(function (a, b) { return a.sortKey - b.sortKey; });
-    function R(icon, label, site, sub, when, whenSub, why, whySub, log) { return { tone: 'neutral', variant: 'outline', icon: icon, label: label, site: site, siteSub: sub, when: when, whenSub: whenSub, why: why, whySub: whySub, logs: [], colLogs: [{ t: log }], muted: false, canApprove: false, canEnd: false, canEdit: false, hasNote: false }; }
+    wait.sort(function (a, b) { return a.sortKey - b.sortKey; });
+    function R(icon, label, site, sub, when, whenSub, why, whySub, log) { return { tone: 'neutral', variant: 'outline', icon: icon, label: label, site: site, siteSub: sub, when: when, whenSub: whenSub, why: why, whySub: whySub, logs: [], colLogs: [{ t: log }], muted: false, canApprove: false, canEnd: false, canEdit: false, hasNote: false, canCancelSeries: false, skips: [], ser2: false, ser2Label: '' }; }
     var recent = recentNew.concat([
       EM ? R('calendar', 'Ended', 'WeCare Studio', 'Tier 2 · Nok · backup Ploy', 'Today 09:30 → 14:00', 'Maintenance · 4 h 30 min', 'CMS upgrade', 'by Nok', 'Ended on time 14:00') : null,
       R('calendar', 'Ended', 'ORCA Thailand', 'Tier 2 · Tao · backup Nok', 'Tue 22 Sep 20:00 → 22:00', 'Maintenance · 2 h', 'Hosting plan upgrade', 'by Tao', 'Ended on time 22:00'),
+      SER ? Object.assign(R('calendar', 'Ended', 'Tubtong', 'Tier 2 · Ploy · backup Nok', 'Tue 22 Sep 01:00 → 03:00', 'Maintenance · 2 h', 'WordPress plugin updates', 'by Ploy', 'Ended on time 03:00'), { ser2: true, ser2Label: 'Part of a series' }) : null,
       R('eye-off', 'Ended early', 'Cando Asia', 'Tier 2 · Nok · backup Ploy', 'Mon 21 Sep 10:15 → 11:40', 'Mute · 1 h 25 min', 'Client changing DNS', 'by Nok', 'Ended early 11:40 by Nok · “DNS change confirmed”'),
       R('calendar', 'Cancelled', 'EQHO', 'Tier 2 · Tao · backup Nok', 'Sat 19 Sep 09:00 → 12:00', 'Maintenance · 3 h · didn’t start', 'Theme update', 'by Tao', 'Cancelled Fri 18 Sep 16:20 by Tao · “Client moved the launch”'),
-      R('calendar', 'Not approved', 'Fuji Links', 'Tier 2 · Ploy · backup Nok', 'Sat 12 Sep 22:00 → Mon 14 Sep 22:00', 'Maintenance · 2 days · didn’t start', 'Server OS upgrade', 'asked by Ploy', 'Not approved — didn’t start · nobody approved before Sat 12 Sep 22:00')
+      R('calendar', 'Not approved', 'Fuji Links', 'Tier 2 · Ploy · backup Nok', 'Sat 12 Sep 22:00 → Mon 14 Sep 22:00', 'Maintenance · 2 days · didn’t start', 'Server OS upgrade', 'asked by Ploy', 'Not approved — didn’t start · nobody approved before Sat 12 Sep 22:00'),
+      SER ? Object.assign(R('calendar', 'Ended', 'ORCA Thailand', 'Tier 2 · Tao · backup Nok', 'Sun 6 Sep 20:00 → 22:00', 'Maintenance · 2 h', 'Hosting security patches', 'by Tao', 'Ended on time 22:00'), { ser2: true, ser2Label: 'Part of a series' }) : null
     ].filter(Boolean));
     var kinds = []; recent.forEach(function (x) { var l = x.label.toLowerCase(); if (kinds.indexOf(l) < 0) kinds.push(l); });
     function A(rows, v) { rows.forEach(function (x) { x.logCol = !v; if (!v) x.logs = []; }); return rows; }
     var sections = []; self._secOf = {};
     function mark(rows, id) { rows.forEach(function (x) { if (x.k) self._secOf[x.k] = id; }); }
-    mark(active, 'mt-active'); mark(wait, 'mt-wait'); mark(sched, 'mt-sched'); mark(recentNew, 'mt-recent');
+    mark(active, 'mt-active'); mark(wait, 'mt-wait'); mark(sched, 'mt-sched'); mark(series, 'mt-series'); mark(recentNew, 'mt-recent');
     if (active.length) sections.push({ id: 'mt-active', title: 'Active now', hint: active.length + ' · alerts off or muted, checks still run', rows: A(active, true), actLabel: '' });
-    if (wait.length) sections.push({ id: 'mt-wait', title: 'Waiting for approval', hint: wait.length + ' · over 24 h, asked by a Responder — doesn’t start unless an Admin approves', rows: A(wait, true), actLabel: '' });
+    if (wait.length) sections.push({ id: 'mt-wait', title: 'Waiting for approval', hint: wait.length + (SER ? ' · over 24 h or repeating, asked by a Responder — nothing is scheduled unless an Admin approves' : ' · over 24 h, asked by a Responder — doesn’t start unless an Admin approves'), rows: A(wait, true), actLabel: '' });
     if (sched.length) sections.push({ id: 'mt-sched', title: 'Scheduled', hint: sched.length + ' · approved, starts on its own', rows: A(sched, true), actLabel: '' });
+    if (series.length) sections.push({ id: 'mt-series', title: 'Repeating series', hint: series.length + ' · each creates its windows 14 days ahead; one that overlaps another window on the site is skipped', rows: A(series, true), actLabel: '' });
     sections.push({ id: 'mt-recent', title: 'Recent · last 30 days', hint: recent.length + ' · ' + kinds.join(', '), rows: A(recent, false), actLabel: 'What happened' });
-    var mp = []; if (active.length) mp.push(active.length + ' active'); if (sched.length) mp.push(sched.length + ' scheduled'); if (wait.length) mp.push(wait.length + ' waiting for approval');
-    var notEmpty = !!(active.length || wait.length || sched.length);
+    var mp = []; if (active.length) mp.push(active.length + ' active'); if (sched.length) mp.push(sched.length + ' scheduled'); if (wait.length) mp.push(wait.length + ' waiting for approval'); if (series.length) mp.push(series.length + ' repeating');
+    var notEmpty = !!(active.length || wait.length || sched.length || series.length);
     // Dialogs
     var dk = st.dlg && DEF[st.dlg] ? st.dlg : 'wecare';
     var D = DEF[dk], DS = S(dk);
     var pendingD = D.request && !DS.approved;
+    var isSer = D.kind === 'series';
+    var occLeft = isSer ? D.occ.filter(function (o) { return S(o).st === 'on'; }) : [];
+    var occDays = occLeft.map(function (o) { return DEF[o].from.slice(0, -6); });
+    var NUM = ['No', 'One', 'Two', 'Three', 'Four'];
     var noun = D.kind === 'mute' ? 'mute' : 'maintenance';
     var curEnd = DS.end;
     function act(k, v, line, title, chan, extra) {
@@ -333,14 +400,16 @@ class Component extends DCLogic {
     function push(base, k, v, line) { var n = Object.assign({}, base); var cur = n[k] || {}; n[k] = Object.assign({}, cur, v, { logs: (cur.logs || []).concat([line]) }); return n; }
     var reasonOk = !!(st.editReason || '').trim();
     var endChanged = st.editEnd && st.editEnd !== curEnd;
-    var desc = D.running ? (D.kind === 'mute' ? 'Muted ' + D.start + ' → ' + curEnd : D.start + ' → ' + curEnd) + ' · ' + D.why + ' · by ' + D.by : D.from + ' → ' + curEnd + ' · ' + D.why + ' · ' + (D.request ? 'asked by Arm' : 'by ' + D.by);
+    var desc = isSer ? D.rule + ' ' + D.start + ' → ' + D.end + ' · ' + D.why + ' · ' + (D.request ? 'asked by ' + D.by : 'by ' + D.by) : D.running ? (D.kind === 'mute' ? 'Muted ' + D.start + ' → ' + curEnd : D.start + ' → ' + curEnd) + ' · ' + D.why + ' · by ' + D.by : D.from + ' → ' + curEnd + ' · ' + D.why + ' · ' + (D.request ? 'asked by Arm' : 'by ' + D.by);
     var baLen = BACLEN[S('bac').end];
     var approveOpen = st.dlgKind === 'approve';
     var cancelCta = pendingD ? 'Withdraw request' : 'Cancel maintenance';
-    var cancelText = pendingD ? 'Withdraws the request — nothing is scheduled; Tao’s request thread gets REQUEST WITHDRAWN in Chat and email, Ploy is told by email, and the reminders stop. Logged as ' + ME + '.' : (dk === 'bac' ? 'It hasn’t started, so cancelling removes it. Arm and Ploy get an email; the Alerts Space gets a line. Logged as ' + ME + '.' : 'It hasn’t started, so cancelling removes it. Ploy and Nok get an email; the Alerts Space gets a line. Logged as ' + ME + '.');
+    var cancelText = pendingD ? 'Withdraws the request — nothing is scheduled; Tao’s request thread gets REQUEST WITHDRAWN in Chat and email, Ploy is told by email, and the reminders stop. Logged as ' + ME + '.' : ('It hasn’t started, so cancelling removes it' + (D.of ? ' — only this window; the series keeps going' : '') + '. ' + D.owner + ' and ' + D.backup + ' get an email; the Alerts Space gets a line. Logged as ' + ME + '.');
     return {
-      views: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm', 'End mute · open incident'], view: view,
-      setView: function (v) { clearInterval(self._iv); self.setState({ toast: false, toastHidden: false, view: v, ov: {}, dlg: v === 'Approve confirm' ? 'bac' : (v === 'End mute · open incident' ? 'bat' : ''), dlgKind: v === 'Approve confirm' ? 'approve' : (v === 'End mute · open incident' ? 'end' : ''), endReason: '', cancelling: false }); },
+      views: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm', 'End mute · open incident', 'Series', 'Series · Responder', 'Approve series', 'Cancel series'], view: view,
+      viewOpts: ['Default', 'Responder', 'Read only', 'Empty', 'Approve confirm', 'End mute · open incident', 'Series', 'Series · Responder', 'Approve series', 'Cancel series'].map(function (v) { return { value: v, label: v }; }),
+      setViewSel: function (e) { self._setView(e && e.target ? e.target.value : e); },
+      setView: function (v) { self._setView(v); },
       me: ME, meLine: ADMIN ? 'Jirawat Piyakit · Admin' : (ROLE === 'resp' ? 'Responder' : 'Viewer · read only'),
       meta: mp.length ? mp.join(' · ') : 'Nothing active, scheduled or waiting',
       empty: !notEmpty, notEmpty: notEmpty, canSchedule: ROLE !== 'ro', headerBtn: notEmpty && ROLE !== 'ro',
@@ -353,18 +422,27 @@ class Component extends DCLogic {
         isHeld: dk === 'bat',
         endCta: D.kind === 'mute' ? 'End mute now' : 'End maintenance now',
         editTitle: D.running ? 'Change end · ' + D.site + ' ' + noun : (pendingD ? 'Edit or withdraw · ' + D.site + ' request' : 'Edit or cancel · ' + D.site + ' maintenance'),
-        ends: D.ends.map(function (e) { return { value: e, label: (D.day || '') + e + (e === curEnd ? ' (current)' : '') }; }),
+        ends: (D.ends || []).map(function (e) { return { value: e, label: (D.day || '') + e + (e === curEnd ? ' (current)' : '') }; }),
         cancelCta: cancelCta + '…', cancelTitle: cancelCta + '?', cancelText: cancelText,
-        approveTitle: 'Approve ' + baLen + ' of maintenance?',
-        approveEffects: L([
+        approveTitle: isSer ? 'Approve the ' + D.site + ' series?' : 'Approve ' + baLen + ' of maintenance?',
+        approveEffects: isSer ? L([
+          D.rule + ' ' + D.start + ' → ' + D.end + ' (' + D.len + '), from ' + D.from + ', ' + D.until + '. ' + D.site + ' is Tier ' + D.tier + '.',
+          'Windows are created 14 days ahead — the first 4 now: Mon 28 Sep, Thu 1 Oct, Mon 5 Oct, Thu 8 Oct. One that overlaps another window on this site is skipped and noted on the series.',
+          'Each one: no alerts, checks still run, not counted in uptime. It doesn’t start if the site is DOWN or has an open incident — Arm, Ploy and Tao are told.',
+          'You approve the series once; its windows don’t ask again. Arm gets a Chat message, Arm and Ploy an email, and the Alerts Space one line for the series. Logged in the audit log as Tao.'
+        ]) : L([
           'Starts Sat 26 Sep 22:00, ends ' + S('bac').end + ' (' + baLen + '). Bangkok Airways – China is Tier 1.',
           'No alerts for this site during the window. Checks still run and are logged.',
           'Not counted in uptime; the client status page shows “Planned maintenance”.',
           'If the site is DOWN or has an open incident at the start, the window doesn’t start — Arm, Ploy and Tao are told.',
           'Arm gets a Chat message, Arm and Ploy an email, and the Alerts Space a line. Logged in the audit log as Tao.'
         ]),
-        approveCta: 'Approve',
-        declineTitle: 'Decline Arm’s request?'
+        approveCta: isSer ? 'Approve series' : 'Approve',
+        declineTitle: isSer ? 'Decline Arm’s series?' : 'Decline Arm’s request?',
+        serTitle: isSer ? (pendingD ? 'Withdraw your series request?' : 'Cancel the ' + D.site + ' series?') : '',
+        serCta: pendingD ? 'Withdraw request' : 'Cancel series',
+        serEffects: !isSer ? [] : (pendingD ? L(['Nothing was scheduled, so nothing is cancelled.', 'Tao’s request thread gets REQUEST WITHDRAWN in Chat and email; Ploy is told by email. Logged in the audit log as ' + ME + '.'])
+          : L([(occLeft.length ? 'Cancels the ' + (occLeft.length === 1 ? 'occurrence' : occLeft.length + ' occurrences') + ' that haven’t started (' + occDays.join(', ') + ').' : 'No occurrence is scheduled yet.') + ' Nothing is running now.', 'No new windows are created. Past ones stay under Recent.', D.owner + ' and ' + D.backup + ' get an email; the Alerts Space gets one line for the series. Logged in the audit log as ' + ME + '.']))
       },
       heldVars: ['Tier 1', 'Tier 2–3', 'Outside hours'], heldVar: st.heldVar || 'Tier 1',
       setHeldVar: function (v) { self.setState({ heldVar: v }); },
@@ -380,11 +458,19 @@ class Component extends DCLogic {
         setTimeout(function () { var id = self._secOf && self._secOf[t.k], el = id && document.getElementById(id); if (el) el.focus(); }, 60);
       },
       dismiss: function () { self.setState({ toastHidden: true }); }, // hides only — a pending action still posts when the timer runs out
+      seriesOpen: st.dlgKind === 'series',
+      serReason: st.serReason || '',
+      setSerReason: function (e) { self.setState({ serReason: e && e.target ? e.target.value : e }); },
+      serBlocked: !(st.serReason || '').trim(),
+      serHint: (st.serReason || '').trim() ? 'Shown in the digest and the audit log.' : 'Required — type a reason to continue. Shown in the digest and the audit log.',
+      confirmSeries: function () { var r = (self.state.serReason || '').trim(); if (!r) return;
+        if (pendingD) act(dk, { st: 'withdrawn' }, 'Withdrawn ' + TS + ' by ' + ME + ' · “' + r + '”', D.site + ' series request withdrawn', 'Chat and email');
+        else act(dk, { st: 'cancelled' }, 'Series cancelled ' + TS + ' by ' + ME + ' · “' + r + '” · ' + (occLeft.length ? occLeft.length + ' not started cancelled (' + occDays.join(', ') + ')' : 'none scheduled'), D.site + ' series cancelled', 'Chat and email', { view: self.state.view === 'Cancel series' ? 'Series' : self.state.view }); },
       endOpen: st.dlgKind === 'end',
       editOpen: st.dlgKind === 'edit',
       approveOpen: approveOpen,
       declineOpen: st.dlgKind === 'decline',
-      closeDlg: function () { self.setState({ dlgKind: '', cancelling: false, view: self.state.view === 'Approve confirm' ? 'Default' : self.state.view }); },
+      closeDlg: function () { var v = self.state.view; self.setState({ dlgKind: '', cancelling: false, view: v === 'Approve confirm' ? 'Default' : (v === 'Approve series' || v === 'Cancel series' ? 'Series' : v) }); },
       endReason: st.endReason,
       setEndReason: function (e) { self.setState({ endReason: e && e.target ? e.target.value : e }); },
       endBlocked: !(st.endReason || '').trim(),
@@ -407,12 +493,12 @@ class Component extends DCLogic {
         if (self.state.cancelling) act(dk, { st: pendingD ? 'withdrawn' : 'cancelled' }, (pendingD ? 'Withdrawn' : 'Cancelled') + ' ' + TS + ' by ' + ME + ' · “' + r + '”', D.site + (pendingD ? ' request withdrawn' : ' maintenance cancelled'), 'Chat and email');
         else act(dk, { end: self.state.editEnd }, 'End changed ' + TS + ' by ' + ME + ' · ' + curEnd + ' → ' + self.state.editEnd + ' · “' + r + '”', D.site + (D.kind === 'mute' ? ' mute' : ' maintenance') + ' end changed', D.kind === 'mute' ? 'Chat' : 'Chat and email');
       },
-      confirmApprove: function () { act('bac', { approved: true }, 'Approved ' + TS + ' by Tao · Arm told in Chat', 'Bangkok Airways – China maintenance approved', 'Chat and email', { view: self.state.view === 'Approve confirm' ? 'Default' : self.state.view }); },
+      confirmApprove: function () { var v = self.state.view; act(dk, { approved: true }, 'Approved ' + TS + ' by Tao · ' + (isSer ? '4 windows created, to Thu 8 Oct · ' : '') + 'Arm told in Chat', D.site + (isSer ? ' series approved' : ' maintenance approved'), 'Chat and email', { view: v === 'Approve confirm' ? 'Default' : (v === 'Approve series' ? 'Series' : v) }); },
       declineReason: st.declineReason,
       setDeclineReason: function (e) { self.setState({ declineReason: e && e.target ? e.target.value : e }); },
       declineBlocked: !(st.declineReason || '').trim(),
       declineHint: 'Required. Arm gets it in a Chat message; Arm and Ploy get an email; the request moves to Recent as Declined.',
-      confirmDecline: function () { var r = (self.state.declineReason || '').trim(); if (!r) return; act('bac', { st: 'declined' }, 'Declined ' + TS + ' by Tao · “' + r + '” · Arm told in Chat', 'Bangkok Airways – China request declined', 'Chat and email'); },
+      confirmDecline: function () { var r = (self.state.declineReason || '').trim(); if (!r) return; act(dk, { st: 'declined' }, 'Declined ' + TS + ' by Tao · “' + r + '” · Arm told in Chat', D.site + (isSer ? ' series declined' : ' request declined'), 'Chat and email'); },
       nav: [
         { items: [
           { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
