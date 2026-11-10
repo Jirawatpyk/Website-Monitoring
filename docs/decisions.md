@@ -83,7 +83,7 @@ The summary gave one figure for all sites ("Uptime all sites 99.98%"), and no so
   - Tier 2 is 99.9% (~43 min).
   - Tier 3 is 99.5% (~3.6 h).
   - A target per site waits for Settings (S17).
-- **What is judged:** each site's uptime over the 30 days ending with the week, maintenance excluded, as the table counts a month. A site watched for less than that is judged since it started ("since Wed 28 Oct"). This week's figure is shown beside a site below target, not judged on its own: Tier 1's week allows only ~5 min.
+- **What is judged:** each site's uptime over the 30 days ending with the week, maintenance excluded, as the table counts a month. A site watched for less than that is judged since it started ("since Wed 28 Oct"). This week's figure is shown beside a site below target, not judged on its own: Tier 1's week allows only ~5 min. Uptime is the one §5 figure every page uses, so a DOWN later marked "False alarm (monitor)" still counts against its site (Tao, 10 Nov). Whether false alarms leave uptime everywhere is a separate decision; on 10 Nov none moved a site's verdict.
 - **The words:**
   - The header gains its own line, "Last 30 days: 15/17 sites on their uptime target". It isn't mixed into the line of this week's figures (message check).
   - A new section after INCIDENTS, "UPTIME BY SITE · 2 BELOW TARGET" or "· ALL ON TARGET", lists every site.
