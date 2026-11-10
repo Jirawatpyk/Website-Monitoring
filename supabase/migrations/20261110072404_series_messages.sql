@@ -22,7 +22,8 @@ alter table public.maintenance_series
   add column reminded_1h_at timestamptz,
   add column outcome text check (outcome is null or outcome = 'not_approved');
 
--- Series made before this file: the first window their rule gave at creation (the same rule as below).
+-- Series made before this file: the first window their rule gave at creation (the first by the rule —
+-- create below also passes over a first window that overlaps; D-057 accepts the difference).
 update public.maintenance_series m
   set first_starts_at = (
     select (d::date + m.start_time) at time zone 'Asia/Bangkok'
@@ -613,7 +614,8 @@ begin
   end if;
   -- The first window: a waiting series' deadline (§32.7) and the start its reminders count back from.
   -- One that already overlaps another window on the site would be skipped, so the deadline is the first
-  -- that doesn't (D-057 amended 10 Nov, engine review M2); every one overlapping → the first by the rule.
+  -- that doesn't (D-057 amended 10 Nov, engine review M2). Only the next 14 days are known — windows
+  -- (another series' too) exist that far ahead — so with none free in them, the first by the rule.
   with days as (
     select (d::date + p_start_time) at time zone 'Asia/Bangkok' as s
     from generate_series(p_starts_on, least(coalesce(p_until_on, p_starts_on + 366), p_starts_on + 366),
@@ -623,7 +625,8 @@ begin
   )
   select coalesce(
     (select min(x.s) from days x
-     where not exists (select 1 from public.maintenance_windows w
+     where x.s < v_now + interval '14 days'
+       and not exists (select 1 from public.maintenance_windows w
                        where w.site_id = p_site_id and w.kind = 'maintenance' and w.cancelled_at is null
                          and tstzrange(w.starts_at, coalesce(w.ended_at, w.ends_at))
                              && tstzrange(x.s, x.s + make_interval(mins => p_duration_min)))),
@@ -750,16 +753,18 @@ begin
   if s.cancelled_at is not null or s.declined_at is not null then
     raise exception 'This series is over already' using errcode = '22023', hint = 'already_over';
   end if;
-  -- A waiting series is the asker's to withdraw or an Admin's to decline (§32.7: others see "Waiting for an
-  -- Admin"; code, message and engine review S14 PR 2b); once its first window has come, NOT APPROVED wins.
-  if s.approved_at is null and s.created_by is distinct from auth.uid() then
-    raise exception 'A waiting series is withdrawn by whoever asked for it, or declined by an Admin'
-      using errcode = '42501', hint = 'use_decline';
-  end if;
-  -- (A series with no first window known can still be withdrawn: nothing could be scheduled anyway.)
+  -- Once a waiting series' first window has come, NOT APPROVED wins (checked first, so nobody is told to
+  -- decline what can't be declined either). A series with no first window known can still be withdrawn —
+  -- the engine marks it NOT APPROVED on its next run anyway (engine review L-a).
   if s.approved_at is null and s.first_starts_at <= now() then
     raise exception 'Nobody approved it before its first window — ask again'
       using errcode = '22023', hint = 'not_approved';
+  end if;
+  -- A waiting series is the asker's to withdraw or an Admin's to decline (§32.7: others see "Waiting for an
+  -- Admin"; code, message and engine review S14 PR 2b).
+  if s.approved_at is null and s.created_by is distinct from auth.uid() then
+    raise exception 'A waiting series is withdrawn by whoever asked for it, or declined by an Admin'
+      using errcode = '42501', hint = 'use_decline';
   end if;
   v_reason := private.require_reason(p_reason);
   v_withdraw := s.approved_at is null;

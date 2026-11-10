@@ -4,7 +4,7 @@
 -- series' window, and claim_notifications holding series rows for a notifier that renders them.
 begin;
 \ir _helpers.psql
-select plan(52);
+select plan(54);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -244,8 +244,10 @@ values ('00000000-0000-0000-0000-0000000000b1', 'maintenance', date_trunc('minut
 set local role service_role;
 select public.engine_expand_series(now());
 reset role;
+-- Only the under-5-min kind: a later day can overlap Site B's one-off window, depending on the hour.
 select ok(not exists (select 1 from public.maintenance_series m, jsonb_array_elements(m.log) e
-                      where m.id = (select id from s where name = 'soon') and e ->> 'action' = 'skipped'),
+                      where m.id = (select id from s where name = 'soon') and e ->> 'action' = 'skipped'
+                        and e ->> 'reason' = 'starts in less than 5 min'),
   'a window that exists isn''t logged as skipped');
 
 -- Cancel while a window's end has passed but the engine hasn't logged it: not "running" (engine review L2).
@@ -260,6 +262,40 @@ select is((select context ->> 'running' from public.notifications
            where template = 'ms_line' and context ->> 'kind' = 'cancelled'
              and maintenance_series_id = (select id from s where name = 'soon')),
   'false', 'a window past its end isn''t called running');
+
+-- Site C: every first window in the next 14 days overlaps a long one-off window → the first by the rule.
+insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000c1', 'Site C', 3,
+   (select id from ids where name = 'arm'), true),
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000c1', 'Site D', 3,
+   (select id from ids where name = 'arm'), true);
+insert into public.maintenance_windows (site_id, kind, starts_at, ends_at, reason, approved_at)
+values ('00000000-0000-0000-0000-0000000000c2', 'maintenance', now(), now() + interval '16 days', 'Rebuild', now());
+select tests.authenticate_as((select id from ids where name = 'arm'));
+insert into s values ('full', public.create_maintenance_series('00000000-0000-0000-0000-0000000000c2',
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '09:00', 30, current_date + 2, null, 'Full'));
+reset role;
+select is((select first_starts_at from public.maintenance_series where id = (select id from s where name = 'full')),
+  ((current_date + 2) + time '09:00') at time zone 'Asia/Bangkok',
+  'with no free first window in the next 14 days, the deadline is the first by the rule');
+
+-- Site D: cancel while a window runs → "the running window finishes".
+with x as (
+  insert into public.maintenance_series (site_id, rule, start_time, duration_min, starts_on, reason, approved_at)
+  values ('00000000-0000-0000-0000-0000000000d1', '{"freq":"monthly","day":1}', '01:00', 60, current_date + 30,
+          'Running', now())
+  returning id)
+insert into s select 'run', id from x;
+insert into public.maintenance_windows (site_id, kind, starts_at, ends_at, reason, approved_at, series_id, start_logged)
+values ('00000000-0000-0000-0000-0000000000d1', 'maintenance', now() - interval '10 minutes', now() + interval '50 minutes',
+        'Running', now(), (select id from s where name = 'run'), true);
+select tests.authenticate_as((select id from ids where name = 'tao'));
+select public.cancel_maintenance_series((select id from s where name = 'run'), 'Stop');
+reset role;
+select is((select context ->> 'running' from public.notifications
+           where template = 'ms_line' and context ->> 'kind' = 'cancelled'
+             and maintenance_series_id = (select id from s where name = 'run')),
+  'true', 'a window still running is called running');
 
 -- ── Only the service role (and the RPCs) queue or claim series messages ──
 select ok(not has_function_privilege('authenticated', 'public.engine_queue_series_messages(uuid,text,uuid,timestamptz,text,jsonb)', 'execute')
