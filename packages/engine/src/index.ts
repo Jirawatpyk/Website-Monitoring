@@ -12,3 +12,4 @@ export * from './escalation';
 export * from './maintenance';
 export * from './page-change';
 export * from './fault';
+export * from './series';

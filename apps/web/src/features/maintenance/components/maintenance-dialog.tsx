@@ -1,7 +1,7 @@
 'use client';
 
 import type { WindowKind } from '@dxt/engine';
-import { formatDay, formatIncidentId, formatTier, formatTime, formatWhen } from '@dxt/shared';
+import { formatDay, formatIncidentId, formatNameList, formatTier, formatTime, formatWhen } from '@dxt/shared';
 import {
   Alert,
   Button,
@@ -9,7 +9,6 @@ import {
   RadioGroup,
   SegmentedControl,
   Select,
-  Switch,
   TextField,
   TimePicker,
 } from '@jirawatpyk/aura-react';
@@ -17,8 +16,18 @@ import { IconCalendar, IconCheck, IconEyeOff, IconInfo } from '@jirawatpyk/aura-
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { APPROVAL_OVER_MIN } from '@dxt/engine';
 import { useNow } from '@/components/use-now';
-import { loadAdminNames, muteSite, scheduleMaintenance } from '../actions';
+import { loadAdminNames, muteSite, scheduleMaintenance, scheduleSeries } from '../actions';
 import { postPendingNow } from './window-dialogs';
+import {
+  daysOf,
+  RepeatControl,
+  RepeatLength,
+  RepeatRest,
+  RepeatStart,
+  RepeatWhen,
+  type RepeatState,
+} from './repeat-fields';
+import { repeatPlanOf, SERIES_DURATIONS, seriesDoneOf, type Repeat } from '../series-form';
 import {
   DURATIONS,
   EFFECT,
@@ -96,6 +105,17 @@ export function MaintenanceDialog({
   const [startTime, setStartTime] = useState('22:00');
   const [duration, setDuration] = useState('4 h');
   const [reason, setReason] = useState('');
+  // Repeat (D-057, §32.2): From starts tomorrow, on that weekday, 2 h windows, no end date.
+  const [rep, setRep] = useState<RepeatState>(() => ({
+    repeat: 'none',
+    from: days[1]!.value,
+    time: '01:00',
+    duration: '2 h',
+    days: null,
+    monthMode: 'day',
+    untilOn: null,
+  }));
+  const patchRep = (p: Partial<RepeatState>) => setRep((r) => ({ ...r, ...p }));
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ title: string; text: string } | null>(null);
   const [pending, start] = useTransition();
@@ -119,7 +139,7 @@ export function MaintenanceDialog({
   const plan = planOf({ ...planInput, later });
   // A Responder's long request names the Admins it goes to before it is sent (§24.9).
   const [admins, setAdmins] = useState<string[] | null>(null);
-  const asksAdmin = !isAdmin && kind === 'maintenance' && plan.needsApproval;
+  const asksAdmin = !isAdmin && kind === 'maintenance' && (plan.needsApproval || rep.repeat !== 'none');
   useEffect(() => {
     if (!asksAdmin || admins) return;
     let live = true;
@@ -138,6 +158,34 @@ export function MaintenanceDialog({
   const mutedUntil =
     picked && current.mutedUntil && new Date(current.mutedUntil) > now ? new Date(current.mutedUntil) : null;
   const timeProblem = plan.problems.find((p) => p === 'starts_in_past' || p === 'ends_before_start');
+  // A repeating window (maintenance only — mutes never repeat, §32.2).
+  const repeating = kind === 'maintenance' && rep.repeat !== 'none';
+  const seriesMin = SERIES_DURATIONS.find((d) => d.label === rep.duration)?.minutes ?? 120;
+  const repPlan =
+    rep.repeat === 'none'
+      ? null
+      : repeatPlanOf({
+          repeat: rep.repeat,
+          from: rep.from,
+          untilOn: rep.untilOn,
+          time: rep.time,
+          durationMin: seriesMin,
+          days: daysOf(rep),
+          monthMode: rep.monthMode,
+          now,
+        });
+  const seriesSubmit = isAdmin ? 'Schedule series' : 'Ask for approval';
+  const submitLabel = repeating ? seriesSubmit : plan.submit;
+  const turnRepeat = (r: Repeat) =>
+    patchRep({
+      repeat: r,
+      ...(rep.repeat === 'none' && r !== 'none'
+        ? {
+            duration: SERIES_DURATIONS.some((d) => d.label === dur) ? dur : '24 h',
+            ...(later ? { from: startDate, time: startTime } : {}),
+          }
+        : {}),
+    });
 
   const switchKind = (v: string) => {
     setKind(v as WindowKind);
@@ -156,6 +204,34 @@ export function MaintenanceDialog({
       await postPendingNow();
       // "Now" is when Save is pressed, not when the dialog opened.
       const at = new Date();
+      if (repeating && repPlan?.rule) {
+        const r = await scheduleSeries({
+          siteId: current.id,
+          rule: repPlan.rule,
+          startTime: rep.time,
+          durationMin: seriesMin,
+          startsOn: rep.from,
+          untilOn: rep.untilOn,
+          reason,
+        }).catch(() => ({ ok: false as const, message: FAILED }));
+        if (!r.ok) {
+          setError(r.message);
+          return;
+        }
+        setDone(
+          seriesDoneOf({
+            site: current.name,
+            waiting: r.waiting ?? !isAdmin,
+            windows: r.windows ?? [],
+            admins: r.admins ?? admins,
+            words: repPlan.words,
+            first: repPlan.next[0],
+            reason,
+            viewer: viewerName,
+          }),
+        );
+        return;
+      }
       const p = planOf({
         kind,
         site: current,
@@ -199,7 +275,8 @@ export function MaintenanceDialog({
     });
 
   const owner = current.owner ? ` · owner ${current.owner}` : '';
-  const title = kind === 'mute' ? 'Mute site' : 'Schedule maintenance';
+  const title =
+    kind === 'mute' ? 'Mute site' : repeating ? 'Schedule repeating maintenance' : 'Schedule maintenance';
 
   return (
     <Dialog
@@ -232,13 +309,15 @@ export function MaintenanceDialog({
             <Button
               variant="primary"
               // Phones: Mute instead is the one primary while the guard blocks (MMaintenance, §13).
-              className={plan.blocked && picked && !mutedUntil ? 'max-md:hidden' : undefined}
+              className={plan.blocked && picked && !mutedUntil && !repeating ? 'max-md:hidden' : undefined}
               icon={kind === 'mute' ? <IconEyeOff /> : <IconCalendar />}
-              disabled={plan.problems.length > 0 || !picked}
+              disabled={
+                !picked || (repeating ? !!repPlan?.blocked || !reason.trim() : plan.problems.length > 0)
+              }
               loading={pending}
               onClick={submit}
             >
-              {plan.submit}
+              {submitLabel}
             </Button>
           </>
         )
@@ -277,7 +356,7 @@ export function MaintenanceDialog({
             />
           </span>
 
-          {plan.blocked && picked && (
+          {plan.blocked && picked && !repeating && (
             <Alert
               tone="danger"
               role="alert"
@@ -307,7 +386,7 @@ export function MaintenanceDialog({
             </Alert>
           )}
 
-          {kind === 'maintenance' && (
+          {kind === 'maintenance' && !repeating && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Start</span>
               <span className="flex flex-wrap items-center gap-4">
@@ -329,7 +408,7 @@ export function MaintenanceDialog({
               </span>
             </div>
           )}
-          {isLater && (
+          {isLater && !repeating && (
             <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
               <Select
                 touchHeight
@@ -348,37 +427,62 @@ export function MaintenanceDialog({
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium">Duration</span>
-            <span className="flex flex-wrap items-center gap-4">
-              <span className="max-md:hidden">
-                <SegmentedControl
-                  touchHeight
-                  label="Duration"
-                  size="sm"
-                  options={durations.map((d) => d.label)}
-                  value={dur}
-                  onChange={setDuration}
-                />
+          {/* A series, desktop: Start · From | Time, then Window length (both widths); phones: From | Time after Repeat. */}
+          {repeating && (
+            <div className="flex flex-col gap-5 max-md:hidden">
+              <RepeatStart />
+              <RepeatWhen state={rep} set={patchRep} now={now} />
+            </div>
+          )}
+          {repeating && <RepeatLength state={rep} set={patchRep} />}
+          {!repeating && (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">Duration</span>
+              <span className="flex flex-wrap items-center gap-4">
+                <span className="max-md:hidden">
+                  <SegmentedControl
+                    touchHeight
+                    label="Duration"
+                    size="sm"
+                    options={durations.map((d) => d.label)}
+                    value={dur}
+                    onChange={setDuration}
+                  />
+                </span>
+                {/* phones: full width, as Type (MMaintenance) */}
+                <span className="w-full md:hidden">
+                  <SegmentedControl
+                    touchHeight
+                    label="Duration"
+                    options={durations.map((d) => d.label)}
+                    value={dur}
+                    onChange={setDuration}
+                    fullWidth
+                  />
+                </span>
+                <span className="text-sm text-fg-secondary">
+                  {asksAdmin
+                    ? approvalSpan(plan.startsAt, plan.endsAt, now)
+                    : `Ends ${formatWhen(plan.endsAt, now, { midSentence: true })} (UTC+7)`}
+                </span>
               </span>
-              {/* phones: full width, as Type (MMaintenance) */}
-              <span className="w-full md:hidden">
-                <SegmentedControl
-                  touchHeight
-                  label="Duration"
-                  options={durations.map((d) => d.label)}
-                  value={dur}
-                  onChange={setDuration}
-                  fullWidth
-                />
-              </span>
-              <span className="text-sm text-fg-secondary">
-                {asksAdmin
-                  ? approvalSpan(plan.startsAt, plan.endsAt, now)
-                  : `Ends ${formatWhen(plan.endsAt, now, { midSentence: true })} (UTC+7)`}
-              </span>
+            </div>
+          )}
+          {/* One Repeat control in a fixed slot: switching it never unmounts it (focus stays). */}
+          {kind === 'maintenance' && <RepeatControl value={rep.repeat} onChange={turnRepeat} />}
+          {repeating && (
+            <span className="md:hidden">
+              <RepeatWhen state={rep} set={patchRep} now={now} />
             </span>
-          </div>
+          )}
+          {repeating && repPlan && <RepeatRest state={rep} set={patchRep} plan={repPlan} />}
+
+          {repeating && !isAdmin && (
+            // Phones: the approval warning comes before Reason (§32.3); desktop after it (board).
+            <span className="md:hidden">
+              <SeriesApproval admins={admins} />
+            </span>
+          )}
 
           {kind === 'mute' && incident && rule && (
             <Alert tone="warning" role="status" title={rule.title}>
@@ -402,8 +506,8 @@ export function MaintenanceDialog({
             onChange={(e) => setReason(e.target.value)}
             hint={
               picked
-                ? reasonHint(reason, plan.submit)
-                : `Choose a site and type a reason to enable “${plan.submit}”.`
+                ? reasonHint(reason, submitLabel)
+                : `Choose a site and type a reason to enable “${submitLabel}”.`
             }
           />
           {error && (
@@ -411,22 +515,31 @@ export function MaintenanceDialog({
               {error}
             </Alert>
           )}
-          {plan.notice && picked && !error && (
+          {plan.notice && picked && !error && !repeating && (
             <Alert tone="warning" role="status">
               {plan.notice}
             </Alert>
           )}
           {/* §23.10: starting maintenance ends the site's running mute (D-036). */}
-          {kind === 'maintenance' && mutedUntil && plan.startsAt < mutedUntil && (
+          {kind === 'maintenance' && !repeating && mutedUntil && plan.startsAt < mutedUntil && (
             <p className="m-0 text-sm text-fg-secondary">Starting this window ends the mute.</p>
           )}
 
-          {kind === 'maintenance' && plan.needsApproval && !plan.problems.includes('needs_approval_now') && (
-            <Alert tone="warning" title="Needs an Admin’s approval">
-              {approvalNotice(admins, plan.startsAt, now)}
-            </Alert>
+          {repeating && !isAdmin && (
+            <span className="max-md:hidden">
+              <SeriesApproval admins={admins} />
+            </span>
           )}
           {kind === 'maintenance' &&
+            !repeating &&
+            plan.needsApproval &&
+            !plan.problems.includes('needs_approval_now') && (
+              <Alert tone="warning" title="Needs an Admin’s approval">
+                {approvalNotice(admins, plan.startsAt, now)}
+              </Alert>
+            )}
+          {kind === 'maintenance' &&
+            !repeating &&
             isAdmin &&
             plan.endsAt.getTime() - plan.startsAt.getTime() > 24 * 3_600_000 && (
               <Alert tone="info" title="You’re an Admin — no approval needed">
@@ -442,16 +555,18 @@ export function MaintenanceDialog({
               <span className="font-semibold">{EFFECT[kind].title}.</span> {EFFECT[kind].text}
             </span>
           </div>
-          {kind === 'maintenance' && (
-            <Switch
-              label="Repeat on a schedule"
-              description="Recurring windows arrive in Phase 2."
-              disabled
-            />
-          )}
           <p className="m-0 text-xs text-fg-secondary md:hidden">{`Signed in as ${viewerEmail}`}</p>
         </div>
       )}
     </Dialog>
+  );
+}
+
+/** A Responder's series waits for an Admin (§32.2): who gets the request. */
+function SeriesApproval({ admins }: { admins: string[] | null }) {
+  return (
+    <Alert tone="warning" title="Needs an Admin’s approval">
+      {`An Admin approves the series once; nothing is scheduled until then.${admins?.length ? ` ${formatNameList(admins)} ${admins.length === 1 ? 'gets' : 'get'} the request now.` : ''}`}
+    </Alert>
   );
 }

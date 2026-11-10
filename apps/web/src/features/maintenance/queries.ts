@@ -11,6 +11,7 @@ import {
 } from '@dxt/shared';
 import type { PausableSite } from './model';
 import type { LogEntry, WindowRow } from './page-model';
+import type { SeriesRow } from './series-model';
 
 const DAY_MS = 86_400_000;
 
@@ -24,7 +25,7 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
     .from('maintenance_windows')
     .select(
       `id, site_id, kind, starts_at, ends_at, approved_at, approved_by, ended_at, cancelled_at, created_at, created_by,
-       reason, end_reason, outcome, outcome_detail, log,
+       reason, end_reason, outcome, outcome_detail, log, series_id,
        creator:profiles!maintenance_windows_created_by_fkey(display_name),
        sites!inner(name, tier, primary_owner_id, backup_owner_id, muted_until,
                    owner:profiles!sites_primary_owner_id_fkey(display_name, role),
@@ -65,6 +66,7 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
       ownerIsAdmin: w.sites.owner?.role === 'admin',
       backupIsAdmin: w.sites.backup?.role === 'admin',
       log: (Array.isArray(w.log) ? w.log : []) as unknown as LogEntry[],
+      seriesId: w.series_id,
       silenced: w.kind === 'mute' ? silencedOf(w.sites.incidents, w.starts_at, w.sites.tier) : null,
     };
   });
@@ -80,6 +82,91 @@ export async function loadWindowRows(db: DbClient, now: Date): Promise<WindowRow
     ]),
   );
   return withPausedUntil(db, await withL1People(db, rows, people), now);
+}
+
+/**
+ * The repeating series `/maintenance` shows (spec §32, D-057): every one still waiting or repeating,
+ * and those that ended in the last 30 days, with their windows still to start (for "next …") and the
+ * windows a cancel took. Read as the signed-in person (staff read, RLS).
+ */
+export async function loadSeriesRows(db: DbClient, now: Date): Promise<SeriesRow[]> {
+  const since = new Date(now.getTime() - 30 * DAY_MS).toISOString();
+  const { data, error } = await db
+    .from('maintenance_series')
+    .select(
+      `id, site_id, rule, start_time, duration_min, starts_on, until_on, first_starts_at, reason, created_at,
+       created_by, approved_at, approved_by, declined_at, cancelled_at, outcome, log,
+       creator:profiles!maintenance_series_created_by_fkey(display_name),
+       approver:profiles!maintenance_series_approved_by_fkey(display_name),
+       sites!inner(name, tier, primary_owner_id, backup_owner_id,
+                   owner:profiles!sites_primary_owner_id_fkey(display_name, role),
+                   backup:profiles!sites_backup_owner_id_fkey(display_name, role),
+                   site_status(status)),
+       maintenance_windows(starts_at, ends_at, ended_at, cancelled_at, start_logged, created_at)`,
+    )
+    // Live series, and those that ended (cancelled, declined, or past their last day) in the 30 days;
+    // only the windows of those 30 days and after — a no-end series keeps adding them (code review).
+    .or(
+      `and(cancelled_at.is.null,declined_at.is.null,or(until_on.is.null,until_on.gte.${since.slice(0, 10)})),cancelled_at.gte.${since},declined_at.gte.${since}`,
+    )
+    .gte('maintenance_windows.ends_at', since)
+    .order('created_at');
+  if (error) throw new Error(`maintenance_series: ${error.message}`);
+  return (data ?? []).map((s): SeriesRow => {
+    const status = Array.isArray(s.sites.site_status) ? s.sites.site_status[0] : s.sites.site_status;
+    const windows = s.maintenance_windows ?? [];
+    return {
+      id: s.id,
+      siteId: s.site_id,
+      siteName: s.sites.name,
+      tier: s.sites.tier as Tier,
+      siteStatus: (status?.status ?? null) as SiteStatus | null,
+      rule: s.rule,
+      startTime: s.start_time,
+      durationMin: s.duration_min,
+      startsOn: s.starts_on,
+      untilOn: s.until_on,
+      firstStartsAt: s.first_starts_at,
+      reason: s.reason,
+      createdAt: s.created_at,
+      createdById: s.created_by,
+      byName: s.creator?.display_name ?? null,
+      approvedAt: s.approved_at,
+      approvedById: s.approved_by,
+      approverName: s.approver?.display_name ?? null,
+      declinedAt: s.declined_at,
+      cancelledAt: s.cancelled_at,
+      outcome: s.outcome,
+      ownerName: s.sites.owner?.display_name ?? null,
+      backupName: s.sites.backup?.display_name ?? null,
+      ownerIds: [s.sites.primary_owner_id, s.sites.backup_owner_id].filter((x): x is string => !!x),
+      ownerIsAdmin: s.sites.owner?.role === 'admin',
+      backupIsAdmin: s.sites.backup?.role === 'admin',
+      log: (Array.isArray(s.log) ? s.log : []) as unknown as LogEntry[],
+      upcoming: windows
+        .filter((w) => !w.cancelled_at && !w.start_logged && Date.parse(w.starts_at) > now.getTime())
+        .map((w) => w.starts_at)
+        .sort(),
+      running: windows.some(
+        (w) => w.start_logged && !w.cancelled_at && Date.parse(w.ended_at ?? w.ends_at) > now.getTime(),
+      ),
+      // Made in the approval's own transaction: the same `now()` as approved_at. Only for an approval inside
+      // the 30 days the windows are read for — an older one's windows have dropped out, so no count at all.
+      approvalWindows:
+        s.approved_at && Date.parse(s.approved_at) >= Date.parse(since)
+          ? windows
+              .filter((w) => Date.parse(w.created_at) === Date.parse(s.approved_at!))
+              .map((w) => w.starts_at)
+              .sort()
+          : [],
+      cancelledWindows: s.cancelled_at
+        ? windows
+            .filter((w) => w.cancelled_at === s.cancelled_at)
+            .map((w) => w.starts_at)
+            .sort()
+        : [],
+    };
+  });
 }
 
 /** The escalation plan of the incident a mute holds (`silencedOf`'s incident). */
