@@ -265,11 +265,12 @@ export async function createSeries(
     db.from('maintenance_series').select('approved_at').eq('id', id).maybeSingle(),
     db.from('maintenance_windows').select('starts_at').eq('series_id', id).order('starts_at'),
   ]);
-  const waiting = !series.data?.approved_at;
+  // Unknown when the read failed: the dialog then goes by the person's role (code review).
+  const waiting = series.data ? !series.data.approved_at : undefined;
   return {
     ok: true,
     id,
-    waiting,
+    ...(waiting === undefined ? {} : { waiting }),
     windows: (windows.data ?? []).map((w) => w.starts_at),
     ...(waiting ? { admins: await activeAdminNames({ db }) } : {}),
   };

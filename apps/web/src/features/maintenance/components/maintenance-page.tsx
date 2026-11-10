@@ -696,18 +696,6 @@ function SeriesSheet({
   act: (kind: SeriesKind, s: SeriesPageRow) => void;
 }) {
   const r = s.series;
-  const facts: [string, string][] = [
-    ['Repeats', s.when],
-    ['Each window', s.whenSub.split(' · ')[1] ?? ''],
-    ['From', s.whenSub.match(/from ([^·]+)/)?.[1]?.trim() ?? ''],
-    ['Ends', r.untilOn ? (s.whenSub.match(/until ([^·]+)/)?.[1]?.trim() ?? '') : 'No end date'],
-    ...(r.upcoming[0]
-      ? ([['Next', formatDay(new Date(r.upcoming[0]), { weekday: true })]] as [string, string][])
-      : []),
-    ['Reason', r.reason],
-    ['By', s.whySub.replace(/ · not counted in uptime$/, '')],
-    ['Site', s.siteSub],
-  ];
   return (
     <Dialog
       open={open}
@@ -719,7 +707,7 @@ function SeriesSheet({
       <div className="flex flex-col gap-3.5">
         <SeriesStatus s={s} />
         <dl className="m-0 flex flex-col gap-1.5 text-sm">
-          {facts.map(([k, v]) => (
+          {s.facts.map(([k, v]) => (
             <div key={k} className="flex justify-between gap-3">
               <dt className="shrink-0 text-fg-secondary">{k}</dt>
               <dd className="m-0 text-right">{v}</dd>

@@ -1,4 +1,4 @@
-import { nextOccurrences } from '@dxt/engine';
+import { bangkokDayOf, isoWeekdayOf, nextOccurrences } from '@dxt/engine';
 import { formatDay, formatSeriesRule, type SeriesRule } from '@dxt/shared';
 
 /**
@@ -39,12 +39,11 @@ export interface RepeatInput {
   now: Date;
 }
 
-/** ISO weekday 1–7 of a Bangkok day. */
-export const isoWeekdayOf = (day: string) => ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+export { isoWeekdayOf };
 const addDays = (day: string, n: number) =>
   new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 /** Today, in Bangkok. */
-export const bangkokToday = (now: Date) => new Date(now.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
+export const bangkokToday = bangkokDayOf;
 /** From: today to a year ahead; Ends on: From to two years after it (§32.2, as the SQL allows). */
 export const fromMax = (now: Date) => addDays(bangkokToday(now), 366);
 export const untilMax = (from: string) => addDays(from, 366 * 2);
@@ -137,6 +136,8 @@ export function seriesDoneOf(o: {
   windows: string[];
   admins: string[] | null | undefined;
   summary: string;
+  /** Its first window by the rule: named when none is made yet (more than 14 days away). */
+  first?: Date;
 }): { title: string; text: string } {
   if (o.waiting) {
     const who = o.admins?.length ? o.admins.join(', ') : 'the Admins';
@@ -146,8 +147,11 @@ export function seriesDoneOf(o: {
     };
   }
   const n = o.windows.length;
+  const made = n
+    ? `${n} window${n === 1 ? '' : 's'} scheduled now (${o.windows.map((w) => day(new Date(w))).join(', ')}); the rest are added 14 days ahead.`
+    : `Its first window${o.first ? `, ${day(o.first)},` : ''} is added 14 days before it starts.`;
   return {
     title: `Series scheduled · ${o.site}`,
-    text: `${n} window${n === 1 ? '' : 's'} scheduled now${n ? ` (${o.windows.map((w) => day(new Date(w))).join(', ')})` : ''}; the rest are added 14 days ahead. Cancel it any time from Maintenance & mutes.`,
+    text: `${made} Cancel it any time from Maintenance & mutes.`,
   };
 }

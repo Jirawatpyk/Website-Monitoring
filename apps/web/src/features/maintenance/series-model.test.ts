@@ -170,6 +170,31 @@ describe('a waiting series (§32.7)', () => {
       note: 'Waiting for an Admin',
     });
   });
+  it('an undone withdraw stays "Withdrawn" in the log, never "Series cancelled" (code review)', () => {
+    const undone: SeriesRow = {
+      ...waiting,
+      log: [
+        { at: '2026-09-25T03:00:00Z', action: 'cancelled', by: 'Arm', reason: 'Not needed' },
+        { at: '2026-09-25T03:00:05Z', action: 'undone', by: 'Arm', undid: 'cancelled' },
+      ],
+    };
+    expect(seriesPageRow(undone, [], arm, NOW).logs).toEqual([
+      'Withdrawn 10:00 by Arm · “Not needed” · nothing was scheduled',
+      'Undone 10:00 by Arm — nothing was posted',
+    ]);
+  });
+  it('the phone sheet’s facts come from the row’s parts (§32.9)', () => {
+    expect(seriesPageRow(base, [], tao, NOW).facts).toEqual([
+      ['Repeats', 'Every Tue 01:00 → 03:00'],
+      ['Each window', '2 h'],
+      ['From', 'Tue 15 Sep'],
+      ['Ends', 'No end date'],
+      ['Next', 'Tue 29 Sep'],
+      ['Reason', 'WordPress plugin updates'],
+      ['By', 'asked by Ploy · approved by Tao Mon 14 Sep 11:20'],
+      ['Site', 'Tier 2 · Ploy · backup Nok'],
+    ]);
+  });
 });
 
 describe('a series that ended without running (§32 7b)', () => {

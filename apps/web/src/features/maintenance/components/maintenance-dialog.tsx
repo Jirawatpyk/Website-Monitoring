@@ -202,10 +202,11 @@ export function MaintenanceDialog({
         setDone(
           seriesDoneOf({
             site: current.name,
-            waiting: !!r.waiting,
+            waiting: r.waiting ?? !isAdmin,
             windows: r.windows ?? [],
             admins: r.admins ?? admins,
             summary: repPlan.summary,
+            first: repPlan.next[0],
           }),
         );
         return;

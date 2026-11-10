@@ -85,4 +85,19 @@ describe('the success line (§32.2)', () => {
       }).title,
     ).toBe('Series request sent to Tao · BA Taiwan');
   });
+
+  it('a series whose first window is over 14 days away names it instead of "0 windows" (code review)', () => {
+    expect(
+      seriesDoneOf({
+        site: 'ORCA Thailand',
+        waiting: false,
+        windows: [],
+        admins: null,
+        summary: '',
+        first: new Date('2026-11-06T13:00:00Z'),
+      }).text,
+    ).toBe(
+      'Its first window, Fri 6 Nov, is added 14 days before it starts. Cancel it any time from Maintenance & mutes.',
+    );
+  });
 });

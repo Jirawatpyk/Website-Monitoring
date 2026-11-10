@@ -10,14 +10,14 @@ const DAY_MS = 86_400_000;
 const BKK_OFFSET_MS = 7 * 3_600_000;
 
 /** ISO weekday 1 (Mon) … 7 (Sun) of a Bangkok day "2026-09-29". */
-const isoWeekday = (day: string) => ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+export const isoWeekdayOf = (day: string) => ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
 
 /** Whether a Bangkok calendar day matches the rule. A month without day N never matches it. */
 export function seriesMatches(rule: SeriesRule, day: string): boolean {
-  if (rule.freq === 'weekly') return rule.days.includes(isoWeekday(day));
+  if (rule.freq === 'weekly') return rule.days.includes(isoWeekdayOf(day));
   const dom = Number(day.slice(8, 10));
   if ('day' in rule) return dom === rule.day;
-  return isoWeekday(day) === rule.weekday && Math.floor((dom - 1) / 7) + 1 === rule.nth;
+  return isoWeekdayOf(day) === rule.weekday && Math.floor((dom - 1) / 7) + 1 === rule.nth;
 }
 
 /** The instant a Bangkok day's wall-clock time falls on ("01:00" or "01:00:00"). */
@@ -26,7 +26,8 @@ export function bangkokStart(day: string, startTime: string): Date {
   return new Date(Date.parse(`${day}T00:00:00Z`) + (h * 60 + m) * 60_000 - BKK_OFFSET_MS);
 }
 
-const bangkokDay = (d: Date) => new Date(d.getTime() + BKK_OFFSET_MS).toISOString().slice(0, 10);
+/** The Bangkok calendar day of an instant. */
+export const bangkokDayOf = (d: Date) => new Date(d.getTime() + BKK_OFFSET_MS).toISOString().slice(0, 10);
 
 export interface SeriesSchedule {
   rule: SeriesRule;
@@ -42,7 +43,7 @@ export interface SeriesSchedule {
  */
 export function nextOccurrences(s: SeriesSchedule, n: number, now: Date, horizonDays = 400): Date[] {
   const out: Date[] = [];
-  const first = s.startsOn > bangkokDay(now) ? s.startsOn : bangkokDay(now);
+  const first = s.startsOn > bangkokDayOf(now) ? s.startsOn : bangkokDayOf(now);
   const start = Date.parse(`${first}T00:00:00Z`);
   for (let i = 0; i <= horizonDays && out.length < n; i++) {
     const day = new Date(start + i * DAY_MS).toISOString().slice(0, 10);
@@ -74,6 +75,6 @@ export function seriesStateOf(s: SeriesFacts, now: Date): SeriesState {
   if (s.declinedAt) return 'declined';
   if (s.cancelledAt) return s.approvedAt ? 'cancelled' : 'withdrawn';
   if (!s.approvedAt) return 'waiting';
-  if (s.untilOn && s.untilOn < bangkokDay(now)) return 'finished';
+  if (s.untilOn && s.untilOn < bangkokDayOf(now)) return 'finished';
   return 'repeating';
 }

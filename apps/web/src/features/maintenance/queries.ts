@@ -104,7 +104,12 @@ export async function loadSeriesRows(db: DbClient, now: Date): Promise<SeriesRow
                    site_status(status)),
        maintenance_windows(starts_at, ends_at, ended_at, cancelled_at, start_logged)`,
     )
-    .or(`and(cancelled_at.is.null,declined_at.is.null),cancelled_at.gte.${since},declined_at.gte.${since}`)
+    // Live series, and those that ended (cancelled, declined, or past their last day) in the 30 days;
+    // only the windows of those 30 days and after — a no-end series keeps adding them (code review).
+    .or(
+      `and(cancelled_at.is.null,declined_at.is.null,or(until_on.is.null,until_on.gte.${since.slice(0, 10)})),cancelled_at.gte.${since},declined_at.gte.${since}`,
+    )
+    .gte('maintenance_windows.ends_at', since)
     .order('created_at');
   if (error) throw new Error(`maintenance_series: ${error.message}`);
   return (data ?? []).map((s): SeriesRow => {

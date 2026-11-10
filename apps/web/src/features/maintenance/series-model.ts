@@ -141,7 +141,8 @@ function seriesLogLine(r: SeriesRow, e: LogEntry, now: Date, undone: boolean): s
     case 'declined':
       return `Declined ${when}${by}${why} · nothing was scheduled${r.byName && !undone ? ` · ${r.byName} told in Chat` : ''}`;
     case 'cancelled': {
-      if (state === 'withdrawn' || (!r.approvedAt && !undone))
+      // Never approved: a withdraw, also once it was undone and the series waits again.
+      if (state === 'withdrawn' || !r.approvedAt)
         return `Withdrawn ${when}${by}${why} · nothing was scheduled`;
       const n = r.cancelledWindows.length;
       const gone = n ? ` · ${n} not started cancelled (${r.cancelledWindows.map(day).join(', ')})` : '';
@@ -176,6 +177,24 @@ export interface SeriesPageRow {
   note: string | null;
   /** The phone row's second line. */
   line: string;
+  /** The phone sheet's facts (§32.9): Repeats · Each window · From · Ends · Next · Reason · By · Site. */
+  facts: [string, string][];
+}
+
+/** The sheet's facts, from the row's own parts — never parsed back out of its sentences. */
+function factsOf(row: SeriesPageRow, len: string, who: string): [string, string][] {
+  const r = row.series;
+  const next = row.state === 'repeating' ? r.upcoming[0] : undefined;
+  return [
+    ['Repeats', row.when],
+    ['Each window', len],
+    ['From', fromText(r)],
+    ['Ends', r.untilOn ? bangkokDay(r.untilOn) : 'No end date'],
+    ...(next ? ([['Next', day(next)]] as [string, string][]) : []),
+    ['Reason', r.reason],
+    ['By', who],
+    ['Site', row.siteSub],
+  ];
 }
 
 const ENDED_LABEL: Partial<Record<SeriesState, string>> = {
@@ -231,15 +250,18 @@ export function seriesPageRow(
     endLabel: null,
     note: null,
     line: '',
+    facts: [],
   };
   if (state === 'waiting') {
+    const who = `asked by ${by} · ${askedWhen}`;
     Object.assign(row, {
       badge: { tone: 'neutral', variant: 'outline', icon: 'clock', label: 'Needs approval' },
       tag: 'Repeating',
       whenSub: `${base} · first ${fromText(r)}`,
-      whySub: `asked by ${by} · ${askedWhen}`,
+      whySub: who,
       line: `${when} · first ${fromText(r)} · ${by}`,
     });
+    row.facts = factsOf(row, len, who);
     if (v.role === 'admin') row.canApprove = true;
     else {
       row.note = 'Waiting for an Admin';
@@ -250,11 +272,13 @@ export function seriesPageRow(
   if (state === 'repeating') {
     const next = r.upcoming[0];
     row.skips = skipNotes(r, windows, now);
+    const who = `${asked ? `asked by ${by}` : `by ${by}`}${asked && r.approverName && r.approvedAt ? ` · approved by ${r.approverName} ${whenText(new Date(r.approvedAt), now)}` : ''}`;
     Object.assign(row, {
       whenSub: `${base}${next ? ` · next ${day(next)}` : ''}`,
-      whySub: `${asked ? `asked by ${by}` : `by ${by}`}${asked && r.approverName && r.approvedAt ? ` · approved by ${r.approverName} ${whenText(new Date(r.approvedAt), now)}` : ''} · not counted in uptime`,
+      whySub: `${who} · not counted in uptime`,
       line: `${when}${next ? ` · next ${day(next)}` : ''}${row.skips.length ? ` · ${row.skips.length} skipped` : ''}`,
     });
+    row.facts = factsOf(row, len, who);
     const asker = v.role === 'responder' && r.createdById === v.id;
     if (mayAct(r, v) || asker) row.endLabel = 'Cancel series…';
     else row.note = whoNote(r, v);
@@ -275,6 +299,7 @@ export function seriesPageRow(
     logs: logs.slice(-1),
     line: `${when} · ${label.toLowerCase()}`,
   });
+  row.facts = factsOf(row, len, row.whySub);
   return row;
 }
 
