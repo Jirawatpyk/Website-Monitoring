@@ -4,6 +4,14 @@ import { UNDO_WINDOW_SEC } from '@dxt/shared';
 import { PROBLEM_WORDS, whenText } from './model';
 import {
   approveSchema,
+  createSeriesSchema,
+  seriesDecisionSchema,
+  seriesIdSchema,
+  seriesReasonSchema,
+  type CreateSeriesInput,
+  type SeriesDecisionInput,
+  type SeriesIdInput,
+  type SeriesReasonInput,
   createMaintenanceSchema,
   editWindowSchema,
   muteSiteSchema,
@@ -210,5 +218,96 @@ export async function undoWindowAction(input: WindowIdInput, { db }: Maintenance
   const p = windowIdSchema.safeParse(input);
   if (!p.success) return first(p.error.issues);
   const { error } = await db.rpc('undo_window_action', { p_window_id: p.data.windowId });
+  return error ? refusal(error, 'Only the person who did it can undo it.') : { ok: true };
+}
+
+// ── Repeating series (D-057, spec §32) ────────────────────────────────────────────────────────────
+
+/** When a series action's held messages go: the series' `undo_until`, set by the RPC (§32 7a). */
+async function heldSeries(db: MaintenanceDeps['db'], seriesId: string): Promise<WindowResult> {
+  const { data } = await db.from('maintenance_series').select('undo_until').eq('id', seriesId).maybeSingle();
+  return {
+    ok: true,
+    id: seriesId,
+    postsAt: data?.undo_until ?? new Date(Date.now() + UNDO_WINDOW_SEC * 1000).toISOString(),
+  };
+}
+
+/**
+ * Schedule a series (an Admin's is approved at once; a Responder's waits). Posts at once, as a one-off
+ * window's create does; returns the windows it made now for the success line (§32.2).
+ */
+export async function createSeries(
+  input: CreateSeriesInput,
+  { db }: MaintenanceDeps,
+): Promise<WindowResult & { windows?: string[] }> {
+  const p = createSeriesSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { data: id, error } = await db.rpc('create_maintenance_series', {
+    p_site_id: p.data.siteId,
+    p_rule: p.data.rule,
+    p_start_time: p.data.startTime,
+    p_duration_min: p.data.durationMin,
+    p_starts_on: p.data.startsOn,
+    p_until_on: p.data.untilOn as string,
+    p_reason: p.data.reason,
+  });
+  if (error || !id) return error ? refusal(error) : { ok: false, message: FAILED };
+  const [series, windows] = await Promise.all([
+    db.from('maintenance_series').select('approved_at').eq('id', id).maybeSingle(),
+    db.from('maintenance_windows').select('starts_at').eq('series_id', id).order('starts_at'),
+  ]);
+  const waiting = !series.data?.approved_at;
+  return {
+    ok: true,
+    id,
+    waiting,
+    windows: (windows.data ?? []).map((w) => w.starts_at),
+    ...(waiting ? { admins: await activeAdminNames({ db }) } : {}),
+  };
+}
+
+export async function decideSeries(
+  input: SeriesDecisionInput,
+  { db }: MaintenanceDeps,
+): Promise<WindowResult> {
+  const p = seriesDecisionSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  if (!p.data.approve && !p.data.reason) return { ok: false, message: 'Type a reason — the asker gets it.' };
+  const { error } = await db.rpc('decide_maintenance_series', {
+    p_series_id: p.data.seriesId,
+    p_approve: p.data.approve,
+    p_reason: p.data.reason,
+  });
+  return error
+    ? refusal(error, 'Only an Admin can approve or decline a series.')
+    : heldSeries(db, p.data.seriesId);
+}
+
+/** Cancel a series, or withdraw a waiting one (the asker) — the RPC tells the two apart. */
+export async function cancelSeries(input: SeriesReasonInput, { db }: MaintenanceDeps): Promise<WindowResult> {
+  const p = seriesReasonSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { error } = await db.rpc('cancel_maintenance_series', {
+    p_series_id: p.data.seriesId,
+    p_reason: p.data.reason,
+  });
+  return error ? refusal(error) : heldSeries(db, p.data.seriesId);
+}
+
+export async function postSeriesActionNow(
+  input: SeriesIdInput,
+  { db }: MaintenanceDeps,
+): Promise<WindowResult> {
+  const p = seriesIdSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { error } = await db.rpc('post_series_action_now', { p_series_id: p.data.seriesId });
+  return error ? refusal(error, 'Only the person who did it can post it now.') : { ok: true };
+}
+
+export async function undoSeriesAction(input: SeriesIdInput, { db }: MaintenanceDeps): Promise<WindowResult> {
+  const p = seriesIdSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { error } = await db.rpc('undo_series_action', { p_series_id: p.data.seriesId });
   return error ? refusal(error, 'Only the person who did it can undo it.') : { ok: true };
 }

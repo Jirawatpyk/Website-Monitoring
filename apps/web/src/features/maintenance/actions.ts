@@ -12,6 +12,10 @@ import * as m from './mutations';
 import type { WindowResult } from './mutations';
 import type {
   ApproveInput,
+  CreateSeriesInput,
+  SeriesDecisionInput,
+  SeriesIdInput,
+  SeriesReasonInput,
   CreateMaintenanceInput,
   EditWindowInput,
   MuteSiteInput,
@@ -101,4 +105,21 @@ export async function postWindowActionNow(input: WindowIdInput) {
 }
 export async function undoWindowAction(input: WindowIdInput) {
   return run(input, m.undoWindowAction, undefined, { send: false });
+}
+
+// Repeating series (D-057, §32): create posts at once; the others hold 10 s for their Undo.
+export async function scheduleSeries(input: CreateSeriesInput) {
+  return run(input, m.createSeries, input.siteId);
+}
+export async function decideSeries(input: SeriesDecisionInput) {
+  return run(input, m.decideSeries);
+}
+export async function cancelSeries(input: SeriesReasonInput) {
+  return run(input, m.cancelSeries);
+}
+export async function postSeriesActionNow(input: SeriesIdInput) {
+  return run(input, m.postSeriesActionNow);
+}
+export async function undoSeriesAction(input: SeriesIdInput) {
+  return run(input, m.undoSeriesAction, undefined, { send: false });
 }

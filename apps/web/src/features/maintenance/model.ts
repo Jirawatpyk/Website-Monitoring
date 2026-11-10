@@ -236,9 +236,29 @@ export const PROBLEM_WORDS: Record<
   | 'undo_expired'
   | 'undo_overlap'
   | 'undo_needs_admin'
-  | 'site_not_live',
+  | 'site_not_live'
+  // Repeating series (D-057, §32): the RPCs' hints.
+  | 'bad_rule'
+  | 'bad_length'
+  | 'too_far'
+  | 'no_occurrence'
+  | 'already_decided'
+  | 'already_over'
+  | 'not_approved'
+  | 'use_decline'
+  | 'undo_window_changed',
   string
 > = {
+  bad_rule: 'Pick weekdays, a day of the month, or which weekday of the month.',
+  bad_length: 'Each window lasts 5 min to 24 h.',
+  too_far: 'Pick days within the next year or two.',
+  no_occurrence: 'No window falls between those days — at least 5 min from now.',
+  already_decided: 'This series was decided already — reload the page.',
+  already_over: 'This series is over already.',
+  not_approved: 'Nobody approved it before its first window — ask again.',
+  use_decline: 'A waiting series is withdrawn by whoever asked for it, or declined by an Admin.',
+  undo_window_changed:
+    'One of its windows was changed since — it can’t be undone; cancel the series instead.',
   ends_too_soon: 'The end must be at least 5 min from now.',
   in_maintenance: 'The site is in maintenance — its alerts are already off.',
   decline_instead: 'Admins answer a request — decline it with a reason to ask for changes.',
