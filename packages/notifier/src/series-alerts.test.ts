@@ -306,6 +306,73 @@ describe('series emails (§32.11: the window layout, "Repeats" instead of When)'
     expect(email(event, 'owner').html).toContain(headline);
   });
 
+  it('a series with no backup, no first window known, or one window: the words still hold', () => {
+    const bare: SeriesFacts = {
+      ...airways,
+      backup: null,
+      owner: null,
+      firstStartsAt: null,
+      untilOn: '2026-10-31',
+    };
+    expect(buildSeriesLine(bare, ev({ action: 'requested', by: 'Arm' })).text).toBe(
+      'MAINTENANCE REQUESTED · Bangkok Airways – Taiwan · every Mon, Thu 22:00 → 23:00 (1 h) · from Mon 28 Sep · until Sat 31 Oct · “Cache purge and log rotation” · by Arm · waiting for an Admin',
+    );
+    expect(buildSeriesDm(bare, ev({ action: 'requested' }), 'reminder_12h', tao, now).text).toContain(
+      'first window in 0 h (Mon 28 Sep)',
+    );
+    expect(buildSeriesDm(bare, ev({ action: 'requested' }), 'still_waiting', arm, now).text).toContain(
+      'Tao reminded',
+    );
+    expect(buildSeriesLine(bare, ev({ action: 'approved', windows: [] })).text).toContain(
+      'no window scheduled yet',
+    );
+    expect(buildSeriesLine(bare, ev({ action: 'skipped', skip: null })).text).toBe(
+      'MAINTENANCE SKIPPED · Bangkok Airways – Taiwan · series every Mon, Thu',
+    );
+    const req = buildSeriesEmail({
+      facts: bare,
+      event: ev({ action: 'requested', by: 'Arm' }),
+      role: 'admin',
+      request: true,
+      from: 'alerts@notify.example',
+      startsThread: true,
+      now,
+    });
+    expect(req.html).toContain('owner —');
+    const reminder = buildSeriesEmail({
+      facts: bare,
+      event: { action: 'reminder_12h', at: now, by: null },
+      role: 'admin',
+      request: true,
+      from: 'alerts@notify.example',
+      startsThread: true,
+      now,
+    });
+    expect(reminder.html).toContain('an hour before');
+    const asker = buildSeriesEmail({
+      facts: airways,
+      event: ev({ action: 'approved', windows: [bkk('2026-09-28T22:00')] }),
+      role: 'owner',
+      toIsAsker: true,
+      request: true,
+      from: 'alerts@notify.example',
+      startsThread: true,
+      now,
+    });
+    expect(asker.html).toContain('Your series was approved.');
+    expect(
+      buildSeriesEmail({
+        facts: airways,
+        event: ev({ action: 'cancelled', reason: 'x', cancelled: [], running: true }),
+        role: 'owner',
+        request: false,
+        from: 'alerts@notify.example',
+        startsThread: true,
+        now,
+      }).html,
+    ).toContain('No window was waiting to start; the one running finishes');
+  });
+
   it('escapes people’s words', () => {
     const m = buildSeriesEmail({
       facts: { ...tubtong, reason: '<b>x</b>' },

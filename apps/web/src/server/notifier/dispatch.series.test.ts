@@ -148,6 +148,79 @@ describe('repeating series messages', () => {
   });
 });
 
+describe('repeating series: what the row carries', () => {
+  it('words SKIPPED from its context: the window it overlaps and the next one', async () => {
+    const post = okPost();
+    const skip = row({
+      id: 'n-skip',
+      dedupe_key: '2026-10-05T18:00Z',
+      context: {
+        kind: 'skipped',
+        at: NOW.toISOString(),
+        startsAt: '2026-10-05T18:00:00Z',
+        endsAt: '2026-10-05T20:00:00Z',
+        next: '2026-10-12T18:00:00Z',
+        overlap: {
+          startsAt: '2026-10-05T17:00:00Z',
+          endsAt: '2026-10-05T21:00:00Z',
+          reason: 'Data-centre move',
+        },
+      },
+    });
+    const { db } = fakeDb(queue([skip]));
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, now, post });
+    const [, message] = post.mock.calls[0] as unknown as [string, { text: string }];
+    expect(message.text).toBe(
+      'MAINTENANCE SKIPPED · Tubtong · Tue 6 Oct 01:00 → 03:00 · overlaps the 00:00 → 04:00 window (“Data-centre move”) · next Tue 13 Oct',
+    );
+  });
+
+  it('the 12 h reminder emails an Admin; a row with an unknown kind or role is never sent', async () => {
+    const send = okSend();
+    const reminder = row({
+      id: 'e-r',
+      channel: 'email',
+      template: 'ms_email',
+      user_id: 'u-nok',
+      context: { kind: 'reminder_12h', role: 'admin', request: true },
+    });
+    const odd = row({
+      id: 'e-odd',
+      channel: 'email',
+      template: 'ms_email',
+      user_id: 'u-nok',
+      context: { kind: 'x', role: 'admin' },
+    });
+    const noRole = row({
+      id: 'e-nr',
+      channel: 'email',
+      template: 'ms_email',
+      user_id: 'u-nok',
+      context: { kind: 'approved' },
+    });
+    const { db, calls } = fakeDb(queue([], [reminder, odd, noRole]));
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, now, send });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect((send.mock.calls[0] as unknown as [{ subject: string }])[0].subject).toBe(
+      'DxT Monitor · Maintenance request · Tubtong · series every Tue',
+    );
+    expect(updates(calls).filter((u) => (u as { status?: string }).status === 'failed')).toHaveLength(2);
+  });
+
+  it('a reply to someone no longer active, or an unknown template, fails for good', async () => {
+    const gone = row({
+      id: 'n-g',
+      template: 'ms_dm',
+      user_id: 'u-left',
+      context: { kind: 'approved', dm: 'approved' },
+    });
+    const odd = row({ id: 'n-o', template: 'ms_other' });
+    const { db, calls } = fakeDb(queue([gone, odd]));
+    await dispatchNotifications({ db, webhookUrl, email, appUrl, now, post: okPost() });
+    expect(updates(calls).filter((u) => (u as { status?: string }).status === 'failed')).toHaveLength(2);
+  });
+});
+
 describe('a series window’s first line', () => {
   it('STARTED ends "· series every Tue"', async () => {
     const post = okPost();
