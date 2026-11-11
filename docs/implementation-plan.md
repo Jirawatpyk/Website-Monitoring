@@ -35,7 +35,7 @@
 | S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | Done |
 | S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Done |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
-| S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | In progress |
+| S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Done |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Todo |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Todo |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Todo |
@@ -686,6 +686,10 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   2. Digests arrive at 09:00 on three consecutive staging days; skipping one triggers the Healthchecks alert.
   3. A weekly recurring window suppresses alerts on its next two occurrences (test).
 - **Review:** message-checker, engine-reviewer.
+- **Evidence (Done 11 Nov 2026):**
+  1. message-checker on the digest and weekly cards (#179), and on the series lines (#187, #188).
+  2. Staging: one 09:00 run and a skipped run that fired the Healthchecks alert (#179). Production: 10 Nov (Healthchecks `reports` UP 09:00:43) and 11 Nov (`/api/cron/reports` 09:00:40, Chat sent 1). Tao accepted two mornings (D-060).
+  3. The engine test on a weekly series: drops in its first two occurrences hold the alerts, a drop outside them alerts (#180). The series UI shipped in #190 (`/verify` on staging), #191 fixed the test's Bangkok date.
 
 ### S15 · Audit log
 
