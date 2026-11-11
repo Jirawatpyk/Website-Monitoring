@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-060 | 11 Nov 2026 | S14 closes on two production mornings of the daily report in a row (10 and 11 Nov), with the staging run and the skipped-run Healthchecks alert, instead of three | D-056 item 5 "three mornings in a row; S14 stays In review until then" |
 | D-059 | 9 Nov 2026 | The weekly summary judges each site against an uptime target by tier — Tier 1 99.95%, Tier 2 99.9%, Tier 3 99.5% (the CEO's standard table) — over the 30 days ending with the week, with this week's figure beside it, in a new UPTIME BY SITE section and a "sites on target" count in the header; a per-site target waits for S17 | Gap — no source set an uptime target; the summary gave one figure for all sites |
 | D-058 | 9 Nov 2026 | The escalation clock counts only the minutes an incident is down: a recovery pauses it, a relapse resumes it with the earlier drops' minutes, and levels already fired stay fired (as the client-update track counts, D-052 item 5). ESCALATED / STILL … say those down minutes | D-034 "a level that came due while the site was up fires on the relapse"; D-004 "escalation keeps its original clock" (now: keeps its minutes) |
 | D-057 | 6 Nov 2026 | S14 recurring maintenance (FR-10b): a series repeats weekly (chosen weekdays) or monthly (day N, or the 1st–4th weekday), each occurrence ≤ 24 h; occurrences are ordinary approved maintenance windows created 14 days ahead, only for an approved, uncancelled series; the series is approved once (an Admin's on create, a Responder's by an Admin); each occurrence starts, ends and "didn't start" on its own with S09b's messages; the series posts one SCHEDULED; cancelling it cancels the occurrences not yet started, quietly; an occurrence that would overlap another window is skipped and logged | Gap: FR-10b, no board (the UI and the series messages wait for one) |
@@ -64,7 +65,18 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
 
-## D-059 — Uptime by site against a target
+## D-060 — S14 closes on two production mornings
+
+**Conflict.** D-056 item 5 proves plan S14 Done-when 2 with three production mornings in a row and keeps S14 In review until then. The report webhook was refused 7–9 Nov, so the count restarted on 10 Nov, and the third morning would be 12 Nov.
+
+**Decision (Tao, 11 Nov 2026).** Two mornings are enough. S14 is Done on:
+
+- 10 Nov: Healthchecks `reports` (production) UP at 09:00:43 Bangkok, after the digest's post went.
+- 11 Nov: the production `/api/cron/reports` log at 09:00:40, `daily: queued`, Chat `sent: 1`.
+- The staging run and the skipped run that fired the Healthchecks alert (D-056 item 5, first point).
+
+**Why.** The report path hasn't changed since #179 except the D-059 weekly section. Both mornings since the new webhook went, and a missed morning still raises the Healthchecks alert, so a third morning adds little. The reports keep running every day; a failure later is an ordinary incident.
+
 
 **Problem.** The CEO read the first weekly summary (9 Nov 2026), asked to "evaluate site by site not overall", and sent a standard:
 
