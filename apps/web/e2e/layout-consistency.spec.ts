@@ -226,7 +226,16 @@ function smallTargets(page: Page) {
       })
       .map((el) => {
         const name = (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 40);
-        return `${el.tagName.toLowerCase()} "${name}" ${Math.round(hitHeight(el))}px`;
+        // Unrounded, with its layout height and any transformed ancestor: "/escalation at 820" twice
+        // failed with the phone bar's 44 px back link reading "44px" (a fraction short), and it never
+        // reproduced, so the next failure names its cause (11 Nov 2026).
+        const moved: string[] = [];
+        for (let p = el.parentElement; p; p = p.parentElement) {
+          const t = getComputedStyle(p).transform;
+          if (t !== 'none') moved.push(`${p.tagName.toLowerCase()}.${p.classList[0] ?? ''} ${t}`);
+        }
+        const why = moved.length ? `, transformed: ${moved.join('; ')}` : '';
+        return `${el.tagName.toLowerCase()} "${name}" ${hitHeight(el).toFixed(2)}px (layout ${el.offsetHeight}px, scrollY ${scrollY}${why})`;
       });
   }, TOUCH);
 }
