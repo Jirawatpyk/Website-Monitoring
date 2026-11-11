@@ -38,7 +38,7 @@ $$;
 -- ── An Admin's series: SCHEDULED, owner + backup emailed ─────────────────
 select tests.authenticate_as((select id from ids where name = 'tao'));
 insert into s values ('daily', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 60, current_date + 2, null, 'Plugin updates'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 60, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Plugin updates'));
 reset role;
 select is(pg_temp.rows('daily', 'ms_line', 'scheduled'), array['-'], 'one SCHEDULED line in the series thread');
 select is((select thread_key from public.notifications where template = 'ms_line'
@@ -46,7 +46,7 @@ select is((select thread_key from public.notifications where template = 'ms_line
   'ms-' || (select id from s where name = 'daily'), 'its own thread, ms-<series>');
 select is(pg_temp.rows('daily', 'ms_email', 'scheduled'), array['arm', 'nok'], 'owner and backup get one email; Tao did it');
 select is(pg_temp.rows('daily', 'ms_dm', 'scheduled'), '{}'::text[], 'nobody is @mentioned');
-select ok((select first_starts_at = ((current_date + 2) + time '01:00') at time zone 'Asia/Bangkok'
+select ok((select first_starts_at = (((now() at time zone 'Asia/Bangkok')::date + 2) + time '01:00') at time zone 'Asia/Bangkok'
            from public.maintenance_series where id = (select id from s where name = 'daily')),
   'first_starts_at is the first window by the rule');
 select is((select count(*)::int from public.notifications n join public.maintenance_windows w on w.id = n.maintenance_window_id
@@ -55,7 +55,7 @@ select is((select count(*)::int from public.notifications n join public.maintena
 -- ── A Responder's series: REQUESTED to the Admins ────────────────────────
 select tests.authenticate_as((select id from ids where name = 'arm'));
 insert into s values ('req', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[2,4]}', '03:00', 60, current_date + 2, null, 'Cache purge'));
+  '{"freq":"weekly","days":[2,4]}', '03:00', 60, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Cache purge'));
 reset role;
 select is(pg_temp.rows('req', 'ms_line', 'requested'), array['-'], 'a REQUESTED line');
 select is(pg_temp.rows('req', 'ms_dm', 'requested'), array['tao'], 'a reply @mentioning every active Admin');
@@ -95,7 +95,7 @@ select is((select jsonb_array_length(context -> 'windows') from public.notificat
 -- ── An overlap: SKIPPED once per window, after the APPROVED line ─────────
 select tests.authenticate_as((select id from ids where name = 'nok'));
 insert into s values ('clash', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:30', 30, current_date + 2, null, 'Backups'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:30', 30, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Backups'));
 reset role;
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select public.decide_maintenance_series((select id from s where name = 'clash'), true, null);
@@ -158,9 +158,9 @@ select is((select jsonb_array_length(context -> 'cancelled') from public.notific
 -- ── A waiting series withdrawn; another nobody approved in time ──────────
 select tests.authenticate_as((select id from ids where name = 'nok'));
 insert into s values ('late', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"monthly","day":28}', '05:00', 60, current_date + 2, null, 'Log rotation'));
+  '{"freq":"monthly","day":28}', '05:00', 60, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Log rotation'));
 insert into s values ('took', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"monthly","day":27}', '05:00', 60, current_date + 2, null, 'Host does it'));
+  '{"freq":"monthly","day":27}', '05:00', 60, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Host does it'));
 select public.cancel_maintenance_series((select id from s where name = 'took'), 'Host does it now');
 reset role;
 select is(pg_temp.rows('took', 'ms_email', 'withdrawn'), array['tao'], 'REQUEST WITHDRAWN emails the Admins');
@@ -190,7 +190,7 @@ reset role;
 -- ── Review fixes: who may end a waiting series, the deadline, a late decision ──
 select tests.authenticate_as((select id from ids where name = 'nok'));
 insert into s values ('wait', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"monthly","day":25}', '05:00', 60, current_date + 2, null, 'Waiting one'));
+  '{"freq":"monthly","day":25}', '05:00', 60, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Waiting one'));
 reset role;
 select tests.authenticate_as((select id from ids where name = 'arm'));
 select throws_ok($$ select public.cancel_maintenance_series((select id from s where name = 'wait'), 'Not mine') $$,
@@ -219,14 +219,14 @@ insert into public.sites (id, client_id, name, tier, primary_owner_id, backup_ow
 -- The deadline skips a first window that already overlaps one: a one-off window holds day 2 at 07:00.
 insert into public.maintenance_windows (site_id, kind, starts_at, ends_at, reason, approved_at)
 values ('00000000-0000-0000-0000-0000000000b1', 'maintenance',
-        ((current_date + 2) + time '06:30') at time zone 'Asia/Bangkok',
-        ((current_date + 2) + time '08:00') at time zone 'Asia/Bangkok', 'Data-centre move', now());
+        (((now() at time zone 'Asia/Bangkok')::date + 2) + time '06:30') at time zone 'Asia/Bangkok',
+        (((now() at time zone 'Asia/Bangkok')::date + 2) + time '08:00') at time zone 'Asia/Bangkok', 'Data-centre move', now());
 select tests.authenticate_as((select id from ids where name = 'arm'));
 insert into s values ('dead', public.create_maintenance_series('00000000-0000-0000-0000-0000000000b1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '07:00', 30, current_date + 2, null, 'Deadline'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '07:00', 30, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Deadline'));
 reset role;
 select is((select first_starts_at from public.maintenance_series where id = (select id from s where name = 'dead')),
-  ((current_date + 3) + time '07:00') at time zone 'Asia/Bangkok',
+  (((now() at time zone 'Asia/Bangkok')::date + 3) + time '07:00') at time zone 'Asia/Bangkok',
   'a waiting series'' deadline is its first window that overlaps nothing — the next day here');
 
 -- The nightly top-up meets a window it made earlier starting in under 5 min: not a skip (engine review M3).
@@ -273,16 +273,16 @@ insert into public.maintenance_windows (site_id, kind, starts_at, ends_at, reaso
 values ('00000000-0000-0000-0000-0000000000c2', 'maintenance', now(), now() + interval '16 days', 'Rebuild', now());
 select tests.authenticate_as((select id from ids where name = 'arm'));
 insert into s values ('full', public.create_maintenance_series('00000000-0000-0000-0000-0000000000c2',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '09:00', 30, current_date + 2, null, 'Full'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '09:00', 30, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Full'));
 reset role;
 select is((select first_starts_at from public.maintenance_series where id = (select id from s where name = 'full')),
-  ((current_date + 2) + time '09:00') at time zone 'Asia/Bangkok',
+  (((now() at time zone 'Asia/Bangkok')::date + 2) + time '09:00') at time zone 'Asia/Bangkok',
   'with no free first window in the next 14 days, the deadline is the first by the rule');
 
 -- Site D: cancel while a window runs → "the running window finishes".
 with x as (
   insert into public.maintenance_series (site_id, rule, start_time, duration_min, starts_on, reason, approved_at)
-  values ('00000000-0000-0000-0000-0000000000d1', '{"freq":"monthly","day":1}', '01:00', 60, current_date + 30,
+  values ('00000000-0000-0000-0000-0000000000d1', '{"freq":"monthly","day":1}', '01:00', 60, (now() at time zone 'Asia/Bangkok')::date + 30,
           'Running', now())
   returning id)
 insert into s select 'run', id from x;
@@ -309,7 +309,7 @@ select ok(not has_function_privilege('authenticated', 'public.engine_queue_serie
 -- ── A waiting series with no first window known still lapses (db review L2) ──
 select tests.authenticate_as((select id from ids where name = 'nok'));
 insert into s values ('nofirst', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"monthly","day":26}', '05:00', 60, current_date + 2, null, 'Old request'));
+  '{"freq":"monthly","day":26}', '05:00', 60, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Old request'));
 reset role;
 update public.maintenance_series set first_starts_at = null, created_at = now() - interval '1 day'
 where id = (select id from s where name = 'nofirst');

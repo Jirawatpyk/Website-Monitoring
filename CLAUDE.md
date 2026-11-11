@@ -31,7 +31,7 @@ packages/notifier Google Chat / email message builders
 packages/db       Supabase generated types; `@dxt/db/service` = server-only service-role client
 supabase/         config.toml, migrations/, tests/ (pgTAP), seed.sql (dev sample data only)
 docs/             plan, workflow, decisions, retro log, runbook, PRD, design spec, canvas snapshot, AURA notes, phase0/ captures
-scripts/          repo checks (check-plan-coverage.mjs, pr-merge.mjs, db-staging.mjs) and the project ESLint plugin `dxt` (eslint/index.mjs: feature-boundaries, design-tokens)
+scripts/          repo checks (check-plan-coverage.mjs, check-sql-tests.mjs, pr-merge.mjs, db-staging.mjs) and the project ESLint plugin `dxt` (eslint/index.mjs: feature-boundaries, design-tokens)
 ```
 
 Inside `apps/web/src`: `app/` holds thin routes, `features/<area>/` holds each domain's UI, queries, actions and schemas behind two public entries (`index.ts`, `server.ts`), `components/` and `lib/` are shared layers, `server/` runs background work. Full tree and rules: `apps/web/CLAUDE.md` → Folder structure; ESLint `dxt/feature-boundaries` enforces them.
@@ -44,8 +44,9 @@ Workspace packages export TypeScript source (`exports: ./src/index.ts`); Next tr
 pnpm install
 pnpm dev                 # web on http://localhost:3500
 pnpm dev:agent           # VPS agent (needs apps/vps-agent/.env)
-pnpm check               # format + plan coverage + lint + typecheck + test — run before saying work is done
+pnpm check               # format + plan coverage + SQL-tests date guard + lint + typecheck + test — run before saying work is done
 pnpm plan:check          # every FR, board, table and go-live test maps to one slice
+pnpm sql-tests:check     # no `current_date` (UTC) in supabase/tests — use (now() at time zone 'Asia/Bangkok')::date
 pnpm pr:merge <number>   # squash-merge a PR only if CI `check` + `db` are green on its head (D-008), then wait for the production deploy
 pnpm test                # Vitest in every package that has tests (web: jsdom + Testing Library)
 pnpm test:coverage       # the same tests with coverage thresholds (what CI runs)
