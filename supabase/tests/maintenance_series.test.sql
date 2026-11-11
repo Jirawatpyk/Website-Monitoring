@@ -38,11 +38,11 @@ select ok(not public.valid_series_rule('{"freq":"monthly","day":1.5}'), 'a fract
 
 -- ── The table: staff read, others refused (RLS) ──────────────────────────
 insert into public.maintenance_series (site_id, rule, start_time, duration_min, starts_on, reason)
-values ('00000000-0000-0000-0000-0000000000a1', '{"freq":"monthly","day":1}', '03:00', 60, current_date + 1, 'RLS row');
+values ('00000000-0000-0000-0000-0000000000a1', '{"freq":"monthly","day":1}', '03:00', 60, (now() at time zone 'Asia/Bangkok')::date + 1, 'RLS row');
 select tests.authenticate_as((select id from ids where name = 'mint'));
 select is((select count(*)::int from public.maintenance_series where reason = 'RLS row'), 1, 'a Viewer (staff) reads series');
 select throws_ok($$ insert into public.maintenance_series (site_id, rule, start_time, duration_min, starts_on, reason)
-  values ('00000000-0000-0000-0000-0000000000a1', '{"freq":"monthly","day":1}', '03:00', 60, current_date + 1, 'x') $$,
+  values ('00000000-0000-0000-0000-0000000000a1', '{"freq":"monthly","day":1}', '03:00', 60, (now() at time zone 'Asia/Bangkok')::date + 1, 'x') $$,
   '42501', null, 'but writes none directly');
 reset role;
 select tests.as_anon();
@@ -62,33 +62,33 @@ select is((select array_agg(d::date) from generate_series('2026-11-01'::date, '2
 -- ── Who may create; an Admin's series is approved and its occurrences added at once ──
 select tests.authenticate_as((select id from ids where name = 'mint'));
 select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 120, current_date + 1, null, 'Updates') $$,
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 120, (now() at time zone 'Asia/Bangkok')::date + 1, null, 'Updates') $$,
   '42501', null, 'a Viewer can''t');
 reset role;
 select tests.authenticate_as((select id from ids where name = 'nok'));
 select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 120, current_date + 1, null, 'Updates') $$,
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 120, (now() at time zone 'Asia/Bangkok')::date + 1, null, 'Updates') $$,
   '42501', null, 'nor a Responder who doesn''t own the site');
 reset role;
 
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 120, current_date + 1, null, ' ') $$,
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 120, (now() at time zone 'Asia/Bangkok')::date + 1, null, ' ') $$,
   '22023', null, 'a reason is required');
 select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 1441, current_date + 1, null, 'Updates') $$,
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 1441, (now() at time zone 'Asia/Bangkok')::date + 1, null, 'Updates') $$,
   '22023', null, 'an occurrence lasts at most 24 h');
 select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
   '{"freq":"monthly","day":31}', '01:00', 60, '2027-04-01', '2027-04-30', 'Updates') $$,
   '22023', null, 'refused when no occurrence falls between the days');
 insert into s values ('daily', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 120, current_date + 1, null, 'Plugin updates'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '01:00', 120, (now() at time zone 'Asia/Bangkok')::date + 1, null, 'Plugin updates'));
 reset role;
 
 select ok((select approved_at is not null from public.maintenance_series where id = (select id from s where name = 'daily')),
   'an Admin''s series is approved on create');
 select is((select count(*)::int from public.maintenance_windows where series_id = (select id from s where name = 'daily')),
-  (select count(*)::int from generate_series(current_date + 1, ((now() + interval '14 days') at time zone 'Asia/Bangkok')::date, '1 day') d
+  (select count(*)::int from generate_series((now() at time zone 'Asia/Bangkok')::date + 1, ((now() + interval '14 days') at time zone 'Asia/Bangkok')::date, '1 day') d
    where ((d::date + time '01:00') at time zone 'Asia/Bangkok') >= now() + interval '5 minutes'),
   'its occurrences for the next 14 days exist as windows');
 select ok((select bool_and(kind = 'maintenance' and approved_at is not null and reason = 'Plugin updates'
@@ -108,7 +108,7 @@ reset role;
 -- A second, overlapping series (Arm asks; Tao approves): the daily one holds every 01:00–03:00.
 select tests.authenticate_as((select id from ids where name = 'arm'));
 insert into s values ('overlap', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '02:00', 60, current_date + 1, null, 'Backups'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '02:00', 60, (now() at time zone 'Asia/Bangkok')::date + 1, null, 'Backups'));
 reset role;
 select is((select count(*)::int from public.maintenance_windows where series_id = (select id from s where name = 'overlap')),
   0, 'a Responder''s series waits for an Admin: no occurrences yet');
@@ -144,7 +144,7 @@ reset role;
 insert into s values ('nok', gen_random_uuid());
 insert into public.maintenance_series (id, site_id, rule, start_time, duration_min, starts_on, reason, created_by)
 values ((select id from s where name = 'nok'), '00000000-0000-0000-0000-0000000000a1', '{"freq":"monthly","day":1}',
-        '03:00', 60, current_date + 1, 'Asked before he moved teams', (select id from ids where name = 'nok'));
+        '03:00', 60, (now() at time zone 'Asia/Bangkok')::date + 1, 'Asked before he moved teams', (select id from ids where name = 'nok'));
 update public.profiles set role = 'viewer' where id = (select id from ids where name = 'nok');
 select tests.authenticate_as((select id from ids where name = 'nok'));
 select throws_ok($$ select public.cancel_maintenance_series((select id from s where name = 'nok'), 'x') $$,
@@ -167,11 +167,11 @@ select ok(exists (select 1 from public.audit_log where action = 'maintenance.occ
   'each skipped window has its own audit row (§32.13)');
 select tests.as_anon();
 select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"monthly","day":1}', '03:00', 60, current_date + 1, null, 'x') $$, '42501', null, 'anon can''t create one');
+  '{"freq":"monthly","day":1}', '03:00', 60, (now() at time zone 'Asia/Bangkok')::date + 1, null, 'x') $$, '42501', null, 'anon can''t create one');
 reset role;
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select throws_ok($$ select public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"monthly","day":1}', '03:00', 60, current_date + 1, current_date + 1000, 'x') $$,
+  '{"freq":"monthly","day":1}', '03:00', 60, (now() at time zone 'Asia/Bangkok')::date + 1, (now() at time zone 'Asia/Bangkok')::date + 1000, 'x') $$,
   '22023', null, 'days more than two years ahead are refused');
 reset role;
 
