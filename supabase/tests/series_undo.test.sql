@@ -22,8 +22,8 @@ grant select, insert on s to authenticated, service_role;
 -- A one-off window that day+3 of a daily 05:00 series overlaps.
 insert into public.maintenance_windows (site_id, kind, starts_at, ends_at, reason, approved_at)
 values ('00000000-0000-0000-0000-0000000000a1', 'maintenance',
-        ((current_date + 3) + time '04:30') at time zone 'Asia/Bangkok',
-        ((current_date + 3) + time '06:00') at time zone 'Asia/Bangkok', 'Data-centre move', now());
+        (((now() at time zone 'Asia/Bangkok')::date + 3) + time '04:30') at time zone 'Asia/Bangkok',
+        (((now() at time zone 'Asia/Bangkok')::date + 3) + time '06:00') at time zone 'Asia/Bangkok', 'Data-centre move', now());
 
 create function pg_temp.held(p_series text, p_kind text)
 returns table (n int, held int, keyed int, undone int) language sql as $$
@@ -43,7 +43,7 @@ $$;
 -- ── Approve: held, and every row under the Undo key ──────────────────────
 select tests.authenticate_as((select id from ids where name = 'arm'));
 insert into s values ('daily', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '05:00', 30, current_date + 2, null, 'Backups'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '05:00', 30, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Backups'));
 reset role;
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select public.decide_maintenance_series((select id from s where name = 'daily'), true, null);
@@ -145,7 +145,7 @@ reset role;
 -- ── Decline and withdraw undo too; too late after a claim or the 10 s ────
 select tests.authenticate_as((select id from ids where name = 'nok'));
 insert into s values ('ask', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"monthly","day":20}', '03:00', 30, current_date + 2, null, 'Asked'));
+  '{"freq":"monthly","day":20}', '03:00', 30, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Asked'));
 reset role;
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select public.decide_maintenance_series((select id from s where name = 'ask'), false, 'Too often');
@@ -173,7 +173,7 @@ reset role;
 -- ── A decline undone past the deadline: the engine then marks it Not approved ──
 select tests.authenticate_as((select id from ids where name = 'nok'));
 insert into s values ('late', public.create_maintenance_series('00000000-0000-0000-0000-0000000000a1',
-  '{"freq":"monthly","day":21}', '03:00', 30, current_date + 2, null, 'Late'));
+  '{"freq":"monthly","day":21}', '03:00', 30, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Late'));
 reset role;
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select public.decide_maintenance_series((select id from s where name = 'late'), false, 'No');
@@ -199,13 +199,13 @@ insert into public.sites (id, client_id, name, tier, primary_owner_id, backup_ow
 -- Security M1: a Responder cancels, puts a window next to one, and can't undo into a chain over 24 h.
 select tests.authenticate_as((select id from ids where name = 'tao'));
 insert into s values ('chain', public.create_maintenance_series('00000000-0000-0000-0000-0000000000b1',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '08:00', 720, current_date + 2, null, 'Long days'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '08:00', 720, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Long days'));
 reset role;
 select tests.authenticate_as((select id from ids where name = 'arm'));
 select public.cancel_maintenance_series((select id from s where name = 'chain'), 'Pause');
 select public.create_maintenance('00000000-0000-0000-0000-0000000000b1',
-  ((current_date + 2) + time '20:00') at time zone 'Asia/Bangkok',
-  ((current_date + 3) + time '08:00') at time zone 'Asia/Bangkok', 'Night work');
+  (((now() at time zone 'Asia/Bangkok')::date + 2) + time '20:00') at time zone 'Asia/Bangkok',
+  (((now() at time zone 'Asia/Bangkok')::date + 3) + time '08:00') at time zone 'Asia/Bangkok', 'Night work');
 select throws_ok($$ select public.undo_series_action((select id from s where name = 'chain')) $$,
   '22023', 'Over 24 h with the windows next to it — it can''t be undone; ask an Admin',
   'a Responder''s Undo can''t chain windows past 24 h');
@@ -214,7 +214,7 @@ reset role;
 -- Engine M1: a window's own Undo can't bring a window back under a cancelled series.
 select tests.authenticate_as((select id from ids where name = 'tao'));
 insert into s values ('m1', public.create_maintenance_series('00000000-0000-0000-0000-0000000000b2',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '03:00', 30, current_date + 2, null, 'Patches'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '03:00', 30, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Patches'));
 reset role;
 create temp table w1 on commit drop as
   select id from public.maintenance_windows where series_id = (select id from s where name = 'm1') order by starts_at limit 1;
@@ -232,7 +232,7 @@ select ok((select cancelled_at is not null from public.maintenance_windows where
 -- carries when it posts.
 select tests.authenticate_as((select id from ids where name = 'nok'));
 insert into s values ('m2', public.create_maintenance_series('00000000-0000-0000-0000-0000000000b3',
-  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '03:00', 30, current_date + 2, null, 'Asked'));
+  '{"freq":"weekly","days":[1,2,3,4,5,6,7]}', '03:00', 30, (now() at time zone 'Asia/Bangkok')::date + 2, null, 'Asked'));
 reset role;
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select public.decide_maintenance_series((select id from s where name = 'm2'), true, null);
