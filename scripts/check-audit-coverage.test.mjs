@@ -200,6 +200,23 @@ test('a re-exported handler or action is an entry too (review)', () => {
   assert.ok(errors.some((e) => e.startsWith('features/demo/actions.ts#quietAction: not in')));
 });
 
+test('the named test must check the function’s own row: one of the codes it writes (advisor)', () => {
+  const dirs = fixture({
+    ...BASE,
+    'migrations/0002.sql':
+      "create function public.ack_incident(p uuid) returns void language plpgsql as $$ begin\n  insert into public.audit_log (action, entity) values ('incident.ack', 'incident');\nend; $$;",
+    'tests/ack.test.sql':
+      "select public.ack_incident(1); select count(*) from public.audit_log where action = 'incident.note';",
+  });
+  const errors = checkAuditCoverage({ ...dirs, registry: REGISTRY, classes: CLASSES });
+  assert.ok(errors.some((e) => e.includes('ack_incident — ack.test.sql must check its row (incident.ack)')));
+  fs.writeFileSync(
+    path.join(dirs.tests, 'ack.test.sql'),
+    "select public.ack_incident(1); select count(*) from public.audit_log where action = 'incident.ack';",
+  );
+  assert.deepEqual(checkAuditCoverage({ ...dirs, registry: REGISTRY, classes: CLASSES }), []);
+});
+
 test('an audited function whose named test doesn’t read audit_log fails', () => {
   const dirs = fixture({ ...BASE, 'tests/ack.test.sql': 'select public.ack_incident(1);' });
   const errors = checkAuditCoverage({ ...dirs, registry: REGISTRY, classes: CLASSES });

@@ -5,7 +5,7 @@
 -- steps never repeat them (Done-when 2).
 begin;
 \ir _helpers.psql
-select plan(52);
+select plan(54);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -225,6 +225,13 @@ select public.ack_incident(pg_temp.inc());
 select throws_ok(format('select public.escalate_now(%L, 3::smallint)', pg_temp.inc()), '55000',
   'only an incident waiting for an ack escalates', 'Acknowledge stops Escalate now (§30.6)');
 reset role;
+
+-- ── Audit rows (S15 coverage: each function's own row) ──────────────────────
+reset role;
+select ok(exists (select 1 from public.audit_log where action = 'incident.escalate_now' and at = now()),
+  'escalate_now writes incident.escalate_now (S15 audit coverage)');
+select ok(exists (select 1 from public.audit_log where action = 'incident.client_update_due' and at = now()),
+  'send_client_update_reminder writes incident.client_update_due (S15 audit coverage)');
 
 select * from finish();
 rollback;

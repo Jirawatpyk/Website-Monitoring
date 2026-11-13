@@ -4,7 +4,7 @@
 -- and that nobody writes the tables directly.
 begin;
 \ir _helpers.psql
-select plan(71);
+select plan(73);
 
 -- ── Fixtures ─────────────────────────────────────────────────────────────
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -308,6 +308,13 @@ select tests.authenticate_as((select id from ids where name = 'tao'));
 select lives_ok($$ select public.decide_oncall_swap((select id from sw2 where name = 'tao_asked'), true) $$,
   'the only active Admin approves a swap they are part of');
 reset role;
+
+-- ── Audit rows (S15 coverage: each function's own row) ──────────────────────
+reset role;
+select ok(exists (select 1 from public.audit_log where action = 'oncall.swap_withdraw' and at = now()),
+  'withdraw_oncall_swap writes oncall.swap_withdraw (S15 audit coverage)');
+select ok(exists (select 1 from public.audit_log where action = 'oncall.swap_expire' and at = now()),
+  'oncall_extend_shifts writes oncall.swap_expire (S15 audit coverage)');
 
 select * from finish();
 rollback;

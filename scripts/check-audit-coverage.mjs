@@ -135,6 +135,21 @@ export function parseClasses(sql) {
   return out;
 }
 
+/** The action codes (`incident.ack`, …) in a function's latest definition across the migrations. */
+export function writtenCodes(migrationSql, fn) {
+  let last = -1;
+  for (const m of migrationSql.matchAll(new RegExp(`create (?:or replace )?function public\\.${fn}\\(`, 'g')))
+    last = m.index;
+  if (last < 0) return [];
+  const start = migrationSql.indexOf('$$', last);
+  const end = migrationSql.indexOf('$$;', start + 2);
+  const body = migrationSql.slice(start, end);
+  const codes = [...body.matchAll(/insert into public\.audit_log[\s\S]{0,2000}?;/g)].flatMap((m) =>
+    [...m[0].matchAll(/'([a-z_]+\.[a-z_]+)'/g)].map((x) => x[1]),
+  );
+  return [...new Set(codes)];
+}
+
 /** Tables an audit trigger covers (`private.audit_row_change`), read from the migrations. */
 export function auditedTables(migrationsDir) {
   const out = new Set();
@@ -198,6 +213,12 @@ export function checkAuditCoverage({ src, registry, classes, tests, migrations }
     if (!entries.has(key)) errors.push(`${key}: in apps/web/audit-coverage.json but no such action or route`);
   }
 
+  const migrationSql = fs
+    .readdirSync(migrations)
+    .filter((n) => n.endsWith('.sql'))
+    .sort()
+    .map((n) => fs.readFileSync(path.join(migrations, n), 'utf8').replace(/--[^\n]*/g, ''))
+    .join('\n');
   for (const [fn, c] of classes) {
     if (c.kind === 'exempt') {
       if (c.note.trim().length < 15) errors.push(`audit_coverage.test.sql: ${fn} — exempt needs a reason`);
@@ -211,6 +232,13 @@ export function checkAuditCoverage({ src, registry, classes, tests, migrations }
     const sql = fs.readFileSync(file, 'utf8');
     if (!new RegExp(`\\b${fn}\\b`).test(sql) || !/\baudit_log\b/.test(sql)) {
       errors.push(`audit_coverage.test.sql: ${fn} — ${c.note} must call it and read audit_log`);
+      continue;
+    }
+    // The test checks this function's own row: it names one of the codes the function writes.
+    // (A function that writes through a helper or a row trigger names no code itself: skipped.)
+    const codes = writtenCodes(migrationSql, fn);
+    if (codes.length && !codes.some((code) => sql.includes(`'${code}'`))) {
+      errors.push(`audit_coverage.test.sql: ${fn} — ${c.note} must check its row (${codes.join(' or ')})`);
     }
   }
 

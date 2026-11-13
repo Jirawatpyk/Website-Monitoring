@@ -3,7 +3,7 @@
 -- of what hasn't started, who may do what, and one audit row per change.
 begin;
 \ir _helpers.psql
-select plan(54);
+select plan(55);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -207,6 +207,11 @@ select is((select count(*)::int from public.audit_log a join public.maintenance_
            where a.action = 'maintenance.create' and w.series_id = (select id from s where name = 'daily')),
   (select count(*)::int from public.maintenance_windows where series_id = (select id from s where name = 'daily')),
   'and each occurrence has its own create row');
+
+-- ── Audit rows (S15 coverage: each function's own row) ──────────────────────
+reset role;
+select ok(exists (select 1 from public.audit_log where action = 'maintenance.series_approve' and at = now()),
+  'decide_maintenance_series writes maintenance.series_approve (S15 audit coverage)');
 
 select * from finish();
 rollback;

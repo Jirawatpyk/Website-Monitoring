@@ -60,14 +60,14 @@ insert into audit_classes (fn, kind, note) values
   ('save_monitors', 'audited', 'sites_registration.test.sql'),
   -- The engine and the crawler (System rows)
   ('engine_open_incident', 'audited', 'probes.test.sql'),
-  ('engine_recover_incident', 'audited', 'resolve.test.sql'),
+  ('engine_recover_incident', 'audited', 'probes.test.sql'),
   ('engine_relapse_incident', 'audited', 'resolve.test.sql'),
   ('engine_escalate_incident', 'audited', 'verifier.test.sql'),
-  ('engine_settle_incident', 'audited', 'resolve.test.sql'),
+  ('engine_settle_incident', 'audited', 'probes.test.sql'),
   ('engine_fire_step', 'audited', 'escalation.test.sql'),
   ('engine_client_update_due', 'audited', 'client_update.test.sql'),
   ('engine_log_windows', 'audited', 'maintenance.test.sql'),
-  ('engine_window_reminders', 'audited', 'maintenance_messages.test.sql'),
+  ('engine_window_reminders', 'audited', 'series_undo.test.sql'),
   ('engine_expand_series', 'audited', 'maintenance_series.test.sql'),
   ('oncall_extend_shifts', 'audited', 'oncall.test.sql'),
   ('open_system_alert', 'audited', 'verifier.test.sql'),
@@ -169,10 +169,14 @@ select is(pg_temp.audited_without_audit(), '{}'::text[],
 select is(
   (select coalesce(array_agg(c.relname::text order by c.relname), '{}')
    from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r', 'p')
+   -- Tables, partitioned tables and views; whole-table and column-level grants alike (a later
+   -- `grant update (col)` counts as a direct write too — security re-review).
+   where n.nspname = 'public' and c.relkind in ('r', 'p', 'v')
      and (has_table_privilege('authenticated', c.oid, 'INSERT')
           or has_table_privilege('authenticated', c.oid, 'UPDATE')
-          or has_table_privilege('authenticated', c.oid, 'DELETE'))
+          or has_table_privilege('authenticated', c.oid, 'DELETE')
+          or has_any_column_privilege('authenticated', c.oid, 'INSERT')
+          or has_any_column_privilege('authenticated', c.oid, 'UPDATE'))
      and not exists (select 1 from pg_trigger t join pg_proc f on f.oid = t.tgfoid
                      where t.tgrelid = c.oid and f.proname = 'audit_row_change')),
   '{}'::text[], 'every table a signed-in session can write has the row-change audit trigger');

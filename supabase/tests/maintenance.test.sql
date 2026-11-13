@@ -3,7 +3,7 @@
 -- engine's window log, T09 (a mute never stops an open incident's ladder) and the late alert after a mute.
 begin;
 \ir _helpers.psql
-select plan(95);
+select plan(96);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -459,6 +459,11 @@ set local role service_role;
 select ok(not public.engine_remind((select id from inc where name = 'a'), now() - interval '1 minute', '{}'),
   'a reminder due before the late alert doesn''t go');
 reset role;
+
+-- ── Audit rows (S15 coverage: each function's own row) ──────────────────────
+reset role;
+select ok(exists (select 1 from public.audit_log where action = 'maintenance.cancel' and at = now()),
+  'cancel_window writes maintenance.cancel (S15 audit coverage)');
 
 select * from finish();
 rollback;
