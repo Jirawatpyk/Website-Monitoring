@@ -558,8 +558,9 @@ export function escalationSides(b: Side, a: Side): AuditSides {
         const parts = (s: Step) => stepWords(s).split(' · ');
         const op = parts(o);
         const np = parts(n);
-        before.push(`${name} · L${level} ${op.filter((p, i) => p !== np[i]).join(' · ')}`);
-        after.push(`${name} · L${level} ${np.filter((p, i) => p !== op[i]).join(' · ')}`);
+        // By content, not position: a part only one side has (FYI) still shows (spec-checker N1).
+        before.push(`${name} · L${level} ${op.filter((p) => !np.includes(p)).join(' · ') || 'none'}`);
+        after.push(`${name} · L${level} ${np.filter((p) => !op.includes(p)).join(' · ') || 'none'}`);
       } else if (o) {
         before.push(`${name} · L${level} ${was}`);
         after.push(`${name} · L${level} removed`);
@@ -579,9 +580,10 @@ export function escalationSides(b: Side, a: Side): AuditSides {
     }
   }
   const note = typeof a.note === 'string' && a.note.trim() ? `“${a.note.trim()}”` : '';
-  const afterWords = [...after, note].filter(Boolean).join(' · ');
+  // One change from the next with "; " — " · " already separates the parts of a step (N1).
+  const afterWords = [after.join('; '), note].filter(Boolean).join(' · ');
   return {
-    before: before.join(' · ') || '—',
+    before: before.join('; ') || '—',
     after: afterWords || 'no change',
     struck: before.length > 0,
   };
@@ -605,14 +607,14 @@ export function sidesOf(action: string, before: Json | null, after: Json | null,
   let changed: Set<string> | undefined;
   if (action.endsWith('.update') && b && a && action !== 'escalation.update') {
     // A changed jsonb column (`monitors.thresholds`) shows the keys inside it that changed:
-    // "thresholds slow ms 3000 → thresholds slow ms 5000", never "—" → "—".
+    // "slow threshold 3 s → slow threshold 5 s", never "—" → "—".
     const flat = flattenChanged(b, a);
     b = flat.before;
     a = flat.after;
     changed = flat.changed;
   }
-  // An Undo stores the whole snapshot it restored; what it undid is the news.
   if (action === 'escalation.update' && b && a) return escalationSides(b, a);
+  // An Undo stores the whole snapshot it restored; what it undid is the news.
   if (a && typeof a.undid === 'string') {
     const before = b && typeof b.action === 'string' ? enumWord('action', b.action) : '';
     return { before: before || '—', after: `undid ${enumWord('undid', a.undid)}`, struck: before !== '' };

@@ -117,7 +117,8 @@ export function AuditLogView({ data }: { data: AuditPage }) {
   const filtered = isFiltered(data.filters);
 
   // Narrow tables fold Entity under the action, so the table fits from 768 px (M1):
-  // 128 + 128 + 196 + 180 + 48 px of gutters = 680, inside the ~703 px a 1024 screen leaves it.
+  // 136 + 128 + 196 + 180 + 48 px of gutters = 688, inside the ~703 px a 1024 screen leaves it
+  // (Time at 136: "Wed 30 Sep 16:20" on one line).
   // The column joins at a 896 px table (DataTable measures its own width), and the folded line
   // hides at the same width by a container query on the table wrapper (@4xl = 56rem = 896 px). The container is named:
   // DataTable wraps its cells in containers of its own (`aura-table-q`).
@@ -125,7 +126,7 @@ export function AuditLogView({ data }: { data: AuditPage }) {
     {
       key: 'at',
       label: 'Time',
-      width: 128,
+      width: 136,
       render: (e) => (
         <time dateTime={e.at} className="py-1.5 font-mono text-xs text-fg-secondary">
           {e.atLabel}
@@ -279,7 +280,11 @@ export function AuditLogView({ data }: { data: AuditPage }) {
                           action: (
                             <Button
                               variant="secondary"
-                              onClick={() => go({ ...data.filters, range: 'All time' }, { now: true })}
+                              onClick={() => {
+                                // The button goes with the empty state: focus lands on Category (N3).
+                                focusCategory.current = true;
+                                go({ ...data.filters, range: 'All time' }, { now: true });
+                              }}
                             >
                               Show all time
                             </Button>

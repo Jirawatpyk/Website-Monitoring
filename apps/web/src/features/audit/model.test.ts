@@ -288,9 +288,9 @@ describe('sidesOf', () => {
       },
       names,
     );
-    expect(s.before).toBe('DOWN · Tier 1 · L2 none · DOWN reminder every 30 min');
+    expect(s.before).toBe('DOWN · Tier 1 · L2 none; DOWN reminder every 30 min');
     expect(s.after).toBe(
-      'DOWN · Tier 1 · L2 after 30 min · Admin · Chat @mention · DOWN reminder every 20 min · “more cover”',
+      'DOWN · Tier 1 · L2 after 30 min · Admin · Chat @mention; DOWN reminder every 20 min · “more cover”',
     );
     const same = { policies: policies(15), downReminderMin: 30, problemReminderMin: 60 };
     expect(sidesOf('escalation.update', same, same, names)).toEqual({
