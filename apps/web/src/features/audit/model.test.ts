@@ -355,6 +355,24 @@ describe('sidesOf', () => {
   });
 });
 
+describe('monitor faults (/verify)', () => {
+  it('read as open / cleared, not the raw kind', () => {
+    expect(
+      sidesOf(
+        'system_alert.opened',
+        null,
+        { kind: 'probe_location_missing', context: { location: 'TYO', lastBeatAt: '2026-09-25T02:58:00Z' } },
+        names,
+      ),
+    ).toEqual({ before: '—', after: 'open · last beat Fri 25 Sep 09:58', struck: false });
+    expect(sidesOf('system_alert.cleared', null, { kind: 'probe_locations_low' }, names)).toEqual({
+      before: 'open',
+      after: 'cleared',
+      struck: true,
+    });
+  });
+});
+
 describe('entityFallback', () => {
   it('names a system alert by kind and location', () => {
     expect(

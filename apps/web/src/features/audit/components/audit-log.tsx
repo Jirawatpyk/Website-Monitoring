@@ -312,6 +312,7 @@ export function AuditLogView({ data }: { data: AuditPage }) {
             resetKey={serverQuery}
             onClear={clear}
             onShowAll={showAll}
+            pending={pending}
           />
         </div>
         <div className="@container/audit hidden md:block">

@@ -626,6 +626,16 @@ export function sidesOf(action: string, before: Json | null, after: Json | null,
     changed = flat.changed;
   }
   if (action === 'escalation.update' && b && a) return escalationSides(b, a);
+  // A monitor fault: the Entity names it already ("Probe location missing · TYO"), so the change is
+  // its state — open, then cleared — with the last beat when known (/verify, 13 Nov).
+  if (action === 'system_alert.opened' || action === 'system_alert.cleared') {
+    const ctx = a && isObject(a.context) ? a.context : null;
+    const beat =
+      ctx && typeof ctx.lastBeatAt === 'string' ? valueWords('lastBeatAt', ctx.lastBeatAt, names) : null;
+    return action === 'system_alert.opened'
+      ? { before: '—', after: beat ? `open · last beat ${beat}` : 'open', struck: false }
+      : { before: 'open', after: 'cleared', struck: true };
+  }
   // An Undo stores the whole snapshot it restored; what it undid is the news.
   if (a && typeof a.undid === 'string') {
     const before = b && typeof b.action === 'string' ? enumWord('action', b.action) : '';

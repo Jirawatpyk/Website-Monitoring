@@ -30,6 +30,7 @@ export function AuditCards({
   resetKey,
   onClear,
   onShowAll,
+  pending = false,
 }: {
   entries: AuditEntry[];
   narrowed: boolean;
@@ -37,6 +38,8 @@ export function AuditCards({
   resetKey: string;
   onClear: () => void;
   onShowAll: () => void;
+  /** A filter change is loading: the list dims and says so (/verify, 13 Nov). */
+  pending?: boolean;
 }) {
   const [shown, setShown] = useState(CARD_PAGE);
   const [seenKey, setSeenKey] = useState(resetKey);
@@ -82,7 +85,10 @@ export function AuditCards({
   const left = entries.length - visible.length;
   return (
     <>
-      <ul className="m-0 list-none overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface p-0">
+      <ul
+        aria-busy={pending}
+        className={`m-0 list-none overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface p-0 transition-opacity ${pending ? 'opacity-60' : ''}`}
+      >
         {visible.map((e, i) => (
           <li key={e.id} className="border-b border-border-subtle last:border-b-0">
             <button
