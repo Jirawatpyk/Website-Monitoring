@@ -49,6 +49,8 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | Expiry | SSL & domain expiry | `/expiry` | P1 | S13 | §14.12, §15.8 | FR-11 |
 | Probes | Probes & heartbeat | `/probes` | P1 | S12a | §14.4, §15.3 | §9 |
 | AuditLog | Audit log | `/audit` | P1 | S15 | §16.11 | FR-13 |
+| MAuditLog | Mobile — Audit log | `/audit` (390) | P1 | S15 | §22, §33 | FR-13 |
+| MAuditLogDark | Mobile — Audit log · dark | same (390), dark theme | P1 | S15 | §33 | FR-13 |
 | Users | Settings — users & roles | `/settings/users` | P1 — until then the allowlist and roles are set by SQL (S01, D-007) | S16 | §14.9, §15.2, §16.6 | §3 |
 | Security | Settings — sessions & security (no 2-step lock, D-007) | `/settings/security` | P1 | S16 | §15.2, §16.7 | §3, §9 |
 | AlertChannels | Settings — alert channels & routing | `/settings/alert-channels` | P1 | S17 | §14.8, §15.5, §15.8 | §7 |

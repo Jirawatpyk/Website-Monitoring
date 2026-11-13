@@ -295,15 +295,12 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
       `/sites/${site}/edit`,
       `/sites/${site}/monitors`,
       `/incidents/${await openTestIncident(ADMIN.email)}`,
-      // The Audit log (S15): from md only until its MAuditLog board exists (D-061 item 5; nav not live yet).
-      '/audit',
     );
 
     for (const width of WIDTHS) {
       const page = await signedInAt(browser, baseURL!, width);
 
       for (const path of pages) {
-        if (path === '/audit' && width < 768) continue;
         await test.step(`${path} at ${width} px`, async () => {
           await page.goto(path);
           // Every page keeps its h1; below lg most show their title in the top bar instead (D-045).

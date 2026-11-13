@@ -23,6 +23,7 @@ import {
 } from '@jirawatpyk/aura-react/icons';
 import { formatCount } from '@dxt/shared';
 import type { AuditEntry, AuditPage } from '../queries';
+import { AuditCards } from './audit-cards';
 import {
   AUDIT_CATEGORIES,
   AUDIT_RANGES,
@@ -87,12 +88,16 @@ export function AuditLogView({ data }: { data: AuditPage }) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const categoryRef = useRef<HTMLDivElement>(null);
+  const phoneCategoryRef = useRef<HTMLDivElement>(null);
   const focusCategory = useRef(false);
   useEffect(() => {
     // After Clear: once the cleared page is here (and its Clear button gone), focus Category (L2).
     if (!focusCategory.current) return;
     focusCategory.current = false;
-    categoryRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+    // Desktop: the checked Category option; phone: the Category select (whichever is on screen).
+    const desktop = categoryRef.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+    const phone = phoneCategoryRef.current?.querySelector<HTMLElement>('[role="combobox"], select');
+    (window.matchMedia('(min-width: 768px)').matches ? desktop : phone)?.focus();
   }, [serverQuery]);
 
   const go = (next: AuditFilters, { now = false }: { now?: boolean } = {}) => {
@@ -220,7 +225,33 @@ export function AuditLogView({ data }: { data: AuditPage }) {
       />
 
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+        {/* Phones (MAuditLog §33.4): three 44 px selects — Category full width, Actor + When side by side. */}
+        <div ref={phoneCategoryRef} className="flex flex-col gap-2.5 md:hidden">
+          <Select
+            label="Category"
+            options={AUDIT_CATEGORIES.map((c) => ({ value: c, label: c }))}
+            value={f.cat}
+            onChange={(e) => go({ ...f, cat: e.target.value as AuditCategory })}
+            touchHeight="always"
+          />
+          <div className="grid grid-cols-2 gap-2.5">
+            <Select
+              label="Actor"
+              options={data.actors}
+              value={f.actor}
+              onChange={(e) => go({ ...f, actor: e.target.value })}
+              touchHeight="always"
+            />
+            <Select
+              label="When"
+              options={AUDIT_RANGES.map((r) => ({ value: r, label: r }))}
+              value={f.range}
+              onChange={(e) => go({ ...f, range: e.target.value as AuditRange })}
+              touchHeight="always"
+            />
+          </div>
+        </div>
+        <div className="hidden flex-wrap items-end justify-between gap-4 md:flex">
           <div ref={categoryRef}>
             <SegmentedControl
               label="Category"
@@ -250,16 +281,19 @@ export function AuditLogView({ data }: { data: AuditPage }) {
             </div>
           </div>
         </div>
-        <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 text-sm text-fg-secondary">
+        <div className="flex min-h-11 items-center justify-between gap-2 text-xs text-fg-secondary md:min-h-8 md:flex-wrap md:text-sm">
           <span aria-live="polite">{countLine(data)}</span>
           {filtered && (
-            <Button variant="ghost" size="sm" icon={<IconX />} onClick={clear}>
+            <Button variant="ghost" size="sm" icon={<IconX />} onClick={clear} touchHeight>
               Clear filters
             </Button>
           )}
         </div>
 
-        <div className="@container/audit">
+        <div className="flex flex-col gap-3 md:hidden">
+          <AuditCards entries={data.entries} narrowed={narrowed} resetKey={serverQuery} onClear={clear} />
+        </div>
+        <div className="@container/audit hidden md:block">
           <DataTable
             label="Audit log entries"
             columns={columns}

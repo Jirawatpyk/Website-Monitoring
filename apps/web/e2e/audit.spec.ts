@@ -11,7 +11,6 @@ test.describe('audit log (local Supabase)', () => {
     context,
     baseURL,
   }, info) => {
-    test.skip(info.project.name !== 'desktop', 'the 390 layout waits for the MAuditLog board (D-061 item 5)');
     await ensureUser('tao@example.test');
     await signIn(context, baseURL!, 'tao@example.test');
     await page.goto('/audit?when=all');
@@ -20,7 +19,11 @@ test.describe('audit log (local Supabase)', () => {
     await expect(page.getByText(/entr(y|ies) · all time/)).toBeVisible();
     await expect(page.getByText(/filtered from/)).toHaveCount(0);
 
-    await page.getByRole('radio', { name: 'Maintenance & mute' }).click();
+    if (info.project.name === 'mobile') {
+      // MAuditLog §33.4: Category is a select on a phone.
+      // A touch screen (coarse pointer) gets the native picker: choose on the <select> itself.
+      await page.locator('select.aura-select__native').first().selectOption({ label: 'Maintenance & mute' });
+    } else await page.getByRole('radio', { name: 'Maintenance & mute' }).click();
     await expect(page).toHaveURL(/cat=maintenance/);
     const count = page.getByText(/^\d[\d,]* entr(y|ies) · all time/);
     await expect(count).toBeVisible();
@@ -28,6 +31,18 @@ test.describe('audit log (local Supabase)', () => {
     await expect(
       page.getByRole('link', { name: `Export ${shown} ${shown === 1 ? 'row' : 'rows'}` }),
     ).toBeVisible();
+    if (info.project.name === 'mobile' && shown > 0) {
+      // §33.6–7: cards, never a table; a card opens the entry in full.
+      await expect(page.getByRole('table')).toBeHidden();
+      await page
+        .getByRole('button', { name: /Open the full entry$/ })
+        .first()
+        .click();
+      const sheet = page.getByRole('dialog');
+      await expect(sheet).toContainText('(UTC+7)');
+      await expect(sheet).toContainText('Can’t be edited or deleted.');
+      await sheet.getByRole('button', { name: 'Close', exact: true }).first().click();
+    }
 
     const res = await page.request.get('/audit/export?cat=maintenance&when=all');
     expect(res.status()).toBe(200);
@@ -47,7 +62,7 @@ test.describe('audit log (local Supabase)', () => {
     await ensureUser('arm@example.test');
     await signIn(context, baseURL!, 'arm@example.test');
     await page.goto('/audit');
-    await expect(page.getByText('The audit log is for Admins')).toBeVisible();
+    await expect(page.getByText('Only Admins can see the audit log')).toBeVisible();
     await expect(page.getByRole('table')).toHaveCount(0);
     const res = await page.request.get('/audit/export');
     expect(res.status()).toBe(403);

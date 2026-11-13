@@ -175,6 +175,8 @@ async function entriesOf(
       category: categoryOf(r.action),
       entity:
         (r.entity_id && labels.get(`${r.entity}:${r.entity_id}`)) ||
+        // A window or series removed since still names its site from the entry itself.
+        siteOfRow(r, labels) ||
         entityFallback(r.entity, r.before, r.after),
       before: sides.before,
       after: sides.after,
@@ -183,6 +185,17 @@ async function entriesOf(
       afterJson: r.after,
     };
   });
+}
+
+function siteOfRow(r: Raw, labels: Map<string, string>): string | undefined {
+  if (r.entity !== 'maintenance_window' && r.entity !== 'maintenance_series') return undefined;
+  for (const side of [r.after, r.before]) {
+    if (side && typeof side === 'object' && !Array.isArray(side) && typeof side.site_id === 'string') {
+      const name = labels.get(`site:${side.site_id}`);
+      if (name) return name;
+    }
+  }
+  return undefined;
 }
 
 function chunks<T>(xs: T[], n: number): T[][] {
@@ -227,7 +240,7 @@ async function entityLabels(db: DbClient, rows: Raw[]): Promise<Map<string, stri
   const has = (entity: string) => rows.some((r) => r.entity === entity);
 
   await Promise.all([
-    has('site') &&
+    (has('site') || has('maintenance_window') || has('maintenance_series')) &&
       db
         .from('sites')
         .select('id, name')

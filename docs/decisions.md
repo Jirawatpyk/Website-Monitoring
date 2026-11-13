@@ -85,7 +85,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
    - It finds, on its own: every export of a `'use server'` file, every `route.ts` under `app/api`, and every volatile `public` function that `authenticated` or `service_role` can execute.
    - Each one is marked either audited or exempt with a reason. An audited database function names the pgTAP test that checks its row.
    - Anything new and unmarked fails CI. A fixture function that skips `audit_log` proves the check catches it.
-5. **Phone layout waits for an MAuditLog board** from Claude Design. The desktop page is built first.
+5. **Phone layout from the MAuditLog board** (spec §33, drawn 13 Nov). Below md: three selects, cards with a full-entry sheet, and 25 at a time with Show more. The No access copy uses the viewer's own name and role and "Ask an Admin" (the board's "Ask Tao" is sample data).
 6. **Every row comes from the change it describes** (S15 security review, migration `s15_audit_hardening`):
    - `write_audit` is dropped. Any signed-in Responder or Stakeholder could write any row with it, and nothing called it.
    - The first alert after a mute (`engine_post_late_alert`) writes `incident.alerted`, because it restarts the ladder clock and sets who may acknowledge.

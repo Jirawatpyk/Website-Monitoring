@@ -43,7 +43,7 @@ const rows = [
   },
 ];
 
-function db(auditRows = rows) {
+function db(auditRows: readonly object[] = rows) {
   return fakeDb({
     'audit_log.select': { data: auditRows, count: auditRows.length },
     'profiles.select': { data: [{ id: TAO, display_name: 'Tao' }] },
@@ -121,6 +121,21 @@ describe('loadAuditPage', () => {
     ]);
     expect(page.entries[0]!.atLabel).toBe('09:58:02');
     expect(page.actors.map((a) => a.label)).toEqual(['Everyone', 'System', 'Tao']);
+  });
+
+  it('a window removed since still names its site from the entry', async () => {
+    const gone = {
+      id: 'w',
+      at: '2026-09-25T02:00:00Z',
+      actor_id: null,
+      action: 'maintenance.create',
+      entity: 'maintenance_window',
+      entity_id: '44444444-4444-4444-8444-444444444444',
+      before: null,
+      after: { site_id: SITE, reason: 'CMS upgrade' },
+    };
+    const page = await loadAuditPage(db([gone]).db as unknown as DbClient, parseFilters({}), NOW);
+    expect(page.entries[0]!.entity).toBe('DxT Games');
   });
 
   it('a bad filter in the URL falls back to the default', () => {

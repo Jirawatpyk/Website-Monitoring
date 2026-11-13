@@ -106,9 +106,11 @@ describe('AuditLogView', () => {
       'href',
       '/audit/export?cat=incidents&actor=system&when=30d',
     );
-    fireEvent.click(screen.getByRole('combobox', { name: 'When' }));
+    // The desktop When (the phone's comes first in the DOM; jsdom shows both).
+    const when = () => screen.getAllByRole('combobox', { name: 'When' }).at(-1)!;
+    fireEvent.click(when());
     fireEvent.click(screen.getByRole('option', { name: 'All time' }));
-    expect(screen.getByRole('combobox', { name: 'When' })).toHaveTextContent('All time');
+    expect(when()).toHaveTextContent('All time');
     expect(push).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(FILTER_DEBOUNCE_MS));
     expect(push).toHaveBeenCalledWith('/audit?cat=incidents&actor=system&when=all', { scroll: false });
@@ -133,11 +135,13 @@ describe('AuditLogView', () => {
     });
     const { rerender } = render(<AuditLogView data={filtered} />);
     const clear = screen.getAllByRole('button', { name: 'Clear filters' });
-    expect(clear).toHaveLength(1);
+    // The count line's, and the phone's empty card's (MAuditLog §33.9).
+    expect(clear).toHaveLength(2);
     fireEvent.click(clear[0]!);
     expect(push).toHaveBeenLastCalledWith('/audit', { scroll: false });
     rerender(<AuditLogView data={page({ total: 34, unfiltered: 34 })} />);
-    expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus();
+    // jsdom matches no min-width query: the phone's Category select takes focus.
+    expect(screen.getAllByRole('combobox', { name: 'Category' })[0]).toHaveFocus();
   });
 
   it('Export says what it downloaded', () => {
@@ -157,7 +161,7 @@ describe('AuditLogView', () => {
         })}
       />,
     );
-    expect(screen.getByText('No entries match these filters.')).toBeInTheDocument();
+    expect(screen.getAllByText('No entries match these filters.').length).toBeGreaterThan(0);
     unmount();
     render(<AuditLogView data={page({ entries: [], total: 0, unfiltered: 0 })} />);
     expect(screen.getByText('Nothing logged in the last 7 days')).toBeInTheDocument();

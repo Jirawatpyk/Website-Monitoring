@@ -283,6 +283,11 @@ export function atLabel(at: Date, now: Date): string {
   return `${formatDay(at, { weekday: true, year: otherYear })} ${formatTime(at)}`;
 }
 
+/** The entry sheet's date (MAuditLog, §33.7): "Fri 25 Sep 2026 09:20:14 (UTC+7)". */
+export function fullAtLabel(at: Date): string {
+  return `${formatDay(at, { weekday: true, year: true })} ${formatTimeWithSeconds(at)} (UTC+7)`;
+}
+
 // ── Before → After ─────────────────────────────────────────────────────────────────────────────
 
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };

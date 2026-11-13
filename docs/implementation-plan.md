@@ -694,7 +694,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S15 · Audit log
 
 - **Scope:** FR-13. Audit log page (filters, CSV export) and a coverage test that runs in CI: every server action / route that changes config or incident state must write `audit_log`.
-- **Boards:** AuditLog
+- **Boards:** AuditLog, MAuditLog, MAuditLogDark (spec §33, drawn 13 Nov)
 - **Depends on:** S09
 - **Done when:**
   1. The coverage test enumerates the mutating actions and routes, and fails on a fixture action that deliberately skips `audit_log` (so slices after S15 are held to it).
@@ -917,6 +917,8 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | Expiry | S13 |
 | WeeklySummary | S14 |
 | AuditLog | S15 |
+| MAuditLog | S15 |
+| MAuditLogDark | S15 |
 | Users | S16 |
 | Security | S16 |
 | Profile | S16 |
