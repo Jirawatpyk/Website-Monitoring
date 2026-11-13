@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Container, PageHeader } from '@jirawatpyk/aura-react';
+import { Button, Container, PageHeader } from '@jirawatpyk/aura-react';
+import { IconFileText } from '@jirawatpyk/aura-react/icons';
 import { EscalationEditor, EscalationView } from '@/features/escalation';
 import { getEscalationPage } from '@/features/escalation/server';
 import { NoAccess } from '@/components/states';
@@ -9,7 +10,8 @@ export const metadata: Metadata = { title: 'Escalation policies' };
 
 /**
  * `/escalation` — Escalation (L0–L1) for an Admin from md; MEscalation, read-only, on phones and for
- * everyone else (spec §8, §14.7, §15.5, §22; D-034). "Change history" waits for the Audit log (S15).
+ * everyone else (spec §8, §14.7, §15.5, §22; D-034). "Change history" opens the Audit log's Config
+ * entries (S15) — Admins only, like the log itself, and from md: the log has no phone layout yet (D-061).
  */
 export default async function EscalationPage() {
   const access = await getAccess();
@@ -38,6 +40,15 @@ export default async function EscalationPage() {
           eyebrow="OPERATIONS"
           title="Escalation policies"
           meta="One person must acknowledge. No ack in time → the next level is notified. Acknowledge stops this chain."
+          actions={
+            admin ? (
+              <span className="hidden md:inline-flex">
+                <Button variant="ghost" icon={<IconFileText />} href="/audit?cat=config&when=all">
+                  Change history
+                </Button>
+              </span>
+            ) : undefined
+          }
         />
         {admin ? (
           <>
