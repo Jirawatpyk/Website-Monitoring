@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: 'Escalation policies' };
 /**
  * `/escalation` — Escalation (L0–L1) for an Admin from md; MEscalation, read-only, on phones and for
  * everyone else (spec §8, §14.7, §15.5, §22; D-034). "Change history" opens the Audit log's
- * escalation saves, all time (S15) — Admins only, like the log itself, and from md: the log has no phone layout yet (D-061).
+ * escalation saves, all time (S15) — Admins only, like the log itself, and from md: MEscalation (the phone view) draws no Change history.
  */
 export default async function EscalationPage() {
   const access = await getAccess();
