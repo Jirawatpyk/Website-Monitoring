@@ -33,6 +33,7 @@ import {
   PAGE_LIMIT,
   filtersQuery,
   isFiltered,
+  hasRowFilters,
   isNarrowed,
   quietWords,
   spanLabel,
@@ -194,7 +195,8 @@ export function AuditLogView({ data }: { data: AuditPage }) {
     },
   ];
 
-  const narrowed = isNarrowed(data.filters);
+  // The empty states: rows hidden by a filter, or a quiet range.
+  const narrowed = hasRowFilters(data.filters);
 
   return (
     <div className="flex flex-col gap-6">

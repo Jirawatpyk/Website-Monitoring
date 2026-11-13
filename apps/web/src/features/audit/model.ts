@@ -114,7 +114,15 @@ export function isFiltered(f: AuditFilters): boolean {
  * category, a person, an entity, or Today (counted against the week). A longer range alone isn't.
  */
 export function isNarrowed(f: AuditFilters): boolean {
-  return f.cat !== 'All' || f.actor !== 'everyone' || !!f.entity || f.range === 'Today';
+  return hasRowFilters(f) || f.range === 'Today';
+}
+
+/**
+ * Whether a category, a person or an entity hides rows: an empty list then "matches no filters".
+ * A range alone — Today too — is a quiet time: "Nothing logged today" (code review, 13 Nov).
+ */
+export function hasRowFilters(f: AuditFilters): boolean {
+  return f.cat !== 'All' || f.actor !== 'everyone' || !!f.entity;
 }
 
 export const NO_FILTERS: AuditFilters = { cat: 'All', actor: 'everyone', range: DEFAULT_RANGE };

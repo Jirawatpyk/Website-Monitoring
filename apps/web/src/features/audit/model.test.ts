@@ -7,6 +7,8 @@ import {
   categoryFilter,
   categoryOf,
   entityFallback,
+  hasRowFilters,
+  isNarrowed,
   rangeStart,
   sidesOf,
   spanLabel,
@@ -352,6 +354,17 @@ describe('sidesOf', () => {
     expect(
       sidesOf('incident.root_cause', null, { category: 'dns', what: 'Expired record' }, names).after,
     ).toBe('category DNS / domain · what happened Expired record');
+  });
+});
+
+describe('hasRowFilters', () => {
+  it('a range alone, Today too, hides no rows; a category, person or entity does', () => {
+    expect(hasRowFilters({ cat: 'All', actor: 'everyone', range: 'Today' })).toBe(false);
+    expect(isNarrowed({ cat: 'All', actor: 'everyone', range: 'Today' })).toBe(true);
+    expect(hasRowFilters({ cat: 'Config', actor: 'everyone', range: 'Last 7 days' })).toBe(true);
+    expect(hasRowFilters({ cat: 'All', actor: 'everyone', range: 'All time', entity: 'escalation' })).toBe(
+      true,
+    );
   });
 });
 
