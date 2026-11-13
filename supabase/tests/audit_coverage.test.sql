@@ -4,8 +4,11 @@
 -- with the reason. A new function missing from the list fails here; a function marked audited that
 -- has no path to audit_log fails here too. The web half is scripts/check-audit-coverage.mjs, which
 -- reads this list (keep one row per line: ('name', 'audited' | 'exempt', 'test file | reason')).
+-- Known limit: pg_cron jobs that call `private.*` functions are outside this list (today only
+-- retention, rollups and the nightly series expansion, whose public twin is listed). A new cron job
+-- that changes config or incident state needs its own row here and an audit row in its function.
 begin;
-select plan(5);
+select plan(7);
 
 create temp table audit_classes (
   fn text primary key,
@@ -55,7 +58,6 @@ insert into audit_classes (fn, kind, note) values
   ('set_site_monitoring', 'audited', 'sites_registration.test.sql'),
   ('delete_site', 'audited', 'sites_registration.test.sql'),
   ('save_monitors', 'audited', 'sites_registration.test.sql'),
-  ('write_audit', 'audited', 'rls.test.sql'),
   -- The engine and the crawler (System rows)
   ('engine_open_incident', 'audited', 'probes.test.sql'),
   ('engine_recover_incident', 'audited', 'resolve.test.sql'),
@@ -71,6 +73,7 @@ insert into audit_classes (fn, kind, note) values
   ('open_system_alert', 'audited', 'verifier.test.sql'),
   ('clear_system_alert', 'audited', 'verifier.test.sql'),
   ('crawler_set_baseline', 'audited', 'page_change.test.sql'),
+  ('engine_post_late_alert', 'audited', 'oncall_routing.test.sql'),
   -- Exempt: no config or incident state changes
   ('post_window_action_now', 'exempt', 'Sends early the messages an audited window action already queued.'),
   ('post_series_action_now', 'exempt', 'Sends early the messages an audited series action already queued.'),
@@ -93,7 +96,6 @@ insert into audit_classes (fn, kind, note) values
   ('engine_queue_l0_emails', 'exempt', 'Queues L0 emails after the grace (D-047).'),
   ('engine_queue_window_messages', 'exempt', 'Queues a window''s messages; the window change itself is audited.'),
   ('engine_queue_series_messages', 'exempt', 'Queues a series'' messages; the series change itself is audited.'),
-  ('engine_post_late_alert', 'exempt', 'Posts the first alert a mute held back; the mute and the incident are audited.'),
   ('engine_remind', 'exempt', 'Queues a STILL DOWN / STILL PROBLEM reminder.'),
   ('engine_oncall_reminders', 'exempt', 'Queues the on-call week reminders.'),
   ('engine_mark_engine_back', 'exempt', 'Adds an "engine back" timeline line to incidents acted on by hand.');
@@ -110,12 +112,19 @@ create function pg_temp.state_changers() returns setof text language sql stable 
          or has_function_privilege('service_role', p.oid, 'execute'))
 $$;
 
--- A function reaches audit_log when its body writes it, calls a function that does, or writes a
--- table an audit trigger covers (`private.audit_row_change`).
+-- A function's body without its comments: a comment that mentions audit_log proves nothing.
+create function pg_temp.code(p_src text) returns text language sql immutable as $$
+  select regexp_replace(regexp_replace(p_src, '/\*.*?\*/', ' ', 'gs'), '--[^\n]*', ' ', 'g')
+$$;
+
+-- A function reaches audit_log when its body inserts into it, calls a function that does, or writes
+-- a table an audit trigger covers (`private.audit_row_change`). Matched on the code text, so a
+-- dynamic call by name would slip through; none of ours does that (D-061 trade-off).
 create function pg_temp.reaches_audit(p_fn text) returns boolean language sql stable as $$
   with writers as (
     select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname in ('public', 'private') and p.prosrc ~* '\maudit_log\M|\mwrite_audit\M'
+    where n.nspname in ('public', 'private')
+      and pg_temp.code(p.prosrc) ~* 'insert\s+into\s+public\.audit_log\M'
   ),
   audited_tables as (
     select distinct c.relname from pg_trigger t
@@ -126,10 +135,11 @@ create function pg_temp.reaches_audit(p_fn text) returns boolean language sql st
   select exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = p_fn
-      and (p.prosrc ~* '\maudit_log\M|\mwrite_audit\M'
-           or exists (select 1 from writers w where w.proname <> p.proname and p.prosrc ~* ('\m' || w.proname || '\M'))
+      and (pg_temp.code(p.prosrc) ~* 'insert\s+into\s+public\.audit_log\M'
+           or exists (select 1 from writers w where w.proname <> p.proname
+                      and pg_temp.code(p.prosrc) ~* ('\m' || w.proname || '\s*\('))
            or exists (select 1 from audited_tables a
-                      where p.prosrc ~* ('(insert\s+into|update|delete\s+from)\s+public\.' || a.relname || '\M')))
+                      where pg_temp.code(p.prosrc) ~* ('(insert\s+into|update|delete\s+from)\s+public\.' || a.relname || '\M')))
   )
 $$;
 
@@ -154,6 +164,19 @@ select is(
 select is(pg_temp.audited_without_audit(), '{}'::text[],
   'every function marked audited reaches audit_log (itself, a helper, or an audited table)');
 
+-- A table a signed-in session can write directly (PostgREST) needs the row-change audit trigger:
+-- the S15 security review found `profiles` (an Admin's role / is_active change) writing nothing.
+select is(
+  (select coalesce(array_agg(c.relname::text order by c.relname), '{}')
+   from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind in ('r', 'p')
+     and (has_table_privilege('authenticated', c.oid, 'INSERT')
+          or has_table_privilege('authenticated', c.oid, 'UPDATE')
+          or has_table_privilege('authenticated', c.oid, 'DELETE'))
+     and not exists (select 1 from pg_trigger t join pg_proc f on f.oid = t.tgfoid
+                     where t.tgrelid = c.oid and f.proname = 'audit_row_change')),
+  '{}'::text[], 'every table a signed-in session can write has the row-change audit trigger');
+
 -- ── Fixtures: a new function that changes incident state and skips audit_log ─────────────────────
 create function public.zz_fixture_skips_audit(p_id uuid) returns void language sql as $$
   update public.incidents set state = 'closed' where id = p_id
@@ -167,6 +190,14 @@ select is(pg_temp.unclassified(), array['zz_fixture_skips_audit'],
 insert into audit_classes select 'zz_fixture_skips_audit', 'audited', 'fixture.test.sql';
 select is(pg_temp.audited_without_audit(), array['zz_fixture_skips_audit'],
   'marking it audited does not help: it has no path to audit_log');
+
+-- A comment that names audit_log doesn't count either.
+create or replace function public.zz_fixture_skips_audit(p_id uuid) returns void language sql as $$
+  -- insert into public.audit_log happens in the caller
+  update public.incidents set state = 'closed' where id = p_id
+$$;
+select is(pg_temp.audited_without_audit(), array['zz_fixture_skips_audit'],
+  'nor does a comment that mentions audit_log');
 
 select * from finish();
 rollback;

@@ -86,6 +86,11 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
    - Each one is marked either audited or exempt with a reason. An audited database function names the pgTAP test that checks its row.
    - Anything new and unmarked fails CI. A fixture function that skips `audit_log` proves the check catches it.
 5. **Phone layout waits for an MAuditLog board** from Claude Design. The desktop page is built first.
+6. **Every row comes from the change it describes** (S15 security review, migration `s15_audit_hardening`):
+   - `write_audit` is dropped. Any signed-in Responder or Stakeholder could write any row with it, and nothing called it.
+   - The first alert after a mute (`engine_post_late_alert`) writes `incident.alerted`, because it restarts the ladder clock and sets who may acknowledge.
+   - `profiles` gets the row-change trigger (`profile.*`, under Access), since an Admin can change a role or deactivate someone directly.
+   - The coverage test also fails on any table a session can write that has no audit trigger.
 
 **Why.** The log is the record of who changed what, and the board's two ranges would hide everything older than a week. An automatic list that forces a classification holds every later slice to the rule without calling ~45 functions with fixture state. Admin-only matches the board (the viewer is Tao) and the current policy.
 

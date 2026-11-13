@@ -64,7 +64,7 @@ select throws_ok(
 select is_empty($$ delete from public.sites returning id $$, 'viewer cannot delete sites');
 select is_empty($$ update public.monitors set timeout_ms = 5000 returning id $$,
   'viewer cannot update monitors');
-select throws_ok($$ select public.write_audit('x', 'y', null) $$, '42501', null,
+select throws_ok($$ insert into public.audit_log (action, entity) values ('x', 'y') $$, '42501', null,
   'a viewer cannot write the audit log (read-only role)');
 reset role;
 
@@ -105,8 +105,8 @@ select throws_ok(
 select is_empty(
   $$ update public.profiles set role = 'admin' where id = auth.uid() returning id $$,
   'responder cannot promote themselves');
-select ok(public.write_audit('site.mute', 'site', '00000000-0000-0000-0000-0000000000a1') is not null,
-  'a signed-in user can write the audit log through write_audit');
+select hasnt_function('public', 'write_audit',
+  'write_audit is gone: nobody writes an arbitrary audit row (S15 security review)');
 select is_empty('select * from public.audit_log', 'only Admins read the audit log');
 select throws_ok(
   $$ insert into public.audit_log (action, entity) values ('forged', 'site') $$,
@@ -119,8 +119,8 @@ select isnt_empty(
   $$ update public.sites set name = 'Site A2'
      where id = '00000000-0000-0000-0000-0000000000a1' returning id $$,
   'admin can change any site field');
-select is((select actor_id from public.audit_log where action = 'site.mute' and after is null),
-  (select id from ids where name = 'arm'), 'write_audit records the signed-in actor');
+select is((select actor_id from public.audit_log where action = 'site.update' order by at desc limit 1),
+  (select id from ids where name = 'admin'), 'the row trigger records the signed-in actor');
 
 -- ── audit_log is append-only ─────────────────────────────────────────────
 select throws_ok($$ update public.audit_log set action = 'x' $$, '42501', null,
@@ -134,7 +134,7 @@ select throws_ok($$ delete from public.audit_log $$, '42501', 'audit_log is appe
   'not even the database owner can DELETE from audit_log');
 
 select tests.authenticate_as((select id from ids where name = 'former'));
-select throws_ok($$ select public.write_audit('x', 'y', null) $$, '42501', null,
+select throws_ok($$ insert into public.audit_log (action, entity) values ('x', 'y') $$, '42501', null,
   'a user without an active profile cannot write the audit log');
 select is_empty(
   $$ update public.profiles set is_active = true where id = auth.uid() returning id $$,

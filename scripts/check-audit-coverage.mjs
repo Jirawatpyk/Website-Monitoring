@@ -10,7 +10,10 @@
 //   apps/web/src/app is in apps/web/audit-coverage.json, either with the audited database functions
 //   it writes through (each must be `audited` in the list and called from its file or the files it
 //   imports) or `exempt` with the reason. No source file writes a table directly unless an audit
-//   trigger covers that table.
+//   trigger covers that table or "directWrites" lists that file and table with the reason.
+// Known limits (S15 security review): the checks read the source text, so `.from(TABLE)` with a
+// non-literal name or a query builder kept in a variable isn't seen as a direct write, and the RPCs
+// an action reaches are counted per file, not per exported function.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -211,18 +214,43 @@ export function checkAuditCoverage({ src, registry, classes, tests, migrations }
     }
   }
 
-  // A direct write is fine on a table an audit trigger covers, or on one listed in "directWrites"
-  // with the reason (monitoring data and delivery state the service role keeps).
+  // A direct write is fine on a table an audit trigger covers, or where "directWrites" lists that
+  // file and table (`server/notifier/dispatch.ts#notifications`) with the reason — per file, so a
+  // later Server Action can't write the same table on the strength of the notifier's reason.
   const covered = auditedTables(migrations);
   const allowed = registry.directWrites ?? {};
-  for (const [table, why] of Object.entries(allowed)) {
-    if (typeof why !== 'string' || why.trim().length < 15)
-      errors.push(`directWrites.${table}: needs a reason`);
+  const writes = directWrites(src);
+  for (const [key, why] of Object.entries(allowed)) {
+    if (typeof why !== 'string' || why.trim().length < 15) errors.push(`directWrites.${key}: needs a reason`);
+    if (!writes.some((w) => `${w.file}#${w.table}` === key)) {
+      errors.push(`directWrites.${key}: that file no longer writes that table — remove the entry`);
+    }
   }
-  for (const w of directWrites(src)) {
-    if (!covered.has(w.table) && !(w.table in allowed)) {
+  for (const w of writes) {
+    if (!covered.has(w.table) && !(`${w.file}#${w.table}` in allowed)) {
       errors.push(
-        `${w.file}: writes ${w.table} directly (${w.op}) — go through a database function that writes audit_log, or list the table in "directWrites" with the reason`,
+        `${w.file}: writes ${w.table} directly (${w.op}) — go through a database function that writes audit_log, or list "${w.file}#${w.table}" in "directWrites" with the reason`,
+      );
+    }
+  }
+
+  // Exports the check can't name one by one, and inline server actions, are refused outright.
+  for (const file of walk(src)) {
+    const code = stripComments(fs.readFileSync(file, 'utf8'));
+    const r = rel(src, file);
+    const serverFile = /^\s*['"]use server['"]/.test(code);
+    if (
+      (serverFile || /(^|\/)route\.ts$/.test(r)) &&
+      /export\s+\*|export\s+(?:const|let|var)\s*\{|export\s+default\b/.test(code)
+    ) {
+      errors.push(
+        `${r}: export each action or handler by name (no export *, destructured or default export) so the audit check can list it`,
+      );
+    }
+    const directives = [...code.matchAll(/['"]use server['"]/g)].length;
+    if (directives > (serverFile ? 1 : 0)) {
+      errors.push(
+        `${r}: an inline 'use server' action — move it to the feature's actions.ts so the audit check can list it`,
       );
     }
   }

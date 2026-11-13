@@ -112,7 +112,10 @@ test('a direct write to a table an audit trigger covers is fine; an allowed tabl
   assert.deepEqual(
     checkAuditCoverage({
       ...dirs,
-      registry: { ...REGISTRY, directWrites: { check_results: 'Probe results, monitoring data.' } },
+      registry: {
+        ...REGISTRY,
+        directWrites: { 'server/probe.ts#check_results': 'Probe results, monitoring data.' },
+      },
       classes: CLASSES,
     }),
     [],
@@ -120,10 +123,41 @@ test('a direct write to a table an audit trigger covers is fine; an allowed tabl
   assert.ok(
     checkAuditCoverage({
       ...dirs,
-      registry: { ...REGISTRY, directWrites: { check_results: 'x' } },
+      registry: { ...REGISTRY, directWrites: { 'server/probe.ts#check_results': 'x' } },
       classes: CLASSES,
-    }).some((e) => e.startsWith('directWrites.check_results: needs a reason')),
+    }).some((e) => e.startsWith('directWrites.server/probe.ts#check_results: needs a reason')),
   );
+});
+
+test('the allowance is per file: another file writing the same table fails (security review)', () => {
+  const dirs = fixture({
+    ...BASE,
+    'src/server/probe.ts': "export const b = (db) => db.from('check_results').insert({});",
+    'src/server/other.ts': "export const c = (db) => db.from('check_results').update({});",
+  });
+  const registry = {
+    ...REGISTRY,
+    directWrites: { 'server/probe.ts#check_results': 'Probe results, monitoring data.' },
+  };
+  const errors = checkAuditCoverage({ ...dirs, registry, classes: CLASSES });
+  assert.deepEqual(errors.length, 1);
+  assert.ok(errors[0].startsWith('server/other.ts: writes check_results directly (update)'));
+});
+
+test('export *, a default export and an inline use server are refused (security review)', () => {
+  const dirs = fixture({
+    ...BASE,
+    'src/app/api/a/route.ts': "export * from '@/server/a';",
+    'src/features/demo/actions.ts': "'use server';\nexport default async function save() {}",
+    'src/app/(app)/demo/page.tsx':
+      "export default function Page() { async function go() { 'use server'; } return null; }",
+  });
+  const errors = checkAuditCoverage({ ...dirs, registry: REGISTRY, classes: CLASSES });
+  assert.ok(errors.some((e) => e.startsWith('app/api/a/route.ts: export each action or handler by name')));
+  assert.ok(
+    errors.some((e) => e.startsWith('features/demo/actions.ts: export each action or handler by name')),
+  );
+  assert.ok(errors.some((e) => e.startsWith("app/(app)/demo/page.tsx: an inline 'use server' action")));
 });
 
 test('route handlers are entries (cron routes are GET), and a stale registry entry fails', () => {

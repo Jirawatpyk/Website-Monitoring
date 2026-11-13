@@ -58,7 +58,7 @@ src/
     schemas.ts              zod input schemas
     *.test.ts(x)            tests next to the code
   components/               UI shared by several features (app-shell, status badges, empty states, time)
-  lib/                      infrastructure: supabase clients, auth, env, audit helper
+  lib/                      infrastructure: supabase clients, auth, env
   server/                   background work the cron / API routes call: engine runner, notifier dispatch,
                             probe runner (service-role, never imported by UI)
   proxy.ts
