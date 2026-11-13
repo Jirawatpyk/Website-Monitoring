@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-061 | 13 Nov 2026 | S15 Audit log: Admins only (the S01 policy stays); When = Today · Last 7 days · Last 30 days · All time in Bangkok days, the page lists the newest 500 and CSV exports every filtered row; the real action codes stay, with words and a category per code; the coverage test lists every server action, API route and state-changing database function and fails on one not marked audited or exempt with a reason; the phone layout waits for an MAuditLog board | AuditLog board "When" (Today, Last 7 days only) and its sample action codes (`incident.open`, `oncall.swap.request`); S01 "who else may read it is decided in S15" |
 | D-060 | 11 Nov 2026 | S14 closes on two production mornings of the daily report in a row (10 and 11 Nov), with the staging run and the skipped-run Healthchecks alert, instead of three | D-056 item 5 "three mornings in a row; S14 stays In review until then" |
 | D-059 | 9 Nov 2026 | The weekly summary judges each site against an uptime target by tier — Tier 1 99.95%, Tier 2 99.9%, Tier 3 99.5% (the CEO's standard table) — over the 30 days ending with the week, with this week's figure beside it, in a new UPTIME BY SITE section and a "sites on target" count in the header; a per-site target waits for S17 | Gap — no source set an uptime target; the summary gave one figure for all sites |
 | D-058 | 9 Nov 2026 | The escalation clock counts only the minutes an incident is down: a recovery pauses it, a relapse resumes it with the earlier drops' minutes, and levels already fired stay fired (as the client-update track counts, D-052 item 5). ESCALATED / STILL … say those down minutes | D-034 "a level that came due while the site was up fires on the relapse"; D-004 "escalation keeps its original clock" (now: keeps its minutes) |
@@ -64,6 +65,29 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-061 — S15 Audit log: who reads it, how far back, what the coverage test holds
+
+**Gap.** The AuditLog board's When filter has only Today and Last 7 days, while the page says entries are kept forever, so older entries could never be seen or exported. The S01 migration left "who else may read it" to S15. The plan asks for a coverage test over "every server action / route that changes config or incident state" without saying how it finds them. The board's action codes are samples (`incident.open`, `oncall.swap.request`), and the database writes others (`incident.opened`, `oncall.swap_request`). There is no mobile board.
+
+**Decision (Tao, 13 Nov 2026).**
+
+1. **Admins only.** The `audit_log_select_admin` policy stays as it is. Anyone else who opens `/audit` sees the No access page, as on the other Admin pages.
+2. **When:** Today · Last 7 days (default) · Last 30 days · All time. Days are Bangkok days. The page lists the newest 500 matching entries and says so when there are more. **Export** returns every matching entry, not just the 500 shown.
+3. **Action codes stay as written.** An append-only log can't rename its rows. Each code gets its words and a category. Unknown codes show as the code itself under All.
+   - Incidents: `incident.*`.
+   - Monitor: `system_alert.*`, `site.hand_check`.
+   - Config: `site.*` (except mute and hand check), `monitor.*`, `client.*`, `holiday.*`, `escalation.*`, `page_baseline.*`.
+   - Maintenance & mute: `maintenance.*`, `site.mute`, `site.mute_end`.
+   - On-call: `oncall.*`.
+   - Access: nothing writes it yet. It starts with S16 (users, sessions, refused sign-ins).
+4. **Coverage test (list + classify).**
+   - It finds, on its own: every export of a `'use server'` file, every `route.ts` under `app/api`, and every volatile `public` function that `authenticated` or `service_role` can execute.
+   - Each one is marked either audited or exempt with a reason. An audited database function names the pgTAP test that checks its row.
+   - Anything new and unmarked fails CI. A fixture function that skips `audit_log` proves the check catches it.
+5. **Phone layout waits for an MAuditLog board** from Claude Design. The desktop page is built first.
+
+**Why.** The log is the record of who changed what, and the board's two ranges would hide everything older than a week. An automatic list that forces a classification holds every later slice to the rule without calling ~45 functions with fixture state. Admin-only matches the board (the viewer is Tao) and the current policy.
 
 ## D-060 — S14 closes on two production mornings
 

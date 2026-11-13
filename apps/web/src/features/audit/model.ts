@@ -1,0 +1,504 @@
+import {
+  INCIDENT_STATE_LABELS,
+  ROOT_CAUSE_LABELS,
+  TRIGGER_LABELS,
+  bangkokDayStart,
+  formatDay,
+  formatTime,
+  formatTimeWithSeconds,
+  isSameBangkokDay,
+} from '@dxt/shared';
+
+/**
+ * The Audit log page's rules (board AuditLog, spec §16.11, D-061): categories, the words for each
+ * action code, the When ranges and the Before → After summaries. Pure, so the page, the CSV export
+ * and the tests share them.
+ */
+
+export const AUDIT_CATEGORIES = [
+  'All',
+  'Incidents',
+  'Monitor',
+  'Config',
+  'Maintenance & mute',
+  'On-call',
+  'Access',
+] as const;
+export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
+
+export const AUDIT_RANGES = ['Today', 'Last 7 days', 'Last 30 days', 'All time'] as const;
+export type AuditRange = (typeof AUDIT_RANGES)[number];
+export const DEFAULT_RANGE: AuditRange = 'Last 7 days';
+
+/** The newest entries the page lists; the CSV export has no cap (D-061). */
+export const PAGE_LIMIT = 500;
+
+/** The filters, as the URL carries them (`?cat=incidents&actor=system&when=30d`). */
+export interface AuditFilters {
+  cat: AuditCategory;
+  /** 'everyone', 'system' (the engine and the notifier: no actor) or a profile id. */
+  actor: string;
+  range: AuditRange;
+}
+
+const CAT_SLUGS: Record<string, AuditCategory> = {
+  incidents: 'Incidents',
+  monitor: 'Monitor',
+  config: 'Config',
+  maintenance: 'Maintenance & mute',
+  oncall: 'On-call',
+  access: 'Access',
+};
+const RANGE_SLUGS: Record<string, AuditRange> = {
+  today: 'Today',
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  all: 'All time',
+};
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type Params = Record<string, string | string[] | undefined> | URLSearchParams;
+
+function param(p: Params, key: string): string | undefined {
+  if (p instanceof URLSearchParams) return p.get(key) ?? undefined;
+  const v = p[key];
+  return Array.isArray(v) ? v[0] : v;
+}
+
+/** Reads the filters from the URL; anything unknown falls back to the default (never an error). */
+export function parseFilters(p: Params): AuditFilters {
+  const actor = param(p, 'actor');
+  return {
+    cat: CAT_SLUGS[param(p, 'cat') ?? ''] ?? 'All',
+    actor: actor === 'system' || (actor && UUID_RE.test(actor)) ? actor : 'everyone',
+    range: RANGE_SLUGS[param(p, 'when') ?? ''] ?? DEFAULT_RANGE,
+  };
+}
+
+/** The filters back to a query string; defaults are left out. */
+export function filtersQuery(f: AuditFilters): string {
+  const q = new URLSearchParams();
+  const cat = Object.entries(CAT_SLUGS).find(([, v]) => v === f.cat)?.[0];
+  if (cat) q.set('cat', cat);
+  if (f.actor !== 'everyone') q.set('actor', f.actor);
+  const when = Object.entries(RANGE_SLUGS).find(([, v]) => v === f.range)?.[0];
+  if (when && f.range !== DEFAULT_RANGE) q.set('when', when);
+  return q.toString();
+}
+
+export function isFiltered(f: AuditFilters): boolean {
+  return f.cat !== 'All' || f.actor !== 'everyone' || f.range !== DEFAULT_RANGE;
+}
+
+/**
+ * Words for every action code the database writes (D-061: the codes stay as written). A code that
+ * isn't here shows as the code itself. `audit-actions.test.ts` fails when a migration adds one.
+ */
+export const ACTION_WORDS: Record<string, string> = {
+  // Incidents
+  'incident.opened': 'Incident opened',
+  'incident.severity': 'Became DOWN',
+  'incident.ack': 'Acknowledged',
+  'incident.ack_undone': 'Undid acknowledge',
+  'incident.escalated': 'Escalated',
+  'incident.escalate_now': 'Escalated by hand',
+  'incident.step_sent': 'Escalation step sent',
+  'incident.hand_down': 'Reported down by hand',
+  'incident.recovered': 'Recovered',
+  'incident.relapsed': 'Down again',
+  'incident.state': 'Changed state',
+  'incident.note': 'Added note',
+  'incident.root_cause': 'Wrote root cause',
+  'incident.client_update_due': 'Client update due',
+  'incident.client_update': 'Marked client update',
+  'incident.resolved': 'Resolved',
+  'incident.resolve_undone': 'Undid resolve',
+  // Monitor
+  'system_alert.opened': 'Monitor fault',
+  'system_alert.cleared': 'Monitor fault cleared',
+  'site.hand_check': 'Checked by hand',
+  // Config
+  'site.create': 'Added site',
+  'site.update': 'Changed site',
+  'site.delete': 'Deleted site',
+  'monitor.create': 'Added monitor',
+  'monitor.update': 'Changed monitor',
+  'monitor.delete': 'Removed monitor',
+  'client.create': 'Added client',
+  'client.update': 'Changed client',
+  'client.delete': 'Deleted client',
+  'holiday.create': 'Added holiday',
+  'holiday.update': 'Changed holiday',
+  'holiday.delete': 'Removed holiday',
+  'escalation.update': 'Changed escalation',
+  'page_baseline.accept': 'Accepted page change',
+  'page_baseline.undo': 'Undid page baseline',
+  'page_baseline.auto': 'Page baseline set',
+  // Maintenance & mute
+  'maintenance.request': 'Asked for maintenance',
+  'maintenance.create': 'Scheduled maintenance',
+  'maintenance.approve': 'Approved maintenance',
+  'maintenance.decline': 'Declined maintenance',
+  'maintenance.withdraw': 'Withdrew request',
+  'maintenance.edit': 'Changed maintenance end',
+  'maintenance.cancel': 'Cancelled maintenance',
+  'maintenance.start': 'Maintenance started',
+  'maintenance.end': 'Maintenance ended',
+  'maintenance.end_early': 'Ended maintenance early',
+  'maintenance.undo': 'Undid maintenance change',
+  'maintenance.series_create': 'Scheduled series',
+  'maintenance.series_request': 'Asked for a series',
+  'maintenance.series_approve': 'Approved series',
+  'maintenance.series_decline': 'Declined series',
+  'maintenance.series_withdraw': 'Withdrew series request',
+  'maintenance.series_cancel': 'Cancelled series',
+  'maintenance.series_not_approved': 'Series not approved in time',
+  'maintenance.series_undo': 'Undid series change',
+  'maintenance.occurrence_skip': 'Skipped occurrence',
+  'site.mute': 'Muted site',
+  'site.mute_end': 'Ended mute early',
+  // On-call
+  'oncall.rotation': 'Changed rotation',
+  'oncall.handover': 'Handed over shift',
+  'oncall.swap_request': 'Requested swap',
+  'oncall.swap_accept': 'Accepted swap',
+  'oncall.swap_decline': 'Declined swap',
+  'oncall.swap_withdraw': 'Withdrew swap',
+  'oncall.swap_approve': 'Approved swap',
+  'oncall.swap_admin_decline': 'Declined swap (Admin)',
+  'oncall.swap_expire': 'Swap expired',
+};
+
+export function wordsOf(action: string): string {
+  return ACTION_WORDS[action] ?? action;
+}
+
+const MONITOR_ACTIONS = new Set(['site.hand_check']);
+const MUTE_ACTIONS = new Set(['site.mute', 'site.mute_end']);
+const CONFIG_PREFIXES = ['site.', 'monitor.', 'client.', 'holiday.', 'escalation.', 'page_baseline.'];
+const ACCESS_PREFIXES = ['user.', 'session.', 'signin.', 'security.', 'profile.'];
+
+/** The category a code belongs to (D-061 item 3); null = shown under All only. */
+export function categoryOf(action: string): Exclude<AuditCategory, 'All'> | null {
+  if (action.startsWith('incident.')) return 'Incidents';
+  if (action.startsWith('system_alert.') || MONITOR_ACTIONS.has(action)) return 'Monitor';
+  if (action.startsWith('maintenance.') || MUTE_ACTIONS.has(action)) return 'Maintenance & mute';
+  if (action.startsWith('oncall.')) return 'On-call';
+  if (ACCESS_PREFIXES.some((p) => action.startsWith(p))) return 'Access';
+  if (CONFIG_PREFIXES.some((p) => action.startsWith(p))) return 'Config';
+  return null;
+}
+
+/**
+ * The same rule as a PostgREST `or` filter on `action`, so the database filters before the limit.
+ * `like` takes `*` as the wildcard; `_` in codes is a literal there only when escaped, so prefixes
+ * are matched with `like` and the few exact codes with `in`.
+ */
+export function categoryFilter(cat: AuditCategory): string | null {
+  const like = (p: string) => `action.like.${p.replaceAll('_', '\\_')}*`;
+  const exact = (codes: Iterable<string>) => `action.in.(${[...codes].join(',')})`;
+  switch (cat) {
+    case 'All':
+      return null;
+    case 'Incidents':
+      return like('incident.');
+    case 'Monitor':
+      return [like('system_alert.'), exact(MONITOR_ACTIONS)].join(',');
+    case 'Maintenance & mute':
+      return [like('maintenance.'), exact(MUTE_ACTIONS)].join(',');
+    case 'On-call':
+      return like('oncall.');
+    case 'Access':
+      return ACCESS_PREFIXES.map(like).join(',');
+    case 'Config': {
+      const notSite = CONFIG_PREFIXES.filter((p) => p !== 'site.').map(like);
+      const site = `and(${like('site.')},action.not.in.(${[...MONITOR_ACTIONS, ...MUTE_ACTIONS].join(',')}))`;
+      return [...notSite, site].join(',');
+    }
+  }
+}
+
+const DAY_MS = 86_400_000;
+
+/** Where a range starts: Bangkok midnight today, or that many Bangkok days back; null = all time. */
+export function rangeStart(range: AuditRange, now: Date): Date | null {
+  const today = bangkokDayStart(now);
+  switch (range) {
+    case 'Today':
+      return today;
+    case 'Last 7 days':
+      return new Date(today.getTime() - 7 * DAY_MS);
+    case 'Last 30 days':
+      return new Date(today.getTime() - 30 * DAY_MS);
+    case 'All time':
+      return null;
+  }
+}
+
+/** The span after the count: "today", "Fri 18 Sep → Fri 25 Sep 10:07", "all time". */
+export function spanLabel(range: AuditRange, now: Date): string {
+  const start = rangeStart(range, now);
+  if (range === 'Today') return 'today';
+  if (!start) return 'all time';
+  return `${formatDay(start, { weekday: true })} → ${formatDay(now, { weekday: true })} ${formatTime(now)}`;
+}
+
+/** The Time column: "10:03:41" today, "Thu 22:22" this week, "Fri 18 Sep 16:20" before that. */
+export function atLabel(at: Date, now: Date): string {
+  if (isSameBangkokDay(at, now)) return formatTimeWithSeconds(at);
+  const weekday = formatDay(at, { weekday: true });
+  if (now.getTime() - at.getTime() < 6 * DAY_MS) return `${weekday.split(' ')[0]} ${formatTime(at)}`;
+  return `${weekday} ${formatTime(at)}`;
+}
+
+// ── Before → After ─────────────────────────────────────────────────────────────────────────────
+
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
+/** What the summaries need to turn ids into names. */
+export interface Names {
+  people: ReadonlyMap<string, string>;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Keys that carry no meaning for a reader (ids, bookkeeping) — never shown. */
+const HIDDEN = new Set([
+  'id',
+  'created_at',
+  'updated_at',
+  'window_id',
+  'check_id',
+  'event',
+  'hand_check_id',
+  'shift',
+  'log_length',
+  'site_id',
+  'series_id',
+  'client_id',
+  'monitor_id',
+  'applies_at',
+  'with_resolve',
+]);
+/** Free text that is shown quoted, last (spec §23.11: "each with the reason"). */
+const TEXT_KEYS = ['reason', 'note', 'text', 'mute_reason', 'end_reason'];
+/** Keys whose value is shown alone, without the key: "Unacked → Acknowledged". */
+const BARE_KEYS = new Set(['state', 'status', 'severity', 'trigger']);
+
+const KEY_WORDS: Record<string, string> = {
+  escalation_level: 'level',
+  l0_user_id: 'L0',
+  primary_owner_id: 'owner',
+  backup_owner_id: 'backup',
+  am_user_id: 'AM',
+  approved_by: 'approved by',
+  ended_by: 'ended by',
+  user: 'person',
+  with: 'with',
+  counterpart: 'with',
+  until_on: 'ends on',
+  starts_on: 'from',
+  start_time: 'at',
+  duration_min: 'minutes',
+  occurrences_cancelled: 'cancelled',
+  notified: 'told',
+  fix: 'what fixed it',
+  what: 'what happened',
+};
+
+function keyWord(key: string): string {
+  return KEY_WORDS[key] ?? key.replace(/_at$/, '').replace(/_id$/, '').replaceAll('_', ' ');
+}
+
+const SEVERITY_WORDS: Record<string, string> = { down: 'DOWN', problem: 'PROBLEM' };
+
+function enumWord(key: string, value: string): string {
+  if (key === 'severity' || key === 'episode') return SEVERITY_WORDS[value] ?? value;
+  if (key === 'trigger') return (TRIGGER_LABELS as Record<string, string>)[value] ?? value;
+  if (key === 'category') return (ROOT_CAUSE_LABELS as Record<string, string>)[value] ?? value;
+  if (key === 'state') {
+    const s = (INCIDENT_STATE_LABELS as Record<string, string>)[value];
+    if (s) return s;
+  }
+  return value.replaceAll('_', ' ');
+}
+
+/** One value as words, or null when there is nothing worth showing (an id nobody can read). */
+function valueWords(key: string, value: Json, names: Names): string | null {
+  if (value === null) return 'none';
+  if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'string') {
+    if (UUID.test(value)) return names.people.get(value) ?? null;
+    if (TIMESTAMP.test(value)) {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? value : `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
+    }
+    if (DATE_ONLY.test(value)) return formatDay(new Date(`${value}T00:00:00+07:00`), { weekday: true });
+    return BARE_KEYS.has(key) ||
+      key === 'category' ||
+      key === 'episode' ||
+      key === 'outcome' ||
+      key === 'kind'
+      ? enumWord(key, value)
+      : value;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return 'none';
+    if (value.every((v) => typeof v === 'string' && UUID.test(v))) {
+      const known = value.map((v) => names.people.get(v as string)).filter((n): n is string => !!n);
+      return known.length === value.length ? known.join(', ') : `${value.length}`;
+    }
+    if (value.every((v) => typeof v === 'string' || typeof v === 'number')) return value.join(', ');
+    return `${value.length}`;
+  }
+  if ('freq' in value) return ruleWords(value);
+  if ('location' in value && typeof value.location === 'string') return value.location;
+  return null;
+}
+
+const WEEKDAY_WORDS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** A series rule: "weekly Mon, Thu", "monthly day 15", "monthly 2nd Tue". */
+function ruleWords(rule: { [key: string]: Json }): string {
+  if (rule.freq === 'weekly' && Array.isArray(rule.days)) {
+    return `weekly ${rule.days.map((d) => WEEKDAY_WORDS[Number(d) % 7] ?? String(d)).join(', ')}`;
+  }
+  if (rule.freq === 'monthly') {
+    if (typeof rule.day === 'number') return `monthly day ${rule.day}`;
+    if (typeof rule.nth === 'number' && typeof rule.weekday === 'number') {
+      const nth = ['', '1st', '2nd', '3rd', '4th'][rule.nth] ?? `${rule.nth}th`;
+      return `monthly ${nth} ${WEEKDAY_WORDS[rule.weekday % 7] ?? rule.weekday}`;
+    }
+  }
+  return String(rule.freq ?? 'rule');
+}
+
+function isObject(v: Json | null | undefined): v is { [key: string]: Json } {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/** A page fingerprint, as the scripts it loads ("scripts evil-cdn.example") or its title. */
+function fingerprintWords(f: Json): string | null {
+  if (!isObject(f)) return null;
+  const scripts = Array.isArray(f.scripts) ? f.scripts.filter((s): s is string => typeof s === 'string') : [];
+  return scripts.length
+    ? `scripts ${scripts.join(', ')}`
+    : typeof f.title === 'string'
+      ? `title “${f.title}”`
+      : null;
+}
+
+/** Shows one side: "key value · key value · “reason”". `only` limits it to changed keys. */
+function sideWords(side: { [key: string]: Json }, names: Names, only?: ReadonlySet<string>): string {
+  const parts: string[] = [];
+  const texts: string[] = [];
+  for (const [key, value] of Object.entries(side)) {
+    if (HIDDEN.has(key) || (only && !only.has(key))) continue;
+    if (TEXT_KEYS.includes(key)) {
+      if (typeof value === 'string' && value.trim()) texts.push(`“${value.trim()}”`);
+      continue;
+    }
+    if (key === 'fingerprint') {
+      const w = fingerprintWords(value);
+      if (w) parts.push(w);
+      continue;
+    }
+    if (key === 'policies' && Array.isArray(value)) {
+      parts.push(`${value.length} ${value.length === 1 ? 'policy' : 'policies'}`);
+      continue;
+    }
+    if ((key === 'windows' || key === 'occurrences_cancelled') && Array.isArray(value)) {
+      const n = `${value.length} ${value.length === 1 ? 'window' : 'windows'}`;
+      parts.push(key === 'windows' ? n : `${n} cancelled`);
+      continue;
+    }
+    const words = valueWords(key, value, names);
+    if (words === null) continue;
+    parts.push(BARE_KEYS.has(key) ? words : `${keyWord(key)} ${words}`);
+  }
+  return [...parts, ...texts].join(' · ');
+}
+
+export interface AuditSides {
+  before: string;
+  after: string;
+  /** The board strikes through a real Before value, not the "—" of a new entry. */
+  struck: boolean;
+}
+
+/**
+ * Before → After as words. A row-change trigger row (`site.update`, …) holds the whole row on both
+ * sides, so only the keys that changed are shown; every other row holds just what its action
+ * changed. A create shows "—" before; a delete shows what was removed and "deleted".
+ */
+export function sidesOf(action: string, before: Json | null, after: Json | null, names: Names): AuditSides {
+  const b = isObject(before) ? before : null;
+  const a = isObject(after) ? after : null;
+  let changed: Set<string> | undefined;
+  if (action.endsWith('.update') && b && a && action !== 'escalation.update') {
+    changed = new Set(
+      [...new Set([...Object.keys(b), ...Object.keys(a)])].filter(
+        (k) => JSON.stringify(b[k] ?? null) !== JSON.stringify(a[k] ?? null),
+      ),
+    );
+  }
+  // An Undo stores the whole snapshot it restored; what it undid is the news.
+  if (a && typeof a.undid === 'string') {
+    const before = b && typeof b.action === 'string' ? enumWord('action', b.action) : '';
+    return { before: before || '—', after: `undid ${enumWord('undid', a.undid)}`, struck: before !== '' };
+  }
+  const created = action.endsWith('.create') && a && 'name' in a;
+  const deleted = action.endsWith('.delete');
+  const beforeWords = b ? (deleted ? nameOf(b) : sideWords(b, names, changed)) : '';
+  const afterWords = deleted
+    ? 'deleted'
+    : created
+      ? `added · ${nameOf(a)}`
+      : a
+        ? sideWords(a, names, changed)
+        : '';
+  return {
+    before: beforeWords || '—',
+    after: afterWords || '—',
+    struck: beforeWords !== '',
+  };
+}
+
+function nameOf(row: { [key: string]: Json }): string {
+  for (const key of ['name', 'path', 'url', 'day']) {
+    const v = row[key];
+    if (typeof v === 'string' && v)
+      return key === 'day' && DATE_ONLY.test(v) ? (valueWords(key, v, { people: new Map() }) ?? v) : v;
+  }
+  return 'removed';
+}
+
+// ── Entity ─────────────────────────────────────────────────────────────────────────────────────
+
+export const SYSTEM_ALERT_WORDS: Record<string, string> = {
+  verifier_unavailable: 'Browser verifier',
+  verifier_backlog: 'Verifier backlog',
+  probe_locations_low: 'Probe locations',
+  bkk_control_failing: 'Bangkok control check',
+  probe_location_missing: 'Probe location missing',
+};
+
+/** What an entity is called when nothing else names it ("Escalation policies", "On-call rotation"). */
+export function entityFallback(entity: string, before: Json | null, after: Json | null): string {
+  const side = isObject(after) ? after : isObject(before) ? before : null;
+  if (entity === 'system_alert' && side && typeof side.kind === 'string') {
+    const kind = SYSTEM_ALERT_WORDS[side.kind] ?? side.kind.replaceAll('_', ' ');
+    const ctx = side.context;
+    return isObject(ctx) && typeof ctx.location === 'string' ? `${kind} · ${ctx.location}` : kind;
+  }
+  if (entity === 'escalation') return 'Escalation policies';
+  if (entity === 'oncall_rotation') return 'On-call rotation';
+  if (side) {
+    const n = nameOf(side);
+    if (n !== 'removed') return n;
+  }
+  return entity.replaceAll('_', ' ');
+}
