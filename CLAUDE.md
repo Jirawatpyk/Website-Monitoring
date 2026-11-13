@@ -31,7 +31,7 @@ packages/notifier Google Chat / email message builders
 packages/db       Supabase generated types; `@dxt/db/service` = server-only service-role client
 supabase/         config.toml, migrations/, tests/ (pgTAP), seed.sql (dev sample data only)
 docs/             plan, workflow, decisions, retro log, runbook, PRD, design spec, canvas snapshot, AURA notes, phase0/ captures
-scripts/          repo checks (check-plan-coverage.mjs, check-sql-tests.mjs, pr-merge.mjs, db-staging.mjs) and the project ESLint plugin `dxt` (eslint/index.mjs: feature-boundaries, design-tokens)
+scripts/          repo checks (check-plan-coverage.mjs, check-sql-tests.mjs, check-audit-coverage.mjs, pr-merge.mjs, db-staging.mjs) and the project ESLint plugin `dxt` (eslint/index.mjs: feature-boundaries, design-tokens)
 ```
 
 Inside `apps/web/src`: `app/` holds thin routes, `features/<area>/` holds each domain's UI, queries, actions and schemas behind two public entries (`index.ts`, `server.ts`), `components/` and `lib/` are shared layers, `server/` runs background work. Full tree and rules: `apps/web/CLAUDE.md` → Folder structure; ESLint `dxt/feature-boundaries` enforces them.
@@ -47,6 +47,7 @@ pnpm dev:agent           # VPS agent (needs apps/vps-agent/.env)
 pnpm check               # format + plan coverage + SQL-tests date guard + lint + typecheck + test — run before saying work is done
 pnpm plan:check          # every FR, board, table and go-live test maps to one slice
 pnpm sql-tests:check     # no `current_date` (UTC) in supabase/tests — use (now() at time zone 'Asia/Bangkok')::date
+pnpm audit:check         # every server action / route is in apps/web/audit-coverage.json (audited functions or exempt + reason)
 pnpm pr:merge <number>   # squash-merge a PR only if CI `check` + `db` are green on its head (D-008), then wait for the production deploy
 pnpm test                # Vitest in every package that has tests (web: jsdom + Testing Library)
 pnpm test:coverage       # the same tests with coverage thresholds (what CI runs)
@@ -65,7 +66,7 @@ pnpm db:push:staging | db:reset:staging          # staging database only (refuse
 - **Time**: store UTC, display Asia/Bangkok (UTC+7).
 - **Status badges** follow spec §11 exactly; accent (violet) is reserved for Maintenance among status badges; status never relies on colour alone.
 - **Security**: RLS on every table; the service-role key only in server code (`createServiceClient` from `@dxt/db/service`, which is `server-only`; cron and Ingest/Job routes) — never in a Client Component, never on the VPS. Cron routes check `CRON_SECRET`, VPS routes check `INGEST_TOKEN` (constant-time). Secrets live in env only; `.env.example` lists names, never values. `?next=` redirects go through `safeNextPath`, company-domain checks through `isAllowedEmail` (both `@dxt/shared`). Sign-up needs the domain and the exact address on the allowlist (`before_user_created` hook, D-007); 2-step is enforced by Google Workspace, never by the app. The repo is private, but never commit real email addresses. New `/api/*` routes need a session unless added to `PUBLIC_PATHS` in `apps/web/src/lib/supabase/proxy.ts` with their own token check. Monitor and webhook URLs must be checked against private/link-local ranges (SSRF) before any probe fetches them.
-- **Audit**: every change to config or incident state writes `audit_log` (append-only, before/after).
+- **Audit**: every change to config or incident state writes `audit_log` (append-only, before/after). The coverage test holds it (S15, D-061): a new state-changing database function goes in `supabase/tests/audit_coverage.test.sql` (audited + the pgTAP test that checks its row, or exempt + reason; the `db` job fails otherwise), and a new server action or route in `apps/web/audit-coverage.json` (`pnpm audit:check`). The page is `/audit` (Admins only).
 - **Undo**: ack and resolve hold Chat, email and webhooks for 10 s (`notifications.hold_until`).
 - **Tests**: engine rules get table-driven Vitest cases taken from the spec's examples (INC-0142 etc.). A behaviour change without a test is not done. Coverage thresholds live in each package's `vitest.config.ts` (engine 95 / 90 branches; shared, probe, notifier 90 / 85; vps-agent 70 / 60; web logic layers 80 / 75) and only ever go up — never lower one to make a PR pass.
 - **Mobile**: every screen works at 390 px; touch targets ≥ 44 px. Check 390 / 820 / 1440, light and dark.
