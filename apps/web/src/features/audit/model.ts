@@ -422,6 +422,38 @@ function sideWords(side: { [key: string]: Json }, names: Names, only?: ReadonlyS
   return [...parts, ...texts].join(' · ');
 }
 
+type Side = { [key: string]: Json };
+
+/** Keys that differ between the two rows; an object on both sides is opened one level (`key_sub`). */
+function flattenChanged(b: Side, a: Side): { before: Side; after: Side; changed: Set<string> } {
+  const before: Side = {};
+  const after: Side = {};
+  const changed = new Set<string>();
+  const same = (x: Json | undefined, y: Json | undefined) =>
+    JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
+  for (const k of new Set([...Object.keys(b), ...Object.keys(a)])) {
+    const bv = b[k];
+    const av = a[k];
+    if (same(bv, av)) continue;
+    if (isObject(bv ?? null) && isObject(av ?? null) && k !== 'fingerprint') {
+      const bo = bv as Side;
+      const ao = av as Side;
+      for (const sub of new Set([...Object.keys(bo), ...Object.keys(ao)])) {
+        if (same(bo[sub], ao[sub])) continue;
+        const key = `${k}_${sub}`;
+        before[key] = bo[sub] ?? null;
+        after[key] = ao[sub] ?? null;
+        changed.add(key);
+      }
+      continue;
+    }
+    before[k] = bv ?? null;
+    after[k] = av ?? null;
+    changed.add(k);
+  }
+  return { before, after, changed };
+}
+
 export interface AuditSides {
   before: string;
   after: string;
@@ -435,27 +467,29 @@ export interface AuditSides {
  * changed. A create shows "—" before; a delete shows what was removed and "deleted".
  */
 export function sidesOf(action: string, before: Json | null, after: Json | null, names: Names): AuditSides {
-  const b = isObject(before) ? before : null;
-  const a = isObject(after) ? after : null;
+  let b = isObject(before) ? before : null;
+  let a = isObject(after) ? after : null;
   let changed: Set<string> | undefined;
   if (action.endsWith('.update') && b && a && action !== 'escalation.update') {
-    changed = new Set(
-      [...new Set([...Object.keys(b), ...Object.keys(a)])].filter(
-        (k) => JSON.stringify(b[k] ?? null) !== JSON.stringify(a[k] ?? null),
-      ),
-    );
+    // A changed jsonb column (`monitors.thresholds`) shows the keys inside it that changed:
+    // "thresholds slow ms 3000 → thresholds slow ms 5000", never "—" → "—".
+    const flat = flattenChanged(b, a);
+    b = flat.before;
+    a = flat.after;
+    changed = flat.changed;
   }
   // An Undo stores the whole snapshot it restored; what it undid is the news.
   if (a && typeof a.undid === 'string') {
     const before = b && typeof b.action === 'string' ? enumWord('action', b.action) : '';
     return { before: before || '—', after: `undid ${enumWord('undid', a.undid)}`, struck: before !== '' };
   }
-  const created = action.endsWith('.create') && a && 'name' in a;
+  // A new site / client / holiday by its name, a new monitor by its URL — not the whole row.
+  const created = action.endsWith('.create') && a && nameOf(a) !== 'removed';
   const deleted = action.endsWith('.delete');
   const beforeWords = b ? (deleted ? nameOf(b) : sideWords(b, names, changed)) : '';
   const afterWords = deleted
     ? 'deleted'
-    : created
+    : created && a
       ? `added · ${nameOf(a)}`
       : a
         ? sideWords(a, names, changed)

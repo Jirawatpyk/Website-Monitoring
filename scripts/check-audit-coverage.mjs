@@ -43,19 +43,39 @@ export function entryPoints(src) {
   for (const file of walk(src)) {
     const code = stripComments(fs.readFileSync(file, 'utf8'));
     const r = rel(src, file);
+    const names = exportedNames(code);
     if (/^\s*['"]use server['"]/.test(code)) {
-      for (const m of code.matchAll(/export\s+(?:async\s+)?(?:function\s+(\w+)|const\s+(\w+)\s*=)/g)) {
-        out.set(`${r}#${m[1] ?? m[2]}`, file);
-      }
+      for (const name of names) out.set(`${r}#${name}`, file);
     }
     if (/(^|\/)route\.ts$/.test(r)) {
-      for (const m of code.matchAll(/export\s+(?:async\s+)?(?:function\s+(\w+)|const\s+(\w+)\s*=)/g)) {
-        const name = m[1] ?? m[2];
-        if (METHODS.includes(name)) out.set(`${r}#${name}`, file);
-      }
+      for (const name of names) if (METHODS.includes(name)) out.set(`${r}#${name}`, file);
     }
   }
   return out;
+}
+
+/**
+ * Every name a module exports: `export (async) function x`, `export const x =`, and the list form
+ * `export { a, b as POST }` / `export { GET } from './x'` (review: a re-exported handler must not
+ * slip past the check). Type-only exports are left out.
+ */
+export function exportedNames(code) {
+  const names = new Set();
+  for (const m of code.matchAll(
+    /export\s+(?:async\s+)?(?:function\s*\*?\s*(\w+)|(?:const|let|var)\s+(\w+)\s*=)/g,
+  )) {
+    names.add(m[1] ?? m[2]);
+  }
+  for (const m of code.matchAll(/export\s+(type\s+)?\{([^}]*)\}/g)) {
+    if (m[1]) continue;
+    for (const part of m[2].split(',')) {
+      const p = part.trim();
+      if (!p || p.startsWith('type ')) continue;
+      const as = p.match(/\bas\s+(\w+)$/);
+      names.add(as ? as[1] : p);
+    }
+  }
+  return names;
 }
 
 /** The file an import names, inside src: `@/x`, `./x`, `../x` (.ts, .tsx, /index.ts). */
@@ -76,7 +96,11 @@ function resolveImport(src, from, spec) {
   return null;
 }
 
-/** Every database function name called as `.rpc('name'` from `file` or anything it imports. */
+/**
+ * Every database function name called as `.rpc('name'` from `file` or anything it imports. Per
+ * file, not per exported function: two actions in one actions.ts reach the same set, so the
+ * registry's `rpc` list is the per-action claim and review keeps it honest (known limit, S15 review).
+ */
 export function reachableRpcs(src, file, cache = new Map()) {
   const seen = new Set();
   const rpcs = new Set();

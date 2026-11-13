@@ -69,6 +69,19 @@ describe('loadAuditPage', () => {
     expect(main.filters).toContainEqual(['is', 'actor_id', null]);
   });
 
+  it('"filtered from" counts the wider of the chosen range and the week (review)', async () => {
+    const heads = async (when: string) => {
+      const fake = db();
+      await loadAuditPage(fake.db as unknown as DbClient, parseFilters({ when, cat: 'config' }), NOW);
+      // The count query is the one without the category filter.
+      return fake.calls.filter((c) => c.table === 'audit_log' && !c.filters.some(([m]) => m === 'or'))[0]!
+        .filters;
+    };
+    expect(await heads('today')).toEqual([['gte', 'at', '2026-09-17T17:00:00.000Z']]);
+    expect(await heads('30d')).toEqual([['gte', 'at', '2026-08-25T17:00:00.000Z']]);
+    expect(await heads('all')).toEqual([]);
+  });
+
   it('All time has no lower bound; one person filters by id', async () => {
     const fake = db();
     await loadAuditPage(fake.db as unknown as DbClient, parseFilters({ when: 'all', actor: TAO }), NOW);

@@ -150,6 +150,22 @@ test('route handlers are entries (cron routes are GET), and a stale registry ent
   );
 });
 
+test('a re-exported handler or action is an entry too (review)', () => {
+  const dirs = fixture({
+    ...BASE,
+    'src/app/api/hooks/route.ts':
+      "export { handle as POST, other } from '@/server/hooks';\nexport type { X } from './x';",
+    'src/features/demo/actions.ts': "'use server';\nimport { a } from './a';\nexport { a as quietAction };",
+  });
+  const keys = [...entryPoints(dirs.src).keys()];
+  assert.ok(keys.includes('app/api/hooks/route.ts#POST'));
+  assert.ok(!keys.includes('app/api/hooks/route.ts#other'));
+  assert.ok(keys.includes('features/demo/actions.ts#quietAction'));
+  const errors = checkAuditCoverage({ ...dirs, registry: REGISTRY, classes: CLASSES });
+  assert.ok(errors.some((e) => e.startsWith('app/api/hooks/route.ts#POST: not in')));
+  assert.ok(errors.some((e) => e.startsWith('features/demo/actions.ts#quietAction: not in')));
+});
+
 test('an audited function whose named test doesn’t read audit_log fails', () => {
   const dirs = fixture({ ...BASE, 'tests/ack.test.sql': 'select public.ack_incident(1);' });
   const errors = checkAuditCoverage({ ...dirs, registry: REGISTRY, classes: CLASSES });

@@ -174,6 +174,31 @@ describe('sidesOf', () => {
     });
   });
 
+  it('a changed jsonb column shows the keys inside it that changed (review)', () => {
+    const before = {
+      id: 'm',
+      url: 'https://fuji.example.test/',
+      thresholds: { slow_ms: 3000, timeout_ms: 10000 },
+    };
+    const after = { ...before, thresholds: { slow_ms: 5000, timeout_ms: 10000 } };
+    expect(sidesOf('monitor.update', before, after, names)).toEqual({
+      before: 'thresholds slow ms 3000',
+      after: 'thresholds slow ms 5000',
+      struck: true,
+    });
+  });
+
+  it('a new monitor by its URL, not the whole row (review)', () => {
+    expect(
+      sidesOf(
+        'monitor.create',
+        null,
+        { id: 'm', url: 'https://fuji.example.test/shop', method: 'GET', timeout_ms: 10000 },
+        names,
+      ).after,
+    ).toBe('added · https://fuji.example.test/shop');
+  });
+
   it('create and delete', () => {
     expect(sidesOf('site.create', null, { id: 'x', name: 'DxT AI', tier: 2 }, names).after).toBe(
       'added · DxT AI',

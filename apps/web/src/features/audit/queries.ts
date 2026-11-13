@@ -85,12 +85,14 @@ function filtered(db: DbClient, f: AuditFilters, now: Date, count: boolean) {
 
 /** `/audit`: the newest PAGE_LIMIT matching entries with their names, read as the signed-in Admin. */
 export async function loadAuditPage(db: DbClient, f: AuditFilters, now = new Date()): Promise<AuditPage> {
-  const [page, base, people] = await Promise.all([
+  // "Filtered from N": every entry in the wider of the chosen range and the default (Today is
+  // counted against the week, as the board does; 30 days and All time against themselves).
+  const baseStart = rangeStart(f.range === 'Today' ? DEFAULT_RANGE : f.range, now);
+  let base = db.from('audit_log').select('id', { count: 'exact', head: true });
+  if (baseStart) base = base.gte('at', baseStart.toISOString());
+  const [page, baseCount, people] = await Promise.all([
     filtered(db, f, now, true).limit(PAGE_LIMIT),
-    db
-      .from('audit_log')
-      .select('id', { count: 'exact', head: true })
-      .gte('at', rangeStart(DEFAULT_RANGE, now)!.toISOString()),
+    base,
     loadPeople(db),
   ]);
   const rows = (check('audit_log', page).data ?? []) as Raw[];
@@ -100,7 +102,7 @@ export async function loadAuditPage(db: DbClient, f: AuditFilters, now = new Dat
     filters: f,
     entries,
     total: page.count ?? rows.length,
-    unfiltered: check('audit_log count', base).count ?? 0,
+    unfiltered: check('audit_log count', baseCount).count ?? 0,
     actors: [
       { value: 'everyone', label: 'Everyone' },
       { value: 'system', label: 'System' },
@@ -201,9 +203,9 @@ async function entityLabels(db: DbClient, rows: Raw[]): Promise<Map<string, stri
     load: (chunk: string[]) => PromiseLike<{ data: R[] | null; error: { message: string } | null }>,
     each: (r: R) => void,
   ) => {
-    for (const chunk of chunks(ids(entity), ID_CHUNK)) {
-      for (const r of check(entity, await load(chunk)).data ?? []) each(r);
-    }
+    // The chunks side by side: a year's export names thousands of incidents (review).
+    const results = await Promise.all(chunks(ids(entity), ID_CHUNK).map((chunk) => load(chunk)));
+    for (const r of results) for (const row of check(entity, r).data ?? []) each(row);
   };
   const has = (entity: string) => rows.some((r) => r.entity === entity);
 
@@ -223,7 +225,8 @@ async function entityLabels(db: DbClient, rows: Raw[]): Promise<Map<string, stri
         .from('company_holidays')
         .select('id, name')
         .then((r) => check('company_holidays', r).data?.forEach((h) => put('holiday', h.id, h.name))),
-    (has('monitor') || has('page_baseline')) &&
+    // page_baseline.* rows name their monitor (entity 'monitor').
+    has('monitor') &&
       db
         .from('monitors')
         .select('id, url, site:sites(name)')
