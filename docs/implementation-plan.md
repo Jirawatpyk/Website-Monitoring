@@ -36,7 +36,7 @@
 | S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Done |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Done |
-| S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | In review |
+| S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Done |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Todo |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Todo |
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Todo |
@@ -701,6 +701,10 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   2. CSV export returns the filtered rows only.
   3. spec-checker passes AuditLog; nav "Audit log" live.
 - **Review:** security-reviewer, spec-checker.
+- **Evidence (Done 13 Nov 2026):**
+  1. `pnpm audit:check` lists 66 actions and routes; `scripts/check-audit-coverage.test.mjs` (12) and `supabase/tests/audit_coverage.test.sql` (7, `zz_fixture_skips_audit` caught three ways) run in CI (#195).
+  2. The export uses the page's filters (`queries.test.ts`, `e2e/audit.spec.ts`). The staging `/verify` exported 14 rows, all `maintenance.*`, matching the page.
+  3. spec-checker AuditLog and MAuditLog: High and Medium closed. Nav `audit` live; layout-consistency at 390 / 820 / 1440. Production on 13 Nov: `/audit` opens for Tao (90 entries in 7 days), signed out it redirects to /login. Migration `s15_audit_hardening` applied by `migrate-production` (D-061 item 6).
 
 ### S16 · Users & access
 
