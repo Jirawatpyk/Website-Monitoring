@@ -91,6 +91,12 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
    - The first alert after a mute (`engine_post_late_alert`) writes `incident.alerted`, because it restarts the ladder clock and sets who may acknowledge.
    - `profiles` gets the row-change trigger (`profile.*`, under Access), since an Admin can change a role or deactivate someone directly.
    - The coverage test also fails on any table a session can write that has no audit trigger.
+7. **Page details** (spec-checker, 13 Nov):
+   - **Paging:** the table shows the 500 it loads 50 a page.
+   - **Narrow tables:** below a 896 px table, Entity folds under the action, so the page fits from 768 px.
+   - **Filters:** they apply 300 ms after the last change, and the controls show the new value at once.
+   - **Change history:** Escalation's link opens `?entity=escalation&when=all`, shown as "Escalation policies only" in the count line and removed by Clear filters.
+   - **Quiet ranges:** a quiet range says "Nothing logged in the last 7 days", with Show all time.
 
 **Why.** The log is the record of who changed what, and the board's two ranges would hide everything older than a week. An automatic list that forces a classification holds every later slice to the rule without calling ~45 functions with fixture state. Admin-only matches the board (the viewer is Tao) and the current policy.
 

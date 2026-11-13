@@ -10,12 +10,15 @@ test.describe('audit log (local Supabase)', () => {
     page,
     context,
     baseURL,
-  }) => {
+  }, info) => {
+    test.skip(info.project.name !== 'desktop', 'the 390 layout waits for the MAuditLog board (D-061 item 5)');
     await ensureUser('tao@example.test');
     await signIn(context, baseURL!, 'tao@example.test');
     await page.goto('/audit?when=all');
     await expect(page.getByRole('heading', { name: 'Audit log', level: 1 })).toBeAttached();
-    await expect(page.getByText(/entr(y|ies) · all time .*filtered from/)).toBeVisible();
+    // A longer range alone narrows nothing inside it: no "filtered from" yet (spec-checker L4).
+    await expect(page.getByText(/entr(y|ies) · all time/)).toBeVisible();
+    await expect(page.getByText(/filtered from/)).toHaveCount(0);
 
     await page.getByRole('radio', { name: 'Maintenance & mute' }).click();
     await expect(page).toHaveURL(/cat=maintenance/);

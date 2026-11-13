@@ -1,4 +1,6 @@
 import {
+  ESCALATION_CHANNEL_LABELS,
+  ESCALATION_TARGET_LABELS,
   INCIDENT_STATE_LABELS,
   ROOT_CAUSE_LABELS,
   TRIGGER_LABELS,
@@ -39,6 +41,8 @@ export interface AuditFilters {
   /** 'everyone', 'system' (the engine and the notifier: no actor) or a profile id. */
   actor: string;
   range: AuditRange;
+  /** One entity only (a key of ENTITY_FILTERS), from a link. */
+  entity?: string;
 }
 
 const CAT_SLUGS: Record<string, AuditCategory> = {
@@ -66,12 +70,26 @@ function param(p: Params, key: string): string | undefined {
 }
 
 /** Reads the filters from the URL; anything unknown falls back to the default (never an error). */
+/** Own keys only: `?cat=constructor` must not reach Object.prototype (security review). */
+const lookup = <T>(map: Record<string, T>, key: string | undefined): T | undefined =>
+  key !== undefined && Object.hasOwn(map, key) ? map[key] : undefined;
+
+/**
+ * The one-entity filter a link can set (`?entity=escalation`: Escalation's "Change history"), with
+ * the words its chip shows. Not a control of its own: Clear filters removes it.
+ */
+export const ENTITY_FILTERS: Record<string, string> = {
+  escalation: 'Escalation policies',
+};
+
 export function parseFilters(p: Params): AuditFilters {
   const actor = param(p, 'actor');
+  const entity = param(p, 'entity');
   return {
-    cat: CAT_SLUGS[param(p, 'cat') ?? ''] ?? 'All',
+    cat: lookup(CAT_SLUGS, param(p, 'cat')) ?? 'All',
     actor: actor === 'system' || (actor && UUID_RE.test(actor)) ? actor : 'everyone',
-    range: RANGE_SLUGS[param(p, 'when') ?? ''] ?? DEFAULT_RANGE,
+    range: lookup(RANGE_SLUGS, param(p, 'when')) ?? DEFAULT_RANGE,
+    ...(lookup(ENTITY_FILTERS, entity) ? { entity } : {}),
   };
 }
 
@@ -83,16 +101,27 @@ export function filtersQuery(f: AuditFilters): string {
   if (f.actor !== 'everyone') q.set('actor', f.actor);
   const when = Object.entries(RANGE_SLUGS).find(([, v]) => v === f.range)?.[0];
   if (when && f.range !== DEFAULT_RANGE) q.set('when', when);
+  if (f.entity) q.set('entity', f.entity);
   return q.toString();
 }
 
 export function isFiltered(f: AuditFilters): boolean {
-  return f.cat !== 'All' || f.actor !== 'everyone' || f.range !== DEFAULT_RANGE;
+  return f.cat !== 'All' || f.actor !== 'everyone' || f.range !== DEFAULT_RANGE || !!f.entity;
 }
 
 /**
+ * Whether the rows are narrowed inside their range, so "filtered from N" says something: a
+ * category, a person, an entity, or Today (counted against the week). A longer range alone isn't.
+ */
+export function isNarrowed(f: AuditFilters): boolean {
+  return f.cat !== 'All' || f.actor !== 'everyone' || !!f.entity || f.range === 'Today';
+}
+
+export const NO_FILTERS: AuditFilters = { cat: 'All', actor: 'everyone', range: DEFAULT_RANGE };
+
+/**
  * Words for every action code the database writes (D-061: the codes stay as written). A code that
- * isn't here shows as the code itself. `audit-actions.test.ts` fails when a migration adds one.
+ * isn't here shows as the code itself. `model.test.ts` fails when a migration adds one.
  */
 export const ACTION_WORDS: Record<string, string> = {
   // Incidents
@@ -253,7 +282,9 @@ export function atLabel(at: Date, now: Date): string {
   if (isSameBangkokDay(at, now)) return formatTimeWithSeconds(at);
   const weekday = formatDay(at, { weekday: true });
   if (now.getTime() - at.getTime() < 6 * DAY_MS) return `${weekday.split(' ')[0]} ${formatTime(at)}`;
-  return `${weekday} ${formatTime(at)}`;
+  // All time reaches back years: an entry from another Bangkok year says which.
+  const otherYear = formatDay(at, { year: true }).slice(-4) !== formatDay(now, { year: true }).slice(-4);
+  return `${formatDay(at, { weekday: true, year: otherYear })} ${formatTime(at)}`;
 }
 
 // ── Before → After ─────────────────────────────────────────────────────────────────────────────
@@ -311,6 +342,11 @@ const KEY_WORDS: Record<string, string> = {
   notified: 'told',
   fix: 'what fixed it',
   what: 'what happened',
+  thresholds_slowMs: 'slow threshold',
+  timeout_ms: 'timeout',
+  expected_status: 'expected status',
+  must_contain: 'must contain',
+  must_not_contain: 'must not contain',
 };
 
 function keyWord(key: string): string {
@@ -334,7 +370,8 @@ function enumWord(key: string, value: string): string {
 function valueWords(key: string, value: Json, names: Names): string | null {
   if (value === null) return 'none';
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (typeof value === 'number') return String(value);
+  // Milliseconds as seconds, as the pages show them (§13): "slow threshold 3 s".
+  if (typeof value === 'number') return /(Ms|_ms)$/.test(key) ? `${value / 1000} s` : String(value);
   if (typeof value === 'string') {
     if (UUID.test(value)) return names.people.get(value) ?? null;
     if (TIMESTAMP.test(value)) {
@@ -459,6 +496,101 @@ function flattenChanged(b: Side, a: Side): { before: Side; after: Side; changed:
   return { before, after, changed };
 }
 
+// ── Escalation saves ───────────────────────────────────────────────────────────────────────────
+
+interface Step {
+  level: number;
+  delayMin: number;
+  targets: string[];
+  channels: string[];
+  fyi: boolean;
+}
+
+/** "DOWN · Tier 1", "PROBLEM · all tiers" (the Escalation page's policy names). */
+function policyName(p: Side): string {
+  const sev = String(p.severity ?? '').toUpperCase();
+  return typeof p.tier === 'number' ? `${sev} · Tier ${p.tier}` : `${sev} · all tiers`;
+}
+
+function stepsOf(p: Side): Map<number, Step> {
+  const steps = Array.isArray(p.steps) ? p.steps : [];
+  return new Map(
+    steps.filter(isObject).map((s) => [
+      Number(s.level),
+      {
+        level: Number(s.level),
+        delayMin: Number(s.delayMin ?? 0),
+        targets: Array.isArray(s.targets) ? s.targets.map(String) : [],
+        channels: Array.isArray(s.channels) ? s.channels.map(String) : [],
+        fyi: s.fyi === true,
+      },
+    ]),
+  );
+}
+
+const label = (map: Record<string, string>, v: string) => map[v] ?? v;
+
+function stepWords(s: Step): string {
+  const who = s.targets.map((t) => label(ESCALATION_TARGET_LABELS, t)).join(', ');
+  const how = s.channels.map((c) => label(ESCALATION_CHANNEL_LABELS, c)).join(', ');
+  return `${s.level === 0 ? 'at once' : `after ${s.delayMin} min`} · ${who} · ${how}${s.fyi ? ' · FYI' : ''}`;
+}
+
+/**
+ * An `escalation.update` row holds every policy before and after the save: show only the steps and
+ * reminders that changed, one per change — "DOWN · Tier 1 · L1 after 10 min" → "… after 15 min"
+ * (board AuditLog's escalation row), then the note.
+ */
+export function escalationSides(b: Side, a: Side): AuditSides {
+  const policies = (s: Side) =>
+    new Map((Array.isArray(s.policies) ? s.policies.filter(isObject) : []).map((p) => [policyName(p), p]));
+  const bp = policies(b);
+  const ap = policies(a);
+  const before: string[] = [];
+  const after: string[] = [];
+  for (const name of new Set([...bp.keys(), ...ap.keys()])) {
+    const bs = bp.has(name) ? stepsOf(bp.get(name)!) : new Map<number, Step>();
+    const as = ap.has(name) ? stepsOf(ap.get(name)!) : new Map<number, Step>();
+    for (const level of [...new Set([...bs.keys(), ...as.keys()])].sort((x, y) => x - y)) {
+      const o = bs.get(level);
+      const n = as.get(level);
+      const was = o ? stepWords(o) : null;
+      const now = n ? stepWords(n) : null;
+      if (was === now) continue;
+      // Only the part that changed, when the step is still there on both sides.
+      if (o && n) {
+        const parts = (s: Step) => stepWords(s).split(' · ');
+        const op = parts(o);
+        const np = parts(n);
+        before.push(`${name} · L${level} ${op.filter((p, i) => p !== np[i]).join(' · ')}`);
+        after.push(`${name} · L${level} ${np.filter((p, i) => p !== op[i]).join(' · ')}`);
+      } else if (o) {
+        before.push(`${name} · L${level} ${was}`);
+        after.push(`${name} · L${level} removed`);
+      } else {
+        before.push(`${name} · L${level} none`);
+        after.push(`${name} · L${level} ${now}`);
+      }
+    }
+  }
+  for (const [key, words] of [
+    ['downReminderMin', 'DOWN reminder'],
+    ['problemReminderMin', 'PROBLEM reminder'],
+  ] as const) {
+    if (b[key] !== a[key]) {
+      before.push(`${words} every ${b[key] ?? '—'} min`);
+      after.push(`${words} every ${a[key] ?? '—'} min`);
+    }
+  }
+  const note = typeof a.note === 'string' && a.note.trim() ? `“${a.note.trim()}”` : '';
+  const afterWords = [...after, note].filter(Boolean).join(' · ');
+  return {
+    before: before.join(' · ') || '—',
+    after: afterWords || 'no change',
+    struck: before.length > 0,
+  };
+}
+
 export interface AuditSides {
   before: string;
   after: string;
@@ -484,6 +616,7 @@ export function sidesOf(action: string, before: Json | null, after: Json | null,
     changed = flat.changed;
   }
   // An Undo stores the whole snapshot it restored; what it undid is the news.
+  if (action === 'escalation.update' && b && a) return escalationSides(b, a);
   if (a && typeof a.undid === 'string') {
     const before = b && typeof b.action === 'string' ? enumWord('action', b.action) : '';
     return { before: before || '—', after: `undid ${enumWord('undid', a.undid)}`, struck: before !== '' };

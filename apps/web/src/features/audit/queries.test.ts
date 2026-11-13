@@ -77,9 +77,25 @@ describe('loadAuditPage', () => {
       return fake.calls.filter((c) => c.table === 'audit_log' && !c.filters.some(([m]) => m === 'or'))[0]!
         .filters;
     };
-    expect(await heads('today')).toEqual([['gte', 'at', '2026-09-17T17:00:00.000Z']]);
-    expect(await heads('30d')).toEqual([['gte', 'at', '2026-08-25T17:00:00.000Z']]);
-    expect(await heads('all')).toEqual([]);
+    const LTE = ['lte', 'at', NOW.toISOString()];
+    expect(await heads('today')).toEqual([LTE, ['gte', 'at', '2026-09-17T17:00:00.000Z']]);
+    expect(await heads('30d')).toEqual([LTE, ['gte', 'at', '2026-08-25T17:00:00.000Z']]);
+    expect(await heads('all')).toEqual([LTE]);
+  });
+
+  it('no extra count when nothing narrows the rows; the page carries no stored JSON (M5)', async () => {
+    const fake = db();
+    const page = await loadAuditPage(fake.db as unknown as DbClient, parseFilters({ when: '30d' }), NOW);
+    expect(fake.calls.filter((c) => c.table === 'audit_log')).toHaveLength(1);
+    expect(page.entries.every((e) => e.beforeJson === null && e.afterJson === null)).toBe(true);
+  });
+
+  it('every read stops at now, so an export never repeats a row at a page seam (H2)', async () => {
+    const fake = db();
+    await loadAuditExport(fake.db as unknown as DbClient, parseFilters({ entity: 'escalation' }), NOW);
+    const main = fake.calls.find((c) => c.table === 'audit_log')!;
+    expect(main.filters).toContainEqual(['lte', 'at', NOW.toISOString()]);
+    expect(main.filters).toContainEqual(['eq', 'entity', 'escalation']);
   });
 
   it('All time has no lower bound; one person filters by id', async () => {

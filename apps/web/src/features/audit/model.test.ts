@@ -182,8 +182,8 @@ describe('sidesOf', () => {
     };
     const after = { ...before, thresholds: { slow_ms: 5000, timeout_ms: 10000 } };
     expect(sidesOf('monitor.update', before, after, names)).toEqual({
-      before: 'thresholds slow ms 3000',
-      after: 'thresholds slow ms 5000',
+      before: 'thresholds slow ms 3 s',
+      after: 'thresholds slow ms 5 s',
       struck: true,
     });
   });
@@ -240,18 +240,74 @@ describe('sidesOf', () => {
     );
   });
 
-  it('escalation shows the policy count and the note', () => {
+  // The payload save_escalation_policies writes (20261029144512_oncall_routing.sql).
+  const step = (level: number, delayMin: number, targets = ['owner'], channels = ['chat', 'email']) => ({
+    level,
+    delayMin,
+    targets,
+    channels,
+    fyi: false,
+  });
+  const policies = (l1: number, extra: ReturnType<typeof step>[] = []) => [
+    {
+      severity: 'down',
+      tier: 1,
+      steps: [step(0, 0, ['owner'], ['chat', 'space', 'email']), step(1, l1, ['backup']), ...extra],
+    },
+    { severity: 'problem', tier: null, steps: [step(0, 0), step(1, 60, ['backup'])] },
+  ];
+
+  it('escalation shows only the step that changed, and the note (review H1)', () => {
     const s = sidesOf(
       'escalation.update',
-      { policies: [{}, {}] },
-      { note: 'match client-update timer', policies: [{}, {}] },
+      { policies: policies(10), downReminderMin: 30, problemReminderMin: 60 },
+      {
+        policies: policies(15),
+        downReminderMin: 30,
+        problemReminderMin: 60,
+        note: 'match client-update timer',
+      },
       names,
     );
     expect(s).toEqual({
-      before: '2 policies',
-      after: '2 policies · “match client-update timer”',
+      before: 'DOWN · Tier 1 · L1 after 10 min',
+      after: 'DOWN · Tier 1 · L1 after 15 min · “match client-update timer”',
       struck: true,
     });
+  });
+
+  it('escalation: an added step, a reminder change, and a save that changed nothing', () => {
+    const s = sidesOf(
+      'escalation.update',
+      { policies: policies(15), downReminderMin: 30, problemReminderMin: 60 },
+      {
+        policies: policies(15, [step(2, 30, ['admins'], ['chat'])]),
+        downReminderMin: 20,
+        problemReminderMin: 60,
+        note: 'more cover',
+      },
+      names,
+    );
+    expect(s.before).toBe('DOWN · Tier 1 · L2 none · DOWN reminder every 30 min');
+    expect(s.after).toBe(
+      'DOWN · Tier 1 · L2 after 30 min · Admin · Chat @mention · DOWN reminder every 20 min · “more cover”',
+    );
+    const same = { policies: policies(15), downReminderMin: 30, problemReminderMin: 60 };
+    expect(sidesOf('escalation.update', same, same, names)).toEqual({
+      before: '—',
+      after: 'no change',
+      struck: false,
+    });
+  });
+
+  it('milliseconds read as seconds; a year shows on an entry from another year', () => {
+    const before = { id: 'm', thresholds: { slowMs: 3000 }, timeout_ms: 10000 };
+    expect(sidesOf('monitor.update', before, { ...before, thresholds: { slowMs: 5000 } }, names)).toEqual({
+      before: 'slow threshold 3 s',
+      after: 'slow threshold 5 s',
+      struck: true,
+    });
+    expect(atLabel(new Date('2025-09-18T09:20:00Z'), NOW)).toBe('Thu 18 Sep 2025 16:20');
   });
 
   it('a page baseline shows its scripts or title', () => {

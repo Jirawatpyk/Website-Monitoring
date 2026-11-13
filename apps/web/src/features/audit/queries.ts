@@ -9,6 +9,7 @@ import {
   categoryFilter,
   categoryOf,
   entityFallback,
+  isNarrowed,
   rangeStart,
   sidesOf,
   wordsOf,
@@ -67,11 +68,16 @@ const check = <T extends { error: { message: string } | null }>(name: string, r:
   return r;
 };
 
-/** The audit_log query for these filters, newest first (`id` breaks ties so pages don't overlap). */
+/**
+ * The audit_log query for these filters, newest first (`id` breaks ties). It stops at `now`, so
+ * rows the engine appends while an export pages through can't shift the offsets and repeat a row
+ * at a page seam (spec-checker H2).
+ */
 function filtered(db: DbClient, f: AuditFilters, now: Date, count: boolean) {
   let q = db
     .from('audit_log')
     .select(COLUMNS, count ? { count: 'exact' } : undefined)
+    .lte('at', now.toISOString())
     .order('at', { ascending: false })
     .order('id', { ascending: false });
   const start = rangeStart(f.range, now);
@@ -80,29 +86,40 @@ function filtered(db: DbClient, f: AuditFilters, now: Date, count: boolean) {
   if (cat) q = q.or(cat);
   if (f.actor === 'system') q = q.is('actor_id', null);
   else if (f.actor !== 'everyone') q = q.eq('actor_id', f.actor);
+  if (f.entity) q = q.eq('entity', f.entity);
   return q;
 }
 
 /** `/audit`: the newest PAGE_LIMIT matching entries with their names, read as the signed-in Admin. */
 export async function loadAuditPage(db: DbClient, f: AuditFilters, now = new Date()): Promise<AuditPage> {
-  // "Filtered from N": every entry in the wider of the chosen range and the default (Today is
-  // counted against the week, as the board does; 30 days and All time against themselves).
-  const baseStart = rangeStart(f.range === 'Today' ? DEFAULT_RANGE : f.range, now);
-  let base = db.from('audit_log').select('id', { count: 'exact', head: true });
-  if (baseStart) base = base.gte('at', baseStart.toISOString());
+  // "Filtered from N" — only when something narrows the rows — counts every entry in the wider of
+  // the chosen range and the default (Today against the week, as the board does).
+  const countBase = () => {
+    const baseStart = rangeStart(f.range === 'Today' ? DEFAULT_RANGE : f.range, now);
+    const base = db
+      .from('audit_log')
+      .select('id', { count: 'exact', head: true })
+      .lte('at', now.toISOString());
+    return baseStart ? base.gte('at', baseStart.toISOString()) : base;
+  };
   const [page, baseCount, people] = await Promise.all([
     filtered(db, f, now, true).limit(PAGE_LIMIT),
-    base,
+    isNarrowed(f) ? countBase() : null,
     loadPeople(db),
   ]);
   const rows = (check('audit_log', page).data ?? []) as Raw[];
-  const entries = await entriesOf(db, rows, people, now);
+  // The page shows words only; the stored JSON stays on the server for the CSV (spec-checker M5).
+  const entries = (await entriesOf(db, rows, people, now)).map((e) => ({
+    ...e,
+    beforeJson: null,
+    afterJson: null,
+  }));
   return {
     nowIso: now.toISOString(),
     filters: f,
     entries,
     total: page.count ?? rows.length,
-    unfiltered: check('audit_log count', baseCount).count ?? 0,
+    unfiltered: baseCount ? (check('audit_log count', baseCount).count ?? 0) : (page.count ?? rows.length),
     actors: [
       { value: 'everyone', label: 'Everyone' },
       { value: 'system', label: 'System' },

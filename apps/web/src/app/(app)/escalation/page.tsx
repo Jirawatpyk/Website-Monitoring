@@ -10,8 +10,8 @@ export const metadata: Metadata = { title: 'Escalation policies' };
 
 /**
  * `/escalation` — Escalation (L0–L1) for an Admin from md; MEscalation, read-only, on phones and for
- * everyone else (spec §8, §14.7, §15.5, §22; D-034). "Change history" opens the Audit log's Config
- * entries (S15) — Admins only, like the log itself, and from md: the log has no phone layout yet (D-061).
+ * everyone else (spec §8, §14.7, §15.5, §22; D-034). "Change history" opens the Audit log's
+ * escalation saves, all time (S15) — Admins only, like the log itself, and from md: the log has no phone layout yet (D-061).
  */
 export default async function EscalationPage() {
   const access = await getAccess();
@@ -43,7 +43,7 @@ export default async function EscalationPage() {
           actions={
             admin ? (
               <span className="hidden md:inline-flex">
-                <Button variant="ghost" icon={<IconFileText />} href="/audit?cat=config&when=all">
+                <Button variant="ghost" icon={<IconFileText />} href="/audit?entity=escalation&when=all">
                   Change history
                 </Button>
               </span>

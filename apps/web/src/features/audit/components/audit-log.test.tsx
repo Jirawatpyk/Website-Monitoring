@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuditEntry, AuditPage } from '../queries';
-import { AuditLogView, countLine } from './audit-log';
+import { AuditLogView, FILTER_DEBOUNCE_MS, countLine } from './audit-log';
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
@@ -18,8 +18,8 @@ const entry: AuditEntry = {
   before: 'Unacked',
   after: 'Acknowledged',
   struck: true,
-  beforeJson: { state: 'unacked' },
-  afterJson: { state: 'acknowledged' },
+  beforeJson: null,
+  afterJson: null,
 };
 
 const page = (over: Partial<AuditPage> = {}): AuditPage => ({
@@ -35,13 +35,17 @@ const page = (over: Partial<AuditPage> = {}): AuditPage => ({
   ...over,
 });
 
-beforeEach(() => push.mockReset());
+beforeEach(() => {
+  push.mockReset();
+  vi.useFakeTimers();
+});
+afterEach(() => vi.useRealTimers());
 
 describe('countLine', () => {
   it('the default view', () => {
     expect(countLine(page({ total: 34, unfiltered: 34 }))).toBe('34 entries · Fri 18 Sep → Fri 25 Sep 10:07');
   });
-  it('filtered, and over the page limit', () => {
+  it('narrowed, over the page limit, and a longer range alone', () => {
     expect(
       countLine(
         page({ total: 1, unfiltered: 34, filters: { cat: 'Incidents', actor: 'everyone', range: 'Today' } }),
@@ -50,11 +54,28 @@ describe('countLine', () => {
     expect(countLine(page({ total: 1234, unfiltered: 1234 }))).toBe(
       'Newest 500 of 1,234 entries · Fri 18 Sep → Fri 25 Sep 10:07 · Export has them all',
     );
+    // A longer range narrows nothing inside it: no "filtered from 120" next to 120 (L4).
+    expect(
+      countLine(
+        page({ total: 120, unfiltered: 120, filters: { cat: 'All', actor: 'everyone', range: 'All time' } }),
+      ),
+    ).toBe('120 entries · all time');
+  });
+  it('the one-entity filter from Escalation’s Change history', () => {
+    expect(
+      countLine(
+        page({
+          total: 3,
+          unfiltered: 40,
+          filters: { cat: 'All', actor: 'everyone', range: 'All time', entity: 'escalation' },
+        }),
+      ),
+    ).toBe('3 entries · all time · Escalation policies only · filtered from 40');
   });
 });
 
 describe('AuditLogView', () => {
-  it('shows the row as the board draws it', () => {
+  it('shows the row as the board draws it; Export is a plain link', () => {
     render(<AuditLogView data={page()} />);
     const row = screen.getAllByRole('row')[1]!;
     for (const text of [
@@ -71,7 +92,7 @@ describe('AuditLogView', () => {
     expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
   });
 
-  it('a filter goes to the URL; Export follows it and says how many rows', () => {
+  it('a filter shows at once, loads after the pause; Export follows the loaded filters', () => {
     render(
       <AuditLogView
         data={page({
@@ -87,9 +108,36 @@ describe('AuditLogView', () => {
     );
     fireEvent.click(screen.getByRole('combobox', { name: 'When' }));
     fireEvent.click(screen.getByRole('option', { name: 'All time' }));
+    expect(screen.getByRole('combobox', { name: 'When' })).toHaveTextContent('All time');
+    expect(push).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(FILTER_DEBOUNCE_MS));
     expect(push).toHaveBeenCalledWith('/audit?cat=incidents&actor=system&when=all', { scroll: false });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Clear filters' })[0]!);
+  });
+
+  it('quick changes load once, with the last value (M4)', () => {
+    render(<AuditLogView data={page()} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Incidents' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Monitor' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Config' }));
+    act(() => vi.advanceTimersByTime(FILTER_DEBOUNCE_MS));
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith('/audit?cat=config', { scroll: false });
+  });
+
+  it('Clear filters loads at once, and focus lands on Category once the cleared page is in', () => {
+    const filtered = page({
+      total: 0,
+      entries: [],
+      unfiltered: 34,
+      filters: { cat: 'Access', actor: 'everyone', range: 'Last 7 days' },
+    });
+    const { rerender } = render(<AuditLogView data={filtered} />);
+    const clear = screen.getAllByRole('button', { name: 'Clear filters' });
+    expect(clear).toHaveLength(1);
+    fireEvent.click(clear[0]!);
     expect(push).toHaveBeenLastCalledWith('/audit', { scroll: false });
+    rerender(<AuditLogView data={page({ total: 34, unfiltered: 34 })} />);
+    expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus();
   });
 
   it('Export says what it downloaded', () => {
@@ -98,8 +146,8 @@ describe('AuditLogView', () => {
     expect(screen.getByRole('status')).toHaveTextContent('audit-log.csv · 34 rows downloaded');
   });
 
-  it('no match: the empty line and nothing to export', () => {
-    render(
+  it('empty: "no match" when narrowed; a quiet week offers all time (L1)', () => {
+    const { unmount } = render(
       <AuditLogView
         data={page({
           entries: [],
@@ -110,5 +158,10 @@ describe('AuditLogView', () => {
       />,
     );
     expect(screen.getByText('No entries match these filters.')).toBeInTheDocument();
+    unmount();
+    render(<AuditLogView data={page({ entries: [], total: 0, unfiltered: 0 })} />);
+    expect(screen.getByText('Nothing logged in the last 7 days')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all time' }));
+    expect(push).toHaveBeenCalledWith('/audit?when=all', { scroll: false });
   });
 });

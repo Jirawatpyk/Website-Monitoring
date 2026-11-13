@@ -214,7 +214,8 @@ export function IncidentsList({ meta, incidents, sites, nowIso, viewer, initialV
         meta={meta}
         actions={
           <span className="hidden md:inline-flex">
-            <Button variant="secondary" icon={<IconDownload />} href={exportHref} download>
+            {/* A plain <a>: a router Link would prefetch (run) the export in the background. */}
+            <Button variant="secondary" icon={<IconDownload />} href={exportHref} linkComponent="a" download>
               Export CSV
             </Button>
           </span>
