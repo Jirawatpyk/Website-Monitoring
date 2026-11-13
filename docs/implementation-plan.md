@@ -36,7 +36,7 @@
 | S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Done |
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Done |
-| S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Todo |
+| S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | In review |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Todo |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Todo |
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Todo |
@@ -694,7 +694,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S15 · Audit log
 
 - **Scope:** FR-13. Audit log page (filters, CSV export) and a coverage test that runs in CI: every server action / route that changes config or incident state must write `audit_log`.
-- **Boards:** AuditLog
+- **Boards:** AuditLog, MAuditLog, MAuditLogDark (spec §33, drawn 13 Nov)
 - **Depends on:** S09
 - **Done when:**
   1. The coverage test enumerates the mutating actions and routes, and fails on a fixture action that deliberately skips `audit_log` (so slices after S15 are held to it).
@@ -917,6 +917,8 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | Expiry | S13 |
 | WeeklySummary | S14 |
 | AuditLog | S15 |
+| MAuditLog | S15 |
+| MAuditLogDark | S15 |
 | Users | S16 |
 | Security | S16 |
 | Profile | S16 |

@@ -1,6 +1,6 @@
 # DxT Monitor — Design spec for developer handoff
 
-Version: 10 Nov 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
+Version: 13 Nov 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
 Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (53 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
 
 ## 0. How to use this spec
@@ -41,6 +41,8 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | OnCall | On-call rotation · VIEW AS + REQUEST + ROTATION show the swap states and the no-one-to-page cases (§27, §28) | 1440×2080 | Operations & governance · web |
 | Probes | Probes & heartbeat | 1440×1496 | Operations & governance · web |
 | AuditLog | Audit log | 1440×2000 | Operations & governance · web |
+| MAuditLog | Mobile — Audit log (§33) | 390×844 | Mobile app · 390 |
+| MAuditLogDark | Mobile — Audit log · dark (§33) | 390×844 | Mobile app · 390 |
 | MIncidents | Mobile — Incidents | 390×844 | Mobile app · 390 |
 | MOnCall | Mobile — On-call · BOARD STATE: test link, swap for Nok / Arm / Tao, Hand over sheet, no-one-to-page cases (§27, §28) | 390×904 | Mobile app · 390 |
 | MMaintenance | Mobile — Mute / maintenance sheet · Repeat (§32) | 390×844 | Mobile app · 390 |
@@ -484,3 +486,17 @@ Decision D-057 settles the behaviour; this section is the layout and the words. 
 11. **Open questions — answered (Tao to confirm):** Weekly summary "Coming up" lists a series once ("Tubtong · every Tue 01:00 → 03:00 · next Tue 29 Sep"), one-off windows one by one. Threads: one thread per series for series actions, one per window for the window (above). Email: one email to owner + backup when a series is scheduled, approved, declined or cancelled; windows of a series send no STARTED / ENDED email (DIDN'T START still does) — at most one email a week for a weekly series.
 12. **Icons.** Series = `rotate-ccw` (the “Repeating” badge, the “Part of a series” / “Series” tag, the summary box, the request card); skipped note = `triangle-alert`. The canvas still uses the AURA copy of 25 Sep (64 icons); names outside that set render blank there, so boards use only names from it. Fixed 6 Nov: MainFault / MOverview4 (§31) had used `circle-x` and `circle-dot`, which drew no icon — now `ban` and `rotate-ccw`.
 13. **Audit log:** maintenance.series_create / series_request / series_approve / series_decline / series_withdraw / series_cancel / occurrence_skip, plus the usual per-window events.
+
+## 33. Audit log on a phone (MAuditLog, /audit at 390) — S15, D-061, added 13 Nov 2026
+Boards: **MAuditLog** and **MAuditLogDark** (same board, dark tokens), next to MMaintenanceList. STATE: Default · Filtered (Maintenance & mute) · Exported · Over 500 · Empty · Entry sheet · No access. The desktop AuditLog board is unchanged. Same mock rows as AuditLog (Fri 25 Sep 10:07) — compute them; never copy.
+
+1. **Layout (§22.1–3).** Top bar: back arrow → Overview, "Audit log", avatar → MProfile; bottom nav with nothing selected; one column, 16 px side padding, 44 px targets. Under the bar the meta line "Who did what, when, with the value before and after. Nobody can edit or delete an entry, Admin included."
+2. **Who sees it.** Admins only. Anyone else gets a card "Only Admins can see the audit log" · "You're signed in as Arm (Responder). Ask Tao if you need an entry." · Back to Overview (STATE › No access).
+3. **Export.** Full-width secondary button: "Export CSV"; with any filter "Export 12 rows" (the count of matching rows, all of them — not just the cards on screen); disabled at 0. After a tap a green line under it: "audit-log.csv · 12 rows downloaded".
+4. **Filters — answer to Q1: three selects, no chips.** Category is a 44 px select (All · Incidents · Monitor · Config · Maintenance & mute · On-call · Access) at full width; Actor (Everyone · System · people) and When (Today · Last 7 days · Last 30 days · All time) sit side by side under it. A scrolling chip row hides options off the edge and needs its own scroll affordance; a select shows all seven and matches the other two. Default: All · Everyone · Last 7 days.
+5. **Count line.** "34 entries · Fri 18 Sep → Fri 25 Sep 10:07", "· filtered from N" when filtered, with a ghost "Clear filters" (44 px) on the right. Over 500: "Newest 500 of 1,234 entries · … · Export has them all".
+6. **Entry card — answer to Q2.** One card per entry inside one rounded list (MMaintenanceList pattern), never a table. Line 1: action words (semibold) left, time right (mono, tabular): "10:03:41" today, "Thu 22:22" this week, "Fri 18 Sep 16:20" older. Line 2: actor (avatar + name; "System" gets a neutral circle with the `monitor` icon instead of an avatar) · entity (one line, ellipsis). Then a tinted mono block with **Before struck on its own line and "→ After" under it** (stacked, never side by side); a created item with no Before ("—") shows only "→ After". Last line: the mono code (`incident.ack`), tertiary.
+7. **Long values — answer to Q3: both.** In the card, Before and After wrap to at most 2 lines each, then clip. The whole card is a button that opens a sheet with every field in full: title = action words, description = full date and time "(UTC+7)", then Actor · Entity · Before (struck) · After · Action (code · category), "Can't be edited or deleted.", Close. The sheet has no actions.
+8. **Paging — answer to Q4: "Show more", not page numbers.** 25 cards at a time on a phone (desktop keeps 50 a page); under the list a full-width secondary "Show 9 more" (or "Show 25 more") with "25 of 34 shown". Filters reset it to 25. After Show more, focus moves to the first new card (so a screen reader carries on where it was). The count line says "No entries · …" at 0. Over 500 the list stops at the newest 500 and the count line points to Export.
+9. **Empty.** "No entries match these filters." with Clear filters, in a card where the list was.
+10. **Footnote.** Lock icon + "Entries are kept forever and can't be edited or deleted. "System" rows are written by the status engine and the notifier."

@@ -1365,9 +1365,6 @@ isOneToOne: false
                            },
 "withdraw_request":
 { Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
-                           },
-"write_audit":
-{ Args: { "p_action": string,"p_after"?: Json,"p_before"?: Json,"p_entity": string,"p_entity_id"?: string }; Returns: string
                            }
           }
           Enums: {

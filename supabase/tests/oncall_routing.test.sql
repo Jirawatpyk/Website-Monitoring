@@ -4,7 +4,7 @@
 -- L1 told-already set leaves them out, a relapse keeps them; the L0 pencil; on-call may acknowledge.
 begin;
 \ir _helpers.psql
-select plan(41);
+select plan(42);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -151,6 +151,9 @@ update public.notifications set status = 'cancelled' where incident_id = (select
 select ok(public.engine_post_late_alert((select id from inc where name = 'mu'), now(), null, true), 'the late alert goes');
 select is(pg_temp.l0('mu'), (select id from ids where name = 'nok'), 'the late alert outside hours pages on-call');
 select ok((select id from ids where name = 'nok') = any (pg_temp.emailed('mu', 'down')), 'and emails them');
+select is((select after ->> 'l0_user_id' from public.audit_log
+           where action = 'incident.alerted' and entity_id = (select id from inc where name = 'mu')),
+  (select id::text from ids where name = 'nok'), 'and audits the new L0 and the ladder clock (S15)');
 select pg_temp.close('mu');
 
 -- ── Access: the on-call person acts on Tier 1 ──────────────────────────────

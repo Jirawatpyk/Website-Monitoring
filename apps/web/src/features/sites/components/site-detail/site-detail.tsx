@@ -619,6 +619,7 @@ function IncidentHistory({ detail }: { detail: SiteDetail }) {
             size="sm"
             icon={<IconDownload />}
             href={`/sites/${detail.id}/incidents.csv`}
+            linkComponent="a"
           >
             Export
           </Button>
@@ -787,7 +788,13 @@ function CheckLog({ detail, now }: { detail: SiteDetail; now: Date }) {
       <div className="mt-auto flex min-h-8 flex-wrap items-center justify-between gap-3 text-sm text-fg-secondary">
         <span>{`Latest ${detail.log.length} of ${formatCount(detail.checksLast24h)} checks in the last 24 h`}</span>
         {detail.checksToday > 0 && (
-          <Button variant="ghost" size="sm" icon={<IconDownload />} href={`/sites/${detail.id}/checks.csv`}>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<IconDownload />}
+            href={`/sites/${detail.id}/checks.csv`}
+            linkComponent="a"
+          >
             Download today’s log
           </Button>
         )}

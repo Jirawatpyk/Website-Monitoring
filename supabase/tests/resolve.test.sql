@@ -3,7 +3,7 @@
 -- S06-review guard on engine_relapse_incident.
 begin;
 \ir _helpers.psql
-select plan(75);
+select plan(78);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -365,6 +365,15 @@ select is(
   true,
   'a PROBLEM relapse on it still goes through'
 );
+
+-- ── Audit rows (S15 coverage: each function's own row) ──────────────────────
+reset role;
+select ok(exists (select 1 from public.audit_log where action = 'incident.root_cause' and at = now()),
+  'save_root_cause writes incident.root_cause (S15 audit coverage)');
+select ok(exists (select 1 from public.audit_log where action = 'incident.resolve_undone' and at = now()),
+  'undo_resolve writes incident.resolve_undone (S15 audit coverage)');
+select ok(exists (select 1 from public.audit_log where action = 'incident.relapsed' and at = now()),
+  'engine_relapse_incident writes incident.relapsed (S15 audit coverage)');
 
 select * from finish();
 rollback;

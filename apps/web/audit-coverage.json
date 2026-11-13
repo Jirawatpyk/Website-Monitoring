@@ -1,0 +1,251 @@
+{
+  "$comment": "Plan S15 Done-when 1, D-061 item 4. Every server action ('use server' export) and route handler: the audited database functions it writes through (supabase/tests/audit_coverage.test.sql), or exempt with the reason. `pnpm audit:check` fails on one missing here.",
+  "directWrites": {
+    "server/check-results.ts#check_results": "Probe results (service role): monitoring data, not config or incident state.",
+    "server/crawler/run-crawler.ts#crawler_checks": "Crawler fetches (service role): monitoring data.",
+    "server/engine/run-engine.ts#verification_jobs": "Queues and settles browser-verify jobs (service role); verdicts are judged by audited engine steps.",
+    "server/verifier/housekeeping.ts#verification_jobs": "Removes verify-job rows older than 30 days (retention).",
+    "server/heartbeats.ts#agent_heartbeats": "Heartbeats of the crons (service role).",
+    "server/verifier/jobs.ts#agent_heartbeats": "The verifier's heartbeat (service role).",
+    "server/ingest/bangkok.ts#probe_locations": "The Bangkok probe's last heartbeat (service role).",
+    "server/probe/run-probe.ts#probe_locations": "A cloud probe location's last heartbeat (service role).",
+    "server/notifier/dispatch.ts#notifications": "Delivery state of queued messages (service role): sent, failed, retry time.",
+    "server/notifier/dispatch.ts#notification_attempts": "The delivery log, one row per attempt (service role, append-only).",
+    "server/notifier/dispatch.ts#incident_events": "The 'alerted' timeline line after a message went; no incident state changes."
+  },
+  "actions": {
+    "features/auth/actions.ts#signOut": {
+      "exempt": "Ends the person's own session; changes nothing in the database."
+    },
+    "features/escalation/actions.ts#saveEscalation": {
+      "rpc": ["save_escalation_policies"]
+    },
+    "features/incidents/actions.ts#acknowledgeIncident": {
+      "rpc": ["ack_incident"]
+    },
+    "features/incidents/actions.ts#undoAcknowledge": {
+      "rpc": ["undo_ack"]
+    },
+    "features/incidents/actions.ts#addNote": {
+      "rpc": ["add_incident_note"]
+    },
+    "features/incidents/actions.ts#saveRootCause": {
+      "rpc": ["save_root_cause"]
+    },
+    "features/incidents/actions.ts#markClientUpdate": {
+      "rpc": ["mark_client_update"]
+    },
+    "features/incidents/actions.ts#resolveIncident": {
+      "rpc": ["resolve_incident"]
+    },
+    "features/incidents/actions.ts#undoResolve": {
+      "rpc": ["undo_resolve"]
+    },
+    "features/incidents/hand-actions.ts#recordHandCheck": {
+      "rpc": ["record_hand_check"]
+    },
+    "features/incidents/hand-actions.ts#openManualIncident": {
+      "rpc": ["open_manual_incident"]
+    },
+    "features/incidents/hand-actions.ts#reportDownByHand": {
+      "rpc": ["report_down_by_hand"]
+    },
+    "features/incidents/hand-actions.ts#escalateNow": {
+      "rpc": ["escalate_now"]
+    },
+    "features/incidents/hand-actions.ts#sendClientUpdateReminder": {
+      "rpc": ["send_client_update_reminder"]
+    },
+    "features/maintenance/actions.ts#scheduleMaintenance": {
+      "rpc": ["create_maintenance"]
+    },
+    "features/maintenance/actions.ts#muteSite": {
+      "rpc": ["mute_site"]
+    },
+    "features/maintenance/actions.ts#endWindowEarly": {
+      "rpc": ["end_window_early"]
+    },
+    "features/maintenance/actions.ts#editWindowEnd": {
+      "rpc": ["edit_window_end"]
+    },
+    "features/maintenance/actions.ts#cancelWindow": {
+      "rpc": ["cancel_window"]
+    },
+    "features/maintenance/actions.ts#withdrawRequest": {
+      "rpc": ["withdraw_request"]
+    },
+    "features/maintenance/actions.ts#declineMaintenance": {
+      "rpc": ["decline_maintenance"]
+    },
+    "features/maintenance/actions.ts#approveMaintenance": {
+      "rpc": ["approve_maintenance"]
+    },
+    "features/maintenance/actions.ts#loadAdminNames": {
+      "exempt": "Reads the active Admins' names for the request dialog; writes nothing."
+    },
+    "features/maintenance/actions.ts#postWindowActionNow": {
+      "exempt": "Sends early the messages an audited window action already queued; changes no window or incident."
+    },
+    "features/maintenance/actions.ts#undoWindowAction": {
+      "rpc": ["undo_window_action"]
+    },
+    "features/maintenance/actions.ts#scheduleSeries": {
+      "rpc": ["create_maintenance_series"]
+    },
+    "features/maintenance/actions.ts#decideSeries": {
+      "rpc": ["decide_maintenance_series"]
+    },
+    "features/maintenance/actions.ts#cancelSeries": {
+      "rpc": ["cancel_maintenance_series"]
+    },
+    "features/maintenance/actions.ts#postSeriesActionNow": {
+      "exempt": "Sends early the messages an audited series action already queued; changes no series or window."
+    },
+    "features/maintenance/actions.ts#undoSeriesAction": {
+      "rpc": ["undo_series_action"]
+    },
+    "features/oncall/actions.ts#saveRotation": {
+      "rpc": ["save_oncall_rotation"]
+    },
+    "features/oncall/actions.ts#requestSwap": {
+      "rpc": ["request_oncall_swap"]
+    },
+    "features/oncall/actions.ts#respondSwap": {
+      "rpc": ["respond_oncall_swap"]
+    },
+    "features/oncall/actions.ts#decideSwap": {
+      "rpc": ["decide_oncall_swap"]
+    },
+    "features/oncall/actions.ts#withdrawSwap": {
+      "rpc": ["withdraw_oncall_swap"]
+    },
+    "features/oncall/actions.ts#handOver": {
+      "rpc": ["hand_over_oncall_shift"]
+    },
+    "features/oncall/actions.ts#setChecklist": {
+      "exempt": "Ticks the person's own phone-readiness checklist (MOnCall); not config or incident state."
+    },
+    "features/oncall/actions.ts#sendTest": {
+      "exempt": "Sends the person a test alert; changes no config or incident."
+    },
+    "features/oncall/actions.ts#confirmTest": {
+      "exempt": "Records that the person got their test alert; not config or incident state."
+    },
+    "features/page-change/actions.ts#acceptBaseline": {
+      "rpc": ["accept_page_baseline"]
+    },
+    "features/page-change/actions.ts#undoBaseline": {
+      "rpc": ["undo_page_baseline"]
+    },
+    "features/sites/actions.ts#createSite": {
+      "rpc": ["create_site"]
+    },
+    "features/sites/actions.ts#updateSite": {
+      "rpc": ["update_site"]
+    },
+    "features/sites/actions.ts#setSiteMonitoring": {
+      "rpc": ["set_site_monitoring"]
+    },
+    "features/sites/actions.ts#deleteSite": {
+      "rpc": ["delete_site"]
+    },
+    "features/sites/actions.ts#saveMonitors": {
+      "rpc": ["save_monitors"]
+    }
+  },
+  "routes": {
+    "app/(app)/audit/export/route.ts#GET": {
+      "exempt": "Downloads the audit log as CSV; reads only."
+    },
+    "app/(app)/incidents/incidents.csv/route.ts#GET": {
+      "exempt": "Downloads the incident list as CSV; reads only."
+    },
+    "app/(app)/sites/[siteId]/checks.csv/route.ts#GET": {
+      "exempt": "Downloads a site's check log as CSV; reads only."
+    },
+    "app/(app)/sites/[siteId]/incidents.csv/route.ts#GET": {
+      "exempt": "Downloads a site's incident history as CSV; reads only."
+    },
+    "app/api/cron/crawler/route.ts#GET": {
+      "rpc": ["crawler_set_baseline"]
+    },
+    "app/api/cron/engine/route.ts#GET": {
+      "rpc": [
+        "engine_open_incident",
+        "engine_recover_incident",
+        "engine_relapse_incident",
+        "engine_escalate_incident",
+        "engine_settle_incident",
+        "engine_fire_step",
+        "engine_client_update_due",
+        "engine_log_windows",
+        "engine_window_reminders",
+        "open_system_alert",
+        "clear_system_alert",
+        "oncall_extend_shifts"
+      ]
+    },
+    "app/api/cron/probe-sin/route.ts#GET": {
+      "rpc": [
+        "engine_open_incident",
+        "engine_recover_incident",
+        "engine_relapse_incident",
+        "engine_escalate_incident"
+      ]
+    },
+    "app/api/cron/probe-tyo/route.ts#GET": {
+      "rpc": [
+        "engine_open_incident",
+        "engine_recover_incident",
+        "engine_relapse_incident",
+        "engine_escalate_incident"
+      ]
+    },
+    "app/api/cron/housekeeping/route.ts#GET": {
+      "exempt": "Removes screenshots and verify-job rows older than 30 days (retention); no config or incident."
+    },
+    "app/api/cron/notifier/route.ts#GET": {
+      "exempt": "Delivers messages that audited actions and engine steps queued."
+    },
+    "app/api/cron/reports/route.ts#GET": {
+      "exempt": "Queues and sends the daily digest and the weekly summary; changes no state."
+    },
+    "app/api/ingest/route.ts#GET": {
+      "exempt": "Hands the VPS the monitors due from Bangkok and stamps its watchdog beat; no config or incident."
+    },
+    "app/api/ingest/route.ts#POST": {
+      "rpc": [
+        "engine_open_incident",
+        "engine_recover_incident",
+        "engine_relapse_incident",
+        "engine_escalate_incident"
+      ]
+    },
+    "app/api/jobs/route.ts#GET": {
+      "exempt": "Leases browser-verify jobs to the VPS and expires stale ones; the verdicts are judged by audited engine steps."
+    },
+    "app/api/jobs/route.ts#POST": {
+      "rpc": [
+        "engine_open_incident",
+        "engine_recover_incident",
+        "engine_escalate_incident",
+        "engine_settle_incident"
+      ]
+    },
+    "app/api/monitor-test/sin/route.ts#POST": {
+      "exempt": "Runs one test check from Singapore and stores nothing."
+    },
+    "app/api/monitor-test/tyo/route.ts#POST": {
+      "exempt": "Runs one test check from Tokyo and stores nothing."
+    },
+    "app/auth/callback/route.ts#GET": {
+      "exempt": "Finishes Google sign-in (sets the session); sign-in auditing is the Access category, S16."
+    },
+    "app/auth/refused/route.ts#GET": {
+      "exempt": "Signs out a refused session and shows why; writes nothing."
+    },
+    "app/auth/sign-in/route.ts#GET": {
+      "exempt": "Starts Google sign-in (a redirect); writes nothing."
+    }
+  }
+}

@@ -96,7 +96,7 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         slice: 'S20',
         live: false,
       },
-      { id: 'audit', label: 'Audit log', icon: <IconFileText />, href: '/audit', slice: 'S15', live: false },
+      { id: 'audit', label: 'Audit log', icon: <IconFileText />, href: '/audit', slice: 'S15', live: true },
     ],
   },
   {

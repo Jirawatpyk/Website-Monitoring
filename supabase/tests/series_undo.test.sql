@@ -4,7 +4,7 @@
 -- approve → Undo → approve posts SKIPPED once; post-now ends the 10 s; the engine waits out an Undo.
 begin;
 \ir _helpers.psql
-select plan(39);
+select plan(40);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -284,6 +284,11 @@ select ok(has_function_privilege('authenticated', 'public.undo_series_action(uui
       and not has_function_privilege('anon', 'public.post_series_action_now(uuid)', 'execute')
       and not has_function_privilege('authenticated', 'private.series_undo_begin(public.maintenance_series,text,timestamptz)', 'execute'),
   'signed-in people undo through the RPC only');
+
+-- ── Audit rows (S15 coverage: each function's own row) ──────────────────────
+reset role;
+select ok(exists (select 1 from public.audit_log where action = 'maintenance.series_not_approved' and at = now()),
+  'engine_window_reminders writes maintenance.series_not_approved (S15 audit coverage)');
 
 select * from finish();
 rollback;

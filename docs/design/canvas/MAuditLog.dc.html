@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Audit log</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:var(--aura-fg-accent)}
+a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg)}
+.aura-dialog__close.aura-icon-btn{width:44px;height:44px;margin:-12px -14px 0 0}
+.aura-input,.aura-input__control,.aura-select__trigger{min-height:44px;box-sizing:border-box}
+.aura-btn{min-height:44px;box-sizing:border-box}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.al-card{width:100%;box-sizing:border-box;padding:12px 14px;display:flex;flex-direction:column;gap:6px;border:0;border-bottom:1px solid var(--aura-border-subtle);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.al-card:last-child{border-bottom:0}
+.al-card:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:-2px}
+.al-clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.al-kv{display:flex;flex-direction:column;gap:2px;font-size:13px;line-height:1.45}
+.al-kv>span:first-child{font-size:12px;color:var(--aura-fg-secondary)}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<a href="MOverview4.dc.html" aria-label="Back to Overview" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<span style="flex-grow: 1; font-size: 17px; font-weight: 600">Audit log</span>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="sm"></x-import></a>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{viewOpts}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import></div>
+</div>
+
+<sc-if value="{{noAccess}}" hint-placeholder-val="{{false}}">
+<div style="padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-surface-hover); color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="lock" size="md"></x-import></span>
+<span style="font-size: 15px; font-weight: 600">Only Admins can see the audit log</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">You’re signed in as Arm (Responder). Ask Tao if you need an entry.</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="arrow-left" full-width="{{yes}}" href="MOverview4.dc.html">Back to Overview</x-import>
+</div>
+</sc-if>
+
+<sc-if value="{{hasAccess}}" hint-placeholder-val="{{true}}">
+<span style="font-size: 13px; line-height: 1.45; color: var(--aura-fg-secondary)">Who did what, when, with the value before and after. Nobody can edit or delete an entry, Admin included.</span>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="download" full-width="{{yes}}" disabled="{{noRows}}" on-click="{{doExport}}">{{exportLabel}}</x-import>
+<sc-if value="{{exported}}" hint-placeholder-val="{{false}}"><span role="status" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import>{{exportNote}}</span></sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<x-import component-from-global-scope="Aura.Select" label="Category" options="{{cats}}" value="{{cat}}" on-change="{{setCat}}"></x-import>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<x-import component-from-global-scope="Aura.Select" label="Actor" options="{{actors}}" value="{{actor}}" on-change="{{setActor}}"></x-import>
+<x-import component-from-global-scope="Aura.Select" label="When" options="{{ranges}}" value="{{range}}" on-change="{{setRange}}"></x-import>
+</div>
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px">
+<span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">{{countLabel}}</span>
+<sc-if value="{{filtered}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="x" on-click="{{clear}}">Clear filters</x-import></span></sc-if>
+</div>
+
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<span style="font-size: 14px; font-weight: 500">No entries match these filters.</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="x" on-click="{{clear}}">Clear filters</x-import>
+</div>
+</sc-if>
+
+<sc-if value="{{notEmpty}}" hint-placeholder-val="{{true}}">
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+<button type="button" class="al-card" aria-label="{{r.aria}}" onClick="{{r.open}}">
+<span style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; line-height: 1.3"><span style="font-size: 14px; font-weight: 600">{{r.words}}</span><span style="flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); font-variant-numeric: tabular-nums">{{r.at}}</span></span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.3; min-width: 0">
+<sc-if value="{{r.isSystem}}" hint-placeholder-val="{{false}}"><span style="width: 24px; height: 24px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-surface-hover); color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="monitor" size="sm"></x-import></span></sc-if>
+<sc-if value="{{r.isPerson}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Avatar" name="{{r.actor}}" size="sm"></x-import></sc-if>
+<span style="flex-shrink: 0; font-weight: 500">{{r.actor}}</span><span style="color: var(--aura-fg-tertiary)">·</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--aura-fg-secondary)">{{r.entity}}</span>
+</span>
+<span style="display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--aura-radius-sm); background: var(--aura-bg-canvas); font-family: var(--font-mono); font-size: 12px; line-height: 1.45">
+<sc-if value="{{r.hasBefore}}" hint-placeholder-val="{{true}}"><span class="al-clamp" style="color: var(--aura-fg-secondary); text-decoration: line-through">{{r.before}}</span></sc-if>
+<span style="display: flex; gap: 6px; min-width: 0"><span style="flex-shrink: 0; color: var(--aura-fg-tertiary)">→</span><span class="al-clamp">{{r.after}}</span></span>
+</span>
+<span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.3; color: var(--aura-fg-tertiary)">{{r.action}}</span>
+</button>
+</sc-for>
+</div>
+<sc-if value="{{hasMore}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 4px; align-items: stretch">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{showMore}}">{{moreLabel}}</x-import>
+<span style="font-size: 12px; text-align: center; color: var(--aura-fg-secondary)">{{shownLabel}}</span>
+</div>
+</sc-if>
+</sc-if>
+
+<div style="display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.45">
+<span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import></span>
+<span>Entries are kept forever and can’t be edited or deleted. “System” rows are written by the status engine and the notifier.</span>
+</div>
+</sc-if>
+
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Audit log at 390 (§33, D-061). §22 layout: back → Overview, title, avatar, bottom nav with nothing selected. Admin only; everyone else sees “Only Admins can see the audit log”. Export CSV full width (“Export N rows” when filtered; after it “audit-log.csv · N rows downloaded”). Filters: Category, Actor and When as 44 px selects — Category full width, Actor + When side by side. Each entry is a card (never a table): action words + time on the first line, actor and entity, Before (struck) above → After, both up to 2 lines, then the mono code. Tap a card → sheet with every field in full. 25 cards at a time, “Show N more” below (focus moves to the first new card). STATE: Default · Filtered · Exported · Over 500 · Empty · Entry sheet · No access. Mock data, same rows as AuditLog — compute it.</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="" label="Sections"></x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{sheetOpen}}" on-close="{{close}}" title="{{s.words}}" description="{{s.when}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="al-kv"><span>Actor</span><span>{{s.actor}}</span></div>
+<div class="al-kv"><span>Entity</span><span>{{s.entity}}</span></div>
+<div class="al-kv"><span>Before</span><span style="font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; color: var(--aura-fg-secondary); text-decoration: {{s.strike}}">{{s.before}}</span></div>
+<div class="al-kv"><span>After</span><span style="font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere">{{s.after}}</span></div>
+<div class="al-kv"><span>Action</span><span style="font-family: var(--font-mono); font-size: 12px">{{s.action}} · {{s.cat}}</span></div>
+<span style="display: flex; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import></span>Can’t be edited or deleted.</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{close}}">Close</x-import>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: 'Default', cat: 'All', actor: 'Everyone', range: 'Last 7 days', exported: false, open: -1, shown: 25 };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    // Same mock rows as AuditLog (Fri 25 Sep 10:07). [time, actor, code, entity, before, after, category, days ago, full date]
+    var data = [
+      ['10:03:41', 'System', 'incident.escalate', 'INC-0142 · MuvMi', 'L0 · Arm', 'L1 · Ploy + Tao', 'Incidents', 0],
+      ['10:03:12', 'System', 'incident.client_update_due', 'INC-0142 · MuvMi', '—', 'Bua @mentioned · draft client message', 'Incidents', 0],
+      ['09:58:02', 'Ploy', 'incident.ack', 'INC-0141 · Fuji Links', 'Unacked', 'Acknowledged', 'Incidents', 0],
+      ['09:52:29', 'System', 'incident.open', 'INC-0141 · Fuji Links', '—', 'PROBLEM · Slow (p50 5.8 s)', 'Incidents', 0],
+      ['09:48:41', 'System', 'incident.open', 'INC-0142 · MuvMi', '—', 'DOWN · Hard fail', 'Incidents', 0],
+      ['09:30:00', 'System', 'maintenance.start', 'WeCare Studio', 'scheduled', 'active until 14:00', 'Maintenance & mute', 0],
+      ['09:20:14', 'Arm', 'maintenance.request', 'Bangkok Airways – China', '—', 'Sat 26 Sep 22:00 → Tue 29 Sep 22:00 · 3 days · “Move to a new hosting provider” · waiting for an Admin', 'Maintenance & mute', 0],
+      ['08:40:10', 'Tao', 'site.mute', 'DxT Games', 'not muted', 'until 18:00 · “Redeploying build”', 'Maintenance & mute', 0],
+      ['03:16:08', 'System', 'monitor.heartbeat_ok', 'probe-sin · Singapore', 'missed', 'pinging again · gap 4 min', 'Monitor', 0],
+      ['03:15:04', 'System', 'monitor.heartbeat_missed', 'probe-sin · Singapore', 'last ping 03:12', 'missed > 3 min · email to Tao, no page', 'Monitor', 0],
+      ['Thu 22:22', 'System', 'incident.recover', 'INC-0139 · ORCA Thailand', 'DOWN · 8 min', 'Recovered · needs root cause', 'Incidents', 1],
+      ['Thu 22:14', 'System', 'incident.open', 'INC-0139 · ORCA Thailand', '—', 'DOWN · Hard fail · outside hours, timers paused', 'Incidents', 1],
+      ['Thu 18:22', 'Tao', 'monitor.update', 'Fuji Links · /', 'slow threshold 3 s', '5 s (Tier 2 default)', 'Config', 1],
+      ['Thu 16:40', 'System', 'signin.blocked', 'Personal Gmail account', '—', 'blocked · not a DxT account', 'Access', 1],
+      ['Thu 16:05', 'Nok', 'maintenance.create', 'WeCare Studio', '—', 'Fri 25 Sep 09:30 → 14:00 · “CMS upgrade”', 'Maintenance & mute', 1],
+      ['Thu 14:14', 'System', 'incident.recover', 'INC-0138 · Tubtong', 'PROBLEM · 12 min', 'Recovered · verifier restarted', 'Incidents', 1],
+      ['Thu 14:02', 'System', 'incident.open', 'INC-0138 · Tubtong', '—', 'PROBLEM · Blocked, not verified', 'Incidents', 1],
+      ['Thu 11:40', 'Tao', 'escalation.update', 'DOWN · Tier 1 · L1', 'after 10 min', '15 min · “match client-update timer”', 'Config', 1],
+      ['Thu 11:00', 'System', 'incident.recover', 'INC-0136 · DxT AI', 'PROBLEM · 1 d 2 h', 'Recovered · cert renewed', 'Incidents', 1],
+      ['Thu 09:20', 'Tao', 'security.2sv_required', 'Everyone', 'Admins only', 'Everyone from Mon 5 Oct · Nok, Thee, Mint emailed', 'Access', 1],
+      ['Thu 09:12', 'Tao', 'user.invite', 'Second Admin', '—', 'invited as Admin · 2-step required', 'Access', 1],
+      ['Wed 18:30', 'Tao', 'session.revoke', 'Nok · old laptop', 'signed in', 'signed out', 'Access', 2],
+      ['Wed 16:30', 'Ploy', 'maintenance.create', 'Tubtong', '—', 'Tue 29 Sep 01:00 → 03:00 · “WordPress plugin updates”', 'Maintenance & mute', 2],
+      ['Wed 09:15', 'Tao', 'site.update', 'Tubtong', 'backup Tao', 'backup Nok', 'Config', 2],
+      ['Wed 09:00', 'System', 'incident.open', 'INC-0136 · DxT AI', '—', 'PROBLEM · SSL expiring (< 14 days)', 'Incidents', 2],
+      ['Tue 22:00', 'System', 'maintenance.end', 'ORCA Thailand', 'active', 'ended on time', 'Maintenance & mute', 3],
+      ['Tue 20:00', 'System', 'maintenance.start', 'ORCA Thailand', 'scheduled', 'active until 22:00 · “Hosting plan upgrade”', 'Maintenance & mute', 3],
+      ['Tue 10:12', 'Arm', 'oncall.swap.request', 'Week Mon 5 → 12 Oct', 'Arm', 'Nok (waiting for Nok)', 'On-call', 3],
+      ['Mon 11:40', 'Nok', 'site.mute_end', 'Cando Asia', 'muted until 14:15', 'ended early · “DNS change confirmed”', 'Maintenance & mute', 4],
+      ['Mon 10:15', 'Nok', 'site.mute', 'Cando Asia', 'not muted', 'until 14:15 · “Client changing DNS”', 'Maintenance & mute', 4],
+      ['Mon 08:04', 'Ploy', 'incident.ack', 'INC-0133 · VOCA', 'Unacked · timers paused', 'Acknowledged (before hours)', 'Incidents', 4],
+      ['Mon 04:04', 'System', 'incident.recover', 'INC-0133 · VOCA', 'DOWN · flapped ×4', 'Recovered · 41 min down', 'Incidents', 4],
+      ['Mon 03:12', 'System', 'incident.open', 'INC-0133 · VOCA', '—', 'DOWN · Hard fail · outside hours, timers paused', 'Incidents', 4],
+      ['Fri 18 Sep 16:20', 'Tao', 'maintenance.cancel', 'EQHO', 'Sat 19 Sep 09:00 → 12:00', 'cancelled · “Client moved the launch”', 'Maintenance & mute', 7]
+    ];
+    var DAY = ['Fri 25 Sep', 'Thu 24 Sep', 'Wed 23 Sep', 'Tue 22 Sep', 'Mon 21 Sep', '', '', ''];
+    var WORDS = {
+      'incident.client_update_due': 'Client update due', 'incident.escalate': 'Escalated', 'incident.ack': 'Acknowledged', 'incident.open': 'Incident opened',
+      'incident.recover': 'Recovered', 'site.mute': 'Muted site', 'maintenance.start': 'Maintenance started', 'monitor.update': 'Changed monitor',
+      'signin.blocked': 'Sign-in blocked', 'maintenance.create': 'Scheduled maintenance', 'maintenance.request': 'Asked for maintenance', 'maintenance.end': 'Maintenance ended', 'site.mute_end': 'Ended mute early', 'maintenance.cancel': 'Cancelled maintenance', 'escalation.update': 'Changed escalation',
+      'security.2sv_required': 'Required 2-step', 'user.invite': 'Invited user', 'session.revoke': 'Signed out devices', 'site.update': 'Changed site',
+      'oncall.swap.request': 'Requested swap', 'monitor.heartbeat_missed': 'Heartbeat missed', 'monitor.heartbeat_ok': 'Heartbeat back'
+    };
+    var V = st.view;
+    var NOACC = V === 'No access';
+    var cat = st.cat, actor = st.actor, range = st.range;
+    var MAXD = { 'Today': 0, 'Last 7 days': 7, 'Last 30 days': 30, 'All time': 9999 }[range];
+    var all = data.map(function (d, i) {
+      return { i: i, at: d[0], actor: d[1], action: d[2], words: WORDS[d[2]] || d[2], entity: d[3], before: d[4], after: d[5], cat: d[6], ago: d[7],
+        when: (d[7] === 7 ? d[0] : DAY[d[7]] + ' ' + d[0].replace(/^[A-Z][a-z]{2} /, '')) + ' (UTC+7)' };
+    });
+    var match = all.filter(function (r) { return (cat === 'All' || r.cat === cat) && (actor === 'Everyone' || r.actor === actor) && r.ago <= MAXD; });
+    var OVER = V === 'Over 500';
+    var total = OVER ? 1234 : match.length;
+    var shown = Math.min(st.shown, match.length);
+    var rows = match.slice(0, shown).map(function (r) {
+      return Object.assign({}, r, { isSystem: r.actor === 'System', isPerson: r.actor !== 'System', hasBefore: r.before !== '—',
+        aria: r.words + ', ' + r.at + ', ' + r.actor + ', ' + r.entity + '. Open the full entry',
+        open: function () { self.setState({ open: r.i }); } });
+    });
+    var filtered = cat !== 'All' || actor !== 'Everyone' || range !== 'Last 7 days';
+    var span = range === 'Today' ? 'today, Fri 25 Sep' : (range === 'Last 7 days' ? 'Fri 18 Sep → Fri 25 Sep 10:07' : (range === 'Last 30 days' ? 'Wed 26 Aug → Fri 25 Sep 10:07' : 'all time → Fri 25 Sep 10:07'));
+    var n = function (x) { return x.toLocaleString('en-US'); };
+    var countLabel = OVER ? 'Newest 500 of ' + n(total) + ' entries · ' + span + ' · Export has them all'
+      : (match.length === 0 ? 'No entries' : match.length === 1 ? '1 entry' : match.length + ' entries') + ' · ' + span + (filtered ? ' · filtered from ' + data.length : '');
+    var left = (OVER ? 500 : match.length) - shown;
+    var S = all[st.open] || all[0];
+    function sv(v, x) { var o = { cat: 'All', actor: 'Everyone', range: 'Last 7 days', exported: false, open: -1, shown: 25 };
+      if (v === 'Filtered') { o.cat = 'Maintenance & mute'; }
+      if (v === 'Exported') { o.cat = 'Maintenance & mute'; o.exported = true; }
+      if (v === 'Over 500') { o.range = 'All time'; }
+      if (v === 'Empty') { o.cat = 'On-call'; o.actor = 'Ploy'; }
+      if (v === 'Entry sheet') { o.open = 6; }
+      return Object.assign(o, { view: v }); }
+    return {
+      yes: true, no: false, me: NOACC ? 'Arm' : 'Tao',
+      viewOpts: ['Default', 'Filtered', 'Exported', 'Over 500', 'Empty', 'Entry sheet', 'No access'].map(function (v) { return { value: v, label: v }; }), view: V,
+      setView: function (e) { self.setState(sv(e && e.target ? e.target.value : e)); },
+      noAccess: NOACC, hasAccess: !NOACC,
+      cats: ['All', 'Incidents', 'Monitor', 'Config', 'Maintenance & mute', 'On-call', 'Access'], cat: cat,
+      setCat: function (e) { self.setState({ cat: e && e.target ? e.target.value : e, exported: false, shown: 25 }); },
+      actors: ['Everyone', 'System', 'Tao', 'Arm', 'Ploy', 'Nok'], actor: actor,
+      setActor: function (e) { self.setState({ actor: e && e.target ? e.target.value : e, exported: false, shown: 25 }); },
+      ranges: ['Today', 'Last 7 days', 'Last 30 days', 'All time'], range: range,
+      setRange: function (e) { self.setState({ range: e && e.target ? e.target.value : e, exported: false, shown: 25 }); },
+      filtered: filtered,
+      clear: function () { self.setState({ cat: 'All', actor: 'Everyone', range: 'Last 7 days', exported: false, shown: 25 }); },
+      countLabel: countLabel,
+      rows: rows, empty: match.length === 0, notEmpty: match.length > 0,
+      hasMore: left > 0 && shown < match.length, moreLabel: 'Show ' + Math.min(25, left) + ' more', shownLabel: shown + ' of ' + (OVER ? '500' : match.length) + ' shown',
+      showMore: function () { var k = self.state.shown; self.setState({ shown: k + 25 }); setTimeout(function () { var c = document.querySelectorAll('.al-card')[k]; if (c) c.focus(); }, 60); },
+      noRows: match.length === 0, exported: !!st.exported,
+      exportLabel: filtered ? 'Export ' + n(total) + ' rows' : 'Export CSV',
+      exportNote: 'audit-log.csv · ' + n(total) + ' rows downloaded',
+      doExport: function () { self.setState({ exported: true }); },
+      sheetOpen: st.open >= 0 && !NOACC,
+      close: function () { self.setState({ open: -1, view: self.state.view === 'Entry sheet' ? 'Default' : self.state.view }); },
+      s: { words: S.words, when: S.when, actor: S.actor === 'System' ? 'System — written by the status engine or the notifier' : S.actor, entity: S.entity, before: S.before, after: S.after, action: S.action, cat: S.cat, strike: S.before === '—' ? 'none' : 'line-through' },
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
