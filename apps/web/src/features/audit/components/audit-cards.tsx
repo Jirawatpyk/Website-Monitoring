@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar, Button, Dialog } from '@jirawatpyk/aura-react';
 import { IconLock, IconMonitor, IconX } from '@jirawatpyk/aura-react/icons';
 import type { AuditEntry } from '../queries';
-import { fullAtLabel } from '../model';
+import { fullAtLabel, quietWords, type AuditRange } from '../model';
 
 /** Cards shown at a time on a phone (§33.8; desktop keeps 50 a page). */
 export const CARD_PAGE = 25;
@@ -26,13 +26,17 @@ function Actor({ name }: { name: string }) {
 export function AuditCards({
   entries,
   narrowed,
+  range,
   resetKey,
   onClear,
+  onShowAll,
 }: {
   entries: AuditEntry[];
   narrowed: boolean;
+  range: AuditRange;
   resetKey: string;
   onClear: () => void;
+  onShowAll: () => void;
 }) {
   const [shown, setShown] = useState(CARD_PAGE);
   const [seenKey, setSeenKey] = useState(resetKey);
@@ -41,6 +45,10 @@ export function AuditCards({
     setShown(CARD_PAGE);
   }
   const [open, setOpen] = useState<AuditEntry | null>(null);
+  // The last one opened stays in the sheet while it animates closed (no blank title).
+  const [last, setLast] = useState<AuditEntry | null>(null);
+  if (open && open !== last) setLast(open);
+  const shownEntry = open ?? last;
   const cards = useRef<(HTMLButtonElement | null)[]>([]);
   const focusAt = useRef<number | null>(null);
   useEffect(() => {
@@ -53,12 +61,18 @@ export function AuditCards({
     return (
       <div className="flex flex-col items-center gap-2 rounded-aura-lg border border-border-default bg-bg-surface px-4 py-6 text-center">
         <span className="text-sm font-medium">
-          {narrowed ? 'No entries match these filters.' : 'Nothing logged in this range.'}
+          {narrowed ? 'No entries match these filters.' : quietWords(range)}
         </span>
-        {narrowed && (
+        {narrowed ? (
           <Button variant="secondary" icon={<IconX />} onClick={onClear}>
             Clear filters
           </Button>
+        ) : (
+          range !== 'All time' && (
+            <Button variant="secondary" onClick={onShowAll}>
+              Show all time
+            </Button>
+          )
         )}
       </div>
     );
@@ -78,7 +92,7 @@ export function AuditCards({
               }}
               onClick={() => setOpen(e)}
               aria-label={`${e.words}, ${e.atLabel}, ${e.actor}, ${e.entity}. Open the full entry`}
-              className="flex w-full cursor-pointer flex-col gap-1.5 border-0 bg-transparent px-3.5 py-3 text-left text-fg-primary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
+              className="flex w-full cursor-pointer flex-col gap-1.5 border-0 bg-transparent px-3.5 py-3 hover:bg-bg-surface-hover active:bg-bg-surface-hover text-left text-fg-primary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
             >
               <span className="flex items-baseline justify-between gap-2.5 leading-snug">
                 <span className="text-sm font-semibold">{e.words}</span>
@@ -127,28 +141,32 @@ export function AuditCards({
         open={open !== null}
         onClose={() => setOpen(null)}
         size="sm"
-        title={open?.words ?? ''}
-        description={open ? fullAtLabel(new Date(open.at)) : ''}
+        title={shownEntry?.words ?? ''}
+        description={shownEntry ? fullAtLabel(new Date(shownEntry.at)) : ''}
       >
-        {open && (
+        {shownEntry && (
           <div className="flex flex-col gap-3">
             <dl className="m-0 flex flex-col gap-3 text-sm leading-normal">
               {[
                 [
                   'Actor',
-                  open.actor === 'System'
+                  shownEntry.actor === 'System'
                     ? 'System — written by the status engine or the notifier'
-                    : open.actor,
+                    : shownEntry.actor,
                   '',
                 ],
-                ['Entity', open.entity, ''],
+                ['Entity', shownEntry.entity, ''],
                 [
                   'Before',
-                  open.before,
-                  `font-mono text-xs break-words text-fg-secondary ${open.struck ? 'line-through' : ''}`,
+                  shownEntry.before,
+                  `font-mono text-xs break-words text-fg-secondary ${shownEntry.struck ? 'line-through' : ''}`,
                 ],
-                ['After', open.after, 'font-mono text-xs break-words'],
-                ['Action', `${open.action} · ${open.category ?? 'Other'}`, 'font-mono text-xs'],
+                ['After', shownEntry.after, 'font-mono text-xs break-words'],
+                [
+                  'Action',
+                  shownEntry.category ? `${shownEntry.action} · ${shownEntry.category}` : shownEntry.action,
+                  'font-mono text-xs',
+                ],
               ].map(([k, v, cls]) => (
                 <div key={k} className="flex flex-col gap-0.5">
                   <dt className="text-xs text-fg-secondary">{k}</dt>

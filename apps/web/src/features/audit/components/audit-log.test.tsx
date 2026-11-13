@@ -164,8 +164,8 @@ describe('AuditLogView', () => {
     expect(screen.getAllByText('No entries match these filters.').length).toBeGreaterThan(0);
     unmount();
     render(<AuditLogView data={page({ entries: [], total: 0, unfiltered: 0 })} />);
-    expect(screen.getByText('Nothing logged in the last 7 days')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show all time' }));
+    expect(screen.getAllByText('Nothing logged in the last 7 days').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Show all time' })[0]!);
     expect(push).toHaveBeenCalledWith('/audit?when=all', { scroll: false });
   });
 });

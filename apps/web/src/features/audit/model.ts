@@ -265,6 +265,13 @@ export function rangeStart(range: AuditRange, now: Date): Date | null {
   }
 }
 
+/** The empty list when nothing narrows it: "Nothing logged in the last 7 days" (both widths). */
+export function quietWords(range: AuditRange): string {
+  if (range === 'Today') return 'Nothing logged today';
+  if (range === 'All time') return 'Nothing logged yet';
+  return `Nothing logged in the ${range.toLowerCase()}`;
+}
+
 /** The span after the count: "today", "Fri 18 Sep → Fri 25 Sep 10:07", "all time". */
 export function spanLabel(range: AuditRange, now: Date): string {
   const start = rangeStart(range, now);

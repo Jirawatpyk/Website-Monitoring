@@ -13,6 +13,7 @@ import {
 } from '@jirawatpyk/aura-react';
 import {
   IconArrowRight,
+  IconCheck,
   IconCalendar,
   IconDownload,
   IconFileText,
@@ -33,6 +34,7 @@ import {
   filtersQuery,
   isFiltered,
   isNarrowed,
+  quietWords,
   spanLabel,
   type AuditCategory,
   type AuditFilters,
@@ -49,7 +51,7 @@ const ENTITY_FROM = 896;
  */
 export const FILTER_DEBOUNCE_MS = 300;
 
-const entries = (n: number) => (n === 1 ? '1 entry' : `${formatCount(n)} entries`);
+const entries = (n: number) => (n === 0 ? 'No entries' : n === 1 ? '1 entry' : `${formatCount(n)} entries`);
 const rows = (n: number) => (n === 1 ? '1 row' : `${formatCount(n)} rows`);
 
 /** The line under the filters: "34 entries · Fri 18 Sep → Fri 25 Sep 10:07 · filtered from 120". */
@@ -65,11 +67,6 @@ export function countLine(data: Pick<AuditPage, 'total' | 'unfiltered' | 'filter
 }
 
 /** The empty table when nothing narrows it: "Nothing logged in the last 7 days" (spec-checker L1). */
-function quietWords(range: AuditRange): string {
-  if (range === 'Today') return 'Nothing logged today';
-  if (range === 'All time') return 'Nothing logged yet';
-  return `Nothing logged in the ${range.toLowerCase()}`;
-}
 
 /** Audit log (board AuditLog, spec §16.11, D-061). Filters live in the URL; the server filters. */
 export function AuditLogView({ data }: { data: AuditPage }) {
@@ -115,6 +112,12 @@ export function AuditLogView({ data }: { data: AuditPage }) {
     // The Clear button goes away with the filters: focus lands on Category, not the page (L2).
     focusCategory.current = true;
     go(NO_FILTERS, { now: true });
+  };
+
+  const showAll = () => {
+    // The button goes with the empty state: focus lands on Category (N3).
+    focusCategory.current = true;
+    go({ ...data.filters, range: 'All time' }, { now: true });
   };
 
   // The export follows what the server shows, never a filter still waiting to load.
@@ -202,25 +205,36 @@ export function AuditLogView({ data }: { data: AuditPage }) {
         meta="Who did what, when, with the value before and after. Nobody can edit or delete an entry, Admin included."
         actionsFullWidthBelow="md"
         actions={
-          <>
+          // One child, so the row's full-width rule keeps Export whole on a phone; the note sits
+          // under it there, centred with a check (MAuditLog §33.3), and beside it from md (AuditLog).
+          <div className="flex w-full flex-col gap-1.5 md:w-auto md:flex-row md:items-center md:gap-3">
             {exported && (
-              <span className="text-xs text-fg-positive" role="status">
+              <span
+                className="order-2 flex items-center justify-center gap-1.5 text-xs text-fg-positive md:order-1"
+                role="status"
+              >
+                <span className="flex md:hidden">
+                  <IconCheck size="sm" aria-hidden />
+                </span>
                 {`audit-log.csv · ${rows(data.total)} downloaded`}
               </span>
             )}
-            {/* A plain <a>: a router Link would prefetch the export and run it in the background (H3). */}
-            <Button
-              variant="secondary"
-              icon={<IconDownload />}
-              href={exportQuery ? `/audit/export?${exportQuery}` : '/audit/export'}
-              linkComponent="a"
-              download
-              onClick={() => setExported(true)}
-              disabled={data.total === 0}
-            >
-              {filtered ? `Export ${rows(data.total)}` : 'Export CSV'}
-            </Button>
-          </>
+            <span className="order-1 flex md:order-2">
+              {/* A plain <a>: a router Link would prefetch the export and run it in the background (H3). */}
+              <Button
+                variant="secondary"
+                icon={<IconDownload />}
+                href={exportQuery ? `/audit/export?${exportQuery}` : '/audit/export'}
+                linkComponent="a"
+                download
+                onClick={() => setExported(true)}
+                disabled={data.total === 0}
+                fullWidth="below-md"
+              >
+                {filtered ? `Export ${rows(data.total)}` : 'Export CSV'}
+              </Button>
+            </span>
+          </div>
         }
       />
 
@@ -291,7 +305,14 @@ export function AuditLogView({ data }: { data: AuditPage }) {
         </div>
 
         <div className="flex flex-col gap-3 md:hidden">
-          <AuditCards entries={data.entries} narrowed={narrowed} resetKey={serverQuery} onClear={clear} />
+          <AuditCards
+            entries={data.entries}
+            narrowed={narrowed}
+            range={data.filters.range}
+            resetKey={serverQuery}
+            onClear={clear}
+            onShowAll={showAll}
+          />
         </div>
         <div className="@container/audit hidden md:block">
           <DataTable
@@ -312,14 +333,7 @@ export function AuditLogView({ data }: { data: AuditPage }) {
                     ...(data.filters.range !== 'All time'
                       ? {
                           action: (
-                            <Button
-                              variant="secondary"
-                              onClick={() => {
-                                // The button goes with the empty state: focus lands on Category (N3).
-                                focusCategory.current = true;
-                                go({ ...data.filters, range: 'All time' }, { now: true });
-                              }}
-                            >
+                            <Button variant="secondary" onClick={showAll}>
                               Show all time
                             </Button>
                           ),
@@ -331,9 +345,9 @@ export function AuditLogView({ data }: { data: AuditPage }) {
         </div>
       </div>
 
-      <p className="flex items-start gap-3 text-sm leading-normal text-fg-secondary">
+      <p className="flex items-start gap-2 text-xs leading-normal text-fg-secondary md:gap-3 md:text-sm">
         <span className="flex pt-0.5">
-          <IconLock size="sm" />
+          <IconLock size="sm" aria-hidden />
         </span>
         <span>
           Entries are kept forever and can’t be edited or deleted. “System” rows are written by the status

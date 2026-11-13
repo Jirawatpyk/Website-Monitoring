@@ -23,9 +23,28 @@ const entry = (i: number, over: Partial<AuditEntry> = {}): AuditEntry => ({
 const cards = () => screen.getAllByRole('button', { name: /Open the full entry$/ });
 
 describe('AuditCards (MAuditLog §33.6–9)', () => {
+  it('a quiet range: the same words as desktop, and Show all time', () => {
+    const onShowAll = vi.fn();
+    render(
+      <AuditCards
+        entries={[]}
+        narrowed={false}
+        range="Last 30 days"
+        resetKey=""
+        onClear={() => {}}
+        onShowAll={onShowAll}
+      />,
+    );
+    expect(screen.getByText('Nothing logged in the last 30 days')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all time' }));
+    expect(onShowAll).toHaveBeenCalled();
+  });
+
   it('25 at a time; Show more adds the next and focuses the first new card', () => {
     render(
       <AuditCards
+        range="Last 7 days"
+        onShowAll={() => {}}
         entries={Array.from({ length: 34 }, (_, i) => entry(i))}
         narrowed={false}
         resetKey=""
@@ -43,15 +62,40 @@ describe('AuditCards (MAuditLog §33.6–9)', () => {
   it('new filters put it back to 25', () => {
     const list = Array.from({ length: 30 }, (_, i) => entry(i));
     const { rerender } = render(
-      <AuditCards entries={list} narrowed={false} resetKey="a" onClear={() => {}} />,
+      <AuditCards
+        range="Last 7 days"
+        onShowAll={() => {}}
+        entries={list}
+        narrowed={false}
+        resetKey="a"
+        onClear={() => {}}
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Show 5 more' }));
-    rerender(<AuditCards entries={list} narrowed resetKey="b" onClear={() => {}} />);
+    rerender(
+      <AuditCards
+        range="Last 7 days"
+        onShowAll={() => {}}
+        entries={list}
+        narrowed
+        resetKey="b"
+        onClear={() => {}}
+      />,
+    );
     expect(cards()).toHaveLength(CARD_PAGE);
   });
 
   it('a card shows no struck Before for a new item; the sheet shows every field in full', () => {
-    render(<AuditCards entries={[entry(0)]} narrowed={false} resetKey="" onClear={() => {}} />);
+    render(
+      <AuditCards
+        range="Last 7 days"
+        onShowAll={() => {}}
+        entries={[entry(0)]}
+        narrowed={false}
+        resetKey=""
+        onClear={() => {}}
+      />,
+    );
     expect(screen.queryByText('—')).toBeNull();
     fireEvent.click(cards()[0]!);
     const sheet = screen.getByRole('dialog');
@@ -63,11 +107,27 @@ describe('AuditCards (MAuditLog §33.6–9)', () => {
   it('System is the monitor icon, not an avatar; empty when narrowed offers Clear filters', () => {
     const onClear = vi.fn();
     const { unmount } = render(
-      <AuditCards entries={[entry(0, { actor: 'System' })]} narrowed={false} resetKey="" onClear={onClear} />,
+      <AuditCards
+        range="Last 7 days"
+        onShowAll={() => {}}
+        entries={[entry(0, { actor: 'System' })]}
+        narrowed={false}
+        resetKey=""
+        onClear={onClear}
+      />,
     );
     expect(screen.queryByText('SY')).toBeNull();
     unmount();
-    render(<AuditCards entries={[]} narrowed resetKey="" onClear={onClear} />);
+    render(
+      <AuditCards
+        range="Last 7 days"
+        onShowAll={() => {}}
+        entries={[]}
+        narrowed
+        resetKey=""
+        onClear={onClear}
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(onClear).toHaveBeenCalled();
   });
