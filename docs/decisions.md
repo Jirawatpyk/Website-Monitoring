@@ -89,9 +89,9 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 6. **Every row comes from the change it describes** (S15 security review, migration `s15_audit_hardening`):
    - `write_audit` is dropped. Any signed-in Responder or Stakeholder could write any row with it, and nothing called it.
    - The first alert after a mute (`engine_post_late_alert`) writes `incident.alerted`, because it restarts the ladder clock and sets who may acknowledge.
-   - `profiles` gets the row-change trigger (`profile.*`, under Access), since an Admin can change a role or deactivate someone directly.
+   - Signed-in sessions can no longer UPDATE `profiles` (Tao, 13 Nov). An Admin could change a role or deactivate someone directly with no audit row. S16's Users screen brings an audited function. A row-change trigger was the other way, but it would keep every person's email, phone and Chat id in a log nobody can delete from.
    - The coverage test also fails on any table a session can write that has no audit trigger.
-7. **Page details** (spec-checker, 13 Nov):
+7. **Page details** (spec-checker findings, fixed 13 Nov):
    - **Paging:** the table shows the 500 it loads 50 a page.
    - **Narrow tables:** below a 896 px table, Entity folds under the action, so the page fits from 768 px.
    - **Filters:** they apply 300 ms after the last change, and the controls show the new value at once.

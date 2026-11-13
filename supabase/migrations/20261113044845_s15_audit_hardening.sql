@@ -7,9 +7,10 @@
 -- 2. engine_post_late_alert writes incident.alerted (M2). The first alert after a mute restarts the
 --    ladder clock (alerted_at) and sets the L0 person (l0_user_id), who may acknowledge. Body
 --    otherwise as 20261029144512_oncall_routing.sql.
--- 3. profiles gets the row-change audit trigger (M3). An Admin can update profiles directly
---    (role, is_active) through PostgREST, and that wrote nothing. Rows are profile.create / update /
---    delete, under Access.
+-- 3. Signed-in sessions can no longer UPDATE profiles (M3). An Admin could change a role or
+--    deactivate someone straight through PostgREST, and that wrote nothing. No screen uses it; S16's
+--    Users screen brings an audited function (Tao, 13 Nov 2026: block it until then rather than keep
+--    whole profile rows — email, phone, Chat id — in a log nobody can delete from).
 
 drop function public.write_audit(text, text, uuid, jsonb, jsonb);
 
@@ -78,5 +79,4 @@ begin
 end;
 $$;
 
-create trigger profiles_audit after insert or update or delete on public.profiles
-  for each row execute function private.audit_row_change('profile');
+revoke update on public.profiles from authenticated;

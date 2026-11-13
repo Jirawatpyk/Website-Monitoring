@@ -1,7 +1,7 @@
 -- RLS per role (PRD §3, D-007, D-012) and the append-only audit_log.
 begin;
 \ir _helpers.psql
-select plan(41);
+select plan(42);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 -- Start from no sites or clients, whatever the dev seed loaded (rolled back at the end).
@@ -102,9 +102,9 @@ select throws_ok(
 select throws_ok(
   $$ insert into public.clients (name) values ('New client') $$,
   '42501', null, 'responder cannot add clients');
-select is_empty(
-  $$ update public.profiles set role = 'admin' where id = auth.uid() returning id $$,
-  'responder cannot promote themselves');
+select throws_ok(
+  $$ update public.profiles set role = 'admin' where id = auth.uid() $$,
+  '42501', null, 'responder cannot promote themselves');
 select hasnt_function('public', 'write_audit',
   'write_audit is gone: nobody writes an arbitrary audit row (S15 security review)');
 select is_empty('select * from public.audit_log', 'only Admins read the audit log');
@@ -119,6 +119,9 @@ select isnt_empty(
   $$ update public.sites set name = 'Site A2'
      where id = '00000000-0000-0000-0000-0000000000a1' returning id $$,
   'admin can change any site field');
+select throws_ok(
+  $$ update public.profiles set role = 'viewer' where id = (select id from ids where name = 'arm') $$,
+  '42501', null, 'even an Admin cannot change a profile directly: unaudited until S16 (S15 security review)');
 select is((select actor_id from public.audit_log where action = 'site.update' order by at desc limit 1),
   (select id from ids where name = 'admin'), 'the row trigger records the signed-in actor');
 
@@ -136,9 +139,9 @@ select throws_ok($$ delete from public.audit_log $$, '42501', 'audit_log is appe
 select tests.authenticate_as((select id from ids where name = 'former'));
 select throws_ok($$ insert into public.audit_log (action, entity) values ('x', 'y') $$, '42501', null,
   'a user without an active profile cannot write the audit log');
-select is_empty(
-  $$ update public.profiles set is_active = true where id = auth.uid() returning id $$,
-  'a deactivated user cannot reactivate themselves');
+select throws_ok(
+  $$ update public.profiles set is_active = true where id = auth.uid() $$,
+  '42501', null, 'a deactivated user cannot reactivate themselves');
 reset role;
 
 set local role service_role;

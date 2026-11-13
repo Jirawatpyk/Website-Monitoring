@@ -187,10 +187,6 @@ export const ACTION_WORDS: Record<string, string> = {
   'maintenance.occurrence_skip': 'Skipped occurrence',
   'site.mute': 'Muted site',
   'site.mute_end': 'Ended mute early',
-  // Access (S15: the row trigger on profiles; S16 adds the Users screen's own codes)
-  'profile.create': 'Person added',
-  'profile.update': 'Changed person',
-  'profile.delete': 'Person removed',
   // On-call
   'oncall.rotation': 'Changed rotation',
   'oncall.handover': 'Handed over shift',
