@@ -222,7 +222,9 @@ function smallTargets(page: Page) {
         const box = el.getBoundingClientRect();
         // Inline text links are exempt (WCAG 2.5.8); hidden controls aren't tappable.
         if (getComputedStyle(el).display === 'inline' || box.width === 0 || box.height === 0) return false;
-        return hitHeight(el) < min;
+        // 0.05 px of slack: under the phone bar's fractional slide (translateY(-54.08px)) a 44 px link
+        // measures 43.99 (the "/escalation at 820" flake of 11 Nov; caught on the avatar link, 14 Nov).
+        return hitHeight(el) < min - 0.05;
       })
       .map((el) => {
         const name = (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 40);
@@ -296,8 +298,9 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
       `/sites/${site}/monitors`,
       `/incidents/${await openTestIncident(ADMIN.email)}`,
     );
-    // Settings isn't in the nav until S16 PR 3 (Security) ships: its pages are checked here meanwhile.
-    if (!pages.includes('/settings/users')) pages.push('/settings/users');
+    // The nav links Settings to its first tab; the other tab and My profile (account footer, avatar) are
+    // reached from there (S16 PR 3).
+    pages.push('/settings/security', '/profile');
 
     for (const width of WIDTHS) {
       const page = await signedInAt(browser, baseURL!, width);

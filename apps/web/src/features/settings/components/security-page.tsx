@@ -85,7 +85,7 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
       key: 'person',
       label: 'Person',
       grow: 1,
-      minWidth: 180,
+      minWidth: 150,
       render: (r) => (
         <span className="flex min-w-0 items-center gap-3">
           <Avatar name={r.name} size="sm" />
@@ -101,18 +101,18 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
         </span>
       ),
     },
-    { key: 'role', label: 'Role', width: 120, render: (r) => <RoleBadge role={r.role} /> },
+    { key: 'role', label: 'Role', width: 112, render: (r) => <RoleBadge role={r.role} /> },
     {
       key: 'devices',
       label: 'Devices',
-      width: 96,
+      width: 80,
       align: 'end',
       render: (r) => <span className="tabular-nums">{r.devices}</span>,
     },
     {
       key: 'last',
       label: 'Last sign-in',
-      width: 168,
+      width: 144,
       render: (r) => <span className="whitespace-nowrap">{r.last}</span>,
     },
     {
@@ -291,7 +291,7 @@ function EventsCard({ events }: { events: SigninEvent[] }) {
           title="Recent sign-in events"
           headingLevel={2}
           actions={
-            <Link href="/audit?cat=access" className="text-sm text-fg-link">
+            <Link href="/audit?cat=access" className="inline-flex min-h-11 items-center text-sm text-fg-link">
               Audit log
             </Link>
           }

@@ -40,6 +40,10 @@ describe('activeNavId', () => {
     ['/login', null],
     ['/incidents/x', 'incidents'], // live since S07
     ['/overview-x', null],
+    ['/settings/users', 'settings'], // live since S16 PR 3
+    ['/settings/security', 'settings'], // every Settings tab keeps Settings current
+    ['/settingsx', null],
+    ['/profile', null], // reached from the account footer and the avatar, not the nav
   ])('%s → %s', (pathname, expected) => {
     expect(activeNavId(pathname)).toBe(expected);
   });
