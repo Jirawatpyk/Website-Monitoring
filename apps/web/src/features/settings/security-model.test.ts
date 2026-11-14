@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   devicesOf,
   devicesWord,
+  previewDevices,
   noDevicesLine,
   oncallWarning,
   securityRows,
@@ -134,7 +135,8 @@ describe('securityRows (Security board, MSecurity §35.6)', () => {
   });
 
   it('your own row offers Sign out other devices only with more than one device', () => {
-    expect(row('Tao')).toMatchObject({ devices: 2, action: 'others', last: 'Today 07:52' });
+    // Last active: the newest use of any session (10:05), not when the session began (07:52) — /verify.
+    expect(row('Tao')).toMatchObject({ devices: 2, action: 'others', last: 'Today 10:05' });
     expect(securityRows({ ...data, sessions: data.sessions.slice(0, 1) }, NOW)[0]!.action).toBeNull();
   });
 
@@ -258,5 +260,25 @@ describe('noDevicesLine (MSecurity sheet, spec-checker pass 2)', () => {
   it('a pending address, and someone with nothing on record', () => {
     expect(noDevicesLine({ personId: null, signedOutAt: null }, NOW)).toBe('Not signed in yet — no devices.');
     expect(noDevicesLine({ personId: TAO, signedOutAt: null }, NOW)).toBe('No devices.');
+  });
+});
+
+describe('previewDevices (/verify: a long device list)', () => {
+  const device = (i: number, current = false) => ({
+    id: `d${i}`,
+    name: 'Chrome · macOS',
+    tag: current ? 'This device' : 'Laptop',
+    when: 'Last used today 10:05',
+    current,
+  });
+  it('a short list shows whole', () => {
+    expect(previewDevices([device(1), device(2)])).toEqual({ shown: [device(1), device(2)], hidden: 0 });
+  });
+  it('a long one shows 10, this browser first even when it sorts late, and counts the rest', () => {
+    const many = [...Array.from({ length: 13 }, (_, i) => device(i)), device(99, true)];
+    const { shown, hidden } = previewDevices(many);
+    expect(shown).toHaveLength(10);
+    expect(shown[0]!.current).toBe(true);
+    expect(hidden).toBe(4);
   });
 });

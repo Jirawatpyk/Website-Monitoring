@@ -31,6 +31,7 @@ import {
   devicesWord,
   noDevicesLine,
   oncallWarning,
+  previewDevices,
   securityRows,
   signinEvents,
   signOutCopy,
@@ -112,7 +113,7 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
     },
     {
       key: 'last',
-      label: 'Last sign-in',
+      label: 'Last active',
       width: 188,
       render: (r) => <span className="whitespace-nowrap">{r.last}</span>,
     },
@@ -331,7 +332,7 @@ function PeopleCards({ data, rows, now }: { data: SecurityData; rows: SecurityRo
             key={r.key}
             type="button"
             onClick={() => setOpen(r)}
-            aria-label={`${r.name}, ${ROLE_LABELS[r.role]}${r.oncall?.live ? ', on call now' : ''}, ${devicesWord(r.devices)}${r.last === '—' ? '' : `, last sign-in ${r.last}`}. Show devices`}
+            aria-label={`${r.name}, ${ROLE_LABELS[r.role]}${r.oncall?.live ? ', on call now' : ''}, ${devicesWord(r.devices)}${r.last === '—' ? '' : `, last active ${r.last}`}. Show devices`}
             className={PERSON_CARD}
           >
             <span className="flex min-w-0 grow flex-col gap-0.5 leading-snug">
@@ -382,9 +383,11 @@ function PeopleCards({ data, rows, now }: { data: SecurityData; rows: SecurityRo
 }
 
 function DeviceList({ devices }: { devices: Device[] }) {
+  // A long list shows its first 10 and says how many more (verify finding: 42 test sessions).
+  const { shown, hidden } = previewDevices(devices);
   return (
     <ul className="m-0 flex list-none flex-col rounded-aura-md border border-border-default px-3.5">
-      {devices.map((x) => (
+      {shown.map((x) => (
         <li
           key={x.id}
           className="flex items-center gap-2.5 border-b border-border-subtle py-2.5 text-sm leading-snug last:border-b-0"
@@ -401,6 +404,11 @@ function DeviceList({ devices }: { devices: Device[] }) {
           )}
         </li>
       ))}
+      {hidden > 0 && (
+        <li className="py-2.5 text-xs text-fg-secondary">
+          and {hidden} more {hidden === 1 ? 'device' : 'devices'}
+        </li>
+      )}
     </ul>
   );
 }

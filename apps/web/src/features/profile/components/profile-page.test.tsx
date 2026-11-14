@@ -67,6 +67,31 @@ beforeEach(() => {
 });
 
 describe('ProfilePageView (Profile, MProfile)', () => {
+  it('a long device list shows 10 until Show all (/verify)', async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 13 }, (_, i) => ({
+      id: `x${i}`,
+      userId: ME,
+      userAgent: IPHONE,
+      createdAt: NOW,
+      lastUsed: NOW,
+      current: false,
+    }));
+    render(
+      <ProfilePageView
+        data={{ ...data, sessions: [...data.sessions, ...many] }}
+        now={NOW}
+        signOutAction={signOutAction}
+      />,
+    );
+    const list = screen.getByRole('list', { name: 'Signed-in devices' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(10);
+    expect(within(list).getByText('This device')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show all 15 devices' }));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(15);
+    expect(screen.queryByRole('button', { name: /^Show all/ })).toBeNull();
+  });
+
   it('signs out another device; this browser has no button', async () => {
     const user = userEvent.setup();
     render(<ProfilePageView data={data} now={NOW} signOutAction={signOutAction} />);

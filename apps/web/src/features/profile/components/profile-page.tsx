@@ -21,7 +21,14 @@ import { phoneHeader } from '@/components/phone-header';
 import { MutedOverlay, untilText } from '@/components/site-cells';
 import { SiteStatusBadge } from '@/components/status-badges';
 import { sendTest } from '@/features/oncall';
-import { ChatIdDialog, devicesOf, RoleBadge, signOutDevice, type Device } from '@/features/settings';
+import {
+  ChatIdDialog,
+  devicesOf,
+  previewDevices,
+  RoleBadge,
+  signOutDevice,
+  type Device,
+} from '@/features/settings';
 import {
   canTest,
   channelRows,
@@ -501,6 +508,10 @@ function Devices({ data, now }: { data: ProfileData; now: Date }) {
   // The refresh drops a signed-out session from the list: keep it in its place as "Signed out · now".
   const rows = devices.filter((x) => !goneIds.has(x.id));
   for (const g of [...gone].sort((a, b) => a.at - b.at)) rows.splice(Math.max(g.at, 0), 0, g.device);
+  // A long list shows its first 10, this browser among them, until "Show all" (verify finding, 14 Nov).
+  const [showAll, setShowAll] = useState(false);
+  const preview = previewDevices(rows);
+  const visible = showAll ? rows : preview.shown;
   return (
     <Card title="Signed-in devices" headingLevel={2} description={DEVICES_SUB}>
       <div className="flex flex-col gap-3">
@@ -510,7 +521,7 @@ function Devices({ data, now }: { data: ProfileData; now: Date }) {
           aria-label="Signed-in devices"
           className="m-0 flex list-none flex-col p-0 outline-none"
         >
-          {rows.map((x) => (
+          {visible.map((x) => (
             <li
               key={x.id}
               className="flex min-h-11 items-center gap-2.5 border-b border-border-subtle py-2 text-sm leading-snug last:border-b-0"
@@ -543,6 +554,11 @@ function Devices({ data, now }: { data: ProfileData; now: Date }) {
             </li>
           ))}
         </ul>
+        {!showAll && preview.hidden > 0 && (
+          <Button variant="ghost" size="sm" touchHeight onClick={() => setShowAll(true)}>
+            {`Show all ${rows.length} devices`}
+          </Button>
+        )}
         <span role="status" className="sr-only">
           {gone.length ? `${gone[gone.length - 1]!.device.name} signed out` : ''}
         </span>

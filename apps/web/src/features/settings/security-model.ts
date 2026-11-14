@@ -123,8 +123,8 @@ export function signedOutLabel(at: Date, now: Date): string {
   return `Signed out · ${formatShortPast(at, now)}`;
 }
 
-/** The table's Last sign-in: "Today 07:52", else the short form. */
-const lastSignIn = (at: Date, now: Date) =>
+/** The table's Last active: "Today 07:52", else the short form. */
+const lastActive = (at: Date, now: Date) =>
   isSameBangkokDay(at, now) ? `Today ${formatTime(at)}` : formatShortPast(at, now);
 
 function oncallMark(d: SecurityData, personId: string, now: Date): SecurityRow['oncall'] {
@@ -141,12 +141,12 @@ export function securityRows(d: SecurityData, now: Date): SecurityRow[] {
     .sort((a, b) => ORDER[a.role] - ORDER[b.role] || a.name.localeCompare(b.name))
     .map((p): SecurityRow => {
       const mine = d.sessions.filter((s) => s.userId === p.id);
-      const signIn = mine.map((s) => s.createdAt).sort((a, b) => b.localeCompare(a))[0];
+      const used = mine.map((s) => s.lastUsed).sort((a, b) => b.localeCompare(a))[0];
       const outAt = out.get(p.id);
       const self = p.id === d.viewerId;
       // No session and no sign-out on record: nothing to say (the devices count already says none).
-      const last = signIn
-        ? lastSignIn(new Date(signIn), now)
+      const last = used
+        ? lastActive(new Date(used), now)
         : outAt
           ? signedOutLabel(new Date(outAt), now)
           : '—';
@@ -158,7 +158,7 @@ export function securityRows(d: SecurityData, now: Date): SecurityRow[] {
         oncall: oncallMark(d, p.id, now),
         devices: mine.length,
         last,
-        signedOutAt: signIn ? null : (outAt ?? null),
+        signedOutAt: used ? null : (outAt ?? null),
         action: self ? (mine.length > 1 ? 'others' : null) : mine.length > 0 ? 'all' : null,
       };
     });
@@ -318,4 +318,19 @@ export function noDevicesLine(r: Pick<SecurityRow, 'personId' | 'signedOutAt'>, 
       ? `yesterday at ${when.replace('Yesterday ', '')}`
       : `on ${when.replace(' ', ' at ')}`;
   return `No devices — signed out everywhere ${phrase}.`;
+}
+
+/** How many devices a list shows before folding the rest (verify finding, 14 Nov). */
+export const DEVICE_PREVIEW = 10;
+
+/** The first `limit` devices, this browser always among them, and how many are left out. */
+export function previewDevices(
+  devices: Device[],
+  limit = DEVICE_PREVIEW,
+): { shown: Device[]; hidden: number } {
+  if (devices.length <= limit) return { shown: devices, hidden: 0 };
+  const here = devices.find((x) => x.current);
+  const rest = devices.filter((x) => !x.current);
+  const shown = here ? [here, ...rest.slice(0, limit - 1)] : rest.slice(0, limit);
+  return { shown, hidden: devices.length - shown.length };
 }
