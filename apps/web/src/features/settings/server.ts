@@ -13,8 +13,10 @@ export interface UsersPageData {
 
 /** The Users page for an Admin (S16, D-062). Hand over's On-call data loads when that dialog opens. */
 export async function getUsersPage(viewer: { id: string }, now = new Date()): Promise<UsersPageData> {
+  const env = serverEnv();
+  const emailOn = !!env.RESEND_API_KEY && !!env.ALERT_EMAIL_FROM;
   const data = await loadUsersData(await createClient(), viewer.id, now);
-  return { data, now: now.toISOString() };
+  return { data: { ...data, emailOn }, now: now.toISOString() };
 }
 
 export interface SecurityPageData {

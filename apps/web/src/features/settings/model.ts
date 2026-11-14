@@ -96,6 +96,16 @@ export interface UsersData {
   swaps: SwapRef[];
   /** Open incidents someone acknowledged (info in "Used in"). */
   acks: AckRef[];
+  /** The email provider is set up (D-013): only then does the dialog promise the role-change email. */
+  emailOn?: boolean;
+}
+
+/** The role-change / deactivate dialog's description (spec §14.9, §34). */
+export function changeDialogText(name: string, deactivate: boolean, emailOn: boolean): string {
+  const mail = emailOn ? ` ${name} gets an email saying what changed.` : '';
+  return deactivate
+    ? `${name} loses access at once — every device is signed out — and stops getting alerts and digests. Past acknowledgements and notes stay in the audit log; an Admin can give access back by adding them again.${mail}`
+    : `Takes effect as soon as you confirm.${mail}`;
 }
 
 const canOwn = (role: Role) => role === 'admin' || role === 'responder';

@@ -3,6 +3,7 @@ import {
   blockedBy,
   ceos,
   changeBlockedWhy,
+  changeDialogText,
   gainsLoses,
   missingPicks,
   oncallOf,
@@ -46,6 +47,19 @@ function data(over: Partial<UsersData> = {}): UsersData {
     ...over,
   };
 }
+
+describe('changeDialogText (spec §34, D-013)', () => {
+  it('promises the email only when the email provider is on', () => {
+    expect(changeDialogText('Nok', false, true)).toBe(
+      'Takes effect as soon as you confirm. Nok gets an email saying what changed.',
+    );
+    expect(changeDialogText('Nok', false, false)).toBe('Takes effect as soon as you confirm.');
+    expect(changeDialogText('Bua', true, true)).toMatch(
+      /adding them again\. Bua gets an email saying what changed\.$/,
+    );
+    expect(changeDialogText('Bua', true, false)).not.toMatch(/email/);
+  });
+});
 
 describe('the role matrix (Users / MUsers)', () => {
   it('one role at a time, with its foot', () => {

@@ -20,6 +20,7 @@ import {
   admins,
   blockedBy,
   EMAIL_SHAPE,
+  changeDialogText,
   gainsLoses,
   INVITE_HINTS,
   missingPicks,
@@ -317,11 +318,7 @@ export function RoleDialog({
       onClose={onClose}
       size="md"
       title={deact ? `Deactivate ${person.name}?` : `Change ${person.name}’s role`}
-      description={
-        deact
-          ? `${person.name} loses access at once — every device is signed out — and stops getting alerts and digests. Past acknowledgements and notes stay in the audit log; an Admin can give access back by adding them again.`
-          : 'Takes effect as soon as you confirm.'
-      }
+      description={changeDialogText(person.name, deact, !!data.emailOn)}
       footer={
         <Foot>
           <Button variant="secondary" onClick={onClose}>
