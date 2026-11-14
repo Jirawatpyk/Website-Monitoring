@@ -231,6 +231,8 @@ export const EMAIL_COLORS = {
   buttonBorder: '#8e8e97',
   inverted: '#ffffff',
   accentDot: '#d9f99d',
+  /** The account emails' grey bar (fg-tertiary). */
+  tertiary: '#71717a',
 } as const;
 const C = EMAIL_COLORS;
 
@@ -287,7 +289,13 @@ interface Body {
   lede: string;
   facts: [string, string][];
   buttons: Button[];
+  /** Lists and a table under the facts (the account emails, spec §34); none elsewhere. */
+  sections?: EmailSection[];
 }
+
+export type EmailSection =
+  | { kind: 'list'; title: string; mark: string; color: string; items: string[] }
+  | { kind: 'table'; title: string; head: [string, string]; rows: [string, string][]; notes: string[] };
 
 function render(input: EmailBaseInput, b: Body): EmailMessage {
   const headers: Record<string, string> = input.startsThread
@@ -306,6 +314,58 @@ export interface Envelope {
 
 /** The body every EmailAlert email fills in (shared with the maintenance emails). */
 export type EmailBody = Omit<Body, 'template'>;
+
+const SECTION_TITLE = `font-size:12px;font-weight:700;letter-spacing:0.04em;color:${C.secondary}`;
+
+/** The account emails' lists (a mark per line) and the Place · Now with table, as the board draws them. */
+function sectionsHtml(sections: EmailSection[] | undefined): string {
+  return (sections ?? [])
+    .map((sec) => {
+      const title = `<div style="margin-top:18px;${SECTION_TITLE}">${escapeHtml(sec.title)}</div>`;
+      if (sec.kind === 'list') {
+        const items = sec.items
+          .map(
+            (i) =>
+              `<tr><td style="width:16px;padding:3px 8px 3px 0;vertical-align:top;font-size:14px;line-height:1.5;font-weight:700;color:${sec.color}">${escapeHtml(sec.mark)}</td>` +
+              `<td style="padding:3px 0;vertical-align:top;font-size:14px;line-height:1.5;color:${C.primary}">${escapeHtml(i)}</td></tr>`,
+          )
+          .join('');
+        return `${title}\n<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px">${items}</table>\n`;
+      }
+      const cell = (text: string, last: boolean, strong: boolean) =>
+        `<td style="padding:7px ${last ? 0 : 12}px 7px 0;${last ? 'width:96px;' : ''}vertical-align:top;font-size:13px;line-height:1.45;color:${C.primary};${strong ? 'font-weight:600;' : ''}border-bottom:1px solid ${C.borderSubtle}">${escapeHtml(text)}</td>`;
+      const head = sec.head
+        .map(
+          (h, i) =>
+            `<td style="padding:6px ${i ? 0 : 12}px 6px 0;font-size:12px;color:${C.secondary};border-bottom:1px solid ${C.border}">${escapeHtml(h)}</td>`,
+        )
+        .join('');
+      const rows = sec.rows
+        .map(([p, w]) => `<tr>${cell(p, false, false)}${cell(w, true, true)}</tr>`)
+        .join('');
+      const notes = sec.notes
+        .map(
+          (n) =>
+            `<div style="margin-top:6px;font-size:13px;line-height:1.5;color:${C.secondary}">${escapeHtml(n)}</div>`,
+        )
+        .join('');
+      const table = sec.rows.length
+        ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px;border-top:1px solid ${C.border}"><tr>${head}</tr>${rows}</table>`
+        : '';
+      return `${title}\n${table}${notes}\n`;
+    })
+    .join('');
+}
+
+function sectionsText(sections: EmailSection[] | undefined): string[] {
+  return (sections ?? []).flatMap((sec) => [
+    sec.title,
+    ...(sec.kind === 'list'
+      ? sec.items.map((i) => `${sec.mark} ${i}`)
+      : [...sec.rows.map(([p, w]) => `${p} · ${w}`), ...sec.notes]),
+    '',
+  ]);
+}
 
 /** The EmailAlert layout: status bar, label, headline, lede, facts table, buttons, footer. */
 export function emailLayout({ subject, why, footer, headers }: Envelope, b: EmailBody): EmailMessage {
@@ -340,7 +400,7 @@ export function emailLayout({ subject, why, footer, headers }: Envelope, b: Emai
 <div style="margin-top:6px;font-size:26px;line-height:1.25;font-weight:700;color:${C.primary}">${escapeHtml(b.headline)}</div>
 <div style="margin-top:6px;font-size:14px;line-height:1.5;color:${C.secondary}">${escapeHtml(b.lede)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border-top:1px solid ${C.border}">${facts}</table>
-<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:16px"><tr>${buttons}
+${sectionsHtml(b.sections)}<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:16px"><tr>${buttons}
 <td style="padding-left:6px"><span style="display:inline-block;padding:4px 8px;border-radius:4px;background:${C.primary};color:${C.inverted};font-size:13px;font-weight:700">DxT <span style="color:${C.accentDot}">&#9679;</span></span></td></tr></table>
 </td></tr></table>
 </td></tr>
@@ -355,6 +415,7 @@ export function emailLayout({ subject, why, footer, headers }: Envelope, b: Emai
     '',
     ...b.facts.map(([k, v]) => `${k}: ${v}`),
     '',
+    ...sectionsText(b.sections),
     ...(b.buttons.length ? [...b.buttons.map((btn) => `${btn.label}: ${btn.href}`), ''] : []),
     '--',
     why,

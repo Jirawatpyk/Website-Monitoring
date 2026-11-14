@@ -14,3 +14,4 @@ export * from './maintenance-alerts';
 export * from './oncall-alerts';
 export * from './reports';
 export * from './series-alerts';
+export * from './account-alerts';
