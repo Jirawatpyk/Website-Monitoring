@@ -1,7 +1,7 @@
 # Brief for Claude Design: the role-change email (an EmailAlert addition)
 
 **Board to add to:** `EmailAlert` (light and dark, desktop mail client and phone mail client), as one more template beside the alert and maintenance emails.
-**Built in:** S16 (D-062 item 9), sent by `packages/notifier`.
+**Built in:** S16 (D-062 item 10), sent by `packages/notifier`.
 
 ## When it goes
 
