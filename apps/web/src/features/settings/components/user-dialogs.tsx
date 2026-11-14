@@ -1,18 +1,19 @@
 'use client';
 
-import { Alert, Badge, Button, Dialog, Select, TextField, Textarea } from '@jirawatpyk/aura-react';
+import { Alert, Button, Dialog, Select, TextField, Textarea } from '@jirawatpyk/aura-react';
 import {
   IconArrowRight,
   IconBan,
   IconCheck,
   IconCircleCheck,
   IconInfo,
-  IconMail,
+  IconMinus,
+  IconPlus,
   IconTriangleAlert,
 } from '@jirawatpyk/aura-react/icons';
-import { ROLE_LABELS } from '@dxt/shared';
+import { ROLE_LABELS, type Role } from '@dxt/shared';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { changeUserRole, deactivateUser, inviteUser, revokeInvite, setChatId } from '../actions';
 import type { UsersResult } from '../mutations';
 import {
@@ -32,6 +33,7 @@ import {
   type Target,
   type UsersData,
 } from '../model';
+import { RoleBadge } from './role-badge';
 
 const FAILED = 'Couldn’t save. Check your connection and try again.';
 
@@ -122,7 +124,7 @@ export function InviteDialog({
             Cancel
           </Button>
           <Button
-            icon={<IconMail />}
+            icon={<IconPlus />}
             loading={pending}
             onClick={() => {
               if (!shapeOk) return setTried(true);
@@ -146,15 +148,13 @@ export function InviteDialog({
           error={tried && !shapeOk ? 'Enter their primary Google address, e.g. name@company' : undefined}
           required
         />
-        <div className="flex flex-col gap-1.5">
-          <Select
-            label="Role"
-            options={roleOptions(STAFF_ROLES)}
-            value={role}
-            onChange={(e) => setRole(e.target.value as StaffRole)}
-          />
-          <span className="text-xs text-fg-secondary">{INVITE_HINTS[role]}</span>
-        </div>
+        <Select
+          label="Role"
+          options={roleOptions(STAFF_ROLES)}
+          value={role}
+          onChange={(e) => setRole(e.target.value as StaffRole)}
+          hint={INVITE_HINTS[role]}
+        />
         <Alert tone="info" title="Before they sign in">
           Ask them to open their Google account’s 2-Step Verification page and check it says it’s on and
           required by DxT. Google enforces it; Monitor doesn’t check.
@@ -233,6 +233,9 @@ export function RevokeDialog({
 
 // ── Change role / Deactivate (one dialog, §14.9) ──────────────────────────────────────────────────
 
+/** The board's first pick (Users `openRole`): Responder ↔ Viewer, anyone else → Viewer — never Admin. */
+const defaultTarget = (role: Role | undefined): StaffRole => (role === 'viewer' ? 'responder' : 'viewer');
+
 export function RoleDialog({
   data,
   person,
@@ -250,20 +253,24 @@ export function RoleDialog({
 }) {
   const current = person?.role ?? 'viewer';
   const choices = STAFF_ROLES.filter((r) => r !== current);
-  const [newRole, setNewRole] = useState<StaffRole>(choices[choices.length - 1] ?? 'viewer');
+  const [newRole, setNewRole] = useState<StaffRole>(defaultTarget(person?.role));
   const [picks, setPicks] = useState<Picks>({});
-  const [tried, setTried] = useState(false);
-  // A different person or mode starts afresh (derive-from-props, S15).
-  // Keyed by the role too: reopened after a change, the dialog starts from the role they have now.
+  const [tried, setTried] = useState(0);
+  // A different person or mode starts afresh (derive-from-props, S15). Keyed by the role too:
+  // reopened after a change, the dialog starts from the role they have now.
   const key = `${person?.id}:${person?.role}:${mode}`;
   const [seen, setSeen] = useState(key);
   if (seen !== key) {
     setSeen(key);
-    const next = STAFF_ROLES.filter((r) => r !== (person?.role ?? 'viewer'));
-    setNewRole(person?.role === 'responder' ? 'viewer' : (next[0] ?? 'viewer'));
+    setNewRole(defaultTarget(person?.role));
     setPicks({});
-    setTried(false);
+    setTried(0);
   }
+  // A save with picks missing moves focus to the first one (apps/web CLAUDE.md, focus moves).
+  const body = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (tried) body.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [tried]);
   const deact = mode === 'deactivate';
   const target: Target = deact ? 'deactivated' : newRole;
   const items = person ? usageOf(data, person.id, target, now) : [];
@@ -280,9 +287,9 @@ export function RoleDialog({
     key,
   );
   if (!person) return <Dialog open={false} onClose={onClose} title="" />;
-  const setPick = (key: string, value: string) => setPicks((p) => ({ ...p, [key]: value }));
+  const setPick = (k: string, value: string) => setPicks((p) => ({ ...p, [k]: value }));
   const save = () => {
-    if (missing.length || blocked.length) return setTried(true);
+    if (missing.length || blocked.length) return setTried((n) => n + 1);
     const reassign = reassignPayload(picks);
     run(() =>
       deact
@@ -291,11 +298,12 @@ export function RoleDialog({
     );
   };
   const secondAdmin = !deact && newRole === 'admin' && admins(data).length === 1;
+  const nobody = 'Nobody else can take this — give an active Admin or Responder a Chat id first.';
   return (
     <Dialog
       open
       onClose={onClose}
-      size="lg"
+      size="md"
       title={deact ? `Deactivate ${person.name}?` : `Change ${person.name}’s role`}
       description={
         deact
@@ -319,15 +327,13 @@ export function RoleDialog({
         </Foot>
       }
     >
-      <div className="flex flex-col gap-5">
+      <div ref={body} className="flex flex-col gap-5">
         {!deact && (
           <>
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex flex-col gap-1">
                 <span className="text-xs text-fg-secondary">Current role</span>
-                <Badge tone="neutral" variant="outline">
-                  {ROLE_LABELS[current]}
-                </Badge>
+                <RoleBadge role={current} />
               </div>
               <IconArrowRight aria-hidden className="mb-1 text-fg-tertiary" />
               <div className="min-w-48">
@@ -338,14 +344,14 @@ export function RoleDialog({
                   onChange={(e) => {
                     setNewRole(e.target.value as StaffRole);
                     setPicks({});
-                    setTried(false);
+                    setTried(0);
                   }}
                 />
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <List title="GAINS" items={gains} empty="Nothing new" />
-              <List title="LOSES" items={loses} empty="Nothing" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <List title="GAINS" sign="plus" items={gains} empty="Nothing new" />
+              <List title="LOSES" sign="minus" items={loses} empty="Nothing" />
             </div>
             {secondAdmin && (
               <Alert tone="info" title="Adds a second active Admin">
@@ -354,9 +360,11 @@ export function RoleDialog({
             )}
           </>
         )}
-        <section className="flex flex-col gap-3" aria-label="Used in">
+        <section className="flex flex-col gap-3" aria-labelledby="used-in-h">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="m-0 font-mono text-xs text-fg-tertiary">USED IN</h3>
+            <h3 id="used-in-h" className="m-0 font-mono text-xs font-normal text-fg-tertiary">
+              USED IN
+            </h3>
             <span className="text-xs text-fg-secondary">{usageSummary(items)}</span>
           </div>
           {items.length === 0 && (
@@ -392,18 +400,21 @@ export function RoleDialog({
                     Pick per site. Owner and backup must be different people, so each list leaves out the
                     person already on that site.
                   </span>
-                  {i.sites.map((s) => (
-                    <Select
-                      key={s.key}
-                      label={s.site}
-                      hint={s.hint}
-                      placeholder="Pick a person"
-                      options={s.options}
-                      value={picks[s.key] ?? ''}
-                      onChange={(e) => setPick(s.key, e.target.value)}
-                      error={tried && !picks[s.key] ? 'Pick a person' : undefined}
-                    />
-                  ))}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {i.sites.map((s) => (
+                      <Select
+                        key={s.key}
+                        label={s.site}
+                        hint={s.options.length ? s.hint : nobody}
+                        placeholder="Pick a person"
+                        options={s.options}
+                        value={picks[s.key] ?? ''}
+                        onChange={(e) => setPick(s.key, e.target.value)}
+                        error={tried && !picks[s.key] ? 'Pick a person' : undefined}
+                        required
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
               {i.pick && (
@@ -413,7 +424,9 @@ export function RoleDialog({
                   options={i.pick.options}
                   value={picks[i.pick.key] ?? ''}
                   onChange={(e) => setPick(i.pick!.key, e.target.value)}
+                  hint={i.pick.options.length ? undefined : nobody}
                   error={tried && !picks[i.pick.key] ? 'Pick who takes this over' : undefined}
+                  required
                 />
               )}
             </div>
@@ -425,14 +438,28 @@ export function RoleDialog({
   );
 }
 
-function List({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+function List({
+  title,
+  sign,
+  items,
+  empty,
+}: {
+  title: string;
+  sign: 'plus' | 'minus';
+  items: string[];
+  empty: string;
+}) {
+  const Mark = sign === 'plus' ? IconPlus : IconMinus;
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 rounded-aura-md border border-border-default p-3">
       <span className="font-mono text-xs text-fg-tertiary">{title}</span>
       {items.length ? (
-        <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-sm">
+        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
           {items.map((t) => (
-            <li key={t}>{t}</li>
+            <li key={t} className="flex gap-1.5">
+              <Mark size="sm" aria-hidden className="mt-0.5 shrink-0 text-fg-secondary" />
+              <span>{t}</span>
+            </li>
           ))}
         </ul>
       ) : (
@@ -454,18 +481,20 @@ export function ChatIdDialog({
   onDone: (line: string) => void;
 }) {
   const [value, setValue] = useState('');
+  // Clearing an id takes a second press that says what it does (§13: a confirm names the effect).
+  const [clearing, setClearing] = useState(false);
   const [seen, setSeen] = useState(person?.id);
   if (seen !== person?.id) {
     setSeen(person?.id);
     setValue('');
+    setClearing(false);
   }
   const { error, pending, run } = useSubmit(
-    () => onDone(`${person?.name}’s Chat id ${value.trim() ? 'saved' : 'cleared'} · logged`),
+    () => onDone(`${person?.name}’s Chat id ${clearing ? 'cleared' : 'saved'} · logged`),
     person?.id ?? '',
   );
-  const digits = /^\d*$/.test(value.trim());
-  // Empty clears an id; with none to clear there is nothing to save (and nothing would be logged).
-  const nothing = !value.trim() && !person?.chatLinked;
+  const id = value.trim();
+  const digits = /^\d*$/.test(id);
   return (
     <Dialog
       open={!!person}
@@ -473,34 +502,56 @@ export function ChatIdDialog({
       title={`${person?.name ?? ''}’s Google Chat id`}
       description={
         person?.chatLinked
-          ? 'They have one. A new id replaces it; leave it empty to clear it.'
+          ? 'They have one. A new id replaces it.'
           : 'Owners and backups need one: alerts @mention them in Chat by it.'
       }
       footer={
         <Foot>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
+          {person?.chatLinked && !clearing && (
+            <Button variant="ghost" onClick={() => setClearing(true)}>
+              Clear Chat id…
+            </Button>
+          )}
+          <Button variant="secondary" onClick={clearing ? () => setClearing(false) : onClose}>
+            {clearing ? 'Keep it' : 'Cancel'}
           </Button>
-          <Button
-            loading={pending}
-            disabled={!digits || nothing}
-            onClick={() => person && run(() => setChatId({ userId: person.id, chatId: value.trim() }))}
-          >
-            Save
-          </Button>
+          {clearing ? (
+            <Button
+              variant="danger"
+              loading={pending}
+              onClick={() => person && run(() => setChatId({ userId: person.id, chatId: '' }))}
+            >
+              Clear Chat id
+            </Button>
+          ) : (
+            <Button
+              loading={pending}
+              disabled={!id || !digits}
+              onClick={() => person && run(() => setChatId({ userId: person.id, chatId: id }))}
+            >
+              Save
+            </Button>
+          )}
         </Foot>
       }
     >
       <div className="flex flex-col gap-4">
-        <TextField
-          label="Chat user id"
-          inputMode="numeric"
-          autoComplete="off"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          hint="Digits only. In Google Chat, open the person’s profile in the Alerts Space; the number after users/ in its link is the id."
-          error={digits ? undefined : 'A Chat user id is digits only'}
-        />
+        {clearing ? (
+          <Alert tone="warning" title={`Clear ${person?.name ?? ''}’s Chat id?`}>
+            {person?.name} stops getting @mentions in Chat. Sites they own or back up need an id, so this is
+            refused while they own a live site.
+          </Alert>
+        ) : (
+          <TextField
+            label="Chat user id"
+            inputMode="numeric"
+            autoComplete="off"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            hint="Digits only. In Google Chat, open the person’s profile in the Alerts Space; the number after users/ in its link is the id. Save unlocks once there is one."
+            error={digits ? undefined : 'A Chat user id is digits only'}
+          />
+        )}
         <Refusal error={error} />
       </div>
     </Dialog>

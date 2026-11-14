@@ -68,6 +68,8 @@ describe('UsersPageView (Users, MUsers)', () => {
     expect(within(dialog).getByText('Owner of 1 site')).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Change to Viewer' }));
     expect(actions.changeUserRole).not.toHaveBeenCalled();
+    // Focus moves to the first pick still missing.
+    await waitFor(() => expect(document.activeElement).toHaveAttribute('aria-invalid', 'true'));
     expect(
       within(dialog)
         .getAllByText('Pick a person')
@@ -104,7 +106,7 @@ describe('UsersPageView (Users, MUsers)', () => {
   it('the invite dialog asks for the primary address and reminds about 2-Step (D-007)', async () => {
     render(<UsersPageView data={data} now={NOW} />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Invite user' }));
+    await user.click(screen.getByRole('button', { name: 'Add person' }));
     const dialog = await screen.findByRole('dialog', { name: 'Add someone to Monitor' });
     expect(
       within(dialog).getByText('The person’s primary Google address — not a DxT alias.'),

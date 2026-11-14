@@ -22,7 +22,7 @@ test.describe('users & roles (local Supabase)', () => {
     await ensureUser('tao@example.test');
     await signIn(context, baseURL!, 'tao@example.test');
     await page.goto('/settings/users');
-    await page.getByRole('button', { name: 'Invite user' }).click();
+    await page.getByRole('button', { name: 'Add person' }).click();
     const dialog = page.getByRole('dialog', { name: 'Add someone to Monitor' });
     await expect(dialog.getByText('not a DxT alias')).toBeVisible();
     await dialog.getByLabel('Primary Google address').fill(email);
@@ -130,7 +130,7 @@ test.describe('users & roles (local Supabase)', () => {
     await signIn(context, baseURL!, 'tao@example.test');
     await page.goto('/settings/users');
     await expect(page.getByText('View only on phones.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Invite user' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Add person' })).toBeHidden();
     await page.getByRole('button', { name: /^Nok, Responder, .*Show details$/ }).click();
     const sheet = page.getByRole('dialog', { name: 'Nok' });
     await expect(sheet.getByText('Roles and reassignments change on a larger screen.')).toBeVisible();

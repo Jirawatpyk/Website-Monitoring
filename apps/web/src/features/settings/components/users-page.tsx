@@ -44,25 +44,14 @@ import {
   type UserRow,
   type UsersData,
 } from '../model';
+import { RoleBadge } from './role-badge';
 import { SettingsHeader } from './settings-header';
 import { loadHandover } from '../actions';
 import { ChatIdDialog, InviteDialog, RevokeDialog, RoleDialog } from './user-dialogs';
 
-const VARIANT: Record<Role, 'solid' | 'soft' | 'outline'> = {
-  admin: 'solid',
-  responder: 'soft',
-  stakeholder: 'outline',
-  viewer: 'soft',
-  client: 'outline',
-};
-
-function RoleBadge({ role }: { role: Role }) {
-  return (
-    <Badge tone="neutral" variant={VARIANT[role]}>
-      {ROLE_LABELS[role]}
-    </Badge>
-  );
-}
+/** A section's h2: MUsers' mono caps on a phone, Site detail's 24 px heading from md. */
+const HEADING =
+  'm-0 font-mono text-xs font-normal text-fg-tertiary md:font-sans md:text-2xl md:font-semibold md:text-fg-primary';
 
 type Open =
   | { kind: 'invite' }
@@ -80,7 +69,8 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
   const rows = userRows(data, now);
   const banner = oneAdminBanner(data);
   const [open, setOpen] = useState<Open>(null);
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<{ text: string; ok: boolean } | null>(null);
+  const [loadingHandover, setLoadingHandover] = useState(false);
   // Hand over's On-call data, read when that dialog opens (S16 code review).
   const [oncall, setOncall] = useState<OncallData | null>(null);
   // Focus goes back to the row's ⋯ once its dialog closes (the trigger, S05 /verify).
@@ -95,7 +85,7 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
   }, [open]);
   const close = () => setOpen(null);
   const finish = (line: string) => {
-    setDone(line);
+    setDone({ text: line, ok: true });
     setOpen(null);
   };
   const personOf = (r: UserRow) => data.people.find((p) => p.id === r.personId) ?? null;
@@ -132,12 +122,27 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
         ? [
             {
               label: 'Hand over shift…',
+              disabled: loadingHandover,
               onSelect: () => {
                 focusKey.current = r.key;
-                void loadHandover().then((d) => {
-                  setOncall(d);
-                  if (d) setOpen({ kind: 'handover', person: p });
-                });
+                setLoadingHandover(true);
+                loadHandover()
+                  .then((d) => {
+                    setOncall(d);
+                    if (d) setOpen({ kind: 'handover', person: p });
+                    else
+                      setDone({
+                        text: 'Couldn’t open Hand over — reload the page and try again.',
+                        ok: false,
+                      });
+                  })
+                  .catch(() =>
+                    setDone({
+                      text: 'Couldn’t load the on-call weeks. Check your connection and try again.',
+                      ok: false,
+                    }),
+                  )
+                  .finally(() => setLoadingHandover(false));
               },
             },
           ]
@@ -159,17 +164,19 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
       key: 'name',
       label: 'Name',
       grow: 1,
+      // 820 keeps Owner · backup and Last active (Tao, 14 Nov): the name gives way and truncates.
+      minWidth: 150,
       render: (r) => (
         <span className="flex min-w-0 items-center gap-3">
           <Avatar name={r.name} size="sm" />
           <span className="flex min-w-0 flex-col leading-snug">
-            <span className="font-medium">{r.name}</span>
+            <span className="truncate font-medium">{r.name}</span>
             <span className="truncate text-xs text-fg-secondary">{r.sub}</span>
           </span>
         </span>
       ),
     },
-    { key: 'role', label: 'Role', width: 120, render: (r) => <RoleBadge role={r.role} /> },
+    { key: 'role', label: 'Role', width: 116, render: (r) => <RoleBadge role={r.role} /> },
     {
       key: 'channels',
       label: 'Alert channels',
@@ -181,23 +188,27 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
     {
       key: 'owns',
       label: 'Owner · backup',
-      width: 120,
-      hideBelow: 980,
+      width: 112,
       render: (r) => <span className="tabular-nums">{r.owns}</span>,
     },
     {
       key: 'oncall',
       label: 'On-call',
-      width: 160,
+      width: 144,
       render: (r) => (
         <span className={r.oncall.live ? 'font-semibold' : 'text-fg-secondary'}>{r.oncall.text}</span>
       ),
     },
-    { key: 'last', label: 'Last active', width: 140, hideBelow: 780, render: (r) => r.last },
+    {
+      key: 'last',
+      label: 'Last active',
+      width: 136,
+      render: (r) => <span className="whitespace-nowrap">{r.last}</span>,
+    },
     {
       key: 'actions',
       label: '',
-      width: 56,
+      width: 48,
       actions: true,
       render: (r) => (
         <DropdownMenu
@@ -224,7 +235,7 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
         actions={
           <span className="hidden md:inline-flex">
             <Button icon={<IconPlus />} onClick={() => setOpen({ kind: 'invite' })}>
-              Invite user
+              Add person
             </Button>
           </span>
         }
@@ -242,16 +253,17 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
         </Alert>
       )}
       <section className="flex flex-col gap-3" aria-labelledby="people-h">
-        <div className="flex flex-col gap-1">
-          <h2 id="people-h" className="m-0 hidden text-lg font-semibold md:block">
-            Users
+        <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
+          <h2 id="people-h" className={HEADING}>
+            <span className="md:hidden">PEOPLE · {rows.length}</span>
+            <span className="hidden md:inline">Users</span>
           </h2>
           <span
             role="status"
             data-testid="users-count"
-            className={`text-sm leading-normal ${done ? 'text-fg-positive' : 'text-fg-secondary'}`}
+            className={`text-sm leading-normal ${done ? (done.ok ? 'text-fg-positive' : 'text-fg-danger') : 'text-fg-secondary'}`}
           >
-            {done ?? countLine(data)}
+            {done?.text ?? countLine(data)}
           </span>
         </div>
         <div ref={tableRef} className="hidden md:block">
@@ -260,13 +272,15 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
         <PeopleCards data={data} rows={rows} />
       </section>
       <section className="flex flex-col gap-3" aria-labelledby="roles-h">
-        <h2 id="roles-h" className="m-0 hidden text-lg font-semibold md:block">
-          What each role can do
-        </h2>
-        <span className="font-mono text-xs text-fg-tertiary md:hidden">WHAT EACH ROLE CAN DO</span>
-        <p className="m-0 hidden text-sm text-fg-secondary md:block">
-          “Own” = sites where the person is primary or backup owner, or clients where they are Site AM.
-        </p>
+        <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
+          <h2 id="roles-h" className={HEADING}>
+            <span className="md:hidden">WHAT EACH ROLE CAN DO</span>
+            <span className="hidden md:inline">What each role can do</span>
+          </h2>
+          <p className="m-0 hidden text-sm text-fg-secondary md:block">
+            “Own” = sites where the person is primary or backup owner, or clients where they are Site AM.
+          </p>
+        </div>
         <div className="hidden md:block">
           <MatrixTable />
         </div>
@@ -330,7 +344,7 @@ function MatrixTable() {
             <Tr key={row.label}>
               <Td>{row.label}</Td>
               {row.cells.map((c, i) => (
-                <Td key={i}>
+                <Td key={i} className="text-center">
                   <Mark cell={c} />
                 </Td>
               ))}
@@ -356,7 +370,7 @@ function Mark({ cell }: { cell: string }) {
       </span>
     );
   return (
-    <span className="flex flex-col gap-0.5">
+    <span className="inline-flex items-start gap-1.5 text-left">
       <span className="text-fg-secondary">
         <IconCheck size="sm" aria-label="Allowed with limits" />
       </span>
@@ -424,7 +438,6 @@ function PeopleCards({ data, rows }: { data: UsersData; rows: UserRow[] }) {
   const facts = shown ? sheetFacts(data, shown) : [];
   return (
     <div className="flex flex-col gap-2 md:hidden">
-      <span className="font-mono text-xs text-fg-tertiary">PEOPLE · {rows.length}</span>
       <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
         {rows.map((r) => (
           <button
