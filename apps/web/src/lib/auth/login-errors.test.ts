@@ -16,6 +16,7 @@ describe('loginErrorFromCallback — Supabase refusals sent back to /auth/callba
       'error=server_error&error_description=Only+DxT+Google+accounts+can+sign+in.+Ask+an+Admin+if+you+need+access.',
       'domain',
     ],
+    ['error=access_denied&error_description=User+is+banned', 'deactivated'],
     ['error=access_denied&error_description=User+cancelled', 'auth'],
     ['error=server_error', 'auth'],
   ])('%s → %s', (query, expected) => {

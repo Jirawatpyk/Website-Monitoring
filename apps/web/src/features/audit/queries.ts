@@ -175,6 +175,8 @@ async function entriesOf(
       category: categoryOf(r.action),
       entity:
         (r.entity_id && labels.get(`${r.entity}:${r.entity_id}`)) ||
+        // A person (Access rows) is named by their profile.
+        (r.entity === 'user' && r.entity_id && people.get(r.entity_id)) ||
         // A window or series removed since still names its site from the entry itself.
         siteOfRow(r, labels) ||
         entityFallback(r.entity, r.before, r.after),

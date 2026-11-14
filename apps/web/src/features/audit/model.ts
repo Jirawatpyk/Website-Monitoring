@@ -205,6 +205,17 @@ export const ACTION_WORDS: Record<string, string> = {
   'oncall.swap_approve': 'Approved swap',
   'oncall.swap_admin_decline': 'Declined swap (Admin)',
   'oncall.swap_expire': 'Swap expired',
+  // Access (S16, D-062)
+  'user.invite': 'Invited',
+  'user.invite_revoke': 'Revoked invite',
+  'user.reactivate': 'Gave access back',
+  'user.role_change': 'Changed role',
+  'user.deactivate': 'Deactivated',
+  'profile.chat_id': 'Changed Chat id',
+  'session.sign_out_all': 'Signed out everywhere',
+  'session.sign_out_others': 'Signed out other devices',
+  'session.sign_out_device': 'Signed out a device',
+  'signin.refused': 'Refused sign-in',
 };
 
 export function wordsOf(action: string): string {
@@ -696,6 +707,11 @@ export function entityFallback(entity: string, before: Json | null, after: Json 
   }
   if (entity === 'escalation') return 'Escalation policies';
   if (entity === 'oncall_rotation') return 'On-call rotation';
+  // An invite or a refused sign-in has no person yet: its address, or the domain (D-062 item 7).
+  if ((entity === 'user' || entity === 'signin') && side) {
+    if (typeof side.email === 'string') return side.email;
+    if (typeof side.domain === 'string') return `an address @${side.domain}`;
+  }
   if (side) {
     const n = nameOf(side);
     if (n !== 'removed') return n;

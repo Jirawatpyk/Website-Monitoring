@@ -57,6 +57,14 @@ describe('readAccess', () => {
     expect(await readAccess(client)).toEqual({ status: expected, email: 'former@example.test' });
   });
 
+  it('a token whose session is gone is ended (D-062 item 5)', async () => {
+    const client = fakeClient({
+      claims: { sub: 'u1', email: 'a@example.test' },
+      access: { status: 'ended', ...none },
+    });
+    expect(await readAccess(client)).toEqual({ status: 'ended' });
+  });
+
   it('throws when the access call fails (never treats an error as access)', async () => {
     const client = fakeClient({ claims: { sub: 'u1' }, error: { message: 'down' } });
     await expect(readAccess(client)).rejects.toThrow(/Could not read access/);

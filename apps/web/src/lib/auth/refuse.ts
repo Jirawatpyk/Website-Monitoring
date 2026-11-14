@@ -14,6 +14,11 @@ export async function refuse(
   access: Exclude<Access, { status: 'active' }>,
   origin: string,
 ): Promise<Response> {
+  // Signed out elsewhere: clear this browser's cookies and go back to the Google sign-in, no refusal.
+  if (access.status === 'ended') {
+    await supabase.auth.signOut({ scope: 'local' });
+    return NextResponse.redirect(new URL('/login', origin));
+  }
   const reason: LoginError =
     access.status === 'inactive' ? 'deactivated' : access.status === 'missing' ? 'access' : 'auth';
   if (access.status !== 'signed-out') {

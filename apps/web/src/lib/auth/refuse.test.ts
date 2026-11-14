@@ -27,6 +27,13 @@ describe('refuse', () => {
     expect(jar.set).not.toHaveBeenCalled();
   });
 
+  it('a session signed out elsewhere clears this browser and shows the sign-in, no refusal', async () => {
+    const res = await refuse(client, { status: 'ended' }, 'http://x');
+    expect(res.headers.get('location')).toBe('http://x/login');
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(jar.set).not.toHaveBeenCalled();
+  });
+
   it('has nothing to sign out when there is no session', async () => {
     const res = await refuse(client, { status: 'signed-out' }, 'http://x');
     expect(res.headers.get('location')).toBe('http://x/login?error=auth');

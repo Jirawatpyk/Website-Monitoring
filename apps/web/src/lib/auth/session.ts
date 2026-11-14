@@ -12,13 +12,15 @@ export interface CurrentProfile {
 
 /**
  * What the signed-in person may do, once per request (D-007): `active` with their profile, or why
- * not — `inactive` (deactivated by an Admin), `missing` (no profile: never on the allowlist) or
+ * not — `inactive` (deactivated by an Admin), `missing` (no profile: never on the allowlist), `ended`
+ * (the token outlived its session: signed out on another device or by an Admin, D-062 item 5) or
  * `signed-out`. RLS hides an inactive profile, so status and profile come from `my_access()` —
  * one database call per request.
  */
 export type Access =
   | { status: 'active'; profile: CurrentProfile }
   | { status: 'inactive' | 'missing'; email: string | null }
+  | { status: 'ended' }
   | { status: 'signed-out' };
 
 export async function readAccess(supabase: ServerClient): Promise<Access> {
@@ -35,6 +37,7 @@ export async function readAccess(supabase: ServerClient): Promise<Access> {
       profile: { id: data.id, email: data.email, displayName: data.display_name, role: data.role },
     };
   }
+  if (data.status === 'ended') return { status: 'ended' };
   return { status: data.status === 'inactive' ? 'inactive' : 'missing', email };
 }
 
