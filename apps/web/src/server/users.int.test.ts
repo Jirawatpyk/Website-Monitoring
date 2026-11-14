@@ -154,3 +154,39 @@ describe('invite → sign in, deactivate (Done-when 1)', () => {
     expect(error).toBeNull();
   });
 });
+
+describe('two Admins demoting each other at once (review M1)', () => {
+  it('one of them stays an Admin', async () => {
+    const a = `s16-a-${run}@example.test`;
+    const b = `s16-b-${run}@example.test`;
+    const ids: string[] = [];
+    for (const email of [a, b]) {
+      await must(asAdmin.rpc('invite_user', { p_email: email, p_role: 'admin' }));
+      const { data, error } = await newClient().auth.signUp({ email, password: PASSWORD });
+      if (error) throw new Error(error.message);
+      ids.push(data.user!.id);
+    }
+    const [asA, asB] = [await signIn(a), await signIn(b)];
+    // Tao steps aside for the race: only A and B are Admins (put back below).
+    const others = await must(db.from('profiles').select('id').eq('role', 'admin').eq('is_active', true));
+    const away = others.map((p) => p.id).filter((id) => !ids.includes(id));
+    await must(db.from('profiles').update({ is_active: false }).in('id', away).select('id'));
+    try {
+      const results = await Promise.all([
+        asA.rpc('change_user_role', { p_user_id: ids[1]!, p_role: 'viewer' }),
+        asB.rpc('change_user_role', { p_user_id: ids[0]!, p_role: 'viewer' }),
+      ]);
+      expect(results.filter((r) => r.error === null)).toHaveLength(1);
+      const { count } = await db
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .in('id', ids)
+        .eq('role', 'admin');
+      expect(count).toBe(1);
+    } finally {
+      await must(db.from('profiles').update({ is_active: true }).in('id', away).select('id'));
+      // The run's two people leave as they came: inactive, off the list.
+      await must(db.from('profiles').update({ is_active: false, role: 'viewer' }).in('id', ids).select('id'));
+    }
+  });
+});

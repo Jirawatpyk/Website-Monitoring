@@ -18,6 +18,21 @@
 set local lock_timeout = '5s';
 
 -- ── Shared guards ─────────────────────────────────────────────────────────
+-- False once the token's session was deleted (signed out elsewhere, deactivated). A token without a
+-- session_id claim (tests, scripts) counts as alive. The PK lookup runs once per call.
+create function private.session_alive()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select (select auth.jwt() ->> 'session_id') is null
+      or exists (select 1 from auth.sessions s where s.id = (select (auth.jwt() ->> 'session_id')::uuid));
+$$;
+revoke execute on function private.session_alive() from public, anon, authenticated;
+
+-- An Admin on a live session: the Users functions stop at once when that session is signed out.
 create function private.require_admin(p_message text)
 returns void
 language plpgsql
@@ -26,7 +41,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if coalesce(public.current_app_role() = 'admin', false) is not true then
+  if coalesce(public.current_app_role() = 'admin', false) is not true or not private.session_alive() then
     raise exception '%', p_message using errcode = '42501';
   end if;
 end;
@@ -48,6 +63,23 @@ end;
 $$;
 revoke execute on function private.staff_role(public.app_role) from public, anon, authenticated;
 
+-- One change to people at a time: two Admins demoting each other at once would both see the other
+-- as an Admin (review M1). Then the on-call lock, before any profile, swap or shift row, in the order
+-- the on-call cron takes them (review M2: deadlock). The caller's role is read again after them.
+create function private.lock_people(p_message text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform pg_advisory_xact_lock(hashtext('user_access'));
+  perform pg_advisory_xact_lock(hashtext('oncall_extend_shifts'));
+  perform private.require_admin(p_message);
+end;
+$$;
+revoke execute on function private.lock_people(text) from public, anon, authenticated;
+
 -- ── Invite (= an allowlist row) ───────────────────────────────────────────
 create function public.invite_user(p_email text, p_role public.app_role)
 returns text
@@ -59,7 +91,7 @@ declare
   v_email text := lower(btrim(coalesce(p_email, '')));
   v_profile public.profiles%rowtype;
 begin
-  perform private.require_admin('Only an Admin can invite people');
+  perform private.lock_people('Only an Admin can invite people');
   perform private.staff_role(p_role);
   if v_email !~ '^[^@[:space:]]+@[^@[:space:]]+$' then
     raise exception 'Enter their primary Google address, e.g. name@company' using errcode = '22023', hint = 'bad_email';
@@ -175,6 +207,8 @@ declare
   v_shift record;
   v_swap record;
   v_before jsonb;
+  v_pos integer;
+  v_count integer;
 begin
   if v_needs_owner then
     for v_site in select s.id from public.sites s where s.primary_owner_id = p_user order by s.id loop
@@ -228,9 +262,15 @@ begin
       end loop;
     end if;
 
-    -- Out of the rotation; the others keep their order.
-    if exists (select 1 from public.oncall_rotation r where r.user_id = p_user) then
-      perform pg_advisory_xact_lock(hashtext('oncall_extend_shifts'));
+    -- Out of the rotation; the others keep their order. Never the last one: nobody would be on call
+    -- once the weeks already made run out (D-062 item 4).
+    select r.position into v_pos from public.oncall_rotation r where r.user_id = p_user;
+    if found then
+      select count(*) into v_count from public.oncall_rotation;
+      if v_count = 1 then
+        raise exception 'They are the only person in the on-call rotation — add someone on On-call first'
+          using errcode = '55000', hint = 'rotation_last';
+      end if;
       select coalesce(jsonb_agg(user_id order by position), '[]'::jsonb) into v_before from public.oncall_rotation;
       delete from public.oncall_rotation where user_id = p_user;
       -- Two steps: `position` is unique and checked row by row.
@@ -238,6 +278,13 @@ begin
       update public.oncall_rotation r set position = o.n
         from (select id, row_number() over (order by position) as n from public.oncall_rotation) o
         where r.id = o.id;
+      -- The weeks' slots follow (review M3): the next week goes to whoever came after the person, so
+      -- nobody is skipped. A week made for their slot now reads as the slot before it.
+      update public.oncall_shifts set slot = case
+          when slot > v_pos then slot - 1
+          when v_pos = 1 then v_count - 1
+          else v_pos - 1 end
+        where slot >= v_pos;
       insert into public.audit_log (actor_id, action, entity, before, after)
       values (auth.uid(), 'oncall.rotation', 'oncall_rotation', jsonb_build_object('order', v_before),
               jsonb_build_object('order', (select coalesce(jsonb_agg(user_id order by position), '[]'::jsonb)
@@ -306,7 +353,7 @@ as $$
 declare
   v public.profiles%rowtype;
 begin
-  perform private.require_admin('Only an Admin can change roles');
+  perform private.lock_people('Only an Admin can change roles');
   perform private.staff_role(p_role);
   v := private.user_for_change(p_user_id);
   if v.role = p_role then
@@ -333,7 +380,7 @@ declare
   v public.profiles%rowtype;
   v_sessions integer;
 begin
-  perform private.require_admin('Only an Admin can deactivate people');
+  perform private.lock_people('Only an Admin can deactivate people');
   v := private.user_for_change(p_user_id);
   perform private.user_reassign(v.id, null, p_reassign, format('%s was deactivated', v.display_name));
   perform private.assert_user_free(v, null);
@@ -387,6 +434,11 @@ begin
         using errcode = '55000', hint = 'owner_needs_chat', detail = v_sites;
     end if;
   end if;
+  -- An @mention reaches one person (security review L2). Checked here, not by a unique index: the
+  -- staging fixture people share Tao's Chat id on purpose (D-035), set by SQL.
+  if v_id is not null and exists (select 1 from public.profiles p where p.google_chat_user_id = v_id and p.id <> p_user_id) then
+    raise exception 'That Chat id belongs to someone else' using errcode = '23505', hint = 'chat_id_taken';
+  end if;
   update public.profiles set google_chat_user_id = v_id where id = p_user_id;
   insert into public.audit_log (actor_id, action, entity, entity_id, after)
   values (auth.uid(), 'profile.chat_id', 'user', p_user_id, jsonb_build_object(
@@ -412,12 +464,13 @@ begin
     raise exception 'Only an Admin can see someone else''s devices' using errcode = '42501';
   end if;
   return query
-    select s.id, s.user_id, s.user_agent, s.created_at, coalesce(s.refreshed_at::timestamptz, s.updated_at, s.created_at),
-           s.id::text = (auth.jwt() ->> 'session_id')
+    select s.id, s.user_id, s.user_agent, s.created_at,
+           coalesce(s.refreshed_at at time zone 'UTC', s.updated_at, s.created_at),
+           s.id = (auth.jwt() ->> 'session_id')::uuid
     from auth.sessions s
     where (p_user_id is null or s.user_id = p_user_id)
       and (s.not_after is null or s.not_after > now())
-    order by s.user_id, coalesce(s.refreshed_at::timestamptz, s.updated_at, s.created_at) desc;
+    order by s.user_id, coalesce(s.refreshed_at at time zone 'UTC', s.updated_at, s.created_at) desc;
 end;
 $$;
 
@@ -455,12 +508,16 @@ set search_path = ''
 as $$
 declare
   v_n integer;
-  v_current text := auth.jwt() ->> 'session_id';
+  v_current uuid := (auth.jwt() ->> 'session_id')::uuid;
 begin
-  if not public.is_staff() then
+  if not public.is_staff() or not private.session_alive() then
     raise exception 'Sign in first' using errcode = '42501';
   end if;
-  delete from auth.sessions where user_id = auth.uid() and id::text is distinct from v_current;
+  -- Without a session claim "this device" is unknown: refuse rather than sign out every device.
+  if v_current is null then
+    raise exception 'Sign in again to continue' using errcode = '42501', hint = 'no_session';
+  end if;
+  delete from auth.sessions where user_id = auth.uid() and id <> v_current;
   get diagnostics v_n = row_count;
   insert into public.audit_log (actor_id, action, entity, entity_id, after)
   values (auth.uid(), 'session.sign_out_others', 'user', auth.uid(), jsonb_build_object('devices', v_n));
@@ -479,7 +536,10 @@ begin
   if not public.is_staff() then
     raise exception 'Sign in first' using errcode = '42501';
   end if;
-  if p_session_id::text = (auth.jwt() ->> 'session_id') then
+  if not private.session_alive() then
+    raise exception 'Sign in first' using errcode = '42501';
+  end if;
+  if p_session_id = (auth.jwt() ->> 'session_id')::uuid then
     raise exception 'That''s this device — use Sign out' using errcode = '22023', hint = 'this_device';
   end if;
   delete from auth.sessions where id = p_session_id and user_id = auth.uid();
@@ -503,9 +563,7 @@ set search_path = ''
 as $$
   select
     case
-      when (select auth.jwt() ->> 'session_id') is not null
-           and not exists (select 1 from auth.sessions s where s.id::text = (select auth.jwt() ->> 'session_id'))
-        then 'ended'
+      when not private.session_alive() then 'ended'
       else coalesce(case when p.is_active then 'active' when p.id is not null then 'inactive' end, 'missing')
     end,
     case when p.is_active then p.id end,
@@ -514,6 +572,53 @@ as $$
     case when p.is_active then p.role end
   from (select 1) as one
   left join public.profiles p on p.id = auth.uid();
+$$;
+
+-- ── Owners are locked while a site names them (security review L3) ──────
+-- A site saved while its new owner is being deactivated would see them active and keep an owner
+-- nobody can reach. The owners' profile rows are share-locked first, so the save waits for the
+-- deactivation (and then refuses), or the deactivation waits for the save (and then lists the site).
+-- Body otherwise as 20261007180740_sites_registration.sql.
+create or replace function private.sites_guard_owners()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_ineligible text;
+  v_unlinked text;
+begin
+  if current_setting('role', true) is distinct from 'authenticated' then
+    return new;
+  end if;
+  if tg_op = 'UPDATE'
+     and new.primary_owner_id is not distinct from old.primary_owner_id
+     and new.backup_owner_id is not distinct from old.backup_owner_id then
+    return new;
+  end if;
+
+  perform 1 from public.profiles p where p.id in (new.primary_owner_id, new.backup_owner_id) for share;
+
+  select string_agg(coalesce(p.display_name, p.email), ', ' order by o.ord)
+           filter (where not p.is_active or p.role not in ('admin', 'responder')),
+         string_agg(coalesce(p.display_name, p.email), ', ' order by o.ord)
+           filter (where p.is_active and p.role in ('admin', 'responder')
+                     and nullif(btrim(p.google_chat_user_id), '') is null)
+    into v_ineligible, v_unlinked
+  from (values (new.primary_owner_id, 1), (new.backup_owner_id, 2)) as o (id, ord)
+  join public.profiles p on p.id = o.id;
+
+  if v_ineligible is not null then
+    raise exception 'Only an active Admin or Responder can own a site: %', v_ineligible
+      using errcode = 'P0001', hint = 'owners_not_eligible', detail = v_ineligible;
+  end if;
+  if v_unlinked is not null then
+    raise exception 'Owners need a Google Chat id: %', v_unlinked
+      using errcode = 'P0001', hint = 'owners_missing_chat_id', detail = v_unlinked;
+  end if;
+  return new;
+end;
 $$;
 
 -- ── Refused sign-ins write `signin.refused` (D-061 item 3, D-062 item 7) ─

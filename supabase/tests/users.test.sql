@@ -4,7 +4,7 @@
 -- refused sign-in row. Every change writes its audit row.
 begin;
 \ir _helpers.psql
-select plan(64);
+select plan(75);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -238,13 +238,62 @@ reset role;
 select is((select count(*)::int from public.audit_log where action in ('session.sign_out_device', 'session.sign_out_all')
   and entity_id = pg_temp.uid('arm')), 2, 'each sign-out writes its row');
 
+-- ── The rotation: never empty, and nobody skipped after a removal (db review M3, M4) ──
+select tests.authenticate_as(pg_temp.uid('tao'));
+select throws_ok(format('select public.deactivate_user(%L, %L)', pg_temp.uid('ploy'), jsonb_build_object(
+    'owners', jsonb_build_object('00000000-0000-0000-0000-0000000000a1', pg_temp.uid('tao')),
+    'backups', jsonb_build_object('00000000-0000-0000-0000-0000000000a2', pg_temp.uid('tao')),
+    'shifts', pg_temp.uid('arm'))), '55000',
+  'They are the only person in the on-call rotation — add someone on On-call first', 'the rotation never ends up empty');
+reset role;
+insert into ids values ('beam', tests.create_user('beam@pgtap.test', 'responder')),
+                       ('cher', tests.create_user('cher@pgtap.test', 'responder'));
+insert into public.oncall_rotation (user_id, position) values (pg_temp.uid('beam'), 2), (pg_temp.uid('cher'), 3);
+-- The last week made was Beam's (slot 2).
+insert into public.oncall_shifts (user_id, starts_at, ends_at, slot)
+values (pg_temp.uid('beam'), now() + interval '20 days', now() + interval '27 days', 2);
+select tests.authenticate_as(pg_temp.uid('tao'));
+select lives_ok(format('select public.deactivate_user(%L, %L)', pg_temp.uid('beam'),
+  jsonb_build_object('shifts', pg_temp.uid('ploy'))), 'Beam (rotation, a week ahead) is deactivated');
+reset role;
+select is((select array_agg(user_id order by position) from public.oncall_rotation),
+  array[pg_temp.uid('ploy'), pg_temp.uid('cher')], 'Ploy, Cher keep their order');
+select is((select user_id from public.oncall_shifts where starts_at = now() + interval '20 days'), pg_temp.uid('ploy'),
+  'Beam''s week went to Ploy');
+select public.oncall_extend_shifts(now() + interval '30 days');
+select is((select user_id from public.oncall_shifts where starts_at = now() + interval '27 days'), pg_temp.uid('cher'),
+  'the next week made goes to Cher, who came after Beam — nobody is skipped');
+
+-- ── A signed-out session stops the Admin functions too (security review L1) ──
+insert into auth.sessions (id, user_id, created_at, updated_at)
+values ('00000000-0000-0000-0000-00000000e201', pg_temp.uid('tao'), now(), now());
+select pg_temp.as_session(pg_temp.uid('tao'), '00000000-0000-0000-0000-00000000e201');
+select is((select status from public.my_access()), 'active', 'a live session reads active');
+reset role;
+delete from auth.sessions where id = '00000000-0000-0000-0000-00000000e201';
+select pg_temp.as_session(pg_temp.uid('tao'), '00000000-0000-0000-0000-00000000e201');
+select throws_ok($$select public.invite_user('late@pgtap.test', 'viewer')$$, '42501',
+  'Only an Admin can invite people', 'a token whose session is gone can''t act as an Admin');
+reset role;
+select tests.authenticate_as(pg_temp.uid('tao'));
+select throws_ok($$select public.sign_out_my_other_devices()$$, '42501', 'Sign in again to continue',
+  'without a session claim "this device" is unknown: nothing is signed out');
+-- One Chat id per person (security review L2).
+select throws_ok(format('select public.set_chat_user_id(%L, ''100003'')', pg_temp.uid('tao')), '23505',
+  'That Chat id belongs to someone else', 'a Chat id already in use is refused');
+reset role;
+select is((select count(*)::int from public.audit_log where action = 'user.deactivate' and entity_id = pg_temp.uid('beam')), 1,
+  'Beam''s deactivation is logged');
+select ok(exists (select 1 from public.audit_log where action = 'oncall.rotation' and after ->> 'note' = 'Beam was deactivated'),
+  'and so is the rotation change');
+
 -- ── A refused sign-in is logged (D-062 item 7) ──────────────────────────
 select is(public.hook_before_user_created('{"user": {"email": "stranger@pgtap.test", "app_metadata": {"provider": "google"}}}')
   -> 'error' ->> 'http_code', '403', 'an address not on the list is refused');
-select is((select after from public.audit_log where action = 'signin.refused' and after ->> 'reason' = 'not_invited'),
+select is((select after from public.audit_log where action = 'signin.refused' and after ->> 'email' = 'stranger@pgtap.test'),
   '{"email": "stranger@pgtap.test", "reason": "not_invited"}'::jsonb, 'with the company address');
 select public.hook_before_user_created('{"user": {"email": "someone@gmail.test", "app_metadata": {"provider": "google"}}}');
-select is((select after from public.audit_log where action = 'signin.refused' and after ->> 'reason' = 'domain'),
+select is((select after from public.audit_log where action = 'signin.refused' and after ->> 'domain' = 'gmail.test'),
   '{"domain": "gmail.test", "reason": "domain"}'::jsonb, 'off the company domains: the domain only');
 
 select * from finish();
