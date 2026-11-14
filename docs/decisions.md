@@ -102,7 +102,8 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
       - The Email row says "Not set up" while the email provider is off (D-013: the UI never promises what isn't there).
       - Sites stay a list at every width, not the desktop board's table. Only live sites are listed.
       - The page is two columns from lg, since the board is 1440; below lg it is one column.
-      - A Viewer sees channels, devices and the shared values only (§22.6).
+      - A Viewer sees channels, devices and the shared values only (§22.6). The CEO, a Stakeholder who manages no client, owns no site, so there is no Sites card for them.
+      - The Chat row says "Alerts @mention your Chat user id…", not the board's "Matched to your Chat user…". The app stores the digits; it never checks them against Chat (D-013).
 
 **Why.** Every change to who may do what goes through one audited function, so the Access category records it and nothing writes `profiles` behind the log. Blocking the save keeps D-015 and D-048 true after a person leaves: no site without a reachable owner, no week with nobody on call. Keeping only company addresses keeps the undeletable log free of anything a person didn't already share with the company.
 
