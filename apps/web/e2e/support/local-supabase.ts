@@ -46,7 +46,14 @@ async function passwordWorks(email: string): Promise<boolean> {
     headers: { apikey: PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password: PASSWORD }),
   });
-  if (!res.ok) return false;
+  if (!res.ok) {
+    // Only a wrong password means "set it"; anything else (a rate limit, a 5xx) must not fall through to
+    // the reset that signs the person out everywhere.
+    const body = (await res.json().catch(() => ({}))) as { error_code?: string; error?: string };
+    if (res.status === 400 && (body.error_code === 'invalid_credentials' || body.error === 'invalid_grant'))
+      return false;
+    throw new Error(`password check for ${email}: ${res.status} ${JSON.stringify(body)}`);
+  }
   // End just this check's session, so the person's device list doesn't grow with every run.
   const { access_token } = (await res.json()) as { access_token: string };
   await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, {

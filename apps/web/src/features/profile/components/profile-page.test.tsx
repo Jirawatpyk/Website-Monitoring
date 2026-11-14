@@ -34,7 +34,16 @@ const data: ProfileData = {
     },
   ],
   sites: [
-    { id: 'a', name: 'realme.link', tier: 1, status: 'ok', role: 'Owner', incident: null, mutedUntil: null },
+    {
+      id: 'a',
+      name: 'realme.link',
+      tier: 1,
+      status: 'ok',
+      role: 'Owner',
+      incident: null,
+      mutedUntil: null,
+      internal: false,
+    },
   ],
   isCeo: false,
   isAm: false,

@@ -18,6 +18,8 @@ export interface MySite {
   incident: string | null;
   /** Muted until (§11: an overlay under the status, never a status). */
   mutedUntil: string | null;
+  /** The site's client is internal: no client-update track (D-052). */
+  internal: boolean;
 }
 
 export interface PolicyStep {
@@ -157,7 +159,9 @@ export function escalationRows(d: ProfileData): { label: string; value: string }
         value: mine.join(' · '),
       });
   }
-  const amOf = (tier: number) => d.sites.filter((x) => x.role === 'AM' && x.tier === tier).length;
+  // Internal clients get no client-update track (D-052, server/engine/client-update.ts).
+  const amOf = (tier: number) =>
+    d.sites.filter((x) => x.role === 'AM' && x.tier === tier && !x.internal).length;
   if (amOf(1) || amOf(2))
     rows.push({
       label: 'Client update',

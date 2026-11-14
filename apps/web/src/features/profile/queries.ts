@@ -37,7 +37,7 @@ export async function loadProfileData(
         )
         .eq('is_active', true)
         .order('name'),
-      db.from('clients').select('id, am_user_id'),
+      db.from('clients').select('id, am_user_id, is_internal'),
       db.from('escalation_policies').select('id, severity, tier'),
       db.from('escalation_steps').select('policy_id, level, delay_min, targets, fyi'),
       db.from('oncall_rotation').select('user_id'),
@@ -69,6 +69,9 @@ export async function loadProfileData(
   const myClients = new Set(
     (check('clients', clients) ?? []).filter((c) => c.am_user_id === meId).map((c) => c.id),
   );
+  const internalClients = new Set(
+    (check('clients', clients) ?? []).filter((c) => c.is_internal).map((c) => c.id),
+  );
   const incidentOf = new Map<string, string>();
   for (const i of check('incidents', open) ?? [])
     if (!incidentOf.has(i.site_id)) incidentOf.set(i.site_id, i.id);
@@ -93,6 +96,7 @@ export async function loadProfileData(
         role,
         incident: incidentOf.get(s.id) ?? null,
         mutedUntil: s.muted_until,
+        internal: !!(s.client_id && internalClients.has(s.client_id)),
       },
     ];
   });

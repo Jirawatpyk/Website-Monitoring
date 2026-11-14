@@ -49,9 +49,36 @@ const base: ProfileData = {
   me: { id: 'arm', name: 'Arm', email: 'arm@x', role: 'responder', chatLinked: true },
   sessions: [],
   sites: [
-    { id: 'a', name: 'realme.link', tier: 1, status: 'ok', role: 'Owner', incident: null, mutedUntil: null },
-    { id: 'b', name: 'MuvMi', tier: 2, status: 'down', role: 'Owner', incident: 'i1', mutedUntil: null },
-    { id: 'c', name: 'EQHO', tier: 2, status: 'ok', role: 'Backup', incident: null, mutedUntil: null },
+    {
+      id: 'a',
+      name: 'realme.link',
+      tier: 1,
+      status: 'ok',
+      role: 'Owner',
+      incident: null,
+      mutedUntil: null,
+      internal: false,
+    },
+    {
+      id: 'b',
+      name: 'MuvMi',
+      tier: 2,
+      status: 'down',
+      role: 'Owner',
+      incident: 'i1',
+      mutedUntil: null,
+      internal: false,
+    },
+    {
+      id: 'c',
+      name: 'EQHO',
+      tier: 2,
+      status: 'ok',
+      role: 'Backup',
+      incident: null,
+      mutedUntil: null,
+      internal: false,
+    },
   ],
   isCeo: false,
   isAm: false,
@@ -119,6 +146,7 @@ describe('escalationRows: read from the policies (D-062 item 12)', () => {
           role: 'AM' as const,
           incident: null,
           mutedUntil: null,
+          internal: false,
         },
       ],
     };
@@ -129,6 +157,16 @@ describe('escalationRows: read from the policies (D-062 item 12)', () => {
         value: '@mentioned with a draft once a Tier 1 site is down 15 min (1 site)',
       },
     ]);
+  });
+
+  it('an internal client has no client-update track (D-052)', () => {
+    const am = {
+      ...base,
+      me: { ...base.me, role: 'stakeholder' as const },
+      isAm: true,
+      sites: [{ ...base.sites[0]!, role: 'AM' as const, internal: true }],
+    };
+    expect(escalationRows(am).map((r) => r.label)).toEqual(['Tier 1 DOWN']);
   });
 
   it('a Viewer named by no step has no rows', () => {
