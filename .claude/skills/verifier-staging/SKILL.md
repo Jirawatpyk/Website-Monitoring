@@ -126,7 +126,9 @@ Sites screens (S05, D-025), as Tao in the browser pane on https://monitor-stagin
 | Edit monitors → add a key page / a header → Save changes                  | "Saved — takes effect on the next round"; the next `check_results` include the key page |
 | Edit site → Stop monitoring                                               | back to Draft; no new `check_results` for it                                            |
 
-Staging has one person (Tao) and no Google Chat id on that profile, so Start monitoring and Stop on a new site can't be driven there (Start needs two different owners with Chat ids, D-015): the local e2e `e2e/sites.spec.ts` covers them. For the same reason the live Test target can't be saved from Edit site until it has a backup owner with a Chat id — re-run `staging/test-target.sql` with a second linked person if a run needs it. On the production build, set form fields by typing (click the field first), not by `form_input`, which doesn't reach React state.
+Since S16 PR 3 (14 Nov 2026) Tao and the fixture people (Staging Owner, Backup, CEO, AM, OnCall) have a Google Chat id on staging. They all share Tao's real id, so every @mention reaches Tao. Never repeat the digits (D-062 item 7). Start monitoring and Stop can be driven there now (two different owners with Chat ids, D-015); the local e2e `e2e/sites.spec.ts` covers them too.
+
+Role changes on staging (S16 PR 4) email the fixture's own address, which goes through Resend. Read the delivery from `notification_attempts.provider_message_id` (`account_event_id` rows), and put the fixture's role back afterwards. On the production build, set form fields by typing (click the field first), not by `form_input`, which doesn't reach React state.
 
 Incidents, notes and Resolve (S07, D-033), as Tao on https://monitor-staging.dxtspace.com/incidents — drive the Test target `error` → wait for DOWN → `ok` and wait two rounds (Needs root cause):
 

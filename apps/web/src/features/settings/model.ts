@@ -1,4 +1,6 @@
-import { formatDay, formatWhen, ROLE_LABELS, type Role } from '@dxt/shared';
+import { formatDay, formatWhen, MATRIX_ROLES, ROLE_LABELS, ROLE_MATRIX, type Role } from '@dxt/shared';
+
+const col = (r: Role) => MATRIX_ROLES.indexOf(r as (typeof MATRIX_ROLES)[number]);
 
 /**
  * Users & roles (S16, D-062, spec §14.9, §35): the pure rules behind the page — the role matrix and its
@@ -12,35 +14,9 @@ export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export const isStaffRole = (r: string): r is StaffRole => (STAFF_ROLES as readonly string[]).includes(r);
 
-// ── The role matrix (Users / MUsers boards) ────────────────────────────────────────────────────────
+// ── The role matrix (Users / MUsers boards): rows and diff in @dxt/shared (D-062 item 13) ─────────
 
-/** 'Y' allowed, 'N' not, anything else: allowed with that limit. Columns: admin … viewer, client. */
-export type Cell = 'Y' | 'N' | string;
-export const MATRIX_ROLES = [
-  'admin',
-  'responder',
-  'stakeholder',
-  'viewer',
-  'client',
-] as const satisfies readonly Role[];
-
-export const ROLE_MATRIX: readonly { label: string; cells: readonly [Cell, Cell, Cell, Cell, Cell] }[] = [
-  { label: 'See dashboard and history', cells: ['Y', 'Y', 'Y', 'Y', 'Own sites'] },
-  { label: 'Receive alerts and digests', cells: ['Y', 'Y', 'Y', 'N', 'N'] },
-  {
-    label: 'Acknowledge and resolve incidents',
-    cells: ['Y', 'Own sites (owner or backup) + Tier 1 when on call', 'N', 'N', 'N'],
-  },
-  { label: 'Mark client update / Not needed', cells: ['Y', 'Own sites', 'Own clients', 'N', 'N'] },
-  { label: 'Maintenance windows and mute', cells: ['Y', 'Own sites', 'N', 'N', 'N'] },
-  { label: 'Download uptime reports', cells: ['Y', 'Y', 'Y', 'N', 'Own sites'] },
-  { label: 'Send client reports / edit AM note', cells: ['Y', 'N', 'Own clients', 'N', 'N'] },
-  { label: 'Approve incident review', cells: ['Y', 'N', 'N', 'N', 'N'] },
-  { label: 'Edit sites, monitors and escalation', cells: ['Y', 'N', 'N', 'N', 'N'] },
-  { label: 'Manage users and roles', cells: ['Y', 'N', 'N', 'N', 'N'] },
-];
-
-const col = (r: Role) => MATRIX_ROLES.indexOf(r as (typeof MATRIX_ROLES)[number]);
+export { gainsLoses, MATRIX_ROLES, ROLE_MATRIX, type Cell } from '@dxt/shared';
 
 /** One role's rows (MUsers' Role select) and its foot: "Responder: 6 of 10 allowed." */
 export function roleRows(role: Role) {
@@ -52,24 +28,6 @@ export function roleRows(role: Role) {
     rows,
     foot: `${name}: ${allowed} of ${rows.length} allowed. “Own” = only where they are owner, backup or Site AM.`,
   };
-}
-
-/** What a role change adds and takes away (the dialog's GAINS / LOSES), in the board's words. */
-export function gainsLoses(from: Role, to: Role): { gains: string[]; loses: string[] } {
-  const gains: string[] = [];
-  const loses: string[] = [];
-  if (from === to) return { gains, loses };
-  const a = col(from);
-  const b = col(to);
-  for (const r of ROLE_MATRIX) {
-    const x = r.cells[a] ?? 'N';
-    const y = r.cells[b] ?? 'N';
-    if (x === 'N' && y !== 'N') gains.push(y === 'Y' ? r.label : `${r.label} (${y.toLowerCase()})`);
-    else if (x !== 'N' && y === 'N') loses.push(r.label);
-    else if (x !== 'Y' && y === 'Y') gains.push(`${r.label} (all sites)`);
-    else if (x === 'Y' && y !== 'Y') loses.push(`${r.label} outside ${y.toLowerCase()}`);
-  }
-  return { gains, loses };
 }
 
 // ── The page's data ────────────────────────────────────────────────────────────────────────────────
@@ -138,6 +96,16 @@ export interface UsersData {
   swaps: SwapRef[];
   /** Open incidents someone acknowledged (info in "Used in"). */
   acks: AckRef[];
+  /** The email provider is set up (D-013): only then does the dialog promise the role-change email. */
+  emailOn?: boolean;
+}
+
+/** The role-change / deactivate dialog's description (spec §14.9, §34). */
+export function changeDialogText(name: string, deactivate: boolean, emailOn: boolean): string {
+  const mail = emailOn ? ` ${name} gets an email saying what changed.` : '';
+  return deactivate
+    ? `${name} loses access at once — every device is signed out — and stops getting alerts and digests. Past acknowledgements and notes stay in the audit log; an Admin can give access back by adding them again.${mail}`
+    : `Takes effect as soon as you confirm.${mail}`;
 }
 
 const canOwn = (role: Role) => role === 'admin' || role === 'responder';

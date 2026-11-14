@@ -85,6 +85,8 @@ set search_path = ''
 as $$
 begin
   delete from public.notifications;
+  -- S16 PR 4: account events (their emails went above).
+  delete from public.account_events;
   -- S14: a report's messages went above; the reports cron may have left rows on a used stack.
   delete from public.reports;
   delete from public.system_alerts;

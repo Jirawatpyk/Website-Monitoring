@@ -37,7 +37,7 @@
 | S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Done |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Done |
-| S16 | Users & access | 2 · P1 | M | — | S10 | 5 | In progress |
+| S16 | Users & access | 2 · P1 | M | — | S10 | 5 | In review |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Todo |
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Todo |
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | Todo |
@@ -966,7 +966,7 @@ ChatAlert starts in S02a and EmailAlert in S02b; both gain rows in every slice t
 | maintenance_windows | S09 |
 | oncall_shifts | S10 |
 
-Tables the plan adds beyond PRD §11: organisation settings and company holidays (S08), API keys and webhooks (S24), `private.allowed_email_domains` (done, migration 0002), `private.allowed_emails` (S01, D-007).
+Tables the plan adds beyond PRD §11: organisation settings and company holidays (S08), API keys and webhooks (S24), `private.allowed_email_domains` (done, migration 0002), `private.allowed_emails` (S01, D-007), `account_events` (S16, D-062 item 13).
 
 ### Go-live test plan (PRD §12)
 
