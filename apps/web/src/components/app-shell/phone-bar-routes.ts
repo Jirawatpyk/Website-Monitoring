@@ -40,5 +40,7 @@ export function phoneBarFor(pathname: string): PhoneBarSpec {
   if (path === '/escalation') return { title: 'Escalation', back: TO_OVERVIEW };
   if (path === '/probes') return { title: 'Probes & heartbeat', back: TO_OVERVIEW };
   if (path === '/audit') return { title: 'Audit log', back: TO_OVERVIEW };
+  // Settings pages share one title; the section tabs sit under the bar (§35.1).
+  if (first === 'settings') return { title: 'Settings', back: TO_OVERVIEW };
   return { title: null };
 }

@@ -1,0 +1,94 @@
+import 'server-only';
+import type { DbClient } from '@dxt/db';
+import { formatIncidentId, type Role } from '@dxt/shared';
+import type { UsersData } from './model';
+
+const OPEN_SWAP = ['waiting', 'accepted'];
+const OPEN_INCIDENT = ['unacked', 'escalated', 'acknowledged', 'monitoring', 'needs_root_cause'] as const;
+
+function check<T>(what: string, r: { data: T; error: { message: string } | null }): T {
+  if (r.error) throw new Error(`${what}: ${r.error.message}`);
+  return r.data;
+}
+
+/**
+ * Everything the Users page reads (S16), as the signed-in Admin under RLS. Small tables, read whole:
+ * ~10 people, 17 sites, a few clients, the shifts not over yet. `pending_invites` and `list_sessions`
+ * refuse anyone but an Admin.
+ */
+export async function loadUsersData(db: DbClient, viewerId: string, now: Date): Promise<UsersData> {
+  const nowIso = now.toISOString();
+  const [people, invites, sessions, sites, clients, rotation, shifts, swaps, acks] = await Promise.all([
+    db.from('profiles').select('id, display_name, email, role, google_chat_user_id').eq('is_active', true),
+    db.rpc('pending_invites'),
+    db.rpc('list_sessions'),
+    db.from('sites').select('id, name, is_active, primary_owner_id, backup_owner_id').order('name'),
+    db.from('clients').select('id, name, am_user_id').order('name'),
+    db.from('oncall_rotation').select('user_id, position').order('position'),
+    db
+      .from('oncall_shifts')
+      .select('id, user_id, starts_at, ends_at')
+      .gt('ends_at', nowIso)
+      .order('starts_at'),
+    db.from('oncall_swaps').select('id, requester_id, counterpart_id').in('status', OPEN_SWAP),
+    db
+      .from('incidents')
+      .select('number, acked_by, sites!inner(name)')
+      .not('acked_by', 'is', null)
+      .in('state', [...OPEN_INCIDENT]),
+  ]);
+
+  const lastUsed = new Map<string, string>();
+  for (const s of check('list_sessions', sessions) ?? []) {
+    const prev = lastUsed.get(s.user_id);
+    if (!prev || s.last_used > prev) lastUsed.set(s.user_id, s.last_used);
+  }
+  const siteName = (s: { name: string } | { name: string }[] | null) =>
+    (Array.isArray(s) ? s[0]?.name : s?.name) ?? '';
+
+  return {
+    viewerId,
+    people: (check('profiles', people) ?? [])
+      .map((p) => ({
+        id: p.id,
+        name: p.display_name,
+        email: p.email,
+        role: p.role as Role,
+        chatLinked: !!p.google_chat_user_id?.trim(),
+        lastActive: lastUsed.get(p.id) ?? null,
+      }))
+      .sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.name.localeCompare(b.name)),
+    invites: (check('pending_invites', invites) ?? []).map((i) => ({
+      email: i.email,
+      role: i.role,
+      addedAt: i.created_at,
+    })),
+    sites: (check('sites', sites) ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      live: s.is_active,
+      ownerId: s.primary_owner_id,
+      backupId: s.backup_owner_id,
+    })),
+    clients: (check('clients', clients) ?? []).map((c) => ({ id: c.id, name: c.name, amId: c.am_user_id })),
+    rotation: (check('oncall_rotation', rotation) ?? []).map((r) => r.user_id),
+    shifts: (check('oncall_shifts', shifts) ?? []).map((s) => ({
+      id: s.id,
+      userId: s.user_id,
+      startsAt: s.starts_at,
+      endsAt: s.ends_at,
+    })),
+    swaps: (check('oncall_swaps', swaps) ?? []).map((w) => ({
+      id: w.id,
+      requesterId: w.requester_id,
+      counterpartId: w.counterpart_id,
+    })),
+    acks: (check('incidents', acks) ?? []).map((i) => ({
+      label: `${formatIncidentId(i.number)} · ${siteName(i.sites)}`,
+      ackedBy: i.acked_by!,
+    })),
+  };
+}
+
+/** The table's order: Admins first, then Responders, Stakeholders, Viewers; by name within. */
+const ROLE_ORDER: Record<Role, number> = { admin: 0, responder: 1, stakeholder: 2, viewer: 3, client: 4 };
