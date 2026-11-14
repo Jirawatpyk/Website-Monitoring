@@ -51,3 +51,11 @@ export const chatIdSchema = z.object({
     .regex(/^\d*$/, 'A Chat user id is digits only'),
 });
 export type ChatIdInput = z.infer<typeof chatIdSchema>;
+
+/** Sign a person out everywhere (Security, Admin; D-062 item 5). */
+export const signOutUserSchema = z.object({ userId: z.uuid() });
+export type SignOutUserInput = z.infer<typeof signOutUserSchema>;
+
+/** Sign out one of your own devices (Profile). */
+export const signOutDeviceSchema = z.object({ sessionId: z.uuid() });
+export type SignOutDeviceInput = z.infer<typeof signOutDeviceSchema>;

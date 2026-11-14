@@ -35,6 +35,15 @@
     "features/settings/actions.ts#setChatId": {
       "rpc": ["set_chat_user_id"]
     },
+    "features/settings/actions.ts#signOutEverywhere": {
+      "rpc": ["sign_out_user_everywhere"]
+    },
+    "features/settings/actions.ts#signOutOtherDevices": {
+      "rpc": ["sign_out_my_other_devices"]
+    },
+    "features/settings/actions.ts#signOutDevice": {
+      "rpc": ["sign_out_my_device"]
+    },
     "features/settings/actions.ts#loadHandover": {
       "exempt": "Reads the On-call data the Hand over dialog shows; changes nothing (the hand-over itself is oncall#handOver)."
     },

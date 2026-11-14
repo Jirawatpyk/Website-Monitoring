@@ -12,7 +12,15 @@ import { notifierDeps } from '@/server/notifier/deps';
 import { dispatchNotifications } from '@/server/notifier/dispatch';
 import * as m from './mutations';
 import type { UsersResult } from './mutations';
-import type { ChangeRoleInput, ChatIdInput, DeactivateInput, InviteInput, RevokeInput } from './schemas';
+import type {
+  ChangeRoleInput,
+  ChatIdInput,
+  DeactivateInput,
+  InviteInput,
+  RevokeInput,
+  SignOutDeviceInput,
+  SignOutUserInput,
+} from './schemas';
 
 /**
  * Users & roles as the signed-in Admin (S16, D-062). The SQL checks the role again, applies the
@@ -41,6 +49,8 @@ async function run<T>(
         }
       });
     revalidatePath('/settings/users');
+    revalidatePath('/settings/security');
+    revalidatePath('/profile');
     revalidatePath('/oncall');
     revalidatePath('/');
   }
@@ -72,4 +82,17 @@ export async function loadHandover(): Promise<OncallData | null> {
 /** Anyone their own (Profile, PR 3), an Admin anyone's — the SQL holds that rule. */
 export async function setChatId(input: ChatIdInput) {
   return run(input, m.setChatId, { adminOnly: false });
+}
+
+/** Security: an Admin signs someone out on every device (D-062 item 5). */
+export async function signOutEverywhere(input: SignOutUserInput) {
+  return run(input, m.signOutEverywhere);
+}
+/** Security's own row: every device of yours but this browser. */
+export async function signOutOtherDevices() {
+  return run({}, m.signOutOtherDevices, { adminOnly: false });
+}
+/** Profile: one of your own devices. */
+export async function signOutDevice(input: SignOutDeviceInput) {
+  return run(input, m.signOutDevice, { adminOnly: false });
 }

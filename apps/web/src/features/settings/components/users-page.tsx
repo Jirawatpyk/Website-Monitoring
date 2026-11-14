@@ -48,6 +48,7 @@ import { RoleBadge } from './role-badge';
 import { SettingsHeader } from './settings-header';
 import { loadHandover } from '../actions';
 import { ChatIdDialog, InviteDialog, RevokeDialog, RoleDialog } from './user-dialogs';
+import { ViewOnlyLine } from './view-only-line';
 
 /** A section's h2: MUsers' mono caps on a phone, Site detail's 24 px heading from md. */
 const HEADING =
@@ -258,13 +259,7 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
           </span>
         }
       />
-      <div className="flex items-start gap-2.5 rounded-aura-md border border-border-default bg-bg-surface p-3 text-sm md:hidden">
-        <IconEye size="sm" aria-hidden className="mt-0.5 text-fg-secondary" />
-        <span>
-          <b className="font-semibold">View only on phones.</b>{' '}
-          <span className="text-fg-secondary">Admins change policies on a larger screen.</span>
-        </span>
-      </div>
+      <ViewOnlyLine />
       {banner && (
         <Alert tone="warning" title={banner.title}>
           {banner.body}

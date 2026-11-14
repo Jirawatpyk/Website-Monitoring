@@ -6,11 +6,15 @@ import {
   deactivateSchema,
   inviteSchema,
   revokeSchema,
+  signOutDeviceSchema,
+  signOutUserSchema,
   type ChangeRoleInput,
   type ChatIdInput,
   type DeactivateInput,
   type InviteInput,
   type RevokeInput,
+  type SignOutDeviceInput,
+  type SignOutUserInput,
 } from './schemas';
 
 export interface UsersDeps {
@@ -46,6 +50,8 @@ export const PROBLEM_WORDS: Record<string, string> = {
   chat_id_digits: 'A Chat user id is digits only.',
   chat_id_taken: 'That Chat id belongs to someone else.',
   owner_needs_chat: 'They own a live site, so they need a Chat id — reassign the site first.',
+  this_device: 'That’s this browser — use Sign out instead.',
+  no_session: 'Sign in again to continue.',
 };
 
 /** Refusals that mean the page is out of date: reload it so "Used in" shows what's there now. */
@@ -117,4 +123,36 @@ export async function setChatId(input: ChatIdInput, { db }: UsersDeps): Promise<
   // An empty id clears it (the SQL reads blank as none).
   const { error } = await db.rpc('set_chat_user_id', { p_user_id: p.data.userId, p_chat_id: p.data.chatId });
   return error ? refusal(error, 'Only an Admin can change someone else’s Chat id.') : { ok: true };
+}
+
+/** `outcome`: how many devices went back to the Google sign-in. */
+const devices = (n: number | null) => ({ ok: true as const, outcome: String(n ?? 0) });
+
+/** An Admin signs someone out on every device (Security, D-062 item 5). Never yourself. */
+export async function signOutEverywhere(input: SignOutUserInput, { db }: UsersDeps): Promise<UsersResult> {
+  const p = signOutUserSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { data, error } = await db.rpc('sign_out_user_everywhere', { p_user_id: p.data.userId });
+  if (error?.hint === 'self')
+    return { ok: false, message: 'For yourself, use Sign out other devices — this browser stays signed in.' };
+  return error ? refusal(error, ONLY_ADMIN) : devices(data);
+}
+
+/** Your own devices but this one (Security's own row). */
+export async function signOutOtherDevices(
+  _input: Record<string, never>,
+  { db }: UsersDeps,
+): Promise<UsersResult> {
+  const { data, error } = await db.rpc('sign_out_my_other_devices');
+  return error ? refusal(error, 'Sign in again to continue.') : devices(data);
+}
+
+/** One of your own devices (Profile). Already gone counts as done: the page shows what's there now. */
+export async function signOutDevice(input: SignOutDeviceInput, { db }: UsersDeps): Promise<UsersResult> {
+  const p = signOutDeviceSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { error } = await db.rpc('sign_out_my_device', { p_session_id: p.data.sessionId });
+  if (error?.code === 'P0002')
+    return { ok: false, message: 'That device is signed out already.', stale: true };
+  return error ? refusal(error, 'Sign in again to continue.') : devices(1);
 }

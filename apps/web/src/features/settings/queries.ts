@@ -2,6 +2,7 @@ import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { formatIncidentId, type Role } from '@dxt/shared';
 import type { UsersData } from './model';
+import { SIGNIN_ACTIONS, type SecurityData } from './security-model';
 
 const OPEN_SWAP = ['waiting', 'accepted'];
 const OPEN_INCIDENT = ['unacked', 'escalated', 'acknowledged', 'monitoring', 'needs_root_cause'] as const;
@@ -86,6 +87,79 @@ export async function loadUsersData(db: DbClient, viewerId: string, now: Date): 
     acks: (check('incidents', acks) ?? []).map((i) => ({
       label: `${formatIncidentId(i.number)} · ${siteName(i.sites)}`,
       ackedBy: i.acked_by!,
+    })),
+  };
+}
+
+/**
+ * Sign-in & security (S16 PR 3) as the signed-in Admin: the Users page's people, every session
+ * (`list_sessions` with no person = everyone, Admin only) and the newest sign-in rows of the audit log —
+ * enough to find each person's last "signed out everywhere" for the table's Last sign-in.
+ */
+export async function loadSecurityData(
+  db: DbClient,
+  viewerId: string,
+  domains: string[],
+  now: Date,
+): Promise<SecurityData> {
+  const [profiles, invites, shifts, sessions, entries] = await Promise.all([
+    db.from('profiles').select('id, display_name, email, role, google_chat_user_id, is_active'),
+    db.rpc('pending_invites'),
+    db
+      .from('oncall_shifts')
+      .select('id, user_id, starts_at, ends_at')
+      .gt('ends_at', now.toISOString())
+      .order('starts_at'),
+    db.rpc('list_sessions'),
+    db
+      .from('audit_log')
+      .select('at, action, actor_id, entity_id, before, after')
+      .in('action', [...SIGNIN_ACTIONS])
+      .order('at', { ascending: false })
+      .limit(100),
+  ]);
+  const everyone = check('profiles', profiles) ?? [];
+  const sessionRows = check('list_sessions', sessions) ?? [];
+  return {
+    viewerId,
+    domains,
+    people: everyone
+      .filter((p) => p.is_active)
+      .map((p) => ({
+        id: p.id,
+        name: p.display_name,
+        email: p.email,
+        role: p.role as Role,
+        chatLinked: !!p.google_chat_user_id?.trim(),
+        lastActive: null,
+      })),
+    invites: (check('pending_invites', invites) ?? []).map((i) => ({
+      email: i.email,
+      role: i.role,
+      addedAt: i.created_at,
+    })),
+    shifts: (check('oncall_shifts', shifts) ?? []).map((s) => ({
+      id: s.id,
+      userId: s.user_id,
+      startsAt: s.starts_at,
+      endsAt: s.ends_at,
+    })),
+    sessions: sessionRows.map((s) => ({
+      id: s.id,
+      userId: s.user_id,
+      userAgent: s.user_agent,
+      createdAt: s.created_at,
+      lastUsed: s.last_used,
+      current: s.is_current,
+    })),
+    names: Object.fromEntries(everyone.map((p) => [p.id, p.display_name])),
+    entries: (check('audit_log', entries) ?? []).map((e) => ({
+      at: e.at,
+      action: e.action,
+      actorId: e.actor_id,
+      entityId: e.entity_id,
+      before: e.before,
+      after: e.after,
     })),
   };
 }

@@ -59,6 +59,36 @@ export async function ensureUser(email: string): Promise<string> {
   return created.id;
 }
 
+/**
+ * A person of a spec's own (S16 PR 3): added to the access list by the seeded Admin through
+ * `invite_user`, then signed up, so the sign-up trigger makes the profile. Specs that sign a person out
+ * everywhere use one of these, never a seeded person other specs are signed in as at the same time.
+ */
+export async function ensurePerson(email: string, role: string): Promise<{ id: string; name: string }> {
+  const tao = await clientFor('tao@example.test');
+  const { error } = await tao.rpc('invite_user', { p_email: email, p_role: role });
+  if (error && !['already_member', 'already_invited'].includes(error.hint ?? ''))
+    throw new Error(`invite_user ${email}: ${error.message}`);
+  const id = await ensureUser(email);
+  const [p] = (await admin(`/rest/v1/profiles?select=display_name&id=eq.${id}`)) as {
+    display_name: string;
+  }[];
+  if (!p) throw new Error(`no profile for ${email}`);
+  return { id, name: p.display_name };
+}
+
+/** A Node client signed in as `email` (the local stack only), for set-up calls made as that person. */
+async function clientFor(email: string) {
+  assertLocal();
+  await ensureUser(email);
+  const c = createServerClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+    cookies: { getAll: () => [], setAll: () => {} },
+  });
+  const { error } = await c.auth.signInWithPassword({ email, password: PASSWORD });
+  if (error) throw new Error(`sign-in failed for ${email}: ${error.message}`);
+  return c;
+}
+
 /** A seeded site's id (layout checks of the pages under /sites). */
 export async function anySiteId(): Promise<string> {
   const [site] = (await admin('/rest/v1/sites?select=id&order=name&limit=1')) as { id: string }[];
