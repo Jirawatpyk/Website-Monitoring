@@ -85,6 +85,15 @@ export async function setActive(userId: string, isActive: boolean): Promise<void
   });
 }
 
+/** Put a seeded person's role back (S16 users.spec: a run that stopped half way). */
+export async function setRole(email: string, role: string): Promise<void> {
+  await admin(`/rest/v1/profiles?email=eq.${encodeURIComponent(email)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ role }),
+  });
+}
+
 /** Stamp an `agent_heartbeats` row (S12a): an aged `engine-sweep` puts the Overview in its fault state. */
 export async function setBeat(name: string, at: Date): Promise<void> {
   await admin('/rest/v1/agent_heartbeats?on_conflict=name', {

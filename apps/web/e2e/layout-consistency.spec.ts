@@ -296,6 +296,8 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
       `/sites/${site}/monitors`,
       `/incidents/${await openTestIncident(ADMIN.email)}`,
     );
+    // Settings isn't in the nav until S16 PR 3 (Security) ships: its pages are checked here meanwhile.
+    if (!pages.includes('/settings/users')) pages.push('/settings/users');
 
     for (const width of WIDTHS) {
       const page = await signedInAt(browser, baseURL!, width);

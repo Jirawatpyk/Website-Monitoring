@@ -240,6 +240,7 @@ export function UsersPageView({
           </h2>
           <span
             role="status"
+            data-testid="users-count"
             className={`text-sm leading-normal ${done ? 'text-fg-positive' : 'text-fg-secondary'}`}
           >
             {done ?? countLine(data)}

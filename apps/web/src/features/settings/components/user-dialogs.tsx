@@ -246,9 +246,11 @@ export function RoleDialog({
   const [picks, setPicks] = useState<Picks>({});
   const [tried, setTried] = useState(false);
   // A different person or mode starts afresh (derive-from-props, S15).
-  const [seen, setSeen] = useState(`${person?.id}:${mode}`);
-  if (seen !== `${person?.id}:${mode}`) {
-    setSeen(`${person?.id}:${mode}`);
+  // Keyed by the role too: reopened after a change, the dialog starts from the role they have now.
+  const key = `${person?.id}:${person?.role}:${mode}`;
+  const [seen, setSeen] = useState(key);
+  if (seen !== key) {
+    setSeen(key);
     const next = STAFF_ROLES.filter((r) => r !== (person?.role ?? 'viewer'));
     setNewRole(person?.role === 'responder' ? 'viewer' : (next[0] ?? 'viewer'));
     setPicks({});
