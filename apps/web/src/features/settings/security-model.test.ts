@@ -71,6 +71,7 @@ const data: SecurityData = {
     },
   ],
   names: { [TAO]: 'Tao', [NOK]: 'Nok', [PLOY]: 'Ploy', [MINT]: 'Mint' },
+  signOuts: [],
   entries: [
     {
       at: '2026-09-25T03:08:00Z',
@@ -142,7 +143,7 @@ describe('securityRows (Security board, MSecurity §35.6)', () => {
       action: 'all',
       oncall: { text: 'On call now', live: true },
     });
-    expect(row('Mint')).toMatchObject({ devices: 0, action: null, last: 'No devices', oncall: null });
+    expect(row('Mint')).toMatchObject({ devices: 0, action: null, last: '—', oncall: null });
   });
 
   it('signed out everywhere reads from the audit row, so it survives a reload', () => {
@@ -154,9 +155,18 @@ describe('securityRows (Security board, MSecurity §35.6)', () => {
     });
   });
 
-  it('an older sign-out keeps its day (code review)', () => {
-    const old = { ...data, entries: [{ ...data.entries[0]!, at: '2026-09-21T03:08:00Z' }] };
-    expect(securityRows(old, NOW).find((r) => r.name === 'Nok')!.last).toBe('Signed out · Mon 21 Sep 10:08');
+  it('an older sign-out keeps its day, and reads from its own query (code review, spec-checker)', () => {
+    const at = (iso: string) => {
+      const old = { ...data, entries: [], signOuts: [{ ...data.entries[0]!, at: iso }] };
+      return securityRows(old, NOW).find((r) => r.name === 'Nok')!.last;
+    };
+    expect(at('2026-09-24T03:08:00Z')).toBe('Signed out · Yesterday 10:08');
+    expect(at('2026-09-21T03:08:00Z')).toBe('Signed out · Mon 10:08');
+    expect(at('2026-09-02T03:08:00Z')).toBe('Signed out · 2 Sep');
+  });
+
+  it('a person with no devices and no sign-out on record reads "—", never "No devices" twice', () => {
+    expect(row('Mint').last).toBe('—');
   });
 
   it('a pending address has no devices and has not signed in', () => {
@@ -226,8 +236,8 @@ describe('signinEvents (§35.7: newest 5)', () => {
       ['10:08', 'log-out', 'Tao signed Nok out everywhere'],
       ['Yesterday 16:40', 'ban', 'Refused sign-in · an address @gmail.com'],
       ['Yesterday 09:12', 'user', 'Tao added new@dxt.test as an Admin'],
-      ['Wed 23 Sep 18:30', 'user', 'Tao removed old@dxt.test from the access list'],
-      ['Tue 22 Sep 08:00', 'log-out', 'Ploy signed out one of their devices'],
+      ['Wed 18:30', 'user', 'Tao removed old@dxt.test from the access list'],
+      ['Tue 08:00', 'log-out', 'Ploy signed out one of their devices'],
     ]);
   });
   it('someone no longer listed reads "someone"', () => {

@@ -102,7 +102,7 @@ export async function loadSecurityData(
   domains: string[],
   now: Date,
 ): Promise<SecurityData> {
-  const [profiles, invites, shifts, sessions, entries] = await Promise.all([
+  const [profiles, invites, shifts, sessions, entries, signOuts] = await Promise.all([
     db.from('profiles').select('id, display_name, email, role, google_chat_user_id, is_active'),
     db.rpc('pending_invites'),
     db
@@ -116,7 +116,14 @@ export async function loadSecurityData(
       .select('at, action, actor_id, entity_id, before, after')
       .in('action', [...SIGNIN_ACTIONS])
       .order('at', { ascending: false })
-      .limit(100),
+      .limit(20),
+    // Each person's last "signed out everywhere" (Last sign-in, D-062 item 12): a few rows a month.
+    db
+      .from('audit_log')
+      .select('at, action, actor_id, entity_id, before, after')
+      .eq('action', 'session.sign_out_all')
+      .order('at', { ascending: false })
+      .limit(500),
   ]);
   const everyone = check('profiles', profiles) ?? [];
   const sessionRows = check('list_sessions', sessions) ?? [];
@@ -153,16 +160,26 @@ export async function loadSecurityData(
       current: s.is_current,
     })),
     names: Object.fromEntries(everyone.map((p) => [p.id, p.display_name])),
-    entries: (check('audit_log', entries) ?? []).map((e) => ({
-      at: e.at,
-      action: e.action,
-      actorId: e.actor_id,
-      entityId: e.entity_id,
-      before: e.before,
-      after: e.after,
-    })),
+    entries: (check('audit_log', entries) ?? []).map(accessEntry),
+    signOuts: (check('audit_log sign-outs', signOuts) ?? []).map(accessEntry),
   };
 }
+
+const accessEntry = (e: {
+  at: string;
+  action: string;
+  actor_id: string | null;
+  entity_id: string | null;
+  before: unknown;
+  after: unknown;
+}) => ({
+  at: e.at,
+  action: e.action,
+  actorId: e.actor_id,
+  entityId: e.entity_id,
+  before: e.before,
+  after: e.after,
+});
 
 /** The table's order: Admins first, then Responders, Stakeholders, Viewers; by name within. */
 const ROLE_ORDER: Record<Role, number> = { admin: 0, responder: 1, stakeholder: 2, viewer: 3, client: 4 };

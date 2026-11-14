@@ -27,7 +27,7 @@ test.describe('sign-in & security (local Supabase)', () => {
     await page.goto('/settings/security');
     await expect(page.getByRole('heading', { name: 'Who can sign in' })).toBeVisible();
     const row = page.getByRole('row').filter({ hasText: person.name });
-    await row.getByRole('button', { name: 'Sign out all' }).click();
+    await row.getByRole('button', { name: /^Sign out all of / }).click();
     const dialog = page.getByRole('dialog', { name: `Sign out ${person.name} everywhere?` });
     await expect(dialog.getByText('Their role and alerts don’t change.', { exact: false })).toBeVisible();
     await dialog.getByRole('button', { name: /^Sign out \d+ devices?$/ }).click();
@@ -35,7 +35,7 @@ test.describe('sign-in & security (local Supabase)', () => {
       new RegExp(`^${person.name} signed out on \\d+ devices? · logged$`),
     );
     await expect(row.getByText(/^Signed out · \d\d:\d\d$/)).toBeVisible();
-    await expect(row.getByRole('button', { name: 'Sign out all' })).toHaveCount(0);
+    await expect(row.getByRole('button', { name: /^Sign out all of / })).toHaveCount(0);
     // Focus goes to the section heading once the row's button is gone.
     await expect(page.getByRole('heading', { name: 'People and their sign-in' })).toBeFocused();
 

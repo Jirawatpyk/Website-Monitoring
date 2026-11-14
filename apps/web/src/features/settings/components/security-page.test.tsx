@@ -52,6 +52,7 @@ const data: SecurityData = {
   ],
   names: { [TAO]: 'Tao', [PLOY]: 'Ploy' },
   entries: [],
+  signOuts: [],
 };
 
 beforeEach(() => {
@@ -65,7 +66,7 @@ describe('SecurityPageView (Security, MSecurity)', () => {
     const user = userEvent.setup();
     render(<SecurityPageView data={data} now={NOW} />);
     const row = screen.getAllByRole('row').find((r) => within(r).queryByText('Ploy'))!;
-    await user.click(within(row).getByRole('button', { name: 'Sign out all' }));
+    await user.click(within(row).getByRole('button', { name: /^Sign out all of / }));
     const dialog = await screen.findByRole('dialog', { name: 'Sign out Ploy everywhere?' });
     expect(within(dialog).getByText('Safari · iPhone')).toBeInTheDocument();
     expect(within(dialog).getByText('Ploy is on call until Mon 28 Sep 09:00')).toBeInTheDocument();
@@ -103,12 +104,12 @@ describe('SecurityPageView (Security, MSecurity)', () => {
     const user = userEvent.setup();
     render(<SecurityPageView data={data} now={NOW} />);
     const row = screen.getAllByRole('row').find((r) => within(r).queryByText('Ploy'))!;
-    await user.click(within(row).getByRole('button', { name: 'Sign out all' }));
+    await user.click(within(row).getByRole('button', { name: /^Sign out all of / }));
     const dialog = await screen.findByRole('dialog', { name: 'Sign out Ploy everywhere?' });
     await user.click(within(dialog).getByRole('button', { name: 'Sign out 2 devices' }));
     expect(await within(dialog).findByText('Only an Admin can change people’s access.')).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(within(row).getByRole('button', { name: 'Sign out all' })).toHaveFocus());
+    await waitFor(() => expect(within(row).getByRole('button', { name: /^Sign out all of / })).toHaveFocus());
   });
 
   it('phone: a card opens the person’s devices, view only (§35.6)', async () => {

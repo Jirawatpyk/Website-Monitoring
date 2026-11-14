@@ -7,9 +7,14 @@ export default function Loading() {
     <Container>
       <PageSkeleton label="Loading sign-in and security">
         <PageHeaderSkeleton phoneBar="title" />
-        <CardSkeleton lines={3} />
+        <div className="md:max-w-xl">
+          <CardSkeleton lines={3} />
+        </div>
         <CardSkeleton lines={8} />
-        <CardSkeleton lines={5} />
+        <div className="grid gap-6 md:grid-cols-2 md:gap-4">
+          <CardSkeleton lines={5} />
+          <CardSkeleton lines={3} />
+        </div>
       </PageSkeleton>
     </Container>
   );

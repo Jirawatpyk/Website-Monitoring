@@ -49,7 +49,7 @@ import { SettingsHeader } from './settings-header';
 import { loadHandover } from '../actions';
 import { ChatIdDialog, InviteDialog, RevokeDialog, RoleDialog } from './user-dialogs';
 import { ViewOnlyLine } from './view-only-line';
-import { SECTION_HEADING } from './heading';
+import { PERSON_CARD, SECTION_HEADING } from './heading';
 
 const HEADING = SECTION_HEADING;
 
@@ -458,7 +458,7 @@ function PeopleCards({ data, rows }: { data: UsersData; rows: UserRow[] }) {
             type="button"
             onClick={() => setOpen(r)}
             aria-label={`${r.name}, ${ROLE_LABELS[r.role]}, ${r.meta}. Show details`}
-            className="flex min-h-16 w-full items-center gap-2.5 border-0 border-b border-border-subtle bg-transparent py-2.5 pr-2 pl-3.5 text-left last:border-b-0"
+            className={PERSON_CARD}
           >
             <span className="flex min-w-0 grow flex-col gap-0.5 leading-snug">
               <span className="flex items-center gap-2">

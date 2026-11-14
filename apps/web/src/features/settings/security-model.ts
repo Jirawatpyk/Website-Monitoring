@@ -46,6 +46,8 @@ export interface SecurityData {
   names: Record<string, string>;
   /** The newest Access rows that are sign-in events (newest first). */
   entries: AccessEntry[];
+  /** The newest "signed out everywhere" rows on their own, so an old one still reads after a busy week. */
+  signOuts: AccessEntry[];
 }
 
 /** The audit actions the "Recent sign-in events" card shows (D-062 item 12). */
@@ -107,15 +109,33 @@ const ORDER: Record<Role, number> = { admin: 0, responder: 1, stakeholder: 2, vi
 /** The newest `session.sign_out_all` per person: "Signed out · 10:08" survives a reload. */
 function signedOutAt(d: SecurityData): Map<string, string> {
   const at = new Map<string, string>();
-  for (const e of d.entries)
-    if (e.action === 'session.sign_out_all' && e.entityId && !at.has(e.entityId)) at.set(e.entityId, e.at);
+  for (const e of [...d.signOuts, ...d.entries])
+    if (e.action === 'session.sign_out_all' && e.entityId && (at.get(e.entityId) ?? '') < e.at)
+      at.set(e.entityId, e.at);
   return at;
 }
 
-/** "Signed out · 10:08" today (the boards), "Signed out · Mon 2 Nov 10:08" before — never a bare old time. */
-export function signedOutLabel(at: Date, now: Date): string {
-  return `Signed out · ${isSameBangkokDay(at, now) ? formatTime(at) : formatWhen(at, now)}`;
+/**
+ * A short past time for the people and events (§35.6–7, §13; D-062 item 12): "10:08" today, "Yesterday
+ * 16:40", "Thu 16:40" within the week, then "21 Sep" — short enough for the phone's right-hand column and
+ * the table's Last sign-in.
+ */
+export function shortWhen(at: Date, now: Date): string {
+  if (isSameBangkokDay(at, now)) return formatTime(at);
+  if (isSameBangkokDay(at, new Date(now.getTime() - 86_400_000))) return `Yesterday ${formatTime(at)}`;
+  if (now.getTime() - at.getTime() < 6 * 86_400_000)
+    return `${formatDay(at, { weekday: true }).split(' ')[0]} ${formatTime(at)}`;
+  return formatDay(at);
 }
+
+/** "Signed out · 10:08" today (the boards), "Signed out · 21 Sep" long ago — never a bare old time. */
+export function signedOutLabel(at: Date, now: Date): string {
+  return `Signed out · ${shortWhen(at, now)}`;
+}
+
+/** The table's Last sign-in: "Today 07:52", else the short form. */
+const lastSignIn = (at: Date, now: Date) =>
+  isSameBangkokDay(at, now) ? `Today ${formatTime(at)}` : shortWhen(at, now);
 
 function oncallMark(d: SecurityData, personId: string, now: Date): SecurityRow['oncall'] {
   const t = now.getTime();
@@ -134,11 +154,12 @@ export function securityRows(d: SecurityData, now: Date): SecurityRow[] {
       const signIn = mine.map((s) => s.createdAt).sort((a, b) => b.localeCompare(a))[0];
       const outAt = out.get(p.id);
       const self = p.id === d.viewerId;
+      // No session and no sign-out on record: nothing to say (the devices count already says none).
       const last = signIn
-        ? formatWhen(new Date(signIn), now)
+        ? lastSignIn(new Date(signIn), now)
         : outAt
           ? signedOutLabel(new Date(outAt), now)
-          : 'No devices';
+          : '—';
       return {
         key: p.id,
         personId: p.id,
@@ -226,7 +247,7 @@ export function oncallWarning(
 export interface SigninEvent {
   key: string;
   at: string;
-  /** Desktop's mono time / MSecurity's right-hand time: "10:08", "Thu 16:40". */
+  /** Desktop's mono time / MSecurity's right-hand time: "10:08", "Yesterday 16:40", "Thu 16:40", "21 Sep". */
   time: string;
   icon: 'log-out' | 'ban' | 'user';
   text: string;
@@ -234,7 +255,8 @@ export interface SigninEvent {
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 const field = (v: unknown, k: string) => (isRecord(v) && typeof v[k] === 'string' ? (v[k] as string) : null);
-const roleWord = (r: string | null) => (r && r in ROLE_LABELS ? ROLE_LABELS[r as Role] : 'someone');
+/** " as an Admin" — nothing when the row carries no known role (never "as a someone"). */
+const asRole = (r: string | null) => (r && r in ROLE_LABELS ? ` as ${article(ROLE_LABELS[r as Role])}` : '');
 const article = (w: string) => (/^[AEIOU]/.test(w) ? `an ${w}` : `a ${w}`);
 
 /**
@@ -244,7 +266,6 @@ const article = (w: string) => (/^[AEIOU]/.test(w) ? `an ${w}` : `a ${w}`);
  */
 export function signinEvents(d: SecurityData, now: Date, limit = 5): SigninEvent[] {
   const who = (id: string | null, fallback: string) => (id ? (d.names[id] ?? fallback) : fallback);
-  const sameDay = (iso: string) => formatWhen(new Date(iso), now);
   return d.entries.slice(0, limit).map((e, i) => {
     const actor = who(e.actorId, 'An Admin');
     const target = who(e.entityId, 'someone');
@@ -271,13 +292,13 @@ export function signinEvents(d: SecurityData, now: Date, limit = 5): SigninEvent
         break;
       }
       case 'user.invite':
-        text = `${actor} added ${email ?? 'an address'} as ${article(roleWord(field(e.after, 'role')))}`;
+        text = `${actor} added ${email ?? 'an address'}${asRole(field(e.after, 'role'))}`;
         break;
       case 'user.invite_revoke':
         text = `${actor} removed ${email ?? 'an address'} from the access list`;
         break;
       case 'user.reactivate':
-        text = `${actor} gave ${target} access again as ${article(roleWord(field(e.after, 'role')))}`;
+        text = `${actor} gave ${target} access again${asRole(field(e.after, 'role'))}`;
         break;
       case 'user.deactivate':
         text = `${actor} deactivated ${target}`;
@@ -285,8 +306,6 @@ export function signinEvents(d: SecurityData, now: Date, limit = 5): SigninEvent
       default:
         text = e.action;
     }
-    // "10:08" today, "Thu 16:40" before (MSecurity).
-    const t = sameDay(e.at);
-    return { key: `${e.at}-${i}`, at: e.at, time: t.replace(/^Today /, ''), icon, text };
+    return { key: `${e.at}-${i}`, at: e.at, time: shortWhen(new Date(e.at), now), icon, text };
   });
 }

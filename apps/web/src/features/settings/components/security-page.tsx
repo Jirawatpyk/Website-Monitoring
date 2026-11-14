@@ -41,7 +41,8 @@ import {
 import { RoleBadge } from './role-badge';
 import { SettingsHeader } from './settings-header';
 import { ViewOnlyLine } from './view-only-line';
-import { SECTION_HEADING } from './heading';
+import { PERSON_CARD, SECTION_HEADING } from './heading';
+import { FOCUS_TARGET } from '@/components/focus-target';
 
 const HEADING = SECTION_HEADING;
 
@@ -84,14 +85,14 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
       key: 'person',
       label: 'Person',
       grow: 1,
-      minWidth: 150,
+      minWidth: 140,
       render: (r) => (
         <span className="flex min-w-0 items-center gap-3">
           <Avatar name={r.name} size="sm" />
           <span className="min-w-0 truncate">
             <span className="font-medium">{r.name}</span>
             {r.oncall && (
-              <span className={r.oncall.live ? 'font-semibold' : 'text-fg-secondary'}>
+              <span className={`text-xs ${r.oncall.live ? 'font-semibold' : 'text-fg-secondary'}`}>
                 {' '}
                 · {r.oncall.text}
               </span>
@@ -100,24 +101,24 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
         </span>
       ),
     },
-    { key: 'role', label: 'Role', width: 112, render: (r) => <RoleBadge role={r.role} /> },
+    { key: 'role', label: 'Role', width: 120, render: (r) => <RoleBadge role={r.role} /> },
     {
       key: 'devices',
       label: 'Devices',
-      width: 80,
+      width: 90,
       align: 'end',
       render: (r) => <span className="tabular-nums">{r.devices}</span>,
     },
     {
       key: 'last',
       label: 'Last sign-in',
-      width: 144,
+      width: 176,
       render: (r) => <span className="whitespace-nowrap">{r.last}</span>,
     },
     {
       key: 'action',
       label: '',
-      width: 196,
+      width: 190,
       actions: true,
       render: (r) =>
         r.action ? (
@@ -126,6 +127,8 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
             size="sm"
             icon={<IconLogOut />}
             data-signout={r.key}
+            // Whose row it is, with the visible words kept in the name (WCAG 2.5.3).
+            aria-label={r.action === 'others' ? undefined : `Sign out all of ${r.name}’s devices`}
             onClick={() => {
               focusKey.current = r.key;
               setOpen(r);
@@ -146,7 +149,7 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
 
       <section className="flex flex-col gap-3" aria-labelledby="signin-h">
         <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
-          <h2 id="signin-h" ref={headingRef} tabIndex={-1} className={HEADING}>
+          <h2 id="signin-h" ref={headingRef} tabIndex={-1} className={`${HEADING} ${FOCUS_TARGET}`}>
             <span className="md:hidden">PEOPLE AND THEIR SIGN-IN · {rows.length}</span>
             <span className="hidden md:inline">People and their sign-in</span>
           </h2>
@@ -170,13 +173,15 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
         <PeopleCards data={data} rows={rows} now={now} />
       </section>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 md:gap-4">
         <EventsCard events={events} />
         <section aria-labelledby="down-h" className="flex flex-col gap-3 md:hidden">
           <h2 id="down-h" className={HEADING}>
             IF GOOGLE SIGN-IN IS DOWN
           </h2>
-          <p className="m-0 text-sm leading-relaxed text-fg-secondary">{DOWN_TEXT}</p>
+          <p className="m-0 rounded-aura-lg border border-border-default bg-bg-surface p-3.5 text-sm leading-relaxed text-fg-secondary">
+            {DOWN_TEXT}
+          </p>
         </section>
         <div className="hidden md:block">
           <Card title="If Google sign-in is down" headingLevel={2}>
@@ -212,7 +217,9 @@ function WhoCanSignIn({ domains }: { domains: string[] }) {
           Google Workspace {domains.length === 1 ? 'domain' : 'domains'}
         </span>
         <span className="font-mono text-sm break-all">{domains.join(' · ')}</span>
-        <span className="text-xs text-fg-secondary">Set at deploy time. Changing it signs everyone out.</span>
+        <span className="text-xs text-fg-secondary">
+          Set at deploy time.<span className="hidden md:inline"> Changing it signs everyone out.</span>
+        </span>
       </div>
       <div className="flex items-start justify-between gap-3">
         <span className="flex flex-col gap-0.5">
@@ -274,16 +281,18 @@ function EventsCard({ events }: { events: SigninEvent[] }) {
         <h2 id="events-h" className={HEADING}>
           RECENT SIGN-IN EVENTS · NEWEST 5
         </h2>
-        <div className="rounded-aura-lg border border-border-default bg-bg-surface px-3.5">{list}</div>
-        <Button
-          variant="ghost"
-          icon={<IconFileText />}
-          href="/audit?cat=access"
-          fullWidth
-          linkComponent={Link}
-        >
-          All sign-in events in the Audit log
-        </Button>
+        <div className="flex flex-col gap-1 rounded-aura-lg border border-border-default bg-bg-surface px-3.5 pb-2">
+          {list}
+          <Button
+            variant="ghost"
+            icon={<IconFileText />}
+            href="/audit?cat=access"
+            fullWidth
+            linkComponent={Link}
+          >
+            All sign-in events in the Audit log
+          </Button>
+        </div>
       </section>
       <div className="hidden md:block">
         <Card
@@ -324,8 +333,8 @@ function PeopleCards({ data, rows, now }: { data: SecurityData; rows: SecurityRo
             key={r.key}
             type="button"
             onClick={() => setOpen(r)}
-            aria-label={`${r.name}, ${ROLE_LABELS[r.role]}${r.oncall?.live ? ', on call now' : ''}, ${devicesWord(r.devices)}, last sign-in ${r.last}. Show devices`}
-            className="flex min-h-16 w-full items-center gap-2.5 border-0 border-b border-border-subtle bg-transparent py-2.5 pr-2 pl-3.5 text-left last:border-b-0"
+            aria-label={`${r.name}, ${ROLE_LABELS[r.role]}${r.oncall?.live ? ', on call now' : ''}, ${devicesWord(r.devices)}${r.last === '—' ? '' : `, last sign-in ${r.last}`}. Show devices`}
+            className={PERSON_CARD}
           >
             <span className="flex min-w-0 grow flex-col gap-0.5 leading-snug">
               <span className="flex items-center gap-2">
@@ -336,7 +345,8 @@ function PeopleCards({ data, rows, now }: { data: SecurityData; rows: SecurityRo
                 {r.oncall?.live && <span className="shrink-0 text-xs font-semibold">· On call now</span>}
               </span>
               <span className="truncate text-xs text-fg-secondary">
-                {devicesWord(r.devices)} · {r.last}
+                {devicesWord(r.devices)}
+                {r.last === '—' ? '' : ` · ${r.last}`}
               </span>
             </span>
             <IconChevronRight size="sm" aria-hidden className="text-fg-tertiary" />
@@ -373,7 +383,7 @@ function PeopleCards({ data, rows, now }: { data: SecurityData; rows: SecurityRo
 
 function DeviceList({ devices }: { devices: Device[] }) {
   return (
-    <ul className="m-0 flex list-none flex-col p-0">
+    <ul className="m-0 flex list-none flex-col rounded-aura-md border border-border-default px-3">
       {devices.map((x) => (
         <li
           key={x.id}
@@ -417,11 +427,15 @@ function SignOutDialog({
     setSeen(row?.key);
     setError(null);
   }
-  const self = !!row && row.personId === data.viewerId;
-  const all = row?.personId ? devicesOf(data, row.personId, now) : [];
+  const [last, setLast] = useState<SecurityRow | null>(row);
+  if (row && row !== last) setLast(row);
+  const shownRow = row ?? last;
+  const self = !!shownRow && shownRow.personId === data.viewerId;
+  const all = shownRow?.personId ? devicesOf(data, shownRow.personId, now) : [];
   const shown = self ? all.filter((x) => !x.current) : all;
-  const copy = row ? signOutCopy(row.name, self, all) : null;
-  const warning = row?.personId && !self ? oncallWarning(data, row.personId, row.name, now) : null;
+  const copy = shownRow ? signOutCopy(shownRow.name, self, all) : null;
+  const warning =
+    shownRow?.personId && !self ? oncallWarning(data, shownRow.personId, shownRow.name, now) : null;
   const go = () =>
     start(async () => {
       setError(null);
