@@ -154,6 +154,11 @@ describe('securityRows (Security board, MSecurity §35.6)', () => {
     });
   });
 
+  it('an older sign-out keeps its day (code review)', () => {
+    const old = { ...data, entries: [{ ...data.entries[0]!, at: '2026-09-21T03:08:00Z' }] };
+    expect(securityRows(old, NOW).find((r) => r.name === 'Nok')!.last).toBe('Signed out · Mon 21 Sep 10:08');
+  });
+
   it('a pending address has no devices and has not signed in', () => {
     expect(row('new@dxt.test')).toMatchObject({ personId: null, last: 'Not signed in yet', action: null });
   });

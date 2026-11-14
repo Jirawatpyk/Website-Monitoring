@@ -39,6 +39,16 @@ async function admin(path: string, init: RequestInit = {}): Promise<unknown> {
   return text ? JSON.parse(text) : null;
 }
 
+/** Whether `email` signs in with the test password (a throwaway session; nothing else changes). */
+async function passwordWorks(email: string): Promise<boolean> {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: PASSWORD }),
+  });
+  return res.ok;
+}
+
 /** The auth user for `email` (created without an allowlist row if missing), with the test password. */
 export async function ensureUser(email: string): Promise<string> {
   const list = (await admin('/auth/v1/admin/users?per_page=1000')) as {
@@ -46,6 +56,10 @@ export async function ensureUser(email: string): Promise<string> {
   };
   const found = list.users.find((u) => u.email === email);
   if (found) {
+    // Setting a password ends every session the person has (GoTrue), and since S16 a session that's gone
+    // is refused at once (`my_access` → ended): resetting it on each call signed out the same person's
+    // tests running alongside (S16 PR 3 code review). Only set it when the test password doesn't work yet.
+    if (await passwordWorks(email)) return found.id;
     await admin(`/auth/v1/admin/users/${found.id}`, {
       method: 'PUT',
       body: JSON.stringify({ password: PASSWORD }),

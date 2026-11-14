@@ -49,10 +49,9 @@ import { SettingsHeader } from './settings-header';
 import { loadHandover } from '../actions';
 import { ChatIdDialog, InviteDialog, RevokeDialog, RoleDialog } from './user-dialogs';
 import { ViewOnlyLine } from './view-only-line';
+import { SECTION_HEADING } from './heading';
 
-/** A section's h2: MUsers' mono caps on a phone, Site detail's 24 px heading from md. */
-const HEADING =
-  'm-0 font-mono text-xs font-normal text-fg-tertiary md:font-sans md:text-2xl md:font-semibold md:text-fg-primary';
+const HEADING = SECTION_HEADING;
 
 /** `focusKey` for the Add person button (a row key is a uuid or an address, never this). */
 const ADD = '<add-person>';

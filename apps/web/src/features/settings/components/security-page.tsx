@@ -41,10 +41,9 @@ import {
 import { RoleBadge } from './role-badge';
 import { SettingsHeader } from './settings-header';
 import { ViewOnlyLine } from './view-only-line';
+import { SECTION_HEADING } from './heading';
 
-/** A section's h2: MSecurity's mono caps on a phone, the board's 24 px heading from md (as Users). */
-const HEADING =
-  'm-0 font-mono text-xs font-normal text-fg-tertiary md:font-sans md:text-2xl md:font-semibold md:text-fg-primary';
+const HEADING = SECTION_HEADING;
 
 const DOWN_TEXT =
   'There are no local passwords, on purpose. Checks, the Chat thread, emails and escalation keep running without anyone signed in — only Ack and editing wait. Escalation doesn’t stop without an ack, so the next level still gets called.';
@@ -435,10 +434,15 @@ function SignOutDialog({
         return;
       }
       const n = Number(r.outcome ?? 0);
+      // 0: their sessions ended meanwhile (another Admin, or they signed out themselves).
       onDone(
-        self
-          ? `Signed out ${devicesWord(n).toLowerCase()} of yours · logged`
-          : `${row!.name} signed out on ${devicesWord(n).toLowerCase()} · logged`,
+        n === 0
+          ? self
+            ? 'Your other devices were signed out already'
+            : `${row!.name} was signed out already`
+          : self
+            ? `Signed out ${devicesWord(n).toLowerCase()} of yours · logged`
+            : `${row!.name} signed out on ${devicesWord(n).toLowerCase()} · logged`,
         true,
       );
       router.refresh();

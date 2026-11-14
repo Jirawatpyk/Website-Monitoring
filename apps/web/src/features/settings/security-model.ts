@@ -3,7 +3,15 @@
  * rules behind the page — the people rows, each person's devices, the sign-out dialog's words, the
  * on-call warning, and the recent sign-in events worded as sentences.
  */
-import { deviceLabel, formatDay, formatTime, formatWhen, ROLE_LABELS, type Role } from '@dxt/shared';
+import {
+  deviceLabel,
+  formatDay,
+  formatTime,
+  formatWhen,
+  isSameBangkokDay,
+  ROLE_LABELS,
+  type Role,
+} from '@dxt/shared';
 import type { Invite, Person, ShiftRef } from './model';
 
 export interface SessionRef {
@@ -104,6 +112,11 @@ function signedOutAt(d: SecurityData): Map<string, string> {
   return at;
 }
 
+/** "Signed out · 10:08" today (the boards), "Signed out · Mon 2 Nov 10:08" before — never a bare old time. */
+export function signedOutLabel(at: Date, now: Date): string {
+  return `Signed out · ${isSameBangkokDay(at, now) ? formatTime(at) : formatWhen(at, now)}`;
+}
+
 function oncallMark(d: SecurityData, personId: string, now: Date): SecurityRow['oncall'] {
   const t = now.getTime();
   const mine = d.shifts.filter((s) => s.userId === personId && Date.parse(s.endsAt) > t);
@@ -124,7 +137,7 @@ export function securityRows(d: SecurityData, now: Date): SecurityRow[] {
       const last = signIn
         ? formatWhen(new Date(signIn), now)
         : outAt
-          ? `Signed out · ${formatTime(new Date(outAt))}`
+          ? signedOutLabel(new Date(outAt), now)
           : 'No devices';
       return {
         key: p.id,

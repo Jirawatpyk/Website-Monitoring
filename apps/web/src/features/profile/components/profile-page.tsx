@@ -64,7 +64,9 @@ export function ProfilePageView({
         eyebrow="ACCOUNT"
         title={
           <span className="flex items-center gap-3">
-            <Avatar name={data.me.name} size="lg" />
+            <span aria-hidden>
+              <Avatar name={data.me.name} size="lg" />
+            </span>
             {data.me.name}
           </span>
         }

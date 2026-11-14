@@ -85,7 +85,9 @@ export async function loadProfileData(db: DbClient, meId: string, now: Date): Pr
 
   const stepRows = check('escalation_steps', steps) ?? [];
   const role = p.role as Role;
-  const swap = (check('oncall_swaps', swaps) ?? [])[0];
+  const swap = [...(check('oncall_swaps', swaps) ?? [])].sort(
+    (a, b) => Number(a.requester_id === meId) - Number(b.requester_id === meId),
+  )[0];
   const hours = check('organisation_settings', settings);
 
   return {

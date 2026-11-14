@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { ensurePerson, ensureUser, localSupabaseEnabled, signIn } from './support/local-supabase';
 
-// S16 PR 3 (D-062 items 6, 12): My profile. Local Supabase only. The device signed out is a second
-// browser of the spec's own person (e2e-profile@…), so no other spec loses its session; the Chat id the
-// spec sets it clears again.
+// S16 PR 3 (D-062 items 6, 12): My profile. Local Supabase only. Each test that signs devices out or
+// edits a Chat id has its own person per project (desktop and mobile run side by side), so no other
+// test loses its session (code review); the Chat id the spec sets it clears again.
 test.describe('my profile (local Supabase)', () => {
   test.skip(!localSupabaseEnabled, 'needs the local Supabase stack: E2E_LOCAL_SUPABASE=1');
 
@@ -12,15 +12,16 @@ test.describe('my profile (local Supabase)', () => {
     context,
     browser,
     baseURL,
-  }) => {
-    await ensurePerson('e2e-profile@example.test', 'responder');
+  }, info) => {
+    const email = `e2e-profile-out-${info.project.name}@example.test`;
+    await ensurePerson(email, 'responder');
     const other = await browser.newContext();
-    await signIn(other, baseURL!, 'e2e-profile@example.test');
+    await signIn(other, baseURL!, email);
     const there = await other.newPage();
     await there.goto('/');
     await expect(there).not.toHaveURL(/\/login/);
 
-    await signIn(context, baseURL!, 'e2e-profile@example.test');
+    await signIn(context, baseURL!, email);
     await page.goto('/profile');
     await expect(page.getByRole('heading', { name: 'Signed-in devices' })).toBeVisible();
     await expect(page.getByText('This device', { exact: true })).toBeVisible();
@@ -30,7 +31,7 @@ test.describe('my profile (local Supabase)', () => {
     // Sign out every other device of this person (earlier runs may have left more).
     for (let i = 0; i < before; i++) {
       await signOuts.first().click();
-      await expect(page.getByText('Signed out · now').first()).toBeVisible();
+      // "Signed out · now" shows until the refresh drops the row (component test): the count is the check.
       await expect(signOuts).toHaveCount(before - i - 1);
     }
     await there.goto('/');
@@ -43,8 +44,8 @@ test.describe('my profile (local Supabase)', () => {
 
   test('your own Chat id: add it, then clear it (D-062 item 6)', async ({ page, context, baseURL }, info) => {
     test.skip(info.project.name === 'mobile', 'one run is enough; the dialog is the same at every width');
-    await ensurePerson('e2e-profile@example.test', 'responder');
-    await signIn(context, baseURL!, 'e2e-profile@example.test');
+    await ensurePerson('e2e-profile-chat@example.test', 'responder');
+    await signIn(context, baseURL!, 'e2e-profile-chat@example.test');
     await page.goto('/profile');
     await page.getByRole('button', { name: 'Edit Chat id…' }).click();
     const dialog = page.getByRole('dialog', { name: 'Your Google Chat id' });
