@@ -20,6 +20,24 @@
     "features/escalation/actions.ts#saveEscalation": {
       "rpc": ["save_escalation_policies"]
     },
+    "features/settings/actions.ts#inviteUser": {
+      "rpc": ["invite_user"]
+    },
+    "features/settings/actions.ts#revokeInvite": {
+      "rpc": ["revoke_invite"]
+    },
+    "features/settings/actions.ts#changeUserRole": {
+      "rpc": ["change_user_role"]
+    },
+    "features/settings/actions.ts#deactivateUser": {
+      "rpc": ["deactivate_user"]
+    },
+    "features/settings/actions.ts#setChatId": {
+      "rpc": ["set_chat_user_id"]
+    },
+    "features/settings/actions.ts#loadHandover": {
+      "exempt": "Reads the On-call data the Hand over dialog shows; changes nothing (the hand-over itself is oncall#handOver)."
+    },
     "features/incidents/actions.ts#acknowledgeIncident": {
       "rpc": ["ack_incident"]
     },
