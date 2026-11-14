@@ -1,4 +1,5 @@
 import 'server-only';
+import type { AccountEventFacts } from './account-facts';
 import type { SeriesFacts } from './series-facts';
 import type { Database, DbClient, Json } from '@dxt/db';
 import type { ChatMessage, EmailMessage } from '@dxt/notifier';
@@ -115,6 +116,8 @@ export interface Facts {
   reports?: Map<string, ReportRow>;
   /** Repeating series (S14, D-057), attached by the dispatcher. */
   series?: SeriesFacts;
+  /** Account events (S16 PR 4, spec §34), attached by the dispatcher. */
+  account?: Map<string, AccountEventFacts>;
 }
 
 /** Loads the incidents, system alerts and email recipients of a batch of claimed messages. */

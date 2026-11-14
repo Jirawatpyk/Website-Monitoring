@@ -7,8 +7,9 @@
  * Run with `pnpm --filter @dxt/web test:int` (CI: the `db` job).
  */
 import { createClient } from '@supabase/supabase-js';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Database, DbClient } from '@dxt/db';
+import { dispatchNotifications } from './notifier/dispatch';
 
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
 // The Supabase CLI's well-known local demo keys — not secrets, and never sent to a non-local URL.
@@ -16,6 +17,7 @@ const SECRET_KEY = process.env.E2E_SUPABASE_SECRET_KEY ?? 'sb_secret_N7UND0UgjKT
 const PUBLISHABLE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH';
 const PASSWORD = 'int-local-only-Password-1';
+const MAIL = { apiKey: 're_local_test', from: 'DxT Monitor <alerts@notify.example.test>' };
 const ADMIN_EMAIL = 'tao@example.test'; // the local seed's Admin (supabase/seed.sql)
 if (!/^http:\/\/(127\.0\.0\.1|localhost):/.test(URL_))
   throw new Error('integration tests run on the local stack only');
@@ -193,5 +195,53 @@ describe('two Admins demoting each other at once (review M1)', () => {
           await must(asAdmin.rpc('deactivate_user', { p_user_id: id }).then((r) => ({ ...r, data: true })));
       }
     }
+  });
+});
+
+describe('the role-change and Access removed emails (spec §34, D-062 item 13)', () => {
+  it('each change emails the person through the real claim and dispatch; Access removed reaches them inactive', async () => {
+    const address = `s16-mail-${run}@example.test`;
+    await must(asAdmin.rpc('invite_user', { p_email: address, p_role: 'viewer' }));
+    const { data, error } = await newClient().auth.signUp({ email: address, password: PASSWORD });
+    if (error) throw new Error(error.message);
+    const id = data.user!.id;
+    const sendOne = async () => {
+      // Only this person's account email: other files' queued rows stay out of the pass.
+      const { error: e } = await db
+        .from('notifications')
+        .update({ status: 'cancelled' })
+        .eq('status', 'queued')
+        .or(`account_event_id.is.null,user_id.neq.${id}`);
+      if (e) throw new Error(e.message);
+      const send = vi.fn(async () => ({ ok: true as const, id: 'em_local' }));
+      await dispatchNotifications({
+        db,
+        webhookUrl: undefined,
+        email: MAIL,
+        appUrl: 'https://monitor.example.test',
+        send,
+      });
+      return send.mock.calls.map((c) => c as unknown as [{ subject: string; text: string }, { to: string }]);
+    };
+
+    await must(
+      asAdmin
+        .rpc('change_user_role', { p_user_id: id, p_role: 'stakeholder' })
+        .then((r) => ({ ...r, data: true })),
+    );
+    const [changed] = await sendOne();
+    expect(changed?.[1].to).toBe(address);
+    expect(changed?.[0].subject).toBe('Your DxT Monitor role is now Stakeholder');
+    expect(changed?.[0].text).toContain('Role: Stakeholder (was Viewer)');
+
+    await must(asAdmin.rpc('deactivate_user', { p_user_id: id }).then((r) => ({ ...r, data: true })));
+    const sent = await sendOne();
+    expect(sent.map(([m, o]) => [m.subject, o.to])).toEqual([
+      ['Your DxT Monitor access was removed', address],
+    ]);
+    const rows = await must(
+      db.from('notifications').select('status').eq('user_id', id).not('account_event_id', 'is', null),
+    );
+    expect(rows.map((r) => r.status)).toEqual(['sent', 'sent']);
   });
 });

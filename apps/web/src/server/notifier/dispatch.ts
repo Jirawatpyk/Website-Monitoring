@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { incidentThreadId, postChatMessage, sendEmail } from '@dxt/notifier';
+import { buildAccountEmail, incidentThreadId, postChatMessage, sendEmail } from '@dxt/notifier';
 import { UNDO_WINDOW_SEC } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { pingHealthcheck } from '../healthchecks';
@@ -10,6 +10,7 @@ import { renderWindowChat, renderWindowEmail } from './render-window';
 import { loadOncallFacts } from './oncall-facts';
 import { renderSeriesChat, renderSeriesEmail } from './render-series';
 import { loadSeriesFacts } from './series-facts';
+import { loadAccountFacts } from './account-facts';
 import { renderOncallChat, renderOncallEmail } from './render-oncall';
 
 export interface EmailConfig {
@@ -116,7 +117,7 @@ export async function dispatchNotifications(
     return { ok: true, chat: 'no_time', email: 'no_time' };
   }
   const claim = async (channel: 'google_chat' | 'email') => {
-    const claimed = await deps.db.rpc('claim_notifications', {
+    const args = {
       p_channel: channel,
       p_limit: CLAIM_LIMIT,
       ...(options.incidentId ? { p_incident_id: options.incidentId } : {}),
@@ -126,7 +127,14 @@ export async function dispatchNotifications(
       p_reports: true,
       // And repeating series' rows (S14 PR 2b).
       p_series: true,
-    });
+    };
+    // And account emails (S16 PR 4). A deploy can go live before `migrate-production` adds the
+    // parameter (PGRST202): claim without it then, so an outage alert never waits for the migration.
+    let claimed = await deps.db.rpc('claim_notifications', { ...args, p_account: true });
+    if (claimed.error?.code === 'PGRST202') {
+      console.error(JSON.stringify({ event: 'claim_without_account', error: claimed.error.message }));
+      claimed = await deps.db.rpc('claim_notifications', args);
+    }
     if (claimed.error) throw new Error(`claim_notifications: ${claimed.error.message}`);
     return claimed.data;
   };
@@ -159,6 +167,14 @@ export async function dispatchNotifications(
       facts.series = await loadSeriesFacts(deps.db, all);
     } catch (err) {
       console.error(JSON.stringify({ event: 'series_facts_unreadable', error: String(err) }));
+    }
+  }
+  // Account emails (S16): as for on-call, a failed read only retries those rows.
+  if (facts && all.some((n) => n.account_event_id)) {
+    try {
+      facts.account = await loadAccountFacts(deps.db, all);
+    } catch (err) {
+      console.error(JSON.stringify({ event: 'account_facts_unreadable', error: String(err) }));
     }
   }
   const [chat, email] = await settled([
@@ -328,6 +344,7 @@ async function release(db: DbClient, rows: readonly Notification[]): Promise<num
 }
 
 async function deliver(deps: DispatchDeps, n: Notification, facts: Facts, now: Date): Promise<Outcome> {
+  if (n.account_event_id) return deliverAccount(deps, n, facts, now);
   if (n.system_alert_id) return deliverSystemAlert(deps, n, facts);
   if (n.maintenance_window_id) return deliverWindow(deps, n, facts, now);
   if (n.oncall_event_id) return deliverOncall(deps, n, facts);
@@ -519,6 +536,51 @@ async function deliverReport(deps: DispatchDeps, n: Notification, facts: Facts):
   const { apiKey, from } = deps.email!;
   const send = deps.send ?? sendEmail;
   const result = await send(r.email, { apiKey, from, to: to.email, idempotencyKey: `notification-${n.id}` });
+  return result.ok ? { ok: true, providerId: result.id } : result;
+}
+
+/** An account email still unsent this long after it was queued (email was off, D-013) isn't sent late. */
+export const ACCOUNT_EMAIL_MAX_AGE_MS = 24 * 3_600_000;
+
+/**
+ * The role-change / access-removed email (S16 PR 4, spec §34, D-062 item 13): email only, to the
+ * event's own person, never threaded. The one email that may reach an inactive person: a `deactivated`
+ * event to the person it removed. Every other check stays as for any other email.
+ */
+async function deliverAccount(
+  deps: DispatchDeps,
+  n: Notification,
+  facts: Facts,
+  now: Date,
+): Promise<Outcome> {
+  if (!facts.account) return { ok: false, error: 'Account events unreadable', retryable: true };
+  const e = facts.account.get(n.account_event_id!);
+  if (!e) return { ok: false, error: 'Account event not found', retryable: false };
+  if (n.channel !== 'email' || n.template !== 'account_email' || !n.user_id || n.user_id !== e.user_id)
+    return { ok: false, error: 'Account emails go to their own person only', retryable: false };
+  const person = e.person;
+  if (!person || !(person.is_active || e.kind === 'deactivated'))
+    return { ok: false, error: 'Recipient not found or inactive', retryable: false };
+  if (now.getTime() - new Date(n.created_at).getTime() > ACCOUNT_EMAIL_MAX_AGE_MS)
+    return { ok: false, error: 'Queued over 24 h ago — not sent late (D-062 item 13)', retryable: false };
+  const { apiKey, from } = deps.email!;
+  const message = buildAccountEmail({
+    eventId: e.id,
+    kind: e.kind,
+    fromRole: e.from_role,
+    toRole: e.to_role,
+    at: new Date(e.created_at),
+    facts: e.facts,
+    from,
+    appUrl: deps.appUrl,
+  });
+  const send = deps.send ?? sendEmail;
+  const result = await send(message, {
+    apiKey,
+    from,
+    to: person.email,
+    idempotencyKey: `notification-${n.id}`,
+  });
   return result.ok ? { ok: true, providerId: result.id } : result;
 }
 

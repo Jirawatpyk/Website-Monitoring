@@ -337,6 +337,7 @@ describe('dispatchNotifications', () => {
         p_oncall: true,
         p_reports: true,
         p_series: true,
+        p_account: true,
       },
       {
         p_channel: 'email',
@@ -345,6 +346,7 @@ describe('dispatchNotifications', () => {
         p_oncall: true,
         p_reports: true,
         p_series: true,
+        p_account: true,
       },
     ]);
   });
