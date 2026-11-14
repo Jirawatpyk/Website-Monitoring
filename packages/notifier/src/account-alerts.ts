@@ -84,8 +84,9 @@ export function buildAccountEmail(input: AccountEmailInput): EmailMessage {
   const headers = { References: `<account-${input.eventId}@${senderDomain(input.from)}>` };
   const footer = accountFooter(facts.actor);
   const rows = movedRows(facts.moves);
+  // The table only when something moved; a note with no rows joins the lede instead (code review).
   const moved = (notes: string[]): EmailSection[] =>
-    rows.length || notes.length
+    rows.length
       ? [{ kind: 'table', title: 'WHAT MOVED TO SOMEONE ELSE', head: ['Place', 'Now with'], rows, notes }]
       : [];
 
@@ -112,7 +113,7 @@ export function buildAccountEmail(input: AccountEmailInput): EmailMessage {
           ['Removed by', `${facts.actor} · ${at}`],
         ],
         buttons: [],
-        sections: rows.length ? moved([DEACTIVATED_NOTE]) : [],
+        sections: moved([DEACTIVATED_NOTE]),
       },
     );
   }
@@ -148,7 +149,15 @@ export function buildAccountEmail(input: AccountEmailInput): EmailMessage {
   // The board's promotion lists what comes, not what stays.
   if (diff.keep && !promoted)
     sections.push({ kind: 'list', title: 'YOU KEEP', mark: '·', color: C.secondary, items: [diff.keep] });
-  sections.push(...moved(facts.left_rotation ? ['You left the on-call rotation.'] : []));
+  const rotationNote = facts.left_rotation ? ['You left the on-call rotation.'] : [];
+  sections.push(...moved(rotationNote));
+  // An Admin keeps what a Responder held (nothing moves); someone with no sites isn't told they stay.
+  // The board's promotion lede, for a Responder: their sites and shifts stay.
+  const first =
+    promoted && fromRole === 'responder'
+      ? 'Your sites and on-call shifts stay as they are.'
+      : 'It took effect straight away.';
+  const tail = !rows.length && rotationNote.length ? `${first} ${rotationNote[0]}` : first;
 
   const pre = promoted
     ? `${facts.actor} made you an Admin · ${at}`
@@ -166,9 +175,7 @@ export function buildAccountEmail(input: AccountEmailInput): EmailMessage {
       label: 'ROLE CHANGED',
       pre,
       headline: `You’re now ${article(to)} ${toLabel}`,
-      lede: promoted
-        ? `${pre}. ${rows.length ? 'It took effect straight away.' : 'Your sites and on-call shifts stay as they are.'}`
-        : `${pre}. It took effect straight away.`,
+      lede: `${pre}. ${tail}`,
       facts: [
         ['Role', `${toLabel} (was ${ROLE_LABELS[fromRole]})`],
         ['Changed by', `${facts.actor} · ${at}`],

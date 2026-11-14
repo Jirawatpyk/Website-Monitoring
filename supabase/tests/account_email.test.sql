@@ -5,7 +5,7 @@
 -- asks for account rows claims them, and one person's account emails leave in order.
 begin;
 \ir _helpers.psql
-select plan(26);
+select plan(27);
 
 -- ── Fixtures (as postgres), as users.test.sql ────────────────────────────
 select tests.clear_sites();
@@ -111,6 +111,12 @@ select is((select count(*)::int from public.notifications n where n.account_even
 -- ── Nobody but the notifier reads them ───────────────────────────────────
 select tests.authenticate_as(pg_temp.uid('tao'));
 select throws_ok('select * from public.account_events', '42501', null, 'an Admin can''t read account events');
+reset role;
+set local role service_role;
+select throws_ok('update public.account_events set facts = ''{}''', '42501', null,
+  'the notifier can''t rewrite an event (append-only)');
+reset role;
+select tests.authenticate_as(pg_temp.uid('tao'));
 select throws_ok($$select * from public.claim_notifications('email', 20, null, false, false, false, true)$$, '42501',
   null, 'a signed-in session can''t claim messages');
 reset role;

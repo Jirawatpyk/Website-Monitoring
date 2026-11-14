@@ -55,8 +55,8 @@ describe('buildAccountEmail (EmailAlert › Account · role change, spec §34)',
         '',
         'YOU CAN NO LONGER',
         '– Acknowledge or resolve incidents on your sites',
-        '– Mark client updates, except for clients where you’re Site AM',
         '– Schedule maintenance or mute your sites',
+        '– Mark client updates, except for clients where you’re Site AM',
         '',
         'YOU KEEP',
         '· The dashboard and history, alerts and digests, uptime reports',
@@ -177,6 +177,29 @@ describe('buildAccountEmail (EmailAlert › Account · role change, spec §34)',
     });
     expect(m.html).not.toMatch(/<b>Tao|<i>x|<u>Arm/);
     expect(m.html).toContain('&lt;b&gt;Tao&lt;/b&gt;');
+  });
+});
+
+describe('the lede (code review)', () => {
+  it('a Stakeholder made Admin isn’t told their sites stay', () => {
+    const m = buildAccountEmail({
+      ...nok,
+      fromRole: 'stakeholder',
+      toRole: 'admin',
+      facts: { ...nok.facts, moves: [], admins: ['Tao'] },
+    });
+    expect(m.text).toContain('Tao made you an Admin · Fri 25 Sep 10:08. It took effect straight away.');
+    expect(m.text).not.toContain('stay as they are');
+  });
+
+  it('left the rotation with nothing else moved: the note joins the lede, no empty table', () => {
+    const m = buildAccountEmail({
+      ...nok,
+      toRole: 'viewer',
+      facts: { ...nok.facts, moves: [], left_rotation: true },
+    });
+    expect(m.text).toContain('It took effect straight away. You left the on-call rotation.');
+    expect(m.text).not.toContain('WHAT MOVED');
   });
 });
 

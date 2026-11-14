@@ -558,22 +558,37 @@ async function deliverAccount(
   if (!e) return { ok: false, error: 'Account event not found', retryable: false };
   if (n.channel !== 'email' || n.template !== 'account_email' || !n.user_id || n.user_id !== e.user_id)
     return { ok: false, error: 'Account emails go to their own person only', retryable: false };
+  // Access removed only while the person is still out (invited back before it went: not sent);
+  // every other account email only while they are active.
   const person = e.person;
-  if (!person || !(person.is_active || e.kind === 'deactivated'))
-    return { ok: false, error: 'Recipient not found or inactive', retryable: false };
+  if (!person || person.is_active !== (e.kind !== 'deactivated'))
+    return {
+      ok: false,
+      error:
+        person && e.kind === 'deactivated'
+          ? 'Access given back before it was sent'
+          : 'Recipient not found or inactive',
+      retryable: false,
+    };
   if (now.getTime() - new Date(n.created_at).getTime() > ACCOUNT_EMAIL_MAX_AGE_MS)
     return { ok: false, error: 'Queued over 24 h ago — not sent late (D-062 item 13)', retryable: false };
   const { apiKey, from } = deps.email!;
-  const message = buildAccountEmail({
-    eventId: e.id,
-    kind: e.kind,
-    fromRole: e.from_role,
-    toRole: e.to_role,
-    at: new Date(e.created_at),
-    facts: e.facts,
-    from,
-    appUrl: deps.appUrl,
-  });
+  let message;
+  try {
+    message = buildAccountEmail({
+      eventId: e.id,
+      kind: e.kind,
+      fromRole: e.from_role,
+      toRole: e.to_role,
+      at: new Date(e.created_at),
+      facts: e.facts,
+      from,
+      appUrl: deps.appUrl,
+    });
+  } catch (err) {
+    // A role pair without words (roleDiff) fails this row only, never the pass (code review).
+    return { ok: false, error: `Can't render account email: ${String(err)}`, retryable: false };
+  }
   const send = deps.send ?? sendEmail;
   const result = await send(message, {
     apiKey,

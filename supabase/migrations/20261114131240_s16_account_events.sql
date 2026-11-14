@@ -31,6 +31,8 @@ alter table public.account_events enable row level security;
 -- No policy: only the notifier (service role) reads it.
 revoke all on public.account_events from public, anon, authenticated;
 grant select on public.account_events to service_role;
+-- Append-only for the notifier too, as audit_log: what the email says never changes after the change.
+revoke update, delete, truncate on public.account_events from service_role;
 
 -- ── notifications: an account event is a seventh subject ──────────────────────────────────────────
 alter table public.notifications
@@ -126,7 +128,7 @@ begin
             where sh.id = (x ->> 'id')::uuid and sh.user_id <> p_user.id),
           (select sh.user_id from public.oncall_shifts sh
             where sh.handed_over_from = p_user.id and sh.ends_at = (x ->> 'ends')::timestamptz
-              and sh.user_id <> p_user.id
+              and sh.starts_at = now() and sh.user_id <> p_user.id
             order by sh.created_at desc limit 1)) as holder
       ) h
       join public.profiles p on p.id = h.holder

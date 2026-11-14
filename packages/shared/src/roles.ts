@@ -220,6 +220,8 @@ export interface RoleDiff {
 export function roleDiff(from: Role, to: Role, opts: { managesClients: boolean }): RoleDiff {
   const now: string[] = [];
   const noLonger: string[] = [];
+  // A limit that changes reads after the rights lost outright, as on the board (message-checker).
+  const narrowed: string[] = [];
   const kept: string[] = [];
   const word = (m: Readonly<Record<string, string>> | undefined, cell: Cell, r: MatrixRow) => {
     const w = m?.[cell];
@@ -239,7 +241,7 @@ export function roleDiff(from: Role, to: Role, opts: { managesClients: boolean }
         noLonger.push(word(r.email.lose, x, r));
         break;
       case 'narrow':
-        noLonger.push(word(r.email.narrow, y, r));
+        narrowed.push(word(r.email.narrow, y, r));
         break;
       case 'keep':
         kept.push(r.email.keep);
@@ -247,5 +249,5 @@ export function roleDiff(from: Role, to: Role, opts: { managesClients: boolean }
     }
   }
   const keep = kept.length ? `${kept.join(', ')}`.replace(/^./, (c) => c.toUpperCase()) : null;
-  return { now, noLonger, keep };
+  return { now, noLonger: [...noLonger, ...narrowed], keep };
 }

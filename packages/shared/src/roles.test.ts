@@ -9,8 +9,8 @@ describe('roleDiff — the role-change email lists (spec §34, D-062 item 13)', 
       now: ['Send client reports for clients where you’re Site AM (none yet)'],
       noLonger: [
         'Acknowledge or resolve incidents on your sites',
-        'Mark client updates, except for clients where you’re Site AM',
         'Schedule maintenance or mute your sites',
+        'Mark client updates, except for clients where you’re Site AM',
       ],
       keep: 'The dashboard and history, alerts and digests, uptime reports',
     });

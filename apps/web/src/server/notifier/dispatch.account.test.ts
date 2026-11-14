@@ -139,6 +139,40 @@ describe('account emails', () => {
     );
   });
 
+  it.each([
+    ['a Chat row', { channel: 'google_chat' }],
+    ['another template', { template: 'probe_locations_low' }],
+    ['no person', { user_id: null }],
+  ])('%s on an account event is refused', async (_, over) => {
+    const send = okSend();
+    const { db, calls } = fakeDb(queue([row(over)], [event()], [bua(false)]));
+    await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send });
+    expect(send).not.toHaveBeenCalled();
+    expect(updates(calls)).toContainEqual(
+      expect.objectContaining({ status: 'failed', error: 'Account emails go to their own person only' }),
+    );
+  });
+
+  it('Access removed is not sent once the person was invited back (code review)', async () => {
+    const send = okSend();
+    const { db, calls } = fakeDb(queue([row()], [event()], [bua(true)]));
+    await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send });
+    expect(send).not.toHaveBeenCalled();
+    expect(updates(calls)).toContainEqual(
+      expect.objectContaining({ status: 'failed', error: 'Access given back before it was sent' }),
+    );
+  });
+
+  it('an email that can’t be rendered fails its row only (code review)', async () => {
+    const send = okSend();
+    const ev = event({ kind: 'role_changed', from_role: 'admin', to_role: 'client' });
+    const { db, calls } = fakeDb(queue([row()], [ev], [bua(true)]));
+    const result = await dispatchNotifications({ db, webhookUrl: undefined, email, appUrl, now, send });
+    expect(result.ok).toBe(true);
+    expect(send).not.toHaveBeenCalled();
+    expect(updates(calls)).toContainEqual(expect.objectContaining({ status: 'failed' }));
+  });
+
   it('a row queued over 24 h ago is not sent late (email was off, D-013)', async () => {
     const send = okSend();
     const old = row({ created_at: '2026-09-24T03:00:00Z' });
