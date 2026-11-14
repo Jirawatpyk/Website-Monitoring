@@ -45,6 +45,7 @@ import {
   type UsersData,
 } from '../model';
 import { SettingsHeader } from './settings-header';
+import { loadHandover } from '../actions';
 import { ChatIdDialog, InviteDialog, RevokeDialog, RoleDialog } from './user-dialogs';
 
 const VARIANT: Record<Role, 'solid' | 'soft' | 'outline'> = {
@@ -74,20 +75,14 @@ type Open =
  * checks). From md: the table, the ⋯ menu and its dialogs; below md: view only (§22.5) — cards, a
  * sheet per person and the role matrix one role at a time.
  */
-export function UsersPageView({
-  data,
-  oncall,
-  now: nowIso,
-}: {
-  data: UsersData;
-  oncall: OncallData | null;
-  now: string;
-}) {
+export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: string }) {
   const now = new Date(nowIso);
   const rows = userRows(data, now);
   const banner = oneAdminBanner(data);
   const [open, setOpen] = useState<Open>(null);
   const [done, setDone] = useState<string | null>(null);
+  // Hand over's On-call data, read when that dialog opens (S16 code review).
+  const [oncall, setOncall] = useState<OncallData | null>(null);
   // Focus goes back to the row's ⋯ once its dialog closes (the trigger, S05 /verify).
   const focusKey = useRef<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -127,13 +122,26 @@ export function UsersPageView({
         },
       ];
     const why = changeBlockedWhy(data, p);
-    const live = oncall && liveShiftOf(data, p.id, now);
+    const live = liveShiftOf(data, p.id, now);
     return [
       {
         label: 'Change role…',
         ...(why ? { disabled: true, disabledReason: why } : { onSelect: show({ kind: 'role', person: p }) }),
       },
-      ...(live ? [{ label: 'Hand over shift…', onSelect: show({ kind: 'handover', person: p }) }] : []),
+      ...(live
+        ? [
+            {
+              label: 'Hand over shift…',
+              onSelect: () => {
+                focusKey.current = r.key;
+                void loadHandover().then((d) => {
+                  setOncall(d);
+                  if (d) setOpen({ kind: 'handover', person: p });
+                });
+              },
+            },
+          ]
+        : []),
       { label: 'Edit Chat id…', onSelect: show({ kind: 'chat', person: p }) },
       { separator: true as const },
       {

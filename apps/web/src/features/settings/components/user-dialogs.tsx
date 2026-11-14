@@ -35,10 +35,18 @@ import {
 
 const FAILED = 'Couldn’t save. Check your connection and try again.';
 
-/** Runs an action: on success hands its result up and refreshes; a refusal stays in the dialog. */
-function useSubmit(onDone: (r: Extract<UsersResult, { ok: true }>) => void) {
+/**
+ * Runs an action: on success hands its result up and refreshes; a refusal stays in the dialog until
+ * `key` changes (the dialog reopens, or opens for someone else) — never carried to the next one.
+ */
+function useSubmit(onDone: (r: Extract<UsersResult, { ok: true }>) => void, key: string) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [seenKey, setSeenKey] = useState(key);
+  if (seenKey !== key) {
+    setSeenKey(key);
+    setError(null);
+  }
   const [pending, start] = useTransition();
   const run = (fn: () => Promise<UsersResult>) =>
     start(async () => {
@@ -53,7 +61,7 @@ function useSubmit(onDone: (r: Extract<UsersResult, { ok: true }>) => void) {
       onDone(r);
       router.refresh();
     });
-  return { error, pending, run, reset: () => setError(null) };
+  return { error, pending, run };
 }
 
 function Refusal({ error }: { error: string | null }) {
@@ -100,7 +108,7 @@ export function InviteDialog({
     );
     setEmail('');
     setTried(false);
-  });
+  }, String(open));
   const shapeOk = EMAIL_SHAPE.test(email.trim());
   return (
     <Dialog
@@ -176,7 +184,7 @@ export function RevokeDialog({
     onDone(`${email} removed from the access list · logged`);
     setReason('');
     setTried(false);
-  });
+  }, email ?? '');
   return (
     <Dialog
       open={!!email}
@@ -262,12 +270,14 @@ export function RoleDialog({
   const missing = missingPicks(items, picks);
   const blocked = blockedBy(items);
   const { gains, loses } = gainsLoses(current, newRole);
-  const { error, pending, run } = useSubmit(() =>
-    onDone(
-      deact
-        ? `${person?.name} deactivated · reassignments applied · logged`
-        : `${person?.name} is now ${ROLE_LABELS[newRole]} · reassignments applied · logged`,
-    ),
+  const { error, pending, run } = useSubmit(
+    () =>
+      onDone(
+        deact
+          ? `${person?.name} deactivated · reassignments applied · logged`
+          : `${person?.name} is now ${ROLE_LABELS[newRole]} · reassignments applied · logged`,
+      ),
+    key,
   );
   if (!person) return <Dialog open={false} onClose={onClose} title="" />;
   const setPick = (key: string, value: string) => setPicks((p) => ({ ...p, [key]: value }));
@@ -449,10 +459,13 @@ export function ChatIdDialog({
     setSeen(person?.id);
     setValue('');
   }
-  const { error, pending, run } = useSubmit(() =>
-    onDone(`${person?.name}’s Chat id ${value.trim() ? 'saved' : 'cleared'} · logged`),
+  const { error, pending, run } = useSubmit(
+    () => onDone(`${person?.name}’s Chat id ${value.trim() ? 'saved' : 'cleared'} · logged`),
+    person?.id ?? '',
   );
   const digits = /^\d*$/.test(value.trim());
+  // Empty clears an id; with none to clear there is nothing to save (and nothing would be logged).
+  const nothing = !value.trim() && !person?.chatLinked;
   return (
     <Dialog
       open={!!person}
@@ -470,7 +483,7 @@ export function ChatIdDialog({
           </Button>
           <Button
             loading={pending}
-            disabled={!digits}
+            disabled={!digits || nothing}
             onClick={() => person && run(() => setChatId({ userId: person.id, chatId: value.trim() }))}
           >
             Save

@@ -16,7 +16,7 @@ export const inviteSchema = z.object({
 export type InviteInput = z.infer<typeof inviteSchema>;
 
 export const revokeSchema = z.object({
-  email: z.string().trim().toLowerCase().max(254),
+  email: z.string().trim().toLowerCase().max(254).regex(EMAIL_SHAPE, 'That isn’t an address on the list'),
   reason: z
     .string()
     .trim()

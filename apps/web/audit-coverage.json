@@ -35,6 +35,9 @@
     "features/settings/actions.ts#setChatId": {
       "rpc": ["set_chat_user_id"]
     },
+    "features/settings/actions.ts#loadHandover": {
+      "exempt": "Reads the On-call data the Hand over dialog shows; changes nothing (the hand-over itself is oncall#handOver)."
+    },
     "features/incidents/actions.ts#acknowledgeIncident": {
       "rpc": ["ack_incident"]
     },

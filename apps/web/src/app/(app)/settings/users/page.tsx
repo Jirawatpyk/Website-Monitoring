@@ -39,10 +39,10 @@ export default async function UsersPage() {
       </Container>
     );
   }
-  const page = await getUsersPage({ id: access.profile.id, name: access.profile.displayName });
+  const page = await getUsersPage({ id: access.profile.id });
   return (
     <Container>
-      <UsersPageView data={page.data} oncall={page.oncall} now={page.now} />
+      <UsersPageView data={page.data} now={page.now} />
     </Container>
   );
 }

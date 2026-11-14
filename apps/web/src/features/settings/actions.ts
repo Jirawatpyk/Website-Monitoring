@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
+import type { OncallData } from '@/features/oncall';
+import { getOncallPage } from '@/features/oncall/server';
 import { getAccess } from '@/lib/auth/session';
 import { serverEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
@@ -57,6 +59,16 @@ export async function changeUserRole(input: ChangeRoleInput) {
 export async function deactivateUser(input: DeactivateInput) {
   return run(input, m.deactivateUser, { send: true });
 }
+/**
+ * The On-call page's data for Hand over shift… (D-048 item 5), read only when the dialog opens — not
+ * on every Users render, since someone is nearly always on call (S16 code review). Admin only.
+ */
+export async function loadHandover(): Promise<OncallData | null> {
+  const access = await getAccess();
+  if (access.status !== 'active' || access.profile.role !== 'admin') return null;
+  return getOncallPage({ id: access.profile.id, name: access.profile.displayName, role: 'admin' }, null);
+}
+
 /** Anyone their own (Profile, PR 3), an Admin anyone's — the SQL holds that rule. */
 export async function setChatId(input: ChatIdInput) {
   return run(input, m.setChatId, { adminOnly: false });

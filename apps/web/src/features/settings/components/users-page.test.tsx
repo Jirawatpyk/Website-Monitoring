@@ -10,6 +10,7 @@ const actions = vi.hoisted(() => ({
   changeUserRole: vi.fn(),
   deactivateUser: vi.fn(),
   setChatId: vi.fn(),
+  loadHandover: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), replace: vi.fn() }));
 vi.mock('../actions', () => actions);
@@ -54,14 +55,14 @@ async function openMenu(name: string, item: string) {
 
 describe('UsersPageView (Users, MUsers)', () => {
   it('the one-Admin banner names the pending Admin, never a link or expiry (D-062)', () => {
-    render(<UsersPageView data={data} oncall={null} now={NOW} />);
+    render(<UsersPageView data={data} now={NOW} />);
     expect(screen.getByText('1 active Admin — monitor-fault alerts reach only Tao')).toBeInTheDocument();
     expect(screen.getByText('new@x was added as an Admin but hasn’t signed in yet.')).toBeInTheDocument();
     expect(screen.queryByText(/expires|2-step/i)).toBeNull();
   });
 
   it('a role change waits for every pick, then sends them (Done-when 2)', async () => {
-    render(<UsersPageView data={data} oncall={null} now={NOW} />);
+    render(<UsersPageView data={data} now={NOW} />);
     const user = await openMenu('Nok', 'Change role…');
     const dialog = await screen.findByRole('dialog', { name: 'Change Nok’s role' });
     expect(within(dialog).getByText('Owner of 1 site')).toBeInTheDocument();
@@ -93,7 +94,7 @@ describe('UsersPageView (Users, MUsers)', () => {
   });
 
   it('focus goes back to the row’s ⋯ when the dialog closes', async () => {
-    render(<UsersPageView data={data} oncall={null} now={NOW} />);
+    render(<UsersPageView data={data} now={NOW} />);
     const user = await openMenu('Nok', 'Edit Chat id…');
     const dialog = await screen.findByRole('dialog', { name: 'Nok’s Google Chat id' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
@@ -101,7 +102,7 @@ describe('UsersPageView (Users, MUsers)', () => {
   });
 
   it('the invite dialog asks for the primary address and reminds about 2-Step (D-007)', async () => {
-    render(<UsersPageView data={data} oncall={null} now={NOW} />);
+    render(<UsersPageView data={data} now={NOW} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Invite user' }));
     const dialog = await screen.findByRole('dialog', { name: 'Add someone to Monitor' });
@@ -119,7 +120,7 @@ describe('UsersPageView (Users, MUsers)', () => {
   });
 
   it('phone: a card opens the person’s sheet (§35.3)', async () => {
-    render(<UsersPageView data={data} oncall={null} now={NOW} />);
+    render(<UsersPageView data={data} now={NOW} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /^Nok, Responder, .*Show details$/ }));
     const sheet = await screen.findByRole('dialog', { name: 'Nok' });
