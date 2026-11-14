@@ -51,6 +51,10 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | AuditLog | Audit log | `/audit` | P1 | S15 | §16.11 | FR-13 |
 | MAuditLog | Mobile — Audit log | `/audit` (390) | P1 | S15 | §22, §33 | FR-13 |
 | MAuditLogDark | Mobile — Audit log · dark | same (390), dark theme | P1 | S15 | §33 | FR-13 |
+| MUsers | Mobile — Settings: Users & roles, view only | `/settings/users` (390) | P1 | S16 | §22.5, §35 | §3 |
+| MUsersDark | Mobile — Settings: Users & roles · dark | same (390), dark theme | P1 | S16 | §35 | §3 |
+| MSecurity | Mobile — Settings: Sign-in & security, view only | `/settings/security` (390) | P1 | S16 | §22.5, §35 | §3, §9 |
+| MSecurityDark | Mobile — Settings: Sign-in & security · dark | same (390), dark theme | P1 | S16 | §35 | §3, §9 |
 | Users | Settings — users & roles | `/settings/users` | P1 — until then the allowlist and roles are set by SQL (S01, D-007) | S16 | §14.9, §15.2, §16.6 | §3 |
 | Security | Settings — sessions & security (no 2-step lock, D-007) | `/settings/security` | P1 | S16 | §15.2, §16.7 | §3, §9 |
 | AlertChannels | Settings — alert channels & routing | `/settings/alert-channels` | P1 | S17 | §14.8, §15.5, §15.8 | §7 |
@@ -84,5 +88,5 @@ Each nav item carries its slice and a `live` flag (`apps/web/src/components/app-
 |---|---|---|---|---|---|---|
 | StatusModel | Status model & verification logic | `packages/engine` (status, rounds, uptime) | P0 | S04a (relapse, flapping: S04b) | §5, §6, §15.3 | §5, FR-03 |
 | ChatAlert | Google Chat alert thread (content spec) · STATE adds maintenance messages | `packages/notifier` (Chat templates) | P0 | S02a (maintenance: S09b; Page change cause: S09d) | §10, §14.10, §15.7, §16.5, §24, §26.9 | §7 |
-| EmailAlert | Alert email template · maintenance threads | `packages/notifier` (email templates) | P0 | S02b (maintenance: S09b) | §10, §14.11, §15.7, §24 | §7 |
+| EmailAlert | Alert email template · maintenance threads · role change | `packages/notifier` (email templates) | P0 | S02b (maintenance: S09b; role change: S16) | §10, §14.11, §15.7, §24, §34 | §7 |
 | WeeklySummary | Weekly summary — Chat card spec | `packages/notifier` (digest + weekly) | P1 | S14 | §10, §15.7 | FR-12 |

@@ -709,7 +709,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S16 · Users & access
 
 - **Scope:** Users & roles (invite = add to the allowlist with a role, change role, deactivate with the "Used in" check and reassignment, §14.9), Security (sessions, sign out everywhere, confirm dialogs), Profile (notification channels incl. the Google Chat user id that alerts mention, D-015; on-call checklist). No 2-step status, required date or lock — Google Workspace enforces 2-step (D-007); the invite dialog asks for the person's primary Google address (not a DxT alias) and reminds the Admin to have them confirm their 2-Step Verification page.
-- **Boards:** Users, Security, Profile, MProfile
+- **Boards:** Users, Security, Profile, MProfile; MUsers, MUsersDark, MSecurity, MSecurityDark (spec §35) and EmailAlert › role change (§34), drawn 14 Nov (D-062)
 - **Depends on:** S10
 - **Done when:**
   1. Inviting an address adds it to the allowlist with the chosen role and that person can then sign in; deactivating removes the entry, bans the auth user and ends their sessions (test). Every change writes `audit_log`.
@@ -927,6 +927,10 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | Security | S16 |
 | Profile | S16 |
 | MProfile | S16 |
+| MUsers | S16 |
+| MUsersDark | S16 |
+| MSecurity | S16 |
+| MSecurityDark | S16 |
 | AlertChannels | S17 |
 | Organisation | S17 |
 | Guide | S18 |

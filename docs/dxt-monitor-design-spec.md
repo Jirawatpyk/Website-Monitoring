@@ -1,6 +1,6 @@
 # DxT Monitor — Design spec for developer handoff
 
-Version: 13 Nov 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
+Version: 14 Nov 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
 Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (53 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
 
 ## 0. How to use this spec
@@ -43,6 +43,8 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | AuditLog | Audit log | 1440×2000 | Operations & governance · web |
 | MAuditLog | Mobile — Audit log (§33) | 390×844 | Mobile app · 390 |
 | MAuditLogDark | Mobile — Audit log · dark (§33) | 390×844 | Mobile app · 390 |
+| MUsers / MUsersDark | Mobile — Settings: Users & roles, view only (§35) | 390×844 | Mobile app · 390 |
+| MSecurity / MSecurityDark | Mobile — Settings: Sign-in & security, view only (§35) | 390×844 | Mobile app · 390 |
 | MIncidents | Mobile — Incidents | 390×844 | Mobile app · 390 |
 | MOnCall | Mobile — On-call · BOARD STATE: test link, swap for Nok / Arm / Tao, Hand over sheet, no-one-to-page cases (§27, §28) | 390×904 | Mobile app · 390 |
 | MMaintenance | Mobile — Mute / maintenance sheet · Repeat (§32) | 390×844 | Mobile app · 390 |
@@ -65,7 +67,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | MainFault | Overview — monitor fault: hand check (S12b, §30) + Down again / Report down (§31) — redrawn on Main3, moved next to Main3 | 1440×2620 | Web app — desktop 1440 + mobile 390 |
 | Expiry | SSL & domain expiry | 1440×1340 | Expiry · summaries · email · account & security · empty states |
 | WeeklySummary | Weekly summary — Chat card spec | 600×2575 | Expiry · summaries · email · account & security · empty states |
-| EmailAlert | Alert email template · Thread › Maintenance (§24) | 720×1980 | Expiry · summaries · email · account & security · empty states |
+| EmailAlert | Alert email template · Thread › Maintenance (§24) · Account › role change (§34) · Preview desktop / phone mail, light / dark | 720×2880 | Expiry · summaries · email · account & security · empty states |
 | Profile | My profile & notifications | 1440×1136 | Expiry · summaries · email · account & security · empty states |
 | Security | Settings — sign-in & security | 1440×1540 | Expiry · summaries · email · account & security · empty states |
 | EmptyStates | Empty, loading & no-access states | 1440×1562 | Expiry · summaries · email · account & security · empty states |
@@ -500,3 +502,26 @@ Boards: **MAuditLog** and **MAuditLogDark** (same board, dark tokens), next to M
 8. **Paging — answer to Q4: "Show more", not page numbers.** 25 cards at a time on a phone (desktop keeps 50 a page); under the list a full-width secondary "Show 9 more" (or "Show 25 more") with "25 of 34 shown". Filters reset it to 25. After Show more, focus moves to the first new card (so a screen reader carries on where it was). The count line says "No entries · …" at 0. Over 500 the list stops at the newest 500 and the count line points to Export.
 9. **Empty.** "No entries match these filters." with Clear filters, in a card where the list was.
 10. **Footnote.** Lock icon + "Entries are kept forever and can't be edited or deleted. "System" rows are written by the status engine and the notifier."
+
+## 34. Role-change email (EmailAlert › Account · role change) — S16, D-062 item 10, added 14 Nov 2026
+Sent by the notifier to the person only, the moment an Admin confirms a role change or a deactivation on Users & roles (the dialog says "{name} gets an email saying what changed"). One email per change, not threaded, nothing to anyone else. No email for an invite (D-011). The board's new Preview controls show any email in a desktop or phone mail client (390 px) and light or dark.
+
+1. **Subject:** "Your DxT Monitor role is now Stakeholder" / "Your DxT Monitor role is now Admin" / "Your DxT Monitor access was removed". Preheader: "ROLE CHANGED — Tao changed your role from Responder to Stakeholder · Fri 25 Sep 10:08" (ACCESS REMOVED — Tao removed your access · …).
+2. **Body** (same template as the other emails, grey bar — nothing urgent): label ROLE CHANGED / ACCESS REMOVED, headline "You're now a Stakeholder", lede = who and when ("Tao changed your role from Responder to Stakeholder · Fri 25 Sep 10:08. It took effect straight away."), two fact rows (Role "Stakeholder (was Responder)", Changed by "Tao · Fri 25 Sep 10:08").
+3. **YOU CAN NOW / YOU CAN NO LONGER / YOU KEEP** — from the role matrix, the same diff as the Users dialog's GAINS / LOSES, written as sentences ("Acknowledge or resolve incidents on your sites", "Send client reports for clients where you're Site AM (none yet)"). Rights that only apply to "own clients" say so, and "(none yet)" when the person is nobody's Site AM. YOU KEEP is one line listing what stays, so a demotion doesn't read as losing everything.
+4. **WHAT MOVED TO SOMEONE ELSE — answer to Q1: a two-column table (Place · Now with).** Every line has the same shape (a place → one person) and the list can run to a dozen; a table scans and stays readable at 390 px. Sites going to the same person are grouped on one row ("WeCare Studio, Cando Asia, WeCare Asia — owner · Arm"); the new person is never the one already on the other side of that site (owner ≠ backup), as in the Users dialog; on-call shifts are rows too ("Your on-call shift Mon 28 Sep → Mon 5 Oct · Arm"). Facts that aren't a hand-over go under the table as plain lines ("You left the on-call rotation."). Left out when nothing moved.
+5. **Promotion to Admin — answer to Q2: yes, an extra block first.** WHAT COMES WITH ADMIN (amber "!"): "You now get monitor-fault emails — when the status engine stops or fewer than 2 probe locations report. They reach Tao and you from now on." and "Responders' maintenance requests (over 24 h or repeating) come to you to approve." — things that start arriving on their own. Then YOU CAN NOW. Lede: "Your sites and on-call shifts stay as they are."
+6. **Deactivated — answer to Q3: same layout, different heading.** ACCESS REMOVED / "Your access was removed"; the lede is the brief's line ("You can no longer sign in. Your past acknowledgements and notes stay in the audit log. Ask an Admin if this is a mistake."); facts Was / Removed by; no lists; WHAT MOVED TO SOMEONE ELSE if anything moved; **no button** (they can't sign in).
+7. **Footer:** "Open DxT Monitor" (primary) for role changes; why line "You got this because your role in DxT Monitor changed." / "… your DxT Monitor account was deactivated."; "Times in Thailand time (UTC+7). This is an automated message — replies aren't read. Questions about your access: ask an Admin (Tao)." Samples: Nok → Stakeholder, Arm → Admin, Bua deactivated — made up.
+
+## 35. Settings on a phone — MUsers and MSecurity (/settings/users, /settings/security at 390) — S16, D-062, added 14 Nov 2026
+Boards: **MUsers**, **MSecurity** and their **Dark** twins. View only (§22.5, D-044): the line "**View only on phones.** Admins change policies on a larger screen." under the tabs; no control edits, saves or opens an editor; no "Open on desktop". Admin only; anyone else gets "Only Admins can see Settings" + Back to Overview (STATE › No access). Drawn from the S16 desktop pages, so no 2-step, invite links, session length, device location or "Ack link" (D-007, D-011). The desktop Users and Security boards on the canvas still show those older elements.
+
+1. **Top bar** "Settings", back → Overview, avatar → MProfile; bottom nav with nothing selected. **Tabs — answer to Q4:** two links that look like a segmented control (Users & roles · Sign-in & security), full width, 44 px, first thing under the top bar, inside `<nav aria-label="Settings pages">` with `aria-current="page"` on the current one. Links, not a radio group: they change pages, and a radio group would navigate on every arrow key. Alert channels and Organisation join in S17 (then a select, as more than three won't fit).
+2. **MUsers.** Banner (warning) while one Admin is active: "1 active Admin — monitor-fault alerts reach only Tao" with the real name, plus why ("new@dxt was added as an Admin but hasn't signed in yet."). Count line "9 people · Google Workspace accounts only · role changes are logged".
+3. **People — answer to Q1.** One card per person in one rounded list: name + role badge; line 2 = email, "· AM", or "Not signed in yet · added Thu 24 Sep"; line 3 = one status — on-call ("On call now", bold; "Next on call 5 Oct"; "Admin backstop") and last active ("today 10:05"), or "No Chat id" for a Viewer. Tap → sheet with Role, Alert channels, Owner · backup (with the site names) or Clients and escalation for a Stakeholder, On-call, Last active, and "Roles and reassignments change on a larger screen." No actions.
+4. **Role matrix — answer to Q2: a Role select over one list.** "What each role can do": Role (Admin · Responder · Stakeholder · Viewer · Client · Phase 3), then the 10 rows for that role: ✓ green = allowed, ✓ grey + the limit written under it ("Own sites (owner or backup) + Tier 1 when on call") = allowed with limits, — grey text = not allowed; foot "Responder: 6 of 10 allowed. "Own" = only where they are owner, backup or Site AM." Default Responder. A scrolling 5-column table breaks §22.2; five per-role lists would be 50 rows.
+5. **MSecurity — Who can sign in:** the domains read-only (mono) + "Set at deploy time.", and "Block personal accounts · Always on" (lock badge).
+6. **People and their sign-in:** card = name, role, "· On call now", "2 devices · Today 09:58" (or "No devices · Signed out · 10:08", "Not signed in yet"); tap → sheet listing devices, each "Chrome · macOS" / "Last used today 07:52" + Phone / Laptop / This device tag. No sign-out buttons: "Signing someone out happens on a larger screen. Your own devices: My profile." (§22.4's "sign devices out" on a phone is the person's own devices, on MProfile.)
+7. **Recent sign-in events — answer to Q3: the newest 5,** each an icon, the text wrapping to at most 2 lines, and the time on the right ("10:08", "Thu 16:40"); then a full-width ghost link "All sign-in events in the Audit log" → MAuditLog.
+8. **If Google sign-in is down:** the desktop card's text, unchanged.
