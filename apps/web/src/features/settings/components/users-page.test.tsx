@@ -121,6 +121,37 @@ describe('UsersPageView (Users, MUsers)', () => {
     );
   });
 
+  it('Clear Chat id asks first, and focus follows the confirm in and out', async () => {
+    actions.setChatId.mockResolvedValue({ ok: true });
+    render(<UsersPageView data={data} now={NOW} />);
+    const user = await openMenu('Nok', 'Edit Chat id…');
+    const dialog = await screen.findByRole('dialog', { name: 'Nok’s Google Chat id' });
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled();
+    await user.click(within(dialog).getByRole('button', { name: 'Clear Chat id…' }));
+    expect(within(dialog).getByText('Clear Nok’s Chat id?')).toBeInTheDocument();
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Clear Chat id' })).toHaveFocus());
+    await user.click(within(dialog).getByRole('button', { name: 'Keep it' }));
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Clear Chat id…' })).toHaveFocus());
+    await user.click(within(dialog).getByRole('button', { name: 'Clear Chat id…' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Clear Chat id' }));
+    await waitFor(() => expect(actions.setChatId).toHaveBeenCalledWith({ userId: NOK, chatId: '' }));
+    expect(await screen.findByTestId('users-count')).toHaveTextContent('Nok’s Chat id cleared · logged');
+  });
+
+  it('Hand over says why it didn’t open (§14.16: no dead controls)', async () => {
+    actions.loadHandover.mockResolvedValue(null);
+    const live = {
+      ...data,
+      rotation: [NOK],
+      shifts: [{ id: 'w1', userId: NOK, startsAt: '2026-09-21T02:00:00Z', endsAt: '2026-09-28T02:00:00Z' }],
+    };
+    render(<UsersPageView data={live} now={NOW} />);
+    await openMenu('Nok', 'Hand over shift…');
+    expect(await screen.findByTestId('users-count')).toHaveTextContent(
+      'Couldn’t open Hand over — reload the page and try again.',
+    );
+  });
+
   it('phone: a card opens the person’s sheet (§35.3)', async () => {
     render(<UsersPageView data={data} now={NOW} />);
     const user = userEvent.setup();

@@ -176,7 +176,7 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
         </span>
       ),
     },
-    { key: 'role', label: 'Role', width: 116, render: (r) => <RoleBadge role={r.role} /> },
+    { key: 'role', label: 'Role', width: 120, render: (r) => <RoleBadge role={r.role} /> },
     {
       key: 'channels',
       label: 'Alert channels',
@@ -194,16 +194,19 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
     {
       key: 'oncall',
       label: 'On-call',
-      width: 144,
+      width: 140,
       render: (r) => (
-        <span className={r.oncall.live ? 'font-semibold' : 'text-fg-secondary'}>{r.oncall.text}</span>
+        // The table's short form (Users board): "Next: 12 Oct"; MUsers' card keeps "Next on call …".
+        <span className={`whitespace-nowrap ${r.oncall.live ? 'font-semibold' : 'text-fg-secondary'}`}>
+          {r.oncall.text.replace(/^Next on call /, 'Next: ')}
+        </span>
       ),
     },
     {
       key: 'last',
       label: 'Last active',
       width: 136,
-      render: (r) => <span className="whitespace-nowrap">{r.last}</span>,
+      render: (r) => <span className="whitespace-nowrap">{r.personId ? r.last : 'Not joined'}</span>,
     },
     {
       key: 'actions',
@@ -252,6 +255,7 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
           {banner.body}
         </Alert>
       )}
+      <span className="text-sm leading-normal text-fg-secondary md:hidden">{countLine(data)}</span>
       <section className="flex flex-col gap-3" aria-labelledby="people-h">
         <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
           <h2 id="people-h" className={HEADING}>
@@ -261,7 +265,7 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
           <span
             role="status"
             data-testid="users-count"
-            className={`text-sm leading-normal ${done ? (done.ok ? 'text-fg-positive' : 'text-fg-danger') : 'text-fg-secondary'}`}
+            className={`hidden text-sm leading-normal md:block ${done ? (done.ok ? 'text-fg-positive' : 'text-fg-danger') : 'text-fg-secondary'}`}
           >
             {done?.text ?? countLine(data)}
           </span>
@@ -326,8 +330,8 @@ function MatrixTable() {
           <Tr>
             <Th>Permission</Th>
             {MATRIX_ROLES.map((r) => (
-              <Th key={r}>
-                <span className="flex items-center gap-1.5">
+              <Th key={r} className="text-center">
+                <span className="inline-flex items-center gap-1.5">
                   {ROLE_LABELS[r]}
                   {r === 'client' && (
                     <Badge tone="neutral" variant="outline">
@@ -449,8 +453,10 @@ function PeopleCards({ data, rows }: { data: UsersData; rows: UserRow[] }) {
           >
             <span className="flex min-w-0 grow flex-col gap-0.5 leading-snug">
               <span className="flex items-center gap-2">
-                <span className="font-semibold">{r.name}</span>
-                <RoleBadge role={r.role} />
+                <span className="min-w-0 truncate font-semibold">{r.name}</span>
+                <span className="shrink-0">
+                  <RoleBadge role={r.role} />
+                </span>
               </span>
               <span className="truncate text-xs text-fg-secondary">{r.sub}</span>
               <span className={`text-xs ${r.oncall.live ? 'font-semibold' : 'text-fg-secondary'}`}>

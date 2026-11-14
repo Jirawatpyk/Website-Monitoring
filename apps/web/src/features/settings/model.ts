@@ -230,7 +230,7 @@ export interface UsageItem {
   /** Pick per site (owner / backup). */
   sites?: SitePick[];
   /** One pick for all of it (AM, shifts). */
-  pick?: { key: string; label: string; options: Option[] };
+  pick?: { key: string; label: string; options: Option[]; empty: string };
   /** Info lines that need no pick (rotation, swaps, acknowledgements, the CEO). */
   info?: boolean;
   /** Can't save at all until fixed elsewhere (the rotation's last person). */
@@ -305,6 +305,7 @@ export function usageOf(d: UsersData, personId: string, target: Target, now: Dat
             pick: {
               key: 'am',
               label: 'New AM for these clients',
+              empty: 'Nobody else can be Site AM — add an Admin, Responder or Stakeholder first.',
               options: others
                 .filter((p) => canBeAm(p.role))
                 .map((p) => ({ value: p.id, label: `${p.name} (${ROLE_LABELS[p.role]})` })),
@@ -329,6 +330,7 @@ export function usageOf(d: UsersData, personId: string, target: Target, now: Dat
             pick: {
               key: 'shifts',
               label: live ? 'Hand the live shift and the weeks ahead to' : 'Take over these shifts',
+              empty: 'Nobody else can be on call — add an Admin or Responder first.',
               options: others.filter((p) => canOwn(p.role)).map((p) => ({ value: p.id, label: p.name })),
             },
           }

@@ -8,7 +8,6 @@ export default function Loading() {
       <PageSkeleton label="Loading users and roles">
         <PageHeaderSkeleton actions={1} phoneBar="title" />
         <CardSkeleton lines={1} />
-        <CardSkeleton lines={2} />
         <CardSkeleton lines={8} />
         <CardSkeleton lines={10} />
       </PageSkeleton>

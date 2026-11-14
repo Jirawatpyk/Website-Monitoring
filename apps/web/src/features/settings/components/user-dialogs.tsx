@@ -106,7 +106,7 @@ export function InviteDialog({
     onDone(
       r.outcome === 'reactivated'
         ? `${address} has access again as ${ROLE_LABELS[role]} · logged`
-        : `Added ${address} as ${ROLE_LABELS[role]} · shows here once they sign in · logged`,
+        : `Added ${address} as ${ROLE_LABELS[role]} · they can sign in now · logged`,
     );
     setEmail('');
     setTried(false);
@@ -117,7 +117,7 @@ export function InviteDialog({
       open={open}
       onClose={onClose}
       title="Add someone to Monitor"
-      description="They sign in with their DxT Google account. Adding them to the access list is the invite — no email or link is sent."
+      description="They sign in with their DxT Google account. No email or link is sent — tell them yourself."
       footer={
         <Foot>
           <Button variant="secondary" onClick={onClose}>
@@ -298,7 +298,8 @@ export function RoleDialog({
     );
   };
   const secondAdmin = !deact && newRole === 'admin' && admins(data).length === 1;
-  const nobody = 'Nobody else can take this — give an active Admin or Responder a Chat id first.';
+  // Owners need a Chat id (D-015): the only pool that can be empty for that reason.
+  const nobody = 'Nobody else can own this site — give an active Admin or Responder a Chat id first.';
   return (
     <Dialog
       open
@@ -424,7 +425,7 @@ export function RoleDialog({
                   options={i.pick.options}
                   value={picks[i.pick.key] ?? ''}
                   onChange={(e) => setPick(i.pick!.key, e.target.value)}
-                  hint={i.pick.options.length ? undefined : nobody}
+                  hint={i.pick.options.length ? undefined : i.pick.empty}
                   error={tried && !picks[i.pick.key] ? 'Pick who takes this over' : undefined}
                   required
                 />
@@ -457,7 +458,11 @@ function List({
         <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
           {items.map((t) => (
             <li key={t} className="flex gap-1.5">
-              <Mark size="sm" aria-hidden className="mt-0.5 shrink-0 text-fg-secondary" />
+              <Mark
+                size="sm"
+                aria-hidden
+                className={`mt-0.5 shrink-0 ${sign === 'plus' ? 'text-fg-positive' : 'text-fg-danger'}`}
+              />
               <span>{t}</span>
             </li>
           ))}
@@ -483,11 +488,14 @@ export function ChatIdDialog({
   const [value, setValue] = useState('');
   // Clearing an id takes a second press that says what it does (§13: a confirm names the effect).
   const [clearing, setClearing] = useState(false);
+  // Focus follows the confirm in and out (spec-checker pass 2); not on the dialog's first open.
+  const [moved, setMoved] = useState(false);
   const [seen, setSeen] = useState(person?.id);
   if (seen !== person?.id) {
     setSeen(person?.id);
     setValue('');
     setClearing(false);
+    setMoved(false);
   }
   const { error, pending, run } = useSubmit(
     () => onDone(`${person?.name}’s Chat id ${clearing ? 'cleared' : 'saved'} · logged`),
@@ -495,6 +503,12 @@ export function ChatIdDialog({
   );
   const id = value.trim();
   const digits = /^\d*$/.test(id);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const askRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!moved) return;
+    (clearing ? confirmRef : askRef).current?.focus();
+  }, [clearing, moved]);
   return (
     <Dialog
       open={!!person}
@@ -508,15 +522,33 @@ export function ChatIdDialog({
       footer={
         <Foot>
           {person?.chatLinked && !clearing && (
-            <Button variant="ghost" onClick={() => setClearing(true)}>
+            <Button
+              ref={askRef}
+              variant="ghost"
+              onClick={() => {
+                setMoved(true);
+                setClearing(true);
+              }}
+            >
               Clear Chat id…
             </Button>
           )}
-          <Button variant="secondary" onClick={clearing ? () => setClearing(false) : onClose}>
+          <Button
+            variant="secondary"
+            onClick={
+              clearing
+                ? () => {
+                    setMoved(true);
+                    setClearing(false);
+                  }
+                : onClose
+            }
+          >
             {clearing ? 'Keep it' : 'Cancel'}
           </Button>
           {clearing ? (
             <Button
+              ref={confirmRef}
               variant="danger"
               loading={pending}
               onClick={() => person && run(() => setChatId({ userId: person.id, chatId: '' }))}

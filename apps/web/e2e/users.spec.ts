@@ -28,7 +28,7 @@ test.describe('users & roles (local Supabase)', () => {
     await dialog.getByLabel('Primary Google address').fill(email);
     await dialog.getByRole('button', { name: 'Add to access list' }).click();
     await expect(page.getByTestId('users-count')).toHaveText(
-      `Added ${email} as Responder · shows here once they sign in · logged`,
+      `Added ${email} as Responder · they can sign in now · logged`,
     );
     await expect(page.getByText('Not signed in yet · added', { exact: false }).first()).toBeVisible();
 
