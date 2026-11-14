@@ -12,7 +12,7 @@ export default function Loading() {
         <PageHeaderSkeleton actions={1} phoneBar="title" />
         <div className="flex items-center gap-3 lg:hidden">
           <Skeleton variant="circle" width={40} height={40} />
-          <Skeleton width="40%" height={28} />
+          <Skeleton variant="rect" width="40%" height={28} />
         </div>
         <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
           <div className="flex flex-col gap-6">
@@ -26,7 +26,7 @@ export default function Loading() {
           </div>
         </div>
         <div className="lg:hidden">
-          <Skeleton width="100%" height={44} />
+          <Skeleton variant="rect" width="100%" height={44} />
         </div>
       </PageSkeleton>
     </Container>
