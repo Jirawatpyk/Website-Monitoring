@@ -533,7 +533,8 @@ function Devices({ data, now }: { data: ProfileData; now: Date }) {
                   touchHeight
                   data-device-signout
                   disabled={pending}
-                  aria-label={`Sign out ${x.name}, ${x.when.toLowerCase()}`}
+                  // Only the leading "Last" lower-cases mid-sentence; days and months keep their capitals.
+                  aria-label={`Sign out ${x.name}, ${x.when.charAt(0).toLowerCase()}${x.when.slice(1)}`}
                   onClick={() => out(x)}
                 >
                   Sign out

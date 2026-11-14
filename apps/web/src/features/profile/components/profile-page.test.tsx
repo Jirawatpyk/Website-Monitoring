@@ -147,6 +147,10 @@ describe('ProfilePageView (Profile, MProfile)', () => {
         signOutAction={signOutAction}
       />,
     );
+    // The label keeps the day's capitals ("last used Wed 23 Sep …", staging /verify).
+    expect(
+      screen.getByRole('button', { name: /^Sign out Chrome · Windows, last used Wed 23 Sep/ }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^Sign out Safari · iPhone/ }));
     expect(await screen.findByText('Signed out · now')).toBeInTheDocument();
     await waitFor(() =>
