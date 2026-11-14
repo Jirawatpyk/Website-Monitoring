@@ -186,8 +186,12 @@ describe('two Admins demoting each other at once (review M1)', () => {
       expect(count).toBe(1);
     } finally {
       await must(db.from('profiles').update({ is_active: true }).in('id', away).select('id'));
-      // The run's two people leave as they came: inactive, off the list.
-      await must(db.from('profiles').update({ is_active: false, role: 'viewer' }).in('id', ids).select('id'));
+      // The run's two people leave as they came: deactivated by Tao (off the list, banned).
+      for (const id of ids) {
+        const { data } = await db.from('profiles').select('is_active').eq('id', id).single();
+        if (data?.is_active)
+          await must(asAdmin.rpc('deactivate_user', { p_user_id: id }).then((r) => ({ ...r, data: true })));
+      }
     }
   });
 });

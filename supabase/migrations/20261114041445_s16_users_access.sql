@@ -66,7 +66,7 @@ revoke execute on function private.staff_role(public.app_role) from public, anon
 -- One change to people at a time: two Admins demoting each other at once would both see the other
 -- as an Admin (review M1). Then the on-call lock, before any profile, swap or shift row, in the order
 -- the on-call cron takes them (review M2: deadlock). The caller's role is read again after them.
-create function private.lock_people(p_message text)
+create function private.lock_people(p_message text, p_oncall boolean default true)
 returns void
 language plpgsql
 security definer
@@ -75,11 +75,14 @@ as $$
 begin
   perform private.require_admin(p_message);
   perform pg_advisory_xact_lock(hashtext('user_access'));
-  perform pg_advisory_xact_lock(hashtext('oncall_extend_shifts'));
+  -- An invite touches no on-call row: it doesn't wait for the cron.
+  if p_oncall then
+    perform pg_advisory_xact_lock(hashtext('oncall_extend_shifts'));
+  end if;
   perform private.require_admin(p_message);
 end;
 $$;
-revoke execute on function private.lock_people(text) from public, anon, authenticated;
+revoke execute on function private.lock_people(text, boolean) from public, anon, authenticated;
 
 -- ── Invite (= an allowlist row) ───────────────────────────────────────────
 create function public.invite_user(p_email text, p_role public.app_role)
@@ -92,7 +95,7 @@ declare
   v_email text := lower(btrim(coalesce(p_email, '')));
   v_profile public.profiles%rowtype;
 begin
-  perform private.lock_people('Only an Admin can invite people');
+  perform private.lock_people('Only an Admin can invite people', false);
   perform private.staff_role(p_role);
   if v_email !~ '^[^@[:space:]]+@[^@[:space:]]+$' then
     raise exception 'Enter their primary Google address, e.g. name@company' using errcode = '22023', hint = 'bad_email';
