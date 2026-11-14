@@ -46,7 +46,14 @@ async function passwordWorks(email: string): Promise<boolean> {
     headers: { apikey: PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password: PASSWORD }),
   });
-  return res.ok;
+  if (!res.ok) return false;
+  // End just this check's session, so the person's device list doesn't grow with every run.
+  const { access_token } = (await res.json()) as { access_token: string };
+  await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, {
+    method: 'POST',
+    headers: { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${access_token}` },
+  });
+  return true;
 }
 
 /** The auth user for `email` (created without an allowlist row if missing), with the test password. */

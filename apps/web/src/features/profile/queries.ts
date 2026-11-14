@@ -15,9 +15,14 @@ const OPEN_SWAP = ['waiting', 'accepted'];
  * (`is_staff()`), and `list_sessions(me)` is your own devices only. Small: your sites, the four
  * policies, your shifts not over yet.
  */
-export async function loadProfileData(db: DbClient, meId: string, now: Date): Promise<ProfileData> {
+export async function loadProfileData(
+  db: DbClient,
+  meId: string,
+  now: Date,
+  emailOn: boolean,
+): Promise<ProfileData> {
   const nowIso = now.toISOString();
-  const [me, sessions, sites, clients, policies, steps, rotation, shifts, swaps, settings, open] =
+  const [me, sessions, sites, clients, policies, steps, rotation, shifts, swaps, settings, open, admins] =
     await Promise.all([
       db
         .from('profiles')
@@ -27,7 +32,9 @@ export async function loadProfileData(db: DbClient, meId: string, now: Date): Pr
       db.rpc('list_sessions', { p_user_id: meId }),
       db
         .from('sites')
-        .select('id, name, tier, client_id, primary_owner_id, backup_owner_id, status:site_status(status)')
+        .select(
+          'id, name, tier, client_id, primary_owner_id, backup_owner_id, muted_until, status:site_status(status)',
+        )
         .eq('is_active', true)
         .order('name'),
       db.from('clients').select('id, am_user_id'),
@@ -49,6 +56,12 @@ export async function loadProfileData(db: DbClient, meId: string, now: Date): Pr
         .in('status', OPEN_SWAP),
       db.from('organisation_settings').select('response_start, response_end, response_days').single(),
       db.from('incidents').select('id, site_id').not('state', 'in', CLOSED_INCIDENT_STATES_IN),
+      db
+        .from('profiles')
+        .select('display_name')
+        .eq('role', 'admin')
+        .eq('is_active', true)
+        .order('display_name'),
     ]);
 
   const p = check('profiles', me);
@@ -79,6 +92,7 @@ export async function loadProfileData(db: DbClient, meId: string, now: Date): Pr
         status: (one(s.status)?.status ?? null) as SiteStatus | null,
         role,
         incident: incidentOf.get(s.id) ?? null,
+        mutedUntil: s.muted_until,
       },
     ];
   });
@@ -130,5 +144,7 @@ export async function loadProfileData(db: DbClient, meId: string, now: Date): Pr
     hours: hours
       ? { start: hours.response_start, end: hours.response_end, days: hours.response_days }
       : { start: '09:00', end: '18:00', days: [1, 2, 3, 4, 5] },
+    emailOn,
+    admins: (check('admins', admins) ?? []).map((a) => a.display_name),
   };
 }

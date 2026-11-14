@@ -33,7 +33,9 @@ const data: ProfileData = {
       current: false,
     },
   ],
-  sites: [{ id: 'a', name: 'realme.link', tier: 1, status: 'ok', role: 'Owner', incident: null }],
+  sites: [
+    { id: 'a', name: 'realme.link', tier: 1, status: 'ok', role: 'Owner', incident: null, mutedUntil: null },
+  ],
   isCeo: false,
   isAm: false,
   policies: [],
@@ -41,6 +43,8 @@ const data: ProfileData = {
   shifts: [{ startsAt: '2026-10-05T02:00:00Z', endsAt: '2026-10-12T02:00:00Z' }],
   swap: null,
   hours: { start: '09:00:00', end: '18:00:00', days: [1, 2, 3, 4, 5] },
+  emailOn: true,
+  admins: ['Tao'],
 };
 
 const signOutAction = vi.fn(async () => {});
@@ -68,7 +72,9 @@ describe('ProfilePageView (Profile, MProfile)', () => {
     render(<ProfilePageView data={data} now={NOW} signOutAction={signOutAction} />);
     await user.click(screen.getAllByRole('button', { name: 'Send me a test alert' })[0]!);
     expect(await screen.findByText('Test sent at 10:08')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Send again' }).length).toBeGreaterThan(0);
+    // The SQL refuses another within a minute: the button says it went and waits (spec-checker).
+    for (const b of screen.getAllByRole('button', { name: 'Test alert sent · 10:08' }))
+      expect(b).toBeDisabled();
     expect(screen.queryByText(/1\.3 s|2\.2 s/)).toBeNull();
   });
 
@@ -96,6 +102,10 @@ describe('ProfilePageView (Profile, MProfile)', () => {
     );
     expect(screen.queryByRole('button', { name: /test alert/i })).toBeNull();
     expect(screen.queryByText('MY NEXT ON-CALL SHIFT')).toBeNull();
+    // §22.6: a Viewer sees channels, devices and the shared values only.
+    expect(screen.queryByRole('heading', { name: /Sites I’m responsible for/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Where I sit in escalation' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Signed-in devices' })).toBeInTheDocument();
   });
 
   it('your own Chat id: the dialog says "you", and focus comes back to Edit Chat id…', async () => {

@@ -91,6 +91,18 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
     - **Device names.** They come from the browser's User-Agent, which the server forwards to Supabase Auth when it creates or refreshes a session (`/auth/callback`, the proxy and the server client). Without it Auth records "node". A session started before this change reads "Unknown device" with its sign-in date.
     - **Recent sign-in events** are the Access rows of the audit log, worded as sentences. The boards also show two events that have no audit row: a sign-in on a new device, and an Admin signing out one of someone else's devices. Neither is shown.
     - **The "Signed out · HH:MM" state** on Security comes from the person's newest `session.sign_out_all` row, so it survives a reload.
+    - **Short times** on Security, for Last sign-in, "Signed out · …" and the events: "10:08" today, "Yesterday 16:40", "Thu 16:40" within the week, then "21 Sep". The boards draw only today and a weekday. This keeps the phone's right-hand column short. Last sign-in today reads "Today 07:52". A person with no session and no sign-out on record reads "—".
+    - **"Where I sit in escalation"** is read from the policies, with one row per policy that names you and each step's reason ("L0 at once as owner of 3 sites · L1 at +15 min as Admin"). It replaces the board's sample lines.
+      - An AM also gets the client-update row (D-052), which is not a policy step.
+      - An Admin also gets "Monitor faults": a probe location silent over 3 min emails every Admin (D-053). The Healthchecks mail is left out: it is Tao-only config outside the app (D-054).
+      - An Admin with no second Admin gets the board's one-Admin warning, linked to Users.
+      - The on-call row says what it means: "L0 for every Tier 1 site". MProfile's on-call card carries the times.
+    - **Profile wording and layout.**
+      - "How alerts reach me" reads "Owners and backups need a Chat id, so alerts can @mention them." The board's "At least one must work…" suggested email alone would do (D-015, D-025).
+      - The Email row says "Not set up" while the email provider is off (D-013: the UI never promises what isn't there).
+      - Sites stay a list at every width, not the desktop board's table. Only live sites are listed.
+      - The page is two columns from lg, since the board is 1440; below lg it is one column.
+      - A Viewer sees channels, devices and the shared values only (§22.6).
 
 **Why.** Every change to who may do what goes through one audited function, so the Access category records it and nothing writes `profiles` behind the log. Blocking the save keeps D-015 and D-048 true after a person leaves: no site without a reachable owner, no week with nobody on call. Keeping only company addresses keeps the undeletable log free of anything a person didn't already share with the company.
 

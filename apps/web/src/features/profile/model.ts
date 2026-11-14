@@ -16,6 +16,8 @@ export interface MySite {
   role: 'Owner' | 'Backup' | 'AM';
   /** The open incident's id, if any: the row links there instead of the site (MProfile). */
   incident: string | null;
+  /** Muted until (§11: an overlay under the status, never a status). */
+  mutedUntil: string | null;
 }
 
 export interface PolicyStep {
@@ -56,6 +58,10 @@ export interface ProfileData {
   shifts: Shift[];
   swap: OpenSwap | null;
   hours: { start: string; end: string; days: number[] };
+  /** Email goes out only with the provider set up (RESEND_API_KEY + ALERT_EMAIL_FROM); D-013: never promise it. */
+  emailOn: boolean;
+  /** Active Admins' names, for the one-Admin warning (D-009: a second Admin before G1). */
+  admins: string[];
 }
 
 /** Only Admins and Responders take on-call weeks, and so get the phone test (D-062 item 12). */
@@ -65,7 +71,7 @@ export interface ChannelRow {
   key: 'chat' | 'email' | 'phone';
   name: string;
   detail: string;
-  status: 'Working' | 'No Chat id' | 'Not available';
+  status: 'Working' | 'No Chat id' | 'Not available' | 'Not set up';
 }
 
 /** "How alerts reach me" (Profile board): Chat, email, phone — the Chat row says when the id is missing. */
@@ -79,7 +85,12 @@ export function channelRows(d: ProfileData): ChannelRow[] {
         : 'Add your Chat id so alerts can @mention you',
       status: d.me.chatLinked ? 'Working' : 'No Chat id',
     },
-    { key: 'email', name: 'Email', detail: 'Your Workspace address · record + fallback', status: 'Working' },
+    {
+      key: 'email',
+      name: 'Email',
+      detail: 'Your Workspace address · record + fallback',
+      status: d.emailOn ? 'Working' : 'Not set up',
+    },
     {
       key: 'phone',
       name: 'Phone call (Twilio)',
@@ -146,36 +157,79 @@ export function escalationRows(d: ProfileData): { label: string; value: string }
         value: mine.join(' · '),
       });
   }
+  const amOf = (tier: number) => d.sites.filter((x) => x.role === 'AM' && x.tier === tier).length;
+  if (amOf(1) || amOf(2))
+    rows.push({
+      label: 'Client update',
+      value: [
+        amOf(1)
+          ? `@mentioned with a draft once a Tier 1 site is down 15 min (${count(amOf(1), 'site')})`
+          : null,
+        amOf(2) ? `Tier 2: down 60 min in response hours (${count(amOf(2), 'site')})` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    });
+  if (d.me.role === 'admin')
+    rows.push({
+      label: 'Monitor faults',
+      value: 'A probe location silent over 3 min → email to every Admin, no page',
+    });
   return rows;
+}
+
+/** Monitor faults reach the active Admins only: with one, they reach one person (D-009, Users board). */
+export function oneAdminWarning(d: ProfileData): string | null {
+  if (d.me.role !== 'admin' || d.admins.length !== 1) return null;
+  return `Only ${d.admins[0]} is an active Admin — add a second one in Users`;
 }
 
 const at = (iso: string) => `${formatDay(new Date(iso), { weekday: true })} ${formatTime(new Date(iso))}`;
 
-/** The on-call line (Profile "Tier 1 night rotation", MProfile's on-call card); null when it doesn't apply. */
+/** The escalation card's on-call row (MProfile "On call (nights, weekends) → L0 for every Tier 1 site"). */
 export function oncallLine(d: ProfileData, now: Date): { label: string; value: string } | null {
   const t = now.getTime();
-  const live = d.shifts.find((s) => Date.parse(s.startsAt) <= t && t < Date.parse(s.endsAt));
-  if (live) return { label: 'Tier 1 nights and weekends', value: `On call now until ${at(live.endsAt)}` };
+  const live = d.shifts.some((s) => Date.parse(s.startsAt) <= t && t < Date.parse(s.endsAt));
   const next = d.shifts.find((s) => Date.parse(s.startsAt) > t);
+  const label = 'On call (nights, weekends)';
+  if (live) return { label, value: 'L0 for every Tier 1 site — on call now' };
   if (next)
     return {
-      label: 'Tier 1 nights and weekends',
-      value: `Next shift ${at(next.startsAt)} → ${at(next.endsAt)}`,
+      label,
+      value: `L0 for every Tier 1 site · next shift ${formatDay(new Date(next.startsAt), { weekday: true })}`,
     };
-  if (d.inRotation)
-    return { label: 'Tier 1 nights and weekends', value: 'In the rotation · no shift scheduled yet' };
+  if (d.inRotation) return { label, value: 'In the rotation · no shift scheduled yet' };
   if (d.me.role === 'admin') return { label: 'Tier 1 night rotation', value: 'Not in it — Admin backstop' };
   return null;
 }
 
-/** MProfile's swap line under the next shift. */
-export function swapLine(s: OpenSwap | null): string | null {
+/** MProfile's on-call card: "Mon 5 Oct → Mon 12 Oct", the live shift's end, or nothing. */
+export function shiftCard(d: ProfileData, now: Date): { eyebrow: string; value: string } | null {
+  const t = now.getTime();
+  const live = d.shifts.find((s) => Date.parse(s.startsAt) <= t && t < Date.parse(s.endsAt));
+  if (live) return { eyebrow: 'ON CALL NOW', value: `Until ${at(live.endsAt)}` };
+  const next = d.shifts.find((s) => Date.parse(s.startsAt) > t);
+  if (!next) return null;
+  return {
+    eyebrow: 'MY NEXT ON-CALL SHIFT',
+    value: `${formatDay(new Date(next.startsAt), { weekday: true })} → ${formatDay(new Date(next.endsAt), { weekday: true })}`,
+  };
+}
+
+/** MProfile's swap under the next shift: the badge, its line, and what it means for you. */
+export function swapLine(s: OpenSwap | null): { badge: string; line: string; note: string | null } | null {
   if (!s) return null;
   if (s.mine)
     return s.status === 'waiting'
-      ? `Swap requested with ${s.other} · not accepted yet. You stay on call until ${s.other} accepts.`
-      : `${s.other} accepted your swap · waiting for an Admin`;
-  return s.status === 'waiting' ? `${s.other} asked to swap with you — answer on On-call` : null;
+      ? {
+          badge: 'Swap requested',
+          line: `with ${s.other} · not accepted yet`,
+          note: `You stay on call for this shift until ${s.other} accepts.`,
+        }
+      : { badge: 'Swap accepted', line: `by ${s.other} · waiting for an Admin`, note: null };
+  return s.status === 'waiting'
+    ? { badge: 'Swap asked', line: `${s.other} asked to swap with you`, note: 'Answer on On-call.' }
+    : null;
 }
 
 const DAYS = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -202,6 +256,6 @@ export function sameForEveryone(d: ProfileData): { label: string; value: string 
   ];
 }
 
-/** "jirawat.p@… · Admin · Google Workspace account" (the board's meta, without 2-step, D-062 item 8). */
+/** "arm@… · Responder · Google Workspace account" (the board's meta, without 2-step, D-062 item 8). */
 export const metaLine = (d: ProfileData) =>
   `${d.me.email} · ${ROLE_LABELS[d.me.role]} · Google Workspace account`;
