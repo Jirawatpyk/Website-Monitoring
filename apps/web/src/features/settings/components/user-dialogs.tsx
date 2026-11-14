@@ -180,6 +180,12 @@ export function RevokeDialog({
 }) {
   const [reason, setReason] = useState('');
   const [tried, setTried] = useState(false);
+  // Each refused Remove moves focus to the reason, after React has shown its error (staging /verify).
+  const [refused, setRefused] = useState(0);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (refused > 0) reasonRef.current?.focus();
+  }, [refused]);
   const { error, pending, run } = useSubmit(() => {
     onDone(`${email} removed from the access list · logged`);
     setReason('');
@@ -200,7 +206,11 @@ export function RevokeDialog({
             variant="danger"
             loading={pending}
             onClick={() => {
-              if (!reason.trim()) return setTried(true);
+              if (!reason.trim()) {
+                setTried(true);
+                setRefused((n) => n + 1);
+                return;
+              }
               run(() => revokeInvite({ email: email ?? '', reason }));
             }}
           >
@@ -217,6 +227,7 @@ export function RevokeDialog({
           </Alert>
         )}
         <Textarea
+          ref={reasonRef}
           label="Reason"
           placeholder="e.g. Wrong address — adding the right person"
           value={reason}

@@ -23,6 +23,15 @@
       @apply sr-only;
     }
   }
+  /*
+   * A dialog's X is 32 px; on a phone every target is 44 px (spec §22.3). AURA's Dialog has no touch size
+   * for it yet, so the phone boards' own override (MAuditLog, MUsers) is applied here, to every dialog.
+   */
+  @variant max-sm {
+    .aura-dialog__close.aura-icon-btn {
+      @apply -mt-3 -mr-3.5 size-11;
+    }
+  }
 }
 
 html,

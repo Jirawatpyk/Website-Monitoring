@@ -404,5 +404,9 @@ describe('entityFallback', () => {
     expect(entityFallback('signin', null, { reason: 'domain', domain: 'gmail.com' })).toBe(
       'an address @gmail.com',
     );
+    // A revoke: the address is on the before side only (staging /verify).
+    expect(entityFallback('user', { email: 'gone@dxt.test', role: 'admin' }, { reason: 'typo' })).toBe(
+      'gone@dxt.test',
+    );
   });
 });

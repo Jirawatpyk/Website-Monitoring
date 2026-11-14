@@ -53,6 +53,9 @@ import { ChatIdDialog, InviteDialog, RevokeDialog, RoleDialog } from './user-dia
 const HEADING =
   'm-0 font-mono text-xs font-normal text-fg-tertiary md:font-sans md:text-2xl md:font-semibold md:text-fg-primary';
 
+/** `focusKey` for the Add person button (a row key is a uuid or an address, never this). */
+const ADD = '<add-person>';
+
 type Open =
   | { kind: 'invite' }
   | { kind: 'revoke'; email: string; isAdmin: boolean }
@@ -74,18 +77,24 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
   // Hand over's On-call data, read when that dialog opens (S16 code review).
   const [oncall, setOncall] = useState<OncallData | null>(null);
   // Focus goes back to the row's ⋯ once its dialog closes (the trigger, S05 /verify).
+  // A removed person's row is gone after the refresh, so focus goes to Add person instead (staging
+  // /verify); so does it after Add person's own dialog.
   const focusKey = useRef<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const addRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (open || !focusKey.current) return;
-    tableRef.current
-      ?.querySelector<HTMLElement>(`[data-row-menu="${CSS.escape(focusKey.current)}"]`)
-      ?.focus();
+    const target =
+      focusKey.current === ADD
+        ? addRef.current?.querySelector<HTMLElement>('button')
+        : tableRef.current?.querySelector<HTMLElement>(`[data-row-menu="${CSS.escape(focusKey.current)}"]`);
+    target?.focus();
     focusKey.current = null;
   }, [open]);
   const close = () => setOpen(null);
   const finish = (line: string) => {
     setDone({ text: line, ok: true });
+    if (open?.kind === 'revoke' || open?.kind === 'deactivate') focusKey.current = ADD;
     setOpen(null);
   };
   const personOf = (r: UserRow) => data.people.find((p) => p.id === r.personId) ?? null;
@@ -236,8 +245,14 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
       <SettingsHeader
         current="users"
         actions={
-          <span className="hidden md:inline-flex">
-            <Button icon={<IconPlus />} onClick={() => setOpen({ kind: 'invite' })}>
+          <span ref={addRef} className="hidden md:inline-flex">
+            <Button
+              icon={<IconPlus />}
+              onClick={() => {
+                focusKey.current = ADD;
+                setOpen({ kind: 'invite' });
+              }}
+            >
               Add person
             </Button>
           </span>

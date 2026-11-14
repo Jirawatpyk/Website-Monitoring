@@ -206,8 +206,8 @@ export const ACTION_WORDS: Record<string, string> = {
   'oncall.swap_admin_decline': 'Declined swap (Admin)',
   'oncall.swap_expire': 'Swap expired',
   // Access (S16, D-062)
-  'user.invite': 'Invited',
-  'user.invite_revoke': 'Revoked invite',
+  'user.invite': 'Added to access list',
+  'user.invite_revoke': 'Removed from access list',
   'user.reactivate': 'Gave access back',
   'user.role_change': 'Changed role',
   'user.deactivate': 'Deactivated',
@@ -708,9 +708,13 @@ export function entityFallback(entity: string, before: Json | null, after: Json 
   if (entity === 'escalation') return 'Escalation policies';
   if (entity === 'oncall_rotation') return 'On-call rotation';
   // An invite or a refused sign-in has no person yet: its address, or the domain (D-062 item 7).
-  if ((entity === 'user' || entity === 'signin') && side) {
-    if (typeof side.email === 'string') return side.email;
-    if (typeof side.domain === 'string') return `an address @${side.domain}`;
+  // A revoke keeps the address only on the before side, so both sides are read.
+  if (entity === 'user' || entity === 'signin') {
+    const sides = [after, before].filter(isObject);
+    const email = sides.map((s) => s.email).find((v) => typeof v === 'string');
+    if (typeof email === 'string') return email;
+    const domain = sides.map((s) => s.domain).find((v) => typeof v === 'string');
+    if (typeof domain === 'string') return `an address @${domain}`;
   }
   if (side) {
     const n = nameOf(side);

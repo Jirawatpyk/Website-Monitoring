@@ -103,6 +103,22 @@ describe('UsersPageView (Users, MUsers)', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Actions for Nok' })[0]).toHaveFocus());
   });
 
+  it('Remove from access list: an empty reason takes focus; once removed, focus goes to Add person', async () => {
+    actions.revokeInvite.mockResolvedValue({ ok: true });
+    render(<UsersPageView data={data} now={NOW} />);
+    const user = await openMenu('new@x', 'Remove from access list…');
+    const dialog = await screen.findByRole('dialog', { name: 'Remove new@x from the access list?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    expect(actions.revokeInvite).not.toHaveBeenCalled();
+    await waitFor(() => expect(within(dialog).getByLabelText(/Reason/)).toHaveFocus());
+    await user.type(within(dialog).getByLabelText(/Reason/), 'Wrong address');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    await waitFor(() =>
+      expect(actions.revokeInvite).toHaveBeenCalledWith({ email: 'new@x', reason: 'Wrong address' }),
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add person' })).toHaveFocus());
+  });
+
   it('the invite dialog asks for the primary address and reminds about 2-Step (D-007)', async () => {
     render(<UsersPageView data={data} now={NOW} />);
     const user = userEvent.setup();
