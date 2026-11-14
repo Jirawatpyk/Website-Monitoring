@@ -64,7 +64,12 @@ describe('the role matrix (Users / MUsers)', () => {
       'responder',
       'stakeholder',
       ['Send client reports / edit AM note (own clients)'],
-      ['Acknowledge and resolve incidents', 'Maintenance windows and mute'],
+      // D-062 item 13: own sites → own clients is named too.
+      [
+        'Acknowledge and resolve incidents',
+        'Mark client update / Not needed outside own clients',
+        'Maintenance windows and mute',
+      ],
     ],
     [
       'responder',

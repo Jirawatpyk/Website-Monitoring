@@ -10,3 +10,4 @@ export * from './forbidden';
 export * from './fingerprint';
 export * from './series';
 export * from './device';
+export * from './roles';
