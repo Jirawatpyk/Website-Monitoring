@@ -399,4 +399,10 @@ describe('entityFallback', () => {
     expect(entityFallback('site', { name: 'Old site' }, null)).toBe('Old site');
     expect(entityFallback('oncall_swap', null, null)).toBe('oncall swap');
   });
+  it('an invite or refused sign-in: its address, or only the domain (D-062 item 7)', () => {
+    expect(entityFallback('user', null, { email: 'new@dxt.test', role: 'responder' })).toBe('new@dxt.test');
+    expect(entityFallback('signin', null, { reason: 'domain', domain: 'gmail.com' })).toBe(
+      'an address @gmail.com',
+    );
+  });
 });

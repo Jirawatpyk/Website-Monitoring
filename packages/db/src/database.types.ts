@@ -899,6 +899,9 @@ isOneToOne: false
 "cancel_window":
 { Args: { "p_reason": string,"p_window_id": string }; Returns: undefined
                            },
+"change_user_role":
+{ Args: { "p_reassign"?: Json,"p_role": Database["public"]['Enums']["app_role"],"p_user_id": string }; Returns: undefined
+                           },
 "claim_notifications":
 { Args: { "p_channel": Database["public"]['Enums']["notification_channel"],"p_incident_id"?: string,"p_limit"?: number,"p_oncall"?: boolean,"p_reports"?: boolean,"p_series"?: boolean }; Returns: {
               "attempts": number,
@@ -1004,6 +1007,9 @@ isOneToOne: false
                            },
 "current_app_role":
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["app_role"]
+                           },
+"deactivate_user":
+{ Args: { "p_reassign"?: Json,"p_user_id": string }; Returns: undefined
                            },
 "decide_maintenance_series":
 { Args: { "p_approve": boolean,"p_reason": string,"p_series_id": string }; Returns: undefined
@@ -1218,8 +1224,16 @@ isOneToOne: false
 "hook_before_user_created":
 { Args: { "event": Json }; Returns: Json
                            },
+"invite_user":
+{ Args: { "p_email": string,"p_role": Database["public"]['Enums']["app_role"] }; Returns: string
+                           },
 "is_staff":
 { Args: Record<PropertyKey, never>; Returns: boolean
+                           },
+"list_sessions":
+{ Args: { "p_user_id"?: string }; Returns: {
+              "created_at": string,"id": string,"is_current": boolean,"last_used": string,"user_agent": string,"user_id": string
+            }[]
                            },
 "mark_client_update":
 { Args: { "p_incident_id": string,"p_not_needed": boolean,"p_note": string }; Returns: undefined
@@ -1260,6 +1274,11 @@ isOneToOne: false
 "owns_site":
 { Args: { "p_site_id": string }; Returns: boolean
                            },
+"pending_invites":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "created_at": string,"email": string,"role": Database["public"]['Enums']["app_role"]
+            }[]
+                           },
 "post_series_action_now":
 { Args: { "p_series_id": string }; Returns: undefined
                            },
@@ -1297,6 +1316,9 @@ isOneToOne: false
 "respond_oncall_swap":
 { Args: { "p_accept": boolean,"p_note"?: string,"p_swap_id": string }; Returns: undefined
                            },
+"revoke_invite":
+{ Args: { "p_email": string,"p_reason": string }; Returns: undefined
+                           },
 "save_escalation_policies":
 { Args: { "p_down_reminder_min": number,"p_note": string,"p_policies": Json,"p_problem_reminder_min": number }; Returns: undefined
                            },
@@ -1315,11 +1337,23 @@ isOneToOne: false
 "send_oncall_test":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"set_chat_user_id":
+{ Args: { "p_chat_id": string,"p_user_id": string }; Returns: undefined
+                           },
 "set_oncall_checklist":
 { Args: { "p_dnd_allowed": boolean,"p_mentions_only": boolean }; Returns: undefined
                            },
 "set_site_monitoring":
 { Args: { "p_on": boolean,"p_site_id": string }; Returns: undefined
+                           },
+"sign_out_my_device":
+{ Args: { "p_session_id": string }; Returns: undefined
+                           },
+"sign_out_my_other_devices":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
+"sign_out_user_everywhere":
+{ Args: { "p_user_id": string }; Returns: number
                            },
 "site_list_locations":
 { Args: Record<PropertyKey, never>; Returns: {
