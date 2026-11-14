@@ -38,5 +38,7 @@ export function loginErrorFromCallback(params: URLSearchParams): LoginError {
   const text = `${params.get('error_description') ?? ''} ${params.get('error') ?? ''}`;
   if (/access list/i.test(text)) return 'access';
   if (/only dxt google accounts/i.test(text)) return 'domain';
+  // A deactivated account is banned (S16, D-062 item 3): Auth refuses its next sign-in.
+  if (/banned/i.test(text)) return 'deactivated';
   return 'auth';
 }

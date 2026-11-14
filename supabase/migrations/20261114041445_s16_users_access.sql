@@ -553,7 +553,7 @@ $$;
 
 -- ── my_access: a signed-out session reads 'ended' (D-062 item 5) ─────────
 -- The token outlives its session by up to jwt_expiry; the app refuses it at once. A token without a
--- session_id claim (tests, scripts) isn't checked.
+-- session_id claim (tests, scripts) isn't checked. A deactivated person reads 'inactive' either way.
 create or replace function public.my_access()
 returns table (status text, id uuid, email text, display_name text, role public.app_role)
 language sql
@@ -563,8 +563,11 @@ set search_path = ''
 as $$
   select
     case
+      -- Deactivated first: their sessions are deleted too, and they should see "Account deactivated".
+      when p.id is not null and not p.is_active then 'inactive'
       when not private.session_alive() then 'ended'
-      else coalesce(case when p.is_active then 'active' when p.id is not null then 'inactive' end, 'missing')
+      when p.is_active then 'active'
+      else 'missing'
     end,
     case when p.is_active then p.id end,
     case when p.is_active then p.email end,

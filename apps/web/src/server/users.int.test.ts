@@ -100,7 +100,8 @@ describe('invite → sign in, deactivate (Done-when 1)', () => {
     // The refresh token is gone with the session; the old access token reads `ended` in the app.
     const { error: refreshError } = await device.auth.refreshSession();
     expect(refreshError).not.toBeNull();
-    expect(await accessOf(device)).toBe('ended');
+    // Deactivated reads before signed out, so they see "Account deactivated".
+    expect(await accessOf(device)).toBe('inactive');
     // Banned: a new sign-in is refused.
     const { error: signInError } = await newClient().auth.signInWithPassword({ email, password: PASSWORD });
     expect(signInError?.message).toMatch(/banned/i);
