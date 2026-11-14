@@ -503,7 +503,7 @@ Boards: **MAuditLog** and **MAuditLogDark** (same board, dark tokens), next to M
 9. **Empty.** "No entries match these filters." with Clear filters, in a card where the list was.
 10. **Footnote.** Lock icon + "Entries are kept forever and can't be edited or deleted. "System" rows are written by the status engine and the notifier."
 
-## 34. Role-change email (EmailAlert › Account · role change) — S16, D-062 item 10, added 14 Nov 2026
+## 34. Role-change email (EmailAlert › Account · role change) — S16, D-062 item 11, added 14 Nov 2026
 Sent by the notifier to the person only, the moment an Admin confirms a role change or a deactivation on Users & roles (the dialog says "{name} gets an email saying what changed"). One email per change, not threaded, nothing to anyone else. No email for an invite (D-011). The board's new Preview controls show any email in a desktop or phone mail client (390 px) and light or dark.
 
 1. **Subject:** "Your DxT Monitor role is now Stakeholder" / "Your DxT Monitor role is now Admin" / "Your DxT Monitor access was removed". Preheader: "ROLE CHANGED — Tao changed your role from Responder to Stakeholder · Fri 25 Sep 10:08" (ACCESS REMOVED — Tao removed your access · …).
