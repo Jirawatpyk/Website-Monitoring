@@ -73,6 +73,7 @@ security definer
 set search_path = ''
 as $$
 begin
+  perform private.require_admin(p_message);
   perform pg_advisory_xact_lock(hashtext('user_access'));
   perform pg_advisory_xact_lock(hashtext('oncall_extend_shifts'));
   perform private.require_admin(p_message);
@@ -266,11 +267,13 @@ begin
     -- once the weeks already made run out (D-062 item 4).
     select r.position into v_pos from public.oncall_rotation r where r.user_id = p_user;
     if found then
-      select count(*) into v_count from public.oncall_rotation;
-      if v_count = 1 then
+      select count(*) into v_count from public.oncall_rotation r
+        join public.profiles p on p.id = r.user_id and p.is_active;
+      if v_count <= 1 then
         raise exception 'They are the only person in the on-call rotation — add someone on On-call first'
           using errcode = '55000', hint = 'rotation_last';
       end if;
+      select count(*) into v_count from public.oncall_rotation;
       select coalesce(jsonb_agg(user_id order by position), '[]'::jsonb) into v_before from public.oncall_rotation;
       delete from public.oncall_rotation where user_id = p_user;
       -- Two steps: `position` is unique and checked row by row.
@@ -284,7 +287,7 @@ begin
           when slot > v_pos then slot - 1
           when v_pos = 1 then v_count - 1
           else v_pos - 1 end
-        where slot >= v_pos;
+        where slot >= v_pos and ends_at > now();
       insert into public.audit_log (actor_id, action, entity, before, after)
       values (auth.uid(), 'oncall.rotation', 'oncall_rotation', jsonb_build_object('order', v_before),
               jsonb_build_object('order', (select coalesce(jsonb_agg(user_id order by position), '[]'::jsonb)
@@ -311,6 +314,9 @@ begin
   if p_user = auth.uid() then
     raise exception 'You can''t change your own access — ask another Admin' using errcode = '22023', hint = 'self';
   end if;
+  -- The person's sites first, then their profile: a site save locks its row, then (its owner trigger)
+  -- the owners' profiles — the same order, so the two never deadlock (db review, second pass M1).
+  perform 1 from public.sites s where p_user in (s.primary_owner_id, s.backup_owner_id) order by s.id for update;
   select * into v from public.profiles where id = p_user for update;
   if not found or not v.is_active then
     raise exception 'That person doesn''t have access any more' using errcode = 'P0002';
@@ -409,7 +415,7 @@ declare
   v_old text;
   v_sites text;
 begin
-  if not public.is_staff() then
+  if not public.is_staff() or not private.session_alive() then
     raise exception 'Sign in first' using errcode = '42501';
   end if;
   if p_user_id is distinct from auth.uid() and public.current_app_role() <> 'admin' then
@@ -436,7 +442,11 @@ begin
   end if;
   -- An @mention reaches one person (security review L2). Checked here, not by a unique index: the
   -- staging fixture people share Tao's Chat id on purpose (D-035), set by SQL.
-  if v_id is not null and exists (select 1 from public.profiles p where p.google_chat_user_id = v_id and p.id <> p_user_id) then
+  if v_id is not null then
+    perform pg_advisory_xact_lock(hashtext('chat_id:' || v_id));
+  end if;
+  if v_id is not null and exists (select 1 from public.profiles p
+                                  where p.google_chat_user_id = v_id and p.id <> p_user_id and p.is_active) then
     raise exception 'That Chat id belongs to someone else' using errcode = '23505', hint = 'chat_id_taken';
   end if;
   update public.profiles set google_chat_user_id = v_id where id = p_user_id;
@@ -457,7 +467,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if not public.is_staff() then
+  if not public.is_staff() or not private.session_alive() then
     raise exception 'Sign in first' using errcode = '42501';
   end if;
   if public.current_app_role() <> 'admin' and p_user_id is distinct from auth.uid() then
@@ -621,6 +631,53 @@ begin
       using errcode = 'P0001', hint = 'owners_missing_chat_id', detail = v_unlinked;
   end if;
   return new;
+end;
+$$;
+
+-- ── save_oncall_rotation: who may be on call, read under the lock (db review, second pass M2) ──
+-- A deactivation (which takes the same lock) could commit between the eligibility check and the
+-- insert and put an inactive person back in the rotation. Body otherwise as
+-- 20261030065528_oncall_rotation_safeupdate.sql.
+create or replace function public.save_oncall_rotation(p_user_ids uuid[], p_note text default null)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_before jsonb;
+  v_u uuid;
+begin
+  if coalesce(public.current_app_role() = 'admin', false) is not true then
+    raise exception 'Only an Admin can change the rotation' using errcode = '42501';
+  end if;
+  if coalesce(cardinality(p_user_ids), 0) = 0 then
+    raise exception 'Add at least one person to the rotation' using errcode = '22023', hint = 'rotation_empty';
+  end if;
+  if (select count(distinct u) from unnest(p_user_ids) u) <> cardinality(p_user_ids) then
+    raise exception 'Each person can be in the rotation once' using errcode = '22023', hint = 'rotation_duplicate';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('oncall_extend_shifts'));
+  foreach v_u in array p_user_ids loop
+    if not private.oncall_eligible(v_u) then
+      raise exception 'Only active Admins and Responders can be on call' using errcode = '22023', hint = 'rotation_person';
+    end if;
+  end loop;
+  select coalesce(jsonb_agg(user_id order by position), '[]'::jsonb) into v_before from public.oncall_rotation;
+  -- `where true`: the API preloads pg_safeupdate, which refuses a DELETE with no WHERE.
+  delete from public.oncall_rotation where true;
+  insert into public.oncall_rotation (user_id, position)
+  select u, o::smallint from unnest(p_user_ids) with ordinality as t(u, o);
+
+  insert into public.audit_log (actor_id, action, entity, before, after)
+  values (auth.uid(), 'oncall.rotation', 'oncall_rotation', jsonb_build_object('order', v_before),
+          jsonb_build_object('order', to_jsonb(p_user_ids), 'note', nullif(btrim(coalesce(p_note, '')), '')));
+  perform private.oncall_event('rotation_changed', null, null, null, jsonb_build_object(
+    'order', to_jsonb(p_user_ids),
+    'removed', coalesce((select jsonb_agg(b) from jsonb_array_elements_text(v_before) b
+                         where not (b::uuid = any (p_user_ids))), '[]'::jsonb)));
+  perform public.oncall_extend_shifts(now() + interval '28 days');
 end;
 $$;
 
