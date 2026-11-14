@@ -4,6 +4,7 @@ import type { Database } from '@dxt/db';
 import { isAllowedEmail } from '@dxt/shared';
 import { loginErrorFromCallback, refusedEmailCookie } from '@/lib/auth/login-errors';
 import { isPublic } from '@/lib/auth/public-paths';
+import { browserHeaders } from './browser-headers';
 
 /**
  * Refreshes the Supabase session cookie on every request, sends signed-out people to /login, and
@@ -17,6 +18,7 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      global: { headers: browserHeaders(request.headers.get('user-agent')) },
       cookies: {
         getAll() {
           return request.cookies.getAll();
