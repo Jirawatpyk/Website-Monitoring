@@ -134,6 +134,12 @@ test.describe('users & roles (local Supabase)', () => {
     await page.getByRole('button', { name: /^Nok, Responder, .*Show details$/ }).click();
     const sheet = page.getByRole('dialog', { name: 'Nok' });
     await expect(sheet.getByText('Roles and reassignments change on a larger screen.')).toBeVisible();
+    // The sheet's X is a 44 px target on a phone (globals.css, staging /verify) and stays inside the sheet.
+    const x = await sheet.locator('.aura-dialog__close').boundingBox();
+    const box = await sheet.boundingBox();
+    expect(x && x.width >= 44 && x.height >= 44, `X is ${x?.width}×${x?.height}`).toBe(true);
+    expect(x && box && x.x + x.width <= box.x + box.width && x.y >= box.y).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('users-sheet-390.png') });
     await sheet.getByRole('button', { name: 'Close', exact: true }).last().click();
     await expect(page.getByText('Responder: 6 of 10 allowed.', { exact: false })).toBeVisible();
     await page.locator('select.aura-select__native').last().selectOption({ label: 'Stakeholder' });
