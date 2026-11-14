@@ -48,10 +48,10 @@ import { RoleBadge } from './role-badge';
 import { SettingsHeader } from './settings-header';
 import { loadHandover } from '../actions';
 import { ChatIdDialog, InviteDialog, RevokeDialog, RoleDialog } from './user-dialogs';
+import { ViewOnlyLine } from './view-only-line';
+import { PERSON_CARD, SECTION_HEADING } from './heading';
 
-/** A section's h2: MUsers' mono caps on a phone, Site detail's 24 px heading from md. */
-const HEADING =
-  'm-0 font-mono text-xs font-normal text-fg-tertiary md:font-sans md:text-2xl md:font-semibold md:text-fg-primary';
+const HEADING = SECTION_HEADING;
 
 /** `focusKey` for the Add person button (a row key is a uuid or an address, never this). */
 const ADD = '<add-person>';
@@ -258,13 +258,7 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
           </span>
         }
       />
-      <div className="flex items-start gap-2.5 rounded-aura-md border border-border-default bg-bg-surface p-3 text-sm md:hidden">
-        <IconEye size="sm" aria-hidden className="mt-0.5 text-fg-secondary" />
-        <span>
-          <b className="font-semibold">View only on phones.</b>{' '}
-          <span className="text-fg-secondary">Admins change policies on a larger screen.</span>
-        </span>
-      </div>
+      <ViewOnlyLine />
       {banner && (
         <Alert tone="warning" title={banner.title}>
           {banner.body}
@@ -464,7 +458,7 @@ function PeopleCards({ data, rows }: { data: UsersData; rows: UserRow[] }) {
             type="button"
             onClick={() => setOpen(r)}
             aria-label={`${r.name}, ${ROLE_LABELS[r.role]}, ${r.meta}. Show details`}
-            className="flex min-h-16 w-full items-center gap-2.5 border-0 border-b border-border-subtle bg-transparent py-2.5 pr-2 pl-3.5 text-left last:border-b-0"
+            className={PERSON_CARD}
           >
             <span className="flex min-w-0 grow flex-col gap-0.5 leading-snug">
               <span className="flex items-center gap-2">

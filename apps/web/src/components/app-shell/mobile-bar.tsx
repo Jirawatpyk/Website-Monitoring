@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { Avatar } from '@jirawatpyk/aura-react';
 
 /**
@@ -11,7 +12,14 @@ export function MobileBar({ displayName, children }: { displayName: string; chil
   return (
     <div className="flex min-w-0 grow items-center gap-1 pr-2">
       <div className="flex min-w-0 grow items-center gap-1">{children}</div>
-      <Avatar name={displayName} size="sm" />
+      {/* The avatar opens My profile (MSecurity / MUsers top bar: aria "My profile"), a 44 px target. */}
+      <Link
+        href="/profile"
+        aria-label="My profile"
+        className="flex size-11 shrink-0 items-center justify-center rounded-aura-full"
+      >
+        <Avatar name={displayName} size="sm" />
+      </Link>
     </div>
   );
 }

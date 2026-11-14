@@ -39,6 +39,30 @@ async function admin(path: string, init: RequestInit = {}): Promise<unknown> {
   return text ? JSON.parse(text) : null;
 }
 
+/** Whether `email` signs in with the test password (a throwaway session; nothing else changes). */
+async function passwordWorks(email: string): Promise<boolean> {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: PASSWORD }),
+  });
+  if (!res.ok) {
+    // Only a wrong password means "set it"; anything else (a rate limit, a 5xx) must not fall through to
+    // the reset that signs the person out everywhere.
+    const body = (await res.json().catch(() => ({}))) as { error_code?: string; error?: string };
+    if (res.status === 400 && (body.error_code === 'invalid_credentials' || body.error === 'invalid_grant'))
+      return false;
+    throw new Error(`password check for ${email}: ${res.status} ${JSON.stringify(body)}`);
+  }
+  // End just this check's session, so the person's device list doesn't grow with every run.
+  const { access_token } = (await res.json()) as { access_token: string };
+  await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, {
+    method: 'POST',
+    headers: { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${access_token}` },
+  });
+  return true;
+}
+
 /** The auth user for `email` (created without an allowlist row if missing), with the test password. */
 export async function ensureUser(email: string): Promise<string> {
   const list = (await admin('/auth/v1/admin/users?per_page=1000')) as {
@@ -46,6 +70,10 @@ export async function ensureUser(email: string): Promise<string> {
   };
   const found = list.users.find((u) => u.email === email);
   if (found) {
+    // Setting a password ends every session the person has (GoTrue), and since S16 a session that's gone
+    // is refused at once (`my_access` → ended): resetting it on each call signed out the same person's
+    // tests running alongside (S16 PR 3 code review). Only set it when the test password doesn't work yet.
+    if (await passwordWorks(email)) return found.id;
     await admin(`/auth/v1/admin/users/${found.id}`, {
       method: 'PUT',
       body: JSON.stringify({ password: PASSWORD }),
@@ -57,6 +85,36 @@ export async function ensureUser(email: string): Promise<string> {
     body: JSON.stringify({ email, password: PASSWORD, email_confirm: true }),
   })) as { id: string };
   return created.id;
+}
+
+/**
+ * A person of a spec's own (S16 PR 3): added to the access list by the seeded Admin through
+ * `invite_user`, then signed up, so the sign-up trigger makes the profile. Specs that sign a person out
+ * everywhere use one of these, never a seeded person other specs are signed in as at the same time.
+ */
+export async function ensurePerson(email: string, role: string): Promise<{ id: string; name: string }> {
+  const tao = await clientFor('tao@example.test');
+  const { error } = await tao.rpc('invite_user', { p_email: email, p_role: role });
+  if (error && !['already_member', 'already_invited'].includes(error.hint ?? ''))
+    throw new Error(`invite_user ${email}: ${error.message}`);
+  const id = await ensureUser(email);
+  const [p] = (await admin(`/rest/v1/profiles?select=display_name&id=eq.${id}`)) as {
+    display_name: string;
+  }[];
+  if (!p) throw new Error(`no profile for ${email}`);
+  return { id, name: p.display_name };
+}
+
+/** A Node client signed in as `email` (the local stack only), for set-up calls made as that person. */
+async function clientFor(email: string) {
+  assertLocal();
+  await ensureUser(email);
+  const c = createServerClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+    cookies: { getAll: () => [], setAll: () => {} },
+  });
+  const { error } = await c.auth.signInWithPassword({ email, password: PASSWORD });
+  if (error) throw new Error(`sign-in failed for ${email}: ${error.message}`);
+  return c;
 }
 
 /** A seeded site's id (layout checks of the pages under /sites). */

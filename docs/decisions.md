@@ -84,6 +84,29 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 9. **Confirmed by Tao the same day, from the reviews:** nobody changes their own access; the rotation's last person can't leave it; one person per Chat id (checked in the function — the staging fixture people share Tao's id on purpose, D-035, so no unique index); a token whose session was signed out can't use any Admin function, the Chat id or the device list.
 10. **Users page words and 820 px (Tao, 14 Nov, from spec-checker):** one vocabulary for the access list — header "Add person", dialog "Add someone to Monitor" / "Add to access list", row menu "Remove from access list…" — since nothing is sent (the board's "Invite / Revoke invite" meant the link). At 820 px the table stays (it edits; only phones are view only) and folds away Alert channels only; Owner · backup and Last active stay.
 11. **Waiting for Claude Design:** the phone layouts of Users and Security (spec §22.5 view only), and the email telling a person their role changed. Briefs in `docs/design/briefs/`.
+12. **Profile and Security (S16 PR 3, 14 Nov).** Tao answered the first three (Chat id, test alert, devices wording). Claude settled the rest from the reviews under the recommendation rule, and listed them in the PR for Tao to veto:
+    - **Chat id.** The person edits their own Chat id from an "Edit Chat id…" button in Profile's "Google Chat @mention" row. It is the same dialog Admins use on the Users page, and the row reads "Working" or "No Chat id". No board draws this control.
+    - **Test alert.** "Send me a test alert" is the on-call phone test (`send_oncall_test`), so Admins and Responders get it and Stakeholders and Viewers see no button. A test for every role comes with S17's Alert channels. The test is a Chat card with a link, not an email, and Profile's success line says that. Sending it clears the on-call "Test alert received on this phone" tick until its link is opened, the same as on the On-call page.
+    - **Devices card wording.** It reads "You stay signed in on this device, so the Ack link opens straight to the incident. Signing out a device takes effect now." It names no number of days (D-011).
+    - **Device names** (settled by Claude, as is everything below). They come from the browser's User-Agent, which the server forwards to Supabase Auth when it creates or refreshes a session (`/auth/callback`, the proxy and the server client). Without it Auth records "node". A refresh records it again (checked locally), so a session started before this change takes its name at its next token refresh, within an hour of use. Until then, and for a session nobody uses, it reads "Unknown device" with its sign-in date.
+    - **Recent sign-in events** are the Access rows of the audit log, worded as sentences. The boards also show two events that have no audit row: a sign-in on a new device, and an Admin signing out one of someone else's devices. Neither is shown.
+    - **The "Signed out · HH:MM" state** on Security comes from the person's newest `session.sign_out_all` row, so it survives a reload.
+    - **Last active, and long device lists (Tao, from /verify).**
+      - Security's column is "Last active": the newest use of any of the person's sessions, as on the Users page. The board's "Last sign-in" read "6 Oct" for a session used today.
+      - A device list shows its first 10, with this browser always among them. The rest fold: "and N more devices" in Security's dialog and sheet, "Show all N devices" on Profile.
+    - **Short times** on Security, for Last active, "Signed out · …" and the events: "10:08" today, "Yesterday 16:40", "Thu 16:40" within the week, then "21 Sep". The boards draw only today and a weekday. This keeps the phone's right-hand column short. Last sign-in today reads "Today 07:52". A person with no session and no sign-out on record reads "—".
+    - **"Where I sit in escalation"** is read from the policies, with one row per policy that names you and each step's reason ("L0 at once as owner of 3 sites · L1 at +15 min as Admin"). It replaces the board's sample lines.
+      - An AM also gets the client-update row (D-052), which is not a policy step.
+      - An Admin also gets "Monitor faults": a probe location silent over 3 min emails every Admin (D-053). The Healthchecks mail is left out: it is Tao-only config outside the app (D-054).
+      - An Admin with no second Admin gets the board's one-Admin warning, linked to Users.
+      - The on-call row says what it means: "L0 for every Tier 1 site". MProfile's on-call card carries the times.
+    - **Profile wording and layout.**
+      - "How alerts reach me" reads "Owners and backups need a Chat id, so alerts can @mention them." The board's "At least one must work…" suggested email alone would do (D-015, D-025).
+      - The Email row says "Not set up" while the email provider is off (D-013: the UI never promises what isn't there).
+      - Sites stay a list at every width, not the desktop board's table. Only live sites are listed.
+      - The page is two columns from lg, since the board is 1440; below lg it is one column.
+      - A Viewer sees channels, devices and the shared values only (§22.6). The CEO, a Stakeholder who manages no client, owns no site, so there is no Sites card for them.
+      - The Chat row says "Alerts @mention your Chat user id…", not the board's "Matched to your Chat user…". The app stores the digits; it never checks them against Chat (D-013).
 
 **Why.** Every change to who may do what goes through one audited function, so the Access category records it and nothing writes `profiles` behind the log. Blocking the save keeps D-015 and D-048 true after a person leaves: no site without a reachable owner, no week with nobody on call. Keeping only company addresses keeps the undeletable log free of anything a person didn't already share with the company.
 

@@ -1,6 +1,7 @@
 import { Avatar, IconButton } from '@jirawatpyk/aura-react';
 import { IconLogOut } from '@jirawatpyk/aura-react/icons';
 import { ROLE_LABELS, type Role } from '@dxt/shared';
+import Link from 'next/link';
 import { signOut } from '../actions';
 
 interface AccountFooterProps {
@@ -16,13 +17,20 @@ interface AccountFooterProps {
 export function AccountFooter({ displayName, role }: AccountFooterProps) {
   return (
     <div className="flex items-center gap-3">
-      <span aria-hidden>
-        <Avatar name={displayName} size="md" />
-      </span>
-      <div className="flex min-w-0 grow flex-col">
-        <span className="line-clamp-2 text-sm font-medium break-words">{displayName}</span>
-        <span className="truncate text-xs text-fg-secondary">{ROLE_LABELS[role]}</span>
-      </div>
+      {/* Name and avatar open My profile (Profile board's account footer, S16 PR 3). */}
+      <Link
+        href="/profile"
+        aria-label={`My profile: ${displayName}, ${ROLE_LABELS[role]}`}
+        className="flex min-h-11 min-w-0 grow items-center gap-3 rounded-aura-md text-fg-primary no-underline"
+      >
+        <span aria-hidden>
+          <Avatar name={displayName} size="md" />
+        </span>
+        <span className="flex min-w-0 grow flex-col">
+          <span className="line-clamp-2 text-sm font-medium break-words">{displayName}</span>
+          <span className="truncate text-xs text-fg-secondary">{ROLE_LABELS[role]}</span>
+        </span>
+      </Link>
       <form action={signOut}>
         {/* AURA IconButton: `label` is its accessible name and its tooltip (AURA sets `title`). */}
         <IconButton type="submit" icon={<IconLogOut />} label="Sign out" touchHeight />

@@ -112,6 +112,19 @@ export function formatWhen(date: Date, now: Date, options: { midSentence?: boole
   return `${options.midSentence ? word.toLowerCase() : word} ${formatTime(date)}`;
 }
 
+/**
+ * A short past time for narrow columns (Security's Last sign-in and events, D-062 item 12): "10:08" today,
+ * "Yesterday 16:40", "Thu 16:40" within the last 6 Bangkok days, then "21 Sep". Days are Bangkok
+ * calendar days, so two times on the same day always read the same way.
+ */
+export function formatShortPast(date: Date, now: Date): string {
+  const days = Math.round((bangkokDayStart(now).getTime() - bangkokDayStart(date).getTime()) / 86_400_000);
+  if (days <= 0) return formatTime(date);
+  if (days === 1) return `Yesterday ${formatTime(date)}`;
+  if (days < 7) return `${WEEKDAYS[bangkokParts(date).weekday]} ${formatTime(date)}`;
+  return formatDay(date);
+}
+
 /** Midnight in Bangkok at the start of `now`'s Bangkok day ("checks today", today's log). */
 /** Bangkok is UTC+7 all year (no daylight saving). */
 export const BANGKOK_OFFSET_MS = 7 * 3_600_000;

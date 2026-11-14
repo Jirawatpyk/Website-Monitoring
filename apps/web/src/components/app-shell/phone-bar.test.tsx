@@ -12,7 +12,9 @@ describe('PhoneBar in MobileBar (spec §22.1, D-045)', () => {
     );
     expect(screen.getByText('DxT')).toBeInTheDocument();
     expect(screen.getByLabelText('Arm')).toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    // The only link is the avatar, to My profile (S16 PR 3): no back arrow.
+    expect(screen.getAllByRole('link').map((l) => l.getAttribute('aria-label'))).toEqual(['My profile']);
+    expect(screen.getByRole('link', { name: 'My profile' })).toHaveAttribute('href', '/profile');
   });
 
   it('a detail page: back arrow, the title (not a second h1), its own buttons, then the avatar', () => {
@@ -30,7 +32,7 @@ describe('PhoneBar in MobileBar (spec §22.1, D-045)', () => {
     expect(screen.queryByRole('heading')).not.toBeInTheDocument();
     expect(screen.queryByText('DxT')).not.toBeInTheDocument();
     const order = [
-      screen.getByRole('link'),
+      screen.getByRole('link', { name: 'Back to sites' }),
       screen.getByText('Bangkok Airways – Taiwan'),
       screen.getByRole('button'),
       screen.getByLabelText('Arm'),

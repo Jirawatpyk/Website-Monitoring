@@ -4,7 +4,10 @@ import Link from 'next/link';
 import { PageHeader, Tabs } from '@jirawatpyk/aura-react';
 
 /** Settings pages built so far (S17 adds Alert channels and Organisation; Phase 3 API & webhooks). */
-export const SETTINGS_TABS = [{ id: 'users', label: 'Users & roles', href: '/settings/users' }] as const;
+export const SETTINGS_TABS = [
+  { id: 'users', label: 'Users & roles', href: '/settings/users' },
+  { id: 'security', label: 'Sign-in & security', href: '/settings/security' },
+] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number]['id'];
 
 /**

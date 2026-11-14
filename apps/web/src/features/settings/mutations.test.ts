@@ -6,6 +6,9 @@ import {
   PROBLEM_WORDS,
   revokeInvite,
   setChatId,
+  signOutDevice,
+  signOutEverywhere,
+  signOutOtherDevices,
   type UsersDeps,
 } from './mutations';
 
@@ -111,5 +114,46 @@ describe('users mutations (S16, D-062)', () => {
     });
     expect(log).toHaveBeenCalledOnce();
     log.mockRestore();
+  });
+});
+
+describe('sign-out mutations (S16 PR 3, D-062 item 5)', () => {
+  it('everywhere: the count; yourself is pointed at Sign out other devices', async () => {
+    const { deps, rpc } = db({ data: 3 });
+    expect(await signOutEverywhere({ userId: U1 }, deps)).toEqual({ ok: true, outcome: '3' });
+    expect(rpc).toHaveBeenCalledWith('sign_out_user_everywhere', { p_user_id: U1 });
+    const self = db({ error: { code: '42501', hint: 'self', message: 'raw' } });
+    expect(await signOutEverywhere({ userId: U1 }, self.deps)).toMatchObject({
+      ok: false,
+      message: expect.stringMatching(/^For yourself, use Sign out other devices/),
+    });
+    expect(await signOutEverywhere({ userId: 'nope' }, deps)).toMatchObject({ ok: false });
+  });
+
+  it('other devices: a token without a session is told to sign in again', async () => {
+    const { deps } = db({ data: 2 });
+    expect(await signOutOtherDevices({}, deps)).toEqual({ ok: true, outcome: '2' });
+    const none = db({ error: { code: '42501', hint: 'no_session', message: 'raw' } });
+    expect(await signOutOtherDevices({}, none.deps)).toEqual({
+      ok: false,
+      message: 'Sign in again to continue.',
+    });
+  });
+
+  it('one device: this browser is refused; one already gone reloads the page', async () => {
+    const { deps, rpc } = db({});
+    expect(await signOutDevice({ sessionId: S1 }, deps)).toEqual({ ok: true, outcome: '1' });
+    expect(rpc).toHaveBeenCalledWith('sign_out_my_device', { p_session_id: S1 });
+    const here = db({ error: { code: '42501', hint: 'this_device', message: 'raw' } });
+    expect(await signOutDevice({ sessionId: S1 }, here.deps)).toEqual({
+      ok: false,
+      message: PROBLEM_WORDS.this_device,
+    });
+    const gone = db({ error: { code: 'P0002', message: 'raw' } });
+    expect(await signOutDevice({ sessionId: S1 }, gone.deps)).toEqual({
+      ok: false,
+      message: 'That device is signed out already.',
+      stale: true,
+    });
   });
 });

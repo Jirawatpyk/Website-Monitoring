@@ -29,6 +29,8 @@ interface NavEntry {
    * The slice that builds the page flips this to `true` as part of its Definition of Done.
    */
   live: boolean;
+  /** The paths it stays current on, when wider than `href` (Settings: every `/settings/…` tab). */
+  scope?: string;
 }
 
 /** Main navigation, as drawn on every desktop board (e.g. docs/design/canvas/AuditLog.dc.html). */
@@ -116,7 +118,8 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         icon: <IconSettings />,
         href: '/settings/users',
         slice: 'S16',
-        live: false,
+        live: true,
+        scope: '/settings',
       },
       { id: 'guide', label: 'User guide', icon: <IconInfo />, href: '/guide', slice: 'S18', live: false },
     ],
@@ -175,10 +178,12 @@ export function bottomNavWithCounts(counts: NavCounts) {
  * `/` only matches itself. Null when no shown item owns the page.
  */
 export function activeNavId(pathname: string): string | null {
-  const items = NAV_SECTIONS.flatMap((section) => section.items);
+  const items = SECTIONS.flatMap((section) => section.items)
+    .filter((item) => item.live)
+    .map((item) => ({ id: item.id, href: item.scope ?? item.href }));
   const matches = items.filter(({ href }) =>
-    href === '/' ? pathname === '/' : !!href && (pathname === href || pathname.startsWith(`${href}/`)),
+    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`),
   );
-  matches.sort((a, b) => (b.href?.length ?? 0) - (a.href?.length ?? 0));
+  matches.sort((a, b) => b.href.length - a.href.length);
   return matches[0]?.id ?? null;
 }

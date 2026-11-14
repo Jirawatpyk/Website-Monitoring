@@ -487,15 +487,45 @@ function List({
 
 // ── Edit Chat id (D-015, D-062 item 6) ────────────────────────────────────────────────────────────
 
+/** The dialog's words about someone else (Users) or about you (Profile, D-062 items 6, 12). */
+function chatIdWords(name: string, self: boolean, linked: boolean) {
+  return self
+    ? {
+        title: 'Your Google Chat id',
+        description: linked
+          ? 'You have one. A new id replaces it.'
+          : 'Alerts @mention you in Chat by it — owners and backups need one.',
+        clearTitle: 'Clear your Chat id?',
+        clearBody:
+          'You stop getting @mentions in Chat. Sites you own or back up need an id, so this is refused while you own a live site.',
+        hint: 'Digits only. In Google Chat, open your own profile in the Alerts Space; the number after users/ in its link is the id. Save unlocks once there is one.',
+        done: (cleared: boolean) => `Your Chat id ${cleared ? 'cleared' : 'saved'} · logged`,
+      }
+    : {
+        title: `${name}’s Google Chat id`,
+        description: linked
+          ? 'They have one. A new id replaces it.'
+          : 'Owners and backups need one: alerts @mention them in Chat by it.',
+        clearTitle: `Clear ${name}’s Chat id?`,
+        clearBody: `${name} stops getting @mentions in Chat. Sites they own or back up need an id, so this is refused while they own a live site.`,
+        hint: 'Digits only. In Google Chat, open the person’s profile in the Alerts Space; the number after users/ in its link is the id. Save unlocks once there is one.',
+        done: (cleared: boolean) => `${name}’s Chat id ${cleared ? 'cleared' : 'saved'} · logged`,
+      };
+}
+
 export function ChatIdDialog({
   person,
+  self = false,
   onClose,
   onDone,
 }: {
-  person: Person | null;
+  person: Pick<Person, 'id' | 'name' | 'chatLinked'> | null;
+  /** Your own id, from Profile: the words say "you". */
+  self?: boolean;
   onClose: () => void;
   onDone: (line: string) => void;
 }) {
+  const w = chatIdWords(person?.name ?? '', self, !!person?.chatLinked);
   const [value, setValue] = useState('');
   // Clearing an id takes a second press that says what it does (§13: a confirm names the effect).
   const [clearing, setClearing] = useState(false);
@@ -508,10 +538,7 @@ export function ChatIdDialog({
     setClearing(false);
     setMoved(false);
   }
-  const { error, pending, run } = useSubmit(
-    () => onDone(`${person?.name}’s Chat id ${clearing ? 'cleared' : 'saved'} · logged`),
-    person?.id ?? '',
-  );
+  const { error, pending, run } = useSubmit(() => onDone(w.done(clearing)), person?.id ?? '');
   const id = value.trim();
   const digits = /^\d*$/.test(id);
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -524,12 +551,8 @@ export function ChatIdDialog({
     <Dialog
       open={!!person}
       onClose={onClose}
-      title={`${person?.name ?? ''}’s Google Chat id`}
-      description={
-        person?.chatLinked
-          ? 'They have one. A new id replaces it.'
-          : 'Owners and backups need one: alerts @mention them in Chat by it.'
-      }
+      title={w.title}
+      description={w.description}
       footer={
         <Foot>
           {person?.chatLinked && !clearing && (
@@ -580,9 +603,8 @@ export function ChatIdDialog({
     >
       <div className="flex flex-col gap-4">
         {clearing ? (
-          <Alert tone="warning" title={`Clear ${person?.name ?? ''}’s Chat id?`}>
-            {person?.name} stops getting @mentions in Chat. Sites they own or back up need an id, so this is
-            refused while they own a live site.
+          <Alert tone="warning" title={w.clearTitle}>
+            {w.clearBody}
           </Alert>
         ) : (
           <TextField
@@ -591,7 +613,7 @@ export function ChatIdDialog({
             autoComplete="off"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            hint="Digits only. In Google Chat, open the person’s profile in the Alerts Space; the number after users/ in its link is the id. Save unlocks once there is one."
+            hint={w.hint}
             error={digits ? undefined : 'A Chat user id is digits only'}
           />
         )}
