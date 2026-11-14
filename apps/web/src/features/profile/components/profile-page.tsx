@@ -17,7 +17,8 @@ import { formatTime } from '@dxt/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { MutedOverlay } from '@/components/site-cells';
+import { phoneHeader } from '@/components/phone-header';
+import { MutedOverlay, untilText } from '@/components/site-cells';
 import { SiteStatusBadge } from '@/components/status-badges';
 import { sendTest } from '@/features/oncall';
 import { ChatIdDialog, devicesOf, RoleBadge, signOutDevice, type Device } from '@/features/settings';
@@ -27,7 +28,7 @@ import {
   escalationRows,
   metaLine,
   oncallLine,
-  oneAdminWarning,
+  onlyAdmin,
   sameForEveryone,
   shiftCard,
   sitesSummary,
@@ -69,6 +70,7 @@ export function ProfilePageView({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
+        className={phoneHeader.noActions}
         titleHideBelow="lg"
         eyebrow="ACCOUNT"
         title={
@@ -113,7 +115,7 @@ export function ProfilePageView({
         <div className="flex min-w-0 flex-col gap-6">
           <Channels data={data} />
           <OncallCard data={data} now={now} />
-          {!viewer && <Sites data={data} now={now} />}
+          {!viewer && !data.isCeo && <Sites data={data} now={now} />}
         </div>
         <div className="flex min-w-0 flex-col gap-6">
           {!viewer && <Escalation data={data} now={now} />}
@@ -162,7 +164,10 @@ function Channels({ data }: { data: ProfileData }) {
   const [editing, setEditing] = useState(false);
   const [line, setLine] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
-  const [cooling, setCooling] = useState(false);
+  const [cooling, setCooling] = useState(
+    () => !!data.testSentAt && Date.now() - Date.parse(data.testSentAt) < TEST_COOLDOWN_MS,
+  );
+  const lastSent = sent ?? data.testSentAt;
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const editRef = useRef<HTMLButtonElement>(null);
@@ -176,9 +181,10 @@ function Channels({ data }: { data: ProfileData }) {
   // The SQL refuses a second test within a minute: the button says so and waits (§14.16).
   useEffect(() => {
     if (!cooling) return;
-    const t = setTimeout(() => setCooling(false), TEST_COOLDOWN_MS);
+    const left = lastSent ? TEST_COOLDOWN_MS - (Date.now() - Date.parse(lastSent)) : 0;
+    const t = setTimeout(() => setCooling(false), Math.max(left, 0));
     return () => clearTimeout(t);
-  }, [cooling]);
+  }, [cooling, lastSent]);
 
   const test = () =>
     start(async () => {
@@ -192,7 +198,7 @@ function Channels({ data }: { data: ProfileData }) {
   const button = (fullWidth?: boolean) => (
     <TestButton
       linked={data.me.chatLinked}
-      sent={sent}
+      sent={lastSent}
       cooling={cooling}
       pending={pending}
       onClick={test}
@@ -326,7 +332,7 @@ function OncallCard({ data, now }: { data: ProfileData; now: Date }) {
   if (!canTest(data.me.role)) return null;
   const card = shiftCard(data, now);
   if (!card) return null;
-  const swap = swapLine(data.swap);
+  const swap = swapLine(data.swap, data, card.shiftId);
   return (
     <section aria-labelledby="shift-h" className="lg:hidden">
       <Card>
@@ -370,19 +376,23 @@ function Sites({ data, now }: { data: ProfileData; now: Date }) {
             <li key={s.id} className="border-b border-border-subtle last:border-b-0">
               <Link
                 href={s.incident ? `/incidents/${s.incident}` : `/sites/${s.id}`}
-                aria-label={`${s.name}, Tier ${s.tier}, ${s.role === 'AM' ? 'AM' : s.role.toLowerCase()}${s.status ? `, ${s.status}` : ''}`}
-                className="flex min-h-11 items-center gap-3 py-2 text-sm text-fg-primary no-underline"
+                aria-label={`${s.name}, Tier ${s.tier}, ${s.role === 'AM' ? 'AM' : s.role.toLowerCase()}${s.status ? `, ${s.status}` : ''}${s.mutedUntil && new Date(s.mutedUntil) > now ? `, muted until ${untilText(new Date(s.mutedUntil), now)}` : ''}`}
+                className="-mx-2 flex min-h-11 items-center gap-3 rounded-aura-md px-2 py-2 text-sm text-fg-primary no-underline hover:bg-bg-surface-hover active:bg-bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
               >
                 <span className="flex min-w-0 grow flex-col gap-0.5 leading-snug">
                   <span className="truncate font-medium">{s.name}</span>
                   <span className="text-xs text-fg-secondary">
                     Tier {s.tier} · {s.role}
                   </span>
+                  <span className="flex">
+                    <MutedOverlay mutedUntil={s.mutedUntil} now={now} />
+                  </span>
                 </span>
-                <span className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                  {s.status && <SiteStatusBadge status={s.status} />}
-                  <MutedOverlay mutedUntil={s.mutedUntil} now={now} />
-                </span>
+                {s.status && (
+                  <span className="shrink-0">
+                    <SiteStatusBadge status={s.status} />
+                  </span>
+                )}
                 <IconChevronRight size="sm" aria-hidden className="text-fg-tertiary" />
               </Link>
             </li>
@@ -402,7 +412,8 @@ function Escalation({ data, now }: { data: ProfileData; now: Date }) {
   const rows = escalationRows(data);
   const oncall = oncallLine(data, now);
   const all = oncall ? [...rows, oncall] : rows;
-  const warning = oneAdminWarning(data);
+  const only = onlyAdmin(data);
+  const hasShiftCard = canTest(data.me.role) && !!shiftCard(data, now);
   return (
     <Card
       title="Where I sit in escalation"
@@ -414,7 +425,8 @@ function Escalation({ data, now }: { data: ProfileData; now: Date }) {
             <span className="hidden lg:inline">Escalation policies</span>
           </Link>
           {canTest(data.me.role) && (
-            <Link href="/oncall" className={TEXT_LINK}>
+            // Below lg the on-call card already links the rotation (MProfile draws one link here).
+            <Link href="/oncall" className={`${TEXT_LINK} ${hasShiftCard ? 'max-lg:hidden' : ''}`}>
               See the rotation
             </Link>
           )}
@@ -437,12 +449,12 @@ function Escalation({ data, now }: { data: ProfileData; now: Date }) {
         ) : (
           <p className="m-0 text-sm text-fg-secondary">No escalation step names you.</p>
         )}
-        {warning && (
+        {only && (
           <span className="flex items-start gap-2 text-sm">
             <IconTriangleAlert size="sm" aria-hidden className="mt-0.5 text-fg-warning" />
             <span>
-              {warning.replace(' in Users', '')} in{' '}
-              <Link href="/settings/users" className="text-fg-link">
+              {only} is the only active Admin — add a second one in{' '}
+              <Link href="/settings/users" className="text-fg-link underline">
                 Users
               </Link>
             </span>
@@ -457,9 +469,18 @@ function Escalation({ data, now }: { data: ProfileData; now: Date }) {
 function Devices({ data, now }: { data: ProfileData; now: Date }) {
   const router = useRouter();
   const devices = devicesOf(data, data.me.id, now);
-  const [gone, setGone] = useState<Device[]>([]);
+  const [gone, setGone] = useState<{ device: Device; at: number }[]>([]);
+  const listRef = useRef<HTMLUListElement>(null);
+  const moveFocus = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // Once the sign-out has finished (the buttons are enabled again), focus the next Sign out, or the list.
+  useEffect(() => {
+    if (pending || !moveFocus.current) return;
+    moveFocus.current = false;
+    const next = listRef.current?.querySelector<HTMLElement>('button[data-device-signout]:not([disabled])');
+    (next ?? listRef.current)?.focus();
+  }, [gone, pending]);
   const out = (x: Device) =>
     start(async () => {
       setError(null);
@@ -472,16 +493,23 @@ function Devices({ data, now }: { data: ProfileData; now: Date }) {
         router.refresh();
         return;
       }
-      setGone((g) => [...g, x]);
+      moveFocus.current = true;
+      setGone((g) => [...g, { device: x, at: devices.findIndex((d) => d.id === x.id) }]);
       router.refresh();
     });
-  const goneIds = new Set(gone.map((g) => g.id));
-  // The refresh drops a signed-out session from the list: keep it here as "Signed out · now".
-  const rows = [...devices.filter((x) => !goneIds.has(x.id)), ...gone];
+  const goneIds = new Set(gone.map((g) => g.device.id));
+  // The refresh drops a signed-out session from the list: keep it in its place as "Signed out · now".
+  const rows = devices.filter((x) => !goneIds.has(x.id));
+  for (const g of [...gone].sort((a, b) => a.at - b.at)) rows.splice(Math.max(g.at, 0), 0, g.device);
   return (
     <Card title="Signed-in devices" headingLevel={2} description={DEVICES_SUB}>
       <div className="flex flex-col gap-3">
-        <ul className="m-0 flex list-none flex-col p-0">
+        <ul
+          ref={listRef}
+          tabIndex={-1}
+          aria-label="Signed-in devices"
+          className="m-0 flex list-none flex-col p-0 outline-none"
+        >
           {rows.map((x) => (
             <li
               key={x.id}
@@ -503,6 +531,7 @@ function Devices({ data, now }: { data: ProfileData; now: Date }) {
                   variant="ghost"
                   size="sm"
                   touchHeight
+                  data-device-signout
                   disabled={pending}
                   aria-label={`Sign out ${x.name}, ${x.when.toLowerCase()}`}
                   onClick={() => out(x)}
@@ -514,7 +543,7 @@ function Devices({ data, now }: { data: ProfileData; now: Date }) {
           ))}
         </ul>
         <span role="status" className="sr-only">
-          {gone.length ? `${gone[gone.length - 1]!.name} signed out` : ''}
+          {gone.length ? `${gone[gone.length - 1]!.device.name} signed out` : ''}
         </span>
         {error && (
           <Alert tone="danger" role="alert">

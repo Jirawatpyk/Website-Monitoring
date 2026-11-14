@@ -29,6 +29,7 @@ import type { UsersResult } from '../mutations';
 import {
   devicesOf,
   devicesWord,
+  noDevicesLine,
   oncallWarning,
   securityRows,
   signinEvents,
@@ -85,7 +86,7 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
       key: 'person',
       label: 'Person',
       grow: 1,
-      minWidth: 140,
+      minWidth: 128,
       render: (r) => (
         <span className="flex min-w-0 items-center gap-3">
           <Avatar name={r.name} size="sm" />
@@ -105,37 +106,40 @@ export function SecurityPageView({ data, now: nowIso }: { data: SecurityData; no
     {
       key: 'devices',
       label: 'Devices',
-      width: 90,
+      width: 72,
       align: 'end',
       render: (r) => <span className="tabular-nums">{r.devices}</span>,
     },
     {
       key: 'last',
       label: 'Last sign-in',
-      width: 176,
+      width: 188,
       render: (r) => <span className="whitespace-nowrap">{r.last}</span>,
     },
     {
       key: 'action',
       label: '',
-      width: 190,
+      width: 208,
       actions: true,
       render: (r) =>
         r.action ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<IconLogOut />}
-            data-signout={r.key}
-            // Whose row it is, with the visible words kept in the name (WCAG 2.5.3).
-            aria-label={r.action === 'others' ? undefined : `Sign out all of ${r.name}’s devices`}
-            onClick={() => {
-              focusKey.current = r.key;
-              setOpen(r);
-            }}
-          >
-            {r.action === 'others' ? 'Sign out other devices' : 'Sign out all'}
-          </Button>
+          // At the cell's end (board); 208 leaves the 4 px focus ring room inside the cell's clip.
+          <span className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<IconLogOut />}
+              data-signout={r.key}
+              // Whose row it is, with the visible words kept in the name (WCAG 2.5.3).
+              aria-label={r.action === 'others' ? undefined : `Sign out all of ${r.name}’s devices`}
+              onClick={() => {
+                focusKey.current = r.key;
+                setOpen(r);
+              }}
+            >
+              {r.action === 'others' ? 'Sign out other devices' : 'Sign out all'}
+            </Button>
+          </span>
         ) : null,
     },
   ];
@@ -273,7 +277,7 @@ function EventsCard({ events }: { events: SigninEvent[] }) {
       ))}
     </ul>
   ) : (
-    <p className="m-0 text-sm text-fg-secondary">No sign-in events yet.</p>
+    <p className="m-0 py-2.5 text-sm text-fg-secondary">No sign-in events yet.</p>
   );
   return (
     <>
@@ -318,13 +322,7 @@ function PeopleCards({ data, rows, now }: { data: SecurityData; rows: SecurityRo
   if (open && open !== last) setLast(open);
   const shown = open ?? last;
   const devices = shown?.personId ? devicesOf(data, shown.personId, now) : [];
-  const empty = !shown
-    ? ''
-    : !shown.personId
-      ? 'Not signed in yet — no devices.'
-      : shown.last.startsWith('Signed out')
-        ? `No devices — signed out everywhere at ${shown.last.replace('Signed out · ', '')}.`
-        : 'No devices.';
+  const empty = shown ? noDevicesLine(shown, now) : '';
   return (
     <div className="flex flex-col gap-2 md:hidden">
       <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
@@ -358,7 +356,9 @@ function PeopleCards({ data, rows, now }: { data: SecurityData; rows: SecurityRo
         onClose={() => setOpen(null)}
         size="sm"
         title={shown ? `${shown.name}${shown.oncall?.live ? ' · On call now' : ''}` : ''}
-        description={shown ? `${ROLE_LABELS[shown.role]} · ${shown.last}` : undefined}
+        description={
+          shown ? `${ROLE_LABELS[shown.role]}${shown.last === '—' ? '' : ` · ${shown.last}`}` : undefined
+        }
       >
         <div className="flex flex-col gap-3">
           {devices.length ? <DeviceList devices={devices} /> : <p className="m-0 text-sm">{empty}</p>}
@@ -383,11 +383,11 @@ function PeopleCards({ data, rows, now }: { data: SecurityData; rows: SecurityRo
 
 function DeviceList({ devices }: { devices: Device[] }) {
   return (
-    <ul className="m-0 flex list-none flex-col rounded-aura-md border border-border-default px-3">
+    <ul className="m-0 flex list-none flex-col rounded-aura-md border border-border-default px-3.5">
       {devices.map((x) => (
         <li
           key={x.id}
-          className="flex items-center gap-2.5 border-b border-border-subtle py-2 text-sm leading-snug last:border-b-0"
+          className="flex items-center gap-2.5 border-b border-border-subtle py-2.5 text-sm leading-snug last:border-b-0"
         >
           <IconMonitor size="sm" aria-hidden className="text-fg-secondary" />
           <span className="flex min-w-0 grow flex-col gap-0.5">
@@ -464,14 +464,16 @@ function SignOutDialog({
   return (
     <Dialog
       open={!!row}
-      onClose={onClose}
+      onClose={() => {
+        if (!pending) onClose();
+      }}
       size="md"
       title={copy?.title ?? ''}
       description={copy?.description}
       footer={
         <div className="flex w-full flex-wrap items-center gap-2">
           <span className="grow text-xs text-fg-secondary">Takes effect now · logged</span>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
           <Button variant="danger" icon={<IconLogOut />} loading={pending} onClick={go}>

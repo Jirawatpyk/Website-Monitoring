@@ -22,47 +22,57 @@ export async function loadProfileData(
   emailOn: boolean,
 ): Promise<ProfileData> {
   const nowIso = now.toISOString();
-  const [me, sessions, sites, clients, policies, steps, rotation, shifts, swaps, settings, open, admins] =
-    await Promise.all([
-      db
-        .from('profiles')
-        .select('id, display_name, email, role, google_chat_user_id')
-        .eq('id', meId)
-        .single(),
-      db.rpc('list_sessions', { p_user_id: meId }),
-      db
-        .from('sites')
-        .select(
-          'id, name, tier, client_id, primary_owner_id, backup_owner_id, muted_until, status:site_status(status)',
-        )
-        .eq('is_active', true)
-        .order('name'),
-      db.from('clients').select('id, am_user_id, is_internal'),
-      db.from('escalation_policies').select('id, severity, tier'),
-      db.from('escalation_steps').select('policy_id, level, delay_min, targets, fyi'),
-      db.from('oncall_rotation').select('user_id'),
-      db
-        .from('oncall_shifts')
-        .select('starts_at, ends_at')
-        .eq('user_id', meId)
-        .gt('ends_at', nowIso)
-        .order('starts_at'),
-      db
-        .from('oncall_swaps')
-        .select(
-          'requester_id, counterpart_id, status, requester:profiles!oncall_swaps_requester_id_fkey(display_name), counterpart:profiles!oncall_swaps_counterpart_id_fkey(display_name)',
-        )
-        .or(`requester_id.eq.${meId},counterpart_id.eq.${meId}`)
-        .in('status', OPEN_SWAP),
-      db.from('organisation_settings').select('response_start, response_end, response_days').single(),
-      db.from('incidents').select('id, site_id').not('state', 'in', CLOSED_INCIDENT_STATES_IN),
-      db
-        .from('profiles')
-        .select('display_name')
-        .eq('role', 'admin')
-        .eq('is_active', true)
-        .order('display_name'),
-    ]);
+  const [
+    me,
+    sessions,
+    sites,
+    clients,
+    policies,
+    steps,
+    rotation,
+    shifts,
+    swaps,
+    settings,
+    open,
+    admins,
+    checklist,
+  ] = await Promise.all([
+    db.from('profiles').select('id, display_name, email, role, google_chat_user_id').eq('id', meId).single(),
+    db.rpc('list_sessions', { p_user_id: meId }),
+    db
+      .from('sites')
+      .select(
+        'id, name, tier, client_id, primary_owner_id, backup_owner_id, muted_until, status:site_status(status)',
+      )
+      .eq('is_active', true)
+      .order('name'),
+    db.from('clients').select('id, am_user_id, is_internal'),
+    db.from('escalation_policies').select('id, severity, tier'),
+    db.from('escalation_steps').select('policy_id, level, delay_min, targets, fyi'),
+    db.from('oncall_rotation').select('user_id'),
+    db
+      .from('oncall_shifts')
+      .select('id, starts_at, ends_at')
+      .eq('user_id', meId)
+      .gt('ends_at', nowIso)
+      .order('starts_at'),
+    db
+      .from('oncall_swaps')
+      .select(
+        'requester_id, counterpart_id, requester_shift_id, counterpart_shift_id, status, requester:profiles!oncall_swaps_requester_id_fkey(display_name), counterpart:profiles!oncall_swaps_counterpart_id_fkey(display_name)',
+      )
+      .or(`requester_id.eq.${meId},counterpart_id.eq.${meId}`)
+      .in('status', OPEN_SWAP),
+    db.from('organisation_settings').select('response_start, response_end, response_days').single(),
+    db.from('incidents').select('id, site_id').not('state', 'in', CLOSED_INCIDENT_STATES_IN),
+    db
+      .from('profiles')
+      .select('display_name')
+      .eq('role', 'admin')
+      .eq('is_active', true)
+      .order('display_name'),
+    db.from('oncall_checklist').select('test_sent_at').eq('user_id', meId).maybeSingle(),
+  ]);
 
   const p = check('profiles', me);
   if (!p) throw new Error('profiles: your own row is missing');
@@ -135,7 +145,11 @@ export async function loadProfileData(
         .map((s) => ({ level: s.level, delayMin: s.delay_min, targets: s.targets, fyi: !!s.fyi })),
     })),
     inRotation: (check('oncall_rotation', rotation) ?? []).some((r) => r.user_id === meId),
-    shifts: (check('oncall_shifts', shifts) ?? []).map((s) => ({ startsAt: s.starts_at, endsAt: s.ends_at })),
+    shifts: (check('oncall_shifts', shifts) ?? []).map((s) => ({
+      id: s.id,
+      startsAt: s.starts_at,
+      endsAt: s.ends_at,
+    })),
     swap: swap
       ? {
           mine: swap.requester_id === meId,
@@ -143,6 +157,7 @@ export async function loadProfileData(
             (swap.requester_id === meId ? one(swap.counterpart) : one(swap.requester))?.display_name ??
             'someone',
           status: swap.status === 'accepted' ? 'accepted' : 'waiting',
+          shiftId: swap.requester_id === meId ? swap.requester_shift_id : swap.counterpart_shift_id,
         }
       : null,
     hours: hours
@@ -150,5 +165,6 @@ export async function loadProfileData(
       : { start: '09:00', end: '18:00', days: [1, 2, 3, 4, 5] },
     emailOn,
     admins: (check('admins', admins) ?? []).map((a) => a.display_name),
+    testSentAt: check('oncall_checklist', checklist)?.test_sent_at ?? null,
   };
 }

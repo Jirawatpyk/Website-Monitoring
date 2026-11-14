@@ -5,7 +5,7 @@ import {
   escalationRows,
   hoursText,
   oncallLine,
-  oneAdminWarning,
+  onlyAdmin,
   shiftCard,
   sitesSummary,
   swapLine,
@@ -84,10 +84,14 @@ const base: ProfileData = {
   isAm: false,
   policies,
   inRotation: true,
-  shifts: [{ startsAt: '2026-10-05T02:00:00Z', endsAt: '2026-10-12T02:00:00Z' }],
+  shifts: [
+    { id: 'w1', startsAt: '2026-10-05T02:00:00Z', endsAt: '2026-10-12T02:00:00Z' },
+    { id: 'w2', startsAt: '2026-10-19T02:00:00Z', endsAt: '2026-10-26T02:00:00Z' },
+  ],
   swap: null,
   hours: { start: '09:00:00', end: '18:00:00', days: [1, 2, 3, 4, 5] },
   emailOn: true,
+  testSentAt: null,
   admins: ['Tao'],
 };
 
@@ -120,9 +124,9 @@ describe('escalationRows: read from the policies (D-062 item 12)', () => {
 
   it('the one-Admin warning, only for an Admin and only with one (D-009)', () => {
     const admin = { ...base, me: { ...base.me, role: 'admin' as const } };
-    expect(oneAdminWarning(admin)).toBe('Only Tao is an active Admin — add a second one in Users');
-    expect(oneAdminWarning({ ...admin, admins: ['Tao', 'Alex'] })).toBeNull();
-    expect(oneAdminWarning(base)).toBeNull();
+    expect(onlyAdmin(admin)).toBe('Tao');
+    expect(onlyAdmin({ ...admin, admins: ['Tao', 'Alex'] })).toBeNull();
+    expect(onlyAdmin(base)).toBeNull();
   });
 
   it('the CEO: Tier 1 L2 and the L3 FYI only (§22.6)', () => {
@@ -183,11 +187,11 @@ describe('oncallLine / shiftCard / swapLine (MProfile on-call card)', () => {
     expect(oncallLine(base, new Date('2026-10-06T00:00:00Z'))?.value).toBe(
       'L0 for every Tier 1 site — on call now',
     );
-    expect(shiftCard(base, NOW)).toEqual({
+    expect(shiftCard(base, NOW)).toMatchObject({
       eyebrow: 'MY NEXT ON-CALL SHIFT',
       value: 'Mon 5 Oct → Mon 12 Oct',
     });
-    expect(shiftCard(base, new Date('2026-10-06T00:00:00Z'))).toEqual({
+    expect(shiftCard(base, new Date('2026-10-06T00:00:00Z'))).toMatchObject({
       eyebrow: 'ON CALL NOW',
       value: 'Until Mon 12 Oct 09:00',
     });
@@ -200,17 +204,23 @@ describe('oncallLine / shiftCard / swapLine (MProfile on-call card)', () => {
   });
 
   it('words the swap you asked for and one asked of you', () => {
-    expect(swapLine({ mine: true, other: 'Nok', status: 'waiting' })).toEqual({
+    expect(swapLine({ mine: true, other: 'Nok', status: 'waiting', shiftId: 'w1' }, base, 'w1')).toEqual({
       badge: 'Swap requested',
       line: 'with Nok · not accepted yet',
       note: 'You stay on call for this shift until Nok accepts.',
     });
-    expect(swapLine({ mine: false, other: 'Ploy', status: 'waiting' })).toEqual({
+    expect(swapLine({ mine: false, other: 'Ploy', status: 'waiting', shiftId: 'w1' }, base, 'w1')).toEqual({
       badge: 'Swap asked',
       line: 'Ploy asked to swap with you',
       note: 'Answer on On-call.',
     });
     expect(swapLine(null)).toBeNull();
+    // A swap about a later shift says which one, and nothing about "this shift" (spec-checker pass 2).
+    expect(swapLine({ mine: true, other: 'Nok', status: 'waiting', shiftId: 'w2' }, base, 'w1')).toEqual({
+      badge: 'Swap requested',
+      line: 'for Mon 19 Oct · with Nok',
+      note: null,
+    });
   });
 });
 

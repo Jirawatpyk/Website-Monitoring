@@ -120,7 +120,7 @@ export async function loadSecurityData(
     // Each person's last "signed out everywhere" (Last sign-in, D-062 item 12): a few rows a month.
     db
       .from('audit_log')
-      .select('at, action, actor_id, entity_id, before, after')
+      .select('at, action, actor_id, entity_id')
       .eq('action', 'session.sign_out_all')
       .order('at', { ascending: false })
       .limit(500),
@@ -161,7 +161,9 @@ export async function loadSecurityData(
     })),
     names: Object.fromEntries(everyone.map((p) => [p.id, p.display_name])),
     entries: (check('audit_log', entries) ?? []).map(accessEntry),
-    signOuts: (check('audit_log sign-outs', signOuts) ?? []).map(accessEntry),
+    signOuts: (check('audit_log sign-outs', signOuts) ?? []).map((e) =>
+      accessEntry({ ...e, before: null, after: null }),
+    ),
   };
 }
 

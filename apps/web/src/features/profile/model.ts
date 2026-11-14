@@ -37,6 +37,7 @@ export interface Policy {
 }
 
 export interface Shift {
+  id: string;
   startsAt: string;
   endsAt: string;
 }
@@ -46,6 +47,8 @@ export interface OpenSwap {
   mine: boolean;
   other: string;
   status: 'waiting' | 'accepted';
+  /** Your shift the swap is about (yours if you asked, the one asked of you otherwise). */
+  shiftId: string;
 }
 
 export interface ProfileData {
@@ -64,6 +67,8 @@ export interface ProfileData {
   emailOn: boolean;
   /** Active Admins' names, for the one-Admin warning (D-009: a second Admin before G1). */
   admins: string[];
+  /** Your last test alert (`oncall_checklist.test_sent_at`): the button waits a minute after it, reload or not. */
+  testSentAt: string | null;
 }
 
 /** Only Admins and Responders take on-call weeks, and so get the phone test (D-062 item 12). */
@@ -83,7 +88,7 @@ export function channelRows(d: ProfileData): ChannelRow[] {
       key: 'chat',
       name: 'Google Chat @mention',
       detail: d.me.chatLinked
-        ? 'Matched to your Chat user in DxT Website Alerts · primary'
+        ? 'Alerts @mention your Chat user id in DxT Website Alerts · primary'
         : 'Add your Chat id so alerts can @mention you',
       status: d.me.chatLinked ? 'Working' : 'No Chat id',
     },
@@ -182,10 +187,13 @@ export function escalationRows(d: ProfileData): { label: string; value: string }
   return rows;
 }
 
-/** Monitor faults reach the active Admins only: with one, they reach one person (D-009, Users board). */
-export function oneAdminWarning(d: ProfileData): string | null {
+/**
+ * Monitor faults reach the active Admins only: with one, they reach one person (D-009). The name, for
+ * the page's "{name} is the only active Admin" (Escalation's words).
+ */
+export function onlyAdmin(d: ProfileData): string | null {
   if (d.me.role !== 'admin' || d.admins.length !== 1) return null;
-  return `Only ${d.admins[0]} is an active Admin — add a second one in Users`;
+  return d.admins[0] ?? null;
 }
 
 const at = (iso: string) => `${formatDay(new Date(iso), { weekday: true })} ${formatTime(new Date(iso))}`;
@@ -208,21 +216,40 @@ export function oncallLine(d: ProfileData, now: Date): { label: string; value: s
 }
 
 /** MProfile's on-call card: "Mon 5 Oct → Mon 12 Oct", the live shift's end, or nothing. */
-export function shiftCard(d: ProfileData, now: Date): { eyebrow: string; value: string } | null {
+export function shiftCard(
+  d: ProfileData,
+  now: Date,
+): { eyebrow: string; value: string; shiftId: string } | null {
   const t = now.getTime();
   const live = d.shifts.find((s) => Date.parse(s.startsAt) <= t && t < Date.parse(s.endsAt));
-  if (live) return { eyebrow: 'ON CALL NOW', value: `Until ${at(live.endsAt)}` };
+  if (live) return { eyebrow: 'ON CALL NOW', value: `Until ${at(live.endsAt)}`, shiftId: live.id };
   const next = d.shifts.find((s) => Date.parse(s.startsAt) > t);
   if (!next) return null;
   return {
+    shiftId: next.id,
     eyebrow: 'MY NEXT ON-CALL SHIFT',
     value: `${formatDay(new Date(next.startsAt), { weekday: true })} → ${formatDay(new Date(next.endsAt), { weekday: true })}`,
   };
 }
 
 /** MProfile's swap under the next shift: the badge, its line, and what it means for you. */
-export function swapLine(s: OpenSwap | null): { badge: string; line: string; note: string | null } | null {
+export function swapLine(
+  s: OpenSwap | null,
+  d?: Pick<ProfileData, 'shifts'>,
+  shownShiftId?: string,
+): { badge: string; line: string; note: string | null } | null {
   if (!s) return null;
+  // A swap about a later shift says which one, and nothing about "this shift" (spec-checker pass 2).
+  if (shownShiftId && s.shiftId !== shownShiftId) {
+    const shift = d?.shifts.find((x) => x.id === s.shiftId);
+    const day = shift ? ` for ${formatDay(new Date(shift.startsAt), { weekday: true })}` : '';
+    if (!s.mine && s.status !== 'waiting') return null;
+    return {
+      badge: s.mine ? (s.status === 'waiting' ? 'Swap requested' : 'Swap accepted') : 'Swap asked',
+      line: s.mine ? `${day.trim()} · with ${s.other}` : `${s.other} asked to swap${day}`,
+      note: s.mine ? null : 'Answer on On-call.',
+    };
+  }
   if (s.mine)
     return s.status === 'waiting'
       ? {

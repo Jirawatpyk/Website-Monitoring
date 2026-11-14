@@ -49,10 +49,11 @@ const data: ProfileData = {
   isAm: false,
   policies: [],
   inRotation: true,
-  shifts: [{ startsAt: '2026-10-05T02:00:00Z', endsAt: '2026-10-12T02:00:00Z' }],
+  shifts: [{ id: 'w1', startsAt: '2026-10-05T02:00:00Z', endsAt: '2026-10-12T02:00:00Z' }],
   swap: null,
   hours: { start: '09:00:00', end: '18:00:00', days: [1, 2, 3, 4, 5] },
   emailOn: true,
+  testSentAt: null,
   admins: ['Tao'],
 };
 
@@ -62,7 +63,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   settings.signOutDevice.mockResolvedValue({ ok: true, outcome: '1' });
   settings.setChatId.mockResolvedValue({ ok: true });
-  oncall.sendTest.mockResolvedValue({ ok: true, at: NOW });
+  oncall.sendTest.mockResolvedValue({ ok: true, at: new Date().toISOString() });
 });
 
 describe('ProfilePageView (Profile, MProfile)', () => {
@@ -80,9 +81,9 @@ describe('ProfilePageView (Profile, MProfile)', () => {
     const user = userEvent.setup();
     render(<ProfilePageView data={data} now={NOW} signOutAction={signOutAction} />);
     await user.click(screen.getAllByRole('button', { name: 'Send me a test alert' })[0]!);
-    expect(await screen.findByText('Test sent at 10:08')).toBeInTheDocument();
+    expect(await screen.findByText(/^Test sent at \d\d:\d\d$/)).toBeInTheDocument();
     // The SQL refuses another within a minute: the button says it went and waits (spec-checker).
-    for (const b of screen.getAllByRole('button', { name: 'Test alert sent · 10:08' }))
+    for (const b of screen.getAllByRole('button', { name: /^Test alert sent · \d\d:\d\d$/ }))
       expect(b).toBeDisabled();
     expect(screen.queryByText(/1\.3 s|2\.2 s/)).toBeNull();
   });
@@ -127,5 +128,39 @@ describe('ProfilePageView (Profile, MProfile)', () => {
     await waitFor(() => expect(settings.setChatId).toHaveBeenCalledWith({ userId: ME, chatId: '123456' }));
     expect(await screen.findByText('Your Chat id saved · logged')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Chat id…' })).toHaveFocus());
+  });
+
+  it('a signed-out device keeps its place, and focus moves to the next Sign out (spec-checker pass 2)', async () => {
+    const user = userEvent.setup();
+    const third = {
+      id: 's3',
+      userId: ME,
+      userAgent: MAC.replace('Macintosh; Intel Mac OS X 10_15_7', 'Windows NT 10.0; Win64; x64'),
+      createdAt: NOW,
+      lastUsed: '2026-09-23T09:40:00Z',
+      current: false,
+    };
+    render(
+      <ProfilePageView
+        data={{ ...data, sessions: [...data.sessions, third] }}
+        now={NOW}
+        signOutAction={signOutAction}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /^Sign out Safari · iPhone/ }));
+    expect(await screen.findByText('Signed out · now')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^Sign out Chrome · Windows/ })).toHaveFocus(),
+    );
+    const rows = screen.getByRole('list', { name: 'Signed-in devices' }).querySelectorAll('li');
+    expect(rows[1]).toHaveTextContent('Signed out · now');
+  });
+
+  it('a muted site says so in its link name (§11: by its word)', () => {
+    const muted = { ...data.sites[0]!, mutedUntil: '2026-09-25T11:00:00Z' };
+    render(<ProfilePageView data={{ ...data, sites: [muted] }} now={NOW} signOutAction={signOutAction} />);
+    expect(
+      screen.getByRole('link', { name: /realme\.link, Tier 1, owner, ok, muted until 18:00/ }),
+    ).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   devicesOf,
   devicesWord,
+  noDevicesLine,
   oncallWarning,
   securityRows,
   signinEvents,
@@ -242,5 +243,20 @@ describe('signinEvents (§35.7: newest 5)', () => {
   });
   it('someone no longer listed reads "someone"', () => {
     expect(signinEvents(data, NOW, 6)[5]!.text).toBe('Tao deactivated someone');
+  });
+});
+
+describe('noDevicesLine (MSecurity sheet, spec-checker pass 2)', () => {
+  it.each([
+    ['2026-09-25T03:08:00Z', 'No devices — signed out everywhere at 10:08.'],
+    ['2026-09-24T09:40:00Z', 'No devices — signed out everywhere yesterday at 16:40.'],
+    ['2026-09-23T11:30:00Z', 'No devices — signed out everywhere on Wed at 18:30.'],
+    ['2026-09-02T03:08:00Z', 'No devices — signed out everywhere on 2 Sep.'],
+  ])('signed out %s → %s', (at, line) => {
+    expect(noDevicesLine({ personId: TAO, signedOutAt: at }, NOW)).toBe(line);
+  });
+  it('a pending address, and someone with nothing on record', () => {
+    expect(noDevicesLine({ personId: null, signedOutAt: null }, NOW)).toBe('Not signed in yet — no devices.');
+    expect(noDevicesLine({ personId: TAO, signedOutAt: null }, NOW)).toBe('No devices.');
   });
 });

@@ -6,6 +6,7 @@
 import {
   deviceLabel,
   formatDay,
+  formatShortPast,
   formatTime,
   formatWhen,
   isSameBangkokDay,
@@ -98,8 +99,10 @@ export interface SecurityRow {
   /** "On call now" (bold), "On call from 28 Sep", or nothing. */
   oncall: { text: string; live: boolean } | null;
   devices: number;
-  /** "Today 07:52", "Signed out · 10:08", "Not signed in yet", "No devices". */
+  /** "Today 07:52", "Signed out · 10:08", "Not signed in yet", "—". */
   last: string;
+  /** When they were signed out everywhere, if that's their latest (the phone sheet's empty sentence). */
+  signedOutAt: string | null;
   /** Desktop's row button: your own "Sign out other devices", anyone else's "Sign out all". */
   action: 'others' | 'all' | null;
 }
@@ -115,27 +118,14 @@ function signedOutAt(d: SecurityData): Map<string, string> {
   return at;
 }
 
-/**
- * A short past time for the people and events (§35.6–7, §13; D-062 item 12): "10:08" today, "Yesterday
- * 16:40", "Thu 16:40" within the week, then "21 Sep" — short enough for the phone's right-hand column and
- * the table's Last sign-in.
- */
-export function shortWhen(at: Date, now: Date): string {
-  if (isSameBangkokDay(at, now)) return formatTime(at);
-  if (isSameBangkokDay(at, new Date(now.getTime() - 86_400_000))) return `Yesterday ${formatTime(at)}`;
-  if (now.getTime() - at.getTime() < 6 * 86_400_000)
-    return `${formatDay(at, { weekday: true }).split(' ')[0]} ${formatTime(at)}`;
-  return formatDay(at);
-}
-
 /** "Signed out · 10:08" today (the boards), "Signed out · 21 Sep" long ago — never a bare old time. */
 export function signedOutLabel(at: Date, now: Date): string {
-  return `Signed out · ${shortWhen(at, now)}`;
+  return `Signed out · ${formatShortPast(at, now)}`;
 }
 
 /** The table's Last sign-in: "Today 07:52", else the short form. */
 const lastSignIn = (at: Date, now: Date) =>
-  isSameBangkokDay(at, now) ? `Today ${formatTime(at)}` : shortWhen(at, now);
+  isSameBangkokDay(at, now) ? `Today ${formatTime(at)}` : formatShortPast(at, now);
 
 function oncallMark(d: SecurityData, personId: string, now: Date): SecurityRow['oncall'] {
   const t = now.getTime();
@@ -168,6 +158,7 @@ export function securityRows(d: SecurityData, now: Date): SecurityRow[] {
         oncall: oncallMark(d, p.id, now),
         devices: mine.length,
         last,
+        signedOutAt: signIn ? null : (outAt ?? null),
         action: self ? (mine.length > 1 ? 'others' : null) : mine.length > 0 ? 'all' : null,
       };
     });
@@ -179,6 +170,7 @@ export function securityRows(d: SecurityData, now: Date): SecurityRow[] {
     oncall: null,
     devices: 0,
     last: 'Not signed in yet',
+    signedOutAt: null,
     action: null,
   }));
   return [...people, ...invites];
@@ -306,6 +298,24 @@ export function signinEvents(d: SecurityData, now: Date, limit = 5): SigninEvent
       default:
         text = e.action;
     }
-    return { key: `${e.at}-${i}`, at: e.at, time: shortWhen(new Date(e.at), now), icon, text };
+    return { key: `${e.at}-${i}`, at: e.at, time: formatShortPast(new Date(e.at), now), icon, text };
   });
+}
+
+/**
+ * MSecurity's sheet with no devices: "Not signed in yet — no devices.", "No devices — signed out everywhere
+ * at 10:08." (the board), "… yesterday at 16:40.", "… on Thu at 16:40.", "… on 21 Sep.", or "No devices.".
+ */
+export function noDevicesLine(r: Pick<SecurityRow, 'personId' | 'signedOutAt'>, now: Date): string {
+  if (!r.personId) return 'Not signed in yet — no devices.';
+  if (!r.signedOutAt) return 'No devices.';
+  const when = formatShortPast(new Date(r.signedOutAt), now);
+  const phrase = /^\d/.test(when)
+    ? when.includes(':')
+      ? `at ${when}`
+      : `on ${when}`
+    : when.startsWith('Yesterday')
+      ? `yesterday at ${when.replace('Yesterday ', '')}`
+      : `on ${when.replace(' ', ' at ')}`;
+  return `No devices — signed out everywhere ${phrase}.`;
 }
