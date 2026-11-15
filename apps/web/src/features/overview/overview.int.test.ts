@@ -168,8 +168,23 @@ describe('loadOverview (S06b, spec §21)', () => {
     expect(data.kpis.uptime30d).toBeGreaterThan(0);
   });
 
-  it('a TLS chain warning’s Since comes from the engine’s carry, not a walk through the checks (§21.4)', async () => {
+  it('a TLS chain warning’s Since: the trigger keeps each location’s start, the page reads it (§21.4)', async () => {
     const chain = 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY';
+    // SIN's streak began 3 days ago (in this month's partition: the local stack keeps no older one).
+    const sinStart = minAgo(3 * 1440);
+    await must(
+      db
+        .from('check_results')
+        .insert({
+          monitor_id: monitorId,
+          location: 'SIN',
+          checked_at: sinStart,
+          attempt: 1,
+          outcome: 'fail',
+          error: chain,
+        })
+        .select('id'),
+    );
     await must(
       db
         .from('check_results')
@@ -201,24 +216,14 @@ describe('loadOverview (S06b, spec §21)', () => {
         ])
         .select('id'),
     );
-    // The trigger started both streaks at those checks (D-029).
+    // The trigger kept each location's start (D-029): BKK at its first chain check, SIN at 3 days ago.
     const kept = await must(
       db.from('check_chain_streaks').select('location, since').eq('monitor_id', monitorId).order('location'),
     );
     expect(kept.map((k) => [k.location, new Date(k.since).toISOString()])).toEqual([
       ['BKK', minAgo(2)],
-      ['SIN', minAgo(2)],
+      ['SIN', sinStart],
     ]);
-    // A streak that began long ago (no check rows from then: the page must not walk them).
-    const sinStart = new Date(NOW.getTime() - 30 * 86_400_000).toISOString();
-    await must(
-      db
-        .from('check_chain_streaks')
-        .update({ since: sinStart })
-        .eq('monitor_id', monitorId)
-        .eq('location', 'SIN')
-        .select('location'),
-    );
     const data = await loadOverview(asAdmin, { ...admin, role: 'admin' }, NOW);
     const ours = data.sites.find((s) => s.id === siteId);
     expect(ours?.locations).toMatchObject({ BKK: 'chain', SIN: 'chain' });
