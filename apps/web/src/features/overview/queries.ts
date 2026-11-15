@@ -410,7 +410,7 @@ async function personName(db: DbClient, userId: string): Promise<string | null> 
  * Only sites with a warning are read, so this is usually nothing. A database a deploy behind (no column
  * yet, 42703 / PGRST204) shows no Since rather than failing the page.
  */
-async function fillChainSince(
+export async function fillChainSince(
   db: DbClient,
   rows: OverviewSite[],
   live: readonly { id: string; monitors: { id: string; is_primary: boolean }[] }[],
