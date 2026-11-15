@@ -16,7 +16,10 @@
 -- in 20261115073510, which only attaches these: in the same file the parent's lock would come after the
 -- partition's, the reverse of an insert's order, and a probe insert landing mid-build deadlocks it
 -- (db-reviewer reproduced it). The old indexes are dropped in a file of their own (20261115073511).
--- Merge at a quiet time.
+-- On production the current month's three indexes are pre-built before the merge with CREATE INDEX
+-- CONCURRENTLY under these exact names (Tao, 15 Nov 2026): no insert lock at all, because a probe insert
+-- waiting on a build fails at the API roles' 8 s statement_timeout. `if not exists` then skips them; an
+-- invalid one (a failed concurrent build) stops the migration instead.
 --
 -- This file: the per-monitor day (overview_response_24h, the site's response series, the rollups, the
 -- due-monitors confirm reads). Same key as `check_results_monitor_idx`, which it replaces.
@@ -33,6 +36,15 @@ begin
     where i.inhparent = 'public.check_results'::regclass
     order by c.relname = 'check_results_' || to_char(now() at time zone 'UTC', 'YYYY_MM'), c.relname
   loop
+    -- Pre-built on production with CREATE INDEX CONCURRENTLY (no insert lock): a build that failed
+    -- leaves an INVALID index that `if not exists` would skip, so stop instead.
+    if exists (
+      select 1 from pg_catalog.pg_index x join pg_catalog.pg_class ic on ic.oid = x.indexrelid
+      where x.indrelid = v_part.part and ic.relname = v_part.relname || '_monitor_cover_idx' and not x.indisvalid
+    ) then
+      raise exception 'Index %_monitor_cover_idx is invalid (a failed CONCURRENTLY build): drop it and build it again',
+        v_part.relname;
+    end if;
     execute format(
       'create index if not exists %I on %s (monitor_id, checked_at desc) include (outcome, error, response_ms)',
       v_part.relname || '_monitor_cover_idx', v_part.part);

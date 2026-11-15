@@ -17,6 +17,15 @@ begin
     where i.inhparent = 'public.check_results'::regclass
     order by c.relname = 'check_results_' || to_char(now() at time zone 'UTC', 'YYYY_MM'), c.relname
   loop
+    -- Pre-built on production with CREATE INDEX CONCURRENTLY (no insert lock): a build that failed
+    -- leaves an INVALID index that `if not exists` would skip, so stop instead.
+    if exists (
+      select 1 from pg_catalog.pg_index x join pg_catalog.pg_class ic on ic.oid = x.indexrelid
+      where x.indrelid = v_part.part and ic.relname = v_part.relname || '_monitor_location_cover_idx' and not x.indisvalid
+    ) then
+      raise exception 'Index %_monitor_location_cover_idx is invalid (a failed CONCURRENTLY build): drop it and build it again',
+        v_part.relname;
+    end if;
     execute format(
       'create index if not exists %I on %s (monitor_id, location, checked_at desc) include (attempt, outcome, error, response_ms)',
       v_part.relname || '_monitor_location_cover_idx', v_part.part);
