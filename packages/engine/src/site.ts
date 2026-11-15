@@ -42,7 +42,6 @@ import {
   latestPerView,
   liveBlips,
   minuteOf,
-  nextChainSince,
   nextFailingSince,
   nextSlowRounds,
   redirectIssue,
@@ -51,7 +50,6 @@ import {
   SLOW_ROUNDS,
   statusIssue,
   type CrawlerFact,
-  type ChainSince,
   type FailingSince,
   type ProblemDetail,
 } from './triggers';
@@ -83,8 +81,6 @@ export interface MonitorCarry {
   failingSince: FailingSince;
   /** D-050: the primary's timeout blips of the last 30 min (none = none). */
   blips?: readonly Date[];
-  /** D-029, §21.4: when each location's TLS chain streak began (none = none; `nextChainSince`). */
-  chainSince?: ChainSince;
 }
 
 export const NEW_MONITOR: MonitorCarry = {
@@ -94,7 +90,6 @@ export const NEW_MONITOR: MonitorCarry = {
   slowRounds: 0,
   failingSince: {},
   blips: [],
-  chainSince: {},
 };
 
 export interface SiteMonitor {
@@ -163,8 +158,6 @@ export interface MonitorState {
   failingSince: FailingSince;
   /** D-050: the timeout blips still in the window (a DOWN clears them). */
   blips: Date[];
-  /** D-029, §21.4: when each location's TLS chain streak began. */
-  chainSince: ChainSince;
 }
 
 /** What every judged decision records besides its incident change. */
@@ -289,7 +282,7 @@ type Verdict =
 
 interface Judgement {
   verdict: Verdict;
-  next: Pick<MonitorCarry, 'slowRounds' | 'failingSince'> & { blips: Date[]; chainSince: ChainSince };
+  next: Pick<MonitorCarry, 'slowRounds' | 'failingSince'> & { blips: Date[] };
 }
 
 export function decideSite(s: SiteSnapshot): SiteDecision {
@@ -345,10 +338,7 @@ function judgeSiteRound(
       m.id,
       isReady(round, s.locations, s.intervalSec, s.now, excludedIn(s, round))
         ? judgeMonitor(s, m, round)
-        : {
-            verdict: { kind: 'insufficient' },
-            next: { ...m.carry, blips: [...(m.carry.blips ?? [])], chainSince: m.carry.chainSince ?? {} },
-          },
+        : { verdict: { kind: 'insufficient' }, next: { ...m.carry, blips: [...(m.carry.blips ?? [])] } },
     );
   }
 
@@ -656,10 +646,8 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
   // D-050: every path carries the blips still in the window; only a timeout blip adds one, a DOWN
   // clears them (`stateOf`).
   const blips = m.isPrimary ? liveBlips(m.carry.blips, roundAt, s.intervalSec) : [];
-  // §21.4: every path carries the chain streak's start, from the round's checks and rechecks.
-  const chainSince = nextChainSince(m.carry.chainSince ?? {}, [...round.scheduled, ...round.rechecks]);
-  const carried = { slowRounds: m.carry.slowRounds, failingSince, blips, chainSince };
-  const reset = { slowRounds: 0, failingSince, blips, chainSince };
+  const carried = { slowRounds: m.carry.slowRounds, failingSince, blips };
+  const reset = { slowRounds: 0, failingSince, blips };
   const blockedChecks = round.scheduled.filter((c) => c.outcome === 'blocked');
   const unverified = (reason: UnverifiedReason, startedAt: Date): Judgement => ({
     verdict: {
@@ -851,7 +839,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     const timed = counted.filter((c) => !s.slowLocations?.get(minuteOf(c.checkedAt))?.has(c.location));
     const p50 = roundP50(timed, minLocations);
     const slowRounds = nextSlowRounds(m.carry.slowRounds, p50, m.slowThresholdMs);
-    const next = { slowRounds, failingSince, blips, chainSince };
+    const next = { slowRounds, failingSince, blips };
     const crawler = crawlerFacts(m, s, roundAt);
     const issue = problemOf(
       m,
@@ -1213,7 +1201,6 @@ function keep(m: SiteMonitor): MonitorState {
     slowRounds: m.carry.slowRounds,
     failingSince: m.carry.failingSince,
     blips: [...(m.carry.blips ?? [])],
-    chainSince: m.carry.chainSince ?? {},
   };
 }
 

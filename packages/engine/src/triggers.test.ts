@@ -6,7 +6,6 @@ import {
   hostOf,
   isAllowedHost,
   keywordIssue,
-  nextChainSince,
   nextFailingSince,
   nextSlowRounds,
   redirectIssue,
@@ -278,57 +277,5 @@ describe('slow location (D-039): one location slow on most sites in a minute tim
       c.location === 'BKK' ? { ...c, outcome: 'fail' as CheckOutcome } : c,
     );
     expect(slowLocationsByMinute(failed).size).toBe(0);
-  });
-});
-
-// Spec §21.4 (Overview location warning "Since"), D-029: when a location's TLS chain streak began — the
-// carry replaces the Overview's walk back through check_results (cold-load follow-up, 15 Nov 2026).
-// Cando Asia's streak in production began Fri 13 Nov 09:15.
-describe('chainSince — when a location’s TLS chain streak began (§21.4, D-029)', () => {
-  const chain = (location: ProbeLocation, sec: number) =>
-    fact(location, {
-      outcome: 'fail',
-      statusCode: null,
-      error: 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
-      checkedAt: at(sec),
-    });
-  const iso = (sec: number) => at(sec).toISOString();
-  it.each([
-    ['a chain error starts it at that check', {}, [chain('SIN', 0)], { SIN: iso(0) }],
-    ['the next chain round keeps the first time', { SIN: iso(0) }, [chain('SIN', 60)], { SIN: iso(0) }],
-    ['a pass clears it', { SIN: iso(0) }, [fact('SIN', { checkedAt: at(60) })], {}],
-    ['a block clears it', { SIN: iso(0) }, [fact('SIN', { outcome: 'blocked', checkedAt: at(60) })], {}],
-    [
-      'a hard fail clears it (it isn’t a chain error)',
-      { SIN: iso(0) },
-      [fact('SIN', { outcome: 'fail', statusCode: 503, checkedAt: at(60) })],
-      {},
-    ],
-    [
-      'a location with no check this round keeps its start (no data isn’t a good check)',
-      { SIN: iso(0) },
-      [fact('BKK', { checkedAt: at(60) })],
-      { SIN: iso(0) },
-    ],
-    [
-      'in time order: a recheck that passes after a chain check clears it',
-      {},
-      [fact('SIN', { checkedAt: at(90) }), chain('SIN', 60)],
-      {},
-    ],
-    [
-      'in time order: a chain recheck after a pass starts at the recheck',
-      {},
-      [chain('SIN', 90), fact('SIN', { checkedAt: at(60) })],
-      { SIN: iso(90) },
-    ],
-    [
-      'each location its own start',
-      { BKK: iso(-600) },
-      [chain('BKK', 0), chain('SIN', 1), fact('TYO', { checkedAt: at(2) })],
-      { BKK: iso(-600), SIN: iso(1) },
-    ],
-  ] as const)('%s', (_, prev, checks, expected) => {
-    expect(nextChainSince(prev, checks)).toEqual(expected);
   });
 });

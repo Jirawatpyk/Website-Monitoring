@@ -41,9 +41,9 @@ export function lastRoundP50(responseMs: readonly (number | null)[]): number | n
 }
 
 /**
- * When a site's TLS chain warning started (§21.4 Since): the earliest start the engine carries
- * (`monitor_status.chain_since`, D-029) over the locations warned now. Null when it has none yet — a
- * streak the engine hasn't judged a round of, or a database before the column.
+ * When a site's TLS chain warning started (§21.4 Since): the earliest kept start (`check_chain_streaks`,
+ * D-029) over the locations warned now, as {location: ISO}. Null when there is none — a database before
+ * the table, or a start not recorded.
  */
 export function chainSinceOf(chainSince: unknown, warned: readonly string[]): string | null {
   if (!chainSince || typeof chainSince !== 'object' || Array.isArray(chainSince)) return null;

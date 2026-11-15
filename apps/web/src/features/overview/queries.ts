@@ -404,11 +404,11 @@ async function personName(db: DbClient, userId: string): Promise<string | null> 
 }
 
 /**
- * When each TLS chain warning started (§21.4 Since for a location warning): the start the engine
- * carries per location (`monitor_status.chain_since`, D-029), one row per warned site's primary — no
- * walk back through check_results, whose cost grew with the streak (cold-load follow-up, 15 Nov 2026).
- * Only sites with a warning are read, so this is usually nothing. A database a deploy behind (no column
- * yet, 42703 / PGRST204) shows no Since rather than failing the page.
+ * When each TLS chain warning started (§21.4 Since for a location warning): `check_chain_streaks`,
+ * kept per monitor and location by a trigger on check_results (D-029) — one read for the warned sites'
+ * primaries, no walk back through check_results, whose cost grew with the streak (cold-load follow-up,
+ * 15 Nov 2026). Only sites with a warning are read, so this is usually nothing. A database a deploy
+ * behind (no table yet: PGRST205, observed locally) shows no Since rather than failing the page.
  */
 export async function fillChainSince(
   db: DbClient,
@@ -423,17 +423,22 @@ export async function fillChainSince(
   });
   if (!warned.length) return;
   const { data, error } = await db
-    .from('monitor_status')
-    .select('monitor_id, chain_since')
+    .from('check_chain_streaks')
+    .select('monitor_id, location, since')
     .in(
       'monitor_id',
       warned.map((w) => w.monitor),
     );
   if (error) {
-    if (error.code === '42703' || error.code === 'PGRST204') return;
-    throw new Error(`monitor_status: ${error.message}`);
+    if (error.code === 'PGRST205') return;
+    throw new Error(`check_chain_streaks: ${error.message}`);
   }
-  const byMonitor = new Map((data ?? []).map((m) => [m.monitor_id, m.chain_since]));
+  const byMonitor = new Map<string, Record<string, string>>();
+  for (const s of data ?? []) {
+    const starts = byMonitor.get(s.monitor_id) ?? {};
+    starts[s.location] = new Date(s.since).toISOString();
+    byMonitor.set(s.monitor_id, starts);
+  }
   for (const w of warned) w.row.chainSince = chainSinceOf(byMonitor.get(w.monitor), w.locations);
 }
 

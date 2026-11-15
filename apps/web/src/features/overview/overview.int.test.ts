@@ -132,7 +132,6 @@ afterAll(async () => {
   // the seed Admin signs in with Google only: don't leave it a password known from this file
   await db.auth.admin.updateUserById(admin.id, { password: crypto.randomUUID() });
   await db.from('check_results').delete().eq('monitor_id', monitorId);
-  await db.from('monitor_status').delete().eq('monitor_id', monitorId);
   await db.from('incident_events').delete().eq('incident_id', incidentId);
   await db.from('incidents').delete().eq('site_id', siteId);
   await db.from('site_status').delete().eq('site_id', siteId);
@@ -202,21 +201,23 @@ describe('loadOverview (S06b, spec §21)', () => {
         ])
         .select('id'),
     );
-    // Streaks that began long ago (no check rows from then: the page must not walk them).
+    // The trigger started both streaks at those checks (D-029).
+    const kept = await must(
+      db.from('check_chain_streaks').select('location, since').eq('monitor_id', monitorId).order('location'),
+    );
+    expect(kept.map((k) => [k.location, new Date(k.since).toISOString()])).toEqual([
+      ['BKK', minAgo(2)],
+      ['SIN', minAgo(2)],
+    ]);
+    // A streak that began long ago (no check rows from then: the page must not walk them).
     const sinStart = new Date(NOW.getTime() - 30 * 86_400_000).toISOString();
     await must(
       db
-        .from('monitor_status')
-        .upsert({
-          monitor_id: monitorId,
-          site_id: siteId,
-          last_round_at: minAgo(1),
-          status: 'ok',
-          slow_rounds: 0,
-          failing_since: {},
-          chain_since: { BKK: minAgo(600), SIN: sinStart },
-        })
-        .select('monitor_id'),
+        .from('check_chain_streaks')
+        .update({ since: sinStart })
+        .eq('monitor_id', monitorId)
+        .eq('location', 'SIN')
+        .select('location'),
     );
     const data = await loadOverview(asAdmin, { ...admin, role: 'admin' }, NOW);
     const ours = data.sites.find((s) => s.id === siteId);

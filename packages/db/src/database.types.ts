@@ -83,6 +83,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"check_chain_streaks": {
+                  Row: {
+                    "location": string,"monitor_id": string,"since": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "location": string,"monitor_id": string,"since": string
+                  }
+                  Update: {
+                    "location"?: string,"monitor_id"?: string,"since"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "check_chain_streaks_location_fkey"
+      columns: ["location"]
+isOneToOne: false
+      referencedRelation: "probe_locations"
+      referencedColumns: ["code"]
+    },{
+      foreignKeyName: "check_chain_streaks_monitor_id_fkey"
+      columns: ["monitor_id"]
+isOneToOne: false
+      referencedRelation: "monitors"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"check_results": {
                   Row: {
                     "akamai_ok": boolean | null,"attempt": number,"checked_at": string,"confirm": boolean | null,"control_ok": boolean | null,"created_at": string,"error": string | null,"final_url": string | null,"id": string,"keyword_forbidden": (string)[] | null,"keyword_missing": (string)[] | null,"location": string,"monitor_id": string,"outcome": Database["public"]['Enums']["check_outcome"],"resolved_ip": unknown,"response_ms": number | null,"status_code": number | null,"ttfb_ms": number | null,"waf": string | null
@@ -441,14 +467,14 @@ isOneToOne: false
                   ]
                 },"monitor_status": {
                   Row: {
-                    "blips": (string)[],"cause": string | null,"chain_since": NonNullable<Json>,"created_at": string,"failing_since": NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds": number,"status": Database["public"]['Enums']["site_state"],"trigger": Database["public"]['Enums']["incident_trigger"] | null,"updated_at": string
+                    "blips": (string)[],"cause": string | null,"created_at": string,"failing_since": NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds": number,"status": Database["public"]['Enums']["site_state"],"trigger": Database["public"]['Enums']["incident_trigger"] | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "blips"?: (string)[],"cause"?: string | null,"chain_since"?: NonNullable<Json>,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
+                    "blips"?: (string)[],"cause"?: string | null,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
                   }
                   Update: {
-                    "blips"?: (string)[],"cause"?: string | null,"chain_since"?: NonNullable<Json>,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at"?: string,"monitor_id"?: string,"site_id"?: string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
+                    "blips"?: (string)[],"cause"?: string | null,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at"?: string,"monitor_id"?: string,"site_id"?: string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1131,7 +1157,6 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "blips": (string)[],
 "cause": string | null,
-"chain_since": NonNullable<Json>,
 "created_at": string,
 "failing_since": NonNullable<Json>,
 "last_round_at": string,
