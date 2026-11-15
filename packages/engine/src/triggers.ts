@@ -1,4 +1,4 @@
-import { failsHere } from './hard-fail';
+import { failsHere, isTlsChainFail } from './hard-fail';
 import {
   CRAWLER_VIEWS,
   type CheckOutcome,
@@ -210,6 +210,26 @@ export function statusIssue(
 // ── Regional (one location failing ≥ 5 min while the others pass) ───────────
 
 export type FailingSince = Readonly<Partial<Record<ProbeLocation, string>>>;
+
+/** When each location's TLS chain streak began (D-029), for the Overview's location warning "Since". */
+export type ChainSince = Readonly<Partial<Record<ProbeLocation, string>>>;
+
+/**
+ * Spec §21.4, D-029: when each location's current run of certificate-chain errors began, after this
+ * round's checks (scheduled and rechecks, in time order). A chain error keeps (or starts) it, any other
+ * check — a pass, a block, a hard fail — ends it, and a location with no check this round keeps it:
+ * the same answer as walking back through the location's checks to the last one that wasn't a chain
+ * error, without the walk (cold-load follow-up, 15 Nov 2026). Unlike `failingSince`, no data never
+ * restarts it.
+ */
+export function nextChainSince(previous: ChainSince, checks: readonly CheckFacts[]): ChainSince {
+  const next: Partial<Record<ProbeLocation, string>> = { ...previous };
+  for (const c of [...checks].sort((a, b) => a.checkedAt.getTime() - b.checkedAt.getTime())) {
+    if (isTlsChainFail(c)) next[c.location] ??= c.checkedAt.toISOString();
+    else delete next[c.location];
+  }
+  return next;
+}
 
 /**
  * When each location started failing, after this round's scheduled checks: a failure keeps (or

@@ -343,3 +343,47 @@ describe('D-029 with an open incident', () => {
     });
   });
 });
+
+// §21.4: the Overview's location warning "Since" comes from the carried chain start, not a walk back
+// through check_results (cold-load follow-up, 15 Nov 2026). Cases in triggers.test.ts; here, that every
+// decision carries it.
+describe('D-029 — chainSince through decideSite', () => {
+  const monitorOf = (d: ReturnType<typeof decideSite>) =>
+    'monitors' in d ? d.monitors.find((m) => m.monitorId === 'home') : undefined;
+
+  it('a chain round starts each location’s streak at its check', () => {
+    const d = decideSite(site([home([chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)])]));
+    expect(monitorOf(d)?.chainSince).toEqual({
+      BKK: at(1).toISOString(),
+      SIN: at(2).toISOString(),
+      TYO: at(3).toISOString(),
+    });
+  });
+
+  it('a later round keeps the start where the chain goes on, and ends it where a check passes', () => {
+    const earlier = at(-3600).toISOString();
+    const carried: SiteMonitor = {
+      ...home([chain('BKK', 1), check('SIN', 'pass', 2), chain('TYO', 3)]),
+      carry: {
+        ...NEW_MONITOR,
+        status: 'problem',
+        trigger: 'tls_chain',
+        chainSince: { BKK: earlier, SIN: earlier, TYO: earlier },
+      },
+    };
+    const d = decideSite(site([carried]));
+    expect(monitorOf(d)?.chainSince).toEqual({ BKK: earlier, TYO: earlier });
+  });
+
+  it('an older carry without the field starts fresh (a monitor_status row from before the column)', () => {
+    const { chainSince: _, ...old } = NEW_MONITOR;
+    const d = decideSite(
+      site([{ ...home([chain('BKK', 1), chain('SIN', 2), chain('TYO', 3)]), carry: old }]),
+    );
+    expect(monitorOf(d)?.chainSince).toEqual({
+      BKK: at(1).toISOString(),
+      SIN: at(2).toISOString(),
+      TYO: at(3).toISOString(),
+    });
+  });
+});
