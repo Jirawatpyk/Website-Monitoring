@@ -1,0 +1,29 @@
+-- Cold-load fix, second index (see 20261115073507 for the numbers and how it's built): a day of checks
+-- per location, for the Probes page (probe_activity_24h, probe_gaps_24h): 12,011 → ~560 buffers each.
+set local lock_timeout = '5s';
+
+do $$
+declare
+  v_part record;
+begin
+  for v_part in
+    select c.oid::regclass as part, c.relname
+    from pg_catalog.pg_inherits i
+    join pg_catalog.pg_class c on c.oid = i.inhrelid
+    where i.inhparent = 'public.check_results'::regclass
+    order by c.relname = 'check_results_' || to_char(now() at time zone 'UTC', 'YYYY_MM'), c.relname
+  loop
+    -- Pre-built on production with CREATE INDEX CONCURRENTLY (no insert lock): a build that failed
+    -- leaves an INVALID index that `if not exists` would skip, so stop instead.
+    if exists (
+      select 1 from pg_catalog.pg_index x join pg_catalog.pg_class ic on ic.oid = x.indexrelid
+      where x.indrelid = v_part.part and ic.relname = v_part.relname || '_day_location_idx' and not x.indisvalid
+    ) then
+      raise exception 'Index %_day_location_idx is invalid (a failed CONCURRENTLY build): drop it and build it again',
+        v_part.relname;
+    end if;
+    execute format('create index if not exists %I on %s (checked_at) include (location)',
+      v_part.relname || '_day_location_idx', v_part.part);
+  end loop;
+end;
+$$;

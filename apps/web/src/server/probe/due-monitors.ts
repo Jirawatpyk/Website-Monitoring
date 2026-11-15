@@ -109,7 +109,7 @@ const IDS_PER_READ = 50;
  * only a minute later still confirms at its next tick. Not when the round before timed out at 2+ too:
  * that round already is D-049's second round, so a confirm can't change the verdict (an outage would
  * otherwise get one every round). Monitor-first reads of this round and the one before, on
- * `check_results_monitor_idx` (db-reviewer), normally empty.
+ * `check_results_monitor_cover_idx` (db-reviewer), normally empty.
  */
 async function confirmsDue(
   db: DbClient,
