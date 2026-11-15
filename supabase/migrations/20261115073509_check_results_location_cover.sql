@@ -3,7 +3,7 @@
 -- check that isn't a chain error — the read that timed out on 15 Nov. Through
 -- `check_results_monitor_location_idx` every row of the streak was a heap fetch. Covering outcome and
 -- error lets it walk the index alone; attempt and response_ms also cover site_list_locations (newest
--- check per monitor and location). Same key as the index it replaces (dropped in 20261115073510).
+-- check per monitor and location). Same key as the index it replaces (dropped in 20261115073511).
 set local lock_timeout = '5s';
 
 do $$
@@ -23,7 +23,3 @@ begin
   end loop;
 end;
 $$;
-
-create index check_results_monitor_location_cover_idx
-  on public.check_results (monitor_id, location, checked_at desc)
-  include (attempt, outcome, error, response_ms);

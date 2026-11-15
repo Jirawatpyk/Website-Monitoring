@@ -39,6 +39,14 @@ describe('insertCheckResults — a long error never fails the round (cold-load f
     expect(stored?.[1]?.error).toBe('ECONNRESET');
     expect(stored?.[2]).toEqual(row);
   });
+
+  it('counts characters, so an emoji at the cut is kept whole (db-reviewer)', async () => {
+    const { db, inserts } = dbAnswering(null);
+    await insertCheckResults(db, [{ ...row, error: 'x'.repeat(499) + '🔥'.repeat(5) }]);
+    const [stored] = inserts as { error?: string | null }[][];
+    expect(Array.from(stored?.[0]?.error ?? '')).toHaveLength(500);
+    expect(stored?.[0]?.error?.endsWith('x🔥')).toBe(true);
+  });
 });
 
 describe('insertCheckResults — the database a migration behind the code (8 Oct 2026)', () => {

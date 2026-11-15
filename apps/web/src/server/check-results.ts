@@ -35,8 +35,11 @@ export function missingColumn(error: { code?: string; message: string }): string
  */
 export const CHECK_ERROR_MAX = 500;
 
-export const capError = (r: CheckRow): CheckRow =>
-  r.error && r.error.length > CHECK_ERROR_MAX ? { ...r, error: r.error.slice(0, CHECK_ERROR_MAX) } : r;
+/** Capped by characters (code points), as the database counts them: never half an emoji. */
+export function capError(r: CheckRow): CheckRow {
+  if (!r.error || r.error.length <= CHECK_ERROR_MAX) return r;
+  return { ...r, error: Array.from(r.error).slice(0, CHECK_ERROR_MAX).join('') };
+}
 
 /**
  * Insert check results; if the database doesn't have one of the fact columns yet, store the rows

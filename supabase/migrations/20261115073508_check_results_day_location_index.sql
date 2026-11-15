@@ -18,6 +18,3 @@ begin
   end loop;
 end;
 $$;
-
-create index check_results_checked_at_location_idx on public.check_results (checked_at)
-  include (location);
