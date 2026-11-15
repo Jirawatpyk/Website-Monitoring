@@ -131,6 +131,7 @@ beforeAll(async () => {
 afterAll(async () => {
   // the seed Admin signs in with Google only: don't leave it a password known from this file
   await db.auth.admin.updateUserById(admin.id, { password: crypto.randomUUID() });
+  await db.from('check_results').delete().eq('monitor_id', monitorId);
   await db.from('incident_events').delete().eq('incident_id', incidentId);
   await db.from('incidents').delete().eq('site_id', siteId);
   await db.from('site_status').delete().eq('site_id', siteId);
@@ -165,5 +166,67 @@ describe('loadOverview (S06b, spec §21)', () => {
     expect(nextStep(data.viewer, first!).kind).toBe('ack');
     expect(countsOf(data.sites).unacked).toBeGreaterThanOrEqual(1);
     expect(data.kpis.uptime30d).toBeGreaterThan(0);
+  });
+
+  it('a TLS chain warning’s Since: the trigger keeps each location’s start, the page reads it (§21.4)', async () => {
+    const chain = 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY';
+    // SIN's streak began 3 days ago (in this month's partition: the local stack keeps no older one).
+    const sinStart = minAgo(3 * 1440);
+    await must(
+      db
+        .from('check_results')
+        .insert({
+          monitor_id: monitorId,
+          location: 'SIN',
+          checked_at: sinStart,
+          attempt: 1,
+          outcome: 'fail',
+          error: chain,
+        })
+        .select('id'),
+    );
+    await must(
+      db
+        .from('check_results')
+        .insert([
+          {
+            monitor_id: monitorId,
+            location: 'BKK',
+            checked_at: minAgo(2),
+            attempt: 1,
+            outcome: 'fail',
+            error: chain,
+          },
+          {
+            monitor_id: monitorId,
+            location: 'SIN',
+            checked_at: minAgo(2),
+            attempt: 1,
+            outcome: 'fail',
+            error: chain,
+          },
+          {
+            monitor_id: monitorId,
+            location: 'TYO',
+            checked_at: minAgo(2),
+            attempt: 1,
+            outcome: 'pass',
+            status_code: 200,
+          },
+        ])
+        .select('id'),
+    );
+    // The trigger kept each location's start (D-029): BKK at its first chain check, SIN at 3 days ago.
+    const kept = await must(
+      db.from('check_chain_streaks').select('location, since').eq('monitor_id', monitorId).order('location'),
+    );
+    expect(kept.map((k) => [k.location, new Date(k.since).toISOString()])).toEqual([
+      ['BKK', minAgo(2)],
+      ['SIN', sinStart],
+    ]);
+    const data = await loadOverview(asAdmin, { ...admin, role: 'admin' }, NOW);
+    const ours = data.sites.find((s) => s.id === siteId);
+    expect(ours?.locations).toMatchObject({ BKK: 'chain', SIN: 'chain' });
+    expect(ours?.chainSince).toBe(sinStart);
   });
 });

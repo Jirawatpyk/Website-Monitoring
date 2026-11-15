@@ -1,5 +1,5 @@
 import { isSweepStale, MONITOR_GRACE_MS } from '@dxt/engine';
-import { isTlsChainError, type Role } from '@dxt/shared';
+import type { Role } from '@dxt/shared';
 import type { MonitorFault, ProbeHealth, ViewerKind } from './types';
 
 /**
@@ -41,18 +41,16 @@ export function lastRoundP50(responseMs: readonly (number | null)[]): number | n
 }
 
 /**
- * When a location's current TLS chain streak started: newest-first checks of one location, walked
- * back while each is a chain error. Null when the newest isn't one.
+ * When a site's TLS chain warning started (§21.4 Since): the earliest kept start (`check_chain_streaks`,
+ * D-029) over the locations warned now, as {location: ISO}. Null when there is none — a database before
+ * the table, or a start not recorded.
  */
-export function chainStreakStart(
-  newestFirst: readonly { checked_at: string; outcome: string; error: string | null }[],
-): string | null {
-  let start: string | null = null;
-  for (const c of newestFirst) {
-    if (c.outcome !== 'fail' || !isTlsChainError(c.error)) break;
-    start = c.checked_at;
-  }
-  return start;
+export function chainSinceOf(chainSince: unknown, warned: readonly string[]): string | null {
+  if (!chainSince || typeof chainSince !== 'object' || Array.isArray(chainSince)) return null;
+  const starts = warned
+    .map((l) => (chainSince as Record<string, unknown>)[l])
+    .filter((t): t is string => typeof t === 'string' && Number.isFinite(Date.parse(t)));
+  return starts.sort()[0] ?? null;
 }
 
 /**
