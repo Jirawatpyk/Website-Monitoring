@@ -69,13 +69,14 @@ begin
   end loop;
 
   -- Each partition is vacuumed after every 10 k inserts, so index-only scans skip the table (only those
-  -- not set yet; same order).
+  -- not set exactly so: a new one, or one changed by hand; same order).
   for v_table in
     select i.inhrelid::regclass
     from pg_catalog.pg_inherits i
     join pg_catalog.pg_class c on c.oid = i.inhrelid
     where i.inhparent = 'public.check_results'::regclass
-      and not ('autovacuum_vacuum_insert_scale_factor=0' = any (coalesce(c.reloptions, '{}')))
+      and not (coalesce(c.reloptions, '{}') @> array['autovacuum_vacuum_insert_threshold=10000',
+                                                      'autovacuum_vacuum_insert_scale_factor=0'])
     order by i.inhrelid::regclass::text
   loop
     execute format(

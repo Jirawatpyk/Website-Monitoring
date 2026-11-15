@@ -29,11 +29,21 @@ export function missingColumn(error: { code?: string; message: string }): string
 }
 
 /**
+ * The longest error a check stores (characters). `error` is in covering indexes since the cold-load fix
+ * (15 Nov 2026), and Postgres refuses an index row over ~2.7 kB: one long network message must not fail
+ * the whole round's insert. Bangkok's ingest caps at the same length; the database checks it too.
+ */
+export const CHECK_ERROR_MAX = 500;
+
+export const capError = (r: CheckRow): CheckRow =>
+  r.error && r.error.length > CHECK_ERROR_MAX ? { ...r, error: r.error.slice(0, CHECK_ERROR_MAX) } : r;
+
+/**
  * Insert check results; if the database doesn't have one of the fact columns yet, store the rows
  * without it (logged as `schema_lag`) so the probe still records the check and beats.
  */
 export async function insertCheckResults(db: DbClient, rows: CheckRow[]): Promise<void> {
-  let batch = rows;
+  let batch = rows.map(capError);
   for (let attempt = 0; attempt <= LAG_TOLERANT_COLUMNS.length; attempt += 1) {
     const { error } = await db.from('check_results').insert(batch);
     if (!error) return;

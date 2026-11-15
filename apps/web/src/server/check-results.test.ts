@@ -28,6 +28,19 @@ function dbAnswering(...answers: ({ code: string; message: string } | null)[]) {
   return { db, inserts };
 }
 
+describe('insertCheckResults — a long error never fails the round (cold-load fix, 15 Nov 2026)', () => {
+  it('stores at most 500 characters of an error; shorter ones and null as they are', async () => {
+    const { db, inserts } = dbAnswering(null);
+    const long = { ...row, outcome: 'fail' as const, error: 'x'.repeat(5000) };
+    const short = { ...row, error: 'ECONNRESET' };
+    await insertCheckResults(db, [long, short, row]);
+    const [stored] = inserts as { error?: string | null }[][];
+    expect(stored?.[0]?.error).toHaveLength(500);
+    expect(stored?.[1]?.error).toBe('ECONNRESET');
+    expect(stored?.[2]).toEqual(row);
+  });
+});
+
 describe('insertCheckResults — the database a migration behind the code (8 Oct 2026)', () => {
   it('stores the rows without a fact column the database doesn\u2019t have yet, and says so', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
