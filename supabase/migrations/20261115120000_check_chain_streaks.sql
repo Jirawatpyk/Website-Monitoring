@@ -29,7 +29,7 @@ create policy check_chain_streaks_select_staff on public.check_chain_streaks
   for select to authenticated using ((select public.is_staff()));
 revoke all on public.check_chain_streaks from public, anon, authenticated;
 grant select on public.check_chain_streaks to authenticated;
-grant all on public.check_chain_streaks to service_role;
+grant select on public.check_chain_streaks to service_role;
 
 -- The walk's own answer, kept up per inserted check (by `checked_at`, never arrival order): with L the
 -- newest check that isn't a chain error, the streak is the chain checks after L, and `since` is the
@@ -41,8 +41,13 @@ grant all on public.check_chain_streaks to service_role;
 -- Both look only at checks newer than T: normally none (T is the newest), read from
 -- check_results_monitor_location_cover_idx alone. Out-of-order arrivals (a late BKK batch, a recheck
 -- before its check) land on the same answer as the walk; the equivalence test checks it.
+-- One (monitor, location) at a time (engine-reviewer): an advisory lock per pair, so a second insert
+-- for the same pair in another transaction (a late BKK batch overlapping a live one) waits and then reads
+-- the first one's rows — under READ COMMITTED each statement after the lock takes a fresh snapshot.
 -- Best effort: the probes' insert must never fail for this bookkeeping (a lost round is worse than a
--- wrong "Since"), so any error is caught and logged as a warning.
+-- wrong "Since"), so any error — a deadlock between two multi-row batches included — is caught and
+-- logged as a warning; the hourly reconcile (20261115120002) puts any row left wrong back. Only inserts
+-- are tracked: nothing updates or deletes check_results rows except retention, which drops whole months.
 create function private.track_chain_streak()
 returns trigger
 language plpgsql
@@ -56,6 +61,7 @@ declare
   v_since timestamptz;
 begin
   begin
+    perform pg_advisory_xact_lock(hashtextextended('chain_streak:' || new.monitor_id::text || ':' || new.location, 0));
     if new.outcome = 'fail' and coalesce(new.error, '') = any (v_chain) then
       if not exists (
         select 1 from public.check_results cr

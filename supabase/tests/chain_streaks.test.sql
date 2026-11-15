@@ -6,7 +6,7 @@
 -- partition the partition job makes later has the trigger, the insert never fails for it, staff read it.
 begin;
 \ir _helpers.psql
-select plan(8);
+select plan(11);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -103,6 +103,22 @@ select is(
   0::bigint,
   'in time order too'
 );
+
+-- The hourly reconcile puts a wrong row back (a row a caught error or a raced backfill left behind).
+update public.check_chain_streaks set since = since - interval '1 day'
+  where (monitor_id, location) in (select monitor_id, location from public.check_chain_streaks limit 1);
+insert into public.check_chain_streaks (monitor_id, location, since)
+select w.monitor_id, w.location, now() - interval '1 day' from walk w where w.since is null limit 1;
+select ok(private.reconcile_chain_streaks() >= 2, 'the reconcile changes the rows left wrong');
+select is(
+  (select count(*) from walk w
+   full join public.check_chain_streaks s on s.monitor_id = w.monitor_id and s.location = w.location
+   where w.since is distinct from s.since),
+  0::bigint,
+  '… and the table equals the walk again'
+);
+select is((select count(*) from cron.job where jobname = 'check-chain-streaks-reconcile'), 1::bigint,
+  'the reconcile runs hourly');
 
 -- A partition the job makes later has the trigger (four months on; the job also drops old months —
 -- the test rolls back).

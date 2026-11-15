@@ -64,7 +64,9 @@ Local stack: `pnpm db:start` (Docker). Migrations in `migrations/`, applied in f
   - **TLS chain "Since":** `check_chain_streaks` holds one row per monitor and location while its newest checks are chain errors (`since` = the first of them; staff read).
     - **Who writes it:** only the trigger `check_results_chain_streak` (`private.track_chain_streak`), on every insert, so every writer is covered. The engine doesn't, because it skips some checks (engine-reviewer).
     - **What it computes:** the old walk's own answer, kept by `checked_at`, so out-of-order arrivals land right. Each insert reads only the checks newer than itself (normally none). It costs about +10 µs per row.
+    - **Concurrency:** one (monitor, location) at a time, through an advisory lock, so two transactions inserting for the same pair can't each miss the other's row. Proved with two sessions; without the lock both of engine-reviewer's races go wrong.
     - **Failure:** any error is caught as a warning and never fails the probes' insert.
+    - **Backstop:** `private.reconcile_chain_streaks()` recomputes the walk per pair under the same lock. It ran once as the backfill and runs hourly (pg_cron `check-chain-streaks-reconcile`, :17).
     - **Tests:** `chain_streaks.test.sql` compares it with the walk over shuffled, generated sequences.
     - **Overview:** reads one row per warned site, never walks the streak. A database without the table answers `PGRST205`, and the page then shows no Since.
   - **Rule:** a new page read over a day of checks gets a covering index. Measure it at production volume with `EXPLAIN (ANALYZE, BUFFERS)` as `authenticated` after a VACUUM; buffers are the metric, not warm time.
