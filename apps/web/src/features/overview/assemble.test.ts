@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chainStreakStart,
+  chainSinceOf,
   byHandOf,
   currentDrop,
   lastRoundP50,
@@ -49,26 +49,22 @@ describe('lastRoundP50', () => {
   });
 });
 
-describe('chainStreakStart', () => {
-  const chain = (at: string) => ({
-    checked_at: at,
-    outcome: 'fail',
-    error: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+describe('chainSinceOf — the TLS chain warning Since from the engine’s carry (§21.4, D-029)', () => {
+  const carry = {
+    BKK: '2026-11-13T02:15:46.000Z',
+    SIN: '2026-11-13T02:15:01.000Z',
+    TYO: '2026-11-14T08:00:00.000Z',
+  };
+  it('the earliest start over the locations warned now', () => {
+    expect(chainSinceOf(carry, ['BKK', 'SIN', 'TYO'])).toBe('2026-11-13T02:15:01.000Z');
+    expect(chainSinceOf(carry, ['TYO'])).toBe('2026-11-14T08:00:00.000Z');
   });
-  it('walks back while the checks are chain errors', () => {
-    expect(
-      chainStreakStart([
-        chain('09:40'),
-        chain('09:35'),
-        chain('09:31'),
-        { checked_at: '09:30', outcome: 'pass', error: null },
-      ]),
-    ).toBe('09:31');
-    expect(
-      chainStreakStart([{ checked_at: '09:40', outcome: 'pass', error: null }, chain('09:35')]),
-    ).toBeNull();
-    expect(chainStreakStart([{ checked_at: '09:40', outcome: 'fail', error: null }])).toBeNull();
-    expect(chainStreakStart([])).toBeNull();
+  it('none for a location the engine hasn’t started yet, or no carry at all', () => {
+    expect(chainSinceOf({ BKK: '2026-11-13T02:15:46.000Z' }, ['SIN'])).toBeNull();
+    expect(chainSinceOf({}, ['BKK'])).toBeNull();
+    expect(chainSinceOf(undefined, ['BKK'])).toBeNull();
+    expect(chainSinceOf(['x'], ['BKK'])).toBeNull();
+    expect(chainSinceOf({ BKK: 'not a time' }, ['BKK'])).toBeNull();
   });
 });
 

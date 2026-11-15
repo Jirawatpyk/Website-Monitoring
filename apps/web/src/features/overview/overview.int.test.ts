@@ -131,6 +131,8 @@ beforeAll(async () => {
 afterAll(async () => {
   // the seed Admin signs in with Google only: don't leave it a password known from this file
   await db.auth.admin.updateUserById(admin.id, { password: crypto.randomUUID() });
+  await db.from('check_results').delete().eq('monitor_id', monitorId);
+  await db.from('monitor_status').delete().eq('monitor_id', monitorId);
   await db.from('incident_events').delete().eq('incident_id', incidentId);
   await db.from('incidents').delete().eq('site_id', siteId);
   await db.from('site_status').delete().eq('site_id', siteId);
@@ -165,5 +167,60 @@ describe('loadOverview (S06b, spec §21)', () => {
     expect(nextStep(data.viewer, first!).kind).toBe('ack');
     expect(countsOf(data.sites).unacked).toBeGreaterThanOrEqual(1);
     expect(data.kpis.uptime30d).toBeGreaterThan(0);
+  });
+
+  it('a TLS chain warning’s Since comes from the engine’s carry, not a walk through the checks (§21.4)', async () => {
+    const chain = 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY';
+    await must(
+      db
+        .from('check_results')
+        .insert([
+          {
+            monitor_id: monitorId,
+            location: 'BKK',
+            checked_at: minAgo(2),
+            attempt: 1,
+            outcome: 'fail',
+            error: chain,
+          },
+          {
+            monitor_id: monitorId,
+            location: 'SIN',
+            checked_at: minAgo(2),
+            attempt: 1,
+            outcome: 'fail',
+            error: chain,
+          },
+          {
+            monitor_id: monitorId,
+            location: 'TYO',
+            checked_at: minAgo(2),
+            attempt: 1,
+            outcome: 'pass',
+            status_code: 200,
+          },
+        ])
+        .select('id'),
+    );
+    // Streaks that began long ago (no check rows from then: the page must not walk them).
+    const sinStart = new Date(NOW.getTime() - 30 * 86_400_000).toISOString();
+    await must(
+      db
+        .from('monitor_status')
+        .upsert({
+          monitor_id: monitorId,
+          site_id: siteId,
+          last_round_at: minAgo(1),
+          status: 'ok',
+          slow_rounds: 0,
+          failing_since: {},
+          chain_since: { BKK: minAgo(600), SIN: sinStart },
+        })
+        .select('monitor_id'),
+    );
+    const data = await loadOverview(asAdmin, { ...admin, role: 'admin' }, NOW);
+    const ours = data.sites.find((s) => s.id === siteId);
+    expect(ours?.locations).toMatchObject({ BKK: 'chain', SIN: 'chain' });
+    expect(ours?.chainSince).toBe(sinStart);
   });
 });

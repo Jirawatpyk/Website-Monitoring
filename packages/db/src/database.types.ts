@@ -441,14 +441,14 @@ isOneToOne: false
                   ]
                 },"monitor_status": {
                   Row: {
-                    "blips": (string)[],"cause": string | null,"created_at": string,"failing_since": NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds": number,"status": Database["public"]['Enums']["site_state"],"trigger": Database["public"]['Enums']["incident_trigger"] | null,"updated_at": string
+                    "blips": (string)[],"cause": string | null,"chain_since": NonNullable<Json>,"created_at": string,"failing_since": NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds": number,"status": Database["public"]['Enums']["site_state"],"trigger": Database["public"]['Enums']["incident_trigger"] | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "blips"?: (string)[],"cause"?: string | null,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
+                    "blips"?: (string)[],"cause"?: string | null,"chain_since"?: NonNullable<Json>,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at": string,"monitor_id": string,"site_id": string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
                   }
                   Update: {
-                    "blips"?: (string)[],"cause"?: string | null,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at"?: string,"monitor_id"?: string,"site_id"?: string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
+                    "blips"?: (string)[],"cause"?: string | null,"chain_since"?: NonNullable<Json>,"created_at"?: string,"failing_since"?: NonNullable<Json>,"last_round_at"?: string,"monitor_id"?: string,"site_id"?: string,"slow_rounds"?: number,"status"?: Database["public"]['Enums']["site_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1131,6 +1131,7 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "blips": (string)[],
 "cause": string | null,
+"chain_since": NonNullable<Json>,
 "created_at": string,
 "failing_since": NonNullable<Json>,
 "last_round_at": string,

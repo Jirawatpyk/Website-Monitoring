@@ -797,6 +797,8 @@ interface CarryRow {
   failing_since: Json;
   /** D-050; absent before the migration reached this database. */
   blips?: string[] | null;
+  /** §21.4, D-029; absent before the chain_since migration reached this database. */
+  chain_since?: Json;
 }
 
 function carryOf(row: CarryRow | undefined): MonitorCarry {
@@ -812,6 +814,10 @@ function carryOf(row: CarryRow | undefined): MonitorCarry {
     slowRounds: row.slow_rounds,
     failingSince,
     blips: (row.blips ?? []).map((b) => new Date(b)).filter((b) => Number.isFinite(b.getTime())),
+    chainSince:
+      row.chain_since && typeof row.chain_since === 'object' && !Array.isArray(row.chain_since)
+        ? (row.chain_since as MonitorCarry['chainSince'])
+        : {},
   };
 }
 
@@ -825,6 +831,7 @@ function nextCarry(state: MonitorState | undefined, m: SiteMonitor, site: SiteRo
     slowRounds: state.slowRounds,
     failingSince: state.failingSince,
     blips: state.blips,
+    chainSince: state.chainSince,
   };
 }
 
@@ -847,6 +854,7 @@ function monitorsJson(d: Exclude<SiteDecision, { kind: 'wait' | 'verify' }>, sit
     slowRounds: m.slowRounds,
     failingSince: m.failingSince as Json,
     blips: m.blips.map((b) => b.toISOString()),
+    chainSince: m.chainSince as Json,
   }));
 }
 

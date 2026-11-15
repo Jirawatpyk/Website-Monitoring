@@ -156,6 +156,7 @@ describe('runEngine', () => {
                 TYO: at(1),
               },
               blips: [],
+              chainSince: {},
             },
           ],
           p_status: 'down',
@@ -234,6 +235,7 @@ describe('runEngine', () => {
           slowRounds: 0,
           failingSince: {},
           blips: [],
+          chainSince: {},
         },
       ],
       p_status: 'ok',
@@ -270,6 +272,7 @@ describe('runEngine', () => {
             slowRounds: 0,
             failingSince: {},
             blips: [],
+            chainSince: {},
           },
         ],
         // PRD §5: the site shows OK only after the second OK round.

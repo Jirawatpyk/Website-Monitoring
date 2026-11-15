@@ -4,7 +4,6 @@ import { shortCause } from '@dxt/notifier';
 import {
   CLOSED_INCIDENT_STATES_IN,
   defaultSlowMs,
-  TLS_CHAIN_ERRORS,
   TRIGGER_LABELS,
   type Role,
   type SiteStatus,
@@ -23,7 +22,7 @@ import {
   watchedSince,
 } from '@/features/sites/server';
 import {
-  chainStreakStart,
+  chainSinceOf,
   byHandOf,
   currentDrop,
   isEngineFault,
@@ -42,7 +41,6 @@ import {
   type OverviewData,
   type OverviewEvent,
   type OverviewIncident,
-  type OverviewLocation,
   type OverviewSite,
 } from './types';
 
@@ -234,7 +232,7 @@ export async function loadOverview(
     };
   });
 
-  await fillChainSince(db, rows, live, now);
+  await fillChainSince(db, rows, live);
   // Only Live issues draw the Response 24h line (§21.5; tiles show the p50): the other sites' 96 points
   // stay on the server (spec-check S06b, 200 monitors)
   for (const r of rows) {
@@ -405,56 +403,38 @@ async function personName(db: DbClient, userId: string): Promise<string | null> 
   return data?.google_chat_user_id ? data.display_name : null;
 }
 
-/** The chain error codes as a PostgREST `in` list, from the one list in `@dxt/shared` (D-029). */ const CHAIN_ERRORS = `(${TLS_CHAIN_ERRORS.join(',')})`;
-
 /**
- * When each TLS chain warning started (§21.4 Since for a location warning): per warned location of
- * the primary monitor, the last check that wasn't a chain error (within the 90 days kept), then the
- * first check after it. Two index reads per warned location (check_results_monitor_location_idx);
- * only sites with a warning are read, so this is usually nothing. Spec-check S06b: a shared 24 h,
- * 1,000-row read cut long streaks short.
+ * When each TLS chain warning started (§21.4 Since for a location warning): the start the engine
+ * carries per location (`monitor_status.chain_since`, D-029), one row per warned site's primary — no
+ * walk back through check_results, whose cost grew with the streak (cold-load follow-up, 15 Nov 2026).
+ * Only sites with a warning are read, so this is usually nothing. A database a deploy behind (no column
+ * yet, 42703 / PGRST204) shows no Since rather than failing the page.
  */
 async function fillChainSince(
   db: DbClient,
   rows: OverviewSite[],
   live: readonly { id: string; monitors: { id: string; is_primary: boolean }[] }[],
-  now: Date,
 ): Promise<void> {
   const monitorOf = new Map(live.map((s) => [s.id, s.monitors.find((m) => m.is_primary)?.id]));
-  const from = new Date(now.getTime() - 90 * DAY_MS).toISOString();
-  const streakStart = async (monitorId: string, location: OverviewLocation): Promise<string | null> => {
-    const lastGood = await db
-      .from('check_results')
-      .select('checked_at')
-      .eq('monitor_id', monitorId)
-      .eq('location', location)
-      .gte('checked_at', from)
-      .or(`outcome.neq.fail,error.is.null,error.not.in.${CHAIN_ERRORS}`)
-      .order('checked_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (lastGood.error) throw new Error(`check_results: ${lastGood.error.message}`);
-    const first = await db
-      .from('check_results')
-      .select('checked_at, outcome, error')
-      .eq('monitor_id', monitorId)
-      .eq('location', location)
-      .gt('checked_at', lastGood.data?.checked_at ?? from)
-      .order('checked_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (first.error) throw new Error(`check_results: ${first.error.message}`);
-    return first.data ? chainStreakStart([first.data]) : null;
-  };
-  await Promise.all(
-    rows.map(async (r) => {
-      const monitor = monitorOf.get(r.id);
-      const warned = OVERVIEW_LOCATIONS.filter((l) => r.locations[l] === 'chain');
-      if (!monitor || !warned.length) return;
-      const starts = await Promise.all(warned.map((l) => streakStart(monitor, l)));
-      r.chainSince = starts.filter((t): t is string => !!t).sort()[0] ?? null;
-    }),
-  );
+  const warned = rows.flatMap((r) => {
+    const monitor = monitorOf.get(r.id);
+    const locations = OVERVIEW_LOCATIONS.filter((l) => r.locations[l] === 'chain');
+    return monitor && locations.length ? [{ row: r, monitor, locations }] : [];
+  });
+  if (!warned.length) return;
+  const { data, error } = await db
+    .from('monitor_status')
+    .select('monitor_id, chain_since')
+    .in(
+      'monitor_id',
+      warned.map((w) => w.monitor),
+    );
+  if (error) {
+    if (error.code === '42703' || error.code === 'PGRST204') return;
+    throw new Error(`monitor_status: ${error.message}`);
+  }
+  const byMonitor = new Map((data ?? []).map((m) => [m.monitor_id, m.chain_since]));
+  for (const w of warned) w.row.chainSince = chainSinceOf(byMonitor.get(w.monitor), w.locations);
 }
 
 /** When a PROBLEM raised to DOWN became an outage (the `escalated_to_down` event's `downStartedAt`, D-021). */
