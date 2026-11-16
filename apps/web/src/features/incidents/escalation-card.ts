@@ -200,21 +200,36 @@ export function escalationCardOf(input: {
   // After a relapse days later a level of the first drop went on another day (spec §13, D-058).
   const now = input.now;
   const hhmm = (d: Date) => (now && !isSameBangkokDay(d, now) ? formatWhen(d, now) : formatTime(d));
+  // A Tier 2–3 incident confirmed outside response hours (D-034, D-065). A DOWN posts at once and its
+  // timers wait for the opening; a PROBLEM's first card itself waits for the opening (`holdFor`). Not an
+  // incident a mute held (`alertedAt`, D-036): its first alert went when the mute ended.
+  const detected = new Date(input.detectedAt);
+  const night = input.tier >= 2 && !input.alertedAt && !isInsideHours(detected, input.hours);
+  const opening = night ? nextOpening(detected, input.hours) : null;
+  const heldProblem = opening && plan.severity === 'problem' ? opening : null;
   const rows = steps.map((s): LadderRow => {
-    const sent = s.level === 0 ? { at: start.toISOString(), sentBy: null } : sentAt.get(s.level);
+    const l0At = heldProblem ?? start;
+    const sent = s.level === 0 ? { at: l0At.toISOString(), sentBy: null } : sentAt.get(s.level);
     // L0 went with the first alert. A level whose minute an earlier drop reached shows when it went
     // (D-058: the schedule would say the relapse); otherwise the schedule, even when sent early by hand.
     const at =
-      s.level === 0 ? start : sent && s.delayMin <= clock.carriedMin ? new Date(sent.at) : due.get(s.level)!;
+      s.level === 0 ? l0At : sent && s.delayMin <= clock.carriedMin ? new Date(sent.at) : due.get(s.level)!;
     const when = s.level === 0 ? `0 min · ${hhmm(at)}` : `+${s.delayMin} min · ${hhmm(at)}`;
-    // §37.6: a Tier 2–3 incident confirmed outside response hours — the Space had it at once and the
-    // timers wait for the opening (D-034). Not an incident a mute held (`alertedAt`, D-036): it posted nothing.
-    const detected = new Date(input.detectedAt);
     const held =
-      s.level === 0 && input.tier >= 2 && !input.alertedAt && !isInsideHours(detected, input.hours)
-        ? ` · posted to the Space at ${formatTime(detected)}, outside response hours — timers paused until ${laterWord(nextOpening(detected, input.hours), detected)}`
-        : '';
+      s.level !== 0 || !opening
+        ? ''
+        : heldProblem
+          ? ` · held until ${laterWord(opening, detected)}, outside response hours`
+          : ` · posted to the Space at ${formatTime(detected)}, outside response hours — timers paused until ${laterWord(opening, detected)}`;
     const who = `${whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'))}${held}`;
+    if (s.level === 0 && heldProblem && now && now < heldProblem)
+      return {
+        label: 'L0',
+        when,
+        who,
+        status: `Held until ${laterWord(heldProblem, detected)}`,
+        tone: 'waits',
+      };
     if (sent || (s.level > 0 && s.level <= input.level)) {
       const t = sent ? hhmm(new Date(sent.at)) : null;
       return {
@@ -308,11 +323,11 @@ export function escalationCardOf(input: {
           : waiting && next && nextAt && byHand && !input.engine.stopped
             ? `Running again · next at ${nextWord(nextAt)}`
             : waiting && next && nextAt
-              ? `${next.targets.includes('ceo') ? 'CEO step' : `L${next.level}`} at ${nextWord(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
+              ? `${next.targets.includes('ceo') && !next.fyi ? 'CEO step' : `L${next.level}${next.fyi ? ' FYI' : ''}`} at ${nextWord(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
               : waiting
                 ? 'No more levels'
                 : input.problemSince
-                  ? `Home page back ${input.problemSince} — DOWN levels wait while it still fails`
+                  ? `DOWN levels wait · home page back ${input.problemSince}`
                   : 'Recovered — nothing more is sent',
       };
   return {

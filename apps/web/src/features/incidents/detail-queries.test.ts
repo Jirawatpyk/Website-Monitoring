@@ -5,8 +5,23 @@ vi.mock('@/server/db', () => ({ serviceDb: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/lib/auth/session', () => ({ getAccess: vi.fn() }));
 
-const { ackInHoursOf, downTriggerOf, incidentAccept, keyPageRows, locationsOf } =
+const { ackInHoursOf, newestInOrder, downTriggerOf, incidentAccept, keyPageRows, locationsOf } =
   await import('./detail-queries');
+
+describe('newestInOrder (the capped timeline, engine-reviewer M1)', () => {
+  it('past the cap keeps the newest rows — the ok_two_rounds after 5,000 fillers — in time order', async () => {
+    // 6,000 rows, oldest first; the last is the ok_two_rounds that unlocks Resolve.
+    const all = Array.from({ length: 6000 }, (_, n) => ({ n, type: n === 5999 ? 'ok_two_rounds' : 'note' }));
+    const desc = [...all].reverse();
+    const rows = await newestInOrder<(typeof all)[number]>(
+      async (from, to) => ({ data: desc.slice(from, to + 1), error: null }),
+      5000,
+    );
+    expect(rows).toHaveLength(5000);
+    expect(rows.at(-1)).toEqual({ n: 5999, type: 'ok_two_rounds' });
+    expect(rows[0]!.n).toBe(1000);
+  });
+});
 
 describe('ackInHoursOf (§37 ACKNOWLEDGED caption, D-034)', () => {
   const HOURS = { startMin: 540, endMin: 1080, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };

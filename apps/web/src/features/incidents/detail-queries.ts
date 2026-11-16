@@ -126,6 +126,8 @@ export interface IncidentDetail {
   /** The viewer is the site's owner (by id: two people may share a display name). */
   youOwn: boolean;
   backup: string | null;
+  /** The site's client is DxT itself (no client to tell): "internal site" beside the owner (§37). */
+  internal?: boolean;
   am: string | null;
   /**
    * The person L0 paged on call (S10, §28.6): set when a Tier 1 incident opened outside response hours
@@ -259,6 +261,18 @@ export function locationsOf(
       },
     ];
   });
+}
+
+/**
+ * Up to `max` of the newest rows, in time order. `page` must answer newest first, so a cut drops the
+ * oldest rows: the resolve gate, the root cause and the timeline's end always come from the newest
+ * (engine-reviewer M1, a long flapping incident).
+ */
+export async function newestInOrder<T>(
+  page: Parameters<typeof fetchAllPages<T>>[0],
+  max: number,
+): Promise<T[]> {
+  return (await fetchAllPages<T>(page, { max })).reverse();
 }
 
 /** Minutes into response hours the ack came (≥ 1), or null when the rule doesn't apply (see the caller). */
@@ -448,20 +462,18 @@ export async function loadIncident(
   // can_ack's on-call branch (S10, D-048): a Responder holding the shift acts on any Tier 1 incident.
   const askShift = viewer.role === 'responder' && i.sites.tier === 1;
   const [events, ladderEvents, around, latest, onCall, engineRun, admins, hours] = await Promise.all([
-    fetchAllPages<EventRow>(
+    newestInOrder<EventRow>(
       (from, to) =>
         db
           .from('incident_events')
           .select('type, at, actor_id, payload')
           .eq('incident_id', incidentId)
-          // newest first, so a cut drops the oldest rows: the gate, the root cause and the timeline's
-          // end always come from the newest (engine-reviewer M1); reversed back to time order below
           .order('at', { ascending: false })
           .order('id', { ascending: false })
           .range(from, to)
           .overrideTypes<EventRow[], { merge: false }>(),
-      { max: MAX_EVENTS },
-    ).then((rows) => rows.reverse()),
+      MAX_EVENTS,
+    ),
     // The drops and the ladder from their own read: a few rows per drop, never cut by the timeline's cap.
     fetchAllPages<EventRow>(
       (from, to) =>
@@ -732,6 +744,7 @@ export async function loadIncident(
     owner: i.sites.primary_owner_id ? nameOf(i.sites.primary_owner_id) : null,
     youOwn: !!i.sites.primary_owner_id && i.sites.primary_owner_id === viewer.id,
     backup: i.sites.backup_owner_id ? nameOf(i.sites.backup_owner_id) : null,
+    internal: !!i.sites.clients?.is_internal,
     am: am ? nameOf(am) : null,
     paged:
       i.l0_user_id && i.l0_user_id !== i.sites.primary_owner_id
@@ -1031,15 +1044,15 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
         rootCauseFix: r.root_cause_fix,
         drops: dropsOf(r),
       };
+      const events = (dropEvents.get(r.id) ?? []).map((e) => ({
+        ...e,
+        payload: (e.payload ?? {}) as Record<string, unknown>,
+      }));
+      const stillFailing = listStillFailing(row, events);
       return {
         ...row,
-        stillFailing: listStillFailing(
-          row,
-          (dropEvents.get(r.id) ?? []).map((e) => ({
-            ...e,
-            payload: (e.payload ?? {}) as Record<string, unknown>,
-          })),
-        ),
+        // "was …" names the DOWN's own cause, as the page's meta line (INC-0003: "TLS chain · was Browser")
+        stillFailing: stillFailing && { ...stillFailing, downTrigger: downTriggerOf(r.trigger, events) },
       };
     }),
     sites: sites.data ?? [],

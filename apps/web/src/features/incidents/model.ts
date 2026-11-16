@@ -83,6 +83,8 @@ export interface ListStillFailing {
   trigger: string;
   /** "404", "TLS chain misconfigured" — what still fails, short. */
   failure: string | null;
+  /** What made it DOWN ("Browser", "Hard fail"); the incident's own trigger when not known. */
+  downTrigger?: string;
 }
 
 export type DesktopView = 'needs_action' | 'done' | 'all';
@@ -334,7 +336,11 @@ export interface StillFailingHeader {
 /** The trigger as the list writes it: "Hard fail", "Slow, flapped"; §37.9 "Key page · was Hard fail". */
 export function triggerWords(i: Pick<ListIncident, 'trigger' | 'isFlapping' | 'stillFailing'>): string {
   const own = `${TRIGGER_LABELS[i.trigger]}${i.isFlapping ? ', flapped' : ''}`;
-  return i.stillFailing ? `${i.stillFailing.trigger} · was ${own}` : own;
+  if (!i.stillFailing) return own;
+  const was = i.stillFailing.downTrigger
+    ? `${i.stillFailing.downTrigger}${i.isFlapping ? ', flapped' : ''}`
+    : own;
+  return `${i.stillFailing.trigger} · was ${was}`;
 }
 
 /**

@@ -491,6 +491,7 @@ export function IncidentDetailView({
               d.paged ? null : d.owner ? `Owner ${d.owner}${d.youOwn ? ' (you)' : ''}` : 'No owner set',
               d.backup ? `backup ${d.backup}` : null,
               d.am ? `AM ${d.am}` : null,
+              d.internal ? 'internal site' : null,
             ]
               .filter(Boolean)
               .join(' · ')}

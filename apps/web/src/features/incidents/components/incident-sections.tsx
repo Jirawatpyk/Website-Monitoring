@@ -138,7 +138,11 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           label: 'OWNER',
           value: d.owner ?? 'No owner set',
           caption:
-            [d.backup ? `Backup ${d.backup}` : null, d.am ? `AM ${d.am}` : null]
+            [
+              d.backup ? `Backup ${d.backup}` : null,
+              d.am ? `AM ${d.am}` : null,
+              d.internal ? 'internal site' : null,
+            ]
               .filter(Boolean)
               .join(' · ') || ' ',
         },

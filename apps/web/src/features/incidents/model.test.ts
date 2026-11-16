@@ -779,6 +779,14 @@ describe('the Incidents list on a partial recovery (§37.9, INC-0140)', () => {
   it('Trigger "Key page · was Hard fail"; Next "Home page back 09:35 · /booking 404" (phone: still failing)', () => {
     const row = { ...voca, stillFailing: listStillFailing(voca, [relapsed]) };
     expect(triggerWords(row)).toBe('Key page · was Hard fail');
+    // INC-0003's shape: opened as a TLS-chain PROBLEM, the browser raised it — the DOWN's own cause.
+    expect(
+      triggerWords({
+        ...row,
+        trigger: 'tls_chain',
+        stillFailing: { ...row.stillFailing!, trigger: 'TLS chain', downTrigger: 'Browser' },
+      }),
+    ).toBe('TLS chain · was Browser');
     expect(nextLine(row, NOW)).toEqual({ text: 'Home page back 09:35 · /booking 404', tone: 'warning' });
     expect(nextLine(row, NOW, true).text).toBe('Home page back 09:35 · /booking still failing');
   });

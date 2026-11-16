@@ -174,7 +174,7 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
       problemSince: '02:40',
       now: new Date(at('02:50')),
     })!;
-    expect(card.fact.caption).toBe('Home page back 02:40 — DOWN levels wait while it still fails');
+    expect(card.fact.caption).toBe('DOWN levels wait · home page back 02:40');
     expect(card.rows[1]!.status).toBe('Not sent · home page back 02:40');
   });
 
@@ -195,10 +195,39 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
     const tao = { ...base, people: { ...base.people, backup: 'Tao' } };
     expect(escalationCardOf(tao)!.rows[1]!.who).toBe('Tao (backup, Admin)');
     // INC-0140 (§37): Tier 2, confirmed Thu 24 Sep 23:42 — the Space had it at once, the timers waited.
-    const held = escalationCardOf({ ...base, tier: 2, detectedAt: '2026-09-24T23:42:08+07:00' })!;
-    expect(held.rows[0]!.who).toBe(
-      'Ploy (on call) + Alerts Space · posted to the Space at 23:42, outside response hours — timers paused until 09:00',
-    );
+    const held = escalationCardOf({
+      ...base,
+      tier: 2,
+      detectedAt: '2026-09-24T23:42:08+07:00',
+      now: new Date('2026-09-25T10:07:00+07:00'),
+    })!;
+    // The DOWN's L0 went with the first card at 23:42 (D-065: a DOWN is never held; the board's "09:00" isn't)
+    expect(held.rows[0]).toEqual({
+      label: 'L0',
+      when: '0 min · Yesterday 23:42',
+      who: 'Ploy (on call) + Alerts Space · posted to the Space at 23:42, outside response hours — timers paused until 09:00',
+      status: 'Sent Yesterday 23:42',
+      tone: 'sent',
+    });
+    // A Tier 2–3 PROBLEM at night: the first card itself waits for the opening (D-034 `holdFor`).
+    const problem = { ...PLAN, severity: 'problem' as const, tier: 2 as const };
+    const heldProblem = (now: string) =>
+      escalationCardOf({
+        ...base,
+        plan: problem,
+        tier: 2,
+        severity: 'problem',
+        detectedAt: '2026-09-24T23:42:08+07:00',
+        now: new Date(now),
+      })!.rows[0]!;
+    expect(heldProblem('2026-09-25T02:00:00+07:00')).toEqual({
+      label: 'L0',
+      when: '0 min · 09:00',
+      who: 'Ploy (on call) + Alerts Space · held until 09:00, outside response hours',
+      status: 'Held until 09:00',
+      tone: 'waits',
+    });
+    expect(heldProblem('2026-09-25T10:00:00+07:00').status).toBe('Sent 09:00');
     // Sat 02:31: the next opening is Monday's, so it carries its weekday.
     expect(escalationCardOf({ ...base, tier: 2 })!.rows[0]!.who).toBe(
       'Ploy (on call) + Alerts Space · posted to the Space at 02:31, outside response hours — timers paused until Mon 09:00',

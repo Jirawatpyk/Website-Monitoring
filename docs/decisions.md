@@ -4,6 +4,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-065 | 16 Nov 2026 | The Incident page's L0 row for a Tier 2–3 incident confirmed outside response hours follows what the engine does (D-034): a DOWN's first card went at the confirm ("0 min · 23:42 · Sent 23:42 · posted to the Space at 23:42, outside response hours — timers paused until 09:00"); a PROBLEM's first card waited for the opening ("Held until 09:00", then "Sent 09:00"); an incident a mute held says neither (D-036). The ACKNOWLEDGED caption counts response-hours minutes from the confirm ("6 min into response hours"); an ack before the opening keeps its own words | Spec §37.6 "L0 at 09:00 held from 23:42" and the Incident / MIncident §37 L0 row "0 min · 09:00 · Sent 09:00" for a DOWN |
 | D-064 | 16 Nov 2026 | A DOWN whose home page is back while a key page or the certificate chain still fails reads as a PROBLEM on every page (title by what still fails, Problem badge, two facts DOWN FOR and PROBLEM SINCE, the failing key page in Evidence); its record stays DOWN and its minutes are the DOWN ones (D-033) | Incident / MIncident / Incidents boards before §37; the incident pages reading the record severity |
 | D-063 | 16 Nov 2026 | The CEO's weekly email gets its own layout (WeeklyEmail board, §36): figures first, badges that carry their word, two lines per incident, dark and phone; the Chat card stays as drawn. UPTIME BY SITE keeps judging each site over 30 days (D-059), not the board's weekly budget | WeeklySummary "the email body is this card"; §36.8 "below its weekly target" |
 | D-062 | 14 Nov 2026 | S16 Users & access: three PRs (schema, Users, Security + Profile); the allowlist row is the invite (no link, expiry or resend); inviting a deactivated address gives their access back; deactivate = reassign, inactive profile, no allowlist row, banned, sessions deleted; a role change or deactivation can't save while a site, client, rotation place, shift or open swap still needs a new person, and never removes the last active Admin; losing the last CEO warns only; a Site AM may be an Admin, Responder or Stakeholder; the Chat id is edited by the person or an Admin; signing out deletes the sessions and the app refuses a token whose session is gone; the audit log keeps company addresses only and never Chat id digits; the phone Users / Security and the role-change email wait for boards | Users / Security / Profile boards: 2-step column, lock and rollout, invite link and expiry, Resend invite, session-length and re-auth selects, "CEO steps go to", device location, the test's delivery times |
@@ -68,6 +69,20 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-065 — The night-time L0 row on the Incident page
+
+**Conflict.** Spec §37.6 and the §37 boards draw a Tier 2 DOWN's L0 at 09:00 ("held from 23:42", "Sent 09:00"). D-034 holds only a Tier 2–3 PROBLEM outside response hours; a DOWN posts its first card at once and its escalation timers wait for the opening (ChatAlert "Tier 2 DOWN outside hours": "timers paused until 09:00"). The page's first build also read `incidents.alerted_at`, which only the after-mute alert writes, so the line never showed (engine-reviewer H1, 16 Nov).
+
+**Decision (16 Nov 2026, Claude's recommendation under Tao's standing "pick the recommended option").** The page says what happened: D-034 stands and the boards' 09:00 L0 time for a DOWN is not followed.
+- DOWN: L0 "0 min · 23:42", "Sent 23:42", with "posted to the Space at 23:42, outside response hours — timers paused until 09:00" (a weekday when the opening is more than a day later: "Mon 09:00").
+- PROBLEM: L0 at the opening, "Held until 09:00" until then, with "held until 09:00, outside response hours".
+- An incident a mute held (`alerted_at` set, D-036) gets neither line.
+- ACKNOWLEDGED: "09:06 · 6 min into response hours" counts from the confirm; 0 minutes (an ack before 09:00, INC-0133) keeps "acknowledged 08:04".
+
+**Why.** An outage at night must reach the Space at once; holding a DOWN until 09:00 would be an engine change against D-034 for a wording difference. The page must not claim a 09:00 send that never happened.
+
+**Impact.** `features/incidents` `escalation-card.ts` and `ackInHoursOf` (`detail-queries.ts`), with table tests from INC-0140 and INC-0133. No engine or notifier change.
 
 ## D-064 — An incident whose home page came back but something still fails
 
