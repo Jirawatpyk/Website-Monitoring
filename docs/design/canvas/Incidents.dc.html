@@ -17,7 +17,7 @@ body{margin:0;background:#fafafa}
 a{color:#6d28d9}a:hover{color:#5b21b6}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1100px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 1100px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -40,6 +40,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </aside>
 
 <main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+<div style="position: absolute; top: 10px; right: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)"><span style="font-family: var(--font-mono)">STATE</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{cases}}" value="{{caseV}}" on-change="{{setCase}}" size="sm"></x-import></div>
 
 <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
 <div style="display: flex; flex-direction: column; gap: 4px">
@@ -51,7 +52,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </div>
 
 <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px">
-<x-import component-from-global-scope="Aura.Stat" label="Open" value="3" icon="bell" caption="1 DOWN · 1 PROBLEM · 1 needs root cause"></x-import>
+<x-import component-from-global-scope="Aura.Stat" label="Open" value="{{openN}}" icon="bell" caption="{{openCap}}"></x-import>
 <x-import component-from-global-scope="Aura.Stat" label="Escalated, not acked" value="1" icon="arrow-up-right" caption="MuvMi · L1 · 18 min unacked"></x-import>
 <x-import component-from-global-scope="Aura.Stat" label="Needs root cause" value="1" icon="pencil" caption="ORCA Thailand · recovered, not resolved"></x-import>
 <x-import component-from-global-scope="Aura.Stat" label="MTTA · 30d" value="6 min 40 s" icon="check" caption="DOWN only · median · target ≤ 15 min"></x-import>
@@ -119,7 +120,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { view: 'Needs action', sev: 'all', site: 'all', period: '30', exported: false };
+    this.state = { caseV: 'As drawn', view: 'Needs action', sev: 'all', site: 'all', period: '30', exported: false };
   }
   renderVals() {
     var self = this;
@@ -139,10 +140,11 @@ class Component extends DCLogic {
       'Resolved': ['success', 'outline', 'circle-check'],
       'Closed': ['neutral', 'soft', 'check']
     };
-    var TRIG = { hard_fail: 'Hard fail', slow: 'Slow', blocked_unverified: 'Blocked, not verified', ssl: 'SSL expiring', regional: 'Regional (SIN)', keyword: 'Keyword' };
+    var TRIG = { keypage: 'Key page', hard_fail: 'Hard fail', slow: 'Slow', blocked_unverified: 'Blocked, not verified', ssl: 'SSL expiring', regional: 'Regional (SIN)', keyword: 'Keyword' };
     var data = [
       ['INC-0142', 'MuvMi', 'down', 'hard_fail', 'Escalated · L1', 'Today 09:48', '19 min', 'Arm', '18 min unacked · CEO 10:18', 'danger', false, 'open'],
       ['INC-0141', 'Fuji Links', 'problem', 'slow', 'Acknowledged', 'Today 09:52', '15 min', 'Ploy', 'Acked by Ploy 09:58', 'muted', false, 'open'],
+      ['INC-0140', 'VOCA', 'problem', 'keypage', 'Acknowledged', 'Yesterday 23:41', '9 h 54 min', 'Ploy', 'Home page back 09:35 · /booking 404', 'warning', false, 'open'],
       ['INC-0139', 'ORCA Thailand', 'wasdown', 'hard_fail', 'Needs root cause', 'Yesterday 22:14', '8 min', 'Tao', 'Recovered on its own 22:22', 'warning', false, 'rc'],
       ['INC-0133', 'VOCA', 'wasdown', 'hard_fail', 'In review', 'Mon 21 Sep 03:12', '41 min', 'Ploy', 'Waiting for Tao’s sign-off', 'warning', true, 'review'],
       ['INC-0138', 'Tubtong', 'wasproblem', 'blocked_unverified', 'Resolved', 'Yesterday 14:02', '12 min', 'Ploy', 'Verifier restarted', 'muted', false, 'done'],
@@ -154,8 +156,9 @@ class Component extends DCLogic {
       ['INC-0120', 'MuvMi', 'wasdown', 'hard_fail', 'Closed', 'Tue 8 Sep 19:30', '47 min', 'Arm', 'Review signed off', 'muted', false, 'done'],
       ['INC-0118', 'Bangkok Airways – Taiwan', 'wasdown', 'hard_fail', 'Closed', 'Wed 2 Sep 03:40', '11 min', 'Arm', 'Server fault · signed off', 'muted', false, 'done']
     ];
+    if (this.state.caseV !== 'Home page back · /booking still failing') data = data.filter(function (d) { return d[0] !== 'INC-0140'; });
     var colors = { danger: 'var(--aura-fg-danger)', warning: 'var(--aura-alert-warning-fg)', muted: 'var(--aura-fg-secondary)' };
-    var DAY = { 'INC-0142': 25, 'INC-0141': 25, 'INC-0139': 24, 'INC-0133': 21, 'INC-0138': 24, 'INC-0136': 23, 'INC-0131': 14, 'INC-0129': 12, 'INC-0126': 11, 'INC-0124': 10, 'INC-0120': 8, 'INC-0118': 2 };
+    var DAY = { 'INC-0140': 24, 'INC-0142': 25, 'INC-0141': 25, 'INC-0139': 24, 'INC-0133': 21, 'INC-0138': 24, 'INC-0136': 23, 'INC-0131': 14, 'INC-0129': 12, 'INC-0126': 11, 'INC-0124': 10, 'INC-0120': 8, 'INC-0118': 2 };
     var view = this.state.view;
     var fsev = this.state.sev, fsite = this.state.site, fper = this.state.period;
     var needs = data.filter(function (d) { return d[11] !== 'done'; }).length;
@@ -176,7 +179,7 @@ class Component extends DCLogic {
       var st = ST[d[4]];
       return {
         id: d[0], site: d[1], sev: s.sev, sevTone: s.sevTone, sevVariant: s.sevVariant, sevIcon: s.sevIcon,
-        trigger: TRIG[d[3]] + (d[10] ? ', flapped ×4' : ''), state: d[4], stTone: st[0], stVariant: st[1], stIcon: st[2], started: d[5], dur: d[6], owner: d[7],
+        trigger: TRIG[d[3]] + (d[10] ? ', flapped ×4' : '') + (d[0] === 'INC-0140' ? ' · was Hard fail' : ''), state: d[4], stTone: st[0], stVariant: st[1], stIcon: st[2], started: d[5], dur: d[6], owner: d[7],
         next: d[8], nextColor: colors[d[9]], flapping: d[10],
         href: d[0] === 'INC-0133' ? 'PostIncident.dc.html' : (d[0] === 'INC-0139' ? 'Resolve.dc.html' : 'Incident.dc.html'),
         rowBg: (d[4] === 'Unacked' || d[4] === 'Escalated · L1') ? 'var(--aura-alert-danger-bg)' : 'var(--aura-bg-surface)'
@@ -203,10 +206,12 @@ class Component extends DCLogic {
       doExport: function () { self.setState({ exported: true }); },
       hiddenNote: key === 'Needs action' ? '' : rows.length + ' shown · 13 short PROBLEMs auto-resolved in < 5 min — never acknowledged — are hidden.',
       rows: rows,
+      cases: ['As drawn', 'Home page back · /booking still failing'], caseV: this.state.caseV, setCase: function (v) { self.setState({ caseV: v }); },
+      openN: String(open), openCap: open === 4 ? '1 DOWN · 2 PROBLEM (1 after a DOWN) · 1 needs root cause' : '1 DOWN · 1 PROBLEM · 1 needs root cause',
       nav: [
         { items: [
           { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
-          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: open, href: 'Incidents.dc.html' },
           { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
           { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
         ] },

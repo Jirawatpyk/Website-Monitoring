@@ -95,7 +95,8 @@ export function reportIncident(
   now: Date,
   inside: (at: Date) => boolean,
 ): ReportIncident | null {
-  const all = episodesFromTimeline(row, row.events).filter((e) => e.start < to && (e.end ?? now) > from);
+  const timeline = episodesFromTimeline(row, row.events);
+  const all = timeline.filter((e) => e.start < to && (e.end ?? now) > from);
   if (!all.length) return null;
   const severity: 'down' | 'problem' = all.some((e) => e.severity === 'down') ? 'down' : 'problem';
   const drops = all
@@ -103,6 +104,14 @@ export function reportIncident(
     .sort((a, b) => a.start.getTime() - b.start.getTime());
   const first = drops[0]!;
   const last = drops.at(-1)!;
+  // §19.7 / D-023: the home page came back but something still fails — the DOWN minutes stand, and the
+  // PROBLEM drop still open keeps it from reading as recovered — even one opened after the period ended
+  // (Monday 05:00 before the 09:00 weekly), so the newest drop of the whole timeline.
+  const open = timeline.at(-1)!;
+  const stillProblem =
+    severity === 'down' && open.severity === 'problem' && open.end === null
+      ? causeOf(row, 'problem', open.start)
+      : null;
   return {
     site: row.site.name,
     number: row.number,
@@ -111,7 +120,9 @@ export function reportIncident(
     startedBefore: first.start < from,
     minutes: drops.reduce((sum, e) => sum + clipMinutes(e, from, to, now), 0),
     drops: drops.length,
-    failing: last.end === null,
+    // As of the report (09:00), not the period's midnight: DOWN AGAIN after `to` is still down (engine review).
+    failing: last.end === null || (open.end === null && open.severity === 'down'),
+    stillProblem,
     cause: causeOf(row, severity, first.start),
     outsideHours: !inside(first.start),
     rootCause: rootCauseOf(row),

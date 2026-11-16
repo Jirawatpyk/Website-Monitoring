@@ -62,6 +62,9 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     trigger: 'hard_fail',
     triggerLabel: 'Hard fail',
     severity: 'down',
+    nowSeverity: 'down',
+    nowSince: at('24T22:14:00'),
+    stillFailing: null,
     escalationLevel: 0,
     startedAt: at('24T22:14:00'),
     detectedAt: at('24T22:14:30'),
@@ -132,6 +135,92 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     expect(
       screen.getAllByText('Resolve locked · 1 of 3 met — ORCA Thailand is still down').length,
     ).toBeGreaterThan(0);
+  });
+
+  it('home page back, /booking still failing: the §37 page (D-064)', () => {
+    // INC-0140 VOCA (the §37 board sample): DOWN Thu 23:41 → home page back Fri 09:35, /booking 404.
+    const cell = (text: string, glyph: 'pass' | 'fail') => ({ text, glyph });
+    show(
+      detail({
+        state: 'acknowledged',
+        recoveredAt: null,
+        startedAt: at('24T23:41:36'),
+        detectedAt: at('24T23:42:08'),
+        durationMinutes: 594,
+        nowSeverity: 'problem',
+        nowSince: at('25T09:35:20'),
+        stillFailing: {
+          what: '/booking',
+          path: '/booking',
+          trigger: 'Key page',
+          downTrigger: 'Hard fail',
+          since: at('25T09:35:20'),
+          downFrom: at('24T23:41:36'),
+          downTo: at('25T09:35:20'),
+          keyPage: {
+            path: '/booking',
+            rows: (['BKK', 'SIN', 'TYO'] as const).map((location) => ({
+              location,
+              home: cell('HTTP 200 · 0.9 s', 'pass'),
+              first: cell('HTTP 404 · 0.4 s', 'fail'),
+              latest: cell('HTTP 404 · 0.4 s', 'fail'),
+            })),
+          },
+        },
+      }),
+    );
+    // What it is now: a PROBLEM, triggered by the key page; the DOWN's trigger goes to the meta line.
+    expect(screen.getAllByText('Problem').length).toBeGreaterThan(0);
+    expect(screen.getByText('Trigger: Key page')).toBeInTheDocument();
+    expect(
+      screen.getByText(/· home page back 09:35 · down from Thu 23:41 \(Hard fail\)$/),
+    ).toBeInTheDocument();
+    // Two facts: the DOWN that is over (its minutes, D-033), the PROBLEM that is open.
+    expect(screen.getByText('DOWN FOR')).toBeInTheDocument();
+    expect(screen.getAllByText('9 h 54 min').length).toBeGreaterThan(0);
+    expect(screen.getByText('Thu 23:41 → 09:35 · counts in uptime')).toBeInTheDocument();
+    expect(screen.getByText('PROBLEM SINCE')).toBeInTheDocument();
+    expect(screen.getByText('33 min · /booking still failing')).toBeInTheDocument();
+    expect(screen.queryByText('Still down')).not.toBeInTheDocument();
+    // Phone: the open PROBLEM first, then the DOWN that is over.
+    expect(screen.getByText('Problem since 09:35 · 33 min')).toBeInTheDocument();
+    expect(
+      screen.getByText('Home page back 09:35 · was down 9 h 54 min (Thu 23:41 → 09:35)'),
+    ).toBeInTheDocument();
+    // Evidence: the failing key page beside the home page, never "OK" under a PROBLEM.
+    expect(screen.getByText('/booking · first fail 09:35:20')).toBeInTheDocument();
+    expect(screen.getByText('Home page OK · /booking still failing.')).toBeInTheDocument();
+  });
+
+  it('the home page answers but its certificate chain still fails: no DOWN verdict under a PROBLEM (§37 M6)', () => {
+    const chain = { text: 'TLS chain misconfigured', glyph: 'chain' as const };
+    const d = detail({
+      state: 'acknowledged',
+      recoveredAt: null,
+      nowSeverity: 'problem',
+      nowSince: at('25T09:35:20'),
+      locations: (['BKK', 'SIN', 'TYO'] as const).map((location) => ({
+        location,
+        first: { text: 'Timeout > 30 s', glyph: 'fail' as const },
+        recheck: null,
+        latest: { ...chain, at: at('25T10:06:40') },
+      })),
+      stillFailing: {
+        what: 'TLS chain misconfigured',
+        path: null,
+        trigger: 'TLS chain',
+        downTrigger: 'Hard fail',
+        since: at('25T09:35:20'),
+        downFrom: at('24T23:41:36'),
+        downTo: at('25T09:35:20'),
+        keyPage: null,
+      },
+    });
+    expect(incidentSections(d, new Date(NOW)).evidenceSummary).toBe(
+      'Home page answers at 3 of 3 · TLS chain error at 3 of 3 → PROBLEM (TLS chain)',
+    );
+    show(d);
+    expect(screen.getByText('Home page answers · TLS chain misconfigured.')).toBeInTheDocument();
   });
 
   it('Needs root cause: Resolve opens the dialog; "Resolve incident" waits for a category and what happened', () => {

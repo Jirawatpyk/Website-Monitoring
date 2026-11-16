@@ -1,6 +1,6 @@
 # Screen map — canvas board → route → rules
 
-The index `/implement-screen` reads. One row per canvas board (56). The board file is in `docs/design/canvas/`; open the [live canvas](https://claude.ai/artifact/Sqa6gYe5eGqTQtBFmjbyMW) in Play mode to click through flows.
+The index `/implement-screen` reads. One row per canvas board (59). The board file is in `docs/design/canvas/`; open the [live canvas](https://claude.ai/artifact/Sqa6gYe5eGqTQtBFmjbyMW) in Play mode to click through flows.
 
 - **Phase** follows PRD §6 priority: `P0` = MVP (Phase 1), `P1` = team go-live (Phase 2), `P2` = client-facing (Phase 3). **Slice** is the slice in [`../implementation-plan.md`](../implementation-plan.md) that builds the board; work in slice order.
 - **Spec** = sections of `docs/dxt-monitor-design-spec.md` that govern the screen. §11 (badges), §13 (copy & formats) and §14.15–17 (eyebrows, no dead controls, 44 px tap targets) apply to every screen and are not repeated below.
@@ -28,13 +28,15 @@ The index `/implement-screen` reads. One row per canvas board (56). The board fi
 | EditMonitors | Edit monitors | `/sites/[siteId]/monitors` | P0 | S05 | §6 | FR-01 |
 | Incidents | Incidents list | `/incidents` | P0 | S07 | §4, §11, §16.1 | FR-06 |
 | MIncidents | Mobile — Incidents | `/incidents` (390) | P0 | S07 | §17 | FR-06 |
-| Incident | Incident — INC-0142 MuvMi DOWN | `/incidents/[incidentId]` | P0 | S07 | §8, §9, §14.1, §14.3, §15.4, §16.2–3, §28.6 (S10: who was paged on call), §30.5–8 (S12b: CASE manual incident, Escalate now), §31.7 (the hand-check timeline lines) | FR-06, FR-20 |
-| MIncident | Mobile — Incident detail | `/incidents/[incidentId]` (390) | P0 | S07 | §15.6, §17, §30.5–8, §31.7 (S12b) | FR-06 |
+| Incident | Incident — INC-0142 MuvMi DOWN | `/incidents/[incidentId]` | P0 | S07 | §8, §9, §14.1, §14.3, §15.4, §16.2–3, §28.6 (S10: who was paged on call), §30.5–8 (S12b: CASE manual incident, Escalate now), §31.7 (the hand-check timeline lines), §37 (CASE home page back, a key page still failing) | FR-06, FR-20 |
+| MIncident | Mobile — Incident detail | `/incidents/[incidentId]` (390) | P0 | S07 | §15.6, §17, §30.5–8, §31.7 (S12b), §37 | FR-06 |
 | IncidentPageChange | Incident — page change (INC-0157 example) | `/incidents/[incidentId]` (trigger Page change) | P1 | S09d | §16.2–3, §26 | — (PRD §2 content-change, D-041) |
 | MIncidentPageChange | Mobile — Incident: page change | `/incidents/[incidentId]` (390, trigger Page change) | P1 | S09d | §17, §26 | — |
 | IncidentPageChange820 | Incident — page change · 820 px | `/incidents/[incidentId]` (820) | P1 | S09d | §26.10 | — |
 | IncidentPageChangeDark | Incident — page change · dark | same, dark theme | P1 | S09d | §26.10 | — |
 | MIncidentPageChangeDark | Mobile — Incident: page change · dark | same (390), dark theme | P1 | S09d | §26.10 | — |
+| IncidentDark | Incident · dark (§37 case) | `/incidents/[incidentId]`, dark theme | P0 | S07 (fix #204) | §37, §19.7 | FR-06 |
+| MIncidentDark | Mobile — Incident detail · dark (§37 case) | same (390), dark theme | P0 | S07 (fix #204) | §37 | FR-06 |
 | MobileAck | Mobile — acknowledge from alert | `/incidents/[incidentId]?ack=1` (390) | P0 | S02b | §14.3, §16.8, §17 | FR-07 |
 | MobileAckDark | Mobile ack — dark (night on-call) | same, dark theme | P0 | S02b | §15.7, §28.6 (S10: paged on call) | FR-07 |
 | Resolve | Resolve incident + root cause | dialog on `/incidents/[incidentId]` | P0 | S07 | §15.4, §16.1–4 | FR-06 |
@@ -89,4 +91,5 @@ Each nav item carries its slice and a `live` flag (`apps/web/src/components/app-
 | StatusModel | Status model & verification logic | `packages/engine` (status, rounds, uptime) | P0 | S04a (relapse, flapping: S04b) | §5, §6, §15.3 | §5, FR-03 |
 | ChatAlert | Google Chat alert thread (content spec) · STATE adds maintenance messages | `packages/notifier` (Chat templates) | P0 | S02a (maintenance: S09b; Page change cause: S09d) | §10, §14.10, §15.7, §16.5, §24, §26.9 | §7 |
 | EmailAlert | Alert email template · maintenance threads · role change | `packages/notifier` (email templates) | P0 | S02b (maintenance: S09b; role change: S16) | §10, §14.11, §15.7, §24, §34 | §7 |
-| WeeklySummary | Weekly summary — Chat card spec | `packages/notifier` (digest + weekly) | P1 | S14 | §10, §15.7 | FR-12 |
+| WeeklySummary | Weekly summary — Chat card spec | `packages/notifier` (digest + weekly Chat card) | P1 | S14 | §10, §15.7 (the email: WeeklyEmail) | FR-12 |
+| WeeklyEmail | Weekly summary email to the CEO | `packages/notifier` (`weeklyEmail`) | P1 | S14 (follow-up) | §36, D-063 | FR-12 |

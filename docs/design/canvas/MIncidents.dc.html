@@ -26,6 +26,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </header>
 
 <div style="flex-grow: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 16px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span><div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{cases}}" value="{{caseV}}" on-change="{{setCase}}"></x-import></div></div>
 <x-import component-from-global-scope="Aura.SegmentedControl" label="State" options="{{views}}" value="{{view}}" on-change="{{setView}}" full-width="{{yes}}" size="sm"></x-import>
 <span style="font-size: 12px; color: var(--aura-fg-secondary)">{{countLabel}}</span>
 
@@ -65,7 +66,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { view: 'Open 3', all: false };
+    this.state = { caseV: 'As drawn', view: 'Open', all: false };
   }
   renderVals() {
     var self = this;
@@ -88,6 +89,7 @@ class Component extends DCLogic {
     var data = [
       ['INC-0142', 'MuvMi', 'down', 'Escalated · L1', 'Today 09:48', '19 min', 'Arm', '18 min unacked · L2 (CEO) at 10:18', 'danger', true, true],
       ['INC-0141', 'Fuji Links', 'problem', 'Acknowledged', 'Today 09:52', '15 min', 'Ploy', 'Acknowledged by Ploy 09:58', 'muted', true, false],
+      ['INC-0140', 'VOCA', 'problem', 'Acknowledged', 'Yesterday 23:41', 'down 9 h 54 min', 'Ploy', 'Home page back 09:35 · /booking still failing', 'warning', true, false],
       ['INC-0139', 'ORCA Thailand', 'wasdown', 'Needs root cause', 'Yesterday 22:14', '8 min', 'Tao', 'Recovered — add a root cause to resolve', 'warning', true, false],
       ['INC-0138', 'Tubtong', 'wasproblem', 'Resolved', 'Thu 24 Sep 14:02', '12 min', 'Ploy', 'Blocked, not verified · verifier restarted', 'muted', false, false],
       ['INC-0136', 'DxT AI', 'wasproblem', 'Resolved', 'Wed 23 Sep 09:00', '1 d 2 h', 'Tao', 'SSL expiring · cert renewed', 'muted', false, false],
@@ -99,11 +101,13 @@ class Component extends DCLogic {
       ['INC-0120', 'MuvMi', 'wasdown', 'Closed', 'Tue 8 Sep 19:30', '47 min', 'Arm', 'Hard fail · review signed off', 'muted', false, false],
       ['INC-0118', 'Bangkok Airways – Taiwan', 'wasdown', 'Closed', 'Wed 2 Sep 03:40', '11 min', 'Arm', 'Hard fail · server fault · review signed off', 'muted', false, false]
     ];
+    if (this.state.caseV !== 'Home page back · /booking still failing') data = data.filter(function (d) { return d[0] !== 'INC-0140'; });
+    var NOPEN = data.filter(function (d) { return d[9]; }).length;
     var all = this.state.all;
-    var view = this.state.view;
+    var view = this.state.view.split(' ')[0];
     var rows = data.filter(function (d) {
-      if (view === 'Open 3') return d[9];
-      if (view === 'Unacked 1') return d[10];
+      if (view === 'Open') return d[9];
+      if (view === 'Unacked') return d[10];
       return !d[9];
     }).filter(function (d, i) { return view !== 'Past' || all || i < 4; }).map(function (d) {
       var s = SEV[d[2]], w = WF[d[3]];
@@ -113,12 +117,14 @@ class Component extends DCLogic {
         state: d[3], wfTone: w.t, wfIcon: w.i, wfVariant: w.v || 'outline', started: d[4], dur: d[5], owner: d[6], next: d[7], nextColor: C[d[8]],
         bg: hot ? 'var(--aura-alert-danger-bg)' : 'var(--aura-bg-surface)', border: hot ? 'var(--aura-alert-danger-border)' : 'var(--aura-border-default)' };
     });
-    var LABEL = { 'Open 3': '3 open · unacknowledged first', 'Unacked 1': '1 not acknowledged', 'Past': all ? 'Last 30 days · all 9 resolved, in review or closed · 13 short PROBLEMs auto-resolved (hidden)' : 'Last 30 days · latest 4 of 9 resolved, in review or closed' };
+    var LABEL = { 'Open': NOPEN + ' open · unacknowledged first', 'Unacked': '1 not acknowledged', 'Past': all ? 'Last 30 days · all 9 resolved, in review or closed · 13 short PROBLEMs auto-resolved (hidden)' : 'Last 30 days · latest 4 of 9 resolved, in review or closed' };
     return {
       yes: true,
-      view: view,
-      views: ['Open 3', 'Unacked 1', 'Past'],
+      view: view === 'Past' ? 'Past' : (view === 'Open' ? 'Open ' + NOPEN : 'Unacked 1'),
+      views: ['Open ' + NOPEN, 'Unacked 1', 'Past'],
       setView: function (v) { self.setState({ view: v }); },
+      cases: ['As drawn', 'Home page back · /booking still failing'].map(function (v) { return { value: v, label: v }; }), caseV: this.state.caseV,
+      setCase: function (e) { var v = e && e.target ? e.target.value : e; self.setState({ caseV: v }); },
       showMore: view === 'Past',
       moreLabel: all ? 'Show latest 4 only' : 'Show all 9',
       moreIcon: all ? 'chevron-up' : 'chevron-down',
@@ -127,7 +133,7 @@ class Component extends DCLogic {
       countLabel: LABEL[view],
       bottom: [
         { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
-        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: NOPEN },
         { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
         { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
       ]

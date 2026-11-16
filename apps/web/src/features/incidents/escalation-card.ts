@@ -141,6 +141,10 @@ export function escalationCardOf(input: {
   steps: readonly StepSent[];
   people: LadderPeople;
   acked: { by: string } | null;
+  /** The site has a client-update track (a Tier 1–2 client site, D-052); false: no promise about it. */
+  clientTrack?: boolean;
+  /** §37.6: the DOWN is over and the incident carries on as a PROBLEM, since this time ("09:35"). */
+  problemSince?: string | null;
   /** No engine run of any kind for 3 min or more (D-055 item 1); `since` the last run. */
   engine: { stopped: boolean; since: string | null };
   canAct: boolean;
@@ -258,7 +262,15 @@ export function escalationCardOf(input: {
           }
         : null,
     footer: input.acked
-      ? `Acknowledged by ${input.acked.by} → escalation stopped. The client-update track continues.`
-      : 'Acknowledge stops escalation. It does not stop the client update.',
+      ? `Acknowledged by ${input.acked.by} → escalation stopped.${
+          input.problemSince
+            ? ` From ${input.problemSince} the same incident carries on as a PROBLEM and stays acknowledged, so no PROBLEM reminders go out.`
+            : input.clientTrack === false
+              ? ''
+              : ' The client-update track continues.'
+        }`
+      : input.clientTrack === false
+        ? 'Acknowledge stops escalation.'
+        : 'Acknowledge stops escalation. It does not stop the client update.',
   };
 }

@@ -575,6 +575,45 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     expect(s.title).toBe('INCIDENTS · 1 NOT RECOVERED');
     expect(s.rows[0]!.label).toBe('Down');
   });
+
+  it('a DOWN that came back with a PROBLEM still open is not recovered (§19.7, D-023)', () => {
+    const m = weeklyModel(
+      weekly({
+        incidents: [
+          incident({
+            site: 'Cando Asia',
+            state: 'acknowledged',
+            minutes: 6,
+            drops: 2,
+            stillProblem: 'TLS chain misconfigured',
+          }),
+        ],
+      }),
+    );
+    const s = m.sections.find((x) => x.title?.startsWith('INCIDENTS'))!;
+    expect(s.title).toBe('INCIDENTS · 1 NOT RECOVERED');
+    // It continues as a PROBLEM (§19.7): open, labelled so; the trail stays its DOWN minutes.
+    expect(s.rows[0]).toMatchObject({ label: 'Problem', trail: '6 min' });
+    expect(s.rows[0]!.text).toMatch(/ · home page back, still failing: TLS chain misconfigured$/);
+    // A root cause written meanwhile comes before it, never after (it didn't fix it).
+    const withRc = weeklyModel(
+      weekly({
+        incidents: [incident({ stillProblem: 'TLS chain misconfigured', rootCause: 'host restarted' })],
+      }),
+    );
+    expect(withRc.sections.find((x) => x.title?.startsWith('INCIDENTS'))!.rows[0]!.text).toMatch(
+      /host restarted · home page back, still failing: TLS chain misconfigured$/,
+    );
+    // The digest's Yesterday line names what still fails too.
+    const d = digestModel(
+      digest({
+        yesterday: [incident({ state: 'acknowledged', stillProblem: 'TLS chain misconfigured' })],
+      }),
+    );
+    expect(d.sections[1]!.rows[0]!.text).toContain(
+      '— home page back, still failing: TLS chain misconfigured, not acknowledged',
+    );
+  });
 });
 
 describe('root cause and the MTTA note (message-checker S14)', () => {

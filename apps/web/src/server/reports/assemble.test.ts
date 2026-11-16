@@ -79,6 +79,78 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
     expect(mid.minutes).toBe(4 + 11 + 12 + 11);
   });
 
+  // §19.7 / D-023: a PROBLEM raised to DOWN whose home page came back while the certificate chain still
+  // fails — its DOWN minutes stand, but it isn't recovered: the PROBLEM drop is still open.
+  const chainStillBroken = row({
+    number: 3,
+    state: 'acknowledged',
+    severity: 'down',
+    trigger: 'tls_chain',
+    started_at: iso('2026-09-10T18:00:00'),
+    resolved_at: null,
+    site: { name: 'Cando Asia', tier: 2, owner: null },
+    events: [
+      { type: 'detected', at: iso('2026-09-10T18:01:30'), payload: { summary: 'TLS chain misconfigured' } },
+      {
+        type: 'escalated_to_down',
+        at: iso('2026-09-25T08:01:13'),
+        payload: { downStartedAt: iso('2026-09-25T08:00:00'), cause: 'Browser: page didn’t load' },
+      },
+      { type: 'recovered', at: iso('2026-09-25T08:03:01'), payload: {} },
+      {
+        type: 'relapsed',
+        at: iso('2026-09-25T08:03:01'),
+        payload: {
+          startedAt: iso('2026-09-25T08:03:01'),
+          severity: 'problem',
+          summary: 'TLS chain misconfigured',
+        },
+      },
+    ],
+  });
+
+  it('a DOWN that came back with a PROBLEM still open: its DOWN minutes, not recovered', () => {
+    expect(reportIncident(chainStillBroken, week.from, week.to, now, insideHours)).toMatchObject({
+      severity: 'down',
+      minutes: 3,
+      drops: 1,
+      failing: false,
+      stillProblem: 'TLS chain misconfigured',
+    });
+    // Once that PROBLEM clears it is an ordinary recovered DOWN.
+    const cleared = {
+      ...chainStillBroken,
+      events: [
+        ...chainStillBroken.events,
+        { type: 'recovered', at: iso('2026-09-26T10:00:00'), payload: {} },
+      ],
+    };
+    expect(reportIncident(cleared, week.from, week.to, now, insideHours)!.stillProblem).toBeNull();
+    // DOWN AGAIN after the period ended, still down at the report: failing, not "recovered".
+    const downAgain = {
+      ...chainStillBroken,
+      events: [
+        ...chainStillBroken.events,
+        {
+          type: 'relapsed',
+          at: iso('2026-09-28T05:01:00'),
+          payload: { startedAt: iso('2026-09-28T05:00:00'), severity: 'down' },
+        },
+      ],
+    };
+    expect(reportIncident(downAgain, week.from, week.to, now, insideHours)).toMatchObject({
+      failing: true,
+      stillProblem: null,
+    });
+    // The PROBLEM drop opened after the period ended (Monday 05:00, the weekly at 09:00): still open.
+    const lateWeek = { from: bkk('2026-09-18T00:00:00'), to: bkk('2026-09-25T08:02:00') };
+    expect(reportIncident(chainStillBroken, lateWeek.from, lateWeek.to, now, insideHours)!.stillProblem).toBe(
+      'TLS chain misconfigured',
+    );
+    // VOCA ended on a recovery: nothing still open.
+    expect(reportIncident(voca, week.from, week.to, now, insideHours)!.stillProblem).toBeNull();
+  });
+
   it('leaves out an incident with no drop in the period', () => {
     expect(reportIncident(voca, bkk('2026-09-22T00:00:00'), week.to, now, insideHours)).toBeNull();
   });

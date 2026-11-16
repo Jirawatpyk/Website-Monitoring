@@ -22,7 +22,7 @@ import {
   formatTimeWithSeconds,
   isSameBangkokDay,
 } from '@dxt/shared';
-import { GLYPH_LEGEND, GLYPHS } from '@/components/site-cells';
+import { GLYPH_LEGEND, GLYPHS, type LocationGlyph } from '@/components/site-cells';
 import type { CheckCell, IncidentDetail } from '../detail-queries';
 import type { TimelineItem } from '../model';
 import { FlapRun } from './flap-run';
@@ -79,18 +79,36 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           ? 'No probe check · engine down'
           : `${d.severity === 'down' && d.trigger === 'hard_fail' ? 'Immediate recheck · ' : ''}MTTD ${formatDurationSeconds(d.detectSeconds)}`,
     },
-    {
-      label: 'DURATION',
-      value: formatDuration(d.durationMinutes),
-      caption: d.recoveredAt
-        ? d.severity === 'problem'
-          ? `Problem ${formatTime(new Date(d.startedAt))} → recovered ${formatTime(new Date(d.recoveredAt))}`
-          : `Recovered ${formatTime(new Date(d.recoveredAt))}`
-        : d.severity === 'problem'
-          ? `Problem since ${formatTime(new Date(d.startedAt))}`
-          : 'Still down',
-      danger: !d.recoveredAt,
-    },
+    // §37.3: the home page back with something still failing — two facts, the DOWN that is over (its
+    // minutes, D-033) and the PROBLEM that is open; one mixed cell read as still down.
+    ...(d.stillFailing
+      ? [
+          {
+            label: 'DOWN FOR',
+            value: formatDuration(d.durationMinutes),
+            caption: `${shortWhen(d.stillFailing.downFrom, now)} → ${shortWhen(d.stillFailing.downTo, now)} · counts in uptime`,
+          },
+          {
+            label: 'PROBLEM SINCE',
+            value: problemSince(d, now),
+            caption: `${formatDuration(Math.max(1, Math.round((now.getTime() - Date.parse(d.stillFailing.since)) / 60_000)))} · ${d.stillFailing.path ? `${d.stillFailing.path} still failing` : d.stillFailing.what}`,
+            warning: true,
+          },
+        ]
+      : [
+          {
+            label: 'DURATION',
+            value: formatDuration(d.durationMinutes),
+            caption: d.recoveredAt
+              ? d.severity === 'problem'
+                ? `Problem ${formatTime(new Date(d.startedAt))} → recovered ${formatTime(new Date(d.recoveredAt))}`
+                : `Recovered ${formatTime(new Date(d.recoveredAt))}`
+              : d.severity === 'problem' || d.nowSeverity === 'problem'
+                ? `Problem since ${problemSince(d, now)}`
+                : 'Still down',
+            danger: !d.recoveredAt && d.nowSeverity === 'down',
+          },
+        ]),
     // Outside response hours a Tier 1 incident pages the person on call, not the owner (§28.6).
     d.paged
       ? {
@@ -123,16 +141,27 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
               d.trigger === 'manual' ? 'opened' : d.severity === 'down' ? 'confirmed down' : 'detected'
             }`,
     },
-  ];
+  ] as { label: string; value: string; caption: string; danger?: boolean; warning?: boolean }[];
   return (
-    <dl className="aura-card m-0 grid grid-cols-2 gap-4 p-aura-5 lg:grid-cols-5">
+    <dl
+      className={`aura-card m-0 grid grid-cols-2 gap-4 p-aura-5 ${d.stillFailing ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}
+    >
       {facts.map((f) => (
-        <div key={f.label} className="flex min-w-0 flex-col gap-0.5">
-          <dt className="font-mono text-xs text-fg-tertiary">{f.label}</dt>
-          <dd className={`m-0 text-lg font-semibold tabular-nums ${f.danger ? 'text-fg-danger' : ''}`}>
+        <div
+          key={f.label}
+          className={`flex min-w-0 flex-col gap-0.5 ${f.warning ? 'rounded-aura-md bg-alert-warning-bg p-aura-2' : ''}`}
+        >
+          <dt className={`font-mono text-xs ${f.warning ? 'text-fg-warning' : 'text-fg-tertiary'}`}>
+            {f.label}
+          </dt>
+          <dd
+            className={`m-0 text-lg font-semibold tabular-nums ${f.danger ? 'text-fg-danger' : f.warning ? 'text-fg-warning' : ''}`}
+          >
             {f.value}
           </dd>
-          <dd className="m-0 text-xs text-fg-secondary">{f.caption}</dd>
+          <dd className={`m-0 text-xs ${f.warning ? 'text-fg-warning' : 'text-fg-secondary'}`}>
+            {f.caption}
+          </dd>
         </div>
       ))}
     </dl>
@@ -153,10 +182,13 @@ function CheckText({ cell, location }: { cell: CheckCell | null; location: strin
   );
 }
 
-function GlyphLegend() {
+function GlyphLegend({ withProblem = false }: { withProblem?: boolean } = {}) {
+  const keys: readonly LocationGlyph[] = withProblem
+    ? [...GLYPH_LEGEND.slice(0, 2), 'problem', ...GLYPH_LEGEND.slice(2)]
+    : GLYPH_LEGEND;
   return (
     <ul className="m-0 mt-3 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-fg-secondary">
-      {GLYPH_LEGEND.map((k) => (
+      {keys.map((k) => (
         <li key={k} className="flex items-center gap-1">
           <span className={`flex [&_svg]:size-3.5 ${GLYPHS[k].tone}`} aria-hidden>
             {GLYPHS[k].icon}
@@ -169,6 +201,33 @@ function GlyphLegend() {
 }
 
 export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
+  const key = d.stillFailing?.keyPage;
+  if (key && key.rows.some((r) => r.latest)) {
+    // §37.4 phone: the key page's round, the home page in the footer.
+    const rows = key.rows.filter((r) => r.latest);
+    const fails = rows.filter((r) => r.latest!.glyph !== 'pass').length;
+    const home = key.rows.filter((r) => r.home?.glyph === 'pass').length;
+    return (
+      <Card
+        title={`Latest round · ${key.path}`}
+        headingLevel={2}
+        description={
+          fails ? `${fails}/${rows.length} fail → PROBLEM` : `${rows.length}/${rows.length} pass → OK`
+        }
+      >
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {rows.map((l) => (
+            <li key={l.location} className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium">{l.location}</span>
+              <CheckText cell={l.latest} location={l.location} />
+            </li>
+          ))}
+        </ul>
+        <p className="m-0 mt-2 text-sm text-fg-secondary">{`Home page OK · ${home}/${key.rows.length} pass since ${formatTime(new Date(d.stillFailing!.since))}`}</p>
+        <GlyphLegend />
+      </Card>
+    );
+  }
   const latest = d.locations.filter((l) => l.latest);
   if (!latest.length && d.trigger === 'manual')
     return (
@@ -240,6 +299,39 @@ export function TimelineLines({ items, newestFirst }: { items: TimelineItem[]; n
 
 /** Evidence by location: first check, recheck and latest per location, with the glyph legend. */
 export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
+  const key = d.stillFailing?.keyPage;
+  if (key && key.rows.length) {
+    // §37.4: the home page passes, the key page fails — both, so the page never reads "OK" under a PROBLEM.
+    const firstAt = d.stillFailing!.since;
+    return (
+      <>
+        <Table aria-label="Evidence by location">
+          <THead>
+            <Tr>
+              <Th>Location</Th>
+              <Th>Home page · latest</Th>
+              <Th>{`${key.path} · first fail ${formatTimeWithSeconds(new Date(firstAt))}`}</Th>
+              <Th>{`${key.path} · latest`}</Th>
+            </Tr>
+          </THead>
+          <TBody>
+            {key.rows.map((l) => (
+              <Tr key={l.location}>
+                <Td className="font-medium">{LOCATION_LABELS[l.location]}</Td>
+                {[l.home, l.first, l.latest].map((c, n) => (
+                  <Td key={n}>
+                    <CheckText cell={c} location={l.location} />
+                  </Td>
+                ))}
+              </Tr>
+            ))}
+          </TBody>
+        </Table>
+        <StillFailingNote detail={d} />
+        <GlyphLegend withProblem />
+      </>
+    );
+  }
   if (d.locations.length === 0) {
     // Opened by hand while the engine was down (S12b, §30.5): no probe ran for it.
     return (
@@ -282,8 +374,42 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
           ))}
         </TBody>
       </Table>
+      {/* §37 M6: the home page's own chain still failing — say why it is still open */}
+      {d.stillFailing && <StillFailingNote detail={d} />}
       <GlyphLegend />
     </>
+  );
+}
+
+/** §37.4: why the incident is still open though the home page passes. */
+function StillFailingNote({ detail: d }: { detail: IncidentDetail }) {
+  const s = d.stillFailing;
+  if (!s) return null;
+  const since = formatTime(new Date(s.since));
+  let lead: string;
+  let text: string;
+  if (s.keyPage) {
+    const n = s.keyPage.rows.length;
+    const home = s.keyPage.rows.filter((r) => r.home?.glyph === 'pass').length;
+    const failing = s.keyPage.rows.filter((r) => r.latest && r.latest.glyph !== 'pass');
+    const words = failing[0]?.latest?.text.replace(/ · [\d.]+ (s|ms)$/, '');
+    lead = `Home page OK · ${s.keyPage.path} still failing.`;
+    text = ` The home page has passed at ${home} of ${n} since ${since}, so the DOWN ended there; ${s.keyPage.path} ${words ? `answers ${words}` : 'fails'} at ${failing.length} of ${n}, so the incident stays open as a PROBLEM (${s.trigger}). It clears after 2 OK rounds of ${s.keyPage.path}.`;
+  } else {
+    // The home page's own certificate chain (D-029): it answers, so the DOWN ended; the chain still fails.
+    lead = `Home page answers · ${s.what}.`;
+    text = ` The home page has answered since ${since}, so the DOWN ended there; its certificate chain still fails, so the incident stays open as a PROBLEM (${s.trigger}). It clears after 2 OK rounds.`;
+  }
+  return (
+    <p className="m-0 mt-3 flex items-start gap-2.5 rounded-aura-md border border-alert-warning-border bg-alert-warning-bg p-aura-3 text-sm">
+      <span className="flex pt-0.5 text-alert-warning-fg [&_svg]:size-4" aria-hidden>
+        <IconTriangleAlert />
+      </span>
+      <span>
+        <b className="font-semibold">{lead}</b>
+        {text}
+      </span>
+    </p>
   );
 }
 
@@ -318,8 +444,23 @@ export function roundVerdict(glyphs: readonly string[]): string {
  * (Incident board, Evidence card), from the first check and the recheck. Null when it wasn't a hard fail.
  */
 export function evidenceSummary(
-  d: Pick<IncidentDetail, 'locations' | 'severity' | 'trigger'>,
+  d: Pick<IncidentDetail, 'locations' | 'severity' | 'trigger'> &
+    Partial<Pick<IncidentDetail, 'stillFailing'>>,
 ): string | null {
+  const key = d.stillFailing?.keyPage;
+  if (key && key.rows.length) {
+    // §37.4: "Home page passes at 3 of 3 · /booking fails at 3 of 3 → PROBLEM (Key page)"
+    const n = key.rows.length;
+    const home = key.rows.filter((r) => r.home?.glyph === 'pass').length;
+    const fails = key.rows.filter((r) => r.latest && r.latest.glyph !== 'pass').length;
+    return `Home page passes at ${home} of ${n} · ${key.path} fails at ${fails} of ${n} → PROBLEM (${d.stillFailing!.trigger})`;
+  }
+  if (d.stillFailing) {
+    // The home page's own chain (no key page): it answers, the chain fails — not the DOWN's verdict.
+    const latest = d.locations.filter((l) => l.latest);
+    const chain = latest.filter((l) => l.latest!.glyph === 'chain').length;
+    return `Home page answers at ${latest.length} of ${latest.length} · TLS chain error at ${chain} of ${latest.length} → PROBLEM (${d.stillFailing.trigger})`;
+  }
   if (d.severity !== 'down' || d.trigger !== 'hard_fail' || d.locations.length === 0) return null;
   const both = d.locations.filter(
     (l) => l.first?.glyph === 'fail' && (l.recheck ?? l.first)?.glyph === 'fail',
@@ -336,6 +477,13 @@ export function startedOn(d: Pick<IncidentDetail, 'startedAt'>, now: Date): stri
 export interface IncidentSections {
   /** The start day when it isn't today (`startedOn`), for the phone's summary line. */
   startedOn: string | null;
+  /** A DOWN back with a PROBLEM still open (§19.7): when that PROBLEM began; else null. */
+  problemSince: string | null;
+  /**
+   * §37: "home page back 09:35 · down from Thu 23:41 (Hard fail)" for the header, and the phone's two
+   * summary lines; null unless the home page came back with something still failing.
+   */
+  stillFailing: { meta: string; phone: [string, string] } | null;
   /** How the DOWN was decided, under the Evidence card's title (`evidenceSummary`). */
   evidenceSummary: string | null;
   /** "18 min unacked" beside the badge while nobody acknowledged it (Incident header). */
@@ -348,9 +496,35 @@ export interface IncidentSections {
 }
 
 /** The slots `IncidentDetailView` places, drawn once on the server. */
+/** A DOWN back with a PROBLEM still open (§19.7): when that PROBLEM began — "08:08", "Fri 13 Nov 09:15". */
+/** "Thu 23:41" — a time with its weekday unless it is today (§37.3 DOWN FOR caption). */
+export function shortWhen(iso: string, now: Date): string {
+  const d = new Date(iso);
+  return isSameBangkokDay(d, now)
+    ? formatTime(d)
+    : `${formatDay(d, { weekday: true }).split(' ')[0]} ${formatTime(d)}`;
+}
+
+export function problemSince(d: Pick<IncidentDetail, 'nowSince'>, now: Date): string {
+  return [startedOn({ startedAt: d.nowSince }, now), formatTime(new Date(d.nowSince))]
+    .filter(Boolean)
+    .join(' ');
+}
+
 export function incidentSections(d: IncidentDetail, now: Date): IncidentSections {
   return {
     startedOn: startedOn(d, now),
+    problemSince:
+      !d.recoveredAt && d.nowSeverity === 'problem' && d.severity === 'down' ? problemSince(d, now) : null,
+    stillFailing: d.stillFailing
+      ? {
+          meta: `home page back ${problemSince(d, now)} · down from ${shortWhen(d.stillFailing.downFrom, now)} (${d.stillFailing.downTrigger})`,
+          phone: [
+            `Problem since ${problemSince(d, now)} · ${formatDuration(Math.max(1, Math.round((now.getTime() - Date.parse(d.stillFailing.since)) / 60_000)))}`,
+            `Home page back ${formatTime(new Date(d.stillFailing.since))} · was down ${formatDuration(d.durationMinutes)} (${shortWhen(d.stillFailing.downFrom, now)} → ${shortWhen(d.stillFailing.downTo, now)})`,
+          ],
+        }
+      : null,
     evidenceSummary: evidenceSummary(d),
     unackedFor:
       d.state === 'unacked' || d.state === 'escalated'

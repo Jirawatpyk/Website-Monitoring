@@ -46,6 +46,11 @@ export interface ReportIncident {
   drops: number;
   /** Still failing when the report was made. */
   failing: boolean;
+  /**
+   * A DOWN whose home page is back while something still fails (spec §19.7, D-023): the cause of the
+   * PROBLEM drop still open ("TLS chain misconfigured"); null otherwise. It isn't recovered either.
+   */
+  stillProblem?: string | null;
   /** Short cause: "Timeout ×2 · 504 ×1", "Blocked, not verified", "SSL expiring". */
   cause: string;
   /** A Tier 2–3 DOWN that started outside response hours. */
@@ -222,8 +227,12 @@ function outcome(i: ReportIncident): { text: string; who: ReportPerson | null } 
   if (i.state === 'needs_root_cause')
     return { text: `needs a root cause${i.owner ? `, ${plainName(i.owner.name)}` : ''}`, who: i.owner };
   if (i.state === 'monitoring') return { text: 'recovered', who: null };
-  const still = i.severity === 'down' ? 'still down' : 'still a problem';
-  if (!i.failing) return { text: 'recovered', who: null };
+  const still = i.stillProblem
+    ? `home page back, still failing: ${midSentence(i.stillProblem)}`
+    : i.severity === 'down'
+      ? 'still down'
+      : 'still a problem';
+  if (!i.failing && !i.stillProblem) return { text: 'recovered', who: null };
   return {
     text: i.acked ? `${still}, acknowledged by ${plainName(i.acked.by)}` : `${still}, not acknowledged`,
     who: null,
@@ -382,6 +391,8 @@ function weeklyWhat(i: ReportIncident): string {
     parts.push(`client updated by ${plainName(i.clientUpdate.by)} ${formatTime(i.clientUpdate.at)}`);
   if (i.rootCause) parts.push(i.rootCause);
   else if (i.state === 'needs_root_cause' || i.state === 'monitoring') parts.push('no root cause yet');
+  // Last, so a root cause never reads as having fixed it (message-checker).
+  if (i.stillProblem) parts.push(`home page back, still failing: ${midSentence(i.stillProblem)}`);
   return parts.join(' · ');
 }
 
@@ -422,7 +433,7 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
   const short = formatDayRange(f.weekStart, f.weekEnd, { short: true });
   const downs = f.incidents.filter((i) => i.severity === 'down').length;
   const problems = f.incidents.length - downs;
-  const failing = f.incidents.filter((i) => i.failing).length;
+  const failing = f.incidents.filter((i) => i.failing || !!i.stillProblem).length;
 
   const needs: Row[] = f.needsSomeone.map((n) => ({
     text: n.text,
@@ -437,13 +448,16 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
       a.startedAt.getTime() - b.startedAt.getTime(),
   );
   const incidents: Row[] = ordered.map((i) => ({
+    // §19.7: a DOWN back with something still failing "continues as a PROBLEM" — open, so labelled so.
     label: i.failing
       ? i.severity === 'down'
         ? 'Down'
         : 'Problem'
-      : i.severity === 'down'
-        ? 'Was down'
-        : 'Was problem',
+      : i.stillProblem
+        ? 'Problem'
+        : i.severity === 'down'
+          ? 'Was down'
+          : 'Was problem',
     text: `${plainName(i.site)} · ${weeklyWhat(i)}`,
     trail: formatDuration(i.minutes),
   }));

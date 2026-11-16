@@ -10,10 +10,12 @@ import {
   lastOneLine,
   listKpis,
   nextLine,
+  nowSeverity,
   okTwoRoundsAt,
   phoneViewCounts,
   resolveGate,
   sortIncidents,
+  stillFailingHeader,
   timelineOf,
   triggerWords,
   type EventRow,
@@ -421,6 +423,32 @@ describe('resolveGate (T10, D-033)', () => {
 });
 
 // ── Timeline ────────────────────────────────────────────────────────────
+describe('timelineOf — home page back, a key page still failing (§37.8)', () => {
+  it('words the partial recovery as one line: the DOWN minutes stop, the same incident carries on', () => {
+    const t = timelineOf(
+      { severity: 'down', trigger: 'hard_fail', startedAt: at('24T23:41:36'), recoveredAt: null },
+      [
+        ev('recovered', '25T09:35:20'),
+        ev('relapsed', '25T09:35:20', {
+          severity: 'problem',
+          summary: 'key page /booking, HTTP 404',
+          keyPage: { path: '/booking', cause: '/booking → HTTP 404 (BKK, SIN, TYO)' },
+          homeBackAt: at('25T09:35:20'),
+        }),
+      ],
+      nameOf,
+      NOW,
+    );
+    expect(t.find((x) => x.title.startsWith('Home page back'))).toMatchObject({
+      kind: 'problem',
+      title: 'Home page back — /booking still failing',
+      detail: expect.stringContaining('The DOWN minutes stop here. Same incident, now a PROBLEM.'),
+    });
+    // The RECOVERED of the same round is in that line, not a line of its own.
+    expect(t.some((x) => x.title.startsWith('Recovered'))).toBe(false);
+  });
+});
+
 describe('timelineOf (§16.11, §19.7)', () => {
   const i = {
     severity: 'down' as const,
@@ -694,6 +722,92 @@ describe('durationMinutes — from the drops, the same number as Site detail and
     expect(durationMinutes(i, new Date('2026-09-21T04:00:00Z'))).toBe(18);
   });
 });
+describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)', () => {
+  const down = { start: '2026-09-25T01:00:00Z', end: '2026-09-25T01:03:00Z', severity: 'down' as const };
+  const problemOpen = { start: '2026-09-25T01:03:00Z', end: null, severity: 'problem' as const };
+  it.each([
+    [
+      'a DOWN back with a PROBLEM still open reads PROBLEM',
+      { recoveredAt: null, drops: [down, problemOpen] },
+      'problem',
+    ],
+    ['a DOWN still down reads DOWN', { recoveredAt: null, drops: [{ ...down, end: null }] }, 'down'],
+    ['recovered: the record (Was down)', { recoveredAt: down.end, drops: [down] }, 'down'],
+    ['no drop read: the record', { recoveredAt: null, drops: [] }, 'down'],
+  ] as const)('%s', (_, over, expected) => {
+    expect(nowSeverity({ severity: 'down', ...over, drops: [...over.drops] })).toBe(expected);
+  });
+  it('counts it as a PROBLEM now, never an unacked DOWN (list KPIs, Unacked tab)', () => {
+    const backWithProblem = inc({
+      severity: 'down',
+      state: 'unacked',
+      recoveredAt: null,
+      drops: [down, problemOpen],
+    });
+    expect(isUnackedDown(backWithProblem)).toBe(false);
+    const k = listKpis([backWithProblem], new Date('2026-09-25T05:00:00Z'));
+    expect(k.openCaption).toBe('1 PROBLEM (1 after a DOWN)');
+  });
+
+  it('titles it by what still fails (§19.7: "/booking still failing after the home page came back")', () => {
+    const relapse = (at: string, payload: Record<string, unknown>) => ({ type: 'relapsed', at, payload });
+    // The engine's PROBLEM AGAIN payload (run-engine: keyPage, homeBackAt).
+    const keyPage = {
+      severity: 'problem',
+      summary: 'key page /booking, HTTP 404',
+      cause: 'Key page /booking → HTTP 404 (BKK, SIN, TYO)',
+      keyPage: { path: '/booking', cause: '/booking → HTTP 404 (BKK, SIN, TYO)' },
+      homeBackAt: '2026-09-25T01:03:00Z',
+      trigger: 'key_page',
+      monitorUrl: 'https://voca.example/booking',
+    };
+    // §37.1: short — the long §19.7 sentence stays the Chat card's.
+    expect(stillFailingHeader('VOCA', [relapse('2026-09-25T01:03:00Z', keyPage)])).toEqual({
+      title: 'VOCA · /booking still failing',
+      cause: '/booking → HTTP 404 (BKK, SIN, TYO)',
+      partial: {
+        homeBackAt: '2026-09-25T01:03:00Z',
+        path: '/booking',
+        monitorUrl: 'https://voca.example/booking',
+        trigger: 'Key page',
+      },
+    });
+    // The home page's certificate chain, no key page.
+    expect(
+      stillFailingHeader('Cando Asia', [
+        relapse('2026-09-25T01:03:00Z', {
+          severity: 'problem',
+          summary: 'TLS chain misconfigured',
+          cause: 'TLS chain misconfigured (BKK, SIN, TYO)',
+          homeBackAt: '2026-09-25T01:03:00Z',
+        }),
+      ]).title,
+    ).toBe('Cando Asia · TLS chain misconfigured');
+    // Recovered fully, then a key page failed later (no homeBackAt): not "still failing".
+    expect(
+      stillFailingHeader('VOCA', [relapse('2026-09-25T01:03:00Z', { ...keyPage, homeBackAt: undefined })]),
+    ).toEqual({ title: 'VOCA has a problem', cause: '/booking → HTTP 404 (BKK, SIN, TYO)', partial: null });
+    // The newest PROBLEM AGAIN names it; a DOWN AGAIN in between doesn't.
+    expect(
+      stillFailingHeader('VOCA', [
+        relapse('2026-09-25T01:03:00Z', keyPage),
+        relapse('2026-09-25T00:30:00Z', { severity: 'down', cause: 'Timeout > 30 s' }),
+      ]).title,
+    ).toBe('VOCA · /booking still failing');
+    // No PROBLEM AGAIN read (an older row): a plain PROBLEM title, the header cause kept.
+    expect(stillFailingHeader('Fuji Links', [])).toEqual({
+      title: 'Fuji Links has a problem',
+      cause: null,
+      partial: null,
+    });
+  });
+
+  it('keeps the DOWN minutes as how long it was down (D-033)', () => {
+    const i = { startedAt: down.start, recoveredAt: null, resolvedAt: null, drops: [down, problemOpen] };
+    expect(durationMinutes(i, new Date('2026-09-25T05:00:00Z'))).toBe(3);
+  });
+});
+
 // Production 12 Oct 2026 (D-038): one flapping incident had 471 timeline lines.
 describe('timelineOf — flapping runs fold into one line', () => {
   const i = {

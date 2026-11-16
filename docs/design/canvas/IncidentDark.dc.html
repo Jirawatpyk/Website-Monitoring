@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Incident (dark)</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="aura-tokens-dark.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#08080a}
+a{color:#6d28d9}a:where(:not(.aura-btn)):hover{color:#5b21b6}
+.ck-re svg{width:12px;height:12px}
+</style>
+</helmet>
+<div style="width: 1440px; height: 2040px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="position: absolute; top: 10px; right: 40px; display: flex; gap: 8px">
+<div style="padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono)">CASE</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Which incident" options="{{caseOpts}}" value="{{caseV}}" on-change="{{setCase}}" size="sm"></x-import>
+</div>
+<sc-if value="{{showCtl}}" hint-placeholder-val="{{true}}">
+<div style="padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono)">OPENED</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="When the incident opened" options="{{openedOpts}}" value="{{opened}}" on-change="{{setOpened}}" size="sm"></x-import>
+</div>
+<div style="padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono)">STATE</span>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{views}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import>
+</div>
+</sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)">
+<a href="Incidents.dc.html" style="text-decoration: none">Incidents</a>
+<x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import>
+<span style="font-family: var(--font-mono); font-size: 12px">{{m.id}}</span>
+</div>
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 16px">
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">{{m.h1}}</h1>
+<x-import component-from-global-scope="Aura.Badge" tone="{{m.sevTone}}" variant="{{m.sevVariant}}" icon="{{m.sevIcon}}">{{m.sev}}</x-import>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<sc-if value="{{notAcked}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Badge" tone="{{m.wfTone}}" variant="outline" icon="{{m.wfIcon}}">{{m.wfLabel}}</x-import>
+<span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-danger); padding-right: 4px">{{m.unacked}}</span>
+</sc-if>
+<sc-if value="{{acked}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="check">Acknowledged</x-import>
+</sc-if>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">{{m.tier}}</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Trigger: {{m.trigger}}</x-import>
+</div>
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{m.causeLine}}</span>
+<sc-if value="{{night}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.5"><span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="moon" size="sm"></x-import></span><span><b style="font-weight: 600">On call · Ploy</b> (Tier 1, outside response hours) — paged at L0, the person who acts. <span style="color: var(--aura-fg-secondary)">Owner {{m.owner}} isn’t paged outside response hours.</span></span></span></sc-if>
+</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="ghost" icon="pencil" on-click="{{openNote}}">Add note</x-import>
+<a href="SiteDetail.dc.html" style="height: 44px; padding: 0 24px; display: inline-flex; align-items: center; border-radius: 9999px; border: 1px solid var(--aura-button-secondary-border); color: var(--aura-fg-primary); font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap">View site</a>
+<sc-if value="{{notAcked}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{ack}}">Acknowledge</x-import>
+</sc-if>
+<sc-if value="{{acked}}" hint-placeholder-val="{{false}}">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1; white-space: nowrap; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import>{{resolveShort}}</span>
+</sc-if>
+</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat({{factCols}}, minmax(0, 1fr)); background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-card-radius); box-shadow: var(--aura-shadow-enterprise)">
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">STARTED</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">{{m.started}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{m.startedSub}}</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">CONFIRMED DOWN</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">{{m.conf}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{m.confSub}}</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{dur.label}}</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: {{dur.color}}">{{duration}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{dur.sub}}</span></div>
+<sc-if value="{{isPart}}" hint-placeholder-val="{{false}}"><div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default); background: var(--aura-alert-warning-bg)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-alert-warning-fg)">PROBLEM SINCE</span><span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--aura-alert-warning-fg)">09:35</span><span style="font-size: 12px; color: var(--aura-alert-warning-fg)">32 min · /booking still failing</span></div></sc-if>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ESCALATION</span><span style="font-size: 15px; font-weight: 600">{{escLevel}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{escNext}}</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5; border-right: 1px solid var(--aura-border-default)"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">{{own.label}}</span><span style="font-size: 15px; font-weight: 600">{{own.name}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{own.sub}}</span></div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; line-height: 1.5"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">ACKNOWLEDGED</span><span style="font-size: 15px; font-weight: 600">{{ackBy}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{ackMeta}}</span></div>
+</div>
+
+<sc-if value="{{cuOpen}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 20px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-lg)">
+<span style="display: flex; color: var(--aura-alert-warning-fg); padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="md"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.5">
+<span style="font-size: 16px; font-weight: 600; color: var(--aura-alert-warning-fg)">{{m.cuTitle}}</span>
+<span>{{m.cuText}}</span>
+</div>
+</div>
+</sc-if>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start">
+
+<div style="grid-column: span 2; display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<div class="aura-card">
+<sc-if value="{{m.noEvidence}}" hint-placeholder-val="{{false}}">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Evidence by location</h3>
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="circle-dot-dashed" size="sm"></x-import></span>
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">Opened by hand while the status engine was down — no probe results for this check</span><span style="color: var(--aura-fg-secondary)">What Tao saw: “Home page shows a 502 error” (02:31). Probe evidence starts with the first round after the engine is back.</span></span>
+</div>
+</sc-if>
+<sc-if value="{{notManual}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Evidence by location</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{evSum}}</span>
+</div>
+<div class="aura-table" style="box-shadow: none">
+<div class="aura-table__head" style="text-transform: uppercase">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__th" style="width: 150px">Location</div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">{{evH1}}</div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px"><sc-if value="{{evRe}}" hint-placeholder-val="{{true}}"><span class="ck-re" style="display: inline-flex"><x-import component-from-global-scope="Aura.Icon" name="rotate-ccw" size="sm"></x-import></span></sc-if>{{evH2}}</div>
+<div class="aura-table__th" style="flex: 1 1 0; min-width: 0">{{latestLabel}}</div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+<sc-for list="{{evidence}}" as="e" hint-placeholder-count="3">
+<div class="aura-table__row">
+<div class="aura-table__gutter"></div>
+<div class="aura-table__td" style="width: 150px; font-weight: 500">{{e.loc}}</div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; line-height: 1"><span style="display: flex; color: {{e.c1}}"><x-import component-from-global-scope="Aura.Icon" name="{{e.i1}}" size="sm" label="{{e.w1}}"></x-import></span><span style="font-family: var(--font-mono); font-size: 12px">{{e.r1}}</span></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; line-height: 1"><span style="display: flex; color: {{e.c2}}"><x-import component-from-global-scope="Aura.Icon" name="{{e.i2}}" size="sm" label="{{e.w2}}"></x-import></span><span style="font-family: var(--font-mono); font-size: 12px">{{e.r2}}</span></div>
+<div class="aura-table__td" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; line-height: 1"><span style="display: flex; color: {{e.c3}}"><x-import component-from-global-scope="Aura.Icon" name="{{e.i3}}" size="sm" label="{{e.w3}}"></x-import></span><span style="font-family: var(--font-mono); font-size: 12px">{{e.r3}}</span></div>
+<div class="aura-table__gutter aura-table__gutter--end"></div>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{isPart}}" hint-placeholder-val="{{false}}"><div style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span><b style="font-weight: 600">Home page OK · /booking still failing.</b> The home page has passed at 3 of 3 since 09:35, so the DOWN ended there; /booking answers HTTP 404 at 3 of 3, so the incident stays open as a PROBLEM (Key page). It clears after 2 OK rounds of /booking.</span></div></sc-if>
+<sc-if value="{{showShot}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; gap: 16px">
+<div style="width: 280px; height: 158px; flex-shrink: 0; box-sizing: border-box; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--aura-fg-secondary); font-size: 12px">
+<x-import component-from-global-scope="Aura.Icon" name="image" size="lg"></x-import>
+<span>[Screenshot — browser timeout page]</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5">
+<span style="font-weight: 600">Screenshot evidence</span>
+<span style="color: var(--aura-fg-secondary)">Taken by the browser verifier in Bangkok at 09:49:20, after DOWN was confirmed. Hard fails don't wait for the browser verifier — it only takes a screenshot afterwards as evidence.</span>
+<span style="color: var(--aura-fg-secondary)">Kept for 30 days.</span>
+<span style="display: flex"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="image" on-click="{{openShot}}">Open full size</x-import></span>
+</div>
+</div>
+</sc-if>
+</sc-if>
+</div>
+
+<div class="aura-card">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Timeline</h3>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">All times UTC+7 · every event is in the audit log</span>
+</div>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{timeline}}" as="t" hint-placeholder-count="9">
+<div style="display: flex; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--aura-border-subtle)">
+<span style="width: 64px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); line-height: 22px">{{t.at}}</span>
+<span style="display: flex; padding-top: 3px; color: {{t.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span>
+<div style="flex-grow: 1; display: flex; flex-direction: column; line-height: 1.5">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500">{{t.title}}<sc-if value="{{t.scheduled}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="clock">Scheduled</x-import></sc-if></span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.detail}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{isManual}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; margin-top: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · TIMELINE LINES FROM A HAND CHECK (§31, D-055 item 7)</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Down again</b> (recovered incident, e.g. INC-0142) — title “Down again, reported by Tao from a hand check · “502 again””, detail “Reported by hand — no probe round confirms it yet”. Status back to Acknowledged; levels already reached stay.</span>
+<span><b style="color: var(--aura-fg-primary); font-weight: 600">Report down</b> (PROBLEM incident, e.g. INC-0150) — title “Raised to DOWN by Tao from a hand check · “Booking page times out””, same detail. The DOWN ladder and, on a client site, the client-update clock start from that time.</span>
+<span>Opened by hand uses the same detail after “Trigger: Manual (hand check) · ”. Sample names and times are made up.</span>
+</div></sc-if>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+
+<sc-if value="{{notPart}}" hint-placeholder-val="{{true}}">
+<div class="aura-card">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Client update</h3>
+<sc-if value="{{cuOpen}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="clock">Due {{m.cuDue}}</x-import></sc-if>
+<sc-if value="{{cuDone}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="success" variant="outline" icon="circle-check">{{cuBadge}}</x-import></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+<div style="display: flex; align-items: center; gap: 10px"><x-import component-from-global-scope="Aura.Avatar" name="{{m.am}}" size="sm"></x-import><span style="flex-grow: 1"><span style="font-weight: 500">{{m.am}}</span> · {{m.amRole}}</span><span style="color: var(--aura-fg-secondary)">{{m.amNote}}</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="color: var(--aura-fg-secondary)">Due</span><span>{{m.cuDueLine}}</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary); flex-shrink: 0">State</span><span style="font-weight: 500; text-align: right; color: {{cuColor}}">{{cuState}}</span></div>
+<sc-if value="{{cuHasNote}}" hint-placeholder-val="{{false}}"><div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: var(--aura-fg-secondary); flex-shrink: 0">{{cuNoteLabel}}</span><span style="text-align: right">{{cuNote}}</span></div></sc-if>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Draft for {{m.client}}</span>
+<span style="display: flex; align-items: center; gap: 4px"><x-import component-from-global-scope="Aura.IconButton" icon="{{copyIcon}}" label="{{copyLabel}}" size="sm" on-click="{{copy}}"></x-import><x-import component-from-global-scope="Aura.SegmentedControl" label="Language" options="{{langs}}" value="{{lang}}" on-change="{{setLang}}" size="sm"></x-import></span>
+</div>
+<div style="padding: 12px 14px; background: var(--aura-bg-canvas); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-sm); font-size: 13px; line-height: 1.7; white-space: pre-line">{{template}}</div>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+<sc-if value="{{cuPrimary}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" size="sm" on-click="{{markUpdated}}">Mark client updated</x-import></sc-if>
+<sc-if value="{{cuSecondary}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="check" size="sm" on-click="{{markUpdated}}">Mark client updated</x-import></sc-if>
+<sc-if value="{{cuOpen}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" on-click="{{openNn}}">Not needed…</x-import></sc-if>
+</div>
+<sc-if value="{{m.canCu}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5"><span>The engine is down, so the 15-min reminder to {{m.am}} won’t go out on its own.</span><span style="display: flex"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="mail" on-click="{{askCu}}">Send client-update reminder now</x-import></span></div></sc-if>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{cuFoot}}</span>
+</div>
+</sc-if>
+<sc-if value="{{isPart}}" hint-placeholder-val="{{false}}"><div class="aura-card" style="gap: 6px"><div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Client update</h3><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="check">Not required</x-import></div><span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">VOCA is an internal site — no client to tell, so this Resolve condition is met.</span></div></sc-if>
+
+<div class="aura-card">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">{{escTitle}}</h3>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{ladder}}" as="l" hint-placeholder-count="4">
+<div style="display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--aura-border-subtle)">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; background: {{l.dotBg}}; color: {{l.dotFg}}">{{l.level}}</span>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; line-height: 1.5; min-width: 0">
+<span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 13px; font-weight: 600">{{l.when}}</span><span style="font-size: 12px; color: {{l.statusColor}}">{{l.status}}</span></span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{l.who}}</span>
+<sc-if value="{{l.proposal}}" hint-placeholder-val="{{false}}"><span style="display: flex"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="clock">Proposal · pending CEO</x-import></span></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{m.canEsc}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; gap: 8px"><span style="display: flex; padding-top: 2px; color: var(--aura-alert-danger-fg)"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import></span><span><b style="font-weight: 600">Nothing escalates on its own</b> — the status engine is down since 02:17. Send the next level by hand if nobody acknowledges.</span></span><span style="display: flex"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="arrow-up-right" on-click="{{askEsc}}">{{m.escLabel}}</x-import></span></div></sc-if>
+<sc-if value="{{m.engineBack}}" hint-placeholder-val="{{false}}"><div style="display: flex; gap: 8px; padding: 10px 12px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span><span>Automatic escalation is running again — levels already sent won’t repeat.</span></div></sc-if>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{ladderFoot}}</span>
+</div>
+
+<div class="aura-card" style="gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Resolve</h3>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import>{{condCount}} of 3 met</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{conds}}" as="c" hint-placeholder-count="3">
+<div style="display: flex; align-items: flex-start; gap: 10px; line-height: 1.45">
+<span style="display: flex; padding-top: 2px; color: {{c.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm" label="{{c.state}}"></x-import></span>
+<span style="display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 500">{{c.label}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.detail}}</span></span>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="lock" size="sm" disabled="{{yes}}">Resolve</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" icon="pencil" size="sm" on-click="{{openRc}}">{{rcCta}}</x-import>
+</div>
+
+</div>
+
+</div>
+</div>
+</main><aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="incidents" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+
+
+<sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+<div role="status" aria-live="polite" style="position: absolute; left: 280px; bottom: 24px; width: 520px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 12px 12px 12px 18px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); line-height: 1.45">
+<span style="display: flex"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; font-size: 13px"><span><span style="font-weight: 600">Acknowledged {{m.id}}</span> · {{m.ackStop}}</span><span style="font-size: 12px; opacity: 0.75">Posting to Chat, email and webhooks in {{left}} s — nothing is sent until then</span></span>
+<button type="button" onClick="{{undo}}" style="height: 36px; padding: 0 16px; flex-shrink: 0; border-radius: 9999px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer">Undo · {{left}} s</button>
+</div>
+</sc-if>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{sendOpen}}" on-close="{{closeSend}}" title="{{send.title}}" description="{{send.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<div style="display: flex; flex-direction: column; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{send.who}}" as="w" hint-placeholder-count="2"><div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: {{w.border}}; font-size: 13px; line-height: 1.4"><x-import component-from-global-scope="Aura.Avatar" name="{{w.n}}" size="sm"></x-import><span style="flex-grow: 1"><b style="font-weight: 600">{{w.n}}</b> <span style="color: var(--aura-fg-secondary)">· {{w.role}}</span></span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{w.how}}</span></div></sc-for>
+</div>
+<div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Sent at once · logged</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeSend}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="{{send.icon}}" on-click="{{doSend}}">{{send.cta}}</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{nnOpen}}" on-close="{{closeNn}}" title="Client update not needed" description="{{m.nnDesc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<x-import component-from-global-scope="Aura.Textarea" label="Reason" required="{{yes}}" rows="{{three}}" value="{{nnReason}}" on-change="{{typeNn}}" placeholder="e.g. MuvMi ops reported it to us first and are on the call" hint="Required. Recorded in the audit log and shown as “Client notified: not needed” in the post-incident review."></x-import>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">{{nnHelp}}</span>
+<div style="display: flex; gap: 12px; flex-shrink: 0">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeNn}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" disabled="{{nnEmpty}}" on-click="{{saveNn}}">Mark not needed</x-import>
+</div>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{noteOpen}}" on-close="{{closeNote}}" title="Add note" description="{{m.id}} · added to the timeline and the audit log as Tao" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px">
+<x-import component-from-global-scope="Aura.Textarea" label="Note text" required="{{yes}}" rows="{{three}}" value="{{noteText}}" on-change="{{typeNote}}" placeholder="e.g. Arm is checking the hosting panel"></x-import>
+<div style="display: flex; justify-content: flex-end; gap: 12px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeNote}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" disabled="{{noteEmpty}}" on-click="{{saveNote}}">Add to timeline</x-import>
+</div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{shotOpen}}" on-close="{{closeShot}}" title="Screenshot · BKK · 09:49:20" description="Browser verifier evidence for INC-0142 · kept for 30 days" size="md" auto-focus="{{no}}">
+<div style="height: 300px; box-sizing: border-box; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--aura-fg-secondary); font-size: 13px">
+<x-import component-from-global-scope="Aura.Icon" name="image" size="lg"></x-import>
+<span>[Screenshot — browser timeout page, full size]</span>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{rcOpen}}" on-close="{{closeRc}}" title="Root cause" description="{{m.rcDesc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 18px; padding-top: 4px">
+<x-import component-from-global-scope="Aura.Select" label="Root cause category" options="{{causes}}" placeholder="Choose one" required="{{yes}}" value="{{rcCat}}" on-change="{{setRcCat}}" error="{{rcCatErr}}" hint="{{rcCatHint}}"></x-import>
+<x-import component-from-global-scope="Aura.Textarea" label="What happened" required="{{yes}}" rows="{{three}}" value="{{rcText}}" on-change="{{setRcText}}" error="{{rcTextErr}}" hint="Plain language — this text goes into the weekly summary and the client report."></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="What fixed it" optional="{{yes}}" value="{{rcFix}}" on-change="{{setRcFix}}" placeholder="Leave empty while it’s still down"></x-import>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px">
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">Same form as Resolve. Saving records a draft on the timeline; Resolve unlocks when all 3 conditions are met.</span>
+<div style="display: flex; gap: 12px; flex-shrink: 0">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeRc}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" on-click="{{saveRc}}">Save, keep open</x-import>
+</div>
+</div>
+</div>
+</x-import>
+
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2040}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { caseV: 'Home page back · /booking still failing', escN: 0, cuSent: false, send: null, opened: 'Inside response hours', view: 'Now · 10:07', acked: false, toast: false, left: 10, updated: false, nn: false, nnOpen: false, nnReason: '', lang: 'TH', rcOpen: false, rcCat: '', rcText: '', rcFix: '', rcTried: false, rc: null, noteOpen: false, noteText: '', notes: [], shotOpen: false, copied: false };
+  }
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var later = st.view !== 'Now · 10:07';
+    var acked = later || st.acked;
+    var holding = !later && st.toast;
+    var updated = later || st.updated;
+    var nn = !later && st.nn;
+    var cuDone = updated || nn;
+    var done = { dotBg: 'var(--aura-bg-surface-strong)', dotFg: 'var(--aura-fg-inverted)', statusColor: 'var(--aura-fg-secondary)' };
+    var next = { dotBg: 'var(--aura-status-blocked-bg)', dotFg: 'var(--aura-status-blocked-fg)', statusColor: 'var(--aura-alert-warning-fg)' };
+    var later2 = { dotBg: 'var(--aura-status-neutral-bg)', dotFg: 'var(--aura-status-neutral-fg)', statusColor: 'var(--aura-fg-secondary)' };
+    // One source of truth for the Tier 1 DOWN ladder; the timeline below is generated from it.
+    var NIGHT = st.opened === 'Outside response hours';
+    var steps = [
+      NIGHT ? { level: 'L0', offset: '0 min', at: '09:48:43', hhmm: '09:48', who: 'Ploy (on call, outside response hours) @mention + Alerts Space · owner Arm not paged', short: '@Ploy (on call) + Alerts Space · Chat + email · Arm (owner) not paged outside response hours', sent: true }
+        : { level: 'L0', offset: '0 min', at: '09:48:43', hhmm: '09:48', who: 'Arm (owner, business hours) @mention + Alerts Space', short: '@Arm + Alerts Space · Chat + email', sent: true },
+      NIGHT ? { level: 'L1', offset: '+15 min', at: '10:03:43', hhmm: '10:03', who: 'Tao — backup Ploy is already paged as on call', short: '“@Tao please acknowledge” in the thread + email (Ploy, the backup, was paged at L0)', sent: true }
+        : { level: 'L1', offset: '+15 min', at: '10:03:43', hhmm: '10:03', who: 'Ploy (backup) + Tao', short: '“@Ploy please acknowledge · Tao FYI” in the thread + email', sent: true },
+      { level: 'L2', offset: '+30 min', at: '10:18:43', hhmm: '10:18', who: 'CEO @mention + email (voice call off until approved)', short: 'CEO @mention + email', sent: false, proposal: false, stopOnAck: true },
+      { level: 'L3', offset: '+60 min', at: '10:48:43', hhmm: '10:48', who: acked ? 'CEO + Bua (AM) · FYI @mention + email, no call' : 'CEO + Bua (AM) @mention + email', short: acked ? 'FYI to CEO + Bua (@mention + email, no call) if MuvMi is still down' : 'CEO + Bua (AM) @mention + email if MuvMi is still down', sent: false, fyi: true }
+    ];
+    var ladder = steps.map(function (s) {
+      var status, look;
+      if (s.sent) { status = 'Sent ' + s.hhmm; look = done; }
+      else if (s.stopOnAck && acked) { status = 'Cancelled · acked'; look = later2; }
+      else if (s.stopOnAck) { status = 'In 11 min'; look = next; }
+      else if (acked) { status = 'FYI at 10:48 if still down'; look = later2; }
+      else { status = 'If still down'; look = later2; }
+      return Object.assign({ level: s.level, when: s.offset + ' · ' + s.hhmm, who: s.who, status: status, proposal: !!s.proposal && !(acked && s.stopOnAck) }, look);
+    });
+    var timeline = [
+      { at: '09:48:12', icon: 'circle-alert', color: 'var(--aura-fg-danger)', title: 'First failed check', detail: 'Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN) → immediate recheck about 30 s later', scheduled: false },
+      { at: '09:48:41', icon: 'ban', color: 'var(--aura-fg-danger)', title: 'Confirmed down 09:48:41', detail: 'Recheck failed at 3 of 3 locations — hard fail on 2 checks in a row. Incident opened.', scheduled: false },
+      { at: '09:49:20', icon: 'image', color: 'var(--aura-fg-secondary)', title: 'Screenshot attached', detail: 'Browser verifier, Bangkok — evidence only.', scheduled: false },
+      { at: '10:03:12', icon: 'mail', color: 'var(--aura-alert-warning-fg)', title: 'Client update due — Bua @mentioned', detail: 'Tier 1 down 15 min · draft client message posted in the thread for Bua (AM)', scheduled: false }
+    ];
+    steps.forEach(function (s) {
+      if (s.sent) timeline.push({ at: s.at, icon: s.level === 'L0' ? 'bell' : 'arrow-up-right', color: s.level === 'L0' ? 'var(--aura-fg-primary)' : 'var(--aura-alert-warning-fg)', title: s.level === 'L0' ? 'L0 alert sent' : 'Escalated to ' + s.level + ' — no ack in 15 min', detail: s.short, scheduled: false });
+    });
+    var POSTACK = 'L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).';
+    if (later) {
+      timeline.push({ at: '10:07:40', icon: 'check', color: 'var(--aura-fg-positive)', title: 'Acknowledged by Arm · Chat card', detail: 'Acknowledged by Arm → ' + POSTACK + ' Posted to Chat + email and incident.acknowledged webhook sent 10:07:50, after the 10 s undo window.', scheduled: false });
+      timeline.push({ at: '10:12:05', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Client update marked by Bua', detail: '“Called MuvMi ops, ETA shared” · client-update track closed', scheduled: false });
+    } else if (acked) {
+      timeline.push({ at: '10:07:15', icon: 'check', color: 'var(--aura-fg-positive)', title: 'Acknowledged by Tao (you) · desktop', detail: holding ? 'Acknowledged by Tao → ' + POSTACK + ' Held — posting to Chat, email and webhooks in ' + st.left + ' s.' : 'Acknowledged by Tao → ' + POSTACK + ' Posted to Chat + email, webhook sent 10:07:25. Client update track continues.', scheduled: false });
+    }
+    if (!later && st.updated) timeline.push({ at: '10:07:30', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Client update marked by Tao', detail: 'Recorded for the post-incident review (Client notified).', scheduled: false });
+    if (nn) timeline.push({ at: '10:07:30', icon: 'circle-check', color: 'var(--aura-fg-secondary)', title: 'Client update marked not needed by Tao', detail: 'Reason: ' + st.nnReason, scheduled: false });
+    if (st.rc) timeline.push({ at: later ? '10:12:30' : '10:07:45', icon: 'pencil', color: 'var(--aura-fg-secondary)', title: 'Root cause draft by Tao', detail: st.rc.catLabel + ' · “' + st.rc.text + '”' + (st.rc.fix ? ' · Fix: ' + st.rc.fix : '') + ' · incident kept open', scheduled: false });
+    st.notes.forEach(function (n) { timeline.push({ at: later ? '10:12:20' : '10:07:35', icon: 'pencil', color: 'var(--aura-fg-secondary)', title: 'Note by Tao', detail: n, scheduled: false }); });
+    timeline.sort(function (a, b) { return a.at < b.at ? -1 : 1; });
+    steps.forEach(function (s) {
+      if (s.sent) return;
+      if (s.stopOnAck && acked) return;
+      timeline.push({ at: s.at, icon: 'clock', color: 'var(--aura-fg-tertiary)', title: s.stopOnAck ? 'L2 · CEO step' : (acked ? 'L3 · FYI if still down' : 'L3 if still down'), detail: s.short, scheduled: true });
+    });
+    var TH = 'เรียนทีม MuvMi\nขณะนี้เว็บไซต์ของท่านไม่สามารถเข้าใช้งานได้ ตั้งแต่เวลา 09:48 น. ทีม DxT ตรวจพบแล้วและกำลังแก้ไข จะแจ้งความคืบหน้าภายใน [ETA] น.\nขออภัยในความไม่สะดวก — Bua, DxT Solutions';
+    var EN = 'Hi MuvMi team,\nYour website has been unavailable since 09:48 (UTC+7). DxT detected it and is working on a fix. Next update by [ETA].\nSorry for the disruption — Bua, DxT Solutions';
+    var OKC = 'var(--aura-fg-positive)', PEND = 'var(--aura-fg-tertiary)';
+    var conds = [
+      { label: 'OK for 2 rounds', icon: 'circle', color: PEND, state: 'Not met', detail: later ? 'Still down at 10:12 · earliest ≈ 10:14 if it recovers now' : 'Still down · earliest ≈ 10:09 if it recovers now' },
+      cuDone
+        ? { label: 'Client update marked', icon: 'circle-check', color: OKC, state: 'Met', detail: later ? 'Bua · 10:12' : (nn ? 'Not needed · Tao 10:07 · reason recorded' : 'Tao · 10:07') }
+        : { label: 'Client update marked', icon: 'circle', color: PEND, state: 'Not met', detail: 'Due 10:03 · Bua notified · Tier 1 down over 15 min' }
+    ];
+    var CAUSE = { hosting: 'Hosting / server', deploy: 'Deploy / code change', dns: 'DNS / domain', ssl: 'SSL certificate', third: 'Third-party / CDN', traffic: 'Traffic / capacity', client: 'Client-side change', 'false': 'False alarm (monitor)', unknown: 'Unknown — keep investigating' };
+    // Unknown — keep investigating never meets the gate (§16.3).
+    var rcMet = !!st.rc && st.rc.cat !== 'unknown';
+    conds.push(rcMet
+      ? { label: 'Root cause written', icon: 'circle-check', color: OKC, state: 'Met', detail: 'Tao · ' + (later ? '10:12' : '10:07') + ' · ' + st.rc.catLabel }
+      : st.rc
+        ? { label: 'Root cause written', icon: 'circle', color: PEND, state: 'Not met', detail: 'Unknown keeps the incident open' }
+        : { label: 'Root cause written', icon: 'circle', color: PEND, state: 'Not met', detail: 'Not written yet · can be drafted now' });
+    var condCount = (cuDone ? 1 : 0) + (rcMet ? 1 : 0);
+    var rcCatErr = st.rcTried && !st.rcCat ? 'Choose a category.' : '';
+    var rcTextErr = st.rcTried && !st.rcText.trim() ? 'Describe what happened in a sentence or two.' : '';
+    var cuState, cuColor = 'var(--aura-fg-positive)';
+    if (later) cuState = 'Updated by Bua 10:12';
+    else if (st.updated) cuState = 'Updated by Tao 10:07';
+    else if (nn) { cuState = 'Not needed · Tao 10:07'; cuColor = 'var(--aura-fg-secondary)'; }
+    else { cuState = 'Not marked yet'; cuColor = 'var(--aura-alert-warning-fg)'; }
+    var RET = {
+      yes: true,
+      no: false,
+      three: 3,
+      views: ['Now · 10:07', 'Later · 10:12'],
+      openedOpts: ['Inside response hours', 'Outside response hours'], opened: st.opened, setOpened: function (v) { self.setState({ opened: v }); },
+      night: NIGHT,
+      own: NIGHT ? { label: 'PAGED · ON CALL', name: 'Ploy', sub: 'Owner Arm, not paged · AM Bua' } : { label: 'OWNER', name: 'Arm', sub: 'Backup Ploy · AM Bua' },
+      view: st.view,
+      setView: function (v) { clearInterval(self._iv); self.setState({ view: v, toast: false }); },
+      acked: acked,
+      notAcked: !acked,
+      toast: holding,
+      left: st.left,
+      ack: function () {
+        clearInterval(self._iv);
+        self.setState({ acked: true, toast: true, left: 10 });
+        self._iv = setInterval(function () {
+          var l = self.state.left - 1;
+          if (l <= 0) { clearInterval(self._iv); self.setState({ toast: false, left: 0 }); }
+          else self.setState({ left: l });
+        }, 1000);
+      },
+      undo: function () { clearInterval(self._iv); self.setState({ acked: false, toast: false, left: 10 }); },
+      duration: later ? '24 min' : '19 min',
+      latestLabel: later ? 'Latest · 10:12:10' : 'Latest · 10:07:10',
+      escLevel: acked ? 'L1–L2 stopped' : (NIGHT ? 'L1 · Tao' : 'L1 · Ploy + Tao'),
+      escNext: acked ? 'L3 FYI at 10:48 if still down' : 'CEO step at 10:18 (in 11 min)',
+      ackBy: later ? 'Arm' : (acked ? 'Tao (you)' : '—'),
+      ackMeta: later ? '10:07:40 · 19 min after confirmed down' : (acked ? '10:07:15 · 18 min after confirmed down' : '18 min since confirmed down'),
+      resolveShort: 'Resolve locked · ' + condCount + ' of 3 conditions met',
+      resolveWhy: 'Resolve stays locked until all 3 are met — MuvMi is still down, so “OK for 2 rounds” can’t be met yet.',
+      rcCta: st.rc ? 'Edit root cause' : 'Write root cause',
+      rcCatHint: st.rcCat === 'unknown' ? 'Unknown keeps the incident open — it does not meet the root-cause condition.' : '',
+      rcCat: st.rcCat, rcText: st.rcText, rcFix: st.rcFix, rcCatErr: rcCatErr, rcTextErr: rcTextErr,
+      setRcCat: function (e) { self.setState({ rcCat: e && e.target ? e.target.value : e }); },
+      setRcText: function (e) { self.setState({ rcText: e && e.target ? e.target.value : e }); },
+      setRcFix: function (e) { self.setState({ rcFix: e && e.target ? e.target.value : e }); },
+      saveRc: function () {
+        var s2 = self.state;
+        if (!s2.rcCat || !s2.rcText.trim()) { self.setState({ rcTried: true }); return; }
+        self.setState({ rc: { cat: s2.rcCat, catLabel: CAUSE[s2.rcCat] || s2.rcCat, text: s2.rcText.trim(), fix: s2.rcFix.trim() }, rcOpen: false, rcTried: false });
+      },
+      conds: conds,
+      condCount: condCount,
+      cuOpen: !cuDone,
+      cuDone: cuDone,
+      cuBadge: nn ? 'Not needed' : 'Updated',
+      cuPrimary: acked && !cuDone,
+      cuSecondary: !acked && !cuDone,
+      cuState: cuState,
+      cuColor: cuColor,
+      cuHasNote: later || nn,
+      cuNoteLabel: later ? 'Note' : 'Reason',
+      cuNote: later ? 'Called MuvMi ops, ETA shared' : st.nnReason,
+      cuFoot: cuDone ? 'Recorded in the audit log and the post-incident review (Client notified).' : 'Tier 1 down over 15 min: Resolve needs this marked, or marked “Not needed” with a reason.',
+      markUpdated: function () { self.setState({ updated: true }); },
+      openNn: function () { self.setState({ nnOpen: true }); },
+      closeNn: function () { self.setState({ nnOpen: false }); },
+      typeNn: function (e) { self.setState({ nnReason: e && e.target ? e.target.value : e }); },
+      saveNn: function () { if (self.state.nnReason.trim()) self.setState({ nn: true, nnOpen: false }); },
+      nnOpen: st.nnOpen,
+      nnReason: st.nnReason,
+      nnEmpty: !st.nnReason.trim(),
+      nnHelp: st.nnReason.trim() ? 'Unlocks the client-update condition for Resolve.' : 'A reason is required before you can save.',
+      openNote: function () { self.setState({ noteOpen: true }); },
+      closeNote: function () { self.setState({ noteOpen: false }); },
+      typeNote: function (e) { self.setState({ noteText: e && e.target ? e.target.value : e }); },
+      saveNote: function () { var n = self.state.noteText.trim(); if (n) self.setState({ notes: self.state.notes.concat([n]), noteText: '', noteOpen: false }); },
+      noteOpen: st.noteOpen,
+      noteText: st.noteText,
+      noteEmpty: !st.noteText.trim(),
+      shotOpen: st.shotOpen,
+      openShot: function () { self.setState({ shotOpen: true }); },
+      closeShot: function () { self.setState({ shotOpen: false }); },
+      copy: function () { self.setState({ copied: true }); },
+      copyLabel: st.copied ? 'Draft copied' : 'Copy draft',
+      copyIcon: st.copied ? 'check' : 'copy',
+      ladderFoot: later ? 'Acknowledged by Arm → ' + POSTACK : (acked ? 'Acknowledged by Tao (you) → ' + POSTACK : 'Acknowledge stops L1–L2. It does not stop the client update.'),
+      lang: st.lang,
+      langs: ['TH', 'EN'],
+      setLang: function (v) { self.setState({ lang: v }); },
+      template: st.lang === 'TH' ? TH : EN,
+      rcOpen: st.rcOpen,
+      openRc: function () { self.setState({ rcOpen: true }); },
+      closeRc: function () { self.setState({ rcOpen: false, rcTried: false }); },
+      causes: [
+        { value: 'hosting', label: 'Hosting / server' },
+        { value: 'deploy', label: 'Deploy / code change' },
+        { value: 'dns', label: 'DNS / domain' },
+        { value: 'ssl', label: 'SSL certificate' },
+        { value: 'third', label: 'Third-party / CDN' },
+        { value: 'traffic', label: 'Traffic / capacity' },
+        { value: 'client', label: 'Client-side change' },
+        { value: 'false', label: 'False alarm (monitor)' },
+        { value: 'unknown', label: 'Unknown — keep investigating' }
+      ],
+      evidence: [
+        { loc: 'BKK · Thai VPS', r1: 'Timeout > 30 s', r2: 'Timeout > 30 s', r3: 'Timeout > 30 s' },
+        { loc: 'SIN · sin1', r1: 'HTTP 504 · 12.4 s', r2: 'HTTP 504 · 11.9 s', r3: 'HTTP 504 · 12.2 s' },
+        { loc: 'TYO · hnd1', r1: 'Timeout > 30 s', r2: 'Timeout > 30 s', r3: 'Timeout > 30 s' }
+      ],
+      timeline: timeline,
+      ladder: ladder,
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+    var PARTC = 'Home page back · /booking still failing';
+    var CASE = st.caseV, PART = CASE === PARTC, MAN = CASE !== 'INC-0142 · probes' && !PART, BACK = CASE === 'Manual · engine back';
+    RET.caseOpts = ['INC-0142 · probes', 'Manual · engine down', 'Manual · engine back', PARTC]; RET.caseV = CASE;
+    RET.setCase = function (v) { clearInterval(self._iv); self.setState({ caseV: v, escN: v === 'Manual · engine back' ? 1 : 0, cuSent: false, send: null, acked: false, toast: false, view: 'Now · 10:07' }); };
+    RET.notManual = !MAN; RET.isManual = MAN; RET.isPart = PART; RET.notPart = !PART; RET.showCtl = !MAN && !PART; RET.showShot = true; RET.factCols = 6; RET.evRe = true;
+    RET.evSum = '3 of 3 locations hard fail on 2 checks in a row → DOWN (2 of 3 needed)'; RET.evH1 = 'First check · 09:48:12'; RET.evH2 = 'Recheck · 09:48:41';
+    RET.dur = { label: 'DURATION', color: 'var(--aura-fg-danger)', sub: 'Still down' }; RET.escTitle = 'Escalation · Tier 1 DOWN';
+    var BAN = { i1: 'ban', c1: 'var(--aura-fg-danger)', w1: 'Fail', i2: 'ban', c2: 'var(--aura-fg-danger)', w2: 'Fail', i3: 'ban', c3: 'var(--aura-fg-danger)', w3: 'Fail' };
+    RET.evidence = RET.evidence.map(function (e) { return Object.assign({}, BAN, e); });
+    RET.m = { id: 'INC-0142', h1: 'MuvMi is down', sev: 'Down', sevTone: 'danger', sevVariant: 'solid', sevIcon: 'ban', tier: 'Tier 1', amRole: 'Account manager', wfTone: 'warning', wfIcon: 'arrow-up-right', wfLabel: 'Escalated · L1', unacked: '18 min unacked', trigger: 'Hard fail',
+      causeLine: 'Primary monitor · HTTP GET / · Timeout > 30 s (BKK, TYO) · HTTP 504 (SIN)', owner: 'Arm', started: '09:48:12', startedSub: 'First failed check', conf: '09:48:41', confSub: 'Immediate recheck · MTTD 29 s',
+      cuTitle: 'Client update due 10:03 · Bua notified 10:03 · not marked yet', cuText: 'Tier 1 down over 15 min, so Bua (AM) was @mentioned in the thread with a draft. Acknowledging does not stop this track — mark it in the Client update card once MuvMi has been told, or mark it “Not needed” with a reason.',
+      cuDue: '10:03', am: 'Bua', amNote: 'Notified 10:03', cuDueLine: '10:03 · Tier 1 down 15 min', client: 'MuvMi', ackStop: 'L1–L2 stopped', nnDesc: 'INC-0142 · MuvMi · Tier 1 · AM Bua · due 10:03', rcDesc: 'INC-0142 · MuvMi · Tier 1 · owner Arm · still down', noEvidence: false, canEsc: false, engineBack: false, canCu: false, escLabel: '' };
+    if (MAN) {
+      var ack2 = !!st.acked, N = st.escN || 0, HOLD = st.toast;
+      var LV = [
+        { level: 'L0', when: '0 min · 02:31', who: 'Ploy (on call) @mention + Alerts Space · owner Nok not paged at night' },
+        { level: 'L1', when: '+15 min · 02:46', who: 'Arm (backup) + Tao', btn: 'L1 (Arm, backup · Tao)', sendWho: [['Arm', 'backup', 'Chat @mention + email'], ['Tao', 'Admin', 'Chat @mention + email']], tl: 'Arm + Tao — “@Arm please acknowledge · Tao FYI” in the thread + email' },
+        { level: 'L2', when: '+30 min · 03:01', who: 'CEO @mention + email (voice call off until approved)', btn: 'L2 (CEO)', sendWho: [['CEO', 'L2', 'Chat @mention + email']], tl: 'CEO @mention + email' },
+        { level: 'L3', when: '+60 min · 03:31', who: 'CEO + Thee (AM) @mention + email', btn: 'L3 (CEO + Thee, Site AM)', sendWho: [['CEO', 'L3', 'Chat @mention + email'], ['Thee', 'Site AM', 'Chat @mention + email']], tl: 'CEO + Thee (AM) @mention + email' }
+      ];
+      var SENTAT = ['02:31', '02:35', '02:36', '02:37'];
+      RET.ladder = LV.map(function (l, i) {
+        var status, look;
+        if (i === 0) { status = 'Sent 02:31'; look = done; }
+        else if (i <= N) { status = 'Sent ' + SENTAT[i] + ' by Tao'; look = done; }
+        else if (ack2) { status = 'Cancelled · acked'; look = later2; }
+        else if (BACK) { status = i === N + 1 ? 'At ' + l.when.split('· ')[1] + ' if unacked' : 'If still unacked'; look = i === N + 1 ? next : later2; }
+        else { status = i === N + 1 ? 'Waits — engine down' : 'Waits'; look = i === N + 1 ? next : later2; }
+        return Object.assign({ level: l.level, when: l.when, who: l.who, status: status, proposal: false }, look);
+      });
+      var tl = [
+        { at: '02:31:05', icon: 'user', color: 'var(--aura-fg-primary)', title: 'Opened by Tao from a hand check · “Home page shows a 502 error”', detail: 'Trigger: Manual (hand check) · reported by hand — no probe round confirms it yet', scheduled: false },
+        { at: '02:31:08', icon: 'bell', color: 'var(--aura-fg-primary)', title: 'L0 alert sent', detail: '@Ploy (on call) + Alerts Space · Chat + email · Nok (owner) not paged outside response hours · client-update clock started (due 02:46)', scheduled: false }
+      ];
+      for (var k = 1; k <= N; k++) tl.push({ at: SENTAT[k] + ':10', icon: 'arrow-up-right', color: 'var(--aura-alert-warning-fg)', title: 'Escalated to ' + LV[k].level + ' by Tao (engine down)', detail: LV[k].tl, scheduled: false });
+      if (st.cuSent) tl.push({ at: '02:36:40', icon: 'mail', color: 'var(--aura-alert-warning-fg)', title: 'Client-update reminder sent by Tao (engine down)', detail: 'Thee (AM) @mentioned in the thread with a draft client message + email', scheduled: false });
+      if (BACK) tl.push({ at: '02:44:00', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Status engine back — automatic escalation running again', detail: 'Levels already sent won’t repeat. Next: L2 at 03:01 if still unacked.', scheduled: false });
+      if (ack2) tl.push({ at: BACK ? '02:45:00' : '02:38:00', icon: 'check', color: 'var(--aura-fg-positive)', title: 'Acknowledged by Tao (you) · desktop', detail: HOLD ? 'Held — posting to Chat, email and webhooks in ' + st.left + ' s.' : 'Escalation stopped. The client-update track continues.', scheduled: false });
+      RET.timeline = tl;
+      var nxt = LV[N + 1];
+      RET.m = { id: 'INC-0143', h1: 'realme.link is down', sev: 'Down', sevTone: 'danger', sevVariant: 'solid', sevIcon: 'ban', tier: 'Tier 1', amRole: 'Account manager', wfTone: N ? 'warning' : 'danger', wfIcon: N ? 'arrow-up-right' : 'clock', wfLabel: N ? 'Escalated · ' + LV[N].level : 'Unacked', unacked: (BACK ? '13' : '4') + ' min unacked', trigger: 'Manual (hand check)',
+        causeLine: 'Opened by Tao from a hand check at 02:31 · “Home page shows a 502 error” · no probe check — the status engine is down', owner: 'Nok', started: '02:31', startedSub: 'Opened by hand', conf: '—', confSub: 'No probe check · engine down',
+        cuTitle: st.cuSent ? 'Client update due 02:46 · Thee notified 02:36 by hand · not marked yet' : (BACK ? 'Client update due 02:46 · the reminder goes to Thee automatically at 02:46' : 'Client update due 02:46 · Thee not notified yet'),
+        cuText: BACK ? 'Tier 1 client site: the client-update clock started when the incident was opened (02:31). The engine is back, so the 15-min reminder goes out on time.' : 'Tier 1 client site: the client-update clock started when the incident was opened (02:31). While the engine is down the 15-min reminder won’t go out on its own — send it from the Client update card.',
+        cuDue: '02:46', am: 'Thee', amNote: st.cuSent ? 'Notified 02:36 (by hand)' : (BACK ? 'Reminder at 02:46' : 'Not notified yet'), cuDueLine: '02:46 · 15 min after it was opened', client: 'realme', ackStop: 'escalation stopped', nnDesc: 'INC-0143 · realme.link · Tier 1 · AM Thee · due 02:46', rcDesc: 'INC-0143 · realme.link · Tier 1 · owner Nok · still down', noEvidence: true,
+        canEsc: !BACK && !ack2 && !!nxt, engineBack: BACK, canCu: !BACK && !st.cuSent, escLabel: nxt ? 'Escalate now · ' + nxt.btn : '' };
+      RET.night = true; RET.showShot = false;
+      RET.own = { label: 'PAGED · ON CALL', name: 'Ploy', sub: 'Owner Nok, not paged · AM Thee' };
+      RET.duration = BACK ? '13 min' : '4 min';
+      RET.escLevel = ack2 ? 'Stopped · acked' : (N ? LV[N].level + ' · sent by hand' : 'L0 · Ploy');
+      RET.escNext = ack2 ? 'Acknowledged — nothing more is sent' : (BACK ? 'Running again · next at ' + (nxt ? nxt.when.split('· ')[1] : '—') : 'Engine down — nothing escalates on its own');
+      RET.ackBy = ack2 ? 'Tao (you)' : '—'; RET.ackMeta = ack2 ? (BACK ? '02:45' : '02:38') + ' · desktop' : (BACK ? '13' : '4') + ' min since opened';
+      RET.ladderFoot = ack2 ? 'Acknowledged by Tao (you) → escalation stopped. The client-update track continues.' : 'Acknowledge stops escalation. It does not stop the client update.';
+      RET.latestLabel = '—';
+      RET.conds = [
+        { label: 'OK for 2 rounds', icon: 'circle', color: PEND, state: 'Not met', detail: BACK ? 'Probes running again · earliest ≈ 02:46 if it recovers' : 'No probe results while the engine is down' },
+        st.cuSent ? { label: 'Client update marked', icon: 'circle', color: PEND, state: 'Not met', detail: 'Thee notified 02:36 · not marked yet' } : { label: 'Client update marked', icon: 'circle', color: PEND, state: 'Not met', detail: 'Due 02:46 · Tier 1 client site' },
+        { label: 'Root cause written', icon: 'circle', color: PEND, state: 'Not met', detail: 'Not written yet · can be drafted now' }
+      ];
+      RET.condCount = 0; RET.resolveShort = 'Resolve locked · 0 of 3 conditions met';
+      RET.cuState = st.cuSent ? 'Thee notified 02:36 · not marked' : 'Not notified yet'; RET.cuColor = 'var(--aura-alert-warning-fg)';
+      RET.cuFoot = 'Tier 1 client site: Resolve needs this marked, or marked “Not needed” with a reason.';
+      RET.cuOpen = true; RET.cuDone = false; RET.cuHasNote = false;
+      RET.template = st.lang === 'TH' ? 'เรียนทีม realme\nขณะนี้เว็บไซต์ของท่านไม่สามารถเข้าใช้งานได้ ตั้งแต่เวลา 02:31 น. ทีม DxT ตรวจพบแล้วและกำลังแก้ไข จะแจ้งความคืบหน้าภายใน [ETA] น.\nขออภัยในความไม่สะดวก — Thee, DxT Solutions' : 'Hi realme team,\nYour website has been unavailable since 02:31 (UTC+7). DxT is working on a fix. Next update by [ETA].\nSorry for the disruption — Thee, DxT Solutions';
+      var SD = st.send;
+      RET.sendOpen = !!SD;
+      RET.send = SD === 'esc' && nxt ? { title: 'Send ' + nxt.level + ' now?', desc: 'INC-0143 · realme.link · the engine is down, so this goes out only because you send it.', who: nxt.sendWho.map(function (w, i) { return { n: w[0], role: w[1], how: w[2], border: i ? '1px solid var(--aura-border-subtle)' : 'none' }; }), cta: 'Send ' + nxt.level + ' now', icon: 'arrow-up-right' }
+        : SD === 'cu' ? { title: 'Send the client-update reminder now?', desc: 'INC-0143 · realme.link · the same reminder the engine sends after 15 min DOWN.', who: [{ n: 'Thee', role: 'Site AM', how: 'Chat @mention with the draft + email', border: 'none' }], cta: 'Send reminder', icon: 'mail' }
+        : { title: '', desc: '', who: [], cta: '', icon: 'mail' };
+      RET.askEsc = function () { self.setState({ send: 'esc' }); };
+      RET.askCu = function () { self.setState({ send: 'cu' }); };
+      RET.closeSend = function () { self.setState({ send: null }); };
+      RET.doSend = function () { var s2 = self.state; if (s2.send === 'esc') self.setState({ send: null, escN: (s2.escN || 0) + 1 }); else self.setState({ send: null, cuSent: true }); };
+    } else if (PART) {
+      // VOCA · Tier 2 · internal. DOWN Thu 23:41 → home page back Fri 09:35; continues as a PROBLEM (Key page). Sample data, made up.
+      var WARN = 'var(--aura-alert-warning-fg)';
+      RET.m = { id: 'INC-0140', h1: 'VOCA · /booking still failing', sev: 'Problem', sevTone: 'warning', sevVariant: 'soft', sevIcon: 'triangle-alert', tier: 'Tier 2', amRole: 'Admin · internal site, no client', trigger: 'Key page',
+        causeLine: 'Key page /booking → HTTP 404 (BKK, SIN, TYO) · home page back 09:35 · down from Thu 23:41 (Hard fail)', owner: 'Ploy', started: 'Thu 23:41:36', startedSub: 'First failed check', conf: '23:42:08', confSub: 'Immediate recheck · MTTD 32 s',
+        cuTitle: '', cuText: '', cuDue: '', am: 'Tao', amNote: 'Not required', cuDueLine: 'Not required — internal site', client: 'VOCA (internal)', ackStop: '', nnDesc: '', rcDesc: 'INC-0140 · VOCA · Tier 2 · owner Ploy · still has a problem', noEvidence: false, canEsc: false, engineBack: false, canCu: false, escLabel: '' };
+      RET.night = false; RET.showShot = false; RET.factCols = 7; RET.evRe = false;
+      RET.own = { label: 'OWNER', name: 'Ploy', sub: 'Backup Tao · internal site' };
+      RET.acked = true; RET.notAcked = false; RET.toast = false;
+      RET.nav[0].items[1] = Object.assign({}, RET.nav[0].items[1], { count: 4 });
+      RET.duration = '9 h 54 min';
+      RET.dur = { label: 'DOWN FOR', color: 'var(--aura-fg-primary)', sub: 'Thu 23:41 → Fri 09:35 · counts in uptime' };
+      RET.escTitle = 'Escalation · Tier 2 DOWN';
+      RET.escLevel = 'Stopped · acked'; RET.escNext = 'Still acknowledged as a PROBLEM — nothing more is sent';
+      RET.ackBy = 'Ploy'; RET.ackMeta = '09:06 · 6 min into response hours';
+      RET.evSum = 'Home page passes at 3 of 3 · /booking fails at 3 of 3 → PROBLEM (Key page)';
+      RET.evH1 = 'Home page · latest 10:06:40'; RET.evH2 = '/booking · first fail 09:35:20'; RET.latestLabel = '/booking · latest 10:06:40';
+      var OK = { c1: 'var(--aura-fg-positive)', i1: 'circle-check', w1: 'Pass', i2: 'triangle-alert', c2: WARN, w2: 'Fail', i3: 'triangle-alert', c3: WARN, w3: 'Fail' };
+      RET.evidence = [
+        Object.assign({ loc: 'BKK · Thai VPS', r1: 'HTTP 200 · 0.9 s', r2: 'HTTP 404 · 0.4 s', r3: 'HTTP 404 · 0.4 s' }, OK),
+        Object.assign({ loc: 'SIN · sin1', r1: 'HTTP 200 · 1.1 s', r2: 'HTTP 404 · 0.5 s', r3: 'HTTP 404 · 0.5 s' }, OK),
+        Object.assign({ loc: 'TYO · hnd1', r1: 'HTTP 200 · 1.3 s', r2: 'HTTP 404 · 0.6 s', r3: 'HTTP 404 · 0.6 s' }, OK)
+      ];
+      RET.ladder = [
+        Object.assign({ level: 'L0', when: '0 min · 09:00', who: '@Ploy (owner) + Alerts Space · posted to the Space at 23:42, outside response hours — timers paused until 09:00', status: 'Sent 09:00', proposal: false }, done),
+        Object.assign({ level: 'L1', when: '+15 min · 09:15', who: 'Tao (backup, Admin)', status: 'Cancelled · acked', proposal: false }, later2),
+        Object.assign({ level: 'L2', when: '+30 min · 09:30', who: 'Tao reminder', status: 'Cancelled · acked', proposal: false }, later2)
+      ];
+      RET.ladderFoot = 'Acknowledged by Ploy 09:06 → escalation stopped. From 09:35 the same incident carries on as a PROBLEM and stays acknowledged, so no PROBLEM reminders go out.';
+      var ptl = [
+        { at: '23:41:36', icon: 'circle-alert', color: 'var(--aura-fg-danger)', title: 'First failed check · Thu 24 Sep', detail: 'Timeout > 30 s (BKK, SIN, TYO) → immediate recheck about 30 s later', scheduled: false },
+        { at: '23:42:08', icon: 'ban', color: 'var(--aura-fg-danger)', title: 'Confirmed down 23:42:08', detail: 'Recheck failed at 3 of 3 locations — hard fail on 2 checks in a row. Incident opened.', scheduled: false },
+        { at: '23:42:10', icon: 'moon', color: 'var(--aura-fg-secondary)', title: 'Posted outside response hours', detail: 'Tier 2 · Alerts Space only · timers paused until 09:00', scheduled: false },
+        { at: '09:00:00', icon: 'bell', color: 'var(--aura-fg-primary)', title: 'L0 alert sent · Fri 25 Sep', detail: '@Ploy (owner) + Alerts Space · Chat + email', scheduled: false },
+        { at: '09:06:12', icon: 'check', color: 'var(--aura-fg-positive)', title: 'Acknowledged by Ploy · Chat card', detail: 'Escalation stopped.', scheduled: false },
+        { at: '09:35:20', icon: 'triangle-alert', color: WARN, title: 'Home page back — /booking still failing', detail: 'RECOVERED and PROBLEM AGAIN (Key page) posted together from the 09:35 round. Down 9 h 54 min — the DOWN minutes stop here. Same incident, now a PROBLEM, still acknowledged by Ploy.', scheduled: false }
+      ];
+      if (st.rc) ptl.push({ at: '10:07:45', icon: 'pencil', color: 'var(--aura-fg-secondary)', title: 'Root cause draft by Tao', detail: st.rc.catLabel + ' · “' + st.rc.text + '”' + (st.rc.fix ? ' · Fix: ' + st.rc.fix : '') + ' · incident kept open', scheduled: false });
+      st.notes.forEach(function (n) { ptl.push({ at: '10:07:35', icon: 'pencil', color: 'var(--aura-fg-secondary)', title: 'Note by Tao', detail: n, scheduled: false }); });
+      RET.timeline = ptl;
+      var prc = !!st.rc && st.rc.cat !== 'unknown';
+      RET.conds = [
+        { label: 'OK for 2 rounds', icon: 'circle', color: PEND, state: 'Not met', detail: 'Still has a problem · needs 2 OK rounds of /booking once it clears' },
+        { label: 'Client update marked', icon: 'circle-check', color: OKC, state: 'Met', detail: 'Not required — internal site' },
+        prc ? { label: 'Root cause written', icon: 'circle-check', color: OKC, state: 'Met', detail: 'Tao · 10:07 · ' + st.rc.catLabel }
+            : { label: 'Root cause written', icon: 'circle', color: PEND, state: 'Not met', detail: st.rc ? 'Unknown keeps the incident open' : 'Not written yet · can be drafted now' }
+      ];
+      RET.condCount = prc ? 2 : 1;
+      RET.resolveShort = 'Resolve locked · ' + RET.condCount + ' of 3 met — VOCA still has a problem';
+      RET.cuOpen = false; RET.cuDone = true; RET.cuBadge = 'Not required'; RET.cuPrimary = false; RET.cuSecondary = false;
+      RET.cuState = 'Not required — internal site'; RET.cuColor = 'var(--aura-fg-secondary)'; RET.cuHasNote = false;
+      RET.cuFoot = 'VOCA is an internal site: no client to tell, so this condition is met.';
+      RET.template = 'No client message — VOCA is an internal site.';
+      RET.sendOpen = false; RET.send = { title: '', desc: '', who: [], cta: '', icon: 'mail' };
+      RET.askEsc = RET.askCu = RET.closeSend = RET.doSend = function () {};
+    } else {
+      RET.sendOpen = false; RET.send = { title: '', desc: '', who: [], cta: '', icon: 'mail' };
+      RET.askEsc = RET.askCu = RET.closeSend = RET.doSend = function () {};
+    }
+    return RET;
+  }
+}
+</script>
+</body>
+</html>

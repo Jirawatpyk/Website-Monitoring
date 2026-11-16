@@ -9,6 +9,7 @@ import {
   IconEyeOff,
   IconLock,
   IconShieldAlert,
+  IconTriangleAlert,
 } from '@jirawatpyk/aura-react/icons';
 import { formatDay, formatIncidentId, formatIncidentLine, formatTime, isSameBangkokDay } from '@dxt/shared';
 
@@ -19,7 +20,7 @@ import { formatDay, formatIncidentId, formatIncidentLine, formatTime, isSameBang
  */
 
 /** What one location's latest check looks like (the §11 legend). */
-export type LocationGlyph = 'pass' | 'fail' | 'blocked' | 'slow' | 'chain' | 'none';
+export type LocationGlyph = 'pass' | 'fail' | 'blocked' | 'slow' | 'chain' | 'problem' | 'none';
 
 export const SITE_LOCATIONS = ['BKK', 'SIN', 'TYO'] as const;
 export type SiteLocation = (typeof SITE_LOCATIONS)[number];
@@ -39,6 +40,8 @@ export const GLYPHS: Record<LocationGlyph, { icon: ReactElement; tone: string; l
   slow: { icon: <IconClock />, tone: 'text-alert-warning-fg', label: 'Slow' },
   // D-029: a broken certificate chain is a PROBLEM, so it never takes the hard-fail glyph
   chain: { icon: <IconShieldAlert />, tone: 'text-alert-warning-fg', label: 'TLS chain error' },
+  // §37.4: a key page failing after the home page came back — a PROBLEM, so amber, never the hard fail
+  problem: { icon: <IconTriangleAlert />, tone: 'text-alert-warning-fg', label: 'Fail' },
   none: { icon: <IconCircleDotDashed />, tone: 'text-fg-tertiary', label: 'No data' },
 };
 

@@ -34,7 +34,9 @@ import {
   canMarkClientUpdate,
   clientUpdateCardOf,
   durationMinutes,
+  nowSeverity,
   resolveGate,
+  stillFailingHeader,
   timelineOf,
   type ClientUpdateCard,
   type EventRow,
@@ -84,6 +86,31 @@ export interface IncidentDetail {
   trigger: Trigger;
   triggerLabel: string;
   severity: Severity;
+  /**
+   * What it is now: the drop in progress (`nowSeverity`, spec §19.7, D-023). A DOWN whose home page came back
+   * with a key page or the certificate chain still failing reads as a PROBLEM; `severity` stays the record.
+   */
+  nowSeverity: Severity;
+  /** When the drop in progress started (ISO); the incident's start without one. */
+  nowSince: string;
+  /**
+   * §37: the home page came back while a key page (or the certificate chain) still fails — the DOWN is
+   * over, the incident carries on as a PROBLEM. Null otherwise.
+   */
+  stillFailing: {
+    /** "/booking", or "TLS chain misconfigured" for the home page's own chain. */
+    what: string;
+    path: string | null;
+    /** "Key page" — what the incident is now; `downTrigger` is the DOWN's ("Hard fail"). */
+    trigger: string;
+    downTrigger: string;
+    /** When the home page came back (ISO). */
+    since: string;
+    /** The DOWN: from its first failed check to the home page back (ISO). */
+    downFrom: string;
+    downTo: string;
+    keyPage: { path: string; rows: KeyPageRow[] } | null;
+  } | null;
   state: IncidentState;
   escalationLevel: number;
   startedAt: string;
@@ -229,6 +256,51 @@ export function locationsOf(
       },
     ];
   });
+}
+
+/**
+ * §37.4: per location, the home page's latest, and the failing key page's first fail around the partial
+ * recovery and its latest.
+ */
+export function keyPageRows(
+  homeLatest: readonly CheckRow[],
+  keyAround: readonly CheckRow[],
+  keyLatest: readonly CheckRow[],
+  homeTimeoutMs: number,
+  keyTimeoutMs: number,
+  homeBackAt: string,
+): KeyPageRow[] {
+  // From the round that ended the DOWN on: key pages are probed while the site is down, and a timeout
+  // from then isn't the failure that keeps the incident open (spec-checker H1).
+  const from = Date.parse(homeBackAt) - 30_000;
+  // A key page failing now is a PROBLEM: amber "Fail", never the red hard fail (§37.4).
+  const amber = (c: CheckCell | null): CheckCell | null =>
+    c && c.glyph === 'fail' ? { ...c, glyph: 'problem' } : c;
+  const newest = (rows: readonly CheckRow[], location: string) =>
+    rows.filter((c) => c.location === location).sort((a, b) => b.checked_at.localeCompare(a.checked_at))[0];
+  return PROBE_LOCATIONS.flatMap((location) => {
+    const home = newest(homeLatest, location);
+    const first = keyAround
+      .filter((c) => c.location === location && c.outcome !== 'pass' && Date.parse(c.checked_at) >= from)
+      .sort((a, b) => a.checked_at.localeCompare(b.checked_at))[0];
+    const last = newest(keyLatest, location);
+    if (!home && !first && !last) return [];
+    return [
+      {
+        location,
+        home: cellOf(home, homeTimeoutMs),
+        first: amber(cellOf(first, keyTimeoutMs)),
+        latest: amber(cellOf(last, keyTimeoutMs)),
+      },
+    ];
+  });
+}
+
+export interface KeyPageRow {
+  location: ProbeLocation;
+  home: CheckCell | null;
+  first: CheckCell | null;
+  latest: CheckCell | null;
 }
 
 /** The latest resolve and whether its RESOLVED is still held (the Undo card / the dialog's done state). */
@@ -421,7 +493,82 @@ export async function loadIncident(
     ? { ...pageChangeLive, accepted: incidentAccept(i, events, nameOf) }
     : null;
   const actor: Viewer = askShift ? { ...viewer, onCallNow: onCall === viewer.id } : viewer;
-  const view = buildIncidentView(i, events, actor, names, now);
+  const drops = episodesFromTimeline(i, events);
+  const openDrop = drops.at(-1);
+  const current = nowSeverity({
+    severity: i.severity,
+    recoveredAt: i.recovered_at,
+    drops: drops.map((d) => ({
+      start: d.start.toISOString(),
+      end: d.end?.toISOString() ?? null,
+      severity: d.severity,
+    })),
+  });
+  const nowSince = !i.recovered_at && openDrop && !openDrop.end ? openDrop.start.toISOString() : i.started_at;
+  const built = buildIncidentView(i, events, actor, names, now);
+  // §19.7: "the same incident continues as a PROBLEM — titled by what still fails, e.g. '/booking still
+  // failing after the home page came back'": the PROBLEM AGAIN that opened the drop names it.
+  const still =
+    current === 'problem' && i.severity === 'down' && !i.recovered_at
+      ? stillFailingHeader(i.sites.name, events)
+      : null;
+  const view = still ? { ...built, title: still.title, cause: still.cause ?? built.cause } : built;
+  // §37.4: the failing key page's own checks beside the home page's — from its first fail at the
+  // partial recovery, and its latest.
+  const keyMonitor = still?.partial?.monitorUrl
+    ? (i.sites.monitors as { id: string; url: string; is_primary: boolean; timeout_ms?: number }[]).find(
+        (m) => !m.is_primary && m.url === still.partial!.monitorUrl,
+      )
+    : undefined;
+  const keyChecks =
+    keyMonitor && still?.partial
+      ? await Promise.all([
+          db
+            .from('check_results')
+            .select(checkCols)
+            .eq('monitor_id', keyMonitor.id)
+            .gte('checked_at', new Date(Date.parse(still.partial.homeBackAt) - 5 * 60_000).toISOString())
+            .lte('checked_at', new Date(Date.parse(still.partial.homeBackAt) + 60_000).toISOString())
+            .order('checked_at')
+            .limit(30),
+          db
+            .from('check_results')
+            .select(checkCols)
+            .eq('monitor_id', keyMonitor.id)
+            .gt('checked_at', new Date(now.getTime() - 15 * 60_000).toISOString())
+            .order('checked_at', { ascending: false })
+            .limit(30),
+        ])
+      : null;
+  if (keyChecks?.[0].error) throw new Error(`check_results: ${keyChecks[0].error.message}`);
+  if (keyChecks?.[1].error) throw new Error(`check_results: ${keyChecks[1].error.message}`);
+  const downDrops = drops.filter((d) => d.severity === 'down');
+  const stillFailing: IncidentDetail['stillFailing'] =
+    still?.partial && current === 'problem'
+      ? {
+          what: still.partial.path ?? still.title.split(' · ').slice(1).join(' · '),
+          path: still.partial.path,
+          trigger: still.partial.trigger ?? TRIGGER_LABELS[i.trigger],
+          downTrigger: TRIGGER_LABELS[i.trigger],
+          since: nowSince,
+          downFrom: (downDrops[0]?.start ?? new Date(i.started_at)).toISOString(),
+          downTo: (downDrops.at(-1)?.end ?? new Date(nowSince)).toISOString(),
+          keyPage:
+            keyChecks && still.partial.path
+              ? {
+                  path: still.partial.path,
+                  rows: keyPageRows(
+                    latest.data ?? [],
+                    keyChecks[0].data ?? [],
+                    keyChecks[1].data ?? [],
+                    primary?.timeout_ms ?? 30_000,
+                    keyMonitor?.timeout_ms ?? 30_000,
+                    still.partial.homeBackAt,
+                  ),
+                }
+              : null,
+        }
+      : null;
   const clientUpdate = clientUpdateOf(i, events, nameOf, viewer, now);
 
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
@@ -446,6 +593,10 @@ export async function loadIncident(
       episodes: episodesFromTimeline(i, events),
       now,
       hours,
+      // D-052: only a Tier 1–2 client site has the track
+      clientTrack:
+        (i.sites.tier === 1 || i.sites.tier === 2) && !!i.sites.clients && !i.sites.clients.is_internal,
+      problemSince: stillFailing ? formatTime(new Date(stillFailing.since)) : null,
       steps: events
         .filter(
           (e) => e.type === 'step_fired' && e.payload.reminder !== true && e.payload.severity === i.severity,
@@ -503,6 +654,9 @@ export async function loadIncident(
     trigger: i.trigger,
     triggerLabel: TRIGGER_LABELS[i.trigger],
     severity: i.severity,
+    nowSeverity: current,
+    nowSince,
+    stillFailing,
     state: i.state,
     escalationLevel: i.escalation_level,
     startedAt: i.started_at,
@@ -512,7 +666,7 @@ export async function loadIncident(
     autoResolved: i.auto_resolved,
     detectSeconds: Math.max(0, Math.round((Date.parse(i.detected_at) - Date.parse(i.started_at)) / 1000)),
     durationMinutes:
-      outageMinutes(episodesFromTimeline(i, events), now) ??
+      outageMinutes(drops, now) ??
       durationMinutes(
         { startedAt: i.started_at, recoveredAt: i.recovered_at, resolvedAt: i.resolved_at, drops: [] },
         now,
@@ -539,7 +693,9 @@ export async function loadIncident(
         {
           siteName: i.sites.name,
           state: i.state,
-          severity: i.severity,
+          // the gate words what is still failing now (§19.7)
+          severity: current,
+          stillFailingPath: stillFailing?.path ?? null,
           recoveredAt: i.recovered_at,
           clientUpdateRequired: i.client_update_required,
           clientUpdatedAt: i.client_updated_at,

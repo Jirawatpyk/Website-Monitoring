@@ -127,6 +127,17 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
     expect(card.footer).toBe('Acknowledged by Tao → escalation stopped. The client-update track continues.');
   });
 
+  it('§37.6: no client-update promise on an internal site; a DOWN carrying on as a PROBLEM says so', () => {
+    const acked = { ...base, state: 'acknowledged', acked: { by: 'Ploy' } };
+    expect(escalationCardOf({ ...acked, clientTrack: false })!.footer).toBe(
+      'Acknowledged by Ploy → escalation stopped.',
+    );
+    expect(escalationCardOf({ ...base, clientTrack: false })!.footer).toBe('Acknowledge stops escalation.');
+    expect(escalationCardOf({ ...acked, clientTrack: false, problemSince: '09:35' })!.footer).toBe(
+      'Acknowledged by Ploy → escalation stopped. From 09:35 the same incident carries on as a PROBLEM and stays acknowledged, so no PROBLEM reminders go out.',
+    );
+  });
+
   it('only those who may acknowledge get the button; the engine running: none and no note', () => {
     expect(escalationCardOf({ ...base, canAct: false })!.button).toBeNull();
     const running = escalationCardOf({ ...base, engine: { stopped: false, since: at('02:30') } })!;
