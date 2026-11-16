@@ -69,6 +69,18 @@ export interface ListIncident {
   rootCauseFix: string | null;
   /** Its drops from the timeline (`episodesFromTimeline`), for how long it was down (`outageMinutes`). */
   drops: { start: string; end: string | null; severity: Severity }[];
+  /** §37.9: the home page came back with something still failing (`listStillFailing`); else null. */
+  stillFailing?: ListStillFailing | null;
+}
+
+export interface ListStillFailing {
+  homeBackAt: string;
+  /** "/booking"; null for the home page's own chain. */
+  path: string | null;
+  /** "Key page", "TLS chain". */
+  trigger: string;
+  /** "404", "TLS chain misconfigured" — what still fails, short. */
+  failure: string | null;
 }
 
 export type DesktopView = 'needs_action' | 'done' | 'all';
@@ -311,9 +323,35 @@ export interface StillFailingHeader {
   } | null;
 }
 
-/** The trigger as the list writes it: "Hard fail", "Slow, flapped". */
-export function triggerWords(i: Pick<ListIncident, 'trigger' | 'isFlapping'>): string {
-  return `${TRIGGER_LABELS[i.trigger]}${i.isFlapping ? ', flapped' : ''}`;
+/** The trigger as the list writes it: "Hard fail", "Slow, flapped"; §37.9 "Key page · was Hard fail". */
+export function triggerWords(i: Pick<ListIncident, 'trigger' | 'isFlapping' | 'stillFailing'>): string {
+  const own = `${TRIGGER_LABELS[i.trigger]}${i.isFlapping ? ', flapped' : ''}`;
+  return i.stillFailing ? `${i.stillFailing.trigger} · was ${own}` : own;
+}
+
+/**
+ * §37.9: a list row's partial recovery, from its drop events — the same gate as the incident page (a DOWN
+ * whose drop in progress is a PROBLEM that came with `homeBackAt`).
+ */
+export function listStillFailing(
+  i: Pick<ListIncident, 'severity' | 'recoveredAt' | 'drops' | 'siteName'>,
+  events: readonly Pick<EventRow, 'type' | 'at' | 'payload'>[],
+): ListStillFailing | null {
+  if (i.severity !== 'down' || nowSeverity(i) !== 'problem') return null;
+  const h = stillFailingHeader(i.siteName, events);
+  if (!h.partial) return null;
+  const relapse = [...events]
+    .filter((e) => e.type === 'relapsed' && e.payload.severity === 'problem')
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
+  const detail = relapse?.payload.detail as { failing?: { statusCode?: number | null }[] } | undefined;
+  const code = detail?.failing?.find((f) => typeof f.statusCode === 'number')?.statusCode;
+  const summary = typeof relapse?.payload.summary === 'string' ? relapse.payload.summary : null;
+  return {
+    homeBackAt: h.partial.homeBackAt,
+    path: h.partial.path,
+    trigger: h.partial.trigger ?? TRIGGER_LABELS.key_page,
+    failure: code ? String(code) : h.partial.path ? null : summary,
+  };
 }
 
 export const rootCauseLabel = (category: string | null) =>
@@ -336,6 +374,16 @@ export function nextLine(
       text: `${formatDuration(waited)} unacked`,
       tone: nowSeverity(i) === 'down' ? 'danger' : 'warning',
     };
+  }
+  // §37.9: why it is still open — the home page is back, something still fails (warning, as the board)
+  if (i.stillFailing && !i.recoveredAt) {
+    const s = i.stillFailing;
+    const what = s.path
+      ? long
+        ? `${s.path} still failing`
+        : [s.path, s.failure].filter(Boolean).join(' ')
+      : (s.failure ?? 'still failing');
+    return { text: `Home page back ${formatTime(new Date(s.homeBackAt))} · ${what}`, tone: 'warning' };
   }
   if (i.state === 'acknowledged') {
     return {

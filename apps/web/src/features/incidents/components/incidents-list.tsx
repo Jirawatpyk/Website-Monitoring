@@ -447,7 +447,12 @@ function PhoneCard({ incident: i, now, canAck }: { incident: ListIncident; now: 
       </span>
       <span className="text-base font-semibold">{i.siteName}</span>
       <span className="text-sm text-fg-secondary">
-        {[formatWhen(new Date(i.startedAt), now), formatDuration(durationMinutes(i, now)), i.ownerName]
+        {[
+          formatWhen(new Date(i.startedAt), now),
+          // §37.9: the minutes are the DOWN ones while a PROBLEM carries on — say so
+          `${i.stillFailing ? 'down ' : ''}${formatDuration(durationMinutes(i, now))}`,
+          i.ownerName,
+        ]
           .filter(Boolean)
           .join(' · ')}
       </span>

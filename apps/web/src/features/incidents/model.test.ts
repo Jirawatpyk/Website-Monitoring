@@ -15,6 +15,7 @@ import {
   phoneViewCounts,
   resolveGate,
   sortIncidents,
+  listStillFailing,
   stillFailingHeader,
   timelineOf,
   triggerWords,
@@ -722,6 +723,55 @@ describe('durationMinutes — from the drops, the same number as Site detail and
     expect(durationMinutes(i, new Date('2026-09-21T04:00:00Z'))).toBe(18);
   });
 });
+describe('the Incidents list on a partial recovery (§37.9, INC-0140)', () => {
+  const drops = [
+    { start: '2026-09-24T16:41:36Z', end: '2026-09-25T02:35:20Z', severity: 'down' as const },
+    { start: '2026-09-25T02:35:20Z', end: null, severity: 'problem' as const },
+  ];
+  const relapsed = {
+    type: 'relapsed',
+    at: '2026-09-25T02:35:20Z',
+    payload: {
+      severity: 'problem',
+      trigger: 'key_page',
+      summary: 'key page /booking, HTTP 404',
+      keyPage: { path: '/booking', cause: '/booking → HTTP 404 (BKK, SIN, TYO)' },
+      homeBackAt: '2026-09-25T02:35:20Z',
+      detail: { failing: [{ location: 'BKK', statusCode: 404, error: null }] },
+    },
+  };
+  const voca = inc({
+    siteName: 'VOCA',
+    severity: 'down',
+    state: 'acknowledged',
+    recoveredAt: null,
+    drops,
+    ackedByName: 'Ploy',
+    ackedAt: '2026-09-25T02:06:12Z',
+  });
+
+  it('reads the row from its drop events', () => {
+    expect(listStillFailing(voca, [relapsed])).toEqual({
+      homeBackAt: '2026-09-25T02:35:20Z',
+      path: '/booking',
+      trigger: 'Key page',
+      failure: '404',
+    });
+    // Not a partial recovery (no homeBackAt), or recovered: nothing.
+    expect(
+      listStillFailing(voca, [{ ...relapsed, payload: { ...relapsed.payload, homeBackAt: undefined } }]),
+    ).toBeNull();
+    expect(listStillFailing({ ...voca, recoveredAt: '2026-09-25T03:00:00Z' }, [relapsed])).toBeNull();
+  });
+
+  it('Trigger "Key page · was Hard fail"; Next "Home page back 09:35 · /booking 404" (phone: still failing)', () => {
+    const row = { ...voca, stillFailing: listStillFailing(voca, [relapsed]) };
+    expect(triggerWords(row)).toBe('Key page · was Hard fail');
+    expect(nextLine(row, NOW)).toEqual({ text: 'Home page back 09:35 · /booking 404', tone: 'warning' });
+    expect(nextLine(row, NOW, true).text).toBe('Home page back 09:35 · /booking still failing');
+  });
+});
+
 describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)', () => {
   const down = { start: '2026-09-25T01:00:00Z', end: '2026-09-25T01:03:00Z', severity: 'down' as const };
   const problemOpen = { start: '2026-09-25T01:03:00Z', end: null, severity: 'problem' as const };
