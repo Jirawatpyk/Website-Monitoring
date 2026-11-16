@@ -4,6 +4,8 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 
 | ID | Date | Decision | Supersedes |
 |---|---|---|---|
+| D-064 | 16 Nov 2026 | A DOWN whose home page is back while a key page or the certificate chain still fails reads as a PROBLEM on every page (title by what still fails, Problem badge, two facts DOWN FOR and PROBLEM SINCE, the failing key page in Evidence); its record stays DOWN and its minutes are the DOWN ones (D-033) | Incident / MIncident / Incidents boards before §37; the incident pages reading the record severity |
+| D-063 | 16 Nov 2026 | The CEO's weekly email gets its own layout (WeeklyEmail board, §36): figures first, badges that carry their word, two lines per incident, dark and phone; the Chat card stays as drawn. UPTIME BY SITE keeps judging each site over 30 days (D-059), not the board's weekly budget | WeeklySummary "the email body is this card"; §36.8 "below its weekly target" |
 | D-062 | 14 Nov 2026 | S16 Users & access: three PRs (schema, Users, Security + Profile); the allowlist row is the invite (no link, expiry or resend); inviting a deactivated address gives their access back; deactivate = reassign, inactive profile, no allowlist row, banned, sessions deleted; a role change or deactivation can't save while a site, client, rotation place, shift or open swap still needs a new person, and never removes the last active Admin; losing the last CEO warns only; a Site AM may be an Admin, Responder or Stakeholder; the Chat id is edited by the person or an Admin; signing out deletes the sessions and the app refuses a token whose session is gone; the audit log keeps company addresses only and never Chat id digits; the phone Users / Security and the role-change email wait for boards | Users / Security / Profile boards: 2-step column, lock and rollout, invite link and expiry, Resend invite, session-length and re-auth selects, "CEO steps go to", device location, the test's delivery times |
 | D-061 | 13 Nov 2026 | S15 Audit log: Admins only (the S01 policy stays); When = Today · Last 7 days · Last 30 days · All time in Bangkok days, the page lists the newest 500 and CSV exports every filtered row; the real action codes stay, with words and a category per code; the coverage test lists every server action, API route and state-changing database function and fails on one not marked audited or exempt with a reason; the phone layout waits for an MAuditLog board | AuditLog board "When" (Today, Last 7 days only) and its sample action codes (`incident.open`, `oncall.swap.request`); S01 "who else may read it is decided in S15" |
 | D-060 | 11 Nov 2026 | S14 closes on two production mornings of the daily report in a row (10 and 11 Nov), with the staging run and the skipped-run Healthchecks alert, instead of three | D-056 item 5 "three mornings in a row; S14 stays In review until then" |
@@ -66,6 +68,34 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 | D-003 | 28 Sep 2026 | PROBLEM incidents pass through Monitoring and Needs root cause like DOWN, and end at Resolved | Spec §15.4 short PROBLEM path (read as "no In review / Closed") |
 | D-002 | 28 Sep 2026 | Client-update track fires when Tier 1 DOWN **reaches** 15 min (`>=`), counted from the first failed check | Spec §16.2 wording "> 15 min" |
 | D-001 | 28 Sep 2026 | Blocked + verifier unavailable → **PROBLEM (unverified) at once**, Admin told, retried every round | PRD §5 "keep status, PROBLEM after 10 min" (flowchart, verification spec, test plan) |
+
+## D-064 — An incident whose home page came back but something still fails
+
+**Gap.** After a D-023 partial recovery the incident pages and reports read `incidents.severity`, which stays DOWN. Production INC-0003 (Cando Asia, 16 Nov) said "is down · Still down · 12 min" while only the certificate chain was broken, and the weekly summary listed it under "ALL RECOVERED". No board drew the state; spec §19.7 gave one sentence.
+
+**Decision (16 Nov 2026, Tao; boards returned the same day, spec §37).**
+- What it is now comes from the drop in progress (`nowSeverity`): title, badge, list badge, KPI counts and Unacked, the resolve gate's words.
+- The record stays DOWN, and how long it was down stays the DOWN minutes (D-033).
+- The layout and words are §37's: a short title ("VOCA · /booking still failing"), Trigger the key page with the DOWN's trigger in the meta line, two facts (DOWN FOR, PROBLEM SINCE), the failing key page in Evidence, a two-line phone summary, the timeline line "Home page back — /booking still failing".
+- Reports: still failing as of the report (09:00), not at midnight; a NEEDS SOMEONE row while no root cause is written.
+
+**Why.** The CEO asked whether the report was right; the page and the report said "down" and "recovered" about a site that loaded with a broken certificate chain. §19.7 already said it carries on as a PROBLEM.
+
+**Impact.** PR #204: `features/incidents` (model, detail queries, page, list), `server/reports/assemble.ts`, `@dxt/notifier` report wording.
+
+## D-063 — The weekly email gets its own layout
+
+**Gap.** WeeklySummary says the CEO's email body is the Chat card. On 16 Nov the CEO forwarded the email asking whether the data was right; Tao found it reads like plain text. The WeeklyEmail board (§36) redraws it. §36.8 judges sites against "the week's budget", but D-059 (the CEO, 9 Nov) judges each site over 30 days.
+
+**Decision (16 Nov 2026, Tao).**
+- The email is built from the weekly facts by `@dxt/notifier` `weeklyEmail` (`weekly-email.ts`), its own layout: tiles, the 30-day line, NEEDS SOMEONE, badges with their word, two lines per incident (open first, then newest), uptime rows below target and one "on target" line, MTTA, planned, coming up, the monitor itself. Dark through `prefers-color-scheme`, phone through `max-width`, tables and inline styles. Plain-text part in the same order.
+- The Chat card stays as WeeklySummary draws it.
+- UPTIME BY SITE keeps D-059: 30 days, with "since …" while a site has been watched for less.
+- "Client first to report" (on the board's MTTA row) stays out until that data exists (D-056).
+
+**Why.** The CEO reads the email, not the Space. Keeping 30 days keeps the email and the "Last 30 days" line on one rule the CEO already chose.
+
+**Impact.** `packages/notifier/src/weekly-email.ts`, `server/reports/run-reports.ts`; WeeklySummary's note about the email body is superseded.
 
 ## D-062 — S16 Users & access: invite, role changes, deactivation, sessions
 

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Weekly summary — email to the CEO</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#6d28d9}
+.r3-col > *{flex-shrink:0}
+.aura-segmented--sm .aura-segmented__option{padding:0 9px}
+.em-dark{--aura-bg-surface:#18181b;
+--aura-bg-surface-hover:#27272a;
+--aura-bg-surface-strong:#ffffff;
+--aura-bg-canvas:#08080a;
+--aura-bg-inverted:#ffffff;
+--aura-fg-primary:#ffffff;
+--aura-fg-secondary:#a1a1aa;
+--aura-fg-tertiary:#8e8e97;
+--aura-fg-inverted:#18181b;
+--aura-fg-accent:#c4b5fd;
+--aura-border-default:rgba(255,255,255,0.1);
+--aura-border-strong:#ffffff;
+--aura-border-subtle:rgba(255,255,255,0.06);
+--aura-accent-violet:#a78bfa;
+--aura-button-primary-bg:#ffffff;
+--aura-button-primary-fg:#18181b;
+--aura-button-primary-bg-hover:#e4e4e7;
+--aura-button-secondary-border:#71717a;
+--aura-focus-ring:#a78bfa;
+--aura-status-neutral-bg:#27272a;
+--aura-status-neutral-fg:#d4d4d8;
+--aura-status-progress-bg:#2f2647;
+--aura-status-progress-fg:#c4b5fd;
+--aura-status-ready-bg:#2b351f;
+--aura-status-ready-fg:#bef264;
+--aura-bg-selected:#2c283a;
+--aura-border-control:#a1a1aa;
+--aura-bg-skeleton:#3f3f46;
+--aura-fg-danger:#f87171;
+--aura-fg-positive:#bef264;
+--aura-border-danger:#f87171;
+--aura-bg-input:#18181b;
+--aura-bg-input-disabled:#08080a;
+--aura-bg-scrim:rgba(0,0,0,0.64);
+--aura-alert-info-bg:#2c283a;
+--aura-alert-info-fg:#c4b5fd;
+--aura-alert-info-border:#514674;
+--aura-alert-success-bg:#27311a;
+--aura-alert-success-fg:#bef264;
+--aura-alert-success-border:#436019;
+--aura-alert-warning-bg:#372b19;
+--aura-alert-warning-fg:#fcd34d;
+--aura-alert-warning-border:#704e15;
+--aura-alert-danger-bg:#361e21;
+--aura-alert-danger-fg:#fca5a5;
+--aura-alert-danger-border:#6e2a2b;
+--aura-chart-1:#bba9ff;
+--aura-chart-3:#fe9c63;
+--aura-chart-5:#ff91d1;
+--aura-chart-7:#e4ac06;
+--aura-chart-seq-1:#784cd6;
+--aura-chart-seq-2:#8f67f2;
+--aura-chart-seq-3:#a78bfe;
+--aura-chart-seq-4:#c1b1fe;
+--aura-chart-seq-5:#dcd5fe;
+--aura-chart-grid:#27272a;
+--aura-chart-axis:#a1a1aa;
+--aura-button-danger-bg:#dc2626;
+--aura-button-danger-bg-hover:#b91c1c;
+--aura-shadow-enterprise:0 1px 2px rgba(0,0,0,0.4);
+--aura-shadow-overlay:0 16px 48px rgba(0,0,0,0.56), 0 2px 8px rgba(0,0,0,0.32);
+--aura-shadow-creative:4px 4px 0px #a78bfa;
+--aura-shadow-creative-hover:6px 6px 0px #a78bfa;
+--aura-card-shadow-creative:8px 8px 0px #a78bfa;
+color-scheme: dark;;color-scheme:dark}
+.wk{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--aura-fg-primary)}
+.wk-sec{padding:16px 0 0;display:flex;flex-direction:column;gap:10px}
+.wk-h{font-size:12px;font-weight:700;letter-spacing:0.05em;color:var(--aura-fg-secondary)}
+.wk-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.em-phone .wk-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+.wk-tile{padding:12px 12px 10px;border:1px solid var(--aura-border-default);border-radius:8px;background:var(--aura-bg-surface);display:flex;flex-direction:column;gap:2px}
+.wk-num{font-size:28px;line-height:1.1;font-weight:700;font-variant-numeric:tabular-nums}
+.wk-cap{font-size:12px;line-height:1.35;color:var(--aura-fg-secondary)}
+.wk-badge{display:inline-block;box-sizing:border-box;padding:2px 8px;border-radius:9999px;font-size:12px;line-height:18px;font-weight:600;white-space:nowrap}
+.wk-row{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--aura-border-default)}
+.em-phone .wk-row{flex-direction:column;gap:6px}
+.wk-bcol{width:104px;flex-shrink:0}
+.em-phone .wk-bcol{width:auto}
+.wk-l1{font-size:15px;line-height:1.4}
+.wk-l2{font-size:13px;line-height:1.45;color:var(--aura-fg-secondary)}
+.em-phone .wk-pad{padding:14px 12px !important}
+.em-phone .wk-card{padding:18px 16px !important}
+.em-phone .wk-title{font-size:21px !important}
+</style>
+</helmet>
+<div class="r3-col" style="width: 720px; height: 3640px; box-sizing: border-box; padding: 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">EMAIL · TO THE CEO · EVERY MONDAY 09:00</span>
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Weekly summary email</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary); line-height: 1.5">The email gets its own layout (figures first, status badges, two lines per incident); the Chat card on the WeeklySummary board stays as drawn and has the same sections in the same order. Sample week Mon 9 – Sun 15 Nov — sites, times and numbers are made up.</span>
+</div>
+
+<div style="display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Week</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Week" options="{{weeks}}" value="{{week}}" on-change="{{pickWeek}}" size="sm"></x-import></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Preview</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Mail client" options="{{clients}}" value="{{client}}" on-change="{{pickClient}}" size="sm"></x-import></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Theme</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Theme" options="{{themes}}" value="{{theme}}" on-change="{{pickTheme}}" size="sm"></x-import></div>
+</div>
+
+<div class="{{pvClass}}" style="align-self: center; width: {{pvWidth}}; color: var(--aura-fg-primary); background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); overflow: hidden">
+<div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--aura-border-default); font-size: 13px; line-height: 1.5">
+<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">From</span><span>DxT Monitor &lt;alerts@[domain]&gt;</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">To</span><span>CEO &lt;ceo@[domain]&gt;</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">Subject</span><span style="font-weight: 600">DxT Monitor · Weekly summary · {{w.range}}</span></div>
+<div style="display: flex; gap: 12px"><span style="width: 76px; flex-shrink: 0; color: var(--aura-fg-secondary)">Preheader</span><span style="color: var(--aura-fg-secondary)">{{w.pre}}</span></div>
+</div>
+
+<div class="wk wk-pad" style="padding: 24px 32px; display: flex; flex-direction: column; gap: 16px; background: var(--aura-bg-canvas)">
+<div class="wk-card" style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: 10px; padding: 24px 28px; display: flex; flex-direction: column">
+
+<div style="display: flex; flex-direction: column; gap: 4px; padding-bottom: 14px">
+<span style="font-size: 12px; font-weight: 700; letter-spacing: 0.05em; color: var(--aura-fg-secondary)">WEEKLY SUMMARY</span>
+<span class="wk-title" style="font-size: 24px; line-height: 1.25; font-weight: 700">Website week · {{w.long}}</span>
+</div>
+
+<div class="wk-tiles">
+<sc-for list="{{w.tiles}}" as="t" hint-placeholder-count="4">
+<div class="wk-tile"><span class="wk-num" style="color: {{t.color}}">{{t.n}}</span><span class="wk-cap"><b style="font-weight: 600; color: var(--aura-fg-primary)">{{t.k}}</b><br>{{t.cap}}</span></div>
+</sc-for>
+</div>
+<span style="padding-top: 10px; font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{w.month}}</span>
+
+<sc-if value="{{w.hasTodo}}" hint-placeholder-val="{{true}}">
+<div class="wk-sec">
+<span class="wk-h">NEEDS SOMEONE · {{w.todoN}}</span>
+<div style="border: 1px solid var(--aura-alert-warning-border); border-radius: 8px; background: var(--aura-alert-warning-bg); padding: 2px 14px">
+<sc-for list="{{w.todo}}" as="x" hint-placeholder-count="3">
+<div style="display: flex; gap: 12px; align-items: baseline; padding: 9px 0; border-top: {{x.bt}}; font-size: 14px; line-height: 1.45"><span style="flex-grow: 1; min-width: 0">{{x.t}}</span><span style="flex-shrink: 0; font-weight: 700">{{x.who}}</span></div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{w.hasInc}}" hint-placeholder-val="{{true}}">
+<div class="wk-sec">
+<span class="wk-h">{{w.incH}}</span>
+<div>
+<sc-for list="{{w.inc}}" as="i" hint-placeholder-count="5">
+<div class="wk-row">
+<div class="wk-bcol"><span class="wk-badge" style="background: {{i.bg}}; color: {{i.fg}}; border: 1px solid {{i.bd}}">{{i.word}}</span></div>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+<span class="wk-l1"><b style="font-weight: 700">{{i.site}}</b> · {{i.when}} · <span style="font-variant-numeric: tabular-nums">{{i.len}}</span></span>
+<span class="wk-l2">{{i.l2}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<div class="wk-sec">
+<span class="wk-h">UPTIME BY SITE · TARGETS</span>
+<sc-for list="{{w.below}}" as="u" hint-placeholder-count="3">
+<div style="display: flex; gap: 12px; align-items: baseline; padding: 9px 12px; border: 1px solid var(--aura-alert-warning-border); border-radius: 8px; background: var(--aura-alert-warning-bg); font-size: 14px; line-height: 1.45; flex-wrap: wrap">
+<span style="flex-grow: 1; min-width: 0"><b style="font-weight: 700">{{u.site}}</b> <span style="color: var(--aura-alert-warning-fg); font-weight: 700">below target</span></span>
+<span style="font-variant-numeric: tabular-nums"><b style="font-weight: 700">{{u.pct}}</b> <span style="color: var(--aura-fg-secondary)">· target {{u.target}} · {{u.down}}</span></span>
+</div>
+</sc-for>
+<div style="display: flex; gap: 8px; font-size: 14px; line-height: 1.45"><span style="font-weight: 700; color: var(--aura-fg-positive)">✓</span><span><b style="font-weight: 600">{{w.onTarget}}</b> <span style="color: var(--aura-fg-secondary)">{{w.onNames}}</span></span></div>
+</div>
+
+<div class="wk-sec">
+<span class="wk-h">MTTA · TIME TO ACKNOWLEDGE A DOWN</span>
+<div style="display: flex; gap: 8px; flex-wrap: wrap; font-size: 14px; line-height: 1.5">
+<sc-for list="{{w.mtta}}" as="m" hint-placeholder-count="3"><span style="padding: 6px 10px; border: 1px solid var(--aura-border-default); border-radius: 8px"><span style="color: var(--aura-fg-secondary)">{{m.k}}</span> <b style="font-weight: 700; color: {{m.c}}">{{m.v}}</b></span></sc-for>
+</div>
+</div>
+
+<sc-if value="{{w.hasPlanned}}" hint-placeholder-val="{{true}}">
+<div class="wk-sec">
+<span class="wk-h">PLANNED &amp; QUIET</span>
+<sc-for list="{{w.planned}}" as="p" hint-placeholder-count="2">
+<div style="display: flex; gap: 10px; align-items: baseline; font-size: 14px; line-height: 1.45"><span class="wk-badge" style="background: {{p.bg}}; color: {{p.fg}}; border: 1px solid {{p.bd}}">{{p.word}}</span><span>{{p.t}}</span></div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{w.hasComing}}" hint-placeholder-val="{{true}}">
+<div class="wk-sec">
+<span class="wk-h">COMING UP</span>
+<sc-for list="{{w.coming}}" as="c" hint-placeholder-count="3"><span style="font-size: 14px; line-height: 1.45">{{c}}</span></sc-for>
+</div>
+</sc-if>
+
+<div class="wk-sec">
+<span class="wk-h">THE MONITOR ITSELF</span>
+<sc-for list="{{w.mon}}" as="c" hint-placeholder-count="2"><span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">{{c}}</span></sc-for>
+</div>
+
+<div style="padding-top: 20px; display: flex; align-items: center; gap: 10px">
+<a href="Incidents.dc.html" style="height: 44px; padding: 0 24px; box-sizing: border-box; display: inline-flex; align-items: center; border-radius: 9999px; background: var(--aura-button-primary-bg); color: var(--aura-button-primary-fg); font-size: 14px; font-weight: 600; text-decoration: none">Open incidents</a>
+<div style="height: 26px; margin-left: auto; padding: 0 8px; display: flex; align-items: center; gap: 5px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)"><span style="font-size: 13px; font-weight: 700">DxT</span><span style="width: 5px; height: 5px; border-radius: 9999px; background: var(--aura-accent-dot)"></span></div>
+</div>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5; text-align: center"><b style="font-weight: 600; color: var(--aura-fg-primary)">You got this because you get the weekly summary as the CEO.</b><br>Times in Thailand time (UTC+7). This is an automated record — replies aren’t read.</span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — weekly summary email (§36)</span>
+<span>• <b style="font-weight: 600; color: var(--aura-fg-primary)">Figures first.</b> Four tiles replace the old figures line: uptime of all sites, sites with no downtime, DOWN incidents, PROBLEM incidents. Every tile is a count of <i>the week</i> (caption “this week”) and all four are neutral — no red or amber number at the top, so “3” never reads as 3 sites down now. 4 across on desktop, 2 × 2 on a phone. The 30-day line sits under the tiles in plain text: another period, so not a tile.</span>
+<span>• <b style="font-weight: 600; color: var(--aura-fg-primary)">Badges carry the word.</b> Open: DOWN = solid red, PROBLEM = solid amber (darkest amber text tone as fill, so it holds in light and dark). Recovered: “Was down” / “Was problem” = outline in the same hue. Violet only for Maintenance.</span>
+<span>• <b style="font-weight: 600; color: var(--aura-fg-primary)">Two lines per incident.</b> Line 1 (15 px): site · started · length (down minutes). Line 2 (13 px, secondary): cause · who acted · root cause or “no root cause yet”. Open incidents first, then newest first. On a phone the badge sits above the lines and line 2 wraps in full — an email can’t expand, so nothing is cut.</span>
+<span>• Uptime: sites below their weekly target get an amber row each (figure · target · “43 min down · 10 min allowed”); the rest fold into one “N on target” line. Empty sections are left out (Week › Quiet week).</span>
+<span>• Build: tables + inline styles, system fonts, no images needed to read it; colours from the email tokens matched to AURA; plain-text part kept. Record the new layout as a decision next to D-056.</span>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":3640}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { week: 'Busy week', client: 'Desktop mail', theme: 'Light' }; }
+  renderVals() {
+    var self = this, st = this.state;
+    var B = {
+      down: { word: 'DOWN', bg: 'var(--aura-fg-danger)', fg: 'var(--aura-bg-surface)', bd: 'var(--aura-fg-danger)' },
+      prob: { word: 'PROBLEM', bg: 'var(--aura-alert-warning-fg)', fg: 'var(--aura-bg-surface)', bd: 'var(--aura-alert-warning-fg)' },
+      wasDown: { word: 'Was down', bg: 'transparent', fg: 'var(--aura-alert-danger-fg)', bd: 'var(--aura-alert-danger-fg)' },
+      wasProb: { word: 'Was problem', bg: 'transparent', fg: 'var(--aura-alert-warning-fg)', bd: 'var(--aura-alert-warning-fg)' },
+      maint: { word: 'Maintenance', bg: 'var(--aura-alert-info-bg)', fg: 'var(--aura-alert-info-fg)', bd: 'var(--aura-alert-info-border)' },
+      mute: { word: 'Muted', bg: 'transparent', fg: 'var(--aura-fg-secondary)', bd: 'var(--aura-border-control)' }
+    };
+    function I(b, site, when, len, l2) { return Object.assign({ site: site, when: when, len: len, l2: l2 }, B[b]); }
+    function P(b, t) { return Object.assign({ t: t }, B[b]); }
+    var NEU = 'var(--aura-fg-primary)';
+    var W = {
+      'Busy week': {
+        range: '9–15 Nov', long: 'Mon 9 – Sun 15 Nov',
+        pre: 'Uptime 99.95% · 14/17 sites had no downtime · 3 DOWN, 4 PROBLEM this week · 1 still open · 4 things need someone',
+        tiles: [{ n: '99.95%', k: 'Uptime, all sites', cap: 'this week · maintenance excluded', color: NEU }, { n: '14/17', k: 'No downtime', cap: 'sites this week', color: NEU },
+                { n: '3', k: 'DOWN incidents', cap: 'this week · 1 still open, now PROBLEM', color: NEU }, { n: '4', k: 'PROBLEM incidents', cap: 'this week · all recovered', color: NEU }],
+        month: 'Last 30 days: 16/17 sites on their uptime target — VOCA is below.',
+        todo: [{ t: 'ENEOS Industrial — still failing since Wed 11 Nov (TLS chain), no root cause yet', who: 'Ploy' }, { t: 'MuvMi DOWN Thu 12 Nov (43 min) — no root cause yet', who: 'Arm' },
+               { t: 'Fuji Links PROBLEM Tue 10 Nov — root cause written, waiting for sign-off', who: 'Tao' }, { t: 'On-call swap 23–30 Nov — Arm asked to swap with Ploy, not accepted yet', who: 'Ploy' }],
+        incH: 'INCIDENTS · 7 · 1 STILL OPEN',
+        inc: [
+          I('prob', 'ENEOS Industrial', 'Wed 11 Nov 14:20', '12 min down · still open', 'Home page back, still failing: TLS chain misconfigured · acked by Ploy 14:25 · no root cause yet'),
+          I('wasDown', 'MuvMi', 'Thu 12 Nov 09:48', '43 min', 'Hard fail — timeout at BKK and TYO, 504 at SIN · reached L1, acked by Arm 10:07 · client updated by Bua 10:12 · no root cause yet'),
+          I('wasDown', 'VOCA', 'Mon 9 Nov 03:12', '30 min', 'Hard fail, flapped ×4 · outside response hours · acked by Ploy 08:04 · root cause: host restarted after a kernel update'),
+          I('wasProb', 'DxT AI', 'Sat 14 Nov 11:10', '9 min', 'Slow, p50 6.1 s · acked by Tao 11:14 · root cause: backup job ran in business hours'),
+          I('wasProb', 'Tubtong', 'Fri 13 Nov 14:02', '12 min', 'Blocked, not verified · acked by Ploy 14:06 · root cause: verifier restarted'),
+          I('wasProb', 'Cando Asia', 'Wed 11 Nov 09:00', '1 d 2 h', 'SSL expiring — 8 days left · acked by Nok 09:20 · root cause: auto-renew failed, renewed by hand'),
+          I('wasProb', 'Fuji Links', 'Tue 10 Nov 16:00', '22 min', 'Slow, p50 5.8 s · acked by Ploy 16:06 · root cause: image CDN slow')
+        ],
+        below: [{ site: 'MuvMi', pct: '99.57%', target: '99.90%', down: '43 min down · 10 min allowed' }, { site: 'VOCA', pct: '99.70%', target: '99.74%', down: '30 min down · 26 min allowed' }, { site: 'ENEOS Industrial', pct: '99.88%', target: '99.90%', down: '12 min down · 10 min allowed' }],
+        onTarget: '14 on target', onNames: '— Bangkok Airways – Taiwan, Bangkok Airways – China, realme.link, Fuji Links and 10 more',
+        mtta: [{ k: 'Tier 1', v: '12 min · target 15', c: 'var(--aura-fg-positive)' }, { k: 'Tier 2', v: '— (no DOWN in hours)', c: NEU }, { k: 'Client first to report', v: '0', c: 'var(--aura-fg-positive)' }],
+        planned: [P('maint', 'Tubtong · Tue 10 Nov 01:00 → 03:00 · every Tue · not counted'), P('mute', 'DxT Games · Fri 13 Nov 13:00 → 15:00 · still counted')],
+        coming: ['On call (Tier 1 nights and weekends): Nok, Mon 16 → Mon 23 Nov. Next: Arm.', 'Maintenance: Tubtong · every Tue 01:00 → 03:00 · next Tue 17 Nov', 'SSL: Bangkok Airways – Taiwan expires Mon 7 Dec — auto-renews, checked daily'],
+        mon: ['Ran 100% of rounds on time · 1 probe gap Thu 12 Nov 03:12 → 03:16 (SIN) — BKK and TYO still decided status.']
+      },
+      'Quiet week': {
+        range: '16–22 Nov', long: 'Mon 16 – Sun 22 Nov',
+        pre: 'Uptime 100% · 17/17 sites had no downtime · no incidents this week',
+        tiles: [{ n: '100%', k: 'Uptime, all sites', cap: 'this week · maintenance excluded', color: NEU }, { n: '17/17', k: 'No downtime', cap: 'sites this week', color: NEU },
+                { n: '0', k: 'DOWN incidents', cap: 'this week', color: NEU }, { n: '0', k: 'PROBLEM incidents', cap: 'this week', color: NEU }],
+        month: 'Last 30 days: 16/17 sites on their uptime target — VOCA is below.',
+        todo: [], incH: '', inc: [], below: [], onTarget: 'All 17 on target', onNames: '',
+        mtta: [{ k: 'Tier 1', v: '— (no DOWN)', c: NEU }, { k: 'Tier 2', v: '— (no DOWN)', c: NEU }, { k: 'Client first to report', v: '0', c: 'var(--aura-fg-positive)' }],
+        planned: [], coming: ['On call (Tier 1 nights and weekends): Arm, Mon 23 → Mon 30 Nov.'],
+        mon: ['Ran 100% of rounds on time.']
+      }
+    };
+    var w = W[st.week];
+    w.hasTodo = w.todo.length > 0; w.todoN = w.todo.length; w.hasInc = w.inc.length > 0; w.hasPlanned = w.planned.length > 0; w.hasComing = w.coming.length > 0;
+    w.todo = w.todo.map(function (x, i) { return Object.assign({ bt: i ? '1px solid var(--aura-alert-warning-border)' : '0' }, x); });
+    return {
+      weeks: Object.keys(W), week: st.week, pickWeek: function (v) { self.setState({ week: v }); },
+      clients: ['Desktop mail', 'Phone mail'], client: st.client, pickClient: function (v) { self.setState({ client: v }); },
+      themes: ['Light', 'Dark'], theme: st.theme, pickTheme: function (v) { self.setState({ theme: v }); },
+      pvClass: (st.theme === 'Dark' ? 'em-dark ' : '') + (st.client === 'Phone mail' ? 'em-phone' : ''),
+      pvWidth: st.client === 'Phone mail' ? '390px' : '100%',
+      w: w
+    };
+  }
+}
+</script>
+</body>
+</html>

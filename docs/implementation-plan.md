@@ -902,6 +902,8 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | MIncidents | S07 |
 | Incident | S07 |
 | MIncident | S07 |
+| IncidentDark | S07 |
+| MIncidentDark | S07 |
 | Resolve | S07 |
 | Escalation | S08 |
 | MEscalation | S08 |
@@ -920,6 +922,7 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | Probes | S12a |
 | Expiry | S13 |
 | WeeklySummary | S14 |
+| WeeklyEmail | S14 |
 | AuditLog | S15 |
 | MAuditLog | S15 |
 | MAuditLogDark | S15 |

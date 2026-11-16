@@ -225,6 +225,77 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span>Opened by hand uses the same detail after “Trigger: Manual (hand check) · ”. Sample names and times are made up.</span>
 </div>
 </sc-if>
+<sc-if value="{{isPart}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+<x-import component-from-global-scope="Aura.Badge" tone="warning" variant="soft" icon="triangle-alert">Problem</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="check">Acknowledged</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Tier 2</x-import>
+<x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Key page</x-import>
+</div>
+<span style="font-size: 13px; font-weight: 600; color: var(--aura-fg-secondary)">VOCA</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 30px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">/booking still failing</h1>
+<span style="font-size: 14px; font-weight: 500; color: var(--aura-alert-warning-fg)">Problem since 09:35 · 39 min</span>
+<span style="font-size: 13px; line-height: 1.45">Home page back 09:35 · was down 9 h 54 min (Thu 23:41 → Fri 09:35)</span>
+<span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Owner Ploy (you) · backup Tao · internal site</span>
+</div>
+
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<div style="padding: 8px 14px; display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary); border-bottom: 1px solid var(--aura-border-subtle)"><span>/BOOKING · LATEST ROUND 10:13</span><span style="color: var(--aura-alert-warning-fg)">3/3 FAIL → PROBLEM</span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))">
+<sc-for list="{{pp.locs}}" as="g" hint-placeholder-count="3">
+<div style="padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; line-height: 1.3; border-right: 1px solid var(--aura-border-subtle)">
+<span style="display: flex; align-items: center; gap: 6px"><span style="display: flex; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm" label="Fail"></x-import></span><span style="font-size: 13px; font-weight: 600">{{g.code}}</span></span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{g.result}}</span>
+</div>
+</sc-for>
+</div>
+<div style="padding: 8px 14px; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.4"><span style="display: flex; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm" label="Pass"></x-import></span><span><b style="font-weight: 600">Home page OK</b> <span style="color: var(--aura-fg-secondary)">· 3/3 pass since 09:35 · HTTP 200</span></span></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><span style="font-size: 15px; font-weight: 600">Escalation · Tier 2 DOWN</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Stopped · acked</span></div>
+<sc-for list="{{pp.ladder}}" as="l" hint-placeholder-count="3">
+<div style="display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--aura-border-subtle)">
+<span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; background: {{l.dotBg}}; color: {{l.dotFg}}">{{l.level}}</span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.45">
+<span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 13px; font-weight: 600; white-space: nowrap">{{l.when}}</span><span style="font-size: 12px; text-align: right; color: {{l.statusColor}}">{{l.status}}</span></span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{l.who}}</span>
+</div>
+</div>
+</sc-for>
+<span style="padding-top: 6px; font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">Acknowledged by Ploy 09:06. Since 09:35 it carries on as a PROBLEM and stays acknowledged — no PROBLEM reminders.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><span style="font-size: 15px; font-weight: 600">Client update</span><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline" icon="check">Not required</x-import></div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">VOCA is an internal site — no client to tell.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><span style="font-size: 15px; font-weight: 600">Resolve</span><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import>{{pp.count}} of 3 met</span></div>
+<sc-for list="{{pp.conds}}" as="c" hint-placeholder-count="3">
+<div style="display: flex; align-items: flex-start; gap: 10px; line-height: 1.45">
+<span style="display: flex; padding-top: 2px; color: {{c.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{c.icon}}" size="sm" label="{{c.state}}"></x-import></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 500">{{c.label}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{c.detail}}</span></span>
+<span style="font-size: 12px; font-weight: 500; white-space: nowrap; color: {{c.color}}">{{c.state}}</span>
+</div>
+</sc-for>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="pencil" full-width="{{yes}}" on-click="{{openRc}}">{{pp.rcCta}}</x-import>
+</div>
+
+<div style="display: flex; flex-direction: column; padding: 12px 16px 4px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 4px"><span style="font-size: 15px; font-weight: 600">Timeline</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">Newest first · UTC+7</span></div>
+<sc-for list="{{pp.timeline}}" as="t" hint-placeholder-count="5">
+<div style="display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--aura-border-subtle)">
+<span style="width: 60px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; line-height: 20px; color: var(--aura-fg-secondary)">{{t.at}}</span>
+<span style="display: flex; padding-top: 2px; color: {{t.color}}"><x-import component-from-global-scope="Aura.Icon" name="{{t.icon}}" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.45"><span style="font-size: 13px; font-weight: 500">{{t.title}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{t.detail}}</span></span>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary); text-align: center">Every event is also in the audit log.</span>
+</sc-if>
 </div>
 
 <sc-if value="{{notManual}}" hint-placeholder-val="{{true}}">
@@ -239,6 +310,15 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <sc-if value="{{bar.one}}" hint-placeholder-val="{{false}}">
 <x-import component-from-global-scope="Aura.Button" variant="secondary" icon="pencil" full-width="{{yes}}" on-click="{{openNote}}">Add note</x-import>
 </sc-if>
+</div>
+</sc-if>
+<sc-if value="{{isPart}}" hint-placeholder-val="{{false}}">
+<div style="flex-shrink: 0; box-sizing: border-box; padding: 10px 16px 24px; display: flex; flex-direction: column; gap: 8px; background: var(--aura-bg-surface); border-top: 1px solid var(--aura-border-default)">
+<span style="display: flex; align-items: flex-start; justify-content: center; gap: 6px; font-size: 12px; line-height: 1.45; text-align: center; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 1px"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import></span><span>Resolve locked · {{pp.count}} of 3 met — VOCA still has a problem</span></span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="pencil" full-width="{{yes}}" on-click="{{openNote}}">Add note</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="circle-check" full-width="{{yes}}" disabled="{{yes}}">Resolve</x-import>
+</div>
 </div>
 </sc-if>
 <sc-if value="{{isManual}}" hint-placeholder-val="{{false}}">
@@ -260,10 +340,10 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <span style="font-size: 12px; text-align: center; color: var(--aura-fg-secondary)">Sent at once · logged in the audit log</span>
 </div>
 </x-import>
-<x-import component-from-global-scope="Aura.Dialog" open="{{noteOpen}}" on-close="{{closeNote}}" title="Add a note" description="INC-0142 · added to the timeline and posted in the Chat thread as “NOTE · MuvMi · Arm: …” — no @mention, no email." size="sm" auto-focus="{{no}}">
+<x-import component-from-global-scope="Aura.Dialog" open="{{noteOpen}}" on-close="{{closeNote}}" title="Add a note" description="{{noteDesc}}" size="sm" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 12px">
 <x-import component-from-global-scope="Aura.Textarea" label="Your note" required="{{yes}}" rows="3" value="{{noteText}}" placeholder="e.g. Host says the app server is restarting" on-change="{{typeNote}}"></x-import>
-<span style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="user" size="sm"></x-import><span>Signed in as <b style="font-weight: 500; color: var(--aura-fg-primary)">arm@[domain]</b></span></span>
+<span style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="user" size="sm"></x-import><span>Signed in as <b style="font-weight: 500; color: var(--aura-fg-primary)">{{meEmail}}</b></span></span>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
 <x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{closeNote}}">Cancel</x-import>
 <x-import component-from-global-scope="Aura.Button" variant="primary" full-width="{{yes}}" disabled="{{noteEmpty}}" on-click="{{saveNote}}">Post note</x-import>
@@ -277,7 +357,7 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 <x-import component-from-global-scope="Aura.Textarea" label="What happened" required="{{yes}}" rows="3" value="{{rcText}}" on-change="{{setRcText}}" error="{{rcTextErr}}" placeholder="e.g. Host rebooted the app server without notice" hint="Plain language — goes into the weekly summary and the client report."></x-import>
 <x-import component-from-global-scope="Aura.TextField" label="Next step" optional="{{yes}}" value="{{rcNext}}" on-change="{{setRcNext}}" placeholder="{{rcNextHint}}"></x-import>
 <span style="font-size: 12px; line-height: 1.5; color: {{rcFootColor}}">{{rcFoot}}</span>
-<span style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="user" size="sm"></x-import><span>Signed in as <b style="font-weight: 500; color: var(--aura-fg-primary)">arm@[domain]</b></span></span>
+<span style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="user" size="sm"></x-import><span>Signed in as <b style="font-weight: 500; color: var(--aura-fg-primary)">{{meEmail}}</b></span></span>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
 <x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{closeRc}}">Cancel</x-import>
 <x-import component-from-global-scope="Aura.Button" variant="primary" full-width="{{yes}}" on-click="{{saveRc}}">{{rcSave}}</x-import>
@@ -520,10 +600,36 @@ class Component extends DCLogic {
       linkLabel: st.linked ? 'Link copied' : 'Copy incident link',
       linkIcon: st.linked ? 'check' : 'copy'
     };
-    var CASE = st.caseV || 'INC-0142 · probes', MAN = CASE !== 'INC-0142 · probes', BACK = CASE === 'Manual · engine back';
-    RET.caseOpts = ['INC-0142 · probes', 'Manual · engine down', 'Manual · engine back'].map(function (v) { return { value: v, label: v }; }); RET.caseV = CASE;
+    var PARTC = 'Home page back · /booking still failing';
+    var CASE = st.caseV || 'INC-0142 · probes', PART = CASE === PARTC, MAN = CASE !== 'INC-0142 · probes' && !PART, BACK = CASE === 'Manual · engine back';
+    RET.caseOpts = ['INC-0142 · probes', 'Manual · engine down', 'Manual · engine back', PARTC].map(function (v) { return { value: v, label: v }; }); RET.caseV = CASE;
     RET.setCase = function (e) { var v = e && e.target ? e.target.value : e; if (self._iv) clearInterval(self._iv); self.setState(Object.assign(self.fresh('Now · 10:14'), { caseV: v, escN: v === 'Manual · engine back' ? 1 : 0 })); };
-    RET.isManual = MAN; RET.notManual = !MAN; RET.hdrId = MAN ? 'INC-0143' : 'INC-0142'; RET.hdrMe = MAN ? 'Ploy' : 'Arm'; RET.moreTitle = MAN ? 'INC-0143 · realme.link' : 'INC-0142 · MuvMi'; RET.visitHref = MAN ? 'https://realme.link' : 'https://www.muvmi.co'; RET.visitLabel = MAN ? 'Visit realme.link' : 'Visit muvmi.co';
+    RET.isManual = MAN; RET.isPart = PART; RET.notManual = !MAN && !PART; RET.hdrId = PART ? 'INC-0140' : (MAN ? 'INC-0143' : 'INC-0142'); RET.hdrMe = (MAN || PART) ? 'Ploy' : 'Arm'; RET.moreTitle = PART ? 'INC-0140 · VOCA' : (MAN ? 'INC-0143 · realme.link' : 'INC-0142 · MuvMi'); RET.visitHref = PART ? 'https://[voca-domain]/booking' : (MAN ? 'https://realme.link' : 'https://www.muvmi.co'); RET.visitLabel = PART ? 'Visit /booking' : (MAN ? 'Visit realme.link' : 'Visit muvmi.co');
+    RET.meEmail = RET.hdrMe.toLowerCase() + '@[domain]';
+    RET.noteDesc = PART ? 'INC-0140 · added to the timeline and posted in the Chat thread as “NOTE · VOCA · Ploy: …” — no @mention, no email.' : (MAN ? 'INC-0143 · added to the timeline and posted in the Chat thread as “NOTE · realme.link · Ploy: …” — no @mention, no email.' : 'INC-0142 · added to the timeline and posted in the Chat thread as “NOTE · MuvMi · Arm: …” — no @mention, no email.');
+    if (PART) {
+      var D0 = { dotBg: 'var(--aura-bg-surface-strong)', dotFg: 'var(--aura-fg-inverted)', statusColor: 'var(--aura-fg-secondary)' };
+      var L0 = { dotBg: 'var(--aura-status-neutral-bg)', dotFg: 'var(--aura-status-neutral-fg)', statusColor: 'var(--aura-fg-secondary)' };
+      var lg = st.rcLog || [], last = lg.length ? lg[lg.length - 1] : null, prc = !!last && last.cat !== 'unknown';
+      var ptl = [];
+      (st.notes || []).slice().reverse().forEach(function (n) { ptl.push({ at: '10:14', icon: 'pencil', color: 'var(--aura-fg-secondary)', title: 'Note by Ploy', detail: n.text || n }); });
+      if (last) ptl.push({ at: '10:14', icon: 'pencil', color: 'var(--aura-fg-secondary)', title: 'Root cause by Ploy', detail: last.catLabel + ' · “' + last.text + '”' });
+      ptl = ptl.concat([
+        { at: '09:35', icon: 'triangle-alert', color: 'var(--aura-alert-warning-fg)', title: 'Home page back — /booking still failing', detail: 'RECOVERED + PROBLEM AGAIN (Key page) from the same round. Down 9 h 54 min — the DOWN minutes stop here. Same incident, now a PROBLEM.' },
+        { at: '09:06', icon: 'check', color: 'var(--aura-fg-positive)', title: 'Acknowledged by Ploy', detail: 'Escalation stopped.' },
+        { at: '09:00', icon: 'bell', color: 'var(--aura-fg-primary)', title: 'L0 alert sent · Fri 25 Sep', detail: '@Ploy (owner) + Alerts Space · Chat + email' },
+        { at: 'Thu 23:42', icon: 'ban', color: 'var(--aura-fg-danger)', title: 'Confirmed down · posted outside response hours', detail: 'Hard fail — timeout at BKK, SIN, TYO · Alerts Space only · timers paused until 09:00' }
+      ]);
+      RET.pp = { locs: [{ code: 'BKK', result: 'HTTP 404' }, { code: 'SIN', result: 'HTTP 404' }, { code: 'TYO', result: 'HTTP 404' }],
+        ladder: [Object.assign({ level: 'L0', when: '0 min · 09:00', who: '@Ploy (owner) + Space · held from 23:42, outside response hours', status: 'Sent 09:00' }, D0),
+                 Object.assign({ level: 'L1', when: '+15 · 09:15', who: 'Tao (backup, Admin)', status: 'Cancelled · acked' }, L0),
+                 Object.assign({ level: 'L2', when: '+30 · 09:30', who: 'Tao reminder', status: 'Cancelled · acked' }, L0)],
+        conds: [{ label: 'OK for 2 rounds', icon: 'circle', color: 'var(--aura-fg-tertiary)', state: 'Not met', detail: 'Still has a problem · needs 2 OK rounds once /booking clears' },
+                { label: 'Client update', icon: 'circle-check', color: 'var(--aura-fg-positive)', state: 'Met', detail: 'Not required — internal site' },
+                prc ? { label: 'Root cause written', icon: 'circle-check', color: 'var(--aura-fg-positive)', state: 'Met', detail: 'Ploy · 10:14 · ' + last.catLabel } : { label: 'Root cause written', icon: 'circle', color: 'var(--aura-fg-tertiary)', state: 'Not met', detail: last ? 'Unknown keeps the incident open' : 'Not written yet · can be drafted now' }],
+        count: prc ? 2 : 1, rcCta: last ? 'Edit root cause' : 'Write root cause', timeline: ptl };
+      RET.rcDesc = 'INC-0140 · VOCA · Tier 2 · owner Ploy · still has a problem';
+    } else { RET.pp = { locs: [], ladder: [], conds: [], count: 0, rcCta: '', timeline: [] }; }
     var N = st.escN || 0, ack = !!st.mAcked;
     var DONE = { dotBg: 'var(--aura-bg-surface-strong)', dotFg: 'var(--aura-fg-inverted)', statusColor: 'var(--aura-fg-secondary)' };
     var NEXT = { dotBg: 'var(--aura-status-blocked-bg)', dotFg: 'var(--aura-status-blocked-fg)', statusColor: 'var(--aura-alert-warning-fg)' };
