@@ -430,7 +430,7 @@ export async function loadIncident(
   const checkCols = 'location, outcome, status_code, response_ms, error, checked_at';
   // can_ack's on-call branch (S10, D-048): a Responder holding the shift acts on any Tier 1 incident.
   const askShift = viewer.role === 'responder' && i.sites.tier === 1;
-  const [events, around, latest, onCall, engineRun, admins, hours] = await Promise.all([
+  const [events, ladderEvents, around, latest, onCall, engineRun, admins, hours] = await Promise.all([
     fetchAllPages<EventRow>(
       (from, to) =>
         db
@@ -442,6 +442,20 @@ export async function loadIncident(
           .range(from, to)
           .overrideTypes<EventRow[], { merge: false }>(),
       { max: MAX_EVENTS },
+    ),
+    // The drops and the ladder from their own read: a few rows per drop, never cut by the timeline's cap.
+    fetchAllPages<EventRow>(
+      (from, to) =>
+        db
+          .from('incident_events')
+          .select('type, at, actor_id, payload')
+          .eq('incident_id', incidentId)
+          .in('type', [...DROP_EVENTS, 'step_fired'])
+          .order('at')
+          .order('id')
+          .range(from, to)
+          .overrideTypes<EventRow[], { merge: false }>(),
+      { max: MAX_EVENTS * 10 },
     ),
     monitorId
       ? db
@@ -515,7 +529,7 @@ export async function loadIncident(
     ? { ...pageChangeLive, accepted: incidentAccept(i, events, nameOf) }
     : null;
   const actor: Viewer = askShift ? { ...viewer, onCallNow: onCall === viewer.id } : viewer;
-  const drops = episodesFromTimeline(i, events);
+  const drops = episodesFromTimeline(i, ladderEvents);
   const openDrop = drops.at(-1);
   const current = nowSeverity({
     severity: i.severity,
@@ -532,7 +546,7 @@ export async function loadIncident(
   // failing after the home page came back'": the PROBLEM AGAIN that opened the drop names it.
   const still =
     current === 'problem' && i.severity === 'down' && !i.recovered_at
-      ? stillFailingHeader(i.sites.name, events)
+      ? stillFailingHeader(i.sites.name, ladderEvents)
       : null;
   const view = still
     ? { ...built, title: still.title, titleShort: still.short ?? null, cause: still.cause ?? built.cause }
@@ -573,7 +587,7 @@ export async function loadIncident(
           what: still.partial.path ?? still.title.split(' · ').slice(1).join(' · '),
           path: still.partial.path,
           trigger: still.partial.trigger ?? TRIGGER_LABELS[i.trigger],
-          downTrigger: downTriggerOf(i.trigger, events),
+          downTrigger: downTriggerOf(i.trigger, ladderEvents),
           since: nowSince,
           downFrom: (downDrops[0]?.start ?? new Date(i.started_at)).toISOString(),
           downTo: (downDrops.at(-1)?.end ?? new Date(nowSince)).toISOString(),
@@ -614,14 +628,14 @@ export async function loadIncident(
       state: i.state,
       detectedAt: i.detected_at,
       alertedAt: i.alerted_at,
-      episodes: episodesFromTimeline(i, events),
+      episodes: drops,
       now,
       hours,
       // D-052: only a Tier 1–2 client site has the track
       clientTrack:
         (i.sites.tier === 1 || i.sites.tier === 2) && !!i.sites.clients && !i.sites.clients.is_internal,
       problemSince: stillFailing ? formatTime(new Date(stillFailing.since)) : null,
-      steps: events
+      steps: ladderEvents
         .filter(
           (e) => e.type === 'step_fired' && e.payload.reminder !== true && e.payload.severity === i.severity,
         )
