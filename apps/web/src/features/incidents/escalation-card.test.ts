@@ -137,6 +137,14 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
     expect(held.rows[0]!.who).toBe(
       'Ploy (on call) + Alerts Space · posted to the Space at 02:31, outside response hours — timers paused until 09:00',
     );
+    // Held by a mute inside response hours (Fri 10:00 → 11:00): not "outside response hours".
+    const muted = escalationCardOf({
+      ...base,
+      tier: 2,
+      detectedAt: '2026-09-25T10:00:00+07:00',
+      alertedAt: '2026-09-25T11:00:00+07:00',
+    })!;
+    expect(muted.rows[0]!.who).toBe('Ploy (on call) + Alerts Space');
   });
 
   it('Acknowledge stops it: the button goes, the rest is cancelled', () => {

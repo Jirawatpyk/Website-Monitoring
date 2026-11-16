@@ -46,7 +46,7 @@ import {
   type TimelineItem,
 } from './model';
 import { loadOnCallNow } from './oncall-now';
-import { isEngineStopped, minutesInsideHours, openEpisode } from '@dxt/engine';
+import { isEngineStopped, isInsideHours, minutesInsideHours, openEpisode } from '@dxt/engine';
 import { escalationPlanSchema, formatTime } from '@dxt/shared';
 import { loadResponseHours } from '@/server/escalation/response-hours';
 import { escalationCardOf, pendingClientUpdate, type EscalationCardView } from './escalation-card';
@@ -270,7 +270,10 @@ export function downTriggerOf(
   trigger: Trigger,
   events: readonly Pick<EventRow, 'type' | 'payload'>[],
 ): string {
-  const raised = events.find((e) => e.type === 'escalated_to_down');
+  // The latest DOWN to open — a DOWN AGAIN after a recovery words its own cause, not the first raise's.
+  const raised = [...events]
+    .reverse()
+    .find((e) => e.type === 'escalated_to_down' || (e.type === 'relapsed' && e.payload.severity === 'down'));
   if (raised)
     return raised.payload.verifyJobId
       ? 'Browser'
@@ -725,10 +728,13 @@ export async function loadIncident(
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
     // A Tier 2–3 alert held to response hours (D-034): the ack counts from the opening, not the confirm.
     ackInHoursMin:
+      // (an ack before the alert went out — from the Space at night — keeps its own words)
       i.acked_at &&
       i.sites.tier >= 2 &&
       i.alerted_at &&
-      Date.parse(i.alerted_at) - Date.parse(i.detected_at) > 60_000
+      Date.parse(i.alerted_at) - Date.parse(i.detected_at) > 60_000 &&
+      !isInsideHours(new Date(i.detected_at), hours) &&
+      Date.parse(i.acked_at) > Date.parse(i.alerted_at)
         ? Math.max(1, Math.round(minutesInsideHours(new Date(i.alerted_at), new Date(i.acked_at), hours)))
         : null,
     canAct: canAcknowledge(actor, i),

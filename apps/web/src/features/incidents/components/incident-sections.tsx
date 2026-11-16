@@ -22,6 +22,7 @@ import {
   formatTimeWithSeconds,
   isSameBangkokDay,
   formatShortWhen,
+  formatWeekdayTime,
 } from '@dxt/shared';
 import { GLYPH_LEGEND, GLYPHS, type LocationGlyph } from '@/components/site-cells';
 import type { CheckCell, IncidentDetail } from '../detail-queries';
@@ -539,8 +540,7 @@ export function shortSpan(fromIso: string, toIso: string, now: Date): string {
   const to = new Date(toIso);
   const a = shortWhen(fromIso, now);
   const b = shortWhen(toIso, now);
-  const withDay =
-    a.includes(' ') && !b.includes(' ') ? `${formatDay(to, { weekday: true }).split(' ')[0]} ${b}` : b;
+  const withDay = a.includes(' ') && !b.includes(' ') ? formatWeekdayTime(to) : b;
   return `${a} → ${withDay}`;
 }
 

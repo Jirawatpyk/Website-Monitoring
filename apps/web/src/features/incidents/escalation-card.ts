@@ -1,4 +1,4 @@
-import { ladderClockOf, ladderClockStart, scheduleOf, type Episode } from '@dxt/engine';
+import { isInsideHours, ladderClockOf, ladderClockStart, scheduleOf, type Episode } from '@dxt/engine';
 import {
   formatDuration,
   formatTime,
@@ -199,7 +199,9 @@ export function escalationCardOf(input: {
       s.level === 0 &&
       input.tier >= 2 &&
       input.alertedAt &&
-      Date.parse(input.alertedAt) - Date.parse(input.detectedAt) > 60_000
+      Date.parse(input.alertedAt) - Date.parse(input.detectedAt) > 60_000 &&
+      // only response hours hold it (D-034) — a mute or the email grace delays it too, but not for this
+      !isInsideHours(new Date(input.detectedAt), input.hours)
         ? ` · posted to the Space at ${hhmm(new Date(input.detectedAt))}, outside response hours — timers paused until ${hhmm(new Date(input.alertedAt))}`
         : '';
     const who = `${whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'))}${held}`;
@@ -284,7 +286,7 @@ export function escalationCardOf(input: {
         caption: stopped
           ? 'Engine down — nothing escalates on its own'
           : waiting && next && nextAt
-            ? `L${next.level} at ${formatTime(nextAt)}${inMin(nextAt) !== null ? ` (in ${formatDuration(inMin(nextAt)!)})` : ''}`
+            ? `L${next.level} at ${formatTime(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
             : waiting
               ? 'No more levels'
               : 'Recovered — nothing more is sent',
