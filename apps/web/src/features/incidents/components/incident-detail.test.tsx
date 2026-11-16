@@ -62,6 +62,8 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     trigger: 'hard_fail',
     triggerLabel: 'Hard fail',
     severity: 'down',
+    nowSeverity: 'down',
+    nowSince: at('24T22:14:00'),
     escalationLevel: 0,
     startedAt: at('24T22:14:00'),
     detectedAt: at('24T22:14:30'),
@@ -132,6 +134,22 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     expect(
       screen.getAllByText('Resolve locked · 1 of 3 met — ORCA Thailand is still down').length,
     ).toBeGreaterThan(0);
+  });
+
+  it('a DOWN that came back with a PROBLEM still open reads as a PROBLEM now (§19.7, D-023)', () => {
+    show(
+      detail({
+        state: 'acknowledged',
+        recoveredAt: null,
+        nowSeverity: 'problem',
+        nowSince: at('25T08:03:00'),
+      }),
+    );
+    // The badge says what it is now; the minutes stay the DOWN ones (D-033).
+    expect(screen.getAllByText('Problem').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Still down')).not.toBeInTheDocument();
+    expect(screen.getByText('Down in total · problem since 08:03')).toBeInTheDocument();
+    expect(screen.getByText(/^Problem now · down 8 min in total/)).toBeInTheDocument();
   });
 
   it('Needs root cause: Resolve opens the dialog; "Resolve incident" waits for a category and what happened', () => {

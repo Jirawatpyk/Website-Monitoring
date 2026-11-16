@@ -45,6 +45,7 @@ import {
   isUnackedDown,
   listKpis,
   nextLine,
+  nowSeverity,
   phoneViewCounts,
   triggerWords,
   type DesktopView,
@@ -148,7 +149,7 @@ export function IncidentsList({ meta, incidents, sites, nowIso, viewer, initialV
       key: 'severity',
       label: 'Severity',
       width: C.severity.width,
-      render: (i) => <SeverityBadge severity={i.severity} recovered={!!i.recoveredAt || !isOpen(i)} />,
+      render: (i) => <SeverityBadge severity={nowSeverity(i)} recovered={!!i.recoveredAt || !isOpen(i)} />,
     },
     {
       key: 'trigger',
@@ -440,7 +441,7 @@ function PhoneCard({ incident: i, now, canAck }: { incident: ListIncident; now: 
       }`}
     >
       <span className="flex items-center gap-2">
-        <SeverityBadge severity={i.severity} recovered={!!i.recoveredAt || !isOpen(i)} />
+        <SeverityBadge severity={nowSeverity(i)} recovered={!!i.recoveredAt || !isOpen(i)} />
         <WorkflowBadge state={i.state} level={i.escalationLevel} />
         <span className="ml-auto font-mono text-xs text-fg-secondary">{formatIncidentId(i.number)}</span>
       </span>

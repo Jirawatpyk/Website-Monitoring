@@ -88,7 +88,10 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           : `Recovered ${formatTime(new Date(d.recoveredAt))}`
         : d.severity === 'problem'
           ? `Problem since ${formatTime(new Date(d.startedAt))}`
-          : 'Still down',
+          : d.nowSeverity === 'problem'
+            ? // §19.7: the home page is back, something still fails — the minutes are the DOWN ones (D-033)
+              `Down in total · problem since ${[startedOn({ startedAt: d.nowSince }, now), formatTime(new Date(d.nowSince))].filter(Boolean).join(' ')}`
+            : 'Still down',
       danger: !d.recoveredAt,
     },
     // Outside response hours a Tier 1 incident pages the person on call, not the owner (§28.6).

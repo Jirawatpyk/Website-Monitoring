@@ -34,6 +34,7 @@ import {
   canMarkClientUpdate,
   clientUpdateCardOf,
   durationMinutes,
+  nowSeverity,
   resolveGate,
   timelineOf,
   type ClientUpdateCard,
@@ -84,6 +85,13 @@ export interface IncidentDetail {
   trigger: Trigger;
   triggerLabel: string;
   severity: Severity;
+  /**
+   * What it is now: the drop in progress (`nowSeverity`, spec §19.7, D-023). A DOWN whose home page came back
+   * with a key page or the certificate chain still failing reads as a PROBLEM; `severity` stays the record.
+   */
+  nowSeverity: Severity;
+  /** When the drop in progress started (ISO); the incident's start without one. */
+  nowSince: string;
   state: IncidentState;
   escalationLevel: number;
   startedAt: string;
@@ -421,7 +429,24 @@ export async function loadIncident(
     ? { ...pageChangeLive, accepted: incidentAccept(i, events, nameOf) }
     : null;
   const actor: Viewer = askShift ? { ...viewer, onCallNow: onCall === viewer.id } : viewer;
-  const view = buildIncidentView(i, events, actor, names, now);
+  const drops = episodesFromTimeline(i, events);
+  const openDrop = drops.at(-1);
+  const current = nowSeverity({
+    severity: i.severity,
+    recoveredAt: i.recovered_at,
+    drops: drops.map((d) => ({
+      start: d.start.toISOString(),
+      end: d.end?.toISOString() ?? null,
+      severity: d.severity,
+    })),
+  });
+  const nowSince = !i.recovered_at && openDrop && !openDrop.end ? openDrop.start.toISOString() : i.started_at;
+  const built = buildIncidentView(i, events, actor, names, now);
+  // §19.7: "the same incident continues as a PROBLEM" — titled as one while that drop is open.
+  const view =
+    current === 'problem' && i.severity === 'down' && !i.recovered_at
+      ? { ...built, title: `${i.sites.name} has a problem` }
+      : built;
   const clientUpdate = clientUpdateOf(i, events, nameOf, viewer, now);
 
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
@@ -503,6 +528,8 @@ export async function loadIncident(
     trigger: i.trigger,
     triggerLabel: TRIGGER_LABELS[i.trigger],
     severity: i.severity,
+    nowSeverity: current,
+    nowSince,
     state: i.state,
     escalationLevel: i.escalation_level,
     startedAt: i.started_at,
@@ -512,7 +539,7 @@ export async function loadIncident(
     autoResolved: i.auto_resolved,
     detectSeconds: Math.max(0, Math.round((Date.parse(i.detected_at) - Date.parse(i.started_at)) / 1000)),
     durationMinutes:
-      outageMinutes(episodesFromTimeline(i, events), now) ??
+      outageMinutes(drops, now) ??
       durationMinutes(
         { startedAt: i.started_at, recoveredAt: i.recovered_at, resolvedAt: i.resolved_at, drops: [] },
         now,
@@ -539,7 +566,8 @@ export async function loadIncident(
         {
           siteName: i.sites.name,
           state: i.state,
-          severity: i.severity,
+          // the gate words what is still failing now (§19.7)
+          severity: current,
           recoveredAt: i.recovered_at,
           clientUpdateRequired: i.client_update_required,
           clientUpdatedAt: i.client_updated_at,

@@ -575,6 +575,34 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     expect(s.title).toBe('INCIDENTS · 1 NOT RECOVERED');
     expect(s.rows[0]!.label).toBe('Down');
   });
+
+  it('a DOWN that came back with a PROBLEM still open is not recovered (§19.7, D-023)', () => {
+    const m = weeklyModel(
+      weekly({
+        incidents: [
+          incident({
+            site: 'Cando Asia',
+            state: 'acknowledged',
+            minutes: 6,
+            drops: 2,
+            stillProblem: 'TLS chain misconfigured',
+          }),
+        ],
+      }),
+    );
+    const s = m.sections.find((x) => x.title?.startsWith('INCIDENTS'))!;
+    expect(s.title).toBe('INCIDENTS · 1 NOT RECOVERED');
+    // The DOWN is over ("Was down", its 6 min); what still fails is said in the row.
+    expect(s.rows[0]).toMatchObject({ label: 'Was down', trail: '6 min' });
+    expect(s.rows[0]!.text).toContain('still a problem: TLS chain misconfigured');
+    // The digest's Yesterday line says the same.
+    const d = digestModel(
+      digest({
+        yesterday: [incident({ state: 'acknowledged', stillProblem: 'TLS chain misconfigured' })],
+      }),
+    );
+    expect(d.sections[1]!.rows[0]!.text).toContain('— still a problem, not acknowledged');
+  });
 });
 
 describe('root cause and the MTTA note (message-checker S14)', () => {

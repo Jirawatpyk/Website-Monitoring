@@ -180,7 +180,11 @@ export function IncidentDetailView({
       d.siteName,
       formatTier(d.tier),
       d.owner ? `owner ${d.owner}` : null,
-      stillDown ? 'still down' : `recovered ${formatTime(new Date(d.recoveredAt!))}`,
+      stillDown
+        ? d.nowSeverity === 'problem'
+          ? 'still has a problem'
+          : 'still down'
+        : `recovered ${formatTime(new Date(d.recoveredAt!))}`,
     ]
       .filter(Boolean)
       .join(' · '),
@@ -273,7 +277,7 @@ export function IncidentDetailView({
         meta={
           <span className="flex flex-col gap-1.5">
             <span className="flex flex-wrap items-center gap-2">
-              <SeverityBadge severity={d.severity} recovered={!!d.recoveredAt || resolved} />
+              <SeverityBadge severity={d.nowSeverity} recovered={!!d.recoveredAt || resolved} />
               <WorkflowBadge state={d.state} level={d.escalationLevel} />
               {sections.unackedFor && (
                 <span className="text-sm font-medium text-fg-danger">{sections.unackedFor}</span>
@@ -420,7 +424,9 @@ export function IncidentDetailView({
       <div className="flex grow flex-col gap-3 md:hidden">
         <span className={`text-sm ${stillDown ? 'font-medium text-fg-danger' : 'text-fg-secondary'}`}>
           {[
-            `${stillDown ? (d.severity === 'down' ? 'Down' : 'Problem') : d.severity === 'down' ? 'Was down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`,
+            stillDown && d.nowSeverity === 'problem' && d.severity === 'down'
+              ? `Problem now · down ${formatDuration(d.durationMinutes)} in total`
+              : `${stillDown ? (d.severity === 'down' ? 'Down' : 'Problem') : d.severity === 'down' ? 'Was down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`,
             downRange ? [sections.startedOn, downRange].filter(Boolean).join(' ') : sections.startedOn,
             d.trigger === 'manual'
               ? `opened by hand ${formatTime(new Date(d.startedAt))}`

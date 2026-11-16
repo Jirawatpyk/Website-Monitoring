@@ -103,6 +103,13 @@ export function reportIncident(
     .sort((a, b) => a.start.getTime() - b.start.getTime());
   const first = drops[0]!;
   const last = drops.at(-1)!;
+  // §19.7 / D-023: the home page came back but something still fails — the DOWN minutes stand, and the
+  // PROBLEM drop still open keeps it from reading as recovered.
+  const open = all.at(-1)!;
+  const stillProblem =
+    severity === 'down' && open.severity === 'problem' && open.end === null
+      ? causeOf(row, 'problem', open.start)
+      : null;
   return {
     site: row.site.name,
     number: row.number,
@@ -112,6 +119,7 @@ export function reportIncident(
     minutes: drops.reduce((sum, e) => sum + clipMinutes(e, from, to, now), 0),
     drops: drops.length,
     failing: last.end === null,
+    stillProblem,
     cause: causeOf(row, severity, first.start),
     outsideHours: !inside(first.start),
     rootCause: rootCauseOf(row),

@@ -244,6 +244,17 @@ export function durationMinutes(
   return clockMinutes(new Date(i.startedAt), end ? new Date(end) : now);
 }
 
+/**
+ * What it is now (spec §19.7, D-023): the severity of the drop in progress. A DOWN whose home page came
+ * back while a key page or the certificate chain still fails carries on as a PROBLEM — the incident's own
+ * severity stays DOWN for the record (and for how long it was down), but the page words it as a PROBLEM.
+ * Recovered, or no drop read: the incident's own severity.
+ */
+export function nowSeverity(i: Pick<ListIncident, 'severity' | 'recoveredAt' | 'drops'>): Severity {
+  const last = i.drops.at(-1);
+  return !i.recoveredAt && last && last.end === null ? last.severity : i.severity;
+}
+
 /** The trigger as the list writes it: "Hard fail", "Slow, flapped". */
 export function triggerWords(i: Pick<ListIncident, 'trigger' | 'isFlapping'>): string {
   return `${TRIGGER_LABELS[i.trigger]}${i.isFlapping ? ', flapped' : ''}`;

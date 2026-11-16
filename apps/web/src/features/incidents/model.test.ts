@@ -10,6 +10,7 @@ import {
   lastOneLine,
   listKpis,
   nextLine,
+  nowSeverity,
   okTwoRoundsAt,
   phoneViewCounts,
   resolveGate,
@@ -694,6 +695,27 @@ describe('durationMinutes — from the drops, the same number as Site detail and
     expect(durationMinutes(i, new Date('2026-09-21T04:00:00Z'))).toBe(18);
   });
 });
+describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)', () => {
+  const down = { start: '2026-09-25T01:00:00Z', end: '2026-09-25T01:03:00Z', severity: 'down' as const };
+  const problemOpen = { start: '2026-09-25T01:03:00Z', end: null, severity: 'problem' as const };
+  it.each([
+    [
+      'a DOWN back with a PROBLEM still open reads PROBLEM',
+      { recoveredAt: null, drops: [down, problemOpen] },
+      'problem',
+    ],
+    ['a DOWN still down reads DOWN', { recoveredAt: null, drops: [{ ...down, end: null }] }, 'down'],
+    ['recovered: the record (Was down)', { recoveredAt: down.end, drops: [down] }, 'down'],
+    ['no drop read: the record', { recoveredAt: null, drops: [] }, 'down'],
+  ] as const)('%s', (_, over, expected) => {
+    expect(nowSeverity({ severity: 'down', ...over, drops: [...over.drops] })).toBe(expected);
+  });
+  it('keeps the DOWN minutes as how long it was down (D-033)', () => {
+    const i = { startedAt: down.start, recoveredAt: null, resolvedAt: null, drops: [down, problemOpen] };
+    expect(durationMinutes(i, new Date('2026-09-25T05:00:00Z'))).toBe(3);
+  });
+});
+
 // Production 12 Oct 2026 (D-038): one flapping incident had 471 timeline lines.
 describe('timelineOf — flapping runs fold into one line', () => {
   const i = {
