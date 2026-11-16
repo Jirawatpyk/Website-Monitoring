@@ -14,6 +14,7 @@ vi.mock('../hand-actions', () => ({
 const card = (over: Partial<EscalationCardView> = {}): EscalationCardView => ({
   title: 'Escalation · Tier 1 DOWN',
   nextLine: null,
+  fact: { value: 'L0 · Ploy', caption: 'Engine down — nothing escalates on its own' },
   rows: [
     {
       label: 'L0',

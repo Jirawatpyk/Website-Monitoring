@@ -56,6 +56,9 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   client_not_needed: { icon: <IconCircleCheck />, tone: 'text-fg-secondary' },
 };
 
+/** One row of facts from lg, however many the case has (5–7; the board's `factCols`). */
+const COLS: Record<number, string> = { 5: 'lg:grid-cols-5', 6: 'lg:grid-cols-6', 7: 'lg:grid-cols-7' };
+
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {
   const confirmedAt = new Date(d.detectedAt);
   const page = d.pageChange;
@@ -110,6 +113,10 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
             danger: !d.recoveredAt && d.nowSeverity === 'down',
           },
         ]),
+    // The ladder in one cell (Incident board ESCALATION): left out with no plan.
+    ...(d.escalation
+      ? [{ label: 'ESCALATION', value: d.escalation.fact.value, caption: d.escalation.fact.caption }]
+      : []),
     // Outside response hours a Tier 1 incident pages the person on call, not the owner (§28.6).
     d.paged
       ? {
@@ -144,9 +151,7 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
     },
   ] as { label: string; value: string; caption: string; danger?: boolean; warning?: boolean }[];
   return (
-    <dl
-      className={`aura-card m-0 grid grid-cols-2 gap-4 p-aura-5 ${d.stillFailing ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}
-    >
+    <dl className={`aura-card m-0 grid grid-cols-2 gap-4 p-aura-5 ${COLS[facts.length] ?? 'lg:grid-cols-5'}`}>
       {facts.map((f) => (
         <div
           key={f.label}

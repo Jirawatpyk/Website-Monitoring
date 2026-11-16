@@ -1,5 +1,6 @@
 import { ladderClockOf, ladderClockStart, scheduleOf, type Episode } from '@dxt/engine';
 import {
+  formatDuration,
   formatTime,
   formatWhen,
   isSameBangkokDay,
@@ -61,6 +62,8 @@ export interface EscalationCardView {
   nextLine: string | null;
   button: EscalateButton | null;
   footer: string;
+  /** The facts strip's ESCALATION cell (Incident board): "L1 · Ploy + Tao" / "Stopped · acked", and what comes next. */
+  fact: { value: string; caption: string };
 }
 
 const WAITING = new Set(['unacked', 'escalated']);
@@ -84,14 +87,20 @@ function peopleOf(targets: readonly EscalationTarget[], p: LadderPeople): { name
   });
 }
 
-/** The ladder row's "who": "Arm (backup) + Tao" — the CEO by role. */
+/**
+ * The ladder row's "who": "Arm (backup) + Tao" — the CEO by role; one person named once with both roles
+ * when a level names them twice ("Tao (backup, Admin)", §37.6).
+ */
 const whoOf = (targets: readonly EscalationTarget[], p: LadderPeople, space: boolean) => {
-  const names = peopleOf(targets, p).map((x) =>
-    x.name === 'CEO'
+  const people = peopleOf(targets, p);
+  const roles = new Map<string, string[]>();
+  for (const x of people) roles.set(x.name, [...(roles.get(x.name) ?? []), x.role]);
+  const names = [...roles].map(([name, rs]) =>
+    name === 'CEO'
       ? 'CEO'
-      : x.role === 'Admin'
-        ? x.name
-        : `${x.name} (${x.role === 'Site AM' ? 'AM' : x.role})`,
+      : rs.length === 1 && rs[0] === 'Admin'
+        ? name
+        : `${name} (${rs.map((r) => (r === 'Site AM' ? 'AM' : r)).join(', ')})`,
   );
   return [names.join(' + ') || 'Nobody', ...(space ? ['Alerts Space'] : [])].join(' + ');
 };
@@ -185,7 +194,15 @@ export function escalationCardOf(input: {
     const at =
       s.level === 0 ? start : sent && s.delayMin <= clock.carriedMin ? new Date(sent.at) : due.get(s.level)!;
     const when = s.level === 0 ? `0 min · ${hhmm(at)}` : `+${s.delayMin} min · ${hhmm(at)}`;
-    const who = whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'));
+    // §37.6: a Tier 2–3 alert held to response hours — the Space had it at once, the people at the opening.
+    const held =
+      s.level === 0 &&
+      input.tier >= 2 &&
+      input.alertedAt &&
+      Date.parse(input.alertedAt) - Date.parse(input.detectedAt) > 60_000
+        ? ` · posted to the Space at ${hhmm(new Date(input.detectedAt))}, outside response hours — timers paused until ${hhmm(new Date(input.alertedAt))}`
+        : '';
+    const who = `${whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'))}${held}`;
     if (sent || (s.level > 0 && s.level <= input.level)) {
       const t = sent ? hhmm(new Date(sent.at)) : null;
       return {
@@ -239,7 +256,41 @@ export function escalationCardOf(input: {
       ? `Nothing escalates on its own — the status engine is down${input.engine.since ? ` since ${formatTime(new Date(input.engine.since))}` : ''}${next && input.canAct ? '. Send the next level by hand if nobody acknowledges.' : '.'}`
       : null;
   const people = next ? peopleOf(next.targets, input.people) : [];
+  // The ESCALATION fact (Incident board): the last level sent, or that the ack stopped it; then what comes.
+  const lastSent = [...rows].reverse().find((r) => r.tone === 'sent');
+  const lastStep = lastSent ? steps.find((s) => `L${s.level}` === lastSent.label) : undefined;
+  const fyi = rows.find((r) => r.tone === 'waits' && r.status.endsWith('· FYI'));
+  const inMin = (d: Date) => (now ? Math.max(0, Math.round((d.getTime() - now.getTime()) / 60_000)) : null);
+  const nextAt = next ? due.get(next.level) : undefined;
+  const fact = input.acked
+    ? {
+        value: 'Stopped · acked',
+        caption: input.problemSince
+          ? 'Still acknowledged as a PROBLEM — nothing more is sent'
+          : fyi
+            ? `${fyi.label} FYI ${fyi.status.replace(/ · FYI$/, '').replace(/^At/, 'at')} if still down`
+            : 'Acknowledged — nothing more is sent',
+      }
+    : {
+        value: lastSent
+          ? `${lastSent.label} · ${
+              lastStep
+                ? peopleOf(lastStep.targets, input.people)
+                    .map((x) => x.name)
+                    .join(' + ') || 'Nobody'
+                : ''
+            }`
+          : 'Not sent yet',
+        caption: stopped
+          ? 'Engine down — nothing escalates on its own'
+          : waiting && next && nextAt
+            ? `L${next.level} at ${formatTime(nextAt)}${inMin(nextAt) !== null ? ` (in ${formatDuration(inMin(nextAt)!)})` : ''}`
+            : waiting
+              ? 'No more levels'
+              : 'Recovered — nothing more is sent',
+      };
   return {
+    fact,
     title: `Escalation · Tier ${input.tier} ${input.severity === 'down' ? 'DOWN' : 'PROBLEM'}`,
     rows,
     stopped,

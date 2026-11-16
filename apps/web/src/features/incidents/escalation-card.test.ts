@@ -110,6 +110,35 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
     ]);
   });
 
+  it('the ESCALATION fact: the last level sent, what comes next, or that the ack stopped it', () => {
+    expect(escalationCardOf(base)!.fact).toEqual({
+      value: 'L0 · Ploy',
+      caption: 'Engine down — nothing escalates on its own',
+    });
+    const running = escalationCardOf({
+      ...base,
+      engine: { stopped: false, since: at('02:40') },
+      now: new Date(at('02:35')),
+    })!;
+    expect(running.fact).toEqual({ value: 'L0 · Ploy', caption: 'L1 at 02:46 (in 11 min)' });
+    expect(
+      escalationCardOf({ ...base, state: 'acknowledged', acked: { by: 'Ploy' }, problemSince: '09:35' })!
+        .fact,
+    ).toEqual({
+      value: 'Stopped · acked',
+      caption: 'Still acknowledged as a PROBLEM — nothing more is sent',
+    });
+  });
+
+  it('§37.6: one person named once with both roles; a held Tier 2–3 alert says the Space had it first', () => {
+    const tao = { ...base, people: { ...base.people, backup: 'Tao' } };
+    expect(escalationCardOf(tao)!.rows[1]!.who).toBe('Tao (backup, Admin)');
+    const held = escalationCardOf({ ...base, tier: 2, detectedAt: at('02:31'), alertedAt: at('09:00') })!;
+    expect(held.rows[0]!.who).toBe(
+      'Ploy (on call) + Alerts Space · posted to the Space at 02:31, outside response hours — timers paused until 09:00',
+    );
+  });
+
   it('Acknowledge stops it: the button goes, the rest is cancelled', () => {
     const card = escalationCardOf({ ...base, state: 'acknowledged', acked: { by: 'Tao' } })!;
     expect(card.button).toBeNull();
