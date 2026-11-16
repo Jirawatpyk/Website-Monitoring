@@ -5,7 +5,7 @@ vi.mock('@/server/db', () => ({ serviceDb: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/lib/auth/session', () => ({ getAccess: vi.fn() }));
 
-const { incidentAccept, keyPageRows, locationsOf } = await import('./detail-queries');
+const { downTriggerOf, incidentAccept, keyPageRows, locationsOf } = await import('./detail-queries');
 
 const check = (location: string, at: string, over: Record<string, unknown> = {}) => ({
   location,
@@ -77,6 +77,24 @@ describe('Evidence by location (Incident board)', () => {
     expect(rows).toMatchObject([
       { location: 'TYO', first: { text: 'Timeout > 10 s', glyph: 'fail' }, recheck: null, latest: null },
     ]);
+  });
+});
+
+describe('downTriggerOf (§37 meta line)', () => {
+  const ev = (type: string, payload: Record<string, unknown> = {}) => ({ type, payload });
+  it.each([
+    // INC-0003: a TLS-chain PROBLEM the browser verifier raised to DOWN — the DOWN's cause, not the record's
+    [
+      'raised by the browser',
+      'tls_chain',
+      [ev('detected'), ev('escalated_to_down', { verifyJobId: 'j1' })],
+      'Browser',
+    ],
+    ['raised by a hard fail', 'slow', [ev('escalated_to_down', {})], 'Hard fail'],
+    ['raised by hand', 'key_page', [ev('escalated_to_down', { manual: true })], 'Manual (hand check)'],
+    ['a DOWN from the start', 'hard_fail', [ev('detected')], 'Hard fail'],
+  ] as const)('%s', (_, trigger, events, expected) => {
+    expect(downTriggerOf(trigger, [...events])).toBe(expected);
   });
 });
 

@@ -21,6 +21,7 @@ import {
   formatTime,
   formatTimeWithSeconds,
   isSameBangkokDay,
+  formatShortWhen,
 } from '@dxt/shared';
 import { GLYPH_LEGEND, GLYPHS, type LocationGlyph } from '@/components/site-cells';
 import type { CheckCell, IncidentDetail } from '../detail-queries';
@@ -86,7 +87,7 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           {
             label: 'DOWN FOR',
             value: formatDuration(d.durationMinutes),
-            caption: `${shortWhen(d.stillFailing.downFrom, now)} → ${shortWhen(d.stillFailing.downTo, now)} · counts in uptime`,
+            caption: `${shortSpan(d.stillFailing.downFrom, d.stillFailing.downTo, now)} · counts in uptime`,
           },
           {
             label: 'PROBLEM SINCE',
@@ -495,16 +496,25 @@ export interface IncidentSections {
   timelinePhone: React.ReactNode;
 }
 
-/** The slots `IncidentDetailView` places, drawn once on the server. */
-/** A DOWN back with a PROBLEM still open (§19.7): when that PROBLEM began — "08:08", "Fri 13 Nov 09:15". */
-/** "Thu 23:41" — a time with its weekday unless it is today (§37.3 DOWN FOR caption). */
+/** "Thu 23:41" (§37.3), dated when weeks back ("Wed 21 Oct 21:15", INC-0003): `formatShortWhen`. */
 export function shortWhen(iso: string, now: Date): string {
-  const d = new Date(iso);
-  return isSameBangkokDay(d, now)
-    ? formatTime(d)
-    : `${formatDay(d, { weekday: true }).split(' ')[0]} ${formatTime(d)}`;
+  return formatShortWhen(new Date(iso), now);
 }
 
+/**
+ * "Thu 23:41 → Fri 09:35" (§37.3): the end carries its day whenever the start does, so a span over
+ * midnight never reads as one evening.
+ */
+export function shortSpan(fromIso: string, toIso: string, now: Date): string {
+  const to = new Date(toIso);
+  const a = shortWhen(fromIso, now);
+  const b = shortWhen(toIso, now);
+  const withDay =
+    a.includes(' ') && !b.includes(' ') ? `${formatDay(to, { weekday: true }).split(' ')[0]} ${b}` : b;
+  return `${a} → ${withDay}`;
+}
+
+/** A DOWN back with a PROBLEM still open (§19.7): when that PROBLEM began — "08:08", "Fri 13 Nov 09:15". */
 export function problemSince(d: Pick<IncidentDetail, 'nowSince'>, now: Date): string {
   return [startedOn({ startedAt: d.nowSince }, now), formatTime(new Date(d.nowSince))]
     .filter(Boolean)
@@ -521,7 +531,7 @@ export function incidentSections(d: IncidentDetail, now: Date): IncidentSections
           meta: `home page back ${problemSince(d, now)} · down from ${shortWhen(d.stillFailing.downFrom, now)} (${d.stillFailing.downTrigger})`,
           phone: [
             `Problem since ${problemSince(d, now)} · ${formatDuration(Math.max(1, Math.round((now.getTime() - Date.parse(d.stillFailing.since)) / 60_000)))}`,
-            `Home page back ${formatTime(new Date(d.stillFailing.since))} · was down ${formatDuration(d.durationMinutes)} (${shortWhen(d.stillFailing.downFrom, now)} → ${shortWhen(d.stillFailing.downTo, now)})`,
+            `Home page back ${formatTime(new Date(d.stillFailing.since))} · was down ${formatDuration(d.durationMinutes)} (${shortSpan(d.stillFailing.downFrom, d.stillFailing.downTo, now)})`,
           ],
         }
       : null,

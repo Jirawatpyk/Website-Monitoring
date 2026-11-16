@@ -259,6 +259,25 @@ export function locationsOf(
 }
 
 /**
+ * What made it DOWN (§37 meta line "down from Wed 21 Oct 21:15 (Browser)"): a PROBLEM raised to DOWN by
+ * the browser verifier says Browser; a DOWN trigger names itself; else a hard fail. The incident's own
+ * trigger is its first drop's (INC-0003: TLS chain), not the DOWN's.
+ */
+export function downTriggerOf(
+  trigger: Trigger,
+  events: readonly Pick<EventRow, 'type' | 'payload'>[],
+): string {
+  const raised = events.find((e) => e.type === 'escalated_to_down');
+  if (raised)
+    return raised.payload.verifyJobId
+      ? 'Browser'
+      : raised.payload.manual === true
+        ? TRIGGER_LABELS.manual
+        : TRIGGER_LABELS.hard_fail;
+  return trigger === 'hard_fail' || trigger === 'manual' ? TRIGGER_LABELS[trigger] : TRIGGER_LABELS.hard_fail;
+}
+
+/**
  * §37.4: per location, the home page's latest, and the failing key page's first fail around the partial
  * recovery and its latest.
  */
@@ -549,7 +568,7 @@ export async function loadIncident(
           what: still.partial.path ?? still.title.split(' · ').slice(1).join(' · '),
           path: still.partial.path,
           trigger: still.partial.trigger ?? TRIGGER_LABELS[i.trigger],
-          downTrigger: TRIGGER_LABELS[i.trigger],
+          downTrigger: downTriggerOf(i.trigger, events),
           since: nowSince,
           downFrom: (downDrops[0]?.start ?? new Date(i.started_at)).toISOString(),
           downTo: (downDrops.at(-1)?.end ?? new Date(nowSince)).toISOString(),
