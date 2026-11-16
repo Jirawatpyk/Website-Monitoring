@@ -283,6 +283,7 @@ const STYLE = `
   .wk-tile{width:50% !important}
   .wk-bcol,.wk-body{display:block !important;width:auto !important}
   .wk-bcol{padding-bottom:6px !important}
+  .wk-body{border-top:0 !important;padding-top:0 !important}
 }
 @media (prefers-color-scheme:dark){
   .wk-bg{background:${D.canvas} !important}
