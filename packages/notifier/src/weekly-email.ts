@@ -1,6 +1,6 @@
 import { allowedDownMinutes, formatDayRange, formatDuration, formatPercent, formatTime } from '@dxt/shared';
 import { plainName } from './chat-alerts';
-import { escapeHtml, type EmailMessage } from './email-alerts';
+import { EMAIL_COLORS, EMAIL_COLORS_DARK, escapeHtml, type EmailMessage } from './email-alerts';
 import {
   dayTime,
   midSentence,
@@ -13,52 +13,16 @@ import {
 } from './reports';
 
 /**
- * The weekly summary's email to the CEO (WeeklyEmail board, spec §36, D-0xx): its own layout — figures
+ * The weekly summary's email to the CEO (WeeklyEmail board, spec §36, D-063): its own layout — figures
  * first, status badges that carry their word, two lines per incident — with the same content and the
  * same section order as the Chat card on WeeklySummary. Email-safe: tables, inline light colours, the
  * dark set from a `prefers-color-scheme` block; phone layout from a `max-width` block. Plain-text part
  * in the same order.
  */
 
-/** AURA light / dark tokens resolved to hex (email clients have no CSS variables). */
-const L = {
-  canvas: '#fafafa',
-  surface: '#ffffff',
-  primary: '#18181b',
-  secondary: '#52525b',
-  border: '#e4e4e7',
-  danger: '#b91c1c',
-  positive: '#3f6212',
-  warnFg: '#92400e',
-  warnBg: '#fffbeb',
-  warnBorder: '#fde68a',
-  dangerFg: '#b91c1c',
-  infoBg: '#f5f3ff',
-  infoFg: '#5b21b6',
-  infoBorder: '#ddd6fe',
-  control: '#71717a',
-  buttonBg: '#18181b',
-  buttonFg: '#ffffff',
-} as const;
-const D = {
-  canvas: '#08080a',
-  surface: '#18181b',
-  primary: '#ffffff',
-  secondary: '#a1a1aa',
-  border: '#3f3f46',
-  danger: '#f87171',
-  positive: '#bef264',
-  warnFg: '#fcd34d',
-  warnBg: '#372b19',
-  warnBorder: '#704e15',
-  dangerFg: '#fca5a5',
-  infoBg: '#2c283a',
-  infoFg: '#c4b5fd',
-  infoBorder: '#514674',
-  control: '#a1a1aa',
-  buttonBg: '#ffffff',
-  buttonFg: '#18181b',
-} as const;
+/** §36.11: colours from the email tokens (AURA light, and the dark set). */
+const L = EMAIL_COLORS;
+const D = EMAIL_COLORS_DARK;
 const FONT = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const esc = escapeHtml;
 
@@ -134,10 +98,12 @@ function uptimeOf(sites: readonly ReportSiteUptime[]) {
   return {
     below: below.map((s) => ({
       site: plainName(s.site),
+      // D-059: judged over 30 days (or since monitoring began), this week beside it — under the weekly
+      // tiles a bare figure would read as the week's.
       figure: s.since
         ? `${pct(s.uptime)} since ${dayTime(s.since).replace(/ \d\d:\d\d$/, '')}`
-        : pct(s.uptime),
-      rest: `target ${formatPercent(s.target)} · ${formatDuration(Math.ceil(s.downMinutes - 1e-6))} down · ${formatDuration(Math.floor(allowedDownMinutes(s.target, s.windowMinutes) + 1e-6))} allowed`,
+        : `30 d ${pct(s.uptime)}`,
+      rest: `target ${formatPercent(s.target)}${s.week !== null ? ` · this week ${pct(s.week)}` : ''} · ${formatDuration(Math.ceil(s.downMinutes - 1e-6))} down · ${formatDuration(Math.floor(allowedDownMinutes(s.target, s.windowMinutes) + 1e-6))} allowed`,
     })),
     on,
   };
@@ -160,7 +126,7 @@ export interface WeeklyEmailModel {
   incidents: IncidentLine[];
   uptime: {
     below: { site: string; figure: string; rest: string }[];
-    onTarget: string | null;
+    onTarget: { count: string; names: string | null } | null;
   } | null;
   mtta: { k: string; v: string; tone: 'positive' | 'warning' | 'neutral' }[];
   planned: { badge: BadgeKind; text: string }[];
@@ -202,7 +168,7 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
   const mttaTone = (m: WeeklyFacts['mtta'][number]) =>
     m.seconds === null || m.targetMin === null
       ? 'neutral'
-      : m.seconds > m.targetMin * 60
+      : Math.max(1, Math.round(m.seconds / 60)) > m.targetMin
         ? 'warning'
         : 'positive';
   const range = formatDayRange(f.weekStart, f.weekEnd, { short: true });
@@ -247,8 +213,8 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
           below: u.below,
           onTarget: u.on.length
             ? u.below.length
-              ? `${u.on.length} on target — ${namesOf(u.on)}`
-              : `All ${u.on.length} on target`
+              ? { count: `${u.on.length} on target`, names: `— ${namesOf(u.on)}` }
+              : { count: `All ${u.on.length} on target`, names: null }
             : null,
         }
       : null,
@@ -258,7 +224,9 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
         m.seconds === null
           ? m.tier === 1
             ? '— (no DOWN)'
-            : '— (no DOWN in hours)'
+            : f.incidents.some((i) => i.severity === 'down')
+              ? '— (no DOWN in hours)'
+              : '— (no DOWN)'
           : `${formatDuration(Math.max(1, Math.round(m.seconds / 60)))}${m.targetMin !== null ? ` · target ${m.targetMin}` : ''}`,
       tone: mttaTone(m),
     })),
@@ -275,12 +243,13 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
 // ── HTML ────────────────────────────────────────────────────────────────
 
 const STYLE = `
-.wk-tile{display:inline-block;width:25%;vertical-align:top}
+.wk-t2{display:none;mso-hide:all}
 @media (max-width:480px){
   .wk-pad{padding:14px 12px !important}
   .wk-card{padding:18px 16px !important}
   .wk-title{font-size:21px !important}
-  .wk-tile{width:50% !important}
+  .wk-t4{display:none !important}
+  .wk-t2{display:table !important}
   .wk-bcol,.wk-body{display:block !important;width:auto !important}
   .wk-bcol{padding-bottom:6px !important}
   .wk-body{border-top:0 !important;padding-top:0 !important}
@@ -291,6 +260,7 @@ const STYLE = `
   .wk-p{color:${D.primary} !important}
   .wk-s{color:${D.secondary} !important}
   .wk-line{border-color:${D.border} !important}
+  .wk-warnline{border-color:${D.warnBorder} !important}
   .wk-warnbox{background:${D.warnBg} !important;border-color:${D.warnBorder} !important;color:${D.primary} !important}
   .wk-warn{color:${D.warnFg} !important}
   .wk-pos{color:${D.positive} !important}
@@ -319,17 +289,18 @@ const heading = (t: string) =>
 
 export function weeklyEmail(f: WeeklyFacts): EmailMessage {
   const m = weeklyEmailModel(f);
-  const tiles = m.tiles
-    .map(
-      (t) =>
-        `<div class="wk-tile"><div style="padding:4px"><div class="wk-surface" style="padding:12px 12px 10px;border:1px solid ${L.border};border-radius:8px;background:${L.surface}"><div class="wk-p" style="font-size:28px;line-height:1.1;font-weight:700;color:${L.primary}">${esc(t.n)}</div><div class="wk-s" style="font-size:12px;line-height:1.35;color:${L.secondary}"><b class="wk-p" style="font-weight:600;color:${L.primary}">${esc(t.k)}</b><br>${esc(t.cap)}</div></div></div></div>`,
-    )
-    .join('');
+  const tile = (t: WeeklyEmailModel['tiles'][number], width: string) =>
+    `<td class="wk-surface" width="${width}" style="width:${width};padding:12px 12px 10px;vertical-align:top;border:1px solid ${L.border};border-radius:8px;background:${L.surface}"><div class="wk-p" style="font-size:28px;line-height:1.1;font-weight:700;color:${L.primary}">${esc(t.n)}</div><div class="wk-s" style="font-size:12px;line-height:1.35;color:${L.secondary}"><b class="wk-p" style="font-weight:600;color:${L.primary}">${esc(t.k)}</b><br>${esc(t.cap)}</div></td>`;
+  const grid = (rows: WeeklyEmailModel['tiles'][], cls: string, width: string, hidden: boolean) =>
+    `<table role="presentation" class="${cls}" width="100%" cellpadding="0" cellspacing="8" style="width:100%;border-collapse:separate;margin:-8px 0 -8px -8px;width:calc(100% + 16px)${hidden ? ';display:none;mso-hide:all' : ''}">${rows.map((r) => `<tr>${r.map((t) => tile(t, width)).join('')}</tr>`).join('')}</table>`;
+  const tiles =
+    grid([m.tiles], 'wk-t4', '25%', false) +
+    grid([m.tiles.slice(0, 2), m.tiles.slice(2)], 'wk-t2', '50%', true);
   const needs = m.needs.length
     ? `${heading(`NEEDS SOMEONE · ${m.needs.length}`)}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="wk-warnbox" style="border:1px solid ${L.warnBorder};border-radius:8px;background:${L.warnBg}">${m.needs
         .map(
           (n, i) =>
-            `<tr><td class="wk-p${i ? ' wk-line' : ''}" style="padding:9px 14px;font-size:14px;line-height:1.45;color:${L.primary};${i ? `border-top:1px solid ${L.warnBorder}` : ''}">${esc(n.text)}</td><td class="wk-p${i ? ' wk-line' : ''}" style="padding:9px 14px 9px 0;font-size:14px;font-weight:700;text-align:right;white-space:nowrap;vertical-align:top;color:${L.primary};${i ? `border-top:1px solid ${L.warnBorder}` : ''}">${esc(n.who)}</td></tr>`,
+            `<tr><td class="wk-p${i ? ' wk-warnline' : ''}" style="padding:9px 14px;font-size:14px;line-height:1.45;color:${L.primary};${i ? `border-top:1px solid ${L.warnBorder}` : ''}"${n.who ? '' : ' colspan="2"'}>${esc(n.text)}</td>${n.who ? `<td class="wk-p${i ? ' wk-warnline' : ''}" style="padding:9px 14px 9px 0;font-size:14px;font-weight:700;text-align:right;white-space:nowrap;vertical-align:top;color:${L.primary};${i ? `border-top:1px solid ${L.warnBorder}` : ''}">${esc(n.who)}</td>` : ''}</tr>`,
         )
         .join('')}</table>`
     : '';
@@ -349,7 +320,7 @@ export function weeklyEmail(f: WeeklyFacts): EmailMessage {
         )
         .join(
           '',
-        )}${m.uptime.onTarget ? `<div class="wk-p" style="font-size:14px;line-height:1.45;color:${L.primary}"><span class="wk-pos" style="font-weight:700;color:${L.positive}">✓</span> ${esc(m.uptime.onTarget)}</div>` : ''}`
+        )}${m.uptime.onTarget ? `<div class="wk-p" style="font-size:14px;line-height:1.45;color:${L.primary}"><span class="wk-pos" style="font-weight:700;color:${L.positive}">✓</span> <b style="font-weight:600">${esc(m.uptime.onTarget.count)}</b>${m.uptime.onTarget.names ? ` <span class="wk-s" style="color:${L.secondary}">${esc(m.uptime.onTarget.names)}</span>` : ''}</div>` : ''}`
     : '';
   const toneColor = {
     positive: L.positive,
@@ -386,7 +357,7 @@ export function weeklyEmail(f: WeeklyFacts): EmailMessage {
 <tr><td class="wk-card wk-surface" style="background:${L.surface};border:1px solid ${L.border};border-radius:10px;padding:24px 28px">
 <div class="wk-s" style="font-size:12px;font-weight:700;letter-spacing:0.05em;color:${L.secondary}">WEEKLY SUMMARY</div>
 <div class="wk-title wk-p" style="padding:4px 0 14px;font-size:24px;line-height:1.25;font-weight:700;color:${L.primary}">${esc(m.title)}</div>
-<div style="margin:0 -4px">${tiles}</div>
+${tiles}
 ${m.month ? `<div class="wk-s" style="padding-top:10px;font-size:13px;line-height:1.5;color:${L.secondary}">${esc(m.month)}</div>` : ''}
 ${needs}${incidents}${uptime}${mtta}${planned}${lines('COMING UP', m.coming)}${lines('THE MONITOR ITSELF', m.monitor, true)}
 <div style="padding-top:20px"><a href="${esc(m.button.url)}" class="wk-btn" style="display:inline-block;padding:12px 24px;border-radius:9999px;background:${L.buttonBg};color:${L.buttonFg};font-size:14px;line-height:20px;font-weight:600;text-decoration:none">${esc(m.button.text)}</a></div>
@@ -402,7 +373,11 @@ ${needs}${incidents}${uptime}${mtta}${planned}${lines('COMING UP', m.coming)}${l
     ...m.tiles.map((t) => `${t.k}: ${t.n} (${t.cap})`),
     ...(m.month ? [m.month] : []),
     ...(m.needs.length
-      ? ['', `NEEDS SOMEONE · ${m.needs.length}`, ...m.needs.map((n) => `${n.text} — ${n.who}`)]
+      ? [
+          '',
+          `NEEDS SOMEONE · ${m.needs.length}`,
+          ...m.needs.map((n) => (n.who ? `${n.text} — ${n.who}` : n.text)),
+        ]
       : []),
     ...(m.incidentsTitle
       ? [
@@ -416,7 +391,9 @@ ${needs}${incidents}${uptime}${mtta}${planned}${lines('COMING UP', m.coming)}${l
           '',
           'UPTIME BY SITE · TARGETS',
           ...m.uptime.below.map((b) => `${b.site} below target · ${b.figure} · ${b.rest}`),
-          ...(m.uptime.onTarget ? [`✓ ${m.uptime.onTarget}`] : []),
+          ...(m.uptime.onTarget
+            ? [`✓ ${m.uptime.onTarget.count}${m.uptime.onTarget.names ? ` ${m.uptime.onTarget.names}` : ''}`]
+            : []),
         ]
       : []),
     ...(m.mtta.length

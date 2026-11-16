@@ -163,13 +163,21 @@ describe('weekly email (WeeklyEmail board, §36)', () => {
   it('a site below its target gets its own row; the rest fold into one line (§36.8, D-059 30 days)', () => {
     const u = weeklyEmailModel(busy()).uptime!;
     expect(u.below).toEqual([
-      { site: 'MuvMi', figure: '99.56%', rest: 'target 99.90% · 3 h 6 min down · 43 min allowed' },
+      // D-059: 30 days, this week beside it — under the weekly tiles a bare figure reads as the week's.
+      {
+        site: 'MuvMi',
+        figure: '30 d 99.56%',
+        rest: 'target 99.90% · this week 100.00% · 3 h 6 min down · 43 min allowed',
+      },
     ]);
-    expect(u.onTarget).toBe('3 on target — Bangkok Airways – Taiwan, realme.link, Fuji Links');
+    expect(u.onTarget).toEqual({
+      count: '3 on target',
+      names: '— Bangkok Airways – Taiwan, realme.link, Fuji Links',
+    });
     const quiet = weeklyEmailModel(
       busy({ sites: [site('Fuji Links', 2, 0.999, 0), site('VOCA', 2, 0.999, 0)] }),
     );
-    expect(quiet.uptime!.onTarget).toBe('All 2 on target');
+    expect(quiet.uptime!.onTarget).toEqual({ count: 'All 2 on target', names: null });
   });
 
   it('leaves an empty section out (Quiet week)', () => {
