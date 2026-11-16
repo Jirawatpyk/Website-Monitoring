@@ -519,7 +519,8 @@ export function IncidentDetailView({
           />
         )}
         {whatChanged ?? sections.latestRound}
-        {d.escalation && (d.escalation.stopped || d.escalation.back) && (
+        {/* §37.6 (MIncident): the phone shows the card too when the DOWN carries on as a PROBLEM. */}
+        {d.escalation && (d.escalation.stopped || d.escalation.back || d.stillFailing) && (
           <EscalationCard
             card={d.escalation}
             incidentId={v.incidentId}

@@ -47,7 +47,7 @@ import {
 } from './model';
 import { loadOnCallNow } from './oncall-now';
 import { isEngineStopped, isInsideHours, minutesInsideHours, openEpisode } from '@dxt/engine';
-import { escalationPlanSchema, formatTime } from '@dxt/shared';
+import { escalationPlanSchema, formatShortWhen, formatTime, type ResponseHours } from '@dxt/shared';
 import { loadResponseHours } from '@/server/escalation/response-hours';
 import { escalationCardOf, pendingClientUpdate, type EscalationCardView } from './escalation-card';
 import type { ReminderView } from './components/escalation-card';
@@ -261,6 +261,18 @@ export function locationsOf(
   });
 }
 
+/** Minutes into response hours the ack came (≥ 1), or null when the rule doesn't apply (see the caller). */
+export function ackInHoursOf(
+  i: { acked_at: string | null; alerted_at: string | null; detected_at: string; sites: { tier: number } },
+  hours: ResponseHours,
+): number | null {
+  if (!i.acked_at || i.sites.tier < 2 || i.alerted_at) return null;
+  const detected = new Date(i.detected_at);
+  if (isInsideHours(detected, hours)) return null;
+  const min = minutesInsideHours(detected, new Date(i.acked_at), hours);
+  return min > 0 ? Math.max(1, Math.round(min)) : null;
+}
+
 /**
  * What made it DOWN (§37 meta line "down from Wed 21 Oct 21:15 (Browser)"): a PROBLEM raised to DOWN by
  * the browser verifier says Browser; a DOWN trigger names itself; else a hard fail. The incident's own
@@ -270,17 +282,19 @@ export function downTriggerOf(
   trigger: Trigger,
   events: readonly Pick<EventRow, 'type' | 'payload'>[],
 ): string {
-  // The latest DOWN to open — a DOWN AGAIN after a recovery words its own cause, not the first raise's.
-  const raised = [...events]
-    .reverse()
-    .find((e) => e.type === 'escalated_to_down' || (e.type === 'relapsed' && e.payload.severity === 'down'));
-  if (raised)
-    return raised.payload.verifyJobId
-      ? 'Browser'
-      : raised.payload.manual === true
-        ? TRIGGER_LABELS.manual
-        : TRIGGER_LABELS.hard_fail;
-  return trigger === 'hard_fail' || trigger === 'manual' ? TRIGGER_LABELS[trigger] : TRIGGER_LABELS.hard_fail;
+  // The event that opened the first DOWN drop — the one whose start the line names ("down from Thu 23:41"):
+  // the incident's own detection when it opened DOWN, else the raise or the DOWN AGAIN.
+  const openedDown = trigger === 'hard_fail' || trigger === 'manual';
+  const opened = events.find(
+    (e) =>
+      (e.type === 'detected' && openedDown) ||
+      e.type === 'escalated_to_down' ||
+      (e.type === 'relapsed' && e.payload.severity === 'down'),
+  );
+  if (opened?.payload.verifyJobId) return 'Browser';
+  if (opened?.payload.manual === true || (opened?.type === 'detected' && trigger === 'manual'))
+    return 'Manual';
+  return !opened && trigger === 'manual' ? 'Manual' : TRIGGER_LABELS.hard_fail;
 }
 
 /**
@@ -440,12 +454,14 @@ export async function loadIncident(
           .from('incident_events')
           .select('type, at, actor_id, payload')
           .eq('incident_id', incidentId)
-          .order('at')
-          .order('id')
+          // newest first, so a cut drops the oldest rows: the gate, the root cause and the timeline's
+          // end always come from the newest (engine-reviewer M1); reversed back to time order below
+          .order('at', { ascending: false })
+          .order('id', { ascending: false })
           .range(from, to)
           .overrideTypes<EventRow[], { merge: false }>(),
       { max: MAX_EVENTS },
-    ),
+    ).then((rows) => rows.reverse()),
     // The drops and the ladder from their own read: a few rows per drop, never cut by the timeline's cap.
     fetchAllPages<EventRow>(
       (from, to) =>
@@ -508,7 +524,7 @@ export async function loadIncident(
   ]) {
     if (id) ids.add(id);
   }
-  for (const e of events) {
+  for (const e of [...events, ...ladderEvents]) {
     if (e.actor_id) ids.add(e.actor_id);
     if (typeof e.payload.user_id === 'string') ids.add(e.payload.user_id);
   }
@@ -637,7 +653,7 @@ export async function loadIncident(
       // D-052: only a Tier 1–2 client site has the track
       clientTrack:
         (i.sites.tier === 1 || i.sites.tier === 2) && !!i.sites.clients && !i.sites.clients.is_internal,
-      problemSince: stillFailing ? formatTime(new Date(stillFailing.since)) : null,
+      problemSince: stillFailing ? formatShortWhen(new Date(stillFailing.since), now) : null,
       steps: ladderEvents
         .filter(
           (e) => e.type === 'step_fired' && e.payload.reminder !== true && e.payload.severity === i.severity,
@@ -657,7 +673,8 @@ export async function loadIncident(
         am: am ? nameOf(am) : null,
         admins: (admins.data ?? []).map((a) => a.display_name),
       },
-      acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by) } : null,
+      acked:
+        i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: formatTime(new Date(i.acked_at)) } : null,
       engine: { stopped, since: engineSince },
       canAct,
     });
@@ -726,17 +743,10 @@ export async function loadIncident(
           }
         : null,
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
-    // A Tier 2–3 alert held to response hours (D-034): the ack counts from the opening, not the confirm.
-    ackInHoursMin:
-      // (an ack before the alert went out — from the Space at night — keeps its own words)
-      i.acked_at &&
-      i.sites.tier >= 2 &&
-      i.alerted_at &&
-      Date.parse(i.alerted_at) - Date.parse(i.detected_at) > 60_000 &&
-      !isInsideHours(new Date(i.detected_at), hours) &&
-      Date.parse(i.acked_at) > Date.parse(i.alerted_at)
-        ? Math.max(1, Math.round(minutesInsideHours(new Date(i.alerted_at), new Date(i.acked_at), hours)))
-        : null,
+    // A Tier 2–3 incident confirmed outside response hours (D-034): the Space had it at once and the
+    // timers waited for the opening, so the ack counts from there. An ack before the opening (INC-0133's
+    // 08:04) keeps its own words; an incident a mute held (`alerted_at`, D-036) isn't this.
+    ackInHoursMin: ackInHoursOf(i, hours),
     canAct: canAcknowledge(actor, i),
     rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },
     gate: pendingClientUpdate(

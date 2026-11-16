@@ -1,7 +1,15 @@
-import { isInsideHours, ladderClockOf, ladderClockStart, scheduleOf, type Episode } from '@dxt/engine';
+import {
+  isInsideHours,
+  ladderClockOf,
+  ladderClockStart,
+  nextOpening,
+  scheduleOf,
+  type Episode,
+} from '@dxt/engine';
 import {
   formatDuration,
   formatTime,
+  formatWeekdayTime,
   formatWhen,
   isSameBangkokDay,
   type EscalationPlan,
@@ -134,6 +142,10 @@ export function pendingClientUpdate<
   return { ...gate, conditions, metCount, lockedReason };
 }
 
+/** A later time: the time alone within a day ("09:00" after Thu 23:42), else with its weekday ("Mon 09:00"). */
+const laterWord = (d: Date, from: Date) =>
+  d.getTime() - from.getTime() < 24 * 3_600_000 ? formatTime(d) : formatWeekdayTime(d);
+
 export function escalationCardOf(input: {
   plan: EscalationPlan | null;
   tier: number;
@@ -149,7 +161,8 @@ export function escalationCardOf(input: {
   hours: ResponseHours;
   steps: readonly StepSent[];
   people: LadderPeople;
-  acked: { by: string } | null;
+  /** Who acknowledged, and when ("09:06", the footer's words). */
+  acked: { by: string; at?: string } | null;
   /** The site has a client-update track (a Tier 1–2 client site, D-052); false: no promise about it. */
   clientTrack?: boolean;
   /** §37.6: the DOWN is over and the incident carries on as a PROBLEM, since this time ("09:35"). */
@@ -194,15 +207,12 @@ export function escalationCardOf(input: {
     const at =
       s.level === 0 ? start : sent && s.delayMin <= clock.carriedMin ? new Date(sent.at) : due.get(s.level)!;
     const when = s.level === 0 ? `0 min · ${hhmm(at)}` : `+${s.delayMin} min · ${hhmm(at)}`;
-    // §37.6: a Tier 2–3 alert held to response hours — the Space had it at once, the people at the opening.
+    // §37.6: a Tier 2–3 incident confirmed outside response hours — the Space had it at once and the
+    // timers wait for the opening (D-034). Not an incident a mute held (`alertedAt`, D-036): it posted nothing.
+    const detected = new Date(input.detectedAt);
     const held =
-      s.level === 0 &&
-      input.tier >= 2 &&
-      input.alertedAt &&
-      Date.parse(input.alertedAt) - Date.parse(input.detectedAt) > 60_000 &&
-      // only response hours hold it (D-034) — a mute or the email grace delays it too, but not for this
-      !isInsideHours(new Date(input.detectedAt), input.hours)
-        ? ` · posted to the Space at ${hhmm(new Date(input.detectedAt))}, outside response hours — timers paused until ${hhmm(new Date(input.alertedAt))}`
+      s.level === 0 && input.tier >= 2 && !input.alertedAt && !isInsideHours(detected, input.hours)
+        ? ` · posted to the Space at ${formatTime(detected)}, outside response hours — timers paused until ${laterWord(nextOpening(detected, input.hours), detected)}`
         : '';
     const who = `${whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'))}${held}`;
     if (sent || (s.level > 0 && s.level <= input.level)) {
@@ -229,7 +239,9 @@ export function escalationCardOf(input: {
         // MIncident: "Not sent · recovered 10:31" — an FYI the ack didn't stop says the recovery too.
         status:
           clock.upSince && (!input.acked || s.fyi)
-            ? `Not sent · recovered ${hhmm(clock.upSince)}`
+            ? input.problemSince
+              ? `Not sent · home page back ${input.problemSince}`
+              : `Not sent · recovered ${hhmm(clock.upSince)}`
             : input.acked
               ? 'Cancelled · acked'
               : 'Not sent · recovered',
@@ -264,9 +276,16 @@ export function escalationCardOf(input: {
   const fyi = rows.find((r) => r.tone === 'waits' && r.status.endsWith('· FYI'));
   const inMin = (d: Date) => (now ? Math.max(0, Math.round((d.getTime() - now.getTime()) / 60_000)) : null);
   const nextAt = next ? due.get(next.level) : undefined;
+  // What the ack stopped while an FYI still goes (board: "L1–L2 stopped" beside "L3 FYI at 10:48").
+  const cancelled = rows.filter((r) => r.status === 'Cancelled · acked').map((r) => r.label);
+  const stoppedWord =
+    fyi && cancelled.length
+      ? `${cancelled.length > 1 ? `${cancelled[0]}–${cancelled.at(-1)}` : cancelled[0]} stopped`
+      : 'Stopped · acked';
+  const nextWord = (d: Date) => (now && !isSameBangkokDay(d, now) ? formatWeekdayTime(d) : formatTime(d));
   const fact = input.acked
     ? {
-        value: 'Stopped · acked',
+        value: stoppedWord,
         caption: input.problemSince
           ? 'Still acknowledged as a PROBLEM — nothing more is sent'
           : fyi
@@ -276,20 +295,25 @@ export function escalationCardOf(input: {
     : {
         value: lastSent
           ? `${lastSent.label} · ${
-              lastStep
-                ? peopleOf(lastStep.targets, input.people)
-                    .map((x) => x.name)
-                    .join(' + ') || 'Nobody'
-                : ''
+              lastSent.status.includes(' by ')
+                ? 'sent by hand'
+                : lastStep
+                  ? [...new Set(peopleOf(lastStep.targets, input.people).map((x) => x.name))].join(' + ') ||
+                    'Nobody'
+                  : ''
             }`
           : 'Not sent yet',
         caption: stopped
           ? 'Engine down — nothing escalates on its own'
-          : waiting && next && nextAt
-            ? `L${next.level} at ${formatTime(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
-            : waiting
-              ? 'No more levels'
-              : 'Recovered — nothing more is sent',
+          : waiting && next && nextAt && byHand && !input.engine.stopped
+            ? `Running again · next at ${nextWord(nextAt)}`
+            : waiting && next && nextAt
+              ? `${next.targets.includes('ceo') ? 'CEO step' : `L${next.level}`} at ${nextWord(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
+              : waiting
+                ? 'No more levels'
+                : input.problemSince
+                  ? `Home page back ${input.problemSince} — DOWN levels wait while it still fails`
+                  : 'Recovered — nothing more is sent',
       };
   return {
     fact,
@@ -315,7 +339,7 @@ export function escalationCardOf(input: {
           }
         : null,
     footer: input.acked
-      ? `Acknowledged by ${input.acked.by} → escalation stopped.${
+      ? `Acknowledged by ${input.acked.by}${input.acked.at ? ` ${input.acked.at}` : ''} → escalation stopped.${
           input.problemSince
             ? ` From ${input.problemSince} the same incident carries on as a PROBLEM and stays acknowledged, so no PROBLEM reminders go out.`
             : input.clientTrack === false

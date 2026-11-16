@@ -22,6 +22,7 @@ import {
   confirmedByWafOf,
   formatDay,
   formatDuration,
+  formatShortWhen,
   formatTime,
   formatTimeWithSeconds,
   formatWhen,
@@ -390,7 +391,10 @@ export function nextLine(
         ? `${s.path} still failing`
         : [s.path, s.failure].filter(Boolean).join(' ')
       : (s.failure ?? 'still failing');
-    return { text: `Home page back ${formatTime(new Date(s.homeBackAt))} · ${what}`, tone: 'warning' };
+    return {
+      text: `Home page back ${formatShortWhen(new Date(s.homeBackAt), now)} · ${what}`,
+      tone: 'warning',
+    };
   }
   if (i.state === 'acknowledged') {
     return {

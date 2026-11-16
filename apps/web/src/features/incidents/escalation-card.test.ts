@@ -128,21 +128,92 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
       value: 'Stopped · acked',
       caption: 'Still acknowledged as a PROBLEM — nothing more is sent',
     });
+    const live = { ...base, engine: { stopped: false, since: null } };
+    // Acked with the Tier 1 FYI still to go: say what the ack stopped (board "L1–L2 stopped").
+    expect(
+      escalationCardOf({ ...live, state: 'acknowledged', acked: { by: 'Ploy' }, now: new Date(at('02:40')) })!
+        .fact,
+    ).toEqual({ value: 'L1–L2 stopped', caption: 'L3 FYI at 03:31 if still down' });
+    // The next level is the CEO: named as the CEO step (Incident board, Probes case).
+    expect(
+      escalationCardOf({
+        ...live,
+        level: 1,
+        state: 'escalated',
+        steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+        now: new Date(at('02:50')),
+      })!.fact,
+    ).toEqual({ value: 'L1 · Arm + Tao', caption: 'CEO step at 03:01 (in 11 min)' });
+    // A level sent by hand, then the engine back: the Manual case's words.
+    expect(
+      escalationCardOf({
+        ...live,
+        level: 1,
+        state: 'escalated',
+        steps: [{ level: 1, at: at('02:35'), sentBy: 'Tao' }],
+        now: new Date(at('02:44')),
+      })!.fact,
+    ).toEqual({ value: 'L1 · sent by hand', caption: 'Running again · next at 03:01' });
+    // One person in two roles is named once.
+    expect(
+      escalationCardOf({
+        ...live,
+        people: { ...base.people, backup: 'Tao' },
+        level: 1,
+        state: 'escalated',
+        steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+      })!.fact.value,
+    ).toBe('L1 · Tao');
+  });
+
+  it('§37: an unacked DOWN whose home page came back — the levels wait, not "Recovered"', () => {
+    const card = escalationCardOf({
+      ...base,
+      engine: { stopped: false, since: null },
+      episodes: [{ severity: 'down', start: new Date(at('02:31')), end: new Date(at('02:40')) }],
+      problemSince: '02:40',
+      now: new Date(at('02:50')),
+    })!;
+    expect(card.fact.caption).toBe('Home page back 02:40 — DOWN levels wait while it still fails');
+    expect(card.rows[1]!.status).toBe('Not sent · home page back 02:40');
+  });
+
+  it('the footer names the ack time (Incident board §37)', () => {
+    expect(
+      escalationCardOf({
+        ...base,
+        state: 'acknowledged',
+        acked: { by: 'Ploy', at: '09:06' },
+        problemSince: '09:35',
+      })!.footer,
+    ).toBe(
+      'Acknowledged by Ploy 09:06 → escalation stopped. From 09:35 the same incident carries on as a PROBLEM and stays acknowledged, so no PROBLEM reminders go out.',
+    );
   });
 
   it('§37.6: one person named once with both roles; a held Tier 2–3 alert says the Space had it first', () => {
     const tao = { ...base, people: { ...base.people, backup: 'Tao' } };
     expect(escalationCardOf(tao)!.rows[1]!.who).toBe('Tao (backup, Admin)');
-    const held = escalationCardOf({ ...base, tier: 2, detectedAt: at('02:31'), alertedAt: at('09:00') })!;
+    // INC-0140 (§37): Tier 2, confirmed Thu 24 Sep 23:42 — the Space had it at once, the timers waited.
+    const held = escalationCardOf({ ...base, tier: 2, detectedAt: '2026-09-24T23:42:08+07:00' })!;
     expect(held.rows[0]!.who).toBe(
-      'Ploy (on call) + Alerts Space · posted to the Space at 02:31, outside response hours — timers paused until 09:00',
+      'Ploy (on call) + Alerts Space · posted to the Space at 23:42, outside response hours — timers paused until 09:00',
     );
-    // Held by a mute inside response hours (Fri 10:00 → 11:00): not "outside response hours".
+    // Sat 02:31: the next opening is Monday's, so it carries its weekday.
+    expect(escalationCardOf({ ...base, tier: 2 })!.rows[0]!.who).toBe(
+      'Ploy (on call) + Alerts Space · posted to the Space at 02:31, outside response hours — timers paused until Mon 09:00',
+    );
+    // Inside response hours (Fri 10:00) and Tier 1: no note.
+    expect(
+      escalationCardOf({ ...base, tier: 2, detectedAt: '2026-09-25T10:00:00+07:00' })!.rows[0]!.who,
+    ).toBe('Ploy (on call) + Alerts Space');
+    expect(escalationCardOf(base)!.rows[0]!.who).toBe('Ploy (on call) + Alerts Space');
+    // Held by a mute over the night (D-036): a muted incident posted nothing, so no "posted to the Space".
     const muted = escalationCardOf({
       ...base,
       tier: 2,
-      detectedAt: '2026-09-25T10:00:00+07:00',
-      alertedAt: '2026-09-25T11:00:00+07:00',
+      detectedAt: '2026-09-24T23:42:00+07:00',
+      alertedAt: '2026-09-25T10:00:00+07:00',
     })!;
     expect(muted.rows[0]!.who).toBe('Ploy (on call) + Alerts Space');
   });

@@ -57,8 +57,15 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   client_not_needed: { icon: <IconCircleCheck />, tone: 'text-fg-secondary' },
 };
 
-/** One row of facts from lg, however many the case has (5–7; the board's `factCols`). */
-const COLS: Record<number, string> = { 5: 'lg:grid-cols-5', 6: 'lg:grid-cols-6', 7: 'lg:grid-cols-7' };
+/**
+ * One row of facts from xl, however many the case has (5–7; the board's `factCols`); two rows of 4 at lg,
+ * where 7 cells would leave ~83 px each at 1024 and "23:41:36" can't break (spec-checker M4).
+ */
+const COLS: Record<number, string> = {
+  5: 'lg:grid-cols-4 xl:grid-cols-5',
+  6: 'lg:grid-cols-4 xl:grid-cols-6',
+  7: 'lg:grid-cols-4 xl:grid-cols-7',
+};
 
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {
   const confirmedAt = new Date(d.detectedAt);
@@ -154,7 +161,7 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
     },
   ] as { label: string; value: string; caption: string; danger?: boolean; warning?: boolean }[];
   return (
-    <dl className={`aura-card m-0 grid grid-cols-2 gap-4 p-aura-5 ${COLS[facts.length] ?? 'lg:grid-cols-5'}`}>
+    <dl className={`aura-card m-0 grid grid-cols-2 gap-4 p-aura-5 ${COLS[facts.length] ?? COLS[5]}`}>
       {facts.map((f) => (
         <div
           key={f.label}
@@ -561,7 +568,7 @@ export function incidentSections(d: IncidentDetail, now: Date): IncidentSections
           meta: `home page back ${problemSince(d, now)} · down from ${shortWhen(d.stillFailing.downFrom, now)} (${d.stillFailing.downTrigger})`,
           phone: [
             `Problem since ${problemSince(d, now)} · ${formatDuration(Math.max(1, Math.round((now.getTime() - Date.parse(d.stillFailing.since)) / 60_000)))}`,
-            `Home page back ${formatTime(new Date(d.stillFailing.since))} · was down ${formatDuration(d.durationMinutes)} (${shortSpan(d.stillFailing.downFrom, d.stillFailing.downTo, now)})`,
+            `Home page back ${formatShortWhen(new Date(d.stillFailing.since), now)} · was down ${formatDuration(d.durationMinutes)} (${shortSpan(d.stillFailing.downFrom, d.stillFailing.downTo, now)})`,
           ],
         }
       : null,

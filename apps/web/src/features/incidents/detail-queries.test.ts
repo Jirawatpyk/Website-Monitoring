@@ -5,7 +5,41 @@ vi.mock('@/server/db', () => ({ serviceDb: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/lib/auth/session', () => ({ getAccess: vi.fn() }));
 
-const { downTriggerOf, incidentAccept, keyPageRows, locationsOf } = await import('./detail-queries');
+const { ackInHoursOf, downTriggerOf, incidentAccept, keyPageRows, locationsOf } =
+  await import('./detail-queries');
+
+describe('ackInHoursOf (§37 ACKNOWLEDGED caption, D-034)', () => {
+  const HOURS = { startMin: 540, endMin: 1080, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };
+  const inc = (over: Record<string, unknown>) => ({
+    acked_at: null,
+    alerted_at: null,
+    detected_at: '2026-09-24T23:42:08+07:00',
+    sites: { tier: 2 },
+    ...over,
+  });
+  it.each([
+    ['INC-0140: Thu 23:42, acked Fri 09:06', inc({ acked_at: '2026-09-25T09:06:00+07:00' }), 6],
+    [
+      'INC-0133: acked 08:04, before hours',
+      inc({ detected_at: '2026-09-21T03:12:00+07:00', acked_at: '2026-09-21T08:04:00+07:00' }),
+      null,
+    ],
+    [
+      'inside hours',
+      inc({ detected_at: '2026-09-25T10:00:00+07:00', acked_at: '2026-09-25T10:05:00+07:00' }),
+      null,
+    ],
+    ['Tier 1', inc({ sites: { tier: 1 }, acked_at: '2026-09-25T09:06:00+07:00' }), null],
+    [
+      'held by a mute (D-036)',
+      inc({ alerted_at: '2026-09-25T10:00:00+07:00', acked_at: '2026-09-25T10:06:00+07:00' }),
+      null,
+    ],
+    ['not acked', inc({}), null],
+  ])('%s', (_, i, want) => {
+    expect(ackInHoursOf(i, HOURS)).toBe(want);
+  });
+});
 
 const check = (location: string, at: string, over: Record<string, unknown> = {}) => ({
   location,
@@ -91,8 +125,18 @@ describe('downTriggerOf (§37 meta line)', () => {
       'Browser',
     ],
     ['raised by a hard fail', 'slow', [ev('escalated_to_down', {})], 'Hard fail'],
-    ['raised by hand', 'key_page', [ev('escalated_to_down', { manual: true })], 'Manual (hand check)'],
+    ['raised by hand', 'key_page', [ev('escalated_to_down', { manual: true })], 'Manual'],
     ['a DOWN from the start', 'hard_fail', [ev('detected')], 'Hard fail'],
+    // A blocked round the browser failed opens DOWN with the job on `detected` (run-engine downContext).
+    ['the verifier from the start', 'hard_fail', [ev('detected', { verifyJobId: 'j1' })], 'Browser'],
+    // The line's time is the first DOWN drop's: its own cause, not a later DOWN AGAIN's.
+    [
+      'a later DOWN AGAIN by the browser',
+      'hard_fail',
+      [ev('detected'), ev('recovered'), ev('relapsed', { severity: 'down', verifyJobId: 'j2' })],
+      'Hard fail',
+    ],
+    ['opened by hand', 'manual', [ev('detected')], 'Manual'],
   ] as const)('%s', (_, trigger, events, expected) => {
     expect(downTriggerOf(trigger, [...events])).toBe(expected);
   });
