@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   digestModel,
   reportChat,
-  weeklyEmail,
   weeklyModel,
   type DigestFacts,
   type MonitorFacts,
@@ -434,11 +433,9 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
     expect(rows.map((r) => r.text.split(' · ')[0])).toEqual(['B', 'A']);
   });
 
-  it('renders the section in the Chat card and the email', () => {
+  it('renders the section in the Chat card', () => {
     const m = weeklyModel(weekly());
     expect(JSON.stringify(reportChat(m, 'weekly'))).toContain('UPTIME BY SITE · 1 BELOW TARGET');
-    const email = weeklyEmail(m, weekly());
-    expect(email.text).toContain('MuvMi · Tier 1 · 30 d 99.90% · target 99.95% · this week 99.57%');
   });
 
   it('lists incidents with their down time, outline severity and the ladder', () => {
@@ -671,22 +668,5 @@ describe('rendering', () => {
         ],
       },
     });
-  });
-
-  it('emails the CEO the same sections with a plain-text part', () => {
-    const m = weeklyModel(weekly());
-    const mail = weeklyEmail(m, weekly());
-    expect(mail.subject).toBe('DxT Monitor · Weekly summary · 21–27 Sep');
-    expect(mail.text).toContain('NEEDS SOMEONE');
-    expect(mail.text).toContain('Tier 2 — (no DOWN inside response hours)');
-    expect(mail.html).toContain('Bangkok Airways – China');
-    expect(mail.html).not.toContain('<users/');
-    // Escaped: a reason can't inject markup (names lose < > anyway, as in every Chat line).
-    const evil = weeklyEmail(
-      weeklyModel(weekly({ planned: [{ ...weekly().planned[0]!, reason: '<img src=x> & "y"' }] })),
-      weekly(),
-    );
-    expect(evil.html).toContain('&lt;img src=x&gt; &amp; &quot;y&quot;');
-    expect(evil.html).not.toContain('<img');
   });
 });

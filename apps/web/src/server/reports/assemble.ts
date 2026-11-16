@@ -1,7 +1,28 @@
 import 'server-only';
 import { episodesFromTimeline, type Episode, type IncidentEventRow } from '@dxt/engine';
 import { shortCause, type MonitorFacts, type ReportIncident, type ReportPerson } from '@dxt/notifier';
-import { clockMinutes, TRIGGER_LABELS, type IncidentState, type Severity, type Trigger } from '@dxt/shared';
+import {
+  clockMinutes,
+  formatDay,
+  TRIGGER_LABELS,
+  type IncidentState,
+  type Severity,
+  type Trigger,
+} from '@dxt/shared';
+
+/**
+ * NEEDS SOMEONE rows for a DOWN back with something still failing (§19.7, WeeklyEmail §36.7): open, so
+ * not in the "DOWN without a root cause" list, yet it needs someone while nobody has written why.
+ */
+export function stillFailingRows(list: readonly ReportIncident[]) {
+  return list
+    .filter((r) => r.stillProblem && !r.rootCause)
+    .map((r) => ({
+      kind: 'root_cause' as const,
+      text: `${r.site} — still failing since ${formatDay(r.startedAt, { weekday: true })} (${r.stillProblem}), no root cause yet`,
+      who: r.owner ? [r.owner] : [],
+    }));
+}
 
 /**
  * Turning stored rows into what the reports say (S14, D-056) — pure, so the rules have tests:

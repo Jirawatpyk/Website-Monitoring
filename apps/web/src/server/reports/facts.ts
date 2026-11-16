@@ -32,7 +32,7 @@ import {
 } from '@dxt/shared';
 import { downEpisodesBySite, maintenanceSpansBySite, watchedSince } from '@/features/sites/server';
 import { loadResponseHours } from '../escalation/response-hours';
-import { causeOf, reportIncident, roundsOf, type IncidentRow } from './assemble';
+import { causeOf, reportIncident, roundsOf, stillFailingRows, type IncidentRow } from './assemble';
 
 /**
  * What the daily digest and the weekly summary say (S14, FR-12, D-056), read as the service role at
@@ -445,6 +445,9 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
       },
     ];
   });
+  // A DOWN back with something still failing (§19.7) is open, so it isn't in `loadOpenDowns`: it leads
+  // the list while nobody has written why (WeeklyEmail §36.7).
+  const stillFailing = stillFailingRows(list);
   const requestRows = must(requests, 'maintenance_windows').map((w) => {
     const s = new Date(w.starts_at);
     const e = new Date(w.ends_at);
@@ -498,7 +501,7 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
     uptime: aggregateUptime(windowsUp),
     incidents: list,
     sites: siteUptimes,
-    needsSomeone: [...rootCause, ...requestRows, ...swapRows],
+    needsSomeone: [...stillFailing, ...rootCause, ...requestRows, ...swapRows],
     mtta,
     planned: planned.map(toWindow),
     comingUp: coming.filter((w) => w.kind === 'maintenance' && new Date(w.starts_at) > now).map(toWindow),

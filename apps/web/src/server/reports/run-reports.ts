@@ -45,7 +45,7 @@ export async function runReports(deps: DispatchDeps, now: Date = new Date()): Pr
       p_kind: 'weekly',
       p_period_start: bangkokDate(new Date(bangkokDayStart(now).getTime() - 7 * DAY_MS)),
       p_chat: reportChat(model, 'weekly-summary') as unknown as Json,
-      p_email: (ceos.length ? weeklyEmail(model, facts) : null) as unknown as Json,
+      p_email: (ceos.length ? weeklyEmail(facts) : null) as unknown as Json,
       p_recipients: ceos,
     });
     if (queued.error) throw new Error(`queue_report weekly: ${queued.error.message}`);
