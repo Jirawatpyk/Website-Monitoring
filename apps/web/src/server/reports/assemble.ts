@@ -129,8 +129,10 @@ export function reportIncident(
   // PROBLEM drop still open keeps it from reading as recovered — even one opened after the period ended
   // (Monday 05:00 before the 09:00 weekly), so the newest drop of the whole timeline.
   const open = timeline.at(-1)!;
+  // A DOWN of an earlier week still failing this week shows only its PROBLEM drop here: the incident's
+  // record says it came back from a DOWN (message-checker).
   const stillProblem =
-    severity === 'down' && open.severity === 'problem' && open.end === null
+    (severity === 'down' || row.severity === 'down') && open.severity === 'problem' && open.end === null
       ? causeOf(row, 'problem', open.start)
       : null;
   return {

@@ -228,6 +228,26 @@ describe('weekly email (WeeklyEmail board, §36)', () => {
     expect(mail.text).toContain('You got this because you get the weekly summary as the CEO.');
   });
 
+  it('COMING UP words the on-call week as the board; the button sits beside the DxT mark', () => {
+    const m = weeklyEmailModel(
+      busy({
+        onCall: {
+          thisWeek: {
+            name: 'Nok',
+            week: { start: bkk('2026-11-16T09:00:00'), end: bkk('2026-11-23T09:00:00') },
+          },
+          next: {
+            name: 'Arm',
+            week: { start: bkk('2026-11-23T09:00:00'), end: bkk('2026-11-30T09:00:00') },
+            swap: null,
+          },
+        },
+      }),
+    );
+    expect(m.coming[0]).toBe('On call (Tier 1 nights and weekends): Nok, Mon 16 → Mon 23 Nov. Next: Arm.');
+    expect(weeklyEmail(busy()).html).toMatch(/>DxT <span/);
+  });
+
   it('escapes what people typed', () => {
     const evil = weeklyEmail(busy({ planned: [{ ...busy().planned[0]!, reason: '<img src=x> & "y"' }] }));
     expect(evil.html).toContain('&lt;img src=x&gt; &amp; &quot;y&quot;');

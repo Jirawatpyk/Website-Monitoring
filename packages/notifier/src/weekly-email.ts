@@ -1,4 +1,11 @@
-import { allowedDownMinutes, formatDayRange, formatDuration, formatPercent, formatTime } from '@dxt/shared';
+import {
+  allowedDownMinutes,
+  formatDay,
+  formatDayRange,
+  formatDuration,
+  formatPercent,
+  formatTime,
+} from '@dxt/shared';
 import { plainName } from './chat-alerts';
 import { EMAIL_COLORS, EMAIL_COLORS_DARK, escapeHtml, type EmailMessage } from './email-alerts';
 import {
@@ -107,6 +114,14 @@ function uptimeOf(sites: readonly ReportSiteUptime[]) {
     })),
     on,
   };
+}
+
+/** "Mon 16 → Mon 23 Nov" (one month), "Mon 30 Nov → Mon 7 Dec". */
+function weekSpan(w: { start: Date; end: Date }): string {
+  const a = formatDay(w.start, { weekday: true });
+  const b = formatDay(w.end, { weekday: true });
+  const month = (s: string) => s.split(' ').at(-1);
+  return `${month(a) === month(b) ? a.replace(/ \S+$/, '') : a} → ${b}`;
 }
 
 /** "Bangkok Airways – Taiwan, realme.link, Fuji Links and 10 more". */
@@ -234,7 +249,15 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
       badge: w.kind === 'mute' ? 'muted' : 'maintenance',
       text: plannedText(w, f.at),
     })),
-    coming: comingLines(f),
+    // The board's on-call line (§36: "On call (…): Nok, Mon 16 → Mon 23 Nov. Next: Arm."); the windows as the card.
+    coming: [
+      ...(f.onCall.thisWeek
+        ? [
+            `On call (Tier 1 nights and weekends): ${plainName(f.onCall.thisWeek.name)}, ${weekSpan(f.onCall.thisWeek.week)}.${f.onCall.next ? ` Next: ${plainName(f.onCall.next.name)}${f.onCall.next.swap ? ` — ${f.onCall.next.swap}` : ''}.` : ''}`,
+          ]
+        : []),
+      ...comingLines({ ...f, onCall: { thisWeek: null, next: null } }),
+    ],
     monitor: monitorLines(f.monitor),
     button: { text: 'Open incidents', url: `${f.appUrl}/incidents` },
   };
@@ -360,7 +383,7 @@ export function weeklyEmail(f: WeeklyFacts): EmailMessage {
 ${tiles}
 ${m.month ? `<div class="wk-s" style="padding-top:10px;font-size:13px;line-height:1.5;color:${L.secondary}">${esc(m.month)}</div>` : ''}
 ${needs}${incidents}${uptime}${mtta}${planned}${lines('COMING UP', m.coming)}${lines('THE MONITOR ITSELF', m.monitor, true)}
-<div style="padding-top:20px"><a href="${esc(m.button.url)}" class="wk-btn" style="display:inline-block;padding:12px 24px;border-radius:9999px;background:${L.buttonBg};color:${L.buttonFg};font-size:14px;line-height:20px;font-weight:600;text-decoration:none">${esc(m.button.text)}</a></div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px"><tr><td><a href="${esc(m.button.url)}" class="wk-btn" style="display:inline-block;padding:12px 24px;border-radius:9999px;background:${L.buttonBg};color:${L.buttonFg};font-size:14px;line-height:20px;font-weight:600;text-decoration:none">${esc(m.button.text)}</a></td><td align="right" style="vertical-align:middle"><span class="wk-btn" style="display:inline-block;padding:3px 8px;border-radius:4px;background:${L.buttonBg};color:${L.buttonFg};font-size:13px;line-height:20px;font-weight:700">DxT <span style="display:inline-block;width:5px;height:5px;border-radius:9999px;background:${L.accentDot};vertical-align:middle"></span></span></td></tr></table>
 </td></tr>
 <tr><td class="wk-s" style="padding:16px 8px 0;text-align:center;font-size:12px;line-height:1.5;color:${L.secondary}"><b class="wk-p" style="font-weight:600;color:${L.primary}">${esc(WHY)}</b><br>${esc(WEEKLY_EMAIL_FOOTER)}</td></tr>
 </table>

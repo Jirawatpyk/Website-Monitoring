@@ -154,6 +154,11 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
     expect(reportIncident(chainStillBroken, lateWeek.from, lateWeek.to, now, insideHours)!.stillProblem).toBe(
       'TLS chain misconfigured',
     );
+    // The DOWN was the week before; this week only the PROBLEM drop: still the home page back, still failing.
+    const nextWeek = { from: bkk('2026-09-28T00:00:00'), to: bkk('2026-10-05T00:00:00') };
+    expect(
+      reportIncident(chainStillBroken, nextWeek.from, nextWeek.to, bkk('2026-10-05T09:00:00'), insideHours),
+    ).toMatchObject({ severity: 'problem', failing: true, stillProblem: 'TLS chain misconfigured' });
     // VOCA ended on a recovery: nothing still open.
     expect(reportIncident(voca, week.from, week.to, now, insideHours)!.stillProblem).toBeNull();
   });
