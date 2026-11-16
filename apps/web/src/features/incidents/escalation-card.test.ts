@@ -175,7 +175,7 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
       now: new Date(at('02:50')),
     })!;
     expect(card.fact.caption).toBe('DOWN levels wait · home page back 02:40');
-    expect(card.rows[1]!.status).toBe('Not sent · home page back 02:40');
+    expect(card.rows[1]!.status).toBe('Waits · home page back 02:40');
   });
 
   it('the footer names the ack time (Incident board §37)', () => {
@@ -204,9 +204,9 @@ describe('escalationCardOf (S12b, spec §30.6–8, D-055)', () => {
     // The DOWN's L0 went with the first card at 23:42 (D-065: a DOWN is never held; the board's "09:00" isn't)
     expect(held.rows[0]).toEqual({
       label: 'L0',
-      when: '0 min · Yesterday 23:42',
+      when: '0 min · Thu 23:42',
       who: 'Ploy (on call) + Alerts Space · posted to the Space at 23:42, outside response hours — timers paused until 09:00',
-      status: 'Sent Yesterday 23:42',
+      status: 'Sent Thu 23:42',
       tone: 'sent',
     });
     // A Tier 2–3 PROBLEM at night: the first card itself waits for the opening (D-034 `holdFor`).
@@ -442,9 +442,109 @@ describe('escalationCardOf — after a relapse (D-058)', () => {
       now: new Date('2026-09-28T08:01:00+07:00'),
     })!;
     expect(card.rows.slice(0, 2).map((r) => [r.when, r.status])).toEqual([
-      ['0 min · Sat 26 Sep 02:31', 'Sent Sat 26 Sep 02:31'],
-      ['+15 min · Sat 26 Sep 02:46', 'Sent Sat 26 Sep 02:46'],
+      ['0 min · Sat 02:31', 'Sent Sat 02:31'],
+      ['+15 min · Sat 02:46', 'Sent Sat 02:46'],
     ]);
     expect(card.rows[2]!.when).toBe('+30 min · 08:11');
+  });
+});
+
+describe('escalationCardOf — the night-time L0 row (D-065, engine re-review)', () => {
+  const thu = (hhmm: string) => `2026-09-24T${hhmm}:00+07:00`;
+  const fri = (hhmm: string) => `2026-09-25T${hhmm}:00+07:00`;
+  const problem = { ...PLAN, severity: 'problem' as const, tier: 2 as const };
+  const night = {
+    ...base,
+    plan: problem,
+    tier: 2,
+    severity: 'problem' as const,
+    detectedAt: thu('23:42'),
+    engine: { stopped: false, since: null },
+  };
+  const ep = (start: string, end: string | null) => ({
+    start: new Date(start),
+    confirmedAt: new Date(start),
+    end: end ? new Date(end) : null,
+    severity: 'problem' as const,
+  });
+  it('a held PROBLEM that recovered before 09:00 never went: not "Sent 09:00"', () => {
+    const row = escalationCardOf({
+      ...night,
+      state: 'resolved',
+      episodes: [ep(thu('23:42'), thu('23:45'))],
+      now: new Date(fri('10:00')),
+    })!.rows[0]!;
+    expect([row.status, row.tone]).toEqual(['Not sent · recovered Thu 23:45', 'cancelled']);
+  });
+  it('acked before the opening: the card was cancelled, at 08:30 and at 10:00', () => {
+    const acked = { ...night, state: 'acknowledged', acked: { by: 'Ploy' }, ackedAt: fri('08:04') };
+    expect(escalationCardOf({ ...acked, now: new Date(fri('08:30')) })!.rows[0]!.status).toBe(
+      'Not sent · acked 08:04',
+    );
+    expect(escalationCardOf({ ...acked, now: new Date(fri('10:00')) })!.rows[0]!.status).toBe(
+      'Not sent · acked 08:04',
+    );
+  });
+  it('recovered at 01:00, PROBLEM AGAIN at 10:30: still no "Sent 09:00"', () => {
+    const row = escalationCardOf({
+      ...night,
+      episodes: [ep(thu('23:42'), fri('01:00')), ep(fri('10:30'), null)],
+      now: new Date(fri('10:40')),
+    })!.rows[0]!;
+    expect(row.status).toBe('Not sent · recovered 01:00');
+  });
+  it('a mute covered the detection: no "posted to the Space", nothing sent', () => {
+    const muted = {
+      ...base,
+      tier: 2,
+      detectedAt: thu('23:42'),
+      mutedAtDetection: true,
+      engine: { stopped: false, since: null },
+    };
+    const open = escalationCardOf({ ...muted, now: new Date(fri('01:00')) })!.rows[0]!;
+    expect(open.who).toBe('Ploy (on call) + Alerts Space');
+    expect([open.status, open.tone]).toEqual(['Held by a mute', 'waits']);
+    expect(
+      escalationCardOf({ ...muted, state: 'resolved', now: new Date(fri('03:00')) })!.rows[0]!.status,
+    ).toBe('Not sent · muted');
+  });
+  it('a PROBLEM whose mute ended at 02:00: the late card waits for 09:00, not "Sent 02:00"', () => {
+    const late = { ...night, alertedAt: fri('02:00') };
+    expect(escalationCardOf({ ...late, now: new Date(fri('02:30')) })!.rows[0]!.status).toBe(
+      'Held until 09:00',
+    );
+    expect(escalationCardOf({ ...late, now: new Date(fri('09:30')) })!.rows[0]!.status).toBe('Sent 09:00');
+  });
+});
+
+describe('escalationCardOf — the ESCALATION fact, board states (spec re-check)', () => {
+  const live = { ...base, engine: { stopped: false, since: null } };
+  it('Tier 1 acked after L1 went: "L1–L2 stopped", the FYI still to come', () => {
+    const card = escalationCardOf({
+      ...live,
+      level: 1,
+      state: 'acknowledged',
+      acked: { by: 'Ploy' },
+      steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+      now: new Date(at('02:50')),
+    })!;
+    expect(card.fact).toEqual({ value: 'L1–L2 stopped', caption: 'L3 FYI at 03:31 if still down' });
+  });
+  it('acked with the engine down: the FYI waits, it is not "nothing more is sent"', () => {
+    const card = escalationCardOf({ ...base, state: 'acknowledged', acked: { by: 'Ploy' } })!;
+    expect(card.fact).toEqual({ value: 'L1–L2 stopped', caption: 'L3 FYI waits — engine down' });
+  });
+  it('"Running again" only while the latest level sent was by hand', () => {
+    const card = escalationCardOf({
+      ...live,
+      level: 2,
+      state: 'escalated',
+      steps: [
+        { level: 1, at: at('02:35'), sentBy: 'Tao' },
+        { level: 2, at: at('03:01'), sentBy: null },
+      ],
+      now: new Date(at('03:05')),
+    })!;
+    expect(card.fact).toEqual({ value: 'L2 · CEO', caption: 'L3 at 03:31 (in 26 min)' });
   });
 });

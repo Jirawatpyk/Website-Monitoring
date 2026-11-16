@@ -80,6 +80,11 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - An incident a mute held (`alerted_at` set, D-036) gets neither line.
 - ACKNOWLEDGED: "09:06 · 6 min into response hours" counts from the confirm; 0 minutes (an ack before 09:00, INC-0133) keeps "acknowledged 08:04".
 
+- A held PROBLEM card the engine cancelled (recovered or acknowledged before the opening, `engine_cancel_held_problem`) reads "Not sent · recovered 23:45" / "Not sent · acked 08:04", never "Sent 09:00". A PROBLEM whose mute ended at night waits for the opening too.
+- A mute that covered the detection: L0 reads "Held by a mute" while open, "Not sent · muted" after; no night line, no response-hours count.
+- Past ladder times carry their day as the meta line does ("Thu 23:42"), later ones their weekday ("Fri 09:15").
+- Addendum (16 Nov, Tao): an internal Tier 1–2 site shows a one-line Client update card, "Not required" — "VOCA is an internal site — no client to tell, so this Resolve condition is met." (§37.7). This amends D-052 item 3 for internal sites only; a client site's card still shows once the track fired. The ladder rows keep one form across cases ("Ploy (owner)", no "@").
+
 **Why.** An outage at night must reach the Space at once; holding a DOWN until 09:00 would be an engine change against D-034 for a wording difference. The page must not claim a 09:00 send that never happened.
 
 **Impact.** `features/incidents` `escalation-card.ts` and `ackInHoursOf` (`detail-queries.ts`), with table tests from INC-0140 and INC-0133. No engine or notifier change.

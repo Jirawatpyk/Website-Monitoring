@@ -89,7 +89,7 @@ describe('Evidence by location (Incident board)', () => {
         location: 'SIN',
         first: { text: 'HTTP 504 · 12.4 s', glyph: 'fail' },
         recheck: { text: 'HTTP 504 · 11.9 s', glyph: 'fail' },
-        latest: { text: '200 · 412 ms', glyph: 'pass' },
+        latest: { text: 'HTTP 200 · 0.4 s', glyph: 'pass' },
       },
     ]);
   });
@@ -112,7 +112,7 @@ describe('Evidence by location (Incident board)', () => {
     expect(rows).toMatchObject([
       {
         location: 'BKK',
-        home: { text: '200 · 900 ms', glyph: 'pass' },
+        home: { text: 'HTTP 200 · 0.9 s', glyph: 'pass' },
         // A PROBLEM's failure: amber "Fail", never the red hard fail.
         first: { text: 'HTTP 404 · 0.4 s', glyph: 'problem', at: '2026-09-25T09:35:20+07:00' },
         latest: { text: 'HTTP 404 · 0.4 s', glyph: 'problem' },

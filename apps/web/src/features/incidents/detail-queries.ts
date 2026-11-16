@@ -219,7 +219,8 @@ const cellOf = (c: CheckRow | undefined, timeoutMs: number): CheckCell | null =>
 
 const checkWords = (c: CheckRow, timeoutMs: number): CheckCell => {
   if (c.outcome === 'pass') {
-    return { text: `${c.status_code ?? 200} · ${c.response_ms ?? '—'} ms`, glyph: 'pass' };
+    const secs = c.response_ms !== null ? ` · ${(c.response_ms / 1000).toFixed(1)} s` : '';
+    return { text: `HTTP ${c.status_code ?? 200}${secs}`, glyph: 'pass' };
   }
   if (c.outcome === 'blocked') return { text: 'Blocked by bot protection', glyph: 'blocked' };
   const what = describeFailure(
@@ -273,6 +274,23 @@ export async function newestInOrder<T>(
   max: number,
 ): Promise<T[]> {
   return (await fetchAllPages<T>(page, { max })).reverse();
+}
+
+/**
+ * Whether a mute covered the incident's detection (D-036): nothing posted then. Staff read the windows
+ * (RLS); anyone else reads none, so false.
+ */
+async function muteCovered(db: DbClient, i: { site_id: string; detected_at: string }): Promise<boolean> {
+  const { data } = await db
+    .from('maintenance_windows')
+    .select('ended_at')
+    .eq('site_id', i.site_id)
+    .eq('kind', 'mute')
+    .is('cancelled_at', null)
+    .lte('starts_at', i.detected_at)
+    .gt('ends_at', i.detected_at)
+    .limit(5);
+  return (data ?? []).some((w) => !w.ended_at || Date.parse(w.ended_at) > Date.parse(i.detected_at));
 }
 
 /** Minutes into response hours the ack came (≥ 1), or null when the rule doesn't apply (see the caller). */
@@ -643,7 +661,7 @@ export async function loadIncident(
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
   const shot =
     typeof evidenceEvent?.payload.screenshotPath === 'string' ? evidenceEvent.payload.screenshotPath : null;
-  const url = shot ? await sign(shot) : null;
+  const [url, mutedAtDetection] = await Promise.all([shot ? sign(shot) : null, muteCovered(db, i)]);
 
   const engineSince = engineRun.data?.last_seen_at ?? null;
   const stopped = isEngineStopped(engineSince ? new Date(engineSince) : null, now);
@@ -659,6 +677,8 @@ export async function loadIncident(
       state: i.state,
       detectedAt: i.detected_at,
       alertedAt: i.alerted_at,
+      ackedAt: i.acked_at,
+      mutedAtDetection,
       episodes: drops,
       now,
       hours,
@@ -686,7 +706,9 @@ export async function loadIncident(
         admins: (admins.data ?? []).map((a) => a.display_name),
       },
       acked:
-        i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: formatTime(new Date(i.acked_at)) } : null,
+        i.acked_at && i.acked_by
+          ? { by: nameOf(i.acked_by), at: formatShortWhen(new Date(i.acked_at), now) }
+          : null,
       engine: { stopped, since: engineSince },
       canAct,
     });
@@ -759,7 +781,7 @@ export async function loadIncident(
     // A Tier 2–3 incident confirmed outside response hours (D-034): the Space had it at once and the
     // timers waited for the opening, so the ack counts from there. An ack before the opening (INC-0133's
     // 08:04) keeps its own words; an incident a mute held (`alerted_at`, D-036) isn't this.
-    ackInHoursMin: ackInHoursOf(i, hours),
+    ackInHoursMin: mutedAtDetection ? null : ackInHoursOf(i, hours),
     canAct: canAcknowledge(actor, i),
     rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },
     gate: pendingClientUpdate(

@@ -10,7 +10,7 @@ import {
   formatDuration,
   formatTime,
   formatWeekdayTime,
-  formatWhen,
+  formatShortWhen,
   isSameBangkokDay,
   type EscalationPlan,
   type EscalationTarget,
@@ -163,6 +163,10 @@ export function escalationCardOf(input: {
   people: LadderPeople;
   /** Who acknowledged, and when ("09:06", the footer's words). */
   acked: { by: string; at?: string } | null;
+  /** When it was acknowledged (ISO): a held PROBLEM card acked before the opening never went (D-065). */
+  ackedAt?: string | null;
+  /** A mute covered the detection (D-036): nothing posted then. */
+  mutedAtDetection?: boolean;
   /** The site has a client-update track (a Tier 1–2 client site, D-052); false: no promise about it. */
   clientTrack?: boolean;
   /** §37.6: the DOWN is over and the incident carries on as a PROBLEM, since this time ("09:35"). */
@@ -199,14 +203,38 @@ export function escalationCardOf(input: {
 
   // After a relapse days later a level of the first drop went on another day (spec §13, D-058).
   const now = input.now;
-  const hhmm = (d: Date) => (now && !isSameBangkokDay(d, now) ? formatWhen(d, now) : formatTime(d));
+  // A past time as the meta line words it ("Thu 23:42"), a later one with its weekday ("Fri 09:15").
+  const hhmm = (d: Date) =>
+    !now || isSameBangkokDay(d, now)
+      ? formatTime(d)
+      : d <= now
+        ? formatShortWhen(d, now)
+        : formatWeekdayTime(d);
   // A Tier 2–3 incident confirmed outside response hours (D-034, D-065). A DOWN posts at once and its
-  // timers wait for the opening; a PROBLEM's first card itself waits for the opening (`holdFor`). Not an
-  // incident a mute held (`alertedAt`, D-036): its first alert went when the mute ended.
+  // timers wait for the opening; a PROBLEM's first card itself waits for the opening (`holdFor`). An
+  // incident a mute held (D-036) posted nothing then: its first alert went when the mute ended
+  // (`alertedAt`), or not yet / never (`mutedAtDetection` with no `alertedAt`).
   const detected = new Date(input.detectedAt);
-  const night = input.tier >= 2 && !input.alertedAt && !isInsideHours(detected, input.hours);
+  const muted = !!input.mutedAtDetection && !input.alertedAt;
+  const night = input.tier >= 2 && !input.alertedAt && !muted && !isInsideHours(detected, input.hours);
   const opening = night ? nextOpening(detected, input.hours) : null;
-  const heldProblem = opening && plan.severity === 'problem' ? opening : null;
+  // A Tier 2–3 PROBLEM's first card waits for the opening — also when the mute ended at night.
+  const firstAt = input.alertedAt ? new Date(input.alertedAt) : detected;
+  const heldProblem =
+    !muted && input.tier >= 2 && plan.severity === 'problem' && !isInsideHours(firstAt, input.hours)
+      ? nextOpening(firstAt, input.hours)
+      : null;
+  // The engine cancels a held card when the incident recovered or was acknowledged before the opening
+  // (`engine_cancel_held_problem`): it never went out.
+  const firstEnd = input.episodes?.[0]?.end ?? null;
+  const ackedAt = input.ackedAt ? new Date(input.ackedAt) : null;
+  const cancelled = !heldProblem
+    ? null
+    : firstEnd && firstEnd < heldProblem
+      ? `Not sent · recovered ${hhmm(firstEnd)}`
+      : ackedAt && ackedAt < heldProblem
+        ? `Not sent · acked ${hhmm(ackedAt)}`
+        : null;
   const rows = steps.map((s): LadderRow => {
     const l0At = heldProblem ?? start;
     const sent = s.level === 0 ? { at: l0At.toISOString(), sentBy: null } : sentAt.get(s.level);
@@ -222,6 +250,15 @@ export function escalationCardOf(input: {
           ? ` · held until ${laterWord(opening, detected)}, outside response hours`
           : ` · posted to the Space at ${formatTime(detected)}, outside response hours — timers paused until ${laterWord(opening, detected)}`;
     const who = `${whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'))}${held}`;
+    if (s.level === 0 && muted)
+      return {
+        label: 'L0',
+        when,
+        who,
+        status: WAITING.has(input.state) ? 'Held by a mute' : 'Not sent · muted',
+        tone: WAITING.has(input.state) ? 'waits' : 'cancelled',
+      };
+    if (s.level === 0 && cancelled) return { label: 'L0', when, who, status: cancelled, tone: 'cancelled' };
     if (s.level === 0 && heldProblem && now && now < heldProblem)
       return {
         label: 'L0',
@@ -255,7 +292,7 @@ export function escalationCardOf(input: {
         status:
           clock.upSince && (!input.acked || s.fyi)
             ? input.problemSince
-              ? `Not sent · home page back ${input.problemSince}`
+              ? `Waits · home page back ${input.problemSince}`
               : `Not sent · recovered ${hhmm(clock.upSince)}`
             : input.acked
               ? 'Cancelled · acked'
@@ -288,15 +325,19 @@ export function escalationCardOf(input: {
   // The ESCALATION fact (Incident board): the last level sent, or that the ack stopped it; then what comes.
   const lastSent = [...rows].reverse().find((r) => r.tone === 'sent');
   const lastStep = lastSent ? steps.find((s) => `L${s.level}` === lastSent.label) : undefined;
-  const fyi = rows.find((r) => r.tone === 'waits' && r.status.endsWith('· FYI'));
+  // The Tier 1 FYI still to go after the ack — also while the engine is down (it goes once it's back).
+  const fyiLevels = new Set(steps.filter((s) => s.fyi).map((s) => `L${s.level}`));
+  const fyi = rows.find((r) => r.tone === 'waits' && fyiLevels.has(r.label));
   const inMin = (d: Date) => (now ? Math.max(0, Math.round((d.getTime() - now.getTime()) / 60_000)) : null);
   const nextAt = next ? due.get(next.level) : undefined;
-  // What the ack stopped while an FYI still goes (board: "L1–L2 stopped" beside "L3 FYI at 10:48").
-  const cancelled = rows.filter((r) => r.status === 'Cancelled · acked').map((r) => r.label);
+  // What the ack stops while an FYI still goes: the levels above L0 that aren't the FYI (board "L1–L2
+  // stopped", POSTACK "L1–L2 stopped." — whether L1 had gone already or not).
+  const stoppable = steps.filter((s) => s.level > 0 && !s.fyi).map((s) => `L${s.level}`);
   const stoppedWord =
-    fyi && cancelled.length
-      ? `${cancelled.length > 1 ? `${cancelled[0]}–${cancelled.at(-1)}` : cancelled[0]} stopped`
+    fyi && stoppable.length && !input.problemSince
+      ? `${stoppable.length > 1 ? `${stoppable[0]}–${stoppable.at(-1)}` : stoppable[0]} stopped`
       : 'Stopped · acked';
+  const lastByHand = !!lastSent?.status.includes(' by ');
   const nextWord = (d: Date) => (now && !isSameBangkokDay(d, now) ? formatWeekdayTime(d) : formatTime(d));
   const fact = input.acked
     ? {
@@ -304,13 +345,15 @@ export function escalationCardOf(input: {
         caption: input.problemSince
           ? 'Still acknowledged as a PROBLEM — nothing more is sent'
           : fyi
-            ? `${fyi.label} FYI ${fyi.status.replace(/ · FYI$/, '').replace(/^At/, 'at')} if still down`
+            ? fyi.status.startsWith('Waits')
+              ? `${fyi.label} FYI waits — engine down`
+              : `${fyi.label} FYI ${fyi.status.replace(/ · FYI$/, '').replace(/^At/, 'at')} if still down`
             : 'Acknowledged — nothing more is sent',
       }
     : {
         value: lastSent
           ? `${lastSent.label} · ${
-              lastSent.status.includes(' by ')
+              lastByHand
                 ? 'sent by hand'
                 : lastStep
                   ? [...new Set(peopleOf(lastStep.targets, input.people).map((x) => x.name))].join(' + ') ||
@@ -320,10 +363,11 @@ export function escalationCardOf(input: {
           : 'Not sent yet',
         caption: stopped
           ? 'Engine down — nothing escalates on its own'
-          : waiting && next && nextAt && byHand && !input.engine.stopped
+          : waiting && next && nextAt && lastByHand && !input.engine.stopped
             ? `Running again · next at ${nextWord(nextAt)}`
             : waiting && next && nextAt
-              ? `${next.targets.includes('ceo') && !next.fyi ? 'CEO step' : `L${next.level}${next.fyi ? ' FYI' : ''}`} at ${nextWord(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
+              ? // unacked, the Tier 1 L3 is a real escalation ("L3 if still down"); "FYI" only after an ack
+                `${next.targets.includes('ceo') && !next.fyi ? 'CEO step' : `L${next.level}`} at ${nextWord(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
               : waiting
                 ? 'No more levels'
                 : input.problemSince

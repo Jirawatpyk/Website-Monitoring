@@ -140,7 +140,7 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           caption:
             [
               d.backup ? `Backup ${d.backup}` : null,
-              d.am ? `AM ${d.am}` : null,
+              d.am && !d.internal ? `AM ${d.am}` : null,
               d.internal ? 'internal site' : null,
             ]
               .filter(Boolean)
@@ -229,7 +229,7 @@ export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
     const home = key.rows.filter((r) => r.home?.glyph === 'pass').length;
     return (
       <Card
-        title={`${key.path} · Latest round${keyLatestAt(key.rows, 'latest') ? ` ${keyLatestAt(key.rows, 'latest')}` : ''}`}
+        title={`${key.path} · Latest round${keyLatestAt(key.rows, 'latest', false) ? ` ${keyLatestAt(key.rows, 'latest', false)}` : ''}`}
         headingLevel={2}
         description={
           fails ? `${fails}/${rows.length} fail → PROBLEM` : `${rows.length}/${rows.length} pass → OK`
@@ -410,17 +410,18 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
 function keyLatestAt(
   rows: readonly { home: CheckCell | null; latest: CheckCell | null }[],
   col: 'home' | 'latest',
+  seconds = true,
 ): string | null {
   const t = rows
     .flatMap((r) => (r[col]?.at ? [r[col]!.at!] : []))
     .sort()
     .at(-1);
-  return t ? formatTimeWithSeconds(new Date(t)) : null;
+  return t ? (seconds ? formatTimeWithSeconds(new Date(t)) : formatTime(new Date(t))) : null;
 }
 
 /** "HTTP 200" when the home page's latest checks answered that code (the phone card's footer). */
 function homeCode(rows: readonly { home: CheckCell | null }[]): string | null {
-  const code = rows.map((r) => /^(\d{3}) /.exec(r.home?.text ?? '')?.[1]).find(Boolean);
+  const code = rows.map((r) => /^HTTP (\d{3})/.exec(r.home?.text ?? '')?.[1]).find(Boolean);
   return code ? `HTTP ${code}` : null;
 }
 
@@ -557,9 +558,7 @@ export function shortSpan(fromIso: string, toIso: string, now: Date): string {
 
 /** A DOWN back with a PROBLEM still open (§19.7): when that PROBLEM began — "08:08", "Fri 13 Nov 09:15". */
 export function problemSince(d: Pick<IncidentDetail, 'nowSince'>, now: Date): string {
-  return [startedOn({ startedAt: d.nowSince }, now), formatTime(new Date(d.nowSince))]
-    .filter(Boolean)
-    .join(' ');
+  return formatShortWhen(new Date(d.nowSince), now);
 }
 
 export function incidentSections(d: IncidentDetail, now: Date): IncidentSections {

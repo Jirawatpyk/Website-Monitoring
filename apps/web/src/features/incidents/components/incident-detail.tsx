@@ -47,7 +47,7 @@ import { acknowledgeIncident, undoAcknowledge, undoResolve } from '../actions';
 import type { IncidentDetail } from '../detail-queries';
 import { clientUpdateWhy, rootCauseLabel } from '../model';
 import { ClientUpdateReminder, EscalateNow, EscalationCard } from './escalation-card';
-import { ClientUpdateCard } from './client-update-card';
+import { ClientUpdateCard, InternalClientUpdate } from './client-update-card';
 import type { IncidentSections } from './incident-sections';
 import { AckPanel } from './ack-panel';
 import {
@@ -406,6 +406,7 @@ export function IncidentDetailView({
                 onUndone={() => setFocusResolve(true)}
               />
             )}
+            {!d.clientUpdate && d.internal && d.tier <= 2 && <InternalClientUpdate siteName={d.siteName} />}
             {d.clientUpdate && (
               <ClientUpdateCard
                 card={d.clientUpdate}
@@ -490,7 +491,7 @@ export function IncidentDetailView({
               // With a Paged row above, the owner is named there already.
               d.paged ? null : d.owner ? `Owner ${d.owner}${d.youOwn ? ' (you)' : ''}` : 'No owner set',
               d.backup ? `backup ${d.backup}` : null,
-              d.am ? `AM ${d.am}` : null,
+              d.am && !d.internal ? `AM ${d.am}` : null,
               d.internal ? 'internal site' : null,
             ]
               .filter(Boolean)
@@ -530,6 +531,7 @@ export function IncidentDetailView({
             phone
           />
         )}
+        {!d.clientUpdate && d.internal && d.tier <= 2 && <InternalClientUpdate siteName={d.siteName} />}
         {d.clientUpdate && (
           <ClientUpdateCard
             card={d.clientUpdate}
