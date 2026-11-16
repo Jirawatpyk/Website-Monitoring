@@ -259,6 +259,26 @@ export function nowSeverity(i: Pick<ListIncident, 'severity' | 'recoveredAt' | '
   return !i.recoveredAt && last && last.end === null ? last.severity : i.severity;
 }
 
+/**
+ * The header of a DOWN that came back with something still failing (spec §19.7: "titled by what still
+ * fails, e.g. '/booking still failing after the home page came back'"): the newest PROBLEM AGAIN names it.
+ * Call it only while `nowSeverity` is a PROBLEM on a DOWN incident.
+ */
+export function stillFailingHeader(
+  site: string,
+  events: readonly Pick<EventRow, 'type' | 'at' | 'payload'>[],
+): { title: string; cause: string | null } {
+  const relapse = [...events]
+    .filter((e) => e.type === 'relapsed' && e.payload.severity === 'problem')
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const what = relapse ? (text(relapse.payload.summary) ?? text(relapse.payload.cause)) : null;
+  return {
+    title: what ? `${site} — ${what} still failing after the home page came back` : `${site} has a problem`,
+    cause: relapse ? text(relapse.payload.cause) : null,
+  };
+}
+
 /** The trigger as the list writes it: "Hard fail", "Slow, flapped". */
 export function triggerWords(i: Pick<ListIncident, 'trigger' | 'isFlapping'>): string {
   return `${TRIGGER_LABELS[i.trigger]}${i.isFlapping ? ', flapped' : ''}`;

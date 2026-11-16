@@ -126,6 +126,22 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
       ],
     };
     expect(reportIncident(cleared, week.from, week.to, now, insideHours)!.stillProblem).toBeNull();
+    // DOWN AGAIN after the period ended, still down at the report: failing, not "recovered".
+    const downAgain = {
+      ...chainStillBroken,
+      events: [
+        ...chainStillBroken.events,
+        {
+          type: 'relapsed',
+          at: iso('2026-09-28T05:01:00'),
+          payload: { startedAt: iso('2026-09-28T05:00:00'), severity: 'down' },
+        },
+      ],
+    };
+    expect(reportIncident(downAgain, week.from, week.to, now, insideHours)).toMatchObject({
+      failing: true,
+      stillProblem: null,
+    });
     // The PROBLEM drop opened after the period ended (Monday 05:00, the weekly at 09:00): still open.
     const lateWeek = { from: bkk('2026-09-18T00:00:00'), to: bkk('2026-09-25T08:02:00') };
     expect(reportIncident(chainStillBroken, lateWeek.from, lateWeek.to, now, insideHours)!.stillProblem).toBe(

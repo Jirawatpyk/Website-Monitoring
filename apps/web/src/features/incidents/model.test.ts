@@ -15,6 +15,7 @@ import {
   phoneViewCounts,
   resolveGate,
   sortIncidents,
+  stillFailingHeader,
   timelineOf,
   triggerWords,
   type EventRow,
@@ -720,6 +721,25 @@ describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)',
     expect(isUnackedDown(backWithProblem)).toBe(false);
     const k = listKpis([backWithProblem], new Date('2026-09-25T05:00:00Z'));
     expect(k.openCaption).toBe('1 PROBLEM');
+  });
+
+  it('titles it by what still fails (§19.7: "/booking still failing after the home page came back")', () => {
+    const relapse = (at: string, payload: Record<string, unknown>) => ({ type: 'relapsed', at, payload });
+    expect(
+      stillFailingHeader('Fuji Links', [
+        relapse('2026-09-25T01:03:00Z', {
+          severity: 'problem',
+          summary: 'Key page /booking 404',
+          cause: 'Key page /booking: HTTP 404 (BKK, SIN, TYO)',
+        }),
+        relapse('2026-09-25T00:30:00Z', { severity: 'down', cause: 'Timeout > 30 s' }),
+      ]),
+    ).toEqual({
+      title: 'Fuji Links — Key page /booking 404 still failing after the home page came back',
+      cause: 'Key page /booking: HTTP 404 (BKK, SIN, TYO)',
+    });
+    // No PROBLEM AGAIN read (an older row): a plain PROBLEM title, the header cause kept.
+    expect(stillFailingHeader('Fuji Links', [])).toEqual({ title: 'Fuji Links has a problem', cause: null });
   });
 
   it('keeps the DOWN minutes as how long it was down (D-033)', () => {

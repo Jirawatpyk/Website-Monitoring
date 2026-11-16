@@ -36,6 +36,7 @@ import {
   durationMinutes,
   nowSeverity,
   resolveGate,
+  stillFailingHeader,
   timelineOf,
   type ClientUpdateCard,
   type EventRow,
@@ -442,11 +443,13 @@ export async function loadIncident(
   });
   const nowSince = !i.recovered_at && openDrop && !openDrop.end ? openDrop.start.toISOString() : i.started_at;
   const built = buildIncidentView(i, events, actor, names, now);
-  // §19.7: "the same incident continues as a PROBLEM" — titled as one while that drop is open.
-  const view =
+  // §19.7: "the same incident continues as a PROBLEM — titled by what still fails, e.g. '/booking still
+  // failing after the home page came back'": the PROBLEM AGAIN that opened the drop names it.
+  const still =
     current === 'problem' && i.severity === 'down' && !i.recovered_at
-      ? { ...built, title: `${i.sites.name} has a problem` }
-      : built;
+      ? stillFailingHeader(i.sites.name, events)
+      : null;
+  const view = still ? { ...built, title: still.title, cause: still.cause ?? built.cause } : built;
   const clientUpdate = clientUpdateOf(i, events, nameOf, viewer, now);
 
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');

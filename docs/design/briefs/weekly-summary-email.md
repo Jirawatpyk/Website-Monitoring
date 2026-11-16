@@ -38,7 +38,9 @@ The figures are right. The layout makes them hard to trust at a glance.
    - DOWN incidents (3)
    - PROBLEM incidents (4)
 
-   The tiles must stack on a phone mail client.
+   The tiles must stack on a phone mail client. They count **the week**, not what is failing now, so the
+   period must be unmistakable. Large red "3 DOWN" and amber "4 PROBLEM" tiles must not read as sites down
+   right now. Use a caption such as "DOWN incidents this week", or keep these two tiles neutral.
 2. **Status as a badge.**
    - Each incident row starts with a badge that carries its word: DOWN / PROBLEM while open, "Was down" / "Was problem" once recovered.
    - Colour: red for DOWN, amber for PROBLEM, outline once recovered (spec §11).
@@ -60,6 +62,10 @@ The figures are right. The layout makes them hard to trust at a glance.
 2. Is "Last 30 days: 16/17 sites on their uptime target" a fifth tile or a line under the tiles?
 3. How much of line 2 shows on a phone before it wraps?
 4. In the dark mail-client view, which tones keep the badges readable?
+
+## Note for the build
+
+The board says today that the email body is the Chat card (same sections, plain-text part too). This redesign gives the email a layout of its own. When it is built, record that in a decision (D-xxx), next to D-056.
 
 ## Rules that apply
 
