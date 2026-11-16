@@ -15,6 +15,7 @@ import {
   phoneViewCounts,
   resolveGate,
   sortIncidents,
+  listStillFailing,
   stillFailingHeader,
   timelineOf,
   triggerWords,
@@ -354,6 +355,18 @@ describe('resolveGate (T10, D-033)', () => {
       canOpenDialog: false,
       lockedReason: 'Resolve locked · 1 of 3 met — MuvMi is still down',
     });
+  });
+  it('§37.7: an internal site says so; the key page still failing is named in the recovery condition', () => {
+    const g = resolveGate(
+      { ...gateBase, siteName: 'VOCA', severity: 'problem', internal: true, stillFailingPath: '/booking' },
+      [],
+      nameOf,
+    );
+    expect(g.conditions.map((c) => c.detail)).toEqual([
+      'Still has a problem · needs 2 OK rounds of /booking once it clears',
+      'Not required — internal site',
+      'Not written yet · needed before Resolve',
+    ]);
   });
   it('a PROBLEM still open reads "still has a problem", not "still down" (S09c /verify)', () => {
     const g = resolveGate({ ...gateBase, severity: 'problem' }, [], nameOf);
@@ -722,6 +735,63 @@ describe('durationMinutes — from the drops, the same number as Site detail and
     expect(durationMinutes(i, new Date('2026-09-21T04:00:00Z'))).toBe(18);
   });
 });
+describe('the Incidents list on a partial recovery (§37.9, INC-0140)', () => {
+  const drops = [
+    { start: '2026-09-24T16:41:36Z', end: '2026-09-25T02:35:20Z', severity: 'down' as const },
+    { start: '2026-09-25T02:35:20Z', end: null, severity: 'problem' as const },
+  ];
+  const relapsed = {
+    type: 'relapsed',
+    at: '2026-09-25T02:35:20Z',
+    payload: {
+      severity: 'problem',
+      trigger: 'key_page',
+      summary: 'key page /booking, HTTP 404',
+      keyPage: { path: '/booking', cause: '/booking → HTTP 404 (BKK, SIN, TYO)' },
+      homeBackAt: '2026-09-25T02:35:20Z',
+      detail: { failing: [{ location: 'BKK', statusCode: 404, error: null }] },
+    },
+  };
+  const voca = inc({
+    siteName: 'VOCA',
+    severity: 'down',
+    state: 'acknowledged',
+    recoveredAt: null,
+    drops,
+    ackedByName: 'Ploy',
+    ackedAt: '2026-09-25T02:06:12Z',
+  });
+
+  it('reads the row from its drop events', () => {
+    expect(listStillFailing(voca, [relapsed])).toEqual({
+      homeBackAt: '2026-09-25T02:35:20Z',
+      path: '/booking',
+      trigger: 'Key page',
+      failure: '404',
+    });
+    // Not a partial recovery (no homeBackAt), or recovered: nothing.
+    expect(
+      listStillFailing(voca, [{ ...relapsed, payload: { ...relapsed.payload, homeBackAt: undefined } }]),
+    ).toBeNull();
+    expect(listStillFailing({ ...voca, recoveredAt: '2026-09-25T03:00:00Z' }, [relapsed])).toBeNull();
+  });
+
+  it('Trigger "Key page · was Hard fail"; Next "Home page back 09:35 · /booking 404" (phone: still failing)', () => {
+    const row = { ...voca, stillFailing: listStillFailing(voca, [relapsed]) };
+    expect(triggerWords(row)).toBe('Key page · was Hard fail');
+    // INC-0003's shape: opened as a TLS-chain PROBLEM, the browser raised it — the DOWN's own cause.
+    expect(
+      triggerWords({
+        ...row,
+        trigger: 'tls_chain',
+        stillFailing: { ...row.stillFailing!, trigger: 'TLS chain', downTrigger: 'Browser' },
+      }),
+    ).toBe('TLS chain · was Browser');
+    expect(nextLine(row, NOW)).toEqual({ text: 'Home page back 09:35 · /booking 404', tone: 'warning' });
+    expect(nextLine(row, NOW, true).text).toBe('Home page back 09:35 · /booking still failing');
+  });
+});
+
 describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)', () => {
   const down = { start: '2026-09-25T01:00:00Z', end: '2026-09-25T01:03:00Z', severity: 'down' as const };
   const problemOpen = { start: '2026-09-25T01:03:00Z', end: null, severity: 'problem' as const };
@@ -764,7 +834,9 @@ describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)',
     // §37.1: short — the long §19.7 sentence stays the Chat card's.
     expect(stillFailingHeader('VOCA', [relapse('2026-09-25T01:03:00Z', keyPage)])).toEqual({
       title: 'VOCA · /booking still failing',
-      cause: '/booking → HTTP 404 (BKK, SIN, TYO)',
+      // §37.1: the phone's h1, the site a label above it
+      short: '/booking still failing',
+      cause: 'Key page /booking → HTTP 404 (BKK, SIN, TYO)',
       partial: {
         homeBackAt: '2026-09-25T01:03:00Z',
         path: '/booking',
@@ -786,7 +858,11 @@ describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)',
     // Recovered fully, then a key page failed later (no homeBackAt): not "still failing".
     expect(
       stillFailingHeader('VOCA', [relapse('2026-09-25T01:03:00Z', { ...keyPage, homeBackAt: undefined })]),
-    ).toEqual({ title: 'VOCA has a problem', cause: '/booking → HTTP 404 (BKK, SIN, TYO)', partial: null });
+    ).toEqual({
+      title: 'VOCA has a problem',
+      cause: 'Key page /booking → HTTP 404 (BKK, SIN, TYO)',
+      partial: null,
+    });
     // The newest PROBLEM AGAIN names it; a DOWN AGAIN in between doesn't.
     expect(
       stillFailingHeader('VOCA', [

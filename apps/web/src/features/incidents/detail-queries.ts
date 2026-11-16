@@ -34,6 +34,7 @@ import {
   canMarkClientUpdate,
   clientUpdateCardOf,
   durationMinutes,
+  listStillFailing,
   nowSeverity,
   resolveGate,
   stillFailingHeader,
@@ -45,8 +46,8 @@ import {
   type TimelineItem,
 } from './model';
 import { loadOnCallNow } from './oncall-now';
-import { isEngineStopped } from '@dxt/engine';
-import { escalationPlanSchema, formatTime } from '@dxt/shared';
+import { isEngineStopped, isInsideHours, minutesInsideHours, openEpisode } from '@dxt/engine';
+import { escalationPlanSchema, formatShortWhen, formatTime, type ResponseHours } from '@dxt/shared';
 import { loadResponseHours } from '@/server/escalation/response-hours';
 import { escalationCardOf, pendingClientUpdate, type EscalationCardView } from './escalation-card';
 import type { ReminderView } from './components/escalation-card';
@@ -125,6 +126,8 @@ export interface IncidentDetail {
   /** The viewer is the site's owner (by id: two people may share a display name). */
   youOwn: boolean;
   backup: string | null;
+  /** The site's client is DxT itself (no client to tell): "internal site" beside the owner (§37). */
+  internal?: boolean;
   am: string | null;
   /**
    * The person L0 paged on call (S10, §28.6): set when a Tier 1 incident opened outside response hours
@@ -133,6 +136,8 @@ export interface IncidentDetail {
   /** `when` is "today 03:41" / "yesterday 23:59" / "Thu 29 Oct 23:59": a page read the next day names it. */
   paged: { name: string; at: string; when: string; you: boolean } | null;
   acked: { by: string; at: string } | null;
+  /** The ack's minutes into response hours when the alert was held to them (Tier 2–3 at night); else null. */
+  ackInHoursMin?: number | null;
   /** Add note, root cause, Resolve: the Acknowledge rule (D-033). */
   canAct: boolean;
   /** The Client update card (S11), once the track fired (D-052 item 3); null before or never. */
@@ -214,7 +219,8 @@ const cellOf = (c: CheckRow | undefined, timeoutMs: number): CheckCell | null =>
 
 const checkWords = (c: CheckRow, timeoutMs: number): CheckCell => {
   if (c.outcome === 'pass') {
-    return { text: `${c.status_code ?? 200} · ${c.response_ms ?? '—'} ms`, glyph: 'pass' };
+    const secs = c.response_ms !== null ? ` · ${(c.response_ms / 1000).toFixed(1)} s` : '';
+    return { text: `HTTP ${c.status_code ?? 200}${secs}`, glyph: 'pass' };
   }
   if (c.outcome === 'blocked') return { text: 'Blocked by bot protection', glyph: 'blocked' };
   const what = describeFailure(
@@ -256,6 +262,71 @@ export function locationsOf(
       },
     ];
   });
+}
+
+/**
+ * Up to `max` of the newest rows, in time order. `page` must answer newest first, so a cut drops the
+ * oldest rows: the resolve gate, the root cause and the timeline's end always come from the newest
+ * (engine-reviewer M1, a long flapping incident).
+ */
+export async function newestInOrder<T>(
+  page: Parameters<typeof fetchAllPages<T>>[0],
+  max: number,
+): Promise<T[]> {
+  return (await fetchAllPages<T>(page, { max })).reverse();
+}
+
+/**
+ * Whether a mute covered the incident's detection (D-036): nothing posted then. Staff read the windows
+ * (RLS); anyone else reads none, so false.
+ */
+async function muteCovered(db: DbClient, i: { site_id: string; detected_at: string }): Promise<boolean> {
+  const { data } = await db
+    .from('maintenance_windows')
+    .select('ended_at')
+    .eq('site_id', i.site_id)
+    .eq('kind', 'mute')
+    .is('cancelled_at', null)
+    .lte('starts_at', i.detected_at)
+    .gt('ends_at', i.detected_at)
+    .limit(5);
+  return (data ?? []).some((w) => !w.ended_at || Date.parse(w.ended_at) > Date.parse(i.detected_at));
+}
+
+/** Minutes into response hours the ack came (≥ 1), or null when the rule doesn't apply (see the caller). */
+export function ackInHoursOf(
+  i: { acked_at: string | null; alerted_at: string | null; detected_at: string; sites: { tier: number } },
+  hours: ResponseHours,
+): number | null {
+  if (!i.acked_at || i.sites.tier < 2 || i.alerted_at) return null;
+  const detected = new Date(i.detected_at);
+  if (isInsideHours(detected, hours)) return null;
+  const min = minutesInsideHours(detected, new Date(i.acked_at), hours);
+  return min > 0 ? Math.max(1, Math.round(min)) : null;
+}
+
+/**
+ * What made it DOWN (§37 meta line "down from Wed 21 Oct 21:15 (Browser)"): a PROBLEM raised to DOWN by
+ * the browser verifier says Browser; a DOWN trigger names itself; else a hard fail. The incident's own
+ * trigger is its first drop's (INC-0003: TLS chain), not the DOWN's.
+ */
+export function downTriggerOf(
+  trigger: Trigger,
+  events: readonly Pick<EventRow, 'type' | 'payload'>[],
+): string {
+  // The event that opened the first DOWN drop — the one whose start the line names ("down from Thu 23:41"):
+  // the incident's own detection when it opened DOWN, else the raise or the DOWN AGAIN.
+  const openedDown = trigger === 'hard_fail' || trigger === 'manual';
+  const opened = events.find(
+    (e) =>
+      (e.type === 'detected' && openedDown) ||
+      e.type === 'escalated_to_down' ||
+      (e.type === 'relapsed' && e.payload.severity === 'down'),
+  );
+  if (opened?.payload.verifyJobId) return 'Browser';
+  if (opened?.payload.manual === true || (opened?.type === 'detected' && trigger === 'manual'))
+    return 'Manual';
+  return !opened && trigger === 'manual' ? 'Manual' : TRIGGER_LABELS.hard_fail;
 }
 
 /**
@@ -408,18 +479,32 @@ export async function loadIncident(
   const checkCols = 'location, outcome, status_code, response_ms, error, checked_at';
   // can_ack's on-call branch (S10, D-048): a Responder holding the shift acts on any Tier 1 incident.
   const askShift = viewer.role === 'responder' && i.sites.tier === 1;
-  const [events, around, latest, onCall, engineRun, admins, hours] = await Promise.all([
+  const [events, ladderEvents, around, latest, onCall, engineRun, admins, hours] = await Promise.all([
+    newestInOrder<EventRow>(
+      (from, to) =>
+        db
+          .from('incident_events')
+          .select('type, at, actor_id, payload')
+          .eq('incident_id', incidentId)
+          .order('at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(from, to)
+          .overrideTypes<EventRow[], { merge: false }>(),
+      MAX_EVENTS,
+    ),
+    // The drops and the ladder from their own read: a few rows per drop, never cut by the timeline's cap.
     fetchAllPages<EventRow>(
       (from, to) =>
         db
           .from('incident_events')
           .select('type, at, actor_id, payload')
           .eq('incident_id', incidentId)
+          .in('type', [...DROP_EVENTS, 'step_fired'])
           .order('at')
           .order('id')
           .range(from, to)
           .overrideTypes<EventRow[], { merge: false }>(),
-      { max: MAX_EVENTS },
+      { max: MAX_EVENTS * 10 },
     ),
     monitorId
       ? db
@@ -469,7 +554,7 @@ export async function loadIncident(
   ]) {
     if (id) ids.add(id);
   }
-  for (const e of events) {
+  for (const e of [...events, ...ladderEvents]) {
     if (e.actor_id) ids.add(e.actor_id);
     if (typeof e.payload.user_id === 'string') ids.add(e.payload.user_id);
   }
@@ -493,8 +578,8 @@ export async function loadIncident(
     ? { ...pageChangeLive, accepted: incidentAccept(i, events, nameOf) }
     : null;
   const actor: Viewer = askShift ? { ...viewer, onCallNow: onCall === viewer.id } : viewer;
-  const drops = episodesFromTimeline(i, events);
-  const openDrop = drops.at(-1);
+  const drops = episodesFromTimeline(i, ladderEvents);
+  const openDrop = openEpisode(drops);
   const current = nowSeverity({
     severity: i.severity,
     recoveredAt: i.recovered_at,
@@ -504,15 +589,17 @@ export async function loadIncident(
       severity: d.severity,
     })),
   });
-  const nowSince = !i.recovered_at && openDrop && !openDrop.end ? openDrop.start.toISOString() : i.started_at;
+  const nowSince = !i.recovered_at && openDrop ? openDrop.start.toISOString() : i.started_at;
   const built = buildIncidentView(i, events, actor, names, now);
   // §19.7: "the same incident continues as a PROBLEM — titled by what still fails, e.g. '/booking still
   // failing after the home page came back'": the PROBLEM AGAIN that opened the drop names it.
   const still =
     current === 'problem' && i.severity === 'down' && !i.recovered_at
-      ? stillFailingHeader(i.sites.name, events)
+      ? stillFailingHeader(i.sites.name, ladderEvents)
       : null;
-  const view = still ? { ...built, title: still.title, cause: still.cause ?? built.cause } : built;
+  const view = still
+    ? { ...built, title: still.title, titleShort: still.short ?? null, cause: still.cause ?? built.cause }
+    : built;
   // §37.4: the failing key page's own checks beside the home page's — from its first fail at the
   // partial recovery, and its latest.
   const keyMonitor = still?.partial?.monitorUrl
@@ -549,7 +636,7 @@ export async function loadIncident(
           what: still.partial.path ?? still.title.split(' · ').slice(1).join(' · '),
           path: still.partial.path,
           trigger: still.partial.trigger ?? TRIGGER_LABELS[i.trigger],
-          downTrigger: TRIGGER_LABELS[i.trigger],
+          downTrigger: downTriggerOf(i.trigger, ladderEvents),
           since: nowSince,
           downFrom: (downDrops[0]?.start ?? new Date(i.started_at)).toISOString(),
           downTo: (downDrops.at(-1)?.end ?? new Date(nowSince)).toISOString(),
@@ -574,7 +661,7 @@ export async function loadIncident(
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
   const shot =
     typeof evidenceEvent?.payload.screenshotPath === 'string' ? evidenceEvent.payload.screenshotPath : null;
-  const url = shot ? await sign(shot) : null;
+  const [url, mutedAtDetection] = await Promise.all([shot ? sign(shot) : null, muteCovered(db, i)]);
 
   const engineSince = engineRun.data?.last_seen_at ?? null;
   const stopped = isEngineStopped(engineSince ? new Date(engineSince) : null, now);
@@ -590,14 +677,16 @@ export async function loadIncident(
       state: i.state,
       detectedAt: i.detected_at,
       alertedAt: i.alerted_at,
-      episodes: episodesFromTimeline(i, events),
+      ackedAt: i.acked_at,
+      mutedAtDetection,
+      episodes: drops,
       now,
       hours,
       // D-052: only a Tier 1–2 client site has the track
       clientTrack:
         (i.sites.tier === 1 || i.sites.tier === 2) && !!i.sites.clients && !i.sites.clients.is_internal,
-      problemSince: stillFailing ? formatTime(new Date(stillFailing.since)) : null,
-      steps: events
+      problemSince: stillFailing ? formatShortWhen(new Date(stillFailing.since), now) : null,
+      steps: ladderEvents
         .filter(
           (e) => e.type === 'step_fired' && e.payload.reminder !== true && e.payload.severity === i.severity,
         )
@@ -616,7 +705,10 @@ export async function loadIncident(
         am: am ? nameOf(am) : null,
         admins: (admins.data ?? []).map((a) => a.display_name),
       },
-      acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by) } : null,
+      acked:
+        i.acked_at && i.acked_by
+          ? { by: nameOf(i.acked_by), at: formatShortWhen(new Date(i.acked_at), now) }
+          : null,
       engine: { stopped, since: engineSince },
       canAct,
     });
@@ -674,6 +766,7 @@ export async function loadIncident(
     owner: i.sites.primary_owner_id ? nameOf(i.sites.primary_owner_id) : null,
     youOwn: !!i.sites.primary_owner_id && i.sites.primary_owner_id === viewer.id,
     backup: i.sites.backup_owner_id ? nameOf(i.sites.backup_owner_id) : null,
+    internal: !!i.sites.clients?.is_internal,
     am: am ? nameOf(am) : null,
     paged:
       i.l0_user_id && i.l0_user_id !== i.sites.primary_owner_id
@@ -685,6 +778,10 @@ export async function loadIncident(
           }
         : null,
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
+    // A Tier 2–3 incident confirmed outside response hours (D-034): the Space had it at once and the
+    // timers waited for the opening, so the ack counts from there. An ack before the opening (INC-0133's
+    // 08:04) keeps its own words; an incident a mute held (`alerted_at`, D-036) isn't this.
+    ackInHoursMin: mutedAtDetection ? null : ackInHoursOf(i, hours),
     canAct: canAcknowledge(actor, i),
     rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },
     gate: pendingClientUpdate(
@@ -696,6 +793,7 @@ export async function loadIncident(
           // the gate words what is still failing now (§19.7)
           severity: current,
           stillFailingPath: stillFailing?.path ?? null,
+          internal: !!i.sites.clients?.is_internal,
           recoveredAt: i.recovered_at,
           clientUpdateRequired: i.client_update_required,
           clientUpdatedAt: i.client_updated_at,
@@ -937,36 +1035,48 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
       severity: d.severity,
     }));
   return {
-    incidents: rows.map((r): ListIncident => ({
-      id: r.id,
-      number: r.number,
-      siteId: r.site_id,
-      siteName: r.sites.name,
-      tier: r.sites.tier,
-      severity: r.severity,
-      trigger: r.trigger,
-      state: r.state,
-      escalationLevel: r.escalation_level,
-      startedAt: r.started_at,
-      downStartedAt: downStart.get(r.id) ?? null,
-      detectedAt: r.detected_at,
-      ackedAt: r.acked_at,
-      ackedByName: r.acker?.display_name ?? null,
-      recoveredAt: r.recovered_at,
-      resolvedAt: r.resolved_at,
-      autoResolved: r.auto_resolved,
-      isFlapping: r.is_flapping,
-      isManual: r.is_manual || raisedByHand.has(r.id),
-      ownerName: r.sites.owner?.display_name ?? null,
-      primaryOwnerId: r.sites.primary_owner_id,
-      backupOwnerId: r.sites.backup_owner_id,
-      // the L0 person acts only while it's open (private.oncall_acts_on)
-      l0UserId: CLOSED.has(r.state) ? null : r.l0_user_id,
-      rootCauseCategory: r.root_cause_category,
-      rootCause: r.root_cause,
-      rootCauseFix: r.root_cause_fix,
-      drops: dropsOf(r),
-    })),
+    incidents: rows.map((r): ListIncident => {
+      const row: ListIncident = {
+        id: r.id,
+        number: r.number,
+        siteId: r.site_id,
+        siteName: r.sites.name,
+        tier: r.sites.tier,
+        severity: r.severity,
+        trigger: r.trigger,
+        state: r.state,
+        escalationLevel: r.escalation_level,
+        startedAt: r.started_at,
+        downStartedAt: downStart.get(r.id) ?? null,
+        detectedAt: r.detected_at,
+        ackedAt: r.acked_at,
+        ackedByName: r.acker?.display_name ?? null,
+        recoveredAt: r.recovered_at,
+        resolvedAt: r.resolved_at,
+        autoResolved: r.auto_resolved,
+        isFlapping: r.is_flapping,
+        isManual: r.is_manual || raisedByHand.has(r.id),
+        ownerName: r.sites.owner?.display_name ?? null,
+        primaryOwnerId: r.sites.primary_owner_id,
+        backupOwnerId: r.sites.backup_owner_id,
+        // the L0 person acts only while it's open (private.oncall_acts_on)
+        l0UserId: CLOSED.has(r.state) ? null : r.l0_user_id,
+        rootCauseCategory: r.root_cause_category,
+        rootCause: r.root_cause,
+        rootCauseFix: r.root_cause_fix,
+        drops: dropsOf(r),
+      };
+      const events = (dropEvents.get(r.id) ?? []).map((e) => ({
+        ...e,
+        payload: (e.payload ?? {}) as Record<string, unknown>,
+      }));
+      const stillFailing = listStillFailing(row, events);
+      return {
+        ...row,
+        // "was …" names the DOWN's own cause, as the page's meta line (INC-0003: "TLS chain · was Browser")
+        stillFailing: stillFailing && { ...stillFailing, downTrigger: downTriggerOf(r.trigger, events) },
+      };
+    }),
     sites: sites.data ?? [],
   };
 }

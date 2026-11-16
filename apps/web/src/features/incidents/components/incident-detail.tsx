@@ -47,7 +47,7 @@ import { acknowledgeIncident, undoAcknowledge, undoResolve } from '../actions';
 import type { IncidentDetail } from '../detail-queries';
 import { clientUpdateWhy, rootCauseLabel } from '../model';
 import { ClientUpdateReminder, EscalateNow, EscalationCard } from './escalation-card';
-import { ClientUpdateCard } from './client-update-card';
+import { ClientUpdateCard, InternalClientUpdate } from './client-update-card';
 import type { IncidentSections } from './incident-sections';
 import { AckPanel } from './ack-panel';
 import {
@@ -273,7 +273,20 @@ export function IncidentDetailView({
         breadcrumb={
           <Breadcrumb items={[{ label: 'Incidents', href: '/incidents' }, { label: incidentLabel }]} />
         }
-        title={title}
+        title={
+          stillDown && !resolved && v.titleShort ? (
+            <>
+              <span className="max-md:hidden">{title}</span>
+              {/* §37.1: the site above a short h1 on a phone, so the title stays within 2 lines */}
+              <span className="flex flex-col md:hidden">
+                <span className="text-sm font-semibold text-fg-secondary">{d.siteName}</span>
+                <span>{v.titleShort}</span>
+              </span>
+            </>
+          ) : (
+            title
+          )
+        }
         meta={
           <span className="flex flex-col gap-1.5">
             <span className="flex flex-wrap items-center gap-2">
@@ -393,6 +406,7 @@ export function IncidentDetailView({
                 onUndone={() => setFocusResolve(true)}
               />
             )}
+            {!d.clientUpdate && d.internal && d.tier <= 2 && <InternalClientUpdate siteName={d.siteName} />}
             {d.clientUpdate && (
               <ClientUpdateCard
                 card={d.clientUpdate}
@@ -477,7 +491,8 @@ export function IncidentDetailView({
               // With a Paged row above, the owner is named there already.
               d.paged ? null : d.owner ? `Owner ${d.owner}${d.youOwn ? ' (you)' : ''}` : 'No owner set',
               d.backup ? `backup ${d.backup}` : null,
-              d.am ? `AM ${d.am}` : null,
+              d.am && !d.internal ? `AM ${d.am}` : null,
+              d.internal ? 'internal site' : null,
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -506,7 +521,8 @@ export function IncidentDetailView({
           />
         )}
         {whatChanged ?? sections.latestRound}
-        {d.escalation && (d.escalation.stopped || d.escalation.back) && (
+        {/* §37.6 (MIncident): the phone shows the card too when the DOWN carries on as a PROBLEM. */}
+        {d.escalation && (d.escalation.stopped || d.escalation.back || d.stillFailing) && (
           <EscalationCard
             card={d.escalation}
             incidentId={v.incidentId}
@@ -515,6 +531,7 @@ export function IncidentDetailView({
             phone
           />
         )}
+        {!d.clientUpdate && d.internal && d.tier <= 2 && <InternalClientUpdate siteName={d.siteName} />}
         {d.clientUpdate && (
           <ClientUpdateCard
             card={d.clientUpdate}
@@ -725,7 +742,8 @@ function EvidenceCard({
               </Button>
             </span>
           </>
-        ) : (
+        ) : d.stillFailing ? null : (
+          // §37: the DOWN is over; a missing screenshot of it isn't what this page is about
           <span className="text-sm text-fg-secondary">
             {d.trigger === 'manual'
               ? 'No screenshot — the browser verifier takes one only after a probe confirms a DOWN.'

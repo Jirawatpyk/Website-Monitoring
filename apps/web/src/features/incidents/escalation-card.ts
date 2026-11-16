@@ -1,7 +1,16 @@
-import { ladderClockOf, ladderClockStart, scheduleOf, type Episode } from '@dxt/engine';
 import {
+  isInsideHours,
+  ladderClockOf,
+  ladderClockStart,
+  nextOpening,
+  scheduleOf,
+  type Episode,
+} from '@dxt/engine';
+import {
+  formatDuration,
   formatTime,
-  formatWhen,
+  formatWeekdayTime,
+  formatShortWhen,
   isSameBangkokDay,
   type EscalationPlan,
   type EscalationTarget,
@@ -61,6 +70,8 @@ export interface EscalationCardView {
   nextLine: string | null;
   button: EscalateButton | null;
   footer: string;
+  /** The facts strip's ESCALATION cell (Incident board): "L1 · Ploy + Tao" / "Stopped · acked", and what comes next. */
+  fact: { value: string; caption: string };
 }
 
 const WAITING = new Set(['unacked', 'escalated']);
@@ -84,14 +95,20 @@ function peopleOf(targets: readonly EscalationTarget[], p: LadderPeople): { name
   });
 }
 
-/** The ladder row's "who": "Arm (backup) + Tao" — the CEO by role. */
+/**
+ * The ladder row's "who": "Arm (backup) + Tao" — the CEO by role; one person named once with both roles
+ * when a level names them twice ("Tao (backup, Admin)", §37.6).
+ */
 const whoOf = (targets: readonly EscalationTarget[], p: LadderPeople, space: boolean) => {
-  const names = peopleOf(targets, p).map((x) =>
-    x.name === 'CEO'
+  const people = peopleOf(targets, p);
+  const roles = new Map<string, string[]>();
+  for (const x of people) roles.set(x.name, [...(roles.get(x.name) ?? []), x.role]);
+  const names = [...roles].map(([name, rs]) =>
+    name === 'CEO'
       ? 'CEO'
-      : x.role === 'Admin'
-        ? x.name
-        : `${x.name} (${x.role === 'Site AM' ? 'AM' : x.role})`,
+      : rs.length === 1 && rs[0] === 'Admin'
+        ? name
+        : `${name} (${rs.map((r) => (r === 'Site AM' ? 'AM' : r)).join(', ')})`,
   );
   return [names.join(' + ') || 'Nobody', ...(space ? ['Alerts Space'] : [])].join(' + ');
 };
@@ -125,6 +142,10 @@ export function pendingClientUpdate<
   return { ...gate, conditions, metCount, lockedReason };
 }
 
+/** A later time: the time alone within a day ("09:00" after Thu 23:42), else with its weekday ("Mon 09:00"). */
+const laterWord = (d: Date, from: Date) =>
+  d.getTime() - from.getTime() < 24 * 3_600_000 ? formatTime(d) : formatWeekdayTime(d);
+
 export function escalationCardOf(input: {
   plan: EscalationPlan | null;
   tier: number;
@@ -140,7 +161,12 @@ export function escalationCardOf(input: {
   hours: ResponseHours;
   steps: readonly StepSent[];
   people: LadderPeople;
-  acked: { by: string } | null;
+  /** Who acknowledged, and when ("09:06", the footer's words). */
+  acked: { by: string; at?: string } | null;
+  /** When it was acknowledged (ISO): a held PROBLEM card acked before the opening never went (D-065). */
+  ackedAt?: string | null;
+  /** A mute covered the detection (D-036): nothing posted then. */
+  mutedAtDetection?: boolean;
   /** The site has a client-update track (a Tier 1–2 client site, D-052); false: no promise about it. */
   clientTrack?: boolean;
   /** §37.6: the DOWN is over and the incident carries on as a PROBLEM, since this time ("09:35"). */
@@ -177,15 +203,70 @@ export function escalationCardOf(input: {
 
   // After a relapse days later a level of the first drop went on another day (spec §13, D-058).
   const now = input.now;
-  const hhmm = (d: Date) => (now && !isSameBangkokDay(d, now) ? formatWhen(d, now) : formatTime(d));
+  // A past time as the meta line words it ("Thu 23:42"), a later one with its weekday ("Fri 09:15").
+  const hhmm = (d: Date) =>
+    !now || isSameBangkokDay(d, now)
+      ? formatTime(d)
+      : d <= now
+        ? formatShortWhen(d, now)
+        : formatWeekdayTime(d);
+  // A Tier 2–3 incident confirmed outside response hours (D-034, D-065). A DOWN posts at once and its
+  // timers wait for the opening; a PROBLEM's first card itself waits for the opening (`holdFor`). An
+  // incident a mute held (D-036) posted nothing then: its first alert went when the mute ended
+  // (`alertedAt`), or not yet / never (`mutedAtDetection` with no `alertedAt`).
+  const detected = new Date(input.detectedAt);
+  const muted = !!input.mutedAtDetection && !input.alertedAt;
+  const night = input.tier >= 2 && !input.alertedAt && !muted && !isInsideHours(detected, input.hours);
+  const opening = night ? nextOpening(detected, input.hours) : null;
+  // A Tier 2–3 PROBLEM's first card waits for the opening — also when the mute ended at night.
+  const firstAt = input.alertedAt ? new Date(input.alertedAt) : detected;
+  const heldProblem =
+    !muted && input.tier >= 2 && plan.severity === 'problem' && !isInsideHours(firstAt, input.hours)
+      ? nextOpening(firstAt, input.hours)
+      : null;
+  // The engine cancels a held card when the incident recovered or was acknowledged before the opening
+  // (`engine_cancel_held_problem`): it never went out.
+  const firstEnd = input.episodes?.[0]?.end ?? null;
+  const ackedAt = input.ackedAt ? new Date(input.ackedAt) : null;
+  const cancelled = !heldProblem
+    ? null
+    : firstEnd && firstEnd < heldProblem
+      ? `Not sent · recovered ${hhmm(firstEnd)}`
+      : ackedAt && ackedAt < heldProblem
+        ? `Not sent · acked ${hhmm(ackedAt)}`
+        : null;
   const rows = steps.map((s): LadderRow => {
-    const sent = s.level === 0 ? { at: start.toISOString(), sentBy: null } : sentAt.get(s.level);
+    const l0At = heldProblem ?? start;
+    const sent = s.level === 0 ? { at: l0At.toISOString(), sentBy: null } : sentAt.get(s.level);
     // L0 went with the first alert. A level whose minute an earlier drop reached shows when it went
     // (D-058: the schedule would say the relapse); otherwise the schedule, even when sent early by hand.
     const at =
-      s.level === 0 ? start : sent && s.delayMin <= clock.carriedMin ? new Date(sent.at) : due.get(s.level)!;
+      s.level === 0 ? l0At : sent && s.delayMin <= clock.carriedMin ? new Date(sent.at) : due.get(s.level)!;
     const when = s.level === 0 ? `0 min · ${hhmm(at)}` : `+${s.delayMin} min · ${hhmm(at)}`;
-    const who = whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'));
+    const held =
+      s.level !== 0 || !opening
+        ? ''
+        : heldProblem
+          ? ` · held until ${laterWord(opening, detected)}, outside response hours`
+          : ` · posted to the Space at ${formatTime(detected)}, outside response hours — timers paused until ${laterWord(opening, detected)}`;
+    const who = `${whoOf(s.targets, input.people, s.level === 0 && s.channels.includes('space'))}${held}`;
+    if (s.level === 0 && muted)
+      return {
+        label: 'L0',
+        when,
+        who,
+        status: WAITING.has(input.state) ? 'Held by a mute' : 'Not sent · muted',
+        tone: WAITING.has(input.state) ? 'waits' : 'cancelled',
+      };
+    if (s.level === 0 && cancelled) return { label: 'L0', when, who, status: cancelled, tone: 'cancelled' };
+    if (s.level === 0 && heldProblem && now && now < heldProblem)
+      return {
+        label: 'L0',
+        when,
+        who,
+        status: `Held until ${laterWord(heldProblem, detected)}`,
+        tone: 'waits',
+      };
     if (sent || (s.level > 0 && s.level <= input.level)) {
       const t = sent ? hhmm(new Date(sent.at)) : null;
       return {
@@ -210,7 +291,9 @@ export function escalationCardOf(input: {
         // MIncident: "Not sent · recovered 10:31" — an FYI the ack didn't stop says the recovery too.
         status:
           clock.upSince && (!input.acked || s.fyi)
-            ? `Not sent · recovered ${hhmm(clock.upSince)}`
+            ? input.problemSince
+              ? `Waits · home page back ${input.problemSince}`
+              : `Not sent · recovered ${hhmm(clock.upSince)}`
             : input.acked
               ? 'Cancelled · acked'
               : 'Not sent · recovered',
@@ -239,7 +322,60 @@ export function escalationCardOf(input: {
       ? `Nothing escalates on its own — the status engine is down${input.engine.since ? ` since ${formatTime(new Date(input.engine.since))}` : ''}${next && input.canAct ? '. Send the next level by hand if nobody acknowledges.' : '.'}`
       : null;
   const people = next ? peopleOf(next.targets, input.people) : [];
+  // The ESCALATION fact (Incident board): the last level sent, or that the ack stopped it; then what comes.
+  const lastSent = [...rows].reverse().find((r) => r.tone === 'sent');
+  const lastStep = lastSent ? steps.find((s) => `L${s.level}` === lastSent.label) : undefined;
+  // The Tier 1 FYI still to go after the ack — also while the engine is down (it goes once it's back).
+  const fyiLevels = new Set(steps.filter((s) => s.fyi).map((s) => `L${s.level}`));
+  const fyi = rows.find((r) => r.tone === 'waits' && fyiLevels.has(r.label));
+  const inMin = (d: Date) => (now ? Math.max(0, Math.round((d.getTime() - now.getTime()) / 60_000)) : null);
+  const nextAt = next ? due.get(next.level) : undefined;
+  // What the ack stops while an FYI still goes: the levels above L0 that aren't the FYI (board "L1–L2
+  // stopped", POSTACK "L1–L2 stopped." — whether L1 had gone already or not).
+  const stoppable = steps.filter((s) => s.level > 0 && !s.fyi).map((s) => `L${s.level}`);
+  const stoppedWord =
+    fyi && stoppable.length && !input.problemSince
+      ? `${stoppable.length > 1 ? `${stoppable[0]}–${stoppable.at(-1)}` : stoppable[0]} stopped`
+      : 'Stopped · acked';
+  const lastByHand = !!lastSent?.status.includes(' by ');
+  const nextWord = (d: Date) => (now && !isSameBangkokDay(d, now) ? formatWeekdayTime(d) : formatTime(d));
+  const fact = input.acked
+    ? {
+        value: stoppedWord,
+        caption: input.problemSince
+          ? 'Still acknowledged as a PROBLEM — nothing more is sent'
+          : fyi
+            ? fyi.status.startsWith('Waits')
+              ? `${fyi.label} FYI waits — engine down`
+              : `${fyi.label} FYI ${fyi.status.replace(/ · FYI$/, '').replace(/^At/, 'at')} if still down`
+            : 'Acknowledged — nothing more is sent',
+      }
+    : {
+        value: lastSent
+          ? `${lastSent.label} · ${
+              lastByHand
+                ? 'sent by hand'
+                : lastStep
+                  ? [...new Set(peopleOf(lastStep.targets, input.people).map((x) => x.name))].join(' + ') ||
+                    'Nobody'
+                  : ''
+            }`
+          : 'Not sent yet',
+        caption: stopped
+          ? 'Engine down — nothing escalates on its own'
+          : waiting && next && nextAt && lastByHand && !input.engine.stopped
+            ? `Running again · next at ${nextWord(nextAt)}`
+            : waiting && next && nextAt
+              ? // unacked, the Tier 1 L3 is a real escalation ("L3 if still down"); "FYI" only after an ack
+                `${next.targets.includes('ceo') && !next.fyi ? 'CEO step' : `L${next.level}`} at ${nextWord(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
+              : waiting
+                ? 'No more levels'
+                : input.problemSince
+                  ? `DOWN levels wait · home page back ${input.problemSince}`
+                  : 'Recovered — nothing more is sent',
+      };
   return {
+    fact,
     title: `Escalation · Tier ${input.tier} ${input.severity === 'down' ? 'DOWN' : 'PROBLEM'}`,
     rows,
     stopped,
@@ -262,7 +398,7 @@ export function escalationCardOf(input: {
           }
         : null,
     footer: input.acked
-      ? `Acknowledged by ${input.acked.by} → escalation stopped.${
+      ? `Acknowledged by ${input.acked.by}${input.acked.at ? ` ${input.acked.at}` : ''} → escalation stopped.${
           input.problemSince
             ? ` From ${input.problemSince} the same incident carries on as a PROBLEM and stays acknowledged, so no PROBLEM reminders go out.`
             : input.clientTrack === false

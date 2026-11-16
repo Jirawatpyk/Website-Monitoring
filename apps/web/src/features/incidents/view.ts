@@ -94,6 +94,8 @@ export interface IncidentView {
   confirmedAt: string;
   confirmedBy: string;
   cause: string;
+  /** §37.1: below md, the h1 without the site (the site is a label above it); null: `title` everywhere. */
+  titleShort?: string | null;
   siteUrl: string | null;
   ack: AckState;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatPercent } from '@dxt/shared';
-import { downEpisodesFromTimeline, episodesFromTimeline, type Episode } from './lifecycle';
+import { downEpisodesFromTimeline, episodesFromTimeline, openEpisode, type Episode } from './lifecycle';
 import { maintenanceSpans, type MaintenanceWindow } from './maintenance';
 import { aggregateUptime, downMinutesIn, siteUptime, siteUptimeOver, spanMinutesIn } from './uptime';
 
@@ -127,6 +127,32 @@ describe('episodesFromTimeline (stored incident_events → drops)', () => {
       { type: 'detected', at: 'not a date', payload: {} },
     ]);
     expect(downMinutesIn(drops, at('2026-09-21T00:00:00'), at('2026-09-21T12:00:00'))).toBe(18);
+  });
+
+  // Engine review (PR #204, L1): a PROBLEM AGAIN whose RECOVERED row was lost, while the DOWN drop is
+  // open. Today it is ignored — the DOWN drop runs on and the page reads DOWN — pinned so a change is a
+  // decision, not an accident. The engine always writes the pair from the same round (run-engine D-023).
+  it('openEpisode: the drop in progress, or null once every drop is over', () => {
+    const d = (end: Date | null) => ({ start: new Date(0), end, severity: 'down' as const });
+    expect(openEpisode([d(new Date(1)), d(null)])).toEqual(d(null));
+    expect(openEpisode([d(new Date(1))])).toBeNull();
+    expect(openEpisode([])).toBeNull();
+  });
+
+  it('a PROBLEM AGAIN with no RECOVERED before it leaves the open DOWN drop as it is', () => {
+    const drops = episodesFromTimeline({ started_at: '2026-09-24T23:41:36+07:00', severity: 'down' }, [
+      { type: 'detected', at: '2026-09-24T23:42:08+07:00', payload: {} },
+      {
+        type: 'relapsed',
+        at: '2026-09-25T09:35:20+07:00',
+        payload: {
+          startedAt: '2026-09-25T09:35:20+07:00',
+          severity: 'problem',
+          homeBackAt: '2026-09-25T09:35:20+07:00',
+        },
+      },
+    ]);
+    expect(drops.map((d) => [d.severity, d.end])).toEqual([['down', null]]);
   });
 
   it('a PROBLEM incident raised to DOWN (D-021) starts its downtime at downStartedAt', () => {

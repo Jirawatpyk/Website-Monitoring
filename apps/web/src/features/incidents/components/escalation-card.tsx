@@ -137,7 +137,14 @@ export function EscalationCard({
   siteName: string;
   phone: boolean;
 }) {
-  const head = phone ? (card.stopped ? 'Paused — engine down' : card.back ? 'Running again' : null) : null;
+  // MIncident: the head's end says where it stands ("Stopped · acked", §37), or the engine's state.
+  const head = phone
+    ? card.stopped
+      ? 'Paused — engine down'
+      : card.back
+        ? 'Running again'
+        : card.fact.value
+    : null;
   return (
     <Card
       title={card.title}

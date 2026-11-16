@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IncidentDetail } from '../detail-queries';
 import { resolveGate, timelineOf, type EventRow } from '../model';
@@ -178,18 +178,32 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     // Two facts: the DOWN that is over (its minutes, D-033), the PROBLEM that is open.
     expect(screen.getByText('DOWN FOR')).toBeInTheDocument();
     expect(screen.getAllByText('9 h 54 min').length).toBeGreaterThan(0);
-    expect(screen.getByText('Thu 23:41 → 09:35 · counts in uptime')).toBeInTheDocument();
+    expect(screen.getByText('Thu 23:41 → Fri 09:35 · counts in uptime')).toBeInTheDocument();
     expect(screen.getByText('PROBLEM SINCE')).toBeInTheDocument();
     expect(screen.getByText('33 min · /booking still failing')).toBeInTheDocument();
     expect(screen.queryByText('Still down')).not.toBeInTheDocument();
     // Phone: the open PROBLEM first, then the DOWN that is over.
     expect(screen.getByText('Problem since 09:35 · 33 min')).toBeInTheDocument();
     expect(
-      screen.getByText('Home page back 09:35 · was down 9 h 54 min (Thu 23:41 → 09:35)'),
+      screen.getByText('Home page back 09:35 · was down 9 h 54 min (Thu 23:41 → Fri 09:35)'),
     ).toBeInTheDocument();
     // Evidence: the failing key page beside the home page, never "OK" under a PROBLEM.
     expect(screen.getByText('/booking · first fail 09:35:20')).toBeInTheDocument();
     expect(screen.getByText('Home page OK · /booking still failing.')).toBeInTheDocument();
+  });
+
+  it('an internal Tier 2 site: the Client update card is one line, "Not required" (§37.7)', () => {
+    show(detail({ internal: true, tier: 2, clientUpdate: null, siteName: 'VOCA' }));
+    // drawn twice (desktop column, phone stack), as the other cards
+    expect(screen.getAllByText('Not required').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('VOCA is an internal site — no client to tell, so this Resolve condition is met.')
+        .length,
+    ).toBeGreaterThan(0);
+    // a client site whose track hasn't fired shows nothing (D-052 item 3)
+    cleanup();
+    show(detail({ internal: false, tier: 2, clientUpdate: null }));
+    expect(screen.queryByText('Not required')).not.toBeInTheDocument();
   });
 
   it('the home page answers but its certificate chain still fails: no DOWN verdict under a PROBLEM (§37 M6)', () => {

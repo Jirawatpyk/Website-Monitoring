@@ -125,6 +125,22 @@ export function formatShortPast(date: Date, now: Date): string {
   return formatDay(date);
 }
 
+/**
+ * A time with as much of its day as it needs (§37: "Thu 23:41 → Fri 09:35"): "09:35" today, "Thu 23:41"
+ * within the last 6 Bangkok days, else "Wed 21 Oct 21:15" — a span of weeks never reads as days.
+ */
+/** "Thu 23:41": a time with its short weekday (Bangkok). */
+export function formatWeekdayTime(date: Date): string {
+  return `${WEEKDAYS[bangkokParts(date).weekday]} ${formatTime(date)}`;
+}
+
+export function formatShortWhen(date: Date, now: Date): string {
+  const days = Math.round((bangkokDayStart(now).getTime() - bangkokDayStart(date).getTime()) / 86_400_000);
+  if (days === 0) return formatTime(date);
+  if (days > 0 && days < 7) return formatWeekdayTime(date);
+  return `${formatDay(date, { weekday: true })} ${formatTime(date)}`;
+}
+
 /** Midnight in Bangkok at the start of `now`'s Bangkok day ("checks today", today's log). */
 /** Bangkok is UTC+7 all year (no daylight saving). */
 export const BANGKOK_OFFSET_MS = 7 * 3_600_000;

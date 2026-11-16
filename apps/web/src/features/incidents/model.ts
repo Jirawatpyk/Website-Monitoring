@@ -8,6 +8,7 @@ import {
   mttrMinutes,
   outageMinutes,
   episodesFromTimeline,
+  openEpisode,
   settledOutageMinutes,
   responseKpis,
   UNKNOWN_ROOT_CAUSE,
@@ -21,6 +22,7 @@ import {
   confirmedByWafOf,
   formatDay,
   formatDuration,
+  formatShortWhen,
   formatTime,
   formatTimeWithSeconds,
   formatWhen,
@@ -69,6 +71,20 @@ export interface ListIncident {
   rootCauseFix: string | null;
   /** Its drops from the timeline (`episodesFromTimeline`), for how long it was down (`outageMinutes`). */
   drops: { start: string; end: string | null; severity: Severity }[];
+  /** §37.9: the home page came back with something still failing (`listStillFailing`); else null. */
+  stillFailing?: ListStillFailing | null;
+}
+
+export interface ListStillFailing {
+  homeBackAt: string;
+  /** "/booking"; null for the home page's own chain. */
+  path: string | null;
+  /** "Key page", "TLS chain". */
+  trigger: string;
+  /** "404", "TLS chain misconfigured" — what still fails, short. */
+  failure: string | null;
+  /** What made it DOWN ("Browser", "Hard fail"); the incident's own trigger when not known. */
+  downTrigger?: string;
 }
 
 export type DesktopView = 'needs_action' | 'done' | 'all';
@@ -257,8 +273,8 @@ export function durationMinutes(
  * Recovered, or no drop read: the incident's own severity.
  */
 export function nowSeverity(i: Pick<ListIncident, 'severity' | 'recoveredAt' | 'drops'>): Severity {
-  const last = i.drops.at(-1);
-  return !i.recoveredAt && last && last.end === null ? last.severity : i.severity;
+  const open = openEpisode(i.drops);
+  return !i.recoveredAt && open ? open.severity : i.severity;
 }
 
 /**
@@ -278,7 +294,8 @@ export function stillFailingHeader(
   if (!relapse) return { ...plain, cause: null };
   const p = relapse.payload;
   const key = p.keyPage && typeof p.keyPage === 'object' ? (p.keyPage as Record<string, unknown>) : null;
-  const cause = text(key?.cause) ?? text(p.cause);
+  // §37.2 meta line: "Key page /booking → HTTP 404 (BKK, SIN, TYO)"
+  const cause = text(key?.cause) ? `Key page ${text(key?.cause)}` : text(p.cause);
   // Only D-023's partial recovery (the engine stamps `homeBackAt`): a DOWN that recovered fully and later
   // had a key page fail isn't "still failing" — it failed again.
   const homeBackAt = text(p.homeBackAt);
@@ -294,13 +311,18 @@ export function stillFailingHeader(
   };
   // §37.1: short — "VOCA · /booking still failing"; the home page's own certificate chain (no key page)
   // "ENEOS Industrial · TLS chain misconfigured".
-  if (path) return { title: `${site} · ${path} still failing`, cause, partial };
+  if (path)
+    return { title: `${site} · ${path} still failing`, short: `${path} still failing`, cause, partial };
   const what = text(p.summary);
-  return { title: what ? `${site} · ${what}` : `${site} has a problem`, cause, partial };
+  return what
+    ? { title: `${site} · ${what}`, short: what, cause, partial }
+    : { title: `${site} has a problem`, cause, partial };
 }
 
 export interface StillFailingHeader {
   title: string;
+  /** §37.1: the phone's h1 without the site ("/booking still failing"); the site sits above it. */
+  short?: string;
   cause: string | null;
   /** D-023's partial recovery: when the home page came back, the key page still failing, its trigger. */
   partial: {
@@ -311,9 +333,39 @@ export interface StillFailingHeader {
   } | null;
 }
 
-/** The trigger as the list writes it: "Hard fail", "Slow, flapped". */
-export function triggerWords(i: Pick<ListIncident, 'trigger' | 'isFlapping'>): string {
-  return `${TRIGGER_LABELS[i.trigger]}${i.isFlapping ? ', flapped' : ''}`;
+/** The trigger as the list writes it: "Hard fail", "Slow, flapped"; §37.9 "Key page · was Hard fail". */
+export function triggerWords(i: Pick<ListIncident, 'trigger' | 'isFlapping' | 'stillFailing'>): string {
+  const own = `${TRIGGER_LABELS[i.trigger]}${i.isFlapping ? ', flapped' : ''}`;
+  if (!i.stillFailing) return own;
+  const was = i.stillFailing.downTrigger
+    ? `${i.stillFailing.downTrigger}${i.isFlapping ? ', flapped' : ''}`
+    : own;
+  return `${i.stillFailing.trigger} · was ${was}`;
+}
+
+/**
+ * §37.9: a list row's partial recovery, from its drop events — the same gate as the incident page (a DOWN
+ * whose drop in progress is a PROBLEM that came with `homeBackAt`).
+ */
+export function listStillFailing(
+  i: Pick<ListIncident, 'severity' | 'recoveredAt' | 'drops' | 'siteName'>,
+  events: readonly Pick<EventRow, 'type' | 'at' | 'payload'>[],
+): ListStillFailing | null {
+  if (i.severity !== 'down' || nowSeverity(i) !== 'problem') return null;
+  const h = stillFailingHeader(i.siteName, events);
+  if (!h.partial) return null;
+  const relapse = [...events]
+    .filter((e) => e.type === 'relapsed' && e.payload.severity === 'problem')
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
+  const detail = relapse?.payload.detail as { failing?: { statusCode?: number | null }[] } | undefined;
+  const code = detail?.failing?.find((f) => typeof f.statusCode === 'number')?.statusCode;
+  const summary = typeof relapse?.payload.summary === 'string' ? relapse.payload.summary : null;
+  return {
+    homeBackAt: h.partial.homeBackAt,
+    path: h.partial.path,
+    trigger: h.partial.trigger ?? TRIGGER_LABELS.key_page,
+    failure: code ? String(code) : h.partial.path ? null : summary,
+  };
 }
 
 export const rootCauseLabel = (category: string | null) =>
@@ -335,6 +387,19 @@ export function nextLine(
     return {
       text: `${formatDuration(waited)} unacked`,
       tone: nowSeverity(i) === 'down' ? 'danger' : 'warning',
+    };
+  }
+  // §37.9: why it is still open — the home page is back, something still fails (warning, as the board)
+  if (i.stillFailing && !i.recoveredAt) {
+    const s = i.stillFailing;
+    const what = s.path
+      ? long
+        ? `${s.path} still failing`
+        : [s.path, s.failure].filter(Boolean).join(' ')
+      : (s.failure ?? 'still failing');
+    return {
+      text: `Home page back ${formatShortWhen(new Date(s.homeBackAt), now)} · ${what}`,
+      tone: 'warning',
     };
   }
   if (i.state === 'acknowledged') {
@@ -490,6 +555,8 @@ export interface GateIncident {
   rootCauseCategory: string | null;
   /** The track's record for the condition's words (S11); absent = the S07 wording. */
   clientUpdate?: ClientUpdateFacts;
+  /** An internal site (no client): no track, said plainly (§37.7). */
+  internal?: boolean;
 }
 
 /** The client-update record (S11, spec §9, §16.2): what the card and the Resolve condition say. */
@@ -509,7 +576,8 @@ export const clientUpdateWhy = (tier: number) =>
 /** The Client update condition's detail (Incident, MIncident, Resolve boards). */
 function clientDetail(i: GateIncident): string {
   const c = i.clientUpdate;
-  if (!i.clientUpdateRequired) return 'Not required — the client-update track didn’t fire';
+  if (!i.clientUpdateRequired)
+    return i.internal ? 'Not required — internal site' : 'Not required — the client-update track didn’t fire';
   const t = (iso: string | null) => (iso ? formatTime(new Date(iso)) : '');
   if (!i.clientUpdatedAt) {
     return c

@@ -21,6 +21,8 @@ import {
   formatTime,
   formatTimeWithSeconds,
   isSameBangkokDay,
+  formatShortWhen,
+  formatWeekdayTime,
 } from '@dxt/shared';
 import { GLYPH_LEGEND, GLYPHS, type LocationGlyph } from '@/components/site-cells';
 import type { CheckCell, IncidentDetail } from '../detail-queries';
@@ -55,6 +57,16 @@ const KIND_ICON: Record<TimelineItem['kind'], { icon: React.ReactNode; tone: str
   client_not_needed: { icon: <IconCircleCheck />, tone: 'text-fg-secondary' },
 };
 
+/**
+ * One row of facts from xl, however many the case has (5–7; the board's `factCols`); two rows of 4 at lg,
+ * where 7 cells would leave ~83 px each at 1024 and "23:41:36" can't break (spec-checker M4).
+ */
+const COLS: Record<number, string> = {
+  5: 'lg:grid-cols-4 xl:grid-cols-5',
+  6: 'lg:grid-cols-4 xl:grid-cols-6',
+  7: 'lg:grid-cols-4 xl:grid-cols-7',
+};
+
 export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Date }) {
   const confirmedAt = new Date(d.detectedAt);
   const page = d.pageChange;
@@ -86,7 +98,7 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           {
             label: 'DOWN FOR',
             value: formatDuration(d.durationMinutes),
-            caption: `${shortWhen(d.stillFailing.downFrom, now)} → ${shortWhen(d.stillFailing.downTo, now)} · counts in uptime`,
+            caption: `${shortSpan(d.stillFailing.downFrom, d.stillFailing.downTo, now)} · counts in uptime`,
           },
           {
             label: 'PROBLEM SINCE',
@@ -109,6 +121,10 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
             danger: !d.recoveredAt && d.nowSeverity === 'down',
           },
         ]),
+    // The ladder in one cell (Incident board ESCALATION): left out with no plan.
+    ...(d.escalation
+      ? [{ label: 'ESCALATION', value: d.escalation.fact.value, caption: d.escalation.fact.caption }]
+      : []),
     // Outside response hours a Tier 1 incident pages the person on call, not the owner (§28.6).
     d.paged
       ? {
@@ -122,7 +138,11 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           label: 'OWNER',
           value: d.owner ?? 'No owner set',
           caption:
-            [d.backup ? `Backup ${d.backup}` : null, d.am ? `AM ${d.am}` : null]
+            [
+              d.backup ? `Backup ${d.backup}` : null,
+              d.am && !d.internal ? `AM ${d.am}` : null,
+              d.internal ? 'internal site' : null,
+            ]
               .filter(Boolean)
               .join(' · ') || ' ',
         },
@@ -132,9 +152,11 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
         ? `${d.acked.by}${d.view.ack.kind === 'acked' && d.view.ack.byViewer ? ' (you)' : ''}`
         : '—',
       caption: d.acked
-        ? `${formatTimeWithSeconds(new Date(d.acked.at))} · ${formatDuration(
-            Math.max(1, Math.round((Date.parse(d.acked.at) - confirmedAt.getTime()) / 60_000)),
-          )} after ${d.severity === 'down' ? 'confirmed down' : 'detected'}`
+        ? d.ackInHoursMin
+          ? `${formatTime(new Date(d.acked.at))} · ${formatDuration(d.ackInHoursMin)} into response hours`
+          : `${formatTimeWithSeconds(new Date(d.acked.at))} · ${formatDuration(
+              Math.max(1, Math.round((Date.parse(d.acked.at) - confirmedAt.getTime()) / 60_000)),
+            )} after ${d.severity === 'down' ? 'confirmed down' : 'detected'}`
         : d.recoveredAt || d.resolvedAt
           ? 'Not acknowledged'
           : `${formatDuration(Math.max(1, Math.round((now.getTime() - confirmedAt.getTime()) / 60_000)))} since ${
@@ -143,23 +165,21 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
     },
   ] as { label: string; value: string; caption: string; danger?: boolean; warning?: boolean }[];
   return (
-    <dl
-      className={`aura-card m-0 grid grid-cols-2 gap-4 p-aura-5 ${d.stillFailing ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}
-    >
+    <dl className={`aura-card m-0 grid grid-cols-2 gap-4 p-aura-5 ${COLS[facts.length] ?? COLS[5]}`}>
       {facts.map((f) => (
         <div
           key={f.label}
           className={`flex min-w-0 flex-col gap-0.5 ${f.warning ? 'rounded-aura-md bg-alert-warning-bg p-aura-2' : ''}`}
         >
-          <dt className={`font-mono text-xs ${f.warning ? 'text-fg-warning' : 'text-fg-tertiary'}`}>
+          <dt className={`font-mono text-xs ${f.warning ? 'text-alert-warning-fg' : 'text-fg-tertiary'}`}>
             {f.label}
           </dt>
           <dd
-            className={`m-0 text-lg font-semibold tabular-nums ${f.danger ? 'text-fg-danger' : f.warning ? 'text-fg-warning' : ''}`}
+            className={`m-0 text-lg font-semibold tabular-nums ${f.danger ? 'text-fg-danger' : f.warning ? 'text-alert-warning-fg' : ''}`}
           >
             {f.value}
           </dd>
-          <dd className={`m-0 text-xs ${f.warning ? 'text-fg-warning' : 'text-fg-secondary'}`}>
+          <dd className={`m-0 text-xs ${f.warning ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}>
             {f.caption}
           </dd>
         </div>
@@ -209,7 +229,7 @@ export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
     const home = key.rows.filter((r) => r.home?.glyph === 'pass').length;
     return (
       <Card
-        title={`Latest round · ${key.path}`}
+        title={`${key.path} · Latest round${keyLatestAt(key.rows, 'latest', false) ? ` ${keyLatestAt(key.rows, 'latest', false)}` : ''}`}
         headingLevel={2}
         description={
           fails ? `${fails}/${rows.length} fail → PROBLEM` : `${rows.length}/${rows.length} pass → OK`
@@ -223,7 +243,12 @@ export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
             </li>
           ))}
         </ul>
-        <p className="m-0 mt-2 text-sm text-fg-secondary">{`Home page OK · ${home}/${key.rows.length} pass since ${formatTime(new Date(d.stillFailing!.since))}`}</p>
+        <p className="m-0 mt-2 flex items-center gap-1.5 text-sm text-fg-primary">
+          <span className="flex text-fg-positive [&_svg]:size-4" aria-hidden>
+            <IconCircleCheck />
+          </span>
+          {`Home page OK · ${home}/${key.rows.length} pass since ${formatTime(new Date(d.stillFailing!.since))}${homeCode(key.rows) ? ` · ${homeCode(key.rows)}` : ''}`}
+        </p>
         <GlyphLegend />
       </Card>
     );
@@ -309,9 +334,9 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
           <THead>
             <Tr>
               <Th>Location</Th>
-              <Th>Home page · latest</Th>
+              <Th>{`Home page · latest${keyLatestAt(key.rows, 'home') ? ` ${keyLatestAt(key.rows, 'home')}` : ''}`}</Th>
               <Th>{`${key.path} · first fail ${formatTimeWithSeconds(new Date(firstAt))}`}</Th>
-              <Th>{`${key.path} · latest`}</Th>
+              <Th>{`${key.path} · latest${keyLatestAt(key.rows, 'latest') ? ` ${keyLatestAt(key.rows, 'latest')}` : ''}`}</Th>
             </Tr>
           </THead>
           <TBody>
@@ -379,6 +404,25 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
       <GlyphLegend />
     </>
   );
+}
+
+/** The newest check time in a key-page column ("10:06:40"), for its header. */
+function keyLatestAt(
+  rows: readonly { home: CheckCell | null; latest: CheckCell | null }[],
+  col: 'home' | 'latest',
+  seconds = true,
+): string | null {
+  const t = rows
+    .flatMap((r) => (r[col]?.at ? [r[col]!.at!] : []))
+    .sort()
+    .at(-1);
+  return t ? (seconds ? formatTimeWithSeconds(new Date(t)) : formatTime(new Date(t))) : null;
+}
+
+/** "HTTP 200" when the home page's latest checks answered that code (the phone card's footer). */
+function homeCode(rows: readonly { home: CheckCell | null }[]): string | null {
+  const code = rows.map((r) => /^HTTP (\d{3})/.exec(r.home?.text ?? '')?.[1]).find(Boolean);
+  return code ? `HTTP ${code}` : null;
 }
 
 /** §37.4: why the incident is still open though the home page passes. */
@@ -495,20 +539,26 @@ export interface IncidentSections {
   timelinePhone: React.ReactNode;
 }
 
-/** The slots `IncidentDetailView` places, drawn once on the server. */
-/** A DOWN back with a PROBLEM still open (§19.7): when that PROBLEM began — "08:08", "Fri 13 Nov 09:15". */
-/** "Thu 23:41" — a time with its weekday unless it is today (§37.3 DOWN FOR caption). */
+/** "Thu 23:41" (§37.3), dated when weeks back ("Wed 21 Oct 21:15", INC-0003): `formatShortWhen`. */
 export function shortWhen(iso: string, now: Date): string {
-  const d = new Date(iso);
-  return isSameBangkokDay(d, now)
-    ? formatTime(d)
-    : `${formatDay(d, { weekday: true }).split(' ')[0]} ${formatTime(d)}`;
+  return formatShortWhen(new Date(iso), now);
 }
 
+/**
+ * "Thu 23:41 → Fri 09:35" (§37.3): the end carries its day whenever the start does, so a span over
+ * midnight never reads as one evening.
+ */
+export function shortSpan(fromIso: string, toIso: string, now: Date): string {
+  const to = new Date(toIso);
+  const a = shortWhen(fromIso, now);
+  const b = shortWhen(toIso, now);
+  const withDay = a.includes(' ') && !b.includes(' ') ? formatWeekdayTime(to) : b;
+  return `${a} → ${withDay}`;
+}
+
+/** A DOWN back with a PROBLEM still open (§19.7): when that PROBLEM began — "08:08", "Fri 13 Nov 09:15". */
 export function problemSince(d: Pick<IncidentDetail, 'nowSince'>, now: Date): string {
-  return [startedOn({ startedAt: d.nowSince }, now), formatTime(new Date(d.nowSince))]
-    .filter(Boolean)
-    .join(' ');
+  return formatShortWhen(new Date(d.nowSince), now);
 }
 
 export function incidentSections(d: IncidentDetail, now: Date): IncidentSections {
@@ -521,7 +571,7 @@ export function incidentSections(d: IncidentDetail, now: Date): IncidentSections
           meta: `home page back ${problemSince(d, now)} · down from ${shortWhen(d.stillFailing.downFrom, now)} (${d.stillFailing.downTrigger})`,
           phone: [
             `Problem since ${problemSince(d, now)} · ${formatDuration(Math.max(1, Math.round((now.getTime() - Date.parse(d.stillFailing.since)) / 60_000)))}`,
-            `Home page back ${formatTime(new Date(d.stillFailing.since))} · was down ${formatDuration(d.durationMinutes)} (${shortWhen(d.stillFailing.downFrom, now)} → ${shortWhen(d.stillFailing.downTo, now)})`,
+            `Home page back ${formatShortWhen(new Date(d.stillFailing.since), now)} · was down ${formatDuration(d.durationMinutes)} (${shortSpan(d.stillFailing.downFrom, d.stillFailing.downTo, now)})`,
           ],
         }
       : null,

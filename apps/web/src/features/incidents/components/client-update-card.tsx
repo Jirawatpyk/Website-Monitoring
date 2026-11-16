@@ -20,6 +20,25 @@ import { markClientUpdate } from '../actions';
 import type { ClientUpdateCard as Card_ } from '../model';
 
 const FAILED = 'Couldn’t reach the server. Check your connection and try again.';
+
+/** §37.7: an internal site has no client to tell — one line instead of the card (D-052, D-065). */
+export function InternalClientUpdate({ siteName }: { siteName: string }) {
+  return (
+    <Card
+      title="Client update"
+      headingLevel={2}
+      actions={
+        <Badge tone="neutral" variant="outline" icon={<IconCheck />}>
+          Not required
+        </Badge>
+      }
+    >
+      <p className="m-0 text-sm text-fg-secondary">
+        {`${siteName} is an internal site — no client to tell, so this Resolve condition is met.`}
+      </p>
+    </Card>
+  );
+}
 const LANGS = [
   { value: 'th', label: 'TH' },
   { value: 'en', label: 'EN' },
