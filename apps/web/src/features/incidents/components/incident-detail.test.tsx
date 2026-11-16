@@ -192,6 +192,37 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     expect(screen.getByText('Home page OK · /booking still failing.')).toBeInTheDocument();
   });
 
+  it('the home page answers but its certificate chain still fails: no DOWN verdict under a PROBLEM (§37 M6)', () => {
+    const chain = { text: 'TLS chain misconfigured', glyph: 'chain' as const };
+    const d = detail({
+      state: 'acknowledged',
+      recoveredAt: null,
+      nowSeverity: 'problem',
+      nowSince: at('25T09:35:20'),
+      locations: (['BKK', 'SIN', 'TYO'] as const).map((location) => ({
+        location,
+        first: { text: 'Timeout > 30 s', glyph: 'fail' as const },
+        recheck: null,
+        latest: { ...chain, at: at('25T10:06:40') },
+      })),
+      stillFailing: {
+        what: 'TLS chain misconfigured',
+        path: null,
+        trigger: 'TLS chain',
+        downTrigger: 'Hard fail',
+        since: at('25T09:35:20'),
+        downFrom: at('24T23:41:36'),
+        downTo: at('25T09:35:20'),
+        keyPage: null,
+      },
+    });
+    expect(incidentSections(d, new Date(NOW)).evidenceSummary).toBe(
+      'Home page answers at 3 of 3 · TLS chain error at 3 of 3 → PROBLEM (TLS chain)',
+    );
+    show(d);
+    expect(screen.getByText('Home page answers · TLS chain misconfigured.')).toBeInTheDocument();
+  });
+
   it('Needs root cause: Resolve opens the dialog; "Resolve incident" waits for a category and what happened', () => {
     show(detail({ events: settled }));
     fireEvent.click(resolveButton());

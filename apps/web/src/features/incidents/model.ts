@@ -7,6 +7,7 @@ import {
   canResolve,
   mttrMinutes,
   outageMinutes,
+  episodesFromTimeline,
   settledOutageMinutes,
   responseKpis,
   UNKNOWN_ROOT_CAUSE,
@@ -161,7 +162,8 @@ export function filterIncidents(list: readonly ListIncident[], f: ListFilters, n
   const matching = list.filter(
     (i) =>
       inPeriod(i, f.period, now) &&
-      (f.severity === 'all' || i.severity === f.severity) &&
+      // what it is now (§37, D-064), as the badge beside it
+      (f.severity === 'all' || nowSeverity(i) === f.severity) &&
       (!f.siteId || i.siteId === f.siteId) &&
       inView(i, f.view),
   );
@@ -480,6 +482,8 @@ export interface GateIncident {
   state: IncidentState;
   /** A PROBLEM drop reads "still has a problem", not "still down" (as the notifier's ACKNOWLEDGED). */
   severity?: Severity;
+  /** §37.7: the key page still failing after the home page came back ("2 OK rounds of /booking"). */
+  stillFailingPath?: string | null;
   recoveredAt: string | null;
   clientUpdateRequired: boolean;
   clientUpdatedAt: string | null;
@@ -698,7 +702,7 @@ export function resolveGate(
       : recovered
         ? `OK since ${formatTime(new Date(i.recoveredAt!))} · waiting for the second OK round`
         : i.severity === 'problem'
-          ? 'Still has a problem · needs 2 OK rounds once it clears'
+          ? `Still has a problem · needs 2 OK rounds${i.stillFailingPath ? ` of ${i.stillFailingPath}` : ''} once it clears`
           : 'Still down · needs 2 OK rounds once it recovers',
   };
   const client: Condition = {
@@ -1060,12 +1064,24 @@ export function timelineOf(
             e.payload.keyPage && typeof e.payload.keyPage === 'object'
               ? (e.payload.keyPage as Record<string, unknown>)
               : null;
-          const what = str(key?.path) ?? str(e.payload.summary) ?? 'a check';
+          const path = str(key?.path);
+          const what = path
+            ? `${path} still failing`
+            : `${str(e.payload.summary) ?? 'a check'}, still failing`;
+          const trig = str(e.payload.trigger);
+          const label = trig && trig in TRIGGER_LABELS ? ` (${TRIGGER_LABELS[trig as Trigger]})` : '';
+          // The DOWN minutes up to this round (D-033): the drops that ended by it.
+          const downMin = outageMinutes(
+            episodesFromTimeline({ started_at: i.startedAt, severity: i.severity }, events).filter(
+              (d) => d.severity === 'down' && d.end && d.end.getTime() <= Date.parse(e.at),
+            ),
+            new Date(e.at),
+          );
           item(
             e,
             'problem',
-            `Home page back — ${what} still failing`,
-            `RECOVERED and PROBLEM AGAIN posted together from the ${formatTime(new Date(e.at))} round. The DOWN minutes stop here. Same incident, now a PROBLEM.`,
+            `Home page back — ${what}`,
+            `RECOVERED and PROBLEM AGAIN${label} posted together from the ${formatTime(new Date(e.at))} round.${downMin ? ` Down ${formatDuration(downMin)} — the DOWN minutes stop here.` : ' The DOWN minutes stop here.'} Same incident, now a PROBLEM.`,
             'relapse',
           );
           return;

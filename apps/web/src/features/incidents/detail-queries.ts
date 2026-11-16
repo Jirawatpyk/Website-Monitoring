@@ -268,13 +268,20 @@ export function keyPageRows(
   keyLatest: readonly CheckRow[],
   homeTimeoutMs: number,
   keyTimeoutMs: number,
+  homeBackAt: string,
 ): KeyPageRow[] {
+  // From the round that ended the DOWN on: key pages are probed while the site is down, and a timeout
+  // from then isn't the failure that keeps the incident open (spec-checker H1).
+  const from = Date.parse(homeBackAt) - 30_000;
+  // A key page failing now is a PROBLEM: amber "Fail", never the red hard fail (§37.4).
+  const amber = (c: CheckCell | null): CheckCell | null =>
+    c && c.glyph === 'fail' ? { ...c, glyph: 'problem' } : c;
   const newest = (rows: readonly CheckRow[], location: string) =>
     rows.filter((c) => c.location === location).sort((a, b) => b.checked_at.localeCompare(a.checked_at))[0];
   return PROBE_LOCATIONS.flatMap((location) => {
     const home = newest(homeLatest, location);
     const first = keyAround
-      .filter((c) => c.location === location && c.outcome !== 'pass')
+      .filter((c) => c.location === location && c.outcome !== 'pass' && Date.parse(c.checked_at) >= from)
       .sort((a, b) => a.checked_at.localeCompare(b.checked_at))[0];
     const last = newest(keyLatest, location);
     if (!home && !first && !last) return [];
@@ -282,8 +289,8 @@ export function keyPageRows(
       {
         location,
         home: cellOf(home, homeTimeoutMs),
-        first: cellOf(first, keyTimeoutMs),
-        latest: cellOf(last, keyTimeoutMs),
+        first: amber(cellOf(first, keyTimeoutMs)),
+        latest: amber(cellOf(last, keyTimeoutMs)),
       },
     ];
   });
@@ -556,6 +563,7 @@ export async function loadIncident(
                     keyChecks[1].data ?? [],
                     primary?.timeout_ms ?? 30_000,
                     keyMonitor?.timeout_ms ?? 30_000,
+                    still.partial.homeBackAt,
                   ),
                 }
               : null,
@@ -585,6 +593,10 @@ export async function loadIncident(
       episodes: episodesFromTimeline(i, events),
       now,
       hours,
+      // D-052: only a Tier 1–2 client site has the track
+      clientTrack:
+        (i.sites.tier === 1 || i.sites.tier === 2) && !!i.sites.clients && !i.sites.clients.is_internal,
+      problemSince: stillFailing ? formatTime(new Date(stillFailing.since)) : null,
       steps: events
         .filter(
           (e) => e.type === 'step_fired' && e.payload.reminder !== true && e.payload.severity === i.severity,
@@ -683,6 +695,7 @@ export async function loadIncident(
           state: i.state,
           // the gate words what is still failing now (§19.7)
           severity: current,
+          stillFailingPath: stillFailing?.path ?? null,
           recoveredAt: i.recovered_at,
           clientUpdateRequired: i.client_update_required,
           clientUpdatedAt: i.client_updated_at,

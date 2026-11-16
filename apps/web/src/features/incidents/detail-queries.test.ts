@@ -52,20 +52,23 @@ describe('Evidence by location (Incident board)', () => {
       check(l, at, { status_code: 404, response_ms: 400, error: null });
     const rows = keyPageRows(
       [pass('BKK', '10:06:40'), pass('SIN', '10:06:40')],
-      // Around the partial recovery: a pass before the first fail isn't the first fail.
-      [pass('BKK', '09:34:20'), notFound('BKK', '09:35:20'), notFound('SIN', '09:35:20')],
+      // Around the partial recovery: the key page timed out while the site was down (09:31) — that is the
+      // DOWN, not the failure keeping it open; the first fail is from the round the home page came back.
+      [check('BKK', '09:31:20'), notFound('BKK', '09:35:20'), notFound('SIN', '09:35:20')],
       [notFound('BKK', '10:06:40'), notFound('SIN', '10:06:40')],
       30_000,
       30_000,
+      '2026-09-25T09:35:20+07:00',
     );
     expect(rows).toMatchObject([
       {
         location: 'BKK',
         home: { text: '200 · 900 ms', glyph: 'pass' },
-        first: { text: 'HTTP 404 · 0.4 s', glyph: 'fail', at: '2026-09-25T09:35:20+07:00' },
-        latest: { text: 'HTTP 404 · 0.4 s', glyph: 'fail' },
+        // A PROBLEM's failure: amber "Fail", never the red hard fail.
+        first: { text: 'HTTP 404 · 0.4 s', glyph: 'problem', at: '2026-09-25T09:35:20+07:00' },
+        latest: { text: 'HTTP 404 · 0.4 s', glyph: 'problem' },
       },
-      { location: 'SIN', home: { glyph: 'pass' }, first: { glyph: 'fail' }, latest: { glyph: 'fail' } },
+      { location: 'SIN', home: { glyph: 'pass' }, first: { glyph: 'problem' }, latest: { glyph: 'problem' } },
     ]);
   });
 

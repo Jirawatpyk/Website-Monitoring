@@ -22,7 +22,7 @@ import {
   formatTimeWithSeconds,
   isSameBangkokDay,
 } from '@dxt/shared';
-import { GLYPH_LEGEND, GLYPHS } from '@/components/site-cells';
+import { GLYPH_LEGEND, GLYPHS, type LocationGlyph } from '@/components/site-cells';
 import type { CheckCell, IncidentDetail } from '../detail-queries';
 import type { TimelineItem } from '../model';
 import { FlapRun } from './flap-run';
@@ -182,10 +182,13 @@ function CheckText({ cell, location }: { cell: CheckCell | null; location: strin
   );
 }
 
-function GlyphLegend() {
+function GlyphLegend({ withProblem = false }: { withProblem?: boolean } = {}) {
+  const keys: readonly LocationGlyph[] = withProblem
+    ? [...GLYPH_LEGEND.slice(0, 2), 'problem', ...GLYPH_LEGEND.slice(2)]
+    : GLYPH_LEGEND;
   return (
     <ul className="m-0 mt-3 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-fg-secondary">
-      {GLYPH_LEGEND.map((k) => (
+      {keys.map((k) => (
         <li key={k} className="flex items-center gap-1">
           <span className={`flex [&_svg]:size-3.5 ${GLYPHS[k].tone}`} aria-hidden>
             {GLYPHS[k].icon}
@@ -325,7 +328,7 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
           </TBody>
         </Table>
         <StillFailingNote detail={d} />
-        <GlyphLegend />
+        <GlyphLegend withProblem />
       </>
     );
   }
@@ -371,6 +374,8 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
           ))}
         </TBody>
       </Table>
+      {/* §37 M6: the home page's own chain still failing — say why it is still open */}
+      {d.stillFailing && <StillFailingNote detail={d} />}
       <GlyphLegend />
     </>
   );
@@ -379,17 +384,30 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
 /** §37.4: why the incident is still open though the home page passes. */
 function StillFailingNote({ detail: d }: { detail: IncidentDetail }) {
   const s = d.stillFailing;
-  if (!s?.keyPage) return null;
-  const n = s.keyPage.rows.length;
-  const fails = s.keyPage.rows.filter((r) => r.latest && r.latest.glyph !== 'pass').length;
+  if (!s) return null;
+  const since = formatTime(new Date(s.since));
+  let lead: string;
+  let text: string;
+  if (s.keyPage) {
+    const n = s.keyPage.rows.length;
+    const home = s.keyPage.rows.filter((r) => r.home?.glyph === 'pass').length;
+    const failing = s.keyPage.rows.filter((r) => r.latest && r.latest.glyph !== 'pass');
+    const words = failing[0]?.latest?.text.replace(/ · [\d.]+ (s|ms)$/, '');
+    lead = `Home page OK · ${s.keyPage.path} still failing.`;
+    text = ` The home page has passed at ${home} of ${n} since ${since}, so the DOWN ended there; ${s.keyPage.path} ${words ? `answers ${words}` : 'fails'} at ${failing.length} of ${n}, so the incident stays open as a PROBLEM (${s.trigger}). It clears after 2 OK rounds of ${s.keyPage.path}.`;
+  } else {
+    // The home page's own certificate chain (D-029): it answers, so the DOWN ended; the chain still fails.
+    lead = `Home page answers · ${s.what}.`;
+    text = ` The home page has answered since ${since}, so the DOWN ended there; its certificate chain still fails, so the incident stays open as a PROBLEM (${s.trigger}). It clears after 2 OK rounds.`;
+  }
   return (
     <p className="m-0 mt-3 flex items-start gap-2.5 rounded-aura-md border border-alert-warning-border bg-alert-warning-bg p-aura-3 text-sm">
       <span className="flex pt-0.5 text-alert-warning-fg [&_svg]:size-4" aria-hidden>
         <IconTriangleAlert />
       </span>
       <span>
-        <b className="font-semibold">{`Home page OK · ${s.keyPage.path} still failing.`}</b>
-        {` The home page has passed since ${formatTime(new Date(s.since))}, so the DOWN ended there; ${s.keyPage.path} fails at ${fails} of ${n}, so the incident stays open as a PROBLEM (${s.trigger}). It clears after 2 OK rounds of ${s.keyPage.path}.`}
+        <b className="font-semibold">{lead}</b>
+        {text}
       </span>
     </p>
   );
@@ -436,6 +454,12 @@ export function evidenceSummary(
     const home = key.rows.filter((r) => r.home?.glyph === 'pass').length;
     const fails = key.rows.filter((r) => r.latest && r.latest.glyph !== 'pass').length;
     return `Home page passes at ${home} of ${n} · ${key.path} fails at ${fails} of ${n} → PROBLEM (${d.stillFailing!.trigger})`;
+  }
+  if (d.stillFailing) {
+    // The home page's own chain (no key page): it answers, the chain fails — not the DOWN's verdict.
+    const latest = d.locations.filter((l) => l.latest);
+    const chain = latest.filter((l) => l.latest!.glyph === 'chain').length;
+    return `Home page answers at ${latest.length} of ${latest.length} · TLS chain error at ${chain} of ${latest.length} → PROBLEM (${d.stillFailing.trigger})`;
   }
   if (d.severity !== 'down' || d.trigger !== 'hard_fail' || d.locations.length === 0) return null;
   const both = d.locations.filter(
