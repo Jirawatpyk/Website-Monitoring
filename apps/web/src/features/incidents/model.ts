@@ -95,9 +95,13 @@ const WAITING_ACK: readonly IncidentState[] = ['unacked', 'escalated'];
 /** Open = any state before Resolved (spec §19, §21.2). */
 export const isOpen = (i: Pick<ListIncident, 'state'>) => !CLOSED.includes(i.state);
 
-/** D-032: "Unacked" counts DOWN incidents waiting for an ack — the Overview's banners and card. */
-export const isUnackedDown = (i: Pick<ListIncident, 'state' | 'severity'>) =>
-  i.severity === 'down' && WAITING_ACK.includes(i.state);
+/**
+ * D-032: "Unacked" counts DOWN incidents waiting for an ack — the Overview's banners and card. DOWN now
+ * (`nowSeverity`), as the Overview's Live issues read the drop in progress: one back from DOWN with a
+ * PROBLEM still open isn't an unacked DOWN (§19.7).
+ */
+export const isUnackedDown = (i: Pick<ListIncident, 'state' | 'severity' | 'recoveredAt' | 'drops'>) =>
+  nowSeverity(i) === 'down' && WAITING_ACK.includes(i.state);
 
 /** Needs action (Incidents) = everything not done: open, Needs root cause, In review. */
 const needsAction = (i: ListIncident) => i.state !== 'resolved' && i.state !== 'closed';
@@ -350,8 +354,8 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
   const open = list.filter(isOpen);
   // What each is now: failing (DOWN / PROBLEM), recovered and being watched, or waiting for a root cause.
   const failing = open.filter((i) => !['monitoring', 'needs_root_cause', 'in_review'].includes(i.state));
-  const down = failing.filter((i) => i.severity === 'down').length;
-  const problem = failing.filter((i) => i.severity === 'problem').length;
+  const down = failing.filter((i) => nowSeverity(i) === 'down').length;
+  const problem = failing.filter((i) => nowSeverity(i) === 'problem').length;
   const watching = open.filter((i) => i.state === 'monitoring').length;
   const rc = open.filter((i) => i.state === 'needs_root_cause');
   const unacked = sortIncidents(open.filter(isUnackedDown));

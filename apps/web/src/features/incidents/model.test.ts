@@ -710,6 +710,18 @@ describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)',
   ] as const)('%s', (_, over, expected) => {
     expect(nowSeverity({ severity: 'down', ...over, drops: [...over.drops] })).toBe(expected);
   });
+  it('counts it as a PROBLEM now, never an unacked DOWN (list KPIs, Unacked tab)', () => {
+    const backWithProblem = inc({
+      severity: 'down',
+      state: 'unacked',
+      recoveredAt: null,
+      drops: [down, problemOpen],
+    });
+    expect(isUnackedDown(backWithProblem)).toBe(false);
+    const k = listKpis([backWithProblem], new Date('2026-09-25T05:00:00Z'));
+    expect(k.openCaption).toBe('1 PROBLEM');
+  });
+
   it('keeps the DOWN minutes as how long it was down (D-033)', () => {
     const i = { startedAt: down.start, recoveredAt: null, resolvedAt: null, drops: [down, problemOpen] };
     expect(durationMinutes(i, new Date('2026-09-25T05:00:00Z'))).toBe(3);
