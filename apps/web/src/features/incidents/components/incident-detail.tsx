@@ -273,7 +273,20 @@ export function IncidentDetailView({
         breadcrumb={
           <Breadcrumb items={[{ label: 'Incidents', href: '/incidents' }, { label: incidentLabel }]} />
         }
-        title={title}
+        title={
+          stillDown && !resolved && v.titleShort ? (
+            <>
+              <span className="max-md:hidden">{title}</span>
+              {/* §37.1: the site above a short h1 on a phone, so the title stays within 2 lines */}
+              <span className="flex flex-col md:hidden">
+                <span className="text-sm font-semibold text-fg-secondary">{d.siteName}</span>
+                <span>{v.titleShort}</span>
+              </span>
+            </>
+          ) : (
+            title
+          )
+        }
         meta={
           <span className="flex flex-col gap-1.5">
             <span className="flex flex-wrap items-center gap-2">

@@ -532,7 +532,9 @@ export async function loadIncident(
     current === 'problem' && i.severity === 'down' && !i.recovered_at
       ? stillFailingHeader(i.sites.name, events)
       : null;
-  const view = still ? { ...built, title: still.title, cause: still.cause ?? built.cause } : built;
+  const view = still
+    ? { ...built, title: still.title, titleShort: still.short ?? null, cause: still.cause ?? built.cause }
+    : built;
   // §37.4: the failing key page's own checks beside the home page's — from its first fail at the
   // partial recovery, and its latest.
   const keyMonitor = still?.partial?.monitorUrl

@@ -306,13 +306,18 @@ export function stillFailingHeader(
   };
   // §37.1: short — "VOCA · /booking still failing"; the home page's own certificate chain (no key page)
   // "ENEOS Industrial · TLS chain misconfigured".
-  if (path) return { title: `${site} · ${path} still failing`, cause, partial };
+  if (path)
+    return { title: `${site} · ${path} still failing`, short: `${path} still failing`, cause, partial };
   const what = text(p.summary);
-  return { title: what ? `${site} · ${what}` : `${site} has a problem`, cause, partial };
+  return what
+    ? { title: `${site} · ${what}`, short: what, cause, partial }
+    : { title: `${site} has a problem`, cause, partial };
 }
 
 export interface StillFailingHeader {
   title: string;
+  /** §37.1: the phone's h1 without the site ("/booking still failing"); the site sits above it. */
+  short?: string;
   cause: string | null;
   /** D-023's partial recovery: when the home page came back, the key page still failing, its trigger. */
   partial: {

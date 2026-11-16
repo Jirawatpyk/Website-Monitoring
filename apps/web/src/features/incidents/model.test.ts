@@ -814,6 +814,8 @@ describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)',
     // §37.1: short — the long §19.7 sentence stays the Chat card's.
     expect(stillFailingHeader('VOCA', [relapse('2026-09-25T01:03:00Z', keyPage)])).toEqual({
       title: 'VOCA · /booking still failing',
+      // §37.1: the phone's h1, the site a label above it
+      short: '/booking still failing',
       cause: '/booking → HTTP 404 (BKK, SIN, TYO)',
       partial: {
         homeBackAt: '2026-09-25T01:03:00Z',
