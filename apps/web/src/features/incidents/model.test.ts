@@ -356,6 +356,18 @@ describe('resolveGate (T10, D-033)', () => {
       lockedReason: 'Resolve locked · 1 of 3 met — MuvMi is still down',
     });
   });
+  it('§37.7: an internal site says so; the key page still failing is named in the recovery condition', () => {
+    const g = resolveGate(
+      { ...gateBase, siteName: 'VOCA', severity: 'problem', internal: true, stillFailingPath: '/booking' },
+      [],
+      nameOf,
+    );
+    expect(g.conditions.map((c) => c.detail)).toEqual([
+      'Still has a problem · needs 2 OK rounds of /booking once it clears',
+      'Not required — internal site',
+      'Not written yet · needed before Resolve',
+    ]);
+  });
   it('a PROBLEM still open reads "still has a problem", not "still down" (S09c /verify)', () => {
     const g = resolveGate({ ...gateBase, severity: 'problem' }, [], nameOf);
     expect(g.conditions[0]!.detail).toBe('Still has a problem · needs 2 OK rounds once it clears');
@@ -816,7 +828,7 @@ describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)',
       title: 'VOCA · /booking still failing',
       // §37.1: the phone's h1, the site a label above it
       short: '/booking still failing',
-      cause: '/booking → HTTP 404 (BKK, SIN, TYO)',
+      cause: 'Key page /booking → HTTP 404 (BKK, SIN, TYO)',
       partial: {
         homeBackAt: '2026-09-25T01:03:00Z',
         path: '/booking',
@@ -838,7 +850,11 @@ describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)',
     // Recovered fully, then a key page failed later (no homeBackAt): not "still failing".
     expect(
       stillFailingHeader('VOCA', [relapse('2026-09-25T01:03:00Z', { ...keyPage, homeBackAt: undefined })]),
-    ).toEqual({ title: 'VOCA has a problem', cause: '/booking → HTTP 404 (BKK, SIN, TYO)', partial: null });
+    ).toEqual({
+      title: 'VOCA has a problem',
+      cause: 'Key page /booking → HTTP 404 (BKK, SIN, TYO)',
+      partial: null,
+    });
     // The newest PROBLEM AGAIN names it; a DOWN AGAIN in between doesn't.
     expect(
       stillFailingHeader('VOCA', [

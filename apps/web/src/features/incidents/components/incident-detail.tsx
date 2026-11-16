@@ -738,7 +738,8 @@ function EvidenceCard({
               </Button>
             </span>
           </>
-        ) : (
+        ) : d.stillFailing ? null : (
+          // §37: the DOWN is over; a missing screenshot of it isn't what this page is about
           <span className="text-sm text-fg-secondary">
             {d.trigger === 'manual'
               ? 'No screenshot — the browser verifier takes one only after a probe confirms a DOWN.'

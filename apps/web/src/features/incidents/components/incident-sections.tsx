@@ -140,9 +140,11 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
         ? `${d.acked.by}${d.view.ack.kind === 'acked' && d.view.ack.byViewer ? ' (you)' : ''}`
         : '—',
       caption: d.acked
-        ? `${formatTimeWithSeconds(new Date(d.acked.at))} · ${formatDuration(
-            Math.max(1, Math.round((Date.parse(d.acked.at) - confirmedAt.getTime()) / 60_000)),
-          )} after ${d.severity === 'down' ? 'confirmed down' : 'detected'}`
+        ? d.ackInHoursMin
+          ? `${formatTime(new Date(d.acked.at))} · ${formatDuration(d.ackInHoursMin)} into response hours`
+          : `${formatTimeWithSeconds(new Date(d.acked.at))} · ${formatDuration(
+              Math.max(1, Math.round((Date.parse(d.acked.at) - confirmedAt.getTime()) / 60_000)),
+            )} after ${d.severity === 'down' ? 'confirmed down' : 'detected'}`
         : d.recoveredAt || d.resolvedAt
           ? 'Not acknowledged'
           : `${formatDuration(Math.max(1, Math.round((now.getTime() - confirmedAt.getTime()) / 60_000)))} since ${
@@ -157,15 +159,15 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           key={f.label}
           className={`flex min-w-0 flex-col gap-0.5 ${f.warning ? 'rounded-aura-md bg-alert-warning-bg p-aura-2' : ''}`}
         >
-          <dt className={`font-mono text-xs ${f.warning ? 'text-fg-warning' : 'text-fg-tertiary'}`}>
+          <dt className={`font-mono text-xs ${f.warning ? 'text-alert-warning-fg' : 'text-fg-tertiary'}`}>
             {f.label}
           </dt>
           <dd
-            className={`m-0 text-lg font-semibold tabular-nums ${f.danger ? 'text-fg-danger' : f.warning ? 'text-fg-warning' : ''}`}
+            className={`m-0 text-lg font-semibold tabular-nums ${f.danger ? 'text-fg-danger' : f.warning ? 'text-alert-warning-fg' : ''}`}
           >
             {f.value}
           </dd>
-          <dd className={`m-0 text-xs ${f.warning ? 'text-fg-warning' : 'text-fg-secondary'}`}>
+          <dd className={`m-0 text-xs ${f.warning ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}>
             {f.caption}
           </dd>
         </div>
@@ -215,7 +217,7 @@ export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
     const home = key.rows.filter((r) => r.home?.glyph === 'pass').length;
     return (
       <Card
-        title={`Latest round · ${key.path}`}
+        title={`${key.path} · Latest round${keyLatestAt(key.rows, 'latest') ? ` ${keyLatestAt(key.rows, 'latest')}` : ''}`}
         headingLevel={2}
         description={
           fails ? `${fails}/${rows.length} fail → PROBLEM` : `${rows.length}/${rows.length} pass → OK`
@@ -229,7 +231,12 @@ export function LatestRoundCard({ detail: d }: { detail: IncidentDetail }) {
             </li>
           ))}
         </ul>
-        <p className="m-0 mt-2 text-sm text-fg-secondary">{`Home page OK · ${home}/${key.rows.length} pass since ${formatTime(new Date(d.stillFailing!.since))}`}</p>
+        <p className="m-0 mt-2 flex items-center gap-1.5 text-sm text-fg-primary">
+          <span className="flex text-fg-positive [&_svg]:size-4" aria-hidden>
+            <IconCircleCheck />
+          </span>
+          {`Home page OK · ${home}/${key.rows.length} pass since ${formatTime(new Date(d.stillFailing!.since))}${homeCode(key.rows) ? ` · ${homeCode(key.rows)}` : ''}`}
+        </p>
         <GlyphLegend />
       </Card>
     );
@@ -315,9 +322,9 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
           <THead>
             <Tr>
               <Th>Location</Th>
-              <Th>Home page · latest</Th>
+              <Th>{`Home page · latest${keyLatestAt(key.rows, 'home') ? ` ${keyLatestAt(key.rows, 'home')}` : ''}`}</Th>
               <Th>{`${key.path} · first fail ${formatTimeWithSeconds(new Date(firstAt))}`}</Th>
-              <Th>{`${key.path} · latest`}</Th>
+              <Th>{`${key.path} · latest${keyLatestAt(key.rows, 'latest') ? ` ${keyLatestAt(key.rows, 'latest')}` : ''}`}</Th>
             </Tr>
           </THead>
           <TBody>
@@ -385,6 +392,24 @@ export function EvidenceTable({ detail: d }: { detail: IncidentDetail }) {
       <GlyphLegend />
     </>
   );
+}
+
+/** The newest check time in a key-page column ("10:06:40"), for its header. */
+function keyLatestAt(
+  rows: readonly { home: CheckCell | null; latest: CheckCell | null }[],
+  col: 'home' | 'latest',
+): string | null {
+  const t = rows
+    .flatMap((r) => (r[col]?.at ? [r[col]!.at!] : []))
+    .sort()
+    .at(-1);
+  return t ? formatTimeWithSeconds(new Date(t)) : null;
+}
+
+/** "HTTP 200" when the home page's latest checks answered that code (the phone card's footer). */
+function homeCode(rows: readonly { home: CheckCell | null }[]): string | null {
+  const code = rows.map((r) => /^(\d{3}) /.exec(r.home?.text ?? '')?.[1]).find(Boolean);
+  return code ? `HTTP ${code}` : null;
 }
 
 /** §37.4: why the incident is still open though the home page passes. */

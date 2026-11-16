@@ -290,7 +290,8 @@ export function stillFailingHeader(
   if (!relapse) return { ...plain, cause: null };
   const p = relapse.payload;
   const key = p.keyPage && typeof p.keyPage === 'object' ? (p.keyPage as Record<string, unknown>) : null;
-  const cause = text(key?.cause) ?? text(p.cause);
+  // §37.2 meta line: "Key page /booking → HTTP 404 (BKK, SIN, TYO)"
+  const cause = text(key?.cause) ? `Key page ${text(key?.cause)}` : text(p.cause);
   // Only D-023's partial recovery (the engine stamps `homeBackAt`): a DOWN that recovered fully and later
   // had a key page fail isn't "still failing" — it failed again.
   const homeBackAt = text(p.homeBackAt);
@@ -543,6 +544,8 @@ export interface GateIncident {
   rootCauseCategory: string | null;
   /** The track's record for the condition's words (S11); absent = the S07 wording. */
   clientUpdate?: ClientUpdateFacts;
+  /** An internal site (no client): no track, said plainly (§37.7). */
+  internal?: boolean;
 }
 
 /** The client-update record (S11, spec §9, §16.2): what the card and the Resolve condition say. */
@@ -562,7 +565,8 @@ export const clientUpdateWhy = (tier: number) =>
 /** The Client update condition's detail (Incident, MIncident, Resolve boards). */
 function clientDetail(i: GateIncident): string {
   const c = i.clientUpdate;
-  if (!i.clientUpdateRequired) return 'Not required — the client-update track didn’t fire';
+  if (!i.clientUpdateRequired)
+    return i.internal ? 'Not required — internal site' : 'Not required — the client-update track didn’t fire';
   const t = (iso: string | null) => (iso ? formatTime(new Date(iso)) : '');
   if (!i.clientUpdatedAt) {
     return c

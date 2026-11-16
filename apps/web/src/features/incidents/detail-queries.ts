@@ -46,7 +46,7 @@ import {
   type TimelineItem,
 } from './model';
 import { loadOnCallNow } from './oncall-now';
-import { isEngineStopped } from '@dxt/engine';
+import { isEngineStopped, minutesInsideHours } from '@dxt/engine';
 import { escalationPlanSchema, formatTime } from '@dxt/shared';
 import { loadResponseHours } from '@/server/escalation/response-hours';
 import { escalationCardOf, pendingClientUpdate, type EscalationCardView } from './escalation-card';
@@ -134,6 +134,8 @@ export interface IncidentDetail {
   /** `when` is "today 03:41" / "yesterday 23:59" / "Thu 29 Oct 23:59": a page read the next day names it. */
   paged: { name: string; at: string; when: string; you: boolean } | null;
   acked: { by: string; at: string } | null;
+  /** The ack's minutes into response hours when the alert was held to them (Tier 2–3 at night); else null. */
+  ackInHoursMin?: number | null;
   /** Add note, root cause, Resolve: the Acknowledge rule (D-033). */
   canAct: boolean;
   /** The Client update card (S11), once the track fired (D-052 item 3); null before or never. */
@@ -707,6 +709,14 @@ export async function loadIncident(
           }
         : null,
     acked: i.acked_at && i.acked_by ? { by: nameOf(i.acked_by), at: i.acked_at } : null,
+    // A Tier 2–3 alert held to response hours (D-034): the ack counts from the opening, not the confirm.
+    ackInHoursMin:
+      i.acked_at &&
+      i.sites.tier >= 2 &&
+      i.alerted_at &&
+      Date.parse(i.alerted_at) - Date.parse(i.detected_at) > 60_000
+        ? Math.max(1, Math.round(minutesInsideHours(new Date(i.alerted_at), new Date(i.acked_at), hours)))
+        : null,
     canAct: canAcknowledge(actor, i),
     rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },
     gate: pendingClientUpdate(
@@ -718,6 +728,7 @@ export async function loadIncident(
           // the gate words what is still failing now (§19.7)
           severity: current,
           stillFailingPath: stillFailing?.path ?? null,
+          internal: !!i.sites.clients?.is_internal,
           recoveredAt: i.recovered_at,
           clientUpdateRequired: i.client_update_required,
           clientUpdatedAt: i.client_updated_at,
