@@ -13,5 +13,6 @@ export * from './client-update-alerts';
 export * from './maintenance-alerts';
 export * from './oncall-alerts';
 export * from './reports';
+export * from './weekly-email';
 export * from './series-alerts';
 export * from './account-alerts';

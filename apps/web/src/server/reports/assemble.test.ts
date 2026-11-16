@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { causeOf, reportIncident, rootCauseOf, roundsOf, type IncidentRow } from './assemble';
+import {
+  causeOf,
+  reportIncident,
+  rootCauseOf,
+  roundsOf,
+  stillFailingRows,
+  type IncidentRow,
+} from './assemble';
 
 // Spec examples as test data (INC-0133 VOCA, INC-0142 MuvMi) — never product code.
 const bkk = (s: string) => new Date(`${s}+07:00`);
@@ -147,8 +154,32 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
     expect(reportIncident(chainStillBroken, lateWeek.from, lateWeek.to, now, insideHours)!.stillProblem).toBe(
       'TLS chain misconfigured',
     );
+    // The DOWN was the week before; this week only the PROBLEM drop: still the home page back, still failing.
+    const nextWeek = { from: bkk('2026-09-28T00:00:00'), to: bkk('2026-10-05T00:00:00') };
+    expect(
+      reportIncident(chainStillBroken, nextWeek.from, nextWeek.to, bkk('2026-10-05T09:00:00'), insideHours),
+    ).toMatchObject({ severity: 'problem', failing: true, stillProblem: 'TLS chain misconfigured' });
     // VOCA ended on a recovery: nothing still open.
     expect(reportIncident(voca, week.from, week.to, now, insideHours)!.stillProblem).toBeNull();
+  });
+
+  it('a DOWN back with something still failing needs someone until a root cause is written (§36.7)', () => {
+    const r = reportIncident(
+      { ...chainStillBroken, site: { ...chainStillBroken.site, owner: { name: 'Ploy', chatUserId: null } } },
+      week.from,
+      week.to,
+      now,
+      insideHours,
+    )!;
+    expect(stillFailingRows([r])).toEqual([
+      {
+        kind: 'root_cause',
+        text: 'Cando Asia — still failing since Fri 25 Sep (TLS chain misconfigured), no root cause yet',
+        who: [{ name: 'Ploy', chatUserId: null }],
+      },
+    ]);
+    expect(stillFailingRows([{ ...r, rootCause: 'host fixed the chain' }])).toEqual([]);
+    expect(stillFailingRows([reportIncident(voca, week.from, week.to, now, insideHours)!])).toEqual([]);
   });
 
   it('leaves out an incident with no drop in the period', () => {

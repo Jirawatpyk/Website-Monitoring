@@ -233,6 +233,38 @@ export const EMAIL_COLORS = {
   accentDot: '#d9f99d',
   /** The account emails' grey bar (fg-tertiary). */
   tertiary: '#71717a',
+  /** WeeklyEmail (§36.9): alert-warning / alert-danger / alert-info, the control border, the primary button. */
+  warnFg: '#92400e',
+  warnBg: '#fffbeb',
+  warnBorder: '#fde68a',
+  dangerFg: '#b91c1c',
+  infoBg: '#f5f3ff',
+  infoFg: '#5b21b6',
+  infoBorder: '#ddd6fe',
+  control: '#71717a',
+  buttonBg: '#18181b',
+  buttonFg: '#ffffff',
+} as const;
+
+/** The same tokens in AURA dark (§36.9), for a `prefers-color-scheme: dark` block. */
+export const EMAIL_COLORS_DARK = {
+  canvas: '#08080a',
+  surface: '#18181b',
+  primary: '#ffffff',
+  secondary: '#a1a1aa',
+  border: '#3f3f46',
+  danger: '#f87171',
+  positive: '#bef264',
+  warnFg: '#fcd34d',
+  warnBg: '#372b19',
+  warnBorder: '#704e15',
+  dangerFg: '#fca5a5',
+  infoBg: '#2c283a',
+  infoFg: '#c4b5fd',
+  infoBorder: '#514674',
+  control: '#a1a1aa',
+  buttonBg: '#ffffff',
+  buttonFg: '#18181b',
 } as const;
 const C = EMAIL_COLORS;
 
