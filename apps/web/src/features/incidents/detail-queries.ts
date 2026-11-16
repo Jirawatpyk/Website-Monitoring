@@ -46,7 +46,7 @@ import {
   type TimelineItem,
 } from './model';
 import { loadOnCallNow } from './oncall-now';
-import { isEngineStopped, minutesInsideHours } from '@dxt/engine';
+import { isEngineStopped, minutesInsideHours, openEpisode } from '@dxt/engine';
 import { escalationPlanSchema, formatTime } from '@dxt/shared';
 import { loadResponseHours } from '@/server/escalation/response-hours';
 import { escalationCardOf, pendingClientUpdate, type EscalationCardView } from './escalation-card';
@@ -530,7 +530,7 @@ export async function loadIncident(
     : null;
   const actor: Viewer = askShift ? { ...viewer, onCallNow: onCall === viewer.id } : viewer;
   const drops = episodesFromTimeline(i, ladderEvents);
-  const openDrop = drops.at(-1);
+  const openDrop = openEpisode(drops);
   const current = nowSeverity({
     severity: i.severity,
     recoveredAt: i.recovered_at,
@@ -540,7 +540,7 @@ export async function loadIncident(
       severity: d.severity,
     })),
   });
-  const nowSince = !i.recovered_at && openDrop && !openDrop.end ? openDrop.start.toISOString() : i.started_at;
+  const nowSince = !i.recovered_at && openDrop ? openDrop.start.toISOString() : i.started_at;
   const built = buildIncidentView(i, events, actor, names, now);
   // §19.7: "the same incident continues as a PROBLEM — titled by what still fails, e.g. '/booking still
   // failing after the home page came back'": the PROBLEM AGAIN that opened the drop names it.

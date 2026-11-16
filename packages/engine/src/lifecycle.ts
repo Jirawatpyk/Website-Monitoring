@@ -300,6 +300,16 @@ export function episodesFromTimeline(
   );
 }
 
+/**
+ * The drop in progress (§19.7, D-023): only the last drop can be open (`episodesOf` closes one before it
+ * opens the next), so the last one if it has no end; null when every drop is over. The one rule the
+ * incident page, the Incidents list and the reports read "what it is now" by.
+ */
+export function openEpisode<T extends { end: unknown }>(episodes: readonly T[]): T | null {
+  const last = episodes.at(-1);
+  return last && last.end === null ? last : null;
+}
+
 /** The DOWN drops of a stored incident, for uptime (spec §5: PROBLEM counts as up; D-021 via the timeline). */
 export function downEpisodesFromTimeline(
   incident: { started_at: string; severity: Severity; resolved_at?: string | null },

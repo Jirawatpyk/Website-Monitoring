@@ -8,6 +8,7 @@ import {
   mttrMinutes,
   outageMinutes,
   episodesFromTimeline,
+  openEpisode,
   settledOutageMinutes,
   responseKpis,
   UNKNOWN_ROOT_CAUSE,
@@ -269,8 +270,8 @@ export function durationMinutes(
  * Recovered, or no drop read: the incident's own severity.
  */
 export function nowSeverity(i: Pick<ListIncident, 'severity' | 'recoveredAt' | 'drops'>): Severity {
-  const last = i.drops.at(-1);
-  return !i.recoveredAt && last && last.end === null ? last.severity : i.severity;
+  const open = openEpisode(i.drops);
+  return !i.recoveredAt && open ? open.severity : i.severity;
 }
 
 /**

@@ -59,6 +59,9 @@ export function chainSinceOf(chainSince: unknown, warned: readonly string[]): st
  * A relapse carries its own `startedAt` and `severity`; an escalation is a DOWN from its
  * `downStartedAt` (the outage's first failed check, as uptime counts it, D-021); the first drop is the
  * incident's own start and severity.
+ *
+ * Not `openEpisode` (@dxt/engine) like the incident pages: the Overview loads no `recovered` events and
+ * wants the event's cause and summary too, so it reads the newest opening event (PR #204 review).
  */
 export function currentDrop(
   events: readonly { type: string; at: string; payload: unknown }[],
