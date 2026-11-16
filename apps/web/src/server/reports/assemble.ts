@@ -1,7 +1,28 @@
 import 'server-only';
 import { episodesFromTimeline, type Episode, type IncidentEventRow } from '@dxt/engine';
 import { shortCause, type MonitorFacts, type ReportIncident, type ReportPerson } from '@dxt/notifier';
-import { clockMinutes, TRIGGER_LABELS, type IncidentState, type Severity, type Trigger } from '@dxt/shared';
+import {
+  clockMinutes,
+  formatDay,
+  TRIGGER_LABELS,
+  type IncidentState,
+  type Severity,
+  type Trigger,
+} from '@dxt/shared';
+
+/**
+ * NEEDS SOMEONE rows for a DOWN back with something still failing (§19.7, WeeklyEmail §36.7): open, so
+ * not in the "DOWN without a root cause" list, yet it needs someone while nobody has written why.
+ */
+export function stillFailingRows(list: readonly ReportIncident[]) {
+  return list
+    .filter((r) => r.stillProblem && !r.rootCause)
+    .map((r) => ({
+      kind: 'root_cause' as const,
+      text: `${r.site} — still failing since ${formatDay(r.startedAt, { weekday: true })} (${r.stillProblem}), no root cause yet`,
+      who: r.owner ? [r.owner] : [],
+    }));
+}
 
 /**
  * Turning stored rows into what the reports say (S14, D-056) — pure, so the rules have tests:
@@ -108,8 +129,10 @@ export function reportIncident(
   // PROBLEM drop still open keeps it from reading as recovered — even one opened after the period ended
   // (Monday 05:00 before the 09:00 weekly), so the newest drop of the whole timeline.
   const open = timeline.at(-1)!;
+  // A DOWN of an earlier week still failing this week shows only its PROBLEM drop here: the incident's
+  // record says it came back from a DOWN (message-checker).
   const stillProblem =
-    severity === 'down' && open.severity === 'problem' && open.end === null
+    (severity === 'down' || row.severity === 'down') && open.severity === 'problem' && open.end === null
       ? causeOf(row, 'problem', open.start)
       : null;
   return {

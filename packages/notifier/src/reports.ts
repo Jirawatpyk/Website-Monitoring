@@ -14,7 +14,6 @@ import {
 } from '@dxt/shared';
 import { plainName, type ChatMessage, type ChatPerson, type ChatWidget } from './chat-alerts';
 import { chatMention } from './chat-text';
-import { EMAIL_COLORS, escapeHtml, type EmailMessage } from './email-alerts';
 
 /** A row's words with its follow-up and figure: "… — Arm", "… — 43 min". */
 const rowText = (r: { text: string; who?: string; trail?: string }) =>
@@ -195,10 +194,10 @@ export interface ReportModel {
   textLine: string;
 }
 
-const dayTime = (d: Date) => `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
+export const dayTime = (d: Date) => `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
 
 /** "timeout ×2 · 504 ×1" mid-sentence; an acronym ("SSL expiring", "HTTP 503") keeps its capitals. */
-const midSentence = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0]!.toLowerCase() + s.slice(1) : s);
+export const midSentence = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0]!.toLowerCase() + s.slice(1) : s);
 
 const SEV = { down: 'DOWN', problem: 'PROBLEM' } as const;
 
@@ -427,6 +426,45 @@ function uptimeRows(sites: readonly ReportSiteUptime[]): { rows: Row[]; below: n
   return { rows: [...below.map((s) => row(s, true)), ...met.map((s) => row(s, false))], below: below.length };
 }
 
+/** COMING UP: the on-call week, then windows in the next 7 days — a series once, at its next window. */
+export function comingLines(f: Pick<WeeklyFacts, 'onCall' | 'comingUp'>): string[] {
+  const coming: { text: string }[] = [];
+  const oc = f.onCall;
+  if (oc.thisWeek) {
+    const next = oc.next
+      ? ` Next: ${plainName(oc.next.name)}, ${formatWeek(oc.next.week).replace(/^\w+ /, '')}${oc.next.swap ? ` — ${oc.next.swap}` : ''}.`
+      : '';
+    coming.push({
+      text: `On call this week (Tier 1 nights and weekends): ${plainName(oc.thisWeek.name)}, ${formatWeek(oc.thisWeek.week)}.${next}`,
+    });
+  }
+  // A series once, at its next window (§32.11); one-off windows one by one. `comingUp` is in start order.
+  const seriesListed = new Set<string>();
+  for (const w of f.comingUp) {
+    const by = w.by ? ` · ${plainName(w.by)}` : '';
+    if (w.series) {
+      if (seriesListed.has(w.series.id)) continue;
+      seriesListed.add(w.series.id);
+      coming.push({
+        text: `Maintenance: ${plainName(w.site)} ${w.series.words} · next ${formatDay(w.start, { weekday: true })} · ${w.reason}${by}`,
+      });
+      continue;
+    }
+    coming.push({ text: `Maintenance: ${plainName(w.site)} ${windowSpan(w, true)} · ${w.reason}${by}` });
+  }
+  return coming.map((c) => c.text);
+}
+
+/** One PLANNED & QUIET line: "WeCare Studio · Fri 25 Sep 09:30–14:00 · CMS upgrade · not counted". */
+export function plannedText(w: ReportWindow, at: Date): string {
+  return `${plainName(w.site)} · ${plannedSpan(w, at)} · ${w.reason}${w.start <= at && at < w.end ? ' · running now' : ''} · ${counted(w)}`;
+}
+
+/** THE MONITOR ITSELF, as plain lines. */
+export function monitorLines(m: MonitorFacts): string[] {
+  return monitorRows(m).map((r) => r.text);
+}
+
 /** The Monday weekly summary (WeeklySummary "Weekly summary"). */
 export function weeklyModel(f: WeeklyFacts): ReportModel {
   const range = formatDayRange(f.weekStart, f.weekEnd);
@@ -486,33 +524,10 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
 
   const planned: Row[] = f.planned.map((w) => ({
     label: w.kind === 'mute' ? 'Muted' : 'Maintenance',
-    text: `${plainName(w.site)} · ${plannedSpan(w, f.at)} · ${w.reason}${w.start <= f.at && f.at < w.end ? ' · running now' : ''} · ${counted(w)}`,
+    text: plannedText(w, f.at),
   }));
 
-  const coming: Row[] = [];
-  const oc = f.onCall;
-  if (oc.thisWeek) {
-    const next = oc.next
-      ? ` Next: ${plainName(oc.next.name)}, ${formatWeek(oc.next.week).replace(/^\w+ /, '')}${oc.next.swap ? ` — ${oc.next.swap}` : ''}.`
-      : '';
-    coming.push({
-      text: `On call this week (Tier 1 nights and weekends): ${plainName(oc.thisWeek.name)}, ${formatWeek(oc.thisWeek.week)}.${next}`,
-    });
-  }
-  // A series once, at its next window (§32.11); one-off windows one by one. `comingUp` is in start order.
-  const seriesListed = new Set<string>();
-  for (const w of f.comingUp) {
-    const by = w.by ? ` · ${plainName(w.by)}` : '';
-    if (w.series) {
-      if (seriesListed.has(w.series.id)) continue;
-      seriesListed.add(w.series.id);
-      coming.push({
-        text: `Maintenance: ${plainName(w.site)} ${w.series.words} · next ${formatDay(w.start, { weekday: true })} · ${w.reason}${by}`,
-      });
-      continue;
-    }
-    coming.push({ text: `Maintenance: ${plainName(w.site)} ${windowSpan(w, true)} · ${w.reason}${by}` });
-  }
+  const coming: Row[] = comingLines(f).map((text) => ({ text }));
 
   const monitor = monitorRows(f.monitor);
   const mention = mentions(f.needsSomeone.flatMap((n) => n.who));
@@ -634,72 +649,4 @@ export function reportChat(m: ReportModel, cardId: string): ChatMessage {
       },
     ],
   };
-}
-
-const C = EMAIL_COLORS;
-const FONT = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-const esc = escapeHtml;
-
-export const REPORT_EMAIL_FOOTER =
-  'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. The same summary is in the DxT Website Reports Space.';
-
-/**
- * The weekly summary's email to the CEO: subject `DxT Monitor · Weekly summary · 21–27 Sep`, the body
- * the card (same sections), with a plain-text part.
- */
-export function weeklyEmail(m: ReportModel, f: Pick<WeeklyFacts, 'weekStart' | 'weekEnd'>): EmailMessage {
-  const subject = `DxT Monitor · Weekly summary · ${formatDayRange(f.weekStart, f.weekEnd, { short: true })}`;
-  const why = 'You got this because you get the weekly summary as the CEO.';
-  const row = (r: Row) =>
-    `<tr><td style="padding:6px 0;font-size:13px;line-height:1.5;color:${r.warning ? C.warning : C.primary};border-bottom:1px solid ${C.borderSubtle}">` +
-    (r.label ? `<b style="font-weight:600">${esc(r.label)}</b> · ` : '') +
-    esc(r.text) +
-    (r.who ? ` <b style="font-weight:600">— ${esc(r.who)}</b>` : '') +
-    (r.trail ? ` — ${esc(r.trail)}` : '') +
-    (r.note ? `<br><span style="font-size:12px">${esc(r.note)}</span>` : '') +
-    '</td></tr>';
-  const section = (s: Section) =>
-    `<tr><td style="padding:18px 0 4px">${
-      s.title
-        ? `<div style="font-size:11px;font-weight:700;letter-spacing:0.06em;color:${C.secondary}">${esc(s.title)}</div>`
-        : ''
-    }<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${s.rows.map(row).join('')}</table></td></tr>`;
-  const buttons = m.buttons
-    .map(
-      (b) =>
-        `<a href="${esc(b.url)}" style="display:inline-block;margin-right:10px;padding:12px 24px;border-radius:9999px;background:transparent;border:1px solid ${C.buttonBorder};color:${C.primary};font-size:14px;line-height:18px;font-weight:500;text-decoration:none">${esc(b.text)}</a>`,
-    )
-    .join('');
-  const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(subject)}</title></head>
-<body style="margin:0;padding:0;background:${C.canvas}">
-<div style="display:none;max-height:0;overflow:hidden">${esc(m.lines.join(' · '))}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.canvas};font-family:${FONT}">
-<tr><td align="center" style="padding:24px 16px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px">
-<tr><td style="background:${C.surface};border:1px solid ${C.border};border-radius:8px;padding:22px 28px">
-<div style="font-size:20px;line-height:1.3;font-weight:700;color:${C.primary}">${esc(m.title)}</div>
-${m.lines.map((l, i) => `<div style="margin-top:4px;font-size:${i === 0 ? 15 : 13}px;line-height:1.5;font-weight:${i === 0 ? 600 : 400};color:${i === 0 ? C.primary : C.secondary}">${esc(l)}</div>`).join('\n')}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${m.sections.map(section).join('')}</table>
-${buttons ? `<div style="margin-top:18px">${buttons}</div>` : ''}
-</td></tr>
-<tr><td style="padding:16px 8px 0;text-align:center;font-size:12px;line-height:1.5;color:${C.secondary}"><b style="font-weight:600;color:${C.primary}">${esc(why)}</b><br>${esc(REPORT_EMAIL_FOOTER)}</td></tr>
-</table>
-</td></tr></table>
-</body></html>`;
-  const text = [
-    m.title,
-    ...m.lines,
-    ...m.sections.flatMap((s) => [
-      '',
-      ...(s.title ? [s.title] : []),
-      ...s.rows.map((r) => `${r.label ? `${r.label} · ` : ''}${rowText(r)}${r.note ? `\n  ${r.note}` : ''}`),
-    ]),
-    '',
-    ...m.buttons.map((b) => `${b.text}: ${b.url}`),
-    '--',
-    why,
-    REPORT_EMAIL_FOOTER,
-  ].join('\n');
-  return { subject, html, text, headers: {} };
 }
