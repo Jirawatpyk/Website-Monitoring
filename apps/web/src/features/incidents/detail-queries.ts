@@ -93,6 +93,24 @@ export interface IncidentDetail {
   nowSeverity: Severity;
   /** When the drop in progress started (ISO); the incident's start without one. */
   nowSince: string;
+  /**
+   * §37: the home page came back while a key page (or the certificate chain) still fails — the DOWN is
+   * over, the incident carries on as a PROBLEM. Null otherwise.
+   */
+  stillFailing: {
+    /** "/booking", or "TLS chain misconfigured" for the home page's own chain. */
+    what: string;
+    path: string | null;
+    /** "Key page" — what the incident is now; `downTrigger` is the DOWN's ("Hard fail"). */
+    trigger: string;
+    downTrigger: string;
+    /** When the home page came back (ISO). */
+    since: string;
+    /** The DOWN: from its first failed check to the home page back (ISO). */
+    downFrom: string;
+    downTo: string;
+    keyPage: { path: string; rows: KeyPageRow[] } | null;
+  } | null;
   state: IncidentState;
   escalationLevel: number;
   startedAt: string;
@@ -238,6 +256,44 @@ export function locationsOf(
       },
     ];
   });
+}
+
+/**
+ * §37.4: per location, the home page's latest, and the failing key page's first fail around the partial
+ * recovery and its latest.
+ */
+export function keyPageRows(
+  homeLatest: readonly CheckRow[],
+  keyAround: readonly CheckRow[],
+  keyLatest: readonly CheckRow[],
+  homeTimeoutMs: number,
+  keyTimeoutMs: number,
+): KeyPageRow[] {
+  const newest = (rows: readonly CheckRow[], location: string) =>
+    rows.filter((c) => c.location === location).sort((a, b) => b.checked_at.localeCompare(a.checked_at))[0];
+  return PROBE_LOCATIONS.flatMap((location) => {
+    const home = newest(homeLatest, location);
+    const first = keyAround
+      .filter((c) => c.location === location && c.outcome !== 'pass')
+      .sort((a, b) => a.checked_at.localeCompare(b.checked_at))[0];
+    const last = newest(keyLatest, location);
+    if (!home && !first && !last) return [];
+    return [
+      {
+        location,
+        home: cellOf(home, homeTimeoutMs),
+        first: cellOf(first, keyTimeoutMs),
+        latest: cellOf(last, keyTimeoutMs),
+      },
+    ];
+  });
+}
+
+export interface KeyPageRow {
+  location: ProbeLocation;
+  home: CheckCell | null;
+  first: CheckCell | null;
+  latest: CheckCell | null;
 }
 
 /** The latest resolve and whether its RESOLVED is still held (the Undo card / the dialog's done state). */
@@ -450,6 +506,61 @@ export async function loadIncident(
       ? stillFailingHeader(i.sites.name, events)
       : null;
   const view = still ? { ...built, title: still.title, cause: still.cause ?? built.cause } : built;
+  // §37.4: the failing key page's own checks beside the home page's — from its first fail at the
+  // partial recovery, and its latest.
+  const keyMonitor = still?.partial?.monitorUrl
+    ? (i.sites.monitors as { id: string; url: string; is_primary: boolean; timeout_ms?: number }[]).find(
+        (m) => !m.is_primary && m.url === still.partial!.monitorUrl,
+      )
+    : undefined;
+  const keyChecks =
+    keyMonitor && still?.partial
+      ? await Promise.all([
+          db
+            .from('check_results')
+            .select(checkCols)
+            .eq('monitor_id', keyMonitor.id)
+            .gte('checked_at', new Date(Date.parse(still.partial.homeBackAt) - 5 * 60_000).toISOString())
+            .lte('checked_at', new Date(Date.parse(still.partial.homeBackAt) + 60_000).toISOString())
+            .order('checked_at')
+            .limit(30),
+          db
+            .from('check_results')
+            .select(checkCols)
+            .eq('monitor_id', keyMonitor.id)
+            .gt('checked_at', new Date(now.getTime() - 15 * 60_000).toISOString())
+            .order('checked_at', { ascending: false })
+            .limit(30),
+        ])
+      : null;
+  if (keyChecks?.[0].error) throw new Error(`check_results: ${keyChecks[0].error.message}`);
+  if (keyChecks?.[1].error) throw new Error(`check_results: ${keyChecks[1].error.message}`);
+  const downDrops = drops.filter((d) => d.severity === 'down');
+  const stillFailing: IncidentDetail['stillFailing'] =
+    still?.partial && current === 'problem'
+      ? {
+          what: still.partial.path ?? still.title.split(' · ').slice(1).join(' · '),
+          path: still.partial.path,
+          trigger: still.partial.trigger ?? TRIGGER_LABELS[i.trigger],
+          downTrigger: TRIGGER_LABELS[i.trigger],
+          since: nowSince,
+          downFrom: (downDrops[0]?.start ?? new Date(i.started_at)).toISOString(),
+          downTo: (downDrops.at(-1)?.end ?? new Date(nowSince)).toISOString(),
+          keyPage:
+            keyChecks && still.partial.path
+              ? {
+                  path: still.partial.path,
+                  rows: keyPageRows(
+                    latest.data ?? [],
+                    keyChecks[0].data ?? [],
+                    keyChecks[1].data ?? [],
+                    primary?.timeout_ms ?? 30_000,
+                    keyMonitor?.timeout_ms ?? 30_000,
+                  ),
+                }
+              : null,
+        }
+      : null;
   const clientUpdate = clientUpdateOf(i, events, nameOf, viewer, now);
 
   const evidenceEvent = [...events].reverse().find((e) => e.type === 'evidence');
@@ -533,6 +644,7 @@ export async function loadIncident(
     severity: i.severity,
     nowSeverity: current,
     nowSince,
+    stillFailing,
     state: i.state,
     escalationLevel: i.escalation_level,
     startedAt: i.started_at,

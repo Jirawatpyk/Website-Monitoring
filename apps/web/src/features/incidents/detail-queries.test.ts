@@ -5,7 +5,7 @@ vi.mock('@/server/db', () => ({ serviceDb: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/lib/auth/session', () => ({ getAccess: vi.fn() }));
 
-const { incidentAccept, locationsOf } = await import('./detail-queries');
+const { incidentAccept, keyPageRows, locationsOf } = await import('./detail-queries');
 
 const check = (location: string, at: string, over: Record<string, unknown> = {}) => ({
   location,
@@ -42,6 +42,30 @@ describe('Evidence by location (Incident board)', () => {
         recheck: { text: 'HTTP 504 · 11.9 s', glyph: 'fail' },
         latest: { text: '200 · 412 ms', glyph: 'pass' },
       },
+    ]);
+  });
+
+  it('§37.4: the home page latest, the key page first fail and latest per location', () => {
+    const pass = (l: string, at: string) =>
+      check(l, at, { outcome: 'pass', status_code: 200, response_ms: 900, error: null });
+    const notFound = (l: string, at: string) =>
+      check(l, at, { status_code: 404, response_ms: 400, error: null });
+    const rows = keyPageRows(
+      [pass('BKK', '10:06:40'), pass('SIN', '10:06:40')],
+      // Around the partial recovery: a pass before the first fail isn't the first fail.
+      [pass('BKK', '09:34:20'), notFound('BKK', '09:35:20'), notFound('SIN', '09:35:20')],
+      [notFound('BKK', '10:06:40'), notFound('SIN', '10:06:40')],
+      30_000,
+      30_000,
+    );
+    expect(rows).toMatchObject([
+      {
+        location: 'BKK',
+        home: { text: '200 · 900 ms', glyph: 'pass' },
+        first: { text: 'HTTP 404 · 0.4 s', glyph: 'fail', at: '2026-09-25T09:35:20+07:00' },
+        latest: { text: 'HTTP 404 · 0.4 s', glyph: 'fail' },
+      },
+      { location: 'SIN', home: { glyph: 'pass' }, first: { glyph: 'fail' }, latest: { glyph: 'fail' } },
     ]);
   });
 

@@ -267,28 +267,46 @@ export function nowSeverity(i: Pick<ListIncident, 'severity' | 'recoveredAt' | '
 export function stillFailingHeader(
   site: string,
   events: readonly Pick<EventRow, 'type' | 'at' | 'payload'>[],
-): { title: string; cause: string | null } {
+): StillFailingHeader {
   const relapse = [...events]
     .filter((e) => e.type === 'relapsed' && e.payload.severity === 'problem')
     .sort((a, b) => b.at.localeCompare(a.at))[0];
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
-  if (!relapse) return { title: `${site} has a problem`, cause: null };
+  const plain = { title: `${site} has a problem`, partial: null };
+  if (!relapse) return { ...plain, cause: null };
   const p = relapse.payload;
   const key = p.keyPage && typeof p.keyPage === 'object' ? (p.keyPage as Record<string, unknown>) : null;
   const cause = text(key?.cause) ?? text(p.cause);
   // Only D-023's partial recovery (the engine stamps `homeBackAt`): a DOWN that recovered fully and later
   // had a key page fail isn't "still failing" — it failed again.
-  if (!text(p.homeBackAt)) return { title: `${site} has a problem`, cause };
+  const homeBackAt = text(p.homeBackAt);
+  if (!homeBackAt) return { ...plain, cause };
   const path = text(key?.path);
-  if (path) return { title: `${site} — ${path} still failing after the home page came back`, cause };
-  // The home page's own certificate chain (no key page): the same words as the Chat card's cause.
-  const what = text(p.summary);
-  return {
-    title: what
-      ? `${site} — ${what}, still failing after the home page came back`
-      : `${site} — still failing after the home page came back`,
-    cause,
+  const trigger = text(p.trigger);
+  const partial = {
+    homeBackAt,
+    path,
+    monitorUrl: text(p.monitorUrl),
+    trigger:
+      trigger && trigger in TRIGGER_LABELS ? TRIGGER_LABELS[trigger as Trigger] : path ? 'Key page' : null,
   };
+  // §37.1: short — "VOCA · /booking still failing"; the home page's own certificate chain (no key page)
+  // "ENEOS Industrial · TLS chain misconfigured".
+  if (path) return { title: `${site} · ${path} still failing`, cause, partial };
+  const what = text(p.summary);
+  return { title: what ? `${site} · ${what}` : `${site} has a problem`, cause, partial };
+}
+
+export interface StillFailingHeader {
+  title: string;
+  cause: string | null;
+  /** D-023's partial recovery: when the home page came back, the key page still failing, its trigger. */
+  partial: {
+    homeBackAt: string;
+    path: string | null;
+    monitorUrl: string | null;
+    trigger: string | null;
+  } | null;
 }
 
 /** The trigger as the list writes it: "Hard fail", "Slow, flapped". */
@@ -391,6 +409,8 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
   const failing = open.filter((i) => !['monitoring', 'needs_root_cause', 'in_review'].includes(i.state));
   const down = failing.filter((i) => nowSeverity(i) === 'down').length;
   const problem = failing.filter((i) => nowSeverity(i) === 'problem').length;
+  // §37.9: a DOWN back with something still failing is counted as a PROBLEM, and said so.
+  const afterDown = failing.filter((i) => nowSeverity(i) === 'problem' && i.severity === 'down').length;
   const watching = open.filter((i) => i.state === 'monitoring').length;
   const rc = open.filter((i) => i.state === 'needs_root_cause');
   const unacked = sortIncidents(open.filter(isUnackedDown));
@@ -405,7 +425,7 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
     openCaption: open.length
       ? [
           down ? `${down} DOWN` : null,
-          problem ? `${problem} PROBLEM` : null,
+          problem ? `${problem} PROBLEM${afterDown ? ` (${afterDown} after a DOWN)` : ''}` : null,
           watching ? `${watching} recovering` : null,
           rc.length ? `${rc.length} needs root cause` : null,
         ]
@@ -986,6 +1006,17 @@ export function timelineOf(
         return;
       }
       case 'recovered': {
+        // §37.8: a partial recovery's RECOVERED shares the round with its PROBLEM AGAIN — one line says both.
+        if (
+          events.some(
+            (r) =>
+              r.type === 'relapsed' &&
+              r.at === e.at &&
+              r.payload.severity === 'problem' &&
+              str(r.payload.homeBackAt),
+          )
+        )
+          return;
         const auto = e.payload.autoResolved === true;
         item(
           e,
@@ -1021,6 +1052,22 @@ export function timelineOf(
         // Down again by hand from the hand check (D-055 item 7).
         if (e.payload.manual === true) {
           item(e, 'down', manualDownTitle(by, e.payload), MANUAL_DOWN_DETAIL, 'relapse');
+          return;
+        }
+        // §37.8: D-023's partial recovery — the DOWN minutes stop here, the same incident carries on.
+        if (!down && str(e.payload.homeBackAt)) {
+          const key =
+            e.payload.keyPage && typeof e.payload.keyPage === 'object'
+              ? (e.payload.keyPage as Record<string, unknown>)
+              : null;
+          const what = str(key?.path) ?? str(e.payload.summary) ?? 'a check';
+          item(
+            e,
+            'problem',
+            `Home page back — ${what} still failing`,
+            `RECOVERED and PROBLEM AGAIN posted together from the ${formatTime(new Date(e.at))} round. The DOWN minutes stop here. Same incident, now a PROBLEM.`,
+            'relapse',
+          );
           return;
         }
         item(

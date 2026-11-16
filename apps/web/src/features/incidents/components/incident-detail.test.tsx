@@ -64,6 +64,7 @@ function detail(over: Partial<IncidentDetail> & { events?: EventRow[] } = {}): I
     severity: 'down',
     nowSeverity: 'down',
     nowSince: at('24T22:14:00'),
+    stillFailing: null,
     escalationLevel: 0,
     startedAt: at('24T22:14:00'),
     detectedAt: at('24T22:14:30'),
@@ -136,24 +137,59 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('a DOWN that came back with a PROBLEM still open reads as a PROBLEM now (§19.7, D-023)', () => {
+  it('home page back, /booking still failing: the §37 page (D-064)', () => {
+    // INC-0140 VOCA (the §37 board sample): DOWN Thu 23:41 → home page back Fri 09:35, /booking 404.
+    const cell = (text: string, glyph: 'pass' | 'fail') => ({ text, glyph });
     show(
       detail({
         state: 'acknowledged',
         recoveredAt: null,
+        startedAt: at('24T23:41:36'),
+        detectedAt: at('24T23:42:08'),
+        durationMinutes: 594,
         nowSeverity: 'problem',
-        nowSince: at('25T08:03:00'),
+        nowSince: at('25T09:35:20'),
+        stillFailing: {
+          what: '/booking',
+          path: '/booking',
+          trigger: 'Key page',
+          downTrigger: 'Hard fail',
+          since: at('25T09:35:20'),
+          downFrom: at('24T23:41:36'),
+          downTo: at('25T09:35:20'),
+          keyPage: {
+            path: '/booking',
+            rows: (['BKK', 'SIN', 'TYO'] as const).map((location) => ({
+              location,
+              home: cell('HTTP 200 · 0.9 s', 'pass'),
+              first: cell('HTTP 404 · 0.4 s', 'fail'),
+              latest: cell('HTTP 404 · 0.4 s', 'fail'),
+            })),
+          },
+        },
       }),
     );
-    // The badge says what it is now; the minutes stay the DOWN ones (D-033).
+    // What it is now: a PROBLEM, triggered by the key page; the DOWN's trigger goes to the meta line.
     expect(screen.getAllByText('Problem').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Still down')).not.toBeInTheDocument();
-    expect(screen.getByText('Down in total · problem since 08:03')).toBeInTheDocument();
+    expect(screen.getByText('Trigger: Key page')).toBeInTheDocument();
     expect(
-      screen.getByText(/^Problem since 08:03 · down 8 min in total · .* · confirmed down /),
+      screen.getByText(/· home page back 09:35 · down from Thu 23:41 \(Hard fail\)$/),
     ).toBeInTheDocument();
-    // The header meta says when the home page came back, not the DOWN's first failed check.
-    expect(screen.getByText(/· home page back 08:03$/)).toBeInTheDocument();
+    // Two facts: the DOWN that is over (its minutes, D-033), the PROBLEM that is open.
+    expect(screen.getByText('DOWN FOR')).toBeInTheDocument();
+    expect(screen.getAllByText('9 h 54 min').length).toBeGreaterThan(0);
+    expect(screen.getByText('Thu 23:41 → 09:35 · counts in uptime')).toBeInTheDocument();
+    expect(screen.getByText('PROBLEM SINCE')).toBeInTheDocument();
+    expect(screen.getByText('33 min · /booking still failing')).toBeInTheDocument();
+    expect(screen.queryByText('Still down')).not.toBeInTheDocument();
+    // Phone: the open PROBLEM first, then the DOWN that is over.
+    expect(screen.getByText('Problem since 09:35 · 33 min')).toBeInTheDocument();
+    expect(
+      screen.getByText('Home page back 09:35 · was down 9 h 54 min (Thu 23:41 → 09:35)'),
+    ).toBeInTheDocument();
+    // Evidence: the failing key page beside the home page, never "OK" under a PROBLEM.
+    expect(screen.getByText('/booking · first fail 09:35:20')).toBeInTheDocument();
+    expect(screen.getByText('Home page OK · /booking still failing.')).toBeInTheDocument();
   });
 
   it('Needs root cause: Resolve opens the dialog; "Resolve incident" waits for a category and what happened', () => {
