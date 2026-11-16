@@ -149,7 +149,11 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     expect(screen.getAllByText('Problem').length).toBeGreaterThan(0);
     expect(screen.queryByText('Still down')).not.toBeInTheDocument();
     expect(screen.getByText('Down in total · problem since 08:03')).toBeInTheDocument();
-    expect(screen.getByText(/^Problem now · down 8 min in total/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^Problem since 08:03 · down 8 min in total · .* · confirmed down /),
+    ).toBeInTheDocument();
+    // The header meta says when the home page came back, not the DOWN's first failed check.
+    expect(screen.getByText(/· home page back 08:03$/)).toBeInTheDocument();
   });
 
   it('Needs root cause: Resolve opens the dialog; "Resolve incident" waits for a category and what happened', () => {

@@ -725,19 +725,40 @@ describe('nowSeverity — what it is now: the drop in progress (§19.7, D-023)',
 
   it('titles it by what still fails (§19.7: "/booking still failing after the home page came back")', () => {
     const relapse = (at: string, payload: Record<string, unknown>) => ({ type: 'relapsed', at, payload });
+    // The engine's PROBLEM AGAIN payload (run-engine: keyPage, homeBackAt).
+    const keyPage = {
+      severity: 'problem',
+      summary: 'key page /booking, HTTP 404',
+      cause: 'Key page /booking → HTTP 404 (BKK, SIN, TYO)',
+      keyPage: { path: '/booking', cause: '/booking → HTTP 404 (BKK, SIN, TYO)' },
+      homeBackAt: '2026-09-25T01:03:00Z',
+    };
+    expect(stillFailingHeader('VOCA', [relapse('2026-09-25T01:03:00Z', keyPage)])).toEqual({
+      title: 'VOCA — /booking still failing after the home page came back',
+      cause: '/booking → HTTP 404 (BKK, SIN, TYO)',
+    });
+    // The home page's certificate chain, no key page.
     expect(
-      stillFailingHeader('Fuji Links', [
+      stillFailingHeader('Cando Asia', [
         relapse('2026-09-25T01:03:00Z', {
           severity: 'problem',
-          summary: 'Key page /booking 404',
-          cause: 'Key page /booking: HTTP 404 (BKK, SIN, TYO)',
+          summary: 'TLS chain misconfigured',
+          cause: 'TLS chain misconfigured (BKK, SIN, TYO)',
+          homeBackAt: '2026-09-25T01:03:00Z',
         }),
+      ]).title,
+    ).toBe('Cando Asia — TLS chain misconfigured, still failing after the home page came back');
+    // Recovered fully, then a key page failed later (no homeBackAt): not "still failing".
+    expect(
+      stillFailingHeader('VOCA', [relapse('2026-09-25T01:03:00Z', { ...keyPage, homeBackAt: undefined })]),
+    ).toEqual({ title: 'VOCA has a problem', cause: '/booking → HTTP 404 (BKK, SIN, TYO)' });
+    // The newest PROBLEM AGAIN names it; a DOWN AGAIN in between doesn't.
+    expect(
+      stillFailingHeader('VOCA', [
+        relapse('2026-09-25T01:03:00Z', keyPage),
         relapse('2026-09-25T00:30:00Z', { severity: 'down', cause: 'Timeout > 30 s' }),
-      ]),
-    ).toEqual({
-      title: 'Fuji Links — Key page /booking 404 still failing after the home page came back',
-      cause: 'Key page /booking: HTTP 404 (BKK, SIN, TYO)',
-    });
+      ]).title,
+    ).toBe('VOCA — /booking still failing after the home page came back');
     // No PROBLEM AGAIN read (an older row): a plain PROBLEM title, the header cause kept.
     expect(stillFailingHeader('Fuji Links', [])).toEqual({ title: 'Fuji Links has a problem', cause: null });
   });

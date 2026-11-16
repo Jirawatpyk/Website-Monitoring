@@ -293,11 +293,13 @@ export function IncidentDetailView({
                 // a page change has no failed check: the board shows only its cause (§26.3)
                 d.trigger === 'manual'
                   ? `${formatTime(new Date(d.startedAt))} · no probe check — the status engine was down`
-                  : stillDown && !d.pageChange
-                    ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
-                    : d.recoveredAt && !resolved
-                      ? `OK since ${formatTime(new Date(d.recoveredAt))}`
-                      : null,
+                  : sections.problemSince
+                    ? `home page back ${sections.problemSince}`
+                    : stillDown && !d.pageChange
+                      ? `first failed check ${formatTimeWithSeconds(new Date(d.startedAt))}`
+                      : d.recoveredAt && !resolved
+                        ? `OK since ${formatTime(new Date(d.recoveredAt))}`
+                        : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -422,15 +424,17 @@ export function IncidentDetailView({
 
       {/* ── phones (MIncident, with MobileAck's ack parts) ── */}
       <div className="flex grow flex-col gap-3 md:hidden">
-        <span className={`text-sm ${stillDown ? 'font-medium text-fg-danger' : 'text-fg-secondary'}`}>
+        <span
+          className={`text-sm ${sections.problemSince ? 'font-medium text-fg-warning' : stillDown ? 'font-medium text-fg-danger' : 'text-fg-secondary'}`}
+        >
           {[
-            stillDown && d.nowSeverity === 'problem' && d.severity === 'down'
-              ? `Problem now · down ${formatDuration(d.durationMinutes)} in total`
+            sections.problemSince
+              ? `Problem since ${sections.problemSince} · down ${formatDuration(d.durationMinutes)} in total`
               : `${stillDown ? (d.severity === 'down' ? 'Down' : 'Problem') : d.severity === 'down' ? 'Was down' : 'Problem lasted'} ${formatDuration(d.durationMinutes)}`,
             downRange ? [sections.startedOn, downRange].filter(Boolean).join(' ') : sections.startedOn,
             d.trigger === 'manual'
               ? `opened by hand ${formatTime(new Date(d.startedAt))}`
-              : `confirmed ${formatTimeWithSeconds(new Date(d.detectedAt))}`,
+              : `${sections.problemSince ? 'confirmed down' : 'confirmed'} ${formatTimeWithSeconds(new Date(d.detectedAt))}`,
           ]
             .filter(Boolean)
             .join(' · ')}

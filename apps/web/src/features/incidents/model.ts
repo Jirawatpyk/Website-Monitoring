@@ -272,10 +272,22 @@ export function stillFailingHeader(
     .filter((e) => e.type === 'relapsed' && e.payload.severity === 'problem')
     .sort((a, b) => b.at.localeCompare(a.at))[0];
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
-  const what = relapse ? (text(relapse.payload.summary) ?? text(relapse.payload.cause)) : null;
+  if (!relapse) return { title: `${site} has a problem`, cause: null };
+  const p = relapse.payload;
+  const key = p.keyPage && typeof p.keyPage === 'object' ? (p.keyPage as Record<string, unknown>) : null;
+  const cause = text(key?.cause) ?? text(p.cause);
+  // Only D-023's partial recovery (the engine stamps `homeBackAt`): a DOWN that recovered fully and later
+  // had a key page fail isn't "still failing" — it failed again.
+  if (!text(p.homeBackAt)) return { title: `${site} has a problem`, cause };
+  const path = text(key?.path);
+  if (path) return { title: `${site} — ${path} still failing after the home page came back`, cause };
+  // The home page's own certificate chain (no key page): the same words as the Chat card's cause.
+  const what = text(p.summary);
   return {
-    title: what ? `${site} — ${what} still failing after the home page came back` : `${site} has a problem`,
-    cause: relapse ? text(relapse.payload.cause) : null,
+    title: what
+      ? `${site} — ${what}, still failing after the home page came back`
+      : `${site} — still failing after the home page came back`,
+    cause,
   };
 }
 
@@ -300,7 +312,10 @@ export function nextLine(
 ): { text: string; tone: 'danger' | 'warning' | 'secondary' } {
   if (WAITING_ACK.includes(i.state)) {
     const waited = minutesBetween(i.detectedAt, now);
-    return { text: `${formatDuration(waited)} unacked`, tone: i.severity === 'down' ? 'danger' : 'warning' };
+    return {
+      text: `${formatDuration(waited)} unacked`,
+      tone: nowSeverity(i) === 'down' ? 'danger' : 'warning',
+    };
   }
   if (i.state === 'acknowledged') {
     return {

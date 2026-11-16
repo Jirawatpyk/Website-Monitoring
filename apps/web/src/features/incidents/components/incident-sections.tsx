@@ -90,9 +90,10 @@ export function FactsStrip({ detail: d, now }: { detail: IncidentDetail; now: Da
           ? `Problem since ${formatTime(new Date(d.startedAt))}`
           : d.nowSeverity === 'problem'
             ? // §19.7: the home page is back, something still fails — the minutes are the DOWN ones (D-033)
-              `Down in total · problem since ${[startedOn({ startedAt: d.nowSince }, now), formatTime(new Date(d.nowSince))].filter(Boolean).join(' ')}`
+              `Down in total · problem since ${problemSince(d, now)}`
             : 'Still down',
-      danger: !d.recoveredAt,
+      // a PROBLEM carrying on after the DOWN has stopped counting: not the danger tone
+      danger: !d.recoveredAt && d.nowSeverity === 'down',
     },
     // Outside response hours a Tier 1 incident pages the person on call, not the owner (§28.6).
     d.paged
@@ -339,6 +340,8 @@ export function startedOn(d: Pick<IncidentDetail, 'startedAt'>, now: Date): stri
 export interface IncidentSections {
   /** The start day when it isn't today (`startedOn`), for the phone's summary line. */
   startedOn: string | null;
+  /** A DOWN back with a PROBLEM still open (§19.7): when that PROBLEM began; else null. */
+  problemSince: string | null;
   /** How the DOWN was decided, under the Evidence card's title (`evidenceSummary`). */
   evidenceSummary: string | null;
   /** "18 min unacked" beside the badge while nobody acknowledged it (Incident header). */
@@ -351,9 +354,18 @@ export interface IncidentSections {
 }
 
 /** The slots `IncidentDetailView` places, drawn once on the server. */
+/** A DOWN back with a PROBLEM still open (§19.7): when that PROBLEM began — "08:08", "Fri 13 Nov 09:15". */
+export function problemSince(d: Pick<IncidentDetail, 'nowSince'>, now: Date): string {
+  return [startedOn({ startedAt: d.nowSince }, now), formatTime(new Date(d.nowSince))]
+    .filter(Boolean)
+    .join(' ');
+}
+
 export function incidentSections(d: IncidentDetail, now: Date): IncidentSections {
   return {
     startedOn: startedOn(d, now),
+    problemSince:
+      !d.recoveredAt && d.nowSeverity === 'problem' && d.severity === 'down' ? problemSince(d, now) : null,
     evidenceSummary: evidenceSummary(d),
     unackedFor:
       d.state === 'unacked' || d.state === 'escalated'
