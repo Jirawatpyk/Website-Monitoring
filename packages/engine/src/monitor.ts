@@ -44,6 +44,11 @@ export interface OpenIncident {
   isFlapping?: boolean;
   /** Its current trigger (`incidents.trigger`): an SSL / domain incident takes a new cause (D-067). */
   trigger?: Trigger;
+  /**
+   * D-067 item 4: the incident's cause came from an SSL / domain expiry (its newest `new_cause` since
+   * the last PROBLEM AGAIN left one) — only such an incident may go back to it.
+   */
+  leftExpiry?: boolean;
 }
 
 /** The site note while a blocked site can't be verified (D-019; trigger label, spec §11). */

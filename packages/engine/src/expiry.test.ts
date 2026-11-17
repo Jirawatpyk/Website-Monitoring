@@ -72,7 +72,13 @@ const site = (monitors: SiteMonitor[], over: Partial<SiteSnapshot> = {}): SiteSn
   monitors,
   ...over,
 });
-const open: OpenIncident = { id: 'inc-136', state: 'unacked', severity: 'problem', hasRootCause: false };
+const open: OpenIncident = {
+  id: 'inc-136',
+  state: 'unacked',
+  severity: 'problem',
+  hasRootCause: false,
+  trigger: 'ssl',
+};
 const heldSsl: MonitorCarry = { ...NEW_MONITOR, status: 'problem', trigger: 'ssl' };
 const heldDomain: MonitorCarry = { ...NEW_MONITOR, status: 'problem', trigger: 'domain' };
 
@@ -351,7 +357,13 @@ describe('decideSite — a new cause on an open expiry incident (D-067)', () => 
 
 describe('decideSite — expiry outside response hours, and back to it (D-067 items 1, 4)', () => {
   const night = { expiryOpens: false } as const;
-  const keywordOpen: OpenIncident = { ...open, trigger: 'keyword', episodeSeverity: 'problem' };
+  /** Open for SSL, then a keyword took over as its cause (D-067 item 2). */
+  const keywordOpen: OpenIncident = {
+    ...open,
+    trigger: 'keyword',
+    episodeSeverity: 'problem',
+    leftExpiry: true,
+  };
   const heldKeyword: MonitorCarry = { ...NEW_MONITOR, status: 'problem', trigger: 'keyword' };
 
   it('Tier 1 crossing the line at 00:00 (or a Saturday) → nothing until the hours open', () => {
@@ -409,14 +421,38 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
     ).toMatchObject({ kind: 'cause_back', trigger: 'ssl' });
   });
 
-  it('opened for slow, slow cleared with SSL under the line → back to SSL (a keyword then is a new cause)', () => {
+  it('a slow PROBLEM that never came from an expiry recovers (and auto-resolves) with SSL under the line (engine re-review H3)', () => {
+    const slowOpen: OpenIncident = {
+      ...open,
+      trigger: 'slow',
+      episodeSeverity: 'problem',
+      detectedAt: new Date(NOW.getTime() - 3 * 60_000),
+    };
     expect(
       decideSite(
         site([monitor(clean, { carry: { ...heldSsl, trigger: 'slow' }, expiry: fact('2026-10-06', null) })], {
-          open: { ...keywordOpen, trigger: 'slow' },
+          open: slowOpen,
         }),
       ),
-    ).toMatchObject({ kind: 'cause_back', trigger: 'ssl' });
+    ).toMatchObject({ kind: 'recover', autoResolve: true });
+  });
+
+  it('a keyword incident opened at 02:00 (never from an expiry) recovers at 02:20, SSL waits for 09:00 (engine re-review H3)', () => {
+    const night02: OpenIncident = { ...keywordOpen, leftExpiry: false, acked: true, state: 'acknowledged' };
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: heldKeyword, expiry: fact('2026-10-06', null) })], {
+          open: night02,
+          ...night,
+        }),
+      ),
+    ).toMatchObject({ kind: 'recover' });
+  });
+
+  it('after a window ending at 20:00 its SSL carry opens nothing at night (engine re-review M1)', () => {
+    expect(
+      decideSite(site([monitor(clean, { carry: heldSsl, expiry: fact('2026-10-06', null) })], night)),
+    ).toMatchObject({ kind: 'none', status: 'ok' });
   });
 
   it('a keyword whose crawler view has no usable fetch holds: no evidence never reads as cleared', () => {

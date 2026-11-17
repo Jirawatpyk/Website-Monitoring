@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(25);
+select plan(31);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -86,12 +86,27 @@ reset role;
 -- D-067 (H2): a PROBLEM AGAIN writes the cause it carries now.
 set local role service_role;
 select ok(
-  public.engine_relapse_incident('00000000-0000-0000-0000-0000000000e1', 'problem', 'keyword', now(), now(), now(), '{}', false, false),
+  public.engine_relapse_incident('00000000-0000-0000-0000-0000000000e1', 'problem', 'keyword', now(), now() + interval '500 milliseconds', now(), '{}', false, false),
   'the recovered SSL incident relapses on a keyword'
 );
 reset role;
 select is((select trigger::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e1'), 'keyword',
   'PROBLEM AGAIN writes the trigger: it no longer reads as open for SSL');
+
+-- Engine re-review H3: a keyword PROBLEM AGAIN never came from an expiry — it has nothing to go back to.
+set local role service_role;
+select ok(
+  not public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e1', null, 'ssl', now(), '{}'),
+  'a keyword relapse doesn''t turn into SSL expiring (it recovers instead)'
+);
+reset role;
+-- It took the keyword from SSL instead (the new cause, a second later).
+insert into public.incident_events (incident_id, type, payload, at) values
+  ('00000000-0000-0000-0000-0000000000e1', 'new_cause', '{"trigger": "keyword", "was": "ssl"}', now() + interval '1 second');
+insert into public.site_status (site_id, status, since, last_evaluated_at, last_round_at)
+values ('00000000-0000-0000-0000-0000000000a1', 'problem', now() - interval '1 day', now() - interval '3 minutes',
+        now() - interval '3 minutes')
+on conflict (site_id) do update set last_round_at = excluded.last_round_at, ok_rounds = 2;
 
 -- D-067 item 4: the keyword cleared, the certificate still 13 days out — back to SSL, silently.
 insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key, hold_until)
@@ -120,6 +135,49 @@ select is(
   (select status::text from public.notifications where dedupe_key = 'new_cause:held'),
   'cancelled', 'a new-cause reply not sent yet is cancelled'
 );
+select ok(
+  (select last_round_at = now() and ok_rounds = 0 from public.site_status
+     where site_id = '00000000-0000-0000-0000-0000000000a1'),
+  'the site''s round moves on with it (the next run judges the site, engine re-review H1)'
+);
+
+-- Engine re-review: a key page flipping is told once per 30 min.
+update public.incidents set trigger = 'ssl' where id = '00000000-0000-0000-0000-0000000000e1';
+insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key)
+  values ('00000000-0000-0000-0000-0000000000e1', 'google_chat', 'problem_again',
+          '00000000-0000-0000-0000-0000000000e1', '{"newCause": true, "trigger": "key_page"}', 'new_cause:earlier');
+set local role service_role;
+select ok(
+  public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e1', null, 'key_page',
+    now() + interval '3 minutes', '{}', true),
+  'the key page takes over again'
+);
+reset role;
+select is(
+  (select count(*)::int from public.notifications where incident_id = '00000000-0000-0000-0000-0000000000e1'
+     and template = 'problem_again' and context ->> 'trigger' = 'key_page' and status <> 'cancelled'),
+  1, 'no second reply within 30 min'
+);
+update public.incidents set trigger = 'ssl' where id = '00000000-0000-0000-0000-0000000000e1';
+
+-- Engine re-review M2: a PROBLEM AGAIN on a DOWN incident keeps its trigger.
+insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000c1', 'VOCA', 1,
+   (select id from ids where name = 'arm'), true);
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000a2', 'http', true, 'https://b.pgtap.test');
+insert into public.incidents (id, site_id, monitor_id, trigger, severity, episode_severity, state, started_at, detected_at, recovered_at)
+  values ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000a2',
+          '00000000-0000-0000-0000-0000000000d2', 'manual', 'down', 'down', 'monitoring',
+          now() - interval '1 hour', now() - interval '1 hour', now() - interval '10 minutes');
+set local role service_role;
+select ok(
+  public.engine_relapse_incident('00000000-0000-0000-0000-0000000000e2', 'problem', 'key_page', now(), now(), now(), '{}', false, false),
+  'a key page fails after the DOWN came back (PROBLEM AGAIN)'
+);
+reset role;
+select is((select trigger::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e2'), 'manual',
+  'the DOWN incident keeps its trigger (a hand-opened DOWN stays manual)');
 set local role service_role;
 select ok(
   not public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e1', null, 'domain', now(), '{}'),
@@ -149,9 +207,9 @@ update public.incidents set severity = 'problem', state = 'unacked', acked_at = 
   where id = '00000000-0000-0000-0000-0000000000e1';
 delete from public.notifications where incident_id = '00000000-0000-0000-0000-0000000000e1';
 insert into public.incident_events (incident_id, type, payload, at) values
-  ('00000000-0000-0000-0000-0000000000e1', 'new_cause', '{"cause": "Found “บาคาร่า” on /", "trigger": "keyword"}', now() + interval '1 second');
+  ('00000000-0000-0000-0000-0000000000e1', 'new_cause', '{"cause": "Found “บาคาร่า” on /", "trigger": "keyword"}', now() + interval '4 minutes');
 set local role service_role;
-select ok(public.engine_post_late_alert('00000000-0000-0000-0000-0000000000e1', now() + interval '2 seconds'),
+select ok(public.engine_post_late_alert('00000000-0000-0000-0000-0000000000e1', now() + interval '5 minutes'),
   'the late card is queued');
 reset role;
 select is(

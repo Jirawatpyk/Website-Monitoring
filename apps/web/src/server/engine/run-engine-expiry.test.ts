@@ -193,7 +193,15 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
     const { db, rpcCalls } = openDb({
       trigger: 'keyword',
       checks: [pass('SIN', 0), pass('TYO', 1)],
-      rpc: { 'rpc.engine_cause_back_incident': { data: true } },
+      rpc: {
+        'rpc.engine_cause_back_incident': { data: true },
+        // It took the keyword from SSL (D-067 item 4: only such an incident goes back).
+        'incident_events.select': {
+          data: [
+            { incident_id: 'i1', type: 'new_cause', at: '2026-10-06T09:00:00Z', payload: { was: 'ssl' } },
+          ],
+        },
+      },
     });
     expect(await runEngine(db, now)).toMatchObject({ causesBack: 1 });
     expect(rpcCalls.find((c) => c.name === 'engine_cause_back_incident')?.args).toMatchObject({
@@ -202,6 +210,45 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
       p_context: { detail: { kind: 'ssl', daysLeft: 6 } },
     });
     expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')).toBeUndefined();
+  });
+
+  it('a keyword incident that never came from SSL recovers instead of turning into SSL (engine re-review H3)', async () => {
+    const { db, rpcCalls } = openDb({
+      trigger: 'keyword',
+      checks: [pass('SIN', 0), pass('TYO', 1)],
+      rpc: {
+        'rpc.engine_recover_incident': { data: true },
+        'incident_events.select': { data: [] },
+      },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_cause_back_incident')).toBeUndefined();
+    expect(rpcCalls.find((c) => c.name === 'engine_recover_incident')).toBeDefined();
+  });
+
+  it('inside a maintenance window the new cause on an SSL incident is recorded as Maintenance, not posted (D-067 item 3, engine re-review H2)', async () => {
+    const { db, rpcCalls } = openDb({
+      rpc: {
+        'maintenance_windows.select': {
+          data: [
+            {
+              site_id: 's1',
+              kind: 'maintenance',
+              starts_at: '2026-10-06T09:30:00Z',
+              ends_at: '2026-10-06T11:00:00Z',
+              approved_at: '2026-10-06T08:00:00Z',
+              ended_at: null,
+              cancelled_at: null,
+            },
+          ],
+        },
+      },
+    });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')).toBeUndefined();
+    expect(rpcCalls.find((c) => c.name === 'engine_record_round')?.args).toMatchObject({
+      p_status: 'maintenance',
+    });
   });
 
   it('a row read from another host (the primary moved) is no data', async () => {

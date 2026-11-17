@@ -67,6 +67,15 @@ begin
 
   v_ctx := coalesce(p_context, '{}') || jsonb_build_object('trigger', p_trigger, 'was', v_was, 'newCause', true);
 
+  -- A cause that comes and goes (a key page flipping) is told once per 30 min (engine re-review).
+  if p_notify and exists (
+    select 1 from public.notifications n
+    where n.incident_id = p_incident_id and n.channel = 'google_chat' and n.template = 'problem_again'
+      and coalesce((n.context ->> 'newCause')::boolean, false) and n.context ->> 'trigger' = p_trigger::text
+      and n.status <> 'cancelled' and n.created_at > now() - interval '30 minutes') then
+    p_notify := false;
+  end if;
+
   if p_notify then
     -- The thread's first card may still be held for response hours (an SSL PROBLEM at night): it goes
     -- no later than this reply, or the reply would wait behind it (claim_notifications keeps order).
@@ -83,6 +92,12 @@ begin
       p_incident_id, 'problem_again', v_ctx,
       greatest(v_hold, now() + interval '5 minutes'), v_key, false);
   end if;
+
+  -- The site's round moves on with the monitors', as every other incident writer does (engine re-review
+  -- H1: otherwise the next run's skew guard skips the site for good).
+  update public.site_status
+    set ok_rounds = 0, last_evaluated_at = now(), last_round_at = p_round_at
+    where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
 
   perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
   return true;
@@ -127,6 +142,13 @@ begin
     and severity = 'problem'
     and coalesce(episode_severity, severity) = 'problem'
     and state in ('unacked', 'escalated', 'acknowledged')
+    -- Its newest new_cause / PROBLEM AGAIN is a new cause taken from an expiry (engine re-review H3:
+    -- an incident that never had one recovers instead).
+    and (select e.type = 'new_cause' and e.payload ->> 'was' in ('ssl', 'domain')
+                and not coalesce((e.payload ->> 'back')::boolean, false)
+         from public.incident_events e
+         where e.incident_id = p_incident_id and e.type in ('new_cause', 'relapsed')
+         order by e.at desc, e.id desc limit 1)
   for update;
 
   if v_site_id is null then
@@ -152,6 +174,12 @@ begin
     set status = 'cancelled', error = 'Superseded: the new cause cleared', next_retry_at = null
     where incident_id = p_incident_id and status = 'queued' and attempts = 0
       and template = 'problem_again' and coalesce((context ->> 'newCause')::boolean, false);
+
+  -- The site's round moves on with the monitors', as every other incident writer does (engine re-review
+  -- H1: otherwise the next run's skew guard skips the site for good).
+  update public.site_status
+    set ok_rounds = 0, last_evaluated_at = now(), last_round_at = p_round_at
+    where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
 
   perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
   return true;
@@ -213,7 +241,8 @@ begin
         episode_severity = p_severity,
         -- D-067: the trigger is the cause the incident carries now, and a DOWN AGAIN keeps it (a DOWN by
         -- hand passes 'manual', which the reports read as true of the whole incident).
-        trigger = case when p_severity = 'problem' then p_trigger else trigger end,
+        -- Only on a PROBLEM incident (engine re-review M2: a DOWN incident keeps hard_fail / manual).
+        trigger = case when p_severity = 'problem' and severity = 'problem' then p_trigger else trigger end,
         recovered_at = null,
         is_flapping = is_flapping or coalesce(p_flapping, false),
         state = case when acked_at is not null then 'acknowledged'::public.incident_state

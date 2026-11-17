@@ -270,6 +270,11 @@ export async function runEngine(
     loadPageChange(db, now),
     loadExpiry(db),
   ]);
+  // D-067 item 4: the open incidents whose cause came from an expiry (only those go back to it).
+  const leftExpiry = await loadLeftExpiry(
+    db,
+    (incidents.data ?? []).filter((i) => i.severity === 'problem').map((i) => i.id),
+  );
   /** D-046: page changes held back (alerts off, or recording), logged instead of acted on. */
   const pageHeld = new Set<string>();
   for (const r of [statuses, carries, incidents]) if (r.error) throw new Error(r.error.message);
@@ -511,6 +516,7 @@ export async function runEngine(
             detectedAt: new Date(open.detected_at),
             isFlapping: open.is_flapping,
             trigger: open.trigger,
+            leftExpiry: leftExpiry.has(open.id),
           } satisfies OpenIncident)
         : null,
       // OK ↔ not-OK changes at incident steps (D-024): the 3rd in 30 min tags flapping.
@@ -572,6 +578,9 @@ export async function runEngine(
               monitorId: open.monitor_id,
               recoveredAt: open.recovered_at,
               isFlapping: open.is_flapping,
+              severity: open.severity,
+              episode_severity: open.episode_severity,
+              trigger: open.trigger,
             }
           : null,
         now,
@@ -1130,6 +1139,10 @@ async function apply(
     /** The last recovery: "was back for 5 min (03:19–03:24)" on DOWN AGAIN. */
     recoveredAt: string | null;
     isFlapping: boolean;
+    /** For `windowHides` (D-067 item 3: an expiry-only incident hides like none). */
+    severity?: string;
+    episode_severity?: string | null;
+    trigger?: string | null;
   } | null,
   now: Date,
   alertQueued: boolean,
@@ -1512,6 +1525,33 @@ async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promis
   }
   if (failed.length) throw new Error(`engine_post_late_alert: ${failed.join('; ')} (${queued} posted)`);
   return queued;
+}
+
+/**
+ * D-067 item 4: of these PROBLEM incidents, those whose newest `new_cause` since their last PROBLEM
+ * AGAIN took the cause from an SSL / domain expiry. A failed read finds none: nothing goes back to an
+ * expiry this run (they recover instead, as any other incident), never a wrong switch.
+ */
+async function loadLeftExpiry(db: DbClient, ids: string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const { data, error } = await db
+    .from('incident_events')
+    .select('incident_id, type, at, payload')
+    .in('incident_id', ids)
+    .in('type', ['new_cause', 'relapsed'])
+    .order('at');
+  if (error) {
+    console.error(JSON.stringify({ event: 'engine_new_cause_events_failed', error: error.message }));
+    return new Set();
+  }
+  const last = new Map<string, { type: string; payload: unknown }>();
+  for (const e of data ?? []) last.set(e.incident_id, e);
+  const left = new Set<string>();
+  for (const [id, e] of last) {
+    const p = (e.payload ?? {}) as { was?: unknown; back?: unknown };
+    if (e.type === 'new_cause' && p.back !== true && (p.was === 'ssl' || p.was === 'domain')) left.add(id);
+  }
+  return left;
 }
 
 /**

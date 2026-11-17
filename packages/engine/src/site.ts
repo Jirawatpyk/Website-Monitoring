@@ -517,7 +517,13 @@ function judgeSiteRound(
     // between an expiry and anything more urgent — announced one way, silent the other.
     const plain =
       !!open && open.severity === 'problem' && episode === 'problem' && RECOVERABLE.includes(open.state);
-    if (plain && open.trigger && !isExpiryTrigger(open.trigger) && isExpiryTrigger(problem.v.trigger)) {
+    if (
+      plain &&
+      open.leftExpiry &&
+      open.trigger &&
+      !isExpiryTrigger(open.trigger) &&
+      isExpiryTrigger(problem.v.trigger)
+    ) {
       return {
         kind: 'cause_back',
         monitorId: problem.m.id,
@@ -1245,22 +1251,23 @@ function problemOf(
 }
 
 /**
- * The primary's expiry PROBLEM this round (D-066), gated by response hours (D-067 item 1): outside them
- * it is raised only when it already was (the primary's last verdict), or to keep a plain PROBLEM
- * incident that is still open — never to open one, relapse one, or follow a DOWN's recovery.
+ * The primary's expiry PROBLEM this round (D-066, D-067 items 1, 4).
+ * - With an incident still open (not recovered), only a plain PROBLEM incident that carries the expiry,
+ *   or took its cause from one, keeps it — any hour. Any other open incident recovers as if it weren't
+ *   there (a slow PROBLEM auto-resolves, a DOWN reads a clean RECOVERED); the expiry then joins as
+ *   PROBLEM AGAIN inside response hours.
+ * - Otherwise (nothing open, or recovered) it opens or relapses only inside response hours.
  */
 function expiryNow(m: SiteMonitor, s: SiteSnapshot): ReturnType<typeof expiryIssue> {
   if (!m.isPrimary) return null;
   const issue = expiryIssue(m.expiry, s.now);
-  if (!issue || s.expiryOpens !== false) return issue;
-  if (m.carry.status === 'problem' && isExpiryTrigger(m.carry.trigger)) return issue;
+  if (!issue) return null;
   const o = s.open;
-  const plainOpen =
-    !!o &&
-    !RECOVERED_STATES.includes(o.state) &&
-    o.severity === 'problem' &&
-    (o.episodeSeverity ?? o.severity) === 'problem';
-  return plainOpen ? issue : null;
+  if (o && !RECOVERED_STATES.includes(o.state)) {
+    const plain = o.severity === 'problem' && (o.episodeSeverity ?? o.severity) === 'problem';
+    return plain && (isExpiryTrigger(o.trigger) || o.leftExpiry) ? issue : null;
+  }
+  return s.expiryOpens === false ? null : issue;
 }
 
 /**
