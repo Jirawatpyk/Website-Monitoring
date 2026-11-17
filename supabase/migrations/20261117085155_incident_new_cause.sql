@@ -5,7 +5,11 @@
 --
 -- The incident's trigger and monitor switch to the new cause, the state is kept (the ladder carries
 -- on: an acknowledged incident stays acknowledged, its acker is the one mentioned), and the thread gets
--- one `problem_new_cause` reply @mentioning whoever acts now, with an email to L0 after the D-047 grace.
+-- one reply @mentioning whoever acts now, with an email to L0 after the D-047 grace. Both are
+-- `problem_again` rows marked `newCause` in their context (keyed `new_cause:<round>`): every list
+-- that cancels, releases, orders or falls back for a PROBLEM AGAIN then covers them too — cancelled on
+-- recovery or ack while held, no email once it cleared inside the grace, the fallback email if the
+-- reply fails (message-checker S13 H3).
 
 create function public.engine_new_cause_incident(
   p_incident_id uuid,
@@ -27,7 +31,8 @@ declare
   v_was public.incident_trigger;
   v_state public.incident_state;
   v_hold timestamptz := case when p_hold_until > now() then p_hold_until end;
-  v_key text := to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+  v_key text := 'new_cause:' || to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+  v_ctx jsonb;
 begin
   -- Only an open, unrecovered PROBLEM drop opened for an expiry, and only for a cause that isn't one.
   select site_id, trigger, state into v_site_id, v_was, v_state
@@ -58,23 +63,22 @@ begin
           jsonb_build_object('trigger', v_was, 'state', v_state),
           jsonb_build_object('trigger', p_trigger, 'state', v_state));
 
+  v_ctx := coalesce(p_context, '{}') || jsonb_build_object('trigger', p_trigger, 'was', v_was, 'newCause', true);
+
   if p_notify then
     -- The thread's first card may still be held for response hours (an SSL PROBLEM at night): it goes
     -- no later than this reply, or the reply would wait behind it (claim_notifications keeps order).
     update public.notifications
       set hold_until = coalesce(v_hold, now())
-      where incident_id = p_incident_id and template = 'problem' and status = 'queued'
-        and hold_until > coalesce(v_hold, now());
+      where incident_id = p_incident_id and template in ('problem', 'problem_again') and status = 'queued'
+        and channel = 'google_chat' and hold_until > coalesce(v_hold, now());
 
     insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key, hold_until)
-    values (p_incident_id, 'google_chat', 'problem_new_cause', p_incident_id::text,
-            coalesce(p_context, '{}') || jsonb_build_object('trigger', p_trigger, 'was', v_was),
-            v_key, v_hold)
+    values (p_incident_id, 'google_chat', 'problem_again', p_incident_id::text, v_ctx, v_key, v_hold)
     on conflict do nothing;
 
     perform public.engine_queue_l0_emails(
-      p_incident_id, 'problem_new_cause',
-      coalesce(p_context, '{}') || jsonb_build_object('trigger', p_trigger, 'was', v_was),
+      p_incident_id, 'problem_again', v_ctx,
       greatest(v_hold, now() + interval '5 minutes'), v_key, false);
   end if;
 

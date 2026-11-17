@@ -6,6 +6,7 @@ import {
   buildAgainAlert,
   buildAgainEmail,
   buildNewCauseAlert,
+  buildNewCauseEmail,
   buildAutoResolvedAlert,
   buildAutoResolvedEmail,
   buildFlapSummaryAlert,
@@ -46,9 +47,11 @@ import {
   ROOT_CAUSE_CATEGORIES,
   ROOT_CAUSE_LABELS,
   TIER_CONFIG,
+  TRIGGER_LABELS,
   type ProbeLocation,
   type RootCauseCategory,
   type Tier,
+  type Trigger,
 } from '@dxt/shared';
 import {
   contextOf,
@@ -71,14 +74,7 @@ import {
   toldAtOf,
 } from './ladder-facts';
 
-const L0_TEMPLATES = new Set([
-  'down',
-  'problem',
-  'down_again',
-  'problem_again',
-  'flap_summary',
-  'problem_new_cause',
-]);
+const L0_TEMPLATES = new Set(['down', 'problem', 'down_again', 'problem_again', 'flap_summary']);
 
 const person = (p: IncidentFacts['sites']['primary']): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
@@ -308,11 +304,19 @@ const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
  * days left are counted again for when the message goes (D-066 item 2).
  */
 function causeOf(i: IncidentFacts, now: Date): string | null {
-  const detected = i.incident_events?.find((e) => e.type === 'detected');
+  const events = i.incident_events ?? [];
+  // D-067: after a new cause, the latest one is the incident's cause.
+  const newCause = events
+    .filter((e) => e.type === 'new_cause')
+    .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''))
+    .at(-1);
+  const detected = newCause ?? events.find((e) => e.type === 'detected');
   const ctx = detected ? contextOf(detected.payload) : {};
   const manual = manualOf(ctx);
   if (manual) return manualCause(manual);
-  const expiry = expiryNow(ctx.detail, now);
+  // Counted to the recovery once it recovered (a renewed certificate never reads "expired 12 days ago").
+  const asOf = i.recovered_at ? new Date(Math.min(now.getTime(), Date.parse(i.recovered_at))) : now;
+  const expiry = expiryNow(ctx.detail, asOf);
   if (expiry) return expiry.cause;
   return typeof ctx.cause === 'string' ? ctx.cause : null;
 }
@@ -487,9 +491,8 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
     }
     case 'down_again':
     case 'problem_again':
-      return againAlert(n, i, now);
-    case 'problem_new_cause':
-      return newCauseAlert(n, i);
+      // D-067: a new cause rides problem_again (its SQL lists), marked in the context.
+      return ctx.newCause === true ? newCauseAlert(n, i) : againAlert(n, i, now);
     case 'note':
       return buildNoteAlert({ site: i.sites.name, by: str(ctx.by, 'someone'), text: str(ctx.text, '') });
     case 'resolved':
@@ -716,24 +719,24 @@ export function renderEmail(
     // The D-016 fallback when the Chat reply failed, or (D-047) the owner's first email: the reply's words.
     case 'down_again':
     case 'problem_again': {
+      // D-067: a new cause rides problem_again (its SQL lists) and has its own email — not an AGAIN.
+      if (ctx.newCause === true) {
+        return buildNewCauseEmail({
+          ...base,
+          now:
+            TRIGGER_LABELS[(typeof ctx.trigger === 'string' ? ctx.trigger : i.trigger) as Trigger] ??
+            'Problem',
+          was: TRIGGER_LABELS[str(ctx.was, 'ssl') as Trigger] ?? 'SSL expiring',
+          cause: str(ctx.cause, 'Problem'),
+          acknowledged,
+        });
+      }
       const chat = againAlert(n, i);
       const card = chat.cardsV2[0]!.card;
       const body = card.sections[0]?.widgets[0];
       return buildAgainEmail({
         ...base,
         severity: n.template === 'down_again' ? 'down' : 'problem',
-        title: card.header.title,
-        body: body && 'textParagraph' in body ? body.textParagraph.text.replace(/&lt;/g, '<') : '',
-        acknowledged,
-      });
-    }
-    // D-067: the L0 email carries the reply's words, as the AGAIN emails do.
-    case 'problem_new_cause': {
-      const card = newCauseAlert(n, i).cardsV2[0]!.card;
-      const body = card.sections[0]?.widgets[0];
-      return buildAgainEmail({
-        ...base,
-        severity: 'problem',
         title: card.header.title,
         body: body && 'textParagraph' in body ? body.textParagraph.text.replace(/&lt;/g, '<') : '',
         acknowledged,

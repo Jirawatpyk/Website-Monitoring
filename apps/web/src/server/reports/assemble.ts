@@ -96,6 +96,8 @@ export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date, 
       if (e.type === 'escalated_to_down') return severity === 'down';
       if (e.type === 'relapsed') return payloadOf(e).severity === severity;
       if (e.type === 'detected') return (raised ? 'problem' : row.severity) === severity;
+      // D-067: a new cause words the PROBLEM drop it joined from then on.
+      if (e.type === 'new_cause') return severity === 'problem';
       return false;
     })
     .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''));
@@ -106,7 +108,14 @@ export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date, 
   // Reported down by hand (D-055 item 7): no probe cause, so never "Hard fail" (/verify S14).
   if (p.manual === true) return TRIGGER_LABELS.manual;
   // S13 (spec §36, D-066 item 2): "SSL expiring — 8 days left", counted at the report's time.
-  const expiry = severity === 'problem' ? expiryNow(p.detail, now) : null;
+  // Counted to the recovery once it recovered: a renewed certificate never reads "expired".
+  // The first `recovered` after the drop's opening event ends the count.
+  const recoveredAt = row.events
+    .filter((e) => e.type === 'recovered' && !!e.at && (!pick?.at || e.at >= pick.at))
+    .map((e) => Date.parse(e.at!))
+    .sort((a, b) => a - b)[0];
+  const asOf = recoveredAt !== undefined ? new Date(Math.min(now.getTime(), recoveredAt)) : now;
+  const expiry = severity === 'problem' ? expiryNow(p.detail, asOf) : null;
   if (expiry) return expiry.label;
   if (severity === 'problem' && typeof p.summary === 'string' && p.summary.trim()) return p.summary.trim();
   if (severity === 'down' && typeof p.cause === 'string' && p.cause.trim()) return shortCause(p.cause);

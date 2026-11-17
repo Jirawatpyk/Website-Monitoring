@@ -47,7 +47,8 @@ select is(
 );
 select is(
   (select count(*)::int from public.notifications where incident_id = '00000000-0000-0000-0000-0000000000e1'
-     and template = 'problem_new_cause' and channel = 'google_chat' and hold_until is null),
+     and template = 'problem_again' and channel = 'google_chat' and hold_until is null
+     and (context ->> 'newCause')::boolean and dedupe_key like 'new_cause:%'),
   1, 'one Chat reply, posted now'
 );
 select ok(
@@ -56,7 +57,7 @@ select ok(
 );
 select is(
   (select count(*)::int from public.notifications where incident_id = '00000000-0000-0000-0000-0000000000e1'
-     and template = 'problem_new_cause' and channel = 'email'
+     and template = 'problem_again' and channel = 'email'
      and user_id = (select id from ids where name = 'arm') and hold_until > now()),
   1, 'the owner (L0) gets the email after the 5-min grace'
 );

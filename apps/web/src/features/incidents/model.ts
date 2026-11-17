@@ -1000,7 +1000,9 @@ export function timelineOf(
         return;
       }
       case 'alerted': {
-        const word = TEMPLATE_WORDS[str(e.payload.template) ?? ''] ?? 'Alert';
+        // D-067: a new cause rides problem_again but is neither an AGAIN nor part of a flapping cycle.
+        const newCause = e.payload.newCause === true;
+        const word = newCause ? 'New cause' : (TEMPLATE_WORDS[str(e.payload.template) ?? ''] ?? 'Alert');
         item(
           e,
           'alert',
@@ -1008,7 +1010,7 @@ export function timelineOf(
             ? `${word} emailed to ${nameOf(str(e.payload.user_id))}`
             : `${word} posted in Chat`,
           null,
-          CYCLE_TEMPLATES.has(str(e.payload.template) ?? '') ? 'between' : undefined,
+          !newCause && CYCLE_TEMPLATES.has(str(e.payload.template) ?? '') ? 'between' : undefined,
         );
         return;
       }

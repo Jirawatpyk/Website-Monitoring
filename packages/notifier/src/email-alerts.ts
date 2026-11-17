@@ -1038,6 +1038,47 @@ export function buildAgainEmail(input: AgainEmailInput): EmailMessage {
   });
 }
 
+export interface NewCauseEmailInput extends EmailBaseInput {
+  /** The new trigger's words ("Keyword") and what the incident was open for ("SSL expiring"). */
+  now: string;
+  was: string;
+  /** The full cause: "Found “บาคาร่า” on / (as Googlebot)". */
+  cause: string;
+  acknowledged?: { by: string; at: Date } | null;
+}
+
+/**
+ * D-067: an incident open for an SSL / domain expiry took a more urgent PROBLEM as its cause. In the
+ * incident's thread, to L0 after the D-047 grace (or as the fallback when the Chat reply failed).
+ * Nothing recovered, so not an AGAIN: "has a new problem".
+ */
+export function buildNewCauseEmail(input: NewCauseEmailInput): EmailMessage {
+  const inc = formatIncidentId(input.incidentNumber);
+  const what = `${input.cause}. ${input.site} was already open as ${inc} for ${input.was}; this new problem joins it.`;
+  return render(input, {
+    template: 'problem_again',
+    color: C.warning,
+    bar: C.warning,
+    label: 'PROBLEM',
+    pre: `${input.site} · new cause: ${input.now} · was ${input.was} · same incident ${inc}`,
+    headline: `${input.site} has a new problem`,
+    lede: !isL0(input.reason)
+      ? `${what} The Google Chat reply couldn’t be delivered, so this email is the alert.`
+      : input.acknowledged
+        ? `${what} ${input.acknowledged.by} acknowledged it at ${formatTime(input.acknowledged.at)}.`
+        : `${what} ${yourPart(input.reason, input.site)} — please acknowledge or hand it over in the Chat thread.`,
+    facts: [
+      ['New cause', input.now],
+      ['Was', input.was],
+      ['Same incident', inc],
+    ],
+    buttons:
+      isL0(input.reason) && !input.acknowledged
+        ? [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }]
+        : [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
+  });
+}
+
 /**
  * RESOLVED email (EmailAlert "Resolved email", spec §16.5, D-033): in the incident's thread to
  * everyone emailed about it, after the 10 s Undo window. Says who resolved it and the root cause —

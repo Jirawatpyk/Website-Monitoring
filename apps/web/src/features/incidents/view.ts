@@ -107,6 +107,14 @@ const str = (v: unknown) => (typeof v === 'string' ? v : null);
 const num = (v: unknown) => (typeof v === 'number' ? v : null);
 
 /** Who may acknowledge this incident (D-016, `mayAcknowledge`). */
+/** D-067: the newest `new_cause` event, if the incident took one. */
+function latestNewCause(events: readonly EventRow[]): EventRow | undefined {
+  return events
+    .filter((e) => e.type === 'new_cause')
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .at(-1);
+}
+
 export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
   return mayAcknowledge(viewer, {
     primaryOwnerId: i.sites.primary_owner_id,
@@ -249,7 +257,9 @@ export function buildIncidentView(
     cause:
       detected?.payload.manual === true
         ? `Opened by ${str(detected.payload.openedBy) ?? 'someone'} from a hand check${str(detected.payload.note) ? ` · “${str(detected.payload.note)}”` : ''}`
-        : (expiryNow(detected?.payload.detail, now)?.cause ??
+        : // D-067: after a new cause, its words; an expiry's days counted to the recovery.
+          (str(latestNewCause(events)?.payload.cause) ??
+          expiryNow(detected?.payload.detail, i.recovered_at ? new Date(i.recovered_at) : now)?.cause ??
           str(detected?.payload.cause) ??
           TRIGGER_LABELS[i.trigger]),
     siteUrl: i.sites.monitors.find((m) => m.is_primary)?.url ?? null,
