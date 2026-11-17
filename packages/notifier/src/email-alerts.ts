@@ -1045,6 +1045,8 @@ export interface NewCauseEmailInput extends EmailBaseInput {
   /** The full cause: "Found “บาคาร่า” on / (as Googlebot)". */
   cause: string;
   acknowledged?: { by: string; at: Date } | null;
+  /** A DOWN incident back up with the expiry its only problem (Tao, 17 Nov). */
+  afterDown?: boolean;
 }
 
 /**
@@ -1054,7 +1056,9 @@ export interface NewCauseEmailInput extends EmailBaseInput {
  */
 export function buildNewCauseEmail(input: NewCauseEmailInput): EmailMessage {
   const inc = formatIncidentId(input.incidentNumber);
-  const what = `${input.cause}. ${input.site} was already open as ${inc} for ${input.was}; this new problem joins it.`;
+  const what = input.afterDown
+    ? `${input.cause}. ${input.site} was back up in ${inc} with ${input.was} still open; this new problem joins it.`
+    : `${input.cause}. ${input.site} was already open as ${inc} for ${input.was}; this new problem joins it.`;
   return render(input, {
     template: 'problem_again',
     color: C.warning,

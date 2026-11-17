@@ -138,6 +138,30 @@ describe('render — a new cause (D-067)', () => {
     expect(email.text).not.toMatch(/Trigger:?\s+Keyword/);
   });
 
+  it('Tier 1 at night: the person on call the row names, and their email says why (Tao, 17 Nov)', () => {
+    const night = {
+      ...context,
+      mention: { id: 'u-oncall', name: 'Arm', chatUserId: 'ARM' },
+    };
+    const m = renderChat(row({ context: night }), incident, appUrl, now)!;
+    expect(m.text).toMatch(/^<users\/ARM> PROBLEM · DxT AI/);
+    const email = renderEmail(
+      row({ channel: 'email', user_id: 'u-oncall', context: night }),
+      incident,
+      { id: 'u-oncall', email: 'arm@example.test', display_name: 'Arm' },
+      appUrl,
+      thread,
+    )!;
+    expect(email.text).not.toContain('couldn’t be delivered');
+  });
+
+  it('a DOWN incident back up on SSL: the body says so, not “open for SSL expiring”', () => {
+    const m = renderChat(row({ context: { ...context, afterDown: true } }), incident, appUrl, now)!;
+    const body = JSON.stringify(m.cardsV2);
+    expect(body).toContain('was back up in INC-0136 with SSL expiring still open');
+    expect(body).not.toContain('was already open');
+  });
+
   it('a plain PROBLEM AGAIN row is still an AGAIN reply', () => {
     const m = renderChat(row({ context: { summary: 'slow, p50 5.4 s' } }), incident, appUrl, now)!;
     expect(m.text).toContain('PROBLEM AGAIN');

@@ -84,7 +84,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 5. **Mute (new):** a new cause during a mute is held until the mute ends, then sent (cancelled if it cleared or the incident recovered by then). An incident whose first card a mute silenced gets one first card after the mute, worded with the cause it carries then (`engine_post_late_alert` reads the `new_cause` event too), never a card plus a reply.
 
 6. **Three more answers (Tao, 17 Nov, after the third review):**
-   - **On-call at night:** a Tier 1 new cause outside response hours that nobody acknowledged @mentions and emails the person on call (`incidents.l0_user_id` re-set at the new cause, as the late card after a mute does).
+   - **On-call at night:** a Tier 1 new cause outside response hours that nobody acknowledged @mentions and emails the person on call — named on that reply and its email only (`context.mention`); the incident's L0 stays, so the owner's later emails and the next day's new cause go to the owner as before (message-checker, fourth check).
    - **After a DOWN:** a DOWN incident back up whose only failing verdict is the expiry (a PROBLEM AGAIN into SSL) takes a new cause and goes back to it as a PROBLEM incident does — its own trigger (hard_fail / manual) kept, the expiry passed by the engine (`p_was`) — and doesn't block a window or a mute either.
    - **After a mute:** a Tier 1 expiry card a mute silenced waits for the opening (09:00) with the owner as L0; a more urgent cause by then goes at once.
    - The cause came from an expiry is one flag on the incident (`incidents.expiry_left`): set by a new cause, cleared by going back or a PROBLEM AGAIN. A new cause is told at most once per 30 min for the same trigger, page and words, per channel.

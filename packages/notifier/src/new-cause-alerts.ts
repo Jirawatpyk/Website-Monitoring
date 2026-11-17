@@ -18,6 +18,8 @@ export interface NewCauseAlertInput {
   /** Whoever acts now: the person who acknowledged, else the L0 person. */
   mention: ChatPerson | null;
   ackedBy: string | null;
+  /** A DOWN incident back up with the expiry its only problem (Tao, 17 Nov): its trigger is kept. */
+  afterDown?: boolean;
   /** When the new cause was seen (the round). */
   at: Date;
 }
@@ -35,8 +37,10 @@ export function buildNewCauseAlert(input: NewCauseAlertInput): ChatMessage {
   const now = TRIGGER_LABELS[input.trigger];
   const ack = input.ackedBy ? plainName(input.ackedBy) : null;
   const body =
-    `${input.cause}. ${site} was already open as ${inc} for ${was}; this new problem joins it, ` +
-    `and the incident now reads ${now}.` +
+    (input.afterDown
+      ? `${input.cause}. ${site} was back up in ${inc} with ${was} still open; this new problem joins it.`
+      : `${input.cause}. ${site} was already open as ${inc} for ${was}; this new problem joins it, ` +
+        `and the incident now reads ${now}.`) +
     (ack ? ` ${ack} acknowledged earlier, so only ${ack} is mentioned.` : '');
   return {
     text: buildChatTextLine({

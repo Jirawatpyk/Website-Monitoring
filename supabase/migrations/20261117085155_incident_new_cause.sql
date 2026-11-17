@@ -41,7 +41,8 @@ declare
   v_was public.incident_trigger;
   v_state public.incident_state;
   v_severity public.severity;
-  v_l0 uuid;
+  v_column public.incident_trigger;
+  v_oncall uuid;
   v_recent_chat boolean;
   v_recent_mail boolean;
   v_hold timestamptz := case when p_hold_until > now() then p_hold_until end;
@@ -51,8 +52,8 @@ begin
   -- An incident on a PROBLEM drop about an expiry, and only for a cause that isn't one: a PROBLEM
   -- incident whose trigger (the cause it carries now, kept by every writer) is the expiry, or a DOWN
   -- incident whose PROBLEM drop the engine saw as the expiry (`p_was`, Tao 17 Nov).
-  select i.site_id, case when i.severity = 'down' then p_was else i.trigger end, i.state, i.severity, i.l0_user_id
-    into v_site_id, v_was, v_state, v_severity, v_l0
+  select i.site_id, case when i.severity = 'down' then p_was else i.trigger end, i.state, i.severity, i.trigger
+    into v_site_id, v_was, v_state, v_severity, v_column
   from public.incidents i
   where i.id = p_incident_id
     and p_trigger not in ('ssl', 'domain')
@@ -69,12 +70,15 @@ begin
   update public.incidents i
     set trigger = case when v_severity = 'problem' then p_trigger else i.trigger end,
         expiry_left = true,
-        monitor_id = case when v_severity = 'problem' then coalesce(p_monitor_id, i.monitor_id) else i.monitor_id end,
-        -- Tier 1 at night, nobody acknowledged: whoever is on call now is L0 for this cause.
-        l0_user_id = case when p_outside_hours and s.tier = 1 and v_state <> 'acknowledged'
-                          then coalesce(public.oncall_person_at(p_round_at), i.l0_user_id) else i.l0_user_id end
-    from public.sites s
-    where i.id = p_incident_id and s.id = i.site_id;
+        monitor_id = case when v_severity = 'problem' then coalesce(p_monitor_id, i.monitor_id) else i.monitor_id end
+    where i.id = p_incident_id;
+
+  -- Tao, 17 Nov: a Tier 1 new cause at night that nobody acknowledged is told to whoever is on call now.
+  -- Only this reply and its email name them: the incident's L0 (the owner's emails, RECOVERED) is kept.
+  if p_outside_hours and v_state <> 'acknowledged'
+     and (select s.tier from public.sites s where s.id = v_site_id) = 1 then
+    v_oncall := public.oncall_person_at(p_round_at);
+  end if;
 
   insert into public.incident_events (incident_id, type, payload, at)
   values (p_incident_id, 'new_cause',
@@ -83,11 +87,16 @@ begin
 
   insert into public.audit_log (action, entity, entity_id, before, after)
   values ('incident.new_cause', 'incident', p_incident_id,
-          jsonb_build_object('trigger', v_was, 'state', v_state, 'l0_user_id', v_l0),
-          jsonb_build_object('trigger', p_trigger, 'state', v_state,
-                             'l0_user_id', (select l0_user_id from public.incidents where id = p_incident_id)));
+          -- The column as it was and is (a DOWN incident keeps hard_fail / manual), and the cause.
+          jsonb_build_object('trigger', v_column, 'cause', v_was, 'state', v_state),
+          jsonb_build_object('trigger', case when v_severity = 'problem' then p_trigger else v_column end,
+                             'cause', p_trigger, 'state', v_state));
 
-  v_ctx := coalesce(p_context, '{}') || jsonb_build_object('trigger', p_trigger, 'was', v_was, 'newCause', true);
+  v_ctx := coalesce(p_context, '{}') || jsonb_build_object('trigger', p_trigger, 'was', v_was, 'newCause', true,
+    'afterDown', v_severity = 'down')
+    || coalesce((select jsonb_build_object('mention', jsonb_build_object(
+                  'id', p.id, 'name', p.display_name, 'chatUserId', p.google_chat_user_id))
+                 from public.profiles p where p.id = v_oncall and p.is_active), '{}');
 
   -- A cause that comes and goes (a key page flipping) is told once per 30 min, per channel: the same
   -- trigger, page and words with a reply (or an L0 email) not cancelled is not posted (or emailed) again.
@@ -98,6 +107,7 @@ begin
       and coalesce((n.context ->> 'newCause')::boolean, false) and n.context ->> 'trigger' = p_trigger::text
       and n.context ->> 'monitorUrl' is not distinct from p_context ->> 'monitorUrl'
       and n.context ->> 'summary' is not distinct from p_context ->> 'summary'
+      and n.context -> 'mention' ->> 'id' is not distinct from v_ctx -> 'mention' ->> 'id'
       and n.status <> 'cancelled' and n.created_at > now() - interval '30 minutes');
   v_recent_mail := exists (
     select 1 from public.notifications n
@@ -105,6 +115,7 @@ begin
       and coalesce((n.context ->> 'newCause')::boolean, false) and n.context ->> 'trigger' = p_trigger::text
       and n.context ->> 'monitorUrl' is not distinct from p_context ->> 'monitorUrl'
       and n.context ->> 'summary' is not distinct from p_context ->> 'summary'
+      and n.context -> 'mention' ->> 'id' is not distinct from v_ctx -> 'mention' ->> 'id'
       and n.status <> 'cancelled' and n.created_at > now() - interval '30 minutes');
 
   if p_notify and not v_recent_chat then
@@ -120,7 +131,13 @@ begin
     on conflict do nothing;
   end if;
 
-  if p_notify and not v_recent_mail then
+  if p_notify and not v_recent_mail and v_ctx ? 'mention' then
+    -- At night: the person on call, as the reply (D-047 grace kept).
+    insert into public.notifications (incident_id, user_id, channel, template, thread_key, context, dedupe_key, hold_until)
+    values (p_incident_id, v_oncall, 'email', 'problem_again', p_incident_id::text, v_ctx, v_key,
+            greatest(v_hold, now() + interval '5 minutes'))
+    on conflict do nothing;
+  elsif p_notify and not v_recent_mail then
     perform public.engine_queue_l0_emails(
       p_incident_id, 'problem_again', v_ctx,
       greatest(v_hold, now() + interval '5 minutes'), v_key, false);

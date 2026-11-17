@@ -233,10 +233,19 @@ function newCauseAlert(n: Notification, i: IncidentFacts): ChatMessage {
     cause: str(ctx.cause, 'Problem'),
     mention: acked
       ? { name: i.acker!.display_name, chatUserId: i.acker!.google_chat_user_id ?? null }
-      : person(l0Of(i)),
+      : (nightMention(ctx) ?? person(l0Of(i))),
     ackedBy: acked ? i.acker!.display_name : null,
+    afterDown: ctx.afterDown === true,
     at: new Date(n.created_at),
   });
+}
+
+/** D-067 (Tao, 17 Nov): the person on call a Tier 1 new cause at night names, stored with the row. */
+function nightMention(ctx: Record<string, unknown>): ChatPerson | null {
+  const m = ctx.mention as { name?: unknown; chatUserId?: unknown } | undefined;
+  return m && typeof m.name === 'string'
+    ? { name: m.name, chatUserId: typeof m.chatUserId === 'string' ? m.chatUserId : null }
+    : null;
 }
 
 /** RESOLVED (D-033): who, when and the root cause, as `resolve_incident` stored them with the message. */
@@ -533,6 +542,9 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   if (n.template === 'acknowledged' && contextOf(n.context).ackedById === n.user_id) return 'acked';
   // A step's own email (its people); the Chat fallback goes to the backup and Admins (D-016).
   if (n.template === 'step_fired') return contextOf(n.context).fallback === true ? 'fallback' : 'step';
+  // A Tier 1 new cause at night: the person on call it named (D-067).
+  const mention = contextOf(n.context).mention as { id?: unknown } | undefined;
+  if (n.template === 'problem_again' && mention?.id && mention.id === n.user_id) return 'oncall';
   if (l0Of(i)?.id === n.user_id) return l0IsOnCall(i) ? 'oncall' : 'owner';
   // Someone the L0 pencil adds (S10): told at once by email too, then followed up like anyone emailed.
   if (n.user_id && l0PeopleOf(i).includes(n.user_id)) return L0_TEMPLATES.has(n.template) ? 'l0' : 'emailed';
@@ -739,6 +751,7 @@ export function renderEmail(
           was: TRIGGER_LABELS[str(ctx.was, 'ssl') as Trigger] ?? 'SSL expiring',
           cause: str(ctx.cause, 'Problem'),
           acknowledged,
+          afterDown: ctx.afterDown === true,
         });
       }
       const chat = againAlert(n, i);
