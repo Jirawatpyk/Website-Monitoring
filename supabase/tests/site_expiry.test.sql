@@ -1,7 +1,7 @@
 -- S13 (D-066): site_expiry — RLS (staff read, nobody but the service role writes) and its checks.
 begin;
 \ir _helpers.psql
-select plan(9);
+select plan(13);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -15,9 +15,11 @@ insert into public.clients (id, name) values ('00000000-0000-0000-0000-000000000
 insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
   ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', 'Live', 1,
    (select id from ids where name = 'arm'), true);
-insert into public.site_expiry (site_id, host, domain, ssl_expires_at, ssl_read_at, ssl_checked_at) values
+insert into public.site_expiry (site_id, host, domain, ssl_expires_at, ssl_valid_from, ssl_read_at, ssl_checked_at,
+  domain_expires_at, domain_source, domain_read_at) values
   ('00000000-0000-0000-0000-0000000000a1', 'www.a.pgtap.test', 'a.pgtap.test',
-   now() + interval '20 days', now(), now());
+   now() + interval '20 days', now() - interval '70 days', now(), now(),
+   now() + interval '200 days', 'rdap', now());
 
 select throws_ok(
   $$insert into public.site_expiry (site_id, host) values ('00000000-0000-0000-0000-0000000000a1', 'x.test')$$,
@@ -30,6 +32,18 @@ select throws_ok(
 select throws_ok(
   $$update public.site_expiry set domain_source = 'dns'$$,
   '23514', null, 'the domain source is RDAP or WHOIS'
+);
+select throws_ok(
+  $$update public.site_expiry set domain_expires_at = null$$,
+  '23514', null, 'a good domain read has its date'
+);
+select throws_ok(
+  $$update public.site_expiry set domain_source = null$$,
+  '23514', null, 'and its source'
+);
+select throws_ok(
+  $$update public.site_expiry set ssl_error = repeat('x', 301)$$,
+  '23514', null, 'an error is at most 300 characters'
 );
 
 -- ── Who reads ─────────────────────────────────────────────────────────────
@@ -50,6 +64,10 @@ select is((select count(*)::int from public.site_expiry), 0, 'a client account r
 
 select tests.as_anon();
 select throws_ok($$select * from public.site_expiry$$, '42501', null, 'anon is refused');
+reset role;
+
+delete from public.sites where id = '00000000-0000-0000-0000-0000000000a1';
+select is((select count(*)::int from public.site_expiry), 0, 'the row goes with its site');
 
 select * from finish();
 rollback;

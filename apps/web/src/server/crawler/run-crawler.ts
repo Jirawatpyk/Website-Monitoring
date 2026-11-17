@@ -11,6 +11,7 @@ import {
 } from '@dxt/shared';
 import { isAllowedHost } from '@dxt/engine';
 import type { CronJobResult } from '../cron-job';
+import { inBatches } from '../in-batches';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 
 /** The crawler runs from Singapore only (vercel.json `functions`); it is a view, not a location (D-041). */
@@ -194,18 +195,4 @@ export async function runCrawler({
     ...(ran.length > done.length ? { skipped: ran.length - done.length } : {}),
     ...(hits.length ? { hits } : {}),
   };
-}
-
-/** Runs `work` over `items`, at most `limit` at a time, keeping the input order. */
-async function inBatches<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  const lane = async () => {
-    while (next < items.length) {
-      const i = next++;
-      out[i] = await work(items[i] as T);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
-  return out;
 }

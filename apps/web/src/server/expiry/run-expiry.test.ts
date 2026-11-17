@@ -13,9 +13,10 @@ const monitor = (site: string, url: string) => ({
   site_id: site,
   sites: { name: site, is_active: true },
 });
-const goodRow = (site: string, host: string) => ({
+const goodRow = (site: string, host: string, domain: string | null = host.replace(/^www\./, '')) => ({
   site_id: site,
   host,
+  domain,
   ssl_read_at: '2026-11-16T23:00:00Z',
   ssl_error: null,
   domain_read_at: '2026-11-16T23:00:00Z',
@@ -67,6 +68,19 @@ describe('needsRead (between full reads)', () => {
     ['no row yet', site({ row: null }), true],
     ['the host changed', site({ host: 'voca.co.th' }), true],
     ['an expiry PROBLEM is open (a renewal recovers within the hour)', site({ openExpiry: true }), true],
+    [
+      'a domain no registry here can read (an IP host) is not retried hourly',
+      site({
+        host: '203.0.113.9',
+        domain: '203.0.113.9',
+        row: {
+          ...goodRow('s', '203.0.113.9'),
+          domain_error: 'No registry lookup for .9',
+          domain_read_at: null,
+        },
+      }),
+      false,
+    ],
     [
       'the last SSL read failed',
       site({ row: { ...goodRow('s', 'www.voca.co.th'), ssl_error: 'Timeout' } }),
@@ -140,7 +154,7 @@ describe('runExpiry', () => {
     expect(voca).not.toHaveProperty('ssl_expires_at');
   });
 
-  it('a host that moved drops the dates read from the old one when the new read fails', async () => {
+  it('a host that moved drops the certificate dates read from the old one; the same domain keeps its own', async () => {
     const { db, calls } = setup({
       monitors: [monitor('voca', 'https://voca.co.th/')],
       rows: [goodRow('voca', 'www.voca.co.th')],
@@ -161,9 +175,57 @@ describe('runExpiry', () => {
       ssl_expires_at: null,
       ssl_read_at: null,
       domain_error: 'RDAP 503',
+    });
+    expect(calls.find((c) => c.op === 'upsert')!.values).not.toHaveProperty('domain_expires_at');
+  });
+
+  it('a domain that changed drops its old dates when the new read fails', async () => {
+    const { db, calls } = setup({
+      monitors: [monitor('voca', 'https://www.voca.com/')],
+      rows: [goodRow('voca', 'www.voca.co.th')],
+    });
+    await runExpiry({
+      db,
+      readCert: async () => cert,
+      readDomain: async () => {
+        throw new ExpiryReadError('RDAP 503');
+      },
+      clock: () => NOW,
+    });
+    expect(calls.find((c) => c.op === 'upsert')!.values).toMatchObject({
+      domain: 'voca.com',
       domain_expires_at: null,
+      domain_source: null,
       domain_read_at: null,
     });
+  });
+
+  it('an http:// home page has no certificate to read: left out', async () => {
+    const { db } = setup({ monitors: [monitor('plain', 'http://plain.example.test/')] });
+    const readCert = vi.fn(async (_host: string) => cert);
+    expect(await runExpiry({ db, all: true, readCert, readDomain: async () => domain })).toMatchObject({
+      sites: 0,
+      read: 0,
+    });
+    expect(readCert).not.toHaveBeenCalled();
+  });
+
+  it('no read starts after the budget; those sites wait for the next run', async () => {
+    const { db, calls } = setup();
+    // The first site's read takes 41 s (its lane starts the moment the run does); the two sites
+    // after it start past the 40 s budget.
+    let t = AT_SIX;
+    const out = await runExpiry({
+      db,
+      readCert: async () => {
+        t += 41_000;
+        return cert;
+      },
+      readDomain: async () => domain,
+      clock: () => t,
+    });
+    expect(out).toMatchObject({ ok: true, read: 1, skipped: 2 });
+    expect(calls.filter((c) => c.op === 'upsert')).toHaveLength(1);
   });
 
   it('a host with no registrable domain still reads its certificate', async () => {
@@ -181,14 +243,27 @@ describe('runExpiry', () => {
     expect(calls.find((c) => c.op === 'upsert')!.values).toMatchObject({ domain: '203.0.113.9' });
   });
 
-  it('a write that fails fails the run', async () => {
+  it('a write that fails is named and fails the run, the other sites still written', async () => {
     const fake = fakeDb({
-      'monitors.select': { data: [monitor('voca', 'https://www.voca.co.th/')] },
-      'site_expiry.upsert': { error: { message: 'boom' } },
+      'monitors.select': {
+        data: [monitor('voca', 'https://www.voca.co.th/'), monitor('eqho', 'https://eqho.com/')],
+      },
+      'site_expiry.upsert': (call) =>
+        (call.values as { site_id: string }).site_id === 'voca'
+          ? { error: { message: 'boom' } }
+          : { data: null },
     });
-    await expect(
-      runExpiry({ db: fake.db, all: true, readCert: async () => cert, readDomain: async () => domain }),
-    ).rejects.toThrow('site_expiry voca: boom');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const out = await runExpiry({
+      db: fake.db,
+      all: true,
+      readCert: async () => cert,
+      readDomain: async () => domain,
+    });
+    expect(out).toMatchObject({ ok: false, unwritten: ['voca'], sslRead: 2 });
+    expect(fake.calls.filter((c) => c.op === 'upsert')).toHaveLength(2);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('expiry_write_failed'));
+    error.mockRestore();
   });
 
   it.each(['monitors', 'site_expiry', 'incidents'])('a failed %s read fails the run', async (table) => {

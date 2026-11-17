@@ -136,7 +136,7 @@ export type Verdict = z.input<typeof verdictSchema>;
  */
 export const rdapDomainSchema = z.object({
   events: z
+    // No count cap: the reader already caps the answer at 64 KB.
     .array(z.object({ eventAction: z.string().max(64), eventDate: z.string().max(64) }))
-    .max(50)
     .default([]),
 });

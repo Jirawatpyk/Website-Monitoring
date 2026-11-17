@@ -4,6 +4,8 @@ import { createServer as createTlsServer } from 'node:tls';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   EXPIRY_MAX_BYTES,
+  cleanText,
+  hasRegistryLookup,
   ExpiryReadError,
   parseRdapExpiry,
   parseWhoisExpiry,
@@ -49,6 +51,13 @@ describe('readCertificate', () => {
     expect(read.validFrom.toISOString()).toBe('2026-10-12T18:05:21.000Z');
     expect(read.issuer).toBe('pinned.test');
   });
+
+  it.each(['127.0.0.1', '169.254.169.254', '10.0.0.5'])(
+    'refuses the IP literal %s at once (a literal does no lookup, so the lookup guard never sees it)',
+    async (ip) => {
+      await expect(readCertificate(ip, { port })).rejects.toThrow(new ExpiryReadError('Address not allowed'));
+    },
+  );
 
   it('refuses a private address unless allowed (the probes’ SSRF guard)', async () => {
     await expect(readCertificate('pinned.test', { port, lookup: local })).rejects.toThrow(
@@ -208,6 +217,48 @@ describe('readDomainExpiry', () => {
     ).rejects.toThrow('WHOIS unreachable');
   });
 
+  it('a chunked answer is refused at the cap, not after reading it whole', async () => {
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        pulled++;
+        c.enqueue(new Uint8Array(16 * 1024));
+      },
+    });
+    await expect(readDomainExpiry('a.com', { fetch: async () => new Response(body) })).rejects.toThrow(
+      'RDAP answer too large',
+    );
+    expect(pulled).toBeLessThanOrEqual(6);
+  });
+
+  it('a body that stalls past the timeout reads as Timeout', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.error(Object.assign(new Error('aborted'), { name: 'TimeoutError' }));
+      },
+    });
+    await expect(readDomainExpiry('a.com', { fetch: async () => new Response(body) })).rejects.toThrow(
+      'Timeout',
+    );
+    const broken = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.error(new Error('reset'));
+      },
+    });
+    await expect(readDomainExpiry('a.com', { fetch: async () => new Response(broken) })).rejects.toThrow(
+      'RDAP unreachable',
+    );
+  });
+
+  it('an answer with many events still finds its expiration', async () => {
+    const events = Array.from({ length: 80 }, (_, i) => ({
+      eventAction: 'transfer',
+      eventDate: `2010-01-${(i % 28) + 1}T00:00:00Z`,
+    }));
+    events.push({ eventAction: 'expiration', eventDate: '2027-05-21T04:08:18Z' });
+    expect(parseRdapExpiry(JSON.stringify({ events }))?.toISOString()).toBe('2027-05-21T04:08:18.000Z');
+  });
+
   it('a TLD with no lookup says so', async () => {
     await expect(readDomainExpiry('example.de')).rejects.toThrow('No registry lookup for .de');
   });
@@ -247,5 +298,20 @@ describe('whoisQuery', () => {
       await big.close();
       await silent.close();
     }
+  });
+});
+
+describe('cleanText, hasRegistryLookup', () => {
+  it('strips control characters (a NUL breaks a text write), trims and cuts', () => {
+    expect(cleanText('Evil\u0000 CA\n', 200)).toBe('Evil CA');
+    expect(cleanText('x'.repeat(250), 200)).toHaveLength(200);
+    expect(cleanText(undefined, 10)).toBe('');
+    expect(new ExpiryReadError('\u0000').message).toBe('Read failed');
+  });
+  it('knows which domains a registry here can read', () => {
+    expect(hasRegistryLookup('voca.co.th')).toBe(true);
+    expect(hasRegistryLookup('muvmi.co')).toBe(true);
+    expect(hasRegistryLookup('example.de')).toBe(false);
+    expect(hasRegistryLookup('203.0.113.9')).toBe(false);
   });
 });

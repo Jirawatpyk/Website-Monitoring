@@ -11,16 +11,30 @@
 import net from 'node:net';
 import tls from 'node:tls';
 import { rdapDomainSchema } from '@dxt/shared';
-import { defaultLookup, publicOnlyLookup, type Lookup } from './target';
+import { defaultLookup, isBlockedAddress, publicOnlyLookup, type Lookup } from './target';
 
 export const EXPIRY_TIMEOUT_MS = 10_000;
 /** An answer bigger than this is refused: a registry's domain answer is a few KB. */
 export const EXPIRY_MAX_BYTES = 64 * 1024;
 
+/**
+ * Text from a host or registry, safe to store: no control characters (a NUL breaks a Postgres
+ * `text` write — security review S13), trimmed and cut to `max`.
+ */
+export function cleanText(s: string | null | undefined, max: number): string {
+  return (
+    (s ?? '')
+      // eslint-disable-next-line no-control-regex -- stripping them is the point
+      .replace(/[\u0000-\u001f\u007f]/g, '')
+      .trim()
+      .slice(0, max)
+  );
+}
+
 /** A read that failed; `message` is short and safe to store (≤ 300 characters). */
 export class ExpiryReadError extends Error {
   constructor(message: string) {
-    super(message.slice(0, 300));
+    super(cleanText(message, 300) || 'Read failed');
     this.name = 'ExpiryReadError';
   }
 }
@@ -43,6 +57,10 @@ export interface CertificateOptions {
 /** The host's leaf certificate dates. Throws ExpiryReadError. */
 export function readCertificate(host: string, opts: CertificateOptions = {}): Promise<CertificateRead> {
   const timeoutMs = opts.timeoutMs ?? EXPIRY_TIMEOUT_MS;
+  // An IP literal does no lookup, so the lookup's guard never sees it: check it here.
+  if (net.isIP(host) && !opts.allowPrivate && isBlockedAddress(host)) {
+    return Promise.reject(new ExpiryReadError('Address not allowed'));
+  }
   return new Promise((resolve, reject) => {
     let done = false;
     const finish = (err: Error | null, read?: CertificateRead) => {
@@ -72,7 +90,7 @@ export function readCertificate(host: string, opts: CertificateOptions = {}): Pr
         return finish(new ExpiryReadError('No certificate'));
       }
       const issuer = first(cert.issuer?.O) ?? first(cert.issuer?.CN) ?? null;
-      finish(null, { expiresAt, validFrom, issuer: issuer?.slice(0, 200) ?? null });
+      finish(null, { expiresAt, validFrom, issuer: cleanText(issuer, 200) || null });
     });
     socket.once('error', (err) => finish(err));
   });
@@ -166,9 +184,36 @@ export async function readDomainExpiry(domain: string, opts: DomainOptions = {})
 async function cappedText(res: Response): Promise<string> {
   const length = Number(res.headers.get('content-length') ?? 0);
   if (length > EXPIRY_MAX_BYTES) throw new ExpiryReadError('RDAP answer too large');
-  const text = await res.text();
-  if (text.length > EXPIRY_MAX_BYTES) throw new ExpiryReadError('RDAP answer too large');
-  return text;
+  if (!res.body) return '';
+  // Read chunk by chunk, so a chunked answer with no length is refused at the cap, not after.
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > EXPIRY_MAX_BYTES) {
+        await reader.cancel();
+        throw new ExpiryReadError('RDAP answer too large');
+      }
+      chunks.push(value);
+    }
+  } catch (err) {
+    if (err instanceof ExpiryReadError) throw err;
+    // The fetch's timeout signal also aborts the body.
+    throw new ExpiryReadError(
+      err instanceof Error && err.name === 'TimeoutError' ? 'Timeout' : 'RDAP unreachable',
+    );
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+/** Whether `domain`'s TLD has a pinned RDAP or WHOIS server (else reading it can never work). */
+export function hasRegistryLookup(domain: string): boolean {
+  const tld = domain.split('.').pop() ?? '';
+  return tld in RDAP_SERVERS || tld in WHOIS_SERVERS;
 }
 
 /** The `expiration` event of an RDAP domain answer, or null. */

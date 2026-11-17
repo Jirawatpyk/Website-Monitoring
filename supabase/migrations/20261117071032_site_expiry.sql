@@ -32,9 +32,13 @@ create table public.site_expiry (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  -- a good read has its date
-  constraint site_expiry_ssl_read check ((ssl_read_at is null) = (ssl_expires_at is null)),
-  constraint site_expiry_domain_read check ((domain_read_at is null) = (domain_expires_at is null))
+  -- a good read has its date (and its start / source); none without one
+  constraint site_expiry_ssl_read check (
+    (ssl_read_at is null) = (ssl_expires_at is null) and (ssl_read_at is null) = (ssl_valid_from is null)
+  ),
+  constraint site_expiry_domain_read check (
+    (domain_read_at is null) = (domain_expires_at is null) and (domain_read_at is null) = (domain_source is null)
+  )
 );
 
 create trigger site_expiry_set_updated_at before update on public.site_expiry
