@@ -126,6 +126,8 @@ export interface EngineSummary extends CronJobResult {
   settled: number;
   /** New drops that joined a recovered incident (D-004): DOWN AGAIN / PROBLEM AGAIN queued. */
   relapses: number;
+  /** D-067: expiry incidents that took a more urgent PROBLEM as their cause (only counted when one did). */
+  newCauses?: number;
   /** Blocked rounds handed to the browser verifier this run (one per monitor). */
   verifying: number;
   /** Monitors the verifier couldn't decide this run: PROBLEM (unverified) (D-001). */
@@ -256,7 +258,7 @@ export async function runEngine(
     db
       .from('incidents')
       .select(
-        'id, site_id, monitor_id, state, severity, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, is_manual, manual_at, root_cause_category, notifications(template)',
+        'id, site_id, monitor_id, state, severity, trigger, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, is_manual, manual_at, root_cause_category, notifications(template)',
       )
       .in('site_id', siteIds)
       .not('state', 'in', CLOSED_INCIDENT_STATES_IN),
@@ -505,6 +507,7 @@ export async function runEngine(
             startedAt: new Date(open.started_at),
             detectedAt: new Date(open.detected_at),
             isFlapping: open.is_flapping,
+            trigger: open.trigger,
           } satisfies OpenIncident)
         : null,
       // OK ↔ not-OK changes at incident steps (D-024): the 3rd in 30 min tags flapping.
@@ -575,7 +578,7 @@ export async function runEngine(
           summary.notified += 1;
         },
       );
-      if (applied) summary[applied] += 1;
+      if (applied) summary[applied] = (summary[applied] ?? 0) + 1;
       if (applied && applied !== 'settled') summary.notified += 1;
       // The site note follows the latest judged round (OK + note, unverified, or none).
       const next = decision.note ?? null;
@@ -1128,7 +1131,7 @@ async function apply(
   hours: ResponseHours,
   /** Counts the PROBLEM AGAIN a D-023 recovery queues in the same round. */
   relapsed: () => void = () => {},
-): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | null> {
+): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | 'newCauses' | null> {
   const at = now.toISOString();
   const incidentId = open?.id ?? null;
   // Inside a maintenance window with nothing open (D-036): the round is recorded, nothing opens and
@@ -1248,6 +1251,31 @@ async function apply(
       });
       if (error) throw new Error(`engine_escalate_incident: ${error.message}`);
       return data ? 'escalated' : null;
+    }
+
+    case 'new_cause': {
+      if (!incidentId) return null;
+      // D-067: the expiry incident takes the more urgent PROBLEM as its cause and the thread is told.
+      const ctx = causeContext(site, d.monitorId);
+      const { data, error } = await db.rpc('engine_new_cause_incident', {
+        p_incident_id: incidentId,
+        p_monitor_id: d.monitorId,
+        p_trigger: d.trigger,
+        p_round_at: d.roundAt.toISOString(),
+        p_context: {
+          cause: formatProblemCause(d.detail, ctx),
+          summary: formatProblemSummary(d.detail, ctx),
+          detail: d.detail as unknown as Json,
+          monitorUrl: ctx.monitorUrl,
+          ...keyPageContext(d.detail, ctx),
+          startedAt: startOf(d.startedAt),
+        },
+        p_notify: !site.muted && alertQueued,
+        ...holdFor(clockTierOf(site.tier, d.trigger), now, hours),
+        ...judged,
+      });
+      if (error) throw new Error(`engine_new_cause_incident: ${error.message}`);
+      return data ? 'newCauses' : null;
     }
 
     case 'relapse': {

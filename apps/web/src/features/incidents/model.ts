@@ -1119,6 +1119,20 @@ export function timelineOf(
           'Short PROBLEM, never acknowledged — no root cause needed',
         );
         return;
+      // D-067: the expiry incident took a more urgent PROBLEM as its cause.
+      case 'new_cause': {
+        const trig = str(e.payload.trigger);
+        const was = str(e.payload.was);
+        const label = (t: string | null) =>
+          t && t in TRIGGER_LABELS ? TRIGGER_LABELS[t as Trigger] : 'a problem';
+        item(
+          e,
+          'problem',
+          `New cause: ${label(trig)}`,
+          `${str(e.payload.cause) ?? label(trig)} · was ${label(was)}`,
+        );
+        return;
+      }
       case 'relapsed': {
         const down = e.payload.severity === 'down';
         // Down again by hand from the hand check (D-055 item 7).

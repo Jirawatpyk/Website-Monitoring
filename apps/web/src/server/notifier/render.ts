@@ -5,6 +5,7 @@ import {
   buildAcknowledgedEmail,
   buildAgainAlert,
   buildAgainEmail,
+  buildNewCauseAlert,
   buildAutoResolvedAlert,
   buildAutoResolvedEmail,
   buildFlapSummaryAlert,
@@ -70,7 +71,14 @@ import {
   toldAtOf,
 } from './ladder-facts';
 
-const L0_TEMPLATES = new Set(['down', 'problem', 'down_again', 'problem_again', 'flap_summary']);
+const L0_TEMPLATES = new Set([
+  'down',
+  'problem',
+  'down_again',
+  'problem_again',
+  'flap_summary',
+  'problem_new_cause',
+]);
 
 const person = (p: IncidentFacts['sites']['primary']): ChatPerson | null =>
   p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null;
@@ -211,6 +219,27 @@ function againAlert(n: Notification, i: IncidentFacts, now: Date = new Date(n.cr
     // S08: a Tier 2–3 DOWN AGAIN outside response hours says the timers are paused (D-034).
     pausedUntil: down && !acked ? (ladderFactsOf(i, now)?.pausedUntil ?? null) : null,
     manual: manualOf(ctx),
+  });
+}
+
+/** D-067: the expiry incident's new, more urgent cause — whoever acts now is mentioned (§19.3). */
+function newCauseAlert(n: Notification, i: IncidentFacts): ChatMessage {
+  const ctx = contextOf(n.context);
+  const acked = !!i.acked_at && !!i.acker;
+  return buildNewCauseAlert({
+    incidentId: i.id,
+    incidentNumber: i.number,
+    site: i.sites.name,
+    tier: i.sites.tier,
+    was: str(ctx.was, 'ssl') as IncidentFacts['trigger'],
+    trigger: (typeof ctx.trigger === 'string' ? ctx.trigger : i.trigger) as IncidentFacts['trigger'],
+    summary: str(ctx.summary, 'problem'),
+    cause: str(ctx.cause, 'Problem'),
+    mention: acked
+      ? { name: i.acker!.display_name, chatUserId: i.acker!.google_chat_user_id ?? null }
+      : person(l0Of(i)),
+    ackedBy: acked ? i.acker!.display_name : null,
+    at: new Date(n.created_at),
   });
 }
 
@@ -459,6 +488,8 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
     case 'down_again':
     case 'problem_again':
       return againAlert(n, i, now);
+    case 'problem_new_cause':
+      return newCauseAlert(n, i);
     case 'note':
       return buildNoteAlert({ site: i.sites.name, by: str(ctx.by, 'someone'), text: str(ctx.text, '') });
     case 'resolved':
@@ -691,6 +722,18 @@ export function renderEmail(
       return buildAgainEmail({
         ...base,
         severity: n.template === 'down_again' ? 'down' : 'problem',
+        title: card.header.title,
+        body: body && 'textParagraph' in body ? body.textParagraph.text.replace(/&lt;/g, '<') : '',
+        acknowledged,
+      });
+    }
+    // D-067: the L0 email carries the reply's words, as the AGAIN emails do.
+    case 'problem_new_cause': {
+      const card = newCauseAlert(n, i).cardsV2[0]!.card;
+      const body = card.sections[0]?.widgets[0];
+      return buildAgainEmail({
+        ...base,
+        severity: 'problem',
         title: card.header.title,
         body: body && 'textParagraph' in body ? body.textParagraph.text.replace(/&lt;/g, '<') : '',
         acknowledged,

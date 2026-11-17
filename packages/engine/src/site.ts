@@ -221,6 +221,17 @@ export type SiteDecision =
       /** When the problem started: its first check (slow: the first slow round). */
       startedAt: Date;
     } & Judged)
+  /**
+   * D-067: the incident open for an SSL / domain expiry now has a more urgent PROBLEM — its cause
+   * switches and the thread is told ("PROBLEM · … · new cause: …"); state and ladder carry on.
+   */
+  | ({
+      kind: 'new_cause';
+      monitorId: string;
+      trigger: Trigger;
+      detail: ProblemDetail;
+      startedAt: Date;
+    } & Judged)
   /** DOWN confirmed on the primary's check and recheck (or in the browser): open an incident. */
   | ({ kind: 'open'; startedAt: Date } & DownFacts & Judged)
   /** DOWN confirmed while the open incident is a PROBLEM: raise it to DOWN (D-021). */
@@ -485,6 +496,24 @@ function judgeSiteRound(
       };
     }
     const status = open && episode === 'down' ? ('down' as const) : ('problem' as const);
+    // D-067: an open expiry PROBLEM drop never swallows a more urgent cause.
+    if (
+      open &&
+      episode === 'problem' &&
+      isExpiryTrigger(open.trigger) &&
+      !isExpiryTrigger(problem.v.trigger) &&
+      ['unacked', 'escalated', 'acknowledged'].includes(open.state)
+    ) {
+      return {
+        kind: 'new_cause',
+        monitorId: problem.m.id,
+        trigger: problem.v.trigger,
+        detail: problem.v.detail,
+        startedAt: problem.v.startedAt,
+        ...base,
+        status,
+      };
+    }
     if (open) return { kind: 'none', okRounds: 0, ...base, status };
     return {
       kind: 'problem',

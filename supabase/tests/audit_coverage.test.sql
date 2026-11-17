@@ -70,6 +70,7 @@ insert into audit_classes (fn, kind, note) values
   ('engine_open_incident', 'audited', 'probes.test.sql'),
   ('engine_recover_incident', 'audited', 'probes.test.sql'),
   ('engine_relapse_incident', 'audited', 'resolve.test.sql'),
+  ('engine_new_cause_incident', 'audited', 'new_cause.test.sql'),
   ('engine_escalate_incident', 'audited', 'verifier.test.sql'),
   ('engine_settle_incident', 'audited', 'probes.test.sql'),
   ('engine_fire_step', 'audited', 'escalation.test.sql'),

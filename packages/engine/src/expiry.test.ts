@@ -281,3 +281,61 @@ describe('decideSite — SSL / domain expiry (D-066)', () => {
     });
   });
 });
+
+describe('decideSite — a new cause on an open expiry incident (D-067)', () => {
+  const sslOpen: OpenIncident = { ...open, trigger: 'ssl', episodeSeverity: 'problem' };
+  const forbidden = all('pass', { keywordForbidden: ['บาคาร่า'] });
+
+  it('a forbidden word on a site open for SSL expiring → new_cause (Keyword), the state kept', () => {
+    expect(
+      decideSite(
+        site([monitor(forbidden, { carry: heldSsl, expiry: fact('2026-10-06', null) })], { open: sslOpen }),
+      ),
+    ).toMatchObject({ kind: 'new_cause', trigger: 'keyword', monitorId: 'home', status: 'problem' });
+  });
+
+  it('acknowledged too: the person who acked is told', () => {
+    expect(
+      decideSite(
+        site([monitor(forbidden, { carry: heldSsl, expiry: fact('2026-10-06', null) })], {
+          open: { ...sslOpen, state: 'acknowledged', acked: true },
+        }),
+      ),
+    ).toMatchObject({ kind: 'new_cause', trigger: 'keyword' });
+  });
+
+  it('a key page answering 404 is a new cause as well', () => {
+    const key = monitor(
+      LOCATIONS.map((l, i) => ({ ...check(l, 'pass', 1 + i), statusCode: 404 })),
+      { id: 'booking', isPrimary: false, url: 'https://www.dxt-ai.example/booking' },
+    );
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: heldSsl, expiry: fact('2026-10-06', null) }), key], { open: sslOpen }),
+      ),
+    ).toMatchObject({ kind: 'new_cause', monitorId: 'booking' });
+  });
+
+  it.each<[string, OpenIncident, StoredCheck[], ExpiryFact]>([
+    ['the expiry itself again', sslOpen, clean, fact('2026-10-06', null)],
+    ['SSL → domain is no new cause', sslOpen, clean, fact('2026-12-22', '2026-10-13')],
+    [
+      'an incident open for another trigger',
+      { ...sslOpen, trigger: 'slow' },
+      forbidden,
+      fact('2026-10-06', null),
+    ],
+  ])('%s → none', (_name, o, checks, expiry) => {
+    expect(decideSite(site([monitor(checks, { carry: heldSsl, expiry })], { open: o }))).toMatchObject({
+      kind: 'none',
+    });
+  });
+
+  it('a DOWN still escalates (D-021), never a new cause', () => {
+    expect(
+      decideSite(
+        site([monitor(failed(), { carry: heldSsl, expiry: fact('2026-10-06', null) })], { open: sslOpen }),
+      ),
+    ).toMatchObject({ kind: 'escalate' });
+  });
+});

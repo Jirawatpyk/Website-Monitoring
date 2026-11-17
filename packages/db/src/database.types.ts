@@ -1193,6 +1193,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"engine_new_cause_incident":
+{ Args: { "p_context": Json,"p_hold_until"?: string,"p_incident_id": string,"p_monitor_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: boolean
+                           },
 "engine_note_site":
 { Args: { "p_note"?: string,"p_round_at": string,"p_site_id": string }; Returns: undefined
                            },

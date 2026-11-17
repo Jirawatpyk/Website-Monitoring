@@ -1,5 +1,5 @@
 import { isHardFail } from './hard-fail';
-import type { IncidentState, ProbeLocation, Severity } from '@dxt/shared';
+import type { IncidentState, ProbeLocation, Severity, Trigger } from '@dxt/shared';
 import type { LocationResult } from './round';
 import type { CheckFacts } from './triggers';
 
@@ -42,6 +42,8 @@ export interface OpenIncident {
   detectedAt?: Date;
   /** Tagged flapping (D-004): RECOVERED becomes one summary after 15 min of continuous OK. */
   isFlapping?: boolean;
+  /** Its current trigger (`incidents.trigger`): an SSL / domain incident takes a new cause (D-067). */
+  trigger?: Trigger;
 }
 
 /** The site note while a blocked site can't be verified (D-019; trigger label, spec §11). */

@@ -71,6 +71,89 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
     });
   });
 
+  it('on a Tier 1 site at night the first card waits for 09:00 (D-067)', async () => {
+    const night = new Date('2026-10-06T16:01:05Z'); // Tue 23:01 Bangkok
+    const at2 = (sec: number) => new Date(Date.parse('2026-10-06T16:00:00Z') + sec * 1000).toISOString();
+    const { db, rpcCalls } = fakeDb({
+      'probe_locations.select': {
+        data: [
+          { code: 'SIN', last_heartbeat_at: '2026-10-06T16:00:50Z' },
+          { code: 'TYO', last_heartbeat_at: '2026-10-06T16:00:30Z' },
+        ],
+      },
+      'monitors.select': { data: [monitor] },
+      'rpc.engine_checks': {
+        data: [
+          { ...pass('SIN', 0), checked_at: at2(0) },
+          { ...pass('TYO', 1), checked_at: at2(1) },
+        ],
+      },
+      'site_expiry.select': { data: [row()] },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    await runEngine(db, night);
+    expect(rpcCalls.find((c) => c.name === 'engine_open_incident')?.args).toMatchObject({
+      p_trigger: 'ssl',
+      p_hold_until: '2026-10-07T02:00:00.000Z', // Wed 09:00 Bangkok
+    });
+  });
+
+  it('a forbidden word on a site open for SSL expiring posts the new cause (D-067)', async () => {
+    const forbidden = (location: string, sec: number) => ({
+      ...pass(location, sec),
+      keyword_forbidden: ['Index of /'],
+    });
+    const { db, rpcCalls } = fakeDb({
+      'probe_locations.select': { data: beating },
+      'monitors.select': { data: [{ ...monitor, must_not_contain: ['Index of /'] }] },
+      'rpc.engine_checks': { data: [forbidden('SIN', 0), forbidden('TYO', 1)] },
+      'site_expiry.select': { data: [row()] },
+      'rpc.engine_monitor_status': {
+        data: [
+          {
+            monitor_id: 'm1',
+            status: 'problem',
+            trigger: 'ssl',
+            cause: 'x',
+            slow_rounds: 0,
+            failing_since: {},
+          },
+        ],
+      },
+      'incidents.select': {
+        data: [
+          {
+            id: 'i1',
+            site_id: 's1',
+            monitor_id: 'm1',
+            state: 'acknowledged',
+            severity: 'problem',
+            trigger: 'ssl',
+            episode_severity: 'problem',
+            started_at: '2026-10-06T00:00:00Z',
+            detected_at: '2026-10-06T00:00:00Z',
+            acked_at: '2026-10-06T02:00:00Z',
+            recovered_at: null,
+            escalation_level: 0,
+            is_flapping: false,
+            is_manual: false,
+            manual_at: null,
+            root_cause_category: null,
+            notifications: [{ template: 'problem' }],
+          },
+        ],
+      },
+      'rpc.engine_new_cause_incident': { data: true },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ newCauses: 1 });
+    expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')?.args).toMatchObject({
+      p_incident_id: 'i1',
+      p_trigger: 'keyword',
+      p_notify: true,
+      p_context: { cause: 'Found “Index of /” on / (SIN, TYO)' },
+    });
+  });
+
   it('a row read from another host (the primary moved) is no data', async () => {
     const { db, rpcCalls } = setup({ data: [row({ host: 'old.tubtong.example.test' })] });
     expect(await runEngine(db, now)).toMatchObject({ problems: 0 });
