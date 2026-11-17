@@ -105,8 +105,13 @@ export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date, 
   // the defacement that took over, not the SSL it opened with).
   let at = dropStart ? opened.findIndex((e) => !!e.at && new Date(e.at) >= dropStart) : -1;
   if (at < 0) at = opened.length - 1;
-  while (dropStart && opened[at + 1]?.type === 'new_cause') at += 1;
-  const pick = opened[at];
+  // A new cause names the drop, even once it went back to the expiry (the defacement was the news).
+  let pickAt = at;
+  while (dropStart && opened[at + 1]?.type === 'new_cause') {
+    at += 1;
+    if (payloadOf(opened[at]!).back !== true) pickAt = at;
+  }
+  const pick = opened[pickAt];
   const p = pick ? payloadOf(pick) : {};
   // Reported down by hand (D-055 item 7): no probe cause, so never "Hard fail" (/verify S14).
   if (p.manual === true) return TRIGGER_LABELS.manual;

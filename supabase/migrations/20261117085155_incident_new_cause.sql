@@ -11,6 +11,11 @@
 -- recovery or ack while held, no email once it cleared inside the grace, the fallback email if the
 -- reply fails (message-checker S13 H3).
 
+-- Whether the cause the incident carries now was taken from an SSL / domain expiry (D-067 item 4: only
+-- such an incident goes back to it). Written by the engine functions only: a new cause sets it, going
+-- back or a PROBLEM AGAIN clears it. One flag the runner reads with the incident, not a history scan.
+alter table public.incidents add column expiry_left boolean not null default false;
+
 create function public.engine_new_cause_incident(
   p_incident_id uuid,
   p_monitor_id uuid,
@@ -20,7 +25,12 @@ create function public.engine_new_cause_incident(
   p_notify boolean,
   p_monitors jsonb default null,
   p_status public.site_state default null,
-  p_hold_until timestamptz default null
+  p_hold_until timestamptz default null,
+  -- The expiry the drop carried (the engine's carry): a DOWN incident keeps its own trigger.
+  p_was public.incident_trigger default null,
+  -- The runner's response-hours verdict (SQL never works out hours): a Tier 1 new cause at night
+  -- @mentions the person on call (Tao, 17 Nov).
+  p_outside_hours boolean default false
 )
 returns boolean
 language plpgsql
@@ -30,30 +40,41 @@ declare
   v_site_id uuid;
   v_was public.incident_trigger;
   v_state public.incident_state;
+  v_severity public.severity;
+  v_l0 uuid;
+  v_recent_chat boolean;
+  v_recent_mail boolean;
   v_hold timestamptz := case when p_hold_until > now() then p_hold_until end;
   v_key text := 'new_cause:' || to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
   v_ctx jsonb;
 begin
-  -- Only a plain PROBLEM incident open for an expiry (trigger = the cause it carries now, kept by
-  -- every writer: open, PROBLEM AGAIN, new cause, back to it), and only for a cause that isn't one.
-  select site_id, trigger, state into v_site_id, v_was, v_state
-  from public.incidents
-  where id = p_incident_id
-    and trigger in ('ssl', 'domain')
+  -- An incident on a PROBLEM drop about an expiry, and only for a cause that isn't one: a PROBLEM
+  -- incident whose trigger (the cause it carries now, kept by every writer) is the expiry, or a DOWN
+  -- incident whose PROBLEM drop the engine saw as the expiry (`p_was`, Tao 17 Nov).
+  select i.site_id, case when i.severity = 'down' then p_was else i.trigger end, i.state, i.severity, i.l0_user_id
+    into v_site_id, v_was, v_state, v_severity, v_l0
+  from public.incidents i
+  where i.id = p_incident_id
     and p_trigger not in ('ssl', 'domain')
-    and severity = 'problem'
-    and coalesce(episode_severity, severity) = 'problem'
-    and state in ('unacked', 'escalated', 'acknowledged')
+    and coalesce(i.episode_severity, i.severity) = 'problem'
+    and i.state in ('unacked', 'escalated', 'acknowledged')
+    and ((i.severity = 'problem' and i.trigger in ('ssl', 'domain'))
+         or (i.severity = 'down' and p_was in ('ssl', 'domain')))
   for update;
 
   if v_site_id is null then
     return false;
   end if;
 
-  update public.incidents
-    set trigger = p_trigger,
-        monitor_id = coalesce(p_monitor_id, monitor_id)
-    where id = p_incident_id;
+  update public.incidents i
+    set trigger = case when v_severity = 'problem' then p_trigger else i.trigger end,
+        expiry_left = true,
+        monitor_id = case when v_severity = 'problem' then coalesce(p_monitor_id, i.monitor_id) else i.monitor_id end,
+        -- Tier 1 at night, nobody acknowledged: whoever is on call now is L0 for this cause.
+        l0_user_id = case when p_outside_hours and s.tier = 1 and v_state <> 'acknowledged'
+                          then coalesce(public.oncall_person_at(p_round_at), i.l0_user_id) else i.l0_user_id end
+    from public.sites s
+    where i.id = p_incident_id and s.id = i.site_id;
 
   insert into public.incident_events (incident_id, type, payload, at)
   values (p_incident_id, 'new_cause',
@@ -62,21 +83,31 @@ begin
 
   insert into public.audit_log (action, entity, entity_id, before, after)
   values ('incident.new_cause', 'incident', p_incident_id,
-          jsonb_build_object('trigger', v_was, 'state', v_state),
-          jsonb_build_object('trigger', p_trigger, 'state', v_state));
+          jsonb_build_object('trigger', v_was, 'state', v_state, 'l0_user_id', v_l0),
+          jsonb_build_object('trigger', p_trigger, 'state', v_state,
+                             'l0_user_id', (select l0_user_id from public.incidents where id = p_incident_id)));
 
   v_ctx := coalesce(p_context, '{}') || jsonb_build_object('trigger', p_trigger, 'was', v_was, 'newCause', true);
 
-  -- A cause that comes and goes (a key page flipping) is told once per 30 min (engine re-review).
-  if p_notify and exists (
+  -- A cause that comes and goes (a key page flipping) is told once per 30 min, per channel: the same
+  -- trigger, page and words with a reply (or an L0 email) not cancelled is not posted (or emailed) again.
+  -- Another page, word or domain is news (engine re-review M-b).
+  v_recent_chat := exists (
     select 1 from public.notifications n
     where n.incident_id = p_incident_id and n.channel = 'google_chat' and n.template = 'problem_again'
       and coalesce((n.context ->> 'newCause')::boolean, false) and n.context ->> 'trigger' = p_trigger::text
-      and n.status <> 'cancelled' and n.created_at > now() - interval '30 minutes') then
-    p_notify := false;
-  end if;
+      and n.context ->> 'monitorUrl' is not distinct from p_context ->> 'monitorUrl'
+      and n.context ->> 'summary' is not distinct from p_context ->> 'summary'
+      and n.status <> 'cancelled' and n.created_at > now() - interval '30 minutes');
+  v_recent_mail := exists (
+    select 1 from public.notifications n
+    where n.incident_id = p_incident_id and n.channel = 'email' and n.template = 'problem_again'
+      and coalesce((n.context ->> 'newCause')::boolean, false) and n.context ->> 'trigger' = p_trigger::text
+      and n.context ->> 'monitorUrl' is not distinct from p_context ->> 'monitorUrl'
+      and n.context ->> 'summary' is not distinct from p_context ->> 'summary'
+      and n.status <> 'cancelled' and n.created_at > now() - interval '30 minutes');
 
-  if p_notify then
+  if p_notify and not v_recent_chat then
     -- The thread's first card may still be held for response hours (an SSL PROBLEM at night): it goes
     -- no later than this reply, or the reply would wait behind it (claim_notifications keeps order).
     update public.notifications
@@ -87,7 +118,9 @@ begin
     insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key, hold_until)
     values (p_incident_id, 'google_chat', 'problem_again', p_incident_id::text, v_ctx, v_key, v_hold)
     on conflict do nothing;
+  end if;
 
+  if p_notify and not v_recent_mail then
     perform public.engine_queue_l0_emails(
       p_incident_id, 'problem_again', v_ctx,
       greatest(v_hold, now() + interval '5 minutes'), v_key, false);
@@ -105,10 +138,10 @@ end;
 $$;
 
 revoke execute on function public.engine_new_cause_incident(uuid, uuid, public.incident_trigger,
-  timestamptz, jsonb, boolean, jsonb, public.site_state, timestamptz)
+  timestamptz, jsonb, boolean, jsonb, public.site_state, timestamptz, public.incident_trigger, boolean)
   from public, anon, authenticated;
 grant execute on function public.engine_new_cause_incident(uuid, uuid, public.incident_trigger,
-  timestamptz, jsonb, boolean, jsonb, public.site_state, timestamptz)
+  timestamptz, jsonb, boolean, jsonb, public.site_state, timestamptz, public.incident_trigger, boolean)
   to service_role;
 
 -- D-067 item 4: the new cause cleared and the certificate / domain is still under its line — the
@@ -134,21 +167,23 @@ declare
   v_was public.incident_trigger;
   v_state public.incident_state;
 begin
-  select site_id, trigger, state into v_site_id, v_was, v_state
+  -- What it goes back from: a PROBLEM incident's trigger, a DOWN incident's newest new cause.
+  select site_id,
+         case when severity = 'down'
+              then (select (e.payload ->> 'trigger')::public.incident_trigger from public.incident_events e
+                    where e.incident_id = p_incident_id and e.type = 'new_cause'
+                    order by e.at desc, e.id desc limit 1)
+              else trigger end,
+         state
+    into v_site_id, v_was, v_state
   from public.incidents
   where id = p_incident_id
-    and trigger not in ('ssl', 'domain')
+    and (severity = 'down' or trigger not in ('ssl', 'domain'))
     and p_trigger in ('ssl', 'domain')
-    and severity = 'problem'
     and coalesce(episode_severity, severity) = 'problem'
     and state in ('unacked', 'escalated', 'acknowledged')
-    -- Its newest new_cause / PROBLEM AGAIN is a new cause taken from an expiry (engine re-review H3:
-    -- an incident that never had one recovers instead).
-    and (select e.type = 'new_cause' and e.payload ->> 'was' in ('ssl', 'domain')
-                and not coalesce((e.payload ->> 'back')::boolean, false)
-         from public.incident_events e
-         where e.incident_id = p_incident_id and e.type in ('new_cause', 'relapsed')
-         order by e.at desc, e.id desc limit 1)
+    -- Its cause was taken from an expiry (engine re-review H3: one that never had one recovers instead).
+    and expiry_left
   for update;
 
   if v_site_id is null then
@@ -156,8 +191,9 @@ begin
   end if;
 
   update public.incidents
-    set trigger = p_trigger,
-        monitor_id = coalesce(p_monitor_id, monitor_id)
+    set trigger = case when severity = 'problem' then p_trigger else trigger end,
+        expiry_left = false,
+        monitor_id = case when severity = 'problem' then coalesce(p_monitor_id, monitor_id) else monitor_id end
     where id = p_incident_id;
 
   insert into public.incident_events (incident_id, type, payload, at)
@@ -243,6 +279,8 @@ begin
         -- hand passes 'manual', which the reports read as true of the whole incident).
         -- Only on a PROBLEM incident (engine re-review M2: a DOWN incident keeps hard_fail / manual).
         trigger = case when p_severity = 'problem' and severity = 'problem' then p_trigger else trigger end,
+        -- A new drop brings its own cause: nothing to go back to.
+        expiry_left = false,
         recovered_at = null,
         is_flapping = is_flapping or coalesce(p_flapping, false),
         state = case when acked_at is not null then 'acknowledged'::public.incident_state
@@ -377,8 +415,15 @@ as $$
   select coalesce(
     (select 'INC-' || lpad(i.number::text, 4, '0') from public.incidents i
       where i.site_id = p_site_id and i.state in ('unacked', 'escalated', 'acknowledged')
-        and not (i.severity = 'problem' and coalesce(i.episode_severity, i.severity) = 'problem'
-                 and i.trigger in ('ssl', 'domain'))
+        and not (coalesce(i.episode_severity, i.severity) = 'problem'
+                 and ((i.severity = 'problem' and i.trigger in ('ssl', 'domain'))
+                      -- A DOWN incident back up whose only failing verdict is the expiry (Tao, 17 Nov).
+                      or (i.severity = 'down'
+                          and exists (select 1 from public.monitor_status ms join public.monitors m on m.id = ms.monitor_id
+                                      where m.site_id = p_site_id and ms.status = 'problem' and ms.trigger in ('ssl', 'domain'))
+                          and not exists (select 1 from public.monitor_status ms join public.monitors m on m.id = ms.monitor_id
+                                          where m.site_id = p_site_id and ms.status <> 'ok'
+                                            and not (ms.status = 'problem' and ms.trigger in ('ssl', 'domain'))))))
       limit 1),
     (select 'down' from public.site_status st where st.site_id = p_site_id and st.status = 'down'));
 $$;

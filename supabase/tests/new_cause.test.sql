@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(31);
+select plan(36);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -35,6 +35,8 @@ reset role;
 
 select is((select trigger::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e1'), 'keyword',
   'the incident now reads Keyword');
+select ok((select expiry_left from public.incidents where id = '00000000-0000-0000-0000-0000000000e1'),
+  'and remembers its cause came from SSL (it may go back to it)');
 select is((select state::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e1'), 'acknowledged',
   'its state is kept (the ladder carries on)');
 select is(
@@ -100,9 +102,10 @@ select ok(
   'a keyword relapse doesn''t turn into SSL expiring (it recovers instead)'
 );
 reset role;
--- It took the keyword from SSL instead (the new cause, a second later).
-insert into public.incident_events (incident_id, type, payload, at) values
-  ('00000000-0000-0000-0000-0000000000e1', 'new_cause', '{"trigger": "keyword", "was": "ssl"}', now() + interval '1 second');
+select ok(not (select expiry_left from public.incidents where id = '00000000-0000-0000-0000-0000000000e1'),
+  'a PROBLEM AGAIN clears the flag: its cause is its own');
+-- It took the keyword from SSL instead (as engine_new_cause_incident marks it).
+update public.incidents set expiry_left = true where id = '00000000-0000-0000-0000-0000000000e1';
 insert into public.site_status (site_id, status, since, last_evaluated_at, last_round_at)
 values ('00000000-0000-0000-0000-0000000000a1', 'problem', now() - interval '1 day', now() - interval '3 minutes',
         now() - interval '3 minutes')
@@ -155,7 +158,8 @@ select ok(
 reset role;
 select is(
   (select count(*)::int from public.notifications where incident_id = '00000000-0000-0000-0000-0000000000e1'
-     and template = 'problem_again' and context ->> 'trigger' = 'key_page' and status <> 'cancelled'),
+     and channel = 'google_chat' and template = 'problem_again' and context ->> 'trigger' = 'key_page'
+     and status <> 'cancelled'),
   1, 'no second reply within 30 min'
 );
 update public.incidents set trigger = 'ssl' where id = '00000000-0000-0000-0000-0000000000e1';
@@ -178,6 +182,23 @@ select ok(
 reset role;
 select is((select trigger::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e2'), 'manual',
   'the DOWN incident keeps its trigger (a hand-opened DOWN stays manual)');
+
+-- Tao, 17 Nov: a DOWN incident whose PROBLEM drop is SSL takes a new cause too, its trigger kept.
+set local role service_role;
+select ok(
+  public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e2', null, 'keyword', now(), '{}', false,
+    p_was => 'ssl'),
+  'a DOWN incident back up on SSL takes the keyword as its new cause'
+);
+select ok(
+  not public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e2', null, 'keyword', now(), '{}', false),
+  'without the expiry its drop carried, it doesn''t'
+);
+reset role;
+select ok(
+  (select trigger = 'manual' and expiry_left from public.incidents where id = '00000000-0000-0000-0000-0000000000e2'),
+  'its trigger stays manual, and it may go back to SSL'
+);
 set local role service_role;
 select ok(
   not public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e1', null, 'domain', now(), '{}'),

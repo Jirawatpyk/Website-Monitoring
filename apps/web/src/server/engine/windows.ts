@@ -30,14 +30,17 @@ export function windowHides(
     | { state: string; severity?: string; episode_severity?: string | null; trigger?: string | null }
     | null
     | undefined,
+  carries: readonly { status: string; trigger: string | null }[] = [],
 ): boolean {
   if (!open || open.state === 'monitoring' || open.state === 'needs_root_cause') return true;
-  return (
-    open.severity === 'problem' &&
-    (open.episode_severity ?? 'problem') === 'problem' &&
-    (open.trigger === 'ssl' || open.trigger === 'domain')
-  );
+  if ((open.episode_severity ?? open.severity) !== 'problem') return false;
+  if (open.severity === 'problem') return isExpiry(open.trigger);
+  // A DOWN incident back up whose only failing verdict is the expiry (Tao, 17 Nov).
+  const failing = carries.filter((c) => c.status !== 'ok');
+  return failing.length > 0 && failing.every((c) => c.status === 'problem' && isExpiry(c.trigger));
 }
+
+const isExpiry = (t: string | null | undefined) => t === 'ssl' || t === 'domain';
 
 /** When the latest window that ended at or before `at` ended: an incident it held back starts there. */
 export function endedBefore(w: SiteWindows | undefined, at: Date): Date | null {

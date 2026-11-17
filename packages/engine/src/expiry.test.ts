@@ -345,12 +345,52 @@ describe('decideSite — a new cause on an open expiry incident (D-067)', () => 
     ).toMatchObject({ kind: 'escalate' });
   });
 
-  it('a D-023 drop of a DOWN takes no new cause', () => {
-    const d023: OpenIncident = { ...open, severity: 'down', episodeSeverity: 'problem', trigger: 'ssl' };
+  it('a DOWN incident whose PROBLEM drop is SSL takes a new cause too (Tao, 17 Nov), its own trigger kept', () => {
+    const d023: OpenIncident = {
+      ...open,
+      severity: 'down',
+      episodeSeverity: 'problem',
+      trigger: 'hard_fail',
+    };
     expect(
       decideSite(
         site([monitor(forbidden, { carry: heldSsl, expiry: fact('2026-10-06', null) })], { open: d023 }),
       ),
+    ).toMatchObject({ kind: 'new_cause', trigger: 'keyword', was: 'ssl' });
+    // …and goes back to SSL when the keyword clears.
+    expect(
+      decideSite(
+        site(
+          [
+            monitor(clean, {
+              carry: { ...heldSsl, trigger: 'keyword' },
+              expiry: fact('2026-10-06', null),
+            }),
+          ],
+          { open: { ...d023, leftExpiry: true } },
+        ),
+      ),
+    ).toMatchObject({ kind: 'cause_back', trigger: 'ssl' });
+  });
+
+  it('a D-023 drop that was a key page (never SSL) takes no new cause', () => {
+    const d023: OpenIncident = {
+      ...open,
+      severity: 'down',
+      episodeSeverity: 'problem',
+      trigger: 'hard_fail',
+    };
+    const key = monitor(
+      LOCATIONS.map((l, i) => ({ ...check(l, 'pass', 1 + i), statusCode: 404 })),
+      {
+        id: 'booking',
+        isPrimary: false,
+        url: 'https://www.dxt-ai.example/booking',
+        carry: { ...NEW_MONITOR, status: 'problem', trigger: 'key_page' },
+      },
+    );
+    expect(
+      decideSite(site([monitor(forbidden, { expiry: fact('2026-10-06', null) }), key], { open: d023 })),
     ).toMatchObject({ kind: 'none' });
   });
 });
@@ -506,6 +546,57 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
           [monitor(clean, { carry: heldKeyword, expiry: fact('2026-10-06', null, { sslFailed: true }) })],
           {
             open: neverSsl,
+          },
+        ),
+      ),
+    ).toMatchObject({ kind: 'recover' });
+  });
+
+  it.each([
+    ['inside hours', {}],
+    ['at night', night],
+  ])('a key page incident with SSL carried beside it recovers when the key page clears (%s)', (_c, over) => {
+    const keyOpen: OpenIncident = {
+      ...open,
+      trigger: 'key_page',
+      episodeSeverity: 'problem',
+      leftExpiry: false,
+    };
+    const key = monitor(clean, {
+      id: 'booking',
+      isPrimary: false,
+      url: 'https://www.dxt-ai.example/booking',
+      carry: { ...NEW_MONITOR, status: 'problem', trigger: 'key_page' },
+    });
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: heldSsl, expiry: fact('2026-10-06', null) }), key], {
+          open: keyOpen,
+          ...over,
+        }),
+      ),
+    ).toMatchObject({ kind: 'recover' });
+  });
+
+  it('…and a failed SSL read doesn’t hold it either', () => {
+    const keyOpen: OpenIncident = {
+      ...open,
+      trigger: 'key_page',
+      episodeSeverity: 'problem',
+      leftExpiry: false,
+    };
+    const key = monitor(clean, {
+      id: 'booking',
+      isPrimary: false,
+      url: 'https://www.dxt-ai.example/booking',
+      carry: { ...NEW_MONITOR, status: 'problem', trigger: 'key_page' },
+    });
+    expect(
+      decideSite(
+        site(
+          [monitor(clean, { carry: heldSsl, expiry: fact('2026-10-06', null, { sslFailed: true }) }), key],
+          {
+            open: keyOpen,
           },
         ),
       ),

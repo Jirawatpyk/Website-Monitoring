@@ -105,6 +105,7 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
       checks?: unknown[];
       trigger?: string;
       mutedUntil?: string | null;
+      leftExpiry?: boolean;
       tier?: number;
       rpc?: Record<string, unknown>;
     } = {},
@@ -153,6 +154,7 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
             is_manual: false,
             manual_at: null,
             root_cause_category: null,
+            expiry_left: o.leftExpiry ?? false,
             notifications: [{ template: 'problem' }],
           },
         ],
@@ -169,6 +171,9 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
       p_trigger: 'keyword',
       p_notify: true,
       p_context: { cause: 'Found “Index of /” on / (SIN, TYO)' },
+      p_was: 'ssl',
+      // 17:01 Bangkok on a Tuesday: inside hours, L0 stays (at night the SQL names the person on call).
+      p_outside_hours: false,
     });
   });
 
@@ -192,15 +197,10 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
   it('the keyword cleared with the certificate still 6 days out: back to SSL, silently (D-067 item 4)', async () => {
     const { db, rpcCalls } = openDb({
       trigger: 'keyword',
+      leftExpiry: true,
       checks: [pass('SIN', 0), pass('TYO', 1)],
       rpc: {
         'rpc.engine_cause_back_incident': { data: true },
-        // It took the keyword from SSL (D-067 item 4: only such an incident goes back).
-        'incident_events.select': {
-          data: [
-            { incident_id: 'i1', type: 'new_cause', at: '2026-10-06T09:00:00Z', payload: { was: 'ssl' } },
-          ],
-        },
       },
     });
     expect(await runEngine(db, now)).toMatchObject({ causesBack: 1 });
@@ -218,7 +218,6 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
       checks: [pass('SIN', 0), pass('TYO', 1)],
       rpc: {
         'rpc.engine_recover_incident': { data: true },
-        'incident_events.select': { data: [] },
       },
     });
     await runEngine(db, now);

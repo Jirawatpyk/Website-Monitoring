@@ -232,6 +232,8 @@ export type SiteDecision =
    */
   | ({
       kind: 'new_cause';
+      /** The expiry it took over from (a DOWN incident's drop: what the site carried). */
+      was: 'ssl' | 'domain';
       monitorId: string;
       trigger: Trigger;
       detail: ProblemDetail;
@@ -513,17 +515,17 @@ function judgeSiteRound(
     }
     const status = open && episode === 'down' ? ('down' as const) : ('problem' as const);
     // D-067: an open expiry PROBLEM drop never swallows a more urgent cause.
-    // D-067 items 2, 4: on a plain PROBLEM incident (never a D-023 drop of a DOWN) the cause follows
-    // between an expiry and anything more urgent — announced one way, silent the other.
-    const plain =
-      !!open && open.severity === 'problem' && episode === 'problem' && RECOVERABLE.includes(open.state);
-    if (
-      plain &&
-      open.leftExpiry &&
-      open.trigger &&
-      !isExpiryTrigger(open.trigger) &&
-      isExpiryTrigger(problem.v.trigger)
-    ) {
+    // D-067 items 2, 4: on a PROBLEM drop the cause follows between an expiry and anything more
+    // urgent — announced one way, silent the other. A PROBLEM incident's cause is its trigger; a DOWN
+    // incident's PROBLEM drop (D-023, a PROBLEM AGAIN) keeps its trigger, so its cause is what the site
+    // carried last round (Tao, 17 Nov: a hijack after a DOWN never waits for a renewal either).
+    const onDrop = !!open && episode === 'problem' && RECOVERABLE.includes(open.state);
+    const was = !open
+      ? null
+      : open.severity === 'problem'
+        ? (open.trigger ?? null)
+        : carriedCause(s.monitors);
+    if (onDrop && open.leftExpiry && !isExpiryTrigger(was) && isExpiryTrigger(problem.v.trigger)) {
       return {
         kind: 'cause_back',
         monitorId: problem.m.id,
@@ -534,9 +536,10 @@ function judgeSiteRound(
         status,
       };
     }
-    if (plain && isExpiryTrigger(open!.trigger) && !isExpiryTrigger(problem.v.trigger)) {
+    if (onDrop && isExpiryTrigger(was) && !isExpiryTrigger(problem.v.trigger)) {
       return {
         kind: 'new_cause',
+        was,
         monitorId: problem.m.id,
         trigger: problem.v.trigger,
         detail: problem.v.detail,
@@ -1276,8 +1279,21 @@ function keepsExpiry(m: SiteMonitor, s: SiteSnapshot): boolean {
   const o = s.open;
   if (!o || RECOVERED_STATES.includes(o.state) || (o.episodeSeverity ?? o.severity) !== 'problem')
     return false;
-  if (m.carry.status === 'problem' && isExpiryTrigger(m.carry.trigger)) return true;
-  return o.severity === 'problem' && (isExpiryTrigger(o.trigger) || !!o.leftExpiry);
+  // The expiry was the drop's only cause last round (engine re-review: a key page carried beside it
+  // means the incident is about the key page, which recovers when it clears).
+  if (isExpiryTrigger(carriedCause(s.monitors))) return true;
+  return (o.severity === 'problem' && isExpiryTrigger(o.trigger)) || !!o.leftExpiry;
+}
+
+/**
+ * The site's cause last round from the monitors' carries, ranked as this round's PROBLEM is (the
+ * primary, then key pages, an expiry last): an expiry only when nothing else was failing.
+ */
+function carriedCause(monitors: readonly SiteMonitor[]): Trigger | null {
+  const failing = monitors.filter((m) => m.carry.status === 'problem' || m.carry.status === 'down');
+  const rank = (m: SiteMonitor) => (isExpiryTrigger(m.carry.trigger) ? 2 : m.isPrimary ? 0 : 1);
+  const first = [...failing].sort((a, b) => rank(a) - rank(b))[0];
+  return first ? (first.carry.trigger ?? null) : null;
 }
 
 /**

@@ -305,15 +305,16 @@ const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
  */
 function causeOf(i: IncidentFacts, now: Date): string | null {
   const events = i.incident_events ?? [];
-  // D-067: the cause the incident carries now — after a new cause (or back to the expiry) that one, and
-  // on a PROBLEM incident a PROBLEM AGAIN since words its own drop (message-checker H1: never the opening
-  // SSL recounted after a renewal and a keyword relapse).
+  // D-067: the cause the incident carries now — the newest of a new cause (or back to the expiry), a
+  // PROBLEM AGAIN and a raise to DOWN, each words its own drop (message-checker: never the opening SSL
+  // recounted after a renewal, never an old keyword after a DOWN). A DOWN AGAIN keeps the opening words.
   const last = [...events]
-    .filter((e) => e.type === 'new_cause' || (i.severity === 'problem' && e.type === 'relapsed'))
+    .filter((e) => e.type === 'new_cause' || e.type === 'relapsed' || e.type === 'escalated_to_down')
     .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''))
     .at(-1);
-  const newCause = last?.type === 'new_cause' || last?.type === 'relapsed' ? last : undefined;
-  const detected = newCause ?? events.find((e) => e.type === 'detected');
+  const current =
+    last && !(last.type === 'relapsed' && contextOf(last.payload).severity === 'down') ? last : undefined;
+  const detected = current ?? events.find((e) => e.type === 'detected');
   const ctx = detected ? contextOf(detected.payload) : {};
   const manual = manualOf(ctx);
   if (manual) return manualCause(manual);
