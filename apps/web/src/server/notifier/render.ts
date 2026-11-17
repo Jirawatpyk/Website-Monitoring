@@ -305,13 +305,14 @@ const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
  */
 function causeOf(i: IncidentFacts, now: Date): string | null {
   const events = i.incident_events ?? [];
-  // D-067: after a new cause (or back to the expiry), the latest one is the incident's cause — unless a
-  // PROBLEM AGAIN came since, which words its own drop.
+  // D-067: the cause the incident carries now — after a new cause (or back to the expiry) that one, and
+  // on a PROBLEM incident a PROBLEM AGAIN since words its own drop (message-checker H1: never the opening
+  // SSL recounted after a renewal and a keyword relapse).
   const last = [...events]
-    .filter((e) => e.type === 'new_cause' || e.type === 'relapsed')
+    .filter((e) => e.type === 'new_cause' || (i.severity === 'problem' && e.type === 'relapsed'))
     .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''))
     .at(-1);
-  const newCause = last?.type === 'new_cause' ? last : undefined;
+  const newCause = last?.type === 'new_cause' || last?.type === 'relapsed' ? last : undefined;
   const detected = newCause ?? events.find((e) => e.type === 'detected');
   const ctx = detected ? contextOf(detected.payload) : {};
   const manual = manualOf(ctx);
@@ -321,6 +322,12 @@ function causeOf(i: IncidentFacts, now: Date): string | null {
   const expiry = expiryNow(ctx.detail, asOf);
   if (expiry) return expiry.cause;
   return typeof ctx.cause === 'string' ? ctx.cause : null;
+}
+
+/** The trigger a message was queued with (D-067: the incident's may have moved to a new cause since). */
+function triggerOf(ctx: Record<string, unknown>, i: IncidentFacts): IncidentFacts['trigger'] {
+  const t = ctx.trigger;
+  return typeof t === 'string' && t in TRIGGER_LABELS ? (t as IncidentFacts['trigger']) : i.trigger;
 }
 
 /** "3 of 3 locations": where the problem was seen, of the locations reporting when it opened. */
@@ -380,7 +387,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         incidentNumber: i.number,
         site: i.sites.name,
         tier: i.sites.tier,
-        trigger: i.trigger,
+        trigger: triggerOf(ctx, i),
         detectedAt: new Date(i.detected_at),
         now,
         cause: str(ctx.cause, 'Problem'),
@@ -600,7 +607,7 @@ export function renderEmail(
     case 'problem':
       return buildProblemEmail({
         ...base,
-        trigger: i.trigger,
+        trigger: triggerOf(ctx, i),
         detectedAt: new Date(i.detected_at),
         cause: str(ctx.cause, 'Problem'),
         summary: str(ctx.summary, 'problem'),

@@ -108,13 +108,12 @@ const num = (v: unknown) => (typeof v === 'number' ? v : null);
 
 /** Who may acknowledge this incident (D-016, `mayAcknowledge`). */
 /**
- * D-067: the newest `new_cause` event (a new cause, or back to the expiry), if the incident took one
- * since its latest PROBLEM AGAIN — a relapse brings its own cause.
+ * D-067: the event the incident's cause comes from now — the newest `new_cause` (a new cause, or back
+ * to the expiry), and on a PROBLEM incident a PROBLEM AGAIN since it (message-checker H1).
  */
-function latestNewCause(events: readonly EventRow[]): EventRow | undefined {
+function latestNewCause(events: readonly EventRow[], problem: boolean): EventRow | undefined {
   const sorted = [...events].sort((a, b) => a.at.localeCompare(b.at));
-  const last = sorted.filter((e) => e.type === 'new_cause' || e.type === 'relapsed').at(-1);
-  return last?.type === 'new_cause' ? last : undefined;
+  return sorted.filter((e) => e.type === 'new_cause' || (problem && e.type === 'relapsed')).at(-1);
 }
 
 /** A new cause's words; back to an expiry, its days counted again (D-066 item 6). */
@@ -266,7 +265,10 @@ export function buildIncidentView(
       detected?.payload.manual === true
         ? `Opened by ${str(detected.payload.openedBy) ?? 'someone'} from a hand check${str(detected.payload.note) ? ` · “${str(detected.payload.note)}”` : ''}`
         : // D-067: after a new cause, its words; an expiry's days counted to the recovery.
-          (newCauseLine(latestNewCause(events), i.recovered_at ? new Date(i.recovered_at) : now) ??
+          (newCauseLine(
+            latestNewCause(events, i.severity === 'problem'),
+            i.recovered_at ? new Date(i.recovered_at) : now,
+          ) ??
           expiryNow(detected?.payload.detail, i.recovered_at ? new Date(i.recovered_at) : now)?.cause ??
           str(detected?.payload.cause) ??
           TRIGGER_LABELS[i.trigger]),

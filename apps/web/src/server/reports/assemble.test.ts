@@ -341,3 +341,27 @@ describe('roundsOf ("Monitor ran 99.7% of rounds on time")', () => {
     expect(r.roundsShare).toBe(1);
   });
 });
+
+describe('causeOf — a drop that took a new cause (D-067, message-checker M2)', () => {
+  it('names the defacement that took over, not the SSL it opened with', () => {
+    const r = row({
+      severity: 'problem',
+      trigger: 'keyword',
+      events: [
+        {
+          type: 'detected',
+          at: iso('2026-09-23T09:00:00'),
+          payload: { summary: 'x', detail: { kind: 'ssl', expiresAt: '2026-10-06T13:00:00Z', daysLeft: 13 } },
+        },
+        {
+          type: 'new_cause',
+          at: iso('2026-09-24T10:00:00'),
+          payload: { summary: '“บาคาร่า” found on the page (as Googlebot)', trigger: 'keyword' },
+        },
+      ],
+    });
+    expect(causeOf(r, 'problem', bkk('2026-09-23T09:00:00'), bkk('2026-09-25T09:00:00'))).toBe(
+      '“บาคาร่า” found on the page (as Googlebot)',
+    );
+  });
+});

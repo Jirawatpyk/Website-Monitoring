@@ -94,6 +94,50 @@ describe('render — a new cause (D-067)', () => {
     expect(email.text).not.toContain('so only Nok is mentioned');
   });
 
+  it('renewed, then a keyword PROBLEM AGAIN: the ACKNOWLEDGED email names the keyword, never the SSL recounted (message-checker H1)', () => {
+    const relapsed: IncidentFacts = {
+      ...incident,
+      state: 'acknowledged',
+      acked_at: '2026-09-26T03:00:00Z',
+      acker: { display_name: 'Nok', google_chat_user_id: 'NOK' },
+      incident_events: [
+        incident.incident_events![0]!,
+        { type: 'recovered', at: '2026-09-24T03:00:00Z', payload: {} },
+        {
+          type: 'relapsed',
+          at: '2026-09-26T02:00:00Z',
+          payload: { severity: 'problem', trigger: 'keyword', cause: 'Found “บาคาร่า” on / (BKK, SIN, TYO)' },
+        },
+      ],
+    };
+    const email = renderEmail(
+      row({ channel: 'email', user_id: 'u-tao', template: 'acknowledged', context: {} }),
+      relapsed,
+      tao,
+      appUrl,
+      thread,
+    )!;
+    expect(email.text).toContain('Found “บาคาร่า” on / (BKK, SIN, TYO)');
+    expect(email.text).not.toContain('SSL certificate expires');
+  });
+
+  it('a PROBLEM email queued for SSL says SSL even after a new cause took over (message-checker M1)', () => {
+    const email = renderEmail(
+      row({
+        channel: 'email',
+        user_id: 'u-tao',
+        template: 'problem',
+        context: { cause: 'SSL certificate expires in 13 days (Tue 6 Oct)', summary: 'x', trigger: 'ssl' },
+      }),
+      incident,
+      tao,
+      appUrl,
+      thread,
+    )!;
+    expect(email.text).toContain('SSL expiring');
+    expect(email.text).not.toMatch(/Trigger:?\s+Keyword/);
+  });
+
   it('a plain PROBLEM AGAIN row is still an AGAIN reply', () => {
     const m = renderChat(row({ context: { summary: 'slow, p50 5.4 s' } }), incident, appUrl, now)!;
     expect(m.text).toContain('PROBLEM AGAIN');

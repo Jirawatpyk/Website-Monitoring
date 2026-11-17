@@ -101,9 +101,12 @@ export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date, 
       return false;
     })
     .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''));
-  const pick = dropStart
-    ? (opened.find((e) => !!e.at && new Date(e.at) >= dropStart) ?? opened.at(-1))
-    : opened.at(-1);
+  // The drop's opening event, then any new cause it took (D-067: message-checker M2 — the digest names
+  // the defacement that took over, not the SSL it opened with).
+  let at = dropStart ? opened.findIndex((e) => !!e.at && new Date(e.at) >= dropStart) : -1;
+  if (at < 0) at = opened.length - 1;
+  while (dropStart && opened[at + 1]?.type === 'new_cause') at += 1;
+  const pick = opened[at];
   const p = pick ? payloadOf(pick) : {};
   // Reported down by hand (D-055 item 7): no probe cause, so never "Hard fail" (/verify S14).
   if (p.manual === true) return TRIGGER_LABELS.manual;
