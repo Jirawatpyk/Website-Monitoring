@@ -1,3 +1,4 @@
+import { expiryIssue, expiryNoData, type ExpiryFact } from './expiry';
 import { failsHere, firstTimeoutRound, isHardFail, isTlsChainFail } from './hard-fail';
 import {
   CRAWLER_FRESH_MS,
@@ -110,6 +111,8 @@ export interface SiteMonitor {
   crawler?: readonly CrawlerFact[];
   /** The primary's page-change facts (S09d, D-046): its baseline and newest plain fetches. */
   pageChange?: PageChangeInput;
+  /** The primary's site's latest SSL / domain expiry read (S13, D-066); none = no data. */
+  expiry?: ExpiryFact;
 }
 
 export interface SiteSnapshot {
@@ -851,6 +854,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
       wafRound,
       crawler.fresh,
       pageIssue(m, s),
+      m.isPrimary ? expiryIssue(m.expiry, s.now) : null,
     );
     if (issue) {
       return {
@@ -858,6 +862,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
           kind: 'problem',
           trigger: issue.trigger,
           detail: issue.detail,
+          // A crawler, expiry or page-change fact starts at its fetch / read (clamped after the last round).
           startedAt: issue.at
             ? issue.trigger === 'content_change'
               ? pageStart(issue.at, s)
@@ -882,6 +887,8 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     if (pageHolds(m, s)) return { verdict: { kind: 'insufficient' }, next };
     // D-050: the OK round between two timeouts isn't the end of an Intermittent PROBLEM.
     if (intermittentHolds(m, s, blips)) return { verdict: { kind: 'insufficient' }, next };
+    // D-066: an open SSL / domain PROBLEM whose read failed or went stale isn't over either.
+    if (expiryHolds(m, s)) return { verdict: { kind: 'insufficient' }, next };
     // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
     const note =
       m.isPrimary && wafBlocked.length
@@ -941,9 +948,24 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
             next: reset,
           };
         }
+        // D-066: the expiry read, as on a passing round (last).
+        const expiry = m.isPrimary ? expiryIssue(m.expiry, s.now) : null;
+        if (expiry) {
+          return {
+            verdict: {
+              kind: 'problem',
+              trigger: expiry.trigger,
+              detail: expiry.detail,
+              startedAt: crawlerStart(expiry.at, s),
+              reachable,
+            },
+            next: reset,
+          };
+        }
         if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next: reset };
         if (pageHolds(m, s)) return { verdict: { kind: 'insufficient' }, next: reset };
         if (intermittentHolds(m, s, blips)) return { verdict: { kind: 'insufficient' }, next: reset };
+        if (expiryHolds(m, s)) return { verdict: { kind: 'insufficient' }, next: reset };
         return { verdict: { kind: 'ok', reachable, note: BLOCKED_NOTE }, next: reset };
       }
       case 'failed':
@@ -1129,6 +1151,7 @@ function problemOf(
   wafSite = false,
   crawler: readonly CrawlerFact[] = [],
   page: { trigger: Trigger; detail: ProblemDetail; at: Date } | null = null,
+  expiry: { trigger: Trigger; detail: ProblemDetail; at: Date } | null = null,
 ): { trigger: Trigger; detail: ProblemDetail; at?: Date } | null {
   const as = (trigger: Trigger, detail: ProblemDetail | null) =>
     detail ? { trigger: m.isPrimary ? trigger : ('key_page' as const), detail } : null;
@@ -1149,8 +1172,21 @@ function problemOf(
           locations: counted.filter((c) => c.outcome === 'pass').map((c) => c.location),
         })
       : null) ??
-    as('regional', regionalIssue(counted, failingSince, wafSite))
+    as('regional', regionalIssue(counted, failingSince, wafSite)) ??
+    // D-066: the least urgent to fix — any other trigger of the round wins.
+    expiry
   );
+}
+
+/**
+ * D-066 item 3: an open SSL / domain PROBLEM (the primary's last verdict, the incident not recovered)
+ * whose read failed, went stale or is missing is no evidence either way — it holds until a good read.
+ */
+function expiryHolds(m: SiteMonitor, s: SiteSnapshot): boolean {
+  const t = m.carry.trigger;
+  if (!m.isPrimary || m.carry.status !== 'problem' || (t !== 'ssl' && t !== 'domain')) return false;
+  if (!s.open || RECOVERED_STATES.includes(s.open.state)) return false;
+  return expiryNoData(m.expiry, t, s.now);
 }
 
 /** When a problem started: slow at its first slow round, regional at the location's first failure. */

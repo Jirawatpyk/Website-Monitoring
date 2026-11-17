@@ -5,6 +5,7 @@ import {
   isRecording,
   ownDomains,
   pageChangeState,
+  type ExpiryFact,
   type PageChangeInput,
   type PageFact,
   latestPerView,
@@ -243,7 +244,7 @@ export async function runEngine(
   const siteIds = sites.map((s) => s.id);
   const windows = await loadWindows(db, siteIds, now);
   for (const s of sites) s.windows = windows.get(s.id);
-  const [checks, statuses, carries, incidents, verifier, crawler, pages] = await Promise.all([
+  const [checks, statuses, carries, incidents, verifier, crawler, pages, expiry] = await Promise.all([
     loadChecks(db, since),
     db
       .from('site_status')
@@ -261,6 +262,7 @@ export async function runEngine(
     loadVerifierState(db, since, now),
     loadCrawler(db, now),
     loadPageChange(db, now),
+    loadExpiry(db),
   ]);
   /** D-046: page changes held back (alerts off, or recording), logged instead of acted on. */
   const pageHeld = new Set<string>();
@@ -519,6 +521,7 @@ export async function runEngine(
         ...(verifier.jobs.get(m.id) ? { verifications: verifier.jobs.get(m.id)! } : {}),
         ...withCrawler(crawlerFor(site, m)),
         ...withPageChange(pageChangeFor(site, m)),
+        ...(m.isPrimary ? withExpiry(expiryFor(expiry.get(site.id), m.url)) : {}),
       })),
       verifierAvailable: verifier.available,
       behindWaf: site.behindWaf,
@@ -695,6 +698,55 @@ type CheckRow = Awaited<ReturnType<typeof loadChecks>>[number];
 
 const withCrawler = (crawler: readonly CrawlerFact[] | undefined) => (crawler?.length ? { crawler } : {});
 const withPageChange = (pageChange: PageChangeInput | undefined) => (pageChange ? { pageChange } : {});
+const withExpiry = (expiry: ExpiryFact | undefined) => (expiry ? { expiry } : {});
+
+interface ExpiryRow {
+  host: string;
+  fact: ExpiryFact;
+}
+
+/**
+ * S13 (D-066): each site's latest SSL / domain expiry read. A failed read (a deploy ahead of
+ * `migrate-production` answers PGRST205) never holds the run back: no row is no data — it holds an
+ * open expiry PROBLEM and opens none.
+ */
+async function loadExpiry(db: DbClient): Promise<Map<string, ExpiryRow>> {
+  const bySite = new Map<string, ExpiryRow>();
+  const { data, error } = await db
+    .from('site_expiry')
+    .select(
+      'site_id, host, ssl_expires_at, ssl_read_at, ssl_error, domain_expires_at, domain_read_at, domain_error',
+    );
+  if (error) {
+    console.error(JSON.stringify({ event: 'engine_site_expiry_failed', error: error.message }));
+    return bySite;
+  }
+  const date = (v: string | null) => (v ? new Date(v) : null);
+  for (const r of data ?? []) {
+    bySite.set(r.site_id, {
+      host: r.host,
+      fact: {
+        ssl: { expiresAt: date(r.ssl_expires_at), readAt: date(r.ssl_read_at), failed: r.ssl_error !== null },
+        domain: {
+          expiresAt: date(r.domain_expires_at),
+          readAt: date(r.domain_read_at),
+          failed: r.domain_error !== null,
+        },
+      },
+    });
+  }
+  return bySite;
+}
+
+/** The row's read, only while it was read from the primary's current host (db review S13). */
+function expiryFor(row: ExpiryRow | undefined, url: string): ExpiryFact | undefined {
+  if (!row) return undefined;
+  try {
+    return new URL(url).hostname === row.host ? row.fact : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Each live primary monitor's baseline and newest plain fetches (D-046, `engine_page_fingerprints`):

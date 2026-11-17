@@ -1,5 +1,6 @@
 import {
   CRAWLER_LABELS,
+  formatDay,
   PROBE_LOCATIONS,
   TIER_CONFIG,
   type CrawlerView,
@@ -103,7 +104,19 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
       return `${d.path} · ${pageChange(d)}`;
     case 'intermittent':
       return `Timing out on and off (${where(d.locations)}) · ${d.blips} times in ${d.windowMin} min`;
+    case 'ssl':
+    case 'domain':
+      // ChatAlert "SSL expiring": "SSL certificate expires in 13 days (Tue 6 Oct)" (D-066).
+      return `${d.kind === 'ssl' ? 'SSL certificate' : 'Domain'} ${expiresIn(d.daysLeft)} (${formatDay(new Date(d.expiresAt), { weekday: true })})`;
   }
+}
+
+/** "expires in 13 days", "expires in 1 day", "expires today", "expired 2 days ago". */
+function expiresIn(days: number): string {
+  if (days === 0) return 'expires today';
+  const n = Math.abs(days);
+  const span = `${n} day${n === 1 ? '' : 's'}`;
+  return days > 0 ? `expires in ${span}` : `expired ${span} ago`;
 }
 
 function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
@@ -137,6 +150,10 @@ function innerSummary(d: ProblemDetail, ctx: ProblemCauseContext): string {
       return pageChangeSummary(d);
     case 'intermittent':
       return 'timing out on and off';
+    case 'ssl':
+      return `SSL certificate ${expiresIn(d.daysLeft)}`;
+    case 'domain':
+      return `domain ${expiresIn(d.daysLeft)}`;
   }
 }
 
