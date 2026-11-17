@@ -1,4 +1,4 @@
-import { expiryIssue, expiryNoData, type ExpiryFact } from './expiry';
+import { expiryIssue, expiryUnknown, isExpiryTrigger, type ExpiryFact } from './expiry';
 import { failsHere, firstTimeoutRound, isHardFail, isTlsChainFail } from './hard-fail';
 import {
   CRAWLER_FRESH_MS,
@@ -440,10 +440,11 @@ function judgeSiteRound(
   });
   const primaryVerdict = verdicts.find((x) => x.m.isPrimary)?.v ?? { kind: 'insufficient' as const };
 
-  // ── PROBLEM: the primary's first, then the key pages in order ──
-  const problem = [...verdicts]
-    .sort((a, b) => Number(b.m.isPrimary) - Number(a.m.isPrimary))
-    .find((x) => x.v.kind === 'problem');
+  // ── PROBLEM: the primary's first, then the key pages in order; an SSL / domain expiry last of all
+  // (D-066: the least urgent — a key page failing outranks it) ──
+  const rank = (x: (typeof verdicts)[number]) =>
+    x.v.kind === 'problem' && isExpiryTrigger(x.v.trigger) ? 2 : x.m.isPrimary ? 0 : 1;
+  const problem = [...verdicts].sort((a, b) => rank(a) - rank(b)).find((x) => x.v.kind === 'problem');
   if (problem && problem.v.kind === 'problem') {
     // D-023: a DOWN drop is over once the home page answers again, whatever a key page says.
     // RECOVERED, and what still fails joins as PROBLEM AGAIN in the same round (spec §19.7).
@@ -1183,10 +1184,11 @@ function problemOf(
  * whose read failed, went stale or is missing is no evidence either way — it holds until a good read.
  */
 function expiryHolds(m: SiteMonitor, s: SiteSnapshot): boolean {
-  const t = m.carry.trigger;
-  if (!m.isPrimary || m.carry.status !== 'problem' || (t !== 'ssl' && t !== 'domain')) return false;
-  if (!s.open || RECOVERED_STATES.includes(s.open.state)) return false;
-  return expiryNoData(m.expiry, t, s.now);
+  const open = s.open;
+  // Keyed on the open PROBLEM drop, as crawlerHolds / intermittentHolds (engine review M2).
+  if (!m.isPrimary || !open || RECOVERED_STATES.includes(open.state)) return false;
+  if ((open.episodeSeverity ?? open.severity) !== 'problem') return false;
+  return expiryUnknown(m.expiry, m.carry.status === 'problem' ? m.carry.trigger : null, s.now);
 }
 
 /** When a problem started: slow at its first slow round, regional at the location's first failure. */

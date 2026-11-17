@@ -14,6 +14,7 @@ import {
   type Severity,
   type Trigger,
 } from '@dxt/shared';
+import { expiryNow } from '@dxt/notifier';
 import type { PersonWhoCanAct } from '@/components/states';
 import { mayAcknowledge } from './ack-rule';
 
@@ -248,7 +249,9 @@ export function buildIncidentView(
     cause:
       detected?.payload.manual === true
         ? `Opened by ${str(detected.payload.openedBy) ?? 'someone'} from a hand check${str(detected.payload.note) ? ` · “${str(detected.payload.note)}”` : ''}`
-        : (str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger]),
+        : (expiryNow(detected?.payload.detail, now)?.cause ??
+          str(detected?.payload.cause) ??
+          TRIGGER_LABELS[i.trigger]),
     siteUrl: i.sites.monitors.find((m) => m.is_primary)?.url ?? null,
     ack,
   };

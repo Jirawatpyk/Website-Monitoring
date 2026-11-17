@@ -5,7 +5,14 @@
  * PROBLEM order. A read that failed, or whose last good read is over 36 h old, is no data: it never
  * opens one and holds an open one (as D-042).
  */
-import { daysLeft, isExpiryAlert, type ProblemDetail } from '@dxt/shared';
+import {
+  bangkokDayStart,
+  daysLeft,
+  DOMAIN_ALERT_DAYS,
+  isExpiryAlert,
+  SSL_ALERT_DAYS,
+  type ProblemDetail,
+} from '@dxt/shared';
 
 /** A good read older than this is no data (the cron reads every site at least daily). */
 export const EXPIRY_FRESH_MS = 36 * 60 * 60_000;
@@ -46,14 +53,33 @@ export function expiryIssue(
       return {
         trigger: kind,
         detail: { kind, expiresAt: d.expiresAt.toISOString(), daysLeft: days },
-        at: d.readAt,
+        // Since the line was crossed (the Bangkok day the count fell under it), never before the read.
+        at: new Date(Math.max(d.readAt.getTime(), crossedAt(kind, d.expiresAt).getTime())),
       };
     }
   }
   return null;
 }
 
-/** The half behind an open `ssl` / `domain` PROBLEM has no evidence now (failed, stale or missing). */
-export function expiryNoData(fact: ExpiryFact | undefined, kind: ExpiryKind, now: Date): boolean {
-  return freshDate(fact?.[kind], now) === null;
+/** Midnight Bangkok of the day the count first reads under the line (13 days left for SSL). */
+function crossedAt(kind: ExpiryKind, expiresAt: Date): Date {
+  const line = kind === 'ssl' ? SSL_ALERT_DAYS : DOMAIN_ALERT_DAYS;
+  return new Date(bangkokDayStart(expiresAt).getTime() - (line - 1) * 86_400_000);
+}
+
+export const isExpiryTrigger = (t: string | null | undefined): t is ExpiryKind =>
+  t === 'ssl' || t === 'domain';
+
+/**
+ * D-066 item 3 (engine review M2): a half with no evidence now — failed, stale or never read — whose
+ * last good date is under its line may be what keeps the site in PROBLEM, so it can't end one. With no
+ * row at all, only an open SSL / domain verdict on the primary is held.
+ */
+export function expiryUnknown(fact: ExpiryFact | undefined, carryTrigger: string | null, now: Date): boolean {
+  if (!fact) return isExpiryTrigger(carryTrigger);
+  return (['ssl', 'domain'] as const).some((k) => {
+    const h = fact[k];
+    if (freshDate(h, now)) return false;
+    return h.expiresAt ? isExpiryAlert(k, daysLeft(h.expiresAt, now)) : carryTrigger === k;
+  });
 }

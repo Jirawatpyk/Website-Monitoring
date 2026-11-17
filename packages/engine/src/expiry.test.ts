@@ -160,6 +160,25 @@ describe('decideSite — SSL / domain expiry (D-066)', () => {
     });
   });
 
+  it('a key page failing outranks it (engine review M1)', () => {
+    const key = monitor(
+      LOCATIONS.map((l, i) => ({ ...check(l, 'pass', 1 + i), statusCode: 404 })),
+      { id: 'booking', isPrimary: false, url: 'https://www.dxt-ai.example/booking' },
+    );
+    expect(decideSite(site([monitor(clean, { expiry: fact('2026-10-06', null) }), key]))).toMatchObject({
+      kind: 'problem',
+      trigger: 'key_page',
+    });
+  });
+
+  it('opened on the first round after midnight Bangkok, it starts at that midnight, not at the 06:00 read the day before', () => {
+    // Read Tue 22 Sep 06:00 (14 days left then); now Wed 23 Sep 09:00 → 13 days, crossed at 00:00 Wed.
+    const read = new Date('2026-09-21T23:00:00Z');
+    expect(
+      decideSite(site([monitor(clean, { expiry: fact('2026-10-06', null, { readAt: read }) })])),
+    ).toMatchObject({ kind: 'problem', startedAt: new Date('2026-09-22T17:00:00Z') });
+  });
+
   it('a key page never raises it, only the primary', () => {
     const key = monitor(clean, {
       id: 'booking',
@@ -192,19 +211,47 @@ describe('decideSite — SSL / domain expiry (D-066)', () => {
 
   describe('no evidence holds an open one (D-066 item 3)', () => {
     it.each<[string, MonitorCarry, ExpiryFact | undefined]>([
-      ['the latest SSL read failed', heldSsl, fact('2026-12-22', null, { sslFailed: true })],
+      [
+        'the latest SSL read failed (its last good date 13 days out)',
+        heldSsl,
+        fact('2026-10-06', null, { sslFailed: true }),
+      ],
       [
         'the last good read is 40 h old',
         heldSsl,
-        fact('2026-12-22', null, { readAt: new Date(NOW.getTime() - 40 * HOUR) }),
+        fact('2026-10-06', null, { readAt: new Date(NOW.getTime() - 40 * HOUR) }),
       ],
       ['the runner had no row', heldSsl, undefined],
-      ['the domain read failed', heldDomain, fact('2026-12-22', '2027-05-03', { domainFailed: true })],
+      [
+        'the domain read failed (20 days out)',
+        heldDomain,
+        fact('2026-12-22', '2026-10-13', { domainFailed: true }),
+      ],
+      [
+        'slow took the carry, slow cleared, the SSL read failed (engine review M2)',
+        { ...heldSsl, trigger: 'slow', slowRounds: 3 },
+        fact('2026-10-06', null, { sslFailed: true }),
+      ],
+      [
+        'renewed, but the domain read failed with its last good date 20 days out (engine review M2)',
+        heldSsl,
+        fact('2026-12-22', '2026-10-13', { domainFailed: true }),
+      ],
     ])('%s → no recovery', (_name, carry, expiry) => {
       expect(decideSite(site([monitor(clean, { carry, expiry })], { open }))).toMatchObject({
         kind: 'none',
         status: null,
       });
+    });
+
+    it('a failed read whose last good date is past its line doesn’t hold (the renewal was read)', () => {
+      expect(
+        decideSite(
+          site([monitor(clean, { carry: heldSsl, expiry: fact('2026-12-22', null, { sslFailed: true }) })], {
+            open,
+          }),
+        ),
+      ).toMatchObject({ kind: 'recover' });
     });
 
     it('a stale read on the other half doesn’t hold: the SSL PROBLEM recovers on a fresh SSL read', () => {

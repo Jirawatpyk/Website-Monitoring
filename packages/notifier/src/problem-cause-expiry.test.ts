@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ProblemDetail } from '@dxt/shared';
-import { formatProblemCause, formatProblemSummary, type ProblemCauseContext } from './problem-cause';
+import {
+  expiryNow,
+  formatProblemCause,
+  formatProblemSummary,
+  type ProblemCauseContext,
+} from './problem-cause';
 
 // S13 (D-066), ChatAlert board "PROBLEM cause wording", row SSL expiring: INC-0136 DxT AI ·
 // "SSL certificate expires in 13 days (Tue 6 Oct)". The board's "· not renewed yet" is left out:
@@ -47,5 +52,25 @@ describe('SSL / domain expiry cause and summary', () => {
   ])('%s', (_name, detail, cause, summary) => {
     expect(formatProblemCause(detail, home)).toBe(cause);
     expect(formatProblemSummary(detail, home)).toBe(summary);
+  });
+});
+
+describe('expiryNow (D-066 item 2: the count moves with the day)', () => {
+  const detail = { kind: 'ssl', expiresAt: '2026-10-06T13:00:00Z', daysLeft: 13 };
+  it('five days after opening: 8 days left, in the cause and in the reports’ trigger words (§36)', () => {
+    expect(expiryNow(detail, new Date('2026-09-28T03:00:00Z'))).toEqual({
+      cause: 'SSL certificate expires in 8 days (Tue 6 Oct)',
+      summary: 'SSL certificate expires in 8 days',
+      label: 'SSL expiring — 8 days left',
+    });
+  });
+  it('a domain on its last day, and anything else', () => {
+    const today = new Date('2026-10-06T01:00:00Z');
+    expect(expiryNow({ kind: 'domain', expiresAt: '2026-10-06T13:00:00Z' }, today)?.label).toBe(
+      'Domain expiring — expires today',
+    );
+    expect(expiryNow({ kind: 'slow' }, today)).toBeNull();
+    expect(expiryNow({ kind: 'ssl', expiresAt: 'soon' }, today)).toBeNull();
+    expect(expiryNow(null, today)).toBeNull();
   });
 });

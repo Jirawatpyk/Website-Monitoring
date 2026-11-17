@@ -1,6 +1,12 @@
 import 'server-only';
 import { episodesFromTimeline, type Episode, type IncidentEventRow } from '@dxt/engine';
-import { shortCause, type MonitorFacts, type ReportIncident, type ReportPerson } from '@dxt/notifier';
+import {
+  expiryNow,
+  shortCause,
+  type MonitorFacts,
+  type ReportIncident,
+  type ReportPerson,
+} from '@dxt/notifier';
 import {
   clockMinutes,
   formatDay,
@@ -82,7 +88,7 @@ const payloadOf = (e: IncidentEventRow) =>
  * count: a PROBLEM raised to DOWN is worded by its `escalated_to_down`, never by the PROBLEM's
  * `detected` (engine review S14, M1). Events are sorted here: the embed has no order.
  */
-export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date): string {
+export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date, now = new Date()): string {
   if (row.trigger === 'manual') return TRIGGER_LABELS.manual;
   const raised = row.events.some((e) => e.type === 'escalated_to_down');
   const opened = row.events
@@ -99,6 +105,9 @@ export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date):
   const p = pick ? payloadOf(pick) : {};
   // Reported down by hand (D-055 item 7): no probe cause, so never "Hard fail" (/verify S14).
   if (p.manual === true) return TRIGGER_LABELS.manual;
+  // S13 (spec §36, D-066 item 2): "SSL expiring — 8 days left", counted at the report's time.
+  const expiry = severity === 'problem' ? expiryNow(p.detail, now) : null;
+  if (expiry) return expiry.label;
   if (severity === 'problem' && typeof p.summary === 'string' && p.summary.trim()) return p.summary.trim();
   if (severity === 'down' && typeof p.cause === 'string' && p.cause.trim()) return shortCause(p.cause);
   return severity === 'down' ? TRIGGER_LABELS.hard_fail : TRIGGER_LABELS[row.trigger];
@@ -133,7 +142,7 @@ export function reportIncident(
   // record says it came back from a DOWN (message-checker).
   const stillProblem =
     (severity === 'down' || row.severity === 'down') && open.severity === 'problem' && open.end === null
-      ? causeOf(row, 'problem', open.start)
+      ? causeOf(row, 'problem', open.start, now)
       : null;
   return {
     site: row.site.name,
@@ -146,7 +155,7 @@ export function reportIncident(
     // As of the report (09:00), not the period's midnight: DOWN AGAIN after `to` is still down (engine review).
     failing: last.end === null || (open.end === null && open.severity === 'down'),
     stillProblem,
-    cause: causeOf(row, severity, first.start),
+    cause: causeOf(row, severity, first.start, now),
     outsideHours: !inside(first.start),
     rootCause: rootCauseOf(row),
     state: row.state,

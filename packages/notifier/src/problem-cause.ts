@@ -1,6 +1,8 @@
 import {
   CRAWLER_LABELS,
+  daysLeft,
   formatDay,
+  TRIGGER_LABELS,
   PROBE_LOCATIONS,
   TIER_CONFIG,
   type CrawlerView,
@@ -109,6 +111,31 @@ function innerCause(d: ProblemDetail, ctx: ProblemCauseContext): string {
       // ChatAlert "SSL expiring": "SSL certificate expires in 13 days (Tue 6 Oct)" (D-066).
       return `${d.kind === 'ssl' ? 'SSL certificate' : 'Domain'} ${expiresIn(d.daysLeft)} (${formatDay(new Date(d.expiresAt), { weekday: true })})`;
   }
+}
+
+/**
+ * S13 (D-066 item 2): an SSL / domain PROBLEM stays open for days, so wherever its stored opening
+ * cause is read again (the replies, the incident header, the reports) the count is worked out for
+ * `now` from the stored expiry. `label` is the reports' form in trigger words (spec §36):
+ * "SSL expiring — 8 days left". Null for any other detail.
+ */
+export function expiryNow(
+  detail: unknown,
+  now: Date,
+): { cause: string; summary: string; label: string } | null {
+  const d = detail as { kind?: unknown; expiresAt?: unknown } | null;
+  if (!d || (d.kind !== 'ssl' && d.kind !== 'domain') || typeof d.expiresAt !== 'string') return null;
+  const expiresAt = new Date(d.expiresAt);
+  if (Number.isNaN(expiresAt.getTime())) return null;
+  const live = { kind: d.kind, expiresAt: d.expiresAt, daysLeft: daysLeft(expiresAt, now) } as const;
+  const ctx: ProblemCauseContext = { monitorUrl: '/', isPrimary: true, tier: 1, timeoutMs: 0 };
+  const n = live.daysLeft;
+  const left = n === 0 ? 'expires today' : n > 0 ? `${n} day${n === 1 ? '' : 's'} left` : 'expired';
+  return {
+    cause: formatProblemCause(live, ctx),
+    summary: formatProblemSummary(live, ctx),
+    label: `${TRIGGER_LABELS[d.kind]} — ${left}`,
+  };
 }
 
 /** "expires in 13 days", "expires in 1 day", "expires today", "expired 2 days ago". */

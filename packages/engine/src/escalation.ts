@@ -59,6 +59,15 @@ export interface LadderDue {
 const alwaysOn = (tier: number) => TIER_CONFIG[tier as Tier]?.alwaysOn ?? false;
 
 /**
+ * D-067: the tier whose clock an incident runs on. An SSL / domain PROBLEM runs on response hours on
+ * every tier — its first card waits for the opening and its ladder counts inside-hours minutes, as a
+ * Tier 2–3 PROBLEM does (D-034): nothing days away wakes anyone at night.
+ */
+export function clockTierOf(tier: Tier, trigger?: string | null): Tier {
+  return tier === 1 && (trigger === 'ssl' || trigger === 'domain') ? 2 : tier;
+}
+
+/**
  * Where the ladder's clock starts (D-036): "Confirmed down" — or, for an incident a mute silenced,
  * the moment its first alert went out once the mute was over (`incidents.alerted_at`). Pass it as
  * `detectedAt` to `ladderDue` / `scheduleOf` / `problemHoldUntil`; "Confirmed down" and "Down for"

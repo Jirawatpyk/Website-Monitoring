@@ -12,6 +12,7 @@ import {
   decideSite,
   faultState,
   probeMissing,
+  clockTierOf,
   problemHoldUntil,
   isInsideHours,
   bkkControlDown,
@@ -1220,7 +1221,7 @@ async function apply(
           ...(d.detail.kind === 'blocked' ? { verifier: d.detail.reason } : {}),
         },
         p_notify: !site.muted,
-        ...holdFor(site.tier, now, hours),
+        ...holdFor(clockTierOf(site.tier, d.trigger), now, hours),
         p_outside_hours: !isInsideHours(now, hours),
         ...judged,
       });
@@ -1285,7 +1286,7 @@ async function apply(
         // A thread whose first alert a mute held back gets that alert (the late card) instead of a
         // DOWN AGAIN out of context (engine review M2): lateAlerts runs after the sites.
         p_notify: !site.muted && alertQueued,
-        ...(d.severity === 'problem' ? holdFor(site.tier, d.detectedAt, hours) : {}),
+        ...(d.severity === 'problem' ? holdFor(clockTierOf(site.tier, d.trigger), d.detectedAt, hours) : {}),
         ...judged,
       });
       if (error) throw new Error(`engine_relapse_incident: ${error.message}`);
@@ -1364,7 +1365,7 @@ async function apply(
             homeBackAt: d.recoveredAt.toISOString(),
           },
           p_flapping: false,
-          ...holdFor(site.tier, d.recoveredAt, hours),
+          ...holdFor(clockTierOf(site.tier, d.then.trigger), d.recoveredAt, hours),
           // With its RECOVERED or not at all: a muted alert gets no reply out of context (engine review L3).
           p_notify: !site.muted && alertQueued,
           ...judged,

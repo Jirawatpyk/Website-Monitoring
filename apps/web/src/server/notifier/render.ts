@@ -35,6 +35,7 @@ import {
   type KeyPageFacts,
   type ProblemFacts,
   type VerifierDownReason,
+  expiryNow,
 } from '@dxt/notifier';
 import {
   clockMinutes,
@@ -273,12 +274,17 @@ function clientUpdateReaderOf(i: IncidentFacts, userId: string): { at: Date; noA
 /** The client the site belongs to; the site's name when it isn't loaded (an older facts query). */
 const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
 
-/** The cause line stored when the incident opened (its `detected` event). */
-function causeOf(i: IncidentFacts): string | null {
+/**
+ * The cause line stored when the incident opened (its `detected` event). An SSL / domain PROBLEM's
+ * days left are counted again for when the message goes (D-066 item 2).
+ */
+function causeOf(i: IncidentFacts, now: Date): string | null {
   const detected = i.incident_events?.find((e) => e.type === 'detected');
   const ctx = detected ? contextOf(detected.payload) : {};
   const manual = manualOf(ctx);
   if (manual) return manualCause(manual);
+  const expiry = expiryNow(ctx.detail, now);
+  if (expiry) return expiry.cause;
   return typeof ctx.cause === 'string' ? ctx.cause : null;
 }
 
@@ -578,7 +584,7 @@ export function renderEmail(
         // From the first failed check (D-002): 15 min on Tier 1; a Tier 2 night counts the wall clock.
         // By hand it can go before it fell due (D-055 item 3): how long it was down when it was sent.
         downMinutes: clockMinutes(new Date(i.started_at), byHandOf(ctx) ? new Date(n.created_at) : dueAt),
-        cause: causeOf(i),
+        cause: causeOf(i, sentAt),
         acked: i.acker && i.acked_at ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
         noAm: ctx.noAm === true,
         draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
@@ -615,7 +621,7 @@ export function renderEmail(
         owner: l0Of(i)?.display_name ?? null,
         asFyi,
         asked: namedIn(i, n.context).askedNames.join(' and ') || null,
-        cause: causeOf(i),
+        cause: causeOf(i, sentAt),
         toldAt: toldAtOf(i),
         fallback: ctx.fallback === true,
         clientUpdate: step.kind === 'fyi' ? clientUpdateFact(i) : null,
@@ -625,7 +631,7 @@ export function renderEmail(
       return buildAcknowledgedEmail({
         ...base,
         problem: problemOf(i),
-        cause: causeOf(i),
+        cause: causeOf(i, sentAt),
         ackedBy: str(ctx.ackedBy, 'someone'),
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
         startedAt: new Date(i.started_at),
@@ -644,7 +650,7 @@ export function renderEmail(
           trigger: i.trigger,
           flaggedAt: new Date(i.detected_at),
           recoveredAt: drop.end,
-          cause: causeOf(i),
+          cause: causeOf(i, sentAt),
           keyPage: keyPageOf(openedWith(i).keyPage),
         });
       }
