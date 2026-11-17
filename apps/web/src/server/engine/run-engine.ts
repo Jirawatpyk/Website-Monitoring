@@ -12,7 +12,6 @@ import {
   decideSite,
   faultState,
   probeMissing,
-  clockTierOf,
   problemHoldUntil,
   isInsideHours,
   bkkControlDown,
@@ -105,6 +104,8 @@ interface SiteRow {
   name: string;
   tier: Tier;
   muted: boolean;
+  /** When the mute ends, while one runs (D-067 item 5: a new cause waits for it). */
+  mutedUntil?: Date;
   /** Flagged behind a WAF: WAF-signed blocks sit the round out (D-027). */
   behindWaf: boolean;
   monitors: MonitorRow[];
@@ -128,6 +129,8 @@ export interface EngineSummary extends CronJobResult {
   relapses: number;
   /** D-067: expiry incidents that took a more urgent PROBLEM as their cause (only counted when one did). */
   newCauses?: number;
+  /** D-067 item 4: incidents whose new cause cleared and went back to their expiry (only when one did). */
+  causesBack?: number;
   /** Blocked rounds handed to the browser verifier this run (one per monitor). */
   verifying: number;
   /** Monitors the verifier couldn't decide this run: PROBLEM (unverified) (D-001). */
@@ -529,6 +532,8 @@ export async function runEngine(
       })),
       verifierAvailable: verifier.available,
       behindWaf: site.behindWaf,
+      // D-067 item 1: an SSL / domain expiry raises a PROBLEM only inside response hours.
+      expiryOpens: isInsideHours(now, hours),
       faulty,
       slowLocations,
     };
@@ -1081,6 +1086,9 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
       name: m.sites.name,
       tier,
       muted: !!m.sites.muted_until && new Date(m.sites.muted_until) > now,
+      ...(m.sites.muted_until && new Date(m.sites.muted_until) > now
+        ? { mutedUntil: new Date(m.sites.muted_until) }
+        : {}),
       behindWaf: m.sites.behind_waf,
       monitors: [],
     };
@@ -1131,7 +1139,17 @@ async function apply(
   hours: ResponseHours,
   /** Counts the PROBLEM AGAIN a D-023 recovery queues in the same round. */
   relapsed: () => void = () => {},
-): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | 'newCauses' | null> {
+): Promise<
+  | 'opened'
+  | 'problems'
+  | 'recovered'
+  | 'settled'
+  | 'escalated'
+  | 'relapses'
+  | 'newCauses'
+  | 'causesBack'
+  | null
+> {
   const at = now.toISOString();
   const incidentId = open?.id ?? null;
   // Inside a maintenance window with nothing open (D-036): the round is recorded, nothing opens and
@@ -1154,7 +1172,9 @@ async function apply(
       d.kind === 'open' ||
       d.kind === 'problem' ||
       d.kind === 'relapse' ||
-      d.kind === 'escalate')
+      d.kind === 'escalate' ||
+      // D-067 item 3: a window hides an expiry incident's new cause; it's told on the first round after.
+      d.kind === 'new_cause')
   ) {
     const { error } = await db.rpc('engine_record_round', {
       p_site_id: site.id,
@@ -1224,7 +1244,7 @@ async function apply(
           ...(d.detail.kind === 'blocked' ? { verifier: d.detail.reason } : {}),
         },
         p_notify: !site.muted,
-        ...holdFor(clockTierOf(site.tier, d.trigger), now, hours),
+        ...holdFor(site.tier, now, hours),
         p_outside_hours: !isInsideHours(now, hours),
         ...judged,
       });
@@ -1270,12 +1290,36 @@ async function apply(
           ...keyPageContext(d.detail, ctx),
           startedAt: startOf(d.startedAt),
         },
-        p_notify: !site.muted && alertQueued,
-        ...holdFor(clockTierOf(site.tier, d.trigger), now, hours),
+        // D-067 item 5: during a mute the reply waits for its end (cancelled if the cause clears first);
+        // a first card the mute silenced goes after it, worded with the new cause (no reply then).
+        p_notify: alertQueued,
+        ...newCauseHold(site, now, hours),
         ...judged,
       });
       if (error) throw new Error(`engine_new_cause_incident: ${error.message}`);
       return data ? 'newCauses' : null;
+    }
+
+    case 'cause_back': {
+      if (!incidentId) return null;
+      // D-067 item 4: the new cause cleared, the expiry is still under its line — silently back to it.
+      const ctx = causeContext(site, d.monitorId);
+      const { data, error } = await db.rpc('engine_cause_back_incident', {
+        p_incident_id: incidentId,
+        p_monitor_id: d.monitorId,
+        p_trigger: d.trigger,
+        p_round_at: d.roundAt.toISOString(),
+        p_context: {
+          cause: formatProblemCause(d.detail, ctx),
+          summary: formatProblemSummary(d.detail, ctx),
+          detail: d.detail as unknown as Json,
+          monitorUrl: ctx.monitorUrl,
+          startedAt: startOf(d.startedAt),
+        },
+        ...judged,
+      });
+      if (error) throw new Error(`engine_cause_back_incident: ${error.message}`);
+      return data ? 'causesBack' : null;
     }
 
     case 'relapse': {
@@ -1314,7 +1358,7 @@ async function apply(
         // A thread whose first alert a mute held back gets that alert (the late card) instead of a
         // DOWN AGAIN out of context (engine review M2): lateAlerts runs after the sites.
         p_notify: !site.muted && alertQueued,
-        ...(d.severity === 'problem' ? holdFor(clockTierOf(site.tier, d.trigger), d.detectedAt, hours) : {}),
+        ...(d.severity === 'problem' ? holdFor(site.tier, d.detectedAt, hours) : {}),
         ...judged,
       });
       if (error) throw new Error(`engine_relapse_incident: ${error.message}`);
@@ -1393,7 +1437,7 @@ async function apply(
             homeBackAt: d.recoveredAt.toISOString(),
           },
           p_flapping: false,
-          ...holdFor(clockTierOf(site.tier, d.then.trigger), d.recoveredAt, hours),
+          ...holdFor(site.tier, d.recoveredAt, hours),
           // With its RECOVERED or not at all: a muted alert gets no reply out of context (engine review L3).
           p_notify: !site.muted && alertQueued,
           ...judged,
@@ -1468,6 +1512,16 @@ async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promis
   }
   if (failed.length) throw new Error(`engine_post_late_alert: ${failed.join('; ')} (${queued} posted)`);
   return queued;
+}
+
+/**
+ * D-067 item 5: a new cause during a mute is held to the mute's end — and then, for a Tier 2–3 site
+ * outside response hours, to the next opening (D-034).
+ */
+function newCauseHold(site: SiteRow, now: Date, hours: ResponseHours): { p_hold_until?: string } {
+  const from = site.mutedUntil && site.mutedUntil > now ? site.mutedUntil : now;
+  const held = holdFor(site.tier, from, hours);
+  return held.p_hold_until || from === now ? held : { p_hold_until: from.toISOString() };
 }
 
 /** A Tier 2–3 PROBLEM flagged outside response hours waits for the next opening (spec §7, §19.2). */

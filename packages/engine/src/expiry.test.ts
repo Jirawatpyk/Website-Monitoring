@@ -338,4 +338,108 @@ describe('decideSite — a new cause on an open expiry incident (D-067)', () => 
       ),
     ).toMatchObject({ kind: 'escalate' });
   });
+
+  it('a D-023 drop of a DOWN takes no new cause', () => {
+    const d023: OpenIncident = { ...open, severity: 'down', episodeSeverity: 'problem', trigger: 'ssl' };
+    expect(
+      decideSite(
+        site([monitor(forbidden, { carry: heldSsl, expiry: fact('2026-10-06', null) })], { open: d023 }),
+      ),
+    ).toMatchObject({ kind: 'none' });
+  });
+});
+
+describe('decideSite — expiry outside response hours, and back to it (D-067 items 1, 4)', () => {
+  const night = { expiryOpens: false } as const;
+  const keywordOpen: OpenIncident = { ...open, trigger: 'keyword', episodeSeverity: 'problem' };
+  const heldKeyword: MonitorCarry = { ...NEW_MONITOR, status: 'problem', trigger: 'keyword' };
+
+  it('Tier 1 crossing the line at 00:00 (or a Saturday) → nothing until the hours open', () => {
+    expect(decideSite(site([monitor(clean, { expiry: fact('2026-10-06', null) })], night))).toMatchObject({
+      kind: 'none',
+      status: 'ok',
+    });
+  });
+
+  it('one already open (raised at 17:59) carries on at 18:01', () => {
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: heldSsl, expiry: fact('2026-10-06', null) })], { open, ...night }),
+      ),
+    ).toMatchObject({ kind: 'none', status: 'problem' });
+  });
+
+  it('a DOWN that recovers at 03:00 with the certificate under the line reads a clean RECOVERED', () => {
+    const downOpen: OpenIncident = {
+      ...open,
+      severity: 'down',
+      episodeSeverity: 'down',
+      trigger: 'hard_fail',
+    };
+    const carry: MonitorCarry = { ...NEW_MONITOR, status: 'down', trigger: 'hard_fail' };
+    const d = decideSite(
+      site([monitor(clean, { carry, expiry: fact('2026-10-06', null) })], {
+        open: downOpen,
+        okRounds: 1,
+        ...night,
+      }),
+    );
+    expect(d).toMatchObject({ kind: 'recover' });
+    expect(d).not.toHaveProperty('then');
+  });
+
+  it('the new cause cleared, the certificate still under the line → back to SSL expiring, silently', () => {
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: heldKeyword, expiry: fact('2026-10-06', null) })], {
+          open: keywordOpen,
+        }),
+      ),
+    ).toMatchObject({ kind: 'cause_back', trigger: 'ssl', monitorId: 'home', detail: { daysLeft: 13 } });
+  });
+
+  it('at night too: a plain PROBLEM incident still open may go back to its expiry', () => {
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: heldKeyword, expiry: fact('2026-10-06', null) })], {
+          open: keywordOpen,
+          ...night,
+        }),
+      ),
+    ).toMatchObject({ kind: 'cause_back', trigger: 'ssl' });
+  });
+
+  it('opened for slow, slow cleared with SSL under the line → back to SSL (a keyword then is a new cause)', () => {
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: { ...heldSsl, trigger: 'slow' }, expiry: fact('2026-10-06', null) })], {
+          open: { ...keywordOpen, trigger: 'slow' },
+        }),
+      ),
+    ).toMatchObject({ kind: 'cause_back', trigger: 'ssl' });
+  });
+
+  it('a keyword whose crawler view has no usable fetch holds: no evidence never reads as cleared', () => {
+    const stale = new Date(NOW.getTime() - 66 * 60_000);
+    const crawler = [
+      { view: 'googlebot' as const, checkedAt: stale, finalUrl: null, forbidden: ['บาคาร่า'] },
+    ];
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: heldKeyword, crawler, expiry: fact('2026-10-06', null) })], {
+          open: keywordOpen,
+        }),
+      ),
+    ).toMatchObject({ kind: 'none', status: null });
+  });
+
+  it('a recovered incident relapses into an expiry only inside the hours', () => {
+    const recovered: OpenIncident = { ...open, state: 'monitoring', trigger: 'keyword' };
+    expect(
+      decideSite(site([monitor(clean, { expiry: fact('2026-10-06', null) })], { open: recovered, ...night })),
+    ).toMatchObject({ kind: 'none', status: 'ok' });
+    expect(
+      decideSite(site([monitor(clean, { expiry: fact('2026-10-06', null) })], { open: recovered })),
+    ).toMatchObject({ kind: 'relapse', trigger: 'ssl' });
+  });
 });

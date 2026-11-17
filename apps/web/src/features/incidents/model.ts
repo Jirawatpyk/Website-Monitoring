@@ -1127,6 +1127,11 @@ export function timelineOf(
         const was = str(e.payload.was);
         const label = (t: string | null) =>
           t && t in TRIGGER_LABELS ? TRIGGER_LABELS[t as Trigger] : 'a problem';
+        // D-067 item 4: the new cause cleared, the expiry still under its line — back to it, silently.
+        if (e.payload.back === true) {
+          item(e, 'problem', `Back to ${label(trig)}`, `${label(was)} cleared · nobody was told`);
+          return;
+        }
         item(
           e,
           'problem',

@@ -1117,6 +1117,9 @@ isOneToOne: false
 "engine_cancel_ladder":
 { Args: { "p_incident_id": string,"p_reason": string }; Returns: number
                            },
+"engine_cause_back_incident":
+{ Args: { "p_context": Json,"p_incident_id": string,"p_monitor_id": string,"p_monitors"?: Json,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: boolean
+                           },
 "engine_checks":
 { Args: { "p_after_checked_at"?: string,"p_after_id"?: string,"p_limit"?: number,"p_since": string }; Returns: {
               "akamai_ok": boolean | null,

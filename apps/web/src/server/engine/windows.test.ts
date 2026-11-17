@@ -11,6 +11,15 @@ describe('engine windows (S09, D-036)', () => {
     for (const state of ['unacked', 'escalated', 'acknowledged']) expect(windowHides({ state })).toBe(false);
   });
 
+  it('D-067 item 3: an incident open only for SSL / domain expiry hides like none (as private.site_busy)', () => {
+    const open = { state: 'acknowledged', severity: 'problem', episode_severity: 'problem' };
+    expect(windowHides({ ...open, trigger: 'ssl' })).toBe(true);
+    expect(windowHides({ ...open, trigger: 'domain', episode_severity: null })).toBe(true);
+    expect(windowHides({ ...open, trigger: 'keyword' })).toBe(false);
+    // A D-023 drop of a DOWN stays a DOWN incident.
+    expect(windowHides({ ...open, severity: 'down', trigger: 'ssl' })).toBe(false);
+  });
+
   it('reads only windows whose start engine_log_windows checked (a failed log hides nothing)', async () => {
     const { db, calls } = fakeDb({});
     await loadWindows(db, ['s1'], new Date('2026-10-06T10:00:00Z'));

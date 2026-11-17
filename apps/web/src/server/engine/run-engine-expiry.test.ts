@@ -71,7 +71,7 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
     });
   });
 
-  it('on a Tier 1 site at night the first card waits for 09:00 (D-067)', async () => {
+  it('on a Tier 1 site at night nothing opens: an expiry raises a PROBLEM inside response hours only (D-067 item 1)', async () => {
     const night = new Date('2026-10-06T16:01:05Z'); // Tue 23:01 Bangkok
     const at2 = (sec: number) => new Date(Date.parse('2026-10-06T16:00:00Z') + sec * 1000).toISOString();
     const { db, rpcCalls } = fakeDb({
@@ -91,29 +91,43 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
       'site_expiry.select': { data: [row()] },
       'rpc.engine_open_incident': { data: 'i1' },
     });
-    await runEngine(db, night);
-    expect(rpcCalls.find((c) => c.name === 'engine_open_incident')?.args).toMatchObject({
-      p_trigger: 'ssl',
-      p_hold_until: '2026-10-07T02:00:00.000Z', // Wed 09:00 Bangkok
-    });
+    expect(await runEngine(db, night)).toMatchObject({ problems: 0 });
+    expect(rpcCalls.find((c) => c.name === 'engine_open_incident')).toBeUndefined();
   });
 
-  it('a forbidden word on a site open for SSL expiring posts the new cause (D-067)', async () => {
-    const forbidden = (location: string, sec: number) => ({
-      ...pass(location, sec),
-      keyword_forbidden: ['Index of /'],
-    });
-    const { db, rpcCalls } = fakeDb({
+  const forbidden = (location: string, sec: number) => ({
+    ...pass(location, sec),
+    keyword_forbidden: ['Index of /'],
+  });
+  /** Tubtong open for an SSL (or, `trigger`, another) PROBLEM, acknowledged, its card sent. */
+  const openDb = (
+    o: {
+      checks?: unknown[];
+      trigger?: string;
+      mutedUntil?: string | null;
+      tier?: number;
+      rpc?: Record<string, unknown>;
+    } = {},
+  ) =>
+    fakeDb({
       'probe_locations.select': { data: beating },
-      'monitors.select': { data: [{ ...monitor, must_not_contain: ['Index of /'] }] },
-      'rpc.engine_checks': { data: [forbidden('SIN', 0), forbidden('TYO', 1)] },
+      'monitors.select': {
+        data: [
+          {
+            ...monitor,
+            must_not_contain: ['Index of /'],
+            sites: { ...monitor.sites, tier: o.tier ?? 1, muted_until: o.mutedUntil ?? null },
+          },
+        ],
+      },
+      'rpc.engine_checks': { data: o.checks ?? [forbidden('SIN', 0), forbidden('TYO', 1)] },
       'site_expiry.select': { data: [row()] },
       'rpc.engine_monitor_status': {
         data: [
           {
             monitor_id: 'm1',
             status: 'problem',
-            trigger: 'ssl',
+            trigger: o.trigger ?? 'ssl',
             cause: 'x',
             slow_rounds: 0,
             failing_since: {},
@@ -128,7 +142,7 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
             monitor_id: 'm1',
             state: 'acknowledged',
             severity: 'problem',
-            trigger: 'ssl',
+            trigger: o.trigger ?? 'ssl',
             episode_severity: 'problem',
             started_at: '2026-10-06T00:00:00Z',
             detected_at: '2026-10-06T00:00:00Z',
@@ -144,7 +158,11 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
         ],
       },
       'rpc.engine_new_cause_incident': { data: true },
+      ...o.rpc,
     });
+
+  it('a forbidden word on a site open for SSL expiring posts the new cause (D-067)', async () => {
+    const { db, rpcCalls } = openDb();
     expect(await runEngine(db, now)).toMatchObject({ newCauses: 1 });
     expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')?.args).toMatchObject({
       p_incident_id: 'i1',
@@ -152,6 +170,38 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
       p_notify: true,
       p_context: { cause: 'Found “Index of /” on / (SIN, TYO)' },
     });
+  });
+
+  it('during a mute the new cause is held to the mute’s end (D-067 item 5)', async () => {
+    const { db, rpcCalls } = openDb({ mutedUntil: '2026-10-06T10:30:00Z' });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')?.args).toMatchObject({
+      p_notify: true,
+      p_hold_until: '2026-10-06T10:30:00.000Z',
+    });
+  });
+
+  it('a Tier 2 site muted until 19:00: the new cause waits for the opening after it (D-034)', async () => {
+    const { db, rpcCalls } = openDb({ mutedUntil: '2026-10-06T12:00:00Z', tier: 2 });
+    await runEngine(db, now);
+    expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')?.args).toMatchObject({
+      p_hold_until: '2026-10-07T02:00:00.000Z', // Wed 09:00 Bangkok
+    });
+  });
+
+  it('the keyword cleared with the certificate still 6 days out: back to SSL, silently (D-067 item 4)', async () => {
+    const { db, rpcCalls } = openDb({
+      trigger: 'keyword',
+      checks: [pass('SIN', 0), pass('TYO', 1)],
+      rpc: { 'rpc.engine_cause_back_incident': { data: true } },
+    });
+    expect(await runEngine(db, now)).toMatchObject({ causesBack: 1 });
+    expect(rpcCalls.find((c) => c.name === 'engine_cause_back_incident')?.args).toMatchObject({
+      p_incident_id: 'i1',
+      p_trigger: 'ssl',
+      p_context: { detail: { kind: 'ssl', daysLeft: 6 } },
+    });
+    expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')).toBeUndefined();
   });
 
   it('a row read from another host (the primary moved) is no data', async () => {

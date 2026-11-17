@@ -305,11 +305,13 @@ const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
  */
 function causeOf(i: IncidentFacts, now: Date): string | null {
   const events = i.incident_events ?? [];
-  // D-067: after a new cause, the latest one is the incident's cause.
-  const newCause = events
-    .filter((e) => e.type === 'new_cause')
+  // D-067: after a new cause (or back to the expiry), the latest one is the incident's cause — unless a
+  // PROBLEM AGAIN came since, which words its own drop.
+  const last = [...events]
+    .filter((e) => e.type === 'new_cause' || e.type === 'relapsed')
     .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''))
     .at(-1);
+  const newCause = last?.type === 'new_cause' ? last : undefined;
   const detected = newCause ?? events.find((e) => e.type === 'detected');
   const ctx = detected ? contextOf(detected.payload) : {};
   const manual = manualOf(ctx);

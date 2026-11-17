@@ -21,11 +21,22 @@ export function inWindow(w: SiteWindows | undefined, at: Date): boolean {
 
 /**
  * Whether a window hides a site's new problems given its open incident: none, or one that recovered
- * (Monitoring / Needs root cause don't stop a window starting, D-036). One still failing is never
- * hidden (§14.5).
+ * (Monitoring / Needs root cause don't stop a window starting, D-036), or one open only for an SSL /
+ * domain expiry (D-067 item 3: a plain PROBLEM incident whose cause is ssl / domain — the same rule as
+ * `private.site_busy`). One still failing otherwise is never hidden (§14.5).
  */
-export function windowHides(open: { state: string } | null | undefined): boolean {
-  return !open || open.state === 'monitoring' || open.state === 'needs_root_cause';
+export function windowHides(
+  open:
+    | { state: string; severity?: string; episode_severity?: string | null; trigger?: string | null }
+    | null
+    | undefined,
+): boolean {
+  if (!open || open.state === 'monitoring' || open.state === 'needs_root_cause') return true;
+  return (
+    open.severity === 'problem' &&
+    (open.episode_severity ?? 'problem') === 'problem' &&
+    (open.trigger === 'ssl' || open.trigger === 'domain')
+  );
 }
 
 /** When the latest window that ended at or before `at` ended: an incident it held back starts there. */

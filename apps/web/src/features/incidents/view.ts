@@ -107,12 +107,20 @@ const str = (v: unknown) => (typeof v === 'string' ? v : null);
 const num = (v: unknown) => (typeof v === 'number' ? v : null);
 
 /** Who may acknowledge this incident (D-016, `mayAcknowledge`). */
-/** D-067: the newest `new_cause` event, if the incident took one. */
+/**
+ * D-067: the newest `new_cause` event (a new cause, or back to the expiry), if the incident took one
+ * since its latest PROBLEM AGAIN — a relapse brings its own cause.
+ */
 function latestNewCause(events: readonly EventRow[]): EventRow | undefined {
-  return events
-    .filter((e) => e.type === 'new_cause')
-    .sort((a, b) => a.at.localeCompare(b.at))
-    .at(-1);
+  const sorted = [...events].sort((a, b) => a.at.localeCompare(b.at));
+  const last = sorted.filter((e) => e.type === 'new_cause' || e.type === 'relapsed').at(-1);
+  return last?.type === 'new_cause' ? last : undefined;
+}
+
+/** A new cause's words; back to an expiry, its days counted again (D-066 item 6). */
+function newCauseLine(e: EventRow | undefined, asOf: Date): string | null {
+  if (!e) return null;
+  return expiryNow(e.payload.detail, asOf)?.cause ?? str(e.payload.cause);
 }
 
 export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
@@ -258,7 +266,7 @@ export function buildIncidentView(
       detected?.payload.manual === true
         ? `Opened by ${str(detected.payload.openedBy) ?? 'someone'} from a hand check${str(detected.payload.note) ? ` · “${str(detected.payload.note)}”` : ''}`
         : // D-067: after a new cause, its words; an expiry's days counted to the recovery.
-          (str(latestNewCause(events)?.payload.cause) ??
+          (newCauseLine(latestNewCause(events), i.recovered_at ? new Date(i.recovered_at) : now) ??
           expiryNow(detected?.payload.detail, i.recovered_at ? new Date(i.recovered_at) : now)?.cause ??
           str(detected?.payload.cause) ??
           TRIGGER_LABELS[i.trigger]),

@@ -7,7 +7,6 @@ import {
   ladderClockStart,
   ladderDue,
   problemHoldUntil,
-  clockTierOf,
   scheduleOf,
   type LadderDue,
   type LadderInput,
@@ -316,23 +315,6 @@ describe('problemHoldUntil — a PROBLEM outside response hours waits until 09:0
     ['Tier 1 PROBLEM at night → now (24/7)', 1, '2026-09-24T22:14:00', null],
   ])('%s', (_case, tier, at, want) => {
     expect(problemHoldUntil(tier as 1 | 2 | 3, bkk(at), HOURS)).toEqual(want ? bkk(want) : null);
-  });
-});
-
-describe('clockTierOf — D-067: an SSL / domain PROBLEM runs on response hours on every tier', () => {
-  it.each([
-    ['Tier 1 SSL expiring', 1, 'ssl', 2],
-    ['Tier 1 Domain expiring', 1, 'domain', 2],
-    ['Tier 1 slow stays 24/7', 1, 'slow', 1],
-    ['Tier 1 DOWN stays 24/7', 1, 'hard_fail', 1],
-    ['Tier 3 SSL keeps its tier', 3, 'ssl', 3],
-  ])('%s', (_case, tier, trigger, want) => {
-    expect(clockTierOf(tier as 1 | 2 | 3, trigger)).toBe(want);
-  });
-  it('a Tier 1 SSL PROBLEM at midnight is held to 09:00, the ladder paused until then', () => {
-    expect(problemHoldUntil(clockTierOf(1, 'ssl'), bkk('2026-09-23T00:01:00'), HOURS)).toEqual(
-      bkk('2026-09-23T09:00:00'),
-    );
   });
 });
 

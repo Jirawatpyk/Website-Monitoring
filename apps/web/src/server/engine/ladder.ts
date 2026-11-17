@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { clockTierOf, incidentLadderClock, ladderDue, problemHoldUntil } from '@dxt/engine';
+import { incidentLadderClock, ladderDue, problemHoldUntil } from '@dxt/engine';
 import {
   escalationPlanSchema,
   type IncidentState,
@@ -27,7 +27,7 @@ export async function escalationTick(
   const { data, error } = await db
     .from('incidents')
     .select(
-      'id, state, severity, trigger, episode_severity, started_at, resolved_at, detected_at, alerted_at, escalation_level, escalation_plan',
+      'id, state, severity, episode_severity, started_at, resolved_at, detected_at, alerted_at, escalation_level, escalation_plan',
     )
     // Acknowledged too, but only Tier 1 DOWN: its FYI step still goes while the site is down (S10,
     // spec §14.1); no other plan fires anything after an ack.
@@ -55,11 +55,7 @@ export async function escalationTick(
       console.error(JSON.stringify({ event: 'escalation_plan_invalid', incident: inc.id }));
       continue;
     }
-    // D-067: an SSL / domain PROBLEM's clock runs on response hours on every tier.
-    const plan = {
-      ...parsed,
-      data: { ...parsed.data, tier: clockTierOf(parsed.data.tier as Tier, inc.trigger) },
-    };
+    const plan = parsed;
     try {
       // Confirmed down — or when a mute that silenced it was over and its first alert went (D-036) —
       // then only the minutes it was down: a recovery pauses the clock, a relapse resumes it (D-058).

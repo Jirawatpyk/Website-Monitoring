@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(12);
+select plan(25);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -82,6 +82,83 @@ select ok(
   'a recovered incident relapses instead (PROBLEM AGAIN)'
 );
 reset role;
+
+-- D-067 (H2): a PROBLEM AGAIN writes the cause it carries now.
+set local role service_role;
+select ok(
+  public.engine_relapse_incident('00000000-0000-0000-0000-0000000000e1', 'problem', 'keyword', now(), now(), now(), '{}', false, false),
+  'the recovered SSL incident relapses on a keyword'
+);
+reset role;
+select is((select trigger::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e1'), 'keyword',
+  'PROBLEM AGAIN writes the trigger: it no longer reads as open for SSL');
+
+-- D-067 item 4: the keyword cleared, the certificate still 13 days out — back to SSL, silently.
+insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key, hold_until)
+  values ('00000000-0000-0000-0000-0000000000e1', 'google_chat', 'problem_again',
+          '00000000-0000-0000-0000-0000000000e1', '{"newCause": true}', 'new_cause:held', now() + interval '8 hours');
+set local role service_role;
+select ok(
+  public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e1', null, 'ssl', now(),
+    '{"cause": "SSL certificate expires in 13 days (Tue 6 Oct)"}'),
+  'a keyword incident goes back to SSL expiring'
+);
+reset role;
+select is((select trigger::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e1'), 'ssl',
+  'it reads SSL expiring again');
+select ok(
+  exists (select 1 from public.incident_events
+     where incident_id = '00000000-0000-0000-0000-0000000000e1' and type = 'new_cause'
+       and (payload ->> 'back')::boolean and payload ->> 'was' = 'keyword' and payload ->> 'trigger' = 'ssl'),
+  'the timeline says it went back, from what'
+);
+select is(
+  (select count(*)::int from public.audit_log where entity_id = '00000000-0000-0000-0000-0000000000e1' and action = 'incident.cause_back'),
+  1, 'one audit row'
+);
+select is(
+  (select status::text from public.notifications where dedupe_key = 'new_cause:held'),
+  'cancelled', 'a new-cause reply not sent yet is cancelled'
+);
+set local role service_role;
+select ok(
+  not public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e1', null, 'domain', now(), '{}'),
+  'an expiry incident has nothing to go back to'
+);
+reset role;
+
+-- D-067 item 3: an incident open only for an expiry doesn't stop a window or a mute.
+select is(private.site_busy('00000000-0000-0000-0000-0000000000a1'), null, 'an SSL incident leaves the site free');
+update public.incidents set trigger = 'keyword' where id = '00000000-0000-0000-0000-0000000000e1';
+select is(private.site_busy('00000000-0000-0000-0000-0000000000a1'), 'INC-' || lpad(
+  (select number::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e1'), 4, '0'),
+  'a keyword incident still blocks it');
+
+-- D-067 item 2: a D-023 drop of a DOWN takes no new cause.
+update public.incidents set trigger = 'ssl', severity = 'down', episode_severity = 'problem'
+  where id = '00000000-0000-0000-0000-0000000000e1';
+set local role service_role;
+select ok(
+  not public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e1', null, 'keyword', now(), '{}', true),
+  'a DOWN incident whose home page is back takes no new cause'
+);
+reset role;
+
+-- D-067 item 5: a first card a mute silenced goes after it, worded with the cause it carries now.
+update public.incidents set severity = 'problem', state = 'unacked', acked_at = null
+  where id = '00000000-0000-0000-0000-0000000000e1';
+delete from public.notifications where incident_id = '00000000-0000-0000-0000-0000000000e1';
+insert into public.incident_events (incident_id, type, payload, at) values
+  ('00000000-0000-0000-0000-0000000000e1', 'new_cause', '{"cause": "Found “บาคาร่า” on /", "trigger": "keyword"}', now() + interval '1 second');
+set local role service_role;
+select ok(public.engine_post_late_alert('00000000-0000-0000-0000-0000000000e1', now() + interval '2 seconds'),
+  'the late card is queued');
+reset role;
+select is(
+  (select context ->> 'cause' from public.notifications where incident_id = '00000000-0000-0000-0000-0000000000e1'
+     and channel = 'google_chat' and template = 'problem'),
+  'Found “บาคาร่า” on /', 'worded with the new cause, not the SSL it opened with'
+);
 
 select tests.authenticate_as((select id from ids where name = 'arm'));
 select throws_ok(
