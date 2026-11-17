@@ -1,4 +1,5 @@
 import 'server-only';
+import { fetchAllPages } from '@/lib/csv';
 import type { DbClient, Json } from '@dxt/db';
 import {
   crawlerIssue,
@@ -1250,6 +1251,8 @@ async function apply(
           summary: formatProblemSummary(d.detail, ctx),
           detail: d.detail as unknown as Json,
           monitorUrl: ctx.monitorUrl,
+          // The trigger it was queued with: a held email still says it after a new cause (D-067).
+          trigger: d.trigger,
           // "3 of 3 locations" on the card: the locations voting when it opened.
           reporting,
           // A key page's parts, for the replies that name it (auto-resolved RECOVERED, §19.6).
@@ -1534,18 +1537,27 @@ async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promis
  */
 async function loadLeftExpiry(db: DbClient, ids: string[]): Promise<Set<string>> {
   if (!ids.length) return new Set();
-  const { data, error } = await db
-    .from('incident_events')
-    .select('incident_id, type, at, payload')
-    .in('incident_id', ids)
-    .in('type', ['new_cause', 'relapsed'])
-    .order('at');
-  if (error) {
-    console.error(JSON.stringify({ event: 'engine_new_cause_events_failed', error: error.message }));
+  // Paged (PostgREST answers at most 1,000 rows, silently: the newest would be the ones dropped).
+  let data: { incident_id: string; type: string; payload: unknown }[];
+  try {
+    data = await fetchAllPages(
+      (from, to) =>
+        db
+          .from('incident_events')
+          .select('incident_id, type, at, payload')
+          .in('incident_id', ids)
+          .in('type', ['new_cause', 'relapsed'])
+          .order('at')
+          .order('id')
+          .range(from, to),
+      { max: 50_000 },
+    );
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'engine_new_cause_events_failed', error: (err as Error).message }));
     return new Set();
   }
   const last = new Map<string, { type: string; payload: unknown }>();
-  for (const e of data ?? []) last.set(e.incident_id, e);
+  for (const e of data) last.set(e.incident_id, e);
   const left = new Set<string>();
   for (const [id, e] of last) {
     const p = (e.payload ?? {}) as { was?: unknown; back?: unknown };

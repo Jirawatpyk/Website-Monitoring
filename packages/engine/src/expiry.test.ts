@@ -478,4 +478,48 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
       decideSite(site([monitor(clean, { expiry: fact('2026-10-06', null) })], { open: recovered })),
     ).toMatchObject({ kind: 'relapse', trigger: 'ssl' });
   });
+
+  it('a DOWN incident whose PROBLEM AGAIN is SSL keeps it (never recover / relapse every other round)', () => {
+    const downAgain: OpenIncident = {
+      ...open,
+      severity: 'down',
+      episodeSeverity: 'problem',
+      trigger: 'hard_fail',
+    };
+    for (const over of [{}, night]) {
+      expect(
+        decideSite(
+          site([monitor(clean, { carry: heldSsl, expiry: fact('2026-10-06', null) })], {
+            open: downAgain,
+            ...over,
+          }),
+        ),
+      ).toMatchObject({ kind: 'none', status: 'problem' });
+    }
+  });
+
+  it('a keyword incident that never came from SSL recovers on a failed SSL read too (one rule with expiryNow)', () => {
+    const neverSsl: OpenIncident = { ...keywordOpen, leftExpiry: false };
+    expect(
+      decideSite(
+        site(
+          [monitor(clean, { carry: heldKeyword, expiry: fact('2026-10-06', null, { sslFailed: true }) })],
+          {
+            open: neverSsl,
+          },
+        ),
+      ),
+    ).toMatchObject({ kind: 'recover' });
+  });
+
+  it('the first round after a window: the keyword the window hid is the SSL incident’s new cause', () => {
+    const forbidden = all('pass', { keywordForbidden: ['บาคาร่า'] });
+    expect(
+      decideSite(
+        site([monitor(forbidden, { carry: heldKeyword, expiry: fact('2026-10-06', null) })], {
+          open: { ...open, episodeSeverity: 'problem' },
+        }),
+      ),
+    ).toMatchObject({ kind: 'new_cause', trigger: 'keyword' });
+  });
 });

@@ -1262,12 +1262,22 @@ function expiryNow(m: SiteMonitor, s: SiteSnapshot): ReturnType<typeof expiryIss
   if (!m.isPrimary) return null;
   const issue = expiryIssue(m.expiry, s.now);
   if (!issue) return null;
-  const o = s.open;
-  if (o && !RECOVERED_STATES.includes(o.state)) {
-    const plain = o.severity === 'problem' && (o.episodeSeverity ?? o.severity) === 'problem';
-    return plain && (isExpiryTrigger(o.trigger) || o.leftExpiry) ? issue : null;
-  }
+  if (s.open && !RECOVERED_STATES.includes(s.open.state)) return keepsExpiry(m, s) ? issue : null;
   return s.expiryOpens === false ? null : issue;
+}
+
+/**
+ * Whether the open, unrecovered incident is (or may go back to being) about the expiry — the one rule
+ * `expiryNow` and `expiryHolds` share: on its PROBLEM drop, the primary's last verdict was the expiry
+ * (a DOWN incident's PROBLEM AGAIN included — engine re-review: else it recovers and relapses every
+ * other round), or a PROBLEM incident whose cause is the expiry or came from it.
+ */
+function keepsExpiry(m: SiteMonitor, s: SiteSnapshot): boolean {
+  const o = s.open;
+  if (!o || RECOVERED_STATES.includes(o.state) || (o.episodeSeverity ?? o.severity) !== 'problem')
+    return false;
+  if (m.carry.status === 'problem' && isExpiryTrigger(m.carry.trigger)) return true;
+  return o.severity === 'problem' && (isExpiryTrigger(o.trigger) || !!o.leftExpiry);
 }
 
 /**
@@ -1275,10 +1285,9 @@ function expiryNow(m: SiteMonitor, s: SiteSnapshot): ReturnType<typeof expiryIss
  * whose read failed, went stale or is missing is no evidence either way — it holds until a good read.
  */
 function expiryHolds(m: SiteMonitor, s: SiteSnapshot): boolean {
-  const open = s.open;
-  // Keyed on the open PROBLEM drop, as crawlerHolds / intermittentHolds (engine review M2).
-  if (!m.isPrimary || !open || RECOVERED_STATES.includes(open.state)) return false;
-  if ((open.episodeSeverity ?? open.severity) !== 'problem') return false;
+  // Keyed on the open PROBLEM drop (engine review M2), and only one about the expiry (the same rule as
+  // `expiryNow`): a keyword incident that never came from SSL recovers on a failed read as on a fresh one.
+  if (!m.isPrimary || !keepsExpiry(m, s)) return false;
   return expiryUnknown(m.expiry, m.carry.status === 'problem' ? m.carry.trigger : null, s.now);
 }
 
