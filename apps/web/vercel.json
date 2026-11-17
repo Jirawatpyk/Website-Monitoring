@@ -5,6 +5,7 @@
     "src/app/api/cron/probe-sin/route.ts": { "regions": ["sin1"], "maxDuration": 90 },
     "src/app/api/cron/probe-tyo/route.ts": { "regions": ["hnd1"], "maxDuration": 90 },
     "src/app/api/cron/crawler/route.ts": { "regions": ["sin1"], "maxDuration": 120 },
+    "src/app/api/cron/expiry/route.ts": { "regions": ["sin1"], "maxDuration": 60 },
     "src/app/api/monitor-test/sin/route.ts": { "regions": ["sin1"], "maxDuration": 60 },
     "src/app/api/monitor-test/tyo/route.ts": { "regions": ["hnd1"], "maxDuration": 60 }
   },
@@ -14,6 +15,7 @@
     { "path": "/api/cron/engine", "schedule": "* * * * *" },
     { "path": "/api/cron/notifier", "schedule": "* * * * *" },
     { "path": "/api/cron/crawler", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/expiry", "schedule": "0 * * * *" },
     { "path": "/api/cron/housekeeping", "schedule": "30 20 * * *" },
     { "path": "/api/cron/reports", "schedule": "0 2 * * *" }
   ]
