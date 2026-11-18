@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(57);
+select plan(64);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -376,6 +376,57 @@ select ok(
   'the ack of the outage holds (D-004)'
 );
 
+-- Engine review: a DOWN AGAIN clears an ack given for the expiry — three times on one incident, each
+-- with an ACKNOWLEDGED sent (the re-key never grows past the 64-character key).
+create function pg_temp.ssl_ack_then_down(p_n int) returns boolean language plpgsql as $$
+begin
+  update public.incidents set episode_severity = 'problem', cause_trigger = 'ssl', state = 'acknowledged',
+         acked_at = now() - make_interval(secs => 100 - p_n), acked_by = (select id from ids where name = 'arm')
+    where id = '00000000-0000-0000-0000-0000000000e5';
+  insert into public.notifications (incident_id, channel, template, thread_key, context, status, sent_at, created_at)
+    values ('00000000-0000-0000-0000-0000000000e5', 'google_chat', 'acknowledged', '00000000-0000-0000-0000-0000000000e5',
+            '{}', 'sent', now(), now() - make_interval(secs => 100 - p_n));
+  return public.engine_relapse_incident('00000000-0000-0000-0000-0000000000e5', 'down', 'hard_fail',
+    now() + make_interval(secs => p_n), now() + make_interval(secs => p_n), now() + make_interval(secs => p_n),
+    '{}', false, false);
+end;
+$$;
+select ok(pg_temp.ssl_ack_then_down(1) and pg_temp.ssl_ack_then_down(2) and pg_temp.ssl_ack_then_down(3),
+  'three DOWN AGAINs, each clearing an ack of the SSL');
+select ok(
+  (select acked_at is null and acked_cause is null and state <> 'acknowledged' from public.incidents
+     where id = '00000000-0000-0000-0000-0000000000e5'),
+  'the expiry''s ack is cleared by the DOWN AGAIN'
+);
+select ok(
+  (select bool_and((after is not null) and (before ->> 'expiry_ack_cleared')::boolean and before ->> 'acked_by' is not null)
+     from public.audit_log where entity_id = '00000000-0000-0000-0000-0000000000e5' and action = 'incident.relapsed'
+       and before ? 'expiry_ack_cleared'),
+  'each audit row records the ack it cleared'
+);
+
+-- Engine review: an incident acknowledged before the migration (no acked_cause) keeps its ack on a DOWN.
+insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000a7', '00000000-0000-0000-0000-0000000000c1', 'Before S13', 1,
+   (select id from ids where name = 'arm'), true);
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000d7', '00000000-0000-0000-0000-0000000000a7', 'http', true, 'https://g.pgtap.test');
+insert into public.incidents (id, site_id, monitor_id, trigger, severity, episode_severity, state, started_at, detected_at,
+                              acked_at, acked_by, escalation_plan)
+  values ('00000000-0000-0000-0000-0000000000e7', '00000000-0000-0000-0000-0000000000a7',
+          '00000000-0000-0000-0000-0000000000d7', 'keyword', 'problem', 'problem', 'acknowledged',
+          now() - interval '1 day', now() - interval '1 day', now() - interval '1 day',
+          (select id from ids where name = 'arm'), public.escalation_plan_for(1::smallint, 'problem'));
+update public.incidents set acked_cause = null where id = '00000000-0000-0000-0000-0000000000e7';
+set local role service_role;
+select ok(public.engine_escalate_incident('00000000-0000-0000-0000-0000000000e7', now(), now(), '{}', false),
+  'an old acked keyword incident goes DOWN');
+reset role;
+select ok(
+  (select state = 'acknowledged' and acked_at is not null from public.incidents where id = '00000000-0000-0000-0000-0000000000e7'),
+  'its ack holds'
+);
+
 -- An ack of the keyword the SSL incident took as its new cause holds through a DOWN too (D-021).
 update public.incidents set acked_at = now(), acked_by = (select id from ids where name = 'nok'), state = 'acknowledged'
   where id = '00000000-0000-0000-0000-0000000000e3';
@@ -387,6 +438,30 @@ select ok(
   (select state = 'acknowledged' and acked_cause = 'keyword' from public.incidents where id = '00000000-0000-0000-0000-0000000000e3'),
   'the keyword''s ack holds'
 );
+
+-- message-checker: an expiry ack's ACKNOWLEDGED waiting for a retry is cancelled by the DOWN too.
+insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000c1', 'Retrying', 1,
+   (select id from ids where name = 'arm'), true);
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000d6', '00000000-0000-0000-0000-0000000000a6', 'http', true, 'https://f.pgtap.test');
+insert into public.incidents (id, site_id, monitor_id, trigger, severity, episode_severity, state, started_at, detected_at,
+                              acked_at, acked_by, escalation_plan)
+  values ('00000000-0000-0000-0000-0000000000e6', '00000000-0000-0000-0000-0000000000a6',
+          '00000000-0000-0000-0000-0000000000d6', 'ssl', 'problem', 'problem', 'acknowledged',
+          now() - interval '1 hour', now() - interval '1 hour', now() - interval '20 seconds',
+          (select id from ids where name = 'arm'), public.escalation_plan_for(1::smallint, 'problem'));
+insert into public.notifications (id, incident_id, channel, template, thread_key, context, status, attempts, next_retry_at)
+  values ('00000000-0000-0000-0000-0000000000f6', '00000000-0000-0000-0000-0000000000e6', 'google_chat', 'acknowledged',
+          '00000000-0000-0000-0000-0000000000e6', '{}', 'queued', 1, now() + interval '20 seconds');
+insert into public.notification_attempts (notification_id, attempt, ok, error)
+  values ('00000000-0000-0000-0000-0000000000f6', 1, false, 'HTTP 503');
+set local role service_role;
+select ok(public.engine_escalate_incident('00000000-0000-0000-0000-0000000000e6', now(), now(), '{}', false),
+  'the SSL-acked site goes DOWN');
+reset role;
+select is((select status::text from public.notifications where id = '00000000-0000-0000-0000-0000000000f6'),
+  'cancelled', 'the retrying ACKNOWLEDGED never posts after the DOWN');
 
 -- D-067 item 3 (db review): a window on a site open only for an expiry starts.
 insert into public.maintenance_windows (site_id, kind, starts_at, ends_at, reason, approved_at)

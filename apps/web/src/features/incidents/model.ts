@@ -1186,7 +1186,13 @@ export function timelineOf(
           e,
           down ? 'down' : 'problem',
           `${down ? 'Down' : 'Problem'} again${e.payload.flapping === true ? ' · flapping' : ''}`,
-          str(e.payload.summary) ?? str(e.payload.cause),
+          // D-067 item 6: an ack of the expiry doesn't silence the outage.
+          [
+            str(e.payload.summary) ?? str(e.payload.cause),
+            e.payload.ackCleared === true ? 'the acknowledgement of the expiry was cleared' : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || null,
           'relapse',
         );
         return;
@@ -1194,7 +1200,19 @@ export function timelineOf(
       case 'escalated_to_down':
         if (e.payload.manual === true)
           item(e, 'down', manualDownTitle(by, e.payload, true), MANUAL_DOWN_DETAIL);
-        else item(e, 'down', 'PROBLEM became DOWN', str(e.payload.cause));
+        else
+          item(
+            e,
+            'down',
+            'PROBLEM became DOWN',
+            // D-067 item 6: an ack of the expiry doesn't silence the outage.
+            [
+              str(e.payload.cause),
+              e.payload.ackCleared === true ? 'the acknowledgement of the expiry was cleared' : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || null,
+          );
         return;
       // §30.8: the first engine run after a stop, on an incident someone acted on by hand.
       case 'engine_back': {

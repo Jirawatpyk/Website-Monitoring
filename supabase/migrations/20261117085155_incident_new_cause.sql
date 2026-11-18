@@ -48,6 +48,10 @@ create trigger incidents_acked_cause
   before insert or update of acked_at on public.incidents
   for each row execute function private.incident_acked_cause();
 
+-- Incidents acknowledged before this migration: acknowledged for the cause they carry (no expiry
+-- incident exists before S13), so no open ack reads "unknown" (engine review).
+update public.incidents set acked_cause = coalesce(cause_trigger, trigger) where acked_at is not null;
+
 create function public.engine_new_cause_incident(
   p_incident_id uuid,
   p_monitor_id uuid,
@@ -301,10 +305,13 @@ declare
   v_to public.incident_state;
   v_after public.severity;
   v_expiry_ack boolean;
+  v_acked_at timestamptz;
+  v_acked_by uuid;
 begin
   select site_id, state, severity,
-         p_severity = 'down' and acked_at is not null and acked_cause in ('ssl', 'domain')
-    into v_site_id, v_from, v_before, v_expiry_ack
+         coalesce(p_severity = 'down' and acked_at is not null and acked_cause in ('ssl', 'domain'), false),
+         acked_at, acked_by
+    into v_site_id, v_from, v_before, v_expiry_ack, v_acked_at, v_acked_by
   from public.incidents
   where id = p_incident_id
     -- A DOWN never relapses a PROBLEM incident: that is engine_escalate_incident (D-021), which
@@ -352,10 +359,12 @@ begin
   if v_expiry_ack then
     update public.notifications
       set status = 'cancelled', error = 'Superseded: went down', next_retry_at = null
-      where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued' and attempts = 0;
+      where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued'
+        and attempts = (select count(*) from public.notification_attempts a where a.notification_id = public.notifications.id);
     update public.notifications
       set dedupe_key = coalesce(dedupe_key, '') || ':expiry-ack:' || to_char(p_detected_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-      where incident_id = p_incident_id and template = 'acknowledged' and status <> 'cancelled';
+      where incident_id = p_incident_id and template = 'acknowledged' and status <> 'cancelled'
+        and coalesce(dedupe_key, '') not like '%:expiry-ack:%';
   end if;
 
   insert into public.incident_events (incident_id, type, payload, at)
@@ -368,7 +377,9 @@ begin
 
   insert into public.audit_log (action, entity, entity_id, before, after)
   values ('incident.relapsed', 'incident', p_incident_id,
-          jsonb_build_object('state', v_from, 'severity', v_before),
+          jsonb_build_object('state', v_from, 'severity', v_before)
+            || case when v_expiry_ack then jsonb_build_object('expiry_ack_cleared', true,
+                 'acked_at', v_acked_at, 'acked_by', v_acked_by) else '{}'::jsonb end,
           jsonb_build_object('state', v_to, 'severity', v_after, 'episode', p_severity));
 
   update public.site_status
@@ -511,13 +522,16 @@ declare
   v_to public.incident_state;
   v_verify_job uuid := nullif(p_context ->> 'verifyJobId', '')::uuid;
   v_expiry_ack boolean;
+  v_acked_at timestamptz;
+  v_acked_by uuid;
 begin
   -- Tao, 17 Nov: an ack of an SSL / domain expiry ("waiting for the client to renew") never silences a
   -- real outage — the DOWN restarts the ladder as if nobody had acknowledged.
   -- An ack given while the incident was about the expiry: its cause is one, or was taken from one (an
   -- ack of the SSL, then a keyword new cause, then the DOWN — advisor).
-  select site_id, state, acked_at is not null and acked_cause in ('ssl', 'domain')
-    into v_site_id, v_from, v_expiry_ack
+  select site_id, state, coalesce(acked_at is not null and acked_cause in ('ssl', 'domain'), false),
+         acked_at, acked_by
+    into v_site_id, v_from, v_expiry_ack, v_acked_at, v_acked_by
   from public.incidents
   where id = p_incident_id and severity = 'problem' and state not in ('resolved', 'in_review', 'closed')
   for update;
@@ -558,10 +572,12 @@ begin
   if v_expiry_ack then
     update public.notifications
       set status = 'cancelled', error = 'Superseded: went down', next_retry_at = null
-      where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued' and attempts = 0;
+      where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued'
+        and attempts = (select count(*) from public.notification_attempts a where a.notification_id = public.notifications.id);
     update public.notifications
       set dedupe_key = coalesce(dedupe_key, '') || ':expiry-ack:' || to_char(p_detected_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-      where incident_id = p_incident_id and template = 'acknowledged' and status <> 'cancelled';
+      where incident_id = p_incident_id and template = 'acknowledged' and status <> 'cancelled'
+        and coalesce(dedupe_key, '') not like '%:expiry-ack:%';
   end if;
 
   insert into public.incident_events (incident_id, type, payload, at)
@@ -572,8 +588,8 @@ begin
   insert into public.audit_log (action, entity, entity_id, before, after)
   values ('incident.severity', 'incident', p_incident_id,
           jsonb_build_object('severity', 'problem', 'state', v_from, 'expiry_ack_cleared', v_expiry_ack)
-            || case when v_expiry_ack then (select jsonb_build_object('acked_at', acked_at, 'acked_by', acked_by)
-                                            from public.incidents where id = p_incident_id) else '{}'::jsonb end,
+            || case when v_expiry_ack then jsonb_build_object('acked_at', v_acked_at, 'acked_by', v_acked_by)
+                    else '{}'::jsonb end,
           jsonb_build_object('severity', 'down', 'state', v_to,
                              'l0_user_id', (select l0_user_id from public.incidents where id = p_incident_id)));
 
