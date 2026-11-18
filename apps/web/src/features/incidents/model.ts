@@ -1143,7 +1143,10 @@ export function timelineOf(
           e,
           'problem',
           `New cause: ${label(trig)}`,
-          `${str(e.payload.cause) ?? label(trig)} · was ${label(was)}`,
+          `${str(e.payload.cause) ?? label(trig)} · was ${label(was)}${
+            // D-067 item 2: an ack of the expiry doesn't cover the new cause (given back with the expiry).
+            e.payload.ackCleared === true ? ' · the acknowledgement of the expiry was set aside' : ''
+          }`,
         );
         return;
       }

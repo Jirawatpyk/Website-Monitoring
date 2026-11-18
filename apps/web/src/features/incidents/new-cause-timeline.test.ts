@@ -34,6 +34,32 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
     }),
   ];
 
+  it('says when an ack of the expiry was set aside or cleared (D-067 items 2, 6)', () => {
+    const t = timelineOf(
+      { ...i, severity: 'down' },
+      [
+        events[0]!,
+        ev('new_cause', '10:00:00', {
+          cause: 'Found “บาคาร่า”',
+          trigger: 'keyword',
+          was: 'ssl',
+          ackCleared: true,
+        }),
+        ev('escalated_to_down', '10:30:00', { cause: 'Timeout', ackCleared: true }),
+        ev('relapsed', '11:30:00', { severity: 'down', summary: 'Timeout', ackCleared: true }),
+      ],
+      nameOf,
+      new Date(at('11:35:00')),
+    );
+    const details = t.map((x) => x.detail ?? '');
+    expect(details.filter((d) => d.includes('the acknowledgement of the expiry was set aside'))).toHaveLength(
+      1,
+    );
+    expect(details.filter((d) => d.includes('the acknowledgement of the expiry was cleared'))).toHaveLength(
+      2,
+    );
+  });
+
   it('SSL renewed with the domain still due: "Now Domain expiring"', () => {
     const t = timelineOf(
       i,

@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(67);
+select plan(69);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -428,14 +428,28 @@ select ok(
 );
 reset role;
 select ok(
-  (select state = 'unacked' and acked_at is null and escalation_level = 0 and alerted_at = now()
+  (select state = 'escalated' and acked_at is null and escalation_level = 1 and alerted_at is null
+          and expiry_ack_by = (select id from ids where name = 'arm')
      from public.incidents where id = '00000000-0000-0000-0000-0000000000e8'),
-  'the ack of the SSL is cleared and the ladder starts again from the new cause'
+  'the ack of the SSL is set aside; the ladder carries on from its level (Tao, 18 Nov)'
 );
 select ok(
   (select dedupe_key like '%:expiry-ack:%' from public.notifications
      where incident_id = '00000000-0000-0000-0000-0000000000e8' and template = 'acknowledged'),
   'its old ACKNOWLEDGED stays the record, under its own key (the next ack posts)'
+);
+-- The keyword clears with the certificate still due: back to SSL, and the ack comes back.
+set local role service_role;
+select ok(
+  public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e8', null, 'ssl', now(), '{}'),
+  'back to SSL expiring'
+);
+reset role;
+select ok(
+  (select state = 'acknowledged' and acked_by = (select id from ids where name = 'arm') and acked_cause = 'ssl'
+          and expiry_ack_at is null
+     from public.incidents where id = '00000000-0000-0000-0000-0000000000e8'),
+  'the ack set aside is given back (no reminders all night for the certificate)'
 );
 
 -- Engine review: an incident acknowledged before the migration (no acked_cause) keeps its ack on a DOWN.

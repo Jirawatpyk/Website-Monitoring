@@ -29,6 +29,12 @@ alter table public.incidents add column cause_trigger public.incident_trigger;
 -- re-review). Kept by a trigger, so every writer of acked_at (ack, Undo, a DOWN clearing it) agrees.
 alter table public.incidents add column acked_cause public.incident_trigger;
 
+-- The ack of the expiry a new cause set aside, given back when the incident goes back to the expiry
+-- (Tao, 18 Nov: a keyword seen once at 23:00 must not leave a certificate 13 days out unacknowledged all
+-- night). Cleared by any new ack, by a DOWN, and once given back.
+alter table public.incidents add column expiry_ack_at timestamptz;
+alter table public.incidents add column expiry_ack_by uuid references public.profiles (id) on delete set null;
+
 create function private.incident_acked_cause()
 returns trigger
 language plpgsql
@@ -39,6 +45,9 @@ begin
     new.acked_cause := null;
   elsif tg_op = 'INSERT' or old.acked_at is distinct from new.acked_at then
     new.acked_cause := coalesce(new.cause_trigger, new.trigger);
+    -- A new ack (or the one given back) supersedes the ack a new cause set aside.
+    new.expiry_ack_at := null;
+    new.expiry_ack_by := null;
   end if;
   return new;
 end;
@@ -89,7 +98,16 @@ begin
   -- An incident on a PROBLEM drop whose cause is an expiry (a DOWN incident back up on SSL too, Tao
   -- 17 Nov), and only for a cause that isn't one.
   select i.site_id, coalesce(i.cause_trigger, i.trigger), i.state, i.severity, i.trigger,
-         coalesce(i.acked_at is not null and i.acked_cause in ('ssl', 'domain'), false), i.acked_at, i.acked_by
+         coalesce(p_notify and i.acked_at is not null and i.acked_cause in ('ssl', 'domain'), false)
+           -- …and only when the thread is told: the same cause again inside 30 min keeps the ack.
+           and not exists (
+             select 1 from public.notifications n
+             where n.incident_id = p_incident_id and n.channel = 'google_chat' and n.template = 'problem_again'
+               and coalesce((n.context ->> 'newCause')::boolean, false) and n.context ->> 'trigger' = p_trigger::text
+               and n.context ->> 'monitorUrl' is not distinct from p_context ->> 'monitorUrl'
+               and n.context ->> 'summary' is not distinct from p_context ->> 'summary'
+               and n.status <> 'cancelled' and n.created_at > now() - interval '30 minutes'),
+         i.acked_at, i.acked_by
     into v_site_id, v_was, v_state, v_severity, v_column, v_expiry_ack, v_acked_at, v_acked_by
   from public.incidents i
   where i.id = p_incident_id
@@ -108,17 +126,21 @@ begin
         expiry_left = true,
         cause_trigger = p_trigger,
         monitor_id = case when v_severity = 'problem' then coalesce(p_monitor_id, i.monitor_id) else i.monitor_id end,
-        -- Tao, 17 Nov: an ack given for the expiry doesn't cover the new cause — it is cleared and the
-        -- ladder starts again from the new cause (alerted_at: no level counted from the old clock).
+        -- Tao, 17–18 Nov: an ack given for the expiry doesn't cover the new cause — it is set aside and
+        -- the ladder carries on from where it was (as a relapse, D-004 / D-058; levels and clock kept).
         acked_at = case when v_expiry_ack then null else i.acked_at end,
         acked_by = case when v_expiry_ack then null else i.acked_by end,
-        state = case when v_expiry_ack then 'unacked'::public.incident_state else i.state end,
-        escalation_level = case when v_expiry_ack then 0 else i.escalation_level end,
-        alerted_at = case when v_expiry_ack then p_round_at else i.alerted_at end
+        state = case when not v_expiry_ack then i.state
+                     when i.escalation_level > 0 then 'escalated'::public.incident_state
+                     else 'unacked'::public.incident_state end
     where i.id = p_incident_id;
+  -- After the trigger (which clears them on any acked_at change): the ack set aside, to give back.
+  if v_expiry_ack then
+    update public.incidents set expiry_ack_at = v_acked_at, expiry_ack_by = v_acked_by where id = p_incident_id;
+  end if;
 
   if v_expiry_ack then
-    v_state := 'unacked';
+    v_state := (select state from public.incidents where id = p_incident_id);
     -- Its ACKNOWLEDGED still held or retrying never posts after the reply; a sent one stays the record.
     update public.notifications
       set status = 'cancelled', error = 'Superseded: new cause', next_retry_at = null
@@ -270,6 +292,11 @@ begin
     set trigger = case when severity = 'problem' then p_trigger else trigger end,
         expiry_left = false,
         cause_trigger = p_trigger,
+        -- Tao, 18 Nov: the ack of the expiry a new cause set aside comes back with the expiry.
+        acked_at = case when expiry_ack_at is not null and acked_at is null then expiry_ack_at else acked_at end,
+        acked_by = case when expiry_ack_at is not null and acked_at is null then expiry_ack_by else acked_by end,
+        state = case when expiry_ack_at is not null and acked_at is null then 'acknowledged'::public.incident_state
+                     else state end,
         monitor_id = case when severity = 'problem' then coalesce(p_monitor_id, monitor_id) else monitor_id end
     where id = p_incident_id;
 
@@ -281,7 +308,9 @@ begin
   insert into public.audit_log (action, entity, entity_id, before, after)
   values ('incident.cause_back', 'incident', p_incident_id,
           jsonb_build_object('trigger', v_was, 'state', v_state),
-          jsonb_build_object('trigger', p_trigger, 'state', v_state));
+          (select jsonb_build_object('trigger', p_trigger, 'state', i.state, 'acked_by', i.acked_by,
+                                     'acked_at', i.acked_at)
+           from public.incidents i where i.id = p_incident_id));
 
   update public.notifications
     set status = 'cancelled', error = 'Superseded: the new cause cleared', next_retry_at = null
@@ -366,6 +395,8 @@ begin
         trigger = case when p_severity = 'problem' and severity = 'problem' then p_trigger else trigger end,
         -- A new drop brings its own cause: nothing to go back to.
         expiry_left = false,
+        expiry_ack_at = null,
+        expiry_ack_by = null,
         cause_trigger = p_trigger,
         recovered_at = null,
         is_flapping = is_flapping or coalesce(p_flapping, false),
@@ -586,6 +617,8 @@ begin
         -- A DOWN drop: its own cause, nothing to go back to.
         cause_trigger = 'hard_fail',
         expiry_left = false,
+        expiry_ack_at = null,
+        expiry_ack_by = null,
         state = case
           when acked_at is not null and not v_expiry_ack then
             case when state in ('monitoring', 'needs_root_cause') then 'acknowledged'::public.incident_state
