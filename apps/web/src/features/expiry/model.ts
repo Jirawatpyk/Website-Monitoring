@@ -207,7 +207,12 @@ export function expiryView(
     const r = byId.get(s.id);
     return !!r && !r.ssl_checked_at && !r.ssl_error && !!r.domain_checked_at;
   }).length;
-  const halves = sites.length * 2 - noTls;
+  // A hosting platform's subdomain has no domain of its own (the read leaves the half empty, unchecked).
+  const noDomain = sites.filter((s) => {
+    const r = byId.get(s.id);
+    return !!r && !r.domain_checked_at && !r.domain_error && !!r.ssl_checked_at;
+  }).length;
+  const halves = sites.length * 2 - noTls - noDomain;
   const read = mine.reduce(
     (n, r) => n + (r.ssl_read_at && !r.ssl_error ? 1 : 0) + (r.domain_read_at && !r.domain_error ? 1 : 0),
     0,
@@ -235,7 +240,7 @@ export function expiryView(
     kpis,
     meta: parts.join(' · '),
     certificates: sites.length - noTls,
-    domains: sites.length,
+    domains: sites.length - noDomain,
     summary: {
       due: soonList.length,
       failed: rows.filter((r) => r.status === 'failed').length,

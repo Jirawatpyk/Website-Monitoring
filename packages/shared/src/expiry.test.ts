@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { certificateKind, daysLeft, expiryCounts, isDueSoon, isExpiryAlert } from './expiry';
+import {
+  certificateKind,
+  daysLeft,
+  expiryCounts,
+  isDueSoon,
+  isExpiryAlert,
+  isHostedSubdomain,
+} from './expiry';
+
+describe('isHostedSubdomain', () => {
+  it('a hosting platform subdomain, never the platform itself or a look-alike', () => {
+    expect(isHostedSubdomain('dxt-test-target.vercel.app')).toBe(true);
+    expect(isHostedSubdomain('vercel.app')).toBe(false);
+    expect(isHostedSubdomain('www.myvercel.app')).toBe(false);
+    expect(isHostedSubdomain('www.voca.co.th')).toBe(false);
+  });
+});
 
 // Spec §15.8 / §14.12: days left computed from Fri 25 Sep 2026 (the Expiry board's snapshot date).
 const FRI = new Date('2026-09-25T03:07:00Z'); // 10:07 Bangkok

@@ -62,6 +62,30 @@ export function isDueSoon(kind: 'ssl' | 'domain', days: number, autoRenew = fals
   return days < (kind === 'ssl' && autoRenew ? AUTO_RENEW_SOON_DAYS : DUE_SOON_DAYS);
 }
 
+/**
+ * Hosting platforms that hand out subdomains (`dxt-test-target.vercel.app`): the site has no domain of
+ * its own to renew, so the domain half is not read at all — like a site served without TLS has no
+ * certificate (/verify 19 Nov: the staging Test target read "No registry lookup for .app" forever).
+ */
+const HOSTED_SUFFIXES = [
+  'vercel.app',
+  'netlify.app',
+  'github.io',
+  'pages.dev',
+  'web.app',
+  'firebaseapp.com',
+  'herokuapp.com',
+  'azurewebsites.net',
+  'onrender.com',
+  'fly.dev',
+];
+
+/** The host is a subdomain of a hosting platform: no domain expiry to read. */
+export function isHostedSubdomain(host: string): boolean {
+  const h = host.trim().toLowerCase().replace(/\.$/, '');
+  return HOSTED_SUFFIXES.some((s) => h.endsWith(`.${s}`));
+}
+
 /** Red under the alert line, amber when due soon, plain otherwise. */
 export type ExpiryTone = 'alert' | 'soon' | 'plain';
 

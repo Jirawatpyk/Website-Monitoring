@@ -8,7 +8,7 @@ import {
   type CertificateRead,
   type DomainRead,
 } from '@dxt/probe';
-import { registrableDomain } from '@dxt/shared';
+import { isHostedSubdomain, registrableDomain } from '@dxt/shared';
 import type { CronJobResult } from '../cron-job';
 import { inBatches } from '../in-batches';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
@@ -38,6 +38,8 @@ export interface ExpirySite {
   /** An https home page: it has a certificate to read (an http:// one only has its domain). */
   https: boolean;
   domain: string | null;
+  /** A hosting platform's subdomain (`*.vercel.app`): no domain of its own, the domain half isn't read. */
+  hosted: boolean;
   row: {
     host: string;
     domain: string | null;
@@ -113,7 +115,9 @@ export async function loadExpirySites(db: DbClient): Promise<ExpirySite[]> {
         siteName: m.sites.name,
         host,
         https: url.protocol === 'https:',
-        domain: registrableDomain(host),
+        // a hosting platform's subdomain has no domain of its own to renew
+        domain: isHostedSubdomain(host) ? null : registrableDomain(host),
+        hosted: isHostedSubdomain(host),
         row: bySite.get(m.site_id) ?? null,
         openExpiry: openSites.has(m.site_id),
       },
@@ -144,6 +148,8 @@ export function needsRead(s: ExpirySite, now: number): boolean {
 
 /** An http:// home page: nothing to read on 443. */
 const NO_TLS = Symbol('no TLS');
+/** A hosting platform's subdomain: no domain of its own to read. */
+const NO_DOMAIN = Symbol('no domain');
 
 const reason = (err: unknown) => (err instanceof ExpiryReadError ? err.message : 'Read failed');
 
@@ -188,7 +194,11 @@ export async function runExpiry({
     }
     const [cert, dom] = await Promise.allSettled([
       s.https ? readCert(s.host) : Promise.reject(NO_TLS),
-      s.domain ? domainOf(s.domain) : Promise.reject(new ExpiryReadError('No registrable domain')),
+      s.hosted
+        ? Promise.reject(NO_DOMAIN)
+        : s.domain
+          ? domainOf(s.domain)
+          : Promise.reject(new ExpiryReadError('No registrable domain')),
     ]);
     const at = new Date(clock()).toISOString();
     const row: ExpiryRow = { site_id: s.siteId, host: s.host, domain: s.domain };
@@ -232,13 +242,26 @@ export async function runExpiry({
         domain_checked_at: at,
         domain_error: null,
       } satisfies Partial<ExpiryRow>);
+    } else if (dom.reason === NO_DOMAIN) {
+      // No domain of its own (a hosting platform's subdomain): the domain half stays empty, and is
+      // never a failure — as the SSL half of a site without TLS.
+      Object.assign(row, {
+        domain_expires_at: null,
+        domain_source: null,
+        domain_read_at: null,
+        domain_checked_at: null,
+        domain_error: null,
+      });
     } else {
       Object.assign(row, { domain_checked_at: at, domain_error: reason(dom.reason) });
       if (s.row && s.row.domain !== s.domain) {
         Object.assign(row, { domain_expires_at: null, domain_source: null, domain_read_at: null });
       }
     }
-    if ((cert.status === 'rejected' && cert.reason !== NO_TLS) || dom.status === 'rejected')
+    if (
+      (cert.status === 'rejected' && cert.reason !== NO_TLS) ||
+      (dom.status === 'rejected' && dom.reason !== NO_DOMAIN)
+    )
       failed.push(s.siteName);
     // One object per upsert: PostgREST updates only the keys present, so a failed half keeps its
     // last good dates. Never batch these into an array — its column set is the union of every row's

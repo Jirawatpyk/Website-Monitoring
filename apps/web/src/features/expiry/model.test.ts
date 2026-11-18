@@ -201,6 +201,17 @@ describe('expiryView — alerts, failures and sites with no read', () => {
     expect(v.rows.find((r) => r.siteId === 'plain')!.status).toBe('ok');
   });
 
+  it('a hosting platform subdomain has one half to read: no domain, OK on its certificate', () => {
+    const v = expiryView(
+      [rec('t', '2027-01-29', 90, null, { domain_checked_at: null })],
+      [{ id: 't', name: 'Test target' }],
+      NOW,
+    );
+    expect(v.meta).toMatch(/· 1 of 1 read$/);
+    expect(v.domains).toBe(0);
+    expect(v.rows[0]!.status).toBe('ok');
+  });
+
   it('a site with no row yet: dashes, listed last, "not checked yet"', () => {
     const v = expiryView([], [{ id: 'new', name: 'New site' }], NOW);
     expect(v.rows[0]).toMatchObject({
