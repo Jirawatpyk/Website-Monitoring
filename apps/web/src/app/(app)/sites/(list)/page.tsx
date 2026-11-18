@@ -3,6 +3,8 @@ import { Button, Container, PageHeader } from '@jirawatpyk/aura-react';
 import { IconPlus } from '@jirawatpyk/aura-react/icons';
 import { listMeta, SitesEmpty, SitesList } from '@/features/sites';
 import { chatConnected, listSites } from '@/features/sites/server';
+import { ExpiryLink } from '@/features/expiry';
+import { getExpiry } from '@/features/expiry/server';
 import { getAccess } from '@/lib/auth/session';
 
 export const metadata: Metadata = { title: 'Sites' };
@@ -14,6 +16,8 @@ export default async function SitesPage() {
   const [sites, access] = await Promise.all([listSites(), getAccess()]);
   const active = access.status === 'active' ? access : null;
   const isAdmin = active?.profile.role === 'admin';
+  // MSites (§39.6): phones reach SSL & domains from a row at the foot of the list (staff only, as /expiry)
+  const expiry = active && active.profile.role !== 'client' && sites.length > 0 ? await getExpiry() : null;
 
   return (
     <Container>
@@ -51,6 +55,11 @@ export default async function SitesPage() {
             viewer={{ name: active?.profile.displayName ?? '', email: active?.profile.email ?? '' }}
             nowIso={new Date().toISOString()}
           />
+        )}
+        {expiry && (
+          <div className="md:hidden">
+            <ExpiryLink summary={expiry.summary} />
+          </div>
         )}
       </div>
     </Container>

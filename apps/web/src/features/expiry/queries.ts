@@ -10,7 +10,7 @@ const check = <T extends { error: { message: string } | null }>(name: string, r:
 /** Everything `/expiry` shows, read as the signed-in person (staff; `site_expiry` is staff-read). */
 export async function loadExpiry(db: DbClient, now: Date = new Date()): Promise<ExpiryData> {
   const [sites, records] = await Promise.all([
-    db.from('sites').select('id, name').eq('is_active', true).order('name'),
+    db.from('sites').select('id, name, created_at').eq('is_active', true).order('name'),
     db
       .from('site_expiry')
       .select(

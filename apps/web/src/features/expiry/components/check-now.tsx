@@ -1,7 +1,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@jirawatpyk/aura-react';
-import { IconRotateCcw } from '@jirawatpyk/aura-react/icons';
+import { IconInfo, IconRotateCcw } from '@jirawatpyk/aura-react/icons';
 import { formatDay, formatTime } from '@dxt/shared';
 
 /**
@@ -55,7 +55,12 @@ export function CheckNowButton({ onChecking }: { onChecking: (startedAt: string 
   return (
     <div className="flex w-full flex-col items-stretch gap-1 md:w-auto md:items-end">
       {button}
-      <span role="status" className={error ? 'text-sm text-alert-warning-fg' : 'sr-only'}>
+      {/* the board's line under the button: info icon, secondary text (§39.5) */}
+      <span
+        role="status"
+        className={error ? 'flex items-center gap-1.5 text-xs text-fg-secondary' : 'sr-only'}
+      >
+        {error && <IconInfo size="sm" aria-hidden />}
         {error ?? done ?? ''}
       </span>
     </div>

@@ -122,19 +122,19 @@ describe('expiryView — alerts, failures and sites with no read', () => {
       error: 'No registry lookup for .app',
       evidence: false,
     });
-    expect(v.meta).toMatch(/· 1 of 2 read$/);
+    expect(v.meta).toMatch(/· 1 of 2 read · 1 couldn't be read$/);
     expect(v.rows[0]!.status).toBe('failed');
   });
 
-  it('a failed read 10 days out stays listed as due, but not as "Would open a PROBLEM" (D-066 item 3)', () => {
+  it('a failed read 10 days out: greyed, "Couldn\'t read", first, in Within 60 days, counted nowhere (§39.4)', () => {
     const v = expiryView(
       [rec('cando', '2026-10-05', 90, '2027-04-24', { ssl_error: 'TLS handshake timed out' })],
       [{ id: 'cando', name: 'Cando Asia' }],
       NOW,
     );
     expect(v.rows[0]!.ssl).toMatchObject({ days: 10, tone: 'alert', evidence: false, date: '5 Oct 2026' });
-    expect(v.rows[0]!.status).toBe('soon');
-    expect(v.kpis.map((k) => k.value)).toEqual(['0', '0', '1']);
+    expect(v.rows[0]).toMatchObject({ status: 'failed', attention: true, soon: false });
+    expect(v.kpis.map((k) => k.value)).toEqual(['0', '0', '0']);
   });
 
   it('a good read older than 36 h is not evidence either', () => {
@@ -154,13 +154,34 @@ describe('expiryView — alerts, failures and sites with no read', () => {
     expect(fresh.kpis[0]!.value).toBe('1');
   });
 
-  it('an expired half reads "expired" in the caption, never "-3 d"', () => {
+  it('an expired half: status Expired, named under its alert card, not repeated under Due within 60 days (§39.4)', () => {
     const v = expiryView(
-      [rec('cando', '2026-09-22', 90, '2027-04-24')],
+      [rec('cando', '2026-09-24', 90, '2026-11-05')],
       [{ id: 'cando', name: 'Cando Asia' }],
       NOW,
     );
-    expect(v.kpis[2]!.caption).toBe('Cando Asia SSL expired');
+    expect(v.rows[0]!.status).toBe('expired');
+    expect(v.kpis[0]).toMatchObject({ value: '1', caption: 'Cando Asia SSL expired' });
+    expect(v.kpis[2]).toMatchObject({ value: '1', caption: 'Cando Asia domain 41 d' });
+  });
+
+  it("not checked yet and couldn't read sort first; a new site is named in the meta line", () => {
+    const v = expiryView(
+      [
+        rec('cando', '2026-11-19', 90, '2026-11-05'),
+        rec('orca', '2026-12-21', 90, '2027-03-15', { domain_error: 'RDAP 503' }),
+      ],
+      [
+        { id: 'cando', name: 'Cando Asia' },
+        { id: 'orca', name: 'ORCA Thailand' },
+        { id: 'eqho', name: 'EQHO Academy', created_at: '2026-09-25T01:40:00Z' },
+      ],
+      NOW,
+    );
+    expect(v.rows.map((r) => r.siteId)).toEqual(['orca', 'eqho', 'cando']);
+    expect(v.meta).toBe(
+      "Checked daily 06:00 · last check Fri 25 Sep 06:00 · 3 of 6 read · 1 couldn't be read · EQHO Academy not checked yet (added today 08:40)",
+    );
   });
 
   it('a site without TLS has one half to read', () => {

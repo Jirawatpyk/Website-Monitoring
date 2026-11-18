@@ -44,7 +44,7 @@ test.describe('SSL & domains (local Supabase)', () => {
     page,
     context,
     baseURL,
-  }) => {
+  }, info) => {
     await ensureUser('tao@example.test');
     await signIn(context, baseURL!, 'tao@example.test');
     await page.goto('/expiry');
@@ -52,18 +52,22 @@ test.describe('SSL & domains (local Supabase)', () => {
     await expect(page.getByText(/^Checked daily 06:00 · last check /)).toBeVisible();
     await expect(page.getByText('Due within 60 days')).toBeVisible();
 
-    const table = page.getByRole('table', { name: 'Certificate and domain expiry' });
-    const row = table.getByRole('row').filter({ hasText: '45' }).first();
-    await expect(row).toContainText('80');
-    await expect(row).toContainText('Due soon');
-    // Soonest first: the fixture's site leads the list.
-    await expect(table.getByRole('row').nth(1)).toContainText('Due soon');
+    // Desktop: the table; a phone: one card per site, the whole card a link (§39.6).
+    const phone = info.project.name === 'mobile';
+    const link = page.locator(`a[href="/sites/${siteId}"]:visible`).first();
+    const item = phone ? link : page.getByRole('row').filter({ has: link });
+    await expect(item).toContainText('80');
+    await expect(item).toContainText('45');
+    await expect(item).toContainText('Due soon');
+    if (phone) await expect(page.getByRole('table')).toBeHidden();
 
-    // Within 60 days: only the due rows stay.
+    // Within 60 days: only the due rows (and those not read yet) stay.
     await page.getByRole('radio', { name: 'Within 60 days' }).click();
     // (the badge exactly: "Bangkok" holds "ok" too)
-    await expect(table.getByText('OK', { exact: true })).toHaveCount(0);
-    await expect(row).toBeVisible();
+    await expect(page.locator('main').getByText('OK', { exact: true }).locator('visible=true')).toHaveCount(
+      0,
+    );
+    await expect(item).toBeVisible();
 
     // The fixture was read just now: Check now is refused, in words, and nothing is read.
     await page.getByRole('button', { name: 'Check now' }).click();

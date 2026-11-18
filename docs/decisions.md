@@ -107,7 +107,9 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 8. **No switch:** alerts are on from the merge. A dry run of the 16 production hosts on 17 Nov found the nearest certificate 29 days out and the nearest domain 102 days.
 9. **Addendum (18 Nov 2026, Tao, PR 3):**
    - **Weekly email lines:** the weekly email's COMING UP expiry lines use the Chat card's words ("Cando Asia domain in 38 days · SSL in 52"), not the WeeklyEmail board's "SSL: … expires Mon 7 Dec — auto-renews, checked daily". This follows spec §36: the email has the same content as the Chat card.
-   - **No evidence on the page:** a failed read, or a last good read more than 36 h old, is still listed on the Expiry page as due soon, in its tone, with its last good date (greyed when the read failed). It is also kept in "Within 60 days" and in the weekly lines. It is never counted under "Would open a PROBLEM", because the engine opens nothing from it (item 3).
+   - **No evidence on the page:** neither case is ever counted under "Would open a PROBLEM", because the engine opens nothing from it (item 3).
+     - A failed read follows spec §39.4 (drawn 18 Nov): the status is "Couldn't read", the last good date and day count are greyed, the row sorts first, and it stays in "Within 60 days" until a read works. It is counted in no card. The weekly lines keep its last good date.
+     - A good read more than 36 h old is listed and counted as due in its tone.
    - **Sites list column:** the Expiry column shows the sooner of the two halves in days. It is amber when either half is due soon and red under either alert line (spec §20).
 
 **Why.** The ChatAlert and Expiry boards both treat it as an incident like any other PROBLEM, and a Chat webhook can't reach the owner without posting in the Space. Inventing a "renewed by" field and a reminder flow has no board and no owner; the certificate itself tells auto-renew from paid.
