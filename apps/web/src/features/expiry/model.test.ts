@@ -87,7 +87,7 @@ describe('expiryView — the §15.8 figures on Fri 25 Sep 2026 (Done-when 2)', (
         label: 'Due within 60 days',
         value: '2',
         unit: 'items',
-        caption: 'Cando Asia domain 41 d · WeCare Studio domain 50 d',
+        caption: 'Cando Asia domain 41\u00a0d · WeCare Studio domain 50\u00a0d',
       },
     ]);
   });
@@ -162,7 +162,19 @@ describe('expiryView — alerts, failures and sites with no read', () => {
     );
     expect(v.rows[0]!.status).toBe('expired');
     expect(v.kpis[0]).toMatchObject({ value: '1', caption: 'Cando Asia SSL expired' });
-    expect(v.kpis[2]).toMatchObject({ value: '1', caption: 'Cando Asia domain 41 d' });
+    const both = expiryView(
+      [rec('cando', '2026-09-24', 90, '2027-04-24'), rec('wecare', '2026-10-05', 90, '2027-04-24')],
+      [
+        { id: 'cando', name: 'Cando Asia' },
+        { id: 'wecare', name: 'WeCare Studio' },
+      ],
+      NOW,
+    );
+    expect(both.kpis[0]).toMatchObject({
+      value: '2',
+      caption: 'Cando Asia SSL expired · 1 would open a PROBLEM',
+    });
+    expect(v.kpis[2]).toMatchObject({ value: '1', caption: 'Cando Asia domain 41\u00a0d' });
   });
 
   it("not checked yet and couldn't read sort first; a new site is named in the meta line", () => {

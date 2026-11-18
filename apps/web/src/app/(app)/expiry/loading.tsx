@@ -17,7 +17,12 @@ export default function Loading() {
             <CardSkeleton lines={2} />
           </div>
         </div>
-        <CardSkeleton lines={1} />
+        <div className="xl:hidden">
+          <CardSkeleton lines={1} />
+        </div>
+        <div className="max-xl:hidden">
+          <CardSkeleton lines={3} />
+        </div>
         <div className="xl:hidden" aria-hidden>
           <Skeleton variant="rect" height={44} />
         </div>

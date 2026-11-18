@@ -9,7 +9,8 @@ export const metadata: Metadata = { title: 'SSL & domains' };
 
 /** `/expiry` — SSL & domains (board Expiry, spec §14.12, §15.8; S13, D-066). Staff; Check now for Admins and Responders. */
 export default async function ExpiryPage() {
-  const access = await getAccess();
+  // both at once: RLS keeps site_expiry to staff, so the read is safe before the role is known
+  const [access, data] = await Promise.all([getAccess(), getExpiry()]);
   if (access.status !== 'active' || access.profile.role === 'client') {
     return (
       <Container>
@@ -20,7 +21,6 @@ export default async function ExpiryPage() {
       </Container>
     );
   }
-  const data = await getExpiry();
   const role = access.profile.role;
   return (
     <Container>

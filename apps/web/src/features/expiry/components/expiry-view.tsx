@@ -52,12 +52,21 @@ const alertsText = (hours: string) =>
   `SSL under 14 days or a domain under 30 days turns the site Problem and opens an incident for the owner. Domains and paid certificates under 60 days are listed here and in the weekly summary — no alert. Auto-renew certificates are only listed when under 30 days. An expired certificate is a hard fail, so the primary monitor catches it as Down. Alerts wait for response hours (${hours}) on every tier — nobody is paged at night for something days away.`;
 
 /** The date; "Couldn't read · Timeout" with the last good date under it, greyed; "Not checked yet" (§39.4). */
-function DateText({ half, unchecked }: { half: ExpiryHalf; unchecked: boolean }) {
+function DateText({
+  half,
+  unchecked,
+  last = true,
+}: {
+  half: ExpiryHalf;
+  unchecked: boolean;
+  /** The "last …" line under the reason; a card puts it on its own line after the pill instead. */
+  last?: boolean;
+}) {
   if (half.error) {
     return (
       <span className="flex flex-col items-start text-fg-secondary">
         <span>{`Couldn't read · ${readWords(half.error)}`}</span>
-        {half.date && <span className="text-xs">{`last ${half.date}`}</span>}
+        {last && half.date && <span className="text-xs">{`last ${half.date}`}</span>}
       </span>
     );
   }
@@ -173,16 +182,22 @@ function Card({ r }: { r: ExpiryRowView }) {
       <span className="flex items-start gap-x-2 tabular-nums">
         <span className="w-13 shrink-0 text-fg-secondary">SSL</span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <DateText half={r.ssl} unchecked={unchecked} />
+          <DateText half={r.ssl} unchecked={unchecked} last={false} />
           <DaysPill half={r.ssl} />
           {r.certificate && <span className="text-xs text-fg-secondary">{r.certificate}</span>}
+          {r.ssl.error && r.ssl.date && (
+            <span className="basis-full text-xs text-fg-secondary">{`last ${r.ssl.date}`}</span>
+          )}
         </span>
       </span>
       <span className="flex items-start gap-x-2 tabular-nums">
         <span className="w-13 shrink-0 text-fg-secondary">Domain</span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <DateText half={r.domain} unchecked={unchecked} />
+          <DateText half={r.domain} unchecked={unchecked} last={false} />
           <DaysPill half={r.domain} />
+          {r.domain.error && r.domain.date && (
+            <span className="basis-full text-xs text-fg-secondary">{`last ${r.domain.date}`}</span>
+          )}
         </span>
       </span>
     </Link>
@@ -317,7 +332,7 @@ export function ExpiryView({ data, canCheck }: { data: ExpiryData & { hours: str
                 value={soonOnly ? SOON : all}
                 onChange={(v) => setSoonOnly(v === SOON)}
                 size="sm"
-                touchHeight
+                touchHeight={wide ? 'always' : true}
                 fullWidth={wide}
               />
             </div>

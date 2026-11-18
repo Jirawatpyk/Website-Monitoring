@@ -165,7 +165,12 @@ export function expiryView(
     rows.filter((r) => r[kind].tone === 'alert' && r[kind].evidence && good(r[kind]));
   const caption = (list: ExpiryRowView[], kind: 'ssl' | 'domain', word: string) => {
     const gone = list.filter((r) => r[kind].days! < 0);
-    return gone.length ? gone.map((r) => `${r.name} ${word} expired`).join(' · ') : 'Would open a PROBLEM';
+    if (!gone.length) return 'Would open a PROBLEM';
+    const rest = list.length - gone.length;
+    return [
+      ...gone.map((r) => `${r.name} ${word} expired`),
+      ...(rest ? [`${rest} would open a PROBLEM`] : []),
+    ].join(' · ');
   };
   const ssl14 = alerting('ssl');
   const dom30 = alerting('domain');
@@ -189,7 +194,7 @@ export function expiryView(
       value: String(soonList.length),
       unit: soonList.length === 1 ? 'item' : 'items',
       caption: soonList.length
-        ? soonList.map((d) => `${d.name} ${d.kind} ${d.days} d`).join(' · ')
+        ? soonList.map((d) => `${d.name} ${d.kind} ${d.days}\u00a0d`).join(' · ')
         : 'Nothing due',
     },
   ];
