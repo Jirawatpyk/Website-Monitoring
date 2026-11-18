@@ -4,7 +4,7 @@ import { IconPlus } from '@jirawatpyk/aura-react/icons';
 import { listMeta, SitesEmpty, SitesList } from '@/features/sites';
 import { chatConnected, listSites } from '@/features/sites/server';
 import { ExpiryLink } from '@/features/expiry';
-import { getExpiry } from '@/features/expiry/server';
+import { getExpirySummary } from '@/features/expiry/server';
 import { getAccess } from '@/lib/auth/session';
 
 export const metadata: Metadata = { title: 'Sites' };
@@ -15,15 +15,15 @@ export const maxDuration = 60;
 export default async function SitesPage() {
   // MSites (§39.6): phones reach SSL & domains from a row at the foot of the list (staff only, as
   // /expiry); read alongside the list, not after it (site_expiry is staff-read, so a client reads none)
-  const [sites, access, expiryData] = await Promise.all([
+  const [sites, access, expirySummary] = await Promise.all([
     listSites(),
     getAccess(),
     // an optional row: a failed read leaves it out rather than failing the Sites page
-    getExpiry().catch(() => null),
+    getExpirySummary().catch(() => null),
   ]);
   const active = access.status === 'active' ? access : null;
   const isAdmin = active?.profile.role === 'admin';
-  const expiry = active && active.profile.role !== 'client' && sites.length > 0 ? expiryData : null;
+  const expiry = active && active.profile.role !== 'client' && sites.length > 0 ? expirySummary : null;
 
   return (
     <Container>
@@ -64,7 +64,7 @@ export default async function SitesPage() {
         )}
         {expiry && (
           <div className="md:hidden">
-            <ExpiryLink summary={expiry.summary} />
+            <ExpiryLink summary={expiry} />
           </div>
         )}
       </div>
