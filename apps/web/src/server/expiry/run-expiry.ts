@@ -143,6 +143,8 @@ export function needsRead(s: ExpirySite, now: number): boolean {
   if (!r || r.host !== s.host || s.openExpiry) return true;
   const old = (at: string | null) => !at || now - Date.parse(at) >= EXPIRY_REREAD_MS;
   if (s.https && (r.ssl_error || old(r.ssl_read_at))) return true;
+  // a hosted site whose row still has a domain error or date from before (D-066 item 9) is re-read once
+  if (s.hosted && (r.domain_error !== null || r.domain_read_at !== null)) return true;
   return domainReadable(s) && (r.domain_error !== null || old(r.domain_read_at));
 }
 

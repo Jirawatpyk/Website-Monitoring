@@ -250,6 +250,26 @@ describe('decideSite — SSL / domain expiry (D-066)', () => {
       });
     });
 
+    it.each<[string, MonitorCarry, ExpiryFact]>([
+      [
+        'the primary moved to a hosting platform subdomain: no domain to read',
+        heldDomain,
+        { ...fact('2026-12-22', null), domain: { expiresAt: null, readAt: null, failed: false, none: true } },
+      ],
+      [
+        'the primary moved to http://: no certificate to read',
+        heldSsl,
+        { ...fact(null, '2027-05-03'), ssl: { expiresAt: null, readAt: null, failed: false, none: true } },
+      ],
+    ])(
+      '%s → the open expiry recovers, never held for ever (engine review M1, 19 Nov)',
+      (_name, carry, expiry) => {
+        expect(decideSite(site([monitor(clean, { carry, expiry })], { open }))).toMatchObject({
+          kind: 'recover',
+        });
+      },
+    );
+
     it('a failed read whose last good date is past its line doesn’t hold (the renewal was read)', () => {
       expect(
         decideSite(

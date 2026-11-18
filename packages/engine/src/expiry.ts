@@ -24,6 +24,11 @@ export interface ExpiryHalf {
   readAt: Date | null;
   /** The latest attempt failed (the last good date may still be there). */
   failed: boolean;
+  /**
+   * Nothing to read by definition: a site without TLS has no certificate, a hosting platform's
+   * subdomain no domain (D-066 item 9). That is evidence of no expiry, so it ends an open one.
+   */
+  none?: boolean;
 }
 
 export interface ExpiryFact {
@@ -79,7 +84,7 @@ export function expiryUnknown(fact: ExpiryFact | undefined, carryTrigger: string
   if (!fact) return isExpiryTrigger(carryTrigger);
   return (['ssl', 'domain'] as const).some((k) => {
     const h = fact[k];
-    if (freshDate(h, now)) return false;
+    if (h.none || freshDate(h, now)) return false;
     return h.expiresAt ? isExpiryAlert(k, daysLeft(h.expiresAt, now)) : carryTrigger === k;
   });
 }
