@@ -508,7 +508,9 @@ function judgeSiteRound(
         detail: problem.v.detail,
         startedAt: problem.v.startedAt,
         detectedAt: roundAt,
-        flapping,
+        // D-067 item 1: an expiry joins after a clean recovery by rule, never because the site flapped
+        // (engine re-review: a DOWN, RECOVERED, then SSL would be its 3rd change in 30 min).
+        flapping: flapping && !isExpiryTrigger(problem.v.trigger),
         ...base,
         status: 'problem',
       };

@@ -1550,7 +1550,6 @@ async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promis
   return queued;
 }
 
-
 const INCIDENT_COLUMNS =
   'id, site_id, monitor_id, state, severity, trigger, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, is_manual, manual_at, root_cause_category, notifications(template)';
 

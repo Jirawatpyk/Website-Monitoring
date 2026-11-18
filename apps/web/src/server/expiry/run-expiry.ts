@@ -70,7 +70,7 @@ export interface ExpiryDeps {
  * http:// site serves none, whatever port 443 holds, but its domain can still lapse.
  */
 export async function loadExpirySites(db: DbClient): Promise<ExpirySite[]> {
-  const [monitors, rows, open, verdicts] = await Promise.all([
+  const [monitors, rows, open, verdicts, left] = await Promise.all([
     db
       .from('monitors')
       .select('url, site_id, sites!inner(name, is_active)')
@@ -84,13 +84,21 @@ export async function loadExpirySites(db: DbClient): Promise<ExpirySite[]> {
       .select('site_id, host, domain, ssl_read_at, ssl_error, domain_read_at, domain_error'),
     db.from('incidents').select('site_id').is('resolved_at', null).in('trigger', ['ssl', 'domain']),
     db.from('monitor_status').select('site_id').eq('status', 'problem').in('trigger', ['ssl', 'domain']),
+    // D-067: an incident whose drop is the expiry, or whose cause came from it (it may go back to it).
+    db
+      .from('incidents')
+      .select('site_id')
+      .is('resolved_at', null)
+      .or('cause_trigger.in.(ssl,domain),expiry_left.is.true'),
   ]);
   if (monitors.error) throw new Error(`monitors: ${monitors.error.message}`);
   if (rows.error) throw new Error(`site_expiry: ${rows.error.message}`);
   if (open.error) throw new Error(`incidents: ${open.error.message}`);
   if (verdicts.error) throw new Error(`monitor_status: ${verdicts.error.message}`);
+  // A database without S13's incident columns yet (a deploy ahead of migrate-production): skip them.
+  if (left.error && left.error.code !== '42703') throw new Error(`incidents: ${left.error.message}`);
   const bySite = new Map(rows.data.map((r) => [r.site_id, r]));
-  const openSites = new Set([...open.data, ...verdicts.data].map((i) => i.site_id));
+  const openSites = new Set([...open.data, ...verdicts.data, ...(left.data ?? [])].map((i) => i.site_id));
   return monitors.data.flatMap((m) => {
     let url: URL;
     try {

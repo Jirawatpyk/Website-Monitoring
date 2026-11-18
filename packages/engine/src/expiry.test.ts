@@ -519,6 +519,26 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
     ).toMatchObject({ kind: 'relapse', trigger: 'ssl' });
   });
 
+  it('opened, recovered, then SSL joins: no flapping tag for a change the rule made (D-024, engine re-review)', () => {
+    const recovered: OpenIncident = { ...open, state: 'monitoring', trigger: 'hard_fail', severity: 'down' };
+    const flips = { flips: [at(-600), at(-60)], flipOk: true }; // opened 10 min ago, recovered 1 min ago
+    expect(
+      decideSite(site([monitor(clean, { expiry: fact('2026-10-06', null) })], { open: recovered, ...flips })),
+    ).toMatchObject({ kind: 'relapse', trigger: 'ssl', flapping: false });
+    // A real third change still flaps (D-004).
+    expect(
+      decideSite(
+        site(
+          [monitor(all('pass', { keywordForbidden: ['บาคาร่า'] }), { expiry: fact('2026-10-06', null) })],
+          {
+            open: recovered,
+            ...flips,
+          },
+        ),
+      ),
+    ).toMatchObject({ kind: 'relapse', trigger: 'keyword', flapping: true });
+  });
+
   it('a DOWN incident whose PROBLEM AGAIN is SSL keeps it (never recover / relapse every other round)', () => {
     const downAgain: OpenIncident = {
       ...open,

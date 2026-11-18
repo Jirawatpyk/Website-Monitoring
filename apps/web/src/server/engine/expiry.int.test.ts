@@ -114,7 +114,7 @@ const incidentOf = (siteId: string) =>
   must(
     db
       .from('incidents')
-      .select('id, state, severity, episode_severity, trigger, expiry_left')
+      .select('id, state, severity, episode_severity, trigger, expiry_left, is_flapping')
       .eq('site_id', siteId)
       .single(),
   );
@@ -225,7 +225,13 @@ describe('S13 · an SSL incident takes a new cause and goes back, round after ro
     await judge(2);
     let inc = await incidentOf(siteId);
     // Recovered at round 1 (a clean RECOVERED), SSL joined as PROBLEM AGAIN at round 2.
-    expect(inc).toMatchObject({ severity: 'down', episode_severity: 'problem', state: 'unacked' });
+    // Opened, recovered, SSL joined: 3 changes by the rule, not a flapping site (engine re-review).
+    expect(inc).toMatchObject({
+      severity: 'down',
+      episode_severity: 'problem',
+      state: 'unacked',
+      is_flapping: false,
+    });
 
     // Maintenance over rounds 3–4.
     const { error } = await db.from('maintenance_windows').insert({
