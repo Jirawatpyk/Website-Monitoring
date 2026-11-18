@@ -13,11 +13,12 @@ export const maxDuration = 60;
 
 /** `/sites` — the Sites list (spec §20, boards Sites and MSites). */
 export default async function SitesPage() {
-  const [sites, access] = await Promise.all([listSites(), getAccess()]);
+  // MSites (§39.6): phones reach SSL & domains from a row at the foot of the list (staff only, as
+  // /expiry); read alongside the list, not after it (site_expiry is staff-read, so a client reads none)
+  const [sites, access, expiryData] = await Promise.all([listSites(), getAccess(), getExpiry()]);
   const active = access.status === 'active' ? access : null;
   const isAdmin = active?.profile.role === 'admin';
-  // MSites (§39.6): phones reach SSL & domains from a row at the foot of the list (staff only, as /expiry)
-  const expiry = active && active.profile.role !== 'client' && sites.length > 0 ? await getExpiry() : null;
+  const expiry = active && active.profile.role !== 'client' && sites.length > 0 ? expiryData : null;
 
   return (
     <Container>

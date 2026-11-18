@@ -308,6 +308,17 @@ describe('expiryOf — the Sites list Expiry column (S13, §15.8)', () => {
       expiryOf(row('2026-11-04T05:00:00Z', '2026-08-06T05:00:00Z', '2026-11-19T05:00:00Z'), FRI),
     ).toEqual({ expiryDays: 40, expiryTone: 'soon' });
   });
+  it('a half whose read failed counts nowhere: the other half decides (§39.4)', () => {
+    expect(
+      expiryOf(
+        {
+          ...row('2026-10-05T05:00:00Z', '2026-07-07T05:00:00Z', '2027-05-03T05:00:00Z'),
+          ssl_error: 'Timeout',
+        },
+        FRI,
+      ),
+    ).toEqual({ expiryDays: 220, expiryTone: 'plain' });
+  });
   it('nothing due: the sooner of the two, plain; no row: dashes', () => {
     expect(
       expiryOf(row('2026-12-21T05:00:00Z', '2026-09-22T05:00:00Z', '2027-05-03T05:00:00Z'), FRI),
