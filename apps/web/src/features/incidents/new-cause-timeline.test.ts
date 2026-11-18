@@ -34,6 +34,27 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
     }),
   ];
 
+  it('SSL renewed with the domain still due: "Now Domain expiring"', () => {
+    const t = timelineOf(
+      i,
+      [
+        events[0]!,
+        ev('new_cause', '11:00:00', {
+          trigger: 'domain',
+          was: 'ssl',
+          back: true,
+          cause: 'Domain expires in 18 days',
+        }),
+      ],
+      nameOf,
+      new Date(at('11:05:00')),
+    );
+    expect(t.map((x) => [x.title, x.detail])).toContainEqual([
+      'Now Domain expiring',
+      'SSL expiring renewed · nobody was told',
+    ]);
+  });
+
   it('says what took over, and that it went back without telling anyone', () => {
     const t = timelineOf(i, events, nameOf, new Date(at('11:05:00')));
     expect(t.map((x) => [x.title, x.detail])).toEqual(

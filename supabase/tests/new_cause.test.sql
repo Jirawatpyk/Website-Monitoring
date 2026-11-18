@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(47);
+select plan(49);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -301,6 +301,10 @@ insert into public.incidents (id, site_id, monitor_id, trigger, severity, episod
           '00000000-0000-0000-0000-0000000000d4', 'ssl', 'problem', 'problem', 'acknowledged',
           now() - interval '9 days', now() - interval '9 days', now() - interval '9 days',
           (select id from ids where name = 'arm'), public.escalation_plan_for(1::smallint, 'problem'));
+-- The ack's ACKNOWLEDGED reply went 9 days ago.
+insert into public.notifications (incident_id, channel, template, thread_key, context, status, sent_at)
+  values ('00000000-0000-0000-0000-0000000000e4', 'google_chat', 'acknowledged', '00000000-0000-0000-0000-0000000000e4',
+          '{}', 'sent', now() - interval '9 days');
 set local role service_role;
 select ok(
   public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e4', null, 'domain', now(), '{}'),
@@ -321,6 +325,21 @@ select ok(
   (select state = 'unacked' and acked_at is null and acked_by is null and escalation_level = 0
      from public.incidents where id = '00000000-0000-0000-0000-0000000000e4'),
   'the expiry''s ack doesn''t silence the outage: Unacked, the ladder from L0'
+);
+-- The owner acknowledges the DOWN: a fresh ACKNOWLEDGED goes (the first one, sent days ago, is kept).
+insert into public.notifications (incident_id, channel, template, thread_key, context, status, sent_at)
+  values ('00000000-0000-0000-0000-0000000000e4', 'google_chat', 'down', '00000000-0000-0000-0000-0000000000e4',
+          '{}', 'sent', now());
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok(
+  $$select public.ack_incident('00000000-0000-0000-0000-0000000000e4')$$,
+  'the owner can acknowledge the DOWN'
+);
+reset role;
+select is(
+  (select count(*)::int from public.notifications where incident_id = '00000000-0000-0000-0000-0000000000e4'
+     and channel = 'google_chat' and template = 'acknowledged' and status = 'queued'),
+  1, 'a fresh ACKNOWLEDGED is queued'
 );
 
 select tests.authenticate_as((select id from ids where name = 'arm'));

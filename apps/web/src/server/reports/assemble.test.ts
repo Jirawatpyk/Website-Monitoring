@@ -342,6 +342,35 @@ describe('roundsOf ("Monitor ran 99.7% of rounds on time")', () => {
   });
 });
 
+describe('causeOf — SSL renewed, the domain still due (Tao, 17 Nov)', () => {
+  it('names the domain, never days counted from the old certificate', () => {
+    const r = row({
+      severity: 'problem',
+      trigger: 'ssl',
+      events: [
+        {
+          type: 'detected',
+          at: iso('2026-09-23T09:00:00'),
+          payload: { detail: { kind: 'ssl', expiresAt: '2026-10-06T13:00:00Z', daysLeft: 13 } },
+        },
+        {
+          type: 'new_cause',
+          at: iso('2026-09-25T10:00:00'),
+          payload: {
+            back: true,
+            was: 'ssl',
+            trigger: 'domain',
+            detail: { kind: 'domain', expiresAt: '2026-10-13T13:00:00Z', daysLeft: 18 },
+          },
+        },
+      ],
+    });
+    expect(causeOf(r, 'problem', bkk('2026-09-23T09:00:00'), bkk('2026-09-28T09:00:00'))).toMatch(
+      /^Domain expiring — \d+ days left$/,
+    );
+  });
+});
+
 describe('causeOf — a drop that took a new cause (D-067, message-checker M2)', () => {
   it('names the defacement that took over, not the SSL it opened with', () => {
     const r = row({

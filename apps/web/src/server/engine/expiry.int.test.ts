@@ -261,4 +261,46 @@ describe('S13 · an SSL incident takes a new cause and goes back, round after ro
     expect((await eventsOf(inc.id)).at(-1)).toBe('new_cause:back');
     expect((await chatOf(inc.id)).filter((t) => t === 'recovered')).toHaveLength(1);
   });
+
+  it('a keyword during a mute waits: nothing for two muted rounds, then one reply on the first round after it', async () => {
+    const { siteId, monitorId } = await newSite('Muted');
+    await round(monitorId, 0, 'ok');
+    await judge(0);
+    const inc = await incidentOf(siteId);
+    // Its SSL card went; then a mute until round 3 starts.
+    await db
+      .from('notifications')
+      .update({ status: 'sent', sent_at: roundAt(0).toISOString() })
+      .eq('incident_id', inc.id);
+    // A mute is a window row mirrored into the site (the engine clears a site mute with no window).
+    const until = new Date(roundAt(3).getTime() + 10_000).toISOString();
+    const win = await db.from('maintenance_windows').insert({
+      site_id: siteId,
+      kind: 'mute',
+      starts_at: roundAt(1).toISOString(),
+      ends_at: until,
+      reason: 'Deploy',
+      approved_at: roundAt(0).toISOString(),
+      start_logged: true,
+    });
+    if (win.error) throw new Error(win.error.message);
+    const muted = await db
+      .from('sites')
+      .update({ muted_until: until, mute_reason: 'Deploy', muted_at: roundAt(1).toISOString() })
+      .eq('id', siteId);
+    if (muted.error) throw new Error(muted.error.message);
+
+    await round(monitorId, 1, 'keyword');
+    await judge(1);
+    await round(monitorId, 2, 'keyword');
+    await judge(2);
+    expect(await chatOf(inc.id)).toEqual(['problem']);
+    expect(await incidentOf(siteId)).toMatchObject({ trigger: 'ssl' });
+    expect(Date.parse((await lastRound(siteId))!)).toBe(roundAt(2).getTime());
+
+    await round(monitorId, 3, 'keyword');
+    await judge(3);
+    expect(await chatOf(inc.id)).toEqual(['problem', 'problem_again:new_cause']);
+    expect(await incidentOf(siteId)).toMatchObject({ trigger: 'keyword', expiry_left: true });
+  });
 });

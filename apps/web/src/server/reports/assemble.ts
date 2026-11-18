@@ -109,7 +109,9 @@ export function causeOf(row: IncidentRow, severity: Severity, dropStart?: Date, 
   let pickAt = at;
   while (dropStart && opened[at + 1]?.type === 'new_cause') {
     at += 1;
-    if (payloadOf(opened[at]!).back !== true) pickAt = at;
+    // …and from one expiry to the other (SSL renewed, the domain still due — Tao, 17 Nov).
+    const p = payloadOf(opened[at]!);
+    if (p.back !== true || p.was === 'ssl' || p.was === 'domain') pickAt = at;
   }
   const pick = opened[pickAt];
   const p = pick ? payloadOf(pick) : {};

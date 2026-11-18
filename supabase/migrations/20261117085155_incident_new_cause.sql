@@ -469,7 +469,10 @@ declare
 begin
   -- Tao, 17 Nov: an ack of an SSL / domain expiry ("waiting for the client to renew") never silences a
   -- real outage — the DOWN restarts the ladder as if nobody had acknowledged.
-  select site_id, state, acked_at is not null and coalesce(cause_trigger, trigger) in ('ssl', 'domain')
+  -- An ack given while the incident was about the expiry: its cause is one, or was taken from one (an
+  -- ack of the SSL, then a keyword new cause, then the DOWN — advisor).
+  select site_id, state,
+         acked_at is not null and (coalesce(cause_trigger, trigger) in ('ssl', 'domain') or expiry_left)
     into v_site_id, v_from, v_expiry_ack
   from public.incidents
   where id = p_incident_id and severity = 'problem' and state not in ('resolved', 'in_review', 'closed')
@@ -504,6 +507,14 @@ begin
     from public.sites s
     where i.id = p_incident_id and s.id = i.site_id
     returning i.state into v_to;
+
+  -- The cleared ack's ACKNOWLEDGED rows stay as the record, under their own key, so the next ack posts a
+  -- fresh one (one live message per incident / channel / template / person / key).
+  if v_expiry_ack then
+    update public.notifications
+      set dedupe_key = coalesce(dedupe_key, '') || ':expiry-ack:' || to_char(p_detected_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+      where incident_id = p_incident_id and template = 'acknowledged' and status <> 'cancelled';
+  end if;
 
   insert into public.incident_events (incident_id, type, payload, at)
   values (p_incident_id, 'escalated_to_down', p_context, p_detected_at);

@@ -54,6 +54,14 @@ const setup = (expiry: { data?: unknown; error?: { message: string } }) =>
     'site_expiry.select': expiry,
     'rpc.engine_open_incident': { data: 'i1' },
   });
+/** A result that fails once with 42703 (a column the database doesn't have yet), then answers. */
+const lagOnce = (lag: boolean, ok: { data: unknown }) => {
+  let calls = 0;
+  return () =>
+    lag && calls++ === 0
+      ? { error: { code: '42703', message: 'column incidents.cause_trigger does not exist' } }
+      : ok;
+};
 const opened = (rpcCalls: { name: string; args: unknown }[]) =>
   rpcCalls.find((c) => c.name === 'engine_open_incident')?.args as
     { p_trigger: string; p_context: { cause: string; summary: string } } | undefined;
@@ -106,6 +114,8 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
       trigger?: string;
       mutedUntil?: string | null;
       leftExpiry?: boolean;
+      /** A deploy ahead of migrate-production: the first incidents read misses S13's columns (42703). */
+      lag?: boolean;
       tier?: number;
       rpc?: Record<string, unknown>;
     } = {},
@@ -135,7 +145,7 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
           },
         ],
       },
-      'incidents.select': {
+      'incidents.select': lagOnce(o.lag ?? false, {
         data: [
           {
             id: 'i1',
@@ -158,10 +168,51 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
             notifications: [{ template: 'problem' }],
           },
         ],
-      },
+      }),
       'rpc.engine_new_cause_incident': { data: true },
       ...o.rpc,
     });
+
+  it('a deploy ahead of migrate-production: the incidents read without S13’s columns, the new function missing — the site is still judged', async () => {
+    const { db, rpcCalls } = openDb({
+      lag: true,
+      rpc: {
+        'rpc.engine_new_cause_incident': {
+          error: {
+            code: 'PGRST202',
+            message: 'Could not find the function public.engine_new_cause_incident',
+          },
+        },
+      },
+    });
+    await expect(runEngine(db, now)).resolves.toBeDefined();
+    expect(rpcCalls.find((c) => c.name === 'engine_record_round')?.args).toMatchObject({ p_site_id: 's1' });
+  });
+
+  it.each([
+    ['at 22:00 it isn’t queued (nothing, no ladder clock, until the opening)', '2026-10-06T15:00:05Z', false],
+    ['inside response hours it goes', now.toISOString(), true],
+  ])('a mute ended on an SSL incident nobody was told about: %s (Tao, 17 Nov)', async (_c, at, posted) => {
+    const { db, rpcCalls } = fakeDb({
+      'probe_locations.select': { data: beating },
+      'monitors.select': { data: [monitor] },
+      'rpc.engine_silent_incidents': {
+        data: [
+          {
+            incident_id: 'i9',
+            site_id: 's1',
+            tier: 1,
+            severity: 'problem',
+            detected_at: '2026-10-06T03:00:00Z',
+          },
+        ],
+      },
+      'incidents.select': { data: [{ id: 'i9', trigger: 'ssl', cause_trigger: null }] },
+      'rpc.engine_post_late_alert': { data: true },
+    });
+    await runEngine(db, new Date(at));
+    expect(rpcCalls.some((c) => c.name === 'engine_post_late_alert')).toBe(posted);
+  });
 
   it('a forbidden word on a site open for SSL expiring posts the new cause (D-067)', async () => {
     const { db, rpcCalls } = openDb();
