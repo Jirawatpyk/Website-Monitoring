@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   causeOf,
+  expiringOf,
   reportIncident,
   rootCauseOf,
   roundsOf,
@@ -392,5 +393,56 @@ describe('causeOf — a drop that took a new cause (D-067, message-checker M2)',
     expect(causeOf(r, 'problem', bkk('2026-09-23T09:00:00'), bkk('2026-09-25T09:00:00'))).toBe(
       '“บาคาร่า” found on the page (as Googlebot)',
     );
+  });
+});
+
+describe('expiringOf — the weekly COMING UP expiry lines (S13, §15.8)', () => {
+  const FRI = new Date('2026-09-25T03:00:00Z');
+  const d = (ssl: string | null, from: string | null, domain: string | null) => ({
+    ssl_expires_at: ssl,
+    ssl_valid_from: from,
+    domain_expires_at: domain,
+  });
+  it('only the halves due soon, soonest first; an auto-renew certificate at 55 days is left out', () => {
+    expect(
+      expiringOf(
+        [
+          {
+            site: 'WeCare Studio',
+            dates: d('2026-12-02T05:00:00Z', '2026-09-03T05:00:00Z', '2026-11-14T05:00:00Z'),
+          },
+          {
+            site: 'Cando Asia',
+            dates: d('2026-11-19T05:00:00Z', '2026-08-21T05:00:00Z', '2026-11-05T05:00:00Z'),
+          },
+          {
+            site: 'DxT AI',
+            dates: d('2026-12-21T05:00:00Z', '2026-09-22T05:00:00Z', '2027-05-03T05:00:00Z'),
+          },
+          { site: 'New site', dates: null },
+        ],
+        FRI,
+      ),
+    ).toEqual([
+      { site: 'Cando Asia', halves: [{ kind: 'domain', days: 41 }] },
+      { site: 'WeCare Studio', halves: [{ kind: 'domain', days: 50 }] },
+    ]);
+  });
+
+  it('a paid certificate under 60 days is listed with its domain, sooner first', () => {
+    expect(
+      expiringOf(
+        [{ site: 'BA', dates: d('2026-11-01T05:00:00Z', '2025-11-01T05:00:00Z', '2026-11-20T05:00:00Z') }],
+        FRI,
+      ),
+    ).toEqual([
+      {
+        site: 'BA',
+        halves: [
+          { kind: 'ssl', days: 37 },
+          { kind: 'domain', days: 56 },
+        ],
+      },
+    ]);
   });
 });

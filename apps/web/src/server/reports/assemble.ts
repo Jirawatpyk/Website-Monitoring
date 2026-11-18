@@ -5,12 +5,15 @@ import {
   shortCause,
   type MonitorFacts,
   type ReportIncident,
+  type ReportExpiry,
   type ReportPerson,
 } from '@dxt/notifier';
 import {
   clockMinutes,
+  expiryCounts,
   formatDay,
   TRIGGER_LABELS,
+  type ExpiryDates,
   type IncidentState,
   type Severity,
   type Trigger,
@@ -210,4 +213,25 @@ export function roundsOf(
     0,
   );
   return { roundsShare: total > 0 ? Math.max(0, 1 - silent / total) : null, engineGaps };
+}
+
+/**
+ * The weekly COMING UP expiry lines (S13, D-066): each site's halves due soon (`expiryCounts`, the
+ * Expiry page's amber and red), soonest first within a site and across sites.
+ */
+export function expiringOf(
+  sites: readonly { site: string; dates: ExpiryDates | null }[],
+  now: Date,
+): ReportExpiry[] {
+  const out: ReportExpiry[] = [];
+  for (const s of sites) {
+    if (!s.dates) continue;
+    const c = expiryCounts(s.dates, now);
+    const halves = [
+      ...(c.ssl && c.ssl.tone !== 'plain' ? [{ kind: 'ssl' as const, days: c.ssl.days }] : []),
+      ...(c.domain && c.domain.tone !== 'plain' ? [{ kind: 'domain' as const, days: c.domain.days }] : []),
+    ].sort((x, y) => x.days - y.days);
+    if (halves.length) out.push({ site: s.site, halves });
+  }
+  return out.sort((x, y) => x.halves[0]!.days - y.halves[0]!.days || x.site.localeCompare(y.site));
 }

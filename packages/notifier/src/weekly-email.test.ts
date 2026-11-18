@@ -102,6 +102,7 @@ const busy = (over: Partial<WeeklyFacts> = {}): WeeklyFacts => ({
     },
   ],
   comingUp: [],
+  expiring: [],
   onCall: {
     thisWeek: { name: 'Nok', week: { start: bkk('2026-11-16T09:00:00'), end: bkk('2026-11-23T09:00:00') } },
     next: null,

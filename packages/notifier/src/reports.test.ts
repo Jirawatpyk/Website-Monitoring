@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   digestModel,
+  expiryLine,
   reportChat,
   weeklyModel,
   type DigestFacts,
@@ -302,6 +303,17 @@ const weekly = (over: Partial<WeeklyFacts> = {}): WeeklyFacts => ({
       by: 'Ploy',
     },
   ],
+  // the WeeklySummary board's two lines, who renews left out (D-066 item 5)
+  expiring: [
+    {
+      site: 'Cando Asia',
+      halves: [
+        { kind: 'domain', days: 38 },
+        { kind: 'ssl', days: 52 },
+      ],
+    },
+    { site: 'WeCare Studio', halves: [{ kind: 'domain', days: 47 }] },
+  ],
   onCall: {
     thisWeek: { name: 'Nok', week: { start: bkk('2026-09-28T09:00:00'), end: bkk('2026-10-05T09:00:00') } },
     next: {
@@ -536,6 +548,8 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
         'On call this week (Tier 1 nights and weekends): Nok, Mon 28 Sep → 5 Oct. Next: Arm, 5 → 12 Oct — swap with Nok asked, not accepted yet.',
       ],
       [undefined, 'Maintenance: Tubtong Tue 29 Sep 01:00–03:00 · WordPress plugin updates · Ploy'],
+      [undefined, 'Cando Asia domain in 38 days · SSL in 52'],
+      [undefined, 'WeCare Studio domain in 47 days'],
     ]);
     expect(rows('THE MONITOR ITSELF')).toEqual([
       [
@@ -558,6 +572,7 @@ describe('weekly summary (WeeklySummary "Weekly summary")', () => {
         needsSomeone: [],
         planned: [],
         comingUp: [],
+        expiring: [],
         onCall: { thisWeek: null, next: null },
         monitor: monitor(),
       }),
@@ -668,5 +683,22 @@ describe('rendering', () => {
         ],
       },
     });
+  });
+});
+
+describe('expiryLine — COMING UP (S13)', () => {
+  it.each([
+    [[{ kind: 'ssl', days: 13 }], 'Cando Asia SSL in 13 days'],
+    [[{ kind: 'domain', days: 1 }], 'Cando Asia domain in 1 day'],
+    [
+      [
+        { kind: 'domain', days: 0 },
+        { kind: 'ssl', days: 9 },
+      ],
+      'Cando Asia domain expires today · SSL in 9',
+    ],
+    [[{ kind: 'domain', days: -2 }], 'Cando Asia domain expired'],
+  ] as const)('%j', (halves, text) => {
+    expect(expiryLine({ site: 'Cando Asia', halves })).toBe(text);
   });
 });
