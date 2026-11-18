@@ -35,7 +35,7 @@
       "y": 14216
     },
     "ChatAlert.dc.html": {
-      "h": 8630,
+      "h": 8880,
       "title": "Google Chat alert thread (content spec)",
       "w": 600,
       "x": 1990,
@@ -50,9 +50,9 @@
       "y": 22401
     },
     "EmailAlert.dc.html": {
-      "h": 1980,
+      "h": 2880,
       "is_interactive": true,
-      "title": "Alert email template",
+      "title": "Alert email template (+ role-change email, D-062)",
       "w": 720,
       "x": 2200,
       "y": 24461
@@ -73,7 +73,7 @@
       "y": 14216
     },
     "Expiry.dc.html": {
-      "h": 1340,
+      "h": 1420,
       "is_interactive": true,
       "title": "SSL & domain expiry",
       "w": 1440,
@@ -89,7 +89,7 @@
       "y": 29620
     },
     "Incident.dc.html": {
-      "h": 2040,
+      "h": 2180,
       "is_interactive": true,
       "title": "Incident — INC-0142 MuvMi DOWN",
       "w": 1440,
@@ -374,7 +374,7 @@
       "y": 17973
     },
     "WeeklySummary.dc.html": {
-      "h": 2575,
+      "h": 2640,
       "title": "Weekly summary — Chat card spec",
       "w": 600,
       "x": 1520,
@@ -459,6 +459,102 @@
       "w": 390,
       "x": 10490,
       "y": 12036
+    },
+    "MAuditLog.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Audit log (S15, D-061)",
+      "w": 390,
+      "x": 2820,
+      "y": 16629
+    },
+    "MAuditLogDark.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Audit log · dark",
+      "w": 390,
+      "x": 3290,
+      "y": 16629
+    },
+    "MUsers.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Settings: Users & roles (S16)",
+      "w": 390,
+      "x": 3760,
+      "y": 16629
+    },
+    "MUsersDark.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Settings: Users & roles · dark",
+      "w": 390,
+      "x": 4230,
+      "y": 16629
+    },
+    "MSecurity.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Settings: Sign-in & security (S16)",
+      "w": 390,
+      "x": 4700,
+      "y": 16629
+    },
+    "MSecurityDark.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Settings: Sign-in & security · dark",
+      "w": 390,
+      "x": 5170,
+      "y": 16629
+    },
+    "WeeklyEmail.dc.html": {
+      "h": 3640,
+      "is_interactive": true,
+      "title": "Weekly summary email · desktop + phone · light + dark",
+      "w": 720,
+      "x": 7560,
+      "y": 24461
+    },
+    "IncidentDark.dc.html": {
+      "h": 2180,
+      "is_interactive": true,
+      "title": "Incident · dark — home page back, /booking still failing",
+      "w": 1440,
+      "x": 10960,
+      "y": 12036
+    },
+    "MIncidentDark.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Incident · dark — /booking still failing",
+      "w": 390,
+      "x": 12480,
+      "y": 12036
+    },
+    "Expiry820.dc.html": {
+      "h": 1800,
+      "is_interactive": true,
+      "title": "SSL & domains · 820 (cards below lg)",
+      "w": 820,
+      "x": 8360,
+      "y": 24461
+    },
+    "MExpiry.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — SSL & domains",
+      "w": 390,
+      "x": 9260,
+      "y": 24461
+    },
+    "MExpiryDark.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — SSL & domains · dark",
+      "w": 390,
+      "x": 9730,
+      "y": 24461
     }
   },
   "createdOnFiles": {
@@ -520,8 +616,8 @@
     },
     "row3": {
       "kind": "title1",
-      "maxW": 10900,
-      "text": "Core flows · incidents · maintenance · onboarding · page change",
+      "maxW": 12870,
+      "text": "Core flows · incidents · maintenance · onboarding · page change · still failing",
       "w": 240,
       "x": 0,
       "y": 11736
@@ -536,7 +632,7 @@
     },
     "row5": {
       "kind": "title1",
-      "maxW": 2740,
+      "maxW": 5600,
       "text": "Mobile app · 390",
       "w": 240,
       "x": 0,
@@ -568,8 +664,8 @@
     },
     "row9": {
       "kind": "title1",
-      "maxW": 7480,
-      "text": "Expiry · summaries · email · account & security · empty states",
+      "maxW": 10120,
+      "text": "Expiry · summaries · email · account & security · empty states · weekly email · SSL & domains on phone",
       "w": 240,
       "x": 0,
       "y": 24161
@@ -596,6 +692,8 @@
     "IncidentPageChange820.dc.html",
     "IncidentPageChangeDark.dc.html",
     "MIncidentPageChangeDark.dc.html",
+    "IncidentDark.dc.html",
+    "MIncidentDark.dc.html",
     "AddSite.dc.html",
     "Escalation.dc.html",
     "OnCall.dc.html",
@@ -609,6 +707,12 @@
     "MEscalation.dc.html",
     "MProfile.dc.html",
     "MMaintenanceList.dc.html",
+    "MAuditLog.dc.html",
+    "MAuditLogDark.dc.html",
+    "MUsers.dc.html",
+    "MUsersDark.dc.html",
+    "MSecurity.dc.html",
+    "MSecurityDark.dc.html",
     "Reports.dc.html",
     "ReportPDF.dc.html",
     "StatusPage.dc.html",
@@ -629,6 +733,10 @@
     "Profile.dc.html",
     "Security.dc.html",
     "EmptyStates.dc.html",
+    "WeeklyEmail.dc.html",
+    "Expiry820.dc.html",
+    "MExpiry.dc.html",
+    "MExpiryDark.dc.html",
     "Organisation.dc.html",
     "Synthetic.dc.html",
     "ApiWebhooks.dc.html",

@@ -61,7 +61,7 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         icon: <IconLock />,
         href: '/expiry',
         slice: 'S13',
-        live: false,
+        live: true,
       },
     ],
   },

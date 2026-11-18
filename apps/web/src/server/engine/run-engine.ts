@@ -721,7 +721,7 @@ async function loadExpiry(db: DbClient): Promise<Map<string, ExpiryRow>> {
   const { data, error } = await db
     .from('site_expiry')
     .select(
-      'site_id, host, ssl_expires_at, ssl_read_at, ssl_error, domain_expires_at, domain_read_at, domain_error',
+      'site_id, host, ssl_expires_at, ssl_read_at, ssl_checked_at, ssl_error, domain_expires_at, domain_read_at, domain_checked_at, domain_error',
     );
   if (error) {
     console.error(JSON.stringify({ event: 'engine_site_expiry_failed', error: error.message }));
@@ -729,14 +729,24 @@ async function loadExpiry(db: DbClient): Promise<Map<string, ExpiryRow>> {
   }
   const date = (v: string | null) => (v ? new Date(v) : null);
   for (const r of data ?? []) {
+    // A half left empty by the read (no TLS; a hosting platform's subdomain) while the other half was
+    // read: nothing to read by definition, so an open expiry on it can end (engine review M1, 19 Nov).
+    const sslNone = !r.ssl_checked_at && !r.ssl_error && !r.ssl_expires_at && !!r.domain_checked_at;
+    const domainNone = !r.domain_checked_at && !r.domain_error && !r.domain_expires_at && !!r.ssl_checked_at;
     bySite.set(r.site_id, {
       host: r.host,
       fact: {
-        ssl: { expiresAt: date(r.ssl_expires_at), readAt: date(r.ssl_read_at), failed: r.ssl_error !== null },
+        ssl: {
+          expiresAt: date(r.ssl_expires_at),
+          readAt: date(r.ssl_read_at),
+          failed: r.ssl_error !== null,
+          none: sslNone,
+        },
         domain: {
           expiresAt: date(r.domain_expires_at),
           readAt: date(r.domain_read_at),
           failed: r.domain_error !== null,
+          none: domainNone,
         },
       },
     });

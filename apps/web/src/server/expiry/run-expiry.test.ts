@@ -60,6 +60,7 @@ describe('needsRead (between full reads)', () => {
     host: 'www.voca.co.th',
     https: true,
     domain: 'voca.co.th',
+    hosted: false,
     row: goodRow('s', 'www.voca.co.th'),
     openExpiry: false,
     ...over,
@@ -224,10 +225,26 @@ describe('runExpiry', () => {
       host: 'www.plain.co.th',
       https: false,
       domain: 'plain.co.th',
+      hosted: false,
       row: { ...goodRow('p', 'www.plain.co.th'), ssl_read_at: null },
       openExpiry: false,
     };
     expect(needsRead(s, NOW)).toBe(false);
+  });
+
+  it('a hosting platform subdomain has no domain to read and is no failure (/verify 19 Nov)', async () => {
+    const { db, calls } = setup({ monitors: [monitor('t', 'https://dxt-test-target.vercel.app/')] });
+    const readDomain = vi.fn(async () => domain);
+    const result = await runExpiry({ db, all: true, readCert: async () => cert, readDomain });
+    expect(result).toMatchObject({ sites: 1, sslRead: 1, domainRead: 0 });
+    expect(result).not.toHaveProperty('failed');
+    expect(readDomain).not.toHaveBeenCalled();
+    expect(calls.find((c) => c.op === 'upsert')!.values).toMatchObject({
+      domain: null,
+      domain_expires_at: null,
+      domain_checked_at: null,
+      domain_error: null,
+    });
   });
 
   it('an expiry verdict on an incident another trigger opened is read hourly (engine review M3)', async () => {

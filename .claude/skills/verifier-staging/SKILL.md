@@ -294,6 +294,28 @@ select json_build_object(
 ) j;
 ```
 
+SSL & domain expiry (S13, D-066, D-067, spec §39), as Tao on https://monitor-staging.dxtspace.com/expiry.
+
+- **The Test target's real row.** Its host is `*.vercel.app`, a hosting platform's subdomain, so it has a certificate and no domain half. The page reads "1 of 1 read", status OK, and Domain "—".
+- **Showing the browser pane.** The page streams, and React reveals it on an animation frame, so keep the pane showing. A hidden pane stays on "Loading SSL and domains" (/verify 19 Nov).
+- **Forcing a read:** press **Check now** (Admin or Responder). The meta's "last check" moves within about 1–2 s, and focus stays on the button. A second press within 60 s answers 429 "Checked less than a minute ago — try again shortly", and `x-vercel-id` reads `sin1`.
+- **A PROBLEM from a fixture.** The engine reads `site_expiry`, so write a row on the Test target in the SQL editor, inside response hours (Mon–Fri 09:00–18:00):
+
+  ```sql
+  update site_expiry set ssl_expires_at = now() + interval '10 days', ssl_valid_from = now() - interval '80 days', ssl_read_at = now(), ssl_checked_at = now(), ssl_error = null
+  where site_id = (select id from sites where name = 'Test target');
+  ```
+
+  - On the next round: PROBLEM `ssl`, "SSL certificate expires in 10 days (…)". For a domain fixture, an RDAP-shaped row with `domain_source = 'rdap'` (the check constraint wants the source with the date): PROBLEM `domain`.
+  - Put it back with Check now, which re-reads the real certificate, and `reset-test-incident.sql`.
+  - PR 2's run: INC-0067 and INC-0068, 18 Nov.
+
+| Width            | Expect                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1440 (xl and up) | The table and the full How it alerts note with the organisation's hours. Check now on the right                                           |
+| 1024 / 820       | Cards, two per row from md. The one-line How it alerts with More / Less. Check now full width below lg                                    |
+| 390              | One card per row, KPIs 2 + 1. The phone bar's back link goes to Overview. On /sites, the "SSL & domains" row sits at the foot of the list |
+
 Daily digest and weekly summary (S14, D-056). Needs on `dxt-monitor-staging`: `GOOGLE_CHAT_REPORTS_WEBHOOK_URL` (a staging Reports Space, Tao's) and `HEALTHCHECKS_PING_URL_REPORTS` (a staging check: cron `0 9 * * *` Asia/Bangkok, grace 5 min), then a redeploy.
 
 | Do                                                                                                                   | Expect                                                                                                                                                                                                                            |

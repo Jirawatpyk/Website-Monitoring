@@ -168,6 +168,46 @@ a.aura-btn--primary,a.aura-btn--primary:hover{color:var(--aura-button-primary-fg
 </div>
 </sc-for>
 </div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-lg); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · TIMELINE ROWS ON AN EXPIRY INCIDENT (D-067)</span>
+<div style="display: flex; gap: 12px; padding: 7px 10px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm)">
+<span style="width: 60px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; line-height: 22px">14:20</span>
+<span style="display: flex; padding-top: 3px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5"><span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-primary)">New cause: Keyword</span><span style="font-size: 12px">Found “บาคาร่า” on / (as Googlebot) · was SSL expiring</span></span>
+</div>
+<div style="display: flex; gap: 12px; padding: 7px 10px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm)">
+<span style="width: 60px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; line-height: 22px">14:20</span>
+<span style="display: flex; padding-top: 3px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="minus" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5"><span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-primary)">Acknowledgement set aside</span><span style="font-size: 12px">Tao’s acknowledgement of SSL expiring (09:20) doesn’t cover Keyword — it needs its own</span></span>
+</div>
+<div style="display: flex; gap: 12px; padding: 7px 10px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm)">
+<span style="width: 60px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; line-height: 22px">15:05</span>
+<span style="display: flex; padding-top: 3px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5"><span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-primary)">Back to SSL expiring</span><span style="font-size: 12px">Keyword cleared · SSL certificate expires in 13 days (Tue 6 Oct) · no message sent</span></span>
+</div>
+<div style="display: flex; gap: 12px; padding: 7px 10px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm)">
+<span style="width: 60px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; line-height: 22px">15:05</span>
+<span style="display: flex; padding-top: 3px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5"><span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-primary)">Acknowledgement given back</span><span style="font-size: 12px">Acknowledged by Tao 09:20 again — it was for SSL expiring</span></span>
+</div>
+<div style="display: flex; gap: 12px; padding: 7px 10px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm)">
+<span style="width: 60px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; line-height: 22px">16:10</span>
+<span style="display: flex; padding-top: 3px; color: var(--aura-fg-danger)"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5"><span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-primary)">Raised to DOWN</span><span style="font-size: 12px">Hard fail — timeout (BKK, SIN, TYO) · the acknowledgement of the expiry was cleared · DOWN ladder from L0</span></span>
+</div>
+<div style="display: flex; gap: 12px; padding: 7px 10px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm)">
+<span style="width: 60px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; line-height: 22px">16:18</span>
+<span style="display: flex; padding-top: 3px; color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5"><span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-primary)">Back up · still SSL expiring</span><span style="font-size: 12px">First OK round after 8 min down · SSL certificate expires in 13 days (Tue 6 Oct) · the DOWN needs a root cause</span></span>
+</div>
+<span style="padding-top: 4px">On a site whose domain is short too (shape only — e.g. Cando Asia, made-up):</span>
+<div style="display: flex; gap: 12px; padding: 7px 10px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-subtle); border-radius: var(--aura-radius-sm)">
+<span style="width: 60px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px; line-height: 22px">10:02</span>
+<span style="display: flex; padding-top: 3px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5"><span style="font-size: 13px; font-weight: 500; color: var(--aura-fg-primary)">Now Domain expiring</span><span style="font-size: 12px">Tue 27 Oct · SSL renewed · domain expires in 9 days (Thu 5 Nov) · no message sent</span></span>
+</div>
+<span>Same tone as the status they name: amber triangle for PROBLEM rows, red ban for DOWN, grey for acknowledgement changes. “Back to SSL expiring” and “Now Domain expiring” are quiet — timeline only, no Chat or email. The header’s Trigger badge always reads the current cause. Sample rows from INC-0136 DxT AI (made-up continuation, not the sample ledger). Newest first on the phone; the board lists them in order for reading.</span>
+</div>
 <span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary); text-align: center">Every event is also in the audit log. Evidence screenshots open on desktop.</span>
 </sc-if>
 <sc-if value="{{isManual}}" hint-placeholder-val="{{false}}">

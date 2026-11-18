@@ -5,7 +5,7 @@ import { fakeDb } from '../../../test/fake-db';
 const m = vi.hoisted(() => ({ db: null as unknown }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => m.db }));
 
-const { getRegistrationOptions, getSite, listSites } = await import('./queries');
+const { expiryOf, getRegistrationOptions, getSite, listSites } = await import('./queries');
 const SITE = '00000000-0000-4000-8000-0000000000a1';
 
 describe('listSites', () => {
@@ -125,6 +125,7 @@ describe('listSites', () => {
         p50Ms: 412,
         uptime30d: 0.999,
         expiryDays: null,
+        expiryTone: null,
       },
       {
         id: 'draft',
@@ -143,6 +144,7 @@ describe('listSites', () => {
         p50Ms: null,
         uptime30d: null,
         expiryDays: null,
+        expiryTone: null,
       },
     ]);
     // only the open incident is embedded
@@ -285,5 +287,42 @@ describe('getSite', () => {
     expect(await getSite(SITE)).toBeNull();
     m.db = fakeDb({ 'sites.select': { error: { message: 'x' } } }).db;
     await expect(getSite(SITE)).rejects.toThrow('site: x');
+  });
+});
+
+describe('expiryOf — the Sites list Expiry column (S13, §15.8)', () => {
+  const FRI = new Date('2026-09-25T03:00:00Z');
+  const row = (ssl: string | null, from: string | null, domain: string | null) => ({
+    ssl_expires_at: ssl,
+    ssl_valid_from: from,
+    domain_expires_at: domain,
+  });
+  it('Cando: the domain due in 41 days, not the auto-renew certificate at 55', () => {
+    expect(
+      expiryOf(row('2026-11-19T05:00:00Z', '2026-08-21T05:00:00Z', '2026-11-05T05:00:00Z'), FRI),
+    ).toEqual({ expiryDays: 41, expiryTone: 'soon' });
+  });
+  it('the sooner of the two in days, amber when either half is due (spec §20)', () => {
+    // an auto-renew certificate at 40 days isn't due; its domain at 55 is
+    expect(
+      expiryOf(row('2026-11-04T05:00:00Z', '2026-08-06T05:00:00Z', '2026-11-19T05:00:00Z'), FRI),
+    ).toEqual({ expiryDays: 40, expiryTone: 'soon' });
+  });
+  it('a half whose read failed counts nowhere: the other half decides (§39.4)', () => {
+    expect(
+      expiryOf(
+        {
+          ...row('2026-10-05T05:00:00Z', '2026-07-07T05:00:00Z', '2027-05-03T05:00:00Z'),
+          ssl_error: 'Timeout',
+        },
+        FRI,
+      ),
+    ).toEqual({ expiryDays: 220, expiryTone: 'plain' });
+  });
+  it('nothing due: the sooner of the two, plain; no row: dashes', () => {
+    expect(
+      expiryOf(row('2026-12-21T05:00:00Z', '2026-09-22T05:00:00Z', '2027-05-03T05:00:00Z'), FRI),
+    ).toEqual({ expiryDays: 87, expiryTone: 'plain' });
+    expect(expiryOf(null, FRI)).toEqual({ expiryDays: null, expiryTone: null });
   });
 });

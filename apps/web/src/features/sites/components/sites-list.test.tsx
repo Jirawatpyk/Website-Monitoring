@@ -26,6 +26,7 @@ const row = (name: string, over: Partial<SiteListRow> = {}): SiteListRow => ({
   p50Ms: null,
   uptime30d: null,
   expiryDays: null,
+  expiryTone: null,
   ...over,
 });
 

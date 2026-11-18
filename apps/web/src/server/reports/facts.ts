@@ -28,11 +28,19 @@ import {
   isSameBangkokDay,
   seriesRuleSchema,
   TIER_CONFIG,
+  type ExpiryDates,
   type Tier,
 } from '@dxt/shared';
 import { downEpisodesBySite, maintenanceSpansBySite, watchedSince } from '@/features/sites/server';
 import { loadResponseHours } from '../escalation/response-hours';
-import { causeOf, reportIncident, roundsOf, stillFailingRows, type IncidentRow } from './assemble';
+import {
+  causeOf,
+  expiringOf,
+  reportIncident,
+  roundsOf,
+  stillFailingRows,
+  type IncidentRow,
+} from './assemble';
 
 /**
  * What the daily digest and the weekly summary say (S14, FR-12, D-056), read as the service role at
@@ -232,6 +240,7 @@ interface SiteRow {
   monitoring_started_at: string | null;
   created_at: string;
   site_status: { status: string; note: string | null } | null;
+  site_expiry: ExpiryDates | null;
 }
 
 async function loadSites(db: DbClient): Promise<SiteRow[]> {
@@ -239,7 +248,7 @@ async function loadSites(db: DbClient): Promise<SiteRow[]> {
     await db
       .from('sites')
       .select(
-        'id, name, tier, is_active, muted_until, mute_reason, monitoring_started_at, created_at, site_status(status, note)',
+        'id, name, tier, is_active, muted_until, mute_reason, monitoring_started_at, created_at, site_status(status, note), site_expiry(ssl_expires_at, ssl_valid_from, domain_expires_at)',
       )
       .eq('is_active', true)
       .order('name'),
@@ -506,6 +515,10 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
     mtta,
     planned: planned.map(toWindow),
     comingUp: coming.filter((w) => w.kind === 'maintenance' && new Date(w.starts_at) > now).map(toWindow),
+    expiring: expiringOf(
+      sites.map((s) => ({ site: s.name, dates: s.site_expiry })),
+      now,
+    ),
     onCall: {
       thisWeek: shiftOf(thisShift),
       next: shiftOf(nextShift)

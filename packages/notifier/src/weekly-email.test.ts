@@ -102,6 +102,7 @@ const busy = (over: Partial<WeeklyFacts> = {}): WeeklyFacts => ({
     },
   ],
   comingUp: [],
+  expiring: [],
   onCall: {
     thisWeek: { name: 'Nok', week: { start: bkk('2026-11-16T09:00:00'), end: bkk('2026-11-23T09:00:00') } },
     next: null,
@@ -246,6 +247,16 @@ describe('weekly email (WeeklyEmail board, §36)', () => {
     );
     expect(m.coming[0]).toBe('On call (Tier 1 nights and weekends): Nok, Mon 16 → Mon 23 Nov. Next: Arm.');
     expect(weeklyEmail(busy()).html).toMatch(/>DxT <span/);
+  });
+
+  it('COMING UP carries the expiry lines after the on-call week, in HTML and plain text (S13)', () => {
+    const f = busy({ expiring: [{ site: 'WeCare Studio', halves: [{ kind: 'domain', days: 47 }] }] });
+    const m = weeklyEmailModel(f);
+    expect(m.coming.at(-1)).toBe('WeCare Studio domain in 47 days');
+    expect(m.coming.indexOf('WeCare Studio domain in 47 days')).toBeGreaterThan(0);
+    const mail = weeklyEmail(f);
+    expect(mail.html).toContain('WeCare Studio domain in 47 days');
+    expect(mail.text).toContain('WeCare Studio domain in 47 days');
   });
 
   it('escapes what people typed', () => {

@@ -158,12 +158,33 @@ export interface WeeklyFacts {
   planned: readonly ReportWindow[];
   /** Windows in the next 7 days. */
   comingUp: readonly ReportWindow[];
+  /** S13 (D-066): sites with a certificate or domain due soon, the halves due soon, soonest first. */
+  expiring: readonly ReportExpiry[];
   onCall: {
     thisWeek: { name: string; week: Week } | null;
     next: { name: string; week: Week; swap: string | null } | null;
   };
   monitor: MonitorFacts;
   appUrl: string;
+}
+
+/** One COMING UP expiry line: a site's halves due soon (`isDueSoon`), soonest first. */
+export interface ReportExpiry {
+  site: string;
+  halves: readonly { kind: 'ssl' | 'domain'; days: number }[];
+}
+
+/** "in 38 days"; the unit is left off only after a half that already said "in N days" ("· SSL in 52"). */
+const inDays = (d: number, unit: boolean) =>
+  d < 0 ? 'expired' : d === 0 ? 'expires today' : `in ${d}${unit ? (d === 1 ? ' day' : ' days') : ''}`;
+
+/** "Cando Asia domain in 38 days · SSL in 52" (WeeklySummary COMING UP; who renews is left out, D-066 item 5). */
+export function expiryLine(e: ReportExpiry): string {
+  const words = e.halves.map((h, i) => {
+    const before = e.halves[i - 1];
+    return `${h.kind === 'ssl' ? 'SSL' : 'domain'} ${inDays(h.days, !before || before.days <= 0)}`;
+  });
+  return `${plainName(e.site)} ${words.join(' · ')}`;
 }
 
 interface Row {
@@ -426,8 +447,8 @@ function uptimeRows(sites: readonly ReportSiteUptime[]): { rows: Row[]; below: n
   return { rows: [...below.map((s) => row(s, true)), ...met.map((s) => row(s, false))], below: below.length };
 }
 
-/** COMING UP: the on-call week, then windows in the next 7 days — a series once, at its next window. */
-export function comingLines(f: Pick<WeeklyFacts, 'onCall' | 'comingUp'>): string[] {
+/** COMING UP: the on-call week, windows in the next 7 days (a series once, at its next window), then expiries due soon. */
+export function comingLines(f: Pick<WeeklyFacts, 'onCall' | 'comingUp' | 'expiring'>): string[] {
   const coming: { text: string }[] = [];
   const oc = f.onCall;
   if (oc.thisWeek) {
@@ -452,6 +473,7 @@ export function comingLines(f: Pick<WeeklyFacts, 'onCall' | 'comingUp'>): string
     }
     coming.push({ text: `Maintenance: ${plainName(w.site)} ${windowSpan(w, true)} · ${w.reason}${by}` });
   }
+  for (const e of f.expiring) coming.push({ text: expiryLine(e) });
   return coming.map((c) => c.text);
 }
 
