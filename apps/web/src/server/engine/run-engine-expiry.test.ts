@@ -176,20 +176,13 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
     });
   });
 
-  it('during a mute the new cause is held to the mute’s end (D-067 item 5)', async () => {
+  it('during a mute the new cause waits: the round is recorded, the cause kept for after it (D-067 item 5)', async () => {
     const { db, rpcCalls } = openDb({ mutedUntil: '2026-10-06T10:30:00Z' });
     await runEngine(db, now);
-    expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')?.args).toMatchObject({
-      p_notify: true,
-      p_hold_until: '2026-10-06T10:30:00.000Z',
-    });
-  });
-
-  it('a Tier 2 site muted until 19:00: the new cause waits for the opening after it (D-034)', async () => {
-    const { db, rpcCalls } = openDb({ mutedUntil: '2026-10-06T12:00:00Z', tier: 2 });
-    await runEngine(db, now);
-    expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')?.args).toMatchObject({
-      p_hold_until: '2026-10-07T02:00:00.000Z', // Wed 09:00 Bangkok
+    expect(rpcCalls.find((c) => c.name === 'engine_new_cause_incident')).toBeUndefined();
+    expect(rpcCalls.find((c) => c.name === 'engine_record_round')?.args).toMatchObject({
+      p_site_id: 's1',
+      p_ok_rounds: 0,
     });
   });
 

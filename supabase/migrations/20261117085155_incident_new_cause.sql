@@ -87,8 +87,8 @@ begin
   values (p_incident_id, 'new_cause',
           coalesce(p_context, '{}') || jsonb_build_object('trigger', p_trigger, 'was', v_was)
             -- Who it told at night (their later emails say why they get them).
-            || case when v_oncall is not null then jsonb_build_object('mention', jsonb_build_object('id', v_oncall))
-                    else '{}'::jsonb end,
+            || case when exists (select 1 from public.profiles p where p.id = v_oncall and p.is_active)
+                    then jsonb_build_object('mention', jsonb_build_object('id', v_oncall)) else '{}'::jsonb end,
           p_round_at);
 
   insert into public.audit_log (action, entity, entity_id, before, after)

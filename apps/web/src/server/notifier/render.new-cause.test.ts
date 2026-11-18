@@ -167,7 +167,10 @@ describe('render — a new cause (D-067)', () => {
     };
     expect(
       emailReason(row({ channel: 'email', user_id: 'u-oncall', template: 'recovered', context: {} }), told),
-    ).toBe('oncall');
+    ).toBe('emailed'); // nothing asked of them: the owner adds the root cause (message-checker)
+    expect(
+      emailReason(row({ channel: 'email', user_id: 'u-tao', template: 'recovered', context: {} }), told),
+    ).toBe('owner');
   });
 
   it('a DOWN incident back up on SSL: the body says so, not “open for SSL expiring”', () => {

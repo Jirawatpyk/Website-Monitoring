@@ -543,15 +543,17 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   // A step's own email (its people); the Chat fallback goes to the backup and Admins (D-016).
   if (n.template === 'step_fired') return contextOf(n.context).fallback === true ? 'fallback' : 'step';
   // A Tier 1 new cause at night: the person on call it named (D-067).
-  // …and every later email to them (RECOVERED, RESOLVED): its event says whom it told (advisor).
+  const mention = contextOf(n.context).mention as { id?: unknown } | undefined;
+  if (n.user_id && n.template === 'problem_again' && mention?.id === n.user_id) return 'oncall';
+  if (l0Of(i)?.id === n.user_id) return l0IsOnCall(i) ? 'oncall' : 'owner';
+  // …and their later emails (RECOVERED, RESOLVED): emailed about it, nothing asked of them — the owner
+  // adds the root cause (message-checker). The new cause's event says whom it told.
   const told = (i.incident_events ?? []).some(
     (e) =>
       e.type === 'new_cause' &&
       (contextOf(e.payload).mention as { id?: unknown } | undefined)?.id === n.user_id,
   );
-  const mention = contextOf(n.context).mention as { id?: unknown } | undefined;
-  if (n.user_id && (told || (n.template === 'problem_again' && mention?.id === n.user_id))) return 'oncall';
-  if (l0Of(i)?.id === n.user_id) return l0IsOnCall(i) ? 'oncall' : 'owner';
+  if (n.user_id && told) return 'emailed';
   // Someone the L0 pencil adds (S10): told at once by email too, then followed up like anyone emailed.
   if (n.user_id && l0PeopleOf(i).includes(n.user_id)) return L0_TEMPLATES.has(n.template) ? 'l0' : 'emailed';
   if (n.template === 'resolved') return 'emailed';

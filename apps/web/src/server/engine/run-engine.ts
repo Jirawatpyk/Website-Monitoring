@@ -104,8 +104,6 @@ interface SiteRow {
   name: string;
   tier: Tier;
   muted: boolean;
-  /** When the mute ends, while one runs (D-067 item 5: a new cause waits for it). */
-  mutedUntil?: Date;
   /** Flagged behind a WAF: WAF-signed blocks sit the round out (D-027). */
   behindWaf: boolean;
   monitors: MonitorRow[];
@@ -1085,9 +1083,6 @@ async function loadSites(db: DbClient, now: Date): Promise<SiteRow[]> {
       name: m.sites.name,
       tier,
       muted: !!m.sites.muted_until && new Date(m.sites.muted_until) > now,
-      ...(m.sites.muted_until && new Date(m.sites.muted_until) > now
-        ? { mutedUntil: new Date(m.sites.muted_until) }
-        : {}),
       behindWaf: m.sites.behind_waf,
       monitors: [],
     };
@@ -1281,6 +1276,14 @@ async function apply(
 
     case 'new_cause': {
       if (!incidentId) return null;
+      // D-067 item 5: during a mute, a thread that already alerted isn't told yet — the round is recorded
+      // and the incident keeps its stored cause, so the first round after the mute takes the new cause,
+      // naming whoever acts then (message-checker: never last night's on-call at 09:30). With no alert
+      // out yet the cause switches silently, and the card after the mute is worded with it.
+      if (site.muted && alertQueued) {
+        await recordOnly(db, site.id, d.roundAt, at, judged);
+        return null;
+      }
       // D-067: the expiry incident takes the more urgent PROBLEM as its cause and the thread is told.
       const ctx = causeContext(site, d.monitorId);
       const { data, error } = await db.rpc('engine_new_cause_incident', {
@@ -1299,7 +1302,7 @@ async function apply(
         // D-067 item 5: during a mute the reply waits for its end (cancelled if the cause clears first);
         // a first card the mute silenced goes after it, worded with the new cause (no reply then).
         p_notify: alertQueued,
-        ...newCauseHold(site, now, hours),
+        ...holdFor(site.tier, now, hours),
         // Tier 1 at night: the person on call is L0 for the new cause (Tao, 17 Nov).
         p_outside_hours: !isInsideHours(now, hours),
         ...judged,
@@ -1547,15 +1550,6 @@ async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promis
   return queued;
 }
 
-/**
- * D-067 item 5: a new cause during a mute is held to the mute's end — and then, for a Tier 2–3 site
- * outside response hours, to the next opening (D-034).
- */
-function newCauseHold(site: SiteRow, now: Date, hours: ResponseHours): { p_hold_until?: string } {
-  const from = site.mutedUntil && site.mutedUntil > now ? site.mutedUntil : now;
-  const held = holdFor(site.tier, from, hours);
-  return held.p_hold_until || from === now ? held : { p_hold_until: from.toISOString() };
-}
 
 const INCIDENT_COLUMNS =
   'id, site_id, monitor_id, state, severity, trigger, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, is_manual, manual_at, root_cause_category, notifications(template)';

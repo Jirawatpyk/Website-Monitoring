@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(39);
+select plan(43);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -249,6 +249,44 @@ select is(
   (select context ->> 'cause' from public.notifications where incident_id = '00000000-0000-0000-0000-0000000000e1'
      and channel = 'google_chat' and template = 'problem'),
   'Found “บาคาร่า” on /', 'worded with the new cause, not the SSL it opened with'
+);
+
+-- Tao, 17 Nov: a Tier 1 new cause at night names the person on call on its reply and email only.
+insert into ids values ('nok', tests.create_user('nok@pgtap.test', 'responder'));
+update public.profiles set google_chat_user_id = '100000000000000000002' where id = (select id from ids where name = 'nok');
+insert into public.oncall_shifts (user_id, starts_at, ends_at, slot)
+values ((select id from ids where name = 'nok'), now() - interval '1 day', now() + interval '6 days', 1);
+insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000c1', 'Night', 1,
+   (select id from ids where name = 'arm'), true);
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000d3', '00000000-0000-0000-0000-0000000000a3', 'http', true, 'https://c.pgtap.test');
+insert into public.incidents (id, site_id, monitor_id, trigger, severity, episode_severity, state, started_at, detected_at, escalation_plan)
+  values ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000a3',
+          '00000000-0000-0000-0000-0000000000d3', 'ssl', 'problem', 'problem', 'unacked',
+          now() - interval '1 day', now() - interval '1 day', public.escalation_plan_for(1::smallint, 'problem'));
+set local role service_role;
+select ok(
+  public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e3', null, 'keyword', now(), '{"summary": "x"}', true,
+    p_outside_hours => true),
+  'a Tier 1 new cause at night'
+);
+reset role;
+select is(
+  (select context -> 'mention' ->> 'id' from public.notifications
+     where incident_id = '00000000-0000-0000-0000-0000000000e3' and channel = 'google_chat'),
+  (select id::text from ids where name = 'nok'), 'the reply @mentions the person on call'
+);
+select is(
+  (select array_agg(user_id::text) from public.notifications
+     where incident_id = '00000000-0000-0000-0000-0000000000e3' and channel = 'email'),
+  array[(select id::text from ids where name = 'nok')], 'only the person on call is emailed, not the owner'
+);
+select ok(
+  (select l0_user_id is null from public.incidents where id = '00000000-0000-0000-0000-0000000000e3')
+  and (select payload -> 'mention' ->> 'id' = (select id::text from ids where name = 'nok') from public.incident_events
+         where incident_id = '00000000-0000-0000-0000-0000000000e3' and type = 'new_cause'),
+  'L0 is kept; the event records whom it told'
 );
 
 select tests.authenticate_as((select id from ids where name = 'arm'));
